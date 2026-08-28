@@ -229,7 +229,7 @@ async function save() {
         <section id="dataset-basics" class="surface scroll-mt-24 space-y-5 p-6">
           <header>
             <h2 class="font-display text-lg font-semibold text-foreground">Basics</h2>
-            <p class="mt-1 text-sm text-muted-foreground">Edit the root Dataset fields. Group and path stay fixed for this document.</p>
+            <p class="mt-1 text-sm text-muted-foreground">Edit the root dataset fields. Group and path stay fixed for this dataset.</p>
           </header>
           <div class="grid gap-4 sm:grid-cols-2">
             <div>
@@ -293,7 +293,7 @@ async function save() {
         <section id="dataset-review" class="surface scroll-mt-24 space-y-5 p-6">
           <header>
             <h2 class="font-display text-lg font-semibold text-foreground">Review</h2>
-            <p class="mt-1 text-sm text-muted-foreground">Validate and save the rebuilt whole crate.</p>
+            <p class="mt-1 text-sm text-muted-foreground">Validate and save the rebuilt dataset.</p>
           </header>
           <DatasetReviewSection
             :rocrate="built.rocrate"

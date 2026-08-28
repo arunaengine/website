@@ -1293,7 +1293,7 @@ async function loadBacklinkPreflight(
   const requestId = backlinkPreflightRequestId
   const apiBase = permanentDeleteApiBase(nodeId)
   if (!apiBase) {
-    backlinkPreflightError.value = 'The node API endpoint for the Dataset-reference lookup is unavailable.'
+    backlinkPreflightError.value = 'The node API endpoint for the dataset-reference lookup is unavailable.'
     return
   }
   const controller = new AbortController()
@@ -1430,7 +1430,7 @@ async function loadBulkBacklinkPreflight(
   const requestId = backlinkPreflightRequestId
   const apiBase = permanentDeleteApiBase(target.nodeId)
   if (!apiBase) {
-    backlinkPreflightError.value = 'The node API endpoint for the Dataset-reference lookup is unavailable.'
+    backlinkPreflightError.value = 'The node API endpoint for the dataset-reference lookup is unavailable.'
     return
   }
   const controller = new AbortController()
@@ -1668,7 +1668,7 @@ async function runBulkPurgeScope(
         return {
           key: scope.key,
           status: 'failed',
-          message: `Job ${submission.job_id} is not a storage purge.`,
+          message: `System job ${submission.job_id} is not a storage purge.`,
         }
       }
       if (isTerminalStoragePurgeJob(status.state)) {
@@ -1676,7 +1676,7 @@ async function runBulkPurgeScope(
         return {
           key: scope.key,
           status: 'failed',
-          message: status.error?.message ?? `The purge job was ${status.state}.`,
+          message: status.error?.message ?? `The purge was ${status.state}.`,
         }
       }
       await new Promise((resolve) => setTimeout(resolve, 1_000))
@@ -1942,7 +1942,7 @@ async function pollPermanentDelete(
     const status = await getStoragePurgeJob(jobId, permanentDeleteClient(target))
     if (requestId !== permanentDeleteRequestId) return
     if (status.kind !== 'storage_purge') {
-      throw new Error(`Job ${jobId} is not a storage purge.`)
+      throw new Error(`System job ${jobId} is not a storage purge.`)
     }
     permanentDeleteStatus.value = status
     permanentDeleteProgress.value = retainStoragePurgeProgress(
@@ -1951,9 +1951,9 @@ async function pollPermanentDelete(
     )
     if (isTerminalStoragePurgeJob(status.state)) {
       if (status.state === 'failed') {
-        permanentDeleteError.value = status.error?.message ?? 'The purge job failed.'
+        permanentDeleteError.value = status.error?.message ?? 'The purge failed.'
       } else if (status.state === 'cancelled') {
-        permanentDeleteError.value = 'The purge job was cancelled.'
+        permanentDeleteError.value = 'The purge was cancelled.'
       }
       await refreshAfterPermanentDelete(target, status)
       return
@@ -2060,7 +2060,7 @@ const isEmpty = computed(
       <Notice v-else-if="!s3.connectedEndpoint.value" tone="warning" class="flex items-start gap-3 p-5 text-sm">
         <ShieldAlert class="mt-0.5 h-4 w-4 shrink-0" />
         <p>
-          This node does not advertise an S3 endpoint, so the data manager cannot connect.
+          This node does not advertise an S3 endpoint, so the portal cannot connect.
           <template v-if="desktop">Turn the local S3 endpoint on under This device, Storage &amp; settings.</template>
         </p>
       </Notice>
@@ -2177,7 +2177,7 @@ const isEmpty = computed(
                 <button
                   type="button"
                   class="flex w-full items-center gap-1 px-4 py-2 text-left text-xs font-medium text-muted-foreground hover:text-foreground"
-                  title="Per-run scratch buckets (ws-…) created by compute jobs"
+                  title="Scratch buckets (ws-…) created by runs"
                   @click="workspacesOpen = !workspacesOpen"
                 >
                   <ChevronRight :class="['h-3.5 w-3.5 shrink-0 transition-transform', workspacesOpen && 'rotate-90']" />
@@ -2366,7 +2366,7 @@ const isEmpty = computed(
                 {{
                   remoteEndpointMissing
                     ? 'The node does not publish an S3 endpoint, so its objects cannot be listed here.'
-                    : 'The node’s S3 endpoint did not answer this browser, it may be unreachable or not allow cross-origin browsing.'
+                    : 'The node’s S3 endpoint is unreachable from this browser, or it does not allow cross-origin browsing.'
                 }}
               </p>
               <div class="mt-4 flex justify-center gap-2">
@@ -2667,7 +2667,7 @@ const isEmpty = computed(
               />
               <span>
                 <span class="block font-medium text-foreground">Permanently purge all versions for {{ bulkDeleteTarget.keys.length }} selected key{{ bulkDeleteTarget.keys.length === 1 ? '' : 's' }}</span>
-                <span class="block text-muted-foreground">Starts one fenced storage purge job per selected key. Every version and delete marker in those file scopes is removed.</span>
+                <span class="block text-muted-foreground">Starts one fenced storage purge per selected key. Every version and delete marker in those file scopes is removed.</span>
               </span>
             </label>
           </fieldset>
@@ -2812,7 +2812,7 @@ const isEmpty = computed(
           class="space-y-1 rounded-md border border-border px-3 py-2 text-xs"
         >
           <h4 class="font-medium text-foreground">Sync relationships</h4>
-          <p class="text-muted-foreground">This scope overlaps a sync relationship. Sync state is separate from Dataset references and source bindings.</p>
+          <p class="text-muted-foreground">This scope overlaps a sync relationship. Sync state is separate from dataset references and source bindings.</p>
         </section>
         <Notice v-if="deleteError" tone="error">{{ deleteError }}</Notice>
         <DialogFooter>
@@ -2926,19 +2926,19 @@ const isEmpty = computed(
             class="space-y-1 rounded-md border border-border px-3 py-2"
           >
             <h4 class="font-medium text-foreground">Sync relationships</h4>
-            <p class="text-muted-foreground">This scope overlaps a sync relationship. Sync state is separate from Dataset references and source bindings.</p>
+            <p class="text-muted-foreground">This scope overlaps a sync relationship. Sync state is separate from dataset references and source bindings.</p>
           </section>
 
           <section
             v-if="permanentDeleteSubmission || permanentDeleteProgress"
             class="space-y-1 rounded-md border border-border px-3 py-2"
           >
-            <h4 class="font-medium text-foreground">Purge job progress</h4>
+            <h4 class="font-medium text-foreground">Purge progress</h4>
             <p v-if="permanentDeleteSubmission" class="break-all text-muted-foreground">
-              Job {{ permanentDeleteSubmission.job_id }}
+              System job {{ permanentDeleteSubmission.job_id }}
             </p>
             <p v-if="permanentDeleteSubmission && !permanentDeleteSubmission.created" class="text-muted-foreground">
-              Reusing the existing purge job for this retry.
+              Reusing the existing purge for this retry.
             </p>
             <p v-if="permanentDeleteStatus" class="capitalize">
               State: {{ permanentDeleteStatus.state.replaceAll('_', ' ') }}

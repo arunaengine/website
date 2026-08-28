@@ -102,7 +102,7 @@ describe('portal chrome', () => {
 })
 
 describe('desktop chrome', () => {
-  it('replaces the switcher with this machine and its realm', async () => {
+  it('replaces the switcher with this device and its realm', async () => {
     const mounted = await mountApp(TopBar, { props: { variant: 'desktop' } })
     const html = content(mounted.root)
 

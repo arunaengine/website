@@ -98,7 +98,7 @@ describe('connecting to a realm', () => {
   })
 
   it('names the address the shell followed', async () => {
-    // A typed server node is followed to a management node; the sign-in
+    // A typed node address is followed to a management node; the sign-in
     // step is told which address the owner actually typed.
     validateRealm.mockResolvedValueOnce({
       origin: ORIGIN,

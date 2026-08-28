@@ -117,7 +117,7 @@ const facts = computed(() => {
     <div class="surface p-5">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="min-w-0">
-          <h3 class="font-display text-sm font-semibold text-aruna-navy">This device's node</h3>
+          <h3 class="font-display text-sm font-semibold text-aruna-navy">This computer's node</h3>
           <p class="mt-1 text-xs text-muted-foreground">
             The node runs inside Aruna Desktop. It holds your own data and never stores realm replicas for others.
           </p>

@@ -72,7 +72,7 @@ try {
     await page.goto(BASE + '/app/compute/some-task-id')
     await page.waitForTimeout(1200)
     step(
-      'compute task deep-link renders honest disabled panel',
+      'compute run deep-link renders honest disabled panel',
       (await page.textContent('body')).includes('Compute is not enabled'),
     )
 
@@ -83,17 +83,18 @@ try {
     await page.waitForTimeout(1500)
     const listBody = await page.textContent('body')
     step(
-      'compute list shows the service line or the honest no-TES panel',
-      listBody.includes('TES ') || listBody.includes('does not serve a TES endpoint'),
+      'compute list shows the run service line or the honest refusal panel',
+      listBody.includes('Run service') || listBody.includes('does not accept runs'),
     )
 
-    await page.getByRole('button', { name: /New task/ }).first().click()
+    await page.getByRole('button', { name: /New run/ }).first().click()
+    await page.getByText('Custom run', { exact: true }).first().click()
     await page.waitForURL(/\/app\/compute\/new/)
     await page.waitForTimeout(800)
 
-    // Basics: name the task, describe it, and pick its owning group.
+    // Basics: name the run, describe it, and pick its owning group.
     await page.getByPlaceholder('align-and-count').fill('TES resource e2e')
-    await page.locator('textarea').first().fill('Exercises the three-step task wizard.')
+    await page.locator('textarea').first().fill('Exercises the three-step run wizard.')
     await page.locator('[role="combobox"], button[aria-haspopup="listbox"]').first().click()
     await page.waitForTimeout(300)
     await page.getByRole('option').first().click()
@@ -122,12 +123,12 @@ try {
 
     step(
       'single executor command-line editor shown',
-      (await page.getByText('The current Aruna TES facade accepts exactly one executor per task.').count()) === 1,
+      (await page.getByText('A run has exactly one executor.').count()) === 1,
     )
     await page.getByRole('button', { name: /^Continue$/ }).click()
 
     // Review replaces the Workload DOM and shows the exact pruned request JSON.
-    await page.getByText('TES task request', { exact: true }).waitFor()
+    await page.getByText('Run request', { exact: true }).waitFor()
     const reviewJson = (await page.locator('pre').filter({ hasText: '"resources"' }).textContent()) || ''
     step('Workload form replaced by Review', (await commandLine.count()) === 0)
     step(
@@ -137,14 +138,14 @@ try {
         reviewJson.includes('"disk_gb": 20.25'),
     )
 
-    await page.getByRole('button', { name: /Submit task/ }).click()
+    await page.getByRole('button', { name: /^Run$/ }).click()
     await page.waitForURL(/\/app\/compute\/[^/]+$/, { timeout: 20000 })
     await page.waitForTimeout(1500)
     const drawerBody = await page.textContent('body')
-    step('task detail drawer opened after submit', drawerBody.includes('Executors') || drawerBody.includes('Queued'))
+    step('run detail drawer opened after the run started', drawerBody.includes('Executors') || drawerBody.includes('Queued'))
 
     // Cancel two-step (state flips or a verbatim error renders).
-    const cancelBtn = page.getByRole('button', { name: /^Cancel task$/ })
+    const cancelBtn = page.getByRole('button', { name: /^Cancel run$/ })
     if (await cancelBtn.count()) {
       await cancelBtn.first().click()
       await page.getByRole('button', { name: /Confirm cancel/ }).click()
@@ -155,7 +156,7 @@ try {
         /Cancel(ing|ed)/.test(afterCancel) || afterCancel.includes('error'),
       )
     } else {
-      step('cancel flips state or renders an error', true, 'task already terminal — cancel not offered')
+      step('cancel flips state or renders an error', true, 'run already terminal, cancel not offered')
     }
   }
 

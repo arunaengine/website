@@ -362,26 +362,26 @@ export function submitErrorMessage(error: unknown): string {
   if (!(error instanceof ApiError)) return errorMessage(error)
   if (error.status === 503) {
     if (error.message === 'job_placement_unavailable') {
-      return 'No node could admit this job right now. Retrying keeps the same idempotency key, so a submission that already committed is not duplicated.'
+      return 'No node could admit this run right now. Retrying keeps the same idempotency key, so a run that already committed is not duplicated.'
     }
     if (error.message === 'structured_id_clock_unhealthy') {
-      return 'The node could not mint a job id right now. Retry in a moment.'
+      return 'The node could not mint an id for this run right now. Retry in a moment.'
     }
-    return `The node could not admit this job right now (${error.message}). Retry in a moment.`
+    return `The node could not admit this run right now (${error.message}). Retry in a moment.`
   }
   if (error.status === 409) {
     if (error.code === 'JobPlanConflict') {
-      return 'This idempotency key is already bound to a different plan. Change the run, or start a new submission.'
+      return 'This idempotency key is already bound to a different plan. Change the run, or start a new one.'
     }
     if (error.code === 'compute_quota_denied') {
-      return `The group's standing compute quota refused this job. ${error.message}`
+      return `The group's standing compute quota refused this run. ${error.message}`
     }
     return error.message
   }
   if (error.status === 403) {
-    return 'This token may not submit for that group, or may not write the workspace bucket it names.'
+    return 'This token may not start a run for that group, or may not write the workspace bucket it names.'
   }
-  if (error.status === 401) return 'Sign in again before submitting.'
+  if (error.status === 401) return 'Sign in again before starting a run.'
   return error.message
 }
 
@@ -647,7 +647,7 @@ export const JOB_STATE_META = Object.fromEntries(
 const JOB_KIND_LABEL: Record<string, string> = {
   probe: 'Probe',
   execution: 'Execution',
-  write_run_crate: 'Write run crate',
+  write_run_crate: 'Write run dataset',
   terminal_cleanup: 'Terminal cleanup',
   staging: 'Staging',
   import_rocrate: 'Import RO-Crate',

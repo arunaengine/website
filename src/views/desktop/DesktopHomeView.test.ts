@@ -250,7 +250,7 @@ describe('desktop home', () => {
 
     expect(html).toContain('on this computer')
     expect(html).toContain('in Testrealm')
-    expect(html).toContain('runs no jobs itself yet')
+    expect(html).toContain('runs nothing itself yet')
   })
 
   it('names the state of a node with no identity yet', async () => {
@@ -381,7 +381,7 @@ describe('desktop home', () => {
     // Drafts load on mount, which a server render never reaches.
     const html = await render()
 
-    expect(html).toContain('Drafts on this device')
+    expect(html).toContain('Drafts on this computer')
     expect(html).not.toContain('waiting to be published')
     expect(html).not.toContain('does not serve')
   })

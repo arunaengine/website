@@ -62,7 +62,7 @@ export const NOTIFICATION_KINDS: Record<string, NotificationKindDescriptor> = {
   },
   metadata_created: {
     icon: FileJson2,
-    title: () => 'New metadata document',
+    title: () => 'New dataset',
     detail: (n) => n.path,
     link: (n) => (n.document_id ? { name: 'dataset', params: { id: n.document_id } } : null),
   },
@@ -84,7 +84,7 @@ export const NOTIFICATION_KINDS: Record<string, NotificationKindDescriptor> = {
   // Emitted for s3-namespace watches when a sync relationship finishes a run
   // (sync_completed with versions_synced) or records a failure (sync_failed
   // with the error text). Both carry bucket + node_id; the deep link opens the
-  // bucket on its hosting node (the Data manager treats the local node id in
+  // bucket on its hosting node (Data treats the local node id in
   // ?node= as the connected node).
   sync_completed: {
     icon: ArrowLeftRight,

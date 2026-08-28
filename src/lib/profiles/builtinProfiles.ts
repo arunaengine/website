@@ -28,7 +28,7 @@ const BASICS: ProfileBasics = {
 const ENTITY_RULES: ProfileEntityRule[] = [
   {
     id: 'dataset',
-    label: 'Root Dataset',
+    label: 'Root dataset',
     description: 'The root RO-Crate dataset entity describing the run and its files.',
     type: `${SCHEMA}Dataset`,
     className: 'Dataset',
@@ -40,7 +40,7 @@ const ENTITY_RULES: ProfileEntityRule[] = [
       {
         id: 'mentions',
         label: 'Process run',
-        description: 'The action that carried out the run, the crate root mentions it.',
+        description: 'The action that carried out the run, the RO-Crate root mentions it.',
         kind: 'entity',
         propertyUri: `${SCHEMA}mentions`,
         valueName: 'mentions',

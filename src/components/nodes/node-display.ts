@@ -9,6 +9,13 @@ export const kindVariant: Record<RealmNodeInfo['kind'], BadgeVariant> = {
   user: 'secondary',
 }
 
+/** Display names for the wire node kinds; the wire values stay untranslated. */
+export const kindLabel: Record<RealmNodeInfo['kind'], string> = {
+  management: 'management',
+  server: 'server',
+  user: 'device',
+}
+
 export function connectionVariant(node: RealmNodeInfo): BadgeVariant {
   // A node without recent contact is a missing signal, not a failure.
   return node.connection_status === 'unknown'

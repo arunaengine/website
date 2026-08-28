@@ -12,7 +12,7 @@ const PROFILE_ROOT_TYPES = new Set([
 ])
 
 // P0-5 precedence: semantic Profile root type, exact Process Run conformance,
-// then the default Dataset purpose. Storage paths never decide the purpose.
+// then the default dataset purpose. Storage paths never decide the purpose.
 export function datasetPurposeOf(
   doc?: Pick<PurposeMetadataDoc, 'type' | 'conformsToIds'> | null,
 ): DatasetPurpose {
@@ -613,7 +613,7 @@ const KIND_OPTIONS: Array<{ id: SearchKind; label: string }> = [
   { id: 'objects', label: 'Data objects' },
   { id: 'buckets', label: 'Buckets' },
   { id: 'groups', label: 'Groups' },
-  { id: 'people', label: 'People' },
+  { id: 'people', label: 'Users' },
 ]
 const textQuery = computed(() => q.value.trim())
 function showKind(kind: Exclude<SearchKind, 'all'>): boolean {
@@ -813,10 +813,10 @@ function downloadSparqlResult() {
 
 function sparqlFailureMessage(error: unknown): string {
   if (documentScope.value && error instanceof ApiError && error.status === 404) {
-    return 'This Dataset does not exist or is not readable by this session. The two cases are intentionally indistinguishable.'
+    return 'This dataset does not exist or is not readable by this session. The two cases are intentionally indistinguishable.'
   }
   if (documentScope.value && error instanceof ApiError && error.status === 503) {
-    return 'This Dataset graph is unavailable or still materializing. Retry when it is ready.'
+    return 'This dataset graph is unavailable or still materializing. Retry when it is ready.'
   }
   return errorMessage(error)
 }
@@ -854,7 +854,7 @@ async function runQuery() {
   <div>
     <PageHeader
       title="Datasets"
-      description="Browse every visible RO-Crate by Dataset purpose, search across supported resource kinds, or use the SPARQL workbench."
+      description="Browse every visible RO-Crate by dataset purpose, search across supported resource kinds, or use the SPARQL workbench."
     >
       <template #breadcrumbs>
         <template v-if="groupFilter">
@@ -873,11 +873,11 @@ async function runQuery() {
       <template #actions>
         <Button :disabled="!currentUser" @click="router.push({ name: 'dataset-new' })"><Plus class="h-4 w-4" /> Create dataset</Button>
         <!-- Importing an archive registers a NEW document, so it lives here next
-             to Create dataset rather than on a single Dataset's page. -->
+             to Create dataset rather than on a single dataset's page. -->
         <Button
           v-if="currentUser && jobsEnabled"
           variant="outline"
-          title="Upload an RO-Crate zip or eln archive and register it as a new Dataset"
+          title="Upload an RO-Crate zip or eln archive and register it as a new dataset"
           @click="showCrateImport = true"
         >
           <FileArchive class="h-4 w-4" /> Import RO-Crate dataset
@@ -895,12 +895,12 @@ async function runQuery() {
         <div class="surface p-4">
           <div class="relative">
             <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input ref="searchBox" v-model="q" :aria-busy="searchBusy" placeholder="Search Datasets, data, groups, and people…" class="h-10 w-full rounded-md border border-input bg-background pl-9 pr-10 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring" />
+            <input ref="searchBox" v-model="q" :aria-busy="searchBusy" placeholder="Search datasets, data, groups, and users…" class="h-10 w-full rounded-md border border-input bg-background pl-9 pr-10 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring" />
             <Spinner v-if="searchBusy" label="Searching…" class="absolute right-3 top-1/2 -translate-y-1/2 text-primary" />
           </div>
           <SearchFilterBar v-model="filterModel" :facets="filterFacets" aria-label="Dataset filters" class="mt-3" />
           <p class="mt-2 text-[11px] text-muted-foreground">
-            Purpose classifies each RO-Crate as Dataset, Profile, or Process Run. Profile and group filters are applied by the server.
+            Purpose classifies each RO-Crate as dataset, Profile, or Process Run. Profile and group filters are applied by the node.
           </p>
         </div>
 
@@ -1087,7 +1087,7 @@ async function runQuery() {
           <section v-if="showKind('people') && (peopleResults.length || peopleSearching)" :aria-busy="peopleSearching">
             <div class="mb-3 flex items-center gap-2">
               <UserRound class="h-4 w-4 text-primary" />
-              <h2 class="font-display text-sm font-semibold text-aruna-navy">People</h2>
+              <h2 class="font-display text-sm font-semibold text-aruna-navy">Users</h2>
               <Spinner v-if="peopleSearching" show-label label="Searching…" />
               <span v-else class="text-xs text-muted-foreground">{{ peopleResults.length }}</span>
             </div>
@@ -1117,8 +1117,8 @@ async function runQuery() {
           />
           <EmptyState
             v-else-if="textQuery && kindFilter === 'people' && !peopleSearching && !peopleResults.length"
-            title="No matching people"
-            :description="currentUser ? `No user in ${realm.shortName} matched “${textQuery}”.` : 'Sign in to search for people.'"
+            title="No matching users"
+            :description="currentUser ? `No user in ${realm.shortName} matched “${textQuery}”.` : 'Sign in to search for users.'"
           />
 
           <template v-if="showKind('datasets')">
@@ -1182,7 +1182,7 @@ async function runQuery() {
               </template>
             </div>
             <p v-if="hiddenByProfile > 0" class="mt-3 text-[11px] text-muted-foreground">
-              {{ hiddenByProfile }} result(s) without catalog details are hidden by the profile filter.
+              {{ hiddenByProfile }} result(s) without loaded details are hidden by the profile filter.
             </p>
           </section>
 
@@ -1192,8 +1192,8 @@ async function runQuery() {
             :description="searchResults.length
               ? 'Results were hidden by the active purpose, group, profile, or favourites filters.'
               : textQuery
-                ? `No Dataset in ${realm.shortName} matched “${textQuery}”.`
-                : `No Dataset in ${realm.shortName} conforms to this profile.`"
+                ? `No dataset in ${realm.shortName} matched “${textQuery}”.`
+                : `No dataset in ${realm.shortName} conforms to this profile.`"
           >
             <Button v-if="searchResults.length" variant="outline" @click="clearFilters">Clear filters</Button>
           </EmptyState>
@@ -1212,7 +1212,7 @@ async function runQuery() {
               <p
                 v-if="searchPageCount > 1 || searchHasNext"
                 class="text-[11px] text-muted-foreground"
-                title="Search pages are walked with an opaque cursor and the server counts no matches, so there is no page total."
+                title="Search pages are walked with an opaque cursor and the node counts no matches, so there is no page total."
               >
                 {{ searchSummary }}
               </p>
@@ -1227,7 +1227,7 @@ async function runQuery() {
               />
               <p v-if="!searchHasNext && !searchPaging && !searchRestarting && !searchPageError" class="py-2 text-center text-[11px] text-muted-foreground">
                 {{ truncated || searchDepthCapped
-                  ? 'End of the first results, refine the query to reach matches past the server depth cap.'
+                  ? 'End of the first results, refine the query to reach matches past the node depth cap.'
                   : 'End of results.' }}
               </p>
             </div>
@@ -1269,7 +1269,7 @@ async function runQuery() {
               <section v-if="catalogSplit.datasets.length">
                 <div class="mb-3 flex items-center gap-2">
                   <FileJson2 class="h-4 w-4 text-primary" />
-                  <h2 class="font-display text-sm font-semibold text-aruna-navy">{{ filtering ? 'Matching Datasets' : 'Datasets' }}</h2>
+                  <h2 class="font-display text-sm font-semibold text-aruna-navy">{{ filtering ? 'Matching datasets' : 'Datasets' }}</h2>
                   <span class="text-xs text-muted-foreground">{{ catalogSplit.datasets.length }}</span>
                 </div>
                 <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -1353,7 +1353,7 @@ async function runQuery() {
               v-else-if="filtering"
               title="No matches on this page"
               :description="hasNextPage
-                ? 'No Dataset on this page matches the active filters. Try the next page, or search by name.'
+                ? 'No dataset on this page matches the active filters. Try the next page, or search by name.'
                 : `Nothing in ${realm.shortName} matches the active filters.`"
             >
               <Button variant="outline" @click="clearFilters">Clear filters</Button>
@@ -1361,8 +1361,8 @@ async function runQuery() {
 
             <EmptyState
               v-else
-              :title="`No visible Datasets in ${realm.shortName}`"
-              description="No RO-Crate Datasets are visible here yet."
+              :title="`No visible datasets in ${realm.shortName}`"
+              description="No RO-Crate datasets are visible here yet."
             >
               <Button v-if="currentUser" @click="router.push({ name: 'dataset-new' })"><Plus class="h-4 w-4" /> Create dataset</Button>
             </EmptyState>
@@ -1372,7 +1372,7 @@ async function runQuery() {
             <div v-if="browseSource.length || browsePage > 1 || hasNextPage" class="flex flex-col items-center gap-2">
               <p
                 class="text-[11px] text-muted-foreground"
-                :title="pageCount !== null && !favouritesOnly ? 'The server estimates this count per group, so the number of pages is approximate.' : undefined"
+                :title="pageCount !== null && !favouritesOnly ? 'The node estimates this count per group, so the number of pages is approximate.' : undefined"
               >
                 {{ browseSummary }}
               </p>
@@ -1408,15 +1408,15 @@ async function runQuery() {
           </div>
           <div v-if="documentScope" class="mt-3 rounded-md border border-primary/25 bg-primary/5 px-3 py-2.5 text-xs text-foreground/80">
             <div class="flex flex-wrap items-center gap-2">
-              <Badge variant="accent" size="sm" class="uppercase">Fixed Dataset scope</Badge>
+              <Badge variant="accent" size="sm" class="uppercase">Fixed dataset scope</Badge>
               <span class="break-all font-mono">{{ documentScope }}</span>
             </div>
             <p class="mt-2 leading-relaxed">
-              Distributed modes try readable replicas of this Dataset until one complete answer succeeds. Distributed best-effort permits local fallback only when holder discovery is unavailable. It never merges graphs from other Datasets. A 404 means the Dataset is either absent or unreadable. A 503 can mean the graph is still materializing, so retry instead of treating it as empty.
+              Distributed modes try readable replicas of this dataset until one complete answer succeeds. Distributed best-effort permits local fallback only when holder discovery is unavailable. It never merges graphs from other datasets. A 404 means the dataset is either absent or unreadable. A 503 can mean the graph is still materializing, so retry instead of treating it as empty.
             </p>
           </div>
           <textarea v-model="sparql" rows="14" class="mt-3 w-full rounded-md border border-input bg-muted/20 p-3 font-mono text-[12px] leading-relaxed text-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
-          <p v-if="documentScope" class="mt-2 text-[11px] text-muted-foreground">Only SELECT and ASK queries are accepted. The selected mode changes replica and fallback behavior, never the fixed Dataset scope.</p>
+          <p v-if="documentScope" class="mt-2 text-[11px] text-muted-foreground">Only SELECT and ASK queries are accepted. The selected mode changes replica and fallback behavior, never the fixed dataset scope.</p>
           <p v-else class="mt-2 text-[11px] text-muted-foreground">Only SELECT and ASK queries are accepted. Distributed queries accept only ASK or SELECT DISTINCT over a single pattern. Joins, aggregates, OFFSET, and other non-union-safe shapes are rejected.</p>
           <div v-if="sparqlError && !sparqlFailure" class="mt-3 text-xs text-destructive">{{ sparqlError }}</div>
         </section>
@@ -1425,7 +1425,7 @@ async function runQuery() {
           <header class="flex flex-wrap items-center gap-2 border-b border-border bg-muted/20 px-4 py-2.5 text-[11px] text-muted-foreground">
             <Badge variant="destructive" size="sm" class="uppercase">Unavailable</Badge>
             <span v-if="sparqlFailureMode">Mode: {{ sparqlModeLabels[sparqlFailureMode] }}</span>
-            <span v-if="documentScope" class="font-mono">Fixed Dataset scope: {{ documentScope }}</span>
+            <span v-if="documentScope" class="font-mono">Fixed dataset scope: {{ documentScope }}</span>
             <Button variant="outline" size="sm" class="ml-auto" :disabled="running" @click="runQuery">Retry</Button>
           </header>
           <div class="space-y-1.5 px-4 py-3 text-xs text-muted-foreground">

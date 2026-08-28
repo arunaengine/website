@@ -654,7 +654,7 @@ function ruleConstraintHtml(rule: ProfilePropertyRule): string {
     for (const source of effectiveEntitySources(rule.entitySources)) {
       if (source === 'new') phrases.push('describing a new entity')
       else if (source === 'existing-external') phrases.push('an external URI')
-      else phrases.push('an entity in this crate')
+      else phrases.push('an entity in this RO-Crate')
     }
     notes.push(`fulfilled by ${phrases.join(' or ')}`)
   }

@@ -220,19 +220,19 @@ const SUBMIT_MESSAGES: Record<number, string> = {
   401: 'Sign in to import an RO-Crate archive.',
   403: 'You may not write to that group, bucket or prefix.',
   404: 'The target bucket or the upload could not be found; the upload may have expired.',
-  409: 'Import conflict: the metadata path may already exist, the upload may already be claimed, or too many RO-Crate jobs are active.',
+  409: 'Import conflict: the metadata path may already exist, the upload may already be claimed, or too many RO-Crate transfers are active.',
 }
 
 const EXPORT_MESSAGES: Record<number, string> = {
-  401: 'Sign in to export this document as an RO-Crate archive.',
-  403: 'You may not read this document, or this token is path-restricted.',
-  404: 'This document does not exist, or this node does not serve RO-Crate exports.',
-  409: 'Too many RO-Crate jobs are active for this account, or that idempotency key is bound to another job.',
+  401: 'Sign in to export this dataset as an RO-Crate archive.',
+  403: 'You may not read this dataset, or this token is path-restricted.',
+  404: 'This dataset does not exist, or this node does not serve RO-Crate exports.',
+  409: 'Too many RO-Crate transfers are active for this account, or that idempotency key is bound to another transfer.',
 }
 
 const ARTIFACT_MESSAGES: Record<number, string> = {
   403: 'This token may not download the export artifact.',
-  404: 'The export artifact is not available; the job may not have produced one.',
+  404: 'The export artifact is not available; the export may not have produced one.',
   410: 'The export artifact expired and was cleaned up. Run the export again.',
 }
 
@@ -302,8 +302,8 @@ export async function fetchArchiveReport<T>(
     return { status: 'pending', state: typeof body.state === 'string' ? body.state : 'queued' }
   }
   throw archiveError(response, body, {
-    403: 'This token may not read the job report.',
-    404: 'This job has no report; it may have been pruned.',
+    403: 'This token may not read the transfer report.',
+    404: 'This transfer has no report; it may have been pruned.',
   })
 }
 

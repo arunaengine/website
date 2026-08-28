@@ -2,7 +2,7 @@
 import Badge from '@/components/ui/Badge.vue'
 import CopyButton from './CopyButton.vue'
 import LocalNodeDetails from './LocalNodeDetails.vue'
-import { connectionLabel, connectionVariant, kindVariant, statusVariant } from './node-display'
+import { connectionLabel, connectionVariant, kindLabel, kindVariant, statusVariant } from './node-display'
 import type { NodeProbe } from './node-probe'
 import type { RealmNodeInfo } from '@/lib/api'
 import { formatBytes, formatNumber } from '@/lib/utils'
@@ -20,7 +20,7 @@ defineProps<{
     <dl class="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
       <div>
         <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Kind</dt>
-        <dd class="mt-1"><Badge size="sm" :variant="kindVariant[node.kind]" class="uppercase">{{ node.kind }}</Badge></dd>
+        <dd class="mt-1"><Badge size="sm" :variant="kindVariant[node.kind]" class="uppercase">{{ kindLabel[node.kind] }}</Badge></dd>
       </div>
       <div>
         <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Connection</dt>

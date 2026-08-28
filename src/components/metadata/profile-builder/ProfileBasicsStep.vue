@@ -157,7 +157,7 @@ watch(
       </div>
       <div>
         <label class="text-xs font-medium text-foreground">Name</label>
-        <Input v-model="builder.name" class="mt-1" placeholder="Proteomics Dataset Profile" :invalid="fieldError('name') ? 'error' : undefined" />
+        <Input v-model="builder.name" class="mt-1" placeholder="Proteomics dataset Profile" :invalid="fieldError('name') ? 'error' : undefined" />
         <p v-if="fieldError('name')" class="mt-1 text-[11px] text-destructive">{{ fieldError('name') }}</p>
       </div>
       <div>

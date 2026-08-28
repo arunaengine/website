@@ -305,7 +305,7 @@ async function submit() {
             </p>
             <template v-else>
               <p class="text-[11px] text-muted-foreground">
-                Stored write-only, the server never returns them.
+                Stored write-only, the node never returns them.
               </p>
               <div v-for="field in schema.secret" :key="field.key">
                 <label :for="`${uid}-sec-${field.key}`" class="text-xs font-medium text-foreground">{{ field.label }}</label>
@@ -351,7 +351,7 @@ async function submit() {
           </p>
 
           <Notice v-if="submitError" tone="error">{{ submitError }}</Notice>
-          <Notice v-if="writesDisabled" tone="warning">You're offline, saving a connector needs connectivity.</Notice>
+          <Notice v-if="writesDisabled" tone="warning">This computer has no connection, saving a connector needs connectivity.</Notice>
         </div>
 
         <DialogFooter class="sm:justify-between">

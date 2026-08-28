@@ -65,10 +65,11 @@ describe('Phase 5 navigation parity', () => {
     const mobile = await render(MobileNav)
 
     expect(uniqueSorted(portalPaths(mobile))).toEqual(uniqueSorted(portalPaths(desktop)))
+    // The bar takes the primary entries in the sidebar's own order.
     expect(portalPaths(mobile).slice(0, 5)).toEqual([
       '/app',
-      '/app/datasets',
       '/app/buckets',
+      '/app/datasets',
       '/app/compute',
       '/app/groups',
     ])
@@ -120,29 +121,37 @@ describe('Phase 5 navigation parity', () => {
     }
   })
 
-  it('leaves quarantine to the Admin view alone', () => {
+  it('keeps quarantine in the permission-gated admin block', async () => {
     const adminSource = readFileSync(fileURLToPath(new URL('../../views/AdminView.vue', import.meta.url)), 'utf8')
-    const sideSource = readFileSync(fileURLToPath(new URL('../layout/SideNav.vue', import.meta.url)), 'utf8')
-    const mobileSource = readFileSync(fileURLToPath(new URL('./MobileNav.vue', import.meta.url)), 'utf8')
-    const desktopSource = readFileSync(fileURLToPath(new URL('../../views/DesktopLayout.vue', import.meta.url)), 'utf8')
+    const navSource = readFileSync(fileURLToPath(new URL('../layout/nav.ts', import.meta.url)), 'utf8')
 
-    for (const source of [sideSource, mobileSource, desktopSource]) {
-      expect(source).not.toContain('/app/admin/quarantine')
-      expect(source).not.toContain('canManageQuarantine')
+    // Without the permission the entry does not exist at all.
+    for (const html of [await render(SideNav), await render(MobileNav)]) {
+      expect(portalPaths(html)).not.toContain('/app/admin/quarantine')
     }
+    permissions.canManageQuarantine.value = true
+    for (const html of [await render(SideNav), await render(MobileNav)]) {
+      expect(portalPaths(html)).toContain('/app/admin/quarantine')
+    }
+    expect(navSource).toContain('canManageQuarantine')
     expect(adminSource).toContain('v-if="canManageQuarantine"')
     expect(adminSource).toContain("{ name: 'admin-quarantine' }")
   })
 
-  it('uses the same compute flag expression and a bottom sheet with readable targets', () => {
+  it('reads one compute flag expression and offers a bottom sheet with readable targets', () => {
+    const navSource = readFileSync(fileURLToPath(new URL('../layout/nav.ts', import.meta.url)), 'utf8')
     const sideSource = readFileSync(
       fileURLToPath(new URL('../layout/SideNav.vue', import.meta.url)),
       'utf8',
     )
     const mobileSource = readFileSync(fileURLToPath(new URL('./MobileNav.vue', import.meta.url)), 'utf8')
 
-    expect(sideSource).toContain('tesEnabled || jobsEnabled')
-    expect(mobileSource).toContain('tesEnabled || jobsEnabled')
+    expect(navSource).toContain("featureEnabled('tes') || featureEnabled('jobs')")
+    // Neither shell decides the destinations any more.
+    for (const source of [sideSource, mobileSource]) {
+      expect(source).toContain("from '@/components/layout/nav'")
+      expect(source).not.toContain('featureEnabled')
+    }
     expect(mobileSource).toContain('side="bottom"')
     expect(mobileSource).not.toContain('side="right"')
     expect(mobileSource).toContain('min-h-12')

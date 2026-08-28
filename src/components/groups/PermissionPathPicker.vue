@@ -9,6 +9,7 @@ import Skeleton from '@/components/ui/Skeleton.vue'
 import MetaPathTree from './MetaPathTree.vue'
 import DataPathTree from './DataPathTree.vue'
 import { buildMetaPathTree, shortNodeId, type MetaPathFolder } from './permission-paths'
+import { kindLabel } from '@/components/nodes/node-display'
 import { useAruna } from '@/composables/useAruna'
 import { useRefresh } from '@/composables/useRefresh'
 import { errorMessage } from '@/lib/utils'
@@ -28,9 +29,9 @@ const emit = defineEmits<{ (e: 'select', suffixes: string[]): void }>()
 const { listGroupMetadata, realmInfo, nodeInfo } = useAruna()
 
 const SCOPES = [
-  { key: 'all', title: 'Everything', icon: Globe, suffixes: ['**'], hint: 'Files, metadata and group administration, the whole group.' },
-  { key: 'data-meta', title: 'Data & metadata', icon: Layers, suffixes: ['meta/**', 'data/**'], hint: 'All files and all metadata documents, but no group administration.' },
-  { key: 'meta', title: 'Metadata', icon: ListChecks, suffixes: ['meta/**'], hint: 'All metadata documents. Browse below to narrow this down.' },
+  { key: 'all', title: 'Everything', icon: Globe, suffixes: ['**'], hint: 'Files, datasets and group administration, the whole group.' },
+  { key: 'data-meta', title: 'Data & datasets', icon: Layers, suffixes: ['meta/**', 'data/**'], hint: 'All files and all datasets, but no group administration.' },
+  { key: 'meta', title: 'Datasets', icon: ListChecks, suffixes: ['meta/**'], hint: 'All datasets. Browse below to narrow this down.' },
   { key: 'data', title: 'Data', icon: Boxes, suffixes: ['data/**'], hint: 'All files on every node. Pick a node below to narrow this down.' },
   { key: 'admin', title: 'Administration', icon: ShieldCheck, suffixes: ['admin/**'], hint: 'Group settings, roles and members.' },
 ]
@@ -107,7 +108,7 @@ const nodeOptions = computed(() => [
   { value: 'all', label: 'All nodes' },
   ...realmNodes.value.map((node) => ({
     value: node.node_id,
-    label: `${node.kind} ${shortNodeId(node.node_id)}${node.node_id === localNodeId.value ? ' (this portal)' : ''}`,
+    label: `${kindLabel[node.kind]} ${shortNodeId(node.node_id)}${node.node_id === localNodeId.value ? ' (this portal)' : ''}`,
   })),
 ])
 const nodeOverride = ref<string | null>(null)
@@ -165,7 +166,7 @@ watch(
             ? 'border-primary/50 bg-primary/[0.08] text-foreground'
             : 'border-border text-foreground/80 hover:bg-muted',
         ]"
-        title="Browse for a specific folder, document or file"
+        title="Browse for a specific folder, dataset or file"
         @click="customOpen = !customOpen"
       >
         <SlidersHorizontal class="h-3.5 w-3.5 text-primary" />
@@ -196,18 +197,18 @@ watch(
           ]"
           @click="customMode = 'meta'"
         >
-          Metadata
+          Datasets
         </button>
       </div>
 
       <section v-if="customMode === 'meta'" class="mt-2 rounded-lg border border-border bg-background">
         <div class="flex items-center justify-between border-b border-border/70 px-3 py-2">
-          <h2 class="font-display text-sm font-semibold text-aruna-navy">Metadata documents</h2>
+          <h2 class="font-display text-sm font-semibold text-aruna-navy">Datasets</h2>
           <RefreshButton :busy="spinning" label="Reload" class="h-6 px-1.5 text-[10px]" @click="onReload" />
         </div>
         <div class="px-3 pb-3 pt-2">
           <p class="text-[11px] text-muted-foreground">
-            Choose a folder to include everything inside it, or a single document.
+            Choose a folder to include everything inside it, or a single dataset.
           </p>
           <div class="scrollbar-thin mt-1.5 max-h-80 min-h-28 overflow-y-auto">
             <div v-if="loading && !tree" class="space-y-1.5">
@@ -216,7 +217,7 @@ watch(
             </div>
             <p v-else-if="loadError" class="text-xs text-destructive">{{ loadError }}</p>
             <p v-else-if="tree && !tree.folders.length && !tree.documents.length" class="text-xs text-muted-foreground">
-              This group has no metadata documents yet; pick a scope above.
+              This group has no datasets yet; pick a scope above.
             </p>
             <MetaPathTree
               v-else-if="tree"

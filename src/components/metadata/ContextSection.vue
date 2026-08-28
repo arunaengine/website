@@ -74,7 +74,7 @@ function timeLabel(iso: string): string {
 
         <EntityFieldList v-if="entity.fields.length" class="mt-3" :fields="entity.fields" @jump="(id) => emit('jump', id)" />
         <p v-else-if="entity.unresolved" class="mt-2 text-xs italic text-muted-foreground">
-          Referenced but not described in this crate.
+          Referenced but not described in this dataset.
         </p>
       </div>
 

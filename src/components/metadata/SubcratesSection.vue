@@ -139,11 +139,11 @@ async function unlink(link: SubcrateLink) {
   <section class="surface overflow-hidden">
     <div class="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-3.5">
       <div class="flex items-center gap-2 text-sm font-medium text-foreground">
-        <Layers class="h-4 w-4 text-primary" /> Subcrates
+        <Layers class="h-4 w-4 text-primary" /> Linked datasets
         <span v-if="links.length" class="text-xs font-normal text-muted-foreground">{{ links.length }}</span>
-        <Badge v-if="isProject" variant="outline" size="sm" class="uppercase">Project crate</Badge>
+        <Badge v-if="isProject" variant="outline" size="sm" class="uppercase">Project dataset</Badge>
       </div>
-      <Button v-if="canWrite" variant="outline" size="sm" @click="openPicker"><Plus class="size-3.5" /> Link subcrate</Button>
+      <Button v-if="canWrite" variant="outline" size="sm" @click="openPicker"><Plus class="size-3.5" /> Link dataset</Button>
     </div>
 
     <ul v-if="links.length" class="divide-y divide-border">
@@ -165,15 +165,15 @@ async function unlink(link: SubcrateLink) {
           </div>
         </div>
         <div class="flex shrink-0 items-center gap-1.5">
-          <Badge variant="outline" size="sm" class="uppercase">{{ resolveDocumentId(link) ? 'subcrate' : 'external subcrate' }}</Badge>
+          <Badge variant="outline" size="sm" class="uppercase">{{ resolveDocumentId(link) ? 'linked' : 'external' }}</Badge>
           <Button
             v-if="canWrite"
             variant="ghost"
             size="icon-sm"
             class="text-muted-foreground hover:text-destructive"
             :disabled="removingIri !== null || saving"
-            :aria-label="`Unlink subcrate ${link.name}`"
-            title="Unlink subcrate (the child document itself is kept)"
+            :aria-label="`Unlink ${link.name}`"
+            title="Unlink (the child dataset itself is kept)"
             @click="unlink(link)"
           >
             <Spinner v-if="removingIri === link.iri" class="text-current" aria-hidden="true" />
@@ -185,8 +185,8 @@ async function unlink(link: SubcrateLink) {
     <EmptyState
       v-else
       compact
-      title="No subcrates linked yet."
-      description="Link existing metadata crates to make this a project-level crate that groups them."
+      title="No datasets linked yet."
+      description="Link existing datasets to make this a project-level dataset that groups them."
     />
     <p v-if="error" class="border-t border-border px-5 py-2.5 text-xs text-destructive">{{ error }}</p>
 

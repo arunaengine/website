@@ -325,7 +325,7 @@ async function submit() {
         <ListChecks class="h-4 w-4 text-primary" /> {{ isEditing ? 'Edit metadata profile' : 'New metadata profile' }}
       </DialogTitle>
       <DialogDescription>
-        <template v-if="isEditing">Adjust the profile's rules and details; saving replaces the stored profile crate in place.</template>
+        <template v-if="isEditing">Adjust the profile's rules and details; saving replaces the stored profile in place.</template>
         <template v-else>Define which RO-Crate entities must, should, or may exist, and the property rules for each, step by step.</template>
       </DialogDescription>
     </DialogHeader>
@@ -369,14 +369,14 @@ async function submit() {
         </TabsList>
         <TabsContent value="create" class="space-y-4">
           <p v-if="!builder.importSummary" class="text-[11px] text-muted-foreground">
-            Starting from an existing profile crate or a Describo/Crate-O mode file? Switch to
+            Starting from an existing profile RO-Crate or a Describo/Crate-O mode file? Switch to
             <button type="button" class="font-medium text-aruna-royal underline-offset-2 hover:underline" @click="startTab = 'import'">Import existing</button>
             above.
           </p>
           <div v-if="builder.importSummary" class="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
             <CheckCircle2 class="h-3.5 w-3.5 shrink-0" />
             <span>
-              Imported from {{ builder.importSummary.kind === 'mode' ? 'a mode file' : 'a profile crate' }}<template v-if="builder.importSummary.name">: <b>{{ builder.importSummary.name }}</b></template>, review the prefilled fields below.
+              Imported from {{ builder.importSummary.kind === 'mode' ? 'a mode file' : 'a profile RO-Crate' }}<template v-if="builder.importSummary.name">: <b>{{ builder.importSummary.name }}</b></template>, review the prefilled fields below.
             </span>
           </div>
           <ProfileBasicsStep :builder="builder" />
@@ -421,7 +421,7 @@ async function submit() {
       <p v-if="!builder.isPublic" class="mt-2 flex items-start gap-1.5 text-[11px] text-muted-foreground">
         <Lock class="mt-0.5 h-3.5 w-3.5 shrink-0" />
         <span>
-          This profile is private, so its artifacts stay embedded in the profile document and no bucket is used.
+          This profile is private, so its artifacts stay embedded in the profile and no bucket is used.
           Turn on <b class="text-foreground">Public profile</b> to publish them where other tools can fetch them without a token.
         </span>
       </p>

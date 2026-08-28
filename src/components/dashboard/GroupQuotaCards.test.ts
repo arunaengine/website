@@ -231,12 +231,12 @@ describe('group purpose counts', () => {
     expect(maxActive).toBe(3)
   })
 
-  it('keeps GroupDetail purpose counts on usage fields, not the approximate document estimate', () => {
+  it('keeps GroupDetail purpose counts on usage fields, not the approximate estimate', () => {
     const source = readFileSync(
       fileURLToPath(new URL('../groups/GroupDetail.vue', import.meta.url)),
       'utf8',
     )
-    const purposeBlock = source.match(/Live documents[\s\S]*?<\/dl>/)?.[0] ?? ''
+    const purposeBlock = source.match(/Live datasets[\s\S]*?<\/dl>/)?.[0] ?? ''
 
     expect(source).toContain("usage.value?.dataset_count")
     expect(source).toContain("usage.value?.profile_count")

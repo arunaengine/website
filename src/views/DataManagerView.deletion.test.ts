@@ -82,7 +82,7 @@ describe('Data Manager version-aware deletion', () => {
     expect(template).toContain('Work committed by completed batches remains deleted.')
     expect(template).toContain('Remaining after refresh')
     expect(template).toContain('Retry purge')
-    expect(template).toContain('Reusing the existing purge job for this retry.')
+    expect(template).toContain('Reusing the existing purge for this retry.')
     expect(dataManagerSource).toContain('target.operation,')
   })
 
@@ -132,7 +132,7 @@ describe('Data Manager version-aware deletion', () => {
       targets: [{
         content_w3id: 'https://w3id.org/aruna/data/sibling',
         targeted_versions: [{ node_id: 'node-a', bucket: 'data', key: 'foo.bar', version_id: 'v1' }],
-        visible_references: [{ document_id: 'sibling-doc', title: 'Sibling Dataset' }],
+        visible_references: [{ document_id: 'sibling-doc', title: 'Sibling dataset' }],
         hidden_references_exist: false,
         would_remove_last_resolvable_aruna_location: true,
         location_impact_complete: true,
@@ -174,7 +174,7 @@ describe('Data Manager version-aware deletion', () => {
     expect(datasetReferencesTemplate).not.toContain('RDF Dataset references')
     expect(datasetReferencesTemplate).toContain("params: { id: reference.document_id }")
     expect(datasetReferencesTemplate).toContain('{{ reference.title }}')
-    expect(datasetReferencesTemplate).toContain('Other restricted Datasets reference this content')
+    expect(datasetReferencesTemplate).toContain('Other restricted datasets reference this content')
     expect(datasetReferencesTemplate).toContain('target.would_remove_last_resolvable_aruna_location')
     expect(datasetReferencesTemplate).toContain("This operation would remove this content's last resolvable Aruna location.")
     expect(datasetReferencesTemplate).toContain('Dataset-reference coverage is partial.')
@@ -251,7 +251,7 @@ describe('Data Manager explicit multi-file deletion', () => {
     expect(merge).toContain('location.bucket === target.bucket && location.key === key')
     expect(merge).toContain('location.bucket !== target.bucket || location.key === key')
     expect(datasetReferencesTemplate).toContain('Dataset-reference lookup failed for part or all of the selection.')
-    expect(datasetReferencesTemplate).toContain('Other restricted Datasets reference this content')
+    expect(datasetReferencesTemplate).toContain('Other restricted datasets reference this content')
     expect(datasetReferencesTemplate).toContain("This operation would remove this content's last resolvable Aruna location.")
     expect(datasetReferencesTemplate).toContain('Dataset-reference coverage is partial.')
     expect(datasetReferencesTemplate).toContain('preflight.coverage.node_freshness')

@@ -269,7 +269,7 @@ watch(
                 @retry="loadPolicyPage()"
               />
               <div class="grid gap-2 md:grid-cols-[minmax(12rem,0.8fr)_minmax(20rem,1.4fr)_auto]">
-                <Input v-model="lookup.policy_id" class="font-mono text-xs" placeholder="Residency policy ULID" aria-label="Residency policy id lookup" />
+                <Input v-model="lookup.policy_id" class="font-mono text-xs" placeholder="Residency policy id" aria-label="Residency policy id lookup" />
                 <Input v-model="lookup.digest" class="font-mono text-xs" placeholder="64-character lowercase digest" aria-label="Residency policy digest lookup" />
                 <Button :disabled="lookupBusy || !lookup.policy_id.trim() || !/^[0-9a-f]{64}$/.test(lookup.digest.trim())" @click="lookupPolicy()">
                   <Search class="h-3.5 w-3.5" /> {{ lookupBusy ? 'Looking up…' : 'Look up' }}

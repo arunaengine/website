@@ -50,7 +50,7 @@ function freshnessTime(updatedAtMs: number): string {
     <Spinner
       v-if="busy"
       show-label
-      :label="selection ? 'Checking Dataset references for the selected keys…' : 'Checking Dataset references…'"
+      :label="selection ? 'Checking dataset references for the selected keys…' : 'Checking dataset references…'"
     />
     <Notice v-else-if="error" tone="warning">
       <p class="font-medium">
@@ -68,7 +68,7 @@ function freshnessTime(updatedAtMs: number): string {
         Dataset-reference coverage is partial. References or remaining locations may be missing.
       </Notice>
       <p v-if="!referencesReported" class="text-muted-foreground">
-        No visible or restricted Dataset references were reported for the covered forms.
+        No visible or restricted dataset references were reported for the covered forms.
       </p>
       <div
         v-for="target in preflight.targets"
@@ -85,7 +85,7 @@ function freshnessTime(updatedAtMs: number): string {
           </li>
         </ul>
         <p v-if="target.hidden_references_exist" class="font-medium text-amber-800 dark:text-amber-300">
-          Other restricted Datasets reference this content
+          Other restricted datasets reference this content
         </p>
         <Notice v-if="target.would_remove_last_resolvable_aruna_location" tone="warning" class="font-medium">
           This operation would remove this content's last resolvable Aruna location.

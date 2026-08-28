@@ -74,7 +74,7 @@ const artifactDownloads = computed(() => [
   { label: 'schema.json', text: artifactTexts.value.schema, filename: `${fileSlug.value}.schema.json`, type: 'application/json' },
   { label: 'mode.json', text: artifactTexts.value.mode, filename: `${fileSlug.value}.mode.json`, type: 'application/json' },
   { label: 'profile.html', text: artifactTexts.value.html, filename: `${fileSlug.value}.profile.html`, type: 'text/html' },
-  { label: 'profile crate', text: builder.generatedCrateText, filename: `${fileSlug.value}.crate.json`, type: 'application/json' },
+  { label: 'profile RO-Crate', text: builder.generatedCrateText, filename: `${fileSlug.value}.crate.json`, type: 'application/json' },
 ])
 
 // Plain-English lines for every constraint the schema/mode preview cannot show at
@@ -208,16 +208,16 @@ function violationsFor(property: string) {
     <div class="rounded-lg border border-border p-4">
       <div class="text-sm font-medium text-foreground">Form preview</div>
       <p class="mt-1 text-xs text-muted-foreground">
-        A read-only preview of the form people see when they create a Dataset with this profile, built by
-        saving your rules into the Profile Crate and reading them back, so it shows exactly what survives
+        A read-only preview of the form users see when they create a dataset with this profile, built by
+        saving your rules into the profile RO-Crate and reading them back, so it shows exactly what survives
         (including any documented round-trip simplifications).
         Required (MUST) values that are empty show an error, recommended (SHOULD) values show an amber warning.
       </p>
       <p v-if="roundTrip.error" class="mt-2 text-[11px] text-destructive">
-        The emitted crate could not be parsed back ({{ roundTrip.error }}), the preview below falls back to the in-memory rules.
+        The emitted RO-Crate could not be parsed back ({{ roundTrip.error }}), the preview below falls back to the in-memory rules.
       </p>
       <div v-if="!controls.length" class="mt-3 text-xs text-muted-foreground">
-        The Dataset entity has no property rules yet, so no inputs are generated.
+        The dataset entity has no property rules yet, so no inputs are generated.
       </div>
       <div v-else class="mt-3 grid gap-3 sm:grid-cols-2">
         <!-- Entity references are filled with a sub-form in the dataset dialog;
@@ -280,11 +280,11 @@ function violationsFor(property: string) {
       </button>
       <div v-if="generatedFilesOpen" class="border-t border-border p-3">
         <p class="text-xs text-muted-foreground">
-          Your rules generate these files, all traveling together in the Profile Crate:
+          Your rules generate these files, all traveling together in the profile RO-Crate:
           <b class="text-foreground">profile.html</b> is the human-readable specification,
           <b class="text-foreground">mode.json</b> the editor form structure (Describo/Crate-O-compatible),
           <b class="text-foreground">schema.json</b> the validation rules, and
-          <b class="text-foreground">shapes.ttl</b> the unified generated and imported SHACL shapes the server validates against.
+          <b class="text-foreground">shapes.ttl</b> the unified generated and imported SHACL shapes the node validates against.
           Editors read the mode file; validation reads the validation rules, mode files have no vocabulary for constraints or recommended levels.
         </p>
         <div class="mt-2 flex flex-wrap items-center gap-1.5">
@@ -305,7 +305,7 @@ function violationsFor(property: string) {
             <TabsTrigger value="mode">Mode file</TabsTrigger>
             <TabsTrigger value="html">Description</TabsTrigger>
             <TabsTrigger value="shapes">SHACL shapes</TabsTrigger>
-            <TabsTrigger value="crate">Profile Crate</TabsTrigger>
+            <TabsTrigger value="crate">Profile RO-Crate</TabsTrigger>
           </TabsList>
 
           <TabsContent value="schema">
@@ -325,13 +325,13 @@ function violationsFor(property: string) {
 
           <TabsContent value="shapes">
             <p class="mb-2 text-[11px] text-muted-foreground">
-              Unified generated and imported SHACL shapes (<code>shapes.ttl</code>), used by the server to validate dataset crates.
+              Unified generated and imported SHACL shapes (<code>shapes.ttl</code>), used by the node to validate datasets.
             </p>
             <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ artifactTexts.shapes }}</pre>
           </TabsContent>
 
           <TabsContent value="crate">
-            <p class="mb-2 text-[11px] text-muted-foreground">The complete profile document that is saved, all generated files travel inside it.</p>
+            <p class="mb-2 text-[11px] text-muted-foreground">The complete profile that is saved, all generated files travel inside it.</p>
             <pre class="max-h-72 overflow-auto rounded-md bg-muted p-3 text-[11px] text-foreground/80">{{ builder.generatedCrateText }}</pre>
           </TabsContent>
         </Tabs>

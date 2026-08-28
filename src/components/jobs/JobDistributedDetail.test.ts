@@ -298,7 +298,7 @@ describe('distributed job detail components', () => {
 
     expect(mounted.errors).toEqual([])
     expect(headJobArtifact).toHaveBeenCalledWith('01JOB')
-    expect(text).toContain('Download run crate')
+    expect(text).toContain('Download run dataset')
     expect(text).toContain('2 KB')
     expect(text).toContain('abc123')
     mounted.app.unmount()
@@ -306,10 +306,10 @@ describe('distributed job detail components', () => {
 
   it('names each unavailable archive state instead of failing', async () => {
     const cases: Array<[Record<string, unknown>, string]> = [
-      [{ state: 'pending', jobState: 'running' }, 'the job\n      is running'],
+      [{ state: 'pending', jobState: 'running' }, 'and it\n      is running'],
       [{ state: 'expired' }, 'retention window has passed'],
-      [{ state: 'unauthorized' }, 'may not read the run crate'],
-      [{ state: 'absent' }, 'No run crate archive is kept'],
+      [{ state: 'unauthorized' }, 'may not read this run dataset'],
+      [{ state: 'absent' }, 'No run dataset archive is kept'],
     ]
     for (const [status, expected] of cases) {
       const JobArtifactButton = compileClientComponent(
@@ -336,7 +336,7 @@ describe('distributed job detail components', () => {
 
       expect(mounted.errors).toEqual([])
       expect(text).toContain(expected.replace(/\s+/g, ' '))
-      expect(text).not.toContain('Download run crate')
+      expect(text).not.toContain('Download run dataset')
       mounted.app.unmount()
     }
   })
@@ -488,6 +488,7 @@ describe('distributed job detail components', () => {
         '@/components/nodes/CopyButton.vue': moduleDefault(PassThroughStub),
         '@/components/ui/ExternalLink.vue': moduleDefault(PassThroughStub),
         '@/components/jobs/JobFamilySection.vue': moduleDefault(JobFamilyStub),
+        '@/components/compute/TaskHeader.vue': moduleDefault(PassThroughStub),
         '@/components/compute/TaskStateBadge.vue': moduleDefault(JobStateBadgeStub),
         '@/components/compute/TesPlacementTags.vue': moduleDefault(PassThroughStub),
         '@/components/onboarding/ClaimWatchStep.vue': moduleDefault(PassThroughStub),

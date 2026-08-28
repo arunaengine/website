@@ -148,24 +148,24 @@ async function confirmWithdraw() {
 
       <template v-if="!loading">
         <p v-if="needsSignIn" class="text-xs text-muted-foreground">
-          Sign in to see the identifier status for this document.
+          Sign in to see the identifier status for this dataset.
         </p>
         <p v-else-if="loadError" class="text-xs text-muted-foreground">
           The identifier status could not be read ({{ loadError }}). Try again later.
         </p>
         <template v-else-if="view">
           <p v-if="state === 'requested' || state === 'processing'" class="text-xs text-muted-foreground">
-            Registration runs automatically as a background job on the PID authority; the identifier is
+            Registration runs automatically in the background on the PID authority; the identifier is
             not live until it finishes.
             <code v-if="view.job_id" class="ml-1 font-mono text-[11px]">{{ view.job_id }}</code>
           </p>
           <p v-else-if="state === 'active' && isPublic" class="text-xs text-muted-foreground">
-            The identifier redirects anonymous visitors to this document's RO-Crate.
+            The identifier redirects anonymous visitors to this dataset's RO-Crate.
             <ExternalLink :href="pid" label="Open landing page" class="text-xs" />
           </p>
           <p v-else-if="state === 'active'" class="text-xs text-muted-foreground">
-            The PID is registered, but the landing page only resolves documents that are anonymously
-            visible; it answers 404 until this document is made public.
+            The PID is registered, but the landing page only resolves datasets that are anonymously
+            visible; it answers 404 until this dataset is made public.
           </p>
           <p v-else-if="state === 'failed'" class="text-xs text-muted-foreground">
             {{ view.failure?.message ?? 'Registration failed on the PID authority.' }}
@@ -176,7 +176,7 @@ async function confirmWithdraw() {
             permanently and it cannot be reactivated.
           </p>
           <p v-else-if="state === 'tombstoned'" class="text-xs text-muted-foreground">
-            The document was deleted; the identifier keeps a resolvable tombstone.
+            The dataset was deleted; the identifier keeps a resolvable tombstone.
           </p>
           <p v-else class="text-xs text-muted-foreground">
             The PID authority cannot currently give a definitive record. Try again later.
@@ -204,7 +204,7 @@ async function confirmWithdraw() {
           <DialogDescription>
             Withdrawing is permanent and irreversible: <span class="font-mono text-xs">{{ pid }}</span>
             will answer 410 Gone forever and can never be reactivated. This is an administrative action;
-            normal deletion of the document keeps a tombstone instead.
+            normal deletion of the dataset keeps a tombstone instead.
           </DialogDescription>
         </DialogHeader>
         <div class="space-y-3">

@@ -86,7 +86,7 @@ watch(
 const nodeOptions = computed(() =>
   realmNodes.nodes.value.map((node) => ({
     value: node.nodeId,
-    label: `${node.label}${node.isLocal ? ' (this node)' : ''}${node.reachable ? '' : ' (offline)'}`,
+    label: `${node.label}${node.isLocal ? ' (this node)' : ''}${node.reachable ? '' : ' (unreachable)'}`,
   })),
 )
 

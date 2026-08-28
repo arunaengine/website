@@ -59,20 +59,20 @@ const spinning = computed(() => refreshBusy.value || refreshing.value)
 watch(dashboardRevision, () => void refreshDashboard(), { immediate: true })
 
 // Node heartbeats republish every 60s but never bump the SSE revision; poll
-// the light info endpoints so the federation panel stays current.
+// the light info endpoints so the realm nodes panel stays current.
 const visibility = useDocumentVisibility()
 useIntervalFn(() => {
   if (visibility.value === 'visible' && !refreshing.value) void loadInfo()
 }, 30_000)
 
-// Devices (kind 'user') run on their owner's machine, not on realm
+// Devices (kind 'user') run on their owner's computer, not on realm
 // infrastructure: they are summarized only, never listed or aggregated.
 const infraNodes = computed(() => (realmInfo.value?.nodes ?? []).filter((node) => node.kind !== 'user'))
 const deviceNodes = computed(() => (realmInfo.value?.nodes ?? []).filter((node) => node.kind === 'user'))
 
 const onlineNodes = computed(() => infraNodes.value.filter((node) => node.present).length)
 
-// Honest realm figure: the sum of documents each node reports holding (replicas
+// Honest realm figure: the sum of datasets each node reports holding (replicas
 // included), shown only once at least one node publishes the count.
 const docsHeld = computed(() => {
   const reporting = infraNodes.value.filter((node) => node.info?.utilization.documents_held !== undefined)
@@ -81,7 +81,7 @@ const docsHeld = computed(() => {
   return { total, nodes: reporting.length, totalNodes: infraNodes.value.length }
 })
 
-// Realm-wide total of live documents, not a per-caller figure. The loaded
+// Realm-wide total of live datasets, not a per-caller figure. The loaded
 // catalog is a paged subset, so it must never stand in as the realm total.
 const realmDocuments = computed(() => usageInfo.value?.metadata_documents ?? null)
 const publicOverview = computed(() => realmInfo.value?.public_overview)
@@ -94,7 +94,7 @@ const stats = computed(() =>
   currentUser.value
     ? [
         {
-          label: 'Realm documents',
+          label: 'Realm datasets',
           value: realmDocuments.value === null ? 'Unknown' : formatCount(realmDocuments.value),
           icon: FileJson2,
           tone: 'bg-aruna-royal/15 text-aruna-royal dark:text-aruna-tagline',
@@ -175,7 +175,7 @@ const pageDescription = computed(() =>
         </Button>
         <Button :variant="currentUser ? 'default' : 'outline'" as-child>
           <RouterLink :to="{ name: 'datasets' }">
-            Open Datasets <ArrowRight class="h-4 w-4" />
+            Open datasets <ArrowRight class="h-4 w-4" />
           </RouterLink>
         </Button>
       </template>
@@ -236,7 +236,7 @@ const pageDescription = computed(() =>
         <div v-if="currentUser && docsHeld" class="surface flex flex-wrap items-center justify-between gap-4 p-5">
           <div>
             <h3 class="font-display text-sm font-semibold text-aruna-navy">Replica-inclusive placement records held</h3>
-            <p class="mt-1 text-xs text-muted-foreground">Metadata placement records held by reporting nodes. Replicas are included.</p>
+            <p class="mt-1 text-xs text-muted-foreground">Dataset placement records held by reporting nodes. Replicas are included.</p>
           </div>
           <div class="text-right">
             <div class="font-display text-xl font-bold text-foreground">{{ formatNumber(docsHeld.total) }}</div>
@@ -266,7 +266,7 @@ const pageDescription = computed(() =>
           <header class="flex items-center justify-between border-b border-border px-5 py-4">
             <div class="flex items-center gap-2">
               <FileJson2 class="h-4 w-4 text-primary" />
-              <h2 class="font-display text-sm font-semibold text-aruna-navy">Recent Datasets</h2>
+              <h2 class="font-display text-sm font-semibold text-aruna-navy">Recent datasets</h2>
             </div>
             <RouterLink :to="{ name: 'datasets' }" class="text-xs font-medium text-primary hover:underline">Datasets</RouterLink>
           </header>
@@ -290,7 +290,7 @@ const pageDescription = computed(() =>
               </RouterLink>
             </li>
             <li v-if="!recentMetadata.length" class="px-5 py-6">
-              <EmptyState compact title="No visible Datasets yet." />
+              <EmptyState compact title="No visible datasets yet." />
             </li>
           </ul>
         </div>
@@ -302,9 +302,9 @@ const pageDescription = computed(() =>
               <h2 class="font-display text-sm font-semibold text-aruna-navy">Buckets</h2>
             </div>
             <p class="mt-2 text-xs text-muted-foreground">
-              Browse buckets, upload objects and mint credentials in the data manager. The same buckets are served by the node's S3 API, so any S3 client works too.
+              Browse buckets, upload objects and mint credentials in Data. The same buckets are served by the node's S3 API, so any S3 client works too.
             </p>
-            <RouterLink to="/app/buckets" class="mt-3 inline-flex text-xs font-medium text-primary hover:underline">Open data manager</RouterLink>
+            <RouterLink to="/app/buckets" class="mt-3 inline-flex text-xs font-medium text-primary hover:underline">Open Data</RouterLink>
           </section>
         </div>
       </section>

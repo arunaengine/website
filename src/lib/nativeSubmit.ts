@@ -89,10 +89,10 @@ function mapInput(
   placement: NativePlacementOptions,
 ): ExecutionInputRequest | NativeBlocked {
   if (input.content !== undefined) {
-    return { blocked: 'An input carries inline content, which no submission surface accepts.', kind: 'unsupported' }
+    return { blocked: 'An input carries inline content, which no run surface accepts.', kind: 'unsupported' }
   }
   if (input.type && input.type !== 'FILE') {
-    return { blocked: 'A directory input cannot be submitted; add its files instead.', kind: 'unsupported' }
+    return { blocked: 'A directory input cannot be used; add its files instead.', kind: 'unsupported' }
   }
   const parsed = input.url ? parseS3Url(input.url) : null
   if (!parsed) {
@@ -139,7 +139,7 @@ function mapOutput(output: {
   const containerPath = output.path.trim()
   if (output.type === 'DIRECTORY' || containerPath.endsWith('/')) {
     return {
-      blocked: `The folder capture ${containerPath} cannot be submitted; capture its files instead.`,
+      blocked: `The folder capture ${containerPath} cannot be used; capture its files instead.`,
       kind: 'unsupported',
     }
   }
@@ -175,7 +175,7 @@ export function tesFormToExecutionRequest(form: NativeSubmitForm): NativeMapping
   if (task.executors.length !== 1) {
     return {
       blocked: task.executors.length
-        ? 'A job runs exactly one executor; this draft declares several.'
+        ? 'A run uses exactly one executor; this draft declares several.'
         : 'The draft declares no executor.',
       kind: 'unsupported',
     }

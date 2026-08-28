@@ -250,7 +250,7 @@ async function changeCredentials(existing: GroupBackendResponse): Promise<GroupB
           <fieldset class="space-y-3 rounded-md border border-border p-3">
             <legend class="px-1 text-xs font-semibold text-foreground">Credentials</legend>
             <p class="text-[11px] text-muted-foreground">
-              Stored write-only: the server never shows them again.
+              Stored write-only: the node never shows them again.
               <template v-if="schema.secretOneOf">One of the two is enough.</template>
               <template v-if="isEdit && !settingsChanged"> Leave blank to keep the current ones.</template>
               <template v-else-if="isEdit"> Changing the settings above rewrites them, so enter them again.</template>

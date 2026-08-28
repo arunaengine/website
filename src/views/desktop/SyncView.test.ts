@@ -161,6 +161,13 @@ const Notice = compileClientComponent(new URL('../../components/ui/Notice.vue', 
   '@/lib/utils': Utils,
 })
 
+const ListShell = compileClientComponent(new URL('../../components/ui/ListShell.vue', import.meta.url), {
+  vue: VueRuntime,
+  '@/components/ui/Skeleton.vue': moduleDefault(Blank),
+  '@/components/ui/ErrorPanel.vue': moduleDefault(RefusalStub),
+  '@/components/ui/EmptyState.vue': moduleDefault(EmptyStateStub),
+})
+
 const SyncItemRow = compileClientComponent(new URL('../../components/desktop/SyncItemRow.vue', import.meta.url), {
   vue: VueRuntime,
   'vue-router': RouterRuntime,
@@ -188,6 +195,7 @@ const SyncView = compileClientComponent(new URL('./SyncView.vue', import.meta.ur
   '@/components/ui/DropdownMenuTrigger.vue': moduleDefault(Pass),
   '@/components/ui/EmptyState.vue': moduleDefault(EmptyStateStub),
   '@/components/ui/FilterChips.vue': moduleDefault(FilterChipsStub),
+  '@/components/ui/ListShell.vue': moduleDefault(ListShell),
   '@/components/ui/Notice.vue': moduleDefault(Notice),
   '@/components/ui/Progress.vue': moduleDefault(ProgressStub),
   '@/components/ui/RefreshButton.vue': moduleDefault(refreshButton()),

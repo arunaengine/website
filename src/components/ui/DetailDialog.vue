@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // The app's single detail-view idiom: a large centered modal used by object
-// previews and the task/job detail views (side sheets are retired for these).
+// previews and the run and system job detail views (side sheets are retired).
 import Dialog from './Dialog.vue'
 import DialogContent from './DialogContent.vue'
 

@@ -292,7 +292,7 @@ export function liftShapes(turtle: string): LiftResult {
   // negation, a qualified value shape) describe part of something else, never
   // the crate root. A PROPERTY-level sh:node is deliberately NOT in this list:
   // the projection emits `sh:node <root shape>` for any rule whose target type
-  // is the crate's own Dataset, and that must not stop the root shape being
+  // is the crate's own dataset, and that must not stop the root shape being
   // recognized. A value shape that pins a class is grouped under that class
   // anyway, so it never reaches the root fallback. validate.ts binds root
   // targets by the same rule, so the two cannot disagree about which shape is
@@ -421,9 +421,9 @@ export function liftShapes(turtle: string): LiftResult {
     }
   }
 
-  // Which group drives the root Dataset form: the target-less group the
-  // projection emits, else a group typed Dataset, else a group whose shapes
-  // merely REQUIRE schema:Dataset (the common "my class is also a Dataset"
+  // Which group drives the root dataset form: the target-less group the
+  // projection emits, else a group typed dataset, else a group whose shapes
+  // merely REQUIRE schema:Dataset (the common "my class is also a dataset"
   // form). That one gets retyped, which is worth a note.
   const ordered = [...groups.values()]
   const rootGroup =
@@ -434,7 +434,7 @@ export function liftShapes(turtle: string): LiftResult {
     const asserting = rootGroup.shapes.find((shape) => isDatasetType(shape.nodeClass ?? shape.targetClass ?? ''))
     notes.add(
       'partial',
-      `Rules targeting ${shortIri(rootGroup.key)} were imported onto the Root Dataset. Crates written here are typed Dataset only, so shapes targeting ${shortIri(rootGroup.key)} in the attached file will not match anything.`,
+      `Rules targeting ${shortIri(rootGroup.key)} were imported onto the Root dataset. Crates written here are typed dataset only, so shapes targeting ${shortIri(rootGroup.key)} in the attached file will not match anything.`,
       asserting?.name ?? rootGroup.shapes[0]?.name,
     )
   }
@@ -453,7 +453,7 @@ export function liftShapes(turtle: string): LiftResult {
     const isRoot = group === rootGroup
     const type = isRoot ? SCHEMA_DATASET : group.key
     const className = classNameFor(type)
-    const scopeName = isRoot ? 'Root Dataset' : className
+    const scopeName = isRoot ? 'Root dataset' : className
     // Every type the group's shapes state, so an rdf:type constraint naming any
     // member of a union is recognized as the type marker it is.
     const groupTypes = [type, ...group.shapes.flatMap((shape) => index.types.get(termKey(shape.subject)) ?? [])]
@@ -519,7 +519,7 @@ export function liftShapes(turtle: string): LiftResult {
 
     entities.push({
       id,
-      label: isRoot ? 'Root Dataset' : group.label || humanLabel(uniqueClassName),
+      label: isRoot ? 'Root dataset' : group.label || humanLabel(uniqueClassName),
       description: '',
       type,
       className: uniqueClassName,
@@ -527,7 +527,7 @@ export function liftShapes(turtle: string): LiftResult {
     })
   }
 
-  // Root Dataset first: the builder's outline opens on it.
+  // Root dataset first: the builder's outline opens on it.
   entities.sort((a, b) => Number(isDatasetType(b.type)) - Number(isDatasetType(a.type)))
 
   return {
@@ -888,7 +888,7 @@ function resolveKind(
     else if (takePattern(URL_PATTERN)) kind = 'url'
     else if (takePattern(DATE_PATTERN)) kind = 'date'
     else if (takePattern(DATETIME_PATTERN)) kind = 'datetime'
-    // A file that only says "the root Dataset must have a license" says nothing
+    // A file that only says "the root dataset must have a license" says nothing
     // about the input; the RO-Crate baseline terms have one obvious form each,
     // and the builder locks these four rules anyway. Beyond those, a term the
     // portal's own catalogue describes is imported the way the builder would

@@ -71,7 +71,7 @@ const idLink = computed(() => {
         </template>
       </template>
       <template v-else-if="contextText">{{ contextText }}</template>
-      <span v-else-if="entity.unresolved" class="italic">Referenced but not described in this crate</span>
+      <span v-else-if="entity.unresolved" class="italic">Referenced but not described in this dataset</span>
     </div>
 
     <div class="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px]">

@@ -23,7 +23,7 @@ import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { statusTone } from '@/components/nodes/node-display'
 
 // 'desktop' is the Aruna Desktop chrome: no realm switcher and no dataset
-// shortcut, and the machine's own node takes the leading slot instead.
+// shortcut, and this computer's own node takes the leading slot instead.
 const props = withDefaults(defineProps<{ variant?: 'portal' | 'desktop' }>(), { variant: 'portal' })
 
 const { realm, role } = useRealm()
@@ -67,7 +67,7 @@ async function handleSignOut() {
 <template>
   <div class="sticky top-0 z-30 border-b border-border/80 bg-background/90 backdrop-blur-xl">
     <div class="container flex h-14 items-center gap-1 min-[480px]:gap-3">
-      <!-- The machine plate: this device's node, and the realm it answers to. -->
+      <!-- The device plate: this computer's node, and the realm it answers to. -->
       <RouterLink
         v-if="desktop"
         :to="{ name: 'device' }"
@@ -124,10 +124,10 @@ async function handleSignOut() {
             <div class="truncate text-xs text-muted-foreground">{{ currentUser.email || currentUser.id }}</div>
           </div>
           <DropdownMenuSeparator />
-          <DropdownMenuItem @click="router.push({ name: 'settings', hash: '#profile' })"
+          <DropdownMenuItem @click="router.push({ name: 'settings' })"
             ><User class="h-3.5 w-3.5" /> Profile
           </DropdownMenuItem>
-          <DropdownMenuItem @click="router.push({ name: 'settings', hash: '#connection' })"
+          <DropdownMenuItem @click="router.push({ name: 'settings', query: { tab: 'connection' } })"
             ><Key class="h-3.5 w-3.5" /> Access tokens</DropdownMenuItem
           >
           <DropdownMenuSeparator />

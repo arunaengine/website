@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Desktop first run, after sign-in: the node this machine runs is offered once
+// Desktop first run, after sign-in: the node this computer runs is offered once
 // and may be skipped. Setting up mints an enrollment against the realm and
 // redeems it here; the shell restarts the node and switches this window's
 // context underneath the step, which keeps watching across it.
@@ -69,7 +69,7 @@ function leave(): void {
           <div class="relative">
             <AppLogo :size="26" subtitle="the data orchestration engine" />
             <h2 class="mt-6 font-display text-base font-semibold tracking-tight text-aruna-navy">
-              Your own node, on this machine
+              Your own node, on this computer
             </h2>
             <p class="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
               Joins

@@ -31,8 +31,8 @@ export const PROFILE_ENTITY_SOURCE_LABELS: Record<ProfileEntitySource, { label: 
     help: 'A URI field emitted as a bare {"@id"} reference to a persistent external identifier; its fields are never re-entered and only the reference itself can be validated.',
   },
   'existing-crate': {
-    label: 'Reuse an entity in this crate (e.g. an attached file)',
-    help: 'References another entity in the same crate, e.g. a file picked from the crate contents; emitted as a crate-local {"@id"} reference.',
+    label: 'Reuse an entity in this RO-Crate (e.g. an attached file)',
+    help: 'References another entity in the same RO-Crate, e.g. a file picked from its contents; emitted as an RO-Crate-local {"@id"} reference.',
   },
 }
 

@@ -174,7 +174,7 @@ export interface JsonSchemaProperty {
 // `recommended` is an array of SHOULD-level property names, a sibling of
 // `required` (the Bioschemas profile convention). Standard validators ignore
 // it; the portal reads it to raise non-blocking warnings. The root schema
-// describes the Dataset entity; non-Dataset entity rules serialize as `$defs`
+// describes the dataset entity; non-Dataset entity rules serialize as `$defs`
 // entries keyed by class short name. Entity-kind property rules appear in the
 // presence arrays only: they are `{"@id"}` references, not scalar keys, so
 // they get no `properties` entry (valid JSON Schema: `required` may list names

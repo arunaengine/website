@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// Whether this machine runs jobs itself, with which runtime, and how much of
-// the machine they may take. The probe is what the shell found; the settings
+// Whether this computer runs work itself, with which runtime, and how much of
+// it that work may take. The probe is what the shell found; the settings
 // are what the owner decided, and saving them restarts the node.
 import { computed, onMounted, ref } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
@@ -114,9 +114,9 @@ const resolved = computed(() => {
 const chosenMissing = computed(() => {
   const backend = settings.value?.backend
   if (!probe.value || !backend || backend === 'off') return null
-  if (backend === 'docker' && !probe.value.docker.available) return 'Docker is not answering on this machine.'
-  if (backend === 'apptainer' && !probe.value.apptainer.available) return 'Apptainer is not installed on this machine.'
-  if (backend === 'auto' && !resolved.value) return 'Neither Docker nor Apptainer was found on this machine.'
+  if (backend === 'docker' && !probe.value.docker.available) return 'Docker is unreachable on this computer.'
+  if (backend === 'apptainer' && !probe.value.apptainer.available) return 'Apptainer is not installed on this computer.'
+  if (backend === 'auto' && !resolved.value) return 'Neither Docker nor Apptainer was found on this computer.'
   return null
 })
 </script>
@@ -126,10 +126,10 @@ const chosenMissing = computed(() => {
     <div class="surface space-y-5 p-5">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 class="font-display text-sm font-semibold text-aruna-navy">Run jobs on this computer</h3>
+          <h3 class="font-display text-sm font-semibold text-aruna-navy">Runs on this computer</h3>
           <p class="mt-1 text-xs text-muted-foreground">
-            Jobs you send to This computer run in a container here, against data this node already holds. The realm
-            never sends work to this machine.
+            Runs you send to This computer execute in a container here, against data this node already holds. The
+            realm never sends work to this computer.
           </p>
         </div>
         <div class="flex shrink-0 items-center gap-2">
@@ -153,7 +153,7 @@ const chosenMissing = computed(() => {
               @update:model-value="patch({ backend: $event as ComputeSettings['backend'] })"
             />
             <span v-if="settings.backend === 'auto' && resolved" class="mt-1 block text-[11px] text-muted-foreground"
-              >Automatic picks {{ resolved }} on this machine.</span
+              >Automatic picks {{ resolved }} on this computer.</span
             >
           </label>
           <label class="block">
@@ -230,7 +230,7 @@ const chosenMissing = computed(() => {
         <Notice v-if="saveError" tone="error">{{ saveError }}</Notice>
 
         <div class="flex flex-wrap items-center justify-end gap-3">
-          <span class="mr-auto text-[11px] text-muted-foreground">Saving restarts the node on this machine.</span>
+          <span class="mr-auto text-[11px] text-muted-foreground">Saving restarts the node on this computer.</span>
           <span v-if="saved" class="text-[11px] text-muted-foreground">Saved.</span>
           <Button :disabled="saving" @click="save">{{ saving ? 'Saving…' : 'Save compute settings' }}</Button>
         </div>
@@ -238,13 +238,13 @@ const chosenMissing = computed(() => {
     </div>
 
     <div class="surface space-y-3 p-5">
-      <h3 class="font-display text-sm font-semibold text-aruna-navy">What this machine offers</h3>
+      <h3 class="font-display text-sm font-semibold text-aruna-navy">What this computer offers</h3>
       <p v-if="probeError" class="text-xs text-muted-foreground">The shell could not look for a runtime: {{ probeError }}</p>
       <dl v-else-if="probe" class="grid gap-3 sm:grid-cols-2">
         <div class="surface-inline px-3 py-2">
           <dt class="text-xs font-medium text-foreground">Docker</dt>
           <dd class="mt-0.5 font-mono text-[11px] text-muted-foreground">
-            {{ probe.docker.available ? (probe.docker.version ?? 'available') : 'not answering' }}
+            {{ probe.docker.available ? (probe.docker.version ?? 'available') : 'unreachable' }}
           </dd>
           <dd v-if="probe.docker.socket" class="truncate font-mono text-[10px] text-muted-foreground">
             {{ probe.docker.socket }}

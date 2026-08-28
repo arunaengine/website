@@ -6,7 +6,7 @@ import Badge from '@/components/ui/Badge.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import NodesHealth from '@/components/dashboard/NodesHealth.vue'
 import type { RealmNodeInfo } from '@/lib/api'
-import { connectionLabel, connectionVariant, kindVariant } from '@/components/nodes/node-display'
+import { connectionLabel, connectionVariant, kindLabel, kindVariant } from '@/components/nodes/node-display'
 import { relativeTime, truncateMiddle } from '@/lib/utils'
 import { Laptop } from '@lucide/vue'
 
@@ -15,7 +15,7 @@ const props = defineProps<{
   /** Devices of the realm's users: summarized here, never drawn as nodes. */
   devices?: RealmNodeInfo[]
   replicationFactor?: number | null
-  /** peer id of the node this portal is connected to */
+  /** id of the node this portal is connected to */
   localPeerId?: string
 }>()
 
@@ -159,7 +159,7 @@ function heartbeatLabel(node: RealmNodeInfo): string | null {
 }
 
 function nodeTitle(node: RealmNodeInfo): string {
-  const parts = [truncateMiddle(node.node_id), node.kind, connectionLabel(node)]
+  const parts = [truncateMiddle(node.node_id), kindLabel[node.kind], connectionLabel(node)]
   const beat = heartbeatLabel(node)
   if (beat) parts.push(`heartbeat ${beat}`)
   return parts.join(' · ')
@@ -204,7 +204,7 @@ function loadArc(cx: number, cy: number, permille: number): string {
 <template>
   <section>
     <div class="mb-3.5 flex flex-wrap items-center justify-between gap-2">
-      <h2 class="font-display text-[15px] font-semibold text-foreground/85">Federation network</h2>
+      <h2 class="font-display text-[15px] font-semibold text-foreground/85">Realm nodes</h2>
       <div class="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
         <Badge variant="outline" class="tabular-nums">{{ nodes.length }} nodes</Badge>
         <Badge variant="outline" class="tabular-nums">{{ connectedCount }} of {{ nodes.length }} present in DHT</Badge>
@@ -377,7 +377,7 @@ function loadArc(cx: number, cy: number, permille: number): string {
         <div class="flex flex-wrap items-center gap-2 border-b border-border/60 px-5 py-3">
           <span class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Kinds</span>
           <Badge v-for="[kind, count] in kindCounts" :key="kind" :variant="kindVariant[kind]" size="sm">
-            {{ kind }} · {{ count }}
+            {{ kindLabel[kind] }} · {{ count }}
           </Badge>
         </div>
         <div class="flex flex-wrap items-center gap-2 border-b border-border/60 px-5 py-3">

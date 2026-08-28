@@ -49,7 +49,7 @@ export function deviceErrorMessage(err: unknown, limit: number | null, node = ''
       const where = origin ? `; the node in use is ${origin}` : ''
       return [
         'This node refused to manage devices.',
-        `Devices are managed on a management node only${where}.`,
+        `Devices are enrolled only on a management node, the node that mints and redeems enrollments${where}.`,
         'It takes an unrestricted token; a path-restricted one is refused.',
         'A realm policy can deny device enrollment.',
       ].join('\n')

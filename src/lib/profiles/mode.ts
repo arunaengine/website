@@ -145,7 +145,7 @@ export function entityRulesToMode(
 // to type URIs via the mode context, falling back to http://schema.org/<Name>.
 // A `type` array containing any non-primitive (class) token yields an `entity`
 // rule. Constraints hydrate from the class's schema scope: the root schema for
-// the Dataset class, `$defs[<class name>]` for every other class. Entity
+// the dataset class, `$defs[<class name>]` for every other class. Entity
 // descriptions round-trip via the schema (`$defs[<class>].description`); the
 // Dataset entity's description is not restored (its baseline is regenerated).
 export function modeToEntityRules(mode: ModeFile, schema?: JsonSchema): ProfileEntityRule[] {

@@ -17,7 +17,7 @@ import {
 const LOCAL = 'http://127.0.0.1:34116/api/v1'
 const REALM = 'https://aruna.example'
 
-// What the shell says about the node this machine runs; mutated per case.
+// What the shell says about the node this computer runs; mutated per case.
 const status = { state: 'running', enrolled: false, apiBaseUrl: LOCAL }
 const nodeStatus = vi.fn(async () => status)
 // What the realm node says it is; null until a realm token asked.

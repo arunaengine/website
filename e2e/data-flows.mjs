@@ -117,7 +117,7 @@ try {
   // Settings: save profile attributes through PATCH /users/info
   await page.goto(BASE + '/app/settings')
   await page.waitForTimeout(1500)
-  const inputs = page.locator('#profile input')
+  const inputs = page.locator('[role="tabpanel"] input')
   await inputs.nth(1).fill('admin@aruna.org')
   await inputs.nth(2).fill('Aruna project')
   await page.getByRole('button', { name: /Save profile/ }).click()
@@ -125,17 +125,19 @@ try {
   step('profile saved via PATCH /users/info', true)
   await page.reload()
   await page.waitForTimeout(2000)
-  const affiliationValue = await page.locator('#profile input').nth(2).inputValue()
+  const affiliationValue = await page.locator('[role="tabpanel"] input').nth(2).inputValue()
   step('profile attributes persisted', affiliationValue === 'Aruna project', affiliationValue)
 
-  // Groups and credentials sections render real data
+  // The Groups tab renders real data
+  await page.getByRole('tab', { name: 'Groups' }).click()
+  await page.waitForTimeout(800)
   const settingsBody = await page.textContent('body')
-  step('groups section shows Genomics lab', settingsBody.includes('Genomics lab'))
+  step('groups tab shows Genomics lab', settingsBody.includes('Genomics lab'))
 
-  // Deep-link to a nonexistent document → honest not-found panel (not a redirect)
+  // Deep-link to a nonexistent dataset gives an honest not-found panel, not a redirect
   await page.goto(BASE + '/app/metadata/01UNKNOWNDOCID0000000000000')
   await page.waitForTimeout(1500)
-  step('unknown document shows not-found panel', (await page.textContent('body')).includes('does not exist'))
+  step('unknown dataset shows not-found panel', (await page.textContent('body')).includes('does not exist'))
 
   // Unknown app URL → 404 view instead of a silent redirect to '/'
   await page.goto(BASE + '/app/nope')

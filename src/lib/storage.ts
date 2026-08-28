@@ -171,7 +171,7 @@ const COPY_STATES: Record<BlobCopyState, { label: string; description: string }>
   },
   unreachable: {
     label: 'unreachable',
-    description: 'This node did not answer, so we cannot tell whether it has a copy.',
+    description: 'This node is unreachable, so we cannot tell whether it has a copy.',
   },
   denied: {
     label: 'denied',
@@ -195,7 +195,7 @@ const SCAN_LIMITS: Record<string, string> = {
   'candidate-cap-reached': 'More nodes could have a copy than one request asks; the rest were not contacted.',
   'holder-lookup-failed': 'The index of nodes that have this file could not be searched.',
   'holder-path-unknown': 'A node that has a copy could not be asked in a way it understood.',
-  'holder-unreachable': 'A node did not answer, so whether it has a copy is unknown.',
+  'holder-unreachable': 'A node is unreachable, so whether it has a copy is unknown.',
 }
 
 export function scanLimitText(limit: string): string {

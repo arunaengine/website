@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Binds a folder on this machine to a bucket in the realm. The folder itself
+// Binds a folder on this computer to a bucket in the realm. The folder itself
 // is picked with the shell's native dialog; everything else names the realm
 // side, the way the bucket sync dialog does.
 import { computed, ref, watch } from 'vue'
@@ -55,7 +55,7 @@ const nodeChoices = computed(() =>
     .filter((node) => node.kind !== 'user')
     .map((node) => ({
       value: node.nodeId,
-      label: `${node.label}${node.reachable ? '' : ' (offline)'}`,
+      label: `${node.label}${node.reachable ? '' : ' (unreachable)'}`,
       reachable: node.reachable,
     })),
 )

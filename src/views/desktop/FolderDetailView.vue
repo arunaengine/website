@@ -135,7 +135,7 @@ async function act(entry: FolderEntry, action: EntryAction): Promise<void> {
   actionError.value = null
   const expected = entryExpectation(entry)
   if (!expected) {
-    actionError.value = 'This device has not hashed that file yet, so nothing can be applied to it. Sync the folder and try again.'
+    actionError.value = 'This computer has not hashed that file yet, so nothing can be applied to it. Sync the folder and try again.'
     return
   }
   try {
@@ -358,7 +358,7 @@ const facts = computed(() => {
       </ul>
 
       <div v-if="cursor" class="flex justify-center">
-        <Button variant="outline" size="sm" @click="loadPage(false)">Load more</Button>
+        <Button variant="ghost" size="sm" @click="loadPage(false)">Load more</Button>
       </div>
 
       <section v-if="folder" class="surface space-y-2 border-destructive/25 px-4 py-3.5">

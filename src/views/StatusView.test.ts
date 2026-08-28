@@ -118,7 +118,7 @@ describe('device summary', () => {
     expect(text).toContain('server-node')
     expect(text).not.toContain('laptop-')
     expect(text).not.toContain('user-2')
-    // Devices are owner-bound machines: they stay out of the placement buckets.
+    // Devices are owner-bound computers: they stay out of the placement buckets.
     expect(text).toContain('eu-west=1')
     expect(text).not.toContain('(not in placement map)')
     expect(text).toContain('1 / 1 present in DHT')

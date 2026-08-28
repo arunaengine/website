@@ -109,7 +109,7 @@ const pickBucket = computed(
 
 const browseHint = computed(() => {
   if (!s3.endpoint.value) return 'This node advertises no S3 endpoint, so the target is typed by hand.'
-  if (!s3.hasActiveKey.value) return 'S3 credentials (Data manager) unlock the bucket picker; the import itself does not need them.'
+  if (!s3.hasActiveKey.value) return 'S3 credentials from Data unlock the bucket picker; the import itself does not need them.'
   if (authRejected.value) return 'Your S3 credentials were rejected, so the target cannot be browsed.'
   if (bucketList.loaded.value && !bucketOptions.value.length) return 'No buckets are visible with this key, type the target name.'
   return null
@@ -425,10 +425,10 @@ function rowTarget(row: TransferRow): string {
         </DialogTitle>
         <DialogDescription>
           <template v-if="isImport">
-            Upload a .zip or .eln RO-Crate, unpack its payload into a bucket and register the crate as a metadata document.
+            Upload a .zip or .eln RO-Crate, unpack its payload into a bucket and register it as a dataset.
           </template>
           <template v-else>
-            Package {{ props.documentPath || 'this document' }} and its resolvable data into a downloadable RO-Crate zip.
+            Package {{ props.documentPath || 'this dataset' }} and its resolvable data into a downloadable RO-Crate zip.
           </template>
         </DialogDescription>
       </DialogHeader>
@@ -465,8 +465,8 @@ function rowTarget(row: TransferRow): string {
               />
             </div>
             <div>
-              <label class="text-xs font-medium text-foreground">Document path</label>
-              <Input v-model="documentPath" placeholder="datasets/my-crate" class="mt-1" />
+              <label class="text-xs font-medium text-foreground">Dataset path</label>
+              <Input v-model="documentPath" placeholder="datasets/my-dataset" class="mt-1" />
             </div>
             <div>
               <label class="text-xs font-medium text-foreground">Target bucket</label>
@@ -527,16 +527,16 @@ function rowTarget(row: TransferRow): string {
             </p>
           </div>
           <div class="flex items-center gap-2">
-            <Switch :checked="isPublic" aria-label="Publish the imported document" @update:checked="isPublic = $event" />
-            <span class="text-xs text-foreground">Make the imported metadata document public</span>
+            <Switch :checked="isPublic" aria-label="Publish the imported dataset" @update:checked="isPublic = $event" />
+            <span class="text-xs text-foreground">Make the imported dataset public</span>
           </div>
           <p class="text-[11px] text-muted-foreground">
-            The archive is uploaded privately first, then unpacked by a durable job. You need write access to the bucket and the group.
+            The archive is uploaded privately first, then unpacked in the background. You need write access to the bucket and the group.
           </p>
         </template>
 
         <p v-else-if="!isImport && !activeJobId" class="text-xs text-muted-foreground">
-          Data entities that cannot be resolved (external URLs, denied, missing or offline objects) are listed in the
+          Data entities that cannot be resolved (external URLs, denied, missing or unreachable objects) are listed in the
           report instead of being packed.
         </p>
 
@@ -548,7 +548,7 @@ function rowTarget(row: TransferRow): string {
           </div>
           <Progress v-if="progressPercent !== null && !terminal" :value="progressPercent" :warn="101" :critical="101" />
           <Notice v-if="loadState === 'unsupported'" tone="warning">
-            This backend does not serve the durable jobs API, so the transfer cannot be followed here.
+            This node does not serve the system jobs API, so the transfer cannot be followed here.
           </Notice>
           <div v-else-if="loadState === 'error'" class="space-y-1">
             <p class="text-xs text-destructive">{{ loadError }}</p>
@@ -566,7 +566,7 @@ function rowTarget(row: TransferRow): string {
           </p>
 
           <Button v-if="createdDocumentId" variant="outline" size="sm" as-child @click="emit('update:open', false)">
-            <RouterLink :to="{ name: 'dataset', params: { id: createdDocumentId } }">Open the created document</RouterLink>
+            <RouterLink :to="{ name: 'dataset', params: { id: createdDocumentId } }">Open the created dataset</RouterLink>
           </Button>
 
           <div v-if="terminal" class="space-y-2">
@@ -576,11 +576,11 @@ function rowTarget(row: TransferRow): string {
             </div>
             <div v-if="reportPending || reportError" class="flex items-center gap-2">
               <p class="text-xs" :class="reportError ? 'text-destructive' : 'text-muted-foreground'">
-                {{ reportError || 'The job report is still being written…' }}
+                {{ reportError || 'The report is still being written…' }}
               </p>
               <Button variant="ghost" size="sm" :disabled="reportLoading" @click="retryReport">Retry</Button>
             </div>
-            <EmptyState v-else-if="!rows.length && !reportLoading" compact title="This job produced no report rows." />
+            <EmptyState v-else-if="!rows.length && !reportLoading" compact title="This transfer produced no report rows." />
             <div v-else-if="rows.length" class="max-h-64 overflow-y-auto rounded-md border border-border">
               <table class="w-full text-[11px]">
                 <tbody>
@@ -608,7 +608,7 @@ function rowTarget(row: TransferRow): string {
 
         <p v-if="submitError" class="text-xs text-destructive">{{ submitError }}</p>
         <p v-if="uploadId && !activeJobId" class="text-[11px] text-muted-foreground">
-          Uploaded {{ formatBytes(uploadedBytes) }}; the import has not been submitted yet.
+          Uploaded {{ formatBytes(uploadedBytes) }}; the import has not started yet.
         </p>
       </div>
 
@@ -624,7 +624,7 @@ function rowTarget(row: TransferRow): string {
         <Button v-if="isImport && !activeJobId" :disabled="!importReady || Boolean(busy)" @click="startImport">
           <Spinner v-if="busy" class="text-current" aria-hidden="true" />
           <Upload v-else class="h-4 w-4" />
-          {{ busy === 'uploading' ? 'Uploading…' : busy === 'submitting' ? 'Submitting…' : 'Upload and import' }}
+          {{ busy === 'uploading' ? 'Uploading…' : busy === 'submitting' ? 'Starting…' : 'Upload and import' }}
         </Button>
         <Button v-if="!isImport && !activeJobId" :disabled="!props.documentId || Boolean(busy)" @click="startExport">
           <Spinner v-if="busy" class="text-current" aria-hidden="true" />

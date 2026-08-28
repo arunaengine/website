@@ -1,16 +1,17 @@
-// Realm-node lookup shared by the federated search and bucket sync surfaces:
+// Realm-node lookup shared by the cross-node search and bucket sync surfaces:
 // node id → display name, published URLs and reachability, from the already
 // loaded GET /info/realm (no extra requests).
 import { computed } from 'vue'
 import { useAruna } from './useAruna'
 import { nodeApiBase } from '@/components/nodes/node-probe'
+import { kindLabel } from '@/components/nodes/node-display'
 import { truncateMiddle } from '@/lib/utils'
 import type { RealmNodeInfo } from '@/lib/api'
 
 export interface RealmNodeDisplay {
   nodeId: string
   kind: RealmNodeInfo['kind']
-  /** Latest advertised node document, including custom placement labels. */
+  /** Latest advertised node record, including custom placement labels. */
   info: RealmNodeInfo['info']
   /** Human label: a published name label when set, else "<kind> <short-id>". */
   label: string
@@ -27,7 +28,7 @@ export interface RealmNodeDisplay {
 function nodeLabel(node: RealmNodeInfo): string {
   const labels = node.info?.labels ?? {}
   const named = labels['name'] || labels['display_name']
-  return named || `${node.kind} ${truncateMiddle(node.node_id, 8, 4)}`
+  return named || `${kindLabel[node.kind]} ${truncateMiddle(node.node_id, 8, 4)}`
 }
 
 export function useRealmNodes() {
@@ -44,7 +45,7 @@ export function useRealmNodes() {
         info: node.info,
         label: nodeLabel(node),
         // The connected node's own S3 endpoint comes from /info even when the
-        // node has not published a realm document yet.
+        // node has not published a realm record yet.
         s3Url:
           node.info?.urls?.s3 ??
           (isLocal ? (nodeInfo.value?.services?.interfaces?.s3?.url ?? null) : null),

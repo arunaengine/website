@@ -182,7 +182,7 @@ function jobPercent(job: StagingJob): number {
       <DialogHeader>
         <div class="flex items-center justify-between gap-2 pr-8">
           <DialogTitle class="flex items-center gap-2">
-            <HardDriveDownload class="h-4 w-4 text-primary" /> Staging jobs
+            <HardDriveDownload class="h-4 w-4 text-primary" /> Staging
           </DialogTitle>
           <RefreshButton :busy="spinning" sr-label="Reload" @click="onReload" />
         </div>
@@ -198,11 +198,11 @@ function jobPercent(job: StagingJob): number {
         <EmptyState
           v-else-if="noRegistry"
           compact
-          title="This backend does not keep a staging job registry yet (aruna#276)."
-          description="Jobs submitted from this browser appear below."
+          title="This node does not keep a staging registry yet (aruna#276)."
+          description="Staging started from this browser appears below."
         />
         <ErrorPanel v-else-if="error" :message="error" @retry="loadJobs" />
-        <EmptyState v-else-if="!jobs.length" title="No staging jobs" />
+        <EmptyState v-else-if="!jobs.length" title="No staging system jobs" />
         <div v-else class="space-y-2">
             <div v-for="job in jobs" :key="job.job_id" class="space-y-1 rounded-md border border-border px-3 py-2">
               <div class="flex items-center gap-2 text-xs">
@@ -244,7 +244,7 @@ function jobPercent(job: StagingJob): number {
         </div>
         <div v-if="nextCursor || loadMoreError" class="space-y-1 text-center">
           <Button v-if="nextCursor" variant="outline" size="sm" :disabled="loadingMore" @click="loadMore">
-            <Spinner v-if="loadingMore" label="Loading more staging jobs" class="text-current" /> Load more
+            <Spinner v-if="loadingMore" label="Loading more staging system jobs" class="text-current" /> Load more
           </Button>
           <p v-if="loadMoreError" class="text-[10px] text-destructive">{{ loadMoreError }}</p>
         </div>

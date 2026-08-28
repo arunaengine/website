@@ -20,8 +20,8 @@ const headline = computed(() =>
   realmMismatch.value
     ? 'The realm was recreated'
     : stopped.value
-      ? "This device's node is not running."
-      : "This device's node failed.",
+      ? "This computer's node is not running."
+      : "This computer's node failed.",
 )
 const detail = computed(() =>
   realmMismatch.value
@@ -86,7 +86,7 @@ async function startNode(): Promise<void> {
             </template>
           </FactList>
           <p class="mt-3 text-sm leading-relaxed text-muted-foreground">
-            This device's data belongs to the old realm. Wipe it before setting it up with the recreated realm.
+            This computer's data belongs to the old realm. Wipe it before setting it up with the recreated realm.
           </p>
         </template>
         <Notice v-if="actionError" tone="error" class="mt-2">{{ actionError }}</Notice>

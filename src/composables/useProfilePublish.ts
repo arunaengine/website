@@ -43,7 +43,7 @@ export function useProfilePublish() {
     const endpoint = s3.endpoint.value
     if (!endpoint) throw new Error('Publishing a public profile needs the node S3 endpoint, which this node does not advertise.')
     if (!s3.hasActiveKey.value) {
-      throw new Error('Publishing a public profile uploads its artifacts to S3, create S3 credentials for this group first (Data manager or Settings).')
+      throw new Error('Publishing a public profile uploads its artifacts to S3, create S3 credentials for this group first (Data or Settings).')
     }
 
     const defaultBucket = `profiles-${groupId.toLowerCase()}`

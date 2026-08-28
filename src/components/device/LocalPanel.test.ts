@@ -87,7 +87,7 @@ describe('the local S3 endpoint', () => {
     const html = content(mounted.root)
 
     expect(html).toContain('Local S3 endpoint')
-    expect(html).toContain('serves you an S3 endpoint on this machine')
+    expect(html).toContain('serves you an S3 endpoint on this computer')
     expect(html).toContain('restarts the node')
     expect(html).toContain('http://127.0.0.1:34118')
     expect(html).not.toContain('Start with the app')

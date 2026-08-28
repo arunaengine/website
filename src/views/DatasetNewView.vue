@@ -521,7 +521,7 @@ async function create() {
           <Notice
             v-if="parsedProfile?.liftNotes.length"
             tone="warning"
-            title="Additional SHACL requirements"
+            title="Additional profile requirements"
             :lines="parsedProfile.liftNotes.map((note) => note.message)"
           />
         </section>
@@ -582,7 +582,7 @@ async function create() {
         <section id="dataset-review" class="surface scroll-mt-24 space-y-5 p-6">
           <header>
             <h2 class="font-display text-lg font-semibold text-foreground">Review</h2>
-            <p class="mt-1 text-sm text-muted-foreground">Validate the complete crate and choose who can see it.</p>
+            <p class="mt-1 text-sm text-muted-foreground">Validate the complete dataset and choose who can see it.</p>
           </header>
           <DatasetReviewSection
             :rocrate="built.rocrate"

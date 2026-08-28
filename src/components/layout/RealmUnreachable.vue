@@ -34,7 +34,7 @@ function toWelcome(): void {
         <h1 class="mt-3 font-display text-lg font-semibold tracking-tight text-aruna-navy">Realm unreachable</h1>
         <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
           Aruna Desktop could not reach <span class="font-mono text-foreground">{{ origin }}</span
-          >. It may be offline, or unreachable from this machine.
+          >. It may be down, or unreachable from this computer.
         </p>
         <Notice v-if="realmFailure" tone="error" class="mt-2">{{ realmFailure }}</Notice>
         <div class="mt-5 flex flex-wrap gap-2">

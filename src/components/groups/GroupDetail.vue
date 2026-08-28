@@ -228,7 +228,7 @@ async function reload() {
         throw err
       }
     }
-    // Documents are loaded separately: a failure here must not blank the panel.
+    // Datasets are loaded separately: a failure here must not blank the panel.
     // One bounded page, never a walk; the panel only previews DOC_LIMIT rows
     // and links to Discover for the rest.
     docsLoading.value = true
@@ -337,7 +337,7 @@ async function leave() {
       <div v-if="usage" class="border-b border-border">
         <div class="flex items-center gap-2 px-5 pb-1 pt-4">
           <FileJson2 class="h-3.5 w-3.5 text-primary" />
-          <h2 class="font-display text-sm font-semibold text-aruna-navy">Live documents</h2>
+          <h2 class="font-display text-sm font-semibold text-aruna-navy">Live datasets</h2>
         </div>
         <dl class="grid grid-cols-3 gap-3 px-5 py-3">
           <div v-for="count in purposeCounts" :key="count.label" class="rounded-md border border-border bg-background px-3 py-2">
@@ -421,7 +421,7 @@ async function leave() {
           <EmptyState
             v-else-if="!historyPoints || historyPoints.length < 2"
             title="No usage history yet"
-            description="Snapshots appear once the server starts recording them."
+            description="Snapshots appear once the node starts recording them."
           />
           <template v-else>
             <div :class="historyLoading ? 'opacity-60 transition-opacity' : ''">
@@ -439,20 +439,20 @@ async function leave() {
       <div>
         <div class="flex items-center gap-2 px-5 pb-1 pt-4">
           <FileJson2 class="h-3.5 w-3.5 text-primary" />
-          <h2 class="font-display text-sm font-semibold text-aruna-navy">Documents</h2>
+          <h2 class="font-display text-sm font-semibold text-aruna-navy">Datasets</h2>
           <Badge
             v-if="docs"
             variant="outline"
             class="tabular-nums"
-            :title="docsEstimate !== null ? 'Approximate: the server estimates this count per group.' : undefined"
+            :title="docsEstimate !== null ? 'Approximate: the node estimates this count per group.' : undefined"
           >
             {{ docsCountLabel }}
           </Badge>
         </div>
         <div class="px-5 py-3">
-          <p v-if="docsLoading && !docs" class="text-xs text-muted-foreground">Loading documents…</p>
+          <p v-if="docsLoading && !docs" class="text-xs text-muted-foreground">Loading datasets…</p>
           <p v-else-if="docsError" class="text-xs text-destructive">{{ docsError }}</p>
-          <p v-else-if="docs && !docs.length" class="text-xs text-muted-foreground">This group has no metadata documents yet.</p>
+          <p v-else-if="docs && !docs.length" class="text-xs text-muted-foreground">This group has no datasets yet.</p>
           <ul v-else-if="docs" class="space-y-1">
             <li v-for="doc in docs.slice(0, DOC_LIMIT)" :key="doc.document_id">
               <RouterLink :to="{ name: 'dataset', params: { id: doc.document_id } }" class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50">
@@ -548,7 +548,7 @@ async function leave() {
                 :can-admin="canAdminStorage"
               />
               <p class="mt-2 text-[11px] text-muted-foreground">
-                Rules for a single bucket live with that bucket: open it in the Data manager and
+                Rules for a single bucket live with that bucket: open it in Data and
                 choose Routing.
               </p>
             </div>

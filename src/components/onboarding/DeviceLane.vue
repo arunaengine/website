@@ -243,7 +243,7 @@ const stages = computed(() => watchStages(watchState.value))
           <TabsContent value="desktop" class="space-y-3">
             <p class="text-xs leading-relaxed text-muted-foreground">
               <template v-if="inDesktop">
-                This portal already runs in Aruna Desktop, so the code goes straight to the node on this machine.
+                This portal already runs in Aruna Desktop, so the code goes straight to the node on this computer.
               </template>
               <template v-else>
                 Hands the code to Aruna Desktop for {{ platformLabel }} over an
@@ -262,7 +262,7 @@ const stages = computed(() => watchStages(watchState.value))
 
           <TabsContent value="qr" class="space-y-3">
             <p class="text-xs leading-relaxed text-muted-foreground">
-              For enrolling a second machine: scan it with Aruna Desktop there.
+              For enrolling a second computer: scan it with Aruna Desktop there.
             </p>
             <div v-if="enrollUrl" class="h-44 w-44 rounded-md border border-border bg-background p-2">
               <QrCode :value="enrollUrl" label="Device enrollment link" />
@@ -308,7 +308,7 @@ const stages = computed(() => watchStages(watchState.value))
         <ClaimWatchStep :stages="stages" :error="watchState.lastError">
           <template #actions>
             <Button variant="outline" size="sm" as-child>
-              <RouterLink :to="{ name: 'settings', hash: '#devices' }"><ExternalLink class="h-4 w-4" /> My devices</RouterLink>
+              <RouterLink :to="{ name: 'settings', query: { tab: 'access' } }"><ExternalLink class="h-4 w-4" /> My devices</RouterLink>
             </Button>
             <Button variant="outline" size="sm" @click="emit('update:step', HANDOFF_STEP)">
               <ArrowLeft class="h-4 w-4" /> Hand-off

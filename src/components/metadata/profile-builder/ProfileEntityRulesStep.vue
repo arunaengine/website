@@ -8,7 +8,7 @@ import { entityTypeLabel } from '@/lib/profiles/entityTypes'
 import { normalizeTypeUri, sameSchemaOrgType } from '@/lib/profiles/uri'
 import type { DraftEntityRule, ProfileBuilder } from './useProfileBuilder'
 
-// Rule-first outline (plan 6.2): the step opens on the Root Dataset shape and
+// Rule-first outline (plan 6.2): the step opens on the Root dataset shape and
 // lists every shared entity shape as its own section of compact sentence rows.
 // The old master/detail editor is gone; shapes are usually created implicitly
 // by entity-valued rules ("Add Person rules"), with an explicit add as fallback.
@@ -19,7 +19,7 @@ const builder = props.builder
 // profile opens as a readable outline rather than one unbroken scroll.
 const COLLAPSE_ABOVE = 3
 
-// Root Dataset first, then the shapes it reaches, breadth first: a reader
+// Root dataset first, then the shapes it reaches, breadth first: a reader
 // follows the same path the data does, instead of the order the shapes happened
 // to be declared in. Anything unreachable keeps its draft order at the end.
 const orderedEntities = computed(() => {
@@ -54,8 +54,8 @@ function scrollToShape(uid: number) {
     <div>
       <h4 class="text-sm font-semibold text-foreground">Rules</h4>
       <p class="text-xs text-muted-foreground">
-        Each rule reads as a sentence: <em>Root Dataset must have Creator, a Person</em>.
-        Start from the Root Dataset, add properties from common terms or terminology search, then set each rule's obligation,
+        Each rule reads as a sentence: <em>Root dataset must have Creator, a Person</em>.
+        Start from the Root dataset, add properties from common terms or terminology search, then set each rule's obligation,
         <b>Required</b>: {{ PROFILE_OBLIGATION_LABELS.MUST.help }}; <b>Recommended</b>: {{ PROFILE_OBLIGATION_LABELS.SHOULD.help }}; <b>Optional</b>: {{ PROFILE_OBLIGATION_LABELS.MAY.help }}.
         Rules for a Person, Organization or File apply when one is described; entity-valued rules link to those shared shapes.
       </p>

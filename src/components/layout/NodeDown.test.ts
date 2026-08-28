@@ -67,14 +67,14 @@ describe('node down page', () => {
   it('uses the state-specific supervisor detail', async () => {
     const mounted = await mountApp(NodeDown)
 
-    expect(content(mounted.root)).toContain("This device's node is not running.")
+    expect(content(mounted.root)).toContain("This computer's node is not running.")
     expect(content(mounted.root)).toContain('Aruna Desktop needs its node to work.')
 
     state.value = 'error'
     status.value = { message: 'The node stopped.', detail: 'The node process exited with code 1.' }
     await flush()
 
-    expect(content(mounted.root)).toContain("This device's node failed.")
+    expect(content(mounted.root)).toContain("This computer's node failed.")
     expect(content(mounted.root)).toContain('The node process exited with code 1.')
     expect(element(mounted.root, (node) => node.tag === 'a').props['data-to']).toContain('device')
     mounted.app.unmount()
@@ -120,7 +120,7 @@ describe('node down page', () => {
     expect(content(mounted.root)).toContain('Realmhttps://realm.example')
     expect(content(mounted.root)).toContain('Expected realm01K4EXPECTEDREALMID')
     expect(content(mounted.root)).toContain('Actual realm01K4ACTUALREALMID')
-    expect(content(mounted.root)).toContain("This device's data belongs to the old realm.")
+    expect(content(mounted.root)).toContain("This computer's data belongs to the old realm.")
     expect(content(mounted.root)).not.toContain('Start the node')
     expect(
       element(mounted.root, (node) => node.tag === 'code' && node.props.title === mismatch.expected).props.class,

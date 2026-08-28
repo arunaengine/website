@@ -114,7 +114,7 @@ describe('wording fallbacks', () => {
   it('explains known and unknown scan limits', () => {
     expect(scanLimitText('holder-path-unknown')).toContain('could not be asked')
     expect(scanLimitText('relationship-scan-failed')).toContain('sync rules')
-    expect(scanLimitText('holder-unreachable')).toContain('did not answer')
+    expect(scanLimitText('holder-unreachable')).toContain('is unreachable')
     expect(scanLimitText('future-limit')).toBe('The search was limited: future-limit.')
   })
 

@@ -16,16 +16,16 @@ describe('Dataset file discovery presentation', () => {
     expect(source).toContain('backlinkResult.coverage.path_style_endpoint_coverage_complete')
     expect(source).toContain('backlinkResult.coverage.target_resolution_complete')
     expect(source).toContain('backlinkTarget.visible_references')
-    expect(source).toContain('Other restricted Datasets reference this content')
+    expect(source).toContain('Other restricted datasets reference this content')
     expect(source).toContain("backlinkResult.coverage.queried_scope.replaceAll('_', ' ')")
     expect(source).toContain("freshness.index_state.replaceAll('_', ' ')")
     expect(source).toContain('relativeTime(new Date(value).toISOString())')
     expect(source).toContain('new Date(freshness.oldest_status_updated_at_ms).toISOString()')
   })
 
-  it('keeps the loaded-crate cache separate and presents identity apart from location', () => {
-    expect(source).toContain('Loaded-crate cache only:')
-    expect(source.indexOf('Loaded-crate cache only:')).not.toBe(source.indexOf('Authoritative Realm backlink lookup'))
+  it('keeps the loaded cache separate and presents identity apart from location', () => {
+    expect(source).toContain('Loaded datasets only:')
+    expect(source.indexOf('Loaded datasets only:')).not.toBe(source.indexOf('Authoritative Realm backlink lookup'))
     expect(source).toContain('Content identity: {{ row.id }}')
     expect(source).toContain('Location:')
     expect(source).toContain("row.contentUrl ?? (contentW3id(row) ? '' : row.id)")

@@ -87,7 +87,7 @@ const wordmark = computed(() =>
           >
             Upcoming
           </span>
-          Federated Compute
+          Realm compute
         </div>
       </div>
     </div>

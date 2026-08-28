@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Where the node stores its data on this machine, and whether it runs at all.
+// Where the node stores its data on this computer, and whether it runs at all.
 // Folder bindings live in the node itself, not here.
 import { computed, onMounted, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
@@ -64,7 +64,7 @@ async function save(): Promise<void> {
       <div>
         <h3 class="font-display text-sm font-semibold text-aruna-navy">Storage and settings</h3>
         <p class="mt-1 text-xs text-muted-foreground">
-          These apply to the node on this machine only. The realm never changes them.
+          These apply to the node on this computer only. The realm never changes them.
         </p>
       </div>
 
@@ -85,7 +85,7 @@ async function save(): Promise<void> {
           <div>
             <span class="text-xs font-medium text-foreground">Local S3 endpoint</span>
             <p class="text-[11px] text-muted-foreground">
-              The node serves you an S3 endpoint on this machine. Changing this restarts the node.
+              The node serves you an S3 endpoint on this computer. Changing this restarts the node.
             </p>
             <p v-if="settings.s3Enabled && s3Url" class="font-mono text-[11px] text-muted-foreground">{{ s3Url }}</p>
           </div>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Home of Aruna Desktop: the state of this machine first, the realm behind it.
+// Home of Aruna Desktop: the state of this computer first, the realm behind it.
 // Every card degrades on its own, so a node that is down or a route that is not
 // served yet costs one card, never the page.
 import { computed, onMounted, ref } from 'vue'
@@ -154,7 +154,7 @@ onMounted(() => void reload())
   <div>
     <PageHeader
       eyebrow="This computer"
-      title="Your data on this machine"
+      title="Your data on this computer"
       :description="`Signed in to ${realm.name}.`"
     >
       <template #breadcrumbs>
@@ -174,7 +174,7 @@ onMounted(() => void reload())
     </PageHeader>
 
     <div class="container space-y-5 py-5">
-      <!-- The machine plate: what the node on this disk is. -->
+      <!-- The plate: what the node on this disk is. -->
       <FactList :items="facts" />
 
       <Notice v-if="status?.message && !online" tone="warning">{{ status.message }}</Notice>
@@ -255,7 +255,7 @@ onMounted(() => void reload())
               </div>
             </div>
             <p v-if="compute && !compute.enabled" class="text-[11px] text-muted-foreground">
-              This computer runs no jobs itself yet. Turn it on under This device.
+              This computer runs nothing itself yet. Turn it on under This device.
             </p>
             <DeviceSurfaceState
               v-else-if="localRunsState !== 'ready'"
@@ -282,7 +282,7 @@ onMounted(() => void reload())
           <header class="flex items-center justify-between border-b border-border px-5 py-3">
             <div class="flex items-center gap-2">
               <FileText class="h-4 w-4 text-primary" />
-              <h2 class="font-display text-sm font-semibold text-aruna-navy">Drafts on this device</h2>
+              <h2 class="font-display text-sm font-semibold text-aruna-navy">Drafts on this computer</h2>
             </div>
             <RouterLink :to="{ name: 'device' }" class="text-xs font-medium text-primary hover:underline">This device</RouterLink>
           </header>
@@ -306,7 +306,7 @@ onMounted(() => void reload())
               </ul>
             </template>
             <p v-else class="text-sm text-muted-foreground">
-              Nothing authored offline is waiting. Metadata you write without a realm lands here.
+              Nothing waits to be published. A dataset you write while the realm is unreachable lands here.
             </p>
           </div>
         </section>

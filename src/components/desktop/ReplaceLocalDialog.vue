@@ -103,7 +103,7 @@ async function apply(): Promise<void> {
       const expected = entryExpectation(target)
       if (!expected) {
         error.value =
-          'This device has not hashed your copy yet, so it cannot be given up. Sync the folder and look again.'
+          'This computer has not hashed your copy yet, so it cannot be given up. Sync the folder and look again.'
         return
       }
       await entryAction(props.folder.folder_id, target.path, props.action, expected)

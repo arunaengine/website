@@ -156,7 +156,7 @@ watch(
 <template>
   <DetailDialog :open="props.open" @update:open="(value: boolean) => emit('update:open', value)">
     <DialogHeader>
-      <DialogTitle>Job audit trail</DialogTitle>
+      <DialogTitle>Audit trail</DialogTitle>
       <DialogDescription>
         Immutable records displayed by event time. API pages arrive in stable record-key order.
       </DialogDescription>
@@ -227,8 +227,8 @@ watch(
         <p v-else class="text-xs text-muted-foreground">No audit records are available in this scope.</p>
 
         <div v-if="nextCursor || moreError" class="flex flex-wrap items-center gap-3">
-          <Button v-if="nextCursor" variant="outline" size="sm" :disabled="loadingMore" @click="load(false)">
-            {{ loadingMore ? 'Loading records…' : 'Load more records' }}
+          <Button v-if="nextCursor" variant="ghost" size="sm" :disabled="loadingMore" @click="load(false)">
+            Load more
           </Button>
           <p v-if="moreError" class="text-[11px] text-destructive">{{ moreError }}</p>
         </div>

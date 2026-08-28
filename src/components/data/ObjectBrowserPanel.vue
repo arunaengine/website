@@ -165,7 +165,7 @@ async function loadObjects(more = false) {
     if (requestId === listRequestId) {
       if (targetNode && isS3NetworkError(err)) {
         listError.value =
-          'The hosting node\'s S3 endpoint did not answer this browser. It may be unreachable or not allow cross-origin browsing.'
+          'The hosting node\'s S3 endpoint is unreachable from this browser, or it does not allow cross-origin browsing.'
       } else {
         listError.value = s3ErrorMessage(err)
         if (isS3AuthError(err)) emit('auth-error')

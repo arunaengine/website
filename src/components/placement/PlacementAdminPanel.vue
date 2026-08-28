@@ -156,7 +156,7 @@ async function saveStrategy() {
   saveMessage.value = null
   const strategy = cloneStrategy(strategyDraft.value)
   if (!strategy.strategy_id.trim()) {
-    saveError.value = 'A valid ULID strategy id is required.'
+    saveError.value = 'A valid strategy id is required.'
     return
   }
   try {
@@ -316,16 +316,16 @@ watch(
               <template v-if="strategyDraft">
                 <div v-if="creatingStrategy">
                   <label class="text-xs font-medium text-foreground">Strategy ID</label>
-                  <Input v-model="strategyDraft.strategy_id" class="mt-1 font-mono" placeholder="ULID" :disabled="busy" />
+                  <Input v-model="strategyDraft.strategy_id" class="mt-1 font-mono" placeholder="Strategy id" :disabled="busy" />
                 </div>
                 <div v-else>
                   <div class="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                     <span class="font-mono">{{ strategyDraft.strategy_id }}</span>
                     <span v-if="selectedIsDefault" class="rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">realm default</span>
-                    <Badge v-if="selectedIsJobFamily" variant="accent">Job family</Badge>
+                    <Badge v-if="selectedIsJobFamily" variant="accent">Run family</Badge>
                   </div>
                   <p v-if="selectedIsJobFamily" class="mt-1 text-[11px] text-muted-foreground">
-                    Routes job-family records. It cannot be removed, and its shard count is frozen.
+                    Routes run-family records. It cannot be removed, and its shard count is frozen.
                   </p>
                 </div>
 
@@ -346,7 +346,7 @@ watch(
                     variant="destructive"
                     size="sm"
                     :disabled="selectedIsJobFamily || strategyDirty || busy"
-                    :title="selectedIsJobFamily ? 'The job-family strategy cannot be removed, and its shard count is frozen.' : undefined"
+                    :title="selectedIsJobFamily ? 'The run-family strategy cannot be removed, and its shard count is frozen.' : undefined"
                     @click="removeStrategy"
                   >
                     Remove strategy
@@ -364,7 +364,7 @@ watch(
           </header>
           <div class="space-y-4 p-5">
             <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-              <Input v-model="bindingGroupId" class="font-mono" placeholder="Group ULID" :disabled="busy || !config" />
+              <Input v-model="bindingGroupId" class="font-mono" placeholder="Group id" :disabled="busy || !config" />
               <Select v-model="bindingStrategyId" :options="strategyOptions" :disabled="busy || !config" />
               <Button size="sm" :disabled="busy || !bindingGroupId.trim() || !bindingStrategyId" @click="saveGroupBinding">Set binding</Button>
             </div>

@@ -274,19 +274,19 @@ describe('placement on a node that is not a management node', () => {
   })
 })
 
-describe('placement job-family strategy controls', () => {
+describe('placement run-family strategy controls', () => {
   it('badges the matching strategy and explains its immutable role', async () => {
     const mounted = await mountPanel(familyId)
 
-    expect(content(mounted.root)).toContain('Job family')
+    expect(content(mounted.root)).toContain('Run family')
     expect(content(mounted.root)).toContain(
-      'Routes job-family records. It cannot be removed, and its shard count is frozen.',
+      'Routes run-family records. It cannot be removed, and its shard count is frozen.',
     )
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })
 
-  it('disables removal for the job-family strategy and enables it for another strategy', async () => {
+  it('disables removal for the run-family strategy and enables it for another strategy', async () => {
     const family = await mountPanel(familyId)
     expect(button(family.root, 'Remove strategy').props.disabled).toBe(true)
     family.app.unmount()
@@ -297,14 +297,14 @@ describe('placement job-family strategy controls', () => {
     other.app.unmount()
   })
 
-  it('locks the shard-count input while editing the job-family strategy', async () => {
+  it('locks the shard-count input while editing the run-family strategy', async () => {
     const mounted = await mountPanel(familyId)
     const shardCount = nodes(mounted.root).find(
       (node) => node.kind === 'element' && node.tag === 'input' && node.props.max === '4096',
     )
 
     expect(shardCount?.props.disabled).toBe(true)
-    expect(content(mounted.root)).toContain('Frozen for the job-family strategy.')
+    expect(content(mounted.root)).toContain('Frozen for the run-family strategy.')
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })

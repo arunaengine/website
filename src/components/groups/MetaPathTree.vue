@@ -57,7 +57,7 @@ defineEmits<{
           'flex min-w-0 items-center gap-1.5 rounded px-1.5 py-1 text-xs hover:bg-muted hover:text-foreground',
           selected?.includes(`meta/${doc.path}`) ? 'text-primary' : 'text-muted-foreground',
         ]"
-        :title="`Select only this document (meta/${doc.path})`"
+        :title="`Select only this dataset (meta/${doc.path})`"
         @click="$emit('select', `meta/${doc.path}`)"
       >
         <span class="w-3 shrink-0" />

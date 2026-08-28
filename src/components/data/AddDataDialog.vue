@@ -459,7 +459,7 @@ watch(
         <Upload class="h-4 w-4 text-primary" /> Add data
       </DialogTitle>
       <DialogDescription>
-        Collect local files, connector sources and objects from other buckets, then submit them into
+        Collect local files, connector sources and objects from other buckets, then add them to
         <span class="font-mono text-xs">{{ bucket }}/{{ prefix }}</span>.
       </DialogDescription>
     </DialogHeader>
@@ -763,8 +763,8 @@ watch(
               </td>
               <td class="px-3 py-2">
                 <div class="flex items-center gap-2">
-                  <Spinner v-if="row.state === 'submitting'" label="Submitting" class="text-primary" />
-                  <Badge :variant="rowVariant(row.state)" size="sm" class="uppercase">{{ row.state }}</Badge>
+                  <Spinner v-if="row.state === 'submitting'" label="Adding" class="text-primary" />
+                  <Badge :variant="rowVariant(row.state)" size="sm" class="uppercase">{{ row.state === 'submitting' ? 'adding' : row.state }}</Badge>
                   <Progress
                     v-if="row.state === 'submitting'"
                     :value="row.progress"
@@ -817,9 +817,9 @@ watch(
           <strong>{{ formatBytes(precheck.current.usedBytes) }}</strong>, past the quota of
           <strong>{{ formatBytes(precheck.projected.quotaBytes ?? 0) }}</strong> into the grace headroom.
         </p>
-        <p class="mt-1 text-muted-foreground">Counters on remote nodes can lag, so these numbers are approximate. The check is advisory; you can still submit.</p>
+        <p class="mt-1 text-muted-foreground">Counters on remote nodes can lag, so these numbers are approximate. The check is advisory; you can still continue.</p>
         <div class="mt-2 flex items-center gap-2">
-          <Button size="sm" @click="confirmPrecheckSubmit">Submit anyway</Button>
+          <Button size="sm" @click="confirmPrecheckSubmit">Add anyway</Button>
           <Button variant="ghost" size="sm" @click="precheck = null">Cancel</Button>
         </div>
       </Notice>
@@ -832,8 +832,8 @@ watch(
         :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
         @click="submitAll"
       >
-        <Spinner v-if="basket.busy.value" label="Submitting" class="text-current" /><CloudDownload v-else class="h-4 w-4" />
-        Submit {{ basket.summary.value.ready || '' }}
+        <Spinner v-if="basket.busy.value" label="Adding" class="text-current" /><CloudDownload v-else class="h-4 w-4" />
+        Add {{ basket.summary.value.ready || '' }}
       </Button>
     </DialogFooter>
 

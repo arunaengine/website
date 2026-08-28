@@ -211,12 +211,12 @@ const referenceHelp = computed(() => {
     return 'Values come from the dataset’s data references (its attached files); each required item below is checked against them, and more are always allowed.'
   }
   if (property.value.requiredInstances.length) {
-    return 'Values become @id references to entities in the crate. The required items below must be present; more are always allowed.'
+    return 'Values become @id references to entities in the dataset. The required items below must be present; more are always allowed.'
   }
   const phrases = selectedSources.value.map((source) => {
     if (source === 'new') return 'describe a new entity'
     if (source === 'existing-external') return 'reuse one via an external URI'
-    return 'reuse an entity from this crate'
+    return 'reuse an entity from this dataset'
   })
   return `Dataset authors may ${phrases.join(', or ')}.`
 })
@@ -627,7 +627,7 @@ watch(advancedNeedsAttention, (needsAttention) => {
               <label class="text-[11px] font-medium text-muted-foreground">Property name</label>
               <Input v-model="property.valueName" class="mt-0.5" placeholder="license" :disabled="anyLock" />
               <p v-if="valueNameError" class="mt-0.5 text-[11px] text-destructive">{{ valueNameError }}</p>
-              <p v-else class="mt-0.5 text-[11px] text-muted-foreground">The compact JSON key in the crate.</p>
+              <p v-else class="mt-0.5 text-[11px] text-muted-foreground">The compact JSON key in the RO-Crate.</p>
             </div>
             <div>
               <label class="text-[11px] font-medium text-muted-foreground">Property term</label>

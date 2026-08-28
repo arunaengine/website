@@ -110,7 +110,7 @@ function changeType(choice: { uri: string; label: string }) {
       <span class="text-[11px] text-muted-foreground">
         {{ entity.properties.length }} {{ entity.properties.length === 1 ? 'rule' : 'rules' }}
       </span>
-      <Badge v-if="isRoot" variant="royal">Root Dataset</Badge>
+      <Badge v-if="isRoot" variant="royal">Root dataset</Badge>
       <Badge
         v-else-if="!isUnreferenced"
         :variant="obligationBadgeVariant(derived.obligation)"
@@ -179,7 +179,7 @@ function changeType(choice: { uri: string; label: string }) {
       <TriangleAlert class="size-3.5 shrink-0" />
       <span>Nothing references this shape yet, so it has no effect.</span>
       <Button v-if="rootEntity && rootEntity !== entity" type="button" variant="outline" size="sm" @click="referenceFromRoot">
-        Reference it from {{ rootEntity.label || 'the Root Dataset' }}
+        Reference it from {{ rootEntity.label || 'the Root dataset' }}
       </Button>
     </Notice>
 

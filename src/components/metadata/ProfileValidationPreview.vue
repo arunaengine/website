@@ -58,7 +58,7 @@ function findingLocation(finding: ProfileValidationFinding): string {
 <template>
   <div class="rounded-md border border-border p-3">
     <div class="flex flex-wrap items-center justify-between gap-2">
-      <p class="text-xs font-medium text-foreground">Server validation preview</p>
+      <p class="text-xs font-medium text-foreground">Node validation preview</p>
       <div class="flex items-center gap-2">
         <span v-if="running" class="text-[11px] text-muted-foreground">Checking…</span>
         <Button type="button" variant="outline" size="sm" :disabled="running" @click="$emit('run')">
@@ -67,14 +67,14 @@ function findingLocation(finding: ProfileValidationFinding): string {
       </div>
     </div>
     <p class="mt-1 text-[11px] text-muted-foreground">
-      Advisory check against the registered profile. Findings never block this form; the server validates the write itself.
+      Advisory check against the registered profile. Findings never block this form; the node validates the write itself.
     </p>
     <p v-if="error" class="mt-2 text-[11px] text-destructive">
-      Server validation preview unavailable: {{ error }} Run preview to retry.
+      Node validation preview unavailable: {{ error }} Run preview to retry.
     </p>
     <template v-else-if="result">
       <p class="mt-2 text-[11px]" :class="result.accepted ? 'text-muted-foreground' : 'text-destructive'">
-        <span class="font-medium">{{ result.accepted ? 'The server would accept this crate.' : 'The server would reject this crate.' }}</span>
+        <span class="font-medium">{{ result.accepted ? 'The node would accept this dataset.' : 'The node would reject this dataset.' }}</span>
         <span class="text-muted-foreground"> Profile state: {{ stateLabel }}.</span>
         <span v-if="result.completeness === 'incomplete'" class="text-muted-foreground">
           Some constraints could not be evaluated.

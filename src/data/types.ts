@@ -199,7 +199,7 @@ export interface MetadataProfile {
   iconColor: string
   // Structured RO-Crate entity rules parsed from the profile crate.
   entityRules: ProfileEntityRule[]
-  // Property rules on the root Dataset entity, kept for quick display/fallback.
+  // Property rules on the root dataset entity, kept for quick display/fallback.
   propertyRules: ProfilePropertyRule[]
   schema?: JsonSchema
   // Raw Describo/Crate-O mode file, for verbatim re-export and re-open.

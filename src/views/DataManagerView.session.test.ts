@@ -15,7 +15,7 @@ const credentialDialog = readFileSync(
   'utf8',
 )
 
-describe('Data Manager session affordances', () => {
+describe('Data view session affordances', () => {
   it('has no manual or long-lived browser credential activation path', () => {
     expect(dataManager).not.toContain('CreateCredentialDialog')
     expect(dataManager).not.toContain('manualKey')

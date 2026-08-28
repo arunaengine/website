@@ -30,7 +30,7 @@ function updateBytes(
 <template>
   <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
     <div>
-      <label class="text-xs font-medium text-foreground">Max jobs</label>
+      <label class="text-xs font-medium text-foreground">Max runs</label>
       <Input
         :model-value="modelValue.max_jobs"
         type="number"
@@ -98,7 +98,7 @@ function updateBytes(
       </div>
     </div>
     <div>
-      <label class="text-xs font-medium text-foreground">Max job CPU cores</label>
+      <label class="text-xs font-medium text-foreground">Max run CPU cores</label>
       <Input
         :model-value="modelValue.max_job_cpu_cores"
         type="number"
@@ -111,7 +111,7 @@ function updateBytes(
       />
     </div>
     <div>
-      <label class="text-xs font-medium text-foreground">Max job RAM</label>
+      <label class="text-xs font-medium text-foreground">Max run RAM</label>
       <div class="mt-1 flex gap-2">
         <Input
           :model-value="modelValue.max_job_ram_bytes.value"
@@ -125,14 +125,14 @@ function updateBytes(
           :model-value="modelValue.max_job_ram_bytes.unit"
           :options="unitOptions"
           class="w-24 shrink-0"
-          aria-label="Max job RAM unit"
+          aria-label="Max run RAM unit"
           :disabled="disabled"
           @update:model-value="updateBytes('max_job_ram_bytes', { unit: $event })"
         />
       </div>
     </div>
     <div>
-      <label class="text-xs font-medium text-foreground">Max job disk</label>
+      <label class="text-xs font-medium text-foreground">Max run disk</label>
       <div class="mt-1 flex gap-2">
         <Input
           :model-value="modelValue.max_job_disk_bytes.value"
@@ -146,14 +146,14 @@ function updateBytes(
           :model-value="modelValue.max_job_disk_bytes.unit"
           :options="unitOptions"
           class="w-24 shrink-0"
-          aria-label="Max job disk unit"
+          aria-label="Max run disk unit"
           :disabled="disabled"
           @update:model-value="updateBytes('max_job_disk_bytes', { unit: $event })"
         />
       </div>
     </div>
     <div>
-      <label class="text-xs font-medium text-foreground">Max job walltime (ms)</label>
+      <label class="text-xs font-medium text-foreground">Max run walltime (ms)</label>
       <Input
         :model-value="modelValue.max_job_walltime_ms"
         type="number"

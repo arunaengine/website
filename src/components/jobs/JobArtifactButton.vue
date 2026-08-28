@@ -9,7 +9,7 @@ import { errorMessage, formatBytes, truncateMiddle } from '@/lib/utils'
 import type { JobArtifactStatus } from '@/lib/jobs'
 import { Download } from '@lucide/vue'
 
-// The run crate archive sits behind bearer auth, so it cannot be a plain link:
+// The run dataset archive sits behind bearer auth, so it cannot be a plain link:
 // HEAD reports whether it is there and GET hands back a Blob the browser saves
 // through a short-lived object URL.
 const props = defineProps<{ jobId: string }>()
@@ -59,7 +59,7 @@ async function download() {
     const result = { ...rest, blob }
     status.value = rest
     if (!result.blob) {
-      downloadError.value = result.message ?? 'The run crate could not be downloaded.'
+      downloadError.value = result.message ?? 'The run dataset could not be downloaded.'
       return
     }
     releaseUrl()
@@ -84,7 +84,7 @@ watch(() => props.jobId, () => {
 
 <template>
   <section class="space-y-2">
-    <h3 class="font-display text-sm font-semibold text-aruna-navy">Run crate archive</h3>
+    <h3 class="font-display text-sm font-semibold text-aruna-navy">Run dataset archive</h3>
 
     <p v-if="checking && !status" class="text-xs text-muted-foreground">Checking for an archive…</p>
 
@@ -92,7 +92,7 @@ watch(() => props.jobId, () => {
       <div v-if="status.state === 'available'" class="space-y-2">
         <div class="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" :disabled="downloading" @click="download">
-            <Download class="h-3.5 w-3.5" /> {{ downloading ? 'Downloading…' : 'Download run crate' }}
+            <Download class="h-3.5 w-3.5" /> {{ downloading ? 'Downloading…' : 'Download run dataset' }}
           </Button>
           <span v-if="status.size !== undefined" class="text-[11px] text-muted-foreground">
             {{ formatBytes(status.size) }}
@@ -108,22 +108,22 @@ watch(() => props.jobId, () => {
 
       <div v-else-if="status.state === 'pending'" class="flex flex-wrap items-center gap-2">
         <p class="text-xs text-muted-foreground">
-          The archive is written once the job finishes<template v-if="status.jobState">, and the job
+          The archive is written once the work finishes<template v-if="status.jobState">, and it
           is {{ status.jobState }}</template>.
         </p>
         <RefreshButton :busy="spinning" label="Check again" @click="onCheck" />
       </div>
 
       <p v-else-if="status.state === 'expired'" class="text-xs text-muted-foreground">
-        The archive's retention window has passed, so it is gone. The job's records remain.
+        The archive's retention window has passed, so it is gone. Its records remain.
       </p>
 
       <p v-else-if="status.state === 'unauthorized'" class="text-xs text-muted-foreground">
-        This token may not read the run crate of this job.
+        This token may not read this run dataset.
       </p>
 
       <p v-else-if="status.state === 'absent'" class="text-xs text-muted-foreground">
-        No run crate archive is kept for this job.
+        No run dataset archive is kept here.
       </p>
 
       <div v-else class="flex flex-wrap items-center gap-2">

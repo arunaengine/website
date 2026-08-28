@@ -14,8 +14,8 @@ import {
 import { errorMessage, truncateMiddle } from '@/lib/utils'
 
 // The frozen per-entry report of an RO-Crate import or export. Only those two
-// job kinds keep one, so an absent report is the normal answer everywhere else
-// and is reported as "not kept" rather than as a failure.
+// kinds keep one, so an absent report is the normal answer everywhere else and
+// is reported as "not kept" rather than as a failure.
 const props = defineProps<{ jobId: string }>()
 
 const { getJobReport } = useJobs()
@@ -41,12 +41,12 @@ const CODE_LABELS: Record<string, string> = {
   not_attempted: 'Not attempted',
   denied: 'Denied',
   missing: 'Missing',
-  offline: 'Offline',
+  offline: 'Unreachable',
   unsupported: 'Unsupported',
   path_synthesized: 'Path synthesized',
   unrewritten_reference: 'Unrewritten reference',
   signature_dropped: 'Signature dropped',
-  unsupported_crate_version: 'Unsupported crate version',
+  unsupported_crate_version: 'Unsupported RO-Crate version',
 }
 const GOOD_CODES = new Set(['imported', 'included', 'external'])
 const BAD_CODES = new Set(['failed', 'denied', 'missing', 'unsupported', 'unsupported_crate_version'])
@@ -137,18 +137,18 @@ const summary = computed(() => {
       class="space-y-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground"
     >
       <p>
-        The report is frozen only once the job finishes. This job is
+        The report is frozen only once the work finishes. This one is
         <span class="font-medium text-foreground">{{ pendingState }}</span>, so there is nothing to page yet.
       </p>
       <Button variant="outline" size="sm" @click="load">Check again</Button>
     </div>
 
     <p v-else-if="panelState === 'absent'" class="text-xs text-muted-foreground">
-      No report is kept for this job. Only RO-Crate import and export jobs keep one, and a kept
-      report disappears again once its retention window passes.
+      No report is kept here. Only an RO-Crate import or export keeps one, and a kept report
+      disappears again once its retention window passes.
     </p>
 
-    <ErrorPanel v-else-if="panelState === 'error'" :message="loadError || 'Failed to load the report.'" @retry="load" />
+    <ErrorPanel v-else-if="panelState === 'error'" :message="loadError || 'The report could not be loaded.'" @retry="load" />
 
     <template v-else-if="panelState === 'ready'">
       <div v-if="summary.length" class="flex flex-wrap gap-1.5">
@@ -180,9 +180,7 @@ const summary = computed(() => {
       <p v-else class="text-xs text-muted-foreground">The report is empty: no entry was recorded.</p>
 
       <div v-if="nextCursor" class="flex items-center gap-2">
-        <Button variant="outline" size="sm" :disabled="loadingMore" @click="loadMore">
-          {{ loadingMore ? 'Loading…' : 'Load more' }}
-        </Button>
+        <Button variant="ghost" size="sm" :disabled="loadingMore" @click="loadMore">Load more</Button>
         <span class="text-[11px] text-muted-foreground">{{ rows.length }} rows loaded</span>
       </div>
       <p v-if="moreError" class="text-[11px] text-destructive">{{ moreError }}</p>

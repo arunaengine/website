@@ -58,7 +58,7 @@ function onEnrolled() {
     <PageHeader
       eyebrow="This computer"
       title="This device"
-      description="The node Aruna Desktop runs on this machine: its state, its enrollment, and the settings only you control."
+      description="The node Aruna Desktop runs on this computer: its state, its enrollment, and the settings only you control."
     />
 
     <div class="container py-5">

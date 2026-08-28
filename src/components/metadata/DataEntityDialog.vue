@@ -158,7 +158,7 @@ async function copyId() {
           <p v-else class="py-2 text-xs text-muted-foreground">This entity carries no further metadata.</p>
         </ScrollArea>
       </div>
-      <p v-else class="py-6 text-sm text-muted-foreground">This entity is not part of the loaded crate.</p>
+      <p v-else class="py-6 text-sm text-muted-foreground">This entity is not part of the loaded dataset.</p>
 
       <DialogFooter>
         <DialogClose as-child><Button variant="outline" size="sm">Close</Button></DialogClose>

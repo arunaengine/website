@@ -1,7 +1,7 @@
-// Shared shapes for the group permission-path browser. A group's metadata
-// documents are authorized at /{realm}/g/{group}/meta/{document_path} (aruna
+// Shared shapes for the group permission-path browser. A group's datasets are
+// authorized at /{realm}/g/{group}/meta/{document_path} (aruna
 // operations/check_permissions), so the browsable tree mirrors the group's
-// document paths one-to-one.
+// dataset paths one-to-one.
 export interface MetaPathDocument {
   name: string
   path: string
@@ -24,11 +24,11 @@ export function describeTarget(suffix: string): string {
   const clean = suffix.replace(/^\/+/, '').replace(/\/+$/, '')
   if (clean === '**' || clean === '') return 'everything in this group'
   if (clean === 'admin' || clean === 'admin/**') return 'group settings, roles and members'
-  if (clean === 'meta' || clean === 'meta/**') return 'all metadata documents'
+  if (clean === 'meta' || clean === 'meta/**') return 'all datasets'
   if (clean.startsWith('meta/')) {
     const rest = clean.slice('meta/'.length)
-    if (rest.endsWith('/**')) return `metadata documents in "${rest.slice(0, -3)}/"`
-    return `the metadata document "${rest}"`
+    if (rest.endsWith('/**')) return `datasets in "${rest.slice(0, -3)}/"`
+    return `the dataset "${rest}"`
   }
   if (clean === 'data' || clean === 'data/**') return 'all files on every node'
   if (clean.startsWith('data/')) {

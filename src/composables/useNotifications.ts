@@ -334,7 +334,7 @@ if (typeof window !== 'undefined') {
 }
 
 // Forces a dashboard refetch after a change the notification stream does not
-// report, such as a background job that created a document.
+// report, such as a system job that created a dataset.
 function bumpDashboard() {
   dashboardRevision.value++
 }

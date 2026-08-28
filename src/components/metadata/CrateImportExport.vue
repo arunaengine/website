@@ -176,7 +176,7 @@ async function confirmImport() {
             <FileJson class="h-4 w-4 text-primary" /> Import RO-Crate metadata
           </h4>
           <p class="mt-1 text-xs text-muted-foreground">
-            Replace this document's crate with an <code class="font-mono">ro-crate-metadata.json</code> file. The import is previewed and confirmed before anything is written.
+            Replace this dataset with an <code class="font-mono">ro-crate-metadata.json</code> file. The import is previewed and confirmed before anything is written.
           </p>
         </div>
         <Button variant="ghost" size="sm" class="shrink-0" @click="closeImport">Close</Button>
@@ -214,18 +214,18 @@ async function confirmImport() {
         </p>
         <Notice v-if="pendingImport.unknownSpecVersion" tone="warning" class="flex items-start gap-2">
           <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span>RO-Crate {{ pendingImport.unknownSpecVersion }} is not recognized by this portal. The backend may reject this import.</span>
+          <span>RO-Crate {{ pendingImport.unknownSpecVersion }} is not recognized by this portal. The node may reject this import.</span>
         </Notice>
         <Notice v-if="unrecognizedImportProfiles.length" tone="warning" class="flex items-start gap-2">
           <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>
-            This crate declares conformance to {{ unrecognizedImportProfiles.length === 1 ? 'a profile that is' : 'profiles that are' }} not yet recognized:
+            This dataset declares conformance to {{ unrecognizedImportProfiles.length === 1 ? 'a profile that is' : 'profiles that are' }} not yet recognized:
             <code class="break-all font-mono">{{ unrecognizedImportProfiles.join(', ') }}</code>. You can still import it.
           </span>
         </Notice>
         <Notice tone="warning" class="flex items-start gap-2">
           <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span>Importing replaces this document's current metadata, every field and file reference. This cannot be undone.</span>
+          <span>Importing replaces this dataset's current metadata, every field and file reference. This cannot be undone.</span>
         </Notice>
         <div class="flex flex-wrap items-center gap-2">
           <Button type="button" variant="destructive" size="sm" :disabled="importing || saving" @click="confirmImport">
@@ -241,7 +241,7 @@ async function confirmImport() {
           <CheckCircle2 class="h-3.5 w-3.5" />
           Imported {{ importedSummary.rootName }} ({{ importedSummary.entityCount }} {{ importedSummary.entityCount === 1 ? 'entity' : 'entities' }}).
         </div>
-        <p class="mt-1">The catalog projection may briefly lag while the new crate materializes.</p>
+        <p class="mt-1">The datasets list may briefly lag while the new metadata materializes.</p>
       </div>
     </div>
   </section>

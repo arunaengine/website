@@ -9,7 +9,7 @@ import CopyButton from '@/components/nodes/CopyButton.vue'
 import LocalNodeDetails from '@/components/nodes/LocalNodeDetails.vue'
 import NodeDetailPanel from '@/components/nodes/NodeDetailPanel.vue'
 import LocationAggregates from '@/components/placement/LocationAggregates.vue'
-import { connectionLabel, connectionVariant, isDegradedStatus, kindVariant, statusVariant, type BadgeVariant } from '@/components/nodes/node-display'
+import { connectionLabel, connectionVariant, isDegradedStatus, kindLabel, kindVariant, statusVariant, type BadgeVariant } from '@/components/nodes/node-display'
 import { nodeApiBase, probeNode, type NodeProbe } from '@/components/nodes/node-probe'
 import { useAruna } from '@/composables/useAruna'
 import { useRefresh } from '@/composables/useRefresh'
@@ -152,7 +152,7 @@ function latencyClass(ms: number): string {
 
 const kindOrder: Record<RealmNodeInfo['kind'], number> = { management: 0, server: 1, user: 2 }
 
-// Devices (kind 'user') run on their owner's machine, not on realm
+// Devices (kind 'user') run on their owner's computer, not on realm
 // infrastructure: they are summarized only, never listed, probed or aggregated.
 const infraNodes = computed(() => (realmInfo.value?.nodes ?? []).filter((node) => node.kind !== 'user'))
 const deviceNodes = computed(() => (realmInfo.value?.nodes ?? []).filter((node) => node.kind === 'user'))
@@ -239,7 +239,7 @@ watch(
 
 <template>
   <div>
-    <PageHeader title="Status" description="Realm topology and local node health, refreshed every minute.">
+    <PageHeader title="Status" description="Realm topology and this node's health, refreshed every minute.">
       <template #actions>
         <span class="text-[11px] tabular-nums text-muted-foreground">Updated {{ lastUpdatedLabel }}</span>
         <RefreshButton :busy="spinning" @click="onRefresh" />
@@ -339,7 +339,7 @@ watch(
                   :class="['h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', expandedId === node.node_id && 'rotate-90']"
                 />
                 <Badge :variant="kindVariant[node.kind]" size="sm" class="w-24 justify-center uppercase">
-                  {{ node.kind }}
+                  {{ kindLabel[node.kind] }}
                 </Badge>
                 <template v-if="node.placement">
                   <span class="chip hidden shrink-0 sm:inline-flex" :title="`Placement location: ${node.placement.location}`">

@@ -100,7 +100,7 @@ export function dataEntitiesOf(crate: unknown): DataEntity[] {
 }
 
 // Data-entity detection accepts both compact and full-URI types. MediaObject
-// and its media subtypes count as files; Dataset marks a sub-directory whose
+// and its media subtypes count as files; dataset marks a sub-directory whose
 // own hasPart may nest further data entities.
 export const DATA_ENTITY_TYPES = new Set(['File', 'MediaObject', 'Dataset', 'ImageObject', 'AudioObject', 'VideoObject'])
 const LEAF_FILE_TYPES = new Set(['File', 'MediaObject', 'ImageObject', 'AudioObject', 'VideoObject'])

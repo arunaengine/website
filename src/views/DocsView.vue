@@ -34,7 +34,7 @@ const topicGroups = computed(() => {
   <div>
     <PageHeader
       :title="topic?.title ?? `Docs ${docsVersion}`"
-      :description="topic?.summary ?? 'Versioned guidance for portal concepts, scopes, states, and common tasks.'"
+      :description="topic?.summary ?? 'Versioned guidance for portal concepts, scopes, states, and common workflows.'"
     >
       <template #breadcrumbs>
         <span>·</span>
@@ -63,7 +63,7 @@ const topicGroups = computed(() => {
           </RouterLink>
           <div v-for="group in topicGroups" :key="group.kind" class="mt-4">
             <h2 class="px-2.5 font-display text-sm font-semibold text-aruna-navy">
-              {{ group.kind === 'Concept' ? 'Concepts' : 'Task guides' }}
+              {{ group.kind === 'Concept' ? 'Concepts' : 'How-to guides' }}
             </h2>
             <ul class="mt-1 space-y-0.5">
               <li v-for="entry in group.topics" :key="entry.slug">
@@ -120,7 +120,7 @@ const topicGroups = computed(() => {
                   <ListChecks v-if="group.kind === 'Guide'" class="h-4 w-4 text-primary" />
                   <FileText v-else class="h-4 w-4 text-primary" />
                   <h2 class="font-display text-base font-semibold text-aruna-navy">
-                    {{ group.kind === 'Concept' ? 'Concepts' : 'Task guides' }}
+                    {{ group.kind === 'Concept' ? 'Concepts' : 'How-to guides' }}
                   </h2>
                 </div>
                 <ul class="mt-3 space-y-2">

@@ -135,11 +135,11 @@ async function ingest(json: unknown, baseUrl?: string) {
     if (!result.entityRules.length) {
       const missing = missingShapesArtifacts(resolved)
       if (missing.length) {
-        throw new Error(`That profile crate keeps its rules in ${missing.join(', ')}, which is not part of the file you opened. Import the crate by URL so the file can be read alongside it, or upload the shapes file on its own.`)
+        throw new Error(`That profile RO-Crate keeps its rules in ${missing.join(', ')}, which is not part of the file you opened. Import the RO-Crate by URL so the file can be read alongside it, or upload the shapes file on its own.`)
       }
     }
   } else {
-    throw new Error('Unrecognized file, expected a Describo/Crate-O mode file, an RO-Crate profile crate (with @graph), or a SHACL shapes file (.ttl).')
+    throw new Error('Unrecognized file, expected a Describo/Crate-O mode file, an RO-Crate profile (with @graph), or a SHACL shapes file (.ttl).')
   }
   if (props.builder.hasEdits) {
     pendingImport.value = result
@@ -295,7 +295,7 @@ async function fromUrl() {
         <Badge variant="secondary">Describo/Crate-O-compatible</Badge>
       </h4>
       <p class="mt-1 text-xs text-muted-foreground">
-        Start from a Describo/Crate-O mode file, an RO-Crate profile crate, or a SHACL shapes file (.ttl). Rules we recognize become editable here; remaining SHACL constraints are preserved in the unified shapes.ttl.
+        Start from a Describo/Crate-O mode file, an RO-Crate profile, or a SHACL shapes file (.ttl). Rules we recognize become editable here; remaining SHACL constraints are preserved in the unified shapes.ttl.
       </p>
     </div>
 
@@ -392,7 +392,7 @@ async function fromUrl() {
     <div v-if="builder.importSummary" class="rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
       <div class="flex items-center gap-2 font-medium">
         <CheckCircle2 class="h-3.5 w-3.5" />
-        Imported {{ builder.importSummary.kind === 'mode' ? 'mode file' : builder.importSummary.kind === 'shacl' ? 'SHACL shapes' : 'profile crate' }}<template v-if="builder.importSummary.name">: {{ builder.importSummary.name }}</template>
+        Imported {{ builder.importSummary.kind === 'mode' ? 'mode file' : builder.importSummary.kind === 'shacl' ? 'SHACL shapes' : 'profile RO-Crate' }}<template v-if="builder.importSummary.name">: {{ builder.importSummary.name }}</template>
       </div>
       <p class="mt-1">
         {{ builder.importSummary.entityCount }} entity {{ builder.importSummary.entityCount === 1 ? 'rule' : 'rules' }},
@@ -407,7 +407,7 @@ async function fromUrl() {
          those only come with a full profile crate (D1). -->
     <div v-if="builder.importSummary?.kind === 'mode'" class="flex items-start gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
       <FileJson class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-      <span>Mode files carry form structure only, value constraints and recommended levels import when you upload a <b class="text-foreground">profile crate</b> instead.</span>
+      <span>Mode files carry form structure only, value constraints and recommended levels import when you upload a <b class="text-foreground">profile RO-Crate</b> instead.</span>
     </div>
   </div>
 </template>

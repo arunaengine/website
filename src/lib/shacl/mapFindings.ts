@@ -16,7 +16,7 @@ export interface MappedPreviewFindings {
 }
 
 // A finding maps inline when it sits on the crate root, names a property path
-// that matches a Dataset rule, and is not an info note. Findings the bespoke
+// that matches a dataset rule, and is not an info note. Findings the bespoke
 // validator already reports at the same field and severity are dropped
 // entirely (the dedup rule): the bespoke message is the one shown.
 export function mapPreviewFindings(

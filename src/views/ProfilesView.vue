@@ -315,7 +315,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
   <div>
     <PageHeader
       :title="route.name === 'profile' ? (selected?.name ?? selectedId) : 'Profiles'"
-      description="Profiles are ordinary RO-Crate metadata documents stored under profiles/."
+      description="Profiles are ordinary RO-Crate datasets stored under profiles/."
     >
       <template #actions>
         <Button @click="openCreate" :disabled="!currentUser">
@@ -350,7 +350,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
           </li>
         </ul>
         <div v-else class="p-8 text-center text-xs text-muted-foreground">
-          No visible profile documents under <code>profiles/</code>.
+          No visible profiles under <code>profiles/</code>.
         </div>
       </aside>
 
@@ -397,13 +397,13 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
                 @click="downloadProfileCrate(selected)"
                 title="Full-fidelity RO-Crate profile, validation rules and form structure travel together"
               >
-                <Download class="h-3.5 w-3.5" /> {{ downloadingCrate ? 'Preparing…' : 'Download profile crate' }}
+                <Download class="h-3.5 w-3.5" /> {{ downloadingCrate ? 'Preparing…' : 'Download profile RO-Crate' }}
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 @click="downloadModeFile(selected)"
-                title="Mode file (Describo/Crate-O), structure only; validation rules travel in the profile crate"
+                title="Mode file (Describo/Crate-O), structure only; validation rules travel in the profile RO-Crate"
               >
                 <Download class="h-3.5 w-3.5" /> Mode file (Describo/Crate-O)
               </Button>
@@ -461,7 +461,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
           class="px-5 py-4"
         >
           <p class="mt-1">{{ selectedLoadError }}</p>
-          <p class="mt-1">The crate may still be materializing. Retry runs the same bounded preparation check again.</p>
+          <p class="mt-1">The profile may still be materializing. Retry runs the same bounded preparation check again.</p>
           <Button variant="outline" size="sm" class="mt-3" @click="ensureFullProfile(selected, true)">Retry</Button>
         </Notice>
 
@@ -542,7 +542,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
         <EmptyState v-else-if="selectedRuleState === 'empty'" title="No rules are defined for this profile." />
       </section>
 
-      <EmptyState v-else title="Select a visible profile document." />
+      <EmptyState v-else title="Select a visible profile." />
     </div>
 
     <Dialog :open="showDelete" @update:open="(value: boolean) => (showDelete = value)">

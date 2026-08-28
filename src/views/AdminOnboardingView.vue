@@ -21,7 +21,7 @@ import { useRefresh } from '@/composables/useRefresh'
 import { useUserDirectory } from '@/composables/useUserDirectory'
 import { NEVER_EXPIRES_AFTER, secretStatus, useNodeOnboarding } from '@/composables/useNodeOnboarding'
 import { buildComposeSnippet, buildEnvBlock, normalizeSeedUrl, type NodeConfigInput } from '@/lib/onboarding-config'
-import { kindVariant } from '@/components/nodes/node-display'
+import { kindLabel, kindVariant } from '@/components/nodes/node-display'
 import { shortUserId, truncateMiddle } from '@/lib/utils'
 import { apiOrigin, type CreateOnboardingSecretResponse, type OnboardingMode, type RealmNodeInfo } from '@/lib/api'
 import { ArrowLeft, ArrowRight, ExternalLink, ServerCog, ShieldCheck } from '@lucide/vue'
@@ -66,7 +66,7 @@ watch(
 )
 
 // --- Wizard state ---------------------------------------------------------
-// Step 0 picks the lane; the server lane runs 1..4 and the device lane 1..3.
+// Step 0 picks the lane; the realm lane runs 1..4 and the device lane 1..3.
 type WizardAudience = 'realm' | 'device'
 
 const SERVER_STEPS = ['Audience', 'Kind', 'Mint secret', 'Configure node', 'Watch it join']
@@ -79,7 +79,7 @@ const wizardSteps = computed(() => (audience.value === 'device' ? DEVICE_STEPS :
 const AUDIENCE_OPTIONS: KindOption[] = [
   {
     value: 'realm',
-    title: 'A server for my realm',
+    title: 'A node for my realm',
     description: 'Infrastructure you operate: it stores and serves realm data around the clock.',
     badgeLabel: 'realm node',
     badgeVariant: 'sky',
@@ -106,7 +106,7 @@ const KIND_OPTIONS: KindOption[] = [
   },
   {
     value: 'Server',
-    title: 'Server',
+    title: 'Storage',
     description:
       'Stores and replicates data as a realm member. Gets a delegated signature, never the realm key.',
     badgeLabel: 'storage member',
@@ -285,7 +285,7 @@ const secretRows = computed<SecretRow[]>(() =>
       !!s.claimed_node_id && (realmInfo.value?.nodes ?? []).some((n) => n.node_id === s.claimed_node_id)
     return {
       id: s.enrollment_id,
-      kindLabel: s.mode,
+      kindLabel: kindLabel[s.mode.toLowerCase() as RealmNodeInfo['kind']] ?? s.mode,
       kindVariant: kindVariant[s.mode.toLowerCase() as RealmNodeInfo['kind']] ?? 'outline',
       owner: s.owner ?? null,
       ownerLabel: s.owner
@@ -348,7 +348,7 @@ const secretRows = computed<SecretRow[]>(() =>
           <!-- Step 1: Audience -->
           <div v-if="currentStep === 0" class="space-y-5">
             <p class="text-sm text-muted-foreground">
-              Who is this node for? Realm servers and personal devices join under different rules and get different
+              Who is this node for? Realm nodes and personal devices join under different rules and get different
               trust.
             </p>
             <KindSelectStep
@@ -404,7 +404,7 @@ const secretRows = computed<SecretRow[]>(() =>
               <div class="max-w-xs">
                 <label class="text-xs font-medium text-foreground">Expires after</label>
                 <Select v-model="expiresIn" :options="EXPIRY_OPTIONS" class="mt-1" />
-                <p class="mt-1 text-[11px] text-muted-foreground">The server clamps this to between 1 minute and 24 hours.</p>
+                <p class="mt-1 text-[11px] text-muted-foreground">The node clamps this to between 1 minute and 24 hours.</p>
               </div>
               <Notice v-if="mintError" tone="error">{{ mintError }}</Notice>
               <div class="flex justify-between">

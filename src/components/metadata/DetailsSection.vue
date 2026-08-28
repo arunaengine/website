@@ -34,11 +34,11 @@ const visible = computed(
         <Skeleton class="h-3.5 w-36" />
         <Skeleton class="h-3.5 w-56" />
       </div>
-      <p class="pt-1 text-xs text-muted-foreground">{{ preparing ? 'Preparing the crate…' : 'Loading full RO-Crate…' }}</p>
+      <p class="pt-1 text-xs text-muted-foreground">{{ preparing ? 'Preparing the dataset…' : 'Loading full RO-Crate…' }}</p>
     </div>
 
     <div v-else-if="notReady" class="flex items-center gap-3 px-5 py-4 text-xs text-muted-foreground">
-      <span>The crate is still being prepared.</span>
+      <span>This dataset is still being prepared.</span>
       <Button variant="outline" size="sm" @click="emit('retry')">Retry</Button>
     </div>
     <p v-else-if="error" class="px-5 py-4 text-xs text-destructive">{{ error }}</p>

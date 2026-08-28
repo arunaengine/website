@@ -98,8 +98,8 @@ const BindFolderDialog = compileClientComponent(new URL('./BindFolderDialog.vue'
   '@/composables/useRealmNodes': {
     useRealmNodes: () => ({
       nodes: ref([
-        { nodeId: 'node-offline', kind: 'storage', label: 'Offline node', reachable: false },
-        { nodeId: 'node-1', kind: 'storage', label: 'Realm node', reachable: true },
+        { nodeId: 'node-offline', kind: 'server', label: 'Offline node', reachable: false },
+        { nodeId: 'node-1', kind: 'server', label: 'Realm node', reachable: true },
       ]),
     }),
   },

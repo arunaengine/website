@@ -69,7 +69,7 @@ async function confirmCancel() {
 <template>
   <DetailDialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
     <div class="scrollbar-thin min-h-0 flex-1 overflow-y-auto pr-1">
-      <DialogTitle class="sr-only">Job details</DialogTitle>
+      <DialogTitle class="sr-only">Details</DialogTitle>
 
       <div v-if="loadState === 'loading'" class="space-y-4">
         <Skeleton class="h-8 w-2/3" />
@@ -78,21 +78,21 @@ async function confirmCancel() {
       </div>
 
       <Notice v-else-if="loadState === 'unsupported'" tone="warning">
-        This backend does not serve the durable jobs API yet. Job details cannot be loaded.
+        This node does not serve these details yet.
       </Notice>
 
-      <ErrorPanel v-else-if="loadState === 'error'" :message="loadError || 'Failed to load the job.'" @retry="load" />
+      <ErrorPanel v-else-if="loadState === 'error'" :message="loadError || 'This could not be loaded.'" @retry="load" />
 
       <div v-else-if="job" class="space-y-6">
         <div class="space-y-2 pr-8">
           <div class="flex flex-wrap items-center gap-2">
-            <h2 class="font-display text-lg font-semibold text-aruna-navy">{{ jobKindLabel(job.kind) }} job</h2>
+            <h2 class="font-display text-lg font-semibold text-aruna-navy">{{ jobKindLabel(job.kind) }}</h2>
             <JobStateBadge :state="job.state" />
             <Badge v-if="job.cancel_requested && !terminal" variant="warn">cancel requested</Badge>
           </div>
           <div class="flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
             <span :title="job.job_id">{{ truncateMiddle(job.job_id) }}</span>
-            <CopyButton :value="job.job_id" label="Copy job id" />
+            <CopyButton :value="job.job_id" label="Copy the id" />
           </div>
         </div>
 
@@ -101,7 +101,7 @@ async function confirmCancel() {
           <Progress
             v-if="progressPercent !== null"
             :value="progressPercent"
-            :label="`Job progress: ${progressText}`"
+            :label="`Progress: ${progressText}`"
           />
           <p class="text-xs text-foreground">{{ progressText }}</p>
           <p v-if="lastPollError" class="text-[11px] text-muted-foreground">Auto-refresh failed: {{ lastPollError }}</p>
@@ -124,7 +124,7 @@ async function confirmCancel() {
               <RouterLink
                 :to="{ name: 'bucket', params: { bucketId: job.workspace_bucket } }"
                 class="text-primary hover:underline"
-                title="Open this workspace bucket in the data manager"
+                title="Open this workspace bucket under Data"
               >{{ job.workspace_bucket }}</RouterLink>
               <Badge v-if="job.workspace_mode" variant="outline" size="sm" class="ml-1.5 uppercase">{{ job.workspace_mode }}</Badge>
             </dd>
@@ -158,7 +158,7 @@ async function confirmCancel() {
         </section>
 
         <section v-if="prettyRunCrate !== null" class="space-y-2">
-          <h3 class="font-display text-sm font-semibold text-aruna-navy">Run crate</h3>
+          <h3 class="font-display text-sm font-semibold text-aruna-navy">Run dataset</h3>
           <pre
             class="max-h-64 overflow-y-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-2 font-mono text-[11px]"
           >{{ prettyRunCrate }}</pre>
@@ -178,7 +178,7 @@ async function confirmCancel() {
                 :disabled="cancelling"
                 @click="requestCancel"
               >
-                <Ban class="h-3.5 w-3.5" /> Cancel job
+                <Ban class="h-3.5 w-3.5" /> Cancel
               </Button>
             </template>
             <template v-else-if="canCancel">
@@ -190,7 +190,7 @@ async function confirmCancel() {
               </Button>
             </template>
             <p v-else class="text-xs text-muted-foreground">
-              Cancellation was requested; the job stops once the executor observes it.
+              Cancellation was requested; it stops once the executor observes it.
             </p>
           </div>
           <p v-if="cancelError" class="mt-2 text-[11px] text-destructive">{{ cancelError }}</p>

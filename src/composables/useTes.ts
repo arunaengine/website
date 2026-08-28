@@ -20,7 +20,7 @@ const busy = ref(false)
 
 function assertEnabled() {
   if (!featureEnabled('tes')) {
-    throw new Error('Compute (TES) is not enabled on this portal (portal-config features.tes)')
+    throw new Error('Compute is not enabled on this portal (portal-config features.tes)')
   }
 }
 
@@ -93,7 +93,7 @@ async function createTask(task: TesTask): Promise<TesCreateTaskResult> {
     throw new Error(`A task must carry the owning group tag (${TES_GROUP_TAG}).`)
   }
   if (!task.executors?.some((e) => e.image.trim() && e.command.some((arg) => arg.trim()))) {
-    throw new Error('A task needs at least one executor with an image and command.')
+    throw new Error('A run needs at least one executor with an image and command.')
   }
   busy.value = true
   try {

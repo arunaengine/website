@@ -15,7 +15,7 @@ import { isDatasetType, sameSchemaOrgType, SCHEMA_ORG, termNameFromUri } from '.
 // Resolves an entity-kind rule's target class to its `$defs` key (the canonical
 // className) when the profile defines a rule for one of its target types.
 // Undefined when no target has a rule (the `new` branch then encodes as a plain
-// object) or when the target is the root Dataset (which has no `$defs` entry).
+// object) or when the target is the root dataset (which has no `$defs` entry).
 export type ResolveDefName = (rule: ProfilePropertyRule) => string | undefined
 
 // MUST rules become `required`; SHOULD rules become `recommended` (a sibling of
@@ -42,14 +42,14 @@ export function schemaFromPropertyRules(
   return schema
 }
 
-// The root schema describes the Dataset entity rule (what NewDatasetDialog
+// The root schema describes the dataset entity rule (what NewDatasetDialog
 // validates); every non-Dataset entity rule becomes a `$defs` entry keyed by
 // its class short name, so per-class constraints and obligations round-trip.
 export function schemaFromEntityRules(profile: Pick<ProfileBasics, 'name' | 'description'>, entities: ProfileEntityRule[]): JsonSchema {
   const datasetEntity = entities.find((entity) => isDatasetType(entity.type))
   // `new`-branch policy encodings point at the target shape's `$defs` entry: the
   // first target type with a non-Dataset entity rule wins (matching how controls
-  // resolve the sub-form). The Dataset root has no `$defs` entry, so it never
+  // resolve the sub-form). The dataset root has no `$defs` entry, so it never
   // resolves; the branch then falls back to a plain object schema.
   const resolveDefName: ResolveDefName = (rule) => {
     for (const target of rule.entityTypes ?? []) {

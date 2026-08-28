@@ -9,7 +9,7 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value))
 }
 
-// A schema.org Dataset type, used to pick the root entity rule (its rules drive
+// A schema.org dataset type, used to pick the root entity rule (its rules drive
 // the dataset dialog / root JSON Schema; every other type becomes a `$defs` entry).
 export function isDatasetType(type: string): boolean {
   return type === 'Dataset' || type.endsWith('/Dataset')

@@ -25,14 +25,14 @@ const features: Feature[] = [
     tone: 'bg-aruna-royal/15 text-aruna-royal dark:text-aruna-tagline',
   },
   {
-    title: 'Metadata',
-    desc: 'Every dataset is an RO-Crate: files, people, licenses, processes. Query the whole realm with SPARQL.',
+    title: 'Datasets',
+    desc: 'Every dataset describes its files, contributors, licenses and processes as linked data, and imports and exports as RO-Crate. Query the whole realm with SPARQL.',
     icon: FileJson2,
     tone: 'bg-aruna-sky/15 text-aruna-sky',
   },
   {
     title: 'Replication',
-    desc: 'Metadata syncs peer to peer and converges after partitions. Data stays with the organization that owns it.',
+    desc: 'Datasets sync directly between nodes and converge after partitions. Data stays with the organization that owns it.',
     icon: Share2,
     tone: 'bg-aruna-aqua/15 text-aruna-aqua',
   },
@@ -43,8 +43,8 @@ const features: Feature[] = [
     tone: 'bg-aruna-tagline/15 text-aruna-tagline',
   },
   {
-    title: 'Federated compute',
-    desc: 'Submit GA4GH TES tasks from the portal: a quick-run wizard, workspace lifecycle choices, and tasks that run next to the data on any realm node.',
+    title: 'Realm compute',
+    desc: 'Start runs from the portal: a quick-run wizard, workspace lifecycle choices, and runs that execute next to the data on any realm node.',
     icon: Cpu,
     tone: 'bg-aruna-indigo/15 text-aruna-indigo dark:text-aruna-tagline',
     upcoming: true,

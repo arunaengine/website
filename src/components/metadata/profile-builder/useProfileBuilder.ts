@@ -31,7 +31,7 @@ import { normalizeEntitySources } from '@/lib/profiles/sources'
 import type { LiftNote } from '@/lib/shacl/lift'
 
 // Two levels of builder-session lock on a baseline draft rule. `full` is the old
-// all-or-nothing read-only (the Root Dataset entity itself). `structural` fixes a
+// all-or-nothing read-only (the Root dataset entity itself). `structural` fixes a
 // rule's identity: it cannot be removed and its propertyUri/valueName/label stay
 // put, while leaving the specific affordances the RO-Crate baseline allows open
 // (name/description obligation stays MUST; license/datePublished obligation is
@@ -123,7 +123,7 @@ export interface DraftEntityRule {
   // No stored obligation: an entity's obligation is derived from which property
   // rules reference its type (see deriveEntityObligation / entityObligation).
   properties: DraftPropertyRule[]
-  // Builder-session only: the fixed Root Dataset entity (`full`). Never serialized.
+  // Builder-session only: the fixed Root dataset entity (`full`). Never serialized.
   lock?: DraftLock
   // Builder-session only: the rule arrived with an import rather than being added
   // here. An imported shape that nothing references is the source file's own
@@ -380,7 +380,7 @@ export function draftFromPropertyRule(rule: ProfilePropertyRule, isRootEntity = 
     // (non-string) select-url and select-object keep their raw options on valueOptions.
     urlOptions: rule.kind === 'select-url' && !preservedUrl ? (rule.valueOptions ?? []).map((option) => toText(option)) : [],
     valueOptions: rule.valueOptions ? [...rule.valueOptions] : undefined,
-    // L2: re-apply the RO-Crate structural lock to the root Dataset's baseline four
+    // L2: re-apply the RO-Crate structural lock to the root dataset's baseline four
     // rules so an import/edit round-trip restores their fixed identity + obligation
     // floor instead of leaving them fully editable/removable.
     lock: isRootEntity && isBaselineRootTerm(rule.propertyUri) ? 'structural' : undefined,
@@ -408,7 +408,7 @@ export function draftFromEntityRule(rule: ProfileEntityRule, isRoot = false): Dr
       type: rule.type,
       // Keep the imported class alias so it round-trips instead of being re-derived.
       className: rule.className,
-      // L2: forward the root flag so the Dataset root's baseline rules re-lock.
+      // L2: forward the root flag so the dataset root's baseline rules re-lock.
       properties: rule.propertyRules.map((property) => draftFromPropertyRule(property, isRoot)),
     }),
     imported: true,
@@ -428,7 +428,7 @@ function defaultEntities(): DraftEntityRule[] {
   return [
     draftEntity({
       id: 'dataset',
-      label: 'Root Dataset',
+      label: 'Root dataset',
       type: 'http://schema.org/Dataset',
       description: 'The root RO-Crate dataset entity described by ro-crate-metadata.json about.',
       lock: 'full',
@@ -485,7 +485,7 @@ export const ENTITY_RULE_TEMPLATES: EntityRuleTemplate[] = [
         id: 'person',
         label: 'Contributor Person',
         type: 'http://schema.org/Person',
-        description: 'Optional contextual Person entities referenced from Dataset author/creator/contributor properties.',
+        description: 'Optional contextual Person entities referenced from dataset author/creator/contributor properties.',
         properties: [
           draftProperty({ id: 'name', label: 'Name', valueName: 'name', propertyUri: 'http://schema.org/name', obligation: 'MUST', description: 'Contributor display name.', example: 'Ada Lovelace' }),
           draftProperty({ id: 'identifier', label: 'Identifier', valueName: 'identifier', propertyUri: 'http://schema.org/identifier', kind: 'url', obligation: 'SHOULD', description: 'Persistent contributor identifier such as ORCID.' }),
@@ -588,11 +588,11 @@ export function useProfileBuilder() {
     if (basics.datePublished) datePublished.value = basics.datePublished
     if (basics.license) license.value = basics.license
     if (!slugTouched.value && basics.name) slug.value = slugify(basics.name)
-    // L2: the first Dataset-typed rule is the RO-Crate root; only its baseline four
-    // rules re-lock as structural (a nested Dataset sub-entity is left untouched).
+    // L2: the first dataset-typed rule is the RO-Crate root; only its baseline four
+    // rules re-lock as structural (a nested dataset sub-entity is left untouched).
     const rootIndex = result.entityRules.findIndex((entity) => isDatasetType(normalizeTypeUri(entity.type)))
     const drafts = result.entityRules.map((entity, index) => draftFromEntityRule(entity, index === rootIndex))
-    // Every RO-Crate has a root Dataset, and the dataset form is generated from
+    // Every RO-Crate has a root dataset, and the dataset form is generated from
     // its rules. An import that describes none (a SHACL file with only
     // class-targeted shapes, say) would otherwise land the author on a draft that
     // can never be saved, so seed the RO-Crate baseline root alongside it.
@@ -650,7 +650,7 @@ export function useProfileBuilder() {
     return `${base}${n}`
   }
 
-  // New entity rules default to Person (H2), not Dataset: a second Dataset rule
+  // New entity rules default to Person (H2), not dataset: a second dataset rule
   // duplicates the root's class name and traps first-timers, whereas Person lands
   // them on the guided "not referenced yet" path.
   function addEntity() {
@@ -1012,7 +1012,7 @@ export function useProfileBuilder() {
   const rulesErrors = computed(() => {
     const errors: string[] = []
     if (!normalizedEntities.value.length) errors.push('Add at least one entity rule.')
-    if (!datasetEntity.value) errors.push('Add a Dataset entity rule so dataset metadata inputs can be generated.')
+    if (!datasetEntity.value) errors.push('Add a dataset entity rule so dataset metadata inputs can be generated.')
 
     // Class short names across the normalized rules, for the property-vs-class
     // collision guard below (case-insensitive, defense in depth per D2).

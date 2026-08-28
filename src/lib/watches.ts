@@ -17,9 +17,9 @@ export interface WatchEventKindInfo {
 export const WATCH_EVENT_KINDS: WatchEventKindInfo[] = [
   {
     kind: 'metadata_created',
-    label: 'Metadata created',
+    label: 'Dataset created',
     description:
-      'Notifies you when a new metadata document (dataset, profile, run record) is created under this catalog path.',
+      'Notifies you when a new dataset, profile or run record is created under this catalog path.',
   },
   {
     kind: 'data_uploaded',
@@ -118,7 +118,7 @@ export function parseWatchPath(pathPrefix: string): WatchPathInfo | null {
       namespace: 'meta',
       groupId,
       prefix,
-      label: prefix || '(all documents)',
+      label: prefix || '(all datasets)',
       link: { name: 'datasets', query: { ...(prefix ? { q: prefix } : {}), group: groupId } },
     }
   }

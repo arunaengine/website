@@ -67,7 +67,7 @@ const STATE_TONE: Record<string, StateTone> = {
   succeeded: 'done',
   failed: 'failed',
   cancelled: 'idle',
-  // Document and folder sync states.
+  // Dataset and folder sync states.
   synced: 'done',
   pending: 'progress',
   publishing: 'progress',

@@ -40,7 +40,7 @@ async function renderTopic(slug: string): Promise<string> {
 }
 
 describe('versioned in-portal Docs', () => {
-  it('renders every declared concept and task-guide topic', async () => {
+  it('renders every declared concept and how-to topic', async () => {
     expect(docsTopics.map((topic) => topic.slug)).toEqual([
       'datasets',
       'profiles-conformance',
@@ -78,7 +78,7 @@ describe('versioned in-portal Docs', () => {
     const copy = JSON.stringify(datasets)
 
     expect(copy).toContain('RO-Crate 1.2 and 1.3 are supported for import, validation, and round-trip export.')
-    expect(copy).toContain('New portal-authored crates currently emit RO-Crate 1.2.')
+    expect(copy).toContain('New portal-authored datasets currently emit RO-Crate 1.2.')
   })
 
   it('renders an honest unknown-topic state', async () => {

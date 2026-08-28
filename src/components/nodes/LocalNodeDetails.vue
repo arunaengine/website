@@ -22,7 +22,7 @@ const portal = computed(() => props.info.portal)
 // Three honest portal states. `installed: false` is the only case where the
 // node itself verifiably reports that no portal is present. A missing portal
 // block means the status was not reported at all: a remote node is probed
-// directly and its /info is not augmented by the connected portal server, so
+// directly and its /info is not augmented by the connected portal node, so
 // the browser cannot know its portal status. That must read as "unknown",
 // never "not installed".
 const portalValue = computed(() => {

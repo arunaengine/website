@@ -393,7 +393,7 @@ function emptyStateText(): string {
               :violations="violationsFor(index, field.property)"
               @update:model-value="(value: unknown) => emit('update', index, field.property, value)"
             />
-            <p class="mt-1 text-[11px] text-muted-foreground">If this is an absolute URI (e.g. an ORCID), it becomes the entity's @id in the crate; otherwise a local #id is generated.</p>
+            <p class="mt-1 text-[11px] text-muted-foreground">If this is an absolute URI (e.g. an ORCID), it becomes the entity's @id in the RO-Crate; otherwise a local #id is generated.</p>
           </div>
           <ProfileControlField
             v-else

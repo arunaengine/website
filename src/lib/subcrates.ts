@@ -1,7 +1,7 @@
 import { crateGraph, crateRootId, stringProp } from '@/lib/dataEntities'
 
 // Subcrate linking per RO-Crate 1.2 "Referencing other RO-Crates" (data
-// entities spec): a referenced crate is a Dataset data entity linked from the
+// entities spec): a referenced crate is a dataset data entity linked from the
 // root via hasPart, whose conformsTo is the version-less RO-Crate profile URI.
 // Because the child's persistent @id may not resolve to a crate directly, the
 // spec's fallback adds subjectOf pointing at a CreativeWork contextual entity
@@ -79,7 +79,7 @@ export function isProjectCrate(crate: unknown): boolean {
 }
 
 // Adds (or completes) one subcrate reference on a crate CLONE: the hasPart
-// ref, the Dataset data entity, and the subjectOf CreativeWork fallback.
+// ref, the dataset data entity, and the subjectOf CreativeWork fallback.
 // Everything else in the crate is left untouched. Idempotent per iri.
 export function addSubcrateLink(crate: unknown, link: SubcrateLink): void {
   if (!isRecord(crate)) return

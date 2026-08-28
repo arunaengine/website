@@ -219,6 +219,42 @@ const RunTargetPicker = compileClientComponent(
   new URL('../components/compute/RunTargetPicker.vue', import.meta.url),
   { vue: VueRuntime, '@lucide/vue': icons },
 )
+const useAuthModule = {
+  useAuth: () => ({ stage: ref('authenticated'), authPending: ref(false), signIn: vi.fn() }),
+}
+const WizardNavBar = compileClientComponent(
+  new URL('../components/compute/WizardNavBar.vue', import.meta.url),
+  { vue: VueRuntime, '@lucide/vue': icons, '@/components/ui/Button.vue': moduleDefault(ButtonStub) },
+)
+const RerunPrefillNote = compileClientComponent(
+  new URL('../components/compute/RerunPrefillNote.vue', import.meta.url),
+  {
+    vue: VueRuntime,
+    '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+    '@/components/ui/Notice.vue': moduleDefault(NoticeStub),
+  },
+)
+const ComputeGates = compileClientComponent(
+  new URL('../components/compute/ComputeGates.vue', import.meta.url),
+  {
+    vue: VueRuntime,
+    '@lucide/vue': icons,
+    '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+    '@/components/ui/EmptyState.vue': moduleDefault(EmptyStateStub),
+    '@/components/ui/Skeleton.vue': moduleDefault(GenericStub),
+    '@/composables/useAruna': useArunaModule,
+    '@/composables/useAuth': useAuthModule,
+  },
+)
+const RunPlacementSection = compileClientComponent(
+  new URL('../components/compute/RunPlacementSection.vue', import.meta.url),
+  {
+    vue: VueRuntime,
+    '@/components/ui/Notice.vue': moduleDefault(NoticeStub),
+    '@/components/compute/RunTargetPicker.vue': moduleDefault(RunTargetPicker),
+    '@/components/compute/PlacementPicker.vue': moduleDefault(PlacementPickerStub),
+  },
+)
 
 // Desktop-only run target, driven by the test: on the web it never appears.
 const runTargetChoice = ref<'realm' | 'local'>('realm')
@@ -261,7 +297,10 @@ const ComputeSubmitView = compileClientComponent(new URL('./ComputeSubmitView.vu
   '@/components/compute/TesInputsEditor.vue': moduleDefault(GenericStub),
   '@/components/compute/TesDataRefDialog.vue': moduleDefault(GenericStub),
   '@/components/compute/ContainerFsTree.vue': moduleDefault(GenericStub),
-  '@/components/compute/PlacementPicker.vue': moduleDefault(PlacementPickerStub),
+  '@/components/compute/ComputeGates.vue': moduleDefault(ComputeGates),
+  '@/components/compute/RerunPrefillNote.vue': moduleDefault(RerunPrefillNote),
+  '@/components/compute/RunPlacementSection.vue': moduleDefault(RunPlacementSection),
+  '@/components/compute/WizardNavBar.vue': moduleDefault(WizardNavBar),
   '@/composables/useTes': {
     isTesUnsupported: () => false,
     useTes: () => ({
@@ -272,9 +311,6 @@ const ComputeSubmitView = compileClientComponent(new URL('./ComputeSubmitView.vu
     }),
   },
   '@/composables/useAruna': useArunaModule,
-  '@/composables/useAuth': {
-    useAuth: () => ({ stage: ref('authenticated'), authPending: ref(false), signIn: vi.fn() }),
-  },
   '@/composables/useComputeDataView': { useComputeDataView: () => ref('table') },
   '@/composables/useS3': {
     useS3: () => ({ hasActiveKey: ref(false), endpoint: ref(null), listBuckets: vi.fn(async () => []) }),
@@ -403,7 +439,7 @@ describe('numeric Input consumers', () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
     await flush()
 
-    expect(content(mounted.root)).toContain('TES task request')
+    expect(content(mounted.root)).toContain('Run request')
     expect(content(mounted.root)).toContain('"cpu_cores": 4')
     expect(content(mounted.root)).toContain('"ram_gb": 8.5')
     expect(content(mounted.root)).toContain('"disk_gb": 20.25')
@@ -482,7 +518,7 @@ describe('numeric Input consumers', () => {
 
   it('renders Admin Onboarding snippets after typing a numeric weight', async () => {
     const mounted = await mount(AdminOnboardingView, '/app/admin')
-    await click(element(mounted.root, (node) => node.tag === 'button' && content(node).includes('server for my realm')))
+    await click(element(mounted.root, (node) => node.tag === 'button' && content(node).includes('node for my realm')))
     await click(button(mounted.root, 'Continue'))
     await click(element(mounted.root, (node) => node.tag === 'button' && content(node).includes('Management')))
     await click(button(mounted.root, 'Continue'))

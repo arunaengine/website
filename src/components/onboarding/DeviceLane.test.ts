@@ -183,7 +183,7 @@ describe('hand-off inside the desktop app', () => {
     inShell = (await import('./DeviceLane.vue')).default
   })
 
-  it('enrolls this machine instead of emitting a link', async () => {
+  it('enrolls this computer instead of emitting a link', async () => {
     minted.value = enrollment()
     const markup = decode(await renderToString(createSSRApp({ render: () => h(inShell, { step: 2 }) })))
 

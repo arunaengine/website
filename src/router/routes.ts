@@ -78,7 +78,7 @@ export function portalRoutes(): RouteRecordRaw[] {
       component: appLayout,
       children: [
         homeRoute(),
-        // Buckets: primary research surface (formerly "Data manager")
+        // Data: buckets and objects, the primary research surface.
         { path: 'buckets', name: 'buckets', component: () => import('@/views/DataManagerView.vue') },
         { path: 'buckets/:bucketId', name: 'bucket', component: () => import('@/views/DataManagerView.vue') },
         // Retired bucket-builder route: the consolidated Add data dialog replaced
@@ -91,7 +91,7 @@ export function portalRoutes(): RouteRecordRaw[] {
             query: { ...(typeof to.query.prefix === 'string' && to.query.prefix ? { prefix: to.query.prefix } : {}), addData: '1' },
           }),
         },
-        // Datasets catalog plus search, with SPARQL in expert mode.
+        // Dataset catalog plus search, with SPARQL in expert mode.
         { path: 'datasets', name: 'datasets', component: () => import('@/views/SearchView.vue') },
         { path: 'datasets/new', name: 'dataset-new', component: () => import('@/views/DatasetNewView.vue') },
         { path: 'datasets/:id', name: 'dataset', component: () => import('@/views/MetadataView.vue') },
@@ -136,7 +136,7 @@ export function portalRoutes(): RouteRecordRaw[] {
           name: 'admin-quarantine',
           component: () => import('@/views/AdminQuarantineView.vue'),
         },
-        // Compute: GA4GH TES tasks and durable system jobs in one surface
+        // Compute: runs and durable system jobs in one surface
         // (each half is feature-gated in-view)
         { path: 'compute', name: 'compute', component: () => import('@/views/ComputeView.vue') },
         { path: 'compute/quick', name: 'compute-quick', component: () => import('@/views/ComputeQuickRunView.vue') },

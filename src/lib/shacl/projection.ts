@@ -78,8 +78,8 @@ export function shapesFromEntityRules(
 
     const nodeLines: string[] = [`${iri(shapeIri)} a sh:NodeShape`]
     if (entity !== root) nodeLines.push(`  sh:targetClass ${iri(entity.type)}`)
-    // The root Dataset shape carries NO static target: crate roots have
-    // crate-local ids and class targeting would also hit non-root Datasets, so
+    // The root dataset shape carries NO static target: crate roots have
+    // crate-local ids and class targeting would also hit non-root datasets, so
     // the validator binds sh:targetNode <crate root> at runtime (plan section 7).
     if (propertyShapes.length) {
       nodeLines.push(`  sh:property ${propertyShapes.map((shape) => iri(shape.iri)).join(', ')}`)

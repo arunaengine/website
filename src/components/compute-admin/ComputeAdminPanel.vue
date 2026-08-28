@@ -267,7 +267,7 @@ watch(
           <section v-else-if="unsupported" class="surface p-5">
             <EmptyState
               title="Compute configuration is unavailable"
-              description="This node returned no compute configuration; it may not hold the realm document or may not serve /admin/compute/config."
+              description="This node returned no compute configuration; it may not hold the realm configuration or may not serve /admin/compute/config."
             >
               <Button @click="loadConfig">Try again</Button>
             </EmptyState>
@@ -431,7 +431,7 @@ watch(
                     <thead class="border-b border-border bg-muted/40 text-muted-foreground">
                       <tr>
                         <th class="px-3 py-2 font-medium">Node</th>
-                        <th class="px-3 py-2 font-medium">Reserved jobs</th>
+                        <th class="px-3 py-2 font-medium">Reserved runs</th>
                         <th class="px-3 py-2 font-medium">Reserved CPU</th>
                         <th class="px-3 py-2 font-medium">Reserved RAM</th>
                         <th class="px-3 py-2 font-medium">Reserved disk</th>
@@ -486,13 +486,13 @@ watch(
                       <Badge v-else variant="outline">replicated logical demand</Badge>
                     </div>
                     <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                      <StatCard label="Jobs" :value="formatNumber(snapshots.group.demand.count)" :hint="`Quota ${quotaValue(snapshots.group.quota.max_jobs)}`" />
+                      <StatCard label="Runs" :value="formatNumber(snapshots.group.demand.count)" :hint="`Quota ${quotaValue(snapshots.group.quota.max_jobs)}`" />
                       <StatCard label="CPU cores" :value="formatNumber(snapshots.group.demand.cpu_cores)" :hint="`Quota ${quotaValue(snapshots.group.quota.max_cpu_cores)}`" />
                       <StatCard label="RAM" :value="formatBytes(snapshots.group.demand.ram_bytes)" :hint="`Quota ${quotaValue(snapshots.group.quota.max_ram_bytes, 'bytes')}`" />
                       <StatCard label="Disk" :value="formatBytes(snapshots.group.demand.disk_bytes)" :hint="`Quota ${quotaValue(snapshots.group.quota.max_disk_bytes, 'bytes')}`" />
                     </div>
                     <p class="mt-3 text-[11px] text-muted-foreground">
-                      Per-job ceilings: {{ quotaValue(snapshots.group.quota.max_job_cpu_cores) }} CPU,
+                      Per-run ceilings: {{ quotaValue(snapshots.group.quota.max_job_cpu_cores) }} CPU,
                       {{ quotaValue(snapshots.group.quota.max_job_ram_bytes, 'bytes') }} RAM,
                       {{ quotaValue(snapshots.group.quota.max_job_disk_bytes, 'bytes') }} disk,
                       {{ quotaValue(snapshots.group.quota.max_job_walltime_ms, 'duration') }} walltime.

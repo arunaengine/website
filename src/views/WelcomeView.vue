@@ -130,7 +130,7 @@ function toEnroll(): void {
               <KeyRound class="h-4 w-4" /> I have an enrollment code
             </Button>
             <p class="mt-1 text-[11px] text-muted-foreground">
-              Enrolls this machine’s node from the code alone.
+              Enrolls this computer’s node from the code alone.
             </p>
           </div>
         </div>

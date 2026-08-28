@@ -21,7 +21,7 @@ import type {
 // Recursive reuse-or-create entity model. An entity-kind sub-control whose
 // target type has an entity rule in the profile nests a full sub-form (its
 // instance value is an `EntityEntry[]` of its own) up to MAX_ENTITY_DEPTH
-// levels of described-new forms below the Dataset root. At the cap, and for
+// levels of described-new forms below the dataset root. At the cap, and for
 // target types without a rule, the value stays the flat URI-reference shape
 // ('' single / string[] multiple), each emitted as a `{"@id"}` reference.
 export const MAX_ENTITY_DEPTH = 5

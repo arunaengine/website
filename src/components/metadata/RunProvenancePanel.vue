@@ -46,7 +46,7 @@ const agentLabel = computed(() => {
   return a.name || a.id.replace(/^#agent-/, '')
 })
 
-// Where "Submitted by" points: an Aruna `{ulid}@{realm}` id resolves to the
+// Where "Run by" points: an Aruna `{ulid}@{realm}` id resolves to the
 // in-portal user profile (same form AuthorChips links); an http(s) identifier
 // (e.g. an ORCID URL) opens externally; otherwise the name stays plain text.
 const agentLink = computed(() => {
@@ -156,17 +156,17 @@ const flow = computed(() => [
         class="ml-auto inline-flex items-center gap-1.5 text-xs font-normal text-primary hover:underline"
         :to="{ name: 'task', params: { taskId: run.runId } }"
       >
-        <Cpu class="h-3.5 w-3.5" /> Open compute task
+        <Cpu class="h-3.5 w-3.5" /> Open the run
       </RouterLink>
     </div>
 
     <dl class="grid gap-3 px-5 py-4 sm:grid-cols-2 lg:grid-cols-4">
       <div v-if="run.runId" class="min-w-0">
-        <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">Compute task ID</dt>
+        <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">Run ID</dt>
         <dd class="mt-1 font-mono text-[11px] text-foreground" :title="run.runId">{{ truncateMiddle(run.runId, 18, 10) }}</dd>
       </div>
       <div v-if="agentLabel" class="min-w-0">
-        <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">Submitted by</dt>
+        <dt class="text-[11px] uppercase tracking-wider text-muted-foreground">Run by</dt>
         <dd class="mt-1 break-all text-sm" :title="run.agent?.identifier || run.agent?.id">
           <RouterLink
             v-if="agentLink.kind === 'user'"

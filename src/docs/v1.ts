@@ -27,34 +27,34 @@ export const docsTopics: DocsTopic[] = [
     slug: 'datasets',
     kind: 'Concept',
     title: 'Datasets and purpose types',
-    summary: 'How the Datasets catalog presents every RO-Crate and distinguishes its purpose.',
+    summary: 'How the datasets catalog presents every RO-Crate and distinguishes its purpose.',
     sections: [
       {
         title: 'One catalog, three purposes',
         paragraphs: [
-          'A Dataset is the portal term for every RO-Crate in the Datasets catalog. An RO-Crate is a structured description whose root identifies the Dataset and whose graph can describe people, files, software, places, and related research objects.',
-          'Dataset is the default purpose. Profile and Process Run are specialized purposes, not separate storage systems. A Profile purpose takes precedence when the crate root declares the Profile type. A Process Run is recognized by conformance to the supported Process Run Crate profile. Every other RO-Crate is shown as Dataset.',
+          'A Dataset is the portal term for every RO-Crate in the datasets catalog. An RO-Crate is a structured description whose root identifies the dataset and whose graph can describe people, files, software, places, and related research objects.',
+          'Dataset is the default purpose. Profile and Process Run are specialized purposes, not separate storage systems. A Profile purpose takes precedence when the RO-Crate root declares the Profile type. A Process Run is recognized by conformance to the supported Process Run Crate profile. Every other RO-Crate is shown as dataset.',
         ],
       },
       {
         title: 'Description and data are separate',
         paragraphs: [
-          'The Dataset record is the RO-Crate graph. Data files live in buckets or at external locations and are referenced by the graph. Editing or deleting the Dataset record does not silently edit or delete those files.',
+          'The dataset record is the RO-Crate graph. Data files live in buckets or at external locations and are referenced by the graph. Editing or deleting the dataset record does not silently edit or delete those files.',
         ],
       },
       {
         title: 'Create or import',
         bullets: [
           'Create dataset starts a new portal-authored RO-Crate and lets you choose its owning group and optional Profile.',
-          'Import RO-Crate dataset accepts an existing RO-Crate archive, previews it, and registers it as a new Dataset.',
-          'These are separate intents. Import does not overwrite an existing Dataset unless an explicit replacement workflow says so.',
+          'Import RO-Crate dataset accepts an existing RO-Crate archive, previews it, and registers it as a new dataset.',
+          'These are separate intents. Import does not overwrite an existing dataset unless an explicit replacement workflow says so.',
         ],
       },
       {
         title: 'RO-Crate version compatibility',
         bullets: [
           'RO-Crate 1.2 and 1.3 are supported for import, validation, and round-trip export.',
-          'New portal-authored crates currently emit RO-Crate 1.2. Importing and exporting an existing 1.3 crate preserves its declared version.',
+          'New portal-authored datasets currently emit RO-Crate 1.2. Importing and exporting an existing 1.3 archive preserves its declared version.',
           'RO-Crate 1.1 remains supported for reading.',
         ],
       },
@@ -69,23 +69,23 @@ export const docsTopics: DocsTopic[] = [
       {
         title: 'Profiles define minimum requirements',
         paragraphs: [
-          'A Profile describes the fields and entities expected for a kind of Dataset. Requirements are minimum requirements by default, so additional metadata remains valid unless an explicit closed SHACL constraint restricts it.',
-          'A conformsTo reference states which Profile a Dataset claims to follow. The reference alone is not proof that the Dataset passed validation.',
+          'A Profile describes the fields and entities expected for a kind of dataset. Requirements are minimum requirements by default, so additional metadata remains valid unless an explicit closed SHACL constraint restricts it.',
+          'A conformsTo reference states which Profile a dataset claims to follow. The reference alone is not proof that the dataset passed validation.',
         ],
       },
       {
         title: 'Validation authority',
         bullets: [
-          'The server validation preview in the dataset dialogs checks a draft against the registered Profile before it is saved. It is advisory and never blocks the form.',
-          'The backend validates the exact submitted crate against the exact registered Profile revision before accepting a tagged write.',
-          'A registered Profile that is unavailable or still preparing fails closed for that tagged write. Retry the check or remove the Profile tag and save an unprofiled Dataset.',
+          'The node validation preview in the dataset dialogs checks a draft against the registered Profile before it is saved. It is advisory and never blocks the form.',
+          'The node validates the exact saved RO-Crate against the exact registered Profile revision before accepting a tagged write.',
+          'A registered Profile that is unavailable or still preparing fails closed for that tagged write. Retry the check or remove the Profile tag and save an unprofiled dataset.',
           'External and unregistered Profile references remain readable, but they cannot currently be used as enforceable write tags.',
         ],
       },
       {
         title: 'Changing Profile',
         paragraphs: [
-          'Changing a saved Dataset to another Profile is a semantic change. The replacement crate must pass authoritative validation, and unmatched existing metadata remains available for explicit review instead of being discarded silently.',
+          'Changing a saved dataset to another Profile is a semantic change. The replacement dataset must pass authoritative validation, and unmatched existing metadata remains available for explicit review instead of being discarded silently.',
         ],
       },
     ],
@@ -94,13 +94,13 @@ export const docsTopics: DocsTopic[] = [
     slug: 'data-and-deletion',
     kind: 'Concept',
     title: 'Data, buckets, references, and deletion',
-    summary: 'How Dataset records relate to S3 data and what ordinary delete and permanent purge affect.',
+    summary: 'How dataset records relate to S3 data and what ordinary delete and permanent purge affect.',
     sections: [
       {
-        title: 'Data and Dataset references',
+        title: 'Data and dataset references',
         paragraphs: [
-          'Data means buckets and S3 objects or files. A Dataset can reference a file identity or location, but that reference does not make the Dataset record own the stored bytes. One content identity can have several resolvable locations or replicas.',
-          'Deletion checks can warn about visible Dataset references, restricted references, and whether the selected operation removes the last resolvable Aruna location. A reference warning informs the decision but does not replace storage permissions or block an otherwise authorized deletion.',
+          'Data means buckets and S3 objects or files. A Dataset can reference a file identity or location, but that reference does not make the dataset record own the stored bytes. One content identity can have several resolvable locations or replicas.',
+          'Deletion checks can warn about visible dataset references, restricted references, and whether the selected operation removes the last resolvable Aruna location. A reference warning informs the decision but does not replace storage permissions or block an otherwise authorized deletion.',
         ],
       },
       {
@@ -108,13 +108,13 @@ export const docsTopics: DocsTopic[] = [
         bullets: [
           'Ordinary file Delete sends a version-less S3 delete. It creates a delete marker, hides the current head, and preserves historical versions and physical data.',
           'Ordinary folder Delete applies the same delete-marker behavior to the current keys under the exact prefix. It can finish partially and reports keys that remain visible.',
-          'Deleting a Dataset record removes its RO-Crate graph. It does not delete referenced S3 objects.',
+          'Deleting a dataset record removes its RO-Crate graph. It does not delete referenced S3 objects.',
         ],
       },
       {
         title: 'Permanent purge is separate',
         paragraphs: [
-          'Permanently delete all versions is an explicit server-side purge operation. It removes named versions and delete markers and reports partial progress for safe retry. A complete bucket deletion also aborts open multipart uploads, handles sync relationships, proves final emptiness, and then deletes the bucket.',
+          'Permanently delete all versions is an explicit node-side purge operation. It removes named versions and delete markers and reports partial progress for safe retry. A complete bucket deletion also aborts open multipart uploads, handles sync relationships, proves final emptiness, and then deletes the bucket.',
         ],
       },
     ],
@@ -130,14 +130,14 @@ export const docsTopics: DocsTopic[] = [
         bullets: [
           'Realm is the selected visibility, membership, and realm-aggregate scope.',
           'Node is the REST and S3 authority and the scope for local storage or placement reports.',
-          'Group is the ownership, role, and quota scope for Datasets, data, and configured storage behavior.',
-          'Membership connects a person to group roles. The backend evaluates the resulting permission paths for every protected action.',
+          'Group is the ownership, role, and quota scope for datasets, data, and configured storage behavior.',
+          'Membership connects a user to group roles. The node evaluates the resulting permission paths for every protected action.',
         ],
       },
       {
         title: 'Replication is not a unique total',
         paragraphs: [
-          'Replication records which nodes currently hold or are responsible for copies. Node holder counts include replicas, so adding them together can exceed the number of unique Datasets. A default replication factor is placement policy, not proof that every record currently has that many copies. A null default can mean all eligible nodes.',
+          'Replication records which nodes currently hold or are responsible for copies. Node holder counts include replicas, so adding them together can exceed the number of unique datasets. A default replication factor is placement policy, not proof that every record currently has that many copies. A null default can mean all eligible nodes.',
         ],
       },
       {
@@ -209,8 +209,8 @@ export const docsTopics: DocsTopic[] = [
       {
         title: 'One automatic primary w3id',
         paragraphs: [
-          'Every persisted Dataset receives exactly one automatic conceptual w3id. Ordinary Datasets and Process Runs use the general Dataset identity. A Profile uses https://w3id.org/aruna/profile/{id} as its sole primary PID instead of receiving a duplicate general Dataset w3id.',
-          'Minting can continue after the Dataset write is accepted. Requested, processing, active, failed, administratively withdrawn, tombstoned, and unknown states remain visible. Normal Dataset deletion keeps a resolvable tombstone. Ordinary Dataset owners cannot withdraw the primary PID.',
+          'Every persisted dataset receives exactly one automatic conceptual w3id. Ordinary datasets and Process Runs use the general dataset identity. A Profile uses https://w3id.org/aruna/profile/{id} as its sole primary PID instead of receiving a duplicate general dataset w3id.',
+          'Minting can continue after the dataset write is accepted. Requested, processing, active, failed, administratively withdrawn, tombstoned, and unknown states remain visible. Normal dataset deletion keeps a resolvable tombstone. Ordinary dataset owners cannot withdraw the primary PID.',
         ],
       },
       {
@@ -243,7 +243,7 @@ export const docsTopics: DocsTopic[] = [
           'Ranked alternatives are the other acceptable targets, capped at 8 per round.',
           'Rejected candidates are targets the round refused, with a reason recorded, capped at 32 explanations.',
           'Omitted counts the rejections that cap dropped. A non-zero value means the recorded rejections are incomplete, not that the remaining targets agreed.',
-          'A plan is kept by the node that made it. A job answered by another node can report no placement at all, which is not the same as an unplanned run.',
+          'A plan is kept by the node that made it. A run answered by another node can report no placement at all, which is not the same as an unplanned run.',
         ],
       },
       {
@@ -258,10 +258,10 @@ export const docsTopics: DocsTopic[] = [
       {
         title: 'Input modes',
         bullets: [
-          'A snapshot input is copied as it was at submission. The run is unaffected by later writes to that key.',
+          'A snapshot input is copied as it was when the run started. The run is unaffected by later writes to that key.',
           'A floating reference resolves the key at run time, so the run sees whatever is current then. It cannot name a version.',
           'An exact reference pins one specific version and requires that version id.',
-          'The GA4GH task interface carries no mode of its own. A task submitted through it takes the mode the serving node derives from its own deployment, and never pins a version.',
+          'The GA4GH task interface carries no mode of its own. A run started through it takes the mode the serving node derives from its own deployment, and never pins a version.',
         ],
       },
       {
@@ -279,11 +279,11 @@ export const docsTopics: DocsTopic[] = [
         ],
       },
       {
-        title: 'Placement policies and the job-family strategy',
+        title: 'Placement policies and the run-family strategy',
         bullets: [
           'A residency policy is an immutable published definition. A reference to one is the pair of its id and the digest of that definition, because an id alone could be answered with other bytes.',
           'Publishing a changed definition requires a new policy id. Policies restrict which nodes a copy may live on, and the planner only routes inputs from copies that comply.',
-          'The job-family strategy places the replicated job records themselves. It cannot be removed and its shard count is frozen, so it is shown read-only.',
+          'The run-family strategy places the replicated run records themselves. It cannot be removed and its shard count is frozen, so it is shown read-only.',
         ],
       },
     ],
@@ -291,8 +291,8 @@ export const docsTopics: DocsTopic[] = [
   {
     slug: 'first-dataset',
     kind: 'Guide',
-    title: 'Create your first Dataset',
-    summary: 'Create a new Dataset or import an existing RO-Crate with an explicit group and purpose.',
+    title: 'Create your first dataset',
+    summary: 'Create a new dataset or import an existing RO-Crate with an explicit group and purpose.',
     sections: [
       {
         title: 'Before you start',
@@ -305,19 +305,19 @@ export const docsTopics: DocsTopic[] = [
       {
         title: 'Create',
         steps: [
-          'Open Datasets and choose Create dataset.',
+          'Open datasets and choose Create dataset.',
           'Select the owning group, then add a title, description, and other useful metadata.',
-          'Optionally choose a registered Profile. Treat the server validation preview findings as advisory and resolve violations before submission.',
-          'Submit the Dataset. Accepted confirms the durable write. If the detail view says Preparing, wait or use Retry instead of creating a duplicate.',
-          'Review the Dataset purpose badge, group scope, conformance status, and automatic w3id status on the detail page.',
+          'Optionally choose a registered Profile. Treat the node validation preview findings as advisory and resolve violations before you save.',
+          'Save the dataset. Accepted confirms the durable write. If the detail view says Preparing, wait or use Retry instead of creating a duplicate.',
+          'Review the dataset purpose badge, group scope, conformance status, and automatic w3id status on the detail page.',
         ],
       },
       {
         title: 'Import',
         steps: [
           'Choose Import RO-Crate dataset and select a supported RO-Crate archive.',
-          'Review the detected version, file count, purpose, Profile references, and destination before submitting.',
-          'Confirm the new Dataset and follow any preparation job until it is Complete or reports a recoverable Partial state.',
+          'Review the detected version, file count, purpose, Profile references, and destination before you import.',
+          'Confirm the new dataset and follow the preparation until it is Complete or reports a recoverable Partial state.',
         ],
       },
     ],
@@ -372,23 +372,23 @@ export const docsTopics: DocsTopic[] = [
   {
     slug: 'compute-run',
     kind: 'Guide',
-    title: 'Submit and follow a compute run',
-    summary: 'Choose a group and inputs, submit work, and read its run and provenance states.',
+    title: 'Start and follow a compute run',
+    summary: 'Choose a group and inputs, start the work, and read its run and provenance states.',
     sections: [
       {
-        title: 'Submit',
+        title: 'Start the run',
         steps: [
-          'Open Compute and choose the quick or structured submission flow available on the connected node.',
+          'Open Compute and choose Quick run or Custom run, whichever the connected node offers.',
           'Select the owning group. The aruna-engine.org/group label carries that accounting and provenance context.',
-          'Choose readable inputs, an output destination, the container or executable details, and resource values accepted by the backend.',
-          'Review the group, node, storage, command, and resource scope before submitting.',
-          'Submit once. Accepted means the request is durable, while Preparing means scheduling or materialization is still converging.',
+          'Choose readable inputs, an output destination, the container or executable details, and resource values the node accepts.',
+          'Review the group, node, storage, command, and resource scope before you start it.',
+          'Run it once. Accepted means the request is durable, while Preparing means scheduling or materialization is still converging.',
         ],
       },
       {
         title: 'Follow results',
         paragraphs: [
-          'The run view reports task or job progress without treating an unavailable node as an empty result. When the run completes, Aruna writes a Process Run Dataset that records the action, tool, inputs, outputs, status, and owning group. Open that Process Run from the run detail or filter Datasets by Process Run.',
+          'The run view reports run progress without treating an unreachable node as an empty result. When the run completes, Aruna writes a Process Run dataset that records the action, tool, inputs, outputs, status, and owning group. Open that Process Run from the run detail or filter datasets by Process Run.',
         ],
       },
     ],

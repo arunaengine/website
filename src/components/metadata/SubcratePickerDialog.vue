@@ -123,9 +123,9 @@ async function confirm() {
   <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
     <DialogContent class="max-w-md">
       <DialogHeader>
-        <DialogTitle class="flex items-center gap-2"><Layers class="h-4 w-4 text-primary" /> Link subcrates</DialogTitle>
+        <DialogTitle class="flex items-center gap-2"><Layers class="h-4 w-4 text-primary" /> Link datasets</DialogTitle>
         <DialogDescription>
-          Reference other metadata crates as parts of this one. Linked crates stay independent documents; this crate only points at them and becomes a project-level Collection.
+          Reference other datasets as parts of this one. Linked datasets stay independent; this one only points at them and becomes a project-level Collection.
         </DialogDescription>
       </DialogHeader>
 
@@ -162,11 +162,11 @@ async function confirm() {
         <EmptyState
           v-else-if="!candidates.length"
           compact
-          :title="searchable ? 'No documents match the search.' : 'Type at least two characters to search the realm.'"
+          :title="searchable ? 'No datasets match the search.' : 'Type at least two characters to search the realm.'"
         />
       </div>
       <p v-if="!searchable" class="text-[11px] text-muted-foreground">
-        Showing the catalog pages loaded so far. Search to reach every document in the realm.
+        Showing the pages loaded so far. Search to reach every dataset in the realm.
       </p>
 
       <Notice v-if="searchError || resolveError || error" tone="error">
@@ -177,7 +177,7 @@ async function confirm() {
         <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
         <Button :disabled="!selected.size || busy || resolving" @click="confirm">
           <Spinner v-if="busy || resolving" class="text-current" aria-hidden="true" />
-          <template v-else>Link {{ selected.size || '' }} {{ selected.size === 1 ? 'subcrate' : 'subcrates' }}</template>
+          <template v-else>Link {{ selected.size || '' }} {{ selected.size === 1 ? 'Dataset' : 'Datasets' }}</template>
         </Button>
       </DialogFooter>
     </DialogContent>

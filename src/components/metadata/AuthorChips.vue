@@ -107,7 +107,7 @@ const authors = computed<AuthorEntry[]>(() => {
             View portal profile →
           </RouterLink>
           <div v-if="!author.affiliation && !author.email && !author.orcid && !author.userId" class="text-xs text-muted-foreground">
-            No further details in this crate.
+            No further details in this dataset.
           </div>
         </div>
       </template>

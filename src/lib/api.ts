@@ -28,7 +28,8 @@ export function isRateLimited(error: unknown): boolean {
 // these codes mean no management node answered.
 const RELAY_FAILURE_CODES = ['no_management_node', 'relay_failed']
 
-export const NO_MANAGEMENT_NODE_MESSAGE = 'No management node is reachable right now. Try again later.'
+export const NO_MANAGEMENT_NODE_MESSAGE =
+  'No management node is reachable right now, the node that keeps the realm settings this needs. Try again later.'
 
 /** True when a management-only call found no management node to serve it. */
 export function isNoManagementNode(error: unknown): boolean {

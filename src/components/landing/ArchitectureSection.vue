@@ -10,7 +10,7 @@ import { Hash, FileJson2, Database, Share2, Layers } from '@lucide/vue'
       <SectionHeader
         eyebrow="Architecture"
         title="How a realm is put together."
-        description="Cooperating organizations each run a node. Nodes replicate metadata to their peers, so the catalog needs no central server."
+        description="Cooperating organizations each run a node. Nodes replicate datasets to one another, so the catalog needs no central node."
       />
 
       <div class="grid gap-10 lg:grid-cols-[1fr_1.1fr]">
@@ -36,12 +36,12 @@ import { Hash, FileJson2, Database, Share2, Layers } from '@lucide/vue'
             </div>
             <div>
               <dt class="font-display text-base font-semibold text-aruna-navy">
-                RO-Crate metadata with history
+                Datasets with history
               </dt>
               <dd class="mt-1 text-sm text-muted-foreground">
-                Each dataset has a metadata document identified by a stable
-                ULID. Changes are recorded as ordered events, which gives every
-                document an append-only audit log.
+                Each dataset carries a stable identifier of its own. Changes
+                are recorded as ordered events, which gives every dataset an
+                append-only audit log.
               </dd>
             </div>
           </div>

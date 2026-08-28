@@ -68,7 +68,7 @@ async function publish() {
       <div>
         <label class="text-xs font-medium text-foreground">Residency policy id (optional)</label>
         <Input v-model="draft.policy_id" class="mt-1 font-mono" placeholder="Mint automatically" />
-        <p class="mt-1 text-[11px] text-muted-foreground">A caller-chosen ULID makes an identical retry idempotent.</p>
+        <p class="mt-1 text-[11px] text-muted-foreground">A caller-chosen id makes an identical retry idempotent.</p>
       </div>
     </div>
 

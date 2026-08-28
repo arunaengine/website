@@ -49,7 +49,7 @@ const QUICK_KIND_LABELS: Record<QuickSection, string> = {
   datasets: 'Dataset',
   objects: 'Object',
   groups: 'Group',
-  people: 'Person',
+  people: 'User',
 }
 
 const PANEL_HISTORY_KEY = '__arunaGlobalSearchPanel'
@@ -364,14 +364,14 @@ onBeforeUnmount(() => {
               <input
                 ref="inputEl"
                 v-model="q"
-                aria-label="Search this realm, metadata and groups"
+                aria-label="Search this realm, datasets and groups"
                 role="combobox"
                 aria-controls="quick-search-results"
                 :aria-expanded="showResults"
                 :aria-busy="quickPending"
                 :aria-activedescendant="activeKey ? 'qs-' + activeKey : undefined"
                 class="h-9 w-full rounded-md border border-input bg-field pl-8 pr-8 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:pr-16"
-                :placeholder="`Search ${realm.shortName}, datasets, groups and people…`"
+                :placeholder="`Search ${realm.shortName}, datasets, groups and users…`"
                 @focus="showResults = true"
                 @keydown="onInputKeydown"
               />

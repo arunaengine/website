@@ -93,7 +93,7 @@ const rows = computed<SecretRow[]>(() =>
       <div class="min-w-0">
         <h3 class="font-display text-sm font-semibold text-aruna-navy">Devices</h3>
         <p class="text-xs text-muted-foreground">
-          Machines enrolled as user nodes under your account. Removing an enrolled device disconnects it from the realm
+          Computers enrolled as user nodes under your account. Removing an enrolled device disconnects it from the realm
           and it has to be enrolled again; removing a pending one makes its code unusable.
         </p>
       </div>

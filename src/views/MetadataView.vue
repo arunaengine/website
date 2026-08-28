@@ -572,7 +572,7 @@ watch(relatedDocs, (rows) => {
   <div>
     <PageHeader
       :title="current ? current.title : fetchedSummary ? fetchedSummary.document_path : 'Dataset'"
-      :description="current ? (runProvenance ? profileName : `${profileName} · ${current.ulid}`) : fetchedSummary ? fetchedSummary.document_id : 'Live RO-Crate Dataset.'"
+      :description="current ? (runProvenance ? profileName : `${profileName} · ${current.ulid}`) : fetchedSummary ? fetchedSummary.document_id : 'Live RO-Crate dataset.'"
     >
       <template #breadcrumbs>
         <template v-if="current?.realmId || fetchedSummary?.group_id">
@@ -618,8 +618,8 @@ watch(relatedDocs, (rows) => {
           event-kind="metadata_created"
           :resource-label="currentPath"
         />
-        <!-- One entry point for every crate transfer; each entry names what it
-             moves, so "the description" and "the whole crate" stay apart. -->
+        <!-- One entry point for every transfer; each entry names what it moves,
+             so "the description" and "the whole dataset" stay apart. -->
         <DropdownMenu v-if="docState === 'found'">
           <DropdownMenuTrigger as-child>
             <Button variant="outline">
@@ -647,8 +647,8 @@ watch(relatedDocs, (rows) => {
             >
               <FileArchive class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
               <span class="min-w-0">
-                <span class="block text-sm font-medium text-foreground">Whole crate as a zip archive</span>
-                <span class="block text-xs leading-relaxed text-muted-foreground">Packages the metadata together with the data files it references. Prepared by a job.</span>
+                <span class="block text-sm font-medium text-foreground">Whole dataset as a zip archive</span>
+                <span class="block text-xs leading-relaxed text-muted-foreground">Packages the metadata together with the data files it references. Prepared in the background.</span>
               </span>
             </DropdownMenuItem>
             <template v-if="canWrite">
@@ -660,8 +660,8 @@ watch(relatedDocs, (rows) => {
               >
                 <Upload class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                 <span class="min-w-0">
-                  <span class="block text-sm font-medium text-foreground">Replace this Dataset from a file</span>
-                  <span class="block text-xs leading-relaxed text-muted-foreground">Overwrites this Dataset's crate with an uploaded ro-crate-metadata.json, previewed first.</span>
+                  <span class="block text-sm font-medium text-foreground">Replace this dataset from a file</span>
+                  <span class="block text-xs leading-relaxed text-muted-foreground">Overwrites this dataset with an uploaded ro-crate-metadata.json, previewed first.</span>
                 </span>
               </DropdownMenuItem>
             </template>
@@ -718,7 +718,7 @@ watch(relatedDocs, (rows) => {
             </div>
             <div class="flex shrink-0 flex-col items-end gap-1.5">
               <Badge variant="secondary">{{ relativeTime(current.updatedAt) }}</Badge>
-              <Badge v-if="projectCrate" variant="outline" size="sm" class="gap-1 uppercase"><Layers class="h-3 w-3" /> Project crate</Badge>
+              <Badge v-if="projectCrate" variant="outline" size="sm" class="gap-1 uppercase"><Layers class="h-3 w-3" /> Project dataset</Badge>
             </div>
           </div>
 
@@ -849,7 +849,7 @@ watch(relatedDocs, (rows) => {
                         <span v-else class="font-mono">{{ row.contentUrl }}</span>
                       </span>
                       <span v-if="referencedBy.get(row.id)?.length" class="mt-1 flex flex-wrap items-center gap-x-1.5 text-[11px] font-normal text-muted-foreground">
-                        <Link2 class="h-3 w-3 shrink-0" /> Loaded-crate cache only:
+                        <Link2 class="h-3 w-3 shrink-0" /> Loaded datasets only:
                         <template v-for="(ref, i) in referencedBy.get(row.id) ?? []" :key="ref.documentId">
                           <RouterLink :to="{ name: 'dataset', params: { id: ref.documentId } }" class="text-primary hover:underline" @click.stop>{{ ref.title }}</RouterLink><span v-if="i < (referencedBy.get(row.id)?.length ?? 0) - 1">,</span>
                         </template>
@@ -865,7 +865,7 @@ watch(relatedDocs, (rows) => {
                           variant="ghost"
                           size="sm"
                           :disabled="!currentUser || (backlinkLoading && selectedBacklinkId === row.id)"
-                          :title="currentUser ? 'Run an authoritative Realm backlink lookup' : 'Sign in to inspect Dataset backlinks'"
+                          :title="currentUser ? 'Run an authoritative Realm backlink lookup' : 'Sign in to inspect dataset backlinks'"
                           @click.stop="loadBacklinks(row)"
                         >
                           <Link2 class="size-3.5" /> Referenced by
@@ -938,16 +938,16 @@ watch(relatedDocs, (rows) => {
                             <p v-else class="mt-1 text-[11px] text-muted-foreground">No per-node freshness detail was returned.</p>
                           </div>
                           <div class="mt-3">
-                            <h4 class="font-display text-sm font-semibold text-aruna-navy">Visible referencing Datasets</h4>
+                            <h4 class="font-display text-sm font-semibold text-aruna-navy">Visible referencing datasets</h4>
                             <ul v-if="backlinkTarget?.visible_references.length" class="mt-1 divide-y divide-border/60 rounded-md border border-border/60">
                               <li v-for="reference in backlinkTarget.visible_references" :key="reference.document_id" class="px-3 py-2 text-xs">
                                 <RouterLink :to="{ name: 'dataset', params: { id: reference.document_id } }" class="font-medium text-primary hover:underline">{{ reference.title }}</RouterLink>
                               </li>
                             </ul>
                             <p v-else class="mt-1 text-xs text-muted-foreground">
-                              {{ backlinkComplete ? 'No visible referencing Datasets were found.' : 'No visible referencing Datasets were returned. Coverage is incomplete.' }}
+                              {{ backlinkComplete ? 'No visible referencing datasets were found.' : 'No visible referencing datasets were returned. Coverage is incomplete.' }}
                             </p>
-                            <p v-if="backlinkTarget?.hidden_references_exist" class="mt-2 text-xs font-medium text-amber-800 dark:text-amber-200">Other restricted Datasets reference this content</p>
+                            <p v-if="backlinkTarget?.hidden_references_exist" class="mt-2 text-xs font-medium text-amber-800 dark:text-amber-200">Other restricted datasets reference this content</p>
                           </div>
                         </template>
                       </div>
@@ -958,14 +958,14 @@ watch(relatedDocs, (rows) => {
             </tbody>
           </table>
 
-          <EmptyState v-if="crateNotReady" compact title="The crate is still being prepared.">
+          <EmptyState v-if="crateNotReady" compact title="This dataset is still being prepared.">
             <Button variant="outline" size="sm" @click="fetchCrate(detailId)">Retry</Button>
           </EmptyState>
           <EmptyState
             v-else-if="!loadingCrate && !dataEntities.length"
             compact
-            title="This Dataset does not reference any data files."
-            description="Files can be attached by editing the crate."
+            title="This dataset does not reference any data files."
+            description="Files can be attached by editing this dataset."
           />
         </section>
 
@@ -1003,11 +1003,11 @@ watch(relatedDocs, (rows) => {
           </div>
           <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
             <div>
-              <h3 class="text-sm font-medium text-foreground">Query this Dataset</h3>
-              <p class="mt-1 text-xs text-muted-foreground">Open the SPARQL workbench with this exact Dataset scope fixed.</p>
+              <h3 class="text-sm font-medium text-foreground">Query this dataset</h3>
+              <p class="mt-1 text-xs text-muted-foreground">Open the SPARQL workbench with this exact dataset scope fixed.</p>
             </div>
             <Button variant="outline" size="sm" as-child>
-              <RouterLink :to="{ name: 'datasets', query: { expert: '1', document: detailId } }"><Code2 class="h-3.5 w-3.5" /> Query this Dataset</RouterLink>
+              <RouterLink :to="{ name: 'datasets', query: { expert: '1', document: detailId } }"><Code2 class="h-3.5 w-3.5" /> Query this dataset</RouterLink>
             </Button>
           </div>
         </section>
@@ -1024,13 +1024,13 @@ watch(relatedDocs, (rows) => {
       <Spinner
         v-else-if="docState === 'loading'"
         show-label
-        label="Loading Dataset…"
+        label="Loading dataset…"
         class="surface flex justify-center p-12 text-sm"
       />
 
       <EmptyState
         v-else-if="docState === 'preparing'"
-        :title="acceptedPreparing ? 'Accepted, preparing Dataset' : 'Dataset is still being prepared'"
+        :title="acceptedPreparing ? 'Accepted, preparing dataset' : 'Dataset is still being prepared'"
         :description="detailId"
       >
         <Button variant="outline" size="sm" :disabled="resolvingDoc" @click="resolveDoc(detailId)">
@@ -1040,7 +1040,7 @@ watch(relatedDocs, (rows) => {
 
       <EmptyState
         v-else-if="docState === 'not-found'"
-        title="This Dataset does not exist or has been deleted."
+        title="This dataset does not exist or has been deleted."
         :description="detailId"
       >
         <Button variant="outline" as-child>
@@ -1050,7 +1050,7 @@ watch(relatedDocs, (rows) => {
 
       <EmptyState
         v-else-if="docState === 'forbidden'"
-        title="This Dataset is not public."
+        title="This dataset is not public."
         :description="currentUser ? 'Sign in with an account that can see it.' : 'Sign in with an account that can see it, using the button in the top bar.'"
       >
         <Button variant="outline" as-child>
@@ -1060,7 +1060,7 @@ watch(relatedDocs, (rows) => {
 
       <ErrorPanel
         v-else-if="docState === 'error'"
-        :message="docError ?? 'Failed to load this Dataset.'"
+        :message="docError ?? 'Failed to load this dataset.'"
         @retry="resolveDoc(detailId)"
       />
     </div>
@@ -1088,11 +1088,11 @@ watch(relatedDocs, (rows) => {
     <Dialog :open="showDelete" @update:open="(v: boolean) => (showDelete = v)">
       <DialogContent class="max-w-md">
         <DialogHeader>
-          <DialogTitle>Delete Dataset</DialogTitle>
+          <DialogTitle>Delete dataset</DialogTitle>
           <DialogDescription>
             <span class="font-medium text-foreground">What is this?</span>
             Deletes <span class="font-medium text-foreground">{{ current?.title }}</span>
-            (<span class="font-mono text-xs">{{ currentPath }}</span>) and its RO-Crate graph from Datasets. Referenced S3 objects are not touched.
+            (<span class="font-mono text-xs">{{ currentPath }}</span>) and its RO-Crate graph from datasets. Referenced S3 objects are not touched.
             <RouterLink
               :to="{ name: 'docs', params: { topic: 'data-and-deletion' } }"
               class="font-medium text-primary hover:underline"

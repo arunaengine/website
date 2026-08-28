@@ -120,7 +120,7 @@ watch(
 
         <div class="max-h-[70vh] space-y-4 overflow-y-auto px-1 scrollbar-thin">
           <p class="text-xs text-muted-foreground">
-            Upload or paste an existing <code class="font-mono">ro-crate-metadata.json</code>. Nothing is created until you review and submit the draft.
+            Upload or paste an existing <code class="font-mono">ro-crate-metadata.json</code>. Nothing is created until you review and save the draft.
           </p>
           <div class="flex flex-wrap items-center gap-2">
             <input ref="importFileInput" type="file" accept="application/json,application/ld+json,.json,.jsonld" class="hidden" @change="onImportFile" />
@@ -153,12 +153,12 @@ watch(
             </div>
             <Notice v-if="importPreview.unknownSpecVersion" tone="warning" class="flex items-start gap-2">
               <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              <span>RO-Crate {{ importPreview.unknownSpecVersion }} is not recognized by this portal. The backend may reject this dataset.</span>
+              <span>RO-Crate {{ importPreview.unknownSpecVersion }} is not recognized by this portal. The node may reject this dataset.</span>
             </Notice>
             <Notice v-if="unrecognizedImportProfiles.length" tone="warning" class="flex items-start gap-2">
               <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>
-                This crate declares conformance to {{ unrecognizedImportProfiles.length === 1 ? 'a profile that is' : 'profiles that are' }} not yet recognized:
+                This dataset declares conformance to {{ unrecognizedImportProfiles.length === 1 ? 'a profile that is' : 'profiles that are' }} not yet recognized:
                 <code class="break-all font-mono">{{ unrecognizedImportProfiles.join(', ') }}</code>. The reference stays in the draft, but the backend may reject it until the Profile is registered.
               </span>
             </Notice>
@@ -167,7 +167,7 @@ watch(
 
         <DialogFooter>
           <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
-          <Button :disabled="!importPreview" @click="useCrate">Use crate</Button>
+          <Button :disabled="!importPreview" @click="useCrate">Use this RO-Crate</Button>
         </DialogFooter>
       </div>
 

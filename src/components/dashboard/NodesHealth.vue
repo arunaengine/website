@@ -4,7 +4,7 @@ import { useNow } from '@vueuse/core'
 import Badge from '@/components/ui/Badge.vue'
 import StatusDot from '@/components/ui/StatusDot.vue'
 import type { RealmNodeInfo } from '@/lib/api'
-import { connectionLabel, connectionVariant, kindVariant } from '@/components/nodes/node-display'
+import { connectionLabel, connectionVariant, kindLabel, kindVariant } from '@/components/nodes/node-display'
 import { stateTone, toneVariant } from '@/lib/stateBadge'
 import { formatBytes, formatNumber, relativeTime, truncateMiddle } from '@/lib/utils'
 
@@ -38,7 +38,7 @@ function heartbeat(node: RealmNodeInfo): string | null {
 }
 
 // load_permille is the 1-minute load average scaled to permille of logical
-// cores (1000‰ = one runnable task per core), clamped 0..1000 by the node.
+// cores (1000‰ = one runnable process per core), clamped 0..1000 by the node.
 function loadPermille(node: RealmNodeInfo): number {
   return node.info?.utilization.load_permille ?? 0
 }
@@ -96,7 +96,7 @@ function labelChips(node: RealmNodeInfo): string[] {
         >
           this node
         </Badge>
-        <Badge :variant="kindVariant[node.kind]" size="sm" class="ml-auto shrink-0 uppercase">{{ node.kind }}</Badge>
+        <Badge :variant="kindVariant[node.kind]" size="sm" class="ml-auto shrink-0 uppercase">{{ kindLabel[node.kind] }}</Badge>
       </div>
 
       <div class="mt-3">
@@ -108,14 +108,14 @@ function labelChips(node: RealmNodeInfo): string[] {
             <span>{{ formatBytes(node.info.utilization.storage_bytes_used) }}</span>
             <span
               v-if="node.info.utilization.documents_held !== undefined"
-              title="Metadata documents this node holds by placement shard"
+              title="Datasets this node holds by placement shard"
             >
-              · {{ formatNumber(node.info.utilization.documents_held) }} docs
+              · {{ formatNumber(node.info.utilization.documents_held) }} datasets
             </span>
             <span
               v-if="node.info.utilization.load_permille !== undefined"
               class="inline-flex items-center gap-1"
-              :title="`1-minute load average at ${loadPercent(node)}% of CPU cores (1000‰ = one runnable task per core)`"
+              :title="`1-minute load average at ${loadPercent(node)}% of CPU cores (1000‰ = one runnable process per core)`"
             >
               ·
               <span class="inline-block h-1.5 w-8 overflow-hidden rounded-full bg-muted">

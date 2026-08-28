@@ -4,7 +4,7 @@ import { useRealm } from '@/composables/useRealm'
 import { cn } from '@/lib/utils'
 
 // `eyebrow` names which surface the page belongs to: the portal, or the
-// machine Aruna Desktop runs on.
+// computer Aruna Desktop runs on.
 withDefaults(
   defineProps<{
     title: string

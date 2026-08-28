@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 const source = readFileSync(fileURLToPath(new URL('./SearchView.vue', import.meta.url)), 'utf8')
 
-describe('object discovery and Dataset-scoped SPARQL presentation', () => {
+describe('object discovery and dataset-scoped SPARQL presentation', () => {
   it('places object coverage before results and exposes strict mode without downgrade copy', () => {
     const coverage = source.indexOf('Object inventory coverage is intentionally before every hit.')
     const results = source.indexOf('v-for="hit in objectResults"')
@@ -34,8 +34,8 @@ describe('object discovery and Dataset-scoped SPARQL presentation', () => {
     expect(icon).not.toContain('{{ ')
   })
 
-  it('renders the exact fixed Dataset scope and preserves retryable ambiguity', () => {
-    expect(source).toContain('Fixed Dataset scope')
+  it('renders the exact fixed dataset scope and preserves retryable ambiguity', () => {
+    expect(source).toContain('Fixed dataset scope')
     expect(source).toContain('runSparql(query, mode, documentScope.value ?? undefined)')
     expect(source).toContain('does not exist or is not readable by this session')
     expect(source).toContain('graph is unavailable or still materializing')
