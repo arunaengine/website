@@ -5,7 +5,7 @@
 // collision policy at `reject`. A run that needs any of those has to go
 // through the native surface, and this is the one place that translation
 // lives, so it can be tested without a component or a network.
-import { parseS3Url, type TesTask } from '@/lib/tes'
+import { parseS3Url, TES_LABEL_TAG_PREFIX, type TesInput, type TesTask } from '@/lib/tes'
 import type {
   CollisionPolicyRequest,
   ExecutionInputRequest,
@@ -85,7 +85,7 @@ function destKey(containerPath: string, key: string): string {
 }
 
 function mapInput(
-  input: { url?: string; content?: string; path: string; type?: string },
+  input: TesInput,
   placement: NativePlacementOptions,
 ): ExecutionInputRequest | NativeBlocked {
   if (input.content !== undefined) {
@@ -103,7 +103,7 @@ function mapInput(
   }
   const containerPath = input.path.trim()
   const chosen = placement.inputs[containerPath] ?? { mode: 'snapshot' as InputModeRequest }
-  const versionId = chosen.versionId?.trim() || undefined
+  const versionId = chosen.versionId?.trim() || input.version_id?.trim() || undefined
   if (chosen.mode === 'exact_reference' && !versionId) {
     return { blocked: `${containerPath} pins an exact version but names none.`, kind: 'invalid' }
   }
@@ -124,6 +124,8 @@ function mapInput(
     container_path: containerPath,
     mode: chosen.mode,
   }
+  const sourceNodeId = input.source_node_id?.trim()
+  if (sourceNodeId) mapped.source_node_id = sourceNodeId
   if (versionId) mapped.version_id = versionId
   return mapped
 }
@@ -198,6 +200,10 @@ export function tesFormToExecutionRequest(form: NativeSubmitForm): NativeMapping
     image: executor.image.trim(),
     command: executor.command.filter((argument) => argument !== ''),
     env: executor.env ?? {},
+    tags: Object.fromEntries(
+      Object.entries(task.tags ?? {}).filter(([key]) => key.startsWith(TES_LABEL_TAG_PREFIX)),
+    ),
+    workdir: executor.workdir?.trim() || null,
     inputs,
     outputs,
     output_prefixes: placement.outputPrefixes.map((prefix) => prefix.trim()).filter(Boolean),

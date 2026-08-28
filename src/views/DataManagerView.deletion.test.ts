@@ -94,7 +94,8 @@ describe('Data Manager version-aware deletion', () => {
       'Delete: { Objects: keys.map((key) => ({ Key: key })), Quiet: false }',
     )
     expect(useS3Source).not.toContain('ListObjectVersionsCommand')
-    expect(useS3Source).not.toContain('VersionId')
+    // Reading a PUT's version id is fine; a delete must never send one.
+    expect(useS3Source).not.toContain('VersionId:')
     expect(template).toContain(
       'Delete markers are written for current objects; earlier versions stay retrievable by version ID.',
     )

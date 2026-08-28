@@ -268,6 +268,7 @@ export type WorkspaceModeRequest = 'temporary' | 'kept' | 'existing'
 export interface ExecutionInputRequest {
   bucket: string
   key: string
+  source_node_id?: string
   version_id?: string
   dest_key: string
   /** Absolute container path; the backend defaults it to /inputs/<dest_key>. */
@@ -294,6 +295,8 @@ export interface SubmitExecutionRequest {
   entrypoint?: string[]
   command: string[]
   env: Record<string, string>
+  tags: Record<string, string>
+  workdir: string | null
   cpu_cores?: number
   ram_bytes?: number
   max_walltime_ms?: number

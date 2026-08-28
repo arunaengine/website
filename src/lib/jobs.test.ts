@@ -272,6 +272,8 @@ const submission: SubmitExecutionRequest = {
   image: 'tools:1',
   command: ['run'],
   env: {},
+  tags: {},
+  workdir: null,
   inputs: [],
   outputs: [],
   output_prefixes: [],

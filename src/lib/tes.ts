@@ -26,6 +26,8 @@ export type TesView = 'MINIMAL' | 'BASIC' | 'FULL'
 export interface TesInput {
   name?: string
   description?: string
+  source_node_id?: string
+  version_id?: string
   // Required by the backend; must be an s3://bucket/key URL. Inline `content`
   // is rejected (400), so scripts are uploaded to S3 and referenced here.
   url?: string

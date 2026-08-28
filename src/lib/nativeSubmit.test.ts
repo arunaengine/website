@@ -71,6 +71,8 @@ describe('task to execution request', () => {
       image: 'tools:1',
       command: ['run', '--in', '/inputs/reads.fastq'],
       env: { T: '2' },
+      tags: {},
+      workdir: null,
       inputs: [
         {
           bucket: 'project',
@@ -118,6 +120,50 @@ describe('task to execution request', () => {
     expect(pinned.inputs[0]).toMatchObject({ mode: 'exact_reference', version_id: '01VERSION' })
     expect(floating.inputs[0].version_id).toBeUndefined()
     expect(floating.inputs[0].mode).toBe('floating_reference')
+  })
+
+  it('forwards uploaded input provenance', () => {
+    const request = mapped(
+      form({
+        task: task({
+          inputs: [
+            {
+              url: 's3://project/scripts/run.py',
+              path: '/work/run.py',
+              source_node_id: ' node-a ',
+              version_id: ' version-a ',
+            },
+          ],
+        }),
+      }),
+    )
+
+    expect(request.inputs[0]).toMatchObject({
+      source_node_id: 'node-a',
+      version_id: 'version-a',
+    })
+  })
+
+  it('maps placement tags and the executor workdir', () => {
+    const request = mapped(
+      form({
+        task: task({
+          executors: [{ image: 'tools:1', command: ['run'], workdir: ' /work ' }],
+          tags: {
+            'aruna-engine.org/group': '01GROUP',
+            'aruna-engine.org/label/aruna-engine.org/node': 'node-a',
+            'aruna-engine.org/label/region': 'eu-central',
+            opaque: 'ignored',
+          },
+        }),
+      }),
+    )
+
+    expect(request.tags).toEqual({
+      'aruna-engine.org/label/aruna-engine.org/node': 'node-a',
+      'aruna-engine.org/label/region': 'eu-central',
+    })
+    expect(request.workdir).toBe('/work')
   })
 
   it('refuses an exact pin with no version and a floating one with a version', () => {

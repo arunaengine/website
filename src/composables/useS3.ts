@@ -737,8 +737,13 @@ function isLegacyPortalCorsRule(rule: CORSRule): boolean {
 
 // Small generated artifacts (profile mode/schema/html): a single PutObject,
 // no multipart machinery.
-async function putTextObject(bucket: string, key: string, text: string, contentType: string): Promise<void> {
-  await client().send(
+async function putTextObject(
+  bucket: string,
+  key: string,
+  text: string,
+  contentType: string,
+): Promise<{ versionId: string | null }> {
+  const response = await client().send(
     new PutObjectCommand({
       Bucket: bucket,
       Key: key,
@@ -746,6 +751,7 @@ async function putTextObject(bucket: string, key: string, text: string, contentT
       ContentType: contentType,
     }),
   )
+  return { versionId: response.VersionId ?? null }
 }
 
 async function listObjects(
