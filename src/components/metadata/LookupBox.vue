@@ -10,13 +10,21 @@ const MAX_HITS = 6
 const props = defineProps<{
   kind: LookupKind
   placeholder?: string
+  /** Lets a host share the search box with its own field (the entity name). */
+  modelValue?: string
+  ariaLabel?: string
 }>()
 const emit = defineEmits<{
   (e: 'select', hit: LookupHit): void
   (e: 'status', status: LookupProviderStatus | 'idle'): void
+  (e: 'update:modelValue', value: string): void
 }>()
 
-const query = ref('')
+const query = ref(props.modelValue ?? '')
+
+watch(() => props.modelValue, (value) => {
+  if ((value ?? '') !== query.value) query.value = value ?? ''
+})
 const hits = ref<LookupHit[]>([])
 const status = ref<LookupProviderStatus | 'idle'>('idle')
 const loading = ref(false)
@@ -34,6 +42,7 @@ function clearTimer() {
 }
 
 watch(query, (value) => {
+  emit('update:modelValue', value)
   clearTimer()
   cancelLookup(props.kind)
   hits.value = []
@@ -99,6 +108,7 @@ onScopeDispose(() => {
       <Input
         v-model="query"
         :placeholder="placeholder ?? (kind === 'person' ? 'Search ORCID' : 'Search ROR')"
+        :aria-label="ariaLabel"
         :aria-busy="loading"
         role="combobox"
         aria-autocomplete="list"

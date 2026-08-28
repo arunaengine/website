@@ -21,9 +21,9 @@ import {
   type DraftEntity,
   type DraftValue,
 } from '@/lib/crate/editor'
-import { fetchOrcidRecord } from '@/lib/lookup/orcid'
-import { fetchRorRecord } from '@/lib/lookup/ror'
-import type { LookupHit, RegistryRecord } from '@/lib/lookup/types'
+import { fetchOrcidRecord, normalizeOrcidId } from '@/lib/lookup/orcid'
+import { fetchRorRecord, normalizeRorId } from '@/lib/lookup/ror'
+import type { ContextEntity, LookupHit, RegistryRecord } from '@/lib/lookup/types'
 import type { VocabIndex } from '@/lib/profiles/vocabulary'
 import { errorMessage } from '@/lib/utils'
 
@@ -31,6 +31,7 @@ const props = defineProps<{
   open: boolean
   draft: CrateDraft
   vocab: VocabIndex | null
+  /** Property range: the type list starts narrowed to what it accepts. */
   range?: string[]
 }>()
 
@@ -39,17 +40,15 @@ const emit = defineEmits<{
   (e: 'created', value: { draft: CrateDraft; entity: DraftEntity }): void
 }>()
 
-const step = ref<'type' | 'details'>('type')
 const type = ref('')
 const onlyMatching = ref(Boolean(props.range?.length))
 const name = ref('')
 const identifier = ref('')
 const idTouched = ref(false)
-const tab = ref<'manual' | 'import'>('manual')
-const registryValue = ref('')
-const registryError = ref('')
 const importing = ref(false)
+const lookupError = ref('')
 const extra = ref<Record<string, DraftValue[]>>({})
+const related = ref<ContextEntity[]>([])
 
 const registry = computed(() => {
   const label = typeLabel(type.value)
@@ -57,18 +56,23 @@ const registry = computed(() => {
   return label === 'Organization' ? { kind: 'organization' as const, label: 'ROR' } : null
 })
 
+// A typed ORCID or ROR id fetches the record instead of searching by name.
+const typedId = computed(() => {
+  if (!registry.value) return ''
+  const value = name.value.trim()
+  return (registry.value.kind === 'person' ? normalizeOrcidId(value) : normalizeRorId(value)) ?? ''
+})
+
 watch(() => props.open, (open) => {
   if (!open) return
-  step.value = 'type'
   type.value = ''
   onlyMatching.value = Boolean(props.range?.length)
   name.value = ''
   identifier.value = ''
   idTouched.value = false
-  tab.value = 'manual'
-  registryValue.value = ''
-  registryError.value = ''
+  lookupError.value = ''
   extra.value = {}
+  related.value = []
 }, { immediate: true })
 
 // The identifier follows the name until someone edits it themselves.
@@ -93,15 +97,15 @@ function applyRecord(record: RegistryRecord) {
 }
 
 async function importRecord() {
-  const value = registryValue.value.trim()
-  if (!value || !registry.value) return
+  if (!typedId.value || !registry.value) return
   importing.value = true
-  registryError.value = ''
+  lookupError.value = ''
   try {
-    applyRecord(registry.value.kind === 'person' ? await fetchOrcidRecord(value) : await fetchRorRecord(value))
-    tab.value = 'manual'
+    applyRecord(registry.value.kind === 'person'
+      ? await fetchOrcidRecord(typedId.value)
+      : await fetchRorRecord(typedId.value))
   } catch (error) {
-    registryError.value = errorMessage(error)
+    lookupError.value = errorMessage(error)
   } finally {
     importing.value = false
   }
@@ -117,14 +121,24 @@ function useHit(hit: LookupHit) {
     ...(value('familyName') ? { familyName: value('familyName') } : {}),
     ...(value('url') ? { url: value('url') } : {}),
   })
-  tab.value = 'manual'
+  const affiliation = properties.affiliation
+  if (affiliation && typeof affiliation === 'object' && '@id' in affiliation) {
+    extra.value = { ...extra.value, affiliation: [{ kind: 'reference', value: String(affiliation['@id']) }] }
+  }
+  related.value = hit.relatedEntities
 }
 
 const canCreate = computed(() => Boolean(type.value && identifier.value.trim()))
 
 function create() {
   if (!canCreate.value) return
-  const created = addEntity(props.draft, {
+  let base = props.draft
+  for (const entity of related.value) {
+    const types = Array.isArray(entity.type) ? entity.type : [entity.type]
+    const label = typeof entity.properties.name === 'string' ? entity.properties.name : ''
+    base = addEntity(base, { type: types[0] ?? 'Thing', id: entity.id, name: label }).draft
+  }
+  const created = addEntity(base, {
     type: type.value,
     name: name.value,
     id: identifier.value,
@@ -139,89 +153,65 @@ function create() {
   <Dialog :open="open" @update:open="(value: boolean) => emit('update:open', value)">
     <DialogContent class="max-w-xl">
       <DialogHeader>
-        <DialogTitle>{{ step === 'type' ? 'What are you adding?' : `New ${typeLabel(type)}` }}</DialogTitle>
+        <DialogTitle>Add an entity</DialogTitle>
         <DialogDescription>
-          {{ step === 'type'
-            ? 'Pick the kind of thing this is. Everything in the dataset is described the same way.'
-            : 'Give it a name; the identifier is filled in for you.' }}
+          Search for the kind of thing this is, then give it a name. Everything in the dataset is
+          described the same way.
         </DialogDescription>
       </DialogHeader>
 
-      <div class="max-h-[60vh] space-y-4 overflow-y-auto px-1">
+      <div class="max-h-[60vh] space-y-5 overflow-y-auto px-1">
         <TypeBrowser
-          v-if="step === 'type'"
           v-model="type"
           v-model:only-matching="onlyMatching"
           :vocab="vocab"
           :range="range"
         />
 
-        <template v-else>
-          <div v-if="registry" class="flex gap-2 border-b border-border">
-            <button
-              v-for="option in [{ id: 'manual', label: 'Enter details' }, { id: 'import', label: `Import from ${registry.label}` }]"
-              :key="option.id"
-              type="button"
-              class="-mb-px border-b-2 px-3 py-1.5 text-xs font-medium"
-              :class="tab === option.id ? 'border-primary text-primary' : 'border-transparent text-muted-foreground'"
-              @click="tab = option.id as 'manual' | 'import'"
-            >
-              {{ option.label }}
-            </button>
-          </div>
-
-          <div v-if="registry && tab === 'import'" class="space-y-3">
-            <div class="flex items-start gap-2">
-              <div class="min-w-0 flex-1">
-                <Input
-                  v-model="registryValue"
-                  :placeholder="registry.kind === 'person' ? '0000-0002-1825-0097' : '03yrm5c26'"
-                  :aria-label="`${registry.label} identifier`"
-                  @keydown.enter="importRecord"
-                />
-                <p class="mt-1 text-[11px] text-muted-foreground">Paste the identifier or its URL, then press Enter.</p>
-              </div>
-              <Button
-                size="sm"
-                aria-label="Import this record"
-                :disabled="importing || !registryValue.trim()"
-                @click="importRecord"
-              >
-                <Spinner v-if="importing" class="text-current" aria-hidden="true" />
-                Import
-              </Button>
-            </div>
-            <Notice v-if="registryError" tone="warning">{{ registryError }}</Notice>
-            <div>
-              <p class="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Or search by name</p>
-              <LookupBox :kind="registry.kind" @select="useHit" />
-            </div>
-          </div>
-
-          <div v-else class="space-y-3">
-            <div>
-              <label class="text-xs font-medium text-foreground">Name</label>
-              <Input v-model="name" class="mt-1" aria-label="Name" @keydown.enter="create" />
-            </div>
-            <div>
-              <label class="text-xs font-medium text-foreground">Identifier</label>
-              <Input
-                :model-value="identifier"
-                class="mt-1 font-mono text-xs"
-                aria-label="Identifier"
-                @update:model-value="(value: string | number) => { identifier = String(value); idTouched = true }"
+        <div v-if="type" class="space-y-3 border-t border-border pt-4">
+          <div>
+            <label class="text-xs font-medium text-foreground">Name</label>
+            <div v-if="registry" class="mt-1 space-y-2">
+              <LookupBox
+                v-model="name"
+                :kind="registry.kind"
+                aria-label="Name"
+                :placeholder="`Search ${registry.label} by name, or paste an id`"
+                @select="useHit"
               />
-              <p class="mt-1 text-[11px] text-muted-foreground">{{ idHint(type) }}</p>
+              <div v-if="typedId" class="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  aria-label="Import this record"
+                  :disabled="importing"
+                  @click="importRecord"
+                >
+                  <Spinner v-if="importing" class="text-current" aria-hidden="true" />
+                  Use {{ registry.label }} {{ typedId }}
+                </Button>
+              </div>
+              <Notice v-if="lookupError" tone="warning">{{ lookupError }}</Notice>
             </div>
+            <Input v-else v-model="name" class="mt-1" aria-label="Name" @keydown.enter="create" />
           </div>
-        </template>
+
+          <div>
+            <label class="text-xs font-medium text-foreground">Identifier</label>
+            <Input
+              :model-value="identifier"
+              class="mt-1 font-mono text-xs"
+              aria-label="Identifier"
+              @update:model-value="(value: string | number) => { identifier = String(value); idTouched = true }"
+            />
+            <p class="mt-1 text-[11px] text-muted-foreground">{{ idHint(type) }}</p>
+          </div>
+        </div>
       </div>
 
       <DialogFooter>
-        <Button v-if="step === 'details'" variant="outline" @click="step = 'type'">Back</Button>
         <Button variant="outline" @click="emit('update:open', false)">Cancel</Button>
-        <Button v-if="step === 'type'" :disabled="!type" @click="step = 'details'">Continue</Button>
-        <Button v-else :disabled="!canCreate" @click="create">Create</Button>
+        <Button :disabled="!canCreate" @click="create">Create</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

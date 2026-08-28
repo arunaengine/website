@@ -58,6 +58,14 @@ function mount(props: Record<string, unknown>) {
 }
 
 describe('NodeCheckPanel', () => {
+  it('waits for an explicit check before it says anything', async () => {
+    const mounted = await mount({})
+
+    expect(content(mounted.root)).toContain('Not checked yet. Saving checks first.')
+    expect(button(mounted.root, 'Check with the node')).toBeDefined()
+    mounted.app.unmount()
+  })
+
   it('reports an accepted draft without a profile', async () => {
     const mounted = await mount({ previewResult: verdict() })
 

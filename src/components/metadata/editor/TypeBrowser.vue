@@ -71,7 +71,13 @@ function isSelected(type: string): boolean {
 <template>
   <div class="space-y-3">
     <div class="flex flex-wrap items-center gap-3">
-      <Input v-model="query" class="min-w-48 flex-1" placeholder="Search types" aria-label="Search entity types" />
+      <Input
+        v-model="query"
+        class="min-w-48 flex-1"
+        autofocus
+        placeholder="Search every type"
+        aria-label="Search entity types"
+      />
       <label v-if="range?.length" class="flex items-center gap-2 text-xs text-muted-foreground">
         <input
           type="checkbox"
@@ -83,7 +89,7 @@ function isSelected(type: string): boolean {
       </label>
     </div>
 
-    <div v-for="group in [{ title: 'Common types', options: results.shortlist }, { title: 'All types', options: results.all }]" :key="group.title">
+    <div v-for="group in [{ title: 'Common', options: results.shortlist }, { title: 'Everything else', options: results.all }]" :key="group.title">
       <p v-if="group.options.length" class="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
         {{ group.title }}
       </p>

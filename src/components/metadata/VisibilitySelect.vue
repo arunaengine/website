@@ -6,6 +6,8 @@ import Select from '@/components/ui/Select.vue'
 const props = defineProps<{
   modelValue: 'group' | 'public'
   groupId?: string
+  /** Header form: the bare control, without its label and hint. */
+  compact?: boolean
 }>()
 const emit = defineEmits<{ (e: 'update:modelValue', value: 'group' | 'public'): void }>()
 
@@ -21,7 +23,15 @@ const hint = computed(() =>
 </script>
 
 <template>
-  <div>
+  <Select
+    v-if="compact"
+    :model-value="modelValue"
+    :options="options"
+    class="h-7 w-28 text-xs"
+    aria-label="Dataset visibility"
+    @update:model-value="(value: string) => emit('update:modelValue', value as 'group' | 'public')"
+  />
+  <div v-else>
     <label class="text-xs font-medium text-foreground">Visibility</label>
     <Select
       :model-value="modelValue"

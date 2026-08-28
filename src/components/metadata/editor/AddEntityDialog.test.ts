@@ -17,6 +17,7 @@ import * as Editor from '@/lib/crate/editor'
 import * as Uri from '@/lib/profiles/uri'
 import * as Orcid from '@/lib/lookup/orcid'
 import * as Ror from '@/lib/lookup/ror'
+import * as Registry from '@/lib/lookup/registry'
 import * as Utils from '@/lib/utils'
 import { loadVocabIndex, type VocabIndex } from '@/lib/profiles/vocabulary'
 
@@ -24,7 +25,10 @@ let vocab: VocabIndex
 beforeAll(async () => {
   vocab = await loadVocabIndex()
 })
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.useRealTimers()
+})
 
 const Passthrough = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
@@ -48,6 +52,13 @@ const TypeBrowser = compileClientComponent(new URL('./TypeBrowser.vue', import.m
   '@/lib/profiles/uri': Uri,
 })
 
+const LookupBox = compileClientComponent(new URL('../LookupBox.vue', import.meta.url), {
+  vue: VueRuntime,
+  '@/components/ui/Input.vue': moduleDefault(InputStub),
+  '@/components/ui/Spinner.vue': moduleDefault(EmptyStub),
+  '@/lib/lookup/registry': Registry,
+})
+
 const AddEntityDialog = compileClientComponent(new URL('./AddEntityDialog.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
@@ -61,7 +72,7 @@ const AddEntityDialog = compileClientComponent(new URL('./AddEntityDialog.vue', 
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Notice.vue': moduleDefault(Passthrough),
   '@/components/ui/Spinner.vue': moduleDefault(EmptyStub),
-  '@/components/metadata/LookupBox.vue': moduleDefault(EmptyStub),
+  '@/components/metadata/LookupBox.vue': moduleDefault(LookupBox),
   './TypeBrowser.vue': moduleDefault(TypeBrowser),
   '@/lib/crate/editor': Editor,
   '@/lib/lookup/orcid': Orcid,
@@ -72,7 +83,7 @@ const AddEntityDialog = compileClientComponent(new URL('./AddEntityDialog.vue', 
 const draft = Editor.newDraft()
 type Created = { draft: Editor.CrateDraft; entity: Editor.DraftEntity }
 
-function mount(props: Record<string, unknown>, created: Created[] = []) {
+function mount(props: Record<string, unknown> = {}, created: Created[] = []) {
   return mountApp(AddEntityDialog, {
     props: { open: true, draft, vocab, onCreated: (value: Created) => created.push(value), ...props },
   })
@@ -82,77 +93,123 @@ function field(root: HostNode, label: string): HostNode {
   return element(root, (node) => node.tag === 'input' && node.props['aria-label'] === label)
 }
 
-async function pickPerson(root: HostNode) {
-  await click(button(root, 'Person'))
-  await click(button(root, 'Continue'))
-}
-
 describe('AddEntityDialog', () => {
-  it('offers only the types a reference accepts', async () => {
-    const mounted = await mount({ range: ['http://schema.org/Person', 'http://schema.org/Organization'] })
+  it('pins the common types above everything else', async () => {
+    const mounted = await mount()
     const text = content(mounted.root)
 
+    expect(text.indexOf('Common')).toBeLessThan(text.indexOf('Everything else'))
     expect(text).toContain('Person')
-    expect(text).toContain('Organization')
-    expect(text).not.toContain('ContactPoint')
+    expect(text).toContain('ContactPoint')
     mounted.app.unmount()
   })
 
-  it('selects the only type a search leaves', async () => {
-    const mounted = await mount({})
-    await typeValue(field(mounted.root, 'Search entity types'), 'SoftwareSourceCode')
-    await click(button(mounted.root, 'Continue'))
+  it('keeps the common group on top of the search results', async () => {
+    const mounted = await mount()
+    await typeValue(field(mounted.root, 'Search entity types'), 'organ')
+    const text = content(mounted.root)
 
-    expect(content(mounted.root)).toContain('New SoftwareSourceCode')
+    expect(text.indexOf('Common')).toBeLessThan(text.indexOf('Everything else'))
+    expect(text.indexOf('Organization')).toBeLessThan(text.indexOf('Everything else'))
+    mounted.app.unmount()
+  })
+
+  it('restricts the list to the types a reference accepts', async () => {
+    const mounted = await mount({ range: ['http://schema.org/Person', 'http://schema.org/Organization'] })
+    expect(content(mounted.root)).not.toContain('ContactPoint')
+
+    const checkbox = element(mounted.root, (node) => node.props['aria-label'] === 'Only matching types')
+    await (checkbox.props.onChange as (event: { target: { checked: boolean } }) => void)({
+      target: { checked: false },
+    })
+    await flush()
+
+    expect(content(mounted.root)).toContain('ContactPoint')
     mounted.app.unmount()
   })
 
   it('creates an entity under the slug of its name', async () => {
     const created: Created[] = []
     const mounted = await mount({}, created)
-    await pickPerson(mounted.root)
-    await typeValue(field(mounted.root, 'Name'), 'Ada Lovelace')
+
+    await click(button(mounted.root, 'Place'))
+    await typeValue(field(mounted.root, 'Name'), 'Giessen')
     await click(button(mounted.root, 'Create'))
 
     expect(created[0].entity).toMatchObject({
-      id: '#ada-lovelace',
-      types: ['Person'],
-      properties: { name: [{ kind: 'text', value: 'Ada Lovelace' }] },
+      id: '#giessen',
+      types: ['Place'],
+      properties: { name: [{ kind: 'text', value: 'Giessen' }] },
     })
-    expect(Editor.findEntity(created[0].draft, '#ada-lovelace')).toBeDefined()
+    expect(Editor.findEntity(created[0].draft, '#giessen')).toBeDefined()
     mounted.app.unmount()
   })
 
-  it('imports a person from an ORCID id', async () => {
-    const fetchMock = vi.fn(async () => ({
+  it('takes a person from an ORCID search by name', async () => {
+    vi.useFakeTimers()
+    const fetchMock = vi.fn(async (_url: unknown) => ({
       ok: true,
       json: async () => ({
-        person: { name: { 'given-names': { value: 'Ada' }, 'family-name': { value: 'Lovelace' } } },
+        'expanded-result': [{
+          'orcid-id': '0000-0002-1825-0097',
+          'given-names': 'Ada',
+          'family-names': 'Lovelace',
+          'institution-name': ['Example Institute'],
+        }],
       }),
     }))
     vi.stubGlobal('fetch', fetchMock)
     const created: Created[] = []
     const mounted = await mount({}, created)
-    await pickPerson(mounted.root)
 
-    await click(button(mounted.root, 'Import from ORCID'))
-    await typeValue(field(mounted.root, 'ORCID identifier'), '0000-0002-1825-0097')
+    await click(button(mounted.root, 'Person'))
+    await typeValue(field(mounted.root, 'Name'), 'ada countess lovelace')
+    vi.advanceTimersByTime(300)
+    for (let round = 0; round < 6; round += 1) await flush()
+
+    expect(String(fetchMock.mock.calls[0][0])).toContain('expanded-search')
+    await click(element(mounted.root, (node) => node.props.role === 'option'))
+    await click(button(mounted.root, 'Create'))
+
+    expect(created[0].entity).toMatchObject({
+      id: 'https://orcid.org/0000-0002-1825-0097',
+      types: ['Person'],
+      properties: {
+        name: [{ value: 'Ada Lovelace' }],
+        givenName: [{ value: 'Ada' }],
+        familyName: [{ value: 'Lovelace' }],
+        affiliation: [{ kind: 'reference', value: '#org-example-institute' }],
+      },
+    })
+    expect(Editor.findEntity(created[0].draft, '#org-example-institute')?.types).toEqual(['Organization'])
+    mounted.app.unmount()
+  })
+
+  it('fetches the record behind a pasted ORCID id', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        person: { name: { 'given-names': { value: 'Grace' }, 'family-name': { value: 'Hopper' } } },
+      }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    const created: Created[] = []
+    const mounted = await mount({}, created)
+
+    await click(button(mounted.root, 'Person'))
+    await typeValue(field(mounted.root, 'Name'), 'https://orcid.org/0000-0001-2345-6789')
     await click(element(mounted.root, (node) => node.props['aria-label'] === 'Import this record'))
     await flush()
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://pub.orcid.org/v3.0/0000-0002-1825-0097',
+      'https://pub.orcid.org/v3.0/0000-0001-2345-6789',
       expect.objectContaining({ headers: { Accept: 'application/json' } }),
     )
     await click(button(mounted.root, 'Create'))
 
     expect(created[0].entity).toMatchObject({
-      id: 'https://orcid.org/0000-0002-1825-0097',
-      properties: {
-        name: [{ value: 'Ada Lovelace' }],
-        givenName: [{ value: 'Ada' }],
-        familyName: [{ value: 'Lovelace' }],
-      },
+      id: 'https://orcid.org/0000-0001-2345-6789',
+      properties: { name: [{ value: 'Grace Hopper' }] },
     })
     mounted.app.unmount()
   })

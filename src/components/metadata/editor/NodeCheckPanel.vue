@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Notice from '@/components/ui/Notice.vue'
@@ -11,8 +11,9 @@ import { displayName, findEntity, rootId, type CrateDraft } from '@/lib/crate/ed
 import { truncateMiddle } from '@/lib/utils'
 import { Check, RefreshCw, Send, TriangleAlert } from '@lucide/vue'
 
-// The node checks the draft exactly as a save would, without saving. Only its
-// verdict (or a refused write) blocks; advisory findings never do.
+// The node checks the draft exactly as a save would, without saving. The check
+// runs on demand and once more before every save. Only its verdict (or a
+// refused write) blocks; advisory findings never do.
 
 const JSON_LD_KEY = 'aruna.dataset.showJsonLd'
 
@@ -33,7 +34,6 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
   (e: 'preview'): void
-  (e: 'visible'): void
   (e: 'save'): void
   (e: 'jump', entityId: string): void
 }>()
@@ -92,38 +92,26 @@ function rememberJson(event: Event) {
   }
 }
 
-const root = ref<HTMLElement | null>(null)
-let observer: IntersectionObserver | null = null
 onMounted(() => {
   try {
     showJson.value = globalThis.localStorage?.getItem(JSON_LD_KEY) === 'true'
   } catch {
     showJson.value = false
   }
-  // Guarded for SSR and the test renderer, which have no observer.
-  if (typeof IntersectionObserver === 'undefined' || !root.value) return
-  // One automatic run on arrival; later edits go through the debounced check.
-  observer = new IntersectionObserver((entries) => {
-    if (!entries.some((entry) => entry.isIntersecting)) return
-    observer?.disconnect()
-    emit('visible')
-  }, { threshold: 0.1 })
-  observer.observe(root.value)
 })
-onBeforeUnmount(() => observer?.disconnect())
 </script>
 
 <template>
-  <section ref="root" class="surface space-y-4 p-5">
+  <section class="surface space-y-4 p-5">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
         <h2 class="font-display text-sm font-semibold text-aruna-navy">Check with the node</h2>
-        <p class="text-xs text-muted-foreground">The node checks the dataset exactly as it would on save, without saving anything.</p>
+        <p class="text-xs text-muted-foreground">The node checks the dataset exactly as it would on save, without saving anything. Saving runs the check first.</p>
       </div>
       <Button variant="outline" size="sm" :disabled="previewRunning" @click="emit('preview')">
         <Spinner v-if="previewRunning" class="text-current" aria-hidden="true" />
         <RefreshCw v-else class="h-3.5 w-3.5" />
-        Check again
+        {{ outcome === 'none' ? 'Check with the node' : 'Check again' }}
       </Button>
     </div>
 
@@ -131,7 +119,7 @@ onBeforeUnmount(() => observer?.disconnect())
       <Spinner class="text-primary" aria-hidden="true" /> Checking…
     </p>
 
-    <p v-else-if="outcome === 'none'" class="text-xs text-muted-foreground">Not checked yet.</p>
+    <p v-else-if="outcome === 'none'" class="text-xs text-muted-foreground">Not checked yet. Saving checks first.</p>
 
     <div v-else-if="outcome === 'accepted'" class="space-y-3">
       <Notice tone="success">

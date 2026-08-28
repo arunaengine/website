@@ -6,17 +6,21 @@ import {
   click,
   compileClientComponent,
   content,
+  element,
   flush,
   moduleDefault,
   mountApp,
+  typeValue,
 } from '@/test/clientRender'
 import * as Editor from '@/lib/crate/editor'
+import * as ProfileSeed from '@/lib/crate/profileSeed'
 import * as Api from '@/lib/api'
 import * as Emit from '@/lib/profiles/emit'
 import * as Utils from '@/lib/utils'
 
 const route = reactive<{ name: string; params: Record<string, string> }>({ name: 'dataset-new', params: {} })
 const groups = ref([{ id: 'group-1', name: 'Research group' }])
+const profiles = ref<Array<Record<string, unknown>>>([])
 const saving = ref(false)
 const apiBaseUrl = ref('https://api.example.test')
 const authToken = ref('token')
@@ -30,8 +34,9 @@ const previewResult = ref<Api.ProfileValidationPreviewResponse | null>(null)
 const previewRunning = ref(false)
 const previewError = ref<string | null>(null)
 const previewUnavailable = ref(false)
+const verify = vi.fn(async () => true)
 
-// A dataset with a name and a Person linked as its author.
+// A dataset with a name, a description and a Person linked as its author.
 function seeded(draft: Editor.CrateDraft): Editor.CrateDraft {
   const named = Editor.updateValue(draft, './', 'name', 0, 'Example dataset')
   const described = Editor.updateValue(named, './', 'description', 0, 'What it holds.')
@@ -41,16 +46,31 @@ function seeded(draft: Editor.CrateDraft): Editor.CrateDraft {
 
 const EmptyStub = defineComponent(() => () => null)
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
+const InputStub = defineComponent({
+  props: { modelValue: { type: [String, Number], default: '' } },
+  emits: ['update:modelValue'],
+  setup(props, { attrs, emit }) {
+    return () => h('input', {
+      ...attrs,
+      value: props.modelValue,
+      onInput: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value),
+    })
+  },
+})
 const PageHeaderStub = defineComponent({
   props: { title: String },
   setup: (props, { slots }) => () => h('header', [h('h1', props.title), slots.actions?.()]),
 })
-const EntityListStub = defineComponent({
+const BrowserStub = defineComponent({
+  props: { draft: { type: Object, required: true } },
+  setup: (props) => () => h('p', `Entities ${(props.draft as Editor.CrateDraft).entities.length}`),
+})
+const EditorStub = defineComponent({
   props: { draft: { type: Object, required: true } },
   emits: ['update'],
   setup(props, { emit }) {
     return () => h('div', [
-      h('p', `Entities ${(props.draft as Editor.CrateDraft).entities.length}`),
+      h('p', Editor.displayName(Editor.rootEntity(props.draft as Editor.CrateDraft))),
       h('button', { onClick: () => emit('update', seeded(props.draft as Editor.CrateDraft)) }, 'Seed dataset'),
     ])
   },
@@ -67,20 +87,25 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
   'vue-router': { useRoute: () => route, useRouter: () => ({ push: routerPush }) },
   '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
   '@/components/dashboard/PageHeader.vue': moduleDefault(PageHeaderStub),
+  '@/components/ui/Badge.vue': moduleDefault(EmptyStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
-  '@/components/ui/Input.vue': moduleDefault(EmptyStub),
+  '@/components/ui/Input.vue': moduleDefault(InputStub),
+  '@/components/ui/Textarea.vue': moduleDefault(InputStub),
   '@/components/ui/Skeleton.vue': moduleDefault(EmptyStub),
   '@/components/ui/ErrorPanel.vue': moduleDefault(EmptyStub),
   '@/components/groups/GroupSelect.vue': moduleDefault(EmptyStub),
   '@/components/groups/CreateGroupDialog.vue': moduleDefault(EmptyStub),
   '@/components/metadata/VisibilitySelect.vue': moduleDefault(EmptyStub),
   '@/components/metadata/ImportCrateDialog.vue': moduleDefault(EmptyStub),
-  '@/components/metadata/editor/EntityList.vue': moduleDefault(EntityListStub),
-  '@/components/metadata/editor/IssueSummary.vue': moduleDefault(EmptyStub),
+  '@/components/metadata/editor/EntityBrowser.vue': moduleDefault(BrowserStub),
+  '@/components/metadata/editor/EntityEditor.vue': moduleDefault(EditorStub),
+  '@/components/metadata/editor/IssueDrawer.vue': moduleDefault(EmptyStub),
   '@/components/metadata/editor/NodeCheckPanel.vue': moduleDefault(NodeCheckStub),
   '@/composables/useAruna': {
+    profileReferenceIri: (profile: { profileUri?: string }) => profile?.profileUri,
     useAruna: () => ({
       groups,
+      profiles,
       createMetadata,
       getMetadataItem,
       fetchRoCrateRaw,
@@ -98,6 +123,7 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
       unavailable: previewUnavailable,
       preview: vi.fn(),
       previewNow: vi.fn(),
+      verify,
     }),
   },
   '@/composables/useDeviceStatus': { useDeviceStatus: () => ({ deviceClient: ref(null) }) },
@@ -108,11 +134,20 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
   '@/lib/profiles/emit': Emit,
   '@/lib/profiles/vocabulary': { loadVocabIndex: () => Promise.resolve(null) },
   '@/lib/crate/editor': Editor,
+  '@/lib/crate/profileSeed': ProfileSeed,
 })
+
+async function start(name = 'Example dataset') {
+  const mounted = await mountApp(DatasetEditorView)
+  await typeValue(element(mounted.root, (node) => node.props['aria-label'] === 'Dataset name'), name)
+  await click(button(mounted.root, 'Continue'))
+  return mounted
+}
 
 beforeEach(() => {
   route.name = 'dataset-new'
   route.params = {}
+  profiles.value = []
   createMetadata.mockReset().mockResolvedValue({ document_id: 'dataset-1' })
   replaceMetadataRoCrate.mockReset().mockResolvedValue({ document_id: 'dataset-1' })
   getMetadataItem.mockReset().mockResolvedValue({
@@ -122,18 +157,34 @@ beforeEach(() => {
     public: false,
   })
   fetchRoCrateRaw.mockReset().mockResolvedValue(Editor.toRoCrate(seeded(Editor.newDraft())))
+  verify.mockReset().mockResolvedValue(true)
   routerPush.mockClear()
   previewResult.value = null
 })
 
 describe('DatasetEditorView', () => {
-  it('creates a dataset from the entity list', async () => {
+  it('asks three questions before it opens the editor', async () => {
     const mounted = await mountApp(DatasetEditorView)
-    await click(button(mounted.root, 'Seed dataset'))
 
+    expect(content(mounted.root)).toContain('Start a dataset')
+    expect(button(mounted.root, 'Continue').props.disabled).toBe(true)
+
+    await typeValue(element(mounted.root, (node) => node.props['aria-label'] === 'Dataset name'), 'Example dataset')
+    await click(button(mounted.root, 'Continue'))
+
+    expect(content(mounted.root)).not.toContain('Start a dataset')
+    expect(content(mounted.root)).toContain('Entities 1')
     expect(content(mounted.root)).toContain('Example dataset')
-    await click(button(mounted.root, 'Create dataset'))
+    mounted.app.unmount()
+  })
 
+  it('checks with the node before it writes anything', async () => {
+    const mounted = await start()
+    await click(button(mounted.root, 'Seed dataset'))
+    await click(button(mounted.root, 'Create dataset'))
+    await flush()
+
+    expect(verify).toHaveBeenCalledTimes(1)
     const payload = createMetadata.mock.calls[0][0]
     expect(payload).toMatchObject({ group_id: 'group-1', path: 'datasets/example-dataset', public: false })
     const graph = payload.rocrate['@graph'] as Array<Record<string, unknown>>
@@ -146,22 +197,28 @@ describe('DatasetEditorView', () => {
     mounted.app.unmount()
   })
 
-  it('refuses to save while the node would reject the dataset', async () => {
-    previewResult.value = {
-      accepted: false,
-      state: 'invalid',
-      evaluator: 'test',
-      findings: [],
-      completeness: 'complete',
-      structural_violations: [{ code: 'missing_name', message: 'A name is required.', entity_id: './' }],
-    }
-    const mounted = await mountApp(DatasetEditorView)
+  it('writes nothing when the node rejects the draft', async () => {
+    verify.mockResolvedValue(false)
+    const mounted = await start()
     await click(button(mounted.root, 'Seed dataset'))
-
-    expect(button(mounted.root, 'Create dataset').props.disabled).toBe(true)
     await click(button(mounted.root, 'Create dataset'))
+    await flush()
 
+    expect(verify).toHaveBeenCalledTimes(1)
     expect(createMetadata).not.toHaveBeenCalled()
+    expect(routerPush).not.toHaveBeenCalled()
+    mounted.app.unmount()
+  })
+
+  it('keeps Continue out of reach until the dataset has a name', async () => {
+    const mounted = await mountApp(DatasetEditorView)
+    const name = element(mounted.root, (node) => node.props['aria-label'] === 'Dataset name')
+
+    await typeValue(name, '   ')
+    expect(button(mounted.root, 'Continue').props.disabled).toBe(true)
+
+    await typeValue(name, 'Example dataset')
+    expect(button(mounted.root, 'Continue').props.disabled).toBe(false)
     mounted.app.unmount()
   })
 
@@ -174,7 +231,9 @@ describe('DatasetEditorView', () => {
     expect(content(mounted.root)).toContain('Example dataset')
     expect(content(mounted.root)).toContain('Entities 2')
     await click(button(mounted.root, 'Save changes'))
+    await flush()
 
+    expect(verify).toHaveBeenCalledTimes(1)
     expect(replaceMetadataRoCrate).toHaveBeenCalledWith('dataset-1', {
       rocrate: expect.objectContaining({ '@graph': expect.any(Array) }),
       public: false,
