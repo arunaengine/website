@@ -104,7 +104,9 @@ export function portalRoutes(): RouteRecordRaw[] {
         },
         // Profiles for RO-Crate metadata schemas
         { path: 'profiles', name: 'profiles', component: () => import('@/views/ProfilesView.vue') },
+        { path: 'profiles/new', name: 'profile-new', component: () => import('@/views/ProfileNewView.vue') },
         { path: 'profiles/:profileId', name: 'profile', component: () => import('@/views/ProfilesView.vue') },
+        { path: 'profiles/:profileId/edit', name: 'profile-edit', component: () => import('@/views/ProfileNewView.vue') },
         // Versioned, repository-owned portal guidance.
         { path: 'docs/v1/:topic?', name: 'docs', component: () => import('@/views/DocsView.vue') },
         // Groups: dedicated management page

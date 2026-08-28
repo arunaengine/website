@@ -9,7 +9,6 @@ import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
-import NewProfileDialog from '@/components/metadata/NewProfileDialog.vue'
 import LiftNotesPanel from '@/components/metadata/profile-builder/LiftNotesPanel.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
 import { computed, ref, watch, onMounted } from 'vue'
@@ -55,28 +54,10 @@ const {
 // Profiles can appear from other nodes or sessions; entering the tab
 // revalidates in the background while the current set stays rendered.
 onMounted(() => void refreshProfiles())
-const showNewProfile = ref(false)
-// Set while the dialog edits an existing profile; null keeps it in create mode.
-const editingProfile = ref<MetadataProfile | null>(null)
 const showDelete = ref(false)
 const deleteError = ref<string | null>(null)
-const acceptedProfiles = ref<Record<string, MetadataProfile>>({})
 
-// Keep the dialog's accepted summary visible until the stored full crate is
-// readable. A stale profiles/ refresh may not contain the new document yet, and
-// a registry summary may omit the rule artifacts the dialog just submitted.
-const visibleProfiles = computed(() => {
-  const storedIds = new Set(profiles.value.map((profile) => profile.id))
-  const stored = profiles.value.map((profile) => {
-    const accepted = acceptedProfiles.value[profile.id]
-    if (!accepted) return profile
-    return accepted.documentId && profileCrateParses.value[accepted.documentId] ? profile : accepted
-  })
-  return [
-    ...stored,
-    ...Object.values(acceptedProfiles.value).filter((profile) => !storedIds.has(profile.id)),
-  ]
-})
+const visibleProfiles = computed(() => profiles.value)
 
 const selectedId = computed(() => (route.params.profileId as string) || visibleProfiles.value[0]?.id || '')
 const selected = computed(() => visibleProfiles.value.find((profile) => profile.id === selectedId.value))
@@ -94,33 +75,23 @@ const canEditSelected = computed(() => {
 })
 
 function openEdit(profile: MetadataProfile) {
-  editingProfile.value = profile
-  showNewProfile.value = true
+  router.push({ name: 'profile-edit', params: { profileId: profile.id } })
 }
 
 function openCreate() {
-  editingProfile.value = null
-  showNewProfile.value = true
+  router.push({ name: 'profile-new' })
 }
 
 async function confirmDelete() {
   if (!selected.value?.documentId) return
-  const profileId = selected.value.id
   deleteError.value = null
   try {
     await deleteMetadataDocument(selected.value.documentId)
-    const { [profileId]: _deleted, ...remaining } = acceptedProfiles.value
-    acceptedProfiles.value = remaining
     showDelete.value = false
     router.push({ name: 'profiles' })
   } catch (err) {
     deleteError.value = errorMessage(err)
   }
-}
-
-function handleCreated(profile: MetadataProfile) {
-  acceptedProfiles.value = { ...acceptedProfiles.value, [profile.id]: profile }
-  router.push({ name: 'profile', params: { profileId: profile.id } })
 }
 
 async function setPreferred(id: string) {
@@ -145,10 +116,6 @@ async function ensureFullProfile(profile: MetadataProfile | undefined, force = f
   try {
     await loadProfileCrate(docId, { force })
     loadedCrateIds.value = { ...loadedCrateIds.value, [docId]: true }
-    if (acceptedProfiles.value[profile.id]?.documentId === docId) {
-      const { [profile.id]: _reconciled, ...remaining } = acceptedProfiles.value
-      acceptedProfiles.value = remaining
-    }
   } catch (err) {
     profileLoadErrors.value = {
       ...profileLoadErrors.value,
@@ -561,11 +528,5 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
       </DialogContent>
     </Dialog>
 
-    <NewProfileDialog
-      v-model:open="showNewProfile"
-      :edit-profile="editingProfile"
-      @created="handleCreated"
-      @updated="editingProfile = null"
-    />
   </div>
 </template>
