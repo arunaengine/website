@@ -14,8 +14,7 @@ import Notice from '@/components/ui/Notice.vue'
 import Textarea from '@/components/ui/Textarea.vue'
 import { profileReferenceIri, useAruna } from '@/composables/useAruna'
 import { analyzeCrateJson, type CrateImportPreview } from '@/lib/crateImport'
-import type { DatasetDraft } from '@/lib/crate/build'
-import { parseDatasetDraft } from '@/lib/crate/parse'
+import { fromRoCrate, type CrateDraft } from '@/lib/crate/editor'
 import { slugify } from '@/lib/profiles/emit'
 import { errorMessage } from '@/lib/utils'
 
@@ -25,7 +24,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
-  (e: 'imported', draft: DatasetDraft): void
+  (e: 'imported', draft: CrateDraft): void
 }>()
 
 const { profiles } = useAruna()
@@ -69,7 +68,7 @@ function onImportFile(event: Event) {
 function useCrate() {
   const pending = importPreview.value
   if (!pending) return
-  emit('imported', parseDatasetDraft(pending.crate, {
+  emit('imported', fromRoCrate(pending.crate, {
     path: `datasets/${slugify(pending.rootName) || 'imported-crate'}`,
   }))
   emit('update:open', false)

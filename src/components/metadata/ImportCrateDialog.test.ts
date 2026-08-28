@@ -6,8 +6,8 @@ const source = readFileSync(new URL('./ImportCrateDialog.vue', import.meta.url),
 describe('ImportCrateDialog', () => {
   it('contains only the JSON-LD draft import surface', () => {
     expect(source).toContain('analyzeCrateJson')
-    expect(source).toContain('parseDatasetDraft')
-    expect(source).toContain("(e: 'imported', draft: DatasetDraft): void")
+    expect(source).toContain('fromRoCrate')
+    expect(source).toContain("(e: 'imported', draft: CrateDraft): void")
     expect(source).toContain('> Import RO-Crate')
     expect(source).not.toContain('startTab')
     expect(source).not.toContain('TabsTrigger')
