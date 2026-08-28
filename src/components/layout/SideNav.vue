@@ -156,6 +156,7 @@ watch(collapsed, (value) => window.localStorage.setItem(COLLAPSE_KEY, value ? '1
         <ArrowLeft class="h-4 w-4 shrink-0" />
         <span v-if="!collapsed">Back to landing</span>
       </RouterLink>
+      <slot name="footer" :collapsed="collapsed" />
     </div>
   </aside>
 </template>
