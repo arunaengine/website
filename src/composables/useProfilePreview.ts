@@ -16,6 +16,7 @@ const PREVIEW_DEBOUNCE_MS = 500
 export interface UseProfilePreviewOptions {
   client: () => ApiClientOptions
   debounceMs?: number
+  request?: (rocrate: unknown, signal: AbortSignal) => Promise<ProfileValidationPreviewResponse>
 }
 
 export function useProfilePreview(options: UseProfilePreviewOptions) {
@@ -48,7 +49,10 @@ export function useProfilePreview(options: UseProfilePreviewOptions) {
     inFlight = controller
     running.value = true
     error.value = null
-    previewProfileValidation(rocrate, options.client(), controller.signal)
+    const request = options.request
+      ? options.request(rocrate, controller.signal)
+      : previewProfileValidation(rocrate, options.client(), controller.signal)
+    request
       .then((response) => {
         if (current !== generation || disposed) return
         result.value = response

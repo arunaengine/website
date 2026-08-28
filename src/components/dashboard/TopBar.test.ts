@@ -40,9 +40,8 @@ const TopBar = compileClientComponent(new URL('./TopBar.vue', import.meta.url), 
   '@/components/ui/DropdownMenuLabel.vue': moduleDefault(Passthrough),
   '@/components/ui/DropdownMenuSeparator.vue': moduleDefault(Passthrough),
   '@/components/layout/RealmSwitcher.vue': moduleDefault(Marker('realm switcher')),
-  '@/components/metadata/NewDatasetDialog.vue': moduleDefault(Passthrough),
   '@/components/dashboard/NotificationBell.vue': moduleDefault(Marker('bell')),
-  '@/components/dashboard/SearchOverlay.vue': moduleDefault(Marker('search')),
+  '@/components/dashboard/SearchOverlay.vue': moduleDefault(Marker('datasets')),
   '@/composables/useRealm': { useRealm: () => ({ realm: ref({ shortName: 'Testrealm' }), role: ref('realm-member') }) },
   '@/composables/useTheme': { useTheme: () => ({ isDark: ref(false), toggleTheme: vi.fn() }) },
   '@/composables/useAruna': {
@@ -77,8 +76,10 @@ describe('portal chrome', () => {
 
     expect(html).toContain('realm switcher')
     expect(html).toContain('Create dataset')
-    expect(html).toContain('search')
+    expect(html).toContain('datasets')
     expect(watchNode).not.toHaveBeenCalled()
+    await click(button(mounted.root, 'Create dataset'))
+    expect(push).toHaveBeenCalledWith({ name: 'dataset-new' })
     mounted.app.unmount()
   })
 
@@ -102,7 +103,7 @@ describe('desktop chrome', () => {
     expect(html).not.toContain('Create dataset')
     expect(html).toContain('online')
     expect(html).toContain('Testrealm')
-    expect(html).toContain('search')
+    expect(html).toContain('datasets')
     expect(html).toContain('bell')
     expect(watchNode).toHaveBeenCalled()
     mounted.app.unmount()

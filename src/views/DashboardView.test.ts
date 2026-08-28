@@ -90,7 +90,6 @@ beforeAll(async () => {
   vi.doMock('@/components/dashboard/PageHeader.vue', () => ({ default: PageHeaderStub }))
   vi.doMock('@/components/dashboard/FederationPanel.vue', () => ({ default: FederationPanelStub }))
   vi.doMock('@/components/dashboard/GroupQuotaCards.vue', () => ({ default: GroupQuotaCardsStub }))
-  vi.doMock('@/components/metadata/NewDatasetDialog.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/components/metadata/ProfileChip.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/components/ui/StatCard.vue', () => ({ default: StatCardStub }))
   vi.doMock('@/components/ui/Skeleton.vue', () => ({ default: SkeletonStub }))

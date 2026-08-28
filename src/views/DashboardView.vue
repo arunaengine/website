@@ -4,7 +4,6 @@ import RefreshButton from '@/components/ui/RefreshButton.vue'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import FederationPanel from '@/components/dashboard/FederationPanel.vue'
 import GroupQuotaCards from '@/components/dashboard/GroupQuotaCards.vue'
-import NewDatasetDialog from '@/components/metadata/NewDatasetDialog.vue'
 import ProfileChip from '@/components/metadata/ProfileChip.vue'
 import SignInPanel from '@/components/auth/SignInPanel.vue'
 import StatCard from '@/components/ui/StatCard.vue'
@@ -25,7 +24,6 @@ const router = useRouter()
 const { currentUser, metadata, profiles, myGroups, discoverableGroups, realm, nodeInfo, realmInfo, usageInfo, bootstrapped, refresh, loadInfo, listRecentMetadata } = useAruna()
 const { authPending } = useAuth()
 const { dashboardRevision } = useNotifications()
-const showNewDataset = ref(false)
 const refreshing = ref(false)
 const quotaRevision = ref(0)
 const recentDocs = ref<MetadataDoc[] | null>(null)
@@ -171,10 +169,10 @@ const pageDescription = computed(() =>
     >
       <template #actions>
         <RefreshButton :busy="spinning" size="default" @click="onRefresh" />
-        <Button v-if="currentUser" variant="outline" @click="showNewDataset = true">
+        <Button v-if="currentUser" variant="outline" @click="router.push({ name: 'dataset-new' })">
           <Plus class="h-4 w-4" /> Create dataset
         </Button>
-        <RouterLink to="/app/metadata">
+        <RouterLink :to="{ name: 'datasets' }">
           <Button :variant="currentUser ? 'default' : 'outline'">
             Open Datasets <ArrowRight class="h-4 w-4" />
           </Button>
@@ -269,7 +267,7 @@ const pageDescription = computed(() =>
               <FileJson2 class="h-4 w-4 text-primary" />
               <h2 class="font-display text-sm font-semibold text-aruna-navy">Recent Datasets</h2>
             </div>
-            <RouterLink to="/app/metadata" class="text-xs font-medium text-primary hover:underline">Datasets</RouterLink>
+            <RouterLink :to="{ name: 'datasets' }" class="text-xs font-medium text-primary hover:underline">Datasets</RouterLink>
           </header>
           <ul v-if="!bootstrapped" class="divide-y divide-border">
             <li v-for="n in 4" :key="n" class="px-5 py-3.5">
@@ -279,7 +277,7 @@ const pageDescription = computed(() =>
           </ul>
           <ul v-else class="divide-y divide-border">
             <li v-for="doc in recentMetadata" :key="doc.ulid">
-              <RouterLink :to="{ name: 'metadata-detail', params: { id: doc.ulid } }" class="block px-5 py-3 hover:bg-muted/40">
+              <RouterLink :to="{ name: 'dataset', params: { id: doc.ulid } }" class="block px-5 py-3 hover:bg-muted/40">
                 <div class="flex items-center justify-between gap-3">
                   <span class="truncate text-sm font-medium text-foreground">{{ doc.title }}</span>
                   <span class="shrink-0 text-[11px] text-muted-foreground">{{ relativeTime(doc.updatedAt) }}</span>
@@ -311,9 +309,5 @@ const pageDescription = computed(() =>
       </section>
     </div>
 
-    <NewDatasetDialog
-      v-model:open="showNewDataset"
-      @created="(doc) => router.push({ name: 'metadata-detail', params: { id: doc.ulid } })"
-    />
   </div>
 </template>

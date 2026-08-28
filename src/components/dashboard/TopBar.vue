@@ -9,7 +9,6 @@ import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
 import DropdownMenuLabel from '@/components/ui/DropdownMenuLabel.vue'
 import DropdownMenuSeparator from '@/components/ui/DropdownMenuSeparator.vue'
 import RealmSwitcher from '@/components/layout/RealmSwitcher.vue'
-import NewDatasetDialog from '@/components/metadata/NewDatasetDialog.vue'
 import NotificationBell from '@/components/dashboard/NotificationBell.vue'
 import SearchOverlay from '@/components/dashboard/SearchOverlay.vue'
 import { ChevronDown, Plus, User, LogIn, LogOut, Key, Moon, Sun, RefreshCw } from '@lucide/vue'
@@ -25,7 +24,6 @@ import { useDeviceStatus } from '@/composables/useDeviceStatus'
 // shortcut, and the machine's own node takes the leading slot instead.
 const props = withDefaults(defineProps<{ variant?: 'portal' | 'desktop' }>(), { variant: 'portal' })
 
-const showNewDataset = ref(false)
 const { realm, role } = useRealm()
 const { currentUser, authError, loading } = useAruna()
 const { hasSession, signIn, signOut, stage, authPending } = useAuth()
@@ -94,7 +92,7 @@ async function handleSignOut() {
         variant="outline"
         size="sm"
         class="hidden h-9 md:inline-flex"
-        @click="showNewDataset = true"
+        @click="router.push({ name: 'dataset-new' })"
       >
         <Plus class="h-4 w-4" /> Create dataset
       </Button>
@@ -175,9 +173,5 @@ async function handleSignOut() {
       </template>
     </div>
 
-    <NewDatasetDialog
-      v-model:open="showNewDataset"
-      @created="(d) => router.push({ name: 'metadata-detail', params: { id: d.ulid } })"
-    />
   </div>
 </template>

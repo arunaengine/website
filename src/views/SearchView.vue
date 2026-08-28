@@ -53,7 +53,6 @@ import Spinner from '@/components/ui/Spinner.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
-import NewDatasetDialog from '@/components/metadata/NewDatasetDialog.vue'
 import CrateTransferDialog from '@/components/metadata/CrateTransferDialog.vue'
 import CatalogCard from '@/components/metadata/CatalogCard.vue'
 import { computed, ref, watch } from 'vue'
@@ -201,7 +200,6 @@ const {
 const expertMode = ref(queryString(route.query.expert) === '1')
 const favBusy = ref<Set<string>>(new Set())
 const favError = ref<string | null>(null)
-const showNewDataset = ref(false)
 const showCrateImport = ref(false)
 const { jobsEnabled } = useJobs()
 const sparql = ref(`SELECT DISTINCT ?s ?p ?o WHERE { ?s ?p ?o } LIMIT 25`)
@@ -866,7 +864,7 @@ async function runQuery() {
         >Learn more</RouterLink>
       </template>
       <template #actions>
-        <Button :disabled="!currentUser" @click="showNewDataset = true"><Plus class="h-4 w-4" /> Create dataset</Button>
+        <Button :disabled="!currentUser" @click="router.push({ name: 'dataset-new' })"><Plus class="h-4 w-4" /> Create dataset</Button>
         <!-- Importing an archive registers a NEW document, so it lives here next
              to Create dataset rather than on a single Dataset's page. -->
         <Button
@@ -1046,7 +1044,7 @@ async function runQuery() {
               <RouterLink
                 v-for="group in groupMatches"
                 :key="group.id"
-                :to="{ name: 'groups', params: { id: group.id } }"
+                :to="{ name: 'group', params: { id: group.id } }"
                 class="surface flex flex-col gap-1 p-4 transition-shadow hover:shadow-md"
               >
                 <div class="text-sm font-medium text-foreground">{{ group.name }}</div>
@@ -1097,7 +1095,7 @@ async function runQuery() {
               <RouterLink
                 v-for="hit in peopleResults"
                 :key="hit.user_id"
-                :to="{ name: 'user-profile', params: { id: hit.user_id } }"
+                :to="{ name: 'user', params: { id: hit.user_id } }"
                 class="surface inline-flex items-center gap-2 px-3 py-2 text-sm transition-shadow hover:shadow-md"
               >
                 <UserRound class="h-3.5 w-3.5 text-primary/70" />
@@ -1164,7 +1162,7 @@ async function runQuery() {
                      page (which handles unknown or private ids honestly). -->
                 <RouterLink
                   v-else
-                  :to="{ name: 'metadata-detail', params: { id: line.hit.document_id } }"
+                  :to="{ name: 'dataset', params: { id: line.hit.document_id } }"
                   class="surface group flex h-full flex-col gap-3 p-4 transition-shadow hover:shadow-md"
                 >
                   <span class="w-fit text-[10px] uppercase text-muted-foreground">Purpose unknown</span>
@@ -1366,7 +1364,7 @@ async function runQuery() {
               :title="`No visible Datasets in ${realm.shortName}`"
               description="No RO-Crate Datasets are visible here yet."
             >
-              <Button v-if="currentUser" @click="showNewDataset = true"><Plus class="h-4 w-4" /> Create dataset</Button>
+              <Button v-if="currentUser" @click="router.push({ name: 'dataset-new' })"><Plus class="h-4 w-4" /> Create dataset</Button>
             </EmptyState>
 
             <!-- The page count is derived from an approximate estimate, so it is
@@ -1476,7 +1474,6 @@ async function runQuery() {
       </template>
     </div>
 
-    <NewDatasetDialog v-model:open="showNewDataset" @created="(doc) => router.push({ name: 'metadata-detail', params: { id: doc.ulid } })" />
     <CrateTransferDialog v-model:open="showCrateImport" mode="import" />
   </div>
 </template>

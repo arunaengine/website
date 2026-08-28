@@ -2,7 +2,7 @@ import { defineComponent, h } from 'vue'
 import { describe, expect, it } from 'vitest'
 import { analyzeCrateJson } from '@/lib/crateImport'
 import CrateImportExport from './CrateImportExport.vue'
-import NewDatasetDialog from './NewDatasetDialog.vue'
+import ImportCrateDialog from './ImportCrateDialog.vue'
 
 const Stub = defineComponent({
   setup(_props, { slots }) {
@@ -78,26 +78,13 @@ describe('RO-Crate 1.3 import notices', () => {
   })
 
   it('renders as supported in the new-document import preview', () => {
-    const html = renderSsr(NewDatasetDialog, {}, {
+    const html = renderSsr(ImportCrateDialog, {}, {
       ...components,
       props: { open: true },
-      startTab: 'import',
-      currentUser: null,
       importPaste: '',
       importError: '',
       importPreview: version13Preview(),
       unrecognizedImportProfiles: [],
-      groupId: '',
-      groupOptions: [],
-      importPath: '',
-      importPathTouched: false,
-      isPublic: false,
-      submitError: null,
-      canSubmitImport: false,
-      saving: false,
-      createGroupOpen: false,
-      subcratePickerOpen: false,
-      subcrates: [],
       confirmDiscardOpen: false,
     })
 

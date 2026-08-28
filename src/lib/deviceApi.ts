@@ -6,7 +6,13 @@
 // The node side of this contract ships in parallel, so every reader below
 // tolerates missing fields and every caller treats 404/405/501 as "not served
 // here yet" rather than an error.
-import { ApiError, apiRequest, type ApiClientOptions, type ApiRequestOptions } from './api'
+import {
+  ApiError,
+  apiRequest,
+  type ApiClientOptions,
+  type ApiRequestOptions,
+  type ProfileValidationPreviewResponse,
+} from './api'
 
 /** Base and token of the local node; the base comes from the shell's status. */
 export interface DeviceClient extends ApiClientOptions {
@@ -58,6 +64,18 @@ function post<T>(path: string, client: DeviceClient, body?: unknown): Promise<T>
   return request<T>(path, client, {
     method: 'POST',
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  })
+}
+
+export function previewDeviceDraft(
+  rocrate: unknown,
+  client: DeviceClient,
+  signal?: AbortSignal,
+): Promise<ProfileValidationPreviewResponse> {
+  return request<ProfileValidationPreviewResponse>('/device/drafts/preview', client, {
+    method: 'POST',
+    body: JSON.stringify({ rocrate }),
+    signal,
   })
 }
 
