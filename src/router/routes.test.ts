@@ -68,6 +68,46 @@ describe('web routes', () => {
     expect(child(routes, '')?.name).toBe('dashboard')
   })
 
+  it('uses uniform collection, item, create and edit route names', async () => {
+    const routes = await build()
+    const expected = [
+      ['datasets', 'datasets'],
+      ['datasets/new', 'dataset-new'],
+      ['datasets/:id', 'dataset'],
+      ['datasets/:id/edit', 'dataset-edit'],
+      ['profiles', 'profiles'],
+      ['profiles/:profileId', 'profile'],
+      ['groups', 'groups'],
+      ['groups/:id', 'group'],
+      ['users/:id', 'user'],
+      ['jobs/:jobId', 'job'],
+      ['compute/:taskId', 'task'],
+    ]
+
+    for (const [path, name] of expected) expect(child(routes, path)?.name).toBe(name)
+  })
+
+  it('redirects legacy dataset and job paths to their canonical routes', async () => {
+    const routes = await build()
+    const metadataRedirect = child(routes, 'metadata/:id')?.redirect as
+      | ((to: { params: Record<string, string> }) => unknown)
+      | undefined
+    const jobRedirect = child(routes, 'compute/jobs/:jobId')?.redirect as
+      | ((to: { params: Record<string, string> }) => unknown)
+      | undefined
+
+    expect(child(routes, 'search')?.redirect).toEqual({ name: 'datasets' })
+    expect(child(routes, 'metadata')?.redirect).toEqual({ name: 'datasets' })
+    expect(metadataRedirect?.({ params: { id: 'dataset-1' } })).toEqual({
+      name: 'dataset',
+      params: { id: 'dataset-1' },
+    })
+    expect(jobRedirect?.({ params: { jobId: 'job-1' } })).toEqual({
+      name: 'job',
+      params: { jobId: 'job-1' },
+    })
+  })
+
   it('mounts no welcome view', async () => {
     const routes = await build()
     expect(find(routes, '/welcome')).toBeUndefined()
@@ -100,7 +140,7 @@ describe('desktop routes', () => {
       ['sync', 'sync'],
       ['folders/:folderId', 'folder'],
       ['runs', 'runs'],
-      ['runs/:jobId', 'run-detail'],
+      ['runs/:jobId', 'run'],
     ]
 
     for (const [path, name] of expected) {

@@ -79,7 +79,7 @@ const selected = computed(() => visibleProfiles.value.find((profile) => profile.
 const preferredId = computed(() => currentUser.value?.preferredProfileId ?? '')
 
 function select(id: string) {
-  router.push({ name: 'profile-detail', params: { profileId: id } })
+  router.push({ name: 'profile', params: { profileId: id } })
 }
 
 // Membership in the owning group is the same write heuristic the metadata
@@ -116,7 +116,7 @@ async function confirmDelete() {
 
 function handleCreated(profile: MetadataProfile) {
   acceptedProfiles.value = { ...acceptedProfiles.value, [profile.id]: profile }
-  router.push({ name: 'profile-detail', params: { profileId: profile.id } })
+  router.push({ name: 'profile', params: { profileId: profile.id } })
 }
 
 async function setPreferred(id: string) {
@@ -310,7 +310,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
 <template>
   <div>
     <PageHeader
-      title="Metadata profiles"
+      :title="route.name === 'profile' ? (selected?.name ?? selectedId) : 'Profiles'"
       description="Profiles are ordinary RO-Crate metadata documents stored under profiles/."
     >
       <template #actions>

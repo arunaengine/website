@@ -83,7 +83,7 @@ function freshnessTime(updatedAtMs: number): string {
         <ul v-if="target.visible_references.length" class="space-y-1 pl-4">
           <li v-for="reference in target.visible_references" :key="reference.document_id" class="list-disc">
             <RouterLink
-              :to="{ name: 'metadata-detail', params: { id: reference.document_id } }"
+              :to="{ name: 'dataset', params: { id: reference.document_id } }"
               class="font-medium text-primary hover:underline"
             >{{ reference.title }}</RouterLink>
           </li>

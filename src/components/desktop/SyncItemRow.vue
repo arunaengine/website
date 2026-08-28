@@ -73,7 +73,7 @@ function moved(transfer: DeviceTransfer): string {
           >{{ folderName(folder.root) }}</RouterLink>
           <RouterLink
             v-else-if="document"
-            :to="{ name: 'metadata-detail', params: { id: document.documentId } }"
+            :to="{ name: 'dataset', params: { id: document.documentId } }"
             class="min-w-0 truncate font-display text-sm font-semibold text-foreground hover:text-primary hover:underline"
           >{{ documentName(document.path, document.documentId) }}</RouterLink>
           <Badge :variant="chip.variant" class="text-[10px]">{{ chip.label }}</Badge>
@@ -120,7 +120,7 @@ function moved(transfer: DeviceTransfer): string {
             <Button variant="outline" size="sm">Open</Button>
           </RouterLink>
         </template>
-        <RouterLink v-else-if="document" :to="{ name: 'metadata-detail', params: { id: document.documentId } }">
+        <RouterLink v-else-if="document" :to="{ name: 'dataset', params: { id: document.documentId } }">
           <Button variant="outline" size="sm">Open</Button>
         </RouterLink>
       </div>

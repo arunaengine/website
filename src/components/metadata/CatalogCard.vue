@@ -17,7 +17,7 @@ const emit = defineEmits<{ (e: 'toggle-favourite', id: string): void }>()
 
 <template>
   <RouterLink
-    :to="{ name: 'metadata-detail', params: { id: props.doc.ulid } }"
+    :to="{ name: 'dataset', params: { id: props.doc.ulid } }"
     class="surface group relative flex h-full flex-col gap-3 p-4 transition-shadow hover:shadow-md"
   >
     <button

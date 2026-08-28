@@ -119,7 +119,7 @@ export function parseWatchPath(pathPrefix: string): WatchPathInfo | null {
       groupId,
       prefix,
       label: prefix || '(all documents)',
-      link: { name: 'search', query: { ...(prefix ? { q: prefix } : {}), group: groupId } },
+      link: { name: 'datasets', query: { ...(prefix ? { q: prefix } : {}), group: groupId } },
     }
   }
   return null

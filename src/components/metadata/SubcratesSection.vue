@@ -151,7 +151,7 @@ async function unlink(link: SubcrateLink) {
           <div class="min-w-0">
             <RouterLink
               v-if="resolveDocumentId(link)"
-              :to="{ name: 'metadata-detail', params: { id: resolveDocumentId(link) } }"
+              :to="{ name: 'dataset', params: { id: resolveDocumentId(link) } }"
               class="block truncate font-medium text-primary hover:underline"
               :title="link.iri"
             >

@@ -627,7 +627,7 @@ describe('narrow TopBar search panel', () => {
     expect(content(dialog)).not.toContain('Freshness source')
 
     await click(element(mounted.root, (node) => node.props['aria-label'] === 'Search coverage: complete'))
-    expect(routerPush).toHaveBeenCalledWith({ name: 'search', query: { q: 'sample' } })
+    expect(routerPush).toHaveBeenCalledWith({ name: 'datasets', query: { q: 'sample' } })
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })

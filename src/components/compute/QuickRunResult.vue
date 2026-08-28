@@ -167,7 +167,7 @@ const firstBucket = computed(() => props.outputs[0]?.bucket ?? '')
         </div>
         <RouterLink
           class="inline-flex shrink-0 items-center gap-1 text-xs text-primary hover:underline"
-          :to="{ name: 'compute-task', params: { taskId } }"
+          :to="{ name: 'task', params: { taskId } }"
         >
           Open full task detail <ExternalLink class="h-3 w-3" />
         </RouterLink>

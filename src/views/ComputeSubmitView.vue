@@ -570,8 +570,8 @@ async function submitNative() {
   )
   void router.push(
     local
-      ? { name: 'run-detail', params: { jobId: created.job_id } }
-      : { name: 'job-detail', params: { jobId: created.job_id } },
+      ? { name: 'run', params: { jobId: created.job_id } }
+      : { name: 'job', params: { jobId: created.job_id } },
   )
 }
 
@@ -589,7 +589,7 @@ async function submit() {
       submittedWithoutWorkspace.value = created.id
       return
     }
-    void router.push({ name: 'compute-task', params: { taskId: created.id } })
+    void router.push({ name: 'task', params: { taskId: created.id } })
   } catch (err) {
     if (useNative.value) {
       submitRetryable.value = isSubmitRetryable(err)
@@ -1039,7 +1039,7 @@ async function submit() {
               variant="outline"
               size="sm"
               class="shrink-0"
-              @click="router.push({ name: 'compute-task', params: { taskId: submittedWithoutWorkspace } })"
+              @click="router.push({ name: 'task', params: { taskId: submittedWithoutWorkspace } })"
             >
               View task <ArrowRight class="h-3.5 w-3.5" />
             </Button>

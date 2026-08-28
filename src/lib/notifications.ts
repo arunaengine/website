@@ -38,7 +38,7 @@ export const NOTIFICATION_KINDS: Record<string, NotificationKindDescriptor> = {
     icon: UserPlus,
     title: (n, ctx) => `You were added to ${groupLabel(n, ctx)}`,
     detail: () => undefined,
-    link: (n) => (n.group_id ? { name: 'groups', params: { id: n.group_id } } : { name: 'groups' }),
+    link: (n) => (n.group_id ? { name: 'group', params: { id: n.group_id } } : { name: 'groups' }),
   },
   removed_from_group: {
     icon: UserMinus,
@@ -51,7 +51,7 @@ export const NOTIFICATION_KINDS: Record<string, NotificationKindDescriptor> = {
     icon: Users,
     title: (n, ctx) => `New member in ${groupLabel(n, ctx)}`,
     detail: (n) => (n.member_user_id ? `Member ${truncateMiddle(n.member_user_id)}` : undefined),
-    link: (n) => (n.group_id ? { name: 'groups', params: { id: n.group_id } } : { name: 'groups' }),
+    link: (n) => (n.group_id ? { name: 'group', params: { id: n.group_id } } : { name: 'groups' }),
   },
   node_onboarded: {
     icon: HardDrive,
@@ -64,7 +64,7 @@ export const NOTIFICATION_KINDS: Record<string, NotificationKindDescriptor> = {
     icon: FileJson2,
     title: () => 'New metadata document',
     detail: (n) => n.path,
-    link: (n) => (n.document_id ? { name: 'metadata-detail', params: { id: n.document_id } } : null),
+    link: (n) => (n.document_id ? { name: 'dataset', params: { id: n.document_id } } : null),
   },
   data_uploaded: {
     icon: Upload,
@@ -122,7 +122,7 @@ export const NOTIFICATION_KINDS: Record<string, NotificationKindDescriptor> = {
     icon: Inbox,
     title: (n, ctx) => `New join request for ${groupLabel(n, ctx)}`,
     detail: (n) => (n.actor_user_id ? `From ${truncateMiddle(n.actor_user_id)}` : undefined),
-    link: (n) => (n.group_id ? { name: 'groups', params: { id: n.group_id } } : { name: 'groups' }),
+    link: (n) => (n.group_id ? { name: 'group', params: { id: n.group_id } } : { name: 'groups' }),
   },
   join_request_decided: {
     icon: Check,
@@ -134,7 +134,7 @@ export const NOTIFICATION_KINDS: Record<string, NotificationKindDescriptor> = {
     icon: Inbox,
     title: (n, ctx) => `New join request for ${groupLabel(n, ctx)}`,
     detail: (n) => (n.actor_user_id ? `From ${truncateMiddle(n.actor_user_id)}` : undefined),
-    link: (n) => (n.group_id ? { name: 'groups', params: { id: n.group_id } } : { name: 'groups' }),
+    link: (n) => (n.group_id ? { name: 'group', params: { id: n.group_id } } : { name: 'groups' }),
   },
   'group.join_request.decided': {
     icon: Check,
@@ -153,25 +153,25 @@ export const NOTIFICATION_KINDS: Record<string, NotificationKindDescriptor> = {
     icon: AlertTriangle,
     title: (n, ctx) => `Storage nearing quota for ${groupLabel(n, ctx)}`,
     detail: () => undefined,
-    link: (n) => (n.group_id ? { name: 'groups', params: { id: n.group_id }, hash: '#storage' } : { name: 'groups' }),
+    link: (n) => (n.group_id ? { name: 'group', params: { id: n.group_id }, hash: '#storage' } : { name: 'groups' }),
   },
   quota_blocked: {
     icon: Ban,
     title: (n, ctx) => `Storage quota exceeded for ${groupLabel(n, ctx)}`,
     detail: () => 'Uploads are blocked until storage is freed or the quota is raised.',
-    link: (n) => (n.group_id ? { name: 'groups', params: { id: n.group_id }, hash: '#storage' } : { name: 'groups' }),
+    link: (n) => (n.group_id ? { name: 'group', params: { id: n.group_id }, hash: '#storage' } : { name: 'groups' }),
   },
   'quota.warned': {
     icon: AlertTriangle,
     title: (n, ctx) => `Storage nearing quota for ${groupLabel(n, ctx)}`,
     detail: () => undefined,
-    link: (n) => (n.group_id ? { name: 'groups', params: { id: n.group_id }, hash: '#storage' } : { name: 'groups' }),
+    link: (n) => (n.group_id ? { name: 'group', params: { id: n.group_id }, hash: '#storage' } : { name: 'groups' }),
   },
   'quota.blocked': {
     icon: Ban,
     title: (n, ctx) => `Storage quota exceeded for ${groupLabel(n, ctx)}`,
     detail: () => 'Uploads are blocked until storage is freed or the quota is raised.',
-    link: (n) => (n.group_id ? { name: 'groups', params: { id: n.group_id }, hash: '#storage' } : { name: 'groups' }),
+    link: (n) => (n.group_id ? { name: 'group', params: { id: n.group_id }, hash: '#storage' } : { name: 'groups' }),
   },
 }
 

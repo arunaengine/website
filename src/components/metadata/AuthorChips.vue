@@ -101,7 +101,7 @@ const authors = computed<AuthorEntry[]>(() => {
           </a>
           <RouterLink
             v-if="author.userId"
-            :to="{ name: 'user-profile', params: { id: author.userId } }"
+            :to="{ name: 'user', params: { id: author.userId } }"
             class="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
           >
             View portal profile →

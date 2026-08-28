@@ -100,7 +100,7 @@ const items = computed<QuickItem[]>(() => [
     section: 'datasets',
     title: hit.title || hit.document_path,
     subtitle: hit.snippet ?? undefined,
-    routeName: 'metadata-detail',
+    routeName: 'dataset',
     routeParams: { id: hit.document_id },
   })),
   ...quickObjects.value.map((hit): QuickItem => ({
@@ -127,7 +127,7 @@ const items = computed<QuickItem[]>(() => [
     key: `u:${user.user_id}`,
     section: 'people',
     title: user.name,
-    routeName: 'user-profile',
+    routeName: 'user',
     routeParams: { id: user.user_id },
   })),
 ])
@@ -237,7 +237,7 @@ function openSearchPage() {
   const term = q.value
   showResults.value = false
   q.value = ''
-  navigateAfterPanel(() => void router.push({ name: 'search', query: { q: term } }))
+  navigateAfterPanel(() => void router.push({ name: 'datasets', query: { q: term } }))
 }
 
 function onInputKeydown(event: KeyboardEvent) {

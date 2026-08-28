@@ -67,7 +67,7 @@ describe('Phase 5 navigation parity', () => {
     expect(uniqueSorted(portalPaths(mobile))).toEqual(uniqueSorted(portalPaths(desktop)))
     expect(portalPaths(mobile).slice(0, 5)).toEqual([
       '/app',
-      '/app/search',
+      '/app/datasets',
       '/app/buckets',
       '/app/compute',
       '/app/groups',
@@ -81,7 +81,7 @@ describe('Phase 5 navigation parity', () => {
     expect(portalPaths(html)).toEqual([
       '/app',
       '/app/buckets',
-      '/app/search',
+      '/app/datasets',
       '/app/profiles',
       '/app/compute',
       '/app/groups',
@@ -151,16 +151,17 @@ describe('Phase 5 navigation parity', () => {
 })
 
 describe('Phase 5 route stability', () => {
-  it('keeps the Datasets destination on the existing search and metadata paths', () => {
+  it('uses the Datasets path and redirects the old catalog paths', () => {
     const routerSource = readFileSync(
       fileURLToPath(new URL('../../router/routes.ts', import.meta.url)),
       'utf8',
     )
 
-    expect(routerSource).toContain("{ path: 'search', name: 'search'")
-    expect(routerSource).toContain("{ path: 'metadata', name: 'metadata', redirect: { name: 'search' } }")
-    expect(routerSource).toContain("{ path: 'metadata/:id', name: 'metadata-detail'")
-    expect(routerSource).not.toMatch(/path:\s*['"]datasets(?:\/|['"])/)
+    expect(routerSource).toContain("{ path: 'datasets', name: 'datasets'")
+    expect(routerSource).toContain("{ path: 'datasets/:id', name: 'dataset'")
+    expect(routerSource).toContain("{ path: 'search', redirect: { name: 'datasets' } }")
+    expect(routerSource).toContain("{ path: 'metadata', redirect: { name: 'datasets' } }")
+    expect(routerSource).toContain("path: 'metadata/:id'")
     expect(routerSource).toContain("{ path: 'docs/v1/:topic?', name: 'docs'")
   })
 })

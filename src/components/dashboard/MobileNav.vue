@@ -44,7 +44,7 @@ const jobsEnabled = featureEnabled('jobs')
 
 const primaryNav = computed<NavItem[]>(() => [
   { to: '/app', icon: LayoutDashboard, label: 'Dashboard', exact: true },
-  { to: '/app/search', icon: FileJson2, label: 'Datasets', match: ['/app/search', '/app/metadata'] },
+  { to: '/app/datasets', icon: FileJson2, label: 'Datasets', match: ['/app/datasets'] },
   { to: '/app/buckets', icon: Boxes, label: 'Data' },
   ...(tesEnabled || jobsEnabled
     ? [{ to: '/app/compute', icon: Workflow, label: 'Compute' }]

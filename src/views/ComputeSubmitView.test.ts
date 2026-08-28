@@ -312,9 +312,9 @@ async function mount(component: Component, path?: string) {
         routes: [
           { path: '/app/compute', name: 'compute', component: RouteStub },
           { path: '/app/compute/new', name: 'compute-new', component: RouteStub },
-          { path: '/app/compute/:taskId', name: 'compute-task', component: RouteStub },
+          { path: '/app/compute/:taskId', name: 'task', component: RouteStub },
           { path: '/app/runs', name: 'runs', component: RouteStub },
-          { path: '/app/runs/:jobId', name: 'run-detail', component: RouteStub },
+          { path: '/app/runs/:jobId', name: 'run', component: RouteStub },
           { path: '/app/admin', name: 'admin', component: RouteStub },
         ],
       })
@@ -518,7 +518,7 @@ describe('run target', () => {
     expect(request.target).toBe('local')
     expect(request.tags).toEqual({})
     expect(client).toEqual({ baseUrl: 'http://127.0.0.1:9000/api/v1', token: 'owner-token' })
-    expect(mounted.router!.currentRoute.value.name).toBe('run-detail')
+    expect(mounted.router!.currentRoute.value.name).toBe('run')
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })

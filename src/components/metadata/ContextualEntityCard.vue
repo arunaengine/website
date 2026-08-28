@@ -85,7 +85,7 @@ const idLink = computed(() => {
       >{{ entity.email }}</a>
       <RouterLink
         v-if="entity.userId"
-        :to="{ name: 'user-profile', params: { id: entity.userId } }"
+        :to="{ name: 'user', params: { id: entity.userId } }"
         class="font-medium text-primary hover:underline"
       >
         Portal profile

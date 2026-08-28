@@ -39,10 +39,10 @@ const { authPending } = useAuth()
 // Deep-linkable task drawer driven by the :taskId route param (the back button
 // closes it, DataManagerView's bucket-param precedent).
 const openTaskId = computed(() =>
-  route.name === 'compute-task' && route.params.taskId ? String(route.params.taskId) : '',
+  route.name === 'task' && route.params.taskId ? String(route.params.taskId) : '',
 )
 function openTask(task: TesTask) {
-  if (task.id) void router.push({ name: 'compute-task', params: { taskId: task.id } })
+  if (task.id) void router.push({ name: 'task', params: { taskId: task.id } })
 }
 function closeTask() {
   void router.push({ name: 'compute' })

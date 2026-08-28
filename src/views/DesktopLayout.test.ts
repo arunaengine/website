@@ -125,7 +125,7 @@ describe('desktop shell', () => {
     expect(destinations(html)).toEqual([
       '/app',
       '/app/buckets',
-      '/app/search',
+      '/app/datasets',
       '/app/profiles',
       '/app/compute',
       '/app/sync',

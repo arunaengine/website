@@ -52,7 +52,7 @@ const anything = computed(
       </Badge>
       <RouterLink
         v-if="placement.jobId"
-        :to="{ name: 'job-detail', params: { jobId: placement.jobId } }"
+        :to="{ name: 'job', params: { jobId: placement.jobId } }"
         class="font-mono text-primary hover:underline"
         :title="`Open native job ${placement.jobId}`"
       >{{ truncateMiddle(placement.jobId) }}</RouterLink>

@@ -210,7 +210,7 @@ onMounted(() => void reload())
                     :to="
                       'folder_id' in item
                         ? { name: 'folder', params: { folderId: item.folder_id } }
-                        : { name: 'metadata-detail', params: { id: item.documentId } }
+                        : { name: 'dataset', params: { id: item.documentId } }
                     "
                     class="truncate text-sm font-medium text-foreground hover:text-primary hover:underline"
                   >{{ 'folder_id' in item ? folderName(item.root) : item.path || item.documentId }}</RouterLink>

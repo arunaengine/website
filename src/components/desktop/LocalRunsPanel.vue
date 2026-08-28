@@ -38,10 +38,10 @@ const list = useJobsList({ client: jobClient, pageSize: 25, pollWhile: () => rea
 const { jobs, listState, listError, refreshing, nextCursor } = list
 
 const openJobId = computed(() =>
-  route.name === 'run-detail' && route.params.jobId ? String(route.params.jobId) : '',
+  route.name === 'run' && route.params.jobId ? String(route.params.jobId) : '',
 )
 function openJob(job: JobStatusResponse): void {
-  void router.push({ name: 'run-detail', params: { jobId: job.job_id } })
+  void router.push({ name: 'run', params: { jobId: job.job_id } })
 }
 function closeJob(): void {
   void router.push({ name: 'runs' })

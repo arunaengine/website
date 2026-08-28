@@ -31,10 +31,10 @@ const route = useRoute()
 // Deep-linkable job drawer driven by the :jobId route param (the back button
 // closes it, the task drawer's taskId precedent).
 const openJobId = computed(() =>
-  route.name === 'job-detail' && route.params.jobId ? String(route.params.jobId) : '',
+  route.name === 'job' && route.params.jobId ? String(route.params.jobId) : '',
 )
 function openJob(job: JobStatusResponse) {
-  void router.push({ name: 'job-detail', params: { jobId: job.job_id } })
+  void router.push({ name: 'job', params: { jobId: job.job_id } })
 }
 function closeJob() {
   void router.push({ name: 'compute', query: { tab: 'jobs' } })

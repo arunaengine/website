@@ -113,7 +113,7 @@ function toggleFolder(folder: SyncedFolder): void {
 }
 
 async function findOfflineDocument(): Promise<void> {
-  await router.push({ name: 'search' })
+  await router.push({ name: 'datasets' })
   await nextTick()
   if (typeof document !== 'undefined') {
     document.querySelector<HTMLInputElement>('input[placeholder^="Search Datasets"]')?.focus()

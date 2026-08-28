@@ -178,7 +178,7 @@ async function removeMember(member: GroupMember, roleId?: string) {
                         <AccessBadge v-for="role in member.roles" :key="role.role_id" :access="role.name" />
                       </div>
                       <RouterLink
-                        :to="{ name: 'user-profile', params: { id: member.user_id } }"
+                        :to="{ name: 'user', params: { id: member.user_id } }"
                         class="block text-xs font-medium text-primary hover:underline"
                       >
                         View profile →

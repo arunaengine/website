@@ -233,8 +233,8 @@ async function mount() {
     history: createMemoryHistory(),
     routes: [
       { path: '/app/sync', name: 'sync', component: Stub },
-      { path: '/app/search', name: 'search', component: Stub },
-      { path: '/app/metadata/:id', name: 'metadata-detail', component: Stub },
+      { path: '/app/datasets', name: 'datasets', component: Stub },
+      { path: '/app/datasets/:id', name: 'dataset', component: Stub },
       { path: '/app/folders/:folderId', name: 'folder', component: Stub },
     ],
   })
@@ -375,7 +375,7 @@ describe('the unified sync list', () => {
 
     await click(button(mounted.root, 'Document available offline...'))
 
-    expect(mounted.router.currentRoute.value.name).toBe('search')
+    expect(mounted.router.currentRoute.value.name).toBe('datasets')
     mounted.app.unmount()
   })
 })

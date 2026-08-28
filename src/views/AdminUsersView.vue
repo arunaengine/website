@@ -254,7 +254,7 @@ const sharedGroups = computed(() => {
             <Input
               id="user-directory-search"
               v-model="query"
-              type="search"
+              type="datasets"
               placeholder="Search by name or email (min 2 characters)"
             />
           </div>
@@ -427,7 +427,7 @@ const sharedGroups = computed(() => {
             </p>
             <ul v-else class="space-y-1.5">
               <li v-for="entry in sharedGroups" :key="entry.groupId" class="flex flex-wrap items-center gap-1.5 text-xs">
-                <RouterLink class="font-medium text-primary hover:underline" :to="{ name: 'groups', params: { id: entry.groupId } }">
+                <RouterLink class="font-medium text-primary hover:underline" :to="{ name: 'group', params: { id: entry.groupId } }">
                   {{ entry.name || truncateMiddle(entry.groupId) }}
                 </RouterLink>
                 <Badge v-for="role in entry.roles" :key="role" variant="secondary">{{ role }}</Badge>

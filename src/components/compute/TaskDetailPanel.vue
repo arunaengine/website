@@ -480,7 +480,7 @@ async function confirmDelete() {
         <!-- Process Run crate -->
         <section class="space-y-1.5">
           <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Process Run crate</h3>
-          <RouterLink v-if="runCrate" class="inline-flex items-center gap-1.5 text-xs text-primary hover:underline" :to="{ name: 'metadata-detail', params: { id: runCrate.document_id } }">
+          <RouterLink v-if="runCrate" class="inline-flex items-center gap-1.5 text-xs text-primary hover:underline" :to="{ name: 'dataset', params: { id: runCrate.document_id } }">
             <FileText class="h-3.5 w-3.5" /> Open Process Run crate
           </RouterLink>
           <div v-else class="flex flex-wrap items-center gap-2">

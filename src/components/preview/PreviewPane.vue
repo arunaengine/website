@@ -112,7 +112,7 @@ async function download() {
               Referenced from
               <RouterLink
                 v-if="props.referencedFrom.connectorId && props.referencedFrom.groupId"
-                :to="{ name: 'groups', params: { id: props.referencedFrom.groupId }, query: { tab: 'sources', connector: props.referencedFrom.connectorId } }"
+                :to="{ name: 'group', params: { id: props.referencedFrom.groupId }, query: { tab: 'sources', connector: props.referencedFrom.connectorId } }"
                 class="text-primary hover:underline"
                 title="Open the connector in its group"
               >

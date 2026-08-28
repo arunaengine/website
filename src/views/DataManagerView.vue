@@ -2008,7 +2008,7 @@ const isEmpty = computed(
 <template>
   <div>
     <PageHeader
-      title="Data"
+      :title="route.name === 'bucket' ? bucket : 'Data'"
       description="Browse buckets and objects through the node's S3 interface, signed in your browser."
     >
       <template #actions>
@@ -2326,7 +2326,7 @@ const isEmpty = computed(
                           <span class="min-w-0 text-foreground">
                             <RouterLink
                               v-if="group.connectorId && activeGroupId"
-                              :to="{ name: 'groups', params: { id: activeGroupId }, query: { tab: 'sources', connector: group.connectorId } }"
+                              :to="{ name: 'group', params: { id: activeGroupId }, query: { tab: 'sources', connector: group.connectorId } }"
                               class="block truncate text-primary hover:underline"
                               :title="`${referenceGroupLabel(group)}, open the connector`"
                             >

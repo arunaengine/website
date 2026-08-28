@@ -454,7 +454,7 @@ async function leave() {
           <p v-else-if="docs && !docs.length" class="text-xs text-muted-foreground">This group has no metadata documents yet.</p>
           <ul v-else-if="docs" class="space-y-1">
             <li v-for="doc in docs.slice(0, DOC_LIMIT)" :key="doc.document_id">
-              <RouterLink :to="{ name: 'metadata-detail', params: { id: doc.document_id } }" class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50">
+              <RouterLink :to="{ name: 'dataset', params: { id: doc.document_id } }" class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50">
                 <span class="min-w-0 flex-1 truncate font-mono text-xs text-foreground/80">{{ doc.document_path }}</span>
                 <Badge :variant="doc.public ? 'success' : 'secondary'" class="shrink-0 text-[10px] uppercase">{{ doc.public ? 'public' : 'private' }}</Badge>
                 <span class="shrink-0 text-[11px] text-muted-foreground">{{ relativeTime(doc.updated_at) }}</span>
@@ -463,7 +463,7 @@ async function leave() {
           </ul>
           <RouterLink
             v-if="moreDocs"
-            :to="{ name: 'search', query: { group: group.group_id } }"
+            :to="{ name: 'datasets', query: { group: group.group_id } }"
             class="mt-2 inline-flex text-xs font-medium text-primary hover:underline"
           >
             View all in Discover{{ docsEstimate !== null ? ` (about ${formatNumber(docsEstimate)})` : '' }} →

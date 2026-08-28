@@ -30,11 +30,16 @@ const { signIn, stage, authPending } = useAuth()
 const anyEnabled = computed(() => tesEnabled.value || jobsEnabled.value)
 const bothEnabled = computed(() => tesEnabled.value && jobsEnabled.value)
 
-// Tab from the route: /app/compute/jobs/:jobId and ?tab=jobs select System jobs.
+// Job detail routes and ?tab=jobs select System jobs.
 const tab = computed(() => {
   if (!tesEnabled.value) return 'jobs'
   if (!jobsEnabled.value) return 'tasks'
-  return route.name === 'job-detail' || route.query.tab === 'jobs' ? 'jobs' : 'tasks'
+  return route.name === 'job' || route.query.tab === 'jobs' ? 'jobs' : 'tasks'
+})
+const pageTitle = computed(() => {
+  if (route.name === 'job') return `Job ${String(route.params.jobId ?? '')}`
+  if (route.name === 'task') return `Task ${String(route.params.taskId ?? '')}`
+  return 'Compute'
 })
 function setTab(next: string) {
   void router.replace({ name: 'compute', query: next === 'jobs' ? { tab: 'jobs' } : {} })
@@ -48,7 +53,7 @@ function startSignIn() {
 
 <template>
   <div>
-    <PageHeader title="Compute" description="Run tasks on this node and monitor the background jobs it produces.">
+    <PageHeader :title="pageTitle" description="Run tasks on this node and monitor the background jobs it produces.">
       <!-- One Run entry point; the menu explains the two submission modes. -->
       <template v-if="tesEnabled && currentUser" #actions>
         <NewRunMenu size="sm" />

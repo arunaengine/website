@@ -20,7 +20,7 @@ const route = useRoute()
         <RouterLink :to="{ name: 'dashboard' }">
           <Button variant="outline"><LayoutDashboard class="h-4 w-4" /> Dashboard</Button>
         </RouterLink>
-        <RouterLink :to="{ name: 'search' }">
+        <RouterLink :to="{ name: 'datasets' }">
           <Button><FileJson2 class="h-4 w-4" /> Datasets</Button>
         </RouterLink>
       </div>

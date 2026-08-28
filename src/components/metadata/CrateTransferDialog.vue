@@ -570,7 +570,7 @@ function rowTarget(row: TransferRow): string {
             <template v-if="downloadedName"> · saved as {{ downloadedName }}</template>
           </p>
 
-          <RouterLink v-if="createdDocumentId" :to="{ name: 'metadata-detail', params: { id: createdDocumentId } }">
+          <RouterLink v-if="createdDocumentId" :to="{ name: 'dataset', params: { id: createdDocumentId } }">
             <Button variant="outline" size="sm" @click="emit('update:open', false)">Open the created document</Button>
           </RouterLink>
 

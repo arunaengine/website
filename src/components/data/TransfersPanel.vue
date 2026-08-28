@@ -143,7 +143,7 @@ function stateVariant(item: UploadQueueItem): 'accent' | 'secondary' | 'warn' | 
           <button class="text-[10px] font-medium text-primary hover:underline" @click="queue.retry(item)">Retry</button>
           <RouterLink
             v-if="item.quotaExceeded"
-            :to="item.groupId ? { name: 'groups', params: { id: item.groupId }, hash: '#storage' } : { name: 'groups' }"
+            :to="item.groupId ? { name: 'group', params: { id: item.groupId }, hash: '#storage' } : { name: 'groups' }"
             class="text-[10px] font-medium text-primary hover:underline"
           >
             View group quota

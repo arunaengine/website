@@ -27,7 +27,7 @@ const jobsEnabled = featureEnabled('jobs')
 
 // The detail drawer lives on the local tab, so a deep link opens it there.
 const tab = computed({
-  get: () => (route.name === 'run-detail' || route.query.where !== 'realm' ? 'local' : 'realm'),
+  get: () => (route.name === 'run' || route.query.where !== 'realm' ? 'local' : 'realm'),
   set: (value: string) => {
     void router.replace({ name: 'runs', query: value === 'realm' ? { where: 'realm' } : {} })
   },
@@ -36,13 +36,16 @@ const tab = computed({
 const localHint = computed(() =>
   compute.value?.backend ? `${compute.value.backend} · ${compute.value.running} running` : '',
 )
+const pageTitle = computed(() =>
+  route.name === 'run' ? `Run ${String(route.params.jobId ?? '')}` : 'Runs',
+)
 
 onMounted(() => void ensureLoaded())
 </script>
 
 <template>
   <div>
-    <PageHeader eyebrow="This computer" title="Runs" description="Work you started, wherever it is executing.">
+    <PageHeader eyebrow="This computer" :title="pageTitle" description="Work you started, wherever it is executing.">
       <template #actions>
         <NewRunMenu size="sm" />
       </template>

@@ -290,7 +290,7 @@ async function runPrunePass() {
             <Input
               id="quarantine-topic-filter"
               v-model="topicDraft"
-              type="search"
+              type="datasets"
               placeholder="Filter by hex sync topic"
               class="font-mono"
             />

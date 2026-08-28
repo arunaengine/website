@@ -79,7 +79,7 @@ const adminItems = computed(() => [
 const items = computed<NavEntry[]>(() => [
   { to: '/app', icon: LayoutDashboard, label: 'Home', exact: true },
   { to: '/app/buckets', icon: Boxes, label: 'Data' },
-  { to: '/app/search', icon: FileJson2, label: 'Datasets', match: ['/app/search', '/app/metadata'] },
+  { to: '/app/datasets', icon: FileJson2, label: 'Datasets', match: ['/app/datasets'] },
   { to: '/app/profiles', icon: ListChecks, label: 'Profiles' },
   ...(tesEnabled || jobsEnabled ? [{ to: '/app/compute', icon: Workflow, label: 'Compute' }] : []),
   navSeparator,

@@ -152,7 +152,7 @@ const flow = computed(() => [
       <RouterLink
         v-if="tesEnabled && run.runId"
         class="ml-auto inline-flex items-center gap-1.5 text-xs font-normal text-primary hover:underline"
-        :to="{ name: 'compute-task', params: { taskId: run.runId } }"
+        :to="{ name: 'task', params: { taskId: run.runId } }"
       >
         <Cpu class="h-3.5 w-3.5" /> Open compute task
       </RouterLink>
@@ -169,7 +169,7 @@ const flow = computed(() => [
           <RouterLink
             v-if="agentLink.kind === 'user'"
             class="text-primary hover:underline"
-            :to="{ name: 'user-profile', params: { id: agentLink.id } }"
+            :to="{ name: 'user', params: { id: agentLink.id } }"
           >
             {{ agentLabel }}
           </RouterLink>

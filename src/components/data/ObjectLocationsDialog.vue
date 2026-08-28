@@ -222,7 +222,7 @@ async function replicate() {
             reachable is up to you: the node only writes and reads it.
             <RouterLink
               v-if="props.groupId"
-              :to="{ name: 'groups', params: { id: props.groupId }, query: { tab: 'storage' } }"
+              :to="{ name: 'group', params: { id: props.groupId }, query: { tab: 'storage' } }"
               class="font-medium underline"
             >
               Your group's storage

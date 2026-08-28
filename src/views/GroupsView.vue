@@ -12,7 +12,7 @@ import { useAuth } from '@/composables/useAuth'
 import { useJoinRequests } from '@/composables/useJoinRequests'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
 import { useRefresh } from '@/composables/useRefresh'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { Inbox, Plus, Users } from '@lucide/vue'
 import { relativeTime } from '@/lib/utils'
@@ -29,6 +29,7 @@ const {
   busy,
 } = useJoinRequests()
 const route = useRoute()
+const router = useRouter()
 
 const createGroupOpen = ref(false)
 const selectedGroupId = ref('')
@@ -72,14 +73,25 @@ async function withdraw(req: JoinRequest) {
 watch(
   () => route.params.id,
   (id) => {
-    if (typeof id === 'string' && id) selectedGroupId.value = id
+    selectedGroupId.value = typeof id === 'string' ? id : ''
   },
   { immediate: true },
 )
 
 function toggleGroup(groupId: string) {
-  selectedGroupId.value = selectedGroupId.value === groupId ? '' : groupId
+  void router.push(
+    selectedGroupId.value === groupId
+      ? { name: 'groups' }
+      : { name: 'group', params: { id: groupId } },
+  )
 }
+
+const selectedGroup = computed(() =>
+  [...myGroups.value, ...discoverableGroups.value].find((group) => group.id === selectedGroupId.value),
+)
+const pageTitle = computed(() =>
+  route.name === 'group' ? (selectedGroup.value?.name ?? selectedGroupId.value) : 'Groups',
+)
 
 // While a stored session restores, keep the signed-in copy so the sign-in
 // hint never flashes for users who are actually signed in.
@@ -92,7 +104,7 @@ const description = computed(() =>
 
 <template>
   <div>
-    <PageHeader title="Groups" :description="description">
+    <PageHeader :title="pageTitle" :description="description">
       <template #actions>
         <RefreshButton :busy="spinning" size="default" @click="onRefresh" />
         <Button :disabled="!currentUser" @click="createGroupOpen = true">
@@ -131,7 +143,7 @@ const description = computed(() =>
               </div>
             </button>
             <div v-if="selectedGroupId === group.id" class="border-t border-border bg-muted/10 p-4">
-              <GroupDetail :group-id="group.id" @left="selectedGroupId = ''" />
+              <GroupDetail :group-id="group.id" @left="router.push({ name: 'groups' })" />
             </div>
           </li>
           <li v-if="!myGroups.length" class="px-5 py-8 text-center text-xs text-muted-foreground">
@@ -230,6 +242,6 @@ const description = computed(() =>
       </section>
     </div>
 
-    <CreateGroupDialog v-model:open="createGroupOpen" @created="(group) => (selectedGroupId = group.group_id)" />
+    <CreateGroupDialog v-model:open="createGroupOpen" @created="(group) => router.push({ name: 'group', params: { id: group.group_id } })" />
   </div>
 </template>

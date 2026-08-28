@@ -24,7 +24,7 @@ import { BookOpen, Link as LinkIcon } from '@lucide/vue'
         <ul class="mt-3 space-y-2 text-sm text-foreground/80">
           <li><a href="/app" class="hover:text-foreground">Dashboard</a></li>
           <li><a href="/app/data" class="hover:text-foreground">Data manager</a></li>
-          <li><a href="/app/metadata" class="hover:text-foreground">Metadata catalog</a></li>
+          <li><a href="/app/datasets" class="hover:text-foreground">Metadata catalog</a></li>
           <li><a href="/app/query" class="hover:text-foreground">SPARQL workbench</a></li>
           <li><a href="/app/groups" class="hover:text-foreground">Groups &amp; access</a></li>
         </ul>

@@ -42,7 +42,7 @@ function desktopRoutes(): RouteRecordRaw[] {
     { path: 'folders', redirect: { name: 'sync' } },
     { path: 'transfers', redirect: { name: 'sync' } },
     { path: 'runs', name: 'runs', component: () => import('@/views/desktop/RunsView.vue') },
-    { path: 'runs/:jobId', name: 'run-detail', component: () => import('@/views/desktop/RunsView.vue') },
+    { path: 'runs/:jobId', name: 'run', component: () => import('@/views/desktop/RunsView.vue') },
     { path: 'device', name: 'device', component: () => import('@/views/DeviceView.vue') },
   ]
 }
@@ -91,21 +91,27 @@ export function portalRoutes(): RouteRecordRaw[] {
             query: { ...(typeof to.query.prefix === 'string' && to.query.prefix ? { prefix: to.query.prefix } : {}), addData: '1' },
           }),
         },
-        // Datasets catalog plus search, with SPARQL in expert mode. The existing
-        // path and route name stay stable for saved links.
-        { path: 'search', name: 'search', component: () => import('@/views/SearchView.vue') },
-        // The old catalog listing merged into Datasets; detail pages stay here.
-        { path: 'metadata', name: 'metadata', redirect: { name: 'search' } },
-        { path: 'metadata/:id', name: 'metadata-detail', component: () => import('@/views/MetadataView.vue') },
+        // Datasets catalog plus search, with SPARQL in expert mode.
+        { path: 'datasets', name: 'datasets', component: () => import('@/views/SearchView.vue') },
+        { path: 'datasets/new', name: 'dataset-new', component: () => import('@/views/DatasetNewView.vue') },
+        { path: 'datasets/:id', name: 'dataset', component: () => import('@/views/MetadataView.vue') },
+        { path: 'datasets/:id/edit', name: 'dataset-edit', component: () => import('@/views/DatasetEditView.vue') },
+        { path: 'search', redirect: { name: 'datasets' } },
+        { path: 'metadata', redirect: { name: 'datasets' } },
+        {
+          path: 'metadata/:id',
+          redirect: (to) => ({ name: 'dataset', params: { id: to.params.id } }),
+        },
         // Profiles for RO-Crate metadata schemas
         { path: 'profiles', name: 'profiles', component: () => import('@/views/ProfilesView.vue') },
-        { path: 'profiles/:profileId', name: 'profile-detail', component: () => import('@/views/ProfilesView.vue') },
+        { path: 'profiles/:profileId', name: 'profile', component: () => import('@/views/ProfilesView.vue') },
         // Versioned, repository-owned portal guidance.
         { path: 'docs/v1/:topic?', name: 'docs', component: () => import('@/views/DocsView.vue') },
         // Groups: dedicated management page
-        { path: 'groups/:id?', name: 'groups', component: () => import('@/views/GroupsView.vue') },
+        { path: 'groups', name: 'groups', component: () => import('@/views/GroupsView.vue') },
+        { path: 'groups/:id', name: 'group', component: () => import('@/views/GroupsView.vue') },
         // Public user profile resolved from the realm's user directory
-        { path: 'users/:id', name: 'user-profile', component: () => import('@/views/UserProfileView.vue') },
+        { path: 'users/:id', name: 'user', component: () => import('@/views/UserProfileView.vue') },
         { path: 'status', name: 'status', component: () => import('@/views/StatusView.vue') },
         ...desktopRoutes(),
         // Settings (consolidates account preferences, members, tokens)
@@ -136,14 +142,17 @@ export function portalRoutes(): RouteRecordRaw[] {
         { path: 'compute/quick', name: 'compute-quick', component: () => import('@/views/ComputeQuickRunView.vue') },
         { path: 'compute/new', name: 'compute-new', component: () => import('@/views/ComputeSubmitView.vue') },
         { path: 'compute/jobs', redirect: { name: 'compute', query: { tab: 'jobs' } } },
-        { path: 'compute/jobs/:jobId', name: 'job-detail', component: () => import('@/views/ComputeView.vue') },
-        { path: 'compute/:taskId', name: 'compute-task', component: () => import('@/views/ComputeView.vue') },
+        {
+          path: 'compute/jobs/:jobId',
+          redirect: (to) => ({ name: 'job', params: { jobId: to.params.jobId } }),
+        },
+        { path: 'compute/:taskId', name: 'task', component: () => import('@/views/ComputeView.vue') },
         // Compatibility redirects from prior IA
         { path: 'jobs', redirect: { name: 'compute', query: { tab: 'jobs' } } },
-        { path: 'jobs/:jobId', redirect: (to) => ({ name: 'job-detail', params: { jobId: to.params.jobId } }) },
+        { path: 'jobs/:jobId', name: 'job', component: () => import('@/views/ComputeView.vue') },
         { path: 'data', redirect: { name: 'buckets' } },
         { path: 'data/:bucketId', redirect: (to) => ({ name: 'bucket', params: { bucketId: to.params.bucketId } }) },
-        { path: 'query', redirect: { name: 'search' } },
+        { path: 'query', redirect: { name: 'datasets' } },
         { path: 'nodes', redirect: { name: 'settings' } },
         { path: 'realm', redirect: { name: 'settings' } },
         // Unknown /app URLs keep the shell and show a 404 instead of redirecting away.
