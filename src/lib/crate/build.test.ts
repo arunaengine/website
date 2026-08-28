@@ -112,6 +112,13 @@ describe('buildRoCrate', () => {
     })
   })
 
+  it('omits the license when none was chosen', () => {
+    const crate = buildRoCrate(draft({ basics: { ...draft().basics, license: '' } }))
+
+    expect(root(crate).license).toBeUndefined()
+    expect(graph(crate).some((entity) => entity['@type'] === 'CreativeWork' && entity['@id'] !== 'ro-crate-metadata.json')).toBe(false)
+  })
+
   it('maps group and public visibility to the API boolean', () => {
     expect(buildDataset(draft()).public).toBe(false)
     expect(buildDataset(draft({ visibility: 'public' })).public).toBe(true)

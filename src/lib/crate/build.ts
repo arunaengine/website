@@ -20,6 +20,27 @@ export type RootRole =
   | 'keywords'
   | (string & {})
 
+const ROLE_LABELS: Record<string, string> = {
+  author: 'Author',
+  contributor: 'Contributor',
+  maintainer: 'Maintainer',
+  publisher: 'Publisher',
+  funder: 'Funder',
+  affiliation: 'Affiliation',
+  citation: 'Cited work',
+  contactPoint: 'Contact',
+  spatialCoverage: 'Location',
+  about: 'About',
+  keywords: 'Keyword',
+  other: 'Other',
+}
+
+/** Reading name for a root role; profile-driven properties fall back to a split. */
+export function roleLabel(role: string): string {
+  return ROLE_LABELS[role]
+    ?? role.replace(/([A-Z])/g, ' $1').replace(/^./, (letter) => letter.toUpperCase())
+}
+
 export interface ContextEntity {
   id: string
   type: string | string[]
@@ -122,8 +143,8 @@ export function buildRoCrate(draft: DatasetDraft): Record<string, unknown> {
     name: draft.basics.title,
     description: draft.basics.description,
     datePublished: draft.basics.datePublished,
-    license: { '@id': draft.basics.license },
   }
+  if (draft.basics.license) dataset.license = { '@id': draft.basics.license }
   if (draft.basics.keywords?.length) dataset.keywords = [...draft.basics.keywords]
   if (draft.basics.identifier) dataset.identifier = draft.basics.identifier
 
