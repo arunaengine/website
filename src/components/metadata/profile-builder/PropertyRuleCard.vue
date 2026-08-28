@@ -16,7 +16,7 @@ import {
 } from '@/lib/profiles/propertyCatalog'
 import { isAbsoluteUri, isValidPropertyTermName, normalizeTypeUri, sameSchemaOrgType, SCHEMA_ORG } from '@/lib/profiles/uri'
 import { isHasPartUri } from '@/lib/profiles/emit'
-import { vocabKind, type VocabTerm } from '@/lib/profiles/vocabulary'
+import { datatypeKind, vocabKind, type VocabTerm } from '@/lib/profiles/vocabulary'
 import VocabSuggestions from './VocabSuggestions.vue'
 import AllowedUrls from './rules/AllowedUrls.vue'
 import AllowedValues from './rules/AllowedValues.vue'
@@ -310,7 +310,8 @@ function applyVocabTerm(term: VocabTerm) {
   const suggested = vocabKind(term)
   if (suggested && suggested !== 'text' && property.value.kind === 'text') property.value.kind = suggested
   if (term.targets?.length && property.value.kind === 'entity' && !property.value.entityTypes.length) {
-    property.value.entityTypes = term.targets.map((target) => normalizeTypeUri(target)).filter(Boolean)
+    // A mixed range lists datatypes next to classes; only the classes are targets.
+    property.value.entityTypes = term.targets.map(normalizeTypeUri).filter((uri) => uri && !datatypeKind(uri))
   }
 }
 

@@ -158,8 +158,8 @@ export interface EntityTreeContext {
 }
 
 // Violations of one entry: its own findings plus the trees of its nested entry
-// lists, keyed by sub-control property. Display (DatasetEntityInstances) and
-// submit gating (countEntryErrors) both read this one structure.
+// lists, keyed by sub-control property. Display and submit gating
+// (countEntryErrors) both read this one structure.
 export interface EntryViolationNode {
   own: ProfileViolation[]
   nested: Record<string, EntryViolationNode[]>

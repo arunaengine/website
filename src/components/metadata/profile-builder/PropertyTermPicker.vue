@@ -6,7 +6,7 @@ import { Plus, X } from '@lucide/vue'
 import VocabSuggestions from './VocabSuggestions.vue'
 import { propertyTermsForType, type PropertyTermOption } from '@/lib/profiles/propertyCatalog'
 import { entityTypeLabel } from '@/lib/profiles/entityTypes'
-import { vocabKind, type VocabTerm } from '@/lib/profiles/vocabulary'
+import { datatypeKind, vocabKind, type VocabTerm } from '@/lib/profiles/vocabulary'
 import { isValidPropertyTermName, normalizeTypeUri, sameSchemaOrgType } from '@/lib/profiles/uri'
 import { draftProperty, propertyName, trimmed, type DraftEntityRule, type ProfileBuilder } from './useProfileBuilder'
 
@@ -95,6 +95,11 @@ function pickCommon(option: PropertyTermOption) {
   )
 }
 
+// A mixed range lists datatypes next to classes; only the classes are targets.
+function entityTargets(term: VocabTerm): string[] {
+  return (term.targets ?? []).map(normalizeTypeUri).filter((uri) => uri && !datatypeKind(uri))
+}
+
 function pickVocab(term: VocabTerm) {
   if (isUsed(term.uri)) return
   const kind = vocabKind(term) ?? 'text'
@@ -107,7 +112,7 @@ function pickVocab(term: VocabTerm) {
       propertyUri: term.uri,
       description: term.description || '',
       kind,
-      entityTypes: kind === 'entity' ? (term.targets ?? []).map(normalizeTypeUri).filter(Boolean) : [],
+      entityTypes: kind === 'entity' ? entityTargets(term) : [],
       obligation: 'MAY',
     }),
   )

@@ -50,8 +50,8 @@ export function isAbsoluteUri(value: string): boolean {
 }
 
 // Single source of truth for the entity-reference URI check + its message (L7),
-// shared by the dataset dialog's submit-gating violations (NewDatasetDialog) and
-// the inline per-row hint (DatasetEntityInstances) so display and gating agree.
+// shared by submit-gating violations and the inline per-row hint so display and
+// gating agree.
 // A reference input holding a non-empty value that is not a valid absolute URI is
 // an error (would emit a broken `{"@id"}` reference); an empty value is left to
 // presence checks, not this format check.
