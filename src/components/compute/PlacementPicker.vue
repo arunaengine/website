@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, useId, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
+import Notice from '@/components/ui/Notice.vue'
 import Select from '@/components/ui/Select.vue'
+import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { truncateMiddle } from '@/lib/utils'
 import { Plus, X } from '@lucide/vue'
@@ -16,6 +18,27 @@ const props = defineProps<{ modelValue: Record<string, string> }>()
 const emit = defineEmits<{ (event: 'update:modelValue', value: Record<string, string>): void }>()
 
 const { nodes } = useRealmNodes()
+const { error: realmError, loadInfo } = useAruna()
+
+// Two pickers can share a page, so every id this component emits is its own.
+const uid = useId()
+const labelKeysId = `placement-label-keys-${uid}`
+const labelValuesId = (rowId: number) => `placement-label-values-${uid}-${rowId}`
+
+// The node list comes from the realm document; without it there is nothing to
+// pick from, so the failure is shown here rather than an empty dropdown.
+const nodesUnavailable = computed(() => Boolean(realmError.value) && !nodes.value.length)
+const retrying = ref(false)
+async function retryNodes() {
+  retrying.value = true
+  try {
+    await loadInfo()
+  } catch {
+    // loadInfo reports through the shared error ref.
+  } finally {
+    retrying.value = false
+  }
+}
 
 interface ConstraintRow {
   id: number
@@ -143,7 +166,12 @@ function removeConstraint(index: number) {
 
 <template>
   <section class="rounded-md border border-border/70 bg-muted/20 p-3">
-    <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Placement</div>
+    <h2 class="font-display text-sm font-semibold text-aruna-navy">Placement</h2>
+    <Notice v-if="nodesUnavailable" tone="error" class="mt-2" :title="realmError ?? undefined">
+      <Button variant="outline" size="sm" class="mt-2" :disabled="retrying" @click="retryNodes">
+        {{ retrying ? 'Retrying…' : 'Try again' }}
+      </Button>
+    </Notice>
     <label class="mt-2 block">
       <span class="text-xs font-medium text-foreground">Run on node</span>
       <Select
@@ -160,7 +188,7 @@ function removeConstraint(index: number) {
         Label constraints<span v-if="rows.length"> ({{ rows.length }})</span>
       </summary>
       <div class="mt-2 space-y-2">
-        <datalist id="placement-label-keys">
+        <datalist :id="labelKeysId">
           <option
             v-for="suggestion in suggestions"
             :key="`${suggestion.key}=${suggestion.value}`"
@@ -175,7 +203,7 @@ function removeConstraint(index: number) {
         >
           <Input
             :model-value="row.key"
-            list="placement-label-keys"
+            :list="labelKeysId"
             class="h-8 font-mono text-xs"
             placeholder="label key"
             :aria-label="`Label key ${index + 1}`"
@@ -183,13 +211,13 @@ function removeConstraint(index: number) {
           />
           <Input
             :model-value="row.value"
-            :list="`placement-label-values-${row.id}`"
+            :list="labelValuesId(row.id)"
             class="h-8 font-mono text-xs"
             placeholder="value"
             :aria-label="`Label value ${index + 1}`"
             @update:model-value="updateValue(row, String($event))"
           />
-          <datalist :id="`placement-label-values-${row.id}`">
+          <datalist :id="labelValuesId(row.id)">
             <option v-for="value in valuesFor(row.key)" :key="value" :value="value" />
           </datalist>
           <Button

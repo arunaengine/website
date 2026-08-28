@@ -83,7 +83,7 @@ function removeEnv(index: number) {
       <p v-if="commandTokens.error" class="mt-1 text-[11px] text-destructive">{{ commandTokens.error }}</p>
       <div v-else-if="commandTokens.argv.length" class="mt-1.5 flex flex-wrap items-center gap-1">
         <span class="text-[10px] uppercase tracking-wider text-muted-foreground">argv</span>
-        <Badge v-for="(arg, index) in commandTokens.argv" :key="`${index}-${arg}`" variant="outline" class="max-w-60 font-mono text-[10px]">
+        <Badge v-for="(arg, index) in commandTokens.argv" :key="`${index}-${arg}`" variant="outline" size="sm" class="max-w-60 font-mono">
           <span class="truncate">{{ arg }}</span>
         </Badge>
       </div>

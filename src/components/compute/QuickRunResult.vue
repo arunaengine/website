@@ -2,14 +2,16 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
+import Notice from '@/components/ui/Notice.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import TaskStateBadge from '@/components/compute/TaskStateBadge.vue'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useS3, s3ErrorMessage } from '@/composables/useS3'
 import { isTerminalTesState, type TesTask } from '@/lib/tes'
-import { formatBytes, formatDuration, relativeTime, truncateMiddle } from '@/lib/utils'
-import { ArrowDownToLine, ArrowUpFromLine, CornerDownRight, Download, ExternalLink, FolderOpen, RefreshCw } from '@lucide/vue'
+import { errorMessage, formatBytes, formatDuration, relativeTime, truncateMiddle } from '@/lib/utils'
+import { ArrowDownToLine, ArrowUpFromLine, CornerDownRight, Download, ExternalLink, FolderOpen } from '@lucide/vue'
 
 const props = defineProps<{
   taskId: string
@@ -19,10 +21,6 @@ const props = defineProps<{
 
 const { getTask } = useTes()
 const s3 = useS3()
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
-}
 
 const task = ref<TesTask | null>(null)
 const loadState = ref<'loading' | 'ready' | 'error' | 'unsupported'>('loading')
@@ -141,9 +139,9 @@ const firstBucket = computed(() => props.outputs[0]?.bucket ?? '')
       <Skeleton class="h-32 w-full" />
     </div>
 
-    <div v-else-if="loadState === 'unsupported'" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+    <Notice v-else-if="loadState === 'unsupported'" tone="warning">
       This node does not expose the TES endpoint. The task cannot be tracked here.
-    </div>
+    </Notice>
 
     <ErrorPanel v-else-if="loadState === 'error'" :message="loadError || 'Failed to load the task.'" @retry="load" />
 
@@ -154,9 +152,7 @@ const firstBucket = computed(() => props.outputs[0]?.bucket ?? '')
           <div class="flex flex-wrap items-center gap-2">
             <h3 class="text-sm font-semibold text-foreground">{{ task.name || 'Quick run' }}</h3>
             <TaskStateBadge :state="task.state" />
-            <span v-if="!isTerminal" class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-              <RefreshCw class="h-3.5 w-3.5 animate-spin" /> Tracking…
-            </span>
+            <Spinner v-if="!isTerminal" label="Tracking…" show-label />
           </div>
           <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
             <span class="font-mono" :title="taskId">{{ truncateMiddle(taskId) }}</span>
@@ -227,7 +223,7 @@ const firstBucket = computed(() => props.outputs[0]?.bucket ?? '')
 
       <!-- stdout / stderr in the editor's mono pane style -->
       <section class="space-y-3">
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Output streams</h3>
+        <h3 class="font-display text-sm font-semibold text-aruna-navy">Output streams</h3>
         <p v-if="!isTerminal" class="text-xs text-muted-foreground">
           stdout and stderr are captured once the task reaches a terminal state.
         </p>

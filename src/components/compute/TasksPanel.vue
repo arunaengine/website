@@ -2,6 +2,8 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
+import Notice from '@/components/ui/Notice.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import FilterChips from '@/components/ui/FilterChips.vue'
@@ -16,7 +18,7 @@ import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useHiddenTasks } from '@/composables/useHiddenTasks'
 import { useRefresh } from '@/composables/useRefresh'
-import { formatDuration, relativeTime, truncateMiddle } from '@/lib/utils'
+import { errorMessage, formatDuration, relativeTime, truncateMiddle } from '@/lib/utils'
 import {
   TES_GROUP_TAG,
   isActiveTesState,
@@ -46,10 +48,6 @@ function openTask(task: TesTask) {
 }
 function closeTask() {
   void router.push({ name: 'compute' })
-}
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
 }
 
 // ── Service banner ───────────────────────────────────────────────────────────
@@ -100,7 +98,7 @@ const GROUP_LABELS: Record<StateFilterGroup, string> = {
   active: 'Active',
   done: 'Completed',
   failed: 'Failed',
-  canceled: 'Canceled',
+  canceled: 'Cancelled',
 }
 const stateGroup = ref<StateGroup>('all')
 
@@ -332,12 +330,9 @@ onUnmounted(() => {
         <Badge v-for="s in serviceInfo.storage" :key="s" variant="outline" class="font-mono">{{ s }}</Badge>
       </template>
     </p>
-    <p
-      v-else-if="serviceState === 'unsupported'"
-      class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
-    >
+    <Notice v-else-if="serviceState === 'unsupported'" tone="warning">
       This node does not expose the TES endpoint. Configure a compute backend before enabling TES.
-    </p>
+    </Notice>
     <ErrorPanel v-else-if="serviceState === 'error'" :message="serviceError || 'Failed to load the TES service info.'" @retry="loadServiceInfo" />
 
     <!-- List. 'idle' is the pre-fetch gap while init() awaits service info and
@@ -349,35 +344,30 @@ onUnmounted(() => {
 
     <ErrorPanel v-else-if="listState === 'error'" :message="listError || 'Failed to load tasks.'" @retry="reload" />
 
-    <p
+    <EmptyState
       v-else-if="listState === 'unsupported'"
-      class="surface px-5 py-8 text-center text-sm text-muted-foreground"
-    >
-      Tasks cannot be listed until this node exposes the GA4GH TES endpoint.
-    </p>
+      compact
+      title="Tasks cannot be listed until this node exposes the GA4GH TES endpoint."
+    />
 
-    <p
-      v-else-if="listState === 'signed-out'"
-      class="surface px-5 py-8 text-center text-sm text-muted-foreground"
-    >
-      Sign in to see the tasks you submitted to this node.
-    </p>
+    <EmptyState v-else-if="listState === 'signed-out'" compact title="Sign in to see the tasks you submitted to this node." />
 
     <!-- First-run empty state doubles as the run-mode chooser. Branch on the
          SHOWN list so hiding every task brings the chooser back, and only stand
          aside for the Deleted chip view while it still has something to show. -->
-    <section
+    <EmptyState
       v-else-if="listState === 'ready' && !shownTasks.length && (stateGroup !== 'deleted' || !hiddenTasks.length)"
-      class="surface px-5 py-10 text-center"
+      title="No compute tasks yet"
+      description="Start your first run with a quick script or a full task."
     >
-      <p class="text-sm font-medium text-foreground">No compute tasks yet</p>
-      <p class="mx-auto mt-1 max-w-md text-sm text-muted-foreground">Start your first run with a quick script or a full task.</p>
-      <div class="mt-5 flex justify-center"><NewRunMenu size="sm" /></div>
-      <p v-if="hiddenTasks.length" class="mt-5 text-xs text-muted-foreground">
-        {{ hiddenTasks.length }} deleted {{ hiddenTasks.length === 1 ? 'run' : 'runs' }} hidden from this list.
-        <button type="button" class="text-primary hover:underline" @click="stateGroup = 'deleted'">Show</button>
-      </p>
-    </section>
+      <div class="space-y-4">
+        <NewRunMenu size="sm" />
+        <p v-if="hiddenTasks.length" class="text-xs text-muted-foreground">
+          {{ hiddenTasks.length }} deleted {{ hiddenTasks.length === 1 ? 'run' : 'runs' }} hidden from this list.
+          <button type="button" class="text-primary hover:underline" @click="stateGroup = 'deleted'">Show</button>
+        </p>
+      </div>
+    </EmptyState>
 
     <div v-else-if="tasks.length" class="surface overflow-hidden">
       <!-- List toolbar -->
@@ -389,9 +379,12 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <p v-if="!visibleTasks.length" class="px-5 py-8 text-center text-sm text-muted-foreground">
-        No {{ emptyGroupLabel }}tasks in the loaded list.
-      </p>
+      <EmptyState
+        v-if="!visibleTasks.length"
+        compact
+        class="rounded-none border-0 shadow-none"
+        :title="`No ${emptyGroupLabel}tasks in the loaded list.`"
+      />
 
       <table v-else class="w-full text-sm">
         <thead class="bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground">

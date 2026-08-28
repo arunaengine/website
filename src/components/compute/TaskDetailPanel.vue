@@ -3,6 +3,7 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import DetailDialog from '@/components/ui/DetailDialog.vue'
 import Badge from '@/components/ui/Badge.vue'
+import Notice from '@/components/ui/Notice.vue'
 import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
@@ -34,7 +35,7 @@ import {
   type TesState,
   type TesTask,
 } from '@/lib/tes'
-import { formatBytes, relativeTime, truncateMiddle } from '@/lib/utils'
+import { errorMessage, formatBytes, relativeTime, truncateMiddle } from '@/lib/utils'
 import { Ban, Download, ExternalLink as ExternalLinkIcon, FileText, RotateCcw, Trash2 } from '@lucide/vue'
 
 const props = defineProps<{ taskId: string; open: boolean }>()
@@ -46,10 +47,6 @@ const { getJob: getNativeJob } = useJobs()
 const { myGroups, apiBaseUrl, metadataAtPath } = useAruna()
 const { hide } = useHiddenTasks()
 const s3 = useS3()
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
-}
 
 const task = ref<TesTask | null>(null)
 const nativeFamily = ref<JobFamilyResponse | null>(null)
@@ -343,9 +340,9 @@ async function confirmDelete() {
         <Skeleton class="h-40 w-full" />
       </div>
 
-      <div v-else-if="loadState === 'unsupported'" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+      <Notice v-else-if="loadState === 'unsupported'" tone="warning">
         This node does not expose the TES endpoint. Task details cannot be loaded.
-      </div>
+      </Notice>
 
       <ErrorPanel v-else-if="loadState === 'error'" :message="loadError || 'Failed to load the task.'" @retry="initialLoad" />
 
@@ -399,7 +396,7 @@ async function confirmDelete() {
 
         <!-- Executors & logs -->
         <section class="space-y-2">
-          <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Executors</h3>
+          <h3 class="font-display text-sm font-semibold text-aruna-navy">Executors</h3>
           <p v-if="!task.logs?.length" class="text-xs text-muted-foreground">No execution log yet.</p>
           <div v-for="(executor, i) in task.executors" :key="i" class="surface space-y-2 p-3">
             <div class="flex items-center justify-between gap-2">
@@ -445,7 +442,7 @@ async function confirmDelete() {
 
         <!-- Outputs -->
         <section v-if="declaredOutputs.length || capturedOutputs.length" class="space-y-3">
-          <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Outputs</h3>
+          <h3 class="font-display text-sm font-semibold text-aruna-navy">Outputs</h3>
 
           <div v-if="declaredOutputs.length" class="space-y-1.5">
             <div class="text-[11px] font-medium text-foreground">Declared</div>
@@ -479,7 +476,7 @@ async function confirmDelete() {
 
         <!-- Process Run crate -->
         <section class="space-y-1.5">
-          <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Process Run crate</h3>
+          <h3 class="font-display text-sm font-semibold text-aruna-navy">Process Run crate</h3>
           <RouterLink v-if="runCrate" class="inline-flex items-center gap-1.5 text-xs text-primary hover:underline" :to="{ name: 'dataset', params: { id: runCrate.document_id } }">
             <FileText class="h-3.5 w-3.5" /> Open Process Run crate
           </RouterLink>

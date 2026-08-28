@@ -56,7 +56,7 @@ watch(
   </span>
   <span v-else-if="entry.hint" class="inline-flex items-center gap-1.5" :title="entry.hint.summary">
     <MapPin class="h-3 w-3 shrink-0 text-muted-foreground" />
-    <Badge :variant="variant" class="text-[10px]">{{ label }}</Badge>
+    <Badge :variant="variant" size="sm">{{ label }}</Badge>
     <span v-if="entry.hint.pendingNodeIds.length" class="text-[10px] text-muted-foreground">
       {{ entry.hint.pendingNodeIds.length }} copy on its way
     </span>

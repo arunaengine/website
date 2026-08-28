@@ -11,6 +11,8 @@ import TabsContent from '@/components/ui/TabsContent.vue'
 import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import FilterChips from '@/components/ui/FilterChips.vue'
+import Notice from '@/components/ui/Notice.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import WizardSteps from '@/components/onboarding/WizardSteps.vue'
 import TaskJsonPreview from '@/components/compute/TaskJsonPreview.vue'
@@ -59,6 +61,7 @@ import { RUNTIMES, TES_NETWORK_TAG, detectQuickRun, type Runtime } from '@/lib/q
 import { defaultPlacement, isNativeBlocked, tesFormToExecutionRequest } from '@/lib/nativeSubmit'
 import { submitJob } from '@/lib/jobs'
 import { isWorkspaceBucket } from '@/lib/workspaces'
+import { errorMessage } from '@/lib/utils'
 import { fetchWithTimeout } from '@/lib/fetch'
 import { targetProblems as collectTargetProblems } from '@/lib/runTarget'
 import {
@@ -97,10 +100,6 @@ const signingIn = computed(() => stage.value === 'redirecting')
 function startSignIn() {
   void signIn({ redirectTo: '/app/compute/quick' })
 }
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
-}
-
 // Runtimes (tagged upstream images) live in lib/quickRuntimes so the task
 // detail panel can detect quick runs for the re-run flow.
 
@@ -143,6 +142,10 @@ const inputDialogOpen = ref(false)
 const credentialDialogOpen = ref(false)
 // Filesystem-tree view is the default; the row grids stay as the Table view.
 // The choice persists per browser (shared with the full task wizard).
+const DATA_VIEWS = [
+  { value: 'tree', label: 'Tree' },
+  { value: 'table', label: 'Table' },
+]
 const dataView = useComputeDataView()
 // Container directory the input picker mounts under; the tree's per-folder
 // "add input" affordance retargets it before opening the dialog.
@@ -405,6 +408,12 @@ const dependencyError = computed(() => {
 })
 
 type DependencyVerification = 'checking' | 'available' | 'not-found' | 'unverified'
+const VERIFICATION_LABEL: Record<DependencyVerification, string> = {
+  checking: 'Checking',
+  available: 'Available',
+  'not-found': 'Not found',
+  unverified: 'Unverified',
+}
 interface DependencyVerificationResult {
   state: DependencyVerification
   detail: string
@@ -474,7 +483,7 @@ async function verifyDependency(dependency: string): Promise<void> {
   } catch (err) {
     result = {
       state: 'unverified',
-      detail: err instanceof Error ? `Registry check unavailable: ${err.message}` : 'Registry check unavailable.',
+      detail: `Registry check unavailable: ${errorMessage(err)}`,
     }
   }
   if (runtimeId.value !== checkedRuntime || !dependencies.value.includes(dependency)) return
@@ -1042,11 +1051,15 @@ function dismissRerun() {
 
 <template>
   <div>
-    <PageHeader title="Quick run" description="Run a Python, JavaScript or Bash script with optional package dependencies without writing a TES task by hand.">
+    <PageHeader
+      eyebrow="Compute"
+      title="Quick run"
+      description="Run a Python, JavaScript or Bash script with optional package dependencies without writing a TES task by hand."
+    >
       <template #actions>
-        <RouterLink :to="{ name: 'compute' }">
-          <Button variant="outline" size="sm"><ArrowLeft class="h-4 w-4" /> Back to Compute</Button>
-        </RouterLink>
+        <Button variant="outline" size="sm" as-child>
+          <RouterLink :to="{ name: 'compute' }"><ArrowLeft class="h-4 w-4" /> Back to Compute</RouterLink>
+        </Button>
       </template>
     </PageHeader>
 
@@ -1099,10 +1112,10 @@ function dismissRerun() {
     <div v-else class="container space-y-6 py-8">
       <!-- Re-run prefill status -->
       <div v-if="rerunLoading" class="surface-inline px-4 py-3 text-xs text-muted-foreground">Loading the task to re-run…</div>
-      <div v-else-if="rerunError" class="flex flex-wrap items-center justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-xs text-destructive">
+      <Notice v-else-if="rerunError" tone="error" class="flex flex-wrap items-center justify-between gap-2">
         <span>{{ rerunError }}</span>
         <Button variant="ghost" size="sm" @click="dismissRerun">Dismiss</Button>
-      </div>
+      </Notice>
       <div v-else-if="rerunSource" class="space-y-1.5 rounded-md border border-primary/30 bg-primary/5 px-4 py-3 text-xs">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <span class="font-medium text-foreground">Prefilled from run <span class="font-mono">{{ rerunSource.name }}</span>.</span>
@@ -1118,7 +1131,7 @@ function dismissRerun() {
       <section class="surface space-y-5 p-6">
         <!-- Step 1: Runtime -->
         <div v-if="step === 0" class="space-y-3">
-          <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Runtime</div>
+          <h2 class="font-display text-sm font-semibold text-aruna-navy">Runtime</h2>
           <div class="grid gap-3 sm:grid-cols-3">
             <button
               v-for="rt in RUNTIMES"
@@ -1152,7 +1165,7 @@ function dismissRerun() {
             <p v-else class="mt-1 text-[11px] text-muted-foreground">
               The script runs here; inputs, captures and generated files default under it.
             </p>
-            <p v-if="workdirNotice" class="mt-1 text-[11px] text-amber-800 dark:text-amber-300">{{ workdirNotice }}</p>
+            <Notice v-if="workdirNotice" tone="warning" class="mt-1">{{ workdirNotice }}</Notice>
           </div>
         </div>
 
@@ -1160,9 +1173,9 @@ function dismissRerun() {
              paths are visible while the script is written. -->
         <div v-else-if="step === 1" class="space-y-5">
           <!-- Credentials gate -->
-          <div v-if="!s3.endpoint.value" class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+          <Notice v-if="!s3.endpoint.value" tone="warning">
             This node does not advertise an S3 endpoint, so the portal cannot stage the script. Use the full task form to reference an existing script.
-          </div>
+          </Notice>
           <div v-else-if="!s3.hasActiveKey.value" class="space-y-2 rounded-md border border-border bg-muted/20 px-3 py-3 text-xs text-muted-foreground">
             <p class="flex items-center gap-2 font-medium text-foreground"><KeyRound class="h-3.5 w-3.5" /> S3 credentials are required to stage the script and browse data.</p>
             <Button variant="outline" size="sm" @click="credentialDialogOpen = true"><Plus class="size-3.5" /> Create credentials</Button>
@@ -1253,28 +1266,7 @@ function dismissRerun() {
             <div class="min-w-0 space-y-3">
               <div class="flex items-center justify-between gap-2">
                 <span class="text-xs font-semibold text-foreground">Container data</span>
-                <div class="inline-flex rounded-md border border-border p-0.5">
-                  <button
-                    type="button"
-                    :class="[
-                      'rounded px-2 py-0.5 text-[11px] font-medium transition-colors',
-                      dataView === 'tree' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
-                    ]"
-                    @click="dataView = 'tree'"
-                  >
-                    Tree
-                  </button>
-                  <button
-                    type="button"
-                    :class="[
-                      'rounded px-2 py-0.5 text-[11px] font-medium transition-colors',
-                      dataView === 'table' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
-                    ]"
-                    @click="dataView = 'table'"
-                  >
-                    Table
-                  </button>
-                </div>
+                <FilterChips v-model="dataView" :options="DATA_VIEWS" aria-label="Container data view" />
               </div>
 
               <section v-if="dataView === 'tree'" class="surface-muted space-y-2.5 p-3.5">
@@ -1402,7 +1394,7 @@ function dismissRerun() {
                             :invalid="!validOutputContainerPath(row.containerPath) ? 'error' : undefined"
                             @update:model-value="setOutputContainerPath(row, String($event))"
                           />
-                          <Badge variant="outline" class="shrink-0 gap-1 text-[10px]">
+                          <Badge variant="outline" size="sm" class="shrink-0 gap-1">
                             <component :is="isDirCapture(row.containerPath) ? Folder : FileText" class="h-3 w-3" />
                             {{ isDirCapture(row.containerPath) ? 'Folder' : 'File' }}
                           </Badge>
@@ -1488,10 +1480,11 @@ function dismissRerun() {
                   <Badge
                     v-if="dependencyVerification[dependency]"
                     :variant="dependencyVerification[dependency].state === 'not-found' ? 'destructive' : dependencyVerification[dependency].state === 'available' ? 'success' : 'outline'"
-                    class="shrink-0 text-[10px]"
+                    size="sm"
+                    class="shrink-0"
                     :title="dependencyVerification[dependency].detail"
                   >
-                    {{ dependencyVerification[dependency].state }}
+                    {{ VERIFICATION_LABEL[dependencyVerification[dependency].state] }}
                   </Badge>
                   <Button
                     variant="ghost"
@@ -1519,12 +1512,7 @@ function dismissRerun() {
               :realm-name="realm.shortName"
             />
             <PlacementPicker v-if="!runTarget.local.value" v-model="placementLabels" />
-            <ul
-              v-if="targetProblems.length"
-              class="list-disc space-y-1 rounded-md border border-destructive/30 bg-destructive/5 px-7 py-2 text-xs text-destructive"
-            >
-              <li v-for="problem in targetProblems" :key="problem">{{ problem }}</li>
-            </ul>
+            <Notice v-if="targetProblems.length" tone="error" :lines="targetProblems" />
           </div>
           <div class="grid gap-4 text-xs lg:grid-cols-2">
             <section class="surface-muted space-y-2 p-4">
@@ -1533,7 +1521,7 @@ function dismissRerun() {
               </div>
               <ul class="space-y-1.5 font-mono text-[11px]">
                 <li>
-                  <div class="truncate text-foreground" :title="scriptUrl">{{ runtime.file }} <span class="font-sans text-muted-foreground">({{ reuseSelectedScript ? 'reused without upload' : 'uploaded on submit' }})</span> <Badge v-if="runtimeId === 'python-uv' && dependencies.length" variant="outline" class="ml-1 font-sans text-[9px]">{{ dependencies.length }} inline dependencies</Badge></div>
+                  <div class="truncate text-foreground" :title="scriptUrl">{{ runtime.file }} <span class="font-sans text-muted-foreground">({{ reuseSelectedScript ? 'reused without upload' : 'uploaded on submit' }})</span> <Badge v-if="runtimeId === 'python-uv' && dependencies.length" variant="outline" size="sm" class="ml-1 font-sans">{{ dependencies.length }} inline dependencies</Badge></div>
                   <div class="flex items-center gap-1 text-muted-foreground"><CornerDownRight class="h-3 w-3 shrink-0" /> {{ scriptContainerPath }}</div>
                 </li>
                 <li v-if="dependencyInput">
@@ -1576,7 +1564,7 @@ function dismissRerun() {
             {{ reuseSelectedScript ? 'the selected script object is reused without an upload.' : 'the script is uploaded on submit because the backend does not accept inline script content.' }}
           </p>
           <TaskJsonPreview title="TES task (POST /ga4gh/tes/v1/tasks)" :task="task" />
-          <p v-if="submitError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">{{ submitError }}</p>
+          <Notice v-if="submitError" tone="error">{{ submitError }}</Notice>
         </div>
       </section>
 
@@ -1586,7 +1574,7 @@ function dismissRerun() {
         </Button>
         <Button v-if="step < WIZARD_STEPS.length - 1" size="sm" :disabled="!canContinue" @click="next">Continue</Button>
         <Button v-else size="sm" :disabled="busy || submitting || !dataReady || !inputsValid || !outputsValid || !!targetProblems.length" @click="submit">
-          <ListPlus class="h-4 w-4" /> {{ submitting ? 'Submitting…' : 'Submit run' }}
+          <ListPlus class="h-4 w-4" /> {{ submitting ? 'Starting…' : 'Run' }}
         </Button>
       </div>
     </div>
@@ -1595,17 +1583,14 @@ function dismissRerun() {
     <CreateCredentialDialog v-model:open="credentialDialogOpen" />
 
     <Dialog :open="loadScriptOpen" @update:open="(v: boolean) => (loadScriptOpen = v)">
-      <DialogContent class="max-w-3xl">
+      <DialogContent class="max-w-xl">
         <DialogHeader>
           <DialogTitle class="flex items-center gap-2"><FolderOpen class="h-4 w-4 text-primary" /> Load existing script</DialogTitle>
           <DialogDescription>
             Pick a script object to load into the editor. Unchanged content is reused directly; editing it uploads a fresh per-run copy.
           </DialogDescription>
         </DialogHeader>
-        <div
-          v-if="pendingScriptPick && editorHasCustomContent"
-          class="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-900 dark:text-amber-200"
-        >
+        <Notice v-if="pendingScriptPick && editorHasCustomContent" tone="warning" class="space-y-2">
           <p>
             Replace the current editor content with
             <span class="font-mono">{{ pendingScriptPick.name }}</span>? Unsaved changes are lost.
@@ -1616,7 +1601,7 @@ function dismissRerun() {
             </Button>
             <Button variant="outline" size="sm" :disabled="loadScriptBusy" @click="pendingScriptPick = null">Cancel</Button>
           </div>
-        </div>
+        </Notice>
         <ObjectBrowserPanel v-else @select="onScriptPick" />
         <p v-if="loadScriptBusy && !(pendingScriptPick && editorHasCustomContent)" class="text-[11px] text-muted-foreground">
           Loading script…

@@ -12,7 +12,7 @@ import {
   nodes,
   typeValue,
 } from '@/test/clientRender'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as Utils from '@/lib/utils'
 
 const ButtonStub = defineComponent({
@@ -57,7 +57,15 @@ const SelectStub = defineComponent({
   },
 })
 
-const realmNodes = ref([
+const NoticeStub = defineComponent({
+  props: { tone: String, title: String },
+  setup: (props, { slots }) => () => h('div', [h('p', props.title), slots.default?.()]),
+})
+
+const realmError = ref<string | null>(null)
+const loadInfo = vi.fn(async () => undefined)
+
+const NODE_FIXTURES = [
   {
     nodeId: '01NODEALPHA1234567890',
     label: 'Alpha',
@@ -82,14 +90,17 @@ const realmNodes = ref([
     executorKinds: [],
     info: { labels: { storage: 'hot' } },
   },
-])
+]
+const realmNodes = ref(NODE_FIXTURES)
 
 const PlacementPicker = compileClientComponent(new URL('./PlacementPicker.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => defineComponent(() => () => h('i')) }),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
+  '@/components/ui/Notice.vue': moduleDefault(NoticeStub),
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
+  '@/composables/useAruna': { useAruna: () => ({ error: realmError, loadInfo }) },
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ nodes: realmNodes }) },
   '@/lib/utils': Utils,
 })
@@ -110,6 +121,12 @@ async function mount() {
 }
 
 describe('PlacementPicker', () => {
+  beforeEach(() => {
+    realmError.value = null
+    realmNodes.value = NODE_FIXTURES
+    loadInfo.mockClear()
+  })
+
   it('pins a node and adds and removes free-form label pairs', async () => {
     const mounted = await mount()
     const nodeSelect = element(
@@ -154,7 +171,8 @@ describe('PlacementPicker', () => {
     const mounted = await mount()
     const datalist = element(
       mounted.root,
-      (node) => node.tag === 'datalist' && node.props.id === 'placement-label-keys',
+      (node) =>
+        node.tag === 'datalist' && String(node.props.id).startsWith('placement-label-keys-'),
     )
     const values = nodes(datalist)
       .filter((node) => node.tag === 'option')
@@ -163,6 +181,19 @@ describe('PlacementPicker', () => {
     expect(values.filter((value) => value === 'region')).toHaveLength(1)
     expect(values).toContain('storage')
     expect(values).not.toContain('aruna-engine.org/node')
+    expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('offers a retry when the realm nodes could not be loaded', async () => {
+    realmError.value = 'Realm info is unavailable.'
+    realmNodes.value = []
+    const mounted = await mount()
+
+    expect(content(mounted.root)).toContain('Realm info is unavailable.')
+    await click(button(mounted.root, 'Try again'))
+
+    expect(loadInfo).toHaveBeenCalledTimes(1)
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })

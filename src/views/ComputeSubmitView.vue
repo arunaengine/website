@@ -8,6 +8,8 @@ import Textarea from '@/components/ui/Textarea.vue'
 import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import FilterChips from '@/components/ui/FilterChips.vue'
+import Notice from '@/components/ui/Notice.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import WizardSteps from '@/components/onboarding/WizardSteps.vue'
 import TaskJsonPreview from '@/components/compute/TaskJsonPreview.vue'
@@ -29,6 +31,7 @@ import { useS3 } from '@/composables/useS3'
 import {
   TES_EXECUTOR_TAG,
   TES_GROUP_TAG,
+  TES_STATE_META,
   captureContainerPath,
   captureOutput,
   expandDataRefEntry,
@@ -62,6 +65,7 @@ import {
   type InputModeRequest,
 } from '@/lib/jobs'
 import { createOperationId } from '@/lib/placementPolicies'
+import { errorMessage } from '@/lib/utils'
 import { targetProblems as collectTargetProblems } from '@/lib/runTarget'
 import Badge from '@/components/ui/Badge.vue'
 import { ArrowLeft, ArrowRight, Cpu, FileText, Folder, ListPlus, LogIn, Plus, X } from '@lucide/vue'
@@ -79,10 +83,6 @@ const signingIn = computed(() => stage.value === 'redirecting')
 function startSignIn() {
   void signIn({ redirectTo: '/app/compute/new' })
 }
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
-}
-
 const WIZARD_STEPS = ['Basics', 'Workload', 'Review & run']
 // The step lives in ?step=N so browser back/forward walks the wizard instead
 // of leaving it.
@@ -403,6 +403,10 @@ function removeOutputRow(i: number) {
 
 // ── Filesystem-tree wiring (shared component with the quick-run wizard) ──────
 // The Tree|Table choice persists per browser (shared with quick run).
+const DATA_VIEWS = [
+  { value: 'tree', label: 'Tree' },
+  { value: 'table', label: 'Table' },
+]
 const dataView = useComputeDataView()
 const inputDialogOpen = ref(false)
 const inputMountDefault = ref('/inputs/')
@@ -607,11 +611,15 @@ async function submit() {
 
 <template>
   <div>
-    <PageHeader title="New compute task" description="Describe a GA4GH TES task and submit it to this node.">
+    <PageHeader
+      eyebrow="Compute"
+      title="New compute task"
+      description="Describe a GA4GH TES task and submit it to this node."
+    >
       <template #actions>
-        <RouterLink :to="{ name: 'compute' }">
-          <Button variant="outline" size="sm"><ArrowLeft class="h-4 w-4" /> Back to Compute</Button>
-        </RouterLink>
+        <Button variant="outline" size="sm" as-child>
+          <RouterLink :to="{ name: 'compute' }"><ArrowLeft class="h-4 w-4" /> Back to Compute</RouterLink>
+        </Button>
       </template>
     </PageHeader>
 
@@ -648,10 +656,10 @@ async function submit() {
     <div v-else class="container space-y-6 py-8">
       <!-- Re-run prefill status -->
       <div v-if="rerunLoading" class="surface-inline px-4 py-3 text-xs text-muted-foreground">Loading the task to re-run…</div>
-      <div v-else-if="rerunError" class="flex flex-wrap items-center justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-xs text-destructive">
+      <Notice v-else-if="rerunError" tone="error" class="flex flex-wrap items-center justify-between gap-2">
         <span>{{ rerunError }}</span>
         <Button variant="ghost" size="sm" @click="dismissRerun">Dismiss</Button>
-      </div>
+      </Notice>
       <div v-else-if="rerunSource" class="space-y-1.5 rounded-md border border-primary/30 bg-primary/5 px-4 py-3 text-xs">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <span class="font-medium text-foreground">Prefilled from task <span class="font-mono">{{ rerunSource.name }}</span>.</span>
@@ -690,29 +698,8 @@ async function submit() {
           <div class="grid gap-5 xl:grid-cols-2">
             <div class="min-w-0 space-y-3">
               <div class="flex items-center justify-between gap-2">
-                <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Container filesystem</div>
-                <div class="inline-flex rounded-md border border-border p-0.5">
-                  <button
-                    type="button"
-                    :class="[
-                      'rounded px-2 py-0.5 text-[11px] font-medium transition-colors',
-                      dataView === 'tree' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
-                    ]"
-                    @click="dataView = 'tree'"
-                  >
-                    Tree
-                  </button>
-                  <button
-                    type="button"
-                    :class="[
-                      'rounded px-2 py-0.5 text-[11px] font-medium transition-colors',
-                      dataView === 'table' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
-                    ]"
-                    @click="dataView = 'table'"
-                  >
-                    Table
-                  </button>
-                </div>
+                <h2 class="font-display text-sm font-semibold text-aruna-navy">Container filesystem</h2>
+                <FilterChips v-model="dataView" :options="DATA_VIEWS" aria-label="Container data view" />
               </div>
 
               <section v-if="dataView === 'tree'" class="surface-inline space-y-2.5 p-3.5">
@@ -766,7 +753,7 @@ async function submit() {
               <template v-else>
                 <TesInputsEditor v-model="inputs" />
                 <div class="space-y-3">
-                  <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Outputs</div>
+                  <h2 class="font-display text-sm font-semibold text-aruna-navy">Outputs</h2>
                   <!-- Same row grid as TesInputsEditor: flexible content column plus
                        a fixed 1.75rem action column so both editors share one right
                        edge for controls and remove buttons. -->
@@ -789,7 +776,7 @@ async function submit() {
                         </div>
                       </div>
                       <div class="flex min-w-0 items-center gap-2 font-mono text-[11px] text-muted-foreground">
-                        <Badge variant="outline" class="shrink-0 gap-1 font-sans text-[10px]">
+                        <Badge variant="outline" size="sm" class="shrink-0 gap-1 font-sans">
                           <component :is="isDirCapture(row.path) ? Folder : FileText" class="h-3 w-3" />
                           {{ isDirCapture(row.path) ? 'Folder' : 'File' }}
                         </Badge>
@@ -814,7 +801,7 @@ async function submit() {
 
           <div class="grid gap-6 lg:grid-cols-2">
           <div class="space-y-3">
-            <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Resources</div>
+            <h2 class="font-display text-sm font-semibold text-aruna-navy">Resources</h2>
             <div class="grid gap-3 sm:grid-cols-3">
               <div>
                 <label class="text-xs font-medium text-foreground">CPU cores</label>
@@ -835,7 +822,7 @@ async function submit() {
             <label class="flex items-center gap-2 text-xs font-medium text-foreground">
               <Switch v-model:checked="preemptible" /> Preemptible
             </label>
-            <p class="text-[11px] text-muted-foreground">Allows the backend to run this on capacity that may be reclaimed (state <code class="rounded bg-muted px-1">PREEMPTED</code>).</p>
+            <p class="text-[11px] text-muted-foreground">Allows the backend to run this on capacity that may be reclaimed (state {{ TES_STATE_META.PREEMPTED.label }}).</p>
 
             <div class="max-w-xs">
               <label class="text-xs font-medium text-foreground">Executor kind</label>
@@ -858,7 +845,7 @@ async function submit() {
           </div>
 
           <div class="space-y-3">
-            <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Workspace</div>
+            <h2 class="font-display text-sm font-semibold text-aruna-navy">Workspace</h2>
             <p class="text-[11px] text-muted-foreground">Choose how the run's scratch storage is handled.</p>
             <div class="grid gap-2 sm:grid-cols-3">
               <button
@@ -891,19 +878,16 @@ async function submit() {
 
           <div class="space-y-3 border-t border-border pt-6">
             <div>
-              <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Advanced placement</div>
+              <h2 class="font-display text-sm font-semibold text-aruna-navy">Advanced placement</h2>
               <p class="mt-1 text-[11px] text-muted-foreground">
                 The GA4GH task interface cannot carry these. Setting any of them submits the run
                 through Aruna's own jobs API instead, which is what makes them take effect.
               </p>
             </div>
 
-            <p
-              v-if="nativeUnsupported"
-              class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-800 dark:text-amber-300"
-            >
+            <Notice v-if="nativeUnsupported" tone="warning">
               These options are unavailable for this draft: {{ nativeUnsupported }}
-            </p>
+            </Notice>
 
             <fieldset v-else class="space-y-4" :disabled="!!nativeUnsupported">
               <div v-if="advancedInputs.length" class="space-y-2">
@@ -992,12 +976,7 @@ async function submit() {
               :realm-name="realm.shortName"
             />
             <PlacementPicker v-if="!runTarget.local.value" v-model="placementLabels" />
-            <ul
-              v-if="targetProblems.length"
-              class="list-disc space-y-1 rounded-md border border-destructive/30 bg-destructive/5 px-7 py-2 text-xs text-destructive"
-            >
-              <li v-for="problem in targetProblems" :key="problem">{{ problem }}</li>
-            </ul>
+            <Notice v-if="targetProblems.length" tone="error" :lines="targetProblems" />
           </div>
           <div
             v-if="useNative"
@@ -1023,17 +1002,14 @@ async function submit() {
             <summary class="cursor-pointer">Technical details</summary>
             <code class="mt-1 block rounded bg-muted px-2 py-1">{{ useNative ? 'POST /jobs/' : 'POST /ga4gh/tes/v1/tasks' }}</code>
           </details>
-          <p v-if="submitError" class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          <Notice v-if="submitError" tone="error">
             {{ submitError }}
-            <span v-if="submitRetryable" class="mt-1 block text-[11px]">
-              Submitting again reuses the same idempotency key, so a request that already committed
+            <span v-if="submitRetryable" class="mt-1 block">
+              Running it again reuses the same idempotency key, so a request that already committed
               is replayed rather than duplicated.
             </span>
-          </p>
-          <div
-            v-if="submittedWithoutWorkspace"
-            class="flex flex-wrap items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
-          >
+          </Notice>
+          <Notice v-if="submittedWithoutWorkspace" tone="warning" class="flex flex-wrap items-center gap-2">
             <span>The task was submitted, but workspace choices are not supported by this node yet, it runs without one.</span>
             <Button
               variant="outline"
@@ -1043,7 +1019,7 @@ async function submit() {
             >
               View task <ArrowRight class="h-3.5 w-3.5" />
             </Button>
-          </div>
+          </Notice>
         </div>
       </section>
 
@@ -1052,7 +1028,7 @@ async function submit() {
           <ArrowLeft v-if="step === 0" class="h-3.5 w-3.5" /> {{ step === 0 ? 'Back to Compute' : 'Back' }}
         </Button>
         <Button v-if="step < WIZARD_STEPS.length - 1" size="sm" :disabled="!canContinue" @click="next">Continue</Button>
-        <Button v-else size="sm" :disabled="busy || !groupId || !executorsValid || !outputsValid || !workspaceValid || !cpuCoresValid || !ramGbValid || !diskGbValid || !!nativeInvalid || !!submittedWithoutWorkspace || !!targetProblems.length" @click="submit"><ListPlus class="h-4 w-4" /> {{ useNative ? 'Submit job' : 'Submit task' }}</Button>
+        <Button v-else size="sm" :disabled="busy || !groupId || !executorsValid || !outputsValid || !workspaceValid || !cpuCoresValid || !ramGbValid || !diskGbValid || !!nativeInvalid || !!submittedWithoutWorkspace || !!targetProblems.length" @click="submit"><ListPlus class="h-4 w-4" /> Run</Button>
       </div>
     </div>
 

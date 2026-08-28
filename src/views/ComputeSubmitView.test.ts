@@ -141,6 +141,26 @@ const EmptyStateStub = defineComponent({
   props: { title: String },
   setup: (props) => () => h('div', props.title),
 })
+const NoticeStub = defineComponent({
+  props: { tone: String, title: String, lines: { type: Array, default: () => [] } },
+  setup: (props, { slots }) => () =>
+    h('div', { role: props.tone === 'error' ? 'alert' : 'status' }, [
+      props.title ? h('p', props.title) : null,
+      slots.default?.(),
+      (props.lines as string[]).map((line) => h('li', line)),
+    ]),
+})
+const FilterChipsStub = defineComponent({
+  props: { options: { type: Array, default: () => [] }, modelValue: String },
+  emits: ['update:modelValue'],
+  setup: (props, { emit }) => () =>
+    h(
+      'div',
+      (props.options as Array<{ value: string; label: string }>).map((option) =>
+        h('button', { onClick: () => emit('update:modelValue', option.value) }, option.label),
+      ),
+    ),
+})
 
 const useArunaModule = {
   useAruna: () => ({
@@ -223,6 +243,8 @@ const sharedComponents = {
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/components/groups/GroupSelect.vue': moduleDefault(SelectStub),
   '@/components/ui/EmptyState.vue': moduleDefault(EmptyStateStub),
+  '@/components/ui/Notice.vue': moduleDefault(NoticeStub),
+  '@/components/ui/FilterChips.vue': moduleDefault(FilterChipsStub),
   '@/components/ui/Skeleton.vue': moduleDefault(GenericStub),
   '@/components/onboarding/WizardSteps.vue': moduleDefault(WizardStepsStub),
 }
@@ -264,6 +286,7 @@ const ComputeSubmitView = compileClientComponent(new URL('./ComputeSubmitView.vu
   '@/composables/useRunTarget': { useRunTarget: () => runTarget },
   '@/components/compute/RunTargetPicker.vue': moduleDefault(RunTargetPicker),
   '@/lib/tes': Tes,
+  '@/lib/utils': Utils,
   '@/lib/workspaces': Workspaces,
   // Real modules: the TES-versus-native switch is the behaviour under test.
   '@/lib/nativeSubmit': NativeSubmit,
@@ -295,13 +318,10 @@ const AdminOnboardingView = compileClientComponent(new URL('./AdminOnboardingVie
   '@/lib/api': Api,
 })
 
-// The submit button's label follows the submission surface it will use; these
-// tests are about validity gating, not about which surface was picked.
+// One submit verb for both submission surfaces; these tests are about validity
+// gating, not about which surface was picked.
 function submitButton(root: HostNode): HostNode {
-  return element(root, (node) => {
-    const text = content(node).trim()
-    return node.tag === 'button' && (text.startsWith('Submit task') || text.startsWith('Submit job'))
-  })
+  return element(root, (node) => node.tag === 'button' && content(node).trim() === 'Run')
 }
 
 // The wizard reads its step from the route, so every case mounts with one.

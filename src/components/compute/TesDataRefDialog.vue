@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Dialog from '@/components/ui/Dialog.vue'
+import Notice from '@/components/ui/Notice.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
@@ -14,6 +15,7 @@ import ObjectBrowserPanel from '@/components/data/ObjectBrowserPanel.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import { useS3, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
 import { useAruna } from '@/composables/useAruna'
+import { errorMessage } from '@/lib/utils'
 import {
   normalizeContainerDir,
   validContainerDir,
@@ -128,7 +130,7 @@ async function addSelection(selection: Selection) {
     for (const entry of entries) emit('add', entry)
     emit('update:open', false)
   } catch (err) {
-    folderError.value = err instanceof Error ? err.message : String(err)
+    folderError.value = errorMessage(err)
   } finally {
     folderBusy.value = false
   }
@@ -149,7 +151,7 @@ watch(
 
 <template>
   <Dialog :open="props.open" @update:open="(value: boolean) => emit('update:open', value)">
-    <DialogContent class="max-w-3xl">
+    <DialogContent class="max-w-xl">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <Database class="h-4 w-4 text-primary" /> Add input reference
@@ -159,10 +161,10 @@ watch(
         </DialogDescription>
       </DialogHeader>
 
-      <div v-if="!s3.endpoint.value" class="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+      <Notice v-if="!s3.endpoint.value" tone="warning" class="flex items-start gap-2">
         <ShieldAlert class="mt-0.5 h-3.5 w-3.5 shrink-0" />
         <span>This node does not advertise an S3 endpoint, so its data cannot be browsed or referenced here.</span>
-      </div>
+      </Notice>
       <div v-else-if="!s3.hasActiveKey.value" class="space-y-2 rounded-md border border-border bg-muted/20 px-3 py-3 text-xs text-muted-foreground">
         <p class="flex items-center gap-2 font-medium text-foreground"><KeyRound class="h-3.5 w-3.5" /> S3 credentials are required to browse node data.</p>
         <Button v-if="currentUser" variant="outline" size="sm" @click="credentialDialogOpen = true">

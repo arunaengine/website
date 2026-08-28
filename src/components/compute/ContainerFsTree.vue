@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
+import Notice from '@/components/ui/Notice.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import DropdownMenu from '@/components/ui/DropdownMenu.vue'
@@ -408,7 +409,8 @@ const MARKER_VARIANT: Record<MarkerKind, 'secondary' | 'sky' | 'warn' | 'outline
             v-for="(marker, i) in row.markers"
             :key="i"
             :variant="MARKER_VARIANT[marker.kind]"
-            class="shrink-0 gap-0.5 px-1.5 text-[9px] uppercase"
+            size="sm"
+            class="shrink-0 gap-0.5 px-1.5 uppercase"
           >
             <ArrowDownToLine v-if="marker.kind === 'in'" class="h-2.5 w-2.5" />
             <ArrowUpFromLine v-else-if="marker.kind === 'out'" class="h-2.5 w-2.5" />
@@ -519,10 +521,14 @@ const MARKER_VARIANT: Record<MarkerKind, 'secondary' | 'sky' | 'warn' | 'outline
     </template>
 
     <!-- Rows whose path cannot be placed in the tree (invalid container path). -->
-    <div v-if="model.unplaced.length" class="mt-2 space-y-1 rounded-md border border-amber-500/30 bg-amber-500/5 p-2">
-      <p class="text-[11px] font-medium text-amber-800 dark:text-amber-300">Not placed, not an absolute container path:</p>
+    <Notice
+      v-if="model.unplaced.length"
+      tone="warning"
+      title="Not placed, not an absolute container path:"
+      class="mt-2 space-y-1"
+    >
       <div v-for="(marker, i) in model.unplaced" :key="i" class="flex items-center gap-1.5">
-        <Badge :variant="MARKER_VARIANT[marker.kind]" class="shrink-0 px-1.5 text-[9px] uppercase">{{ MARKER_LABEL[marker.kind] }}</Badge>
+        <Badge :variant="MARKER_VARIANT[marker.kind]" size="sm" class="shrink-0 px-1.5 uppercase">{{ MARKER_LABEL[marker.kind] }}</Badge>
         <template v-if="editing && sameMarker(marker, editing.marker)">
           <Input
             v-model="editing.value"
@@ -535,7 +541,7 @@ const MARKER_VARIANT: Record<MarkerKind, 'secondary' | 'sky' | 'warn' | 'outline
           />
         </template>
         <template v-else>
-          <span class="min-w-0 flex-1 truncate font-mono text-[11px] text-amber-800 dark:text-amber-300">{{ marker.raw || '(empty)' }}</span>
+          <span class="min-w-0 flex-1 truncate font-mono text-[11px]">{{ marker.raw || '(empty)' }}</span>
           <Button v-if="!disabled && marker.index !== undefined" variant="ghost" size="icon-sm" class="h-5 w-5" aria-label="Edit path" @click="startEditMarker(marker)">
             <Pencil class="size-3" />
           </Button>
@@ -544,6 +550,6 @@ const MARKER_VARIANT: Record<MarkerKind, 'secondary' | 'sky' | 'warn' | 'outline
           </Button>
         </template>
       </div>
-    </div>
+    </Notice>
   </div>
 </template>
