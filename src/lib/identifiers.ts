@@ -4,7 +4,7 @@
 
 export const ARUNA_USER_ID = /^[0-9A-HJKMNP-TV-Z]{26}@[A-Za-z0-9_-]{43}$/
 export const ORCID = /(?:^|orcid\.org\/)(\d{4}-\d{4}-\d{4}-\d{3}[\dX])$/
-export const ROR = /ror\.org\/(0[a-z0-9]{8})$/
+export const ROR = /(?:^|ror\.org\/)(0[a-z0-9]{8})$/i
 
 export function isArunaUserId(value: unknown): value is string {
   return typeof value === 'string' && ARUNA_USER_ID.test(value)

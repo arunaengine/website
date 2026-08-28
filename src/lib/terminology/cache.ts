@@ -20,21 +20,21 @@ const FRESH_MS = 6 * 60 * 60 * 1000
 const FAILURE_TTL_MS = 30_000
 
 interface PersistedEntry {
-  hits: TermHit[]
+  hits: unknown[]
   // Write time: drives staleness.
   at: number
   // Last-read time: drives LRU eviction.
   used: number
 }
 
-export interface CachedHits {
-  hits: TermHit[]
+export interface CachedHits<T = TermHit> {
+  hits: T[]
   // True when the entry is past the freshness window and worth revalidating.
   stale: boolean
 }
 
-const sessionCache = new Map<string, TermHit[]>()
-const recentFailures = new Map<string, { status: ProviderStatus; at: number }>()
+const sessionCache = new Map<string, unknown[]>()
+const recentFailures = new Map<string, { status: string; at: number }>()
 
 function cacheKey(providerId: string, query: string): string {
   return `${providerId}|${query.trim().toLowerCase()}`
@@ -66,10 +66,10 @@ function validEntry(entry: unknown): entry is PersistedEntry {
   return Array.isArray(candidate.hits) && typeof candidate.at === 'number'
 }
 
-export function readTermCache(providerId: string, query: string): CachedHits | null {
+export function readTermCache<T = TermHit>(providerId: string, query: string): CachedHits<T> | null {
   const key = cacheKey(providerId, query)
   const session = sessionCache.get(key)
-  if (session) return { hits: session, stale: false }
+  if (session) return { hits: session as T[], stale: false }
 
   const store = readStore()
   const entry = store[key]
@@ -77,10 +77,10 @@ export function readTermCache(providerId: string, query: string): CachedHits | n
   // Touch for LRU; skip the write if touching fails, purely an optimization.
   entry.used = Date.now()
   writeStore(store)
-  return { hits: entry.hits, stale: Date.now() - entry.at > FRESH_MS }
+  return { hits: entry.hits as T[], stale: Date.now() - entry.at > FRESH_MS }
 }
 
-export function writeTermCache(providerId: string, query: string, hits: TermHit[]): void {
+export function writeTermCache<T = TermHit>(providerId: string, query: string, hits: T[]): void {
   const key = cacheKey(providerId, query)
   sessionCache.set(key, hits)
 
@@ -99,18 +99,18 @@ export function writeTermCache(providerId: string, query: string, hits: TermHit[
 
 // Negative caching: remember that a provider just failed (and how), so the
 // registry can skip it (and still report the degraded status) for a moment.
-export function noteProviderFailure(providerId: string, status: ProviderStatus): void {
+export function noteProviderFailure<T extends string = ProviderStatus>(providerId: string, status: T): void {
   recentFailures.set(providerId, { status, at: Date.now() })
 }
 
-export function recentProviderFailure(providerId: string): ProviderStatus | null {
+export function recentProviderFailure<T extends string = ProviderStatus>(providerId: string): T | null {
   const failure = recentFailures.get(providerId)
   if (!failure) return null
   if (Date.now() - failure.at > FAILURE_TTL_MS) {
     recentFailures.delete(providerId)
     return null
   }
-  return failure.status
+  return failure.status as T
 }
 
 export function clearProviderFailure(providerId: string): void {

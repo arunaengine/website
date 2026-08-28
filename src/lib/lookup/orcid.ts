@@ -1,0 +1,84 @@
+import { orcidOf } from '@/lib/identifiers'
+import { slugify } from '@/lib/profiles/emit'
+import type { ContextEntity } from '@/lib/crate/build'
+import type { LookupHit, LookupProvider } from './types'
+import { LookupResponseError } from './types'
+
+const ORCID_SEARCH_URL = 'https://pub.orcid.org/v3.0/expanded-search/'
+
+interface OrcidExpandedResult {
+  'orcid-id'?: string
+  'given-names'?: string
+  'family-names'?: string
+  'institution-name'?: string[]
+}
+
+interface OrcidSearchResponse {
+  'expanded-result'?: OrcidExpandedResult[]
+}
+
+export function normalizeOrcidId(value: string): string | undefined {
+  const id = orcidOf(value.trim())
+  return id ? `https://orcid.org/${id}` : undefined
+}
+
+export function orcidResults(payload: unknown, limit = 10): LookupHit[] {
+  const results = payload && typeof payload === 'object'
+    ? (payload as OrcidSearchResponse)['expanded-result']
+    : undefined
+  if (!Array.isArray(results)) return []
+
+  const hits: LookupHit[] = []
+  for (const result of results.slice(0, limit)) {
+    const id = normalizeOrcidId(result['orcid-id'] ?? '')
+    if (!id) continue
+    const givenName = result['given-names']?.trim() ?? ''
+    const familyName = result['family-names']?.trim() ?? ''
+    const name = [givenName, familyName].filter(Boolean).join(' ') || id
+    const institution = result['institution-name']?.find((value) => value.trim())?.trim()
+    const relatedEntities: ContextEntity[] = []
+    const properties: Record<string, unknown> = {
+      ...(givenName ? { givenName } : {}),
+      ...(familyName ? { familyName } : {}),
+      name,
+    }
+    if (institution) {
+      const affiliationId = `#org-${slugify(institution) || 'affiliation'}`
+      properties.affiliation = { '@id': affiliationId }
+      relatedEntities.push({
+        id: affiliationId,
+        type: 'Organization',
+        properties: { name: institution },
+        roles: [],
+      })
+    }
+    hits.push({
+      id,
+      label: name,
+      description: institution,
+      providerId: 'orcid',
+      entity: { id, type: 'Person', properties, roles: ['author'] },
+      relatedEntities,
+    })
+  }
+  return hits
+}
+
+export const orcidProvider: LookupProvider = {
+  id: 'orcid',
+  label: 'ORCID',
+  kind: 'person',
+  async search(query, options) {
+    const normalized = normalizeOrcidId(query)
+    const searchQuery = normalized ? orcidOf(normalized) ?? query.trim() : query.trim()
+    const url = new URL(ORCID_SEARCH_URL)
+    url.searchParams.set('q', searchQuery)
+    url.searchParams.set('rows', String(Math.min(options.limit, 10)))
+    const response = await fetch(url, {
+      headers: { Accept: 'application/json' },
+      signal: options.signal,
+    })
+    if (!response.ok) throw new LookupResponseError(response.status, `ORCID lookup failed with ${response.status}`)
+    return orcidResults(await response.json(), options.limit)
+  },
+}
