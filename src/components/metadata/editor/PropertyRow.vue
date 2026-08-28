@@ -6,6 +6,9 @@ import DropdownMenu from '@/components/ui/DropdownMenu.vue'
 import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
 import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
 import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
+import DropdownMenuSub from '@/components/ui/DropdownMenuSub.vue'
+import DropdownMenuSubTrigger from '@/components/ui/DropdownMenuSubTrigger.vue'
+import DropdownMenuSubContent from '@/components/ui/DropdownMenuSubContent.vue'
 import ValueInput from './ValueInput.vue'
 import ReferenceValue from './ReferenceValue.vue'
 import LinkEntityPopover from './LinkEntityPopover.vue'
@@ -14,21 +17,21 @@ import IssueMark from './IssueMark.vue'
 import { ROW_ACTIONS, ROW_GRID, ROW_LABEL } from './grid'
 import {
   addValue,
+  allowedKinds,
   changeKind,
   defaultValue,
   propertyTerm,
   removeValue,
-  setProperty,
   updateValue,
-  valueKindsFor,
   VALUE_KIND_LABELS,
+  VALUE_PRESETS,
   type CrateDraft,
   type DraftEntity,
   type DraftValueKind,
   type LiveIssue,
 } from '@/lib/crate/editor'
 import type { VocabIndex } from '@/lib/profiles/vocabulary'
-import { ExternalLink, Info, Link2, MoreHorizontal, Plus, X } from '@lucide/vue'
+import { Info, MoreHorizontal, Plus } from '@lucide/vue'
 
 const props = defineProps<{
   draft: CrateDraft
@@ -44,33 +47,44 @@ const emit = defineEmits<{
   (e: 'select', entityId: string): void
 }>()
 
-const linkOpen = ref(false)
-const urlOpen = ref(false)
-const createOpen = ref(false)
+const linkFor = ref(-1)
+const createFor = ref(-1)
 
 const term = computed(() => propertyTerm(props.vocab, props.property))
 const label = computed(() => term.value?.label ?? props.property)
 const values = computed(() => props.entity.properties[props.property] ?? [])
-const kinds = computed(() => valueKindsFor(props.vocab, props.property))
+const kinds = computed(() => allowedKinds(props.vocab, props.property))
 const range = computed(() => term.value?.targets ?? [])
-const plain = computed(() => kinds.value.filter((kind) => kind !== 'reference'))
+const presets = computed(() => VALUE_PRESETS[props.property])
 
-function add(kind: DraftValueKind) {
+function set(index: number, value: string) {
+  emit('update', updateValue(props.draft, props.entity.id, props.property, index, value))
+}
+
+function addEntry(kind: DraftValueKind) {
   emit('update', addValue(props.draft, props.entity.id, props.property, defaultValue(kind)))
 }
 
-function link(id: string) {
-  linkOpen.value = false
-  urlOpen.value = false
-  emit('update', addValue(props.draft, props.entity.id, props.property, { kind: 'reference', value: id }))
+// Removing the last value takes the property with it.
+function removeEntry(index: number) {
+  emit('update', removeValue(props.draft, props.entity.id, props.property, index))
 }
 
-function retype(kind: DraftValueKind) {
-  let next = props.draft
-  for (let index = 0; index < values.value.length; index += 1) {
-    next = changeKind(next, props.entity.id, props.property, index, kind)
-  }
-  emit('update', next)
+function retype(index: number, kind: DraftValueKind) {
+  emit('update', changeKind(props.draft, props.entity.id, props.property, index, kind))
+}
+
+function link(id: string) {
+  const index = linkFor.value
+  linkFor.value = -1
+  if (index >= 0) set(index, id)
+}
+
+function created(next: CrateDraft, entityId: string) {
+  const index = createFor.value
+  createFor.value = -1
+  if (index < 0) return
+  emit('update', updateValue(next, props.entity.id, props.property, index, entityId))
 }
 </script>
 
@@ -89,79 +103,81 @@ function retype(kind: DraftValueKind) {
       </Tooltip>
     </div>
 
-    <div class="min-w-0 space-y-3">
-      <div v-for="(value, index) in values" :key="index" class="flex items-start gap-2">
-        <div class="min-w-0 flex-1">
+    <div class="min-w-0 space-y-2">
+      <div v-for="(value, index) in values" :key="index" class="flex items-start gap-1">
+        <div class="relative min-w-0 flex-1">
           <ReferenceValue
             v-if="value.kind === 'reference'"
             :draft="draft"
             :value="value.value"
-            :label="`${label} reference`"
+            :label="label"
             :locked="locked"
             @select="(id) => emit('select', id)"
-            @update:value="(next) => emit('update', updateValue(draft, entity.id, property, index, next))"
+            @create="createFor = index"
+            @link="linkFor = index"
           />
           <ValueInput
             v-else
             :model-value="value"
             :label="label"
-            @update:model-value="(next) => emit('update', updateValue(draft, entity.id, property, index, next.value))"
+            :presets="presets"
+            @update:model-value="(next) => set(index, next.value)"
+          />
+          <LinkEntityPopover
+            v-if="linkFor === index"
+            :draft="draft"
+            :vocab="vocab"
+            :range="range"
+            @pick="link"
+            @close="linkFor = -1"
           />
         </div>
-        <Button
-          v-if="!locked && values.length > 1"
-          variant="ghost"
-          size="icon-sm"
-          class="mt-1 shrink-0"
-          :aria-label="`Remove this ${label} value`"
-          @click="emit('update', removeValue(draft, entity.id, property, index))"
-        >
-          <X class="h-3.5 w-3.5" />
-        </Button>
+
+        <DropdownMenu v-if="!locked">
+          <DropdownMenuTrigger as-child>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              class="mt-0.5 h-8 w-8 shrink-0"
+              :aria-label="`Actions for ${label} ${index + 1}`"
+            >
+              <MoreHorizontal class="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem @select="set(index, '')">
+              {{ value.kind === 'reference' ? 'Unlink' : 'Clear' }}
+            </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>Change type</DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                <DropdownMenuItem
+                  v-for="kind in kinds"
+                  :key="kind"
+                  :disabled="value.kind === kind"
+                  @select="retype(index, kind)"
+                >
+                  {{ VALUE_KIND_LABELS[kind] }}
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuItem @select="removeEntry(index)">Remove entry</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
-      <div v-if="!locked" class="flex flex-wrap items-center gap-2">
-        <template v-if="kinds.includes('reference')">
-          <Button variant="outline" size="sm" @click="createOpen = true">
-            <Plus class="h-3.5 w-3.5" /> Add
-          </Button>
-          <div class="relative">
-            <Button variant="outline" size="sm" @click="linkOpen = !linkOpen">
-              <Link2 class="h-3.5 w-3.5" /> Choose existing
-            </Button>
-            <LinkEntityPopover
-              v-if="linkOpen"
-              :draft="draft"
-              :vocab="vocab"
-              :range="range"
-              @pick="link"
-              @close="linkOpen = false"
-            />
-          </div>
-          <div class="relative">
-            <Button variant="outline" size="sm" @click="urlOpen = !urlOpen">
-              <ExternalLink class="h-3.5 w-3.5" /> External URL
-            </Button>
-            <LinkEntityPopover
-              v-if="urlOpen"
-              mode="url"
-              :draft="draft"
-              :vocab="vocab"
-              :range="range"
-              @pick="link"
-              @close="urlOpen = false"
-            />
-          </div>
-        </template>
-        <Button v-if="plain.length === 1" variant="outline" size="sm" @click="add(plain[0])">
-          <Plus class="h-3.5 w-3.5" /> Add another
+      <div v-if="!locked">
+        <Button v-if="kinds.length === 1" variant="ghost" size="sm" class="h-7 px-2 text-xs" @click="addEntry(kinds[0])">
+          <Plus class="h-3.5 w-3.5" /> Add entry
         </Button>
-        <DropdownMenu v-else-if="plain.length > 1">
+        <DropdownMenu v-else>
           <DropdownMenuTrigger as-child>
-            <Button variant="outline" size="sm"><Plus class="h-3.5 w-3.5" /> Add another</Button>
+            <Button variant="ghost" size="sm" class="h-7 px-2 text-xs">
+              <Plus class="h-3.5 w-3.5" /> Add entry
+            </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
-            <DropdownMenuItem v-for="kind in plain" :key="kind" @select="add(kind)">
+            <DropdownMenuItem v-for="kind in kinds" :key="kind" @select="addEntry(kind)">
               {{ VALUE_KIND_LABELS[kind] }}
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -171,39 +187,16 @@ function retype(kind: DraftValueKind) {
 
     <div :class="ROW_ACTIONS">
       <IssueMark :issues="issues ?? []" />
-      <DropdownMenu v-if="!locked">
-        <DropdownMenuTrigger as-child>
-          <Button variant="ghost" size="icon-sm" class="h-8 w-8" :aria-label="`Actions for ${label}`">
-            <MoreHorizontal class="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem
-            v-for="kind in kinds"
-            :key="kind"
-            :disabled="values.every((value) => value.kind === kind)"
-            @select="retype(kind)"
-          >
-            Change type to {{ VALUE_KIND_LABELS[kind].toLowerCase() }}
-          </DropdownMenuItem>
-          <DropdownMenuItem @select="emit('update', setProperty(draft, entity.id, property, []))">
-            Remove {{ label }}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
     </div>
 
     <AddEntityDialog
-      v-if="createOpen"
-      :open="createOpen"
+      v-if="createFor >= 0"
+      open
       :draft="draft"
       :vocab="vocab"
       :range="range"
-      @update:open="(value) => (createOpen = value)"
-      @created="(created) => {
-        createOpen = false
-        emit('update', addValue(created.draft, entity.id, property, { kind: 'reference', value: created.entity.id }))
-      }"
+      @update:open="(value) => { if (!value) createFor = -1 }"
+      @created="(entry) => created(entry.draft, entry.entity.id)"
     />
   </div>
 </template>

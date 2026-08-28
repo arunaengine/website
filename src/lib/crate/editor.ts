@@ -162,11 +162,15 @@ export const ROOT_FORM_PROPERTIES = [
   'datePublished',
   'license',
   'keywords',
-  'publisher',
-  'contactPoint',
-  'funder',
   'conformsTo',
 ]
+
+/** The types that describe stored data; a contextual entity is none of them. */
+export const DATA_TYPES = ['File', 'Dataset', 'MediaObject']
+
+export function isDataType(type: string): boolean {
+  return DATA_TYPES.includes(typeLabel(type))
+}
 
 export const LICENSE_PRESETS: ReadonlyArray<{ value: string; label: string }> = [
   { value: 'https://creativecommons.org/licenses/by/4.0/', label: 'CC BY 4.0' },
@@ -176,13 +180,9 @@ export const LICENSE_PRESETS: ReadonlyArray<{ value: string; label: string }> = 
   { value: 'https://www.apache.org/licenses/LICENSE-2.0', label: 'Apache 2.0' },
 ]
 
-export type PromotableProperty = 'license' | 'publisher' | 'contactPoint' | 'funder'
-
-export const PROMOTED_TYPES: Readonly<Record<PromotableProperty, string>> = {
-  license: 'CreativeWork',
-  publisher: 'Organization',
-  contactPoint: 'ContactPoint',
-  funder: 'Organization',
+/** Well-known values a property's editor offers beside its free input. */
+export const VALUE_PRESETS: Readonly<Record<string, ReadonlyArray<{ value: string; label: string }>>> = {
+  license: LICENSE_PRESETS,
 }
 
 export type EntityGroup = 'root' | 'data' | 'contextual'
@@ -241,6 +241,26 @@ export function valueKindsFor(vocab: VocabIndex | null, key: string): DraftValue
   if (kinds.length) return kinds
   const bare = term?.kind ? KIND_BY_DATATYPE[term.kind] : undefined
   return [bare ?? (term?.kind === 'entity' ? 'reference' : 'text')]
+}
+
+/** The kinds a row may offer: an unknown range still allows text and a link. */
+export function allowedKinds(vocab: VocabIndex | null, key: string): DraftValueKind[] {
+  const kinds = valueKindsFor(vocab, key)
+  if (propertyTerm(vocab, key)?.targets?.length) return kinds
+  return [...new Set<DraftValueKind>([...kinds, 'text', 'reference'])]
+}
+
+/** Reference properties of `sourceTypes` whose range accepts `targetTypes`. */
+export function linkProperties(
+  vocab: VocabIndex | null,
+  sourceTypes: string[],
+  targetTypes: string[],
+): VocabTerm[] {
+  if (!vocab || !targetTypes.length) return []
+  const wanted = new Set(targetTypes.map(vocabTypeUri))
+  return vocab
+    .propertiesForTypes(sourceTypes.map(vocabTypeUri))
+    .filter((term) => vocab.classesInRange(term.targets).some((klass) => wanted.has(klass.uri)))
 }
 
 export const VALUE_KIND_LABELS: Readonly<Record<DraftValueKind, string>> = {
@@ -422,24 +442,6 @@ export function changeKind(
   const list = findEntity(draft, id)?.properties[property] ?? []
   return setProperty(draft, id, property, list.map((entry, position) =>
     (position === index ? { kind, value: entry.value } : entry)))
-}
-
-/** Turns a plain root value into a linked entity of the type that fits. */
-export function promoteField(
-  draft: CrateDraft,
-  property: PromotableProperty,
-): { draft: CrateDraft; entity: DraftEntity } {
-  const root = rootEntity(draft)
-  const current = root?.properties[property]?.find((value) => value.kind !== 'reference')?.value.trim() ?? ''
-  const name = LICENSE_PRESETS.find((option) => option.value === current)?.label || current
-  const properties: Record<string, DraftValue[]> = {}
-  if (property === 'license' && isAbsoluteUri(current)) properties.url = [{ kind: 'url', value: current }]
-  if (property === 'contactPoint' && current.includes('@')) properties.email = [{ kind: 'text', value: current }]
-  const created = addEntity(draft, { type: PROMOTED_TYPES[property], name, properties })
-  const linked = setProperty(created.draft, rootId(draft), property, [
-    { kind: 'reference', value: created.entity.id },
-  ])
-  return { draft: linked, entity: created.entity }
 }
 
 export interface ReferenceUse {
