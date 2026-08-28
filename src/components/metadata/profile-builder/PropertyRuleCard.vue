@@ -3,15 +3,8 @@ import { computed, ref, watch } from 'vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
-import Button from '@/components/ui/Button.vue'
-import Notice from '@/components/ui/Notice.vue'
-import { ChevronDown, ChevronRight, Lock, Plus, Trash2, X } from '@lucide/vue'
-import {
-  OBLIGATION_ACCENT,
-  PROFILE_ENTITY_SOURCE_LABELS,
-  PROFILE_OBLIGATION_LABELS,
-} from '@/lib/profiles/labels'
-import { ENTITY_SOURCE_ORDER, effectiveEntitySources, normalizeEntitySources } from '@/lib/profiles/sources'
+import { ChevronDown, ChevronRight, Lock } from '@lucide/vue'
+import { OBLIGATION_ACCENT, PROFILE_OBLIGATION_LABELS } from '@/lib/profiles/labels'
 import {
   isSchemaOrgUri,
   loadCustomPropertyTerms,
@@ -21,13 +14,17 @@ import {
   termNameFromUri,
   type PropertyTermOption,
 } from '@/lib/profiles/propertyCatalog'
-import { entityTypeLabel } from '@/lib/profiles/entityTypes'
-import EntityTypePicker from './EntityTypePicker.vue'
 import { isAbsoluteUri, isValidPropertyTermName, normalizeTypeUri, sameSchemaOrgType, SCHEMA_ORG } from '@/lib/profiles/uri'
 import { isHasPartUri } from '@/lib/profiles/emit'
 import { vocabKind, type VocabTerm } from '@/lib/profiles/vocabulary'
 import VocabSuggestions from './VocabSuggestions.vue'
-import type { ProfileEntitySource } from '@/lib/profiles/types'
+import AllowedUrls from './rules/AllowedUrls.vue'
+import AllowedValues from './rules/AllowedValues.vue'
+import CardinalityFields from './rules/CardinalityFields.vue'
+import EntitySources from './rules/EntitySources.vue'
+import EntityTargets from './rules/EntityTargets.vue'
+import RequiredContents from './rules/RequiredContents.vue'
+import ScalarConstraints from './rules/ScalarConstraints.vue'
 import {
   VALUE_KIND_OPTIONS,
   hasPreservedUrlOptions,
@@ -156,14 +153,6 @@ const urlOptionsError = computed(() => {
   return ''
 })
 
-function addUrlOption() {
-  property.value.urlOptions.push('')
-}
-
-function removeUrlOption(index: number) {
-  property.value.urlOptions.splice(index, 1)
-}
-
 const isHasPart = computed(() => isHasPartUri(resolvedUri.value))
 // The allowed-sources policy carries for every entity reference except hasPart,
 // whose values come from the dataset's data references (normalizeProperty drops
@@ -187,40 +176,6 @@ watch(
     if (isHasPartEntity && !wasHasPartEntity) property.value.multipleValues = true
   },
 )
-const selectedSources = computed<ProfileEntitySource[]>(() => effectiveEntitySources(property.value.entitySources))
-const entitySourceOptions = ENTITY_SOURCE_ORDER.map((source) => ({ source, ...PROFILE_ENTITY_SOURCE_LABELS[source] }))
-
-function toggleEntitySource(source: ProfileEntitySource) {
-  const current = new Set(selectedSources.value)
-  if (current.has(source)) {
-    // At least one source must stay allowed, otherwise the rule is unfulfillable.
-    if (current.size === 1) return
-    current.delete(source)
-  } else {
-    current.add(source)
-  }
-  // The legacy default (exactly ['new']) stores as absent so byte-stability holds.
-  property.value.entitySources = normalizeEntitySources([...current])
-}
-
-// Explanation shown under the referenced-types picker. hasPart and
-// required-contents cases get their own guidance; otherwise summarize the policy
-// as the sentence dataset authors will experience.
-const referenceHelp = computed(() => {
-  if (isHasPart.value) {
-    return 'Values come from the dataset’s data references (its attached files); each required item below is checked against them, and more are always allowed.'
-  }
-  if (property.value.requiredInstances.length) {
-    return 'Values become @id references to entities in the dataset. The required items below must be present; more are always allowed.'
-  }
-  const phrases = selectedSources.value.map((source) => {
-    if (source === 'new') return 'describe a new entity'
-    if (source === 'existing-external') return 'reuse one via an external URI'
-    return 'reuse an entity from this dataset'
-  })
-  return `Dataset authors may ${phrases.join(', or ')}.`
-})
-
 // WS5/M1/M2: the required-contents editor is authorable ONLY for the hasPart term;
 // that is the one relation the dataset dialog enforces. Imported required instances
 // on other rules are preserved (see normalizeProperty) and surfaced in the review
@@ -229,25 +184,9 @@ const referenceHelp = computed(() => {
 const showRequiredContents = computed(
   () => isEntity.value && isHasPart.value && (isMultiValued.value || property.value.requiredInstances.length > 0),
 )
-const MATCH_OPTIONS = [
-  { value: 'name', label: 'Name' },
-  { value: 'id', label: '@id' },
-]
-
-function addRequiredInstance() {
-  property.value.requiredInstances.push({ match: 'name', value: '', hint: '' })
-}
-
-function removeRequiredInstance(index: number) {
-  property.value.requiredInstances.splice(index, 1)
-}
-
 // Obligation-colored left accent, from the shared labels map so it stays in sync
 // with the Badge mapping; updates live when the obligation changes.
 const accentClass = computed(() => OBLIGATION_ACCENT[property.value.obligation])
-
-const lengthKinds: DraftPropertyRule['kind'][] = ['text', 'longtext', 'email']
-const numericKinds: DraftPropertyRule['kind'][] = ['integer', 'number']
 
 function autofillName() {
   if (!trimmed(property.value.valueName)) property.value.valueName = propertyName(trimmed(property.value.label))
@@ -375,61 +314,12 @@ function applyVocabTerm(term: VocabTerm) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Entity-reference target types (kind === 'entity'), grouped so the profile's
-// own entity rules (which supply a real sub-form) come first, then the curated /
-// custom "other types" that would need a rule created for them.
-// ---------------------------------------------------------------------------
+// The class short name an entity rule serializes to, for the property-vs-class
+// collision check above.
 function entityClassName(item: DraftEntityRule): string {
   const type = normalizeTypeUri(item.type)
   if (!type) return ''
   return isSchemaOrgUri(type) ? termNameFromUri(type) : trimmed(item.className) || termNameFromUri(type)
-}
-
-const profileEntityRules = computed(() =>
-  props.builder.entities
-    .map((item) => {
-      const uri = normalizeTypeUri(item.type)
-      return { uri, label: trimmed(item.label) || entityTypeLabel(uri), className: entityClassName(item) }
-    })
-    .filter((item) => item.uri),
-)
-
-// Selected targets as removable chips, labeled by the profile shape that
-// defines them (when one exists) with a plain type-label fallback.
-const selectedTargets = computed(() =>
-  property.value.entityTypes
-    .filter(Boolean)
-    .map((uri) => {
-      const shape = profileEntityRules.value.find((rule) => sameSchemaOrgType(rule.uri, uri))
-      return { uri, label: shape ? shape.label : entityTypeLabel(uri), hasShape: Boolean(shape) }
-    }),
-)
-
-// Selected targets that no entity rule defines; no sub-form is generated for
-// them until one is created (offered inline as a quick action).
-const unresolvedTargets = computed(() =>
-  property.value.entityTypes
-    .filter((uri) => uri && !profileEntityRules.value.some((rule) => sameSchemaOrgType(rule.uri, uri)))
-    .map((uri) => ({ uri, label: entityTypeLabel(uri) })),
-)
-
-function addTarget(choice: { uri: string }) {
-  if (!choice.uri) return
-  const list = property.value.entityTypes
-  if (!list.some((entry) => sameSchemaOrgType(entry, choice.uri))) list.push(choice.uri)
-}
-
-function removeTarget(uri: string) {
-  const list = property.value.entityTypes
-  const index = list.indexOf(uri)
-  if (index >= 0) list.splice(index, 1)
-}
-
-// Append an entity rule for an other-type target and select it (D6). The target
-// stays selected on this property; once a rule exists it resolves to a sub-form.
-function createEntityRule(uri: string) {
-  props.builder.addEntityRuleForType(uri)
 }
 
 // ---------------------------------------------------------------------------
@@ -553,53 +443,13 @@ watch(advancedNeedsAttention, (needsAttention) => {
 
     <!-- Entity-reference targets: which types this reference points at. The
          allowed-sources policy and required-contents editor move to Advanced. -->
-    <div v-if="isEntity" class="mt-2 space-y-2">
-      <div>
-        <label class="text-[11px] font-medium text-muted-foreground">Referenced entity types</label>
-        <p class="text-[11px] text-muted-foreground">{{ referenceHelp }}</p>
-      </div>
-      <div class="flex flex-wrap items-center gap-1.5">
-        <span
-          v-for="target in selectedTargets"
-          :key="target.uri"
-          class="inline-flex items-center gap-1 rounded-full border border-aruna-royal/60 bg-aruna-royal/10 px-2.5 py-1 text-[11px] text-foreground"
-          :title="target.uri"
-        >
-          {{ target.label }}
-          <span v-if="target.hasShape" class="text-[10px] text-muted-foreground">(shape)</span>
-          <button
-            v-if="!anyLock"
-            type="button"
-            class="text-muted-foreground transition-colors hover:text-destructive"
-            :aria-label="`Remove target ${target.label}`"
-            @click="removeTarget(target.uri)"
-          >
-            <X class="size-3" />
-          </button>
-        </span>
-        <span v-if="!selectedTargets.length" class="text-[11px] text-muted-foreground">No target type yet, add one:</span>
-      </div>
-      <EntityTypePicker
-        v-if="!anyLock"
-        :builder="builder"
-        :exclude="property.entityTypes"
-        button-label="Add target type"
-        @pick="addTarget"
-      />
-      <!-- A selected other-type target has no rule, so no sub-form is generated:
-           offer to create one in a click. -->
-      <Notice
-        v-for="target in unresolvedTargets"
-        :key="target.uri"
-        tone="warning"
-        class="flex flex-wrap items-center gap-2 border-dashed px-2.5 py-1.5 text-[11px]"
-      >
-        <span>No entity rule defines <b>{{ target.label }}</b>, no sub-form is generated for it yet.</span>
-        <Button v-if="!anyLock" type="button" variant="outline" size="sm" @click="createEntityRule(target.uri)">
-          <Plus class="h-3 w-3" /> Create entity rule for {{ target.label }}
-        </Button>
-      </Notice>
-    </div>
+    <EntityTargets
+      v-if="isEntity"
+      :builder="builder"
+      :property="property"
+      :disabled="anyLock"
+      :is-has-part="isHasPart"
+    />
 
     <p class="mt-2 text-[11px] text-muted-foreground">{{ PROFILE_OBLIGATION_LABELS[property.obligation].help }}</p>
 
@@ -658,152 +508,33 @@ watch(advancedNeedsAttention, (needsAttention) => {
 
         <!-- Allowed sources: a rule may allow several (reuse-or-create). Hidden for
              hasPart, which binds to the data references. -->
-        <div v-if="showEntitySources">
-          <label class="text-[11px] font-medium text-muted-foreground">Allowed sources</label>
-          <div class="mt-1 space-y-1">
-            <label
-              v-for="option in entitySourceOptions"
-              :key="option.source"
-              class="flex cursor-pointer items-start gap-2 rounded-md border px-2.5 py-1.5 text-[11px] transition-colors"
-              :class="selectedSources.includes(option.source)
-                ? 'border-aruna-royal/60 bg-aruna-royal/10'
-                : 'border-border hover:border-primary/40'"
-            >
-              <input
-                type="checkbox"
-                class="mt-0.5 accent-aruna-royal"
-                :checked="selectedSources.includes(option.source)"
-                :disabled="anyLock || (selectedSources.length === 1 && selectedSources.includes(option.source))"
-                @change="toggleEntitySource(option.source)"
-              />
-              <span>
-                <span class="font-medium text-foreground">{{ option.label }}</span>
-                <span class="block text-muted-foreground">{{ option.help }}</span>
-              </span>
-            </label>
-          </div>
-        </div>
+        <EntitySources v-if="showEntitySources" :property="property" :disabled="anyLock" />
 
         <!-- WS2: list cardinality for a multi-valued rule. -->
-        <div v-if="isMultiValued" class="grid gap-2 sm:grid-cols-2">
-          <div>
-            <label class="text-[11px] font-medium text-muted-foreground">Min entries</label>
-            <Input v-model="property.minItems" type="number" min="1" class="mt-0.5" placeholder="optional" :disabled="anyLock" :invalid="listCountError ? 'error' : undefined" />
-          </div>
-          <div>
-            <label class="text-[11px] font-medium text-muted-foreground">Max entries</label>
-            <Input v-model="property.maxItems" type="number" min="1" class="mt-0.5" placeholder="optional" :disabled="anyLock" :invalid="listCountError ? 'error' : undefined" />
-          </div>
-          <p v-if="listCountError" class="text-[11px] text-destructive sm:col-span-2">{{ listCountError }}</p>
-        </div>
+        <CardinalityFields v-if="isMultiValued" :property="property" :disabled="anyLock" :error="listCountError" />
 
         <!-- "One of" allowed values. -->
-        <div v-if="property.kind === 'enum'">
-          <label class="text-[11px] font-medium text-muted-foreground">Allowed values</label>
-          <Input v-model="property.enumOptions" class="mt-0.5" placeholder="LC-MS, MALDI-TOF" :disabled="anyLock" :invalid="enumOptionsError ? 'error' : undefined" />
-          <p v-if="enumOptionsError" class="mt-0.5 text-[11px] text-destructive">{{ enumOptionsError }}</p>
-          <p v-else class="mt-0.5 text-[11px] text-muted-foreground">Comma-separated list of the values users may pick.</p>
-        </div>
+        <AllowedValues v-if="property.kind === 'enum'" :property="property" :disabled="anyLock" :error="enumOptionsError" />
 
         <!-- WS3: select-url is authorable, an add/remove list of the allowed absolute
              URLs users may pick from. At least one is required. L1: an imported set that
              carries non-string (structured) options is preserved verbatim and read-only. -->
-        <div v-if="property.kind === 'select-url'">
-          <label class="text-[11px] font-medium text-muted-foreground">Allowed URLs</label>
-          <p
-            v-if="isPreservedUrlOptions"
-            class="mt-1 rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground"
-          >
-            Preserved from import, {{ preservedOptionCount }} {{ preservedOptionCount === 1 ? 'option' : 'options' }} kept as-is because they include structured (non-URL) values. Edit the option list in Describo/Crate-O.
-          </p>
-          <template v-else>
-          <div class="mt-1 space-y-1.5">
-            <div v-for="(_, index) in property.urlOptions" :key="index" class="flex items-center gap-1.5">
-              <Input v-model="property.urlOptions[index]" placeholder="https://creativecommons.org/licenses/by/4.0/" :disabled="kindDisabled" />
-              <button
-                v-if="!kindDisabled"
-                type="button"
-                class="shrink-0 rounded-md p-1.5 text-muted-foreground hover:text-destructive"
-                @click="removeUrlOption(index)"
-              >
-                <Trash2 class="h-3.5 w-3.5" />
-              </button>
-            </div>
-          </div>
-          <Button v-if="!kindDisabled" type="button" variant="outline" size="sm" class="mt-1.5" @click="addUrlOption">
-            <Plus class="h-3 w-3" /> Add URL
-          </Button>
-          <p v-if="urlOptionsError" class="mt-1 text-[11px] text-destructive">{{ urlOptionsError }}</p>
-          <p v-else class="mt-1 text-[11px] text-muted-foreground">Users pick one of these absolute URLs.</p>
-          </template>
-        </div>
+        <AllowedUrls
+          v-if="property.kind === 'select-url'"
+          :property="property"
+          :disabled="kindDisabled"
+          :preserved="isPreservedUrlOptions"
+          :preserved-count="preservedOptionCount"
+          :error="urlOptionsError"
+        />
 
         <!-- Scalar constraints: default / example / pattern / length / numeric range. -->
-        <div v-if="!isEntity" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          <div>
-            <label class="text-[11px] font-medium text-muted-foreground">Example value</label>
-            <Input v-model="property.example" class="mt-0.5" placeholder="https://creativecommons.org/licenses/by/4.0/" :disabled="anyLock" />
-          </div>
-          <div>
-            <label class="text-[11px] font-medium text-muted-foreground">Default value</label>
-            <Input v-model="property.defaultValue" class="mt-0.5" :disabled="anyLock" />
-          </div>
-          <div v-if="property.kind !== 'boolean' && property.kind !== 'enum'">
-            <label class="text-[11px] font-medium text-muted-foreground">Pattern (regex)</label>
-            <Input v-model="property.pattern" class="mt-0.5" placeholder="^[A-Z][a-z]+ [a-z]+$" :disabled="anyLock" />
-          </div>
-          <div v-if="lengthKinds.includes(property.kind)">
-            <label class="text-[11px] font-medium text-muted-foreground">Min length</label>
-            <Input v-model="property.minLength" type="number" class="mt-0.5" :disabled="anyLock" />
-          </div>
-          <div v-if="lengthKinds.includes(property.kind)">
-            <label class="text-[11px] font-medium text-muted-foreground">Max length</label>
-            <Input v-model="property.maxLength" type="number" class="mt-0.5" :disabled="anyLock" />
-          </div>
-          <div v-if="numericKinds.includes(property.kind)">
-            <label class="text-[11px] font-medium text-muted-foreground">Min value</label>
-            <Input v-model="property.minValue" type="number" class="mt-0.5" :disabled="anyLock" />
-          </div>
-          <div v-if="numericKinds.includes(property.kind)">
-            <label class="text-[11px] font-medium text-muted-foreground">Max value</label>
-            <Input v-model="property.maxValue" type="number" class="mt-0.5" :disabled="anyLock" />
-          </div>
-          <div v-if="numericKinds.includes(property.kind)">
-            <label class="text-[11px] font-medium text-muted-foreground">Step</label>
-            <Input v-model="property.stepValue" type="number" class="mt-0.5" :disabled="anyLock" />
-          </div>
-        </div>
+        <ScalarConstraints v-if="!isEntity" :property="property" :disabled="anyLock" />
 
         <!-- WS5: required contents for a multi-valued reference (most useful for
              hasPart). Rows match a required entry by Name or @id, with an optional
              hint. More entries than listed are always allowed. -->
-        <div v-if="showRequiredContents" class="rounded-md border border-border px-3 py-2">
-          <div class="text-[11px] font-medium text-foreground">Required contents</div>
-          <p class="text-[11px] text-muted-foreground">
-            Checked against the dataset's data references; more files are always allowed.
-          </p>
-          <p class="mt-0.5 text-[11px] text-muted-foreground">
-            Match by <b>Name</b> against the entry's label / filename (e.g. <code class="rounded bg-muted px-1">index.html</code>). Match by <b>@id</b> only against its exact reference URL, data references are absolute URLs, so a bare filename never matches.
-          </p>
-          <div v-for="(row, index) in property.requiredInstances" :key="index" class="mt-1.5 space-y-1">
-            <div class="flex flex-wrap items-center gap-1.5">
-              <Select v-model="row.match" :options="MATCH_OPTIONS" class="w-[92px] shrink-0" :disabled="anyLock" />
-              <Input v-model="row.value" class="min-w-[140px] flex-1" :placeholder="row.match === 'id' ? 'https://example.org/data/index.html' : 'index.html'" :disabled="anyLock" :invalid="!trimmed(row.value) ? 'error' : undefined" />
-              <button
-                v-if="!anyLock"
-                type="button"
-                class="shrink-0 rounded-md p-1.5 text-muted-foreground hover:text-destructive"
-                @click="removeRequiredInstance(index)"
-              >
-                <Trash2 class="h-3.5 w-3.5" />
-              </button>
-            </div>
-            <Input v-model="row.hint" class="text-[11px]" placeholder="Optional hint shown to users" :disabled="anyLock" />
-          </div>
-          <Button v-if="!anyLock" type="button" variant="outline" size="sm" class="mt-1.5" @click="addRequiredInstance">
-            <Plus class="h-3 w-3" /> Add required item
-          </Button>
-        </div>
+        <RequiredContents v-if="showRequiredContents" :property="property" :disabled="anyLock" />
       </div>
     </div>
     </template>
