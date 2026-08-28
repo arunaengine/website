@@ -2,7 +2,7 @@
 // Runs this machine executed itself. Both the list and the detail drawer talk
 // to the node's own API, so the job client is provided down this subtree.
 import { computed, onMounted, provide, watch } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
@@ -12,6 +12,7 @@ import Progress from '@/components/ui/Progress.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import JobStateBadge from '@/components/jobs/JobStateBadge.vue'
 import JobDetailPanel from '@/components/jobs/JobDetailPanel.vue'
+import NewRunMenu from '@/components/compute/NewRunMenu.vue'
 import DeviceSurfaceState from '@/components/desktop/DeviceSurfaceState.vue'
 import { JOB_CLIENT, useJobsList } from '@/composables/useJobs'
 import { useDeviceCompute } from '@/composables/useDeviceCompute'
@@ -100,7 +101,7 @@ watch(reachable, (now) => now && reload())
         description="Submit a task and pick This computer as the place to run it."
       >
         <template #icon><Cpu class="h-6 w-6" /></template>
-        <RouterLink :to="{ name: 'compute-new' }"><Button size="sm">New task</Button></RouterLink>
+        <NewRunMenu size="sm" />
       </EmptyState>
 
       <div v-else class="surface overflow-hidden">

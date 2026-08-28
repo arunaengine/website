@@ -5,12 +5,18 @@ import type { ApiClientOptions } from '@/lib/api'
 
 const deviceClient = ref<{ baseUrl: string; token: string } | null>(null)
 const compute = ref<{ enabled: boolean } | null>(null)
+const jobs = ref<unknown[]>([])
+const listState = ref('idle')
 
 // Whatever the panel handed useJobsList, so the wiring itself can be checked.
 let listOptions: { client?: () => ApiClientOptions; pollWhile?: () => boolean } = {}
 const load = vi.fn(async () => undefined)
 
-const EmptyStub = defineComponent(() => () => null)
+const EmptyStub = defineComponent({
+  props: { title: String },
+  setup: (props, { slots }) => () => h('div', [props.title, slots.default?.()]),
+})
+const NewRunMenuStub = defineComponent(() => () => h('button', 'New run'))
 const RouterLinkStub = defineComponent((_, { slots }) => () => h('a', slots.default?.()))
 const SurfaceStateStub = defineComponent({
   props: { state: String, subject: String },
@@ -30,8 +36,8 @@ beforeAll(async () => {
     useJobsList: (options: typeof listOptions) => {
       listOptions = options
       return {
-        jobs: ref([]),
-        listState: ref('idle'),
+        jobs,
+        listState,
         listError: ref(null),
         refreshing: ref(false),
         nextCursor: ref(null),
@@ -47,6 +53,7 @@ beforeAll(async () => {
   vi.doMock('@/components/desktop/DeviceSurfaceState.vue', () => ({ default: SurfaceStateStub }))
   vi.doMock('@/components/jobs/JobDetailPanel.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/components/jobs/JobStateBadge.vue', () => ({ default: EmptyStub }))
+  vi.doMock('@/components/compute/NewRunMenu.vue', () => ({ default: NewRunMenuStub }))
   vi.doMock('@/components/ui/Badge.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/components/ui/Button.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/components/ui/EmptyState.vue', () => ({ default: EmptyStub }))
@@ -59,6 +66,8 @@ beforeAll(async () => {
 beforeEach(() => {
   deviceClient.value = null
   compute.value = null
+  jobs.value = []
+  listState.value = 'idle'
   listOptions = {}
   load.mockClear()
 })
@@ -92,5 +101,15 @@ describe('local runs', () => {
     compute.value = { enabled: false }
 
     expect(await render()).toContain('switched off')
+  })
+
+  it('offers the shared run menu in the empty state', async () => {
+    deviceClient.value = { baseUrl: 'http://127.0.0.1:9000/api/v1', token: 'owner-token' }
+    listState.value = 'ready'
+
+    const html = await render()
+
+    expect(html).toContain('Nothing has run here yet')
+    expect(html).toContain('New run')
   })
 })

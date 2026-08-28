@@ -3,20 +3,19 @@
 // computer, or in the realm. The realm half is the portal's own compute
 // surface, reused as it is.
 import { computed, onMounted } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
-import Button from '@/components/ui/Button.vue'
+import { useRoute, useRouter } from 'vue-router'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
+import NewRunMenu from '@/components/compute/NewRunMenu.vue'
 import LocalRunsPanel from '@/components/desktop/LocalRunsPanel.vue'
 import JobsPanel from '@/components/jobs/JobsPanel.vue'
 import TasksPanel from '@/components/compute/TasksPanel.vue'
 import { useDeviceCompute } from '@/composables/useDeviceCompute'
 import { useRealm } from '@/composables/useRealm'
 import { featureEnabled } from '@/lib/config'
-import { Plus } from '@lucide/vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -45,12 +44,7 @@ onMounted(() => void ensureLoaded())
   <div>
     <PageHeader eyebrow="This computer" title="Runs" description="Work you started, wherever it is executing.">
       <template #actions>
-        <RouterLink :to="{ name: 'compute-quick' }">
-          <Button variant="outline" size="sm">Quick run</Button>
-        </RouterLink>
-        <RouterLink :to="{ name: 'compute-new' }">
-          <Button size="sm"><Plus class="h-4 w-4" /> New task</Button>
-        </RouterLink>
+        <NewRunMenu size="sm" />
       </template>
     </PageHeader>
 

@@ -10,6 +10,7 @@ import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import TaskStateBadge from '@/components/compute/TaskStateBadge.vue'
 import TesPlacementTags from '@/components/compute/TesPlacementTags.vue'
 import TaskDetailPanel from '@/components/compute/TaskDetailPanel.vue'
+import NewRunMenu from '@/components/compute/NewRunMenu.vue'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
@@ -24,7 +25,7 @@ import {
   type TesState,
   type TesTask,
 } from '@/lib/tes'
-import { ArchiveRestore, ChevronRight, ListPlus, Trash2, Zap } from '@lucide/vue'
+import { ArchiveRestore, ChevronRight, Trash2 } from '@lucide/vue'
 
 // Task list section of the unified Compute view. ComputeView gates the feature
 // flag and sign-in, but the panel tracks the session itself so a late or lost
@@ -34,13 +35,6 @@ const route = useRoute()
 const { getTesServiceInfo, listTasks } = useTes()
 const { currentUser, myGroups } = useAruna()
 const { authPending } = useAuth()
-
-function goNew() {
-  void router.push({ name: 'compute-new' })
-}
-function goQuick() {
-  void router.push({ name: 'compute-quick' })
-}
 
 // Deep-linkable task drawer driven by the :taskId route param (the back button
 // closes it, DataManagerView's bucket-param precedent).
@@ -377,17 +371,8 @@ onUnmounted(() => {
       class="surface px-5 py-10 text-center"
     >
       <p class="text-sm font-medium text-foreground">No compute tasks yet</p>
-      <p class="mx-auto mt-1 max-w-md text-sm text-muted-foreground">Start your first run, submissions appear here.</p>
-      <div class="mx-auto mt-5 grid max-w-xl gap-3 text-left sm:grid-cols-2">
-        <button type="button" class="surface-inline p-4 text-left transition-colors hover:border-primary/40 hover:bg-muted/40" @click="goQuick">
-          <span class="flex items-center gap-1.5 text-sm font-semibold text-foreground"><Zap class="h-4 w-4 text-primary" /> Quick run</span>
-          <span class="mt-1 block text-xs text-muted-foreground">Write a short script, the portal stages it and builds the task for you.</span>
-        </button>
-        <button type="button" class="surface-inline p-4 text-left transition-colors hover:border-primary/40 hover:bg-muted/40" @click="goNew">
-          <span class="flex items-center gap-1.5 text-sm font-semibold text-foreground"><ListPlus class="h-4 w-4 text-primary" /> New task</span>
-          <span class="mt-1 block text-xs text-muted-foreground">Describe a full GA4GH TES task by hand, image, command, resources.</span>
-        </button>
-      </div>
+      <p class="mx-auto mt-1 max-w-md text-sm text-muted-foreground">Start your first run with a quick script or a full task.</p>
+      <div class="mt-5 flex justify-center"><NewRunMenu size="sm" /></div>
       <p v-if="hiddenTasks.length" class="mt-5 text-xs text-muted-foreground">
         {{ hiddenTasks.length }} deleted {{ hiddenTasks.length === 1 ? 'run' : 'runs' }} hidden from this list.
         <button type="button" class="text-primary hover:underline" @click="stateGroup = 'deleted'">Show</button>

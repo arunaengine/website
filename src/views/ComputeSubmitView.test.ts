@@ -26,6 +26,7 @@ import * as OnboardingConfig from '@/lib/onboarding-config'
 import * as Jobs from '@/lib/jobs'
 import * as NativeSubmit from '@/lib/nativeSubmit'
 import * as PlacementPolicies from '@/lib/placementPolicies'
+import * as RunTarget from '@/lib/runTarget'
 import * as Tes from '@/lib/tes'
 import * as Utils from '@/lib/utils'
 import * as Workspaces from '@/lib/workspaces'
@@ -266,6 +267,7 @@ const ComputeSubmitView = compileClientComponent(new URL('./ComputeSubmitView.vu
   '@/lib/workspaces': Workspaces,
   // Real modules: the TES-versus-native switch is the behaviour under test.
   '@/lib/nativeSubmit': NativeSubmit,
+  '@/lib/runTarget': RunTarget,
   '@/lib/jobs': { ...Jobs, submitJob },
   '@/lib/placementPolicies': PlacementPolicies,
 })
@@ -496,17 +498,17 @@ describe('run target', () => {
     runTargetAvailable.value = true
     const mounted = await mount(ComputeSubmitView, '/app/compute/new')
 
-    expect(content(mounted.root)).toContain('Run on')
-    await click(button(mounted.root, 'This computer'))
-    expect(content(mounted.root)).toContain('copied to this computer')
-    expect(content(mounted.root)).not.toContain('Set test placement')
-
+    expect(content(mounted.root)).not.toContain('Run on')
     await typeValue(element(mounted.root, (node) => node.tag === 'select'), 'group-id')
     await mounted.router!.push('/app/compute/new?step=1')
     await flush()
     await fillValidWorkload(mounted.root)
     await mounted.router!.push('/app/compute/new?step=2')
     await flush()
+    expect(content(mounted.root)).toContain('Run on')
+    await click(button(mounted.root, 'This computer'))
+    expect(content(mounted.root)).toContain('copied to this computer')
+    expect(content(mounted.root)).not.toContain('Set test placement')
     await click(submitButton(mounted.root))
     await new Promise((resolve) => setTimeout(resolve, 0))
     await flush()
@@ -514,6 +516,7 @@ describe('run target', () => {
     expect(submitJob).toHaveBeenCalledTimes(1)
     const [request, client] = submitJob.mock.calls[0] as unknown as [Record<string, unknown>, Record<string, unknown>]
     expect(request.target).toBe('local')
+    expect(request.tags).toEqual({})
     expect(client).toEqual({ baseUrl: 'http://127.0.0.1:9000/api/v1', token: 'owner-token' })
     expect(mounted.router!.currentRoute.value.name).toBe('run-detail')
     expect(mounted.errors).toEqual([])
@@ -525,7 +528,7 @@ describe('run target', () => {
     runTargetAvailable.value = true
     const mounted = await mount(ComputeSubmitView, '/app/compute/new')
 
-    await click(button(mounted.root, 'This computer'))
+    expect(content(mounted.root)).not.toContain('Run on')
     await typeValue(element(mounted.root, (node) => node.tag === 'select'), 'group-id')
     await mounted.router!.push('/app/compute/new?step=1')
     await flush()
@@ -538,9 +541,11 @@ describe('run target', () => {
     await typeValue(input(mounted.root, 'placeholder', '1'), '1')
     await typeValue(input(mounted.root, 'placeholder', '2'), '1')
     await typeValue(input(mounted.root, 'placeholder', '10'), '1')
+    await click(button(mounted.root, 'Keep workspace'))
     await mounted.router!.push('/app/compute/new?step=2')
     await flush()
 
+    await click(button(mounted.root, 'This computer'))
     expect(content(mounted.root)).toContain('POST /jobs/')
     await click(submitButton(mounted.root))
     await new Promise((resolve) => setTimeout(resolve, 0))
@@ -557,12 +562,14 @@ describe('run target', () => {
     runTargetAvailable.value = true
     const mounted = await mount(ComputeSubmitView, '/app/compute/new')
 
+    expect(content(mounted.root)).not.toContain('Run on')
     await typeValue(element(mounted.root, (node) => node.tag === 'select'), 'group-id')
     await mounted.router!.push('/app/compute/new?step=1')
     await flush()
     await fillValidWorkload(mounted.root)
     await mounted.router!.push('/app/compute/new?step=2')
     await flush()
+    expect(content(mounted.root)).toContain('Run on')
     await click(submitButton(mounted.root))
     await flush()
 
@@ -585,7 +592,7 @@ describe('placement labels', () => {
   it('adds picker constraints to the TES task tags', async () => {
     const mounted = await mount(ComputeSubmitView, '/app/compute/new')
 
-    await click(button(mounted.root, 'Set test placement'))
+    expect(content(mounted.root)).not.toContain('Set test placement')
     await typeValue(element(mounted.root, (node) => node.tag === 'select'), 'group-id')
     await mounted.router!.push('/app/compute/new?step=1')
     await flush()
@@ -593,6 +600,7 @@ describe('placement labels', () => {
     await click(button(mounted.root, 'Keep workspace'))
     await mounted.router!.push('/app/compute/new?step=2')
     await flush()
+    await click(button(mounted.root, 'Set test placement'))
     await click(submitButton(mounted.root))
     await flush()
 

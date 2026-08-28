@@ -62,6 +62,7 @@ import {
   type InputModeRequest,
 } from '@/lib/jobs'
 import { createOperationId } from '@/lib/placementPolicies'
+import { targetProblems as collectTargetProblems } from '@/lib/runTarget'
 import Badge from '@/components/ui/Badge.vue'
 import { ArrowLeft, ArrowRight, Cpu, FileText, Folder, ListPlus, LogIn, Plus, X } from '@lucide/vue'
 
@@ -82,7 +83,7 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
-const WIZARD_STEPS = ['Basics', 'Workload', 'Review']
+const WIZARD_STEPS = ['Basics', 'Workload', 'Review & run']
 // The step lives in ?step=N so browser back/forward walks the wizard instead
 // of leaving it.
 const step = computed(() => {
@@ -303,7 +304,7 @@ const task = computed<TesTask>(() =>
     tags: {
       [TES_GROUP_TAG]: groupId.value,
       ...(executorConstraint.value.trim() ? { [TES_EXECUTOR_TAG]: executorConstraint.value.trim() } : {}),
-      ...placementTags(placementLabels.value),
+      ...(runTarget.local.value ? {} : placementTags(placementLabels.value)),
     },
     workspace: workspaceMode.value
       ? { mode: workspaceMode.value, bucket: workspaceMode.value === 'existing' ? workspaceBucket.value.trim() : undefined }
@@ -494,6 +495,25 @@ const placement = computed<NativePlacementOptions>(() => ({
     : null,
 }))
 
+const targetProblems = computed(() =>
+  collectTargetProblems({
+    target: runTarget.local.value ? 'local' : 'realm',
+    executorConstraint: executorConstraint.value,
+    backend: runTarget.compute.value?.backend,
+    workspaceMode: workspaceMode.value,
+    inputModes: advancedInputs.value.map((input) => placementFor(input.path).mode),
+    realmInputsMissingVersion: advancedInputs.value.some(
+      (input) => !input.source_node_id?.trim() || !input.version_id?.trim(),
+    ),
+    cpuCores: resources.value.cpu_cores,
+    ramBytes:
+      resources.value.ram_gb === undefined
+        ? undefined
+        : Math.floor(resources.value.ram_gb * 1_000_000_000),
+    limits: runTarget.compute.value?.limits ?? null,
+  }),
+)
+
 const nativeMapping = computed(() =>
   tesFormToExecutionRequest({
     groupId: groupId.value,
@@ -655,13 +675,6 @@ async function submit() {
             <label class="text-xs font-medium text-foreground">Description <span class="text-muted-foreground">(optional)</span></label>
             <Textarea v-model="description" class="mt-1" rows="3" />
           </div>
-          <RunTargetPicker
-            v-if="runTarget.available.value"
-            v-model="runTarget.target.value"
-            :compute="runTarget.compute.value"
-            :realm-name="realm.shortName"
-          />
-          <PlacementPicker v-if="!runTarget.local.value" v-model="placementLabels" />
           <div>
             <label class="text-xs font-medium text-foreground">Group</label>
             <GroupSelect v-model="groupId" :options="groupOptions" placeholder="Select a group" class="mt-1" />
@@ -971,6 +984,21 @@ async function submit() {
 
         <!-- Step 3: Review -->
         <div v-else class="space-y-3">
+          <div class="space-y-3">
+            <RunTargetPicker
+              v-if="runTarget.available.value"
+              v-model="runTarget.target.value"
+              :compute="runTarget.compute.value"
+              :realm-name="realm.shortName"
+            />
+            <PlacementPicker v-if="!runTarget.local.value" v-model="placementLabels" />
+            <ul
+              v-if="targetProblems.length"
+              class="list-disc space-y-1 rounded-md border border-destructive/30 bg-destructive/5 px-7 py-2 text-xs text-destructive"
+            >
+              <li v-for="problem in targetProblems" :key="problem">{{ problem }}</li>
+            </ul>
+          </div>
           <div
             v-if="useNative"
             class="space-y-1 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-foreground"
@@ -1024,7 +1052,7 @@ async function submit() {
           <ArrowLeft v-if="step === 0" class="h-3.5 w-3.5" /> {{ step === 0 ? 'Back to Compute' : 'Back' }}
         </Button>
         <Button v-if="step < WIZARD_STEPS.length - 1" size="sm" :disabled="!canContinue" @click="next">Continue</Button>
-        <Button v-else size="sm" :disabled="busy || !groupId || !executorsValid || !outputsValid || !workspaceValid || !cpuCoresValid || !ramGbValid || !diskGbValid || !!nativeInvalid || !!submittedWithoutWorkspace" @click="submit"><ListPlus class="h-4 w-4" /> {{ useNative ? 'Submit job' : 'Submit task' }}</Button>
+        <Button v-else size="sm" :disabled="busy || !groupId || !executorsValid || !outputsValid || !workspaceValid || !cpuCoresValid || !ramGbValid || !diskGbValid || !!nativeInvalid || !!submittedWithoutWorkspace || !!targetProblems.length" @click="submit"><ListPlus class="h-4 w-4" /> {{ useNative ? 'Submit job' : 'Submit task' }}</Button>
       </div>
     </div>
 

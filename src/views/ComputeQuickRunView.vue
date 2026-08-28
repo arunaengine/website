@@ -60,6 +60,7 @@ import { defaultPlacement, isNativeBlocked, tesFormToExecutionRequest } from '@/
 import { submitJob } from '@/lib/jobs'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import { fetchWithTimeout } from '@/lib/fetch'
+import { targetProblems as collectTargetProblems } from '@/lib/runTarget'
 import {
   ArrowDownToLine,
   ArrowLeft,
@@ -107,7 +108,7 @@ function errorMessage(err: unknown): string {
 // with their editable container mount paths (defaulting to /work/in and
 // /work/out) right next to the editor, so container paths are visible while
 // the script is written.
-const WIZARD_STEPS = ['Runtime', 'Script & data', 'Review']
+const WIZARD_STEPS = ['Runtime', 'Script & data', 'Review & run']
 const REVIEW_STEP = 2
 // The step lives in ?step=N so browser back/forward walks the wizard instead
 // of leaving it.
@@ -368,7 +369,7 @@ const task = computed<TesTask>(() =>
       [TES_GROUP_TAG]: groupId.value,
       [TES_IDEMPOTENCY_TAG]: runId.value,
       ...(dependencies.value.length ? { [TES_NETWORK_TAG]: 'open' } : {}),
-      ...placementTags(placementLabels.value),
+      ...(runTarget.local.value ? {} : placementTags(placementLabels.value)),
     },
   }),
 )
@@ -751,6 +752,21 @@ const dataReady = computed(
     groupId.value.length > 0 &&
     (!needsStagingLocation.value || (stagingBucketValid.value && scriptKeyValid.value)),
 )
+const targetProblems = computed(() =>
+  collectTargetProblems({
+    target: runTarget.local.value ? 'local' : 'realm',
+    dependencies: dependencies.value,
+    realmInputsMissingVersion:
+      reuseSelectedScript.value ||
+      dataInputs.value.some((input) => !input.source_node_id?.trim() || !input.version_id?.trim()),
+    cpuCores: task.value.resources?.cpu_cores,
+    ramBytes:
+      task.value.resources?.ram_gb === undefined
+        ? undefined
+        : Math.floor(task.value.resources.ram_gb * 1_000_000_000),
+    limits: runTarget.compute.value?.limits ?? null,
+  }),
+)
 const canContinue = computed(() => {
   switch (step.value) {
     case 0:
@@ -785,11 +801,6 @@ const submittedOutputs = ref<{ bucket: string; key: string; path: string }[]>([]
 async function submitLocally(draft: TesTask): Promise<boolean> {
   const client = runTarget.localClient.value
   if (!client) return false
-  if (dependencies.value.length) {
-    submitError.value =
-      'A run on this computer has no network access, so the dependencies cannot be installed. Remove them, or run this in the realm.'
-    return true
-  }
   const mapping = tesFormToExecutionRequest({
     groupId: groupId.value,
     task: draft,
@@ -810,29 +821,48 @@ async function submit() {
   submitting.value = true
   try {
     const reuseScript = reuseSelectedScript.value
-    const submittedTask = task.value
-    const uploads: Promise<void>[] = []
-    if (!reuseScript) {
-      uploads.push(
-        s3.putTextObject(
-          stagingBucket.value.trim(),
-          normalizedScriptKey.value,
-          stagedScript.value,
-          runtime.value.contentType,
-        ),
-      )
+    let submittedTask = task.value
+    const [scriptUpload, dependencyUpload] = await Promise.all([
+      !reuseScript
+        ? s3.putTextObject(
+            stagingBucket.value.trim(),
+            normalizedScriptKey.value,
+            stagedScript.value,
+            runtime.value.contentType,
+          )
+        : Promise.resolve(null),
+      dependencyConfig.value
+        ? s3.putTextObject(
+            stagingBucket.value.trim(),
+            dependencyConfigKey.value,
+            dependencyConfig.value,
+            'application/json',
+          )
+        : Promise.resolve(null),
+    ])
+    if (runTarget.local.value) {
+      const sourceNodeId = s3.nodeIdFor()
+      if (!sourceNodeId) throw new Error('The realm node for staged inputs is not available.')
+      const localInputs = [...(submittedTask.inputs ?? [])]
+      if (scriptUpload?.versionId && localInputs[0]) {
+        localInputs[0] = {
+          ...localInputs[0],
+          source_node_id: sourceNodeId,
+          version_id: scriptUpload.versionId,
+        }
+      }
+      if (dependencyUpload?.versionId && localInputs[1]) {
+        localInputs[1] = {
+          ...localInputs[1],
+          source_node_id: sourceNodeId,
+          version_id: dependencyUpload.versionId,
+        }
+      }
+      if (localInputs.some((input) => !input.source_node_id || !input.version_id)) {
+        throw new Error('Realm data inputs need an exact version for a local run.')
+      }
+      submittedTask = { ...submittedTask, inputs: localInputs }
     }
-    if (dependencyConfig.value) {
-      uploads.push(
-        s3.putTextObject(
-          stagingBucket.value.trim(),
-          dependencyConfigKey.value,
-          dependencyConfig.value,
-          'application/json',
-        ),
-      )
-    }
-    await Promise.all(uploads)
     if (await submitLocally(submittedTask)) return
     const created = await createTask(submittedTask)
     submittedOutputs.value = outputRows.value.map((row) => ({
@@ -1088,13 +1118,6 @@ function dismissRerun() {
       <section class="surface space-y-5 p-6">
         <!-- Step 1: Runtime -->
         <div v-if="step === 0" class="space-y-3">
-          <RunTargetPicker
-            v-if="runTarget.available.value"
-            v-model="runTarget.target.value"
-            :compute="runTarget.compute.value"
-            :realm-name="realm.shortName"
-          />
-          <PlacementPicker v-if="!runTarget.local.value" v-model="placementLabels" />
           <div class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Runtime</div>
           <div class="grid gap-3 sm:grid-cols-3">
             <button
@@ -1488,6 +1511,21 @@ function dismissRerun() {
 
         <!-- Step 4: Review. Mirrors the data step's in/out structure. -->
         <div v-else class="space-y-4">
+          <div class="space-y-3">
+            <RunTargetPicker
+              v-if="runTarget.available.value"
+              v-model="runTarget.target.value"
+              :compute="runTarget.compute.value"
+              :realm-name="realm.shortName"
+            />
+            <PlacementPicker v-if="!runTarget.local.value" v-model="placementLabels" />
+            <ul
+              v-if="targetProblems.length"
+              class="list-disc space-y-1 rounded-md border border-destructive/30 bg-destructive/5 px-7 py-2 text-xs text-destructive"
+            >
+              <li v-for="problem in targetProblems" :key="problem">{{ problem }}</li>
+            </ul>
+          </div>
           <div class="grid gap-4 text-xs lg:grid-cols-2">
             <section class="surface-muted space-y-2 p-4">
               <div class="flex items-center gap-1.5 font-semibold text-foreground">
@@ -1547,7 +1585,7 @@ function dismissRerun() {
           <ArrowLeft v-if="step === 0" class="h-3.5 w-3.5" /> {{ step === 0 ? 'Back to Compute' : 'Back' }}
         </Button>
         <Button v-if="step < WIZARD_STEPS.length - 1" size="sm" :disabled="!canContinue" @click="next">Continue</Button>
-        <Button v-else size="sm" :disabled="busy || submitting || !dataReady || !inputsValid || !outputsValid" @click="submit">
+        <Button v-else size="sm" :disabled="busy || submitting || !dataReady || !inputsValid || !outputsValid || !!targetProblems.length" @click="submit">
           <ListPlus class="h-4 w-4" /> {{ submitting ? 'Submitting…' : 'Submit run' }}
         </Button>
       </div>
