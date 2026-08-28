@@ -1,12 +1,10 @@
 import { orcidOf, rorOf } from '@/lib/identifiers'
-import { CURATED_ENTITY_TYPES, type EntityTypeOption } from '@/lib/profiles/entityTypes'
 import {
   CURATED_PROPERTY_TERMS,
   propertyTermsForType,
   type PropertyTermOption,
 } from '@/lib/profiles/propertyCatalog'
 import { slugify } from '@/lib/profiles/emit'
-import { loadVocabulary } from '@/lib/profiles/vocabulary'
 import type { ContextEntity, RootRole } from './build'
 
 export type EntityTemplateFieldKind = 'text' | 'url' | 'date' | 'number' | 'email' | 'reference' | 'term'
@@ -92,6 +90,29 @@ function template(config: Omit<EntityTemplate, 'create'> & {
       }
     },
   }
+}
+
+const DEFAULT_PROPERTIES = ['name', 'description', 'url', 'identifier']
+
+/** Maps a catalogue or vocabulary value kind onto a form field kind. */
+export function fieldKindOf(kind?: string): EntityTemplateFieldKind {
+  if (kind === 'url' || kind === 'email' || kind === 'date' || kind === 'number') return kind
+  if (kind === 'entity') return 'reference'
+  return 'text'
+}
+
+// What an entity of any type starts with: the four properties every crate
+// reader understands, plus the two most useful curated ones for that type.
+export function defaultFieldsForType(typeUri: string): EntityTemplateField[] {
+  const shown = new Set(DEFAULT_PROPERTIES)
+  return [
+    ...DEFAULT_PROPERTIES.map((property) =>
+      propertyField(typeUri, property, property === 'url' ? 'url' : 'text', property === 'name')),
+    ...propertyTermsForType(typeUri)
+      .filter((term) => !shown.has(term.name))
+      .slice(0, 2)
+      .map((term) => propertyField(typeUri, term.name, fieldKindOf(term.suggestedKind))),
+  ]
 }
 
 const personType = `${SCHEMA}Person`
@@ -213,28 +234,43 @@ export const ENTITY_TEMPLATES: EntityTemplate[] = [
   }),
   template({
     id: 'other',
-    label: 'Other type',
-    description: 'Another bundled schema.org or Dublin Core class.',
+    label: 'Something else',
+    description: 'Any other schema.org or Dublin Core type.',
     type: 'Thing',
     typeUri: `${SCHEMA}Thing`,
     roles: ['about'],
-    fields: [propertyField(`${SCHEMA}Thing`, 'name', 'text', true)],
+    fields: defaultFieldsForType(`${SCHEMA}Thing`),
     idFor: (values) => derivedId(values, 'entity'),
   }),
 ]
+
+const ROLE_TEMPLATES: Record<string, string> = {
+  author: 'person',
+  contributor: 'person',
+  maintainer: 'person',
+  publisher: 'organization',
+  funder: 'organization',
+  affiliation: 'organization',
+  citation: 'publication',
+  contactPoint: 'contact',
+  spatialCoverage: 'place',
+}
+
+/** The template a root reference field opens for its role. */
+export function templateForRole(role: RootRole): EntityTemplate | undefined {
+  const id = ROLE_TEMPLATES[String(role)]
+  return id ? ENTITY_TEMPLATES.find((template) => template.id === id) : undefined
+}
 
 export function createOtherEntity(
   typeUri: string,
   values: Record<string, unknown>,
   role: RootRole = 'about',
 ): ContextEntity {
-  const fields = propertySuggestionsForType(typeUri).map((term) =>
-    propertyField(typeUri, term.name, term.suggestedKind === 'url' ? 'url' : 'text'),
-  )
   return {
     id: derivedId(values, 'entity'),
     type: typeUri.split('/').pop() || typeUri,
-    properties: propertiesFromFields(fields, values),
+    properties: propertiesFromFields(defaultFieldsForType(typeUri), values),
     roles: [role],
   }
 }
@@ -243,17 +279,12 @@ export function propertySuggestionsForType(typeUri: string): PropertyTermOption[
   return propertyTermsForType(typeUri)
 }
 
-export async function otherEntityTypeOptions(): Promise<EntityTypeOption[]> {
-  const vocab = await loadVocabulary()
-  const byUri = new Map(CURATED_ENTITY_TYPES.map((option) => [option.uri, option]))
-  for (const entry of vocab.classes) {
-    if (!byUri.has(entry.uri)) {
-      byUri.set(entry.uri, {
-        uri: entry.uri,
-        label: entry.label,
-        description: entry.description,
-      })
-    }
-  }
-  return [...byUri.values()]
+/** Extra properties a form added beyond its template, merged onto the entity. */
+export function applyFields(
+  entity: ContextEntity,
+  fields: EntityTemplateField[],
+  values: Record<string, unknown>,
+): ContextEntity {
+  if (!fields.length) return entity
+  return { ...entity, properties: { ...entity.properties, ...propertiesFromFields(fields, values) } }
 }

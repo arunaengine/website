@@ -6,28 +6,31 @@ import DialogContent from '@/components/ui/DialogContent.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
-import Select from '@/components/ui/Select.vue'
+import Input from '@/components/ui/Input.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import EntityTemplateForm from '@/components/metadata/EntityTemplateForm.vue'
+import VocabSuggestions from '@/components/metadata/profile-builder/VocabSuggestions.vue'
 import {
   ENTITY_TEMPLATES,
   createOtherEntity,
-  otherEntityTypeOptions,
-  propertySuggestionsForType,
+  defaultFieldsForType,
+  templateForRole,
   type EntityTemplate,
-  type EntityTemplateFieldKind,
 } from '@/lib/crate/entityTemplates'
 import type { ContextEntity, RootRole } from '@/lib/crate/build'
-import { entityTypeLabel } from '@/lib/profiles/entityTypes'
+import { CURATED_ENTITY_TYPES, entityTypeLabel } from '@/lib/profiles/entityTypes'
 
 const props = defineProps<{
   open: boolean
   entities: ContextEntity[]
   datasetEntities?: ContextEntity[]
   editing?: ContextEntity | null
+  // Set by a root reference field: the template is preselected and the form
+  // writes this role instead of asking for one.
+  role?: RootRole | null
 }>()
 const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
@@ -38,7 +41,7 @@ const emit = defineEmits<{
 const tab = ref('templates')
 const selectedTemplateId = ref('')
 const otherTypeUri = ref('http://schema.org/Thing')
-const otherOptions = ref<Array<{ value: string; label: string }>>([])
+const typeQuery = ref('')
 
 function typeName(entity: ContextEntity): string {
   const type = Array.isArray(entity.type) ? entity.type[0] : entity.type
@@ -56,19 +59,16 @@ watch(
   (open) => {
     if (!open) return
     tab.value = 'templates'
-    selectedTemplateId.value = templateForEntity(props.editing)?.id ?? ''
+    typeQuery.value = ''
+    selectedTemplateId.value = templateForEntity(props.editing)?.id
+      ?? (props.role ? templateForRole(props.role)?.id ?? '' : '')
   },
+  { immediate: true },
 )
 
 const selectedTemplate = computed(() =>
   ENTITY_TEMPLATES.find((template) => template.id === selectedTemplateId.value),
 )
-
-function fieldKind(kind?: string): EntityTemplateFieldKind {
-  if (kind === 'url' || kind === 'email' || kind === 'date' || kind === 'number') return kind
-  if (kind === 'entity') return 'reference'
-  return 'text'
-}
 
 const activeTemplate = computed<EntityTemplate | undefined>(() => {
   const selected = selectedTemplate.value
@@ -78,27 +78,11 @@ const activeTemplate = computed<EntityTemplate | undefined>(() => {
     ...selected,
     type: entityTypeLabel(typeUri),
     typeUri,
-    fields: propertySuggestionsForType(typeUri).map((term) => ({
-      property: term.name,
-      label: term.label,
-      kind: fieldKind(term.suggestedKind),
-      propertyUri: term.uri,
-      required: term.name === 'name' || undefined,
-    })),
+    fields: defaultFieldsForType(typeUri),
     create: (values: Record<string, unknown>, role?: RootRole) =>
       createOtherEntity(typeUri, values, role ?? 'about'),
   }
 })
-
-async function chooseTemplate(template: EntityTemplate) {
-  selectedTemplateId.value = template.id
-  if (template.id === 'other' && !otherOptions.value.length) {
-    otherOptions.value = (await otherEntityTypeOptions()).map((option) => ({
-      value: option.uri,
-      label: option.label,
-    }))
-  }
-}
 
 function commit(value: { entity: ContextEntity; relatedEntities: ContextEntity[] }) {
   const duplicate = props.entities.find((entity) =>
@@ -132,8 +116,8 @@ function entityName(entity: ContextEntity): string {
   <Dialog :open="open" @update:open="(value: boolean) => emit('update:open', value)">
     <DialogContent class="max-w-xl">
       <DialogHeader>
-        <DialogTitle>{{ editing ? 'Edit context' : 'Add context' }}</DialogTitle>
-        <DialogDescription>Add a described entity or reuse one from a dataset already loaded in this session.</DialogDescription>
+        <DialogTitle>{{ editing ? 'Edit entity' : 'Add entity' }}</DialogTitle>
+        <DialogDescription>Describe something the dataset refers to, or reuse one from a dataset already loaded in this session.</DialogDescription>
       </DialogHeader>
 
       <Tabs v-model="tab">
@@ -149,7 +133,7 @@ function entityName(entity: ContextEntity): string {
               :key="template.id"
               type="button"
               class="rounded-lg border border-border p-3 text-left hover:border-primary/40 hover:bg-primary/5"
-              @click="chooseTemplate(template)"
+              @click="selectedTemplateId = template.id"
             >
               <span class="block text-sm font-medium text-foreground">{{ template.label }}</span>
               <span class="mt-1 block text-xs text-muted-foreground">{{ template.description }}</span>
@@ -162,11 +146,38 @@ function entityName(entity: ContextEntity): string {
             </div>
             <div v-if="activeTemplate.id === 'other'">
               <label class="text-xs font-medium text-foreground">Entity type</label>
-              <Select v-model="otherTypeUri" :options="otherOptions" class="mt-1" aria-label="Other entity type" />
+              <div class="mt-1 flex flex-wrap gap-1.5">
+                <button
+                  v-for="option in CURATED_ENTITY_TYPES"
+                  :key="option.uri"
+                  type="button"
+                  class="rounded-full border px-2.5 py-1 text-[11px] transition-colors"
+                  :class="option.uri === otherTypeUri
+                    ? 'border-primary/40 bg-primary/10 text-primary'
+                    : 'border-border text-muted-foreground hover:bg-muted/40'"
+                  @click="otherTypeUri = option.uri"
+                >{{ option.label }}</button>
+              </div>
+              <Input
+                v-model="typeQuery"
+                class="mt-1.5"
+                placeholder="Search for another type"
+                aria-label="Search entity types"
+              />
+              <VocabSuggestions
+                :query="typeQuery"
+                kind="class"
+                :exclude="[otherTypeUri]"
+                @pick="(term) => { otherTypeUri = term.uri; typeQuery = '' }"
+              />
+              <p class="mt-1 text-[11px] text-muted-foreground">
+                Using {{ entityTypeLabel(otherTypeUri) }}.
+              </p>
             </div>
             <EntityTemplateForm
               :template="activeTemplate"
               :initial="editing"
+              :role="role"
               @save="commit"
               @cancel="selectedTemplateId = ''"
             />
