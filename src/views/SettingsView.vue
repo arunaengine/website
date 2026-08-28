@@ -13,16 +13,21 @@ import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue
 import GroupDetail from '@/components/groups/GroupDetail.vue'
 import DevicesPanel from '@/components/onboarding/DevicesPanel.vue'
 import CopyButton from '@/components/nodes/CopyButton.vue'
+import Tabs from '@/components/ui/Tabs.vue'
+import TabsList from '@/components/ui/TabsList.vue'
+import TabsTrigger from '@/components/ui/TabsTrigger.vue'
+import TabsContent from '@/components/ui/TabsContent.vue'
 import { useTheme, type ThemeMode } from '@/composables/useTheme'
 import { useAruna } from '@/composables/useAruna'
 import { useRefresh } from '@/composables/useRefresh'
+import { useRouteTab } from '@/composables/useRouteTab'
 import { useAuth } from '@/composables/useAuth'
 import { useWatches } from '@/composables/useWatches'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import { apiOrigin } from '@/lib/api'
 import { errorMessage, relativeTime } from '@/lib/utils'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { ChevronRight, ExternalLink, KeyRound, Palette, Rss, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, LogOut, Plus, Save } from '@lucide/vue'
+import { computed, ref, watch } from 'vue'
+import { ChevronRight, ExternalLink, Eye, KeyRound, Palette, Rss, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, LogOut, Plus, Save } from '@lucide/vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 
 const {
@@ -44,9 +49,20 @@ const {
   revokeS3Credential,
 } = useAruna()
 const { signIn, signOut, isAuthenticated, authPending, stage, stageError } = useAuth()
-const route = useRoute()
 // Optimistic until a watch request answers 404/403 (mirrors the bell's probe).
 const { available: watchesAvailable } = useWatches()
+
+const settingsTabs = [
+  { id: 'profile', label: 'Profile' },
+  { id: 'groups', label: 'Groups' },
+  { id: 'access', label: 'Access' },
+  { id: 'connection', label: 'Connection' },
+  { id: 'appearance', label: 'Appearance' },
+] as const
+const tab = useRouteTab(
+  settingsTabs.map((entry) => entry.id),
+  'profile',
+)
 
 const { busy: refreshBusy, refresh: onRefresh } = useRefresh(refresh)
 const apiBaseDraft = ref(apiBaseUrl.value)
@@ -163,133 +179,6 @@ const themeOptions: Array<{ id: ThemeMode; title: string; icon: unknown; preview
 ]
 const { mode: appearance, setTheme } = useTheme()
 
-const settingsSections = [
-  { id: 'connection', label: 'API connection' },
-  { id: 'profile', label: 'Profile' },
-  { id: 'default-profile', label: 'Default profile' },
-  { id: 'groups', label: 'Groups & roles' },
-  { id: 'credentials', label: 'CLI and service access' },
-  { id: 'devices', label: 'Devices' },
-  { id: 'interop', label: 'Interoperability' },
-  { id: 'appearance', label: 'Appearance' },
-] as const
-type SettingsSectionId = (typeof settingsSections)[number]['id']
-
-const activeSettingsSection = ref<SettingsSectionId>('connection')
-const mobileSettingsTabs = ref<HTMLElement | null>(null)
-const showMobileTabsStartFade = ref(false)
-const showMobileTabsEndFade = ref(false)
-let settingsScrollFrame: number | null = null
-
-function settingsSectionFromHash(hash: string): SettingsSectionId | null {
-  const id = hash.replace(/^#/, '')
-  return settingsSections.some((section) => section.id === id) ? (id as SettingsSectionId) : null
-}
-
-function updateMobileTabFades() {
-  const tabs = mobileSettingsTabs.value
-  if (!tabs) return
-  showMobileTabsStartFade.value = tabs.scrollLeft > 2
-  showMobileTabsEndFade.value = tabs.scrollLeft + tabs.clientWidth < tabs.scrollWidth - 2
-}
-
-function revealMobileTab(tab: HTMLElement) {
-  const tabs = mobileSettingsTabs.value
-  if (!tabs) return
-
-  const visibleLeft = tabs.scrollLeft + 4
-  const visibleRight = tabs.scrollLeft + tabs.clientWidth - 40
-  const tabLeft = tab.offsetLeft
-  const tabRight = tabLeft + tab.offsetWidth
-  if (tabLeft >= visibleLeft && tabRight <= visibleRight) return
-
-  const left = tabLeft < visibleLeft ? tabLeft - 4 : tabRight - tabs.clientWidth + 40
-  tabs.scrollTo({ left: Math.max(0, left), behavior: 'smooth' })
-}
-
-function setActiveSettingsSection(sectionId: SettingsSectionId) {
-  if (activeSettingsSection.value === sectionId) return
-  activeSettingsSection.value = sectionId
-  void nextTick(() => {
-    const tab = mobileSettingsTabs.value?.querySelector<HTMLElement>(`a[href="#${sectionId}"]`)
-    if (tab) revealMobileTab(tab)
-  })
-}
-
-function revealFocusedMobileTab(event: FocusEvent) {
-  if (event.currentTarget instanceof HTMLElement) revealMobileTab(event.currentTarget)
-}
-
-function onMobileTabsKeydown(event: KeyboardEvent) {
-  if (!(event.currentTarget instanceof HTMLElement) || !(event.target instanceof HTMLAnchorElement)) return
-  const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLAnchorElement>('a'))
-  const currentIndex = tabs.indexOf(event.target)
-  if (currentIndex < 0) return
-
-  let nextIndex: number | null = null
-  if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % tabs.length
-  if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + tabs.length) % tabs.length
-  if (event.key === 'Home') nextIndex = 0
-  if (event.key === 'End') nextIndex = tabs.length - 1
-  if (nextIndex === null) return
-
-  event.preventDefault()
-  tabs[nextIndex]?.focus()
-  if (tabs[nextIndex]) revealMobileTab(tabs[nextIndex])
-}
-
-function updateActiveSettingsSection() {
-  const lastSection = settingsSections[settingsSections.length - 1]
-  if (window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2) {
-    setActiveSettingsSection(lastSection.id)
-    return
-  }
-
-  let current: SettingsSectionId = settingsSections[0].id
-  for (const section of settingsSections) {
-    const target = document.getElementById(section.id)
-    if (!target || target.getBoundingClientRect().top > 80) break
-    current = section.id
-  }
-  setActiveSettingsSection(current)
-}
-
-function scheduleActiveSettingsSectionUpdate() {
-  if (settingsScrollFrame !== null) return
-  settingsScrollFrame = window.requestAnimationFrame(() => {
-    settingsScrollFrame = null
-    updateActiveSettingsSection()
-  })
-}
-
-function onSettingsViewportResize() {
-  updateMobileTabFades()
-  scheduleActiveSettingsSectionUpdate()
-}
-
-watch(
-  () => route.hash,
-  (hash) => {
-    const section = settingsSectionFromHash(hash)
-    if (section) setActiveSettingsSection(section)
-  },
-  { immediate: true },
-)
-watch(watchesAvailable, () => void nextTick(updateMobileTabFades))
-
-onMounted(() => {
-  window.addEventListener('scroll', scheduleActiveSettingsSectionUpdate, { passive: true })
-  window.addEventListener('resize', onSettingsViewportResize)
-  void nextTick(updateMobileTabFades)
-  scheduleActiveSettingsSectionUpdate()
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('scroll', scheduleActiveSettingsSectionUpdate)
-  window.removeEventListener('resize', onSettingsViewportResize)
-  if (settingsScrollFrame !== null) window.cancelAnimationFrame(settingsScrollFrame)
-})
-
 const createGroupOpen = ref(false)
 const createCredentialOpen = ref(false)
 const revokeError = ref<string | null>(null)
@@ -332,63 +221,30 @@ function toggleGroup(groupId: string) {
 </script>
 
 <template>
-  <!-- The submenu switches on this column's own width, not the window's: the
-       desktop shell's side navigation already takes about 240px of it. -->
-  <div class="@container">
-    <PageHeader title="Settings" description="API connection, current user, profiles, groups and credentials from the local Aruna API.">
+  <div>
+    <PageHeader title="Settings" description="Your account, groups, access keys and this browser's connection to the realm.">
       <template #actions>
         <RefreshButton :busy="refreshBusy" size="default" @click="onRefresh" />
-        <Button :disabled="!currentUser || saving || !profileDirty" @click="saveProfile"><Save class="h-4 w-4" /> Save profile</Button>
+        <Button v-if="watchesAvailable" variant="outline" size="default" as-child>
+          <RouterLink :to="{ name: 'settings-watches' }"><Eye class="h-4 w-4" /> Watched resources</RouterLink>
+        </Button>
+        <Button v-if="tab === 'profile'" :disabled="!currentUser || saving || !profileDirty" @click="saveProfile"><Save class="h-4 w-4" /> Save profile</Button>
       </template>
     </PageHeader>
 
-    <div class="container grid min-w-0 gap-6 py-8 @4xl:grid-cols-[260px_1fr]">
-      <nav class="hidden flex-col gap-1 text-sm @4xl:flex">
-        <a
-          v-for="section in settingsSections"
-          :key="section.id"
-          :href="'#' + section.id"
-          class="rounded-md px-3 py-2"
-          :class="activeSettingsSection === section.id ? 'bg-primary/5 font-medium text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'"
-        >{{ section.label }}</a>
-        <RouterLink v-if="watchesAvailable" :to="{ name: 'settings-watches' }" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Watched resources &rarr;</RouterLink>
-      </nav>
-
-      <div class="relative min-w-0 @4xl:hidden">
-        <nav
-          ref="mobileSettingsTabs"
-          aria-label="Settings sections"
-          class="scrollbar-thin flex min-w-0 gap-1 overflow-x-auto border-y border-border/70 py-2 pr-10 text-sm"
-          @keydown="onMobileTabsKeydown"
-          @scroll="updateMobileTabFades"
-        >
-          <a
-            v-for="section in settingsSections"
-            :key="section.id"
-            :href="'#' + section.id"
-            :aria-current="activeSettingsSection === section.id ? 'location' : undefined"
-            class="shrink-0 rounded-md px-3 py-1.5 transition-colors hover:bg-muted hover:text-foreground"
-            :class="activeSettingsSection === section.id ? 'bg-primary/10 font-medium text-primary' : 'text-muted-foreground'"
-            @click="setActiveSettingsSection(section.id)"
-            @focus="revealFocusedMobileTab"
-          >
-            {{ section.label }}
-          </a>
-          <RouterLink
-            v-if="watchesAvailable"
-            :to="{ name: 'settings-watches' }"
-            class="shrink-0 rounded-md px-3 py-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            @focus="revealFocusedMobileTab"
-          >
-            Watched resources &rarr;
-          </RouterLink>
-        </nav>
-        <div v-if="showMobileTabsStartFade" aria-hidden="true" class="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-background to-transparent" />
-        <div v-if="showMobileTabsEndFade" aria-hidden="true" class="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-background to-transparent" />
+    <Tabs v-model="tab">
+      <div class="container pt-6">
+        <div class="overflow-x-auto">
+          <TabsList aria-label="Settings sections">
+            <TabsTrigger v-for="entry in settingsTabs" :key="entry.id" :value="entry.id">
+              {{ entry.label }}
+            </TabsTrigger>
+          </TabsList>
+        </div>
       </div>
 
-      <div class="min-w-0 space-y-6">
-        <section id="connection" class="surface scroll-mt-20 lg:scroll-mt-[4.5rem]">
+      <TabsContent value="connection" class="container mt-0 min-w-0 space-y-5 py-6">
+        <section class="surface">
           <header class="border-b border-border px-5 py-4">
             <h3 class="font-display text-sm font-semibold text-aruna-navy">Session &amp; API connection</h3>
             <p class="text-xs text-muted-foreground">Sign-in is handled by the realm's identity provider; the issued Aruna token authenticates this browser.</p>
@@ -462,7 +318,39 @@ function toggleGroup(groupId: string) {
           </div>
         </section>
 
-        <section id="profile" class="surface scroll-mt-20 lg:scroll-mt-[4.5rem]">
+        <section class="surface">
+          <header class="border-b border-border px-5 py-4">
+            <div class="flex items-center gap-2"><Rss class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">Interoperability</h3></div>
+            <p class="text-xs text-muted-foreground">Open protocols external services can consume from this node.</p>
+          </header>
+          <div class="space-y-3 p-5">
+            <div>
+              <div class="text-sm font-medium text-foreground">OAI-PMH data provider</div>
+              <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Standard OAI-PMH 2.0 endpoint for metadata harvesters: publicly visible datasets are
+                exposed as Dublin Core (<span class="font-mono">oai_dc</span>) records. All six protocol verbs are
+                answered over GET or form-encoded POST; the repository has no set hierarchy. Point a harvester at
+                the base URL below.
+              </p>
+              <div class="mt-2 flex flex-wrap items-center gap-1.5 rounded-md border border-border bg-muted/30 px-3 py-2">
+                <code class="min-w-0 break-all font-mono text-[11px] text-foreground">{{ oaiBaseUrl }}</code>
+                <CopyButton :value="oaiBaseUrl" label="Copy OAI-PMH base URL" />
+                <a v-if="oaiIdentifyUrl" :href="oaiIdentifyUrl" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                  <ExternalLink class="h-3 w-3" /> Identify
+                </a>
+              </div>
+            </div>
+            <Separator />
+            <div class="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>Harvesting external OAI-PMH sources into this node</span>
+              <Badge size="sm" variant="outline" class="uppercase">Coming soon</Badge>
+            </div>
+          </div>
+        </section>
+      </TabsContent>
+
+      <TabsContent value="profile" class="container mt-0 min-w-0 space-y-5 py-6">
+        <section class="surface">
           <header class="border-b border-border px-5 py-4">
             <h3 class="font-display text-sm font-semibold text-aruna-navy">Profile</h3>
             <p class="text-xs text-muted-foreground">Loaded from /users/info and saved with PATCH /users/info.</p>
@@ -491,9 +379,9 @@ function toggleGroup(groupId: string) {
           </div>
         </section>
 
-        <section id="default-profile" class="surface scroll-mt-20 lg:scroll-mt-[4.5rem]">
+        <section class="surface">
           <header class="flex items-center justify-between border-b border-border px-5 py-4">
-            <div class="flex items-center gap-2"><ListChecks class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">Default metadata profile</h3></div>
+            <div class="flex items-center gap-2"><ListChecks class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">Default profile</h3></div>
             <Button variant="outline" size="sm" as-child><RouterLink :to="{ name: 'profiles' }">Browse profiles <ArrowRight class="h-3.5 w-3.5" /></RouterLink></Button>
           </header>
           <div class="grid gap-2 p-5 sm:grid-cols-2">
@@ -501,12 +389,14 @@ function toggleGroup(groupId: string) {
               <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-white" :style="{ backgroundColor: profile.iconColor }"><ListChecks class="h-4 w-4" /></span>
               <div class="min-w-0 flex-1"><div class="flex items-center gap-2"><span class="text-sm font-medium text-foreground">{{ profile.name }}</span><Badge v-if="preferredProfileId === profile.id" size="sm" variant="accent" class="uppercase">default</Badge></div><p class="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">{{ profile.description }}</p></div>
             </button>
-            <div v-if="!profiles.length" class="text-sm text-muted-foreground">No visible profile documents.</div>
+            <div v-if="!profiles.length" class="text-sm text-muted-foreground">No profiles are visible to you.</div>
           </div>
           <div v-if="preferredProfile" class="border-t border-border bg-muted/20 px-5 py-3 text-[11px] text-muted-foreground">Selected: <span class="font-medium text-foreground">{{ preferredProfile.name }}</span><span v-if="profileDirty">, apply with "Save profile" above.</span></div>
         </section>
+      </TabsContent>
 
-        <section id="groups" class="surface scroll-mt-20 overflow-hidden lg:scroll-mt-[4.5rem]">
+      <TabsContent value="groups" class="container mt-0 min-w-0 space-y-5 py-6">
+        <section class="surface overflow-hidden">
           <header class="flex items-center justify-between border-b border-border px-5 py-4">
             <div class="flex items-center gap-2"><h3 class="font-display text-sm font-semibold text-aruna-navy">Groups &amp; roles</h3><Badge variant="outline" class="tabular-nums">{{ myGroups.length }} groups</Badge></div>
             <Button size="sm" :disabled="!currentUser" @click="createGroupOpen = true"><Plus class="h-3.5 w-3.5" /> Create group</Button>
@@ -548,8 +438,10 @@ function toggleGroup(groupId: string) {
           </div>
           <CreateGroupDialog v-model:open="createGroupOpen" @created="(group) => (selectedGroupId = group.group_id)" />
         </section>
+      </TabsContent>
 
-        <section id="credentials" class="surface scroll-mt-20 overflow-hidden lg:scroll-mt-[4.5rem]">
+      <TabsContent value="access" class="container mt-0 min-w-0 space-y-5 py-6">
+        <section class="surface overflow-hidden">
           <header class="flex items-center justify-between border-b border-border px-5 py-4">
             <div class="flex items-center gap-2">
               <KeyRound class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">CLI and service access</h3><Badge size="sm" variant="secondary" class="uppercase">Advanced</Badge><Badge variant="outline">{{ visibleCredentials.length }}</Badge>
@@ -588,47 +480,19 @@ function toggleGroup(groupId: string) {
           <CreateCredentialDialog v-model:open="createCredentialOpen" />
         </section>
 
-        <section id="devices" class="surface scroll-mt-20 overflow-hidden lg:scroll-mt-[4.5rem]">
+        <section class="surface overflow-hidden">
           <DevicesPanel />
         </section>
+      </TabsContent>
 
-        <section id="interop" class="surface scroll-mt-20 lg:scroll-mt-[4.5rem]">
-          <header class="border-b border-border px-5 py-4">
-            <div class="flex items-center gap-2"><Rss class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">Interoperability</h3></div>
-            <p class="text-xs text-muted-foreground">Open protocols external services can consume from this node.</p>
-          </header>
-          <div class="space-y-3 p-5">
-            <div>
-              <div class="text-sm font-medium text-foreground">OAI-PMH data provider</div>
-              <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
-                Standard OAI-PMH 2.0 endpoint for metadata harvesters: publicly visible metadata documents are
-                exposed as Dublin Core (<span class="font-mono">oai_dc</span>) records. All six protocol verbs are
-                answered over GET or form-encoded POST; the repository has no set hierarchy. Point a harvester at
-                the base URL below.
-              </p>
-              <div class="mt-2 flex flex-wrap items-center gap-1.5 rounded-md border border-border bg-muted/30 px-3 py-2">
-                <code class="min-w-0 break-all font-mono text-[11px] text-foreground">{{ oaiBaseUrl }}</code>
-                <CopyButton :value="oaiBaseUrl" label="Copy OAI-PMH base URL" />
-                <a v-if="oaiIdentifyUrl" :href="oaiIdentifyUrl" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs text-primary hover:underline">
-                  <ExternalLink class="h-3 w-3" /> Identify
-                </a>
-              </div>
-            </div>
-            <Separator />
-            <div class="flex items-center gap-2 text-xs text-muted-foreground">
-              <span>Harvesting external OAI-PMH sources into this node</span>
-              <Badge size="sm" variant="outline" class="uppercase">Coming soon</Badge>
-            </div>
-          </div>
-        </section>
-
-        <section id="appearance" class="surface scroll-mt-20 lg:scroll-mt-[4.5rem]">
+      <TabsContent value="appearance" class="container mt-0 min-w-0 space-y-5 py-6">
+        <section class="surface">
           <header class="flex items-center justify-between border-b border-border px-5 py-4"><div class="flex items-center gap-2"><Palette class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">Appearance</h3></div></header>
           <div class="grid gap-3 p-5 md:grid-cols-3">
             <button v-for="option in themeOptions" :key="option.id" class="flex items-center gap-3 rounded-lg border border-border bg-background/70 p-3 text-left transition-colors hover:border-primary/40" :class="appearance === option.id ? 'border-primary/60 ring-1 ring-primary/30' : ''" @click="setTheme(option.id)"><span class="grid h-12 w-16 shrink-0 place-items-center rounded-md border border-border shadow-inner" :style="{ background: option.preview }"><component :is="option.icon" class="h-4 w-4 text-primary" /></span><div><div class="text-sm font-medium text-foreground">{{ option.title }}</div></div></button>
           </div>
         </section>
-      </div>
-    </div>
+      </TabsContent>
+    </Tabs>
   </div>
 </template>

@@ -4,7 +4,7 @@ import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
-import ErrorPanel from '@/components/ui/ErrorPanel.vue'
+import ListShell from '@/components/ui/ListShell.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { computed, onMounted, watch } from 'vue'
 import { RouterLink } from 'vue-router'
@@ -55,6 +55,14 @@ function timeOf(w: ApiWatch): string {
   return relativeTime(new Date(w.created_at_ms).toISOString())
 }
 
+// Only what the shell models; being signed out or unsupported is answered above
+// it, and the first load is still 'loading' before it lands.
+const shellState = computed<'loading' | 'error' | 'empty' | 'ready'>(() => {
+  if (listError.value) return 'error'
+  if (!listLoaded.value) return 'loading'
+  return watches.value.length ? 'ready' : 'empty'
+})
+
 onMounted(() => void ensureLoaded())
 // Account switch without a reload: refetch for the new identity.
 watch(currentUser, () => void ensureLoaded())
@@ -64,7 +72,7 @@ watch(currentUser, () => void ensureLoaded())
   <div>
     <PageHeader
       title="Watched resources"
-      description="Watches deliver a notification when data is uploaded or metadata is created under a path you follow."
+      description="Watches deliver a notification when data is uploaded or a dataset is created under a path you follow."
     >
       <template #actions>
         <RefreshButton :busy="spinning" @click="onRefresh" />
@@ -89,36 +97,31 @@ watch(currentUser, () => void ensureLoaded())
       <EmptyState
         v-else-if="!available"
         title="Watches are not available."
-        description="This node's backend does not serve watch subscriptions for your session."
+        description="This node does not serve watch subscriptions for your session."
       />
 
       <template v-else>
-        <ErrorPanel v-if="listError" :message="listError" @retry="loadWatches" />
-
-        <div class="surface overflow-hidden">
-          <div class="flex items-center justify-between border-b border-border px-5 py-3">
+        <ListShell
+          :state="shellState"
+          :error="listError || undefined"
+          :rows="2"
+          empty-title="No watches yet"
+          empty-description="Use the Watch button on a dataset or on a bucket folder under Data to follow it."
+          @retry="loadWatches"
+        >
+          <template #icon><Eye class="h-6 w-6" /></template>
+          <template #filters>
             <h2 class="text-sm font-semibold text-foreground">Active watches</h2>
+          </template>
+          <template #tools>
             <Badge variant="outline">{{ watches.length }}</Badge>
-          </div>
+          </template>
 
-          <div v-if="listLoading && !watches.length" class="space-y-2 p-4">
-            <Skeleton class="h-12 w-full" />
-            <Skeleton class="h-12 w-full" />
-          </div>
-
-          <EmptyState
-            v-else-if="listLoaded && !listError && watches.length === 0"
-            title="No watches yet"
-            description="Use the Watch button on a metadata document or an object-browser prefix to follow it."
-          >
-            <template #icon><Eye class="h-6 w-6" /></template>
-          </EmptyState>
-
-          <ul v-else class="divide-y divide-border">
+          <ul class="divide-y divide-border">
             <li v-for="{ w, info, groupName } in rows" :key="w.id" class="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
               <div class="min-w-0 flex-1">
                 <div class="flex flex-wrap items-center gap-2">
-                  <Badge variant="secondary" size="sm" class="uppercase">{{ info?.namespace === 'meta' ? 'metadata' : info?.namespace === 's3' ? 'data' : 'watch' }}</Badge>
+                  <Badge variant="secondary" size="sm" class="uppercase">{{ info?.namespace === 'meta' ? 'dataset' : info?.namespace === 's3' ? 'data' : 'watch' }}</Badge>
                   <RouterLink
                     v-if="info?.link"
                     :to="info.link"
@@ -154,12 +157,12 @@ watch(currentUser, () => void ensureLoaded())
               </Button>
             </li>
           </ul>
-        </div>
+        </ListShell>
 
         <!-- What each watch kind actually covers. -->
         <div class="surface-muted space-y-1.5 px-4 py-3 text-[11px] leading-relaxed text-muted-foreground">
           <p><span class="font-medium text-foreground">Data watches</span> cover a bucket folder: every object uploaded under it, your own uploads included, across all folders below, triggers a notification; never just a single object.</p>
-          <p><span class="font-medium text-foreground">Metadata watches</span> cover a catalog path: you are notified when a new metadata document (dataset, profile, run record) is created under it.</p>
+          <p><span class="font-medium text-foreground">Dataset watches</span> cover a catalog path: you are notified when a new dataset, profile or run record is created under it.</p>
           <p>Events arrive in the notification bell; delivery can lag a few seconds. Each account can hold up to 50 watches; hover a watch to see its technical path.</p>
         </div>
       </template>

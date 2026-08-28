@@ -68,52 +68,45 @@ describe('SettingsView responsive geometry', () => {
     expect(collectElements(root, (node) => node.tag === 'Switch')).toHaveLength(0)
   })
 
-  it('renders every Settings section anchor in one narrow-container tab row', () => {
-    const sectionIds = ['connection', 'profile', 'default-profile', 'groups', 'credentials', 'devices', 'interop', 'appearance']
-    const sectionList = source.match(/const settingsSections = \[([\s\S]*?)\] as const/)?.[1] ?? ''
-    const renderedIds = Array.from(sectionList.matchAll(/\{ id: '([^']+)'/g), (match) => match[1])
-    const targetIds = collectElements(root, (node) => node.tag === 'section')
-      .map((node) => staticAttribute(node, 'id'))
+  it('offers every settings section as a shareable tab', () => {
+    const tabIds = ['profile', 'groups', 'access', 'connection', 'appearance']
+    const tabList = source.match(/const settingsTabs = \[([\s\S]*?)\] as const/)?.[1] ?? ''
+    const declaredIds = Array.from(tabList.matchAll(/\{ id: '([^']+)'/g), (match) => match[1])
+    const panelIds = collectElements(root, (node) => node.tag === 'TabsContent')
+      .map((node) => staticAttribute(node, 'value'))
       .filter((id): id is string => Boolean(id))
 
-    const navPath = findElementPath(root, (node) => node.tag === 'nav' && staticAttribute(node, 'aria-label') === 'Settings sections')
-    expect(navPath).toBeDefined()
-    const nav = navPath?.at(-1)
-    expect(nav).toBeDefined()
-    expect(classTokens(nav!)).toContain('overflow-x-auto')
-    expect(navPath?.some((node) => classTokens(node).includes('@4xl:hidden'))).toBe(true)
-    expect(nav?.loc.source).toContain('v-for="section in settingsSections"')
-    expect(nav?.loc.source).toContain(`:href="'#' + section.id"`)
-    expect(nav?.loc.source).toContain('@keydown="onMobileTabsKeydown"')
-    expect(nav?.loc.source).not.toContain('tabindex="-1"')
-    expect(renderedIds).toEqual(sectionIds)
-    expect(targetIds).toEqual(expect.arrayContaining(sectionIds))
-    for (const sectionId of sectionIds) {
-      const target = collectElements(root, (node) => staticAttribute(node, 'id') === sectionId)[0]
-      expect(classTokens(target)).toContain('scroll-mt-20')
-    }
+    expect(declaredIds).toEqual(tabIds)
+    expect(panelIds.sort()).toEqual([...tabIds].sort())
+    // Tabs live in ?tab= so a section is a link a person can share or reload into.
+    expect(source).toContain("useRouteTab(\n  settingsTabs.map((entry) => entry.id),\n  'profile',\n)")
+    expect(source).not.toContain('settingsSections')
+    expect(source).not.toContain('onMobileTabsKeydown')
   })
 
-  it('switches the submenu on the content container instead of the viewport', () => {
-    const shell = collectElements(root, (node) => classTokens(node).includes('@container'))
-    const grid = collectElements(root, (node) => classTokens(node).includes('@4xl:grid-cols-[260px_1fr]'))
-    const sideNav = collectElements(root, (node) => node.tag === 'nav' && classTokens(node).includes('@4xl:flex'))
-
-    expect(shell).toHaveLength(1)
-    expect(grid).toHaveLength(1)
-    expect(sideNav).toHaveLength(1)
-    // A container query cannot read its own container, so the grid must be nested.
-    expect(shell[0]).not.toBe(grid[0])
+  it('keeps the tab row scrollable and drops the anchored submenu', () => {
+    const listPath = findElementPath(
+      root,
+      (node) => node.tag === 'TabsList' && staticAttribute(node, 'aria-label') === 'Settings sections',
+    )
+    expect(listPath).toBeDefined()
+    expect(listPath?.some((node) => classTokens(node).includes('overflow-x-auto'))).toBe(true)
+    expect(collectElements(root, (node) => node.tag === 'TabsTrigger')).toHaveLength(1)
+    expect(source).not.toContain('@4xl:grid-cols-[260px_1fr]')
     expect(source).not.toContain('lg:grid-cols-[260px_1fr]')
+    expect(source).not.toContain('scroll-mt-20')
+  })
+
+  it('keeps the watched resources page reachable from the settings header', () => {
+    expect(source).toContain("{ name: 'settings-watches' }")
+    expect(source).toContain('Watched resources')
   })
 
   it('places the credentials table inside a horizontal overflow boundary', () => {
     const tablePath = findElementPath(root, (node) => node.tag === 'table')
     expect(tablePath).toBeDefined()
     const tableParent = tablePath?.at(-2)
-    const credentialsSection = tablePath?.find(
-      (node) => node.tag === 'section' && staticAttribute(node, 'id') === 'credentials',
-    )
+    const credentialsSection = tablePath?.find((node) => node.tag === 'section')
 
     expect(tableParent?.tag).toBe('div')
     expect(classTokens(tableParent!)).toEqual(expect.arrayContaining(['min-w-0', 'overflow-x-auto']))
