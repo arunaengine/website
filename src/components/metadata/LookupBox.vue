@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { onScopeDispose, ref, watch } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
 import Input from '@/components/ui/Input.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { cancelLookup, searchLookups } from '@/lib/lookup/registry'
 import type { LookupHit, LookupKind, LookupProviderStatus } from '@/lib/lookup/types'
+
+const MAX_HITS = 6
 
 const props = defineProps<{
   kind: LookupKind
@@ -19,7 +21,11 @@ const hits = ref<LookupHit[]>([])
 const status = ref<LookupProviderStatus | 'idle'>('idle')
 const loading = ref(false)
 const searched = ref(false)
+const dismissed = ref(false)
+const active = ref(-1)
 let timer: ReturnType<typeof setTimeout> | undefined
+
+const visible = computed(() => dismissed.value ? [] : hits.value.slice(0, MAX_HITS))
 
 function clearTimer() {
   if (timer === undefined) return
@@ -32,6 +38,8 @@ watch(query, (value) => {
   cancelLookup(props.kind)
   hits.value = []
   searched.value = false
+  dismissed.value = false
+  active.value = -1
   status.value = 'idle'
   emit('status', 'idle')
   if (!value.trim()) {
@@ -51,6 +59,34 @@ watch(query, (value) => {
   }, 300)
 })
 
+function move(delta: number) {
+  if (!visible.value.length) return
+  const next = active.value + delta
+  active.value = (next + visible.value.length) % visible.value.length
+}
+
+function choose(index: number) {
+  const hit = visible.value[index]
+  if (hit) emit('select', hit)
+}
+
+function onKeydown(event: KeyboardEvent) {
+  if (event.key === 'ArrowDown') {
+    event.preventDefault()
+    move(1)
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault()
+    move(-1)
+  } else if (event.key === 'Enter') {
+    if (active.value < 0) return
+    event.preventDefault()
+    choose(active.value)
+  } else if (event.key === 'Escape') {
+    dismissed.value = true
+    active.value = -1
+  }
+}
+
 onScopeDispose(() => {
   clearTimer()
   cancelLookup(props.kind)
@@ -64,23 +100,39 @@ onScopeDispose(() => {
         v-model="query"
         :placeholder="placeholder ?? (kind === 'person' ? 'Search ORCID' : 'Search ROR')"
         :aria-busy="loading"
+        role="combobox"
+        aria-autocomplete="list"
+        :aria-expanded="visible.length > 0"
         class="pr-9"
+        @keydown="onKeydown"
       />
       <Spinner v-if="loading" class="absolute right-3 top-1/2 -translate-y-1/2 text-primary" label="Searching" />
     </div>
-    <div v-if="hits.length" class="space-y-1">
-      <button
-        v-for="hit in hits"
-        :key="hit.id"
-        type="button"
-        class="w-full rounded-md border border-border px-3 py-2 text-left hover:bg-muted/40"
-        @click="emit('select', hit)"
-      >
-        <span class="block text-sm font-medium text-foreground">{{ hit.label }}</span>
-        <span class="block truncate font-mono text-[11px] text-muted-foreground">{{ hit.id }}</span>
-        <span v-if="hit.description" class="block text-[11px] text-muted-foreground">{{ hit.description }}</span>
-      </button>
-    </div>
+    <ul
+      v-if="visible.length"
+      role="listbox"
+      :aria-label="kind === 'person' ? 'ORCID results' : 'ROR results'"
+      class="max-h-56 divide-y divide-border overflow-y-auto rounded-md border border-border"
+    >
+      <li v-for="(hit, index) in visible" :key="hit.id">
+        <!-- mousedown.prevent keeps the input focused so the click still lands. -->
+        <button
+          type="button"
+          role="option"
+          :aria-selected="index === active"
+          class="flex w-full items-baseline px-2.5 py-1.5 text-left text-xs"
+          :class="index === active ? 'bg-muted' : 'hover:bg-muted/40'"
+          @mousedown.prevent
+          @click="choose(index)"
+        >
+          <span class="min-w-0 truncate">
+            <span class="font-medium text-foreground">{{ hit.label }}</span>
+            <span class="text-muted-foreground"> · {{ hit.id }}</span>
+            <span v-if="hit.description" class="text-muted-foreground"> · {{ hit.description }}</span>
+          </span>
+        </button>
+      </li>
+    </ul>
     <p v-else-if="status === 'offline' || status === 'error'" class="text-xs text-amber-700 dark:text-amber-300">
       {{ kind === 'person' ? 'ORCID' : 'ROR' }} is unavailable. Continue with the manual form below.
     </p>
