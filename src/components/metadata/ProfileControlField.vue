@@ -15,9 +15,8 @@ import type { ProfileControl, ProfileViolation } from '@/lib/profiles/types'
 // input (textarea / select / checkbox / plain input, incl. a depth-1 entity
 // reference URI input) + description + example placeholder + violations. A
 // `multiple` select / select-object renders as a checkbox list holding a string
-// array (of option values / option `@id`s). Used by NewDatasetDialog,
-// DatasetEntityInstances and the ProfileReviewStep preview so the three never
-// drift. `disabled` renders a read-only preview.
+// array (of option values / option `@id`s). Shared with the ProfileReviewStep
+// preview so the two never drift. `disabled` renders a read-only preview.
 const props = defineProps<{
   control: ProfileControl
   modelValue: unknown
@@ -30,8 +29,8 @@ const props = defineProps<{
 }>()
 
 // Which entity input this control renders (Phase 0 bridge until the combined
-// reuse-or-create control lands): controls that allow `new` render a sub-form in
-// DatasetEntityInstances and never reach the entity branch here.
+// reuse-or-create control lands): controls that allow `new` render their own
+// sub-form and never reach the entity branch here.
 const entityInput = computed(() => primaryEntityInput(props.control.entitySources))
 
 const emit = defineEmits<{ (e: 'update:modelValue', value: unknown): void }>()
@@ -99,7 +98,7 @@ const crateEntityOptions = computed(() => props.crateOptions ?? [])
 
 // An external-URI multiple entity control edits a real string array of
 // reference URIs; each row emits the whole array back (the parent stores it
-// verbatim), mirroring DatasetEntityInstances' nested repeatable list. Per-row URI
+// verbatim), mirroring the nested repeatable list. Per-row URI
 // errors are shown inline; the dialog derives the matching submit-gating violations
 // via the same uri.ts predicate so display and gating agree.
 const referenceList = computed<string[]>(() => (Array.isArray(props.modelValue) ? props.modelValue.map(String) : []))
@@ -328,7 +327,7 @@ function update(value: unknown) {
       <Switch :checked="Boolean(modelValue)" :disabled="disabled" @update:checked="(value: boolean) => update(value)" />
     </label>
     <!-- Entity references. Controls that allow describing a new entity render a
-         sub-form (DatasetEntityInstances) and never reach this renderer; here a
+         sub-form and never reach this renderer; here a
          reference is a crate pick or an absolute URI (external, or a depth-1
          nested reference whose policy allows `new`). URI-format errors show
          inline; the dialog computes the matching gating violations from the same
