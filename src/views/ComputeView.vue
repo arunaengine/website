@@ -2,107 +2,73 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
-import Button from '@/components/ui/Button.vue'
-import EmptyState from '@/components/ui/EmptyState.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
-import Skeleton from '@/components/ui/Skeleton.vue'
+import ComputeGates from '@/components/compute/ComputeGates.vue'
 import NewRunMenu from '@/components/compute/NewRunMenu.vue'
 import TasksPanel from '@/components/compute/TasksPanel.vue'
 import JobsPanel from '@/components/jobs/JobsPanel.vue'
 import { useTes } from '@/composables/useTes'
 import { useJobs } from '@/composables/useJobs'
 import { useAruna } from '@/composables/useAruna'
-import { useAuth } from '@/composables/useAuth'
-import { Cpu, LogIn } from '@lucide/vue'
 
-// One surface for both compute planes: TES tasks (user-submitted) and durable
-// system jobs (node-produced). Each half degrades on its own feature flag.
+// One surface for both compute planes: the runs people start and the system
+// jobs the node produces. Each half degrades on its own feature flag.
 const router = useRouter()
 const route = useRoute()
 const { tesEnabled } = useTes()
 const { jobsEnabled } = useJobs()
 const { currentUser } = useAruna()
-const { signIn, stage, authPending } = useAuth()
 
 const anyEnabled = computed(() => tesEnabled.value || jobsEnabled.value)
 const bothEnabled = computed(() => tesEnabled.value && jobsEnabled.value)
 
-// Job detail routes and ?tab=jobs select System jobs.
+// System job routes and ?tab=jobs select System jobs.
 const tab = computed(() => {
   if (!tesEnabled.value) return 'jobs'
   if (!jobsEnabled.value) return 'tasks'
   return route.name === 'job' || route.query.tab === 'jobs' ? 'jobs' : 'tasks'
 })
 const pageTitle = computed(() => {
-  if (route.name === 'job') return `Job ${String(route.params.jobId ?? '')}`
-  if (route.name === 'task') return `Task ${String(route.params.taskId ?? '')}`
+  if (route.name === 'job') return `System job ${String(route.params.jobId ?? '')}`
+  if (route.name === 'task') return `Run ${String(route.params.taskId ?? '')}`
   return 'Compute'
 })
 function setTab(next: string) {
   void router.replace({ name: 'compute', query: next === 'jobs' ? { tab: 'jobs' } : {} })
 }
-
-const signingIn = computed(() => stage.value === 'redirecting')
-function startSignIn() {
-  void signIn({ redirectTo: route.fullPath })
-}
 </script>
 
 <template>
   <div>
-    <PageHeader :title="pageTitle" description="Run tasks on this node and monitor the background jobs it produces.">
-      <!-- One Run entry point; the menu explains the two submission modes. -->
+    <PageHeader :title="pageTitle" description="The runs you start on this node, and the system jobs it produces.">
+      <!-- One Run entry point; the menu explains the two ways to start one. -->
       <template v-if="tesEnabled && currentUser" #actions>
         <NewRunMenu size="sm" />
       </template>
     </PageHeader>
 
-    <!-- Gate 1: both features disabled; no API call is ever issued here. -->
-    <div v-if="!anyEnabled" class="container py-8">
-      <EmptyState
-        title="Compute is not enabled"
-        description="Enable features.tes (GA4GH TES tasks) or features.jobs (durable background jobs) in portal-config.json to activate this surface."
-      >
-        <template #icon><Cpu class="h-7 w-7" /></template>
-      </EmptyState>
-    </div>
-
-    <!-- Session restore in flight: a stored token exists but the user profile
-         has not resolved yet, never flash the signed-out gate. -->
-    <div v-else-if="authPending" class="container py-8">
-      <section class="surface mx-auto max-w-xl space-y-3 p-8">
-        <Skeleton class="mx-auto h-8 w-8 rounded-full" />
-        <Skeleton class="mx-auto h-4 w-44" />
-        <Skeleton class="mx-auto h-3 w-64" />
-      </section>
-    </div>
-
-    <!-- Gate 2: not signed in; tasks and jobs are scoped to the account. -->
-    <div v-else-if="!currentUser" class="container py-8">
-      <section class="surface mx-auto max-w-xl p-8 text-center">
-        <Cpu class="mx-auto h-8 w-8 text-muted-foreground/70" />
-        <h2 class="mt-3 font-display text-base font-semibold text-aruna-navy">Sign in to use compute</h2>
-        <p class="mt-1.5 text-sm text-muted-foreground">Task submission and job monitoring are scoped to your account.</p>
-        <Button class="mt-4" size="sm" :disabled="signingIn" @click="startSignIn">
-          <LogIn class="h-3.5 w-3.5" /> Sign in
-        </Button>
-      </section>
-    </div>
-
-    <div v-else class="container py-8">
-      <Tabs v-if="bothEnabled" :model-value="tab" @update:model-value="setTab">
-        <TabsList>
-          <TabsTrigger value="tasks">Tasks</TabsTrigger>
-          <TabsTrigger value="jobs">System jobs</TabsTrigger>
-        </TabsList>
-        <TabsContent value="tasks" class="mt-4"><TasksPanel /></TabsContent>
-        <TabsContent value="jobs" class="mt-4"><JobsPanel /></TabsContent>
-      </Tabs>
-      <TasksPanel v-else-if="tesEnabled" />
-      <JobsPanel v-else />
-    </div>
+    <ComputeGates
+      :enabled="anyEnabled"
+      disabled-description="Enable features.tes or features.jobs in portal-config.json to activate this surface."
+      sign-in-title="Sign in to use compute"
+      sign-in-description="Runs and system jobs are scoped to your account."
+      :redirect-to="route.fullPath"
+    >
+      <div class="container py-8">
+        <Tabs v-if="bothEnabled" :model-value="tab" @update:model-value="setTab">
+          <TabsList>
+            <TabsTrigger value="tasks">Runs</TabsTrigger>
+            <TabsTrigger value="jobs">System jobs</TabsTrigger>
+          </TabsList>
+          <TabsContent value="tasks" class="mt-4"><TasksPanel /></TabsContent>
+          <TabsContent value="jobs" class="mt-4"><JobsPanel /></TabsContent>
+        </Tabs>
+        <TasksPanel v-else-if="tesEnabled" />
+        <JobsPanel v-else />
+      </div>
+    </ComputeGates>
   </div>
 </template>

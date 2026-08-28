@@ -8,11 +8,9 @@ import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
-import CopyButton from '@/components/nodes/CopyButton.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
 import JobFamilySection from '@/components/jobs/JobFamilySection.vue'
-import TaskStateBadge from '@/components/compute/TaskStateBadge.vue'
-import TesPlacementTags from '@/components/compute/TesPlacementTags.vue'
+import TaskHeader from '@/components/compute/TaskHeader.vue'
 import ClaimWatchStep, { type WatchStage } from '@/components/onboarding/ClaimWatchStep.vue'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useJobs } from '@/composables/useJobs'
@@ -250,7 +248,7 @@ const capturedOutputs = computed<OutRow[]>(() =>
     .map((o) => ({ url: o.url, path: o.path, size: Number(o.size_bytes), link: resolveUrl(o.url) })),
 )
 
-// ── Process Run crate (targeted lookup at runs/{taskId}) ─────────────────────
+// ── Run dataset (targeted lookup at runs/{taskId}) ───────────────────────────
 async function findRunCrate() {
   if (runCrateLoading.value) return
   runCrateLoading.value = true
@@ -294,8 +292,8 @@ async function confirmCancel() {
 const canCancel = computed(() => !!task.value && !isTerminalTesState(task.value.state))
 
 // ── Re-run ───────────────────────────────────────────────────────────────────
-// Quick runs reopen the quick-run wizard, anything else the New task wizard;
-// both read ?rerun=<taskId> and prefill from the FULL task record.
+// Quick runs reopen the quick-run wizard, anything else the custom-run wizard;
+// both read ?rerun=<taskId> and prefill from the FULL run record.
 function rerun() {
   if (!task.value) return
   const target = detectQuickRun(task.value) ? 'compute-quick' : 'compute-new'
@@ -341,24 +339,20 @@ async function confirmDelete() {
       </div>
 
       <Notice v-else-if="loadState === 'unsupported'" tone="warning">
-        This node does not expose the TES endpoint. Task details cannot be loaded.
+        This node does not accept runs, so the run detail cannot be loaded.
       </Notice>
 
-      <ErrorPanel v-else-if="loadState === 'error'" :message="loadError || 'Failed to load the task.'" @retry="initialLoad" />
+      <ErrorPanel v-else-if="loadState === 'error'" :message="loadError || 'Failed to load the run.'" @retry="initialLoad" />
 
       <div v-else-if="task" class="space-y-6">
-        <!-- Header -->
-        <div class="space-y-2 pr-8">
-          <div class="flex flex-wrap items-center gap-2">
-            <h2 class="font-display text-lg font-semibold text-aruna-navy">{{ headerTitle }}</h2>
-            <TaskStateBadge :state="task.state" />
-          </div>
-          <div class="flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
-            <span :title="task.id || taskId">{{ truncateMiddle(task.id || taskId) }}</span>
-            <CopyButton :value="task.id || taskId" label="Copy task id" />
-          </div>
-          <p v-if="task.description" class="text-sm text-muted-foreground">{{ task.description }}</p>
-        </div>
+        <TaskHeader
+          class="pr-8"
+          :title="headerTitle"
+          :run-id="task.id || taskId"
+          :state="task.state"
+          :tags="task.tags"
+          :description="task.description"
+        />
 
         <!-- State progression -->
         <ClaimWatchStep :stages="stages" :error="lastPollError" />
@@ -383,7 +377,6 @@ async function confirmDelete() {
             </dd>
           </template>
         </dl>
-        <TesPlacementTags :tags="task.tags" />
 
         <div v-if="otherTags.length" class="flex flex-wrap items-center gap-1.5">
           <Badge v-for="[k, v] in otherTags" :key="k" variant="outline" class="font-mono">{{ k }}={{ v }}</Badge>
@@ -474,14 +467,14 @@ async function confirmDelete() {
           </div>
         </section>
 
-        <!-- Process Run crate -->
+        <!-- Run dataset -->
         <section class="space-y-1.5">
-          <h3 class="font-display text-sm font-semibold text-aruna-navy">Process Run crate</h3>
+          <h3 class="font-display text-sm font-semibold text-aruna-navy">Run dataset</h3>
           <RouterLink v-if="runCrate" class="inline-flex items-center gap-1.5 text-xs text-primary hover:underline" :to="{ name: 'dataset', params: { id: runCrate.document_id } }">
-            <FileText class="h-3.5 w-3.5" /> Open Process Run crate
+            <FileText class="h-3.5 w-3.5" /> Open the run dataset
           </RouterLink>
           <div v-else class="flex flex-wrap items-center gap-2">
-            <p class="text-xs text-muted-foreground">No Process Run crate at <code class="rounded bg-muted px-1">runs/&lt;task-id&gt;</code> yet; it is written once the run completes.</p>
+            <p class="text-xs text-muted-foreground">No run dataset at <code class="rounded bg-muted px-1">runs/&lt;run-id&gt;</code> yet; it is written once the run completes.</p>
             <RefreshButton :busy="spinning" label="Check again" @click="onFindCrate" />
           </div>
         </section>
@@ -489,10 +482,10 @@ async function confirmDelete() {
         <!-- Actions: re-run, cancel, delete -->
         <section class="space-y-2 border-t border-border pt-4">
           <div class="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" title="Start a new run prefilled from this task" @click="rerun"><RotateCcw class="h-3.5 w-3.5" /> Re-run</Button>
+            <Button variant="outline" size="sm" title="Starts a new run prefilled from this one" @click="rerun"><RotateCcw class="h-3.5 w-3.5" /> Run again</Button>
             <template v-if="canCancel">
               <template v-if="!confirmingCancel">
-                <Button variant="outline" size="sm" class="text-destructive hover:text-destructive" :disabled="busy" @click="requestCancel"><Ban class="h-3.5 w-3.5" /> Cancel task</Button>
+                <Button variant="outline" size="sm" class="text-destructive hover:text-destructive" :disabled="busy" @click="requestCancel"><Ban class="h-3.5 w-3.5" /> Cancel run</Button>
               </template>
               <template v-else>
                 <Button variant="destructive" size="sm" :disabled="busy" @click="confirmCancel"><Ban class="h-3.5 w-3.5" /> Confirm cancel</Button>
@@ -514,7 +507,7 @@ async function confirmDelete() {
             </div>
           </div>
           <p v-if="confirmingDelete" class="text-[11px] text-muted-foreground">
-            {{ canCancel ? 'Cancels the run first, then removes' : 'Removes' }} it from the task list in this browser only; the record stays on the node and reappears via the Deleted filter.
+            {{ canCancel ? 'Cancels the run first, then removes' : 'Removes' }} it from the run list in this browser only; the record stays on the node and reappears via the Deleted filter.
           </p>
           <p v-if="cancelError" class="text-[11px] text-destructive">{{ cancelError }}</p>
           <p v-if="deleteError" class="text-[11px] text-destructive">{{ deleteError }}</p>

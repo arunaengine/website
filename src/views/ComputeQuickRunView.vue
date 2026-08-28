@@ -10,11 +10,14 @@ import Tabs from '@/components/ui/Tabs.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
-import EmptyState from '@/components/ui/EmptyState.vue'
 import FilterChips from '@/components/ui/FilterChips.vue'
 import Notice from '@/components/ui/Notice.vue'
-import Skeleton from '@/components/ui/Skeleton.vue'
 import WizardSteps from '@/components/onboarding/WizardSteps.vue'
+import ComputeGates from '@/components/compute/ComputeGates.vue'
+import ContainerIoSummary from '@/components/compute/ContainerIoSummary.vue'
+import RerunPrefillNote from '@/components/compute/RerunPrefillNote.vue'
+import RunPlacementSection from '@/components/compute/RunPlacementSection.vue'
+import WizardNavBar from '@/components/compute/WizardNavBar.vue'
 import TaskJsonPreview from '@/components/compute/TaskJsonPreview.vue'
 import GroupSelect from '@/components/groups/GroupSelect.vue'
 import Dialog from '@/components/ui/Dialog.vue'
@@ -28,14 +31,10 @@ import ObjectBrowserPanel from '@/components/data/ObjectBrowserPanel.vue'
 import TesDataRefDialog from '@/components/compute/TesDataRefDialog.vue'
 import ContainerFsTree from '@/components/compute/ContainerFsTree.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
-import QuickRunResult from '@/components/compute/QuickRunResult.vue'
 import InputLocalityHint from '@/components/compute/InputLocalityHint.vue'
-import RunTargetPicker from '@/components/compute/RunTargetPicker.vue'
-import PlacementPicker from '@/components/compute/PlacementPicker.vue'
 import { asyncChunkError } from '@/lib/chunk-recovery'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useAruna } from '@/composables/useAruna'
-import { useAuth } from '@/composables/useAuth'
 import { useComputeDataView } from '@/composables/useComputeDataView'
 import { useRealm } from '@/composables/useRealm'
 import { useRunTarget } from '@/composables/useRunTarget'
@@ -68,14 +67,11 @@ import {
   ArrowDownToLine,
   ArrowLeft,
   ArrowUpFromLine,
-  CornerDownRight,
-  Cpu,
   FileText,
   Folder,
   FolderOpen,
   KeyRound,
   ListPlus,
-  LogIn,
   Plus,
   X,
 } from '@lucide/vue'
@@ -91,17 +87,12 @@ const route = useRoute()
 const { tesEnabled, busy, createTask, getTask } = useTes()
 const { currentUser, myGroups } = useAruna()
 const { realm } = useRealm()
-// Desktop only: this machine can run the script itself.
+// Desktop only: this computer can run the script itself.
 const runTarget = useRunTarget()
-const { signIn, stage, authPending } = useAuth()
 const s3 = useS3()
 
-const signingIn = computed(() => stage.value === 'redirecting')
-function startSignIn() {
-  void signIn({ redirectTo: '/app/compute/quick' })
-}
-// Runtimes (tagged upstream images) live in lib/quickRuntimes so the task
-// detail panel can detect quick runs for the re-run flow.
+// Runtimes (tagged upstream images) live in lib/quickRuntimes so the run detail
+// panel can detect quick runs for the run-again flow.
 
 // One combined "Script & data" step: the selected data references are listed
 // with their editable container mount paths (defaulting to /work/in and
@@ -375,6 +366,41 @@ const task = computed<TesTask>(() =>
       ...(runTarget.local.value ? {} : placementTags(placementLabels.value)),
     },
   }),
+)
+
+// ── Review summary ───────────────────────────────────────────────────────────
+const reviewInputs = computed(() => [
+  {
+    label: runtime.value.file,
+    title: scriptUrl.value,
+    note: reuseSelectedScript.value ? 'reused without upload' : 'uploaded when the run starts',
+    ...(runtimeId.value === 'python-uv' && dependencies.value.length
+      ? { badge: `${dependencies.value.length} inline dependencies` }
+      : {}),
+    path: scriptContainerPath.value,
+  },
+  ...(dependencyInput.value
+    ? [
+        {
+          label: 'deno.json',
+          title: dependencyConfigUrl.value,
+          note: 'generated from dependencies',
+          path: dependencyConfigPath.value,
+        },
+      ]
+    : []),
+  ...inputs.value.map((entry) =>
+    entry.kind === 'folder'
+      ? {
+          label: `s3://${entry.bucket}/${entry.prefix}`,
+          note: `${entry.files.length} file${entry.files.length === 1 ? '' : 's'}`,
+          path: entry.basePath,
+        }
+      : { label: entry.url, path: entry.path },
+  ),
+])
+const reviewOutputs = computed(() =>
+  declaredOutputs.value.map((output) => ({ label: output.path, path: output.url })),
 )
 
 // ── Dependencies ─────────────────────────────────────────────────────────────
@@ -798,12 +824,9 @@ function back() {
 // ── Submit ───────────────────────────────────────────────────────────────────
 const submitting = ref(false)
 const submitError = ref<string | null>(null)
-const submittedTaskId = ref<string | null>(null)
-// Snapshot of the declared destinations for the result view.
-const submittedOutputs = ref<{ bucket: string; key: string; path: string }[]>([])
 
 /**
- * Sends the run to this machine as a native job, which is the only surface
+ * Sends the run to this computer as a native job, which is the only surface
  * that accepts a local target. Answers false when the realm is the target, and
  * reports its own refusal when the draft has no native form.
  */
@@ -819,9 +842,8 @@ async function submitLocally(draft: TesTask): Promise<boolean> {
     submitError.value = mapping.blocked
     return true
   }
-  await submitJob({ ...mapping.request, target: 'local' }, client)
-  // Local runs are followed in Runs; the result panel polls the realm's TES.
-  void router.push({ name: 'runs' })
+  const created = await submitJob({ ...mapping.request, target: 'local' }, client)
+  void router.push({ name: 'run', params: { jobId: created.job_id } })
   return true
 }
 
@@ -874,26 +896,14 @@ async function submit() {
     }
     if (await submitLocally(submittedTask)) return
     const created = await createTask(submittedTask)
-    submittedOutputs.value = outputRows.value.map((row) => ({
-      bucket: row.bucket.trim(),
-      key: normalizedOutputKey(row.path),
-      path: row.containerPath.trim(),
-    }))
-    submittedTaskId.value = created.id
+    void router.push({ name: 'task', params: { taskId: created.id } })
   } catch (err) {
     submitError.value = isTesUnsupported(err)
-      ? `This node does not expose the TES endpoint. ${errorMessage(err)}`
+      ? `This node does not accept runs. ${errorMessage(err)}`
       : errorMessage(err)
   } finally {
     submitting.value = false
   }
-}
-function runAnother() {
-  submittedTaskId.value = null
-  submitError.value = null
-  submittedOutputs.value = []
-  goStep(0)
-  runId.value = crypto.randomUUID()
 }
 
 // ── Re-run prefill (?rerun=<taskId>) ─────────────────────────────────────────
@@ -943,7 +953,7 @@ async function applyRerun(id: string) {
     const source = await getTask(id, 'FULL')
     const match = detectQuickRun(source)
     if (!match) {
-      rerunError.value = 'This task was not created by Quick run. Use the New task wizard to re-run it.'
+      rerunError.value = 'This run was not created by Quick run. Use Custom run to run it again.'
       return
     }
     const notes: string[] = []
@@ -1054,7 +1064,7 @@ function dismissRerun() {
     <PageHeader
       eyebrow="Compute"
       title="Quick run"
-      description="Run a Python, JavaScript or Bash script with optional package dependencies without writing a TES task by hand."
+      description="Run a Python, JavaScript or Bash script with optional package dependencies, without describing a container by hand."
     >
       <template #actions>
         <Button variant="outline" size="sm" as-child>
@@ -1063,521 +1073,440 @@ function dismissRerun() {
       </template>
     </PageHeader>
 
-    <!-- Gate 1: feature disabled -->
-    <div v-if="!tesEnabled" class="container py-8">
-      <EmptyState
-        title="Compute is not enabled"
-        description="Set features.tes to true in portal-config.json for this deployment; the Compute surface then targets any node that exposes the GA4GH TES endpoint."
-      >
-        <template #icon><Cpu class="h-7 w-7" /></template>
-      </EmptyState>
-    </div>
+    <ComputeGates
+      :enabled="tesEnabled"
+      disabled-description="Set features.tes to true in portal-config.json for this deployment; Compute then targets any node that accepts runs."
+      sign-in-title="Sign in to run a script"
+      sign-in-description="Starting a run is an authenticated operation."
+      redirect-to="/app/compute/quick"
+    >
+      <div class="container space-y-6 py-8">
+        <RerunPrefillNote
+          :loading="rerunLoading"
+          :error="rerunError"
+          :source="rerunSource"
+          :notes="rerunNotes"
+          @dismiss="dismissRerun"
+        />
 
-    <!-- Session restore in flight: never flash the signed-out gate. -->
-    <div v-else-if="authPending" class="container py-8">
-      <section class="surface mx-auto max-w-xl space-y-3 p-8">
-        <Skeleton class="mx-auto h-8 w-8 rounded-full" />
-        <Skeleton class="mx-auto h-4 w-44" />
-        <Skeleton class="mx-auto h-3 w-64" />
-      </section>
-    </div>
+        <WizardSteps :steps="WIZARD_STEPS" :current="step" />
 
-    <!-- Gate 2: not signed in -->
-    <div v-else-if="!currentUser" class="container py-8">
-      <section class="surface mx-auto max-w-xl p-8 text-center">
-        <Cpu class="mx-auto h-8 w-8 text-muted-foreground/70" />
-        <h2 class="mt-3 font-display text-base font-semibold text-aruna-navy">Sign in to run a script</h2>
-        <p class="mt-1.5 text-sm text-muted-foreground">Submitting GA4GH TES tasks is an authenticated operation.</p>
-        <Button class="mt-4" size="sm" :disabled="signingIn" @click="startSignIn"><LogIn class="h-3.5 w-3.5" /> Sign in</Button>
-      </section>
-    </div>
-
-    <!-- Result -->
-    <div v-else-if="submittedTaskId" class="container space-y-6 py-8">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <h2 class="font-display text-base font-semibold text-aruna-navy">Run submitted</h2>
-        <div class="flex items-center gap-2">
-          <Button variant="outline" size="sm" @click="router.push({ name: 'compute' })">
-            <ArrowLeft class="h-3.5 w-3.5" /> Back to Compute
-          </Button>
-          <Button size="sm" title="Starts the wizard again with this run's script and data settings" @click="runAnother">
-            <ListPlus class="h-4 w-4" /> Run again
-          </Button>
-        </div>
-      </div>
-      <QuickRunResult :task-id="submittedTaskId" :outputs="submittedOutputs" />
-    </div>
-
-    <!-- Wizard -->
-    <div v-else class="container space-y-6 py-8">
-      <!-- Re-run prefill status -->
-      <div v-if="rerunLoading" class="surface-inline px-4 py-3 text-xs text-muted-foreground">Loading the task to re-run…</div>
-      <Notice v-else-if="rerunError" tone="error" class="flex flex-wrap items-center justify-between gap-2">
-        <span>{{ rerunError }}</span>
-        <Button variant="ghost" size="sm" @click="dismissRerun">Dismiss</Button>
-      </Notice>
-      <div v-else-if="rerunSource" class="space-y-1.5 rounded-md border border-primary/30 bg-primary/5 px-4 py-3 text-xs">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <span class="font-medium text-foreground">Prefilled from run <span class="font-mono">{{ rerunSource.name }}</span>.</span>
-          <Button variant="ghost" size="sm" @click="dismissRerun">Dismiss</Button>
-        </div>
-        <ul v-if="rerunNotes.length" class="list-disc space-y-0.5 pl-4 text-muted-foreground">
-          <li v-for="note in rerunNotes" :key="note">{{ note }}</li>
-        </ul>
-      </div>
-
-      <WizardSteps :steps="WIZARD_STEPS" :current="step" />
-
-      <section class="surface space-y-5 p-6">
-        <!-- Step 1: Runtime -->
-        <div v-if="step === 0" class="space-y-3">
-          <h2 class="font-display text-sm font-semibold text-aruna-navy">Runtime</h2>
-          <div class="grid gap-3 sm:grid-cols-3">
-            <button
-              v-for="rt in RUNTIMES"
-              :key="rt.id"
-              type="button"
-              class="rounded-lg border p-4 text-left transition-colors"
-              :class="runtimeId === rt.id ? 'border-primary bg-primary/5 ring-1 ring-primary/40' : 'border-border hover:bg-muted/40'"
-              @click="runtimeId = rt.id"
-            >
-              <div class="text-sm font-semibold text-foreground">{{ rt.label }}</div>
-              <div class="mt-0.5 text-[11px] text-muted-foreground">{{ rt.hint }}</div>
-              <div class="mt-1 truncate font-mono text-[11px] text-muted-foreground" :title="rt.image">{{ rt.image }}</div>
-            </button>
-          </div>
-          <p class="text-[11px] text-muted-foreground">
-            The script runs as <code class="rounded bg-muted px-1 font-mono">{{ commandPreview }}</code> in a fresh container.
-          </p>
-          <div class="border-t border-border pt-3">
-            <label class="text-xs font-medium text-foreground">Working directory <span class="text-muted-foreground">(advanced)</span></label>
-            <Input
-              :model-value="workdir"
-              class="mt-1 w-56 font-mono"
-              placeholder="/work"
-              aria-label="Container working directory"
-              :invalid="!workdirValid ? 'error' : undefined"
-              @update:model-value="setWorkdir(String($event))"
-            />
-            <p v-if="!workdirValid" class="mt-1 text-[11px] text-destructive">
-              Use an absolute canonical container directory other than /.
-            </p>
-            <p v-else class="mt-1 text-[11px] text-muted-foreground">
-              The script runs here; inputs, captures and generated files default under it.
-            </p>
-            <Notice v-if="workdirNotice" tone="warning" class="mt-1">{{ workdirNotice }}</Notice>
-          </div>
-        </div>
-
-        <!-- Step 2: Script & data. Mounts sit next to the editor so container
-             paths are visible while the script is written. -->
-        <div v-else-if="step === 1" class="space-y-5">
-          <!-- Credentials gate -->
-          <Notice v-if="!s3.endpoint.value" tone="warning">
-            This node does not advertise an S3 endpoint, so the portal cannot stage the script. Use the full task form to reference an existing script.
-          </Notice>
-          <div v-else-if="!s3.hasActiveKey.value" class="space-y-2 rounded-md border border-border bg-muted/20 px-3 py-3 text-xs text-muted-foreground">
-            <p class="flex items-center gap-2 font-medium text-foreground"><KeyRound class="h-3.5 w-3.5" /> S3 credentials are required to stage the script and browse data.</p>
-            <Button variant="outline" size="sm" @click="credentialDialogOpen = true"><Plus class="size-3.5" /> Create credentials</Button>
-          </div>
-
-          <div v-if="s3.endpoint.value && s3.hasActiveKey.value" class="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label class="text-xs font-medium text-foreground">Group</label>
-              <GroupSelect v-model="groupId" :options="groupOptions" placeholder="Select a group" class="mt-1" />
-              <p class="mt-1 text-[11px] text-muted-foreground">Owns the run and receives its Process Run crate.</p>
+        <section class="surface space-y-5 p-6">
+          <!-- Step 1: Runtime -->
+          <div v-if="step === 0" class="space-y-3">
+            <h2 class="font-display text-sm font-semibold text-aruna-navy">Runtime</h2>
+            <div class="grid gap-3 sm:grid-cols-3">
+              <button
+                v-for="rt in RUNTIMES"
+                :key="rt.id"
+                type="button"
+                class="rounded-lg border p-4 text-left transition-colors"
+                :class="runtimeId === rt.id ? 'border-primary bg-primary/5 ring-1 ring-primary/40' : 'border-border hover:bg-muted/40'"
+                @click="runtimeId = rt.id"
+              >
+                <div class="text-sm font-semibold text-foreground">{{ rt.label }}</div>
+                <div class="mt-0.5 text-[11px] text-muted-foreground">{{ rt.hint }}</div>
+                <div class="mt-1 truncate font-mono text-[11px] text-muted-foreground" :title="rt.image">{{ rt.image }}</div>
+              </button>
             </div>
-            <div>
-              <div v-if="reuseSelectedScript">
-                <label class="text-xs font-medium text-foreground">Existing script</label>
-                <p class="mt-1 truncate font-mono text-[11px] text-foreground" :title="scriptUrl">{{ scriptUrl }}</p>
-                <p class="mt-1 text-[11px] text-muted-foreground">Reused directly; no script object will be uploaded.</p>
-              </div>
-              <div v-if="needsStagingLocation" :class="reuseSelectedScript ? 'mt-3' : ''">
-                <label class="text-xs font-medium text-foreground">{{ reuseSelectedScript ? 'Generated files location' : 'Script location' }} <span class="text-destructive">*</span></label>
-                <div class="mt-1 flex items-center gap-2">
-                  <Select v-if="bucketOptions.length" v-model="stagingBucket" :options="bucketOptions" placeholder="Select a bucket" class="w-40 shrink-0" />
-                  <Input
-                    v-else
-                    v-model="stagingBucket"
-                    class="w-40 shrink-0 font-mono"
-                    :placeholder="bucketsLoading ? 'Loading buckets…' : 'my-results'"
-                    :invalid="stagingBucket.trim() && !stagingBucketValid ? 'error' : undefined"
-                  />
-                  <Input
-                    :model-value="scriptKey"
-                    class="min-w-0 flex-1 font-mono"
-                    :placeholder="defaultScriptKey"
-                    :aria-label="reuseSelectedScript ? 'Generated file path basis' : 'Script object key'"
-                    :invalid="!scriptKeyValid ? 'error' : undefined"
-                    @update:model-value="setScriptKey(String($event))"
-                  />
-                </div>
-                <p v-if="stagingBucket.trim() && !stagingBucketValid" class="mt-1 text-[11px] text-destructive">
-                  This bucket does not exist. Files can only be staged into one of your buckets.
-                </p>
-                <p v-else-if="bucketsLoaded && !buckets.length" class="mt-1 text-[11px] text-destructive">
-                  You have no buckets yet. Create one in Data first.
-                </p>
-                <p v-else-if="!scriptKeyValid" class="mt-1 text-[11px] text-destructive">
-                  Use an object key without a leading slash or empty segments, ending in a file name.
-                </p>
-                <p v-else class="mt-1 truncate font-mono text-[11px] text-muted-foreground" :title="stagedFileUrl">{{ stagedFileUrl }}</p>
-                <p class="mt-1 text-[11px] text-muted-foreground">
-                  {{ reuseSelectedScript ? 'Generated dependency files are uploaded here.' : "The default key keeps each run's copy separate, so reruns never overwrite a script an earlier task references." }}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <Tabs v-model="editorTab">
-            <TabsList>
-              <TabsTrigger value="work">Script &amp; data</TabsTrigger>
-              <TabsTrigger v-if="runtimeId !== 'bash'" value="dependencies">Dependencies ({{ dependencies.length }})</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="work" class="mt-4">
-              <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
-            <!-- Script editor -->
-            <div class="min-w-0 space-y-2">
-              <div class="flex items-center justify-between gap-2">
-                <label class="text-xs font-medium text-foreground">Script <span class="font-mono text-muted-foreground">({{ runtime.file }})</span></label>
-                <div class="flex items-center gap-1.5">
-                  <Button variant="outline" size="sm" @click="loadScriptOpen = true">
-                    <FolderOpen class="h-3.5 w-3.5" /> Load existing script
-                  </Button>
-                  <Button variant="ghost" size="sm" @click="script = runtime.template">Reset to template</Button>
-                </div>
-              </div>
-              <Suspense>
-                <ScriptEditor v-model="script" :language="runtime.lang" />
-                <template #fallback>
-                  <div class="grid h-40 place-items-center rounded-md border border-input bg-field text-xs text-muted-foreground">Loading editor…</div>
-                </template>
-              </Suspense>
-              <p v-if="!script.trim()" class="text-[11px] text-destructive">The script cannot be empty.</p>
-              <p class="text-[11px] text-muted-foreground">
-                Runs as <code class="rounded bg-muted px-1 font-mono">{{ commandPreview }}</code> in a fresh container.
+            <p class="text-[11px] text-muted-foreground">
+              The script runs as <code class="rounded bg-muted px-1 font-mono">{{ commandPreview }}</code> in a fresh container.
+            </p>
+            <div class="border-t border-border pt-3">
+              <label class="text-xs font-medium text-foreground">Working directory <span class="text-muted-foreground">(advanced)</span></label>
+              <Input
+                :model-value="workdir"
+                class="mt-1 w-56 font-mono"
+                placeholder="/work"
+                aria-label="Container working directory"
+                :invalid="!workdirValid ? 'error' : undefined"
+                @update:model-value="setWorkdir(String($event))"
+              />
+              <p v-if="!workdirValid" class="mt-1 text-[11px] text-destructive">
+                Use an absolute canonical container directory other than /.
               </p>
+              <p v-else class="mt-1 text-[11px] text-muted-foreground">
+                The script runs here; inputs, captures and generated files default under it.
+              </p>
+              <Notice v-if="workdirNotice" tone="warning" class="mt-1">{{ workdirNotice }}</Notice>
+            </div>
+          </div>
+
+          <!-- Step 2: Script & data. Mounts sit next to the editor so container
+               paths are visible while the script is written. -->
+          <div v-else-if="step === 1" class="space-y-5">
+            <!-- Credentials gate -->
+            <Notice v-if="!s3.endpoint.value" tone="warning">
+              This node does not advertise an S3 endpoint, so the portal cannot stage the script. Use Custom run to reference an existing script.
+            </Notice>
+            <div v-else-if="!s3.hasActiveKey.value" class="space-y-2 rounded-md border border-border bg-muted/20 px-3 py-3 text-xs text-muted-foreground">
+              <p class="flex items-center gap-2 font-medium text-foreground"><KeyRound class="h-3.5 w-3.5" /> S3 credentials are required to stage the script and browse data.</p>
+              <Button variant="outline" size="sm" @click="credentialDialogOpen = true"><Plus class="size-3.5" /> Create credentials</Button>
             </div>
 
-            <!-- Data references: filesystem tree by default, row grids as the
-                 Table alternative; both operate on the same inputs/outputRows. -->
-            <div class="min-w-0 space-y-3">
-              <div class="flex items-center justify-between gap-2">
-                <span class="text-xs font-semibold text-foreground">Container data</span>
-                <FilterChips v-model="dataView" :options="DATA_VIEWS" aria-label="Container data view" />
+            <div v-if="s3.endpoint.value && s3.hasActiveKey.value" class="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label class="text-xs font-medium text-foreground">Group</label>
+                <GroupSelect v-model="groupId" :options="groupOptions" placeholder="Select a group" class="mt-1" />
+                <p class="mt-1 text-[11px] text-muted-foreground">Owns the run and receives its run dataset.</p>
               </div>
-
-              <section v-if="dataView === 'tree'" class="surface-muted space-y-2.5 p-3.5">
-                <p class="text-[11px] text-muted-foreground">
-                  The container filesystem as the script will see it. Use a folder's + menu to create subfolders, stage inputs, or capture outputs.
-                </p>
-                <ContainerFsTree
-                  :inputs="inputs"
-                  :outputs="treeOutputs"
-                  :script="{ path: scriptContainerPath, label: scriptUrl }"
-                  :workspace="activeWorkdir"
-                  @update-input-path="onTreeInputPath"
-                  @remove-input="removeInput"
-                  @update-output-path="onTreeOutputPath"
-                  @remove-output="removeOutput"
-                  @add-output="onTreeAddOutput"
-                  @add-input="onTreeAddInput"
-                >
-                  <template #output-details="{ index }">
-                    <div v-if="outputRows[index]" class="flex items-center gap-1.5">
-                      <span class="shrink-0 text-[10px] font-medium text-muted-foreground">into</span>
-                      <Select
-                        v-if="bucketOptions.length"
-                        v-model="outputRows[index].bucket"
-                        :options="bucketOptions"
-                        placeholder="Bucket"
-                        class="h-7 w-32 shrink-0 text-xs"
-                        aria-label="Destination bucket"
-                      />
-                      <Input v-else v-model="outputRows[index].bucket" class="h-7 w-32 shrink-0 font-mono text-xs" placeholder="bucket" aria-label="Destination bucket" />
-                      <span class="shrink-0 text-muted-foreground">/</span>
-                      <Input
-                        :model-value="outputRows[index].path"
-                        class="h-7 min-w-0 flex-1 font-mono text-xs"
-                        placeholder="results/output.txt"
-                        aria-label="Destination key"
-                        @update:model-value="setOutputKey(outputRows[index], String($event))"
-                        @blur="onOutputKeyBlur(outputRows[index])"
-                      />
-                    </div>
-                  </template>
-                </ContainerFsTree>
-                <p v-if="!inputsValid" class="text-[11px] text-destructive">
-                  Each input needs an absolute canonical container path (folders a base directory), unique across all staged files.
-                </p>
-                <p v-if="!outputsValid" class="text-[11px] text-destructive">
-                  Each capture needs one of your buckets, a canonical key and an absolute container path; folder captures (path ending in /) need a key ending in /; container paths and destinations must be unique.
-                </p>
-                <div class="flex flex-wrap items-center gap-1.5 pt-0.5">
-                  <Button variant="outline" size="sm" @click="openInputDialog"><ListPlus class="size-3.5" /> Add input</Button>
-                  <Button variant="outline" size="sm" @click="addOutput"><Plus class="size-3.5" /> Add output</Button>
+              <div>
+                <div v-if="reuseSelectedScript">
+                  <label class="text-xs font-medium text-foreground">Existing script</label>
+                  <p class="mt-1 truncate font-mono text-[11px] text-foreground" :title="scriptUrl">{{ scriptUrl }}</p>
+                  <p class="mt-1 text-[11px] text-muted-foreground">Reused directly; no script object will be uploaded.</p>
                 </div>
-                <p class="text-[11px] text-muted-foreground">stdout and stderr are always captured.</p>
-              </section>
-
-              <template v-else>
-              <section class="surface-muted space-y-2.5 p-3.5">
-                <div>
-                  <div class="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                    <ArrowDownToLine class="h-3.5 w-3.5 text-primary" /> Input data
+                <div v-if="needsStagingLocation" :class="reuseSelectedScript ? 'mt-3' : ''">
+                  <label class="text-xs font-medium text-foreground">{{ reuseSelectedScript ? 'Generated files location' : 'Script location' }} <span class="text-destructive">*</span></label>
+                  <div class="mt-1 flex items-center gap-2">
+                    <Select v-if="bucketOptions.length" v-model="stagingBucket" :options="bucketOptions" placeholder="Select a bucket" class="w-40 shrink-0" />
+                    <Input
+                      v-else
+                      v-model="stagingBucket"
+                      class="w-40 shrink-0 font-mono"
+                      :placeholder="bucketsLoading ? 'Loading buckets…' : 'my-results'"
+                      :invalid="stagingBucket.trim() && !stagingBucketValid ? 'error' : undefined"
+                    />
+                    <Input
+                      :model-value="scriptKey"
+                      class="min-w-0 flex-1 font-mono"
+                      :placeholder="defaultScriptKey"
+                      :aria-label="reuseSelectedScript ? 'Generated file path basis' : 'Script object key'"
+                      :invalid="!scriptKeyValid ? 'error' : undefined"
+                      @update:model-value="setScriptKey(String($event))"
+                    />
                   </div>
+                  <p v-if="stagingBucket.trim() && !stagingBucketValid" class="mt-1 text-[11px] text-destructive">
+                    This bucket does not exist. Files can only be staged into one of your buckets.
+                  </p>
+                  <p v-else-if="bucketsLoaded && !buckets.length" class="mt-1 text-[11px] text-destructive">
+                    You have no buckets yet. Create one in Data first.
+                  </p>
+                  <p v-else-if="!scriptKeyValid" class="mt-1 text-[11px] text-destructive">
+                    Use an object key without a leading slash or empty segments, ending in a file name.
+                  </p>
+                  <p v-else class="mt-1 truncate font-mono text-[11px] text-muted-foreground" :title="stagedFileUrl">{{ stagedFileUrl }}</p>
                   <p class="mt-1 text-[11px] text-muted-foreground">
-                    Staged read-only before the script starts, by default under <code class="rounded bg-muted px-1 font-mono">{{ activeWorkdir }}/in/</code>. Paths are editable.
+                    {{ reuseSelectedScript ? 'Generated dependency files are uploaded here.' : "The default key keeps each run's copy separate, so a repeat never overwrites a script an earlier run references." }}
                   </p>
                 </div>
-                <div v-if="inputs.length" class="space-y-1.5">
-                  <!-- Shared row grid with the output section: flexible content
-                       column plus a fixed 1.25rem action column so control
-                       right edges and remove buttons line up across both. -->
-                  <div v-for="(input, i) in inputs" :key="i" class="surface-inline grid grid-cols-[minmax(0,1fr)_1.25rem] gap-x-1.5 p-2 text-xs">
-                    <div v-if="input.kind === 'folder'" class="min-w-0 space-y-1">
-                      <Input
-                        v-model="input.basePath"
-                        class="h-7 font-mono text-xs"
-                        aria-label="Container base path"
-                        :invalid="!validContainerDir(input.basePath) ? 'error' : undefined"
-                      />
-                      <div class="flex min-w-0 items-center gap-1 font-mono text-[10px] text-muted-foreground" :title="`s3://${input.bucket}/${input.prefix}`">
-                        <Folder class="h-3 w-3 shrink-0 text-primary/70" />
-                        <span class="truncate">{{ input.name }}/ · {{ input.files.length }} file{{ input.files.length === 1 ? '' : 's' }} · s3://{{ input.bucket }}/{{ input.prefix }}</span>
-                      </div>
-                    </div>
-                    <div v-else class="min-w-0 space-y-1">
-                      <Input
-                        v-model="input.path"
-                        class="h-7 font-mono text-xs"
-                        aria-label="Container path"
-                        :invalid="!validContainerPath(input.path.trim()) ? 'error' : undefined"
-                      />
-                      <div class="truncate font-mono text-[10px] text-muted-foreground" :title="input.url">{{ input.url }}</div>
-                      <InputLocalityHint :url="input.url" />
-                    </div>
-                    <Button variant="ghost" size="icon-sm" class="mt-1 h-5 w-5 self-start" aria-label="Remove input" @click="removeInput(i)"><X class="size-3" /></Button>
+              </div>
+            </div>
+
+            <Tabs v-model="editorTab">
+              <TabsList>
+                <TabsTrigger value="work">Script &amp; data</TabsTrigger>
+                <TabsTrigger v-if="runtimeId !== 'bash'" value="dependencies">Dependencies ({{ dependencies.length }})</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="work" class="mt-4">
+                <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
+              <!-- Script editor -->
+              <div class="min-w-0 space-y-2">
+                <div class="flex items-center justify-between gap-2">
+                  <label class="text-xs font-medium text-foreground">Script <span class="font-mono text-muted-foreground">({{ runtime.file }})</span></label>
+                  <div class="flex items-center gap-1.5">
+                    <Button variant="outline" size="sm" @click="loadScriptOpen = true">
+                      <FolderOpen class="h-3.5 w-3.5" /> Load existing script
+                    </Button>
+                    <Button variant="ghost" size="sm" @click="script = runtime.template">Reset to template</Button>
                   </div>
+                </div>
+                <Suspense>
+                  <ScriptEditor v-model="script" :language="runtime.lang" />
+                  <template #fallback>
+                    <div class="grid h-40 place-items-center rounded-md border border-input bg-field text-xs text-muted-foreground">Loading editor…</div>
+                  </template>
+                </Suspense>
+                <p v-if="!script.trim()" class="text-[11px] text-destructive">The script cannot be empty.</p>
+                <p class="text-[11px] text-muted-foreground">
+                  Runs as <code class="rounded bg-muted px-1 font-mono">{{ commandPreview }}</code> in a fresh container.
+                </p>
+              </div>
+
+              <!-- Data references: filesystem tree by default, row grids as the
+                   Table alternative; both operate on the same inputs/outputRows. -->
+              <div class="min-w-0 space-y-3">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-xs font-semibold text-foreground">Container data</span>
+                  <FilterChips v-model="dataView" :options="DATA_VIEWS" aria-label="Container data view" />
+                </div>
+
+                <section v-if="dataView === 'tree'" class="surface-muted space-y-2.5 p-3.5">
+                  <p class="text-[11px] text-muted-foreground">
+                    The container filesystem as the script will see it. Use a folder's + menu to create subfolders, stage inputs, or capture outputs.
+                  </p>
+                  <ContainerFsTree
+                    :inputs="inputs"
+                    :outputs="treeOutputs"
+                    :script="{ path: scriptContainerPath, label: scriptUrl }"
+                    :workspace="activeWorkdir"
+                    @update-input-path="onTreeInputPath"
+                    @remove-input="removeInput"
+                    @update-output-path="onTreeOutputPath"
+                    @remove-output="removeOutput"
+                    @add-output="onTreeAddOutput"
+                    @add-input="onTreeAddInput"
+                  >
+                    <template #output-details="{ index }">
+                      <div v-if="outputRows[index]" class="flex items-center gap-1.5">
+                        <span class="shrink-0 text-[10px] font-medium text-muted-foreground">into</span>
+                        <Select
+                          v-if="bucketOptions.length"
+                          v-model="outputRows[index].bucket"
+                          :options="bucketOptions"
+                          placeholder="Bucket"
+                          class="h-7 w-32 shrink-0 text-xs"
+                          aria-label="Destination bucket"
+                        />
+                        <Input v-else v-model="outputRows[index].bucket" class="h-7 w-32 shrink-0 font-mono text-xs" placeholder="bucket" aria-label="Destination bucket" />
+                        <span class="shrink-0 text-muted-foreground">/</span>
+                        <Input
+                          :model-value="outputRows[index].path"
+                          class="h-7 min-w-0 flex-1 font-mono text-xs"
+                          placeholder="results/output.txt"
+                          aria-label="Destination key"
+                          @update:model-value="setOutputKey(outputRows[index], String($event))"
+                          @blur="onOutputKeyBlur(outputRows[index])"
+                        />
+                      </div>
+                    </template>
+                  </ContainerFsTree>
                   <p v-if="!inputsValid" class="text-[11px] text-destructive">
                     Each input needs an absolute canonical container path (folders a base directory), unique across all staged files.
                   </p>
-                </div>
-                <p v-else class="text-[11px] text-muted-foreground">No input data. Added files are staged into the container, by default under <code class="rounded bg-muted px-1 font-mono">{{ activeWorkdir }}/in/</code>.</p>
-                <Button variant="outline" size="sm" @click="openInputDialog"><ListPlus class="size-3.5" /> Add input</Button>
-              </section>
-
-              <section class="surface-muted space-y-2.5 p-3.5">
-                <div>
-                  <div class="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                    <ArrowUpFromLine class="h-3.5 w-3.5 text-primary" /> Output data
+                  <p v-if="!outputsValid" class="text-[11px] text-destructive">
+                    Each capture needs one of your buckets, a canonical key and an absolute container path; folder captures (path ending in /) need a key ending in /; container paths and destinations must be unique.
+                  </p>
+                  <div class="flex flex-wrap items-center gap-1.5 pt-0.5">
+                    <Button variant="outline" size="sm" @click="openInputDialog"><ListPlus class="size-3.5" /> Add input</Button>
+                    <Button variant="outline" size="sm" @click="addOutput"><Plus class="size-3.5" /> Add output</Button>
                   </div>
-                  <p class="mt-1 text-[11px] text-muted-foreground">
-                    Captures files or folders the script writes, by default under <code class="rounded bg-muted px-1 font-mono">{{ activeWorkdir }}/out/</code>, into a bucket after the run. A container path ending in / captures the files written directly in that folder; nested subfolders are not. stdout and stderr are always captured.
+                  <p class="text-[11px] text-muted-foreground">stdout and stderr are always captured.</p>
+                </section>
+
+                <template v-else>
+                <section class="surface-muted space-y-2.5 p-3.5">
+                  <div>
+                    <div class="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                      <ArrowDownToLine class="h-3.5 w-3.5 text-primary" /> Input data
+                    </div>
+                    <p class="mt-1 text-[11px] text-muted-foreground">
+                      Staged read-only before the script starts, by default under <code class="rounded bg-muted px-1 font-mono">{{ activeWorkdir }}/in/</code>. Paths are editable.
+                    </p>
+                  </div>
+                  <div v-if="inputs.length" class="space-y-1.5">
+                    <!-- Shared row grid with the output section: flexible content
+                         column plus a fixed 1.25rem action column so control
+                         right edges and remove buttons line up across both. -->
+                    <div v-for="(input, i) in inputs" :key="i" class="surface-inline grid grid-cols-[minmax(0,1fr)_1.25rem] gap-x-1.5 p-2 text-xs">
+                      <div v-if="input.kind === 'folder'" class="min-w-0 space-y-1">
+                        <Input
+                          v-model="input.basePath"
+                          class="h-7 font-mono text-xs"
+                          aria-label="Container base path"
+                          :invalid="!validContainerDir(input.basePath) ? 'error' : undefined"
+                        />
+                        <div class="flex min-w-0 items-center gap-1 font-mono text-[10px] text-muted-foreground" :title="`s3://${input.bucket}/${input.prefix}`">
+                          <Folder class="h-3 w-3 shrink-0 text-primary/70" />
+                          <span class="truncate">{{ input.name }}/ · {{ input.files.length }} file{{ input.files.length === 1 ? '' : 's' }} · s3://{{ input.bucket }}/{{ input.prefix }}</span>
+                        </div>
+                      </div>
+                      <div v-else class="min-w-0 space-y-1">
+                        <Input
+                          v-model="input.path"
+                          class="h-7 font-mono text-xs"
+                          aria-label="Container path"
+                          :invalid="!validContainerPath(input.path.trim()) ? 'error' : undefined"
+                        />
+                        <div class="truncate font-mono text-[10px] text-muted-foreground" :title="input.url">{{ input.url }}</div>
+                        <InputLocalityHint :url="input.url" />
+                      </div>
+                      <Button variant="ghost" size="icon-sm" class="mt-1 h-5 w-5 self-start" aria-label="Remove input" @click="removeInput(i)"><X class="size-3" /></Button>
+                    </div>
+                    <p v-if="!inputsValid" class="text-[11px] text-destructive">
+                      Each input needs an absolute canonical container path (folders a base directory), unique across all staged files.
+                    </p>
+                  </div>
+                  <p v-else class="text-[11px] text-muted-foreground">No input data. Added files are staged into the container, by default under <code class="rounded bg-muted px-1 font-mono">{{ activeWorkdir }}/in/</code>.</p>
+                  <Button variant="outline" size="sm" @click="openInputDialog"><ListPlus class="size-3.5" /> Add input</Button>
+                </section>
+
+                <section class="surface-muted space-y-2.5 p-3.5">
+                  <div>
+                    <div class="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                      <ArrowUpFromLine class="h-3.5 w-3.5 text-primary" /> Output data
+                    </div>
+                    <p class="mt-1 text-[11px] text-muted-foreground">
+                      Captures files or folders the script writes, by default under <code class="rounded bg-muted px-1 font-mono">{{ activeWorkdir }}/out/</code>, into a bucket after the run. A container path ending in / captures the files written directly in that folder; nested subfolders are not. stdout and stderr are always captured.
+                    </p>
+                  </div>
+                  <div v-if="outputRows.length" class="space-y-1.5">
+                    <!-- Same row grid as the input section above; every control
+                         line ends at the shared content-column edge. -->
+                    <div v-for="(row, i) in outputRows" :key="i" class="surface-inline grid grid-cols-[minmax(0,1fr)_1.25rem] gap-x-1.5 p-2 text-xs">
+                      <div class="min-w-0 space-y-1.5">
+                        <div>
+                          <label class="text-[10px] font-medium text-muted-foreground">Capture</label>
+                          <div class="mt-0.5 flex items-center gap-1.5">
+                            <Input
+                              :model-value="row.containerPath"
+                              class="h-7 min-w-0 flex-1 font-mono text-xs"
+                              :placeholder="`${activeWorkdir}/out/result.txt`"
+                              aria-label="Container path to capture"
+                              :invalid="!validOutputContainerPath(row.containerPath) ? 'error' : undefined"
+                              @update:model-value="setOutputContainerPath(row, String($event))"
+                            />
+                            <Badge variant="outline" size="sm" class="shrink-0 gap-1">
+                              <component :is="isDirCapture(row.containerPath) ? Folder : FileText" class="h-3 w-3" />
+                              {{ isDirCapture(row.containerPath) ? 'Folder' : 'File' }}
+                            </Badge>
+                          </div>
+                        </div>
+                        <div>
+                          <label class="text-[10px] font-medium text-muted-foreground">into</label>
+                          <div class="mt-0.5 flex items-center gap-1.5">
+                            <Select
+                              v-if="bucketOptions.length"
+                              v-model="row.bucket"
+                              :options="bucketOptions"
+                              placeholder="Bucket"
+                              class="h-7 w-32 shrink-0 text-xs"
+                              aria-label="Destination bucket"
+                            />
+                            <Input v-else v-model="row.bucket" class="h-7 w-32 shrink-0 font-mono text-xs" placeholder="bucket" aria-label="Destination bucket" />
+                            <span class="shrink-0 text-muted-foreground">/</span>
+                            <Input
+                              :model-value="row.path"
+                              class="h-7 min-w-0 flex-1 font-mono text-xs"
+                              placeholder="results/output.txt"
+                              aria-label="Destination key"
+                              @update:model-value="setOutputKey(row, String($event))"
+                              @blur="onOutputKeyBlur(row)"
+                            />
+                          </div>
+                        </div>
+                        <div class="truncate font-mono text-[10px] text-muted-foreground" :title="outputDestination(row)">{{ outputDestination(row) }}</div>
+                      </div>
+                      <Button variant="ghost" size="icon-sm" class="mt-1 h-5 w-5 self-start" aria-label="Remove output" @click="removeOutput(i)"><X class="size-3" /></Button>
+                    </div>
+                  </div>
+                  <p v-else class="text-[11px] text-muted-foreground">Nothing captured yet; only stdout and stderr are collected after the run.</p>
+                  <p v-if="!outputsValid" class="text-[11px] text-destructive">
+                    Each capture needs one of your buckets, a canonical key and an absolute container path; folder captures (path ending in /) need a key ending in /; container paths and destinations must be unique.
+                  </p>
+                  <Button variant="outline" size="sm" @click="addOutput"><Plus class="size-3.5" /> Add output</Button>
+                </section>
+                </template>
+              </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="dependencies" class="mt-4 space-y-4">
+                <p class="max-w-2xl rounded-md border border-border bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
+                  Added dependencies are checked against the registry automatically (browser-only, nothing is started); uv or Deno still performs the authoritative resolution when the run starts.
+                </p>
+                <div class="max-w-2xl space-y-2">
+                  <label class="text-xs font-medium text-foreground">
+                    {{ runtimeId === 'python-uv' ? 'PyPI requirement' : 'npm package' }}
+                  </label>
+                  <div class="flex items-center gap-2">
+                    <Input
+                      v-model="dependencyDraft"
+                      class="font-mono text-xs"
+                      :placeholder="runtimeId === 'python-uv' ? 'requests>=2' : 'chalk@5'"
+                      :invalid="dependencyError ? 'error' : undefined"
+                      @keyup.enter.prevent="addDependency"
+                    />
+                    <Button size="sm" :disabled="!dependencyDraft.trim() || !!dependencyError" @click="addDependency">
+                      <Plus class="size-3.5" /> Add
+                    </Button>
+                  </div>
+                  <p v-if="dependencyError" class="text-[11px] text-destructive">{{ dependencyError }}</p>
+                  <p v-else class="text-[11px] text-muted-foreground">
+                    <template v-if="runtimeId === 'python-uv'">
+                      Requirements are stored as hidden PEP 723 metadata in the uploaded script; the editor stays unchanged.
+                    </template>
+                    <template v-else>
+                      Packages are mapped to bare imports, for example <code class="rounded bg-muted px-1 font-mono">import chalk from "chalk"</code>.
+                    </template>
                   </p>
                 </div>
-                <div v-if="outputRows.length" class="space-y-1.5">
-                  <!-- Same row grid as the input section above; every control
-                       line ends at the shared content-column edge. -->
-                  <div v-for="(row, i) in outputRows" :key="i" class="surface-inline grid grid-cols-[minmax(0,1fr)_1.25rem] gap-x-1.5 p-2 text-xs">
-                    <div class="min-w-0 space-y-1.5">
-                      <div>
-                        <label class="text-[10px] font-medium text-muted-foreground">Capture</label>
-                        <div class="mt-0.5 flex items-center gap-1.5">
-                          <Input
-                            :model-value="row.containerPath"
-                            class="h-7 min-w-0 flex-1 font-mono text-xs"
-                            :placeholder="`${activeWorkdir}/out/result.txt`"
-                            aria-label="Container path to capture"
-                            :invalid="!validOutputContainerPath(row.containerPath) ? 'error' : undefined"
-                            @update:model-value="setOutputContainerPath(row, String($event))"
-                          />
-                          <Badge variant="outline" size="sm" class="shrink-0 gap-1">
-                            <component :is="isDirCapture(row.containerPath) ? Folder : FileText" class="h-3 w-3" />
-                            {{ isDirCapture(row.containerPath) ? 'Folder' : 'File' }}
-                          </Badge>
-                        </div>
-                      </div>
-                      <div>
-                        <label class="text-[10px] font-medium text-muted-foreground">into</label>
-                        <div class="mt-0.5 flex items-center gap-1.5">
-                          <Select
-                            v-if="bucketOptions.length"
-                            v-model="row.bucket"
-                            :options="bucketOptions"
-                            placeholder="Bucket"
-                            class="h-7 w-32 shrink-0 text-xs"
-                            aria-label="Destination bucket"
-                          />
-                          <Input v-else v-model="row.bucket" class="h-7 w-32 shrink-0 font-mono text-xs" placeholder="bucket" aria-label="Destination bucket" />
-                          <span class="shrink-0 text-muted-foreground">/</span>
-                          <Input
-                            :model-value="row.path"
-                            class="h-7 min-w-0 flex-1 font-mono text-xs"
-                            placeholder="results/output.txt"
-                            aria-label="Destination key"
-                            @update:model-value="setOutputKey(row, String($event))"
-                            @blur="onOutputKeyBlur(row)"
-                          />
-                        </div>
-                      </div>
-                      <div class="truncate font-mono text-[10px] text-muted-foreground" :title="outputDestination(row)">{{ outputDestination(row) }}</div>
-                    </div>
-                    <Button variant="ghost" size="icon-sm" class="mt-1 h-5 w-5 self-start" aria-label="Remove output" @click="removeOutput(i)"><X class="size-3" /></Button>
-                  </div>
-                </div>
-                <p v-else class="text-[11px] text-muted-foreground">Nothing captured yet; only stdout and stderr are collected after the run.</p>
-                <p v-if="!outputsValid" class="text-[11px] text-destructive">
-                  Each capture needs one of your buckets, a canonical key and an absolute container path; folder captures (path ending in /) need a key ending in /; container paths and destinations must be unique.
-                </p>
-                <Button variant="outline" size="sm" @click="addOutput"><Plus class="size-3.5" /> Add output</Button>
-              </section>
-              </template>
-            </div>
-              </div>
-            </TabsContent>
 
-            <TabsContent value="dependencies" class="mt-4 space-y-4">
-              <p class="max-w-2xl rounded-md border border-border bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
-                Added dependencies are checked against the registry automatically (browser-only, no task is created); uv or Deno still performs the authoritative resolution when the run starts.
-              </p>
-              <div class="max-w-2xl space-y-2">
-                <label class="text-xs font-medium text-foreground">
-                  {{ runtimeId === 'python-uv' ? 'PyPI requirement' : 'npm package' }}
-                </label>
-                <div class="flex items-center gap-2">
-                  <Input
-                    v-model="dependencyDraft"
-                    class="font-mono text-xs"
-                    :placeholder="runtimeId === 'python-uv' ? 'requests>=2' : 'chalk@5'"
-                    :invalid="dependencyError ? 'error' : undefined"
-                    @keyup.enter.prevent="addDependency"
-                  />
-                  <Button size="sm" :disabled="!dependencyDraft.trim() || !!dependencyError" @click="addDependency">
-                    <Plus class="size-3.5" /> Add
-                  </Button>
-                </div>
-                <p v-if="dependencyError" class="text-[11px] text-destructive">{{ dependencyError }}</p>
-                <p v-else class="text-[11px] text-muted-foreground">
-                  <template v-if="runtimeId === 'python-uv'">
-                    Requirements are stored as hidden PEP 723 metadata in the uploaded script; the editor stays unchanged.
-                  </template>
-                  <template v-else>
-                    Packages are mapped to bare imports, for example <code class="rounded bg-muted px-1 font-mono">import chalk from "chalk"</code>.
-                  </template>
-                </p>
-              </div>
-
-              <ul v-if="dependencies.length" class="max-w-2xl space-y-2">
-                <li
-                  v-for="(dependency, index) in dependencies"
-                  :key="dependency"
-                  class="surface-inline flex items-center gap-2 px-3 py-2 text-xs"
-                >
-                  <code class="min-w-0 flex-1 truncate font-mono text-foreground">{{ dependency }}</code>
-                  <Badge
-                    v-if="dependencyVerification[dependency]"
-                    :variant="dependencyVerification[dependency].state === 'not-found' ? 'destructive' : dependencyVerification[dependency].state === 'available' ? 'success' : 'outline'"
-                    size="sm"
-                    class="shrink-0"
-                    :title="dependencyVerification[dependency].detail"
+                <ul v-if="dependencies.length" class="max-w-2xl space-y-2">
+                  <li
+                    v-for="(dependency, index) in dependencies"
+                    :key="dependency"
+                    class="surface-inline flex items-center gap-2 px-3 py-2 text-xs"
                   >
-                    {{ VERIFICATION_LABEL[dependencyVerification[dependency].state] }}
-                  </Badge>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    :aria-label="`Remove ${dependency}`"
-                    @click="removeDependency(index)"
-                  >
-                    <X class="size-3" />
-                  </Button>
-                </li>
-              </ul>
-              <p v-else class="text-xs text-muted-foreground">No extra dependencies. Standard library modules remain available.</p>
-            </TabsContent>
-          </Tabs>
+                    <code class="min-w-0 flex-1 truncate font-mono text-foreground">{{ dependency }}</code>
+                    <Badge
+                      v-if="dependencyVerification[dependency]"
+                      :variant="dependencyVerification[dependency].state === 'not-found' ? 'destructive' : dependencyVerification[dependency].state === 'available' ? 'success' : 'outline'"
+                      size="sm"
+                      class="shrink-0"
+                      :title="dependencyVerification[dependency].detail"
+                    >
+                      {{ VERIFICATION_LABEL[dependencyVerification[dependency].state] }}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      :aria-label="`Remove ${dependency}`"
+                      @click="removeDependency(index)"
+                    >
+                      <X class="size-3" />
+                    </Button>
+                  </li>
+                </ul>
+                <p v-else class="text-xs text-muted-foreground">No extra dependencies. Standard library modules remain available.</p>
+              </TabsContent>
+            </Tabs>
 
-        </div>
+          </div>
 
-        <!-- Step 4: Review. Mirrors the data step's in/out structure. -->
-        <div v-else class="space-y-4">
-          <div class="space-y-3">
-            <RunTargetPicker
-              v-if="runTarget.available.value"
-              v-model="runTarget.target.value"
+          <!-- Step 4: Review. Mirrors the data step's in/out structure. -->
+          <div v-else class="space-y-4">
+            <RunPlacementSection
+              v-model:target="runTarget.target.value"
+              v-model:labels="placementLabels"
+              :available="runTarget.available.value"
+              :local="runTarget.local.value"
               :compute="runTarget.compute.value"
               :realm-name="realm.shortName"
+              :problems="targetProblems"
             />
-            <PlacementPicker v-if="!runTarget.local.value" v-model="placementLabels" />
-            <Notice v-if="targetProblems.length" tone="error" :lines="targetProblems" />
+            <ContainerIoSummary
+              :inputs="reviewInputs"
+              :outputs="reviewOutputs"
+              footnote="stdout and stderr are always captured."
+            />
+            <p class="text-xs text-muted-foreground">
+              Runs as <code class="rounded bg-muted px-1 font-mono">{{ commandPreview }}</code> in
+              <code class="rounded bg-muted px-1 font-mono">{{ runtime.image }}</code>;
+              {{ reuseSelectedScript ? 'the selected script object is reused without an upload.' : 'the script is uploaded when the run starts, because the backend does not accept inline script content.' }}
+            </p>
+            <TaskJsonPreview title="Run request" :task="task" />
+            <details class="text-[11px] text-muted-foreground">
+              <summary class="cursor-pointer">Technical details</summary>
+              <code class="mt-1 block rounded bg-muted px-2 py-1">POST /ga4gh/tes/v1/tasks</code>
+            </details>
+            <Notice v-if="submitError" tone="error">{{ submitError }}</Notice>
           </div>
-          <div class="grid gap-4 text-xs lg:grid-cols-2">
-            <section class="surface-muted space-y-2 p-4">
-              <div class="flex items-center gap-1.5 font-semibold text-foreground">
-                <ArrowDownToLine class="h-3.5 w-3.5 text-primary" /> Into the container
-              </div>
-              <ul class="space-y-1.5 font-mono text-[11px]">
-                <li>
-                  <div class="truncate text-foreground" :title="scriptUrl">{{ runtime.file }} <span class="font-sans text-muted-foreground">({{ reuseSelectedScript ? 'reused without upload' : 'uploaded on submit' }})</span> <Badge v-if="runtimeId === 'python-uv' && dependencies.length" variant="outline" size="sm" class="ml-1 font-sans">{{ dependencies.length }} inline dependencies</Badge></div>
-                  <div class="flex items-center gap-1 text-muted-foreground"><CornerDownRight class="h-3 w-3 shrink-0" /> {{ scriptContainerPath }}</div>
-                </li>
-                <li v-if="dependencyInput">
-                  <div class="truncate text-foreground" :title="dependencyConfigUrl">deno.json <span class="font-sans text-muted-foreground">(generated from dependencies)</span></div>
-                  <div class="flex items-center gap-1 text-muted-foreground"><CornerDownRight class="h-3 w-3 shrink-0" /> {{ dependencyConfigPath }}</div>
-                </li>
-                <li v-for="(input, i) in inputs" :key="i">
-                  <template v-if="input.kind === 'folder'">
-                    <div class="truncate text-foreground" :title="`s3://${input.bucket}/${input.prefix}`">
-                      s3://{{ input.bucket }}/{{ input.prefix }} <span class="font-sans text-muted-foreground">({{ input.files.length }} file{{ input.files.length === 1 ? '' : 's' }})</span>
-                    </div>
-                    <div class="flex items-center gap-1 text-muted-foreground"><CornerDownRight class="h-3 w-3 shrink-0" /> {{ input.basePath }}</div>
-                  </template>
-                  <template v-else>
-                    <div class="truncate text-foreground" :title="input.url">{{ input.url }}</div>
-                    <div class="flex items-center gap-1 text-muted-foreground"><CornerDownRight class="h-3 w-3 shrink-0" /> {{ input.path }}</div>
-                  </template>
-                </li>
-              </ul>
-            </section>
-            <section class="surface-muted space-y-2 p-4">
-              <div class="flex items-center gap-1.5 font-semibold text-foreground">
-                <ArrowUpFromLine class="h-3.5 w-3.5 text-primary" /> Out of the container
-              </div>
-              <ul v-if="declaredOutputs.length" class="space-y-1.5 font-mono text-[11px]">
-                <li v-for="output in declaredOutputs" :key="output.path">
-                  <div class="text-foreground">{{ output.path }}</div>
-                  <div class="flex min-w-0 items-center gap-1 text-muted-foreground">
-                    <CornerDownRight class="h-3 w-3 shrink-0" /> <span class="truncate" :title="output.url">{{ output.url }}</span>
-                  </div>
-                </li>
-              </ul>
-              <p v-else class="text-[11px] text-muted-foreground">No declared output files.</p>
-              <p class="text-[11px] text-muted-foreground">stdout and stderr are always captured.</p>
-            </section>
-          </div>
-          <p class="text-xs text-muted-foreground">
-            Runs as <code class="rounded bg-muted px-1 font-mono">{{ commandPreview }}</code> in
-            <code class="rounded bg-muted px-1 font-mono">{{ runtime.image }}</code>;
-            {{ reuseSelectedScript ? 'the selected script object is reused without an upload.' : 'the script is uploaded on submit because the backend does not accept inline script content.' }}
-          </p>
-          <TaskJsonPreview title="TES task (POST /ga4gh/tes/v1/tasks)" :task="task" />
-          <Notice v-if="submitError" tone="error">{{ submitError }}</Notice>
-        </div>
-      </section>
+        </section>
 
-      <div class="flex items-center justify-between">
-        <Button variant="outline" size="sm" @click="back">
-          <ArrowLeft v-if="step === 0" class="h-3.5 w-3.5" /> {{ step === 0 ? 'Back to Compute' : 'Back' }}
-        </Button>
-        <Button v-if="step < WIZARD_STEPS.length - 1" size="sm" :disabled="!canContinue" @click="next">Continue</Button>
-        <Button v-else size="sm" :disabled="busy || submitting || !dataReady || !inputsValid || !outputsValid || !!targetProblems.length" @click="submit">
-          <ListPlus class="h-4 w-4" /> {{ submitting ? 'Starting…' : 'Run' }}
-        </Button>
+        <WizardNavBar
+          :first="step === 0"
+          :last="step === WIZARD_STEPS.length - 1"
+          :can-continue="canContinue"
+          :can-run="!busy && !submitting && dataReady && inputsValid && outputsValid && !targetProblems.length"
+          :running="submitting"
+          @back="back"
+          @next="next"
+          @run="submit"
+        />
       </div>
-    </div>
+    </ComputeGates>
 
     <TesDataRefDialog v-model:open="inputDialogOpen" mode="input" :mount-default="inputMountDefault" @add="addInput" />
     <CreateCredentialDialog v-model:open="credentialDialogOpen" />

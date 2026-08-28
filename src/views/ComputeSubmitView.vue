@@ -7,22 +7,21 @@ import Input from '@/components/ui/Input.vue'
 import Textarea from '@/components/ui/Textarea.vue'
 import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
-import EmptyState from '@/components/ui/EmptyState.vue'
 import FilterChips from '@/components/ui/FilterChips.vue'
 import Notice from '@/components/ui/Notice.vue'
-import Skeleton from '@/components/ui/Skeleton.vue'
 import WizardSteps from '@/components/onboarding/WizardSteps.vue'
+import ComputeGates from '@/components/compute/ComputeGates.vue'
+import RerunPrefillNote from '@/components/compute/RerunPrefillNote.vue'
+import RunPlacementSection from '@/components/compute/RunPlacementSection.vue'
+import WizardNavBar from '@/components/compute/WizardNavBar.vue'
 import TaskJsonPreview from '@/components/compute/TaskJsonPreview.vue'
 import ExecutorStepsEditor from '@/components/compute/ExecutorStepsEditor.vue'
 import TesInputsEditor from '@/components/compute/TesInputsEditor.vue'
 import TesDataRefDialog from '@/components/compute/TesDataRefDialog.vue'
 import ContainerFsTree from '@/components/compute/ContainerFsTree.vue'
-import RunTargetPicker from '@/components/compute/RunTargetPicker.vue'
-import PlacementPicker from '@/components/compute/PlacementPicker.vue'
 import GroupSelect from '@/components/groups/GroupSelect.vue'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useAruna } from '@/composables/useAruna'
-import { useAuth } from '@/composables/useAuth'
 import { useComputeDataView } from '@/composables/useComputeDataView'
 import { useRealm } from '@/composables/useRealm'
 import { useRealmNodes } from '@/composables/useRealmNodes'
@@ -68,21 +67,16 @@ import { createOperationId } from '@/lib/placementPolicies'
 import { errorMessage } from '@/lib/utils'
 import { targetProblems as collectTargetProblems } from '@/lib/runTarget'
 import Badge from '@/components/ui/Badge.vue'
-import { ArrowLeft, ArrowRight, Cpu, FileText, Folder, ListPlus, LogIn, Plus, X } from '@lucide/vue'
+import { ArrowLeft, ArrowRight, FileText, Folder, ListPlus, Plus, X } from '@lucide/vue'
 
 const router = useRouter()
 const route = useRoute()
 const { tesEnabled, busy, createTask, getTask } = useTes()
-const { apiBaseUrl, authToken, currentUser, myGroups } = useAruna()
+const { apiBaseUrl, authToken, myGroups } = useAruna()
 const { realm } = useRealm()
-// Desktop only: this machine can run the task itself.
+// Desktop only: this computer can run the container itself.
 const runTarget = useRunTarget()
-const { signIn, stage, authPending } = useAuth()
 
-const signingIn = computed(() => stage.value === 'redirecting')
-function startSignIn() {
-  void signIn({ redirectTo: '/app/compute/new' })
-}
 const WIZARD_STEPS = ['Basics', 'Workload', 'Review & run']
 // The step lives in ?step=N so browser back/forward walks the wizard instead
 // of leaving it.
@@ -223,7 +217,7 @@ async function applyRerun(id: string) {
         },
       ]
       if ((source.executors?.length ?? 0) > 1) {
-        notes.push('Only the first executor was restored; the facade accepts one per task.')
+        notes.push('Only the first executor was restored; a run carries one.')
       }
     }
 
@@ -250,7 +244,7 @@ async function applyRerun(id: string) {
       workspaceMode.value = source.workspace.mode
       workspaceBucket.value = source.workspace.bucket ?? ''
     } else {
-      notes.push('The workspace choice is not part of the task record; pick one before submitting.')
+      notes.push('The workspace choice is not part of the run record; pick one before starting it.')
     }
 
     rerunSource.value = { id, name: source.name || id }
@@ -598,12 +592,12 @@ async function submit() {
     if (useNative.value) {
       submitRetryable.value = isSubmitRetryable(err)
       submitError.value = isNativeSubmitUnsupported(err)
-        ? 'This node does not serve the native jobs API, so these advanced options cannot be submitted here.'
+        ? 'This node does not serve the native jobs API, so these advanced options cannot be used here.'
         : submitErrorMessage(err)
       return
     }
     submitError.value = isTesUnsupported(err)
-      ? `This node does not expose the TES endpoint. ${errorMessage(err)}`
+      ? `This node does not accept runs. ${errorMessage(err)}`
       : errorMessage(err)
   }
 }
@@ -613,8 +607,8 @@ async function submit() {
   <div>
     <PageHeader
       eyebrow="Compute"
-      title="New compute task"
-      description="Describe a GA4GH TES task and submit it to this node."
+      title="Custom run"
+      description="Describe a container run: image, command, data and resources."
     >
       <template #actions>
         <Button variant="outline" size="sm" as-child>
@@ -623,414 +617,385 @@ async function submit() {
       </template>
     </PageHeader>
 
-    <!-- Gate 1: feature disabled -->
-    <div v-if="!tesEnabled" class="container py-8">
-      <EmptyState
-        title="Compute is not enabled"
-        description="Set features.tes to true in portal-config.json for this deployment; the Compute surface then targets any node that exposes the GA4GH TES endpoint."
-      >
-        <template #icon><Cpu class="h-7 w-7" /></template>
-      </EmptyState>
-    </div>
+    <ComputeGates
+      :enabled="tesEnabled"
+      disabled-description="Set features.tes to true in portal-config.json for this deployment; Compute then targets any node that accepts runs."
+      sign-in-title="Sign in to start a run"
+      sign-in-description="Starting a run is an authenticated operation."
+      redirect-to="/app/compute/new"
+    >
+      <div class="container space-y-6 py-8">
+        <RerunPrefillNote
+          :loading="rerunLoading"
+          :error="rerunError"
+          :source="rerunSource"
+          :notes="rerunNotes"
+          @dismiss="dismissRerun"
+        />
 
-    <!-- Session restore in flight: never flash the signed-out gate. -->
-    <div v-else-if="authPending" class="container py-8">
-      <section class="surface mx-auto max-w-xl space-y-3 p-8">
-        <Skeleton class="mx-auto h-8 w-8 rounded-full" />
-        <Skeleton class="mx-auto h-4 w-44" />
-        <Skeleton class="mx-auto h-3 w-64" />
-      </section>
-    </div>
+        <WizardSteps :steps="WIZARD_STEPS" :current="step" />
 
-    <!-- Gate 2: not signed in -->
-    <div v-else-if="!currentUser" class="container py-8">
-      <section class="surface mx-auto max-w-xl p-8 text-center">
-        <Cpu class="mx-auto h-8 w-8 text-muted-foreground/70" />
-        <h2 class="mt-3 font-display text-base font-semibold text-aruna-navy">Sign in to submit a task</h2>
-        <p class="mt-1.5 text-sm text-muted-foreground">Submitting GA4GH TES tasks is an authenticated operation.</p>
-        <Button class="mt-4" size="sm" :disabled="signingIn" @click="startSignIn"><LogIn class="h-3.5 w-3.5" /> Sign in</Button>
-      </section>
-    </div>
-
-    <!-- Wizard -->
-    <div v-else class="container space-y-6 py-8">
-      <!-- Re-run prefill status -->
-      <div v-if="rerunLoading" class="surface-inline px-4 py-3 text-xs text-muted-foreground">Loading the task to re-run…</div>
-      <Notice v-else-if="rerunError" tone="error" class="flex flex-wrap items-center justify-between gap-2">
-        <span>{{ rerunError }}</span>
-        <Button variant="ghost" size="sm" @click="dismissRerun">Dismiss</Button>
-      </Notice>
-      <div v-else-if="rerunSource" class="space-y-1.5 rounded-md border border-primary/30 bg-primary/5 px-4 py-3 text-xs">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <span class="font-medium text-foreground">Prefilled from task <span class="font-mono">{{ rerunSource.name }}</span>.</span>
-          <Button variant="ghost" size="sm" @click="dismissRerun">Dismiss</Button>
-        </div>
-        <ul v-if="rerunNotes.length" class="list-disc space-y-0.5 pl-4 text-muted-foreground">
-          <li v-for="note in rerunNotes" :key="note">{{ note }}</li>
-        </ul>
-      </div>
-
-      <WizardSteps :steps="WIZARD_STEPS" :current="step" />
-
-      <section class="surface space-y-5 p-6">
-        <!-- Step 1: Basics -->
-        <div v-if="step === 0" class="max-w-xl space-y-4">
-          <div>
-            <label class="text-xs font-medium text-foreground">Name <span class="text-muted-foreground">(optional)</span></label>
-            <Input v-model="name" class="mt-1" placeholder="align-and-count" />
+        <section class="surface space-y-5 p-6">
+          <!-- Step 1: Basics -->
+          <div v-if="step === 0" class="max-w-xl space-y-4">
+            <div>
+              <label class="text-xs font-medium text-foreground">Name <span class="text-muted-foreground">(optional)</span></label>
+              <Input v-model="name" class="mt-1" placeholder="align-and-count" />
+            </div>
+            <div>
+              <label class="text-xs font-medium text-foreground">Description <span class="text-muted-foreground">(optional)</span></label>
+              <Textarea v-model="description" class="mt-1" rows="3" />
+            </div>
+            <div>
+              <label class="text-xs font-medium text-foreground">Group</label>
+              <GroupSelect v-model="groupId" :options="groupOptions" placeholder="Select a group" class="mt-1" />
+              <p class="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                Sets the required <code class="rounded bg-muted px-1">aruna-engine.org/group</code> tag; the node accounts the run and writes its run dataset under this group.
+              </p>
+            </div>
           </div>
-          <div>
-            <label class="text-xs font-medium text-foreground">Description <span class="text-muted-foreground">(optional)</span></label>
-            <Textarea v-model="description" class="mt-1" rows="3" />
-          </div>
-          <div>
-            <label class="text-xs font-medium text-foreground">Group</label>
-            <GroupSelect v-model="groupId" :options="groupOptions" placeholder="Select a group" class="mt-1" />
-            <p class="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-              Sets the required <code class="rounded bg-muted px-1">aruna-engine.org/group</code> tag; the node accounts the run and writes its Process Run crate under this group.
-            </p>
-          </div>
-        </div>
 
-        <!-- Step 2: Workload, the container filesystem (inputs and captures)
-             and the executor that runs against it, one coherent surface. -->
-        <div v-else-if="step === 1" class="space-y-6">
-          <div class="grid gap-5 xl:grid-cols-2">
-            <div class="min-w-0 space-y-3">
-              <div class="flex items-center justify-between gap-2">
-                <h2 class="font-display text-sm font-semibold text-aruna-navy">Container filesystem</h2>
-                <FilterChips v-model="dataView" :options="DATA_VIEWS" aria-label="Container data view" />
-              </div>
-
-              <section v-if="dataView === 'tree'" class="surface-inline space-y-2.5 p-3.5">
-                <p class="text-[11px] text-muted-foreground">
-                  What the task sees at run time. Use a folder's + menu to create subfolders, stage inputs, or capture outputs.
-                </p>
-                <ContainerFsTree
-                  :inputs="inputs"
-                  :outputs="treeOutputs"
-                  :workspace="executors[0]?.workdir || null"
-                  @update-input-path="onTreeInputPath"
-                  @remove-input="removeInputEntry"
-                  @update-output-path="onTreeOutputPath"
-                  @remove-output="removeOutputRow"
-                  @add-output="onTreeAddOutput"
-                  @add-input="onTreeAddInput"
-                >
-                  <template #output-details="{ index }">
-                    <div v-if="outputRows[index]" class="flex items-center gap-1.5">
-                      <span class="shrink-0 text-[10px] font-medium text-muted-foreground">into</span>
-                      <Select
-                        v-if="workspaceBucketOptions.length"
-                        v-model="outputRows[index].bucket"
-                        :options="workspaceBucketOptions"
-                        placeholder="Bucket"
-                        class="h-7 w-32 shrink-0 text-xs"
-                        aria-label="Destination bucket"
-                      />
-                      <Input v-else v-model="outputRows[index].bucket" class="h-7 w-32 shrink-0 font-mono text-xs" placeholder="my-results" aria-label="Destination bucket" />
-                      <span class="shrink-0 text-muted-foreground">/</span>
-                      <Input
-                        v-model="outputRows[index].key"
-                        class="h-7 min-w-0 flex-1 font-mono text-xs"
-                        placeholder="runs/result.txt"
-                        aria-label="Destination key"
-                        @blur="onOutputKeyBlur(outputRows[index])"
-                      />
-                    </div>
-                  </template>
-                </ContainerFsTree>
-                <p v-if="outputRows.length && !outputsValid" class="text-[11px] text-destructive">
-                  Every capture needs an absolute container path, one bucket and a canonical key; folder captures (path ending in /) need a key ending in /; container paths and destinations must be unique.
-                </p>
-                <div class="flex flex-wrap items-center gap-1.5 pt-0.5">
-                  <Button variant="outline" size="sm" @click="openInputDialog"><ListPlus class="size-3.5" /> Add input</Button>
-                  <Button variant="outline" size="sm" @click="addOutputRow"><Plus class="size-3.5" /> Add output</Button>
+          <!-- Step 2: Workload, the container filesystem (inputs and captures)
+               and the executor that runs against it, one coherent surface. -->
+          <div v-else-if="step === 1" class="space-y-6">
+            <div class="grid gap-5 xl:grid-cols-2">
+              <div class="min-w-0 space-y-3">
+                <div class="flex items-center justify-between gap-2">
+                  <h2 class="font-display text-sm font-semibold text-aruna-navy">Container filesystem</h2>
+                  <FilterChips v-model="dataView" :options="DATA_VIEWS" aria-label="Container data view" />
                 </div>
-                <p class="text-[11px] text-muted-foreground">A folder capture (path ending in /) uploads the files the task wrote directly in that folder. Nested subfolders are not captured.</p>
-              </section>
 
-              <template v-else>
-                <TesInputsEditor v-model="inputs" />
-                <div class="space-y-3">
-                  <h2 class="font-display text-sm font-semibold text-aruna-navy">Outputs</h2>
-                  <!-- Same row grid as TesInputsEditor: flexible content column plus
-                       a fixed 1.75rem action column so both editors share one right
-                       edge for controls and remove buttons. -->
-                  <div v-for="(row, i) in outputRows" :key="i" class="surface-inline grid grid-cols-[minmax(0,1fr)_1.75rem] gap-x-2 p-3">
-                    <div class="min-w-0 space-y-2">
-                      <div class="flex flex-wrap items-end gap-3">
-                        <div class="min-w-0 flex-1">
-                          <label class="text-xs font-medium text-foreground">Capture <span class="text-muted-foreground">(container path)</span></label>
-                          <Input v-model="row.path" class="mt-1 font-mono" placeholder="/outputs/result.txt" aria-label="Container path to capture" />
-                        </div>
-                        <span class="pb-2.5 text-xs text-muted-foreground">into</span>
-                        <div class="w-44">
-                          <label class="text-xs font-medium text-foreground">Bucket</label>
-                          <Select v-if="workspaceBucketOptions.length" v-model="row.bucket" :options="workspaceBucketOptions" placeholder="Bucket" class="mt-1" aria-label="Destination bucket" />
-                          <Input v-else v-model="row.bucket" class="mt-1 font-mono" placeholder="my-results" aria-label="Destination bucket" />
-                        </div>
-                        <div class="min-w-0 flex-1">
-                          <label class="text-xs font-medium text-foreground">Key</label>
-                          <Input v-model="row.key" class="mt-1 font-mono" placeholder="runs/result.txt" aria-label="Destination key" @blur="onOutputKeyBlur(row)" />
-                        </div>
+                <section v-if="dataView === 'tree'" class="surface-inline space-y-2.5 p-3.5">
+                  <p class="text-[11px] text-muted-foreground">
+                    What the run sees at run time. Use a folder's + menu to create subfolders, stage inputs, or capture outputs.
+                  </p>
+                  <ContainerFsTree
+                    :inputs="inputs"
+                    :outputs="treeOutputs"
+                    :workspace="executors[0]?.workdir || null"
+                    @update-input-path="onTreeInputPath"
+                    @remove-input="removeInputEntry"
+                    @update-output-path="onTreeOutputPath"
+                    @remove-output="removeOutputRow"
+                    @add-output="onTreeAddOutput"
+                    @add-input="onTreeAddInput"
+                  >
+                    <template #output-details="{ index }">
+                      <div v-if="outputRows[index]" class="flex items-center gap-1.5">
+                        <span class="shrink-0 text-[10px] font-medium text-muted-foreground">into</span>
+                        <Select
+                          v-if="workspaceBucketOptions.length"
+                          v-model="outputRows[index].bucket"
+                          :options="workspaceBucketOptions"
+                          placeholder="Bucket"
+                          class="h-7 w-32 shrink-0 text-xs"
+                          aria-label="Destination bucket"
+                        />
+                        <Input v-else v-model="outputRows[index].bucket" class="h-7 w-32 shrink-0 font-mono text-xs" placeholder="my-results" aria-label="Destination bucket" />
+                        <span class="shrink-0 text-muted-foreground">/</span>
+                        <Input
+                          v-model="outputRows[index].key"
+                          class="h-7 min-w-0 flex-1 font-mono text-xs"
+                          placeholder="runs/result.txt"
+                          aria-label="Destination key"
+                          @blur="onOutputKeyBlur(outputRows[index])"
+                        />
                       </div>
-                      <div class="flex min-w-0 items-center gap-2 font-mono text-[11px] text-muted-foreground">
-                        <Badge variant="outline" size="sm" class="shrink-0 gap-1 font-sans">
-                          <component :is="isDirCapture(row.path) ? Folder : FileText" class="h-3 w-3" />
-                          {{ isDirCapture(row.path) ? 'Folder' : 'File' }}
-                        </Badge>
-                        <span class="truncate" :title="outputDestination(row)">{{ outputDestination(row) }}</span>
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="icon-sm" class="self-center text-destructive hover:text-destructive" aria-label="Remove output" @click="removeOutputRow(i)"><X class="h-4 w-4" /></Button>
-                  </div>
-                  <Button variant="outline" size="sm" @click="addOutputRow"><Plus class="size-3.5" /> Add output</Button>
-                  <p class="text-[11px] text-muted-foreground">A folder capture (container path ending in /) uploads the files the task wrote directly in that folder. Nested subfolders are not captured.</p>
+                    </template>
+                  </ContainerFsTree>
                   <p v-if="outputRows.length && !outputsValid" class="text-[11px] text-destructive">
                     Every capture needs an absolute container path, one bucket and a canonical key; folder captures (path ending in /) need a key ending in /; container paths and destinations must be unique.
                   </p>
-                </div>
-              </template>
-            </div>
-
-            <div class="min-w-0">
-              <ExecutorStepsEditor v-model="executors" />
-            </div>
-          </div>
-
-          <div class="grid gap-6 lg:grid-cols-2">
-          <div class="space-y-3">
-            <h2 class="font-display text-sm font-semibold text-aruna-navy">Resources</h2>
-            <div class="grid gap-3 sm:grid-cols-3">
-              <div>
-                <label class="text-xs font-medium text-foreground">CPU cores</label>
-                <Input v-model="cpuCores" type="number" min="1" :max="U32_MAX" step="1" class="mt-1" placeholder="1" title="Allowed range: 1 to 4294967295." />
-                <p v-if="!cpuCoresValid" class="mt-1 text-[11px] text-destructive">Enter a whole number of at least 1.</p>
-              </div>
-              <div>
-                <label class="text-xs font-medium text-foreground">RAM (GB)</label>
-                <Input v-model="ramGb" type="number" :min="MIN_RESOURCE_GB" :max="MAX_RESOURCE_GB" step="any" class="mt-1" placeholder="2" title="Allowed range: 0.000000001 to 9223372036.854774 GB." />
-                <p v-if="!ramGbValid" class="mt-1 text-[11px] text-destructive">Must be greater than zero.</p>
-              </div>
-              <div>
-                <label class="text-xs font-medium text-foreground">Disk (GB)</label>
-                <Input v-model="diskGb" type="number" :min="MIN_RESOURCE_GB" :max="MAX_RESOURCE_GB" step="any" class="mt-1" placeholder="10" title="Allowed range: 0.000000001 to 9223372036.854774 GB." />
-                <p v-if="!diskGbValid" class="mt-1 text-[11px] text-destructive">Must be greater than zero.</p>
-              </div>
-            </div>
-            <label class="flex items-center gap-2 text-xs font-medium text-foreground">
-              <Switch v-model:checked="preemptible" /> Preemptible
-            </label>
-            <p class="text-[11px] text-muted-foreground">Allows the backend to run this on capacity that may be reclaimed (state {{ TES_STATE_META.PREEMPTED.label }}).</p>
-
-            <div class="max-w-xs">
-              <label class="text-xs font-medium text-foreground">Executor kind</label>
-              <Select
-                v-if="executorKindOptions.length"
-                v-model="executorConstraint"
-                :options="executorKindOptions"
-                placeholder="Any kind the realm offers"
-                class="mt-1"
-              />
-              <Input v-else v-model="executorConstraint" class="mt-1 font-mono" placeholder="docker" />
-              <p class="mt-1 text-[11px] text-muted-foreground">
-                {{
-                  executorKindOptions.length
-                    ? 'Restricts placement to one backend kind. Leave unset to let the planner choose.'
-                    : 'No node has advertised an executor here yet, so this is free text. Leave it empty to let the planner choose.'
-                }}
-              </p>
-            </div>
-          </div>
-
-          <div class="space-y-3">
-            <h2 class="font-display text-sm font-semibold text-aruna-navy">Workspace</h2>
-            <p class="text-[11px] text-muted-foreground">Choose how the run's scratch storage is handled.</p>
-            <div class="grid gap-2 sm:grid-cols-3">
-              <button
-                v-for="option in WORKSPACE_OPTIONS"
-                :key="option.mode"
-                type="button"
-                class="rounded-lg border p-3 text-left transition-colors"
-                :class="workspaceMode === option.mode ? 'border-primary bg-primary/5 ring-1 ring-primary/40' : 'border-border hover:bg-muted/40'"
-                @click="workspaceMode = option.mode"
-              >
-                <div class="text-xs font-semibold text-foreground">{{ option.label }}</div>
-                <div class="mt-0.5 text-[11px] text-muted-foreground">{{ option.hint }}</div>
-              </button>
-            </div>
-            <div v-if="workspaceMode === 'existing'" class="max-w-xs">
-              <label class="text-xs font-medium text-foreground">Workspace bucket</label>
-              <Select v-if="workspaceBucketOptions.length" v-model="workspaceBucket" :options="workspaceBucketOptions" placeholder="Select a bucket" class="mt-1" />
-              <Input v-else v-model="workspaceBucket" class="mt-1 font-mono" placeholder="my-workspace" />
-            </div>
-            <p v-if="!workspaceValid" class="text-[11px] text-destructive">
-              {{ workspaceMode === 'existing' ? 'Pick the bucket the run should work in.' : 'A workspace choice is required before submitting.' }}
-            </p>
-            <p class="text-[11px] text-muted-foreground">
-              The GA4GH task interface carries no workspace field of its own, so a node may derive
-              the workspace from its own deployment instead. The run detail reports the mode that
-              was actually used.
-            </p>
-          </div>
-          </div>
-
-          <div class="space-y-3 border-t border-border pt-6">
-            <div>
-              <h2 class="font-display text-sm font-semibold text-aruna-navy">Advanced placement</h2>
-              <p class="mt-1 text-[11px] text-muted-foreground">
-                The GA4GH task interface cannot carry these. Setting any of them submits the run
-                through Aruna's own jobs API instead, which is what makes them take effect.
-              </p>
-            </div>
-
-            <Notice v-if="nativeUnsupported" tone="warning">
-              These options are unavailable for this draft: {{ nativeUnsupported }}
-            </Notice>
-
-            <fieldset v-else class="space-y-4" :disabled="!!nativeUnsupported">
-              <div v-if="advancedInputs.length" class="space-y-2">
-                <div class="text-xs font-medium text-foreground">Input versions</div>
-                <div
-                  v-for="input in advancedInputs"
-                  :key="input.path"
-                  class="surface-inline grid gap-2 p-3 sm:grid-cols-[minmax(0,1fr)_12rem_minmax(0,1fr)]"
-                >
-                  <div class="min-w-0 truncate font-mono text-[11px] text-foreground" :title="input.path">
-                    {{ input.path }}
+                  <div class="flex flex-wrap items-center gap-1.5 pt-0.5">
+                    <Button variant="outline" size="sm" @click="openInputDialog"><ListPlus class="size-3.5" /> Add input</Button>
+                    <Button variant="outline" size="sm" @click="addOutputRow"><Plus class="size-3.5" /> Add output</Button>
                   </div>
-                  <Select
-                    :model-value="placementFor(input.path).mode"
-                    :options="INPUT_MODE_OPTIONS"
-                    aria-label="Input composition mode"
-                    @update:model-value="setInputMode(input.path, String($event) as InputModeRequest)"
-                  />
-                  <Input
-                    v-if="placementFor(input.path).mode === 'exact_reference'"
-                    :model-value="placementFor(input.path).versionId ?? ''"
-                    class="font-mono"
-                    placeholder="Version id"
-                    aria-label="Input version id"
-                    @update:model-value="setInputVersion(input.path, String($event))"
-                  />
-                  <p v-else class="self-center text-[11px] text-muted-foreground">
-                    {{
-                      placementFor(input.path).mode === 'floating_reference'
-                        ? 'Resolved when the run starts.'
-                        : 'Copied as it is at submission.'
-                    }}
-                  </p>
+                  <p class="text-[11px] text-muted-foreground">A folder capture (path ending in /) uploads the files the run wrote directly in that folder. Nested subfolders are not captured.</p>
+                </section>
+
+                <template v-else>
+                  <TesInputsEditor v-model="inputs" />
+                  <div class="space-y-3">
+                    <h2 class="font-display text-sm font-semibold text-aruna-navy">Outputs</h2>
+                    <!-- Same row grid as TesInputsEditor: flexible content column plus
+                         a fixed 1.75rem action column so both editors share one right
+                         edge for controls and remove buttons. -->
+                    <div v-for="(row, i) in outputRows" :key="i" class="surface-inline grid grid-cols-[minmax(0,1fr)_1.75rem] gap-x-2 p-3">
+                      <div class="min-w-0 space-y-2">
+                        <div class="flex flex-wrap items-end gap-3">
+                          <div class="min-w-0 flex-1">
+                            <label class="text-xs font-medium text-foreground">Capture <span class="text-muted-foreground">(container path)</span></label>
+                            <Input v-model="row.path" class="mt-1 font-mono" placeholder="/outputs/result.txt" aria-label="Container path to capture" />
+                          </div>
+                          <span class="pb-2.5 text-xs text-muted-foreground">into</span>
+                          <div class="w-44">
+                            <label class="text-xs font-medium text-foreground">Bucket</label>
+                            <Select v-if="workspaceBucketOptions.length" v-model="row.bucket" :options="workspaceBucketOptions" placeholder="Bucket" class="mt-1" aria-label="Destination bucket" />
+                            <Input v-else v-model="row.bucket" class="mt-1 font-mono" placeholder="my-results" aria-label="Destination bucket" />
+                          </div>
+                          <div class="min-w-0 flex-1">
+                            <label class="text-xs font-medium text-foreground">Key</label>
+                            <Input v-model="row.key" class="mt-1 font-mono" placeholder="runs/result.txt" aria-label="Destination key" @blur="onOutputKeyBlur(row)" />
+                          </div>
+                        </div>
+                        <div class="flex min-w-0 items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                          <Badge variant="outline" size="sm" class="shrink-0 gap-1 font-sans">
+                            <component :is="isDirCapture(row.path) ? Folder : FileText" class="h-3 w-3" />
+                            {{ isDirCapture(row.path) ? 'Folder' : 'File' }}
+                          </Badge>
+                          <span class="truncate" :title="outputDestination(row)">{{ outputDestination(row) }}</span>
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="icon-sm" class="self-center text-destructive hover:text-destructive" aria-label="Remove output" @click="removeOutputRow(i)"><X class="h-4 w-4" /></Button>
+                    </div>
+                    <Button variant="outline" size="sm" @click="addOutputRow"><Plus class="size-3.5" /> Add output</Button>
+                    <p class="text-[11px] text-muted-foreground">A folder capture (container path ending in /) uploads the files the run wrote directly in that folder. Nested subfolders are not captured.</p>
+                    <p v-if="outputRows.length && !outputsValid" class="text-[11px] text-destructive">
+                      Every capture needs an absolute container path, one bucket and a canonical key; folder captures (path ending in /) need a key ending in /; container paths and destinations must be unique.
+                    </p>
+                  </div>
+                </template>
+              </div>
+
+              <div class="min-w-0">
+                <ExecutorStepsEditor v-model="executors" />
+              </div>
+            </div>
+
+            <div class="grid gap-6 lg:grid-cols-2">
+            <div class="space-y-3">
+              <h2 class="font-display text-sm font-semibold text-aruna-navy">Resources</h2>
+              <div class="grid gap-3 sm:grid-cols-3">
+                <div>
+                  <label class="text-xs font-medium text-foreground">CPU cores</label>
+                  <Input v-model="cpuCores" type="number" min="1" :max="U32_MAX" step="1" class="mt-1" placeholder="1" title="Allowed range: 1 to 4294967295." />
+                  <p v-if="!cpuCoresValid" class="mt-1 text-[11px] text-destructive">Enter a whole number of at least 1.</p>
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-foreground">RAM (GB)</label>
+                  <Input v-model="ramGb" type="number" :min="MIN_RESOURCE_GB" :max="MAX_RESOURCE_GB" step="any" class="mt-1" placeholder="2" title="Allowed range: 0.000000001 to 9223372036.854774 GB." />
+                  <p v-if="!ramGbValid" class="mt-1 text-[11px] text-destructive">Must be greater than zero.</p>
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-foreground">Disk (GB)</label>
+                  <Input v-model="diskGb" type="number" :min="MIN_RESOURCE_GB" :max="MAX_RESOURCE_GB" step="any" class="mt-1" placeholder="10" title="Allowed range: 0.000000001 to 9223372036.854774 GB." />
+                  <p v-if="!diskGbValid" class="mt-1 text-[11px] text-destructive">Must be greater than zero.</p>
                 </div>
               </div>
-              <p v-else class="text-[11px] text-muted-foreground">Add an input to choose how it is composed.</p>
+              <label class="flex items-center gap-2 text-xs font-medium text-foreground">
+                <Switch v-model:checked="preemptible" /> Preemptible
+              </label>
+              <p class="text-[11px] text-muted-foreground">Allows the backend to run this on capacity that may be reclaimed (state {{ TES_STATE_META.PREEMPTED.label }}).</p>
 
-              <div class="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label class="text-xs font-medium text-foreground">Collision policy</label>
-                  <Select v-model="collisionPolicy" :options="COLLISION_OPTIONS" class="mt-1" />
-                  <p class="mt-1 text-[11px] text-muted-foreground">
-                    What happens when two inputs stage onto the same key. Only Reject refuses them.
-                  </p>
-                </div>
-                <div class="space-y-1.5">
-                  <label class="text-xs font-medium text-foreground">Output prefixes</label>
-                  <p class="text-[11px] text-muted-foreground">
-                    Workspace prefixes inventoried when the run finishes. Only objects this run
-                    wrote are attributed to it.
-                  </p>
+              <div class="max-w-xs">
+                <label class="text-xs font-medium text-foreground">Executor kind</label>
+                <Select
+                  v-if="executorKindOptions.length"
+                  v-model="executorConstraint"
+                  :options="executorKindOptions"
+                  placeholder="Any kind the realm offers"
+                  class="mt-1"
+                />
+                <Input v-else v-model="executorConstraint" class="mt-1 font-mono" placeholder="docker" />
+                <p class="mt-1 text-[11px] text-muted-foreground">
+                  {{
+                    executorKindOptions.length
+                      ? 'Restricts placement to one backend kind. Leave unset to let the planner choose.'
+                      : 'No node has advertised an executor here yet, so this is free text. Leave it empty to let the planner choose.'
+                  }}
+                </p>
+              </div>
+            </div>
+
+            <div class="space-y-3">
+              <h2 class="font-display text-sm font-semibold text-aruna-navy">Workspace</h2>
+              <p class="text-[11px] text-muted-foreground">Choose how the run's scratch storage is handled.</p>
+              <div class="grid gap-2 sm:grid-cols-3">
+                <button
+                  v-for="option in WORKSPACE_OPTIONS"
+                  :key="option.mode"
+                  type="button"
+                  class="rounded-lg border p-3 text-left transition-colors"
+                  :class="workspaceMode === option.mode ? 'border-primary bg-primary/5 ring-1 ring-primary/40' : 'border-border hover:bg-muted/40'"
+                  @click="workspaceMode = option.mode"
+                >
+                  <div class="text-xs font-semibold text-foreground">{{ option.label }}</div>
+                  <div class="mt-0.5 text-[11px] text-muted-foreground">{{ option.hint }}</div>
+                </button>
+              </div>
+              <div v-if="workspaceMode === 'existing'" class="max-w-xs">
+                <label class="text-xs font-medium text-foreground">Workspace bucket</label>
+                <Select v-if="workspaceBucketOptions.length" v-model="workspaceBucket" :options="workspaceBucketOptions" placeholder="Select a bucket" class="mt-1" />
+                <Input v-else v-model="workspaceBucket" class="mt-1 font-mono" placeholder="my-workspace" />
+              </div>
+              <p v-if="!workspaceValid" class="text-[11px] text-destructive">
+                {{ workspaceMode === 'existing' ? 'Pick the bucket the run should work in.' : 'A workspace choice is required before the run starts.' }}
+              </p>
+              <p class="text-[11px] text-muted-foreground">
+                The standard run interface carries no workspace field of its own, so a node may derive
+                the workspace from its own deployment instead. The run detail reports the mode that
+                was actually used.
+              </p>
+            </div>
+            </div>
+
+            <div class="space-y-3 border-t border-border pt-6">
+              <div>
+                <h2 class="font-display text-sm font-semibold text-aruna-navy">Advanced placement</h2>
+                <p class="mt-1 text-[11px] text-muted-foreground">
+                  The standard run interface cannot carry these. Setting any of them sends the run
+                  through Aruna's own jobs API instead, which is what makes them take effect.
+                </p>
+              </div>
+
+              <Notice v-if="nativeUnsupported" tone="warning">
+                These options are unavailable for this draft: {{ nativeUnsupported }}
+              </Notice>
+
+              <fieldset v-else class="space-y-4" :disabled="!!nativeUnsupported">
+                <div v-if="advancedInputs.length" class="space-y-2">
+                  <div class="text-xs font-medium text-foreground">Input versions</div>
                   <div
-                    v-for="(prefix, index) in outputPrefixes"
-                    :key="index"
-                    class="grid grid-cols-[minmax(0,1fr)_1.75rem] gap-x-2"
+                    v-for="input in advancedInputs"
+                    :key="input.path"
+                    class="surface-inline grid gap-2 p-3 sm:grid-cols-[minmax(0,1fr)_12rem_minmax(0,1fr)]"
                   >
-                    <Input
-                      :model-value="prefix"
-                      class="font-mono"
-                      placeholder="reports/"
-                      aria-label="Output prefix"
-                      @update:model-value="outputPrefixes[index] = String($event)"
+                    <div class="min-w-0 truncate font-mono text-[11px] text-foreground" :title="input.path">
+                      {{ input.path }}
+                    </div>
+                    <Select
+                      :model-value="placementFor(input.path).mode"
+                      :options="INPUT_MODE_OPTIONS"
+                      aria-label="Input composition mode"
+                      @update:model-value="setInputMode(input.path, String($event) as InputModeRequest)"
                     />
-                    <Button variant="ghost" size="icon-sm" class="self-center" aria-label="Remove output prefix" @click="removeOutputPrefix(index)">
-                      <X class="h-4 w-4" />
+                    <Input
+                      v-if="placementFor(input.path).mode === 'exact_reference'"
+                      :model-value="placementFor(input.path).versionId ?? ''"
+                      class="font-mono"
+                      placeholder="Version id"
+                      aria-label="Input version id"
+                      @update:model-value="setInputVersion(input.path, String($event))"
+                    />
+                    <p v-else class="self-center text-[11px] text-muted-foreground">
+                      {{
+                        placementFor(input.path).mode === 'floating_reference'
+                          ? 'Resolved when the run starts.'
+                          : 'Copied as it is when the run starts.'
+                      }}
+                    </p>
+                  </div>
+                </div>
+                <p v-else class="text-[11px] text-muted-foreground">Add an input to choose how it is composed.</p>
+
+                <div class="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label class="text-xs font-medium text-foreground">Collision policy</label>
+                    <Select v-model="collisionPolicy" :options="COLLISION_OPTIONS" class="mt-1" />
+                    <p class="mt-1 text-[11px] text-muted-foreground">
+                      What happens when two inputs stage onto the same key. Only Reject refuses them.
+                    </p>
+                  </div>
+                  <div class="space-y-1.5">
+                    <label class="text-xs font-medium text-foreground">Output prefixes</label>
+                    <p class="text-[11px] text-muted-foreground">
+                      Workspace prefixes inventoried when the run finishes. Only objects this run
+                      wrote are attributed to it.
+                    </p>
+                    <div
+                      v-for="(prefix, index) in outputPrefixes"
+                      :key="index"
+                      class="grid grid-cols-[minmax(0,1fr)_1.75rem] gap-x-2"
+                    >
+                      <Input
+                        :model-value="prefix"
+                        class="font-mono"
+                        placeholder="reports/"
+                        aria-label="Output prefix"
+                        @update:model-value="outputPrefixes[index] = String($event)"
+                      />
+                      <Button variant="ghost" size="icon-sm" class="self-center" aria-label="Remove output prefix" @click="removeOutputPrefix(index)">
+                        <X class="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <Button variant="outline" size="sm" @click="addOutputPrefix">
+                      <Plus class="h-3.5 w-3.5" /> Add prefix
                     </Button>
                   </div>
-                  <Button variant="outline" size="sm" @click="addOutputPrefix">
-                    <Plus class="h-3.5 w-3.5" /> Add prefix
-                  </Button>
                 </div>
-              </div>
 
-              <p v-if="nativeInvalid" class="text-[11px] text-destructive">{{ nativeInvalid }}</p>
-            </fieldset>
+                <p v-if="nativeInvalid" class="text-[11px] text-destructive">{{ nativeInvalid }}</p>
+              </fieldset>
+            </div>
           </div>
-        </div>
 
-        <!-- Step 3: Review -->
-        <div v-else class="space-y-3">
-          <div class="space-y-3">
-            <RunTargetPicker
-              v-if="runTarget.available.value"
-              v-model="runTarget.target.value"
+          <!-- Step 3: Review -->
+          <div v-else class="space-y-3">
+            <RunPlacementSection
+              v-model:target="runTarget.target.value"
+              v-model:labels="placementLabels"
+              :available="runTarget.available.value"
+              :local="runTarget.local.value"
               :compute="runTarget.compute.value"
               :realm-name="realm.shortName"
+              :problems="targetProblems"
             />
-            <PlacementPicker v-if="!runTarget.local.value" v-model="placementLabels" />
-            <Notice v-if="targetProblems.length" tone="error" :lines="targetProblems" />
-          </div>
-          <div
-            v-if="useNative"
-            class="space-y-1 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-foreground"
-          >
-            <p>
-              This run is submitted through Aruna's native jobs API, because the GA4GH task
-              interface cannot express the advanced placement options you set.
-            </p>
-            <p v-if="nativeDropped.length" class="text-[11px] text-muted-foreground">
-              The native surface carries no {{ nativeDropped.join(', no ') }}, so that is not sent.
-            </p>
-          </div>
-          <p
-            v-if="hasFolderCapture"
-            class="rounded-md border border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground"
-          >
-            Folder captures are submitted as a wildcard pattern. Only the files written directly in
-            the captured folder are uploaded; nested subfolders are not.
-          </p>
-          <TaskJsonPreview title="TES task request" :task="task" />
-          <details class="text-[11px] text-muted-foreground">
-            <summary class="cursor-pointer">Technical details</summary>
-            <code class="mt-1 block rounded bg-muted px-2 py-1">{{ useNative ? 'POST /jobs/' : 'POST /ga4gh/tes/v1/tasks' }}</code>
-          </details>
-          <Notice v-if="submitError" tone="error">
-            {{ submitError }}
-            <span v-if="submitRetryable" class="mt-1 block">
-              Running it again reuses the same idempotency key, so a request that already committed
-              is replayed rather than duplicated.
-            </span>
-          </Notice>
-          <Notice v-if="submittedWithoutWorkspace" tone="warning" class="flex flex-wrap items-center gap-2">
-            <span>The task was submitted, but workspace choices are not supported by this node yet, it runs without one.</span>
-            <Button
-              variant="outline"
-              size="sm"
-              class="shrink-0"
-              @click="router.push({ name: 'task', params: { taskId: submittedWithoutWorkspace } })"
+            <div
+              v-if="useNative"
+              class="space-y-1 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-foreground"
             >
-              View task <ArrowRight class="h-3.5 w-3.5" />
-            </Button>
-          </Notice>
-        </div>
-      </section>
+              <p>
+                This run goes through Aruna's native jobs API, because the standard run interface
+                cannot express the advanced placement options you set.
+              </p>
+              <p v-if="nativeDropped.length" class="text-[11px] text-muted-foreground">
+                The native surface carries no {{ nativeDropped.join(', no ') }}, so that is not sent.
+              </p>
+            </div>
+            <p
+              v-if="hasFolderCapture"
+              class="rounded-md border border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground"
+            >
+              A folder capture travels as a wildcard pattern. Only the files written directly in the
+              captured folder are uploaded; nested subfolders are not.
+            </p>
+            <TaskJsonPreview title="Run request" :task="task" />
+            <details class="text-[11px] text-muted-foreground">
+              <summary class="cursor-pointer">Technical details</summary>
+              <code class="mt-1 block rounded bg-muted px-2 py-1">{{ useNative ? 'POST /jobs/' : 'POST /ga4gh/tes/v1/tasks' }}</code>
+            </details>
+            <Notice v-if="submitError" tone="error">
+              {{ submitError }}
+              <span v-if="submitRetryable" class="mt-1 block">
+                Running it again reuses the same idempotency key, so a request that already committed
+                is replayed rather than duplicated.
+              </span>
+            </Notice>
+            <Notice v-if="submittedWithoutWorkspace" tone="warning" class="flex flex-wrap items-center gap-2">
+              <span>The run started, but this node does not support workspace choices yet, so it runs without one.</span>
+              <Button
+                variant="outline"
+                size="sm"
+                class="shrink-0"
+                @click="router.push({ name: 'task', params: { taskId: submittedWithoutWorkspace } })"
+              >
+                View run <ArrowRight class="h-3.5 w-3.5" />
+              </Button>
+            </Notice>
+          </div>
+        </section>
 
-      <div class="flex items-center justify-between">
-        <Button variant="outline" size="sm" @click="back">
-          <ArrowLeft v-if="step === 0" class="h-3.5 w-3.5" /> {{ step === 0 ? 'Back to Compute' : 'Back' }}
-        </Button>
-        <Button v-if="step < WIZARD_STEPS.length - 1" size="sm" :disabled="!canContinue" @click="next">Continue</Button>
-        <Button v-else size="sm" :disabled="busy || !groupId || !executorsValid || !outputsValid || !workspaceValid || !cpuCoresValid || !ramGbValid || !diskGbValid || !!nativeInvalid || !!submittedWithoutWorkspace || !!targetProblems.length" @click="submit"><ListPlus class="h-4 w-4" /> Run</Button>
+        <WizardNavBar
+          :first="step === 0"
+          :last="step === WIZARD_STEPS.length - 1"
+          :can-continue="canContinue"
+          :can-run="!busy && !!groupId && executorsValid && outputsValid && workspaceValid && cpuCoresValid && ramGbValid && diskGbValid && !nativeInvalid && !submittedWithoutWorkspace && !targetProblems.length"
+          @back="back"
+          @next="next"
+          @run="submit"
+        />
       </div>
-    </div>
+    </ComputeGates>
 
     <!-- Input picker for the filesystem tree's per-folder add-input action;
          the Table view's TesInputsEditor keeps its own dialog. -->

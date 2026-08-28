@@ -40,19 +40,19 @@ describe('new run menu', () => {
 
     expect(content(mounted.root)).toContain('New run')
     expect(content(mounted.root)).toContain('Quick run')
-    expect(content(mounted.root)).toContain('New task')
+    expect(content(mounted.root)).toContain('Custom run')
     expect(
       nodes(mounted.root).filter(
         (node) =>
           node.tag === 'button' &&
-          (content(node).trim().startsWith('Quick run') || content(node).trim().startsWith('New task')),
+          (content(node).trim().startsWith('Quick run') || content(node).trim().startsWith('Custom run')),
       ),
     ).toHaveLength(2)
 
     await click(button(mounted.root, 'Quick run'))
     expect(push).toHaveBeenLastCalledWith({ name: 'compute-quick' })
 
-    await click(button(mounted.root, 'New task'))
+    await click(button(mounted.root, 'Custom run'))
     expect(push).toHaveBeenLastCalledWith({ name: 'compute-new' })
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()

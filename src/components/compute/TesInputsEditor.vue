@@ -12,7 +12,7 @@ import { Folder, ListPlus, X } from '@lucide/vue'
 // Input row editor (aruna#290): never mutates the prop; every change emits a
 // fresh array. New rows come from the TesDataRefDialog picker. Files keep an
 // inline-editable container path; a folder is ONE summary row whose base path
-// is editable and which expands to per-file FILE inputs at task assembly
+// is editable and which expands to per-file FILE inputs at run assembly
 // (lib/tes expandDataRefEntry) because the facade accepts FILE inputs only.
 const props = defineProps<{ modelValue: TesDataRefEntry[]; disabled?: boolean }>()
 const emit = defineEmits<{ (e: 'update:modelValue', v: TesDataRefEntry[]): void }>()
@@ -42,7 +42,7 @@ function remove(i: number) {
 <template>
   <div class="space-y-3">
     <p v-if="!modelValue.length" class="text-sm text-muted-foreground">
-      No inputs, the task starts with an empty working directory.
+      No inputs; the run starts with an empty working directory.
     </p>
     <div v-else class="space-y-2">
       <!-- Shared row grid with the outputs step (ComputeSubmitView): flexible

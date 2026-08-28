@@ -65,7 +65,7 @@ const anything = computed(
         v-if="placement.jobId"
         :to="{ name: 'job', params: { jobId: placement.jobId } }"
         class="font-mono text-primary hover:underline"
-        :title="`Open native job ${placement.jobId}`"
+        :title="`Open system job ${placement.jobId}`"
       >{{ truncateMiddle(placement.jobId) }}</RouterLink>
     </template>
   </div>

@@ -12,7 +12,7 @@ const emit = defineEmits<{ (e: 'update:modelValue', value: RunTarget): void }>()
 const localHint = computed(() => {
   const backend = props.compute?.backend
   const running = props.compute?.running ?? 0
-  return backend ? `${backend}${running ? ` · ${running} running` : ''}` : 'this machine'
+  return backend ? `${backend}${running ? ` · ${running} running` : ''}` : 'this computer'
 })
 
 const options = computed(() => [

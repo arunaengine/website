@@ -113,6 +113,6 @@ function removeEnv(index: number) {
       </Button>
     </div>
 
-    <p class="text-[11px] text-muted-foreground">The current Aruna TES facade accepts exactly one executor per task.</p>
+    <p class="text-[11px] text-muted-foreground">A run has exactly one executor.</p>
   </div>
 </template>
