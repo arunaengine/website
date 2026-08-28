@@ -15,7 +15,7 @@ const options = [
 ]
 const hint = computed(() =>
   props.modelValue === 'group'
-    ? 'Visible according to the selected group policies.'
+    ? 'Members of the group, as its policies allow.'
     : 'Visible to anyone without signing in.',
 )
 </script>
@@ -36,7 +36,7 @@ const hint = computed(() =>
         v-if="groupId"
         :to="{ name: 'group', params: { id: groupId }, hash: '#policies' }"
         class="font-medium text-primary hover:underline"
-      >Review group policies</RouterLink>
+      >Group policies</RouterLink>
     </p>
   </div>
 </template>

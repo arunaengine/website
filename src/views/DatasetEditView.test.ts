@@ -11,7 +11,9 @@ import {
   mountApp,
 } from '@/test/clientRender'
 import * as CrateBuild from '@/lib/crate/build'
+import * as CrateIssues from '@/lib/crate/issues'
 import * as CrateParse from '@/lib/crate/parse'
+import * as CustomFields from '@/lib/customFields'
 import * as Api from '@/lib/api'
 import * as Utils from '@/lib/utils'
 
@@ -43,7 +45,10 @@ const routerPush = vi.fn(async () => undefined)
 const previewResult = ref(null)
 const previewRunning = ref(false)
 const previewError = ref(null)
+const previewUnavailable = ref(false)
+const previewLater = vi.fn()
 const previewNow = vi.fn()
+const currentUser = ref({ id: 'user-1', name: 'Test User' })
 
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
 const Passthrough = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
@@ -61,6 +66,16 @@ const ReviewStub = defineComponent({
   props: { actionLabel: String },
   emits: ['create'],
   setup: (props, { emit }) => () => h('button', { onClick: () => emit('create') }, props.actionLabel),
+})
+const ReferenceFieldStub = defineComponent({
+  props: { label: String, role: String, entities: { type: Array, default: () => [] } },
+  emits: ['add'],
+  setup(props, { emit, slots }) {
+    return () => h('div', [
+      h('button', { onClick: () => emit('add', props.role) }, `Add ${props.label}`),
+      slots.action?.(),
+    ])
+  },
 })
 const RouterLinkStub = defineComponent((_, { attrs, slots }) => () => h('a', attrs, slots.default?.()))
 const icons = new Proxy({}, { get: () => EmptyStub })
@@ -84,6 +99,9 @@ const DatasetEditView = compileClientComponent(new URL('./DatasetEditView.vue', 
   '@/components/metadata/AddContextDialog.vue': moduleDefault(EmptyStub),
   '@/components/metadata/DatasetPartsSection.vue': moduleDefault(EmptyStub),
   '@/components/metadata/DatasetReviewSection.vue': moduleDefault(ReviewStub),
+  '@/components/metadata/CustomFieldsEditor.vue': moduleDefault(EmptyStub),
+  '@/components/metadata/LicenseField.vue': moduleDefault(EmptyStub),
+  '@/components/metadata/RootReferenceField.vue': moduleDefault(ReferenceFieldStub),
   '@/composables/useAruna': {
     useAruna: () => ({
       fullCrates,
@@ -91,16 +109,26 @@ const DatasetEditView = compileClientComponent(new URL('./DatasetEditView.vue', 
       fetchRoCrateRaw,
       replaceMetadataRoCrate,
       saving,
+      currentUser,
       apiBaseUrl,
       authToken,
     }),
   },
   '@/composables/useProfilePreview': {
-    useProfilePreview: () => ({ result: previewResult, running: previewRunning, error: previewError, previewNow }),
+    useProfilePreview: () => ({
+      result: previewResult,
+      running: previewRunning,
+      error: previewError,
+      unavailable: previewUnavailable,
+      preview: previewLater,
+      previewNow,
+    }),
   },
   '@/composables/useDeviceStatus': { useDeviceStatus: () => ({ deviceClient: ref(null) }) },
   '@/lib/crate/build': CrateBuild,
+  '@/lib/crate/issues': CrateIssues,
   '@/lib/crate/parse': CrateParse,
+  '@/lib/customFields': CustomFields,
   '@/lib/desktop': { isDesktop: () => false },
   '@/lib/deviceApi': { previewDeviceDraft: vi.fn(), requireDevice: vi.fn() },
   '@/lib/api': Api,

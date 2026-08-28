@@ -4,7 +4,7 @@ import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { Pencil, Trash2 } from '@lucide/vue'
-import type { ContextEntity, RootRole } from '@/lib/crate/build'
+import { roleLabel, type ContextEntity, type RootRole } from '@/lib/crate/build'
 
 const props = defineProps<{
   rootName: string
@@ -42,15 +42,15 @@ function entityType(entity: ContextEntity): string {
 <template>
   <div class="space-y-4">
     <div class="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
-      <p class="text-[10px] font-semibold uppercase tracking-wider text-primary">Root dataset</p>
+      <p class="text-[10px] font-semibold uppercase tracking-wider text-primary">This dataset</p>
       <p class="mt-1 text-sm font-medium text-foreground">{{ rootName || 'Untitled dataset' }}</p>
       <p class="font-mono text-[11px] text-muted-foreground">./</p>
     </div>
 
-    <EmptyState v-if="!entities.length" compact title="No context entities yet." />
+    <EmptyState v-if="!entities.length" compact title="Nothing referenced yet." />
 
     <section v-for="group in groups" :key="group.role" class="space-y-2">
-      <h3 class="text-xs font-semibold capitalize text-foreground">{{ group.role }}</h3>
+      <h3 class="text-xs font-semibold text-foreground">{{ roleLabel(String(group.role)) }}</h3>
       <div
         v-for="entity in group.entities"
         :key="`${group.role}:${entity.id}`"

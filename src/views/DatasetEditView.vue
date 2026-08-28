@@ -10,18 +10,40 @@ import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import ContextEntityList from '@/components/metadata/ContextEntityList.vue'
 import AddContextDialog from '@/components/metadata/AddContextDialog.vue'
+import CustomFieldsEditor from '@/components/metadata/CustomFieldsEditor.vue'
 import DatasetPartsSection from '@/components/metadata/DatasetPartsSection.vue'
 import DatasetReviewSection from '@/components/metadata/DatasetReviewSection.vue'
+import LicenseField from '@/components/metadata/LicenseField.vue'
+import RootReferenceField from '@/components/metadata/RootReferenceField.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useProfilePreview } from '@/composables/useProfilePreview'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
-import { buildDataset, type ContextEntity, type DatasetDraft } from '@/lib/crate/build'
+import {
+  buildDataset,
+  signedInUserEntity,
+  type ContextEntity,
+  type DatasetDraft,
+  type Part,
+  type RootRole,
+} from '@/lib/crate/build'
 import { parseDatasetDraft } from '@/lib/crate/parse'
+import { collectIssues, issueCounts, sectionOf } from '@/lib/crate/issues'
+import { groupCustomFieldRows, seedCustomFieldRows, type CustomFieldRow } from '@/lib/customFields'
 import { isDesktop } from '@/lib/desktop'
 import { previewDeviceDraft, requireDevice } from '@/lib/deviceApi'
 import { ApiError, profileValidationFindings, type RoCrateStructuralViolation } from '@/lib/api'
 import { errorMessage } from '@/lib/utils'
-import { ArrowLeft, Plus } from '@lucide/vue'
+import { ArrowLeft, Plus, UserRoundPlus } from '@lucide/vue'
+
+const REFERENCE_FIELDS: Array<{ label: string; role: RootRole }> = [
+  { label: 'Authors', role: 'author' },
+  { label: 'Contributors', role: 'contributor' },
+  { label: 'Publisher', role: 'publisher' },
+  { label: 'Funder', role: 'funder' },
+  { label: 'Cited works', role: 'citation' },
+  { label: 'Contact', role: 'contactPoint' },
+  { label: 'Location', role: 'spatialCoverage' },
+]
 
 const route = useRoute()
 const router = useRouter()
@@ -31,6 +53,7 @@ const {
   fetchRoCrateRaw,
   replaceMetadataRoCrate,
   saving,
+  currentUser,
   apiBaseUrl,
   authToken,
 } = useAruna()
@@ -38,11 +61,15 @@ const {
 const documentId = computed(() => String(route.params.id ?? ''))
 const draft = ref<DatasetDraft | null>(null)
 const keywordsText = ref('')
+const customRows = ref<CustomFieldRow[]>([])
+const preservedCustom = ref<Record<string, unknown>>({})
 const loading = ref(false)
 const loadError = ref<string | null>(null)
 const activeSection = ref('basics')
+const reviewVisible = ref(false)
 const contextOpen = ref(false)
 const editingEntity = ref<ContextEntity | null>(null)
+const referenceRole = ref<RootRole | null>(null)
 const submitError = ref<string | null>(null)
 const writeIssues = ref<Array<{
   code?: string
@@ -67,6 +94,7 @@ async function load() {
       public: summary.public,
     })
     keywordsText.value = draft.value.basics.keywords?.join(', ') ?? ''
+    seedCustomRows(draft.value.custom)
   } catch (error) {
     loadError.value = errorMessage(error)
   } finally {
@@ -78,18 +106,52 @@ watch(keywordsText, (value) => {
   if (draft.value) draft.value.basics.keywords = value.split(',').map((entry) => entry.trim()).filter(Boolean)
 })
 
+// Scalar extras become editable rows; anything structured is preserved as-is.
+function seedCustomRows(custom: Record<string, unknown> | undefined) {
+  const seeded = seedCustomFieldRows(custom ?? {}, new Set())
+  const preserved = new Set(seeded.preserved.map((entry) => entry.key))
+  preservedCustom.value = Object.fromEntries(Object.entries(custom ?? {}).filter(([key]) => preserved.has(key)))
+  customRows.value = seeded.rows
+}
+watch(customRows, (rows) => {
+  if (draft.value) draft.value.custom = { ...preservedCustom.value, ...groupCustomFieldRows(rows) }
+}, { deep: true })
+
 const built = computed(() => draft.value ? buildDataset(draft.value) : null)
 const basicsComplete = computed(() => Boolean(
   draft.value?.basics.title.trim()
   && draft.value.basics.description.trim()
-  && draft.value.basics.datePublished
-  && draft.value.basics.license.trim(),
+  && draft.value.basics.datePublished,
 ))
+
+function partEntityId(part: Part): string {
+  if (part.kind === 'object') return part.id
+  return part.kind === 'external' ? part.url : part.link.iri
+}
+const partEntityIds = computed(() => new Set((draft.value?.parts ?? []).map(partEntityId)))
+
+const desktop = isDesktop()
+const deviceStatus = desktop ? useDeviceStatus() : null
+const preview = useProfilePreview({
+  client: () => ({ baseUrl: apiBaseUrl.value, token: authToken.value ?? undefined }),
+  ...(desktop
+    ? {
+        request: (rocrate: unknown, signal: AbortSignal) =>
+          previewDeviceDraft(rocrate, requireDevice(deviceStatus?.deviceClient.value, 'draft validation'), signal),
+      }
+    : {}),
+})
+
+// The node's last verdict blocks the write; a check that could not run does not.
+const nodeRejected = computed(() => preview.result.value ? !preview.result.value.accepted : false)
+const canSave = computed(() => basicsComplete.value && !nodeRejected.value)
+const checkIssues = computed(() => collectIssues(preview.result.value, writeIssues.value))
+const problemCounts = computed(() => issueCounts(checkIssues.value, partEntityIds.value))
 const sections = computed(() => [
-  { id: 'basics', label: 'Basics', complete: basicsComplete.value },
-  { id: 'context', label: 'Context', complete: true },
-  { id: 'parts', label: 'Parts', complete: true },
-  { id: 'review', label: 'Review', complete: basicsComplete.value },
+  { id: 'basics', label: 'Basics', problems: problemCounts.value.basics },
+  { id: 'context', label: 'Context', problems: problemCounts.value.context },
+  { id: 'parts', label: 'Parts', problems: problemCounts.value.parts },
+  { id: 'review', label: 'Review', problems: 0 },
 ])
 
 const reusableEntities = computed(() => {
@@ -101,6 +163,42 @@ const reusableEntities = computed(() => {
   }
   return [...entities.values()]
 })
+
+const signedInUserId = computed(() => currentUser.value ? signedInUserEntity(currentUser.value).id : '')
+
+function openAddContext() {
+  editingEntity.value = null
+  referenceRole.value = null
+  contextOpen.value = true
+}
+
+function editContext(entity: ContextEntity) {
+  editingEntity.value = entity
+  referenceRole.value = null
+  contextOpen.value = true
+}
+
+function addReference(role: RootRole) {
+  editingEntity.value = null
+  referenceRole.value = role
+  contextOpen.value = true
+}
+
+function selectReference(role: RootRole, entity: ContextEntity) {
+  if (!draft.value) return
+  draft.value.entities = draft.value.entities.map((candidate) => candidate.id === entity.id
+    ? { ...candidate, roles: [...new Set([...candidate.roles, role])] }
+    : candidate)
+}
+
+// Dropping a role keeps the entity while another role still points at it.
+function removeReference(role: RootRole, entity: ContextEntity) {
+  if (!draft.value) return
+  const roles = entity.roles.filter((candidate) => candidate !== role)
+  draft.value.entities = roles.length
+    ? draft.value.entities.map((candidate) => candidate.id === entity.id ? { ...candidate, roles } : candidate)
+    : draft.value.entities.filter((candidate) => candidate.id !== entity.id)
+}
 
 function saveContext(value: { entity: ContextEntity; relatedEntities: ContextEntity[] }) {
   if (!draft.value) return
@@ -123,6 +221,11 @@ function reuseContext(entity: ContextEntity) {
   editingEntity.value = null
 }
 
+function addYourself() {
+  if (!currentUser.value) return
+  reuseContext(signedInUserEntity(currentUser.value))
+}
+
 function removeContext(id: string) {
   if (draft.value) draft.value.entities = draft.value.entities.filter((entity) => entity.id !== id)
 }
@@ -131,23 +234,19 @@ function setVisibility(value: 'group' | 'public') {
   if (draft.value) draft.value.visibility = value
 }
 
-const desktop = isDesktop()
-const deviceStatus = desktop ? useDeviceStatus() : null
-const preview = useProfilePreview({
-  client: () => ({ baseUrl: apiBaseUrl.value, token: authToken.value ?? undefined }),
-  ...(desktop
-    ? {
-        request: (rocrate: unknown, signal: AbortSignal) =>
-          previewDeviceDraft(rocrate, requireDevice(deviceStatus?.deviceClient.value, 'draft validation'), signal),
-      }
-    : {}),
-})
-
 function goToSection(id: string) {
   activeSection.value = id
   globalThis.document?.getElementById(`dataset-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   if (id === 'review' && built.value) preview.previewNow(built.value.rocrate)
 }
+
+function reviewEntered() {
+  reviewVisible.value = true
+  if (built.value) preview.previewNow(built.value.rocrate)
+}
+watch(built, (value) => {
+  if (value && reviewVisible.value) preview.preview(value.rocrate)
+})
 
 function structuralViolations(error: unknown): RoCrateStructuralViolation[] {
   const violations = error instanceof ApiError ? error.details?.violations : undefined
@@ -158,7 +257,7 @@ function structuralViolations(error: unknown): RoCrateStructuralViolation[] {
 }
 
 async function save() {
-  if (!draft.value || !built.value || !basicsComplete.value) return
+  if (!draft.value || !built.value || !canSave.value) return
   submitError.value = null
   writeIssues.value = []
   try {
@@ -192,7 +291,7 @@ async function save() {
 
 <template>
   <div>
-    <PageHeader title="Edit dataset" description="Edit and review the complete RO-Crate dataset.">
+    <PageHeader title="Edit dataset" description="Change what the dataset says, then check it with the node.">
       <template #actions>
         <Button variant="outline" as-child>
           <RouterLink :to="{ name: 'dataset', params: { id: documentId } }"><ArrowLeft class="h-4 w-4" /> Dataset</RouterLink>
@@ -220,7 +319,7 @@ async function save() {
             @click="goToSection(section.id)"
           >
             <span>{{ section.label }}</span>
-            <Badge :variant="section.complete ? 'success' : 'warn'">{{ section.complete ? 'Complete' : 'Incomplete' }}</Badge>
+            <Badge v-if="section.problems" variant="destructive">{{ section.problems }}</Badge>
           </button>
         </nav>
       </aside>
@@ -229,7 +328,7 @@ async function save() {
         <section id="dataset-basics" class="surface scroll-mt-24 space-y-5 p-6">
           <header>
             <h2 class="font-display text-lg font-semibold text-foreground">Basics</h2>
-            <p class="mt-1 text-sm text-muted-foreground">Edit the root dataset fields. Group and path stay fixed for this dataset.</p>
+            <p class="mt-1 text-sm text-muted-foreground">What the dataset is and who made it. Group and path stay fixed.</p>
           </header>
           <div class="grid gap-4 sm:grid-cols-2">
             <div>
@@ -252,32 +351,62 @@ async function save() {
               <label class="text-xs font-medium text-foreground">Date published <span class="text-destructive">*</span></label>
               <Input v-model="draft.basics.datePublished" type="date" class="mt-1" />
             </div>
-            <div>
-              <label class="text-xs font-medium text-foreground">License URL <span class="text-destructive">*</span></label>
-              <Input v-model="draft.basics.license" type="url" class="mt-1" />
-            </div>
+            <LicenseField v-model="draft.basics.license" />
             <div class="sm:col-span-2">
               <label class="text-xs font-medium text-foreground">Keywords</label>
               <Input v-model="keywordsText" class="mt-1" />
             </div>
           </div>
+
+          <div class="grid gap-4 border-t border-border pt-5 sm:grid-cols-2">
+            <RootReferenceField
+              v-for="field in REFERENCE_FIELDS"
+              :key="field.role"
+              :label="field.label"
+              :role="field.role"
+              :entities="draft.entities"
+              @add="addReference"
+              @select="selectReference"
+              @remove="removeReference"
+            >
+              <template #action>
+                <Button
+                  v-if="field.role === 'author' && currentUser && !draft.entities.some((entity) => entity.id === signedInUserId)"
+                  variant="link"
+                  size="sm"
+                  class="h-auto p-0 text-xs"
+                  @click="addYourself"
+                >
+                  <UserRoundPlus class="h-3.5 w-3.5" /> Add yourself
+                </Button>
+              </template>
+            </RootReferenceField>
+          </div>
+
           <p v-if="draft.profile" class="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
             Profile reference: <span class="font-medium text-foreground">{{ draft.profile.name || draft.profile.iri }}</span>
           </p>
+
+          <details class="border-t border-border pt-4">
+            <summary class="cursor-pointer text-xs font-medium text-foreground">Other properties</summary>
+            <div class="mt-3">
+              <CustomFieldsEditor :rows="customRows" @update:rows="(rows) => (customRows = rows)" />
+            </div>
+          </details>
         </section>
 
         <section id="dataset-context" class="surface scroll-mt-24 space-y-5 p-6">
           <header class="flex items-center justify-between gap-3">
             <div>
               <h2 class="font-display text-lg font-semibold text-foreground">Context</h2>
-              <p class="mt-1 text-sm text-muted-foreground">Entities without a recognized root role are retained under Other.</p>
+              <p class="mt-1 text-sm text-muted-foreground">Everything this dataset refers to. Authors and publishers added above appear here too.</p>
             </div>
-            <Button size="sm" @click="editingEntity = null; contextOpen = true"><Plus class="h-3.5 w-3.5" /> Add context</Button>
+            <Button size="sm" @click="openAddContext"><Plus class="h-3.5 w-3.5" /> Add entity</Button>
           </header>
           <ContextEntityList
             :root-name="draft.basics.title"
             :entities="draft.entities"
-            @edit="(entity) => { editingEntity = entity; contextOpen = true }"
+            @edit="editContext"
             @remove="removeContext"
           />
         </section>
@@ -285,7 +414,7 @@ async function save() {
         <section id="dataset-parts" class="surface scroll-mt-24 space-y-5 p-6">
           <header>
             <h2 class="font-display text-lg font-semibold text-foreground">Parts</h2>
-            <p class="mt-1 text-sm text-muted-foreground">Objects, external URLs, and existing datasets linked through hasPart.</p>
+            <p class="mt-1 text-sm text-muted-foreground">Files from your buckets, external links, and other datasets.</p>
           </header>
           <DatasetPartsSection v-model="draft.parts" />
         </section>
@@ -293,25 +422,31 @@ async function save() {
         <section id="dataset-review" class="surface scroll-mt-24 space-y-5 p-6">
           <header>
             <h2 class="font-display text-lg font-semibold text-foreground">Review</h2>
-            <p class="mt-1 text-sm text-muted-foreground">Validate and save the rebuilt dataset.</p>
+            <p class="mt-1 text-sm text-muted-foreground">Check the dataset with the node and choose who can see it.</p>
           </header>
           <DatasetReviewSection
             :rocrate="built.rocrate"
             :visibility="draft.visibility"
             :group-id="draft.basics.groupId"
+            :entities="draft.entities"
+            :root-name="draft.basics.title"
+            :part-ids="[...partEntityIds]"
+            :profile-name="draft.profile?.name"
             :preview-result="preview.result.value"
             :preview-running="preview.running.value"
             :preview-error="preview.error.value"
+            :preview-unavailable="preview.unavailable.value"
             :write-issues="writeIssues"
             :submit-error="submitError"
             :saving="saving"
-            :can-create="basicsComplete"
+            :can-create="canSave"
             action-label="Save changes"
             busy-label="Saving"
             @update:visibility="setVisibility"
             @preview="preview.previewNow(built.rocrate)"
+            @visible="reviewEntered"
             @create="save"
-            @jump="(entityId) => goToSection(entityId === './' ? 'basics' : 'context')"
+            @jump="(entityId) => goToSection(sectionOf(entityId, partEntityIds))"
           />
         </section>
       </main>
@@ -323,6 +458,7 @@ async function save() {
       :entities="draft.entities"
       :dataset-entities="reusableEntities"
       :editing="editingEntity"
+      :role="referenceRole"
       @save="saveContext"
       @reuse="reuseContext"
     />

@@ -14,13 +14,25 @@ import ProfileControlField from '@/components/metadata/ProfileControlField.vue'
 import DatasetEntityInstances from '@/components/metadata/DatasetEntityInstances.vue'
 import ContextEntityList from '@/components/metadata/ContextEntityList.vue'
 import AddContextDialog from '@/components/metadata/AddContextDialog.vue'
+import CustomFieldsEditor from '@/components/metadata/CustomFieldsEditor.vue'
 import DatasetPartsSection from '@/components/metadata/DatasetPartsSection.vue'
 import DatasetReviewSection from '@/components/metadata/DatasetReviewSection.vue'
 import ImportCrateDialog from '@/components/metadata/ImportCrateDialog.vue'
+import LicenseField from '@/components/metadata/LicenseField.vue'
+import RootReferenceField from '@/components/metadata/RootReferenceField.vue'
 import { profileReferenceIri, useAruna } from '@/composables/useAruna'
 import { useProfilePreview } from '@/composables/useProfilePreview'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
-import { buildDataset, signedInUserEntity, type ContextEntity, type DatasetDraft } from '@/lib/crate/build'
+import {
+  buildDataset,
+  signedInUserEntity,
+  type ContextEntity,
+  type DatasetDraft,
+  type Part,
+  type RootRole,
+} from '@/lib/crate/build'
+import { collectIssues, issueCounts, sectionOf } from '@/lib/crate/issues'
+import { groupCustomFieldRows, seedCustomFieldRows, type CustomFieldRow } from '@/lib/customFields'
 import { isDesktop } from '@/lib/desktop'
 import { previewDeviceDraft, requireDevice } from '@/lib/deviceApi'
 import { ApiError, profileValidationFindings, type RoCrateStructuralViolation } from '@/lib/api'
@@ -45,6 +57,16 @@ import type {
 import type { ParsedProfileControls } from '@/lib/profiles/rocrate'
 import { FileJson2, Plus, UserRoundPlus } from '@lucide/vue'
 
+const REFERENCE_FIELDS: Array<{ label: string; role: RootRole }> = [
+  { label: 'Authors', role: 'author' },
+  { label: 'Contributors', role: 'contributor' },
+  { label: 'Publisher', role: 'publisher' },
+  { label: 'Funder', role: 'funder' },
+  { label: 'Cited works', role: 'citation' },
+  { label: 'Contact', role: 'contactPoint' },
+  { label: 'Location', role: 'spatialCoverage' },
+]
+
 const router = useRouter()
 const {
   groups,
@@ -65,7 +87,7 @@ const draft = reactive<DatasetDraft>({
     title: '',
     description: '',
     datePublished: new Date().toISOString().slice(0, 10),
-    license: 'https://creativecommons.org/licenses/by/4.0/',
+    license: '',
     keywords: [],
   },
   entities: [],
@@ -74,11 +96,15 @@ const draft = reactive<DatasetDraft>({
 })
 const keywordsText = ref('')
 const pathTouched = ref(false)
+const pathEditing = ref(false)
+const customRows = ref<CustomFieldRow[]>([])
 const createGroupOpen = ref(false)
 const importCrateOpen = ref(false)
 const contextOpen = ref(false)
 const editingEntity = ref<ContextEntity | null>(null)
+const referenceRole = ref<RootRole | null>(null)
 const activeSection = ref('basics')
+const reviewVisible = ref(false)
 const submitError = ref<string | null>(null)
 const writeIssues = ref<Array<{
   code?: string
@@ -175,10 +201,19 @@ async function seedDraftFromCrate(imported: DatasetDraft) {
   draft.visibility = visibility
   keywordsText.value = imported.basics.keywords?.join(', ') ?? ''
   pathTouched.value = false
+  seedCustomRows(imported.custom)
   profileValues.value = {}
   profileEntries.value = {}
   submitError.value = null
   writeIssues.value = []
+}
+
+// Scalar extras become editable rows; anything structured stays on the draft.
+function seedCustomRows(custom: Record<string, unknown> | undefined) {
+  const seeded = seedCustomFieldRows(custom ?? {}, new Set())
+  customRows.value = seeded.rows
+  const preserved = new Set(seeded.preserved.map((entry) => entry.key))
+  draft.custom = Object.fromEntries(Object.entries(custom ?? {}).filter(([key]) => preserved.has(key)))
 }
 
 const profileRules = computed<ProfilePropertyRule[]>(() => parsedProfile.value?.datasetPropertyRules ?? [])
@@ -196,6 +231,12 @@ const partOptions = computed(() => draft.parts
     label: part.kind === 'object' ? part.name : part.name || part.url,
   })))
 const partIds = computed(() => new Set(partOptions.value.map((option) => option.value)))
+
+function partEntityId(part: Part): string {
+  if (part.kind === 'object') return part.id
+  return part.kind === 'external' ? part.url : part.link.iri
+}
+const partEntityIds = computed(() => new Set(draft.parts.map(partEntityId)))
 
 function addProfileEntry(control: ProfileControl, source: 'new' | 'existing') {
   const entry = source === 'new' ? newEntityEntry(control, profileEntityRules.value, 1) : newRefEntry()
@@ -244,6 +285,7 @@ const assembledDraft = computed<DatasetDraft>(() => {
   }))
   const custom = {
     ...(draft.custom ?? {}),
+    ...groupCustomFieldRows(customRows.value),
     ...normalizeProfileValues(profileValues.value, profileScalarControls.value, { omitEmpty: true }),
   }
   const usedSyntheticIds = new Set<string>()
@@ -327,7 +369,34 @@ const reusableEntities = computed<ContextEntity[]>(() => {
 
 function openAddContext() {
   editingEntity.value = null
+  referenceRole.value = null
   contextOpen.value = true
+}
+
+function editContext(entity: ContextEntity) {
+  editingEntity.value = entity
+  referenceRole.value = null
+  contextOpen.value = true
+}
+
+function addReference(role: RootRole) {
+  editingEntity.value = null
+  referenceRole.value = role
+  contextOpen.value = true
+}
+
+function selectReference(role: RootRole, entity: ContextEntity) {
+  draft.entities = draft.entities.map((candidate) => candidate.id === entity.id
+    ? { ...candidate, roles: [...new Set([...candidate.roles, role])] }
+    : candidate)
+}
+
+// Dropping a role keeps the entity while another role still points at it.
+function removeReference(role: RootRole, entity: ContextEntity) {
+  const roles = entity.roles.filter((candidate) => candidate !== role)
+  draft.entities = roles.length
+    ? draft.entities.map((candidate) => candidate.id === entity.id ? { ...candidate, roles } : candidate)
+    : draft.entities.filter((candidate) => candidate.id !== entity.id)
 }
 
 function saveContext(value: { entity: ContextEntity; relatedEntities: ContextEntity[] }) {
@@ -369,17 +438,20 @@ const preview = useProfilePreview({
 
 const basicsComplete = computed(() => Boolean(
   draft.basics.groupId
-  && draft.basics.path?.trim()
   && draft.basics.title.trim()
   && draft.basics.description.trim()
-  && draft.basics.datePublished
-  && draft.basics.license.trim(),
+  && draft.basics.datePublished,
 ))
+// The node's last verdict blocks the write; a check that could not run does not.
+const nodeRejected = computed(() => preview.result.value ? !preview.result.value.accepted : false)
+const canCreate = computed(() => basicsComplete.value && !nodeRejected.value)
+const checkIssues = computed(() => collectIssues(preview.result.value, writeIssues.value))
+const problemCounts = computed(() => issueCounts(checkIssues.value, partEntityIds.value))
 const sections = computed(() => [
-  { id: 'basics', label: 'Basics', complete: basicsComplete.value },
-  { id: 'context', label: 'Context', complete: true },
-  { id: 'parts', label: 'Parts', complete: true },
-  { id: 'review', label: 'Review', complete: basicsComplete.value },
+  { id: 'basics', label: 'Basics', problems: problemCounts.value.basics },
+  { id: 'context', label: 'Context', problems: problemCounts.value.context },
+  { id: 'parts', label: 'Parts', problems: problemCounts.value.parts },
+  { id: 'review', label: 'Review', problems: 0 },
 ])
 
 function goToSection(id: string) {
@@ -387,6 +459,14 @@ function goToSection(id: string) {
   globalThis.document?.getElementById(`dataset-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   if (id === 'review') preview.previewNow(built.value.rocrate)
 }
+
+function reviewEntered() {
+  reviewVisible.value = true
+  preview.previewNow(built.value.rocrate)
+}
+watch(built, (value) => {
+  if (reviewVisible.value) preview.preview(value.rocrate)
+})
 
 function writeStructuralViolations(error: unknown): RoCrateStructuralViolation[] {
   const violations = error instanceof ApiError ? error.details?.violations : undefined
@@ -397,7 +477,7 @@ function writeStructuralViolations(error: unknown): RoCrateStructuralViolation[]
 }
 
 async function create() {
-  if (!basicsComplete.value) return
+  if (!canCreate.value) return
   submitError.value = null
   writeIssues.value = []
   try {
@@ -433,7 +513,7 @@ async function create() {
 
 <template>
   <div>
-    <PageHeader title="New dataset" description="Create and review one complete RO-Crate dataset." />
+    <PageHeader title="New dataset" description="Describe your dataset, add people and files, then create it." />
 
     <div class="container grid gap-8 py-8 lg:grid-cols-[220px_minmax(0,1fr)]">
       <aside class="lg:sticky lg:top-20 lg:self-start">
@@ -447,7 +527,7 @@ async function create() {
             @click="goToSection(section.id)"
           >
             <span>{{ section.label }}</span>
-            <Badge :variant="section.complete ? 'success' : 'warn'">{{ section.complete ? 'Complete' : 'Incomplete' }}</Badge>
+            <Badge v-if="section.problems" variant="destructive">{{ section.problems }}</Badge>
           </button>
         </nav>
       </aside>
@@ -457,10 +537,10 @@ async function create() {
           <header class="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 class="font-display text-lg font-semibold text-foreground">Basics</h2>
-              <p class="mt-1 text-sm text-muted-foreground">Name, location, profile, and descriptive fields.</p>
+              <p class="mt-1 text-sm text-muted-foreground">What the dataset is and who made it.</p>
             </div>
             <Button type="button" variant="outline" size="sm" @click="importCrateOpen = true">
-              <FileJson2 class="h-3.5 w-3.5" /> Start from RO-Crate JSON-LD
+              <FileJson2 class="h-3.5 w-3.5" /> Import an RO-Crate
             </Button>
           </header>
 
@@ -484,12 +564,22 @@ async function create() {
               <Input v-model="draft.basics.title" class="mt-1" />
             </div>
             <div>
-              <label class="text-xs font-medium text-foreground">Path <span class="text-destructive">*</span></label>
+              <div class="flex items-center justify-between gap-2">
+                <label class="text-xs font-medium text-foreground">Path</label>
+                <Button variant="link" size="sm" class="h-auto p-0 text-xs" @click="pathEditing = !pathEditing">
+                  {{ pathEditing ? 'Done' : 'Edit' }}
+                </Button>
+              </div>
               <Input
+                v-if="pathEditing"
                 :model-value="draft.basics.path"
+                aria-label="Dataset path"
                 class="mt-1 font-mono text-xs"
                 @update:model-value="(value: string | number) => { draft.basics.path = String(value); pathTouched = true }"
               />
+              <p v-else class="mt-1 truncate rounded-md border border-border bg-muted/30 px-3 py-2 font-mono text-xs text-muted-foreground">
+                {{ draft.basics.path || 'Generated from the title.' }}
+              </p>
             </div>
             <div class="sm:col-span-2">
               <label class="text-xs font-medium text-foreground">Description <span class="text-destructive">*</span></label>
@@ -499,14 +589,36 @@ async function create() {
               <label class="text-xs font-medium text-foreground">Date published <span class="text-destructive">*</span></label>
               <Input v-model="draft.basics.datePublished" type="date" class="mt-1" />
             </div>
-            <div>
-              <label class="text-xs font-medium text-foreground">License URL <span class="text-destructive">*</span></label>
-              <Input v-model="draft.basics.license" type="url" class="mt-1" />
-            </div>
+            <LicenseField v-model="draft.basics.license" />
             <div class="sm:col-span-2">
               <label class="text-xs font-medium text-foreground">Keywords</label>
               <Input v-model="keywordsText" class="mt-1" placeholder="genomics, microscopy" />
             </div>
+          </div>
+
+          <div class="grid gap-4 border-t border-border pt-5 sm:grid-cols-2">
+            <RootReferenceField
+              v-for="field in REFERENCE_FIELDS"
+              :key="field.role"
+              :label="field.label"
+              :role="field.role"
+              :entities="draft.entities"
+              @add="addReference"
+              @select="selectReference"
+              @remove="removeReference"
+            >
+              <template #action>
+                <Button
+                  v-if="field.role === 'author' && currentUser && !draft.entities.some((entity) => entity.id === signedInUserId)"
+                  variant="link"
+                  size="sm"
+                  class="h-auto p-0 text-xs"
+                  @click="addYourself"
+                >
+                  <UserRoundPlus class="h-3.5 w-3.5" /> Add yourself
+                </Button>
+              </template>
+            </RootReferenceField>
           </div>
 
           <div v-if="profileScalarControls.length" class="grid gap-4 border-t border-border pt-5 sm:grid-cols-2">
@@ -524,30 +636,32 @@ async function create() {
             title="Additional profile requirements"
             :lines="parsedProfile.liftNotes.map((note) => note.message)"
           />
+
+          <details class="border-t border-border pt-4">
+            <summary class="cursor-pointer text-xs font-medium text-foreground">Other properties</summary>
+            <div class="mt-3">
+              <CustomFieldsEditor :rows="customRows" @update:rows="(rows) => (customRows = rows)" />
+            </div>
+          </details>
         </section>
 
         <section id="dataset-context" class="surface scroll-mt-24 space-y-5 p-6">
           <header class="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 class="font-display text-lg font-semibold text-foreground">Context</h2>
-              <p class="mt-1 text-sm text-muted-foreground">People, organizations, publications, terms, and other entities around the root.</p>
+              <p class="mt-1 text-sm text-muted-foreground">Everything this dataset refers to. Authors and publishers added above appear here too.</p>
             </div>
-            <div class="flex items-center gap-2">
-              <Button v-if="currentUser && !draft.entities.some((entity) => entity.id === signedInUserId)" variant="outline" size="sm" @click="addYourself">
-                <UserRoundPlus class="h-3.5 w-3.5" /> Add yourself
-              </Button>
-              <Button size="sm" @click="openAddContext"><Plus class="h-3.5 w-3.5" /> Add context</Button>
-            </div>
+            <Button size="sm" @click="openAddContext"><Plus class="h-3.5 w-3.5" /> Add entity</Button>
           </header>
           <ContextEntityList
             :root-name="draft.basics.title"
             :entities="draft.entities"
-            @edit="(entity) => { editingEntity = entity; contextOpen = true }"
+            @edit="editContext"
             @remove="(id) => (draft.entities = draft.entities.filter((entity) => entity.id !== id))"
           />
 
           <div v-if="profileEntityControls.length" class="space-y-4 border-t border-border pt-5">
-            <h3 class="text-sm font-semibold text-foreground">Profile entity instances</h3>
+            <h3 class="text-sm font-semibold text-foreground">Required by the profile</h3>
             <DatasetEntityInstances
               v-for="control in profileEntityControls"
               :key="control.property"
@@ -574,7 +688,7 @@ async function create() {
         <section id="dataset-parts" class="surface scroll-mt-24 space-y-5 p-6">
           <header>
             <h2 class="font-display text-lg font-semibold text-foreground">Parts</h2>
-            <p class="mt-1 text-sm text-muted-foreground">Objects, external URLs, and existing datasets linked through hasPart.</p>
+            <p class="mt-1 text-sm text-muted-foreground">Files from your buckets, external links, and other datasets.</p>
           </header>
           <DatasetPartsSection v-model="draft.parts" />
         </section>
@@ -582,23 +696,29 @@ async function create() {
         <section id="dataset-review" class="surface scroll-mt-24 space-y-5 p-6">
           <header>
             <h2 class="font-display text-lg font-semibold text-foreground">Review</h2>
-            <p class="mt-1 text-sm text-muted-foreground">Validate the complete dataset and choose who can see it.</p>
+            <p class="mt-1 text-sm text-muted-foreground">Check the dataset with the node and choose who can see it.</p>
           </header>
           <DatasetReviewSection
             :rocrate="built.rocrate"
             :visibility="draft.visibility"
             :group-id="draft.basics.groupId"
+            :entities="draft.entities"
+            :root-name="draft.basics.title"
+            :part-ids="[...partEntityIds]"
+            :profile-name="selectedProfile?.name ?? draft.profile?.name"
             :preview-result="preview.result.value"
             :preview-running="preview.running.value"
             :preview-error="preview.error.value"
+            :preview-unavailable="preview.unavailable.value"
             :write-issues="writeIssues"
             :submit-error="submitError"
             :saving="saving"
-            :can-create="basicsComplete"
+            :can-create="canCreate"
             @update:visibility="(value) => (draft.visibility = value)"
             @preview="preview.previewNow(built.rocrate)"
+            @visible="reviewEntered"
             @create="create"
-            @jump="(entityId) => goToSection(entityId === './' ? 'basics' : 'context')"
+            @jump="(entityId) => goToSection(sectionOf(entityId, partEntityIds))"
           />
         </section>
       </main>
@@ -611,6 +731,7 @@ async function create() {
       :entities="draft.entities"
       :dataset-entities="reusableEntities"
       :editing="editingEntity"
+      :role="referenceRole"
       @save="saveContext"
       @reuse="reuseContext"
     />

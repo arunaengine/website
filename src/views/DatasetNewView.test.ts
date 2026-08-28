@@ -14,6 +14,8 @@ import {
   typeValue,
 } from '@/test/clientRender'
 import * as CrateBuild from '@/lib/crate/build'
+import * as CrateIssues from '@/lib/crate/issues'
+import * as CustomFields from '@/lib/customFields'
 import * as Api from '@/lib/api'
 import * as ProfileControls from '@/lib/profiles/controls'
 import * as ProfileEmit from '@/lib/profiles/emit'
@@ -41,6 +43,8 @@ const routerPush = vi.fn(async () => undefined)
 const previewResult = ref<Api.ProfileValidationPreviewResponse | null>(null)
 const previewRunning = ref(false)
 const previewError = ref<string | null>(null)
+const previewUnavailable = ref(false)
+const previewLater = vi.fn()
 const previewNow = vi.fn(() => {
   previewResult.value = {
     accepted: false,
@@ -140,6 +144,16 @@ const ImportCrateStub = defineComponent({
       : null
   },
 })
+const ReferenceFieldStub = defineComponent({
+  props: { label: String, role: String, entities: { type: Array, default: () => [] } },
+  emits: ['add'],
+  setup(props, { emit, slots }) {
+    return () => h('div', [
+      h('button', { onClick: () => emit('add', props.role) }, `Add ${props.label}`),
+      slots.action?.(),
+    ])
+  },
+})
 const ReviewStub = defineComponent({
   props: {
     previewResult: { type: Object, default: null },
@@ -179,6 +193,9 @@ const DatasetNewView = compileClientComponent(new URL('./DatasetNewView.vue', im
   '@/components/metadata/DatasetPartsSection.vue': moduleDefault(EmptyStub),
   '@/components/metadata/DatasetReviewSection.vue': moduleDefault(ReviewStub),
   '@/components/metadata/ImportCrateDialog.vue': moduleDefault(ImportCrateStub),
+  '@/components/metadata/CustomFieldsEditor.vue': moduleDefault(EmptyStub),
+  '@/components/metadata/LicenseField.vue': moduleDefault(EmptyStub),
+  '@/components/metadata/RootReferenceField.vue': moduleDefault(ReferenceFieldStub),
   '@/composables/useAruna': {
     profileReferenceIri: () => undefined,
     useAruna: () => ({
@@ -198,11 +215,15 @@ const DatasetNewView = compileClientComponent(new URL('./DatasetNewView.vue', im
       result: previewResult,
       running: previewRunning,
       error: previewError,
+      unavailable: previewUnavailable,
+      preview: previewLater,
       previewNow,
     }),
   },
   '@/composables/useDeviceStatus': { useDeviceStatus: () => ({ deviceClient: ref(null) }) },
   '@/lib/crate/build': CrateBuild,
+  '@/lib/crate/issues': CrateIssues,
+  '@/lib/customFields': CustomFields,
   '@/lib/desktop': { isDesktop: () => false },
   '@/lib/deviceApi': { previewDeviceDraft: vi.fn(), requireDevice: vi.fn() },
   '@/lib/api': Api,
@@ -219,6 +240,12 @@ beforeEach(() => {
   previewResult.value = null
 })
 
+async function fillRequired(root: Parameters<typeof nodes>[0]) {
+  const title = nodes(root).filter((node) => node.tag === 'input')[0]!
+  await typeValue(title, 'Example dataset')
+  await typeValue(element(root, (node) => node.tag === 'textarea'), 'Example description')
+}
+
 describe('DatasetNewView', () => {
   it('renders all four reachable sections', async () => {
     const mounted = await mountApp(DatasetNewView)
@@ -232,7 +259,7 @@ describe('DatasetNewView', () => {
   it('adds a mocked ORCID Person to Context with the author role', async () => {
     const mounted = await mountApp(DatasetNewView)
 
-    await click(button(mounted.root, 'Add context'))
+    await click(button(mounted.root, 'Add entity'))
     await click(button(mounted.root, 'Choose ORCID person'))
 
     expect(content(mounted.root)).toContain('Ada ORCID author')
@@ -242,7 +269,7 @@ describe('DatasetNewView', () => {
   it('seeds the draft from the Basics RO-Crate JSON-LD action', async () => {
     const mounted = await mountApp(DatasetNewView)
 
-    await click(button(mounted.root, 'Start from RO-Crate JSON-LD'))
+    await click(button(mounted.root, 'Import an RO-Crate'))
     await click(button(mounted.root, 'Use fixture crate'))
     await flush()
 
@@ -263,18 +290,33 @@ describe('DatasetNewView', () => {
     mounted.app.unmount()
   })
 
-  it('shows preview violations and creates Group-visible metadata by default', async () => {
+  it('refuses to create while the node would reject the dataset', async () => {
     const mounted = await mountApp(DatasetNewView)
+    await fillRequired(mounted.root)
 
     await click(button(mounted.root, 'Run preview'))
     await flush()
     expect(content(mounted.root)).toContain('Dataset title is required.')
 
-    const inputs = nodes(mounted.root).filter((node) => node.tag === 'input')
-    const title = inputs[0]!
-    const description = element(mounted.root, (node) => node.tag === 'textarea')
-    await typeValue(title, 'Example dataset')
-    await typeValue(description, 'Example description')
+    await click(button(mounted.root, 'Create dataset'))
+
+    expect(createMetadata).not.toHaveBeenCalled()
+    mounted.app.unmount()
+  })
+
+  it('creates Group-visible metadata once the node accepts the draft', async () => {
+    const mounted = await mountApp(DatasetNewView)
+    await fillRequired(mounted.root)
+
+    previewResult.value = {
+      accepted: true,
+      state: 'valid',
+      evaluator: 'test',
+      findings: [],
+      completeness: 'complete',
+      structural_violations: [],
+    }
+    await flush()
     await click(button(mounted.root, 'Create dataset'))
 
     expect(createMetadata).toHaveBeenCalledWith(expect.objectContaining({
