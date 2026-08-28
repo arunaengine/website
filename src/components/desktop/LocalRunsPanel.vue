@@ -8,6 +8,7 @@ import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
+import Notice from '@/components/ui/Notice.vue'
 import Progress from '@/components/ui/Progress.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import JobStateBadge from '@/components/jobs/JobStateBadge.vue'
@@ -19,7 +20,7 @@ import { useDeviceCompute } from '@/composables/useDeviceCompute'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { useRefresh } from '@/composables/useRefresh'
 import { requireDevice } from '@/lib/deviceApi'
-import { formatJobProgress, jobProgressPercent, type JobStatusResponse } from '@/lib/jobs'
+import { formatJobProgress, jobKindLabel, jobProgressPercent, type JobStatusResponse } from '@/lib/jobs'
 import { relativeTime, truncateMiddle } from '@/lib/utils'
 import { Cpu } from '@lucide/vue'
 
@@ -71,12 +72,9 @@ watch(reachable, (now) => now && reload())
     <DeviceSurfaceState v-if="!reachable" state="offline" subject="its runs" />
 
     <template v-else>
-      <p
-        v-if="compute && !compute.enabled"
-        class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
-      >
+      <Notice v-if="compute && !compute.enabled" tone="warning">
         Running jobs on this computer is switched off. Turn it on under This device to use it.
-      </p>
+      </Notice>
 
       <div v-if="listState === 'idle' || listState === 'loading'" class="space-y-2">
         <Skeleton v-for="n in 3" :key="n" class="h-12" />
@@ -88,12 +86,9 @@ watch(reachable, (now) => now && reload())
         @retry="reload"
       />
 
-      <p
-        v-else-if="listState === 'unsupported'"
-        class="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
-      >
+      <Notice v-else-if="listState === 'unsupported'" tone="warning">
         This node version does not serve a job list yet, so local runs cannot be shown.
-      </p>
+      </Notice>
 
       <EmptyState
         v-else-if="!jobs.length"
@@ -111,12 +106,16 @@ watch(reachable, (now) => now && reload())
         </div>
         <ul class="divide-y divide-border">
           <li v-for="job in jobs" :key="job.job_id">
-            <button type="button" class="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-muted/40" @click="openJob(job)">
+            <button
+              type="button"
+              class="flex w-full items-center gap-3 px-5 py-2.5 text-left hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+              @click="openJob(job)"
+            >
               <div class="min-w-0 flex-1">
                 <div class="flex flex-wrap items-center gap-2">
-                  <span class="text-[13px] font-medium capitalize text-foreground">{{ job.kind }}</span>
+                  <span class="text-[13px] font-medium text-foreground">{{ jobKindLabel(job.kind) }}</span>
                   <JobStateBadge :state="job.state" />
-                  <Badge v-if="job.cancel_requested && !job.finished_at" variant="warn" class="text-[10px]">cancelling</Badge>
+                  <Badge v-if="job.cancel_requested && !job.finished_at" variant="warn" size="sm">cancelling</Badge>
                 </div>
                 <span class="mt-0.5 block font-mono text-[10px] text-muted-foreground">{{ truncateMiddle(job.job_id) }}</span>
               </div>

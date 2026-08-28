@@ -9,6 +9,8 @@ import RefreshButton from '@/components/ui/RefreshButton.vue'
 import RefusalNote from '@/components/ui/RefusalNote.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
+import FactList from '@/components/ui/FactList.vue'
+import Notice from '@/components/ui/Notice.vue'
 import Select from '@/components/ui/Select.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
@@ -33,8 +35,8 @@ import {
   orderEntries,
   replaceableCount,
 } from '@/lib/syncStates'
-import { formatBytes, relativeTime } from '@/lib/utils'
-import { ArrowLeft, ArrowRight, FolderOpen, Link2Off, Pause, Play } from '@lucide/vue'
+import { errorMessage, formatBytes, relativeTime } from '@/lib/utils'
+import { ArrowLeft, FolderOpen, Link2Off, Pause, Play } from '@lucide/vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -96,7 +98,7 @@ async function loadPage(reset = true): Promise<void> {
     listState.value = 'ready'
   } catch (err) {
     listState.value = 'error'
-    listError.value = err instanceof Error ? err.message : String(err)
+    listError.value = errorMessage(err)
   }
 }
 
@@ -106,7 +108,7 @@ async function retry(): Promise<void> {
   try {
     await sync(folderId.value)
   } catch (err) {
-    actionError.value = err instanceof Error ? err.message : String(err)
+    actionError.value = errorMessage(err)
   }
 }
 
@@ -115,7 +117,7 @@ async function refresh(): Promise<void> {
   try {
     await refreshFolder(folderId.value)
   } catch (err) {
-    actionError.value = err instanceof Error ? err.message : String(err)
+    actionError.value = errorMessage(err)
   }
   await loadPage()
 }
@@ -143,9 +145,7 @@ async function act(entry: FolderEntry, action: EntryAction): Promise<void> {
   } catch (err) {
     actionError.value = isStaleExpectation(err)
       ? 'That file changed again, so nothing was applied. Refresh and look at it once more.'
-      : err instanceof Error
-        ? err.message
-        : String(err)
+      : errorMessage(err)
   }
 }
 
@@ -163,7 +163,7 @@ async function detach(): Promise<void> {
     await unbind(folderId.value)
     void router.push({ name: 'sync' })
   } catch (err) {
-    actionError.value = err instanceof Error ? err.message : String(err)
+    actionError.value = errorMessage(err)
   }
 }
 
@@ -173,7 +173,7 @@ async function reveal(path: string): Promise<void> {
     const { revealPath } = await import('@/lib/desktopBridge')
     await revealPath(path)
   } catch (err) {
-    actionError.value = err instanceof Error ? err.message : String(err)
+    actionError.value = errorMessage(err)
   }
 }
 
@@ -184,6 +184,19 @@ function bytes(value: number | null | undefined): string {
 function when(ms: number | null | undefined): string {
   return ms ? relativeTime(new Date(ms).toISOString()) : 'n/a'
 }
+
+const facts = computed(() => {
+  const current = folder.value
+  if (!current) return []
+  return [
+    { label: 'On this computer', value: current.local_bucket, mono: true },
+    {
+      label: 'In the realm',
+      value: `${displayName(current.remote.node_id)} · ${current.remote.bucket}/${current.remote.prefix}`,
+    },
+    { label: 'Files', value: `${current.counters.in_sync} in sync · ${current.counters.uploading} uploading` },
+  ]
+})
 </script>
 
 <template>
@@ -194,15 +207,15 @@ function when(ms: number | null | undefined): string {
       :description="folder?.root"
     >
       <template #breadcrumbs>
-        <Badge v-if="folder" variant="outline" class="text-[10px] uppercase">{{
+        <Badge v-if="folder" variant="outline" size="sm" class="uppercase">{{
           folder.mode === 'two_way' ? 'two-way' : 'upload only'
         }}</Badge>
-        <Badge v-if="folder?.state === 'paused'" variant="secondary" class="text-[10px] uppercase">paused</Badge>
+        <Badge v-if="folder?.state === 'paused'" variant="secondary" size="sm" class="uppercase">paused</Badge>
       </template>
       <template #actions>
-        <RouterLink :to="{ name: 'sync' }">
-          <Button variant="ghost" size="sm"><ArrowLeft class="h-3.5 w-3.5" /> Sync</Button>
-        </RouterLink>
+        <Button variant="ghost" size="sm" as-child>
+          <RouterLink :to="{ name: 'sync' }"><ArrowLeft class="h-3.5 w-3.5" /> Sync</RouterLink>
+        </Button>
         <Button v-if="folder" variant="outline" size="sm" @click="reveal(folder.root)">
           <FolderOpen class="h-3.5 w-3.5" /> Show on disk
         </Button>
@@ -235,23 +248,16 @@ function when(ms: number | null | undefined): string {
         :message="actionError"
       />
 
-      <div v-if="folder" class="surface flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3 text-[11px] text-muted-foreground">
-        <span class="font-mono">{{ folder.local_bucket }}</span>
-        <ArrowRight class="h-3 w-3" />
-        <span class="font-mono"
-          >{{ displayName(folder.remote.node_id) }} · {{ folder.remote.bucket }}/{{ folder.remote.prefix }}</span
-        >
-        <span class="ml-auto">{{ folder.counters.in_sync }} in sync · {{ folder.counters.uploading }} uploading</span>
-      </div>
+      <FactList v-if="folder" :items="facts" />
 
       <!-- The decision band: the only place a local file can be given up. -->
-      <section v-if="folder && waiting > 0" class="rounded-lg border border-amber-500/40 bg-amber-500/[0.07] px-4 py-3.5">
+      <Notice v-if="folder && waiting > 0" tone="warning">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div class="min-w-0">
-            <h2 class="text-sm font-semibold text-amber-900 dark:text-amber-200">
+            <h2 class="text-sm font-semibold">
               {{ waiting }} {{ waiting === 1 ? 'file waits' : 'files wait' }} for your decision
             </h2>
-            <p class="mt-0.5 text-[12px] leading-relaxed text-amber-900/80 dark:text-amber-200/80">
+            <p class="mt-0.5">
               <span>{{ folder.counters.conflicts }} both changed</span> ·
               <span>{{ folder.counters.pending_replacements }} waiting to be replaced</span> ·
               <span>{{ folder.counters.remote_deleted }} deleted in the realm</span>. Your copies are untouched until
@@ -262,11 +268,11 @@ function when(ms: number | null | undefined): string {
             Replace {{ replaceable }} of them…
           </Button>
         </div>
-        <p v-if="folder.counters.errors" class="mt-2 text-[11px] text-amber-900/80 dark:text-amber-200/80">
+        <p v-if="folder.counters.errors" class="mt-2">
           {{ folder.counters.errors }} {{ folder.counters.errors === 1 ? 'file' : 'files' }} failed and are listed
           separately.
         </p>
-      </section>
+      </Notice>
 
       <div class="flex flex-wrap items-center gap-2">
         <Select
@@ -303,9 +309,7 @@ function when(ms: number | null | undefined): string {
             <div class="min-w-0 flex-1">
               <div class="flex flex-wrap items-center gap-2">
                 <span class="truncate font-mono text-[12px] text-foreground" :title="entry.path">{{ entry.path }}</span>
-                <Badge :variant="entryBadge(entry.state)" class="text-[10px]">{{
-                  entryMeta(entry.state).label
-                }}</Badge>
+                <Badge :variant="entryBadge(entry.state)" size="sm">{{ entryMeta(entry.state).label }}</Badge>
               </div>
               <p class="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
                 {{ entry.message || entryMeta(entry.state).hint }}
@@ -358,7 +362,7 @@ function when(ms: number | null | undefined): string {
       </div>
 
       <section v-if="folder" class="surface space-y-2 border-destructive/25 px-4 py-3.5">
-        <h2 class="text-sm font-semibold text-foreground">Stop syncing this folder</h2>
+        <h2 class="font-display text-sm font-semibold text-aruna-navy">Stop syncing this folder</h2>
         <p class="text-[12px] leading-relaxed text-muted-foreground">
           The binding is dropped and the realm keeps its versions. Every file on this disk stays exactly where it is.
         </p>

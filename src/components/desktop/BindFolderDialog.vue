@@ -8,6 +8,7 @@ import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import RefusalNote from '@/components/ui/RefusalNote.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
@@ -23,7 +24,8 @@ import { useSyncedFolders } from '@/composables/useSyncedFolders'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import type { BucketSearchHit } from '@/lib/api'
 import type { FolderMode, SyncedFolder } from '@/lib/deviceApi'
-import { FolderOpen, Loader2 } from '@lucide/vue'
+import { errorMessage } from '@/lib/utils'
+import { FolderOpen } from '@lucide/vue'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{
@@ -95,7 +97,7 @@ async function chooseFolder(): Promise<void> {
     const picked = await pickDirectory({ title: 'Folder to sync', startPath: root.value || undefined })
     if (picked) root.value = picked
   } catch (err) {
-    pickError.value = err instanceof Error ? err.message : String(err)
+    pickError.value = errorMessage(err)
   }
 }
 
@@ -143,7 +145,7 @@ async function submit(): Promise<void> {
     emit('bound', folder)
     emit('update:open', false)
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err)
+    error.value = errorMessage(err)
   } finally {
     submitting.value = false
   }
@@ -164,7 +166,7 @@ async function submit(): Promise<void> {
         <div>
           <span class="text-xs font-medium text-foreground">Folder on this computer</span>
           <div class="mt-1 flex flex-wrap items-center gap-2">
-            <code class="min-w-0 flex-1 truncate rounded-md bg-muted/40 px-3 py-2 font-mono text-xs">{{
+            <code class="surface-muted min-w-0 flex-1 truncate px-3 py-2 font-mono text-xs">{{
               root || 'No folder picked yet'
             }}</code>
             <Button variant="outline" size="sm" @click="chooseFolder">
@@ -195,6 +197,7 @@ async function submit(): Promise<void> {
               placeholder="Pick a node"
               aria-label="Realm node holding the bucket"
             />
+            <span class="mt-1 block text-[11px] text-muted-foreground">The node that stores the bucket.</span>
           </label>
         </div>
 
@@ -230,7 +233,7 @@ async function submit(): Promise<void> {
               aria-label="Sync direction"
             />
           </label>
-          <div class="flex items-start justify-between gap-3 rounded-md border border-border/70 px-3 py-2">
+          <div class="surface-inline flex items-start justify-between gap-3 px-3 py-2">
             <div class="min-w-0">
               <span class="text-xs font-medium text-foreground">Propagate deletes</span>
               <p class="mt-0.5 text-[11px] leading-snug text-muted-foreground">
@@ -245,7 +248,7 @@ async function submit(): Promise<void> {
           </div>
         </div>
 
-        <p class="rounded-md bg-muted/40 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
+        <p class="surface-muted px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
           {{ modeHint }}
         </p>
 
@@ -255,7 +258,7 @@ async function submit(): Promise<void> {
       <DialogFooter>
         <DialogClose as-child><Button variant="ghost">Cancel</Button></DialogClose>
         <Button :disabled="!canSubmit" @click="submit">
-          <Loader2 v-if="busy || submitting" class="h-4 w-4 animate-spin" /> Sync a folder
+          <Spinner v-if="busy || submitting" label="Starting the sync…" /> Start syncing
         </Button>
       </DialogFooter>
     </DialogContent>

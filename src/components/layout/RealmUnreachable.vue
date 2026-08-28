@@ -4,8 +4,10 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
+import Notice from '@/components/ui/Notice.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import { probeRealm, realmFailure, realmOrigin, realmReach } from '@/lib/desktopBoot'
-import { RotateCw, ServerOff } from '@lucide/vue'
+import { ServerOff } from '@lucide/vue'
 
 const router = useRouter()
 const origin = realmOrigin()
@@ -29,18 +31,20 @@ function toWelcome(): void {
       />
       <div class="relative">
         <ServerOff class="h-5 w-5 text-destructive" aria-hidden="true" />
-        <h1 class="mt-3 font-display text-lg font-semibold tracking-tight text-aruna-navy">
-          This realm is not answering
-        </h1>
+        <h1 class="mt-3 font-display text-lg font-semibold tracking-tight text-aruna-navy">Realm unreachable</h1>
         <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
           Aruna Desktop could not reach <span class="font-mono text-foreground">{{ origin }}</span
           >. It may be offline, or unreachable from this machine.
         </p>
-        <p v-if="realmFailure" class="hash mt-2 break-all">{{ realmFailure }}</p>
+        <Notice v-if="realmFailure" tone="error" class="mt-2">{{ realmFailure }}</Notice>
         <div class="mt-5 flex flex-wrap gap-2">
-          <Button :disabled="retrying" @click="retry">
-            <RotateCw :class="['h-4 w-4', retrying && 'animate-spin']" /> {{ retrying ? 'Retrying…' : 'Retry' }}
-          </Button>
+          <RefreshButton
+            :busy="retrying"
+            variant="default"
+            size="default"
+            :label="retrying ? 'Retrying…' : 'Retry'"
+            @click="retry"
+          />
           <Button variant="outline" @click="toWelcome">Choose a different realm</Button>
         </div>
       </div>

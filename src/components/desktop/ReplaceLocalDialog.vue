@@ -5,6 +5,8 @@
 import { computed, ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
+import Notice from '@/components/ui/Notice.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
@@ -21,8 +23,7 @@ import {
   type SyncedFolder,
 } from '@/lib/deviceApi'
 import { folderConfirmed, replaceableCount } from '@/lib/syncStates'
-import { formatBytes, relativeTime, truncateMiddle } from '@/lib/utils'
-import { Loader2 } from '@lucide/vue'
+import { errorMessage, formatBytes, relativeTime, truncateMiddle } from '@/lib/utils'
 
 // `entry` absent means the folder-wide form, which only ever replaces.
 const props = withDefaults(
@@ -114,9 +115,7 @@ async function apply(): Promise<void> {
   } catch (err) {
     error.value = isStaleExpectation(err)
       ? 'The file changed again since this screen was drawn, so nothing was touched. Reload the folder and look at it once more.'
-      : err instanceof Error
-        ? err.message
-        : String(err)
+      : errorMessage(err)
   }
 }
 </script>
@@ -146,7 +145,7 @@ async function apply(): Promise<void> {
 
       <div class="space-y-4 py-1">
         <div v-if="entry" class="grid gap-3 sm:grid-cols-2">
-          <section class="rounded-md border border-primary/30 bg-primary/[0.06] px-3 py-2.5">
+          <section class="surface-inline border-primary/30 bg-primary/[0.06] px-3 py-2.5">
             <h3 class="text-[11px] font-semibold uppercase tracking-wider text-foreground">On this computer</h3>
             <dl class="mt-2 space-y-1">
               <div v-for="fact in localFacts" :key="fact.label" class="flex items-baseline justify-between gap-3">
@@ -155,7 +154,7 @@ async function apply(): Promise<void> {
               </div>
             </dl>
           </section>
-          <section class="rounded-md border border-border px-3 py-2.5">
+          <section class="surface-inline px-3 py-2.5">
             <h3 class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">In the realm</h3>
             <p v-if="removing" class="mt-2 text-[11px] text-muted-foreground">
               Deleted. Earlier versions stay recoverable in the realm.
@@ -171,7 +170,7 @@ async function apply(): Promise<void> {
 
         <p
           v-if="!removing && entry?.conflicted_copy"
-          class="rounded-md bg-muted/40 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground"
+          class="surface-muted px-3 py-2 text-[11px] leading-relaxed text-muted-foreground"
         >
           The realm version is already on this disk as
           <code class="font-mono">{{ entry.conflicted_copy }}</code
@@ -196,18 +195,13 @@ async function apply(): Promise<void> {
           </p>
         </div>
 
-        <p
-          v-if="error"
-          class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
-        >
-          {{ error }}
-        </p>
+        <Notice v-if="error" tone="error">{{ error }}</Notice>
       </div>
 
       <DialogFooter>
         <DialogClose as-child><Button variant="ghost">Keep my copy</Button></DialogClose>
         <Button variant="destructive" :disabled="!canApply" @click="apply">
-          <Loader2 v-if="busy" class="h-4 w-4 animate-spin" />
+          <Spinner v-if="busy" label="Applying…" />
           {{ applyLabel }}
         </Button>
       </DialogFooter>

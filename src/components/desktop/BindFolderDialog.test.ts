@@ -1,6 +1,7 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import * as Utils from '@/lib/utils'
 import * as Workspaces from '@/lib/workspaces'
 import {
   button,
@@ -59,6 +60,7 @@ const SelectStub = defineComponent({
     }),
 })
 const SwitchStub = defineComponent(() => () => h('button'))
+const SpinnerStub = defineComponent({ props: { label: String }, setup: () => () => h('i') })
 const BucketSearchStub = defineComponent({
   props: { modelValue: { type: String, default: '' }, placeholder: String },
   emits: ['update:modelValue', 'select'],
@@ -89,6 +91,7 @@ const BindFolderDialog = compileClientComponent(new URL('./BindFolderDialog.vue'
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/components/ui/Switch.vue': moduleDefault(SwitchStub),
   '@/components/ui/RefusalNote.vue': moduleDefault(RefusalStub),
+  '@/components/ui/Spinner.vue': moduleDefault(SpinnerStub),
   '@/components/groups/GroupSelect.vue': moduleDefault(SelectStub),
   '@/components/data/BucketSearchBox.vue': moduleDefault(BucketSearchStub),
   '@/composables/useAruna': { useAruna: () => ({ myGroups }) },
@@ -104,6 +107,7 @@ const BindFolderDialog = compileClientComponent(new URL('./BindFolderDialog.vue'
     useS3,
   },
   '@/composables/useSyncedFolders': { useSyncedFolders: () => ({ bind, busy }) },
+  '@/lib/utils': Utils,
   '@/lib/workspaces': Workspaces,
   '@/lib/desktopBridge': { pickDirectory: vi.fn(async () => '/home/me/data') },
 })
@@ -126,7 +130,7 @@ describe('syncing a folder to a bucket', () => {
     const mounted = await mountReady()
     await typeValue(input(mounted.root, 'aria-label', 'Bucket name'), 'new-bucket')
 
-    await click(button(mounted.root, 'Sync a folder'))
+    await click(button(mounted.root, 'Start syncing'))
 
     expect(useS3).not.toHaveBeenCalled()
     expect(bind).toHaveBeenCalledWith(
@@ -145,7 +149,7 @@ describe('syncing a folder to a bucket', () => {
     const mounted = await mountReady()
 
     await click(button(mounted.root, 'Use existing bucket'))
-    await click(button(mounted.root, 'Sync a folder'))
+    await click(button(mounted.root, 'Start syncing'))
 
     expect(useS3).not.toHaveBeenCalled()
     expect(bind).toHaveBeenCalledWith(
@@ -163,7 +167,7 @@ describe('syncing a folder to a bucket', () => {
     const mounted = await mountReady()
     await typeValue(input(mounted.root, 'aria-label', 'Bucket name'), 'lab')
 
-    await click(button(mounted.root, 'Sync a folder'))
+    await click(button(mounted.root, 'Start syncing'))
 
     expect(content(mounted.root)).toContain(conflict)
     mounted.app.unmount()

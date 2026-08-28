@@ -53,9 +53,10 @@ import Spinner from '@/components/ui/Spinner.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import Notice from '@/components/ui/Notice.vue'
 import CrateTransferDialog from '@/components/metadata/CrateTransferDialog.vue'
 import CatalogCard from '@/components/metadata/CatalogCard.vue'
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
   buildObjectSearchExportArtifact,
@@ -77,7 +78,7 @@ import { useCatalogBrowse, type CatalogPageParams } from '@/composables/useCatal
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useJobs } from '@/composables/useJobs'
 import { useDebounceFn } from '@vueuse/core'
-import { formatBytes, formatNumber, relativeTime, shortUserId, truncateMiddle } from '@/lib/utils'
+import { errorMessage, formatBytes, formatNumber, relativeTime, shortUserId, truncateMiddle } from '@/lib/utils'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import { Search, FileArchive, FileJson2, Boxes, Code2, Play, Plus, Star, AlertTriangle, Users, UserRound, Download, ListChecks } from '@lucide/vue'
 import type { MetadataDoc, SparqlExecutionMode, SparqlResult } from '@/data/types'
@@ -93,6 +94,12 @@ import {
 import type { RouteLocationRaw } from 'vue-router'
 
 const route = useRoute()
+const searchBox = ref<{ focus: () => void } | null>(null)
+
+// Desktop's "Keep a dataset offline…" opens this page on the search box.
+onMounted(() => {
+  if (route.query.focus === 'search') searchBox.value?.focus()
+})
 const router = useRouter()
 const {
   realm,
@@ -330,7 +337,7 @@ async function loadBrowsePage(force = false) {
     if (seq !== browseSeq) return
     browseDocs.value = []
     browseReturned.value = 0
-    browseError.value = err instanceof Error ? err.message : String(err)
+    browseError.value = errorMessage(err)
   } finally {
     if (seq === browseSeq) browseLoading.value = false
   }
@@ -364,7 +371,7 @@ async function loadFavourites() {
       .map(toMetadataDoc)
   } catch (err) {
     if (seq !== favouriteSeq) return
-    browseError.value = err instanceof Error ? err.message : String(err)
+    browseError.value = errorMessage(err)
   } finally {
     if (seq === favouriteSeq) favouritesLoading.value = false
   }
@@ -714,7 +721,7 @@ const runBucketSearch = useDebounceFn(async (term: string) => {
   } catch (err) {
     if (seq !== bucketSeq) return
     bucketResults.value = []
-    bucketsError.value = err instanceof Error ? err.message : String(err)
+    bucketsError.value = errorMessage(err)
   } finally {
     if (seq === bucketSeq) bucketsSearching.value = false
   }
@@ -765,7 +772,7 @@ async function toggleFav(id: string) {
   try {
     await toggleFavourite(id)
   } catch (err) {
-    favError.value = err instanceof Error ? err.message : String(err)
+    favError.value = errorMessage(err)
   } finally {
     const next = new Set(favBusy.value)
     next.delete(id)
@@ -811,7 +818,7 @@ function sparqlFailureMessage(error: unknown): string {
   if (documentScope.value && error instanceof ApiError && error.status === 503) {
     return 'This Dataset graph is unavailable or still materializing. Retry when it is ready.'
   }
-  return error instanceof Error ? error.message : String(error)
+  return errorMessage(error)
 }
 
 async function runQuery() {
@@ -888,7 +895,7 @@ async function runQuery() {
         <div class="surface p-4">
           <div class="relative">
             <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input v-model="q" :aria-busy="searchBusy" placeholder="Search Datasets, data, groups, and people…" class="h-10 w-full rounded-md border border-input bg-background pl-9 pr-10 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring" />
+            <input ref="searchBox" v-model="q" :aria-busy="searchBusy" placeholder="Search Datasets, data, groups, and people…" class="h-10 w-full rounded-md border border-input bg-background pl-9 pr-10 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring" />
             <Spinner v-if="searchBusy" label="Searching…" class="absolute right-3 top-1/2 -translate-y-1/2 text-primary" />
           </div>
           <SearchFilterBar v-model="filterModel" :facets="filterFacets" aria-label="Dataset filters" class="mt-3" />
@@ -903,15 +910,11 @@ async function runQuery() {
         <template v-if="searchActive">
           <!-- Partial-result banner: served today via nodes_queried/nodes_failed, so it is
                NOT gated behind the cursor flag. Shows even when zero hits came back. -->
-          <div
-            v-if="partial"
-            role="status"
-            class="surface flex flex-wrap items-center gap-2 border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-xs"
-          >
-            <AlertTriangle class="h-4 w-4 text-amber-600" />
+          <Notice v-if="partial" tone="warning" class="flex flex-wrap items-center gap-2 px-4 py-2.5">
+            <AlertTriangle class="h-4 w-4" />
             <span>Partial results, {{ nodesQueried - nodesFailed }} of {{ nodesQueried }} nodes answered; matches on failed nodes are missing.</span>
             <Button variant="outline" size="sm" class="ml-auto" @click="retrySearch">Retry</Button>
-          </div>
+          </Notice>
 
           <!-- Entity-kind chips: metadata stays the primary result set; groups and
                people render as extra sections like the top-bar quick search. -->
@@ -957,13 +960,10 @@ async function runQuery() {
             </div>
 
             <!-- Object inventory coverage is intentionally before every hit. -->
-            <div
+            <Notice
               v-if="objectCoverageShown && !objectCoverageComplete"
-              role="status"
-              class="mb-3 flex flex-wrap items-center gap-2 rounded-md border px-4 py-3 text-xs"
-              :class="objectError
-                ? 'border-destructive/30 bg-destructive/5 text-destructive'
-                : 'border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200'"
+              :tone="objectError ? 'error' : 'warning'"
+              class="mb-3 flex flex-wrap items-center gap-2 px-4 py-3"
             >
               <div class="min-w-0 flex-1 space-y-1.5">
                 <p v-if="objectInventoryPartial" class="font-medium">Partial object inventory. Coverage is incomplete, so missing objects cannot be treated as absent.</p>
@@ -973,7 +973,7 @@ async function runQuery() {
                 </template>
               </div>
               <Button variant="outline" size="sm" :disabled="objectsSearching" @click="retryObjectSearch">Retry</Button>
-            </div>
+            </Notice>
 
             <CoverageStatsModal
               v-model:open="showCoverageStats"
@@ -990,8 +990,8 @@ async function runQuery() {
                 class="surface flex min-w-0 flex-col gap-3 p-4 transition-shadow hover:shadow-md"
               >
                 <div class="flex flex-wrap items-center gap-1.5">
-                  <Badge variant="secondary" class="text-[10px] uppercase">Object</Badge>
-                  <Badge variant="outline" class="text-[10px]">{{ OBJECT_SEARCH_MODE_LABELS[hit.mode] }}</Badge>
+                  <Badge variant="secondary" size="sm" class="uppercase">Object</Badge>
+                  <Badge variant="outline" size="sm">{{ OBJECT_SEARCH_MODE_LABELS[hit.mode] }}</Badge>
                 </div>
                 <p class="break-all font-mono text-xs font-medium text-foreground">{{ hit.key }}</p>
                 <dl class="grid gap-1 text-[11px] text-muted-foreground">
@@ -1074,7 +1074,7 @@ async function runQuery() {
               >
                 <Boxes class="h-3.5 w-3.5 text-primary/70" />
                 <span class="font-mono text-xs font-medium text-foreground">{{ hit.bucket }}</span>
-                <Badge :variant="isLocalNode(hit.node_id) ? 'accent' : 'outline'" class="text-[10px]" :title="hit.node_id">
+                <Badge :variant="isLocalNode(hit.node_id) ? 'accent' : 'outline'" size="sm" :title="hit.node_id">
                   {{ isLocalNode(hit.node_id) ? 'this node' : nodeDisplayName(hit.node_id) }}
                 </Badge>
                 <span class="text-[10px] text-muted-foreground" :title="hit.group_id">
@@ -1145,7 +1145,7 @@ async function runQuery() {
             <div class="grid gap-4 transition-opacity sm:grid-cols-2 lg:grid-cols-3" :class="searchStale ? 'opacity-40' : ''">
               <template v-for="line in visibleResults" :key="line.hit.document_id">
                 <div v-if="line.doc" class="flex min-w-0 flex-col gap-1.5">
-                  <Badge variant="secondary" class="w-fit text-[10px] uppercase">
+                  <Badge variant="secondary" size="sm" class="w-fit uppercase">
                     {{ datasetPurposeLabel(datasetPurposeOf(line.doc)) }}
                   </Badge>
                   <CatalogCard
@@ -1174,7 +1174,7 @@ async function runQuery() {
                   <div class="mt-auto flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
                     <span class="truncate font-mono">{{ truncateMiddle(line.hit.document_id) }}</span>
                     <div class="flex shrink-0 items-center gap-1.5">
-                      <Badge v-if="textQuery" variant="outline" class="text-[10px]">score {{ line.hit.score.toFixed(2) }}</Badge>
+                      <Badge v-if="textQuery" variant="outline" size="sm">score {{ line.hit.score.toFixed(2) }}</Badge>
                       <span class="truncate">{{ groupNames.get(line.hit.group_id) ?? truncateMiddle(line.hit.group_id) }}</span>
                     </div>
                   </div>
@@ -1394,7 +1394,7 @@ async function runQuery() {
             <div class="flex items-center gap-2">
               <Code2 class="h-4 w-4 text-primary" />
               <h2 class="font-display text-sm font-semibold text-aruna-navy">SPARQL workbench</h2>
-              <Badge variant="secondary" class="text-[10px] uppercase">real API</Badge>
+              <Badge variant="secondary" size="sm" class="uppercase">real API</Badge>
             </div>
             <div class="flex items-center gap-3">
               <Select
@@ -1408,7 +1408,7 @@ async function runQuery() {
           </div>
           <div v-if="documentScope" class="mt-3 rounded-md border border-primary/25 bg-primary/5 px-3 py-2.5 text-xs text-foreground/80">
             <div class="flex flex-wrap items-center gap-2">
-              <Badge variant="accent" class="text-[10px] uppercase">Fixed Dataset scope</Badge>
+              <Badge variant="accent" size="sm" class="uppercase">Fixed Dataset scope</Badge>
               <span class="break-all font-mono">{{ documentScope }}</span>
             </div>
             <p class="mt-2 leading-relaxed">
@@ -1423,7 +1423,7 @@ async function runQuery() {
 
         <section v-if="sparqlFailure" class="surface overflow-hidden">
           <header class="flex flex-wrap items-center gap-2 border-b border-border bg-muted/20 px-4 py-2.5 text-[11px] text-muted-foreground">
-            <Badge variant="destructive" class="text-[10px] uppercase">Unavailable</Badge>
+            <Badge variant="destructive" size="sm" class="uppercase">Unavailable</Badge>
             <span v-if="sparqlFailureMode">Mode: {{ sparqlModeLabels[sparqlFailureMode] }}</span>
             <span v-if="documentScope" class="font-mono">Fixed Dataset scope: {{ documentScope }}</span>
             <Button variant="outline" size="sm" class="ml-auto" :disabled="running" @click="runQuery">Retry</Button>
@@ -1439,7 +1439,8 @@ async function runQuery() {
           <header class="flex flex-wrap items-center gap-2 border-b border-border bg-muted/20 px-4 py-2.5 text-[11px] text-muted-foreground">
             <Badge
               :variant="sparqlCoverageStatus(sparqlResult) === 'Complete' ? 'success' : sparqlCoverageStatus(sparqlResult) === 'Partial' ? 'warn' : 'destructive'"
-              class="text-[10px] uppercase"
+              size="sm"
+              class="uppercase"
             >
               {{ sparqlCoverageStatus(sparqlResult) }}
             </Badge>
@@ -1453,10 +1454,14 @@ async function runQuery() {
               </Button>
             </div>
           </header>
-          <div v-if="!sparqlResult.complete" class="space-y-1 border-b border-border bg-amber-500/10 px-4 py-2 text-[11px] text-amber-800 dark:text-amber-200">
+          <Notice
+            v-if="!sparqlResult.complete"
+            tone="warning"
+            class="space-y-1 rounded-none border-0 border-b px-4 py-2 text-[11px]"
+          >
             <p>{{ sparqlResult.nodesFailed }} of {{ sparqlResult.nodesQueried }} node partitions failed.</p>
             <p v-if="sparqlResult.failedPartitions.length" class="break-all">Failed partitions: {{ sparqlResult.failedPartitions.join(', ') }}</p>
-          </div>
+          </Notice>
           <div class="max-h-[480px] overflow-auto scrollbar-thin">
             <table class="w-full text-sm">
               <thead class="sticky top-0 bg-background text-[11px] uppercase tracking-wider text-muted-foreground">

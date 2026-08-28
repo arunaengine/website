@@ -16,3 +16,11 @@ export interface NavSeparator {
 export type NavEntry = NavItem | NavSeparator
 
 export const navSeparator: NavSeparator = { separator: true }
+
+/** The one row shape every sidebar entry wears, destinations and actions alike. */
+export function navRowClass(collapsed: boolean): string {
+  return [
+    'flex w-full items-center gap-2.5 rounded-md py-2 text-[13px] font-medium transition-colors',
+    collapsed ? 'justify-center px-0' : 'px-2.5',
+  ].join(' ')
+}

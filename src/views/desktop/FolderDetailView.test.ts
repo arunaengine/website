@@ -101,6 +101,14 @@ const RefusalStub = defineComponent({
 const SelectStub = defineComponent({ setup: () => () => h('select') })
 const icons = new Proxy({}, { get: () => defineComponent(() => () => h('i')) })
 
+const FactList = compileClientComponent(new URL('../../components/ui/FactList.vue', import.meta.url), {
+  vue: VueRuntime,
+})
+const Notice = compileClientComponent(new URL('../../components/ui/Notice.vue', import.meta.url), {
+  vue: VueRuntime,
+  '@/lib/utils': Utils,
+})
+
 const FolderDetailView = compileClientComponent(new URL('./FolderDetailView.vue', import.meta.url), {
   vue: VueRuntime,
   'vue-router': RouterRuntime,
@@ -111,6 +119,8 @@ const FolderDetailView = compileClientComponent(new URL('./FolderDetailView.vue'
   '@/components/ui/RefusalNote.vue': moduleDefault(RefusalStub),
   '@/components/ui/EmptyState.vue': moduleDefault(Passthrough),
   '@/components/ui/ErrorPanel.vue': moduleDefault(Passthrough),
+  '@/components/ui/FactList.vue': moduleDefault(FactList),
+  '@/components/ui/Notice.vue': moduleDefault(Notice),
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/components/ui/Skeleton.vue': moduleDefault(Passthrough),
   '@/components/dashboard/PageHeader.vue': moduleDefault(Passthrough),

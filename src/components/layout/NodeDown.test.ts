@@ -1,6 +1,7 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import * as Utils from '@/lib/utils'
 import {
   button,
   click,
@@ -31,13 +32,28 @@ const RouterLinkStub = defineComponent({
 })
 const icons = new Proxy({}, { get: () => defineComponent(() => () => h('i')) })
 
+const FactList = compileClientComponent(new URL('../ui/FactList.vue', import.meta.url), { vue: VueRuntime })
+const Notice = compileClientComponent(new URL('../ui/Notice.vue', import.meta.url), {
+  vue: VueRuntime,
+  '@/lib/utils': Utils,
+})
+const Spinner = compileClientComponent(new URL('../ui/Spinner.vue', import.meta.url), {
+  vue: VueRuntime,
+  '@lucide/vue': icons,
+  '@/lib/utils': Utils,
+})
+
 const NodeDown = compileClientComponent(new URL('./NodeDown.vue', import.meta.url), {
   vue: VueRuntime,
   'vue-router': { RouterLink: RouterLinkStub },
   '@lucide/vue': icons,
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+  '@/components/ui/FactList.vue': moduleDefault(FactList),
+  '@/components/ui/Notice.vue': moduleDefault(Notice),
+  '@/components/ui/Spinner.vue': moduleDefault(Spinner),
   '@/composables/useDeviceStatus': { useDeviceStatus: () => ({ status, state, refresh }) },
   '@/lib/desktopBridge': { setNodeSettings },
+  '@/lib/utils': Utils,
 })
 
 beforeEach(() => {
@@ -100,7 +116,8 @@ describe('node down page', () => {
     }
     const mounted = await mountApp(NodeDown)
 
-    expect(content(mounted.root)).toContain('The realm at https://realm.example was recreated')
+    expect(content(mounted.root)).toContain('The realm was recreated')
+    expect(content(mounted.root)).toContain('Realmhttps://realm.example')
     expect(content(mounted.root)).toContain('Expected realm01K4EXPECTEDREALMID')
     expect(content(mounted.root)).toContain('Actual realm01K4ACTUALREALMID')
     expect(content(mounted.root)).toContain("This device's data belongs to the old realm.")

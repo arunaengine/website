@@ -101,6 +101,9 @@ beforeAll(async () => {
       load: vi.fn(async () => undefined),
     }),
   }))
+  vi.doMock('@/composables/useRealmNodes', () => ({
+    useRealmNodes: () => ({ displayName: () => 'lab node' }),
+  }))
   vi.doMock('@/composables/useDeviceCompute', () => ({
     useDeviceCompute: () => ({ compute, ensureLoaded: vi.fn(async () => undefined) }),
   }))
@@ -321,7 +324,7 @@ describe('desktop home', () => {
     const html = await render()
 
     expect(html).toContain('3 changes pending')
-    expect(html).toContain('Realm not answering')
+    expect(html).toContain('Realm unreachable')
     expect(html).toContain('Invalid')
     expect(html).toContain('2 validation findings')
   })

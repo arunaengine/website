@@ -82,6 +82,16 @@ const dialogStubs = Object.fromEntries(
   ),
 )
 
+const Notice = compileClientComponent(new URL('../ui/Notice.vue', import.meta.url), {
+  vue: VueRuntime,
+  '@/lib/utils': Utils,
+})
+const Spinner = compileClientComponent(new URL('../ui/Spinner.vue', import.meta.url), {
+  vue: VueRuntime,
+  '@lucide/vue': icons,
+  '@/lib/utils': Utils,
+})
+
 const ReplaceLocalDialog = compileClientComponent(new URL('./ReplaceLocalDialog.vue', import.meta.url), {
   vue: VueRuntime,
   'vue-router': RouterRuntime,
@@ -89,6 +99,8 @@ const ReplaceLocalDialog = compileClientComponent(new URL('./ReplaceLocalDialog.
   ...dialogStubs,
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Input.vue': moduleDefault(Input),
+  '@/components/ui/Notice.vue': moduleDefault(Notice),
+  '@/components/ui/Spinner.vue': moduleDefault(Spinner),
   '@/composables/useSyncedFolders': {
     useSyncedFolders: () => ({ entryAction, folderReplace, busy: ref(false) }),
   },

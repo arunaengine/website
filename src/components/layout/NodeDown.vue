@@ -2,9 +2,13 @@
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
+import FactList from '@/components/ui/FactList.vue'
+import Notice from '@/components/ui/Notice.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { setNodeSettings } from '@/lib/desktopBridge'
-import { Loader2, Play, ServerOff } from '@lucide/vue'
+import { errorMessage } from '@/lib/utils'
+import { Play, ServerOff } from '@lucide/vue'
 
 const { status, state, refresh } = useDeviceStatus()
 const busy = ref(false)
@@ -14,7 +18,7 @@ const stopped = computed(() => state.value === 'stopped')
 const realmMismatch = computed(() => status.value?.realmMismatch ?? null)
 const headline = computed(() =>
   realmMismatch.value
-    ? `The realm at ${realmMismatch.value.realmUrl} was recreated`
+    ? 'The realm was recreated'
     : stopped.value
       ? "This device's node is not running."
       : "This device's node failed.",
@@ -27,9 +31,15 @@ const detail = computed(() =>
       : (status.value?.detail ?? status.value?.message),
 )
 
-function message(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
-}
+const facts = computed(() => {
+  const mismatch = realmMismatch.value
+  if (!mismatch) return []
+  return [
+    { key: 'url', label: 'Realm', value: mismatch.realmUrl },
+    { key: 'expected', label: 'Expected realm', value: mismatch.expected, mono: true },
+    { key: 'actual', label: 'Actual realm', value: mismatch.actual, mono: true },
+  ]
+})
 
 async function startNode(): Promise<void> {
   if (busy.value) return
@@ -39,7 +49,7 @@ async function startNode(): Promise<void> {
     await setNodeSettings({ paused: false })
     await refresh()
   } catch (err) {
-    actionError.value = message(err)
+    actionError.value = errorMessage(err)
   } finally {
     busy.value = false
   }
@@ -58,42 +68,40 @@ async function startNode(): Promise<void> {
         <h1 class="mt-3 font-display text-lg font-semibold tracking-tight text-aruna-navy">{{ headline }}</h1>
         <p v-if="detail" class="mt-2 text-sm leading-relaxed text-muted-foreground">{{ detail }}</p>
         <template v-if="realmMismatch">
-          <dl class="mt-3 grid gap-2 text-sm text-muted-foreground">
-            <div class="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-baseline gap-2">
-              <dt>Expected realm</dt>
-              <dd class="min-w-0">
-                <code :title="realmMismatch.expected" class="block truncate font-mono text-xs text-foreground">{{
-                  realmMismatch.expected
-                }}</code>
-              </dd>
-            </div>
-            <div class="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-baseline gap-2">
-              <dt>Actual realm</dt>
-              <dd class="min-w-0">
-                <code :title="realmMismatch.actual" class="block truncate font-mono text-xs text-foreground">{{
-                  realmMismatch.actual
-                }}</code>
-              </dd>
-            </div>
-          </dl>
+          <FactList :items="facts" class="mt-3">
+            <template #url>
+              <code :title="realmMismatch.realmUrl" class="block truncate font-mono text-xs">{{
+                realmMismatch.realmUrl
+              }}</code>
+            </template>
+            <template #expected>
+              <code :title="realmMismatch.expected" class="block truncate font-mono text-xs">{{
+                realmMismatch.expected
+              }}</code>
+            </template>
+            <template #actual>
+              <code :title="realmMismatch.actual" class="block truncate font-mono text-xs">{{
+                realmMismatch.actual
+              }}</code>
+            </template>
+          </FactList>
           <p class="mt-3 text-sm leading-relaxed text-muted-foreground">
             This device's data belongs to the old realm. Wipe it before setting it up with the recreated realm.
           </p>
         </template>
-        <p v-if="actionError" class="hash mt-2 break-all">{{ actionError }}</p>
+        <Notice v-if="actionError" tone="error" class="mt-2">{{ actionError }}</Notice>
         <div class="mt-5 flex flex-wrap gap-2">
           <Button v-if="!realmMismatch" :disabled="busy" @click="startNode">
-            <Loader2 v-if="busy" class="h-4 w-4 animate-spin" aria-hidden="true" />
-            <Play v-else class="h-4 w-4" aria-hidden="true" />
-            {{ busy ? 'Starting…' : 'Start the node' }}
+            <Spinner v-if="busy" label="Starting…" show-label />
+            <template v-else><Play class="h-4 w-4" aria-hidden="true" /> Start the node</template>
           </Button>
-          <Button v-if="realmMismatch" as-child>
+          <Button v-if="realmMismatch" variant="destructive" as-child>
             <RouterLink :to="{ name: 'device', query: { section: 'wipe' } }">
               Wipe this device and set it up again
             </RouterLink>
           </Button>
           <Button v-else variant="outline" as-child>
-            <RouterLink :to="{ name: 'device' }">Open This device</RouterLink>
+            <RouterLink :to="{ name: 'device' }">Open the device page</RouterLink>
           </Button>
         </div>
       </div>

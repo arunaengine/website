@@ -5,6 +5,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useRefresh } from '@/composables/useRefresh'
 import * as DeviceApi from '@/lib/deviceApi'
+import * as StateBadge from '@/lib/stateBadge'
 import * as SyncStates from '@/lib/syncStates'
 import * as Utils from '@/lib/utils'
 import {
@@ -155,14 +156,22 @@ const ProgressStub = defineComponent({
 })
 const icons = new Proxy({}, { get: () => defineComponent(() => () => h('i')) })
 
+const Notice = compileClientComponent(new URL('../../components/ui/Notice.vue', import.meta.url), {
+  vue: VueRuntime,
+  '@/lib/utils': Utils,
+})
+
 const SyncItemRow = compileClientComponent(new URL('../../components/desktop/SyncItemRow.vue', import.meta.url), {
   vue: VueRuntime,
   'vue-router': RouterRuntime,
   '@lucide/vue': icons,
   '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+  '@/components/ui/Notice.vue': moduleDefault(Notice),
   '@/components/ui/Progress.vue': moduleDefault(ProgressStub),
+  '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: () => 'lab node' }) },
   '@/lib/deviceApi': DeviceApi,
+  '@/lib/stateBadge': StateBadge,
   '@/lib/syncStates': SyncStates,
   '@/lib/utils': Utils,
 })
@@ -179,6 +188,7 @@ const SyncView = compileClientComponent(new URL('./SyncView.vue', import.meta.ur
   '@/components/ui/DropdownMenuTrigger.vue': moduleDefault(Pass),
   '@/components/ui/EmptyState.vue': moduleDefault(EmptyStateStub),
   '@/components/ui/FilterChips.vue': moduleDefault(FilterChipsStub),
+  '@/components/ui/Notice.vue': moduleDefault(Notice),
   '@/components/ui/Progress.vue': moduleDefault(ProgressStub),
   '@/components/ui/RefreshButton.vue': moduleDefault(refreshButton()),
   '@/components/ui/RefusalNote.vue': moduleDefault(RefusalStub),
@@ -223,6 +233,7 @@ const SyncView = compileClientComponent(new URL('./SyncView.vue', import.meta.ur
   },
   '@/composables/useUploadQueue': { useUploadQueue: () => ({ items: uploadItems }) },
   '@/lib/deviceApi': DeviceApi,
+  '@/lib/stateBadge': StateBadge,
   '@/lib/syncStates': SyncStates,
   '@/lib/utils': Utils,
 })
@@ -364,18 +375,19 @@ describe('the unified sync list', () => {
     const text = content(mounted.root)
 
     expect(text).toContain('Nothing syncs with this computer yet')
-    expect(text).toContain('Sync a folder...')
-    expect(text).toContain('Document available offline...')
+    expect(text).toContain('Sync a folder…')
+    expect(text).toContain('Keep a dataset offline…')
     expect(rows(mounted.root)).toHaveLength(0)
     mounted.app.unmount()
   })
 
-  it('takes the document Add item to the realm search', async () => {
+  it('takes the dataset Add item to the realm search', async () => {
     const mounted = await mount()
 
-    await click(button(mounted.root, 'Document available offline...'))
+    await click(button(mounted.root, 'Keep a dataset offline…'))
 
     expect(mounted.router.currentRoute.value.name).toBe('datasets')
+    expect(mounted.router.currentRoute.value.query.focus).toBe('search')
     mounted.app.unmount()
   })
 })

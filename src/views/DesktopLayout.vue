@@ -7,6 +7,7 @@ import TopBar from '@/components/dashboard/TopBar.vue'
 import GlobalErrorBanner from '@/components/layout/GlobalErrorBanner.vue'
 import RealmUnreachable from '@/components/layout/RealmUnreachable.vue'
 import NodeDown from '@/components/layout/NodeDown.vue'
+import Notice from '@/components/ui/Notice.vue'
 import TransfersPanel from '@/components/data/TransfersPanel.vue'
 import { RouterView, useRoute } from 'vue-router'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
@@ -15,7 +16,8 @@ import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { featureEnabled } from '@/lib/config'
 import { appQuit } from '@/lib/desktopBridge'
 import { probeRealm, realmReach } from '@/lib/desktopBoot'
-import { navSeparator, type NavEntry } from '@/components/layout/nav'
+import { errorMessage } from '@/lib/utils'
+import { navRowClass, navSeparator, type NavEntry } from '@/components/layout/nav'
 import {
   Activity,
   BookOpen,
@@ -49,17 +51,13 @@ const nodeDown = computed(
       (status.value?.enrolled === true && (state.value === 'stopped' || state.value === 'error'))),
 )
 
-function message(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
-}
-
 async function quit(): Promise<void> {
   quitting.value = true
   quitError.value = null
   try {
     await appQuit()
   } catch (err) {
-    quitError.value = message(err)
+    quitError.value = errorMessage(err)
     quitting.value = false
   }
 }
@@ -126,23 +124,15 @@ watch(
           :title="collapsed ? 'Quit Aruna Desktop' : undefined"
           :aria-label="collapsed ? 'Quit Aruna Desktop' : undefined"
           :class="[
-            'flex w-full items-center gap-2.5 rounded-md py-2 text-[12px] font-medium text-destructive/80 transition-colors hover:bg-destructive/[0.08] hover:text-destructive disabled:opacity-60',
-            collapsed ? 'justify-center px-0' : 'px-2.5',
+            navRowClass(collapsed),
+            'text-destructive/80 hover:bg-destructive/[0.08] hover:text-destructive disabled:opacity-60',
           ]"
           @click="quit"
         >
           <Power class="h-4 w-4 shrink-0" />
           <span v-if="!collapsed">{{ quitting ? 'Quitting…' : 'Quit Aruna Desktop' }}</span>
         </button>
-        <p
-          v-if="quitError"
-          :class="[
-            'mt-1 break-all text-[11px] leading-snug text-destructive',
-            collapsed ? 'px-0 text-center' : 'px-2.5',
-          ]"
-        >
-          {{ quitError }}
-        </p>
+        <Notice v-if="quitError" tone="error" class="mt-1 break-all">{{ quitError }}</Notice>
       </template>
     </SideNav>
     <div class="flex min-w-0 flex-1 flex-col">
