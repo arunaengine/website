@@ -1,5 +1,5 @@
 import * as VueRuntime from 'vue'
-import { defineComponent, h, ref } from 'vue'
+import { defineComponent, h, reactive, ref } from 'vue'
 import * as RouterRuntime from 'vue-router'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -72,6 +72,7 @@ const entryAction = vi.fn(
 const sync = vi.fn(async () => folder)
 const entries = vi.fn(async () => ({ entries: rows, next_cursor: null }))
 const refreshFolder = vi.fn(async () => folder)
+const actionErrors = reactive(new Map<string, string>())
 
 // Records what the dialog was opened with, which is the point of the gating.
 const dialogOpens: Array<{ path: string | null; action: string }> = []
@@ -93,6 +94,10 @@ const ButtonStub = defineComponent({
   setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()),
 })
 const BadgeStub = defineComponent((_, { slots }) => () => h('span', slots.default?.()))
+const RefusalStub = defineComponent({
+  props: { message: { type: String, required: true } },
+  setup: (props) => () => h('div', props.message),
+})
 const SelectStub = defineComponent({ setup: () => () => h('select') })
 const icons = new Proxy({}, { get: () => defineComponent(() => () => h('i')) })
 
@@ -103,6 +108,7 @@ const FolderDetailView = compileClientComponent(new URL('./FolderDetailView.vue'
   '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/RefreshButton.vue': moduleDefault(refreshButton()),
+  '@/components/ui/RefusalNote.vue': moduleDefault(RefusalStub),
   '@/components/ui/EmptyState.vue': moduleDefault(Passthrough),
   '@/components/ui/ErrorPanel.vue': moduleDefault(Passthrough),
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
@@ -122,6 +128,7 @@ const FolderDetailView = compileClientComponent(new URL('./FolderDetailView.vue'
       sync,
       unbind: vi.fn(),
       busy: ref(false),
+      actionErrors,
     }),
   },
   '@/lib/deviceApi': DeviceApi,
@@ -158,6 +165,8 @@ function rowButton(root: HostNode, path: string, label: string): HostNode {
 beforeEach(() => {
   entryAction.mockClear()
   sync.mockClear()
+  actionErrors.clear()
+  folder.last_error = null
   dialogOpens.length = 0
 })
 
@@ -235,6 +244,18 @@ describe('folder-wide replace', () => {
     await click(button(mounted.root, 'Replace 1 of them'))
 
     expect(dialogOpens).toContainEqual({ path: null, action: 'replace_local' })
+    mounted.app.unmount()
+  })
+})
+
+describe('folder failures', () => {
+  it('shows both the persisted folder error and the latest action refusal', async () => {
+    folder.last_error = 'the bucket "lab" does not exist on node n1'
+    actionErrors.set('f1', 'the node is unreachable')
+    const mounted = await mount()
+
+    expect(content(mounted.root)).toContain('the bucket "lab" does not exist on node n1')
+    expect(content(mounted.root)).toContain('the node is unreachable')
     mounted.app.unmount()
   })
 })

@@ -114,7 +114,7 @@ describe('desktop routes', () => {
 
     expect(child(routes, 'folders')?.redirect).toEqual({ name: 'sync' })
     expect(child(routes, 'folders')?.component).toBeUndefined()
-    expect(child(routes, 'transfers')?.redirect).toEqual({ name: 'sync', query: { tab: 'transfers' } })
+    expect(child(routes, 'transfers')?.redirect).toEqual({ name: 'sync' })
     expect(child(routes, 'transfers')?.component).toBeUndefined()
   })
 

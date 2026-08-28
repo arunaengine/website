@@ -2,7 +2,93 @@
 // wins by default, so the states that wait for a decision are named as such and
 // sort to the top; nothing here ever describes an automatic overwrite.
 import type { BadgeVariant } from '@/components/nodes/node-display'
-import { folderName, type EntryState, type FolderCounters, type FolderEntry } from './deviceApi'
+import {
+  folderName,
+  type DeviceTransfer,
+  type DocumentSyncState,
+  type EntryState,
+  type FolderCounters,
+  type FolderEntry,
+  type SyncedFolder,
+  type SyncDocument,
+} from './deviceApi'
+
+export interface ItemChip {
+  label: string
+  variant: BadgeVariant
+  detail?: string
+}
+
+export type SyncItem =
+  | {
+      kind: 'folder'
+      folder: SyncedFolder
+      actionError?: string | null
+      transfers?: readonly DeviceTransfer[]
+    }
+  | { kind: 'document'; document: SyncDocument }
+
+const DOCUMENT_BADGE: Record<DocumentSyncState, BadgeVariant> = {
+  synced: 'success',
+  pending: 'sky',
+  publishing: 'sky',
+  invalid: 'warn',
+  failed: 'destructive',
+  local_only: 'outline',
+}
+
+const DOCUMENT_LABEL: Record<DocumentSyncState, string> = {
+  synced: 'In sync',
+  pending: 'Pending',
+  publishing: 'Publishing',
+  invalid: 'Invalid',
+  failed: 'Error',
+  local_only: 'Local only',
+}
+
+function documentDetail(document: SyncDocument): string | undefined {
+  if (document.state !== 'invalid' && document.state !== 'failed') return undefined
+  if (document.lastError) return document.lastError
+  const noun = document.validationFindings === 1 ? 'validation finding' : 'validation findings'
+  return `${document.validationFindings} ${noun}; the last valid version is shown until this is fixed`
+}
+
+export function itemChip(item: SyncItem): ItemChip {
+  if (item.kind === 'document') {
+    const detail = documentDetail(item.document)
+    return {
+      label: DOCUMENT_LABEL[item.document.state],
+      variant: DOCUMENT_BADGE[item.document.state],
+      ...(detail ? { detail } : {}),
+    }
+  }
+
+  const { folder } = item
+  if (folder.state === 'paused') return { label: 'Paused', variant: 'secondary' }
+
+  const folderTransfers = item.transfers?.filter((transfer) => transfer.folder_id === folder.folder_id) ?? []
+  const failedTransfer = folderTransfers.find((transfer) => transfer.state === 'failed')
+  const failedMessage = folderTransfers.find((transfer) => transfer.state === 'failed' && transfer.message)?.message
+  const errorDetail = folder.last_error ?? item.actionError ?? failedMessage ?? undefined
+  if (folder.state === 'error' || folder.counters.errors > 0 || errorDetail || failedTransfer) {
+    return { label: 'Error', variant: 'destructive', ...(errorDetail ? { detail: errorDetail } : {}) }
+  }
+
+  const needsYou = needsYouCount(folder.counters)
+  if (needsYou) return { label: `Needs you ${needsYou}`, variant: 'warn' }
+
+  const activeTransfers = folderTransfers.filter(
+    (transfer) => transfer.state === 'queued' || transfer.state === 'running',
+  ).length
+  const syncing = folder.counters.uploading || activeTransfers
+  if (syncing) return { label: `Syncing ${syncing}`, variant: 'sky' }
+
+  return {
+    label: 'In sync',
+    variant: 'success',
+    detail: folder.last_reconcile_ms === null ? 'Never checked' : undefined,
+  }
+}
 
 export type EntryTone = 'settled' | 'moving' | 'decide' | 'error'
 

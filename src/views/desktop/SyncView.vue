@@ -1,123 +1,124 @@
 <script setup lang="ts">
-// One section for everything this computer syncs: the folders bound to the
-// realm, the documents it keeps offline, and the bytes in motion right now.
-import { computed, onMounted, ref } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { computed, nextTick, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
-import RefreshButton from '@/components/ui/RefreshButton.vue'
+import DropdownMenu from '@/components/ui/DropdownMenu.vue'
+import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
+import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
+import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import FilterChips from '@/components/ui/FilterChips.vue'
+import Progress from '@/components/ui/Progress.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
+import RefusalNote from '@/components/ui/RefusalNote.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
-import Tabs from '@/components/ui/Tabs.vue'
-import TabsList from '@/components/ui/TabsList.vue'
-import TabsTrigger from '@/components/ui/TabsTrigger.vue'
-import TabsContent from '@/components/ui/TabsContent.vue'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import BindFolderDialog from '@/components/desktop/BindFolderDialog.vue'
 import DeviceSurfaceState from '@/components/desktop/DeviceSurfaceState.vue'
-import DeviceTransfersPanel from '@/components/desktop/DeviceTransfersPanel.vue'
-import FoldersPanel from '@/components/desktop/FoldersPanel.vue'
+import SyncItemRow from '@/components/desktop/SyncItemRow.vue'
 import { useDeviceSync } from '@/composables/useDeviceSync'
+import { useDeviceTransfers } from '@/composables/useDeviceTransfers'
 import { useRefresh } from '@/composables/useRefresh'
 import { useSyncedFolders } from '@/composables/useSyncedFolders'
-import type { DocumentSyncState, SyncDocument } from '@/lib/deviceApi'
-import { relativeTime } from '@/lib/utils'
-import type { BadgeVariant } from '@/components/nodes/node-display'
-import { CloudOff, FileText, Plus } from '@lucide/vue'
+import { useUploadQueue } from '@/composables/useUploadQueue'
+import type { SyncedFolder } from '@/lib/deviceApi'
+import { itemChip, type SyncItem } from '@/lib/syncStates'
+import { formatBytes, relativeTime } from '@/lib/utils'
+import { CloudOff, FileText, FolderSync, Plus, Search, Upload } from '@lucide/vue'
 
-const { status, state, loading, error, runError, running, runSync, load } = useDeviceSync()
-const { load: loadFolders, needsYouTotal } = useSyncedFolders()
-
-const route = useRoute()
 const router = useRouter()
+const { status, state, loading, error, runError, running, runSync, load } = useDeviceSync()
+const {
+  folders,
+  listState,
+  listError,
+  busy,
+  actionErrors,
+  load: loadFolders,
+  ensureLoaded,
+  setPaused,
+  sync,
+} = useSyncedFolders()
+const { all: transfers, state: transfersState, error: transfersError, load: loadTransfers } = useDeviceTransfers()
+const { items: uploadItems } = useUploadQueue()
+
 const filter = ref('all')
 const showBind = ref(false)
 
-const TABS = ['folders', 'documents', 'transfers']
-
-const tab = computed(() => {
-  const asked = route.query.tab
-  return typeof asked === 'string' && TABS.includes(asked) ? asked : 'folders'
-})
-
-function setTab(next: string): void {
-  void router.replace({ name: 'sync', query: next === 'folders' ? {} : { tab: next } })
-}
-
-onMounted(() => void load())
+onMounted(() => void Promise.all([load(), ensureLoaded(), loadTransfers()]))
 
 async function reload(): Promise<void> {
-  await Promise.all([load(), loadFolders()])
+  await Promise.all([load(), loadFolders(), loadTransfers()])
 }
 
 const { busy: refreshBusy, refresh: onRefresh } = useRefresh(reload)
-const spinning = computed(() => refreshBusy.value || loading.value)
+const spinning = computed(
+  () => refreshBusy.value || loading.value || listState.value === 'loading' || transfersState.value === 'loading',
+)
 
-const DOC_BADGE: Record<DocumentSyncState, BadgeVariant> = {
-  synced: 'success',
-  pending: 'sky',
-  publishing: 'sky',
-  invalid: 'warn',
-  failed: 'destructive',
-  local_only: 'outline',
-}
-
-const DOC_LABEL: Record<DocumentSyncState, string> = {
-  synced: 'synced',
-  pending: 'pending',
-  publishing: 'publishing',
-  invalid: 'invalid',
-  failed: 'failed',
-  local_only: 'local only',
-}
-
-function attention(doc: SyncDocument): boolean {
-  return doc.state === 'invalid' || doc.state === 'failed'
-}
-
-function pending(doc: SyncDocument): boolean {
-  return doc.state === 'pending' || doc.state === 'publishing'
-}
-
-// Why a document is stuck. Findings stand in for a node that named no error:
-// the document is held back, and the realm keeps serving the last valid one.
-function reason(doc: SyncDocument): string {
-  if (doc.lastError) return doc.lastError
-  const findings = doc.validationFindings
-  const noun = findings === 1 ? 'validation finding' : 'validation findings'
-  return `${findings} ${noun}; the last valid version is shown until this is fixed`
-}
-
-const documents = computed(() => status.value.documents)
-
-const chips = computed(() => [
-  { value: 'all', label: 'All', count: documents.value.length },
-  { value: 'attention', label: 'Needs attention', count: documents.value.filter(attention).length },
-  { value: 'pending', label: 'Pending', count: documents.value.filter(pending).length },
-  { value: 'synced', label: 'Synced', count: documents.value.filter((doc) => doc.state === 'synced').length },
+const items = computed<SyncItem[]>(() => [
+  ...folders.value.map(
+    (folder): SyncItem => ({
+      kind: 'folder',
+      folder,
+      actionError: actionErrors.get(folder.folder_id) ?? null,
+      transfers: transfers.value.filter((transfer) => transfer.folder_id === folder.folder_id),
+    }),
+  ),
+  ...status.value.documents.map((document): SyncItem => ({ kind: 'document', document })),
 ])
 
-const shown = computed(() => {
-  switch (filter.value) {
-    case 'attention':
-      return documents.value.filter(attention)
-    case 'pending':
-      return documents.value.filter(pending)
-    case 'synced':
-      return documents.value.filter((doc) => doc.state === 'synced')
-    default:
-      return documents.value
-  }
-})
+function category(item: SyncItem): string {
+  const variant = itemChip(item).variant
+  if (variant === 'destructive' || variant === 'warn') return 'attention'
+  if (variant === 'sky') return 'syncing'
+  if (variant === 'success') return 'in-sync'
+  return 'other'
+}
+
+const chips = computed(() => [
+  { value: 'all', label: 'All', count: items.value.length },
+  {
+    value: 'attention',
+    label: 'Needs attention',
+    count: items.value.filter((item) => category(item) === 'attention').length,
+  },
+  { value: 'syncing', label: 'Syncing', count: items.value.filter((item) => category(item) === 'syncing').length },
+  { value: 'in-sync', label: 'In sync', count: items.value.filter((item) => category(item) === 'in-sync').length },
+])
+
+const shown = computed(() =>
+  filter.value === 'all' ? items.value : items.value.filter((item) => category(item) === filter.value),
+)
 
 const lastSync = computed(() =>
   status.value.lastSyncMs ? relativeTime(new Date(status.value.lastSyncMs).toISOString()) : 'never',
 )
-
 const canRun = computed(() => state.value === 'ready' && status.value.realmReachable && !running.value)
+const nothingSynced = computed(
+  () => state.value === 'ready' && listState.value === 'ready' && !items.value.length && !uploadItems.value.length,
+)
 
-const nothingHeld = computed(() => state.value === 'ready' && !documents.value.length)
+function itemKey(item: SyncItem): string {
+  return item.kind === 'folder' ? `folder:${item.folder.folder_id}` : `document:${item.document.documentId}`
+}
+
+function runFolder(folder: SyncedFolder): void {
+  void sync(folder.folder_id).catch(() => undefined)
+}
+
+function toggleFolder(folder: SyncedFolder): void {
+  void setPaused(folder.folder_id, folder.state !== 'paused').catch(() => undefined)
+}
+
+async function findOfflineDocument(): Promise<void> {
+  await router.push({ name: 'search' })
+  await nextTick()
+  if (typeof document !== 'undefined') {
+    document.querySelector<HTMLInputElement>('input[placeholder^="Search Datasets"]')?.focus()
+  }
+}
 </script>
 
 <template>
@@ -128,19 +129,29 @@ const nothingHeld = computed(() => state.value === 'ready' && !documents.value.l
       description="What this computer keeps in step with the realm, and what it still owes it."
     >
       <template #breadcrumbs>
-        <span>·</span>
-        <Badge :variant="status.realmReachable ? 'success' : 'secondary'">{{
-          status.realmReachable ? 'Realm reachable' : 'Realm not answering'
-        }}</Badge>
+        <Badge :variant="status.realmReachable ? 'success' : 'secondary'">
+          {{ status.realmReachable ? 'Realm reachable' : 'Realm not answering' }}
+        </Badge>
         <span>·</span>
         <span>last sync {{ lastSync }}</span>
+        <span>·</span>
+        <span>{{ status.pendingTotal }} {{ status.pendingTotal === 1 ? 'change' : 'changes' }} pending</span>
       </template>
       <template #actions>
-        <span class="text-xs text-muted-foreground">
-          {{ status.pendingTotal }} {{ status.pendingTotal === 1 ? 'change' : 'changes' }} pending
-        </span>
         <RefreshButton :busy="spinning" @click="onRefresh" />
-        <Button variant="outline" size="sm" @click="showBind = true"><Plus class="h-4 w-4" /> Bind a folder</Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger as-child>
+            <Button size="sm"><Plus class="h-4 w-4" /> Add</Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem @click="showBind = true">
+              <FolderSync class="h-4 w-4" /> Sync a folder...
+            </DropdownMenuItem>
+            <DropdownMenuItem @click="findOfflineDocument">
+              <Search class="h-4 w-4" /> Document available offline...
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <RefreshButton
           :busy="running"
           :disabled="!canRun"
@@ -152,12 +163,7 @@ const nothingHeld = computed(() => state.value === 'ready' && !documents.value.l
     </PageHeader>
 
     <div class="container space-y-5 py-5">
-      <p
-        v-if="runError"
-        class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
-      >
-        {{ runError }}
-      </p>
+      <RefusalNote v-if="runError" :message="runError" />
 
       <p
         v-else-if="state === 'ready' && !status.realmReachable"
@@ -167,80 +173,82 @@ const nothingHeld = computed(() => state.value === 'ready' && !documents.value.l
         The realm cannot be reached. Your edits are kept here and go out on their own once it answers.
       </p>
 
-      <Tabs :model-value="tab" @update:model-value="setTab">
-        <TabsList>
-          <TabsTrigger value="folders">
-            Folders
-            <span v-if="needsYouTotal" class="ml-1.5 text-[11px] text-amber-700 dark:text-amber-300"
-              >{{ needsYouTotal }}</span
-            >
-          </TabsTrigger>
-          <TabsTrigger value="documents">Documents</TabsTrigger>
-          <TabsTrigger value="transfers">Transfers</TabsTrigger>
-        </TabsList>
+      <DeviceSurfaceState v-if="state !== 'ready'" :state="state" subject="its sync status" :error="error" @retry="load" />
+      <DeviceSurfaceState
+        v-if="listState !== 'ready'"
+        :state="listState"
+        subject="its folders"
+        :error="listError"
+        @retry="loadFolders"
+      />
+      <DeviceSurfaceState
+        v-if="transfersState !== 'ready'"
+        :state="transfersState"
+        subject="its transfers"
+        :error="transfersError"
+        @retry="loadTransfers"
+      />
 
-        <TabsContent value="folders">
-          <FoldersPanel @bind="showBind = true" />
-        </TabsContent>
+      <div v-if="spinning && !items.length" class="space-y-3">
+        <Skeleton v-for="n in 2" :key="n" class="h-28" />
+      </div>
 
-        <TabsContent value="documents" class="space-y-4">
-          <DeviceSurfaceState :state="state" subject="its sync status" :error="error" @retry="load" />
+      <EmptyState
+        v-else-if="nothingSynced"
+        title="Nothing syncs with this computer yet"
+        description="Sync a folder or find a realm document to make available offline."
+      >
+        <template #icon><FileText class="h-6 w-6" /></template>
+        <div class="flex flex-wrap justify-center gap-2">
+          <Button size="sm" @click="showBind = true"><FolderSync class="h-4 w-4" /> Sync a folder...</Button>
+          <Button variant="outline" size="sm" @click="findOfflineDocument">
+            <Search class="h-4 w-4" /> Document available offline...
+          </Button>
+        </div>
+      </EmptyState>
 
-          <div v-if="loading && state !== 'offline'" class="space-y-3">
-            <Skeleton v-for="n in 2" :key="n" class="h-28" />
-          </div>
+      <section v-else-if="items.length || uploadItems.length" class="space-y-3">
+        <header class="flex flex-wrap items-center justify-between gap-3">
+          <h2 class="font-display text-sm font-semibold text-aruna-navy">Synced items</h2>
+          <FilterChips v-model="filter" :options="chips" aria-label="Filter synced items by state" />
+        </header>
 
-          <EmptyState
-            v-else-if="nothingHeld"
-            title="Nothing is kept on this computer yet"
-            description="A document becomes available offline when you create it here, edit it here, or select it for offline use on its page."
-          >
-            <template #icon><FileText class="h-6 w-6" /></template>
-          </EmptyState>
+        <p v-if="!shown.length && !uploadItems.length" class="surface px-5 py-6 text-sm text-muted-foreground">
+          No synced item is in this state.
+        </p>
+        <ul v-else class="surface divide-y divide-border/70 overflow-hidden">
+          <SyncItemRow
+            v-for="item in shown"
+            :key="itemKey(item)"
+            :item="item"
+            :busy="busy"
+            @sync="item.kind === 'folder' && runFolder(item.folder)"
+            @pause="item.kind === 'folder' && toggleFolder(item.folder)"
+          />
 
-          <section v-else-if="state === 'ready'" class="surface overflow-hidden">
-            <header class="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3">
-              <div class="flex items-center gap-2">
-                <FileText class="h-4 w-4 text-primary" />
-                <h2 class="font-display text-sm font-semibold text-aruna-navy">Documents</h2>
-              </div>
-              <FilterChips v-model="filter" :options="chips" aria-label="Filter documents by sync state" />
-            </header>
-
-            <p v-if="!shown.length" class="px-5 py-6 text-sm text-muted-foreground">
-              No document is in this state.
-            </p>
-            <ul v-else class="divide-y divide-border/70">
-              <li v-for="doc in shown" :key="doc.documentId" class="px-5 py-3">
-                <div class="flex flex-wrap items-center gap-2">
-                  <Badge :variant="DOC_BADGE[doc.state]" class="uppercase">{{ DOC_LABEL[doc.state] }}</Badge>
-                  <RouterLink
-                    :to="{ name: 'metadata-detail', params: { id: doc.documentId } }"
-                    class="min-w-0 truncate font-mono text-[12px] text-foreground hover:text-primary hover:underline"
-                    >{{ doc.path || doc.documentId }}</RouterLink
-                  >
-                  <span v-if="doc.pendingEdits" class="ml-auto text-[11px] text-muted-foreground">
-                    {{ doc.pendingEdits }} {{ doc.pendingEdits === 1 ? 'edit' : 'edits' }} waiting
-                  </span>
+          <li v-if="uploadItems.length" class="px-5 py-3.5">
+            <div class="flex items-center gap-2">
+              <Upload class="h-4 w-4 text-primary" />
+              <h3 class="font-display text-sm font-semibold text-foreground">Uploads from this window</h3>
+              <Badge variant="outline" class="text-[10px]">{{ uploadItems.length }}</Badge>
+            </div>
+            <div class="mt-2 space-y-2">
+              <div v-for="item in uploadItems.slice(0, 3)" :key="item.id" class="flex items-center gap-3 text-[11px]">
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-foreground">{{ item.name }}</p>
+                  <p class="truncate font-mono text-[10px] text-muted-foreground">{{ item.bucket }}/{{ item.key }}</p>
+                  <p v-if="item.error" class="text-destructive">{{ item.error }}</p>
                 </div>
-                <p
-                  v-if="doc.state === 'invalid' || doc.state === 'failed'"
-                  :class="[
-                    'mt-1 text-[11px]',
-                    doc.state === 'failed' ? 'text-destructive' : 'text-amber-700 dark:text-amber-300',
-                  ]"
-                >
-                  {{ reason(doc) }}
-                </p>
-              </li>
-            </ul>
-          </section>
-        </TabsContent>
-
-        <TabsContent value="transfers">
-          <DeviceTransfersPanel />
-        </TabsContent>
-      </Tabs>
+                <Progress :value="item.progress" :label="`${item.name}: ${item.progress}%`" class="h-1.5 w-28" />
+                <span class="text-muted-foreground">{{ formatBytes(item.size) }}</span>
+              </div>
+              <p v-if="uploadItems.length > 3" class="text-[11px] text-muted-foreground">
+                and {{ uploadItems.length - 3 }} more
+              </p>
+            </div>
+          </li>
+        </ul>
+      </section>
     </div>
 
     <BindFolderDialog v-model:open="showBind" @bound="loadFolders" />

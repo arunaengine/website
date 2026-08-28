@@ -104,6 +104,7 @@ export interface RemoteBinding {
 export interface FolderCounters {
   in_sync: number
   uploading: number
+  observed?: number
   conflicts: number
   pending_replacements: number
   remote_deleted: number
@@ -124,6 +125,8 @@ export interface SyncedFolder {
   last_reconcile_ms: number | null
   created_at_ms: number | null
   message: string | null
+  last_error?: string | null
+  last_error_at_ms?: number | null
 }
 
 /** How a bound folder is named to its owner: the last segment of its root. */
@@ -154,6 +157,7 @@ function readCounters(value: unknown): FolderCounters {
   return {
     in_sync: count(raw.in_sync),
     uploading: count(raw.uploading),
+    observed: count(raw.observed),
     conflicts: count(raw.conflicts),
     pending_replacements: count(raw.pending_replacements),
     remote_deleted: count(raw.remote_deleted),
@@ -176,6 +180,8 @@ export function readFolder(value: unknown): SyncedFolder {
     last_reconcile_ms: size(raw.last_reconcile_ms),
     created_at_ms: size(raw.created_at_ms),
     message: text(raw.message),
+    last_error: text(raw.last_error),
+    last_error_at_ms: size(raw.last_error_at_ms),
   }
 }
 
@@ -549,9 +555,9 @@ const DOCUMENT_SYNC_STATES: readonly DocumentSyncState[] = [
   'local_only',
 ]
 
-export type DatasetSyncState = 'synced' | 'pending' | 'paused' | 'error'
+export type DatasetSyncState = 'synced' | 'pending' | 'active' | 'paused' | 'error'
 
-const DATASET_SYNC_STATES: readonly DatasetSyncState[] = ['synced', 'pending', 'paused', 'error']
+const DATASET_SYNC_STATES: readonly DatasetSyncState[] = ['synced', 'pending', 'active', 'paused', 'error']
 
 /** One metadata document this device keeps a replica of. */
 export interface SyncDocument {
@@ -576,6 +582,7 @@ export interface SyncDataset {
   pendingUploads: number
   unsyncedFiles: number
   conflicts: number
+  lastError?: string | null
 }
 
 export interface DeviceSyncStatus {
@@ -621,6 +628,7 @@ function readSyncDataset(value: unknown): SyncDataset {
     pendingUploads: count(raw.pendingUploads),
     unsyncedFiles: count(raw.unsyncedFiles),
     conflicts: count(raw.conflicts),
+    lastError: text(raw.lastError),
   }
 }
 

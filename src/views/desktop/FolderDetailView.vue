@@ -6,6 +6,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
+import RefusalNote from '@/components/ui/RefusalNote.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Select from '@/components/ui/Select.vue'
@@ -48,6 +49,7 @@ const {
   sync,
   unbind,
   busy,
+  actionErrors,
 } = useSyncedFolders()
 
 const folderId = computed(() => String(route.params.folderId ?? ''))
@@ -199,7 +201,7 @@ function when(ms: number | null | undefined): string {
       </template>
       <template #actions>
         <RouterLink :to="{ name: 'sync' }">
-          <Button variant="ghost" size="sm"><ArrowLeft class="h-3.5 w-3.5" /> Folders</Button>
+          <Button variant="ghost" size="sm"><ArrowLeft class="h-3.5 w-3.5" /> Sync</Button>
         </RouterLink>
         <Button v-if="folder" variant="outline" size="sm" @click="reveal(folder.root)">
           <FolderOpen class="h-3.5 w-3.5" /> Show on disk
@@ -223,12 +225,15 @@ function when(ms: number | null | undefined): string {
     </PageHeader>
 
     <div class="container space-y-4 py-5">
-      <p
-        v-if="actionError"
-        class="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
-      >
-        {{ actionError }}
-      </p>
+      <RefusalNote v-if="folder?.last_error" :message="folder.last_error" />
+      <RefusalNote
+        v-if="actionErrors.get(folderId) && actionErrors.get(folderId) !== folder?.last_error"
+        :message="actionErrors.get(folderId) || ''"
+      />
+      <RefusalNote
+        v-if="actionError && actionError !== actionErrors.get(folderId) && actionError !== folder?.last_error"
+        :message="actionError"
+      />
 
       <div v-if="folder" class="surface flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3 text-[11px] text-muted-foreground">
         <span class="font-mono">{{ folder.local_bucket }}</span>

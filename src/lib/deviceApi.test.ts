@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { ApiError } from './api'
 import {
   bindFolder,
+  deviceSyncStatus,
   entryExpectation,
   isDeviceUnsupported,
   isStaleExpectation,
@@ -25,8 +26,10 @@ describe('folder mapping', () => {
       mode: 'upload_only',
       propagate_deletes: false,
       state: 'paused',
-      counters: { in_sync: 4, conflicts: 2, pending_replacements: 1 },
+      counters: { in_sync: 4, observed: 7, conflicts: 2, pending_replacements: 1 },
       last_reconcile_ms: 1_700_000,
+      last_error: 'the bucket "lab" does not exist on node n1',
+      last_error_at_ms: 1_700_001,
     })
 
     expect(folder.remote).toEqual({ node_id: 'n1', bucket: 'lab', prefix: 'raw/' })
@@ -35,6 +38,9 @@ describe('folder mapping', () => {
     expect(folder.state).toBe('paused')
     expect(folder.counters.conflicts).toBe(2)
     expect(folder.counters.errors).toBe(0)
+    expect(folder.counters.observed).toBe(7)
+    expect(folder.last_error).toBe('the bucket "lab" does not exist on node n1')
+    expect(folder.last_error_at_ms).toBe(1_700_001)
   })
 
   it('defaults a folder the node described only in part', () => {
@@ -45,7 +51,10 @@ describe('folder mapping', () => {
     expect(folder.propagate_deletes).toBe(true)
     expect(folder.state).toBe('active')
     expect(folder.counters.in_sync).toBe(0)
+    expect(folder.counters.observed).toBe(0)
     expect(folder.last_reconcile_ms).toBeNull()
+    expect(folder.last_error).toBeNull()
+    expect(folder.last_error_at_ms).toBeNull()
   })
 
   it('refuses to invent a state it does not know', () => {
@@ -219,5 +228,21 @@ describe('failure classification', () => {
   it('names a refused action whose hashes went stale', () => {
     expect(isStaleExpectation(new ApiError(412, 'drifted'))).toBe(true)
     expect(isStaleExpectation(new ApiError(409, 'other'))).toBe(false)
+  })
+})
+
+describe('sync dataset mapping', () => {
+  it('keeps an active dataset active', async () => {
+    const request = vi.spyOn(await import('./api'), 'apiRequest').mockResolvedValue({
+      datasets: [{ folderId: 'f1', state: 'active', unsyncedFiles: 4, lastError: 'retrying' }],
+    })
+    const client = { baseUrl: 'http://127.0.0.1:9000/api/v1', token: 'owner-token' }
+
+    const status = await deviceSyncStatus(client)
+
+    expect(status.datasets[0]?.state).toBe('active')
+    expect(status.datasets[0]?.unsyncedFiles).toBe(4)
+    expect(status.datasets[0]?.lastError).toBe('retrying')
+    request.mockRestore()
   })
 })

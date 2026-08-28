@@ -1,7 +1,7 @@
 // Folders on this machine bound to a realm bucket. Module singleton, so the
 // home card, the list and the detail view share one loaded set and one loading
 // state; every call needs the local node up and the owner signed in.
-import { computed, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useDeviceQuery } from '@/composables/useDeviceQuery'
 import {
   applyEntryAction,
@@ -32,6 +32,7 @@ const folders = query.data
 const listState = query.state
 const listError = query.error
 const busy = ref(false)
+const actionErrors = reactive(new Map<string, string>())
 
 const { deviceClient } = useDeviceStatus()
 
@@ -40,7 +41,13 @@ function client(): DeviceClient {
   return requireDevice(deviceClient.value, 'its folders')
 }
 
-const load = query.run
+async function load(): Promise<void> {
+  await query.run()
+  if (listState.value !== 'ready') return
+  for (const folder of folders.value) {
+    if (!folder.last_error) actionErrors.delete(folder.folder_id)
+  }
+}
 
 /** Paints the loaded set once; the views call it on mount. */
 async function ensureLoaded(): Promise<void> {
@@ -54,6 +61,19 @@ function replace(folder: SyncedFolder): SyncedFolder {
     ? folders.value.map((entry) => (entry.folder_id === folder.folder_id ? folder : entry))
     : [...folders.value, folder]
   return folder
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
+async function folderAction<T>(folderId: string, work: () => Promise<T>): Promise<T> {
+  try {
+    return await work()
+  } catch (error) {
+    actionErrors.set(folderId, errorMessage(error))
+    throw error
+  }
 }
 
 // Every mutation reports upward: the dialogs render the node's own refusal.
@@ -73,18 +93,27 @@ function bind(request: BindFolderRequest): Promise<SyncedFolder> {
 async function unbind(folderId: string): Promise<void> {
   await track(() => unbindFolder(folderId, client()))
   folders.value = folders.value.filter((entry) => entry.folder_id !== folderId)
+  actionErrors.delete(folderId)
 }
 
 function setPaused(folderId: string, paused: boolean): Promise<SyncedFolder> {
-  return track(async () => replace(await setFolderPaused(folderId, paused, client())))
+  return track(() => folderAction(folderId, async () => replace(await setFolderPaused(folderId, paused, client()))))
 }
 
 function sync(folderId: string): Promise<SyncedFolder> {
-  return track(async () => replace(await syncFolder(folderId, client())))
+  return track(() =>
+    folderAction(folderId, async () => {
+      const folder = replace(await syncFolder(folderId, client()))
+      if (!folder.last_error) actionErrors.delete(folderId)
+      return folder
+    }),
+  )
 }
 
 async function refreshFolder(folderId: string): Promise<SyncedFolder> {
-  return replace(await getFolder(folderId, client()))
+  const folder = replace(await getFolder(folderId, client()))
+  if (!folder.last_error) actionErrors.delete(folderId)
+  return folder
 }
 
 function entries(
@@ -101,13 +130,15 @@ function entryAction(
   action: EntryAction,
   expected: ActionExpectation,
 ) {
-  return track(() => applyEntryAction(folderId, path, { action, expected }, client()))
+  return track(() => folderAction(folderId, () => applyEntryAction(folderId, path, { action, expected }, client())))
 }
 
 /** Replaces every pending file in the folder; `confirm` is the folder name. */
 function folderReplace(folderId: string, confirm: string): Promise<SyncedFolder> {
-  return track(async () =>
-    replace(await applyFolderAction(folderId, { action: 'replace_local', scope: 'all_pending', confirm }, client())),
+  return track(() =>
+    folderAction(folderId, async () =>
+      replace(await applyFolderAction(folderId, { action: 'replace_local', scope: 'all_pending', confirm }, client())),
+    ),
   )
 }
 
@@ -127,6 +158,7 @@ export function useSyncedFolders() {
     listState,
     listError,
     busy,
+    actionErrors,
     available,
     needsYouTotal,
     load,
