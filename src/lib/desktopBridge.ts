@@ -48,6 +48,7 @@ export interface NodeStatus {
   // Why the supervisor is stopped or in error, in the owner's words.
   message: string | null
   detail?: string | null
+  realmMismatch: { expected: string; actual: string; realmUrl: string } | null
 }
 
 /** Which executor local runs use, and how much of the machine they may take. */
@@ -197,6 +198,13 @@ export function readStatus(payload: unknown): NodeStatus {
     payload && typeof payload === 'object' && !Array.isArray(payload)
       ? (payload as Record<string, unknown>)
       : {}
+  const mismatch =
+    raw.realmMismatch && typeof raw.realmMismatch === 'object' && !Array.isArray(raw.realmMismatch)
+      ? (raw.realmMismatch as Record<string, unknown>)
+      : null
+  const expected = asText(mismatch?.expected)
+  const actual = asText(mismatch?.actual)
+  const realmUrl = asText(mismatch?.realmUrl)
   return {
     state: STATES.find((known) => known === raw.state) ?? 'error',
     nodeId: asText(raw.nodeId),
@@ -209,6 +217,7 @@ export function readStatus(payload: unknown): NodeStatus {
     uptimeSeconds: asNumber(raw.uptimeSeconds),
     message: asText(raw.message),
     detail: asText(raw.detail),
+    realmMismatch: expected && actual && realmUrl ? { expected, actual, realmUrl } : null,
   }
 }
 

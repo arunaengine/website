@@ -141,6 +141,7 @@ beforeEach(() => {
     version: '0.4.0',
     uptimeSeconds: 3600,
     message: null,
+    realmMismatch: null,
   }
   nodeState.value = 'running'
   nodeLabel.value = 'online'

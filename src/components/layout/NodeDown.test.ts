@@ -12,7 +12,11 @@ import {
   mountApp,
 } from '@/test/clientRender'
 
-const status = ref<{ message: string | null; detail?: string | null }>({ message: null, detail: null })
+const status = ref<{
+  message: string | null
+  detail?: string | null
+  realmMismatch?: { expected: string; actual: string; realmUrl: string } | null
+}>({ message: null, detail: null, realmMismatch: null })
 const state = ref<'stopped' | 'error'>('stopped')
 const refresh = vi.fn(async () => undefined)
 const setNodeSettings = vi.fn()
@@ -37,7 +41,7 @@ const NodeDown = compileClientComponent(new URL('./NodeDown.vue', import.meta.ur
 })
 
 beforeEach(() => {
-  status.value = { message: null, detail: null }
+  status.value = { message: null, detail: null, realmMismatch: null }
   state.value = 'stopped'
   refresh.mockReset().mockResolvedValue(undefined)
   setNodeSettings.mockReset().mockResolvedValue({})
@@ -80,6 +84,38 @@ describe('node down page', () => {
 
     expect(refresh).toHaveBeenCalledOnce()
     expect(content(mounted.root)).toContain('Start the node')
+    mounted.app.unmount()
+  })
+
+  it('explains a recreated realm and links directly to the wipe section', async () => {
+    const mismatch = {
+      expected: '01K4EXPECTEDREALMID',
+      actual: '01K4ACTUALREALMID',
+      realmUrl: 'https://realm.example',
+    }
+    status.value = {
+      message: 'The enrolled realm no longer matches.',
+      detail: 'The realm at https://realm.example reports a different realm id.',
+      realmMismatch: mismatch,
+    }
+    const mounted = await mountApp(NodeDown)
+
+    expect(content(mounted.root)).toContain('The realm at https://realm.example was recreated')
+    expect(content(mounted.root)).toContain('Expected realm01K4EXPECTEDREALMID')
+    expect(content(mounted.root)).toContain('Actual realm01K4ACTUALREALMID')
+    expect(content(mounted.root)).toContain("This device's data belongs to the old realm.")
+    expect(content(mounted.root)).not.toContain('Start the node')
+    expect(
+      element(mounted.root, (node) => node.tag === 'code' && node.props.title === mismatch.expected).props.class,
+    ).toContain('truncate')
+    expect(
+      element(mounted.root, (node) => node.tag === 'code' && node.props.title === mismatch.actual).props.class,
+    ).toContain('font-mono')
+    const link = element(
+      mounted.root,
+      (node) => node.tag === 'a' && content(node).trim() === 'Wipe this device and set it up again',
+    )
+    expect(JSON.parse(String(link.props['data-to']))).toEqual({ name: 'device', query: { section: 'wipe' } })
     mounted.app.unmount()
   })
 

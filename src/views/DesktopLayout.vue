@@ -40,9 +40,9 @@ const { status, loaded, state, start: watchNode, stop: unwatchNode } = useDevice
 const nodeDown = computed(
   () =>
     loaded.value &&
-    status.value?.enrolled === true &&
-    (state.value === 'stopped' || state.value === 'error') &&
-    route.name !== 'device',
+    route.name !== 'device' &&
+    ((state.value === 'stopped' && status.value?.realmMismatch != null) ||
+      (status.value?.enrolled === true && (state.value === 'stopped' || state.value === 'error'))),
 )
 
 // Same read as the portal sidebar: one Compute entry for either compute plane.

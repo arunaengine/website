@@ -72,6 +72,11 @@ describe('bridge commands', () => {
       enrolled: true,
       uptimeSeconds: 90,
       detail: ' supervisor exited ',
+      realmMismatch: {
+        expected: ' old-realm ',
+        actual: ' new-realm ',
+        realmUrl: ' https://realm.test ',
+      },
     }))
     await expect(bridge.nodeStatus()).resolves.toEqual({
       state: 'error',
@@ -85,6 +90,11 @@ describe('bridge commands', () => {
       uptimeSeconds: 90,
       message: null,
       detail: 'supervisor exited',
+      realmMismatch: {
+        expected: 'old-realm',
+        actual: 'new-realm',
+        realmUrl: 'https://realm.test',
+      },
     })
   })
 
@@ -93,7 +103,7 @@ describe('bridge commands', () => {
     await expect(bridge.nodeStatus()).resolves.toMatchObject({ state: 'running', ready: false })
 
     const silent = await withShell(() => ({ state: 'running', enrolled: true }))
-    await expect(silent.nodeStatus()).resolves.toMatchObject({ state: 'running', ready: false })
+    await expect(silent.nodeStatus()).resolves.toMatchObject({ state: 'running', ready: false, realmMismatch: null })
   })
 
   it('reads a node that is redeeming a code', async () => {

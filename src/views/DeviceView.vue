@@ -17,7 +17,8 @@ import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { useEnrollWatch } from '@/composables/useEnrollWatch'
 
 // The welcome view sends an owner holding a code straight to the right tab.
-const tab = ref(useRoute().query.tab === 'enroll' ? 'enroll' : 'node')
+const route = useRoute()
+const tab = ref(route.query.section === 'wipe' ? 'danger' : route.query.tab === 'enroll' ? 'enroll' : 'node')
 const { invite, start, clear } = useEnrollWatch()
 const { status, loaded, refresh } = useDeviceStatus()
 
@@ -29,6 +30,13 @@ const showEnroll = computed(() => !enrolled.value || Boolean(invite.value) || ta
 watch(invite, (next) => {
   if (next) tab.value = 'enroll'
 })
+
+watch(
+  () => route.query.section,
+  (section) => {
+    if (section === 'wipe') tab.value = 'danger'
+  },
+)
 
 onMounted(() => {
   void start()
@@ -65,7 +73,7 @@ function onEnrolled() {
       <TabsContent v-if="showEnroll" value="enroll">
         <EnrollPanel :invite="invite" @enrolled="onEnrolled" />
       </TabsContent>
-      <TabsContent value="danger"><WipePanel @wiped="refresh" /></TabsContent>
+      <TabsContent id="wipe" value="danger"><WipePanel @wiped="refresh" /></TabsContent>
     </Tabs>
   </div>
 </template>

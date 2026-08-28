@@ -14,7 +14,10 @@ const probeRealm = vi.fn(async () => undefined)
 const watchNode = vi.fn()
 const unwatchNode = vi.fn()
 const realmReach = ref('reachable')
-const nodeStatus = ref<{ enrolled: boolean } | null>(null)
+const nodeStatus = ref<{
+  enrolled: boolean
+  realmMismatch?: { expected: string; actual: string; realmUrl: string } | null
+} | null>(null)
 const nodeState = ref<'stopped' | 'starting' | 'running' | 'error' | 'unknown'>('unknown')
 const nodeLoaded = ref(false)
 
@@ -146,6 +149,24 @@ describe('desktop shell', () => {
     nodeLoaded.value = true
     nodeStatus.value = { enrolled: true }
     nodeState.value = state
+
+    const html = await renderToString(createSSRApp(DesktopLayout))
+
+    expect(html).toContain('node-down')
+    expect(html).not.toContain('routed-view')
+  })
+
+  it('blocks routed views for a stopped recreated realm', async () => {
+    nodeLoaded.value = true
+    nodeStatus.value = {
+      enrolled: false,
+      realmMismatch: {
+        expected: 'old-realm',
+        actual: 'new-realm',
+        realmUrl: 'https://realm.example',
+      },
+    }
+    nodeState.value = 'stopped'
 
     const html = await renderToString(createSSRApp(DesktopLayout))
 
