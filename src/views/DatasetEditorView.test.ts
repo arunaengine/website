@@ -219,6 +219,22 @@ describe('DatasetEditorView', () => {
     mounted.app.unmount()
   })
 
+  it('locks submission while draft validation is in flight', async () => {
+    const verdict = deferred<boolean>()
+    verify.mockReturnValue(verdict.promise)
+    const mounted = await mountApp(DatasetEditorView)
+    await click(button(mounted.root, 'Seed dataset'))
+
+    await click(button(mounted.root, 'Create dataset'))
+    await click(button(mounted.root, 'Create dataset'))
+    expect(verify).toHaveBeenCalledTimes(1)
+
+    verdict.resolve(true)
+    await flush()
+    expect(createMetadata).toHaveBeenCalledTimes(1)
+    mounted.app.unmount()
+  })
+
   it('swaps the editor for the graph when the browser asks', async () => {
     const mounted = await mountApp(DatasetEditorView)
 

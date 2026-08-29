@@ -68,6 +68,7 @@ const createGroupOpen = ref(false)
 const profileId = ref('')
 const submitError = ref<string | null>(null)
 const writeIssues = ref<WriteIssue[]>([])
+const submitting = ref(false)
 
 onMounted(() => void loadVocabIndex().then((index) => (vocab.value = index)))
 
@@ -190,10 +191,17 @@ function discard() {
 // The node validates the crate before every write; a rejected verdict stops
 // here and the panel shows what it found.
 async function save() {
-  if (!canSave.value || saving.value) return
+  if (!canSave.value || saving.value || submitting.value) return
+  submitting.value = true
   submitError.value = null
   writeIssues.value = []
-  if (!(await preview.verify(crate.value))) return
+  let verified = false
+  try {
+    verified = await preview.verify(crate.value)
+  } finally {
+    if (!verified) submitting.value = false
+  }
+  if (!verified || !submitting.value) return
   const isPublic = draft.value.visibility === 'public'
   try {
     if (mode.value === 'edit') {
@@ -226,6 +234,8 @@ async function save() {
         severity: finding.severity,
       })),
     ]
+  } finally {
+    submitting.value = false
   }
 }
 </script>
@@ -323,7 +333,7 @@ async function save() {
               :preview-unavailable="preview.unavailable.value"
               :write-issues="writeIssues"
               :submit-error="submitError"
-              :saving="saving"
+              :saving="saving || submitting"
               :can-save="canSave"
               :action-label="mode === 'edit' ? 'Save changes' : 'Create dataset'"
               :busy-label="mode === 'edit' ? 'Saving' : 'Creating'"
