@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
@@ -20,8 +20,8 @@ import {
 import type { VocabIndex } from '@/lib/profiles/vocabulary'
 import { Plus } from '@lucide/vue'
 
-const ROOT_VIEW_KEY = 'aruna.dataset.rootView'
-
+// One editor per entity: the root gets its form with the remaining properties
+// as rows below it, every other entity gets its rows straight away.
 const props = defineProps<{
   draft: CrateDraft
   selected: string
@@ -37,30 +37,10 @@ const emit = defineEmits<{
 }>()
 
 const propertyOpen = ref(false)
-const rootView = ref<'form' | 'properties'>('form')
 
 const entity = computed(() => findEntity(props.draft, props.selected))
 const isRoot = computed(() => props.selected === rootId(props.draft))
-const asRows = computed(() => !isRoot.value || rootView.value === 'properties')
 const json = computed(() => JSON.stringify(toRoCrate(props.draft), null, 2))
-
-onMounted(() => {
-  try {
-    const stored = globalThis.localStorage?.getItem(ROOT_VIEW_KEY)
-    if (stored === 'properties' || stored === 'form') rootView.value = stored
-  } catch {
-    rootView.value = 'form'
-  }
-})
-
-function pickView(view: 'form' | 'properties') {
-  rootView.value = view
-  try {
-    globalThis.localStorage?.setItem(ROOT_VIEW_KEY, view)
-  } catch {
-    // A browser without writable storage simply forgets the choice.
-  }
-}
 
 function addProperty(picked: { key: string; kind: DraftValueKind }) {
   propertyOpen.value = false
@@ -77,26 +57,10 @@ function addProperty(picked: { key: string; kind: DraftValueKind }) {
       :vocab="vocab"
       @update="(next) => emit('update', next)"
       @select="(id) => emit('select', id)"
-    >
-      <template v-if="isRoot" #view>
-        <div class="inline-flex items-center rounded-md border border-border p-0.5">
-          <button
-            v-for="view in (['form', 'properties'] as const)"
-            :key="view"
-            type="button"
-            class="rounded-[3px] px-2.5 py-1 text-xs font-medium capitalize"
-            :class="rootView === view ? 'bg-primary/10 text-foreground' : 'text-muted-foreground hover:text-foreground'"
-            :aria-pressed="rootView === view"
-            @click="pickView(view)"
-          >
-            {{ view === 'form' ? 'Form' : 'Properties' }}
-          </button>
-        </div>
-      </template>
-    </EntityHeader>
+    />
 
     <RootForm
-      v-if="isRoot && !asRows"
+      v-if="isRoot"
       :draft="draft"
       :vocab="vocab"
       :issues="issues"
@@ -111,7 +75,6 @@ function addProperty(picked: { key: string; kind: DraftValueKind }) {
       :draft="draft"
       :entity="entity"
       :vocab="vocab"
-      :locked="isRoot ? ['hasPart'] : []"
       :issues="issues"
       @update="(next) => emit('update', next)"
       @select="(id) => emit('select', id)"
@@ -131,7 +94,7 @@ function addProperty(picked: { key: string; kind: DraftValueKind }) {
       />
     </div>
 
-    <details v-if="isRoot && asRows" class="border-t border-border">
+    <details v-if="isRoot" class="border-t border-border">
       <summary class="cursor-pointer px-5 py-2.5 text-xs font-medium text-foreground">Show JSON-LD</summary>
       <div class="border-t border-border p-5">
         <div class="mb-2 flex justify-end">

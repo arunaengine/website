@@ -2,6 +2,7 @@ import * as VueRuntime from 'vue'
 import { defineComponent, h } from 'vue'
 import { beforeAll, describe, expect, it } from 'vitest'
 import {
+  click,
   compileClientComponent,
   content,
   element,
@@ -122,19 +123,54 @@ async function choose(node: HostNode, value: string) {
 }
 
 describe('RootForm', () => {
-  it('keeps five fields and nothing that has to be promoted', async () => {
+  it('shows every dedicated field, the linked ones included', async () => {
     const mounted = await mount([])
     const text = content(mounted.root)
 
-    expect(text).toContain('Name')
-    expect(text).toContain('Description')
-    expect(text).toContain('Date published')
-    expect(text).toContain('License')
-    expect(text).toContain('Keywords')
-    expect(text).not.toContain('More details')
-    expect(text).not.toContain('Publisher')
-    expect(text).not.toContain('Contact')
-    expect(text).not.toContain('Funder')
+    for (const label of ['Name', 'Description', 'Date published', 'License', 'Keywords', 'Publisher', 'Contact point', 'Funder']) {
+      expect(text).toContain(label)
+    }
+    mounted.app.unmount()
+  })
+
+  it('offers More details only once a value is typed', async () => {
+    const updates: Editor.CrateDraft[] = []
+    const mounted = await mount(updates)
+    expect(content(mounted.root)).not.toContain('More details')
+
+    await typeValue(field(mounted.root, 'Publisher'), 'ACME Research')
+    expect(updates[0].entities[0].properties.publisher).toEqual([{ kind: 'text', value: 'ACME Research' }])
+
+    const typed = await mount([], updates[0])
+    expect(content(typed.root)).toContain('More details')
+    typed.app.unmount()
+    mounted.app.unmount()
+  })
+
+  it('promotes a publisher into a linked organization', async () => {
+    const updates: Editor.CrateDraft[] = []
+    const selections: string[] = []
+    const draft = Editor.setProperty(Editor.newDraft(), './', 'publisher', [{ kind: 'text', value: 'ACME Research' }])
+    const mounted = await mountApp(RootForm, {
+      props: {
+        draft,
+        vocab,
+        issues: [],
+        profiles: [],
+        profileId: '',
+        onUpdate: (next: Editor.CrateDraft) => updates.push(next),
+        onSelect: (id: string) => selections.push(id),
+      },
+    })
+
+    await click(element(mounted.root, (node) => node.tag === 'button' && content(node).trim() === 'More details'))
+
+    expect(updates[0].entities[0].properties.publisher).toEqual([{ kind: 'reference', value: '#acme-research' }])
+    expect(Editor.findEntity(updates[0], '#acme-research')).toMatchObject({
+      types: ['Organization'],
+      properties: { name: [{ kind: 'text', value: 'ACME Research' }] },
+    })
+    expect(selections).toEqual(['#acme-research'])
     mounted.app.unmount()
   })
 

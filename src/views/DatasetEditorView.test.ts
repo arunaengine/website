@@ -231,10 +231,10 @@ describe('DatasetEditorView', () => {
     await flush()
 
     const graph = createMetadata.mock.calls[0][0].rocrate['@graph'] as Array<Record<string, unknown>>
-    expect(graph.find((entity) => entity['@id'] === './')).toMatchObject({
-      conformsTo: { '@id': 'https://example.test/profiles/genomics' },
-      identifier: '',
-    })
+    const root = graph.find((entity) => entity['@id'] === './')
+    expect(root).toMatchObject({ conformsTo: { '@id': 'https://example.test/profiles/genomics' } })
+    // The seeded identifier row stays empty, so it must not reach the crate.
+    expect(root).not.toHaveProperty('identifier')
     mounted.app.unmount()
   })
 

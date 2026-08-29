@@ -13,6 +13,7 @@ import {
   linkProperties,
   liveIssues,
   newDraft,
+  promoteValue,
   referencesTo,
   orderedEntities,
   removeEntity,
@@ -44,6 +45,60 @@ function seeded(): CrateDraft {
 }
 
 describe('crate draft', () => {
+  it('leaves empty rows out of the crate', () => {
+    // A blank row is a prompt, not a value; an empty literal would satisfy a profile by accident.
+    const graph = toRoCrate(newDraft())['@graph'] as Array<Record<string, unknown>>
+    const root = graph.find((node) => node['@id'] === './')
+
+    expect(root).not.toHaveProperty('name')
+    expect(root).not.toHaveProperty('license')
+    expect(root).toHaveProperty('datePublished')
+  })
+
+  it('promotes a text value into a named entity', () => {
+    const draft = addValue(newDraft(), './', 'publisher', { kind: 'text', value: 'ACME Research' })
+    const promoted = promoteValue(draft, './', 'publisher', 0, 'Organization')
+
+    expect(promoted?.entity).toMatchObject({
+      id: '#acme-research',
+      types: ['Organization'],
+      properties: { name: [{ kind: 'text', value: 'ACME Research' }] },
+    })
+    expect(findEntity(promoted!.draft, './')?.properties.publisher).toEqual([
+      { kind: 'reference', value: '#acme-research' },
+    ])
+  })
+
+  it('promotes a license preset under its URL with the preset name', () => {
+    const draft = addValue(newDraft(), './', 'license', {
+      kind: 'url',
+      value: 'https://creativecommons.org/licenses/by/4.0/',
+    })
+    const promoted = promoteValue(draft, './', 'license', 0, 'CreativeWork')
+
+    expect(promoted?.entity).toMatchObject({
+      id: 'https://creativecommons.org/licenses/by/4.0/',
+      types: ['CreativeWork'],
+      properties: { name: [{ kind: 'text', value: 'CC BY 4.0' }] },
+    })
+  })
+
+  it('promotes an email address into a mailto contact', () => {
+    const draft = addValue(newDraft(), './', 'contactPoint', { kind: 'text', value: 'team@example.org' })
+    const promoted = promoteValue(draft, './', 'contactPoint', 0, 'ContactPoint')
+
+    expect(promoted?.entity).toMatchObject({
+      id: 'mailto:team@example.org',
+      properties: { email: [{ kind: 'text', value: 'team@example.org' }] },
+    })
+  })
+
+  it('refuses to promote a reference or an empty value', () => {
+    const draft = addValue(newDraft(), './', 'publisher', { kind: 'reference', value: '#org' })
+    expect(promoteValue(draft, './', 'publisher', 0, 'Organization')).toBeUndefined()
+    expect(promoteValue(newDraft(), './', 'license', 0, 'CreativeWork')).toBeUndefined()
+  })
+
   it('round trips a crate through the model', () => {
     const crate = toRoCrate(seeded())
     const draft = fromRoCrate(crate)

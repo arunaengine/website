@@ -20,13 +20,16 @@ import {
   allowedKinds,
   changeKind,
   defaultValue,
+  promoteValue,
   propertyTerm,
   removeValue,
+  setProperty,
   updateValue,
   VALUE_KIND_LABELS,
   VALUE_PRESETS,
   type CrateDraft,
   type DraftEntity,
+  type DraftValue,
   type DraftValueKind,
   type LiveIssue,
 } from '@/lib/crate/editor'
@@ -41,6 +44,10 @@ const props = defineProps<{
   issues?: LiveIssue[]
   /** The root's parts list is maintained by the files dialog, not by hand. */
   locked?: boolean
+  /** Root form field: one input is shown even before the property exists. */
+  always?: boolean
+  /** "More details" promotes a literal value into a linked entity of this type. */
+  promoteTo?: string
 }>()
 const emit = defineEmits<{
   (e: 'update', draft: CrateDraft): void
@@ -52,13 +59,32 @@ const createFor = ref(-1)
 
 const term = computed(() => propertyTerm(props.vocab, props.property))
 const label = computed(() => term.value?.label ?? props.property)
-const values = computed(() => props.entity.properties[props.property] ?? [])
 const kinds = computed(() => allowedKinds(props.vocab, props.property))
 const range = computed(() => term.value?.targets ?? [])
 const presets = computed(() => VALUE_PRESETS[props.property])
+const stored = computed(() => props.entity.properties[props.property] ?? [])
+// The blank row an always-shown field offers before anything is typed.
+const blank = computed<DraftValue>(() => defaultValue(kinds.value.find((kind) => kind !== 'reference') ?? 'text'))
+const values = computed(() => (stored.value.length || !props.always ? stored.value : [blank.value]))
 
 function set(index: number, value: string) {
+  if (!stored.value.length) {
+    emit('update', setProperty(props.draft, props.entity.id, props.property, value.trim() ? [{ ...blank.value, value }] : []))
+    return
+  }
   emit('update', updateValue(props.draft, props.entity.id, props.property, index, value))
+}
+
+function promote(index: number) {
+  if (!props.promoteTo) return
+  const promoted = promoteValue(props.draft, props.entity.id, props.property, index, props.promoteTo)
+  if (!promoted) return
+  emit('update', promoted.draft)
+  emit('select', promoted.entity.id)
+}
+
+function promotable(value: DraftValue): boolean {
+  return Boolean(props.promoteTo) && value.kind !== 'reference' && Boolean(value.value.trim())
 }
 
 function addEntry(kind: DraftValueKind) {
@@ -133,7 +159,18 @@ function created(next: CrateDraft, entityId: string) {
           />
         </div>
 
-        <DropdownMenu v-if="!locked">
+        <Button
+          v-if="promotable(value)"
+          variant="ghost"
+          size="sm"
+          class="mt-0.5 h-8 shrink-0 px-2 text-xs text-primary"
+          :aria-label="`More details about this ${label.toLowerCase()}`"
+          @click="promote(index)"
+        >
+          More details
+        </Button>
+
+        <DropdownMenu v-if="!locked && stored.length">
           <DropdownMenuTrigger as-child>
             <Button
               variant="ghost"
@@ -166,7 +203,7 @@ function created(next: CrateDraft, entityId: string) {
         </DropdownMenu>
       </div>
 
-      <div v-if="!locked">
+      <div v-if="!locked && stored.length">
         <Button v-if="kinds.length === 1" variant="ghost" size="sm" class="h-7 px-2 text-xs" @click="addEntry(kinds[0])">
           <Plus class="h-3.5 w-3.5" /> Add entry
         </Button>

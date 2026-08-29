@@ -161,8 +161,19 @@ export const ROOT_FORM_PROPERTIES = [
   'datePublished',
   'license',
   'keywords',
+  'publisher',
+  'contactPoint',
+  'funder',
   'conformsTo',
 ]
+
+/** The entity type a root form value is promoted to for "More details". */
+export const PROMOTED_TYPES: Readonly<Record<string, string>> = {
+  license: 'CreativeWork',
+  publisher: 'Organization',
+  funder: 'Organization',
+  contactPoint: 'ContactPoint',
+}
 
 /** The types that describe stored data; a contextual entity is none of them. */
 export const DATA_TYPES = ['File', 'Dataset', 'MediaObject']
@@ -449,6 +460,44 @@ export function changeKind(
     (position === index ? { kind, value: entry.value } : entry)))
 }
 
+/**
+ * Turns one literal value into a linked entity of `type`: a URL becomes the
+ * entity's identifier, a preset keeps its label as the name, plain text becomes
+ * the name, and an email address becomes a mailto contact.
+ */
+export function promoteValue(
+  draft: CrateDraft,
+  entityId: string,
+  property: string,
+  index: number,
+  type: string,
+): { draft: CrateDraft; entity: DraftEntity } | undefined {
+  const value = findEntity(draft, entityId)?.properties[property]?.[index]
+  const text = value?.value.trim() ?? ''
+  if (!value || value.kind === 'reference' || !text) return undefined
+  const preset = VALUE_PRESETS[property]?.find((candidate) => candidate.value === text)
+  const email = !isAbsoluteUri(text) && /^[^\s@]+@[^\s@]+$/.test(text) ? text : ''
+  const url = isAbsoluteUri(text) ? text : ''
+  const name = preset?.label ?? (url ? '' : email ? '' : text)
+  const properties: Record<string, DraftValue[]> = {
+    ...(name ? { name: [{ kind: 'text', value: name }] } : {}),
+    ...(url && !preset ? { url: [{ kind: 'url', value: url }] } : {}),
+    ...(email ? { email: [{ kind: 'text', value: email }] } : {}),
+  }
+  const id = url || (email ? `mailto:${email}` : '')
+  const created = addEntity(draft, { type, ...(id ? { id } : { name }), properties })
+  return {
+    draft: updateReference(created.draft, entityId, property, index, created.entity.id),
+    entity: created.entity,
+  }
+}
+
+function updateReference(draft: CrateDraft, id: string, property: string, index: number, target: string): CrateDraft {
+  const list = findEntity(draft, id)?.properties[property] ?? []
+  return setProperty(draft, id, property, list.map((entry, position) =>
+    (position === index ? { kind: 'reference' as const, value: target } : entry)))
+}
+
 export interface ReferenceUse {
   entityId: string
   property: string
@@ -545,8 +594,10 @@ export function toRoCrate(draft: CrateDraft): Record<string, unknown> {
       '@type': entity.types.length === 1 ? entity.types[0] : entity.types,
     }
     for (const [property, list] of Object.entries(entity.properties)) {
-      if (!list.length) continue
-      const encoded = list.map(jsonFrom)
+      // An empty row is a prompt in the editor, not a value in the crate.
+      const filled = list.filter((value) => value.kind === 'boolean' || value.value.trim())
+      if (!filled.length) continue
+      const encoded = filled.map(jsonFrom)
       node[property] = encoded.length === 1 ? encoded[0] : encoded
     }
     for (const [property, value] of Object.entries(entity.extra ?? {})) node[property] = value

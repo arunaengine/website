@@ -10,6 +10,7 @@ import { ROW_ACTIONS, ROW_GRID, ROW_LABEL } from './grid'
 import {
   addValue,
   findEntity,
+  PROMOTED_TYPES,
   removeValue,
   ROOT_FORM_PROPERTIES,
   rootId,
@@ -21,6 +22,8 @@ import {
 import type { VocabIndex } from '@/lib/profiles/vocabulary'
 import { X } from '@lucide/vue'
 
+// The dataset's own form: the fields every dataset has, each one promotable
+// into a linked entity, followed by whatever else the root carries as rows.
 const props = defineProps<{
   draft: CrateDraft
   vocab: VocabIndex | null
@@ -33,6 +36,8 @@ const emit = defineEmits<{
   (e: 'select', entityId: string): void
   (e: 'profile', profileId: string): void
 }>()
+
+const LINKED = ['publisher', 'contactPoint', 'funder']
 
 const keywordDraft = ref('')
 
@@ -114,6 +119,8 @@ function addKeyword() {
         property="license"
         :vocab="vocab"
         :issues="issuesFor('license')"
+        always
+        :promote-to="PROMOTED_TYPES.license"
         @update="(next) => emit('update', next)"
         @select="(entityId) => emit('select', entityId)"
       />
@@ -144,6 +151,22 @@ function addKeyword() {
         </div>
         <div :class="ROW_ACTIONS"><IssueMark :issues="issuesFor('keywords')" /></div>
       </div>
+
+      <template v-if="root">
+        <PropertyRow
+          v-for="property in LINKED"
+          :key="property"
+          :draft="draft"
+          :entity="root"
+          :property="property"
+          :vocab="vocab"
+          :issues="issuesFor(property)"
+          always
+          :promote-to="PROMOTED_TYPES[property]"
+          @update="(next) => emit('update', next)"
+          @select="(entityId) => emit('select', entityId)"
+        />
+      </template>
 
       <div :class="ROW_GRID">
         <span :class="ROW_LABEL">Profile</span>
