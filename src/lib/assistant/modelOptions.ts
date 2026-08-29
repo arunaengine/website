@@ -1,5 +1,5 @@
 // Which model ids a provider offers: whatever the node listed for it, and for
-// a ChatGPT subscription the gpt-5 family the node falls back to when the
+// a Codex subscription the gpt-5 family the node falls back to when the
 // backend does not answer. Any non-empty id is accepted beyond that.
 import type { AssistantModel, AssistantProvider } from '@/lib/api'
 

@@ -11,7 +11,7 @@ describe('modelSuggestions', () => {
     expect(suggestions[0].display_name).toBe('GPT 5')
   })
 
-  it('falls back to the gpt-5 family for a ChatGPT subscription without a list', () => {
+  it('falls back to the gpt-5 family for a Codex subscription without a list', () => {
     // The node answers the static set when the backend does not list models.
     expect(modelSuggestions({ kind: 'chatgpt', models: [] })).toEqual(CHATGPT_MODELS)
     expect(modelSuggestions({ kind: 'chatgpt', models: [{ id: 'gpt-5.7' }] }).map((model) => model.id)).toEqual(['gpt-5.7'])

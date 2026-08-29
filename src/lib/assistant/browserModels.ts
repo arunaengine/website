@@ -7,12 +7,87 @@ import { createAnthropic } from '@ai-sdk/anthropic'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import type { LanguageModel } from 'ai'
+import type { AssistantModel } from '@/lib/api'
 import type { BrowserProvider, OpenAICompatibleBrowserProvider } from './browserProviders'
 
 export const ANTHROPIC_DIRECT_BROWSER_HEADER = 'anthropic-dangerous-direct-browser-access'
 
 export interface BrowserModelContext {
   fetch?: typeof globalThis.fetch
+}
+
+const NON_TEXT_MODEL_TERMS = [
+  'embed',
+  'whisper',
+  'tts',
+  'image',
+  'dall-e',
+  'audio',
+  'moderation',
+  'realtime',
+]
+
+function modelsUrl(baseUrl: string): string {
+  return `${baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`}models`
+}
+
+function textModel(id: string): boolean {
+  const lower = id.toLowerCase()
+  return !NON_TEXT_MODEL_TERMS.some((term) => lower.includes(term))
+}
+
+/** Fetches a provider's model list without sending an Aruna bearer. */
+export async function fetchBrowserProviderModels(
+  provider: BrowserProvider,
+  fetcher: typeof globalThis.fetch = globalThis.fetch,
+): Promise<AssistantModel[]> {
+  const headers = new Headers(provider.kind === 'anthropic'
+    ? {
+        'x-api-key': provider.apiKey,
+        [ANTHROPIC_DIRECT_BROWSER_HEADER]: 'true',
+        'anthropic-version': '2023-06-01',
+      }
+    : provider.headers)
+  if (provider.kind === 'openai_compatible' && provider.apiKey) {
+    headers.set('Authorization', `Bearer ${provider.apiKey}`)
+  }
+  const response = await fetcher(
+    provider.kind === 'anthropic' ? 'https://api.anthropic.com/v1/models' : modelsUrl(provider.baseUrl),
+    { headers },
+  )
+  if (response.status === 404 || response.status === 405) return []
+  if (!response.ok) throw new Error(`Provider model listing failed (${response.status}).`)
+  const payload = await response.json() as unknown
+  const entries = Array.isArray(payload)
+    ? payload
+    : payload && typeof payload === 'object'
+      ? [
+          ...((Array.isArray((payload as Record<string, unknown>).data)
+            ? (payload as Record<string, unknown>).data
+            : []) as unknown[]),
+          ...((Array.isArray((payload as Record<string, unknown>).models)
+            ? (payload as Record<string, unknown>).models
+            : []) as unknown[]),
+        ]
+      : []
+  return entries.flatMap((entry) => {
+    if (!entry || typeof entry !== 'object') return []
+    const item = entry as Record<string, unknown>
+    const id = typeof item.id === 'string'
+      ? item.id
+      : typeof item.slug === 'string'
+        ? item.slug
+        : typeof item.name === 'string'
+          ? item.name
+          : ''
+    if (!id || !textModel(id)) return []
+    const displayName = typeof item.display_name === 'string'
+      ? item.display_name
+      : typeof item.name === 'string' && item.name !== id
+        ? item.name
+        : undefined
+    return [{ id, ...(displayName ? { display_name: displayName } : {}) }]
+  })
 }
 
 function fetchWithOptionalAuth(

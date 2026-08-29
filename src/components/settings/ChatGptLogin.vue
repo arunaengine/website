@@ -1,13 +1,13 @@
 <script setup lang="ts">
-// Sign in with a ChatGPT subscription: the node runs the device-code flow and
-// keeps the tokens, this card only shows the code and waits for the verdict.
-import { computed, onBeforeUnmount, ref } from 'vue'
+// Codex device login: the node runs the flow and keeps the tokens, this card
+// only shows the code and waits for the verdict.
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import Notice from '@/components/ui/Notice.vue'
 import { useAssistantProviders } from '@/composables/useAssistantProviders'
 import { pollChatGptLogin, startChatGptLogin, type ChatGptLoginStatus } from '@/lib/api'
-import { apiBaseUrl, authToken } from '@/composables/aruna/state'
+import { apiBaseUrl, authToken, sessionEpoch, userInfo } from '@/composables/aruna/state'
 import { isDesktop } from '@/lib/desktop'
 import { errorMessage } from '@/lib/utils'
 import { ExternalLink } from '@lucide/vue'
@@ -20,6 +20,7 @@ const status = ref<ChatGptLoginStatus | 'idle'>('idle')
 const failure = ref<string | null>(null)
 const busy = ref(false)
 let timer: ReturnType<typeof setTimeout> | undefined
+let pollContext: { epoch: number; identity: string } | null = null
 
 const waiting = computed(() => status.value === 'pending')
 
@@ -27,29 +28,61 @@ function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
 }
 
+function identityKey(): string {
+  return userInfo.value?.user.user_id ?? ''
+}
+
+function isCurrent(context: { epoch: number; identity: string }): boolean {
+  return pollContext === context && context.epoch === sessionEpoch.value && context.identity === identityKey()
+}
+
 function stopPolling() {
   if (timer !== undefined) clearTimeout(timer)
   timer = undefined
+  pollContext = null
 }
 
-function schedule(providerId: string, intervalSeconds: number) {
-  timer = setTimeout(() => void poll(providerId, intervalSeconds), Math.max(intervalSeconds, 1) * 1000)
+function schedule(providerId: string, intervalSeconds: number, context: { epoch: number; identity: string }) {
+  timer = setTimeout(() => void poll(providerId, intervalSeconds, context), Math.max(intervalSeconds, 1) * 1000)
 }
 
-async function poll(providerId: string, intervalSeconds: number) {
+async function poll(providerId: string, intervalSeconds: number, context: { epoch: number; identity: string }) {
+  if (!isCurrent(context)) {
+    stopPolling()
+    return
+  }
   try {
     const result = await pollChatGptLogin(providerId, client())
+    if (!isCurrent(context)) {
+      stopPolling()
+      return
+    }
     status.value = result.status
     if (result.status === 'pending') {
-      schedule(providerId, intervalSeconds)
+      schedule(providerId, intervalSeconds, context)
       return
     }
     if (result.status === 'ready') await load()
   } catch (cause) {
+    if (!isCurrent(context)) {
+      stopPolling()
+      return
+    }
     status.value = 'idle'
     failure.value = errorMessage(cause)
   }
 }
+
+function invalidateLogin() {
+  stopPolling()
+  status.value = 'idle'
+  userCode.value = ''
+  verificationUrl.value = ''
+  failure.value = null
+}
+
+watch(sessionEpoch, invalidateLogin, { flush: 'sync' })
+watch(() => userInfo.value?.user.user_id ?? '', invalidateLogin)
 
 async function openVerification() {
   if (!verificationUrl.value) return
@@ -65,13 +98,23 @@ async function start() {
   busy.value = true
   failure.value = null
   stopPolling()
+  const context = { epoch: sessionEpoch.value, identity: identityKey() }
+  pollContext = context
   try {
-    const login = await startChatGptLogin('ChatGPT subscription', client())
+    const login = await startChatGptLogin('Codex subscription', client())
+    if (!pollContext || !isCurrent(context)) {
+      stopPolling()
+      return
+    }
     userCode.value = login.user_code
     verificationUrl.value = login.verification_url
     status.value = 'pending'
-    schedule(login.provider_id, login.interval_seconds)
+    schedule(login.provider_id, login.interval_seconds, context)
   } catch (cause) {
+    if (!pollContext || !isCurrent(context)) {
+      stopPolling()
+      return
+    }
     failure.value = errorMessage(cause)
   } finally {
     busy.value = false
@@ -85,14 +128,14 @@ onBeforeUnmount(stopPolling)
   <div class="space-y-3 rounded-lg border border-border bg-muted/10 p-4">
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div class="min-w-0">
-        <h4 class="text-sm font-medium text-foreground">Sign in with ChatGPT</h4>
+        <h4 class="text-sm font-medium text-foreground">Codex device login (experimental)</h4>
         <p class="mt-0.5 text-xs text-muted-foreground">
-          Use a regular ChatGPT subscription instead of an API key. This uses OpenAI's Codex sign-in, which is their
-          client and may stop working.
+          Use a regular ChatGPT subscription instead of an API key. The node keeps this Codex credential because the
+          upstream does not support production browser origins and this flow may stop working.
         </p>
       </div>
       <Button variant="outline" size="sm" :disabled="busy || waiting" @click="start">
-        {{ waiting ? 'Waiting…' : 'Sign in with ChatGPT' }}
+        {{ waiting ? 'Waiting…' : 'Sign in with Codex' }}
       </Button>
     </div>
 

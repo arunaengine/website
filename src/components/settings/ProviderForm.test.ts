@@ -11,14 +11,31 @@ import {
   mountApp,
   typeValue,
 } from '@/test/clientRender'
-import { ADDABLE_PROVIDER_KINDS, PROVIDER_KIND_LABELS, type AssistantProvider } from '@/lib/api/assistant'
+import type { AssistantProvider } from '@/lib/api/assistant'
 import { errorMessage } from '@/lib/utils'
 import * as ModelOptions from '@/lib/assistant/modelOptions'
+import * as BrowserProviders from '@/lib/assistant/browserProviders'
+import type { BrowserProvider } from '@/lib/assistant/browserProviders'
 
-const create = vi.fn(async (_request: Record<string, unknown>) => ({ provider_id: 'p-new' }))
-const update = vi.fn(async (_id: string, _patch: Record<string, unknown>) => ({ provider_id: 'p-new' }))
-const check = vi.fn(async (_id: string) => ({ ok: true, message: 'ok' }))
-const models = vi.fn(async (_id: string) => [{ id: 'm-1' }])
+const create = vi.fn(async (provider: Record<string, unknown>) => ({
+  provider_id: provider.id,
+  kind: provider.kind,
+  label: provider.label,
+  models: [{ id: provider.model }],
+  default_model: provider.model,
+  status: 'ready',
+}))
+const update = vi.fn(async (id: string, provider: Record<string, unknown>) => ({
+  provider_id: id,
+  kind: provider.kind,
+  label: provider.label,
+  models: [{ id: provider.model }],
+  default_model: provider.model,
+  status: 'ready',
+}))
+const check = vi.fn(async (_provider: Record<string, unknown>) => ({ ok: true, message: 'ok' }))
+const models = vi.fn(async (_provider: Record<string, unknown>) => [{ id: 'm-1' }])
+const direct = vi.fn((_id: string): BrowserProvider | null => null)
 
 const ButtonStub = defineComponent({
   inheritAttrs: false,
@@ -65,10 +82,10 @@ const ProviderForm = compileClientComponent(new URL('./ProviderForm.vue', import
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/components/assistant/ModelCombobox.vue': moduleDefault(ComboboxStub),
   '@/lib/assistant/modelOptions': ModelOptions,
+  '@/lib/assistant/browserProviders': BrowserProviders,
   '@/composables/useAssistantProviders': {
-    useAssistantProviders: () => ({ create, update, check, models }),
+    useAssistantProviders: () => ({ create, update, check, models, direct }),
   },
-  '@/lib/api': { ADDABLE_PROVIDER_KINDS, PROVIDER_KIND_LABELS },
   '@/lib/utils': { errorMessage },
 })
 
@@ -91,6 +108,7 @@ beforeEach(() => {
   update.mockClear()
   check.mockClear()
   models.mockClear()
+  direct.mockClear()
   check.mockResolvedValue({ ok: true, message: 'ok' })
 })
 
@@ -98,68 +116,81 @@ describe('ProviderForm', () => {
   it('keeps Save disabled until the connection test passes', async () => {
     const { root } = await mountApp(ProviderForm)
     await typeValue(field(root, 'Work account'), 'Work')
-    await typeValue(field(root, 'Paste the provider key'), 'sk-1')
+    await typeValue(field(root, 'Paste the Anthropic key'), 'sk-1')
+    await typeValue(element(root, (node) => node.props['aria-label'] === 'Default model'), 'claude-sonnet')
 
     expect(button(root, 'Save provider').props.disabled).toBe(true)
 
     await click(button(root, 'Test connection'))
 
-    expect(create).toHaveBeenCalledWith({ kind: 'anthropic', label: 'Work', api_key: 'sk-1' })
-    expect(check).toHaveBeenCalledWith('p-new')
+    expect(create).not.toHaveBeenCalled()
+    expect(check).toHaveBeenCalledWith(expect.objectContaining({ kind: 'anthropic', label: 'Work', model: 'claude-sonnet', apiKey: 'sk-1' }))
     expect(button(root, 'Save provider').props.disabled).toBe(false)
+
+    await click(button(root, 'Save provider'))
+    expect(create).toHaveBeenCalledOnce()
   })
 
   it('keeps Save disabled when the provider refuses the credentials', async () => {
     check.mockResolvedValueOnce({ ok: false, message: 'bad key' })
     const { root } = await mountApp(ProviderForm)
     await typeValue(field(root, 'Work account'), 'Work')
-    await typeValue(field(root, 'Paste the provider key'), 'sk-1')
+    await typeValue(field(root, 'Paste the Anthropic key'), 'sk-1')
+    await typeValue(element(root, (node) => node.props['aria-label'] === 'Default model'), 'claude-sonnet')
     await click(button(root, 'Test connection'))
 
     expect(content(root)).toContain('bad key')
+    expect(create).not.toHaveBeenCalled()
     expect(button(root, 'Save provider').props.disabled).toBe(true)
   })
 
-  it('creates the record once and patches every later attempt', async () => {
+  it('keeps testing and model discovery side effect free until save', async () => {
     const { root } = await mountApp(ProviderForm)
     await typeValue(field(root, 'Work account'), 'Work')
-    await typeValue(field(root, 'Paste the provider key'), 'sk-1')
+    await typeValue(field(root, 'Paste the Anthropic key'), 'sk-1')
+    await typeValue(element(root, (node) => node.props['aria-label'] === 'Default model'), 'claude-sonnet')
     await click(button(root, 'Test connection'))
     await click(button(root, 'Fetch models'))
 
+    expect(create).not.toHaveBeenCalled()
+    expect(models).toHaveBeenCalledWith(expect.objectContaining({ kind: 'anthropic', apiKey: 'sk-1' }))
+    await click(button(root, 'Save provider'))
     expect(create).toHaveBeenCalledOnce()
-    expect(update).toHaveBeenCalledWith('p-new', { label: 'Work' })
   })
 
-  it('omits the stored key from a patch that did not retype it', async () => {
-    // The node never sends a key back, so an untouched field must not clear it.
+  it('keeps the tab-stored key when editing without retyping it', async () => {
+    // The browser keeps the key locally, so an untouched field must not clear it.
+    direct.mockReturnValue({ kind: 'anthropic', id: 'p-1', label: 'Work', model: 'm-1', apiKey: 'stored-key' })
     const { root } = await mountApp(ProviderForm, { props: { provider: stored } })
+    await click(button(root, 'Test connection'))
     await click(button(root, 'Save provider'))
 
     expect(create).not.toHaveBeenCalled()
-    expect(update.mock.calls[0]).toEqual(['p-1', { label: 'Work' }])
-    expect(Object.keys(update.mock.calls[0][1] as object)).not.toContain('api_key')
+    expect(update.mock.calls[0][0]).toBe('p-1')
+    expect(update.mock.calls[0][1]).toEqual(expect.objectContaining({ apiKey: 'stored-key' }))
   })
 
   it('stores a model id typed by hand as the default', async () => {
     // A fine-tune or a brand-new model needs no entry in the fetched list.
+    direct.mockReturnValue({ kind: 'anthropic', id: 'p-1', label: 'Work', model: 'm-1', apiKey: 'stored-key' })
     const { root } = await mountApp(ProviderForm, { props: { provider: stored } })
     const model = element(root, (node) => node.tag === 'input' && node.props['aria-label'] === 'Default model')
     expect(model.props['data-suggestions']).toBe('m-1')
 
     await typeValue(model, '  my-fine-tune ')
+    await click(button(root, 'Test connection'))
     await click(button(root, 'Save provider'))
 
-    expect(update.mock.calls.at(-1)).toEqual(['p-1', { models: [{ id: 'm-1' }], default_model: 'my-fine-tune' }])
+    expect(update.mock.calls.at(-1)?.[1]).toEqual(expect.objectContaining({ model: 'my-fine-tune' }))
   })
 
   it('asks for a base URL only for an openai-compatible provider', async () => {
     const { root } = await mountApp(ProviderForm)
     expect(() => field(root, 'https://api.example.org/v1')).toThrow()
 
-    await click(button(root, PROVIDER_KIND_LABELS.openai_compatible))
+    await click(button(root, 'OpenAI-compatible'))
 
-    expect(field(root, 'https://api.example.org/v1')).toBeDefined()
-    expect(content(root)).toContain('OLLAMA_ORIGINS')
+    expect(field(root, 'https://api.openai.com/v1')).toBeDefined()
+    expect(content(root)).toContain('Responses')
   })
 })

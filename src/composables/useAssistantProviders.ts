@@ -1,61 +1,140 @@
-// The AI providers configured for this account. Module singleton: the settings
-// tab, the chat launcher and the panel all read one list, revalidated in the
-// background whenever a surface asks for it (stale-while-revalidate).
-import { computed, ref } from 'vue'
+// Browser providers are session-scoped direct connections. The node remains
+// the source for ChatGPT/Codex providers because that upstream is not browser
+// CORS-capable; its summary is merged with the local direct providers.
+import { computed, ref, watch } from 'vue'
 import {
   apiErrorMessage,
-  createAssistantProvider,
   deleteAssistantProvider,
-  fetchAssistantModels,
   listAssistantProviders,
-  patchAssistantProvider,
-  testAssistantProvider,
   type AssistantModel,
   type AssistantProvider,
-  type CreateProviderRequest,
-  type PatchProviderRequest,
 } from '@/lib/api'
-import { apiBaseUrl, authToken } from './aruna/state'
+import {
+  createBrowserProviderStore,
+  validateBrowserProvider,
+  type BrowserProvider,
+} from '@/lib/assistant/browserProviders'
+import { errorMessage } from '@/lib/utils'
+import { apiBaseUrl, authToken, sessionEpoch, userInfo } from './aruna/state'
 
+export interface BrowserProviderTestResponse {
+  ok: boolean
+  message: string
+}
+
+const browserStore = createBrowserProviderStore()
+const nodeProviders = ref<AssistantProvider[]>([])
 const providers = ref<AssistantProvider[]>([])
 const loading = ref(false)
 const loaded = ref(false)
 const error = ref<string | null>(null)
-let inFlight: Promise<void> | null = null
+let nodeGeneration = 0
+let inFlight: { epoch: number; generation: number; identity: string; promise: Promise<void> } | null = null
 
 function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
 }
 
-function replace(provider: AssistantProvider) {
-  const index = providers.value.findIndex((entry) => entry.provider_id === provider.provider_id)
-  if (index < 0) providers.value = [...providers.value, provider]
-  else providers.value = providers.value.map((entry, at) => (at === index ? provider : entry))
+function directSummary(provider: BrowserProvider): AssistantProvider {
+  const base = {
+    provider_id: provider.id,
+    kind: provider.kind,
+    label: provider.label,
+    models: [{ id: provider.model }],
+    default_model: provider.model,
+    status: 'ready' as const,
+    // Direct providers have no node creation timestamp; this field is only
+    // retained for the existing summary consumers.
+    created_at: new Date(0).toISOString(),
+  }
+  if (provider.kind === 'anthropic') return base
+  return {
+    ...base,
+    base_url: provider.baseUrl,
+    header_names: Object.keys(provider.headers ?? {}),
+  }
 }
 
-async function revalidate(): Promise<void> {
+function rebuild() {
+  providers.value = [
+    ...browserStore.state.providers.map(directSummary),
+    ...nodeProviders.value.filter((provider) => provider.kind === 'chatgpt'),
+  ]
+}
+
+function direct(providerId: string): BrowserProvider | null {
+  return browserStore.state.providers.find((provider) => provider.id === providerId) ?? null
+}
+
+function identityKey(): string {
+  return userInfo.value?.user.user_id ?? ''
+}
+
+function currentNodeContext(epoch: number, generation: number, identity: string): boolean {
+  return epoch === sessionEpoch.value && generation === nodeGeneration && identity === identityKey()
+}
+
+async function revalidate(epoch: number, generation: number, identity: string): Promise<void> {
   loading.value = true
   error.value = null
   try {
-    providers.value = (await listAssistantProviders(client())).providers
+    const response = await listAssistantProviders(client())
+    if (!currentNodeContext(epoch, generation, identity)) return
+    nodeProviders.value = response.providers.filter((provider) => provider.kind === 'chatgpt')
+    rebuild()
     loaded.value = true
   } catch (cause) {
+    if (!currentNodeContext(epoch, generation, identity)) return
+    nodeProviders.value = []
+    rebuild()
     error.value = apiErrorMessage(cause)
   } finally {
-    loading.value = false
-    inFlight = null
+    if (currentNodeContext(epoch, generation, identity)) {
+      loading.value = false
+      if (inFlight?.epoch === epoch && inFlight.generation === generation && inFlight.identity === identity) {
+        inFlight = null
+      }
+    }
   }
 }
 
+function resetNodeCache() {
+  nodeGeneration += 1
+  nodeProviders.value = []
+  loaded.value = false
+  loading.value = false
+  error.value = null
+  inFlight = null
+  rebuild()
+}
+
+function resetBrowserSession() {
+  browserStore.clear()
+  resetNodeCache()
+}
+
+// Token or node changes clear direct credentials immediately. A user-info-only
+// change only invalidates node Codex summaries and in-flight loads.
+watch(sessionEpoch, resetBrowserSession, { flush: 'sync' })
+watch(() => userInfo.value?.user.user_id ?? '', resetNodeCache)
+
 export function useAssistantProviders() {
-  /** Revalidates once; concurrent callers share the request in flight. */
+  /** Revalidates the node-managed Codex summaries once per concurrent wave. */
   function load(): Promise<void> {
+    rebuild()
     if (!authToken.value) return Promise.resolve()
-    inFlight ??= revalidate()
-    return inFlight
+    const epoch = sessionEpoch.value
+    const generation = nodeGeneration
+    const identity = identityKey()
+    if (inFlight?.epoch === epoch && inFlight.generation === generation && inFlight.identity === identity) {
+      return inFlight.promise
+    }
+    const promise = revalidate(epoch, generation, identity)
+    inFlight = { epoch, generation, identity, promise }
+    return promise
   }
 
-  /** Serves what is cached and refreshes behind it. */
+  /** Serves the local direct providers and refreshes Codex behind them. */
   function ensureLoaded(): void {
     if (loaded.value) {
       void load()
@@ -64,31 +143,64 @@ export function useAssistantProviders() {
     void load()
   }
 
-  async function create(request: CreateProviderRequest): Promise<AssistantProvider> {
-    const provider = await createAssistantProvider(request, client())
-    replace(provider)
-    return provider
+  async function create(provider: BrowserProvider): Promise<AssistantProvider> {
+    const validated = validateBrowserProvider(provider)
+    browserStore.upsert(validated)
+    rebuild()
+    return directSummary(validated)
   }
 
-  async function update(providerId: string, request: PatchProviderRequest): Promise<AssistantProvider> {
-    const provider = await patchAssistantProvider(providerId, request, client())
-    replace(provider)
-    return provider
+  async function update(providerId: string, provider: BrowserProvider): Promise<AssistantProvider> {
+    const current = direct(providerId)
+    if (!current) throw new Error('Only browser-owned providers can be edited here.')
+    const validated = validateBrowserProvider({ ...provider, id: providerId })
+    browserStore.upsert(validated)
+    rebuild()
+    return directSummary(validated)
   }
 
   async function remove(providerId: string): Promise<void> {
+    if (direct(providerId)) {
+      browserStore.remove(providerId)
+      rebuild()
+      return
+    }
+    const nodeProvider = nodeProviders.value.find((provider) => provider.provider_id === providerId)
+    if (!nodeProvider || nodeProvider.kind !== 'chatgpt') return
     await deleteAssistantProvider(providerId, client())
-    providers.value = providers.value.filter((entry) => entry.provider_id !== providerId)
+    nodeProviders.value = nodeProviders.value.filter((provider) => provider.provider_id !== providerId)
+    rebuild()
   }
 
-  function check(providerId: string) {
-    return testAssistantProvider(providerId, client())
+  /** Tests a candidate only; no provider state is changed on success or failure. */
+  async function check(provider: BrowserProvider): Promise<BrowserProviderTestResponse> {
+    try {
+      const validated = validateBrowserProvider(provider)
+      const [{ generateText }, { buildBrowserModel }] = await Promise.all([
+        import('ai'),
+        import('@/lib/assistant/browserModels'),
+      ])
+      const result = await generateText({
+        model: buildBrowserModel(validated),
+        prompt: 'Reply with a brief confirmation that this connection works.',
+        maxOutputTokens: 16,
+        maxRetries: 0,
+        providerOptions: validated.kind === 'openai_compatible' && validated.protocol === 'responses'
+          ? { openai: { store: false } }
+          : undefined,
+      })
+      return { ok: true, message: result.text.trim() || 'The provider answered.' }
+    } catch (cause) {
+      return { ok: false, message: errorMessage(cause) }
+    }
   }
 
-  async function models(providerId: string): Promise<AssistantModel[]> {
-    return (await fetchAssistantModels(providerId, client())).models
+  async function models(provider: BrowserProvider): Promise<AssistantModel[]> {
+    const { fetchBrowserProviderModels } = await import('@/lib/assistant/browserModels')
+    return fetchBrowserProviderModels(validateBrowserProvider(provider))
   }
 
+  rebuild()
   return {
     providers,
     loading,
@@ -102,5 +214,6 @@ export function useAssistantProviders() {
     remove,
     check,
     models,
+    direct,
   }
 }

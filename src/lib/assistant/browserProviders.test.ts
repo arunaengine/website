@@ -99,6 +99,10 @@ describe('browser provider contract', () => {
       kind: 'openai_compatible',
       id: 'id', label: 'label', model: 'model', protocol: 'unknown', baseUrl: 'https://example.test/v1',
     })).toThrowError('provider.protocol')
+    expect(() => validateBrowserProvider({
+      kind: 'openai_compatible',
+      id: 'id', label: 'OpenAI', model: 'gpt-5.6', protocol: 'responses', baseUrl: 'https://api.openai.com/v1',
+    })).toThrowError('provider.apiKey')
   })
 })
 

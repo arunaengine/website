@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// The AI providers this account has configured. Keys live sealed on the node;
-// the browser only ever sees the summaries listed here.
+// Direct provider credentials live in this tab's session store. Codex remains
+// node-managed and is included only as a summary from the node.
 import { ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
@@ -22,16 +22,18 @@ const editingId = ref('')
 const confirmingDelete = ref('')
 const removeError = ref<string | null>(null)
 
-let loadedOnce = false
 watch(currentUser, (user) => {
-  if (!user || loadedOnce) return
-  loadedOnce = true
-  void load()
+  if (user) void load()
 }, { immediate: true })
 
 function edit(provider: AssistantProvider) {
+  if (provider.kind === 'chatgpt') return
   adding.value = false
   editingId.value = provider.provider_id
+}
+
+function label(provider: AssistantProvider): string {
+  return provider.kind === 'chatgpt' ? 'Codex device login (experimental)' : PROVIDER_KIND_LABELS[provider.kind]
 }
 
 function close() {
@@ -61,7 +63,7 @@ async function confirmRemove(providerId: string) {
       <div class="min-w-0">
         <h3 class="font-display text-sm font-semibold text-aruna-navy">AI providers</h3>
         <p class="text-xs text-muted-foreground">
-          Bring your own account. The node stores each key sealed and makes the provider calls for you.
+          Claude and OpenAI-compatible keys stay in this tab's session. Codex device login remains node-managed.
         </p>
       </div>
       <div class="flex shrink-0 items-center gap-2">
@@ -87,7 +89,7 @@ async function confirmRemove(providerId: string) {
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-2">
                 <span class="truncate text-sm font-medium text-foreground">{{ provider.label }}</span>
-                <Badge size="sm" variant="secondary">{{ PROVIDER_KIND_LABELS[provider.kind] }}</Badge>
+                <Badge size="sm" variant="secondary">{{ label(provider) }}</Badge>
                 <Badge size="sm" :variant="statusVariant(provider)" class="uppercase">{{ provider.status }}</Badge>
               </div>
               <p class="mt-0.5 truncate text-[11px] text-muted-foreground">
@@ -106,7 +108,7 @@ async function confirmRemove(providerId: string) {
               <Button variant="ghost" size="sm" @click="confirmingDelete = ''">Cancel</Button>
             </div>
             <div v-else class="flex items-center gap-2">
-              <Button variant="outline" size="sm" @click="edit(provider)">Edit</Button>
+              <Button v-if="provider.kind !== 'chatgpt'" variant="outline" size="sm" @click="edit(provider)">Edit</Button>
               <Button
                 variant="ghost"
                 size="sm"

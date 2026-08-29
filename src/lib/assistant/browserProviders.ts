@@ -34,6 +34,8 @@ export const OPENAI_COMPATIBLE_PRESETS: readonly OpenAICompatiblePreset[] = [
   },
 ]
 
+const OFFICIAL_OPENAI_ROOT = OPENAI_COMPATIBLE_PRESETS[0].baseUrl
+
 interface BrowserProviderBase {
   id: string
   label: string
@@ -110,6 +112,10 @@ function apiRoot(value: unknown, path: string): string {
   return value
 }
 
+function isOfficialOpenAiRoot(value: string): boolean {
+  return value.replace(/\/+$/, '') === OFFICIAL_OPENAI_ROOT
+}
+
 function headers(value: unknown, path: string): Record<string, string> | undefined {
   if (value === undefined) return undefined
   const input = record(value, path)
@@ -147,10 +153,12 @@ export function validateBrowserProvider(value: unknown, path = 'provider'): Brow
       if (protocol !== 'responses' && protocol !== 'chat_completions') invalid(`${path}.protocol`)
       const apiKey = optionalSecret(input.apiKey, `${path}.apiKey`)
       const customHeaders = headers(input.headers, `${path}.headers`)
+      const baseUrl = apiRoot(input.baseUrl, `${path}.baseUrl`)
+      if (isOfficialOpenAiRoot(baseUrl) && !apiKey) invalid(`${path}.apiKey`)
       return {
         ...common,
         kind: 'openai_compatible',
-        baseUrl: apiRoot(input.baseUrl, `${path}.baseUrl`),
+        baseUrl,
         protocol,
         ...(apiKey ? { apiKey } : {}),
         ...(customHeaders ? { headers: customHeaders } : {}),
