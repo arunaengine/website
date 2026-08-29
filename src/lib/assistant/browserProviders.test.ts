@@ -53,6 +53,7 @@ describe('browser provider contract', () => {
       id: 'local',
       label: 'Local model',
       model: 'model',
+      models: [{ id: 'model' }],
       baseUrl: 'http://127.0.0.1:11434/v1/',
       protocol: 'chat_completions',
       headers: { Alpha: '1', Zeta: '2' },
@@ -103,6 +104,25 @@ describe('browser provider contract', () => {
       kind: 'openai_compatible',
       id: 'id', label: 'OpenAI', model: 'gpt-5.6', protocol: 'responses', baseUrl: 'https://api.openai.com/v1',
     })).toThrowError('provider.apiKey')
+  })
+
+  it('rejects custom headers that are not HTTP tokens', () => {
+    expect(() => validateBrowserProvider({
+      kind: 'openai_compatible',
+      id: 'id', label: 'label', model: 'model', protocol: 'chat_completions', baseUrl: 'https://example.test/v1',
+      headers: { 'bad header': 'value' },
+    })).toThrowError('provider.headers.bad header')
+  })
+
+  it('retains fetched model suggestions and adds a manually selected model', () => {
+    expect(validateBrowserProvider({
+      kind: 'openai_compatible',
+      id: 'id', label: 'label', model: 'typed-model', protocol: 'chat_completions', baseUrl: 'https://example.test/v1',
+      models: [{ id: 'listed-model', display_name: 'Listed model' }],
+    }).models).toEqual([
+      { id: 'listed-model', display_name: 'Listed model' },
+      { id: 'typed-model' },
+    ])
   })
 })
 

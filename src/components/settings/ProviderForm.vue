@@ -40,7 +40,7 @@ const headers = reactive<Array<{ name: string; value: string }>>(
   Object.entries(existingCompatible?.headers ?? {}).map(([name, value]) => ({ name, value })),
 )
 const headersOpen = ref(false)
-const models = ref<AssistantModel[]>(props.provider?.models ?? [])
+const models = ref<AssistantModel[]>(props.provider?.models ?? existingDirect?.models ?? [])
 const defaultModel = ref(existingDirect?.model ?? props.provider?.default_model ?? '')
 const providerId = ref(props.provider?.provider_id ?? '')
 const testedFingerprint = ref('')
@@ -102,6 +102,7 @@ function candidate(modelOverride = defaultModel.value, listing = false): Browser
     id,
     label: label.value.trim() || (listing ? 'Model listing' : ''),
     model: normalizeModelId(modelOverride) || (listing ? MODEL_LISTING_PLACEHOLDER : ''),
+    models: models.value,
   }
   if (kind.value === 'anthropic') {
     const key = apiKey.value.trim() || (existingDirect?.kind === 'anthropic' ? existingDirect.apiKey : '')

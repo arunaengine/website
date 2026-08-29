@@ -1,3 +1,5 @@
+import type { AssistantModel } from '@/lib/api'
+
 /**
  * Browser-owned assistant provider configuration for the direct providers.
  *
@@ -40,6 +42,7 @@ interface BrowserProviderBase {
   id: string
   label: string
   model: string
+  models?: AssistantModel[]
 }
 
 export interface AnthropicBrowserProvider extends BrowserProviderBase {
@@ -123,7 +126,9 @@ function headers(value: unknown, path: string): Record<string, string> | undefin
   const seen = new Set<string>()
   const output: Array<[string, string]> = []
   for (const name of names) {
-    if (!name || /[\r\n]/.test(name) || seen.has(name.toLowerCase())) invalid(`${path}.${name || '<empty>'}`)
+    if (!/^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/.test(name) || seen.has(name.toLowerCase())) {
+      invalid(`${path}.${name || '<empty>'}`)
+    }
     const headerValue = input[name]
     if (typeof headerValue !== 'string' || /[\r\n]/.test(headerValue)) invalid(`${path}.${name}`)
     seen.add(name.toLowerCase())
@@ -132,12 +137,35 @@ function headers(value: unknown, path: string): Record<string, string> | undefin
   return names.length ? Object.fromEntries(output) : undefined
 }
 
+function modelSuggestions(value: unknown, path: string, selected: string): AssistantModel[] {
+  if (value === undefined) return [{ id: selected }]
+  if (!Array.isArray(value)) invalid(path)
+  const seen = new Set<string>()
+  const output: AssistantModel[] = []
+  value.forEach((entry, index) => {
+    const input = record(entry, `${path}[${index}]`)
+    const id = requiredString(input.id, `${path}[${index}].id`)
+    if (seen.has(id)) return
+    const displayName = input.display_name
+    if (displayName !== undefined && displayName !== null && typeof displayName !== 'string') {
+      invalid(`${path}[${index}].display_name`)
+    }
+    const normalizedDisplayName = typeof displayName === 'string' ? displayName.trim() : ''
+    seen.add(id)
+    output.push({ id, ...(normalizedDisplayName ? { display_name: normalizedDisplayName } : {}) })
+  })
+  if (!seen.has(selected)) output.push({ id: selected })
+  return output
+}
+
 function base(value: unknown, path: string): BrowserProviderBase {
   const input = record(value, path)
+  const model = requiredString(input.model, `${path}.model`)
   return {
     id: requiredString(input.id, `${path}.id`),
     label: requiredString(input.label, `${path}.label`),
-    model: requiredString(input.model, `${path}.model`),
+    model,
+    models: modelSuggestions(input.models, `${path}.models`, model),
   }
 }
 

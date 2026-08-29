@@ -117,7 +117,7 @@ describe('ProviderForm', () => {
     const { root } = await mountApp(ProviderForm)
     await typeValue(field(root, 'Work account'), 'Work')
     await typeValue(field(root, 'Paste the Anthropic key'), 'sk-1')
-    await typeValue(element(root, (node) => node.props['aria-label'] === 'Default model'), 'claude-sonnet')
+    await typeValue(element(root, (node) => node.props['aria-label'] === 'Model'), 'claude-sonnet')
 
     expect(button(root, 'Save provider').props.disabled).toBe(true)
 
@@ -136,7 +136,7 @@ describe('ProviderForm', () => {
     const { root } = await mountApp(ProviderForm)
     await typeValue(field(root, 'Work account'), 'Work')
     await typeValue(field(root, 'Paste the Anthropic key'), 'sk-1')
-    await typeValue(element(root, (node) => node.props['aria-label'] === 'Default model'), 'claude-sonnet')
+    await typeValue(element(root, (node) => node.props['aria-label'] === 'Model'), 'claude-sonnet')
     await click(button(root, 'Test connection'))
 
     expect(content(root)).toContain('bad key')
@@ -148,7 +148,7 @@ describe('ProviderForm', () => {
     const { root } = await mountApp(ProviderForm)
     await typeValue(field(root, 'Work account'), 'Work')
     await typeValue(field(root, 'Paste the Anthropic key'), 'sk-1')
-    await typeValue(element(root, (node) => node.props['aria-label'] === 'Default model'), 'claude-sonnet')
+    await typeValue(element(root, (node) => node.props['aria-label'] === 'Model'), 'claude-sonnet')
     await click(button(root, 'Test connection'))
     await click(button(root, 'Fetch models'))
 
@@ -156,6 +156,7 @@ describe('ProviderForm', () => {
     expect(models).toHaveBeenCalledWith(expect.objectContaining({ kind: 'anthropic', apiKey: 'sk-1' }))
     await click(button(root, 'Save provider'))
     expect(create).toHaveBeenCalledOnce()
+    expect(create.mock.calls[0][0]).toEqual(expect.objectContaining({ models: [{ id: 'm-1' }] }))
   })
 
   it('keeps the tab-stored key when editing without retyping it', async () => {
@@ -174,7 +175,7 @@ describe('ProviderForm', () => {
     // A fine-tune or a brand-new model needs no entry in the fetched list.
     direct.mockReturnValue({ kind: 'anthropic', id: 'p-1', label: 'Work', model: 'm-1', apiKey: 'stored-key' })
     const { root } = await mountApp(ProviderForm, { props: { provider: stored } })
-    const model = element(root, (node) => node.tag === 'input' && node.props['aria-label'] === 'Default model')
+    const model = element(root, (node) => node.tag === 'input' && node.props['aria-label'] === 'Model')
     expect(model.props['data-suggestions']).toBe('m-1')
 
     await typeValue(model, '  my-fine-tune ')

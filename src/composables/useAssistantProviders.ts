@@ -1,6 +1,5 @@
-// Browser providers are session-scoped direct connections. The node remains
-// the source for ChatGPT/Codex providers because that upstream is not browser
-// CORS-capable; its summary is merged with the local direct providers.
+// Browser providers are session-scoped direct connections. Node-managed
+// provider summaries are merged with the local direct providers.
 import { computed, ref, watch } from 'vue'
 import {
   apiErrorMessage,
@@ -40,7 +39,7 @@ function directSummary(provider: BrowserProvider): AssistantProvider {
     provider_id: provider.id,
     kind: provider.kind,
     label: provider.label,
-    models: [{ id: provider.model }],
+    models: provider.models?.length ? provider.models : [{ id: provider.model }],
     default_model: provider.model,
     status: 'ready' as const,
     // Direct providers have no node creation timestamp; this field is only
@@ -58,7 +57,7 @@ function directSummary(provider: BrowserProvider): AssistantProvider {
 function rebuild() {
   providers.value = [
     ...browserStore.state.providers.map(directSummary),
-    ...nodeProviders.value.filter((provider) => provider.kind === 'chatgpt'),
+    ...nodeProviders.value,
   ]
 }
 
@@ -68,6 +67,10 @@ function direct(providerId: string): BrowserProvider | null {
 
 function identityKey(): string {
   return userInfo.value?.user.user_id ?? ''
+}
+
+function authenticated(): boolean {
+  return Boolean(authToken.value.trim() && identityKey())
 }
 
 function currentNodeContext(epoch: number, generation: number, identity: string): boolean {
@@ -80,7 +83,7 @@ async function revalidate(epoch: number, generation: number, identity: string): 
   try {
     const response = await listAssistantProviders(client())
     if (!currentNodeContext(epoch, generation, identity)) return
-    nodeProviders.value = response.providers.filter((provider) => provider.kind === 'chatgpt')
+    nodeProviders.value = response.providers
     rebuild()
     loaded.value = true
   } catch (cause) {
@@ -119,10 +122,10 @@ watch(sessionEpoch, resetBrowserSession, { flush: 'sync' })
 watch(() => userInfo.value?.user.user_id ?? '', resetNodeCache)
 
 export function useAssistantProviders() {
-  /** Revalidates the node-managed Codex summaries once per concurrent wave. */
+  /** Revalidates the node-managed provider summaries once per concurrent wave. */
   function load(): Promise<void> {
     rebuild()
-    if (!authToken.value) return Promise.resolve()
+    if (!authenticated()) return Promise.resolve()
     const epoch = sessionEpoch.value
     const generation = nodeGeneration
     const identity = identityKey()
@@ -134,7 +137,7 @@ export function useAssistantProviders() {
     return promise
   }
 
-  /** Serves the local direct providers and refreshes Codex behind them. */
+  /** Serves the local direct providers and refreshes node providers behind them. */
   function ensureLoaded(): void {
     if (loaded.value) {
       void load()
@@ -166,7 +169,7 @@ export function useAssistantProviders() {
       return
     }
     const nodeProvider = nodeProviders.value.find((provider) => provider.provider_id === providerId)
-    if (!nodeProvider || nodeProvider.kind !== 'chatgpt') return
+    if (!nodeProvider) return
     await deleteAssistantProvider(providerId, client())
     nodeProviders.value = nodeProviders.value.filter((provider) => provider.provider_id !== providerId)
     rebuild()
@@ -176,20 +179,32 @@ export function useAssistantProviders() {
   async function check(provider: BrowserProvider): Promise<BrowserProviderTestResponse> {
     try {
       const validated = validateBrowserProvider(provider)
-      const [{ generateText }, { buildBrowserModel }] = await Promise.all([
+      const [{ dynamicTool, generateText, jsonSchema }, { buildBrowserModel }] = await Promise.all([
         import('ai'),
         import('@/lib/assistant/browserModels'),
       ])
+      const probeToolName = 'assistant_connection_probe'
       const result = await generateText({
         model: buildBrowserModel(validated),
-        prompt: 'Reply with a brief confirmation that this connection works.',
-        maxOutputTokens: 16,
+        prompt: `Call ${probeToolName} exactly once to verify that this provider accepts function tools.`,
+        tools: {
+          [probeToolName]: dynamicTool({
+            description: 'A harmless connection test. It accepts no arguments and returns a fixed result.',
+            inputSchema: jsonSchema({ type: 'object', properties: {}, additionalProperties: false }),
+            execute: async () => ({ ok: true }),
+          }),
+        },
+        toolChoice: { type: 'tool', toolName: probeToolName },
+        maxOutputTokens: 128,
         maxRetries: 0,
         providerOptions: validated.kind === 'openai_compatible' && validated.protocol === 'responses'
           ? { openai: { store: false } }
           : undefined,
       })
-      return { ok: true, message: result.text.trim() || 'The provider answered.' }
+      if (!result.toolCalls.some((call) => call.toolName === probeToolName)) {
+        throw new Error('The provider did not accept the function-tool connection test.')
+      }
+      return { ok: true, message: 'The provider accepted function tools.' }
     } catch (cause) {
       return { ok: false, message: errorMessage(cause) }
     }
@@ -206,7 +221,7 @@ export function useAssistantProviders() {
     loading,
     loaded,
     error,
-    ready: computed(() => providers.value.filter((provider) => provider.status === 'ready')),
+    ready: computed(() => authenticated() ? providers.value.filter((provider) => provider.status === 'ready') : []),
     load,
     ensureLoaded,
     create,

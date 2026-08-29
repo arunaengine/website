@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// Direct provider credentials live in this tab's session store. Codex remains
-// node-managed and is included only as a summary from the node.
+// Direct provider credentials live in this tab's session store. Node-managed
+// providers remain available as summaries from the node.
 import { ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
@@ -10,12 +10,12 @@ import ChatGptLogin from '@/components/settings/ChatGptLogin.vue'
 import ProviderForm from '@/components/settings/ProviderForm.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useAssistantProviders } from '@/composables/useAssistantProviders'
-import { PROVIDER_KIND_LABELS, type AssistantProvider } from '@/lib/api'
+import type { AssistantProvider } from '@/lib/api'
 import { errorMessage } from '@/lib/utils'
 import { Plus } from '@lucide/vue'
 
-const { currentUser } = useAruna()
-const { providers, loading, error, load, remove } = useAssistantProviders()
+const { currentUser, sessionEpoch } = useAruna()
+const { providers, loading, error, load, remove, direct } = useAssistantProviders()
 
 const adding = ref(false)
 const editingId = ref('')
@@ -25,15 +25,20 @@ const removeError = ref<string | null>(null)
 watch(currentUser, (user) => {
   if (user) void load()
 }, { immediate: true })
+watch(sessionEpoch, close, { flush: 'sync' })
+watch(() => currentUser.value?.id ?? '', close, { flush: 'sync' })
 
 function edit(provider: AssistantProvider) {
-  if (provider.kind === 'chatgpt') return
+  if (!direct(provider.provider_id)) return
   adding.value = false
   editingId.value = provider.provider_id
 }
 
 function label(provider: AssistantProvider): string {
-  return provider.kind === 'chatgpt' ? 'Codex device login (experimental)' : PROVIDER_KIND_LABELS[provider.kind]
+  if (direct(provider.provider_id)) return provider.kind === 'anthropic' ? 'Claude' : 'OpenAI-compatible'
+  if (provider.kind === 'chatgpt') return 'Codex device login (experimental)'
+  if (provider.kind === 'anthropic') return 'Claude node-managed'
+  return 'OpenAI-compatible node-managed'
 }
 
 function close() {
@@ -108,7 +113,7 @@ async function confirmRemove(providerId: string) {
               <Button variant="ghost" size="sm" @click="confirmingDelete = ''">Cancel</Button>
             </div>
             <div v-else class="flex items-center gap-2">
-              <Button v-if="provider.kind !== 'chatgpt'" variant="outline" size="sm" @click="edit(provider)">Edit</Button>
+              <Button v-if="direct(provider.provider_id)" variant="outline" size="sm" @click="edit(provider)">Edit</Button>
               <Button
                 variant="ghost"
                 size="sm"
