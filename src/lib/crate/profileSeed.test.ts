@@ -60,7 +60,7 @@ describe('profile seeding', () => {
     expect(draft.entities[0].properties.conformsTo).toEqual([
       { kind: 'reference', value: 'https://example.test/profile' },
     ])
-    expect(person?.types).toEqual(['Person'])
+    expect(person?.types).toEqual(['http://schema.org/Person'])
     expect(person?.properties.affiliation).toEqual([{ kind: 'text', value: '' }])
   })
 

@@ -78,7 +78,7 @@ export function applyProfile(draft: CrateDraft, profile: MetadataProfile, iri?: 
     const target = rule.kind === 'entity' ? rule.entityTypes?.[0] : undefined
     if (rule.kind === 'entity' && !target) continue
     if (target) {
-      const created = addEntity(next, { type: typeLabel(target), properties: seededRows(ruleFor(profile, target)) })
+      const created = addEntity(next, { type: target, properties: seededRows(ruleFor(profile, target)) })
       next = addValue(created.draft, root, rule.valueName, { kind: 'reference', value: created.entity.id })
       continue
     }

@@ -343,7 +343,7 @@ export function addEntity(
   const id = options.id?.trim() || autoId(name || typeLabel(options.type), draft.entities.map((entity) => entity.id))
   const entity: DraftEntity = {
     id,
-    types: [typeLabel(options.type)],
+    types: [isAbsoluteUri(options.type) ? options.type : typeLabel(options.type)],
     properties: {
       ...(name ? { name: [{ kind: 'text' as const, value: name }] } : {}),
       ...options.properties,
@@ -390,7 +390,7 @@ export function renameEntity(draft: CrateDraft, id: string, nextId: string): Cra
 }
 
 export function setTypes(draft: CrateDraft, id: string, types: string[]): CrateDraft {
-  const unique = [...new Set(types.map(typeLabel).filter(Boolean))]
+  const unique = [...new Set(types.map((type) => isAbsoluteUri(type) ? type : typeLabel(type)).filter(Boolean))]
   if (!unique.length) return draft
   return mapEntity(draft, id, (entity) => ({ ...entity, types: unique }))
 }

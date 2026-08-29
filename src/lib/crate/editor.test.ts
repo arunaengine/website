@@ -18,6 +18,7 @@ import {
   removeEntity,
   removeValue,
   renameEntity,
+  setTypes,
   toRoCrate,
   updateValue,
   valueKindsFor,
@@ -66,6 +67,16 @@ describe('crate draft', () => {
     expect(draft.entities[0].types).toEqual(['Dataset', 'UnknownThing'])
     expect(graph.find((node) => node['@id'] === './')).toMatchObject({ weird: { nested: { deep: [1, 2] } } })
     expect(graph.find((node) => node['@id'] === '#odd')).toMatchObject({ retained: true, count: 3 })
+  })
+
+  it('keeps an absolute class IRI while editing types', () => {
+    const iri = 'http://purl.org/dc/terms/Agent'
+    const created = addEntity(newDraft(), { type: iri, id: '#agent' }).draft
+    const added = setTypes(created, '#agent', [iri, 'Person'])
+    const removed = setTypes(added, '#agent', [iri])
+
+    expect(findEntity(added, '#agent')?.types).toEqual([iri, 'Person'])
+    expect(findEntity(removed, '#agent')?.types).toEqual([iri])
   })
 
   it('numbers the slug of a repeated name', () => {

@@ -39,7 +39,7 @@ function allowed(type: string): boolean {
 }
 
 function asOption(term: VocabTerm) {
-  return { type: term.name, label: term.label, description: term.description }
+  return { type: term.source === 'schema.org' ? term.name : term.uri, label: term.label, description: term.description }
 }
 
 const results = computed(() => {
@@ -47,13 +47,13 @@ const results = computed(() => {
   if (!text) {
     const shortlist = curated.value.filter((option) => allowed(option.type))
     const all = (props.vocab?.classes ?? [])
-      .filter((term) => allowed(term.name) && !CURATED_TYPES.includes(term.name))
+      .filter((term) => allowed(term.uri) && !CURATED_TYPES.includes(term.name))
       .slice(0, ALL_LIMIT)
       .map(asOption)
     return { shortlist, all }
   }
   const hits = (props.vocab?.searchClasses(text, ALL_LIMIT) ?? [])
-    .filter((term) => allowed(term.name))
+    .filter((term) => allowed(term.uri))
     .map(asOption)
   const shortlist = curated.value.filter((option) =>
     allowed(option.type) && option.label.toLowerCase().includes(text.toLowerCase()))
