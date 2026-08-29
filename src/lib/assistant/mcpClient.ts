@@ -26,6 +26,23 @@ function descriptors(tools: unknown): McpToolDescriptor[] {
   })
 }
 
+/**
+ * What the model receives from a call: the structured content when the server
+ * sent one, else the text blocks, and a plain error result for `isError`.
+ */
+export function toolOutput(result: unknown): unknown {
+  if (!result || typeof result !== 'object') return result
+  const call = result as Record<string, unknown>
+  const blocks = Array.isArray(call.content) ? (call.content as Array<Record<string, unknown>>) : []
+  const text = blocks
+    .filter((block) => block?.type === 'text' && typeof block.text === 'string')
+    .map((block) => block.text as string)
+    .join('\n')
+  if (call.isError) return { error: text || 'The tool call failed.' }
+  if (call.structuredContent !== undefined && call.structuredContent !== null) return call.structuredContent
+  return text || result
+}
+
 /** Connects and hands back the tool source; the caller closes it. */
 export async function connectMcp(url: string, token: string): Promise<McpConnection> {
   const transport = new StreamableHTTPClientTransport(new URL(url), {
@@ -37,8 +54,8 @@ export async function connectMcp(url: string, token: string): Promise<McpConnect
     async listTools() {
       return descriptors((await client.listTools()).tools)
     },
-    callTool(name, input) {
-      return client.callTool({ name, arguments: input })
+    async callTool(name, input) {
+      return toolOutput(await client.callTool({ name, arguments: input }))
     },
     close() {
       return client.close()

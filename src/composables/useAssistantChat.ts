@@ -149,9 +149,11 @@ export function useAssistantChat() {
   function openPanel() {
     open.value = true
     void providers.load()
-    void sessionToken().catch(() => {
-      // A node that refuses the mint leaves the editor tools working.
-    })
+    if (realmInfo.value?.interfaces.mcp?.url) {
+      void sessionToken().catch(() => {
+        // A node that refuses the mint leaves the editor tools working.
+      })
+    }
   }
 
   function closePanel() {

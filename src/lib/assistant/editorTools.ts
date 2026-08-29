@@ -13,6 +13,7 @@ import {
   rootEntity,
   rootId,
   setProperty,
+  setTypes,
   type CrateDraft,
   type DraftEntity,
   type DraftValue,
@@ -158,14 +159,16 @@ export function editorTools(bridge: EditorBridge, gate: ApprovalGate): ToolSet {
           const list = rows(value)
           if (list) properties[property] = list
         }
-        const created = addEntity(bridge.draft(), {
+        const added = addEntity(bridge.draft(), {
           type: input.types[0] ?? 'Thing',
           ...(input.id ? { id: input.id } : {}),
           properties,
         })
-        bridge.update(created.draft)
-        remember(created.entity)
-        return entityJson(created.entity)
+        const draft = input.types.length > 1 ? setTypes(added.draft, added.entity.id, input.types) : added.draft
+        const entity = findEntity(draft, added.entity.id) ?? added.entity
+        bridge.update(draft)
+        remember(entity)
+        return entityJson(entity)
       },
     }),
 
