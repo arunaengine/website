@@ -7,6 +7,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAruna } from './useAruna'
 import { useBuckets } from './useBuckets'
 import { useBucketShortcuts } from './useBucketShortcuts'
+import { useGroupSelection } from './useGroupSelection'
 import { useRealmNodes } from './useRealmNodes'
 import { useRefresh } from './useRefresh'
 import { useStagingReferences } from './useStagingReferences'
@@ -88,6 +89,7 @@ export function useDataManager() {
     return nodeId
   })
   const selectedGroupId = ref(routeString(route.query.group) || s3.activeContext.value?.groupId || '')
+  const { groupsLoading } = useGroupSelection(selectedGroupId)
   const selectedGroupLabel = ref('')
   const contextBusy = ref(false)
   const contextError = ref<string | null>(null)
@@ -821,6 +823,7 @@ export function useDataManager() {
     shortcuts,
     selectedGroupId,
     selectedGroupLabel,
+    groupsLoading,
     contextBusy,
     contextError,
     contextReady,

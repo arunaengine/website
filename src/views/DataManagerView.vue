@@ -48,6 +48,7 @@ const {
   realmNodes,
   selectedGroupId,
   selectedGroupLabel,
+  groupsLoading,
   contextBusy,
   contextError,
   contextReady,
@@ -241,6 +242,13 @@ async function createFolder() {
             <p v-else-if="contextMismatch" class="mt-2 text-sm text-muted-foreground">
               The current session was issued by {{ issuerNodeName }} ({{ contextMismatch.issuerNodeId }}). This bucket requires {{ requiredNodeName }} ({{ contextMismatch.requiredNodeId }}). Select the group and choose Open on this node. The existing credential will not be sent to the required node.
             </p>
+            <!-- Never the create-or-join state while memberships are loading. -->
+            <Spinner
+              v-else-if="groupsLoading"
+              show-label
+              label="Loading your groups…"
+              class="mt-2 text-sm"
+            />
             <template v-else-if="!selectedGroupId">
               <p class="mt-2 text-sm text-muted-foreground">
                 Select a group above. The portal mints a node-local session only after that explicit selection and keeps it in memory only.
