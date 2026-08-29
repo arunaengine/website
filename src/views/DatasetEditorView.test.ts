@@ -43,6 +43,16 @@ function seeded(draft: Editor.CrateDraft): Editor.CrateDraft {
   return Editor.addValue(person.draft, './', 'author', { kind: 'reference', value: person.entity.id })
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((done) => { resolve = done })
+  return { promise, resolve }
+}
+
+function namedCrate(name: string) {
+  return Editor.toRoCrate(Editor.updateValue(Editor.newDraft(), './', 'name', 0, name))
+}
+
 const EmptyStub = defineComponent(() => () => null)
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
 const PageHeaderStub = defineComponent({
@@ -238,6 +248,50 @@ describe('DatasetEditorView', () => {
     const saved = replaceMetadataRoCrate.mock.calls[0][1].rocrate as Record<string, unknown>
     expect((saved['@graph'] as Array<Record<string, unknown>>).some((entity) => entity['@id'] === '#ada-lovelace')).toBe(true)
     expect(routerPush).toHaveBeenCalledWith({ name: 'dataset', params: { id: 'dataset-1' } })
+    mounted.app.unmount()
+  })
+
+  it('ignores a stale editor load after the route changes', async () => {
+    const first = deferred<unknown>()
+    const second = deferred<unknown>()
+    getMetadataItem.mockImplementation(async (id: string) => ({
+      document_id: id,
+      group_id: 'group-1',
+      document_path: `datasets/${id}`,
+      public: false,
+    }))
+    fetchRoCrateRaw.mockImplementation((id: string) => id === 'dataset-a' ? first.promise : second.promise)
+    route.name = 'dataset-edit'
+    route.params = { id: 'dataset-a' }
+    const mounted = await mountApp(DatasetEditorView)
+
+    route.params = { id: 'dataset-b' }
+    await flush()
+    second.resolve(namedCrate('Dataset B'))
+    await flush()
+    expect(content(mounted.root)).toContain('Dataset B')
+
+    first.resolve(namedCrate('Dataset A'))
+    await flush()
+    expect(content(mounted.root)).toContain('Dataset B')
+    expect(content(mounted.root)).not.toContain('Dataset A')
+    mounted.app.unmount()
+  })
+
+  it('resets the draft when the editor enters create mode', async () => {
+    route.name = 'dataset-edit'
+    route.params = { id: 'dataset-1' }
+    const mounted = await mountApp(DatasetEditorView)
+    await flush()
+    expect(content(mounted.root)).toContain('Example dataset')
+
+    route.name = 'dataset-new'
+    route.params = {}
+    await flush()
+
+    expect(content(mounted.root)).toContain('New dataset')
+    expect(content(mounted.root)).toContain('Entities 1')
+    expect(content(mounted.root)).not.toContain('Example dataset')
     mounted.app.unmount()
   })
 })

@@ -91,15 +91,29 @@ watch(rootName, (name) => {
   draft.value.path = name ? `datasets/${slugify(name)}` : ''
 })
 
+let loadGeneration = 0
 async function load() {
-  if (mode.value !== 'edit' || !documentId.value) return
+  const generation = ++loadGeneration
+  const id = documentId.value
+  if (mode.value !== 'edit' || !id) {
+    draft.value = newDraft({ groupId: groups.value[0]?.id })
+    selected.value = rootId(draft.value)
+    profileId.value = ''
+    tab.value = 'editor'
+    loading.value = false
+    loadError.value = null
+    submitError.value = null
+    writeIssues.value = []
+    return
+  }
   loading.value = true
   loadError.value = null
   try {
     const [summary, crate] = await Promise.all([
-      getMetadataItem(documentId.value),
-      fetchRoCrateRaw(documentId.value),
+      getMetadataItem(id),
+      fetchRoCrateRaw(id),
     ])
+    if (generation !== loadGeneration || mode.value !== 'edit' || documentId.value !== id) return
     draft.value = fromRoCrate(crate, {
       groupId: summary.group_id,
       path: summary.document_path,
@@ -108,12 +122,14 @@ async function load() {
     selected.value = rootId(draft.value)
     profileId.value = declaredProfile()
   } catch (error) {
-    loadError.value = errorMessage(error)
+    if (generation === loadGeneration && mode.value === 'edit' && documentId.value === id) {
+      loadError.value = errorMessage(error)
+    }
   } finally {
-    loading.value = false
+    if (generation === loadGeneration) loading.value = false
   }
 }
-watch(documentId, () => void load(), { immediate: true })
+watch([mode, documentId], () => void load(), { immediate: true })
 
 function declaredProfile(): string {
   const declared = new Set((rootEntity(draft.value)?.properties.conformsTo ?? []).map((value) => value.value))
