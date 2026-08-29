@@ -8,6 +8,7 @@ import {
   type ModelMessage,
   type ToolSet,
 } from 'ai'
+import type { OpenAILanguageModelResponsesOptions } from '@ai-sdk/openai'
 import { errorMessage } from '@/lib/utils'
 
 /** Bound on one turn, so a looping model cannot run away with the session. */
@@ -27,6 +28,7 @@ export interface TurnOptions extends TurnHandlers {
   tools: ToolSet
   maxSteps?: number
   abortSignal?: AbortSignal
+  providerOptions?: { openai?: OpenAILanguageModelResponsesOptions }
 }
 
 export interface TurnResult {
@@ -52,6 +54,7 @@ export async function runTurn(options: TurnOptions): Promise<TurnResult> {
     tools: options.tools,
     stopWhen: stepCountIs(options.maxSteps ?? MAX_STEPS),
     abortSignal: options.abortSignal,
+    providerOptions: options.providerOptions,
   })
 
   let failure: string | undefined

@@ -15,13 +15,13 @@ import { MessageSquare, Minimize2, Plus } from '@lucide/vue'
 
 const router = useRouter()
 const { currentUser } = useAruna()
-const { busy, messages, pending, available, closePanel, openPanel, newChat, ensureProviders } = useAssistantChat()
+const { busy, messages, pending, available, hidePanel, openPanel, newChat, ensureProviders } = useAssistantChat()
 
 const deleteCallId = computed(() =>
   (pending.value?.always ? pending.value.request.id : undefined))
 
 onMounted(() => {
-  closePanel()
+  hidePanel()
   if (currentUser.value) ensureProviders()
 })
 

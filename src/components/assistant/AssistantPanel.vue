@@ -12,14 +12,14 @@ import { useAssistantChat } from '@/composables/useAssistantChat'
 import { Maximize2, MessageSquare, Plus, X } from '@lucide/vue'
 
 const router = useRouter()
-const { open, busy, messages, pending, closePanel, newChat } = useAssistantChat()
+const { open, busy, messages, pending, hidePanel, closePanel, newChat } = useAssistantChat()
 
 const deleteCallId = computed(() =>
   (pending.value?.always ? pending.value.request.id : undefined))
 
 // The same conversation continues on the page; the panel steps aside.
 function openFullView() {
-  closePanel()
+  hidePanel()
   void router.push({ name: 'assistant' })
 }
 </script>
