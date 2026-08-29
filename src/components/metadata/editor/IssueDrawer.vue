@@ -6,35 +6,80 @@ import {
   displayName,
   entityName,
   findEntity,
-  issueCountsBySeverity,
   rootId,
   type CrateDraft,
   type LiveIssue,
 } from '@/lib/crate/editor'
+import type { CheckIssue } from '@/lib/crate/issues'
 import { ChevronDown, ChevronUp } from '@lucide/vue'
 
-const props = defineProps<{ draft: CrateDraft; issues: LiveIssue[] }>()
+// Everything outstanding in one place: the editor's own advisory checks and
+// what the node answered (a rejected preview or write), each with a jump.
+const props = defineProps<{ draft: CrateDraft; issues: LiveIssue[]; nodeIssues?: CheckIssue[] }>()
 const emit = defineEmits<{ (e: 'jump', entityId: string): void }>()
+
+type Tone = 'error' | 'warning' | 'rejected' | 'advisory'
+
+interface Entry {
+  key: string
+  entityId: string
+  tone: Tone
+  message: string
+  detail?: string
+}
+
+const TONE_LABEL: Record<Tone, string> = {
+  error: 'Fix',
+  warning: 'Consider',
+  rejected: 'Node',
+  advisory: 'Advisory',
+}
+const TONE_VARIANT = {
+  error: 'destructive',
+  warning: 'warn',
+  rejected: 'destructive',
+  advisory: 'secondary',
+} as const
 
 const expanded = ref(false)
 
-const counts = computed(() => issueCountsBySeverity(props.issues))
+const entries = computed<Entry[]>(() => [
+  ...props.issues.map((issue) => ({
+    key: issue.key,
+    entityId: issue.entityId,
+    tone: issue.severity,
+    message: issue.message,
+  })),
+  ...(props.nodeIssues ?? []).map((issue) => ({
+    key: issue.key,
+    entityId: issue.entityId,
+    tone: issue.severity === 'violation' ? ('rejected' as const) : ('advisory' as const),
+    message: issue.message,
+    detail: [issue.code, issue.path].filter(Boolean).join(' · '),
+  })),
+])
+
+const counts = computed(() => {
+  const count = (tone: Tone) => entries.value.filter((entry) => entry.tone === tone).length
+  return { error: count('error'), warning: count('warning'), rejected: count('rejected'), advisory: count('advisory') }
+})
 const summary = computed(() => {
-  if (!props.issues.length) return 'Nothing outstanding'
-  return props.issues.length === 1 ? '1 problem' : `${props.issues.length} problems`
+  const total = entries.value.length
+  if (!total) return 'Nothing outstanding'
+  return total === 1 ? '1 problem' : `${total} problems`
 })
 
 const groups = computed(() => {
-  const grouped = new Map<string, LiveIssue[]>()
-  for (const issue of props.issues) {
-    grouped.set(issue.entityId, [...(grouped.get(issue.entityId) ?? []), issue])
+  const grouped = new Map<string, Entry[]>()
+  for (const entry of entries.value) {
+    grouped.set(entry.entityId, [...(grouped.get(entry.entityId) ?? []), entry])
   }
-  return [...grouped.entries()].map(([entityId, entries]) => ({
+  return [...grouped.entries()].map(([entityId, list]) => ({
     entityId,
     name: entityId === rootId(props.draft)
       ? entityName(props.draft.entities[0]) || 'This dataset'
       : displayName(findEntity(props.draft, entityId)) || entityId,
-    entries,
+    entries: list,
   }))
 })
 
@@ -50,14 +95,15 @@ function jump(entityId: string) {
       <div v-for="group in groups" :key="group.entityId" class="border-b border-border py-2 last:border-0">
         <div class="flex items-center gap-3">
           <p class="min-w-0 flex-1 truncate text-xs font-medium text-foreground">{{ group.name }}</p>
-          <Button variant="ghost" size="sm" class="h-8" @click="jump(group.entityId)">Open</Button>
+          <Button variant="ghost" size="sm" @click="jump(group.entityId)">Open</Button>
         </div>
         <ul class="mt-1 space-y-1">
-          <li v-for="issue in group.entries" :key="issue.key" class="flex items-start gap-2">
-            <Badge :variant="issue.severity === 'error' ? 'destructive' : 'warn'" size="sm">
-              {{ issue.severity === 'error' ? 'Fix' : 'Consider' }}
-            </Badge>
-            <span class="min-w-0 flex-1 text-xs text-muted-foreground">{{ issue.message }}</span>
+          <li v-for="entry in group.entries" :key="entry.key" class="flex items-start gap-2">
+            <Badge :variant="TONE_VARIANT[entry.tone]" size="sm" class="mt-0.5 shrink-0">{{ TONE_LABEL[entry.tone] }}</Badge>
+            <span class="min-w-0 flex-1 text-xs text-muted-foreground">
+              {{ entry.message }}
+              <span v-if="entry.detail" class="ml-1 font-mono text-[10px]">{{ entry.detail }}</span>
+            </span>
           </li>
         </ul>
       </div>
@@ -74,9 +120,11 @@ function jump(entityId: string) {
         <ChevronUp v-else class="h-3.5 w-3.5" />
         {{ summary }}
       </button>
+      <Badge v-if="counts.rejected" variant="destructive" size="sm">{{ counts.rejected }} rejected by the node</Badge>
       <Badge v-if="counts.error" variant="destructive" size="sm">{{ counts.error }} to fix</Badge>
       <Badge v-if="counts.warning" variant="warn" size="sm">{{ counts.warning }} to consider</Badge>
-      <Badge v-if="!issues.length" variant="success" size="sm">Nothing outstanding</Badge>
+      <Badge v-if="counts.advisory" variant="secondary" size="sm">{{ counts.advisory }} advisory</Badge>
+      <Badge v-if="!entries.length" variant="success" size="sm">Nothing outstanding</Badge>
     </div>
   </section>
 </template>

@@ -57,6 +57,32 @@ describe('IssueDrawer', () => {
     mounted.app.unmount()
   })
 
+  it('lists what the node rejected with a jump to the entity', async () => {
+    const jumps: string[] = []
+    const draft = seeded()
+    const mounted = await mountApp(IssueDrawer, {
+      props: {
+        draft,
+        issues: [],
+        nodeIssues: [{
+          key: 'write:Bad request::',
+          code: 'Bad request',
+          message: 'Bad request',
+          entityId: './',
+          severity: 'violation',
+        }],
+        onJump: (id: string) => jumps.push(id),
+      },
+    })
+
+    expect(content(mounted.root)).toContain('1 rejected by the node')
+    await click(element(mounted.root, (node) => node.props['aria-expanded'] !== undefined))
+    expect(content(mounted.root)).toContain('Bad request')
+    await click(element(mounted.root, (node) => node.tag === 'button' && content(node).trim() === 'Open'))
+    expect(jumps).toEqual(['./'])
+    mounted.app.unmount()
+  })
+
   it('says so when a dataset has nothing outstanding', async () => {
     const complete = Editor.updateValue(
       Editor.updateValue(

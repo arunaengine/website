@@ -26,6 +26,8 @@ export function useProfilePreview(options: UseProfilePreviewOptions) {
   const result = shallowRef<ProfileValidationPreviewResponse | null>(null)
   const running = ref(false)
   const unavailable = ref(false)
+  // A 400: the node refused the draft itself, which a write would refuse too.
+  const rejection = shallowRef<ApiError | null>(null)
   // Message of the last failed request (503, 429, network, no device client).
   // A failure does not disable the check; the explicit action retries it.
   const error = ref<string | null>(null)
@@ -50,6 +52,7 @@ export function useProfilePreview(options: UseProfilePreviewOptions) {
     inFlight = controller
     running.value = true
     error.value = null
+    rejection.value = null
     // The injected request is deferred so a synchronous throw (no device
     // client) lands in `catch` and is rendered as a failed check instead of
     // leaving `running` stuck.
@@ -67,6 +70,11 @@ export function useProfilePreview(options: UseProfilePreviewOptions) {
         running.value = false
         if (cause instanceof ApiError && (cause.status === 404 || cause.status === 405)) {
           unavailable.value = true
+          result.value = null
+          return
+        }
+        if (cause instanceof ApiError && cause.status === 400) {
+          rejection.value = cause
           result.value = null
           return
         }
@@ -97,6 +105,7 @@ export function useProfilePreview(options: UseProfilePreviewOptions) {
     if (unavailable.value || disposed) return true
     clearTimer()
     await run(rocrate)
+    if (rejection.value) return false
     if (error.value || unavailable.value) return true
     return result.value?.accepted !== false
   }
@@ -110,6 +119,7 @@ export function useProfilePreview(options: UseProfilePreviewOptions) {
     result.value = null
     running.value = false
     error.value = null
+    rejection.value = null
   }
 
   onScopeDispose(() => {
@@ -118,5 +128,5 @@ export function useProfilePreview(options: UseProfilePreviewOptions) {
     inFlight?.abort()
   })
 
-  return { result, running, unavailable, error, preview, previewNow, verify, reset }
+  return { result, running, unavailable, error, rejection, preview, previewNow, verify, reset }
 }

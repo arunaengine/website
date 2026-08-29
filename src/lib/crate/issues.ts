@@ -2,7 +2,12 @@
 // and the issues a failed write returned collapse into the same list, so the
 // check panel groups exactly the same things.
 
-import type { ProfileValidationPreviewResponse } from '@/lib/api'
+import {
+  ApiError,
+  profileValidationFindings,
+  type ProfileValidationPreviewResponse,
+  type RoCrateStructuralViolation,
+} from '@/lib/api'
 
 export type IssueSeverity = 'violation' | 'warning' | 'info'
 
@@ -59,4 +64,49 @@ export function collectIssues(
       severity: severityOf(issue.severity),
     })),
   ]
+}
+
+/** True for a request the node refused outright. */
+export function isNodeRejection(error: unknown): error is ApiError {
+  return error instanceof ApiError && error.status === 400
+}
+
+function structuralViolations(error: ApiError): RoCrateStructuralViolation[] {
+  const violations = error.details?.violations
+  if (!Array.isArray(violations)) return []
+  return violations.filter((value): value is RoCrateStructuralViolation =>
+    Boolean(value && typeof value === 'object' && !Array.isArray(value)
+      && typeof (value as Record<string, unknown>).message === 'string'))
+}
+
+/**
+ * Everything a refused write or preview said, as write issues. A 400 without
+ * violations or findings still becomes one issue, so the node's error and code
+ * reach the drawer instead of a bare status line.
+ */
+export function rejectionIssues(error: unknown): WriteIssue[] {
+  if (!(error instanceof ApiError)) return []
+  const issues: WriteIssue[] = [
+    ...structuralViolations(error).map((issue) => ({
+      code: issue.code,
+      message: issue.message,
+      entityId: issue.entity_id,
+      path: issue.pointer,
+      severity: 'violation',
+    })),
+    ...profileValidationFindings(error).map((finding) => ({
+      code: finding.code,
+      message: finding.message,
+      entityId: finding.focus_node,
+      path: finding.path,
+      severity: finding.severity,
+    })),
+  ]
+  if (issues.length || error.status !== 400) return issues
+  const detail = typeof error.details?.details === 'string' ? error.details.details : ''
+  return [{
+    code: error.code ?? 'bad_request',
+    message: detail ? `${error.message}: ${detail}` : error.message,
+    severity: 'violation',
+  }]
 }

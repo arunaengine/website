@@ -118,6 +118,25 @@ describe('server profile validation preview', () => {
     expect(fetch).toHaveBeenCalledTimes(1)
   })
 
+  it('treats a refused draft as rejected, not as a failed check', async () => {
+    // A 400 is the verdict a write would get, so verify must answer false.
+    const preview = setupPreview()
+
+    const verdict = preview.verify(CRATE)
+    answer(0, { error: 'Bad request', code: 'Bad request' }, 400)
+    await flush()
+
+    expect(await verdict).toBe(false)
+    expect(preview.error.value).toBeNull()
+    expect(preview.rejection.value?.status).toBe(400)
+    expect(preview.rejection.value?.code).toBe('Bad request')
+
+    preview.previewNow(CRATE)
+    answer(1, body(true))
+    await flush()
+    expect(preview.rejection.value).toBeNull()
+  })
+
   it('surfaces a retryable error when the validator is unavailable', async () => {
     const preview = setupPreview()
 

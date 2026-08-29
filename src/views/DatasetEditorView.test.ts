@@ -13,6 +13,7 @@ import {
 } from '@/test/clientRender'
 import * as Editor from '@/lib/crate/editor'
 import * as ProfileSeed from '@/lib/crate/profileSeed'
+import * as Issues from '@/lib/crate/issues'
 import * as Api from '@/lib/api'
 import * as Emit from '@/lib/profiles/emit'
 import * as Utils from '@/lib/utils'
@@ -34,6 +35,7 @@ const previewResult = ref<Api.ProfileValidationPreviewResponse | null>(null)
 const previewRunning = ref(false)
 const previewError = ref<string | null>(null)
 const previewUnavailable = ref(false)
+const previewRejection = ref<unknown>(null)
 const verify = vi.fn(async () => true)
 
 // A dataset with a name, a description and a Person linked as its author.
@@ -93,6 +95,10 @@ const EditorStub = defineComponent({
   },
 })
 const GraphStub = defineComponent(() => () => h('p', 'Graph pane'))
+const DrawerStub = defineComponent({
+  props: { nodeIssues: { type: Array, default: () => [] } },
+  setup: (props) => () => h('p', `Node issues ${(props.nodeIssues as Array<{ message: string }>).map((issue) => issue.message).join(', ')}`),
+})
 const NodeCheckStub = defineComponent({
   props: { canSave: Boolean, actionLabel: String },
   emits: ['save'],
@@ -115,7 +121,7 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
   '@/components/metadata/editor/EntityBrowser.vue': moduleDefault(BrowserStub),
   '@/components/metadata/editor/EntityEditor.vue': moduleDefault(EditorStub),
   '@/components/metadata/editor/EditorGraph.vue': moduleDefault(GraphStub),
-  '@/components/metadata/editor/IssueDrawer.vue': moduleDefault(EmptyStub),
+  '@/components/metadata/editor/IssueDrawer.vue': moduleDefault(DrawerStub),
   '@/components/metadata/editor/NodeCheckPanel.vue': moduleDefault(NodeCheckStub),
   '@/composables/useAruna': {
     profileReferenceIri: (profile: { profileUri?: string }) => profile?.profileUri,
@@ -138,6 +144,7 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
       running: previewRunning,
       error: previewError,
       unavailable: previewUnavailable,
+      rejection: previewRejection,
       preview: vi.fn(),
       previewNow: vi.fn(),
       verify,
@@ -153,6 +160,7 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
   '@/lib/profiles/vocabulary': { loadVocabIndex: () => Promise.resolve(null) },
   '@/lib/crate/editor': Editor,
   '@/lib/crate/profileSeed': ProfileSeed,
+  '@/lib/crate/issues': Issues,
 })
 
 beforeEach(() => {
@@ -173,6 +181,7 @@ beforeEach(() => {
   verify.mockReset().mockResolvedValue(true)
   routerPush.mockClear()
   previewResult.value = null
+  previewRejection.value = null
 })
 
 describe('DatasetEditorView', () => {
@@ -260,6 +269,28 @@ describe('DatasetEditorView', () => {
     })
     expect(graph.find((entity) => entity['@id'] === '#ada-lovelace')).toMatchObject({ '@type': 'Person' })
     expect(routerPush).toHaveBeenCalledWith({ name: 'dataset', params: { id: 'dataset-1' } })
+    mounted.app.unmount()
+  })
+
+  it('hands a refused write to the drawer with its code', async () => {
+    createMetadata.mockRejectedValue(new Api.ApiError(400, 'Bad request', 'Bad request', { error: 'Bad request' }))
+    const mounted = await mountApp(DatasetEditorView)
+    await click(button(mounted.root, 'Seed dataset'))
+    await click(button(mounted.root, 'Create dataset'))
+    await flush()
+
+    expect(content(mounted.root)).toContain('Node issues Bad request')
+    expect(routerPush).not.toHaveBeenCalled()
+    mounted.app.unmount()
+  })
+
+  it('shows a refused preview in the drawer', async () => {
+    previewRejection.value = new Api.ApiError(400, 'Bad request', 'Bad request', {
+      violations: [{ code: 'missing_root', message: 'No root dataset.' }],
+    })
+    const mounted = await mountApp(DatasetEditorView)
+
+    expect(content(mounted.root)).toContain('Node issues No root dataset.')
     mounted.app.unmount()
   })
 

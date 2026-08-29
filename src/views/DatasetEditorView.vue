@@ -19,11 +19,11 @@ import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { provideEditorBridge } from '@/composables/useAssistantEditor'
 import { isDesktop } from '@/lib/desktop'
 import { previewDeviceDraft, requireDevice } from '@/lib/deviceApi'
-import { ApiError, profileValidationFindings, type RoCrateStructuralViolation } from '@/lib/api'
+import { apiErrorMessage } from '@/lib/api'
 import { errorMessage } from '@/lib/utils'
 import { slugify } from '@/lib/profiles/emit'
 import { loadVocabIndex, type VocabIndex } from '@/lib/profiles/vocabulary'
-import type { WriteIssue } from '@/lib/crate/issues'
+import { collectIssues, rejectionIssues, type WriteIssue } from '@/lib/crate/issues'
 import { applyProfile, profileExpectation } from '@/lib/crate/profileSeed'
 import {
   entityName,
@@ -72,7 +72,7 @@ const createGroupOpen = ref(false)
 const profileId = ref('')
 const preferredProfileInitialized = ref(false)
 const submitError = ref<string | null>(null)
-const writeIssues = ref<WriteIssue[]>([])
+const saveIssues = ref<WriteIssue[]>([])
 const submitting = ref(false)
 
 onMounted(() => void loadVocabIndex().then((index) => (vocab.value = index)))
@@ -111,7 +111,7 @@ async function load() {
     loading.value = false
     loadError.value = null
     submitError.value = null
-    writeIssues.value = []
+    saveIssues.value = []
     return
   }
   loading.value = true
@@ -163,6 +163,9 @@ const preview = useProfilePreview({
 })
 
 const canSave = computed(() => Boolean(rootName.value && draft.value.groupId))
+// What the node refused, from the last preview and the last write attempt.
+const writeIssues = computed(() => [...rejectionIssues(preview.rejection.value), ...saveIssues.value])
+const nodeIssues = computed(() => collectIssues(preview.result.value, writeIssues.value))
 
 // What the assistant may do to the open draft while this view is mounted. It
 // never saves: the check below is the same one the Save button runs first.
@@ -217,15 +220,6 @@ watch([mode, currentUser, selectableProfiles], ([currentMode, user, available]) 
   if (available.some((profile) => profile.id === preferred)) pickProfile(preferred)
 }, { immediate: true })
 
-function structuralViolations(error: unknown): RoCrateStructuralViolation[] {
-  const violations = error instanceof ApiError ? error.details?.violations : undefined
-  return Array.isArray(violations)
-    ? violations.filter((value): value is RoCrateStructuralViolation =>
-        Boolean(value && typeof value === 'object' && !Array.isArray(value)
-          && typeof (value as Record<string, unknown>).message === 'string'))
-    : []
-}
-
 function discard() {
   void router.push(mode.value === 'edit'
     ? { name: 'dataset', params: { id: documentId.value } }
@@ -238,7 +232,7 @@ async function save() {
   if (!canSave.value || saving.value || submitting.value) return
   submitting.value = true
   submitError.value = null
-  writeIssues.value = []
+  saveIssues.value = []
   let verified = false
   try {
     verified = await preview.verify(crate.value)
@@ -261,23 +255,8 @@ async function save() {
     })
     await router.push({ name: 'dataset', params: { id: result.document_id } })
   } catch (error) {
-    submitError.value = errorMessage(error)
-    writeIssues.value = [
-      ...structuralViolations(error).map((issue) => ({
-        code: issue.code,
-        message: issue.message,
-        entityId: issue.entity_id,
-        path: issue.pointer,
-        severity: 'violation',
-      })),
-      ...profileValidationFindings(error).map((finding) => ({
-        code: finding.code,
-        message: finding.message,
-        entityId: finding.focus_node,
-        path: finding.path,
-        severity: finding.severity,
-      })),
-    ]
+    submitError.value = apiErrorMessage(error)
+    saveIssues.value = rejectionIssues(error)
   } finally {
     submitting.value = false
   }
@@ -399,7 +378,7 @@ async function save() {
         </div>
       </div>
 
-      <IssueDrawer :draft="draft" :issues="issues" @jump="open" />
+      <IssueDrawer :draft="draft" :issues="issues" :node-issues="nodeIssues" @jump="open" />
     </template>
 
     <ImportCrateDialog
