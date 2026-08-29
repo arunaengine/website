@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { QUOTA_STATE_BADGES, assessQuota } from '@/lib/quota'
 import { formatBytes } from '@/lib/utils'
+import { areaPath as areaOf, linePath as lineOf } from '@/lib/chartPaths'
 import type { UsageHistoryPoint } from '@/lib/api'
 
 const props = defineProps<{
@@ -38,17 +39,9 @@ function topPctForValue(v: number): number {
   return (yFor(v) / 40) * 100
 }
 
-const linePath = computed(() =>
-  series.value.map((d, i) => `${i === 0 ? 'M' : 'L'}${xFor(d.t).toFixed(2)} ${yFor(d.v).toFixed(2)}`).join(' '),
-)
-const areaPath = computed(() => {
-  const pts = series.value
-  if (!pts.length) return ''
-  const first = xFor(pts[0].t).toFixed(2)
-  const last = xFor(pts[pts.length - 1].t).toFixed(2)
-  const mid = pts.map((d) => `L${xFor(d.t).toFixed(2)} ${yFor(d.v).toFixed(2)}`).join(' ')
-  return `M${first} 40 ${mid} L${last} 40 Z`
-})
+const points = computed(() => series.value.map((d) => ({ x: xFor(d.t), y: yFor(d.v) })))
+const linePath = computed(() => lineOf(points.value))
+const areaPath = computed(() => areaOf(points.value, 40))
 
 function refWithinDomain(value: number | null | undefined): number | null {
   return value != null && value >= 0 && value <= yMax.value ? value : null

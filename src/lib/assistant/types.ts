@@ -5,6 +5,15 @@ export const DENIAL_MESSAGE = 'The user has denied this operation'
 
 export type ToolCallState = 'approval' | 'running' | 'done' | 'error' | 'denied'
 
+export type ChartKind = 'bar' | 'line' | 'pie'
+
+/** What a render tool asked the conversation to show; kept beside the call. */
+export type RenderView =
+  | { kind: 'table'; title: string; columns: string[]; rows: unknown[][] }
+  | { kind: 'chart'; title: string; chart: ChartKind; labels: string[]; series: Array<{ name: string; values: number[] }> }
+  | { kind: 'stats'; title: string; items: Array<{ label: string; value: string; hint?: string }> }
+  | { kind: 'crate'; title: string; documentId?: string; crate: unknown }
+
 export interface ToolCallView {
   id: string
   name: string
@@ -12,6 +21,8 @@ export interface ToolCallView {
   state: ToolCallState
   output?: unknown
   error?: string
+  /** Set by a render tool: the card the message shows in place of raw output. */
+  view?: RenderView
 }
 
 export interface ChatMessage {

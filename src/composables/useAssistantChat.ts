@@ -5,6 +5,7 @@ import { computed, ref } from 'vue'
 import type { ModelMessage, ToolSet } from 'ai'
 import { createSession, providerModelId, type AssistantProvider } from '@/lib/api'
 import { apiBaseUrl, authToken, readStored, realmInfo, storeValue } from './aruna/state'
+import { loadRoCrate } from './aruna/crates'
 import { useAssistantProviders } from './useAssistantProviders'
 import { useAssistantEditor } from './useAssistantEditor'
 import type { McpConnection } from '@/lib/assistant/mcpClient'
@@ -99,11 +100,17 @@ async function nodeToolSet(): Promise<ToolSet> {
   return nodeTools(await connection.listTools(), connection, gate)
 }
 
+// The cards a render tool asks for stay on the call; the model only hears "shown".
+async function renderToolSet(): Promise<ToolSet> {
+  const { renderTools } = await import('@/lib/assistant/renderTools')
+  return renderTools({ keep: (id, view) => patchCall(id, { view }), loadCrate: loadRoCrate })
+}
+
 async function toolSet(): Promise<ToolSet> {
   const { bridge } = useAssistantEditor()
   const { editorTools } = await import('@/lib/assistant/editorTools')
   const { mergeTools } = await import('@/lib/assistant/tools')
-  const local = bridge.value ? editorTools(bridge.value, gate) : {}
+  const local = mergeTools(await renderToolSet(), bridge.value ? editorTools(bridge.value, gate) : {})
   try {
     return mergeTools(await nodeToolSet(), local)
   } catch (cause) {

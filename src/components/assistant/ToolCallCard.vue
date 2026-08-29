@@ -1,13 +1,14 @@
 <script setup lang="ts">
 // One tool call the model made: what it asked for, what came back, and the
-// approve or abort choice while it waits for one.
-import { computed } from 'vue'
+// approve or abort choice while it waits for one. The body folds away once
+// the call is settled; a call still asking stays open.
+import { computed, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import type { ToolCallView } from '@/lib/assistant/types'
-import { Wrench } from '@lucide/vue'
+import { ChevronRight, Wrench } from '@lucide/vue'
 
-const props = defineProps<{ call: ToolCallView; awaitingDelete?: boolean }>()
+const props = defineProps<{ call: ToolCallView; awaitingDelete?: boolean; collapsed?: boolean }>()
 const emit = defineEmits<{ (e: 'decide', approved: boolean): void }>()
 
 const STATE_VARIANT = {
@@ -18,6 +19,12 @@ const STATE_VARIANT = {
   denied: 'secondary',
 } as const
 
+const open = ref(!props.collapsed)
+// A call that needs an answer opens itself, whatever the fold says.
+watch(() => props.call.state, (state) => {
+  if (state === 'approval') open.value = true
+}, { immediate: true })
+
 function preview(value: unknown): string {
   if (value === undefined) return ''
   const text = typeof value === 'string' ? value : JSON.stringify(value, null, 2)
@@ -26,16 +33,27 @@ function preview(value: unknown): string {
 
 const input = computed(() => preview(props.call.input))
 const output = computed(() => preview(props.call.output))
+const hasBody = computed(() =>
+  (input.value && input.value !== '{}') || props.call.state === 'approval' || props.call.state === 'denied'
+  || Boolean(props.call.error) || Boolean(output.value))
 </script>
 
 <template>
   <div class="rounded-md border border-border bg-muted/20 text-[11px]">
-    <div class="flex items-center gap-2 border-b border-border/60 px-2.5 py-1.5">
+    <button
+      type="button"
+      class="flex w-full items-center gap-2 px-2.5 py-1.5 text-left"
+      :class="open && hasBody ? 'border-b border-border/60' : ''"
+      :aria-expanded="open"
+      :disabled="!hasBody"
+      @click="open = !open"
+    >
+      <ChevronRight :class="['h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', open && hasBody && 'rotate-90', !hasBody && 'invisible']" />
       <Wrench class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       <span class="min-w-0 truncate font-mono font-medium text-foreground">{{ call.name }}</span>
       <Badge size="sm" :variant="STATE_VARIANT[call.state]" class="ml-auto uppercase">{{ call.state }}</Badge>
-    </div>
-    <div class="space-y-1.5 px-2.5 py-2">
+    </button>
+    <div v-if="open && hasBody" class="space-y-1.5 px-2.5 py-2">
       <pre v-if="input && input !== '{}'" class="scrollbar-thin max-h-32 overflow-auto font-mono text-[10px] text-muted-foreground">{{ input }}</pre>
       <div v-if="call.state === 'approval'" class="flex flex-wrap items-center gap-2">
         <span class="text-muted-foreground">
