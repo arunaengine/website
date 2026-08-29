@@ -145,6 +145,19 @@ describe('device mint', () => {
     expect(mintError.value).toContain('2 per user')
   })
 
+  it('does not count expired enrollments against the device cap', async () => {
+    realmInfo.value = realm([], 2)
+    serve((url) => url.endsWith('/users/me/devices')
+      ? json({ devices: [device(), device({ id: 'enr-old', status: 'expired', node_id: null })] })
+      : json({}, 404))
+
+    const { loadDevices, deviceCount, atCap } = await mount()
+    await loadDevices()
+
+    expect(deviceCount.value).toBe(1)
+    expect(atCap.value).toBe(false)
+  })
+
   it('names the token restriction behind a refusal', async () => {
     serve((url, method) => {
       if (url.endsWith('/users/me/devices')) return json({ devices: [] })

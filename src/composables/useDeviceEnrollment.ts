@@ -93,10 +93,10 @@ export function useDeviceEnrollment() {
     return apiRequest<T>(path, options, { baseUrl: apiBaseUrl.value, token: authToken.value })
   }
 
-  // Enrolled devices and outstanding enrollments both occupy a slot, and the
+  // Enrolled devices and live outstanding enrollments both occupy a slot, and the
   // list already charges a claimed-and-enrolled device once.
   const deviceLimit = computed(() => realmInfo.value?.quota?.max_devices_per_user ?? null)
-  const deviceCount = computed(() => devices.value.length)
+  const deviceCount = computed(() => devices.value.filter((device) => device.status !== 'expired').length)
   const atCap = computed(() => deviceLimit.value != null && deviceCount.value >= deviceLimit.value)
 
   function message(err: unknown): string {

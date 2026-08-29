@@ -2,7 +2,7 @@
 // Self-scoped: always the caller's own devices, never another user's. An
 // enrolled device is addressed by its node id, an in-flight enrollment by its
 // enrollment id, and one device is listed once.
-export type UserDeviceStatus = 'enrolled' | 'claimed' | 'pending'
+export type UserDeviceStatus = 'enrolled' | 'claimed' | 'pending' | 'expired'
 
 export interface UserDevice {
   id: string

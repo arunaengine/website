@@ -68,6 +68,7 @@ const STATUS: Record<UserDevice['status'], Pick<SecretRow, 'status' | 'statusLab
   enrolled: { status: 'claimed', statusLabel: 'enrolled', statusVariant: 'success' },
   claimed: { status: 'claimed', statusLabel: 'claimed', statusVariant: 'sky' },
   pending: { status: 'outstanding', statusLabel: 'pending', statusVariant: 'outline' },
+  expired: { status: 'expired', statusLabel: 'expired', statusVariant: 'secondary' },
 }
 
 const rows = computed<SecretRow[]>(() =>

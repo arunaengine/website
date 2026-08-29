@@ -20,7 +20,7 @@ vi.mock('@/composables/useDeviceEnrollment', () => ({
     devices,
     devicesError,
     busyIds: ref(new Set<string>()),
-    deviceCount: computed(() => devices.value.length),
+    deviceCount: computed(() => devices.value.filter((device) => device.status !== 'expired').length),
     deviceLimit,
     loadingDevices: ref(false),
     loadDevices: vi.fn(),
@@ -83,6 +83,15 @@ describe('devices panel', () => {
     deviceLimit.value = 3
 
     expect(await text()).toContain('2 of 3 devices')
+  })
+
+  it('shows but does not count expired enrollments', async () => {
+    devices.value = [device(), device({ id: 'enr-old', node_id: null, status: 'expired' })]
+    deviceLimit.value = 2
+
+    const rendered = await text()
+    expect(rendered).toContain('expired')
+    expect(rendered).toContain('1 of 2 devices')
   })
 
   it('says the realm caps nothing when it does not', async () => {
