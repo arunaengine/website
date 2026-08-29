@@ -45,6 +45,7 @@ const router = useRouter()
 const {
   groups,
   profiles,
+  currentUser,
   createMetadata,
   getMetadataItem,
   fetchRoCrateRaw,
@@ -66,6 +67,7 @@ const loadError = ref<string | null>(null)
 const importOpen = ref(false)
 const createGroupOpen = ref(false)
 const profileId = ref('')
+const preferredProfileInitialized = ref(false)
 const submitError = ref<string | null>(null)
 const writeIssues = ref<WriteIssue[]>([])
 const submitting = ref(false)
@@ -100,6 +102,7 @@ async function load() {
     draft.value = newDraft({ groupId: groups.value[0]?.id })
     selected.value = rootId(draft.value)
     profileId.value = ''
+    preferredProfileInitialized.value = false
     tab.value = 'editor'
     loading.value = false
     loadError.value = null
@@ -168,10 +171,25 @@ function open(entityId: string) {
 }
 
 function pickProfile(id: string) {
+  preferredProfileInitialized.value = true
   profileId.value = id
   const profile = profiles.value.find((candidate) => candidate.id === id)
   if (profile) draft.value = applyProfile(draft.value, profile, profileReferenceIri(profile))
 }
+
+watch([mode, currentUser, profiles], ([currentMode, user, available]) => {
+  if (currentMode !== 'create') {
+    preferredProfileInitialized.value = false
+    return
+  }
+  if (preferredProfileInitialized.value || !user) return
+  const preferred = user.preferredProfileId
+  if (!preferred) {
+    preferredProfileInitialized.value = true
+    return
+  }
+  if (available.some((profile) => profile.id === preferred)) pickProfile(preferred)
+}, { immediate: true })
 
 function structuralViolations(error: unknown): RoCrateStructuralViolation[] {
   const violations = error instanceof ApiError ? error.details?.violations : undefined

@@ -20,6 +20,7 @@ import * as Utils from '@/lib/utils'
 const route = reactive<{ name: string; params: Record<string, string> }>({ name: 'dataset-new', params: {} })
 const groups = ref([{ id: 'group-1', name: 'Research group' }])
 const profiles = ref<Array<Record<string, unknown>>>([])
+const currentUser = ref<{ preferredProfileId?: string } | null>(null)
 const saving = ref(false)
 const apiBaseUrl = ref('https://api.example.test')
 const authToken = ref('token')
@@ -115,6 +116,7 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
     useAruna: () => ({
       groups,
       profiles,
+      currentUser,
       createMetadata,
       getMetadataItem,
       fetchRoCrateRaw,
@@ -151,6 +153,7 @@ beforeEach(() => {
   route.params = {}
   groups.value = [{ id: 'group-1', name: 'Research group' }]
   profiles.value = []
+  currentUser.value = null
   createMetadata.mockReset().mockResolvedValue({ document_id: 'dataset-1' })
   replaceMetadataRoCrate.mockReset().mockResolvedValue({ document_id: 'dataset-1' })
   getMetadataItem.mockReset().mockResolvedValue({
@@ -184,6 +187,36 @@ describe('DatasetEditorView', () => {
 
     await click(element(mounted.root, (node) => node.props['aria-label'] === 'Group'))
     expect(button(mounted.root, 'Create dataset').props.disabled).toBe(false)
+    mounted.app.unmount()
+  })
+
+  it('initializes a new draft from the preferred profile', async () => {
+    profiles.value = [{
+      id: 'genomics',
+      name: 'Genomics',
+      profileUri: 'https://example.test/profiles/genomics',
+      propertyRules: [{
+        id: 'identifier',
+        label: 'Identifier',
+        description: '',
+        kind: 'text',
+        propertyUri: 'http://schema.org/identifier',
+        valueName: 'identifier',
+        obligation: 'MUST',
+      }],
+      entityRules: [],
+    }]
+    currentUser.value = { preferredProfileId: 'genomics' }
+    const mounted = await mountApp(DatasetEditorView)
+    await click(button(mounted.root, 'Seed dataset'))
+    await click(button(mounted.root, 'Create dataset'))
+    await flush()
+
+    const graph = createMetadata.mock.calls[0][0].rocrate['@graph'] as Array<Record<string, unknown>>
+    expect(graph.find((entity) => entity['@id'] === './')).toMatchObject({
+      conformsTo: { '@id': 'https://example.test/profiles/genomics' },
+      identifier: '',
+    })
     mounted.app.unmount()
   })
 
