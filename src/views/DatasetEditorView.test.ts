@@ -77,11 +77,12 @@ const BrowserStub = defineComponent({
   },
 })
 const EditorStub = defineComponent({
-  props: { draft: { type: Object, required: true } },
+  props: { draft: { type: Object, required: true }, profiles: { type: Array, default: () => [] } },
   emits: ['update'],
   setup(props, { emit }) {
     return () => h('div', [
       h('p', Editor.displayName(Editor.rootEntity(props.draft as Editor.CrateDraft))),
+      h('p', `Profiles ${(props.profiles as Array<{ label: string }>).map((profile) => profile.label).join(', ')}`),
       h('button', { onClick: () => emit('update', seeded(props.draft as Editor.CrateDraft)) }, 'Seed dataset'),
     ])
   },
@@ -194,6 +195,7 @@ describe('DatasetEditorView', () => {
     profiles.value = [{
       id: 'genomics',
       name: 'Genomics',
+      managed: true,
       profileUri: 'https://example.test/profiles/genomics',
       propertyRules: [{
         id: 'identifier',
@@ -217,6 +219,21 @@ describe('DatasetEditorView', () => {
       conformsTo: { '@id': 'https://example.test/profiles/genomics' },
       identifier: '',
     })
+    mounted.app.unmount()
+  })
+
+  it('excludes private profiles from the conformance picker', async () => {
+    profiles.value = [
+      { id: 'private', name: 'Private profile', managed: false },
+      { id: 'public', name: 'Public profile', managed: true },
+      { id: 'built-in', name: 'Built-in profile', managed: false, builtIn: true },
+    ]
+    const mounted = await mountApp(DatasetEditorView)
+    const rendered = content(mounted.root)
+
+    expect(rendered).toContain('Public profile')
+    expect(rendered).toContain('Built-in profile')
+    expect(rendered).not.toContain('Private profile')
     mounted.app.unmount()
   })
 

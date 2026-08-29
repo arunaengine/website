@@ -77,8 +77,9 @@ onMounted(() => void loadVocabIndex().then((index) => (vocab.value = index)))
 const rootName = computed(() => entityName(rootEntity(draft.value)))
 const title = computed(() => rootName.value || (mode.value === 'edit' ? 'Edit dataset' : 'New dataset'))
 const groupOptions = computed(() => groups.value.map((group) => ({ value: group.id, label: group.name })))
+const selectableProfiles = computed(() => profiles.value.filter((profile) => profile.managed || profile.builtIn))
 const profileOptions = computed(() =>
-  profiles.value.map((profile) => ({ value: profile.id, label: profile.name })))
+  selectableProfiles.value.map((profile) => ({ value: profile.id, label: profile.name })))
 const expectation = computed(() => {
   const profile = profiles.value.find((candidate) => candidate.id === profileId.value)
   return profile ? profileExpectation(profile) : null
@@ -177,7 +178,7 @@ function pickProfile(id: string) {
   if (profile) draft.value = applyProfile(draft.value, profile, profileReferenceIri(profile))
 }
 
-watch([mode, currentUser, profiles], ([currentMode, user, available]) => {
+watch([mode, currentUser, selectableProfiles], ([currentMode, user, available]) => {
   if (currentMode !== 'create') {
     preferredProfileInitialized.value = false
     return
