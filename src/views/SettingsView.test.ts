@@ -69,7 +69,7 @@ describe('SettingsView responsive geometry', () => {
   })
 
   it('offers every settings section as a shareable tab', () => {
-    const tabIds = ['profile', 'groups', 'access', 'sessions', 'connection', 'appearance']
+    const tabIds = ['profile', 'groups', 'access', 'sessions', 'assistant', 'connection', 'appearance']
     const tabList = source.match(/const settingsTabs = \[([\s\S]*?)\] as const/)?.[1] ?? ''
     const declaredIds = Array.from(tabList.matchAll(/\{ id: '([^']+)'/g), (match) => match[1])
     const panelIds = collectElements(root, (node) => node.tag === 'TabsContent')

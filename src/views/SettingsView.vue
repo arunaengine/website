@@ -13,6 +13,8 @@ import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue
 import GroupDetail from '@/components/groups/GroupDetail.vue'
 import DevicesPanel from '@/components/onboarding/DevicesPanel.vue'
 import SessionsPanel from '@/components/settings/SessionsPanel.vue'
+import AssistantProviders from '@/components/settings/AssistantProviders.vue'
+import McpConnect from '@/components/settings/McpConnect.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsList from '@/components/ui/TabsList.vue'
@@ -58,6 +60,7 @@ const settingsTabs = [
   { id: 'groups', label: 'Groups' },
   { id: 'access', label: 'Access' },
   { id: 'sessions', label: 'Sessions' },
+  { id: 'assistant', label: 'Assistant' },
   { id: 'connection', label: 'Connection' },
   { id: 'appearance', label: 'Appearance' },
 ] as const
@@ -489,6 +492,11 @@ function toggleGroup(groupId: string) {
 
       <TabsContent value="sessions" class="container mt-0 min-w-0 space-y-5 py-6">
         <SessionsPanel />
+      </TabsContent>
+
+      <TabsContent value="assistant" class="container mt-0 min-w-0 space-y-5 py-6">
+        <AssistantProviders />
+        <McpConnect />
       </TabsContent>
 
       <TabsContent value="appearance" class="container mt-0 min-w-0 space-y-5 py-6">
