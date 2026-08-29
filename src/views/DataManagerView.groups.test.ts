@@ -49,9 +49,14 @@ describe('Data view group selection', () => {
   })
 
   it('gates the browser on one readiness condition', () => {
-    const gate = template.indexOf('v-else-if="!viewReady"')
+    const gate = template.indexOf('<DataViewSkeleton v-else-if="contextBusy || !viewReady" />')
     const browser = template.indexOf('<section v-else class="grid')
     expect(gate).toBeGreaterThan(-1)
     expect(browser).toBeGreaterThan(gate)
+  })
+
+  it('shows one placeholder instead of stacked loading states', () => {
+    expect(template.split('<DataViewSkeleton')).toHaveLength(3)
+    expect(template).not.toContain('<Spinner')
   })
 })

@@ -17,7 +17,6 @@ import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import Notice from '@/components/ui/Notice.vue'
-import Spinner from '@/components/ui/Spinner.vue'
 import AddDataDialog from '@/components/data/AddDataDialog.vue'
 import DataViewSkeleton from '@/components/data/DataViewSkeleton.vue'
 import StagingJobsPanel from '@/components/data/StagingJobsPanel.vue'
@@ -291,11 +290,8 @@ async function createFolder() {
         </div>
       </section>
 
-      <DataViewSkeleton v-else-if="!contextReady" />
-
-      <section v-else-if="!viewReady" class="surface p-5">
-        <Spinner show-label label="Loading group data…" class="text-sm" />
-      </section>
+      <!-- Opening the session and loading its data share one placeholder. -->
+      <DataViewSkeleton v-else-if="contextBusy || !viewReady" />
 
       <section v-else class="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
         <Notice v-if="sessionWarning" tone="warning" class="lg:col-span-2">
