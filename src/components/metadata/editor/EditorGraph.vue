@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { Handle, Position, VueFlow, type Connection, type NodeMouseEvent } from '@vue-flow/core'
+import { computed, nextTick, ref, watch } from 'vue'
+import { Handle, Position, useVueFlow, VueFlow, type Connection, type NodeMouseEvent } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
 import Badge from '@/components/ui/Badge.vue'
@@ -26,6 +26,12 @@ const emit = defineEmits<{
 
 const pending = ref<Connection | null>(null)
 
+// The whole crate stays in view: fitted with room around it when the nodes
+// are placed and again whenever an entity comes or goes.
+const FIT = { padding: 0.25, maxZoom: 0.9, duration: 0 }
+const { fitView, onNodesInitialized } = useVueFlow()
+onNodesInitialized(() => void fitView(FIT))
+
 const model = computed(() => crateGraph(props.draft, props.vocab))
 const nodes = computed(() => layoutGraph(model.value).map((placed) => ({
   id: placed.node.id,
@@ -39,6 +45,7 @@ const edges = computed(() => model.value.edges.map((edge) => ({
   target: edge.target,
   label: edge.label,
 })))
+watch(() => nodes.value.length, () => void nextTick(() => fitView(FIT)))
 
 // Only the reference properties of the dragged-from entity that accept what it
 // was dropped on; picking one writes the reference.
@@ -69,12 +76,13 @@ function iconFor(node: GraphNode) {
 </script>
 
 <template>
-  <div class="surface relative h-[32rem] overflow-hidden">
+  <div class="surface relative h-[36rem] overflow-hidden">
     <VueFlow
       :nodes="nodes"
       :edges="edges"
-      fit-view-on-init
-      :min-zoom="0.2"
+      :default-viewport="{ zoom: 0.6, x: 0, y: 0 }"
+      :min-zoom="0.1"
+      :max-zoom="1.5"
       @node-click="(event: NodeMouseEvent) => emit('select', event.node.id)"
       @node-double-click="(event: NodeMouseEvent) => emit('open', event.node.id)"
       @connect="connect"
