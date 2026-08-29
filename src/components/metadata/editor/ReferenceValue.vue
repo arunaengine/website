@@ -4,8 +4,7 @@ import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import { entityIcon } from './icons'
 import { displayName, findEntity, rootId, typeLabel, type CrateDraft } from '@/lib/crate/editor'
-import { isAbsoluteUri } from '@/lib/profiles/uri'
-import { truncateMiddle } from '@/lib/utils'
+import { isHttpUrl, truncateMiddle } from '@/lib/utils'
 import { ExternalLink, Link2, Plus } from '@lucide/vue'
 
 // A reference is one of four things: nothing yet, an entity of this crate, a
@@ -18,7 +17,7 @@ const emit = defineEmits<{
 }>()
 
 const target = computed(() => findEntity(props.draft, props.value))
-const external = computed(() => !target.value && isAbsoluteUri(props.value))
+const external = computed(() => !target.value && isHttpUrl(props.value))
 const unresolved = computed(() => Boolean(props.value.trim()) && !target.value && !external.value)
 const icon = computed(() => entityIcon(target.value, target.value?.id === rootId(props.draft)))
 </script>

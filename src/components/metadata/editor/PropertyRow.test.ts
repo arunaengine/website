@@ -138,6 +138,14 @@ describe('PropertyRow', () => {
     mounted.app.unmount()
   })
 
+  it('does not link unsafe absolute reference IRIs', async () => {
+    const draft = Editor.addValue(seeded(), './', 'author', { kind: 'reference', value: 'javascript:alert(1)' })
+    const mounted = await mount('author', [], draft)
+
+    expect(nodes(mounted.root).some((node) => node.tag === 'a')).toBe(false)
+    mounted.app.unmount()
+  })
+
   it('limits the change-type submenu to the kinds the property allows', async () => {
     const narrow = await mount('author', [], Editor.addValue(seeded(), './', 'author', {
       kind: 'reference',
