@@ -16,7 +16,7 @@ describe('list shell', () => {
     const markup = await render({ state: 'loading', rows: 3 }, rows)
 
     expect(markup).not.toContain('one')
-    expect(markup.match(/animate-pulse/g)).toHaveLength(3)
+    expect(markup.match(/data-skeleton-row/g)).toHaveLength(3)
   })
 
   it('offers a retry on a load failure and hides the toolbar', async () => {

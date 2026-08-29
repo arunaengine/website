@@ -33,6 +33,9 @@ import { errorMessage } from '@/lib/utils'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import ListSkeleton from '@/components/ui/ListSkeleton.vue'
+import SectionSkeleton from '@/components/ui/SectionSkeleton.vue'
+import { useFirstPaint } from '@/composables/useFirstPaint'
 
 const route = useRoute()
 const router = useRouter()
@@ -41,6 +44,8 @@ const {
   profileItems,
   currentUser,
   userInfo,
+  loading,
+  bootstrapped,
   updateUserProfile,
   saving,
   loadRoCrate,
@@ -153,6 +158,12 @@ const selectedRuleState = computed(() => {
   })
 })
 const selectedLoadingFull = computed(() => selectedRuleState.value === 'loading')
+// The list and the selected profile's rules paint together; switching the
+// selection waits for its rules once, a later revalidation refreshes in place.
+const painted = useFirstPaint(
+  () => bootstrapped.value && !loading.value && !selectedLoadingFull.value,
+  () => selectedId.value,
+)
 const additionalRequirements = computed(() => cloneLiftNotes(selectedProfileParse.value?.liftNotes ?? []))
 
 function propertyCount(profile: MetadataProfile): number {
@@ -291,7 +302,15 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
       </template>
     </PageHeader>
 
-    <div class="container grid gap-6 py-8 lg:grid-cols-[360px_1fr]">
+    <div v-if="!painted" class="container grid gap-6 py-8 lg:grid-cols-[360px_1fr]">
+      <ListSkeleton :rows="5" label="Loading profiles" />
+      <div class="space-y-5">
+        <SectionSkeleton :header="false" :lines="3" :tiles="3" />
+        <SectionSkeleton :lines="4" />
+      </div>
+    </div>
+
+    <div v-else class="container grid gap-6 py-8 lg:grid-cols-[360px_1fr]">
       <aside class="surface max-h-[80vh] overflow-y-auto scrollbar-thin">
         <ul v-if="visibleProfiles.length" class="divide-y divide-border">
           <li v-for="profile in visibleProfiles" :key="profile.id">

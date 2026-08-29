@@ -7,12 +7,14 @@ import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import FilterChips from '@/components/ui/FilterChips.vue'
 import ListShell from '@/components/ui/ListShell.vue'
+import ListSkeleton from '@/components/ui/ListSkeleton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import Progress from '@/components/ui/Progress.vue'
 import JobStateBadge from '@/components/jobs/JobStateBadge.vue'
 import JobDetailPanel from '@/components/jobs/JobDetailPanel.vue'
 import { useJobsList } from '@/composables/useJobs'
 import { useRefresh } from '@/composables/useRefresh'
+import { useFirstPaint } from '@/composables/useFirstPaint'
 import {
   formatJobProgress,
   jobKindLabel,
@@ -96,6 +98,9 @@ function reload() {
 const { busy: reloadBusy, refresh: onReload } = useRefresh(reload)
 const spinning = computed(() => reloadBusy.value || refreshing.value)
 
+// One placeholder until the first page has answered; later loads refresh in place.
+const painted = useFirstPaint(() => listState.value !== 'idle' && listState.value !== 'loading')
+
 // The states the shared list shell models; the rest are answered above it.
 const shellState = computed<'loading' | 'error' | 'empty' | 'ready'>(() => {
   if (listState.value === 'error') return 'error'
@@ -112,7 +117,9 @@ onMounted(() => void list.load())
       System jobs are the background work <span class="font-medium text-foreground">a node runs for your account</span>, staging, provenance and maintenance. You cannot start one here, only follow it or cancel it.
     </p>
 
-    <Notice v-if="listState === 'unsupported'" tone="warning">
+    <ListSkeleton v-if="!painted" header :rows="5" label="Loading system jobs" />
+
+    <Notice v-else-if="listState === 'unsupported'" tone="warning">
       This node does not serve system jobs yet, so none can be listed.
     </Notice>
 

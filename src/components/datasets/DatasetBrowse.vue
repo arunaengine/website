@@ -6,7 +6,7 @@ import Button from '@/components/ui/Button.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Pagination from '@/components/ui/Pagination.vue'
-import Skeleton from '@/components/ui/Skeleton.vue'
+import ListSkeleton from '@/components/ui/ListSkeleton.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import DatasetCard from '@/components/datasets/DatasetCard.vue'
 import { useAruna } from '@/composables/useAruna'
@@ -37,9 +37,15 @@ const { realm, currentUser, error, bootstrapped, refresh } = useAruna()
 </script>
 
 <template>
-  <section v-if="!bootstrapped || (browseBusy && !browseSource.length)" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-    <Skeleton v-for="n in 6" :key="n" class="h-36" />
-  </section>
+  <!-- One placeholder until the catalog page and the session have answered;
+       paging keeps the outgoing page on screen instead (browseStale). -->
+  <ListSkeleton
+    v-if="!bootstrapped || (browseBusy && !browseSource.length)"
+    layout="cards"
+    header
+    :rows="6"
+    label="Loading datasets"
+  />
 
   <ErrorPanel v-else-if="browseError && !keptBrowse" :message="browseError" @retry="retryBrowse" />
 

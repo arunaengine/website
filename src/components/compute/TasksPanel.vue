@@ -8,6 +8,7 @@ import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import FilterChips from '@/components/ui/FilterChips.vue'
 import ListShell from '@/components/ui/ListShell.vue'
+import ListSkeleton from '@/components/ui/ListSkeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import TaskStateBadge from '@/components/compute/TaskStateBadge.vue'
 import TesPlacementTags from '@/components/compute/TesPlacementTags.vue'
@@ -18,6 +19,7 @@ import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useHiddenTasks } from '@/composables/useHiddenTasks'
 import { useRefresh } from '@/composables/useRefresh'
+import { useFirstPaint } from '@/composables/useFirstPaint'
 import { errorMessage, formatDuration, relativeTime, truncateMiddle } from '@/lib/utils'
 import {
   TES_GROUP_TAG,
@@ -286,6 +288,11 @@ const shellState = computed<'loading' | 'error' | 'empty' | 'ready'>(() => {
       return listEmpty.value ? 'empty' : 'ready'
   }
 })
+// The service banner and the list paint together, once both have answered.
+const painted = useFirstPaint(() =>
+  serviceState.value !== 'idle' && serviceState.value !== 'loading'
+  && listState.value !== 'idle' && listState.value !== 'loading')
+
 const emptyTitle = computed(() => {
   if (listState.value === 'unsupported') return 'Runs cannot be listed until this node accepts them.'
   if (listState.value === 'signed-out') return 'Sign in to see the runs you started on this node.'
@@ -344,9 +351,11 @@ onUnmounted(() => {
       Runs are the work <span class="font-medium text-foreground">you start</span> on this node; begin with Quick run, or describe a custom run.
     </p>
 
+    <ListSkeleton v-if="!painted" header :rows="5" label="Loading runs" />
+
     <!-- Service banner: capability and storage only; the protocol version lives
          in the tooltip and the realm identity in the page header badge. -->
-    <p v-if="serviceState === 'ready' && serviceInfo" class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+    <p v-else-if="serviceState === 'ready' && serviceInfo" class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
       <span class="font-medium text-foreground" :title="`GA4GH TES ${serviceInfo.type.version}`">Run service</span>
       <template v-if="serviceInfo.storage?.length">
         <span>·</span>
@@ -361,6 +370,7 @@ onUnmounted(() => {
     <!-- 'loading' also covers the pre-fetch gap while init() awaits service
          info and a session that has not resolved yet. -->
     <ListShell
+      v-if="painted"
       :state="shellState"
       :error="listError || 'Failed to load the runs.'"
       :empty-title="emptyTitle"

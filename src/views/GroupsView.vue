@@ -5,6 +5,8 @@ import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import AccessBadge from '@/components/ui/AccessBadge.vue'
 import ListShell from '@/components/ui/ListShell.vue'
+import ListSkeleton from '@/components/ui/ListSkeleton.vue'
+import SectionSkeleton from '@/components/ui/SectionSkeleton.vue'
 import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
 import GroupDetail from '@/components/groups/GroupDetail.vue'
 import JoinRequestButton from '@/components/groups/JoinRequestButton.vue'
@@ -13,22 +15,29 @@ import { useAuth } from '@/composables/useAuth'
 import { useJoinRequests } from '@/composables/useJoinRequests'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
 import { useRefresh } from '@/composables/useRefresh'
+import { useFirstPaint } from '@/composables/useFirstPaint'
 import { useRoute, useRouter } from 'vue-router'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { Inbox, Plus, Users } from '@lucide/vue'
 import { errorMessage, relativeTime } from '@/lib/utils'
 import type { JoinRequest } from '@/lib/api'
 
-const { currentUser, myGroups, discoverableGroups, loading, refresh } = useAruna()
+const { currentUser, myGroups, discoverableGroups, loading, bootstrapped, refresh } = useAruna()
 const { authPending } = useAuth()
 const {
   joinRequestsEnabled,
   ownRequests,
+  ownRequestsLoaded,
   ownRequestsError,
   ensureOwnRequestsLoaded,
   withdrawRequest,
   busy,
 } = useJoinRequests()
+
+// The memberships, the realm's groups and the join requests paint together.
+const painted = useFirstPaint(() =>
+  bootstrapped.value && !loading.value && !authPending.value
+  && (!joinRequestsEnabled.value || !currentUser.value || ownRequestsLoaded.value || Boolean(ownRequestsError.value)))
 const route = useRoute()
 const router = useRouter()
 
@@ -108,10 +117,10 @@ const emptyGroupsMessage = computed(() =>
     : 'Sign in to see the groups you belong to.',
 )
 
-// The shell owns the wait: the message below it only names an empty result.
+// After the first paint a refresh never shows the shell's own wait again.
 const shellState = computed<'loading' | 'empty' | 'ready'>(() => {
   if (myGroups.value.length) return 'ready'
-  return loading.value || authPending.value ? 'loading' : 'empty'
+  return painted.value ? 'empty' : 'loading'
 })
 </script>
 
@@ -126,7 +135,12 @@ const shellState = computed<'loading' | 'empty' | 'ready'>(() => {
       </template>
     </PageHeader>
 
-    <div class="container space-y-6 py-8">
+    <div v-if="!painted" class="container space-y-6 py-8">
+      <ListSkeleton header :rows="3" label="Loading groups" />
+      <SectionSkeleton :lines="2" />
+    </div>
+
+    <div v-else class="container space-y-6 py-8">
       <ListShell :state="shellState" :rows="3" :empty-title="emptyGroupsMessage">
         <template #icon><Users class="h-6 w-6" /></template>
         <template #empty-actions>

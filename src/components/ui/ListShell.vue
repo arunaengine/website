@@ -2,7 +2,7 @@
 // The one list surface: an optional toolbar, skeleton rows while loading, the
 // load failure with its retry, the empty state, the rows and an optional
 // footer, all inside a single card.
-import Skeleton from '@/components/ui/Skeleton.vue'
+import ListSkeleton from '@/components/ui/ListSkeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 
@@ -52,9 +52,7 @@ defineEmits<{ (e: 'retry'): void }>()
       <div v-if="$slots.tools" class="ml-auto flex items-center gap-2"><slot name="tools" /></div>
     </div>
 
-    <div v-if="state === 'loading'" class="divide-y divide-border">
-      <div v-for="n in rows" :key="n" class="px-5 py-3"><Skeleton class="h-6 w-full" /></div>
-    </div>
+    <ListSkeleton v-if="state === 'loading'" bare :rows="rows" />
     <slot v-else />
 
     <div v-if="state === 'ready' && $slots.footer" class="border-t border-border px-5 py-2">

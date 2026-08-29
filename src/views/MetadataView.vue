@@ -5,7 +5,6 @@ import Button from '@/components/ui/Button.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Notice from '@/components/ui/Notice.vue'
-import Spinner from '@/components/ui/Spinner.vue'
 import DetailsSection from '@/components/metadata/DetailsSection.vue'
 import PeopleSection from '@/components/metadata/PeopleSection.vue'
 import ContextSection from '@/components/metadata/ContextSection.vue'
@@ -15,6 +14,7 @@ import SubcratesSection from '@/components/metadata/SubcratesSection.vue'
 import PersistentIdSection from '@/components/metadata/PersistentIdSection.vue'
 import RunProvenancePanel from '@/components/metadata/RunProvenancePanel.vue'
 import DatasetActions from '@/components/metadata/view/DatasetActions.vue'
+import DatasetDetailSkeleton from '@/components/metadata/view/DatasetDetailSkeleton.vue'
 import DatasetFiles from '@/components/metadata/view/DatasetFiles.vue'
 import DatasetHeader from '@/components/metadata/view/DatasetHeader.vue'
 import DatasetRelated from '@/components/metadata/view/DatasetRelated.vue'
@@ -31,6 +31,7 @@ import { ref } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
 import { useDatasetView } from '@/composables/useDatasetView'
+import { useFirstPaint } from '@/composables/useFirstPaint'
 import { type MetadataDocumentSummary } from '@/lib/api'
 import { errorMessage, truncateMiddle } from '@/lib/utils'
 import { ArrowLeft, Code2 } from '@lucide/vue'
@@ -64,6 +65,13 @@ const {
   highlightId,
   jumpEntity,
 } = state
+
+// The page paints once the registry entry and the crate have both answered;
+// a save or a provenance poll later refreshes in place.
+const painted = useFirstPaint(
+  () => docState.value !== 'loading' && !(docState.value === 'found' && loadingCrate.value),
+  () => detailId.value,
+)
 
 const showCrateExport = ref(false)
 const showDelete = ref(false)
@@ -138,10 +146,11 @@ function openInfo(entityId: string) {
     </PageHeader>
 
     <div class="container space-y-6 py-8">
-      <DatasetHeader v-if="current" :doc="current" :state="state" />
+      <DatasetDetailSkeleton v-if="!painted" />
 
-      <!-- Crate + referenced data for any resolved document (keyed on detailId). -->
-      <template v-if="docState === 'found'">
+      <template v-else-if="docState === 'found'">
+        <DatasetHeader v-if="current" :doc="current" :state="state" />
+
         <PersistentIdSection
           v-if="fetchedSummary"
           :document-id="detailId"
@@ -209,13 +218,6 @@ function openInfo(entityId: string) {
           @imported="onSaved"
         />
       </template>
-
-      <Spinner
-        v-else-if="docState === 'loading'"
-        show-label
-        label="Loading dataset…"
-        class="surface flex justify-center p-12 text-sm"
-      />
 
       <EmptyState
         v-else-if="docState === 'preparing'"
