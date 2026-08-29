@@ -2,6 +2,7 @@
 import { RouterLink, useRoute } from 'vue-router'
 import { computed, ref } from 'vue'
 import { useAruna } from '@/composables/useAruna'
+import { useAssistantChat } from '@/composables/useAssistantChat'
 import { isDesktop } from '@/lib/desktop'
 import Sheet from '@/components/ui/Sheet.vue'
 import SheetContent from '@/components/ui/SheetContent.vue'
@@ -18,6 +19,7 @@ const {
   canManageOnboarding,
   canManageQuarantine,
 } = useAruna()
+const { available: assistant } = useAssistantChat()
 
 // The same list the sidebar renders, in the same order: the bottom bar takes
 // the primary entries and the More sheet keeps every other one reachable.
@@ -28,6 +30,7 @@ const items = computed<NavItem[]>(() =>
     canInspectUsers: canInspectUsers.value,
     canManageOnboarding: canManageOnboarding.value,
     canManageQuarantine: canManageQuarantine.value,
+    assistant: assistant.value,
   }).filter((entry): entry is NavItem => !('separator' in entry)),
 )
 

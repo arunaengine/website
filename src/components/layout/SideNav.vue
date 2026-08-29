@@ -3,6 +3,7 @@ import AppLogo from '@/components/layout/AppLogo.vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { computed, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
+import { useAssistantChat } from '@/composables/useAssistantChat'
 import { isDesktop } from '@/lib/desktop'
 import { navEntries, navItemActive, navRowClass, type NavEntry, type NavItem } from '@/components/layout/nav'
 import { ArrowLeft, ChevronsLeft, ChevronsRight } from '@lucide/vue'
@@ -17,6 +18,7 @@ const {
   canManageOnboarding,
   canManageQuarantine,
 } = useAruna()
+const { available: assistant } = useAssistantChat()
 
 // The shell has no landing page to go back to.
 const desktop = isDesktop()
@@ -30,6 +32,7 @@ const items = computed<NavEntry[]>(
       canInspectUsers: canInspectUsers.value,
       canManageOnboarding: canManageOnboarding.value,
       canManageQuarantine: canManageQuarantine.value,
+      assistant: assistant.value,
     }),
 )
 const showBackLink = computed(() => props.backLink ?? !desktop)

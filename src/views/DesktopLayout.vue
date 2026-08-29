@@ -13,6 +13,7 @@ import AssistantPanel from '@/components/assistant/AssistantPanel.vue'
 import { RouterView, useRoute } from 'vue-router'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
+import { useAssistantChat } from '@/composables/useAssistantChat'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { appQuit } from '@/lib/desktopBridge'
 import { probeRealm, realmReach } from '@/lib/desktopBoot'
@@ -27,6 +28,7 @@ const quitting = ref(false)
 const quitError = ref<string | null>(null)
 
 const { isRealmAdmin, canInspectUsers, canManageOnboarding, canManageQuarantine } = useAruna()
+const { available: assistant } = useAssistantChat()
 const { status, loaded, state, start: watchNode, stop: unwatchNode } = useDeviceStatus()
 const nodeDown = computed(
   () =>
@@ -54,6 +56,7 @@ const items = computed<NavEntry[]>(() =>
     canInspectUsers: canInspectUsers.value,
     canManageOnboarding: canManageOnboarding.value,
     canManageQuarantine: canManageQuarantine.value,
+    assistant: assistant.value,
   }),
 )
 

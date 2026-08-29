@@ -62,6 +62,7 @@ const DesktopLayoutClient = compileClientComponent(new URL('./DesktopLayout.vue'
   '@/components/assistant/AssistantPanel.vue': moduleDefault(EmptyStub),
   '@/components/ui/Notice.vue': moduleDefault(Notice),
   '@/composables/useAruna': { useAruna: () => permissions },
+  '@/composables/useAssistantChat': { useAssistantChat: () => ({ available: ref(false) }) },
   '@/composables/useDeviceStatus': {
     useDeviceStatus: () => ({
       status: nodeStatus,

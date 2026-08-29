@@ -8,6 +8,7 @@ import {
   Laptop,
   LayoutDashboard,
   ListChecks,
+  MessageSquare,
   Play,
   RefreshCw,
   Settings,
@@ -44,6 +45,8 @@ export interface NavOptions {
   canInspectUsers: boolean
   canManageOnboarding: boolean
   canManageQuarantine: boolean
+  /** At least one AI provider is ready, the same gate as the top-bar launcher. */
+  assistant?: boolean
 }
 
 /** One Compute entry as soon as either compute plane answers; the view degrades per flag. */
@@ -78,6 +81,7 @@ export function navEntries(options: NavOptions): NavEntry[] {
     { to: '/app/datasets', icon: FileJson2, label: 'Datasets', match: ['/app/datasets'], primary: true },
     { to: '/app/profiles', icon: ListChecks, label: 'Profiles' },
     ...(computeEnabled() ? [{ to: '/app/compute', icon: Workflow, label: 'Compute', primary: true }] : []),
+    ...(options.assistant ? [{ to: '/app/assistant', icon: MessageSquare, label: 'Assistant' }] : []),
     navSeparator,
     ...(options.desktop
       ? [
