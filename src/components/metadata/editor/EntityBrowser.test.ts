@@ -106,17 +106,10 @@ describe('EntityBrowser', () => {
   it('separates adding data from adding context', async () => {
     const mounted = await mount()
 
-    expect(button(mounted.root, 'Add data entity')).toBeDefined()
-    expect(button(mounted.root, 'Add contextual entity')).toBeDefined()
-    mounted.app.unmount()
-  })
-
-  it('hands the graph over to the page', async () => {
-    const asked: boolean[] = []
-    const mounted = await mount({ onGraph: () => asked.push(true) })
-
-    await click(button(mounted.root, 'Graph'))
-    expect(asked).toEqual([true])
+    expect(button(mounted.root, 'Add files')).toBeDefined()
+    expect(button(mounted.root, 'Add entity')).toBeDefined()
+    // The graph is switched from the page's own toggle, never from here.
+    expect(() => button(mounted.root, 'Graph')).toThrow()
     mounted.app.unmount()
   })
 

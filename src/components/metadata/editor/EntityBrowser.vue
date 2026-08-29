@@ -16,7 +16,7 @@ import {
   type LiveIssue,
 } from '@/lib/crate/editor'
 import type { VocabIndex } from '@/lib/profiles/vocabulary'
-import { Network, Plus, Upload } from '@lucide/vue'
+import { Plus, Upload } from '@lucide/vue'
 
 const props = defineProps<{
   draft: CrateDraft
@@ -28,7 +28,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'select', entityId: string): void
   (e: 'update', draft: CrateDraft): void
-  (e: 'graph'): void
 }>()
 
 const query = ref('')
@@ -74,17 +73,14 @@ function countFor(entityId: string) {
           placeholder="Search this dataset"
           aria-label="Search entities"
         />
-        <div class="flex flex-col gap-2">
-          <Button variant="outline" size="sm" class="h-8 justify-start" @click="filesOpen = true">
-            <Upload class="h-3.5 w-3.5" /> Add data entity
+        <div class="flex gap-2">
+          <Button variant="outline" size="sm" class="flex-1" @click="filesOpen = true">
+            <Upload class="h-3.5 w-3.5" /> Add files
           </Button>
-          <Button variant="outline" size="sm" class="h-8 justify-start" @click="addOpen = true">
-            <Plus class="h-3.5 w-3.5" /> Add contextual entity
+          <Button variant="outline" size="sm" class="flex-1" @click="addOpen = true">
+            <Plus class="h-3.5 w-3.5" /> Add entity
           </Button>
         </div>
-        <Button variant="ghost" size="sm" class="h-8 w-full justify-start" @click="emit('graph')">
-          <Network class="h-3.5 w-3.5" /> Graph
-        </Button>
       </div>
 
       <div class="min-h-0 flex-1 overflow-y-auto">
