@@ -350,6 +350,17 @@ describe('the unified sync list', () => {
     mounted.app.unmount()
   })
 
+  it('shows deleting folders without sync controls', async () => {
+    folders.value = [folder({ state: 'deleting' })]
+    const mounted = await mount()
+    const target = row(mounted.root, 'data')
+
+    expect(badge(target, 'Deleting').props['data-variant']).toBe('sky')
+    expect(() => rowButton(mounted.root, 'data', 'Sync now')).toThrow()
+    expect(() => rowButton(mounted.root, 'data', 'Pause')).toThrow()
+    mounted.app.unmount()
+  })
+
   it('renders transfers only inside their folder row', async () => {
     folders.value = [folder(), folder({ folder_id: 'f2', root: '/home/me/other' })]
     transfers.value = [transfer()]

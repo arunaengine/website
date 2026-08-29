@@ -211,6 +211,7 @@ const facts = computed(() => {
           folder.mode === 'two_way' ? 'two-way' : 'upload only'
         }}</Badge>
         <Badge v-if="folder?.state === 'paused'" variant="secondary" size="sm" class="uppercase">paused</Badge>
+        <Badge v-if="folder?.state === 'deleting'" variant="sky" size="sm" class="uppercase">deleting</Badge>
       </template>
       <template #actions>
         <Button variant="ghost" size="sm" as-child>
@@ -221,7 +222,7 @@ const facts = computed(() => {
         </Button>
         <RefreshButton :busy="refreshBusy" :disabled="busy" @click="onRefresh" />
         <Button
-          v-if="folder"
+          v-if="folder && folder.state !== 'deleting'"
           variant="outline"
           size="sm"
           :disabled="busy"
@@ -231,7 +232,12 @@ const facts = computed(() => {
           <Pause v-else class="h-3.5 w-3.5" />
           {{ folder.state === 'paused' ? 'Resume' : 'Pause' }}
         </Button>
-        <Button v-if="folder && folder.state !== 'paused'" size="sm" :disabled="busy" @click="retry">
+        <Button
+          v-if="folder && folder.state !== 'paused' && folder.state !== 'deleting'"
+          size="sm"
+          :disabled="busy"
+          @click="retry"
+        >
           Sync now
         </Button>
       </template>
@@ -361,7 +367,7 @@ const facts = computed(() => {
         <Button variant="ghost" size="sm" @click="loadPage(false)">Load more</Button>
       </div>
 
-      <section v-if="folder" class="surface space-y-2 border-destructive/25 px-4 py-3.5">
+      <section v-if="folder && folder.state !== 'deleting'" class="surface space-y-2 border-destructive/25 px-4 py-3.5">
         <h2 class="font-display text-sm font-semibold text-aruna-navy">Stop syncing this folder</h2>
         <p class="text-[12px] leading-relaxed text-muted-foreground">
           The binding is dropped and the realm keeps its versions. Every file on this disk stays exactly where it is.

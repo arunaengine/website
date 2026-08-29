@@ -57,6 +57,7 @@ export function itemChip(item: SyncItem): ItemChip {
 
   const { folder } = item
   if (folder.state === 'paused') return { label: 'Paused', variant: toneVariant('idle') }
+  if (folder.state === 'deleting') return { label: 'Deleting', variant: toneVariant('progress') }
 
   const folderTransfers = item.transfers?.filter((transfer) => transfer.folder_id === folder.folder_id) ?? []
   const failedTransfer = folderTransfers.find((transfer) => transfer.state === 'failed')

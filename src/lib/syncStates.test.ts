@@ -67,6 +67,16 @@ describe('folder item chips', () => {
     })
   })
 
+  it('shows cleanup before stale folder activity', () => {
+    const value = folder({
+      state: 'deleting',
+      last_error: 'old failure',
+      counters: { ...folder().counters, conflicts: 2, uploading: 3 },
+    })
+
+    expect(itemChip({ kind: 'folder', folder: value })).toEqual({ label: 'Deleting', variant: 'sky' })
+  })
+
   it('uses errors before decisions and activity', () => {
     const value = folder({ counters: { ...folder().counters, conflicts: 2, uploading: 3 } })
 

@@ -106,10 +106,10 @@ function member<T extends string>(known: readonly T[], value: unknown, fallback:
 // ── Synced folders ───────────────────────────────────────────────────────────
 
 export type FolderMode = 'two_way' | 'upload_only'
-export type FolderState = 'active' | 'paused' | 'error'
+export type FolderState = 'active' | 'paused' | 'deleting' | 'error'
 
 export const FOLDER_MODES: readonly FolderMode[] = ['two_way', 'upload_only']
-const FOLDER_STATES: readonly FolderState[] = ['active', 'paused', 'error']
+const FOLDER_STATES: readonly FolderState[] = ['active', 'paused', 'deleting', 'error']
 
 /** Where a folder's contents live in the realm. */
 export interface RemoteBinding {
@@ -575,9 +575,9 @@ const DOCUMENT_SYNC_STATES: readonly DocumentSyncState[] = [
   'local_only',
 ]
 
-export type DatasetSyncState = 'synced' | 'pending' | 'active' | 'paused' | 'error'
+export type DatasetSyncState = 'synced' | 'pending' | 'active' | 'paused' | 'deleting' | 'error'
 
-const DATASET_SYNC_STATES: readonly DatasetSyncState[] = ['synced', 'pending', 'active', 'paused', 'error']
+const DATASET_SYNC_STATES: readonly DatasetSyncState[] = ['synced', 'pending', 'active', 'paused', 'deleting', 'error']
 
 /** One metadata document this device keeps a replica of. */
 export interface SyncDocument {

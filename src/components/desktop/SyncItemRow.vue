@@ -110,7 +110,7 @@ function moved(transfer: DeviceTransfer): string {
         </p>
       </div>
 
-      <div v-if="folder && !compact" class="flex shrink-0 items-center gap-1.5">
+      <div v-if="folder && !compact && folder.state !== 'deleting'" class="flex shrink-0 items-center gap-1.5">
         <Button variant="ghost" size="sm" :disabled="busy || folder.state === 'paused'" @click="emit('sync')">
           <FolderSync class="h-3.5 w-3.5" /> Sync now
         </Button>

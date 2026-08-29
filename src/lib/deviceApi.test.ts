@@ -58,6 +58,7 @@ describe('folder mapping', () => {
   })
 
   it('refuses to invent a state it does not know', () => {
+    expect(readFolder({ state: 'deleting' }).state).toBe('deleting')
     expect(readFolder({ state: 'melting' }).state).toBe('active')
     expect(readEntry({ path: 'a.txt', state: 'sideways' }).state).toBe('error')
   })
@@ -236,7 +237,10 @@ describe('failure classification', () => {
 describe('sync dataset mapping', () => {
   it('keeps an active dataset active', async () => {
     const request = vi.spyOn(await import('./api'), 'apiRequest').mockResolvedValue({
-      datasets: [{ folderId: 'f1', state: 'active', unsyncedFiles: 4, lastError: 'retrying' }],
+      datasets: [
+        { folderId: 'f1', state: 'active', unsyncedFiles: 4, lastError: 'retrying' },
+        { folderId: 'f2', state: 'deleting' },
+      ],
     })
     const client = { baseUrl: 'http://127.0.0.1:9000/api/v1', token: 'owner-token' }
 
@@ -245,6 +249,7 @@ describe('sync dataset mapping', () => {
     expect(status.datasets[0]?.state).toBe('active')
     expect(status.datasets[0]?.unsyncedFiles).toBe(4)
     expect(status.datasets[0]?.lastError).toBe('retrying')
+    expect(status.datasets[1]?.state).toBe('deleting')
     request.mockRestore()
   })
 })

@@ -89,6 +89,8 @@ const ReplaceLocalDialogStub = defineComponent({
 })
 
 const Passthrough = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
+const PageHeaderStub = defineComponent((_, { slots }) => () =>
+  h('div', [slots.breadcrumbs?.(), slots.actions?.(), slots.default?.()]))
 const ButtonStub = defineComponent({
   inheritAttrs: false,
   setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()),
@@ -123,7 +125,7 @@ const FolderDetailView = compileClientComponent(new URL('./FolderDetailView.vue'
   '@/components/ui/Notice.vue': moduleDefault(Notice),
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/components/ui/Skeleton.vue': moduleDefault(Passthrough),
-  '@/components/dashboard/PageHeader.vue': moduleDefault(Passthrough),
+  '@/components/dashboard/PageHeader.vue': moduleDefault(PageHeaderStub),
   '@/components/desktop/ReplaceLocalDialog.vue': moduleDefault(ReplaceLocalDialogStub),
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: () => 'lab node' }) },
   '@/composables/useRefresh': { useRefresh },
@@ -177,6 +179,7 @@ beforeEach(() => {
   sync.mockClear()
   actionErrors.clear()
   folder.last_error = null
+  folder.state = 'active'
   dialogOpens.length = 0
 })
 
@@ -266,6 +269,17 @@ describe('folder failures', () => {
 
     expect(content(mounted.root)).toContain('the bucket "lab" does not exist on node n1')
     expect(content(mounted.root)).toContain('the node is unreachable')
+    mounted.app.unmount()
+  })
+
+  it('shows cleanup without folder actions', async () => {
+    folder.state = 'deleting'
+    const mounted = await mount()
+
+    expect(content(mounted.root)).toContain('deleting')
+    expect(() => button(mounted.root, 'Pause')).toThrow()
+    expect(() => button(mounted.root, 'Sync now')).toThrow()
+    expect(() => button(mounted.root, 'Unbind folder')).toThrow()
     mounted.app.unmount()
   })
 })
