@@ -144,6 +144,7 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
     }),
   },
   '@/composables/useDeviceStatus': { useDeviceStatus: () => ({ deviceClient: ref(null) }) },
+  '@/composables/useAssistantEditor': { provideEditorBridge: vi.fn() },
   '@/lib/desktop': { isDesktop: () => false },
   '@/lib/deviceApi': { previewDeviceDraft: vi.fn(), requireDevice: vi.fn() },
   '@/lib/api': Api,

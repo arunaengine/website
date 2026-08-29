@@ -59,6 +59,7 @@ const DesktopLayoutClient = compileClientComponent(new URL('./DesktopLayout.vue'
   '@/components/layout/RealmUnreachable.vue': moduleDefault(RealmUnreachableStub),
   '@/components/layout/NodeDown.vue': moduleDefault(NodeDownStub),
   '@/components/data/TransfersPanel.vue': moduleDefault(EmptyStub),
+  '@/components/assistant/AssistantPanel.vue': moduleDefault(EmptyStub),
   '@/components/ui/Notice.vue': moduleDefault(Notice),
   '@/composables/useAruna': { useAruna: () => permissions },
   '@/composables/useDeviceStatus': {
@@ -106,6 +107,7 @@ beforeAll(async () => {
   vi.doMock('@/components/layout/RealmUnreachable.vue', () => ({ default: RealmUnreachableStub }))
   vi.doMock('@/components/layout/NodeDown.vue', () => ({ default: NodeDownStub }))
   vi.doMock('@/components/data/TransfersPanel.vue', () => ({ default: EmptyStub }))
+  vi.doMock('@/components/assistant/AssistantPanel.vue', () => ({ default: EmptyStub }))
   DesktopLayout = (await import('./DesktopLayout.vue')).default
   AppLayout = (await import('./AppLayout.vue')).default
 })

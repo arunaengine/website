@@ -5,6 +5,7 @@ import GlobalErrorBanner from '@/components/layout/GlobalErrorBanner.vue'
 import MobileNav from '@/components/dashboard/MobileNav.vue'
 import RealmUnreachable from '@/components/layout/RealmUnreachable.vue'
 import TransfersPanel from '@/components/data/TransfersPanel.vue'
+import AssistantPanel from '@/components/assistant/AssistantPanel.vue'
 import { RouterView, useRoute } from 'vue-router'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { probeRealm, realmReach } from '@/lib/desktopBoot'
@@ -50,5 +51,6 @@ watch(
     <!-- Uploads run through the shared queue and survive navigation, so the
          floating transfers panel lives at the layout, bottom-right. -->
     <TransfersPanel />
+    <AssistantPanel />
   </div>
 </template>

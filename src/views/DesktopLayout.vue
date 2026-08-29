@@ -9,6 +9,7 @@ import RealmUnreachable from '@/components/layout/RealmUnreachable.vue'
 import NodeDown from '@/components/layout/NodeDown.vue'
 import Notice from '@/components/ui/Notice.vue'
 import TransfersPanel from '@/components/data/TransfersPanel.vue'
+import AssistantPanel from '@/components/assistant/AssistantPanel.vue'
 import { RouterView, useRoute } from 'vue-router'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
@@ -109,5 +110,6 @@ watch(
       </main>
     </div>
     <TransfersPanel />
+    <AssistantPanel />
   </div>
 </template>

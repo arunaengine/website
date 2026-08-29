@@ -12,14 +12,15 @@ import RealmSwitcher from '@/components/layout/RealmSwitcher.vue'
 import NotificationBell from '@/components/dashboard/NotificationBell.vue'
 import StatusDot from '@/components/ui/StatusDot.vue'
 import SearchOverlay from '@/components/dashboard/SearchOverlay.vue'
-import { ChevronDown, Plus, User, LogIn, LogOut, Key, Moon, Sun, RefreshCw } from '@lucide/vue'
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ChevronDown, MessageSquare, Plus, User, LogIn, LogOut, Key, Moon, Sun, RefreshCw } from '@lucide/vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useRealm } from '@/composables/useRealm'
 import { useTheme } from '@/composables/useTheme'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
+import { useAssistantChat } from '@/composables/useAssistantChat'
 import { statusTone } from '@/components/nodes/node-display'
 
 // 'desktop' is the Aruna Desktop chrome: no realm switcher and no dataset
@@ -45,8 +46,14 @@ const nodeTone = computed(() =>
   nodeState.value === 'starting' ? ('progress' as const) : statusTone(nodeState.value),
 )
 
+const { available: assistantAvailable, openPanel: openAssistant, ensureProviders } = useAssistantChat()
+
 onMounted(() => {
   if (desktop.value) watchNode()
+  if (currentUser.value) ensureProviders()
+})
+watch(currentUser, (user) => {
+  if (user) ensureProviders()
 })
 onUnmounted(() => {
   if (desktop.value) unwatchNode()
@@ -84,6 +91,18 @@ async function handleSignOut() {
       <RealmSwitcher v-else class="max-w-36 min-[480px]:max-w-none" />
 
       <SearchOverlay />
+
+      <!-- Only offered once a provider is configured and ready. -->
+      <Button
+        v-if="assistantAvailable"
+        variant="ghost"
+        size="icon"
+        aria-label="Open the assistant"
+        title="Assistant"
+        @click="openAssistant"
+      >
+        <MessageSquare class="h-4 w-4" />
+      </Button>
 
       <Button
         v-if="currentUser && !desktop"

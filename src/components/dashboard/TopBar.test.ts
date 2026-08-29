@@ -4,7 +4,7 @@ import * as RouterRuntime from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as NodeDisplay from '@/components/nodes/node-display'
 import * as Utils from '@/lib/utils'
-import { button, click, compileClientComponent, content, moduleDefault, mountApp } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, element, moduleDefault, mountApp } from '@/test/clientRender'
 
 const push = vi.fn()
 const signOut = vi.fn(async () => undefined)
@@ -13,6 +13,9 @@ const nodeLabel = ref('online')
 const nodeState = ref('running')
 const watchNode = vi.fn()
 const stopNode = vi.fn()
+const assistantAvailable = ref(false)
+const openAssistant = vi.fn()
+const ensureProviders = vi.fn()
 
 const Passthrough = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
 const Marker = (text: string) => defineComponent(() => () => h('div', text))
@@ -66,6 +69,13 @@ const TopBar = compileClientComponent(new URL('./TopBar.vue', import.meta.url), 
   '@/composables/useDeviceStatus': {
     useDeviceStatus: () => ({ label: nodeLabel, state: nodeState, start: watchNode, stop: stopNode }),
   },
+  '@/composables/useAssistantChat': {
+    useAssistantChat: () => ({
+      available: assistantAvailable,
+      openPanel: openAssistant,
+      ensureProviders,
+    }),
+  },
   '@/lib/utils': Utils,
 })
 
@@ -74,7 +84,13 @@ beforeEach(() => {
   signOut.mockClear()
   watchNode.mockClear()
   currentUser.value = { id: 'u1', name: 'Test User', email: 'me@example.org' }
+  assistantAvailable.value = false
+  openAssistant.mockClear()
 })
+
+function launcher(root: Parameters<typeof content>[0]) {
+  return element(root, (node) => node.props['aria-label'] === 'Open the assistant')
+}
 
 describe('portal chrome', () => {
   it('keeps the realm switcher and the dataset shortcut', async () => {
@@ -87,6 +103,19 @@ describe('portal chrome', () => {
     expect(watchNode).not.toHaveBeenCalled()
     await click(button(mounted.root, 'Create dataset'))
     expect(push).toHaveBeenCalledWith({ name: 'dataset-new' })
+    mounted.app.unmount()
+  })
+
+  it('offers the assistant only once a provider is ready', async () => {
+    const without = await mountApp(TopBar)
+    expect(() => launcher(without.root)).toThrow()
+    without.app.unmount()
+
+    assistantAvailable.value = true
+    const mounted = await mountApp(TopBar)
+    await click(launcher(mounted.root))
+
+    expect(openAssistant).toHaveBeenCalledOnce()
     mounted.app.unmount()
   })
 
