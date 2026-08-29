@@ -56,6 +56,7 @@ const {
   hasGroups,
   contextBusy,
   contextError,
+  contextHold,
   contextReady,
   viewReady,
   requiredNodeId,
@@ -125,6 +126,11 @@ function onNewSyncRequested() {
 }
 
 const addDataOpen = ref(false)
+// The Add data browser may open another node or group; the view takes its
+// own session back once the dialog closes.
+watch(addDataOpen, (open) => {
+  contextHold.value = open
+})
 const staging = useStaging()
 // Staging jobs side panel: config-gated (no job-listing endpoint on today's
 // backend). The dialog's connector tab covers registered connectors regardless.

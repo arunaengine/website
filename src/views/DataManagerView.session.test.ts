@@ -49,12 +49,13 @@ describe('Data view session affordances', () => {
     expect(dataManager).toContain("<RouterLink :to=\"{ name: 'groups' }\">Create or join a group</RouterLink>")
   })
 
-  it('blocks wrong-node browsing and names both node scopes before switching', () => {
-    expect(objectBrowser).toContain('v-if="contextMismatch"')
-    expect(objectBrowser).toContain('contextMismatch.issuerNodeId')
-    expect(objectBrowser).toContain('contextMismatch.requiredNodeId')
-    expect(objectBrowser).toContain('Browsing and selection stay disabled')
-    expect(objectBrowser).toContain('Open on this node')
-    expect(objectBrowser).toContain(':disabled="switchBusy || !s3.activeContext.value?.groupId"')
+  it('browses only with a session of the required node', () => {
+    // The dialog browser opens the required node's own session instead of
+    // offering a switch button; a wrong-node session never lists anything.
+    expect(objectBrowser).toContain('context.nodeId === requiredNodeId.value')
+    expect(objectBrowser).toContain('s3.activateContext(props.nodeId ?? null, selectedGroupId.value)')
+    expect(objectBrowser).toContain('const canBrowse = computed(() => contextReady.value && Boolean(effectiveEndpoint.value))')
+    expect(objectBrowser).not.toContain('Open on this node')
+    expect(objectBrowser).not.toContain('Open group')
   })
 })

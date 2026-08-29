@@ -4,6 +4,7 @@
 // instance instead of passing the same values down as props.
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { contextKey, shouldOpenContext } from './s3/context'
 import { useAruna } from './useAruna'
 import { useBuckets } from './useBuckets'
 import { useBucketShortcuts } from './useBucketShortcuts'
@@ -55,30 +56,6 @@ interface UploadContext {
 function routeString(value: unknown): string {
   if (Array.isArray(value)) return typeof value[0] === 'string' ? value[0] : ''
   return typeof value === 'string' ? value : ''
-}
-
-/** Identifies one session pair, so a failed open is recognised again. */
-export function contextKey(nodeId: string | null, groupId: string): string {
-  return `${nodeId ?? ''}|${groupId}`
-}
-
-/**
- * Whether the session for the selected group and node has to be opened now.
- * A pair that did not become ready is never opened again automatically, so a
- * failure ends in the view's Retry button instead of a retry loop; another
- * group or node is a new pair and opens on its own.
- */
-export function shouldOpenContext(state: {
-  signedIn: boolean
-  groupId: string
-  nodeId: string | null
-  ready: boolean
-  busy: boolean
-  failedKey: string | null
-}): boolean {
-  if (!state.signedIn || !state.groupId || !state.nodeId) return false
-  if (state.ready || state.busy) return false
-  return state.failedKey !== contextKey(state.nodeId, state.groupId)
 }
 
 /**
@@ -185,6 +162,8 @@ export function useDataManager() {
   // The (group, node) pair of the last attempt that did not end in a ready
   // session; only the view's Retry button opens it again.
   let failedContextKey: string | null = null
+  // An open dialog browsing another node or group drives the session meanwhile.
+  const contextHold = ref(false)
 
   async function openSelectedContext() {
     if (!selectedGroupId.value || !requiredNodeId.value || contextBusy.value) return
@@ -210,8 +189,9 @@ export function useDataManager() {
   // First load, a switched group and a deep link to another node all open their
   // session here; no button stands between the selection and the buckets.
   watch(
-    [selectedGroupId, requiredNodeId, currentUser, contextReady, contextBusy],
+    [selectedGroupId, requiredNodeId, currentUser, contextReady, contextBusy, contextHold],
     () => {
+      if (contextHold.value) return
       const open = shouldOpenContext({
         signedIn: Boolean(currentUser.value),
         groupId: selectedGroupId.value,
@@ -909,6 +889,7 @@ export function useDataManager() {
     hasGroups,
     contextBusy,
     contextError,
+    contextHold,
     contextReady,
     viewReady,
     contextMismatch,

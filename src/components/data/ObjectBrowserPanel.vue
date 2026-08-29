@@ -2,26 +2,35 @@
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Breadcrumbs from '@/components/data/Breadcrumbs.vue'
+import DropdownMenu from '@/components/ui/DropdownMenu.vue'
+import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
+import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
+import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
+import DropdownMenuLabel from '@/components/ui/DropdownMenuLabel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
-import NodeLabel from '@/components/ui/NodeLabel.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
+import ObjectBrowserSkeleton from '@/components/data/ObjectBrowserSkeleton.vue'
 import ObjectIcon from '@/components/data/ObjectIcon.vue'
+import { useAruna } from '@/composables/useAruna'
+import { useGroupSelection } from '@/composables/useGroupSelection'
 import { useS3, s3ErrorMessage, isS3AuthError, isS3NetworkError, type BucketEntry, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
+import { contextKey, shouldOpenContext } from '@/composables/s3/context'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useStagingReferences } from '@/composables/useStagingReferences'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import { computed, ref, watch } from 'vue'
-import { Boxes, KeyRound, Link2 } from '@lucide/vue'
+import { Boxes, Check, ChevronsUpDown, KeyRound, Link2, ShieldAlert } from '@lucide/vue'
 
 // Read-only bucket/object browser (no uploads, deletes or routing; the Data
 // Manager keeps its own richer inline browser). Two shapes:
 //  - default: own bucket sidebar, clicking an object emits `select` (pickers).
 //  - controlled (`bucket` prop set): browses exactly that bucket, optionally
-//    on another realm node after an explicit node-local session switch, and
-//    with `selectable` offers checkbox multi-select of objects
-//    AND folders, emitting `add` with the selection.
+//    on another realm node, and with `selectable` offers checkbox
+//    multi-select of objects AND folders, emitting `add` with the selection.
+// The session for the selected group opens on the required node by itself,
+// the same way the Data view does it.
 const props = withDefaults(
   defineProps<{
     /** Controlled mode: browse exactly this bucket and hide the bucket sidebar. */
@@ -48,6 +57,7 @@ const emit = defineEmits<{
 
 const s3 = useS3()
 const realmNodes = useRealmNodes()
+const { currentUser, myGroups } = useAruna()
 
 const controlled = computed(() => props.bucket !== undefined)
 const activeBucket = ref(props.bucket ?? '')
@@ -56,27 +66,82 @@ const s3Prefix = computed(() => (prefix.value ? `${prefix.value}/` : ''))
 
 // The endpoint actually serving the browsed bucket (local or remote).
 const effectiveEndpoint = computed(() => s3.endpointForNode(props.nodeId ?? null))
-const contextMismatch = computed(() => s3.contextMismatch(props.nodeId ?? null))
 const requiredNodeId = computed(() => s3.nodeIdFor(props.nodeId ?? null))
-const canBrowse = computed(() =>
-  Boolean(s3.hasActiveKey.value && effectiveEndpoint.value && !contextMismatch.value),
+const requiredNodeName = computed(() =>
+  requiredNodeId.value ? realmNodes.displayName(requiredNodeId.value) : 'the selected node',
 )
-const switchBusy = ref(false)
-const switchError = ref<string | null>(null)
 
-async function openOnThisNode() {
-  const groupId = s3.activeContext.value?.groupId
-  if (!groupId || switchBusy.value) return
-  switchBusy.value = true
-  switchError.value = null
+const selectedGroupId = ref(s3.activeContext.value?.groupId ?? '')
+const { groupsLoading, hasGroups } = useGroupSelection(selectedGroupId)
+const groupOptions = computed(() => {
+  const options = myGroups.value.map((group) => ({ value: group.id, label: group.name }))
+  if (selectedGroupId.value && !options.some((option) => option.value === selectedGroupId.value)) {
+    options.push({ value: selectedGroupId.value, label: selectedGroupId.value })
+  }
+  return options
+})
+const selectedGroupName = computed(
+  () => groupOptions.value.find((option) => option.value === selectedGroupId.value)?.label || 'Select a group',
+)
+
+const contextBusy = ref(false)
+const contextError = ref<string | null>(null)
+const contextReady = computed(() => {
+  const context = s3.activeContext.value
+  return Boolean(
+    context &&
+      s3.activeKey.value &&
+      currentUser.value &&
+      context.userId === currentUser.value.id &&
+      context.nodeId === requiredNodeId.value &&
+      context.groupId === selectedGroupId.value,
+  )
+})
+const contextFingerprint = computed(() => {
+  const context = contextReady.value ? s3.activeContext.value : null
+  return context ? `${context.nodeId}|${context.groupId}|${context.session.accessKeyId}` : ''
+})
+const canBrowse = computed(() => contextReady.value && Boolean(effectiveEndpoint.value))
+
+watch(selectedGroupId, () => {
+  contextError.value = null
+})
+
+// The (group, node) pair of the last attempt that did not end in a ready
+// session; only the Retry button opens it again.
+let failedContextKey: string | null = null
+
+async function openSelectedContext() {
+  if (!selectedGroupId.value || !requiredNodeId.value || contextBusy.value) return
+  const key = contextKey(requiredNodeId.value, selectedGroupId.value)
+  contextBusy.value = true
+  contextError.value = null
   try {
-    await s3.activateContext(props.nodeId ?? null, groupId)
+    // The required node mints its own session; no key crosses nodes.
+    await s3.activateContext(props.nodeId ?? null, selectedGroupId.value)
   } catch (err) {
-    switchError.value = s3ErrorMessage(err)
+    contextError.value = s3ErrorMessage(err)
   } finally {
-    switchBusy.value = false
+    contextBusy.value = false
+    failedContextKey = contextReady.value ? null : key
   }
 }
+
+watch(
+  [selectedGroupId, requiredNodeId, currentUser, contextReady, contextBusy],
+  () => {
+    const open = shouldOpenContext({
+      signedIn: Boolean(currentUser.value),
+      groupId: selectedGroupId.value,
+      nodeId: requiredNodeId.value,
+      ready: contextReady.value,
+      busy: contextBusy.value,
+      failedKey: failedContextKey,
+    })
+    if (open) void openSelectedContext()
+  },
+  { immediate: true },
+)
 
 // Reference-backed rows get the same subtle marker as the Data Manager
 // listing. The staging-references listing only covers the connected node, so
@@ -177,17 +242,16 @@ async function loadObjects(more = false) {
   }
 }
 
+// A ready session lists at once; a switched group, node or key starts over.
 watch(
-  [() => s3.activeKey.value?.accessKeyId, effectiveEndpoint, contextMismatch],
-  ([key, endpoint, mismatch]) => {
+  [contextFingerprint, effectiveEndpoint],
+  ([context, endpoint]) => {
     ++bucketRequestId
     buckets.value = []
     bucketsLoading.value = false
     bucketsError.value = null
     clearObjects()
-    if (!key || !endpoint || mismatch) {
-      return
-    }
+    if (!context || !endpoint) return
     void refreshBuckets()
     if (activeBucket.value) void loadObjects()
   },
@@ -281,166 +345,191 @@ const isEmpty = computed(
 </script>
 
 <template>
-  <div :class="controlled ? '' : 'grid gap-3 sm:grid-cols-[200px_minmax(0,1fr)]'">
-    <aside v-if="!controlled" class="overflow-hidden rounded-md border border-border">
-      <header class="flex items-center justify-between border-b border-border px-3 py-2">
-        <span class="text-xs font-semibold text-foreground">Buckets</span>
-        <Badge variant="outline">{{ visibleBuckets.length }}</Badge>
-      </header>
-      <Spinner v-if="bucketsLoading" show-label label="Loading…" class="px-3 py-3" />
-      <p v-else-if="bucketsError" class="px-3 py-2 text-xs text-destructive">{{ bucketsError }}</p>
-      <ul v-else-if="visibleBuckets.length" class="max-h-[260px] overflow-y-auto py-1">
-        <li v-for="entry in visibleBuckets" :key="entry.name">
+  <div class="space-y-3">
+    <!-- Same context line as the Data view header: the group switches here. -->
+    <div v-if="currentUser && groupOptions.length" class="flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+      <span>{{ controlled ? 'Browsing as' : 'Showing buckets of' }}</span>
+      <DropdownMenu>
+        <DropdownMenuTrigger as-child>
           <button
             type="button"
-            class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-muted"
-            :class="entry.name === activeBucket ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground'"
-            @click="openBucket(entry.name)"
+            class="inline-flex h-8 max-w-[12rem] items-center gap-1 rounded-md border border-border bg-card px-2 text-xs font-medium text-foreground shadow-sm transition-colors hover:border-primary/40"
+            aria-label="Switch group"
           >
-            <Boxes class="h-3.5 w-3.5 shrink-0 text-primary" />
-            <span class="truncate">{{ entry.name }}</span>
+            <span class="truncate">{{ selectedGroupName }}</span>
+            <ChevronsUpDown class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           </button>
-        </li>
-      </ul>
-      <EmptyState v-else compact title="No buckets in this group yet." />
-    </aside>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" class="w-64">
+          <DropdownMenuLabel>Switch group</DropdownMenuLabel>
+          <DropdownMenuItem
+            v-for="option in groupOptions"
+            :key="option.value"
+            @click="selectedGroupId = option.value"
+          >
+            <span class="min-w-0 flex-1 truncate">{{ option.label }}</span>
+            <Check v-if="option.value === selectedGroupId" class="h-3.5 w-3.5 shrink-0 text-primary" />
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <span :title="requiredNodeId ?? undefined">on {{ requiredNodeName }}</span>
+    </div>
 
-    <div class="min-w-0">
-      <Notice v-if="contextMismatch" tone="warning" class="grid min-h-[160px] place-items-center p-5 text-center">
-        <div class="max-w-lg">
-          <KeyRound class="mx-auto h-5 w-5" />
-          <p class="mt-2 font-medium text-foreground">Open a session on the required node</p>
-          <p class="mt-1 text-muted-foreground">
-            The active session was issued by <NodeLabel :node-id="contextMismatch.issuerNodeId" />. This bucket requires <NodeLabel :node-id="contextMismatch.requiredNodeId" />. Browsing and selection stay disabled until the node-local session is opened.
-          </p>
-          <Button class="mt-3" size="sm" :disabled="switchBusy || !s3.activeContext.value?.groupId" @click="openOnThisNode">
-            <Spinner v-if="switchBusy" label="Opening the session" class="text-current" />
-            <KeyRound v-else class="h-3.5 w-3.5" /> Open on this node
-          </Button>
-          <p v-if="switchError" class="mt-2 text-destructive">{{ switchError }}</p>
-        </div>
-      </Notice>
-      <div v-else-if="!s3.hasActiveKey.value" class="grid min-h-[160px] place-items-center rounded-md border border-border bg-muted/20 p-5 text-center text-xs">
-        <div class="max-w-lg">
-          <KeyRound class="mx-auto h-5 w-5 text-muted-foreground" />
-          <p class="mt-2 font-medium text-foreground">A valid temporary S3 session is required</p>
-          <p class="mt-1 text-muted-foreground">
-            The session is missing or expired. Open the same explicit group on {{ requiredNodeId ? realmNodes.displayName(requiredNodeId) : 'the selected node' }} before browsing.
-          </p>
-          <Button class="mt-3" size="sm" :disabled="switchBusy || !s3.activeContext.value?.groupId" @click="openOnThisNode">
-            <Spinner v-if="switchBusy" label="Opening the session" class="text-current" />
-            <KeyRound v-else class="h-3.5 w-3.5" /> Open group
-          </Button>
-          <p v-if="switchError" class="mt-2 text-destructive">{{ switchError }}</p>
-        </div>
+    <EmptyState v-if="!currentUser" compact title="Sign in to browse data." />
+    <Notice v-else-if="contextError && !contextReady" tone="error" class="grid min-h-[160px] place-items-center p-5 text-center">
+      <div class="max-w-lg">
+        <ShieldAlert class="mx-auto h-5 w-5" />
+        <p class="mt-2 font-medium text-foreground">
+          The session for {{ selectedGroupName }} on {{ requiredNodeName }} could not be opened
+        </p>
+        <p class="mt-1">{{ contextError }}</p>
+        <Button variant="outline" size="sm" class="mt-3" :disabled="contextBusy" @click="openSelectedContext">
+          <KeyRound class="h-3.5 w-3.5" /> Retry
+        </Button>
       </div>
-      <EmptyState v-else-if="!activeBucket" class="h-full" title="Select a bucket to browse its objects." />
-      <template v-else>
-        <div class="flex min-w-0 items-center gap-2 pb-2">
-          <Breadcrumbs :bucket="activeBucket" :path="prefix" @navigate="navigateTo" />
-          <Spinner v-if="listLoading" label="Loading objects" class="shrink-0" />
-        </div>
-        <div class="overflow-hidden rounded-md border border-border">
-          <p v-if="listError" class="border-b border-border px-3 py-2 text-xs text-destructive">{{ listError }}</p>
-          <div tabindex="0" role="region" aria-label="Objects" class="max-h-[260px] overflow-y-auto">
-            <table class="w-full text-sm">
-              <thead class="bg-muted/50 text-[11px] uppercase tracking-wider text-muted-foreground">
-                <tr>
-                  <th v-if="selectable" class="w-8 px-3 py-1.5"></th>
-                  <th scope="col" class="px-3 py-1.5 text-left font-semibold">Name</th>
-                  <th scope="col" class="px-3 py-1.5 text-right font-semibold">Size</th>
-                  <th scope="col" class="px-3 py-1.5 text-left font-semibold">Modified</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="folder in folders"
-                  :key="folder.prefix"
-                  class="cursor-pointer border-t border-border hover:bg-muted/50"
-                  @click="openFolder(folder)"
-                >
-                  <td v-if="selectable" class="w-8 px-3 py-2" @click.stop>
-                    <input
-                      type="checkbox"
-                      class="h-3.5 w-3.5 rounded border-border accent-primary"
-                      :checked="selected.has(folder.prefix)"
-                      :aria-label="`Select folder ${folder.name}`"
-                      @change="toggleFolder(folder, ($event.target as HTMLInputElement).checked)"
-                    />
-                  </td>
-                  <td class="px-3 py-2">
-                    <span class="flex items-center gap-2 text-xs">
-                      <ObjectIcon :name="folder.name" folder class="h-4 w-4" /> {{ folder.name }}/
-<!-- Tooltip lives on a span: title on inline svg is unreliable. -->
-                      <span
-                        v-if="references.prefixHasReferences(folder.prefix)"
-                        class="shrink-0"
-                        title="Contains objects referenced from an external source"
-                      >
-                        <Link2
-                          class="h-3 w-3 text-primary/40"
-                          aria-label="Contains objects referenced from an external source"
-                        />
-                      </span>
-                    </span>
-                  </td>
-                  <td class="px-3 py-2 text-right text-xs text-muted-foreground">-</td>
-                  <td class="px-3 py-2 text-xs text-muted-foreground">-</td>
-                </tr>
-                <tr
-                  v-for="object in objects"
-                  :key="object.key"
-                  class="cursor-pointer border-t border-border hover:bg-muted/30"
-                  @click="pick(object)"
-                >
-                  <td v-if="selectable" class="w-8 px-3 py-2" @click.stop>
-                    <input
-                      type="checkbox"
-                      class="h-3.5 w-3.5 rounded border-border accent-primary"
-                      :checked="selected.has(object.key)"
-                      :aria-label="`Select ${object.name}`"
-                      @change="toggleObject(object, ($event.target as HTMLInputElement).checked)"
-                    />
-                  </td>
-                  <td class="px-3 py-2">
-                    <span class="flex items-center gap-2 text-xs">
-                      <ObjectIcon :name="object.name" class="h-4 w-4" /> <span class="truncate">{{ object.name }}</span>
-<span
-                        v-if="references.keyIsReferenced(object.key)"
-                        class="shrink-0"
-                        title="Referenced from an external source"
-                      >
-                        <Link2
-                          class="h-3 w-3 text-primary/40"
-                          aria-label="Referenced from an external source"
-                        />
-                      </span>
-                    </span>
-                  </td>
-                  <td class="px-3 py-2 text-right font-mono text-xs text-muted-foreground">{{ object.size !== undefined ? formatBytes(object.size) : '-' }}</td>
-                  <td class="px-3 py-2 text-xs text-muted-foreground">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '-' }}</td>
-                </tr>
-                <tr v-if="isEmpty">
-                  <td :colspan="selectable ? 4 : 3" class="px-3 py-6 text-center text-xs text-muted-foreground">This prefix is empty.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div v-if="nextToken" class="border-t border-border px-3 py-1.5">
-            <Button variant="ghost" size="sm" :disabled="listLoading" @click="loadObjects(true)">Load more</Button>
-          </div>
-        </div>
+    </Notice>
+    <!-- Never the join-a-group state while memberships are loading. -->
+    <EmptyState
+      v-else-if="!groupsLoading && !hasGroups"
+      compact
+      title="Join a group to browse data."
+      description="Buckets belong to a group."
+    />
+    <ObjectBrowserSkeleton v-else-if="contextBusy || !contextReady" :sidebar="!controlled" />
+    <EmptyState v-else-if="!effectiveEndpoint" compact title="This node does not advertise an S3 endpoint." />
+    <div v-else :class="controlled ? '' : 'grid gap-3 sm:grid-cols-[200px_minmax(0,1fr)]'">
+      <aside v-if="!controlled" class="overflow-hidden rounded-md border border-border">
+        <header class="flex items-center justify-between border-b border-border px-3 py-2">
+          <span class="text-xs font-semibold text-foreground">Buckets</span>
+          <Badge variant="outline">{{ visibleBuckets.length }}</Badge>
+        </header>
+        <Spinner v-if="bucketsLoading" show-label label="Loading…" class="px-3 py-3" />
+        <p v-else-if="bucketsError" class="px-3 py-2 text-xs text-destructive">{{ bucketsError }}</p>
+        <ul v-else-if="visibleBuckets.length" class="max-h-[260px] overflow-y-auto py-1">
+          <li v-for="entry in visibleBuckets" :key="entry.name">
+            <button
+              type="button"
+              class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-muted"
+              :class="entry.name === activeBucket ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground'"
+              @click="openBucket(entry.name)"
+            >
+              <Boxes class="h-3.5 w-3.5 shrink-0 text-primary" />
+              <span class="truncate">{{ entry.name }}</span>
+            </button>
+          </li>
+        </ul>
+        <EmptyState v-else compact title="No buckets in this group yet." />
+      </aside>
 
-        <div v-if="selectable" class="mt-2 flex items-center justify-between gap-2">
-          <span class="text-[11px] text-muted-foreground">
-            {{ selectedList.length ? `${selectedList.length} selected` : 'Select objects or folders.' }}
-          </span>
-          <Button size="sm" :disabled="!selectedList.length" @click="addSelected">
-            Add {{ selectedList.length || '' }}
-            <Badge v-if="selectedFolderCount" variant="outline" size="sm" class="ml-1">incl. folders</Badge>
-          </Button>
-        </div>
-      </template>
+      <div class="min-w-0">
+        <EmptyState v-if="!activeBucket" class="h-full" title="Select a bucket to browse its objects." />
+        <template v-else>
+          <div class="flex min-w-0 items-center gap-2 pb-2">
+            <Breadcrumbs :bucket="activeBucket" :path="prefix" @navigate="navigateTo" />
+            <Spinner v-if="listLoading" label="Loading objects" class="shrink-0" />
+          </div>
+          <div class="overflow-hidden rounded-md border border-border">
+            <p v-if="listError" class="border-b border-border px-3 py-2 text-xs text-destructive">{{ listError }}</p>
+            <div tabindex="0" role="region" aria-label="Objects" class="max-h-[260px] overflow-y-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-muted/50 text-[11px] uppercase tracking-wider text-muted-foreground">
+                  <tr>
+                    <th v-if="selectable" class="w-8 px-3 py-1.5"></th>
+                    <th scope="col" class="px-3 py-1.5 text-left font-semibold">Name</th>
+                    <th scope="col" class="px-3 py-1.5 text-right font-semibold">Size</th>
+                    <th scope="col" class="px-3 py-1.5 text-left font-semibold">Modified</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="folder in folders"
+                    :key="folder.prefix"
+                    class="cursor-pointer border-t border-border hover:bg-muted/50"
+                    @click="openFolder(folder)"
+                  >
+                    <td v-if="selectable" class="w-8 px-3 py-2" @click.stop>
+                      <input
+                        type="checkbox"
+                        class="h-3.5 w-3.5 rounded border-border accent-primary"
+                        :checked="selected.has(folder.prefix)"
+                        :aria-label="`Select folder ${folder.name}`"
+                        @change="toggleFolder(folder, ($event.target as HTMLInputElement).checked)"
+                      />
+                    </td>
+                    <td class="px-3 py-2">
+                      <span class="flex items-center gap-2 text-xs">
+                        <ObjectIcon :name="folder.name" folder class="h-4 w-4" /> {{ folder.name }}/
+  <!-- Tooltip lives on a span: title on inline svg is unreliable. -->
+                        <span
+                          v-if="references.prefixHasReferences(folder.prefix)"
+                          class="shrink-0"
+                          title="Contains objects referenced from an external source"
+                        >
+                          <Link2
+                            class="h-3 w-3 text-primary/40"
+                            aria-label="Contains objects referenced from an external source"
+                          />
+                        </span>
+                      </span>
+                    </td>
+                    <td class="px-3 py-2 text-right text-xs text-muted-foreground">-</td>
+                    <td class="px-3 py-2 text-xs text-muted-foreground">-</td>
+                  </tr>
+                  <tr
+                    v-for="object in objects"
+                    :key="object.key"
+                    class="cursor-pointer border-t border-border hover:bg-muted/30"
+                    @click="pick(object)"
+                  >
+                    <td v-if="selectable" class="w-8 px-3 py-2" @click.stop>
+                      <input
+                        type="checkbox"
+                        class="h-3.5 w-3.5 rounded border-border accent-primary"
+                        :checked="selected.has(object.key)"
+                        :aria-label="`Select ${object.name}`"
+                        @change="toggleObject(object, ($event.target as HTMLInputElement).checked)"
+                      />
+                    </td>
+                    <td class="px-3 py-2">
+                      <span class="flex items-center gap-2 text-xs">
+                        <ObjectIcon :name="object.name" class="h-4 w-4" /> <span class="truncate">{{ object.name }}</span>
+  <span
+                          v-if="references.keyIsReferenced(object.key)"
+                          class="shrink-0"
+                          title="Referenced from an external source"
+                        >
+                          <Link2
+                            class="h-3 w-3 text-primary/40"
+                            aria-label="Referenced from an external source"
+                          />
+                        </span>
+                      </span>
+                    </td>
+                    <td class="px-3 py-2 text-right font-mono text-xs text-muted-foreground">{{ object.size !== undefined ? formatBytes(object.size) : '-' }}</td>
+                    <td class="px-3 py-2 text-xs text-muted-foreground">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '-' }}</td>
+                  </tr>
+                  <tr v-if="isEmpty">
+                    <td :colspan="selectable ? 4 : 3" class="px-3 py-6 text-center text-xs text-muted-foreground">This prefix is empty.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div v-if="nextToken" class="border-t border-border px-3 py-1.5">
+              <Button variant="ghost" size="sm" :disabled="listLoading" @click="loadObjects(true)">Load more</Button>
+            </div>
+          </div>
+
+          <div v-if="selectable" class="mt-2 flex items-center justify-between gap-2">
+            <span class="text-[11px] text-muted-foreground">
+              {{ selectedList.length ? `${selectedList.length} selected` : 'Select objects or folders.' }}
+            </span>
+            <Button size="sm" :disabled="!selectedList.length" @click="addSelected">
+              Add {{ selectedList.length || '' }}
+              <Badge v-if="selectedFolderCount" variant="outline" size="sm" class="ml-1">incl. folders</Badge>
+            </Button>
+          </div>
+        </template>
+      </div>
     </div>
   </div>
 </template>
