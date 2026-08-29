@@ -152,6 +152,11 @@ export function assistantProxyBaseUrl(apiBaseUrl: string, providerId: string): s
   return `${apiBaseUrl.replace(/\/+$/, '')}${providerPath(providerId, '/proxy')}`
 }
 
+/** The model to use: an explicit choice, else the default, else the first. */
+export function providerModelId(provider: AssistantProvider, modelId?: string): string {
+  return modelId || provider.default_model || provider.models[0]?.id || ''
+}
+
 export const PROVIDER_KIND_LABELS: Readonly<Record<AssistantProviderKind, string>> = {
   anthropic: 'Anthropic',
   openai: 'OpenAI',

@@ -27,10 +27,6 @@ export function proxyFetch(context: ModelContext): typeof globalThis.fetch {
   }
 }
 
-export function providerModelId(provider: AssistantProvider, modelId?: string): string {
-  return modelId || provider.default_model || provider.models[0]?.id || ''
-}
-
 /**
  * The model the chat loop talks to. ChatGPT rides the OpenAI responses model
  * because the proxy exposes only `/responses` for it; every other kind speaks

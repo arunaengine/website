@@ -13,11 +13,11 @@ import {
   rootEntity,
   rootId,
   setProperty,
-  typeLabel,
   type CrateDraft,
   type DraftEntity,
   type DraftValue,
 } from '@/lib/crate/editor'
+import type { DraftContext } from './prompt'
 import { fetchOrcidRecord } from '@/lib/lookup/orcid'
 import { fetchRorRecord } from '@/lib/lookup/ror'
 import { errorMessage } from '@/lib/utils'
@@ -27,7 +27,8 @@ import { denied, type ApprovalGate } from './types'
 export interface EditorBridge {
   draft: () => CrateDraft
   update: (next: CrateDraft) => void
-  profileId: () => string
+  /** What the system prompt says about the open draft. */
+  summary: () => DraftContext
   profiles: () => Array<{ id: string; name: string }>
   applyProfile: (profileId: string) => void
   validate: () => Promise<unknown>
@@ -205,15 +206,15 @@ export function editorTools(bridge: EditorBridge, gate: ApprovalGate): ToolSet {
       inputSchema: schema<Record<string, never>>({}),
       execute: () => {
         const draft = bridge.draft()
-        const root = rootEntity(draft)
+        const summary = bridge.summary()
         return {
           root_id: rootId(draft),
-          name: root?.properties.name?.[0]?.value ?? '',
-          description: root?.properties.description?.[0]?.value ?? '',
-          profile_id: bridge.profileId(),
-          entity_count: draft.entities.length,
-          part_count: partIds(draft).size,
-          types: [...new Set(draft.entities.flatMap((entity) => entity.types.map(typeLabel)))],
+          name: summary.rootName ?? '',
+          description: rootEntity(draft)?.properties.description?.[0]?.value ?? '',
+          profile_id: summary.profileId ?? '',
+          entity_count: summary.entityCount,
+          part_count: summary.partCount,
+          types: summary.types,
           available_profiles: bridge.profiles(),
         }
       },

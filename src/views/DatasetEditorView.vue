@@ -31,9 +31,11 @@ import {
   fromRoCrate,
   liveIssues,
   newDraft,
+  partIds,
   rootEntity,
   rootId,
   toRoCrate,
+  typeLabel,
   type CrateDraft,
 } from '@/lib/crate/editor'
 import { FileJson2, Plus } from '@lucide/vue'
@@ -167,7 +169,13 @@ const canSave = computed(() => Boolean(rootName.value && draft.value.groupId))
 provideEditorBridge({
   draft: () => draft.value,
   update,
-  profileId: () => profileId.value,
+  summary: () => ({
+    profileId: profileId.value,
+    rootName: rootName.value,
+    entityCount: draft.value.entities.length,
+    partCount: partIds(draft.value).size,
+    types: [...new Set(draft.value.entities.flatMap((entity) => entity.types.map(typeLabel)))],
+  }),
   profiles: () => selectableProfiles.value.map((profile) => ({ id: profile.id, name: profile.name })),
   applyProfile: pickProfile,
   validate: async () => {

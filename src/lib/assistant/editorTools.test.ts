@@ -20,7 +20,13 @@ function harness(approve = true) {
     update: (next) => {
       draft = next
     },
-    profileId: () => 'p-1',
+    summary: () => ({
+      profileId: 'p-1',
+      rootName: '',
+      entityCount: draft.entities.length,
+      partCount: 1,
+      types: ['Dataset', 'Person'],
+    }),
     profiles: () => [{ id: 'p-1', name: 'Base' }],
     applyProfile,
     validate,

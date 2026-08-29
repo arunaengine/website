@@ -1,18 +1,14 @@
 // The chat panel's session: one provider, one model, one conversation held in
-// memory. Module singleton, so the launcher, the panel and the editor bridge
-// all see the same state.
+// memory, shared by the launcher and the panel. The AI SDK and the MCP client
+// are only imported once a message is actually sent.
 import { computed, ref } from 'vue'
 import type { ModelMessage, ToolSet } from 'ai'
-import { createSession, type AssistantProvider } from '@/lib/api'
+import { createSession, providerModelId, type AssistantProvider } from '@/lib/api'
 import { apiBaseUrl, authToken, readStored, realmInfo, storeValue } from './aruna/state'
 import { useAssistantProviders } from './useAssistantProviders'
 import { useAssistantEditor } from './useAssistantEditor'
-import { runTurn } from '@/lib/assistant/chat'
-import { connectMcp, type McpConnection } from '@/lib/assistant/mcpClient'
-import { editorTools } from '@/lib/assistant/editorTools'
-import { buildModel, providerModelId } from '@/lib/assistant/models'
-import { mergeTools, nodeTools } from '@/lib/assistant/tools'
-import { systemPrompt, type PromptContext } from '@/lib/assistant/prompt'
+import type { McpConnection } from '@/lib/assistant/mcpClient'
+import type { PromptContext } from '@/lib/assistant/prompt'
 import type { ApprovalGate, ApprovalRequest, ChatMessage, ToolCallView } from '@/lib/assistant/types'
 import { errorMessage } from '@/lib/utils'
 
@@ -95,14 +91,18 @@ async function nodeToolSet(): Promise<ToolSet> {
   }
   const token = await sessionToken()
   if (!connection || connectionToken !== token) {
+    const { connectMcp } = await import('@/lib/assistant/mcpClient')
     connection = await connectMcp(url, token)
     connectionToken = token
   }
+  const { nodeTools } = await import('@/lib/assistant/tools')
   return nodeTools(await connection.listTools(), connection, gate)
 }
 
 async function toolSet(): Promise<ToolSet> {
   const { bridge } = useAssistantEditor()
+  const { editorTools } = await import('@/lib/assistant/editorTools')
+  const { mergeTools } = await import('@/lib/assistant/tools')
   const local = bridge.value ? editorTools(bridge.value, gate) : {}
   try {
     return mergeTools(await nodeToolSet(), local)
@@ -171,6 +171,11 @@ export function useAssistantChat() {
     ]
     history = [...history, { role: 'user', content: prompt }]
     try {
+      const [{ runTurn }, { buildModel }, { systemPrompt }] = await Promise.all([
+        import('@/lib/assistant/chat'),
+        import('@/lib/assistant/models'),
+        import('@/lib/assistant/prompt'),
+      ])
       const tools = await toolSet()
       const result = await runTurn({
         model: buildModel(provider.value, model.value, { apiBaseUrl: apiBaseUrl.value, token: authToken.value }),

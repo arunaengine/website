@@ -13,8 +13,6 @@ import MessageList from '@/components/assistant/MessageList.vue'
 import { useAssistantChat } from '@/composables/useAssistantChat'
 import { useAssistantEditor } from '@/composables/useAssistantEditor'
 import { useAruna } from '@/composables/useAruna'
-import { partIds, rootEntity, typeLabel } from '@/lib/crate/editor'
-import type { DraftContext } from '@/lib/assistant/prompt'
 import { MessageSquare, Plus, X } from '@lucide/vue'
 
 const route = useRoute()
@@ -48,25 +46,12 @@ const modelOptions = computed(() =>
 const deleteCallId = computed(() =>
   (pending.value?.always ? pending.value.request.id : undefined))
 
-function draftContext(): DraftContext | null {
-  const editor = bridge.value
-  if (!editor) return null
-  const draft = editor.draft()
-  return {
-    profileId: editor.profileId(),
-    rootName: rootEntity(draft)?.properties.name?.[0]?.value ?? '',
-    entityCount: draft.entities.length,
-    partCount: partIds(draft).size,
-    types: [...new Set(draft.entities.flatMap((entity) => entity.types.map(typeLabel)))],
-  }
-}
-
 function submit() {
   const text = input.value
   input.value = ''
   void send(text, {
     route: route.fullPath,
-    draft: draftContext(),
+    draft: bridge.value?.summary() ?? null,
     profiles: profiles.value.map((profile) => ({ id: profile.id, name: profile.name })),
   })
 }
