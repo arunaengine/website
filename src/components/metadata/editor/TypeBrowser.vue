@@ -5,9 +5,13 @@ import { CURATED_TYPES, isDataType, typeLabel, vocabTypeUri } from '@/lib/crate/
 import { normalizeTypeUri } from '@/lib/profiles/uri'
 import type { VocabIndex, VocabTerm } from '@/lib/profiles/vocabulary'
 
+// The one type list: the common types on top, every bundled class behind
+// them. A host with its own search box passes `query`; otherwise the list
+// carries one itself.
 const props = defineProps<{
   vocab: VocabIndex | null
   modelValue: string
+  query?: string
   /** Property range: when set, "Only matching types" narrows the list to it. */
   range?: string[]
   onlyMatching?: boolean
@@ -20,7 +24,8 @@ const emit = defineEmits<{
 }>()
 
 const ALL_LIMIT = 40
-const query = ref('')
+const ownQuery = ref('')
+const text = computed(() => (props.query ?? ownQuery.value).trim())
 
 // The curated shortlist keeps its crate names (File is RO-Crate's, not
 // schema.org's); everything else comes from the bundled vocabulary.
@@ -43,8 +48,7 @@ function asOption(term: VocabTerm) {
 }
 
 const results = computed(() => {
-  const text = query.value.trim()
-  if (!text) {
+  if (!text.value) {
     const shortlist = curated.value.filter((option) => allowed(option.type))
     const all = (props.vocab?.classes ?? [])
       .filter((term) => allowed(term.uri) && !CURATED_TYPES.includes(term.name))
@@ -52,11 +56,11 @@ const results = computed(() => {
       .map(asOption)
     return { shortlist, all }
   }
-  const hits = (props.vocab?.searchClasses(text, ALL_LIMIT) ?? [])
+  const hits = (props.vocab?.searchClasses(text.value, ALL_LIMIT) ?? [])
     .filter((term) => allowed(term.uri))
     .map(asOption)
   const shortlist = curated.value.filter((option) =>
-    allowed(option.type) && option.label.toLowerCase().includes(text.toLowerCase()))
+    allowed(option.type) && option.label.toLowerCase().includes(text.value.toLowerCase()))
   return { shortlist, all: hits.filter((option) => !shortlist.some((entry) => entry.type === option.type)) }
 })
 
@@ -72,10 +76,11 @@ function isSelected(type: string): boolean {
 </script>
 
 <template>
-  <div class="space-y-3">
-    <div class="flex flex-wrap items-center gap-3">
+  <div class="space-y-2">
+    <div v-if="query === undefined || range?.length" class="flex flex-wrap items-center gap-3 px-1">
       <Input
-        v-model="query"
+        v-if="query === undefined"
+        v-model="ownQuery"
         class="min-w-48 flex-1"
         autofocus
         placeholder="Search every type"
@@ -93,25 +98,24 @@ function isSelected(type: string): boolean {
     </div>
 
     <div v-for="group in [{ title: 'Common', options: results.shortlist }, { title: 'Everything else', options: results.all }]" :key="group.title">
-      <p v-if="group.options.length" class="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+      <p v-if="group.options.length" class="px-2.5 pb-1 pt-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
         {{ group.title }}
       </p>
-      <ul v-if="group.options.length" class="divide-y divide-border rounded-md border border-border">
-        <li v-for="option in group.options" :key="option.type">
-          <button
-            type="button"
-            class="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left"
-            :class="isSelected(option.type) ? 'bg-primary/10' : 'hover:bg-muted/40'"
-            @click="emit('update:modelValue', option.type)"
-          >
-            <span class="text-sm font-medium text-foreground">{{ typeLabel(option.label) }}</span>
-            <span v-if="option.description" class="line-clamp-1 text-[11px] text-muted-foreground">{{ option.description }}</span>
-          </button>
-        </li>
-      </ul>
+      <button
+        v-for="option in group.options"
+        :key="option.type"
+        type="button"
+        role="option"
+        class="flex w-full flex-col items-start gap-0.5 rounded-md px-2.5 py-1.5 text-left hover:bg-muted/40 data-[active=true]:bg-muted"
+        :class="isSelected(option.type) ? 'bg-primary/10' : ''"
+        @click="emit('update:modelValue', option.type)"
+      >
+        <span class="text-sm font-medium text-foreground">{{ typeLabel(option.label) }}</span>
+        <span v-if="option.description" class="line-clamp-1 text-[11px] text-muted-foreground">{{ option.description }}</span>
+      </button>
     </div>
 
-    <p v-if="!results.shortlist.length && !results.all.length" class="text-xs text-muted-foreground">
+    <p v-if="!results.shortlist.length && !results.all.length" class="px-2.5 py-2 text-xs text-muted-foreground">
       No type matches that search.
     </p>
   </div>

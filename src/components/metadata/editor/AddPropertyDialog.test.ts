@@ -23,29 +23,35 @@ beforeAll(async () => {
 })
 
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
-const InputStub = defineComponent({
-  props: { modelValue: { type: [String, Number], default: '' } },
+// The dialog shell reduced to its search box and its two slots.
+const CommandDialogStub = defineComponent({
+  props: { modelValue: { type: String, default: '' }, ariaLabel: String, placeholder: String, description: String },
   emits: ['update:modelValue'],
-  setup(props, { attrs, emit }) {
-    return () => h('input', {
-      ...attrs,
-      value: props.modelValue,
-      onInput: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value),
-    })
+  setup(props, { emit, slots }) {
+    return () => h('div', [
+      h('p', props.description),
+      h('input', {
+        'aria-label': props.ariaLabel ?? props.placeholder,
+        value: props.modelValue,
+        onInput: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value),
+      }),
+      slots.default?.(),
+      slots.footer?.(),
+    ])
   },
 })
 
-const AddPropertyPopover = compileClientComponent(new URL('./AddPropertyPopover.vue', import.meta.url), {
+const AddPropertyDialog = compileClientComponent(new URL('./AddPropertyDialog.vue', import.meta.url), {
   vue: VueRuntime,
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
-  '@/components/ui/Input.vue': moduleDefault(InputStub),
+  '@/components/ui/CommandDialog.vue': moduleDefault(CommandDialogStub),
   '@/lib/crate/editor': Editor,
   '@/lib/profiles/uri': Uri,
 })
 
 function mount(entity: Editor.DraftEntity, picked: Array<{ key: string; kind: string }> = []) {
-  return mountApp(AddPropertyPopover, {
-    props: { entity, vocab, onPick: (value: { key: string; kind: string }) => picked.push(value) },
+  return mountApp(AddPropertyDialog, {
+    props: { open: true, entity, vocab, onPick: (value: { key: string; kind: string }) => picked.push(value) },
   })
 }
 
@@ -65,7 +71,7 @@ function row(root: HostNode, label: string): HostNode {
   return match
 }
 
-describe('AddPropertyPopover', () => {
+describe('AddPropertyDialog', () => {
   it('suggests the properties the entity type carries', async () => {
     const mounted = await mount(dataset)
     const text = content(mounted.root)

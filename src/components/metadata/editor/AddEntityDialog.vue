@@ -6,6 +6,7 @@ import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
+import CommandPane from '@/components/ui/CommandPane.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
@@ -33,6 +34,8 @@ import type { ContextEntity, LookupHit, RegistryRecord } from '@/lib/lookup/type
 import type { VocabIndex } from '@/lib/profiles/vocabulary'
 import { errorMessage } from '@/lib/utils'
 
+// Two steps in one dialog: search the type, then name the entity. A link from
+// the dataset is offered, never assumed.
 const props = defineProps<{
   open: boolean
   draft: CrateDraft
@@ -52,6 +55,7 @@ const emit = defineEmits<{
   (e: 'created', value: { draft: CrateDraft; entity: DraftEntity }): void
 }>()
 
+const query = ref('')
 const type = ref('')
 const onlyMatching = ref(Boolean(props.range?.length))
 const name = ref('')
@@ -91,6 +95,7 @@ const typedId = computed(() => {
 
 watch(() => props.open, (open) => {
   if (!open) return
+  query.value = ''
   type.value = ''
   onlyMatching.value = Boolean(props.range?.length)
   name.value = ''
@@ -184,84 +189,92 @@ function create() {
 
 <template>
   <Dialog :open="open" @update:open="(value: boolean) => emit('update:open', value)">
-    <DialogContent class="max-w-xl">
-      <DialogHeader>
-        <DialogTitle>Add an entity</DialogTitle>
-        <DialogDescription>
-          Search for the kind of thing this is, then give it a name. Everything in the dataset is
-          described the same way.
+    <DialogContent v-if="!type" class="max-w-lg gap-0 overflow-hidden p-0">
+      <div class="border-b border-border px-4 py-3 pr-10">
+        <DialogTitle class="text-sm">Add an entity</DialogTitle>
+        <DialogDescription class="mt-0.5 text-xs">
+          Search for the kind of thing this is. Everything in the dataset is described the same way.
         </DialogDescription>
-      </DialogHeader>
-
-      <div class="max-h-[60vh] space-y-5 overflow-y-auto px-1">
+      </div>
+      <CommandPane v-model="query" placeholder="Search every type" aria-label="Search entity types">
         <TypeBrowser
           v-model="type"
           v-model:only-matching="onlyMatching"
+          :query="query"
           :vocab="vocab"
           :range="range"
           :exclude-data="excludeData"
         />
+      </CommandPane>
+    </DialogContent>
 
-        <div v-if="type" class="space-y-3 border-t border-border pt-4">
-          <div>
-            <label class="text-xs font-medium text-foreground">Name</label>
-            <div v-if="registry" class="mt-1 space-y-2">
-              <LookupBox
-                v-model="name"
-                :kind="registry.kind"
-                aria-label="Name"
-                :placeholder="`Search ${registry.label} by name or id`"
-                @select="useHit"
-              />
-              <p class="text-[11px] text-muted-foreground">
-                Search {{ registry.label }} by name or id, or simply type the name yourself.
-              </p>
-              <div v-if="typedId" class="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  aria-label="Import this record"
-                  :disabled="importing"
-                  @click="importRecord"
-                >
-                  <Spinner v-if="importing" class="text-current" aria-hidden="true" />
-                  Use {{ registry.label }} {{ typedId }}
-                </Button>
-              </div>
-              <Notice v-if="lookupError" tone="warning">{{ lookupError }}</Notice>
-            </div>
-            <Input v-else v-model="name" class="mt-1" aria-label="Name" @keydown.enter="create" />
-          </div>
+    <DialogContent v-else class="max-w-lg">
+      <DialogHeader>
+        <DialogTitle>Add {{ /^[aeiou]/i.test(typeLabel(type)) ? 'an' : 'a' }} {{ typeLabel(type) }}</DialogTitle>
+        <DialogDescription>
+          <button type="button" class="font-medium text-primary hover:underline" @click="type = ''">Change type</button>
+        </DialogDescription>
+      </DialogHeader>
 
-          <div>
-            <label class="text-xs font-medium text-foreground">Identifier</label>
-            <Input
-              :model-value="identifier"
-              class="mt-1 font-mono text-xs"
-              aria-label="Identifier"
-              @update:model-value="(value: string | number) => { identifier = String(value); idTouched = true }"
+      <div class="space-y-4">
+        <div>
+          <label class="text-xs font-medium text-foreground">Name</label>
+          <div v-if="registry" class="mt-1 space-y-2">
+            <LookupBox
+              v-model="name"
+              :kind="registry.kind"
+              aria-label="Name"
+              :placeholder="`Search ${registry.label} by name or id`"
+              @select="useHit"
             />
-            <p class="mt-1 text-[11px] text-muted-foreground">{{ idHint(type) }}</p>
-          </div>
-
-          <div v-if="linkedFrom" class="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
-            Linked from <span class="font-medium text-foreground">{{ linkedFrom.entity }}</span>
-            as <span class="font-medium text-foreground">{{ linkedFrom.property }}</span>.
-          </div>
-          <div v-else-if="offerLink && linkOptions.length">
-            <label class="text-xs font-medium text-foreground">Link from the dataset as</label>
-            <Select
-              :model-value="linkAs"
-              :options="[{ value: '', label: 'None' }, ...linkOptions]"
-              class="mt-1"
-              placeholder="None"
-              aria-label="Link from the dataset as"
-              @update:model-value="(value: string) => (linkAs = value)"
-            />
-            <p class="mt-1 text-[11px] text-muted-foreground">
-              {{ linkAs ? 'The dataset will point at this entity.' : 'Nothing points at this entity until you pick a property.' }}
+            <p class="text-[11px] text-muted-foreground">
+              Search {{ registry.label }} by name or id, or simply type the name yourself.
             </p>
+            <div v-if="typedId" class="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                aria-label="Import this record"
+                :disabled="importing"
+                @click="importRecord"
+              >
+                <Spinner v-if="importing" class="text-current" aria-hidden="true" />
+                Use {{ registry.label }} {{ typedId }}
+              </Button>
+            </div>
+            <Notice v-if="lookupError" tone="warning">{{ lookupError }}</Notice>
           </div>
+          <Input v-else v-model="name" class="mt-1" aria-label="Name" autofocus @keydown.enter="create" />
+        </div>
+
+        <div>
+          <label class="text-xs font-medium text-foreground">Identifier</label>
+          <Input
+            :model-value="identifier"
+            class="mt-1 font-mono text-xs"
+            aria-label="Identifier"
+            @update:model-value="(value: string | number) => { identifier = String(value); idTouched = true }"
+          />
+          <p class="mt-1 text-[11px] text-muted-foreground">{{ idHint(type) }}</p>
+        </div>
+
+        <div v-if="linkedFrom" class="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+          Linked from <span class="font-medium text-foreground">{{ linkedFrom.entity }}</span>
+          as <span class="font-medium text-foreground">{{ linkedFrom.property }}</span>.
+        </div>
+        <div v-else-if="offerLink && linkOptions.length">
+          <label class="text-xs font-medium text-foreground">Link from the dataset as</label>
+          <Select
+            :model-value="linkAs"
+            :options="[{ value: '', label: 'None' }, ...linkOptions]"
+            class="mt-1"
+            placeholder="None"
+            aria-label="Link from the dataset as"
+            @update:model-value="(value: string) => (linkAs = value)"
+          />
+          <p class="mt-1 text-[11px] text-muted-foreground">
+            {{ linkAs ? 'The dataset will point at this entity.' : 'Nothing points at this entity until you pick a property.' }}
+          </p>
         </div>
       </div>
 

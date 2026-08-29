@@ -41,7 +41,7 @@ const EntityHeader = compileClientComponent(new URL('./EntityHeader.vue', import
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Notice.vue': moduleDefault(BadgeStub),
   '@/components/ui/Popover.vue': moduleDefault(PopoverStub),
-  './TypeBrowser.vue': moduleDefault(EmptyStub),
+  './TypeDialog.vue': moduleDefault(EmptyStub),
   '@/lib/crate/editor': Editor,
   '@/lib/utils': Utils,
 })

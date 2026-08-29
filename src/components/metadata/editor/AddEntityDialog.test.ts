@@ -72,9 +72,26 @@ const LookupBox = compileClientComponent(new URL('../LookupBox.vue', import.meta
   '@/lib/lookup/registry': Registry,
 })
 
+// The search box and the list around the type browser, without the dialog chrome.
+const CommandPaneStub = defineComponent({
+  props: { modelValue: { type: String, default: '' }, ariaLabel: String, placeholder: String },
+  emits: ['update:modelValue'],
+  setup(props, { emit, slots }) {
+    return () => h('div', [
+      h('input', {
+        'aria-label': props.ariaLabel ?? props.placeholder,
+        value: props.modelValue,
+        onInput: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value),
+      }),
+      slots.default?.(),
+    ])
+  },
+})
+
 const AddEntityDialog = compileClientComponent(new URL('./AddEntityDialog.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
+  '@/components/ui/CommandPane.vue': moduleDefault(CommandPaneStub),
   '@/components/ui/Dialog.vue': moduleDefault(Passthrough),
   '@/components/ui/DialogContent.vue': moduleDefault(Passthrough),
   '@/components/ui/DialogHeader.vue': moduleDefault(Passthrough),
@@ -181,6 +198,7 @@ describe('AddEntityDialog', () => {
     await click(button(mounted.root, 'Person'))
     expect(content(mounted.root)).toContain('Search ORCID by name or id')
 
+    await click(button(mounted.root, 'Change type'))
     await click(button(mounted.root, 'Organization'))
     expect(content(mounted.root)).toContain('Search ROR by name or id')
     mounted.app.unmount()

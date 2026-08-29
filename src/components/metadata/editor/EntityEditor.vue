@@ -6,7 +6,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import RootForm from './RootForm.vue'
 import EntityHeader from './EntityHeader.vue'
 import PropertyEditor from './PropertyEditor.vue'
-import AddPropertyPopover from './AddPropertyPopover.vue'
+import AddPropertyDialog from './AddPropertyDialog.vue'
 import {
   addValue,
   defaultValue,
@@ -43,7 +43,6 @@ const isRoot = computed(() => props.selected === rootId(props.draft))
 const json = computed(() => JSON.stringify(toRoCrate(props.draft), null, 2))
 
 function addProperty(picked: { key: string; kind: DraftValueKind }) {
-  propertyOpen.value = false
   if (!entity.value) return
   emit('update', addValue(props.draft, entity.value.id, picked.key, defaultValue(picked.kind)))
 }
@@ -80,17 +79,17 @@ function addProperty(picked: { key: string; kind: DraftValueKind }) {
       @select="(id) => emit('select', id)"
     />
 
-    <div class="relative flex flex-wrap items-center gap-2 border-t border-border px-5 py-3">
-      <Button variant="outline" size="sm" @click="propertyOpen = !propertyOpen">
+    <div class="flex flex-wrap items-center gap-2 border-t border-border px-5 py-3">
+      <Button variant="outline" size="sm" @click="propertyOpen = true">
         <Plus class="h-3.5 w-3.5" /> Add property
       </Button>
-      <AddPropertyPopover
+      <AddPropertyDialog
         v-if="propertyOpen"
+        :open="propertyOpen"
         :entity="entity"
         :vocab="vocab"
-        class="left-5"
+        @update:open="(value) => (propertyOpen = value)"
         @pick="addProperty"
-        @close="propertyOpen = false"
       />
     </div>
 

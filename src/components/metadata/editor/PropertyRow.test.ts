@@ -92,7 +92,7 @@ const PropertyRow = compileClientComponent(new URL('./PropertyRow.vue', import.m
   '@/components/ui/DropdownMenuSubContent.vue': moduleDefault(Passthrough),
   './ValueInput.vue': moduleDefault(ValueInput),
   './ReferenceValue.vue': moduleDefault(ReferenceValue),
-  './LinkEntityPopover.vue': moduleDefault(EmptyStub),
+  './LinkEntityDialog.vue': moduleDefault(EmptyStub),
   './AddEntityDialog.vue': moduleDefault(EmptyStub),
   './IssueMark.vue': moduleDefault(IssueMarkStub),
   './grid': Grid,

@@ -11,7 +11,7 @@ import DropdownMenuSubTrigger from '@/components/ui/DropdownMenuSubTrigger.vue'
 import DropdownMenuSubContent from '@/components/ui/DropdownMenuSubContent.vue'
 import ValueInput from './ValueInput.vue'
 import ReferenceValue from './ReferenceValue.vue'
-import LinkEntityPopover from './LinkEntityPopover.vue'
+import LinkEntityDialog from './LinkEntityDialog.vue'
 import AddEntityDialog from './AddEntityDialog.vue'
 import IssueMark from './IssueMark.vue'
 import { ROW_ACTIONS, ROW_GRID, ROW_LABEL } from './grid'
@@ -150,14 +150,6 @@ function created(next: CrateDraft, entityId: string) {
             :presets="presets"
             @update:model-value="(next) => set(index, next.value)"
           />
-          <LinkEntityPopover
-            v-if="linkFor === index"
-            :draft="draft"
-            :vocab="vocab"
-            :range="range"
-            @pick="link"
-            @close="linkFor = -1"
-          />
         </div>
 
         <Button
@@ -227,6 +219,15 @@ function created(next: CrateDraft, entityId: string) {
       <IssueMark :issues="issues ?? []" />
     </div>
 
+    <LinkEntityDialog
+      v-if="linkFor >= 0"
+      open
+      :draft="draft"
+      :vocab="vocab"
+      :range="range"
+      @update:open="(value) => { if (!value) linkFor = -1 }"
+      @pick="link"
+    />
     <AddEntityDialog
       v-if="createFor >= 0"
       open

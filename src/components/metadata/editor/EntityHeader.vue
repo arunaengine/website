@@ -5,7 +5,7 @@ import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Popover from '@/components/ui/Popover.vue'
-import TypeBrowser from './TypeBrowser.vue'
+import TypeDialog from './TypeDialog.vue'
 import {
   displayName,
   entityGroup,
@@ -32,7 +32,6 @@ const emit = defineEmits<{
 const idEditing = ref(false)
 const idDraft = ref('')
 const typeOpen = ref(false)
-const pickerType = ref('')
 const confirmRemove = ref(false)
 
 const group = computed(() => entityGroup(props.draft, props.entity))
@@ -61,8 +60,6 @@ function commitId() {
 }
 
 function addType(type: string) {
-  typeOpen.value = false
-  pickerType.value = ''
   emit('update', setTypes(props.draft, props.entity.id, [...props.entity.types, type]))
 }
 
@@ -157,23 +154,10 @@ function remove() {
           <X class="h-3 w-3" />
         </button>
       </span>
-      <div class="relative">
-        <Button variant="ghost" size="sm" class="h-6 px-2 text-[11px]" @click="typeOpen = !typeOpen">
-          <Plus class="h-3 w-3" /> Add type
-        </Button>
-        <div
-          v-if="typeOpen"
-          class="absolute left-0 top-full z-30 mt-1 w-80 rounded-md border border-border bg-popover p-2 shadow-md"
-        >
-          <TypeBrowser v-model="pickerType" :vocab="vocab" />
-          <div class="mt-2 flex justify-end gap-2">
-            <Button variant="ghost" size="sm" @click="typeOpen = false">Cancel</Button>
-            <Button size="sm" aria-label="Add this type" :disabled="!pickerType" @click="addType(pickerType)">
-              Add
-            </Button>
-          </div>
-        </div>
-      </div>
+      <Button variant="ghost" size="sm" class="h-6 px-2 text-[11px]" @click="typeOpen = true">
+        <Plus class="h-3 w-3" /> Add type
+      </Button>
+      <TypeDialog v-if="typeOpen" :open="typeOpen" :vocab="vocab" @update:open="(value) => (typeOpen = value)" @pick="addType" />
     </div>
 
     <Notice v-if="confirmRemove" tone="warning">
