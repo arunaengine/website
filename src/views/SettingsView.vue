@@ -12,6 +12,7 @@ import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import GroupDetail from '@/components/groups/GroupDetail.vue'
 import DevicesPanel from '@/components/onboarding/DevicesPanel.vue'
+import SessionsPanel from '@/components/settings/SessionsPanel.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsList from '@/components/ui/TabsList.vue'
@@ -56,6 +57,7 @@ const settingsTabs = [
   { id: 'profile', label: 'Profile' },
   { id: 'groups', label: 'Groups' },
   { id: 'access', label: 'Access' },
+  { id: 'sessions', label: 'Sessions' },
   { id: 'connection', label: 'Connection' },
   { id: 'appearance', label: 'Appearance' },
 ] as const
@@ -483,6 +485,10 @@ function toggleGroup(groupId: string) {
         <section class="surface overflow-hidden">
           <DevicesPanel />
         </section>
+      </TabsContent>
+
+      <TabsContent value="sessions" class="container mt-0 min-w-0 space-y-5 py-6">
+        <SessionsPanel />
       </TabsContent>
 
       <TabsContent value="appearance" class="container mt-0 min-w-0 space-y-5 py-6">
