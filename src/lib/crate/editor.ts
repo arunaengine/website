@@ -6,13 +6,12 @@
 
 import { slugify, uniqueId } from '@/lib/profiles/emit'
 import { isAbsoluteUri, isRecord, normalizeTypeUri, SCHEMA_ORG, termNameFromUri } from '@/lib/profiles/uri'
-import { RO_CRATE_PROFILE } from '@/lib/profiles/types'
 import { RO_CRATE_PROFILE_IRI, type SubcrateLink } from '@/lib/subcrates'
 import { datatypeKind, type VocabIndex, type VocabTerm } from '@/lib/profiles/vocabulary'
+import { contextIri, contextVersion, DEFAULT_CRATE_VERSION, normalizeContext, specIri } from './version'
 
 export const ROOT_ID = './'
 export const DESCRIPTOR_ID = 'ro-crate-metadata.json'
-const RO_CRATE_CONTEXT = 'https://w3id.org/ro/crate/1.1/context'
 const LONG_TEXT = 100
 
 export type DraftValueKind =
@@ -532,10 +531,11 @@ export function addSubcratePart(draft: CrateDraft, link: SubcrateLink): CrateDra
 // ---------------------------------------------------------------------------
 
 export function toRoCrate(draft: CrateDraft): Record<string, unknown> {
+  const context = draft.context ?? contextIri(DEFAULT_CRATE_VERSION)
   const graph: Record<string, unknown>[] = [{
     '@id': DESCRIPTOR_ID,
     '@type': 'CreativeWork',
-    conformsTo: { '@id': RO_CRATE_PROFILE },
+    conformsTo: { '@id': specIri(contextVersion(context)) },
     about: { '@id': rootId(draft) },
     ...draft.descriptor,
   }]
@@ -552,7 +552,7 @@ export function toRoCrate(draft: CrateDraft): Record<string, unknown> {
     for (const [property, value] of Object.entries(entity.extra ?? {})) node[property] = value
     graph.push(node)
   }
-  return { '@context': draft.context ?? RO_CRATE_CONTEXT, '@graph': graph }
+  return { '@context': context, '@graph': graph }
 }
 
 export function fromRoCrate(
@@ -591,7 +591,7 @@ export function fromRoCrate(
     visibility: options.visibility ?? 'group',
     ...(options.groupId ? { groupId: options.groupId } : {}),
     ...(options.path ? { path: options.path } : {}),
-    ...(crate['@context'] === undefined ? {} : { context: crate['@context'] }),
+    ...(crate['@context'] === undefined ? {} : { context: normalizeContext(crate['@context']) }),
     ...(Object.keys(descriptor).length ? { descriptor } : {}),
   }
 }
