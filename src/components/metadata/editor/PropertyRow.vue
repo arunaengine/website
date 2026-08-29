@@ -20,6 +20,7 @@ import {
   allowedKinds,
   changeKind,
   defaultValue,
+  displayName,
   promoteValue,
   propertyTerm,
   removeValue,
@@ -232,6 +233,7 @@ function created(next: CrateDraft, entityId: string) {
       :draft="draft"
       :vocab="vocab"
       :range="range"
+      :linked-from="{ entity: displayName(entity), property: label }"
       @update:open="(value) => { if (!value) createFor = -1 }"
       @created="(entry) => created(entry.draft, entry.entity.id)"
     />

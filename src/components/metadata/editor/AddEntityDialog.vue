@@ -41,8 +41,10 @@ const props = defineProps<{
   range?: string[]
   /** Contextual entities only: File, Dataset and MediaObject stay out. */
   excludeData?: boolean
-  /** Offers to link the new entity from the root in the same step. */
+  /** Offers to link the new entity from the root; nothing is linked unless picked. */
   offerLink?: boolean
+  /** Opened from a property row: that row takes the link, so it is shown fixed. */
+  linkedFrom?: { entity: string; property: string }
 }>()
 
 const emit = defineEmits<{
@@ -59,10 +61,8 @@ const importing = ref(false)
 const lookupError = ref('')
 const extra = ref<Record<string, DraftValue[]>>({})
 const related = ref<ContextEntity[]>([])
+// Empty means the entity is created without any link; a link is always a choice.
 const linkAs = ref('')
-
-// The link a new author or publisher almost always needs, offered up front.
-const PRESELECTED: Readonly<Record<string, string>> = { Person: 'author', Organization: 'publisher' }
 
 const linkOptions = computed(() => {
   if (!props.offerLink || !type.value) return []
@@ -71,10 +71,9 @@ const linkOptions = computed(() => {
     .map((term) => ({ value: propertyKey(term), label: term.label }))
 })
 
-watch([type, linkOptions], () => {
-  const preselected = PRESELECTED[typeLabel(type.value)] ?? ''
-  const offered = linkOptions.value.some((option) => option.value === preselected)
-  linkAs.value = offered ? preselected : ''
+// A type change drops a link that no longer fits the new type.
+watch(linkOptions, (options) => {
+  if (!options.some((option) => option.value === linkAs.value)) linkAs.value = ''
 })
 
 const registry = computed(() => {
@@ -245,16 +244,23 @@ function create() {
             <p class="mt-1 text-[11px] text-muted-foreground">{{ idHint(type) }}</p>
           </div>
 
-          <div v-if="offerLink && linkOptions.length">
-            <label class="text-xs font-medium text-foreground">Link to this dataset as</label>
+          <div v-if="linkedFrom" class="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+            Linked from <span class="font-medium text-foreground">{{ linkedFrom.entity }}</span>
+            as <span class="font-medium text-foreground">{{ linkedFrom.property }}</span>.
+          </div>
+          <div v-else-if="offerLink && linkOptions.length">
+            <label class="text-xs font-medium text-foreground">Link from the dataset as</label>
             <Select
               :model-value="linkAs"
-              :options="[{ value: '', label: 'Do not link' }, ...linkOptions]"
+              :options="[{ value: '', label: 'None' }, ...linkOptions]"
               class="mt-1"
-              placeholder="Do not link"
-              aria-label="Link to this dataset as"
+              placeholder="None"
+              aria-label="Link from the dataset as"
               @update:model-value="(value: string) => (linkAs = value)"
             />
+            <p class="mt-1 text-[11px] text-muted-foreground">
+              {{ linkAs ? 'The dataset will point at this entity.' : 'Nothing points at this entity until you pick a property.' }}
+            </p>
           </div>
         </div>
       </div>

@@ -186,20 +186,46 @@ describe('AddEntityDialog', () => {
     mounted.app.unmount()
   })
 
-  it('links a new person to the dataset as its author', async () => {
+  it('creates a person without any link unless one is picked', async () => {
+    // A contextual person must not silently become an author.
     const created: Created[] = []
     const mounted = await mount({ offerLink: true }, created)
 
     await click(button(mounted.root, 'Person'))
-    const select = element(mounted.root, (node) => node.props['aria-label'] === 'Link to this dataset as')
-    expect(select.props.value).toBe('author')
-    expect(content(select)).toContain('Do not link')
+    const select = element(mounted.root, (node) => node.props['aria-label'] === 'Link from the dataset as')
+    expect(select.props.value).toBe('')
+    expect(content(select)).toContain('None')
+    expect(content(select)).toContain('Author')
 
+    await click(button(mounted.root, 'Create'))
+
+    expect(created[0].draft.entities[0].properties.author).toBeUndefined()
+    mounted.app.unmount()
+  })
+
+  it('links a new person as the property that was picked', async () => {
+    const created: Created[] = []
+    const mounted = await mount({ offerLink: true }, created)
+
+    await click(button(mounted.root, 'Person'))
+    const select = element(mounted.root, (node) => node.props['aria-label'] === 'Link from the dataset as')
+    select.value = 'author'
+    await (select.props.onChange as (event: { target: HostNode }) => Promise<void>)({ target: select })
+    await flush()
     await click(button(mounted.root, 'Create'))
 
     expect(created[0].draft.entities[0].properties.author).toEqual([
       { kind: 'reference', value: created[0].entity.id },
     ])
+    mounted.app.unmount()
+  })
+
+  it('shows the fixed link when opened from a property row', async () => {
+    const mounted = await mount({ linkedFrom: { entity: 'Example dataset', property: 'Author' } })
+
+    await click(button(mounted.root, 'Person'))
+    expect(content(mounted.root)).toContain('Linked from Example dataset as Author')
+    expect(() => element(mounted.root, (node) => node.props['aria-label'] === 'Link from the dataset as')).toThrow()
     mounted.app.unmount()
   })
 
