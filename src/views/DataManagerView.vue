@@ -4,7 +4,11 @@ import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Input from '@/components/ui/Input.vue'
-import Select from '@/components/ui/Select.vue'
+import DropdownMenu from '@/components/ui/DropdownMenu.vue'
+import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
+import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
+import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
+import DropdownMenuLabel from '@/components/ui/DropdownMenuLabel.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
@@ -15,6 +19,7 @@ import DialogClose from '@/components/ui/DialogClose.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import AddDataDialog from '@/components/data/AddDataDialog.vue'
+import DataViewSkeleton from '@/components/data/DataViewSkeleton.vue'
 import StagingJobsPanel from '@/components/data/StagingJobsPanel.vue'
 import SyncBucketDialog from '@/components/data/SyncBucketDialog.vue'
 import SyncStatusPanel from '@/components/data/SyncStatusPanel.vue'
@@ -32,7 +37,7 @@ import { isDesktop } from '@/lib/desktop'
 import type { BucketSearchHit } from '@/lib/api'
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { HardDriveDownload, KeyRound, LogIn, ShieldAlert } from '@lucide/vue'
+import { Check, ChevronsUpDown, HardDriveDownload, KeyRound, LogIn, ShieldAlert } from '@lucide/vue'
 
 const { bootstrapped, currentUser } = useAruna()
 const s3 = useS3()
@@ -49,14 +54,13 @@ const {
   selectedGroupId,
   selectedGroupLabel,
   groupsLoading,
+  hasGroups,
   contextBusy,
   contextError,
   contextReady,
   viewReady,
-  contextMismatch,
   requiredNodeId,
   requiredNodeName,
-  issuerNodeName,
   sessionWarning,
   groupOptions,
   keyTail,
@@ -75,6 +79,13 @@ const {
   refreshSpinning,
   onRefresh,
 } = manager
+
+const selectedGroupName = computed(
+  () =>
+    groupOptions.value.find((option) => option.value === selectedGroupId.value)?.label ||
+    selectedGroupLabel.value ||
+    'Select a group',
+)
 
 const deletion = ref<InstanceType<typeof DeletionFlow> | null>(null)
 
@@ -181,26 +192,33 @@ async function createFolder() {
     >
       <template #actions>
         <template v-if="currentUser && s3.connectedEndpoint.value">
-          <span class="hidden text-xs text-muted-foreground xl:inline" :title="requiredNodeId ?? undefined">
-            Node: {{ requiredNodeName }}
-          </span>
-          <Select
-            v-model="selectedGroupId"
-            :options="groupOptions"
-            placeholder="Select a group"
-            aria-label="S3 session group"
-            class="w-52"
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            :disabled="!selectedGroupId || !requiredNodeId || contextBusy || contextReady"
-            @click="openSelectedContext"
-          >
-            <Spinner v-if="contextBusy" label="Opening the session" class="text-current" />
-            <KeyRound v-else class="h-4 w-4" />
-            {{ contextReady ? 'Session active' : contextMismatch || remoteNodeId ? 'Open on this node' : 'Open group' }}
-          </Button>
+          <!-- The sentence collapses to the group switcher on narrow screens. -->
+          <div class="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+            <span class="hidden lg:inline">Showing buckets of</span>
+            <DropdownMenu>
+              <DropdownMenuTrigger as-child>
+                <button
+                  class="inline-flex h-8 max-w-[12rem] items-center gap-1 rounded-md border border-border bg-card px-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:border-primary/40"
+                  aria-label="Switch group"
+                >
+                  <span class="truncate">{{ selectedGroupName }}</span>
+                  <ChevronsUpDown class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" class="w-64">
+                <DropdownMenuLabel>Switch group</DropdownMenuLabel>
+                <DropdownMenuItem
+                  v-for="option in groupOptions"
+                  :key="option.value"
+                  @click="selectedGroupId = option.value"
+                >
+                  <span class="min-w-0 flex-1 truncate">{{ option.label }}</span>
+                  <Check v-if="option.value === selectedGroupId" class="h-3.5 w-3.5 shrink-0 text-primary" />
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <span class="hidden lg:inline" :title="requiredNodeId ?? undefined">on {{ requiredNodeName }}</span>
+          </div>
         </template>
         <template v-if="contextReady">
           <span
@@ -220,9 +238,7 @@ async function createFolder() {
     </PageHeader>
 
     <div class="container space-y-6 py-8">
-      <section v-if="!s3.connectedEndpoint.value && !bootstrapped" class="surface p-5">
-        <Spinner show-label label="Connecting to the node…" class="text-sm" />
-      </section>
+      <DataViewSkeleton v-if="!bootstrapped" />
 
       <Notice v-else-if="!s3.connectedEndpoint.value" tone="warning" class="flex items-start gap-3 p-5 text-sm">
         <ShieldAlert class="mt-0.5 h-4 w-4 shrink-0" />
@@ -232,39 +248,50 @@ async function createFolder() {
         </p>
       </Notice>
 
-      <section v-else-if="!contextReady" class="surface p-6">
+      <section v-else-if="!currentUser" class="surface p-6">
         <div class="flex items-start gap-3">
-          <KeyRound class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          <LogIn class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
           <div>
-            <h2 class="font-display text-base font-semibold text-aruna-navy">Open a temporary S3 session</h2>
-            <p v-if="!currentUser" class="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
-              <LogIn class="h-4 w-4" /> Sign in, then explicitly select a node and group.
+            <h2 class="font-display text-base font-semibold text-aruna-navy">Sign in to browse data</h2>
+            <p class="mt-2 text-sm text-muted-foreground">
+              The portal then opens a temporary S3 session for your group on {{ requiredNodeName }} and keeps it in memory only.
             </p>
-            <p v-else-if="contextMismatch" class="mt-2 text-sm text-muted-foreground">
-              The current session was issued by {{ issuerNodeName }} ({{ contextMismatch.issuerNodeId }}). This bucket requires {{ requiredNodeName }} ({{ contextMismatch.requiredNodeId }}). Select the group and choose Open on this node. The existing credential will not be sent to the required node.
-            </p>
-            <!-- Never the create-or-join state while memberships are loading. -->
-            <Spinner
-              v-else-if="groupsLoading"
-              show-label
-              label="Loading your groups…"
-              class="mt-2 text-sm"
-            />
-            <template v-else-if="!selectedGroupId">
-              <p class="mt-2 text-sm text-muted-foreground">
-                Select a group above. The portal mints a node-local session only after that explicit selection and keeps it in memory only.
-              </p>
-              <Button variant="outline" size="sm" class="mt-3" as-child>
-                <RouterLink :to="{ name: 'groups' }">Create or join a group</RouterLink>
-              </Button>
-            </template>
-            <p v-else class="mt-2 text-sm text-muted-foreground">
-              Open group {{ selectedGroupLabel || selectedGroupId }} on {{ requiredNodeName }}. Expired sessions block new operations and are replaced only after this explicit action.
-            </p>
-            <p v-if="contextError" class="mt-3 text-xs text-destructive">{{ contextError }}</p>
           </div>
         </div>
       </section>
+
+      <section v-else-if="contextError" class="surface p-6">
+        <div class="flex items-start gap-3">
+          <ShieldAlert class="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+          <div>
+            <h2 class="font-display text-base font-semibold text-aruna-navy">
+              The session for {{ selectedGroupName }} on {{ requiredNodeName }} could not be opened
+            </h2>
+            <p class="mt-2 text-sm text-destructive">{{ contextError }}</p>
+            <Button variant="outline" size="sm" class="mt-3" :disabled="contextBusy" @click="openSelectedContext">
+              <KeyRound class="h-4 w-4" /> Retry
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Never the create-or-join state while memberships are loading. -->
+      <section v-else-if="!groupsLoading && !hasGroups" class="surface p-6">
+        <div class="flex items-start gap-3">
+          <KeyRound class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          <div>
+            <h2 class="font-display text-base font-semibold text-aruna-navy">Join a group to browse data</h2>
+            <p class="mt-2 text-sm text-muted-foreground">
+              Buckets belong to a group. The portal opens a temporary S3 session for the selected group on {{ requiredNodeName }} and keeps it in memory only.
+            </p>
+            <Button variant="outline" size="sm" class="mt-3" as-child>
+              <RouterLink :to="{ name: 'groups' }">Create or join a group</RouterLink>
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <DataViewSkeleton v-else-if="!contextReady" />
 
       <section v-else-if="!viewReady" class="surface p-5">
         <Spinner show-label label="Loading group data…" class="text-sm" />

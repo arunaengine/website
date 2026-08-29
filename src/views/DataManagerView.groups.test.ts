@@ -19,11 +19,29 @@ describe('Data view group selection', () => {
     expect(managerSource).toContain('useGroupSelection(selectedGroupId)')
   })
 
+  it('opens the selected group without a button', () => {
+    expect(managerSource).toContain('shouldOpenContext({')
+    expect(template).not.toContain('Open group')
+    expect(template).not.toContain('Open on this node')
+    expect(template).not.toContain('Session active')
+  })
+
+  it('switches the group from the context line', () => {
+    expect(template).toContain('Showing buckets of')
+    expect(template).toContain('on {{ requiredNodeName }}')
+    expect(template).toContain('<DropdownMenuTrigger as-child>')
+    expect(template).toContain('v-for="option in groupOptions"')
+    expect(template).toContain('@click="selectedGroupId = option.value"')
+  })
+
+  it('retries a failed session on request', () => {
+    const errorBranch = template.indexOf('v-else-if="contextError"')
+    expect(errorBranch).toBeGreaterThan(-1)
+    expect(template.indexOf('@click="openSelectedContext"')).toBeGreaterThan(errorBranch)
+  })
+
   it('keeps create or join out of the loading window', () => {
-    const loadingBranch = template.indexOf('v-else-if="groupsLoading"')
-    const createBranch = template.indexOf('v-else-if="!selectedGroupId"')
-    expect(loadingBranch).toBeGreaterThan(-1)
-    expect(createBranch).toBeGreaterThan(loadingBranch)
+    expect(template).toContain('v-else-if="!groupsLoading && !hasGroups"')
   })
 
   it('keeps create or join for a user without groups', () => {

@@ -44,8 +44,8 @@ describe('Data view session affordances', () => {
     expect(managerBrowser).toContain('This session is read-only')
   })
 
-  it('offers a way out when no group is selected', () => {
-    expect(dataManager).toContain('Select a group above.')
+  it('offers a way out without a group membership', () => {
+    expect(dataManager).toContain('Join a group to browse data')
     expect(dataManager).toContain("<RouterLink :to=\"{ name: 'groups' }\">Create or join a group</RouterLink>")
   })
 

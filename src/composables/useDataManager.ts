@@ -57,6 +57,30 @@ function routeString(value: unknown): string {
   return typeof value === 'string' ? value : ''
 }
 
+/** Identifies one session pair, so a failed open is recognised again. */
+export function contextKey(nodeId: string | null, groupId: string): string {
+  return `${nodeId ?? ''}|${groupId}`
+}
+
+/**
+ * Whether the session for the selected group and node has to be opened now.
+ * A pair that did not become ready is never opened again automatically, so a
+ * failure ends in the view's Retry button instead of a retry loop; another
+ * group or node is a new pair and opens on its own.
+ */
+export function shouldOpenContext(state: {
+  signedIn: boolean
+  groupId: string
+  nodeId: string | null
+  ready: boolean
+  busy: boolean
+  failedKey: string | null
+}): boolean {
+  if (!state.signedIn || !state.groupId || !state.nodeId) return false
+  if (state.ready || state.busy) return false
+  return state.failedKey !== contextKey(state.nodeId, state.groupId)
+}
+
 /**
  * Everything the browser waits for, in one condition: opening a group and
  * switching between groups paint once instead of filling in panel by panel.
@@ -100,8 +124,8 @@ export function useDataManager() {
 
   // Federated bucket search + cross-node browsing. The optional ?node=<id> route
   // param selects the hosting node (default: the connected node) so deep links
-  // into remote buckets stay stable. Each node and group uses its own temporary
-  // session, selected explicitly before any request is sent.
+  // into remote buckets stay stable. The temporary session for the selected
+  // group and node is opened automatically and kept in memory only.
   const realmNodes = useRealmNodes()
   const shortcuts = useBucketShortcuts()
 
@@ -111,7 +135,7 @@ export function useDataManager() {
     return nodeId
   })
   const selectedGroupId = ref(routeString(route.query.group) || s3.activeContext.value?.groupId || '')
-  const { groupsLoading } = useGroupSelection(selectedGroupId)
+  const { groupsLoading, hasGroups } = useGroupSelection(selectedGroupId)
   const selectedGroupLabel = ref('')
   const contextBusy = ref(false)
   const contextError = ref<string | null>(null)
@@ -158,8 +182,13 @@ export function useDataManager() {
     uploadRestrictionError.value = null
   })
 
+  // The (group, node) pair of the last attempt that did not end in a ready
+  // session; only the view's Retry button opens it again.
+  let failedContextKey: string | null = null
+
   async function openSelectedContext() {
     if (!selectedGroupId.value || !requiredNodeId.value || contextBusy.value) return
+    const key = contextKey(requiredNodeId.value, selectedGroupId.value)
     contextBusy.value = true
     contextError.value = null
     try {
@@ -174,8 +203,27 @@ export function useDataManager() {
       contextError.value = s3ErrorMessage(err)
     } finally {
       contextBusy.value = false
+      failedContextKey = contextReady.value ? null : key
     }
   }
+
+  // First load, a switched group and a deep link to another node all open their
+  // session here; no button stands between the selection and the buckets.
+  watch(
+    [selectedGroupId, requiredNodeId, currentUser, contextReady, contextBusy],
+    () => {
+      const open = shouldOpenContext({
+        signedIn: Boolean(currentUser.value),
+        groupId: selectedGroupId.value,
+        nodeId: requiredNodeId.value,
+        ready: contextReady.value,
+        busy: contextBusy.value,
+        failedKey: failedContextKey,
+      })
+      if (open) void openSelectedContext()
+    },
+    { immediate: true },
+  )
   // The endpoint actually serving the browsed bucket (local or remote).
   const effectiveEndpoint = computed(() => s3.endpointForNode(remoteNodeId.value))
   // Remote node without a published S3 endpoint: honest info panel, never a
@@ -858,6 +906,7 @@ export function useDataManager() {
     selectedGroupId,
     selectedGroupLabel,
     groupsLoading,
+    hasGroups,
     contextBusy,
     contextError,
     contextReady,
