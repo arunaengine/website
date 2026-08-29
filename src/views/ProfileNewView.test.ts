@@ -208,6 +208,12 @@ const storedProfile: MetadataProfile = {
   managed: false,
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((done) => { resolve = done })
+  return { promise, resolve }
+}
+
 async function fillBasics(root: Parameters<typeof content>[0]) {
   await typeValue(input(root, 'data-field', 'name'), 'Example profile')
   await typeValue(input(root, 'data-field', 'description'), 'What this profile requires.')
@@ -310,6 +316,52 @@ describe('ProfileNewView edit', () => {
     }))
     expect(createMetadata).not.toHaveBeenCalled()
     expect(routerPush).toHaveBeenCalledWith({ name: 'profile', params: { profileId: 'example' } })
+    mounted.app.unmount()
+  })
+
+  it('fences profile seeding when the edit route changes', async () => {
+    const otherProfile: MetadataProfile = {
+      ...storedProfile,
+      id: 'other',
+      documentId: 'doc-2',
+      name: 'Other profile',
+      shortName: 'Other',
+    }
+    profiles.value = [storedProfile, otherProfile]
+    profileItems.value.push({ document_id: 'doc-2', group_id: 'group-1' })
+    const first = deferred<unknown>()
+    const second = deferred<unknown>()
+    loadProfileCrate.mockImplementation((id: string) => id === 'doc-1' ? first.promise : second.promise)
+    const mounted = await mountApp(ProfileNewView)
+
+    route.params = { profileId: 'other' }
+    await flush()
+    second.resolve({})
+    await flush()
+    expect(input(mounted.root, 'data-field', 'name').value).toBe('Other profile')
+
+    first.resolve({})
+    await flush()
+    expect(input(mounted.root, 'data-field', 'name').value).toBe('Other profile')
+    await click(button(mounted.root, 'Next'))
+    await click(button(mounted.root, 'Next'))
+    await click(button(mounted.root, 'Save profile'))
+    await flush()
+    expect(replaceMetadataRoCrate).toHaveBeenCalledWith('doc-2', expect.anything())
+    mounted.app.unmount()
+  })
+
+  it('resets the builder when an edit route becomes create', async () => {
+    const mounted = await mountApp(ProfileNewView)
+    await flush()
+    expect(input(mounted.root, 'data-field', 'name').value).toBe('Example profile')
+
+    route.name = 'profile-new'
+    route.params = {}
+    await flush()
+
+    expect(content(mounted.root)).toContain('New profile')
+    expect(input(mounted.root, 'data-field', 'name').value).toBe('')
     mounted.app.unmount()
   })
 })

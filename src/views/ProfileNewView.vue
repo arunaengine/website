@@ -199,13 +199,18 @@ const currentStepCallout = computed(() => {
 // for the stored crate so the builder opens on the profile's real rules.
 const seeded = ref(false)
 
-function seedDraft(profile: MetadataProfile | null) {
+function resetDraft() {
   builder.reset()
   step.value = 1
   startTab.value = 'create'
   destBucket.value = ''
+  destPrefix.value = ''
   destPrefixEdited.value = false
   destBuckets.value = []
+}
+
+function seedDraft(profile: MetadataProfile | null) {
+  resetDraft()
   if (profile) {
     builder.applyImport({
       kind: 'crate',
@@ -239,19 +244,31 @@ function seedDraft(profile: MetadataProfile | null) {
   seeded.value = true
 }
 
+let seedGeneration = 0
+watch(
+  editId,
+  (id) => {
+    seedGeneration += 1
+    seeded.value = false
+    if (id) resetDraft()
+    else seedDraft(null)
+  },
+  { immediate: true },
+)
+
 watch(
   editProfile,
   async (profile) => {
     if (seeded.value) return
-    if (!isEditing.value) {
-      seedDraft(null)
-      return
-    }
     if (!profile) return
+    const id = editId.value
+    const generation = seedGeneration
     // A list summary can omit the rule artifacts; materialize the crate first so
     // the builder never opens on a rule-less draft. A failure keeps the summary.
     if (profile.documentId) await loadProfileCrate(profile.documentId).catch(() => undefined)
-    if (!seeded.value) seedDraft(editProfile.value)
+    if (generation !== seedGeneration || editId.value !== id) return
+    const current = editProfile.value
+    if (!seeded.value && current?.id === id) seedDraft(current)
   },
   { immediate: true },
 )
@@ -270,7 +287,7 @@ function goNext() {
 }
 
 async function submit() {
-  if (formErrors.value.length || saving.value || publishing.value || publishBlocked.value) return
+  if (!seeded.value || formErrors.value.length || saving.value || publishing.value || publishBlocked.value) return
   builder.submitError = null
   publishing.value = true
   try {
