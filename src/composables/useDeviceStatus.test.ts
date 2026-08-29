@@ -103,21 +103,37 @@ describe('watching the node', () => {
     device.stop()
   })
 
+  it('keeps command-only fields across supervisor events', async () => {
+    const device = await load()
+    device.start()
+    await vi.waitFor(() => expect(device.nodeBaseUrl.value).toBe(RUNNING.apiBaseUrl))
+
+    push({ state: 'running', ready: true, detail: 'settled', realmMismatch: null })
+
+    expect(device.status.value).toMatchObject({
+      state: 'running',
+      enrolled: true,
+      apiBaseUrl: RUNNING.apiBaseUrl,
+      detail: 'settled',
+    })
+    expect(device.deviceClient.value?.baseUrl).toBe(RUNNING.apiBaseUrl)
+    device.stop()
+  })
+
   it('says connecting while the code is redeemed', async () => {
     // A device that never joined is not set up; one redeeming a code is joining.
     const device = await load()
-    device.start()
-    await vi.waitFor(() => expect(onNodeStatus).toHaveBeenCalled())
-
-    push({ ...RUNNING, enrolled: false, enrolling: true })
+    nodeStatus.mockResolvedValueOnce({ ...RUNNING, enrolled: false, enrolling: true })
+    await device.refresh()
     expect(device.label.value).toBe('connecting')
 
-    push({ ...RUNNING, state: 'starting', enrolled: false, enrolling: true })
+    nodeStatus.mockResolvedValueOnce({ ...RUNNING, state: 'starting', enrolled: false, enrolling: true })
+    await device.refresh()
     expect(device.label.value).toBe('connecting')
 
-    push({ ...RUNNING, enrolled: false })
+    nodeStatus.mockResolvedValueOnce({ ...RUNNING, enrolled: false })
+    await device.refresh()
     expect(device.label.value).toBe('not set up')
-    device.stop()
   })
 
   it('reads the node id from the node itself', async () => {

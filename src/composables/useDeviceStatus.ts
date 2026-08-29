@@ -53,7 +53,15 @@ function start(): void {
   void refresh()
   void import('@/lib/desktopEvents').then(async ({ onNodeStatus }) => {
     const off = await onNodeStatus((next) => {
-      status.value = next
+      status.value = status.value
+        ? {
+            ...status.value,
+            state: next.state,
+            ready: next.ready,
+            detail: next.detail,
+            realmMismatch: next.realmMismatch,
+          }
+        : next
       error.value = null
       loaded.value = true
     })
