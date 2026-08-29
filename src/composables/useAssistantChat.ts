@@ -38,6 +38,7 @@ const approveWrites = ref(readStored(APPROVE_KEY) !== 'off')
 let history: ModelMessage[] = []
 let counter = 0
 let session: { token: string; expiresAt: number; epoch: number } | null = null
+let sessionInFlight: { epoch: number; promise: Promise<string> } | null = null
 let connection: McpConnection | null = null
 let connectionToken = ''
 let connectionUrl = ''
@@ -151,10 +152,22 @@ async function sessionToken(signal?: AbortSignal, turn?: TurnContext): Promise<s
   if (turn && !isCurrentTurn(turn)) throw abortError()
   const epoch = sessionEpoch.value
   if (session && session.epoch === epoch && session.expiresAt - Date.now() > SESSION_MARGIN_MS) return session.token
-  const minted = await createSession({ kind: 'assistant', label: 'Portal chat' }, client(), signal)
-  if (epoch !== sessionEpoch.value || (turn && !isCurrentTurn(turn))) throw abortError()
-  session = { token: minted.token, expiresAt: new Date(minted.expires_at).getTime(), epoch }
-  return session.token
+  if (!sessionInFlight || sessionInFlight.epoch !== epoch) {
+    const promise = createSession({ kind: 'assistant', label: 'Portal chat' }, client(), signal).then((minted) => {
+      if (epoch !== sessionEpoch.value) throw abortError()
+      session = { token: minted.token, expiresAt: new Date(minted.expires_at).getTime(), epoch }
+      return minted.token
+    })
+    sessionInFlight = { epoch, promise }
+  }
+  const pendingSession = sessionInFlight
+  try {
+    const token = await pendingSession.promise
+    if (turn && !isCurrentTurn(turn)) throw abortError()
+    return token
+  } finally {
+    if (sessionInFlight === pendingSession) sessionInFlight = null
+  }
 }
 
 async function closeConnection(): Promise<void> {
@@ -252,6 +265,7 @@ function discardTurn(turn: TurnContext | null) {
 function resetAssistantSession() {
   abortTurn()
   session = null
+  sessionInFlight = null
   void closeConnection()
   resetConversation()
   providerId.value = ''

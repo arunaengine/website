@@ -8,8 +8,9 @@ import {
   type ModelMessage,
   type ToolSet,
 } from 'ai'
-import type { OpenAILanguageModelResponsesOptions } from '@ai-sdk/openai'
 import { errorMessage } from '@/lib/utils'
+
+type StreamProviderOptions = Parameters<typeof streamText>[0]['providerOptions']
 
 /** Bound on one turn, so a looping model cannot run away with the session. */
 export const MAX_STEPS = 16
@@ -28,7 +29,7 @@ export interface TurnOptions extends TurnHandlers {
   tools: ToolSet
   maxSteps?: number
   abortSignal?: AbortSignal
-  providerOptions?: { openai?: OpenAILanguageModelResponsesOptions }
+  providerOptions?: StreamProviderOptions
 }
 
 export interface TurnResult {
