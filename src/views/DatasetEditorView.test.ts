@@ -1,5 +1,5 @@
 import * as VueRuntime from 'vue'
-import { defineComponent, h, reactive, ref } from 'vue'
+import { computed, defineComponent, h, reactive, ref, watch, type Ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   button,
@@ -10,10 +10,12 @@ import {
   flush,
   moduleDefault,
   mountApp,
+  typeValue,
 } from '@/test/clientRender'
 import * as Editor from '@/lib/crate/editor'
 import * as ProfileSeed from '@/lib/crate/profileSeed'
 import * as Issues from '@/lib/crate/issues'
+import * as Paths from '@/lib/crate/paths'
 import * as Api from '@/lib/api'
 import * as Emit from '@/lib/profiles/emit'
 import * as Utils from '@/lib/utils'
@@ -62,24 +64,47 @@ const PageHeaderStub = defineComponent({
   props: { title: String },
   setup: (props, { slots }) => () => h('header', [h('h1', props.title), slots.breadcrumbs?.(), slots.actions?.()]),
 })
-const GroupSelectStub = defineComponent({
-  props: { modelValue: { type: String, default: '' }, disabled: Boolean },
-  emits: ['update:modelValue'],
-  setup: (props, { emit }) => () => h('button', {
-    'aria-label': 'Group',
-    disabled: props.disabled,
-    onClick: () => emit('update:modelValue', 'group-1'),
-  }, props.modelValue),
+// The start screen and the header bar, reduced to the controls the view wires.
+const StartStub = defineComponent({
+  props: { draft: { type: Object, required: true } },
+  emits: ['update', 'path', 'continue'],
+  setup(props, { emit }) {
+    return () => {
+      const draft = props.draft as Editor.CrateDraft
+      const name = Editor.entityName(Editor.rootEntity(draft))
+      return h('div', [
+        h('p', 'Start a dataset'),
+        h('button', {
+          'aria-label': 'Group',
+          disabled: false,
+          onClick: () => emit('update', { ...draft, groupId: 'group-1' }),
+        }, draft.groupId ?? ''),
+        h('input', {
+          'aria-label': 'Dataset name',
+          value: name,
+          onInput: (event: { target: { value: string } }) => emit('update', Editor.setProperty(
+            draft, './', 'name', event.target.value ? [{ kind: 'text', value: event.target.value }] : [])),
+        }),
+        h('input', {
+          'aria-label': 'Dataset path',
+          value: draft.path ?? '',
+          onInput: (event: { target: { value: string } }) => emit('path', event.target.value),
+        }),
+        h('button', { disabled: !(name && draft.groupId && draft.path), onClick: () => emit('continue') }, 'Continue'),
+      ])
+    }
+  },
+})
+const HeaderBarStub = defineComponent({
+  props: { draft: { type: Object, required: true }, mode: { type: String, required: true } },
+  setup: (props) => () => h('div', [
+    h('button', { 'aria-label': 'Group', disabled: props.mode === 'edit' }, (props.draft as Editor.CrateDraft).groupId ?? ''),
+    h('p', `Path ${(props.draft as Editor.CrateDraft).path ?? ''}`),
+  ]),
 })
 const BrowserStub = defineComponent({
   props: { draft: { type: Object, required: true } },
-  emits: ['graph'],
-  setup(props, { emit }) {
-    return () => h('div', [
-      h('p', `Entities ${(props.draft as Editor.CrateDraft).entities.length}`),
-      h('button', { onClick: () => emit('graph') }, 'Show the graph'),
-    ])
-  },
+  setup: (props) => () => h('p', `Entities ${(props.draft as Editor.CrateDraft).entities.length}`),
 })
 const EditorStub = defineComponent({
   props: { draft: { type: Object, required: true }, profiles: { type: Array, default: () => [] } },
@@ -114,10 +139,10 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Skeleton.vue': moduleDefault(EmptyStub),
   '@/components/ui/ErrorPanel.vue': moduleDefault(EmptyStub),
-  '@/components/groups/GroupSelect.vue': moduleDefault(GroupSelectStub),
   '@/components/groups/CreateGroupDialog.vue': moduleDefault(EmptyStub),
-  '@/components/metadata/VisibilitySelect.vue': moduleDefault(EmptyStub),
   '@/components/metadata/ImportCrateDialog.vue': moduleDefault(EmptyStub),
+  '@/components/metadata/editor/DatasetStart.vue': moduleDefault(StartStub),
+  '@/components/metadata/editor/DatasetHeaderBar.vue': moduleDefault(HeaderBarStub),
   '@/components/metadata/editor/EntityBrowser.vue': moduleDefault(BrowserStub),
   '@/components/metadata/editor/EntityEditor.vue': moduleDefault(EditorStub),
   '@/components/metadata/editor/EditorGraph.vue': moduleDefault(GraphStub),
@@ -136,6 +161,21 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
       saving,
       apiBaseUrl,
       authToken,
+    }),
+  },
+  '@/composables/useGroupSelection': {
+    useGroupSelection: (selected: Ref<string>) => {
+      watch(groups, (available) => {
+        if (!selected.value && available.length) selected.value = available[0].id
+      }, { immediate: true })
+      return {}
+    },
+  },
+  '@/composables/usePathPrefixes': {
+    usePathPrefixes: () => ({
+      options: computed(() => [{ value: 'datasets', label: 'datasets/' }, { value: '', label: 'Group root' }]),
+      preselected: computed(() => 'datasets'),
+      loading: ref(false),
     }),
   },
   '@/composables/useProfilePreview': {
@@ -161,7 +201,14 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
   '@/lib/crate/editor': Editor,
   '@/lib/crate/profileSeed': ProfileSeed,
   '@/lib/crate/issues': Issues,
+  '@/lib/crate/paths': Paths,
 })
+
+// Walks a new dataset through its start screen into the editor.
+async function start(root: Parameters<typeof content>[0], name = 'Draft') {
+  await typeValue(element(root, (node) => node.props['aria-label'] === 'Dataset name'), name)
+  await click(button(root, 'Continue'))
+}
 
 beforeEach(() => {
   route.name = 'dataset-new'
@@ -185,25 +232,43 @@ beforeEach(() => {
 })
 
 describe('DatasetEditorView', () => {
-  it('opens the editor on an empty root, asking nothing first', async () => {
+  it('asks for the group, name and path before opening the editor', async () => {
     const mounted = await mountApp(DatasetEditorView)
 
+    expect(content(mounted.root)).toContain('Start a dataset')
+    expect(content(mounted.root)).not.toContain('Entities')
+    expect(button(mounted.root, 'Continue').props.disabled).toBe(true)
+
+    await start(mounted.root, 'Reads 2026')
     expect(content(mounted.root)).toContain('Entities 1')
-    expect(content(mounted.root)).toContain('New dataset')
-    expect(element(mounted.root, (node) => node.props['aria-label'] === 'Group').props.disabled).toBe(false)
-    expect(button(mounted.root, 'Create dataset').props.disabled).toBe(true)
+    expect(content(mounted.root)).toContain('Path datasets/reads-2026')
+    expect(button(mounted.root, 'Create dataset').props.disabled).toBe(false)
     mounted.app.unmount()
   })
 
-  it('keeps Create out of reach until there is a name and a group', async () => {
+  it('derives the path from the name until the slug is edited', async () => {
+    const mounted = await mountApp(DatasetEditorView)
+    const name = element(mounted.root, (node) => node.props['aria-label'] === 'Dataset name')
+    const path = element(mounted.root, (node) => node.props['aria-label'] === 'Dataset path')
+
+    await typeValue(name, 'Reads 2026')
+    expect(path.props.value).toBe('datasets/reads-2026')
+
+    await typeValue(path, 'datasets/my-reads')
+    await typeValue(name, 'Reads 2027')
+    expect(element(mounted.root, (node) => node.props['aria-label'] === 'Dataset path').props.value).toBe('datasets/my-reads')
+    mounted.app.unmount()
+  })
+
+  it('keeps Continue out of reach without a group', async () => {
     groups.value = []
     const mounted = await mountApp(DatasetEditorView)
 
-    await click(button(mounted.root, 'Seed dataset'))
-    expect(button(mounted.root, 'Create dataset').props.disabled).toBe(true)
+    await typeValue(element(mounted.root, (node) => node.props['aria-label'] === 'Dataset name'), 'Reads')
+    expect(button(mounted.root, 'Continue').props.disabled).toBe(true)
 
     await click(element(mounted.root, (node) => node.props['aria-label'] === 'Group'))
-    expect(button(mounted.root, 'Create dataset').props.disabled).toBe(false)
+    expect(button(mounted.root, 'Continue').props.disabled).toBe(false)
     mounted.app.unmount()
   })
 
@@ -226,6 +291,7 @@ describe('DatasetEditorView', () => {
     }]
     currentUser.value = { preferredProfileId: 'genomics' }
     const mounted = await mountApp(DatasetEditorView)
+    await start(mounted.root)
     await click(button(mounted.root, 'Seed dataset'))
     await click(button(mounted.root, 'Create dataset'))
     await flush()
@@ -245,6 +311,7 @@ describe('DatasetEditorView', () => {
       { id: 'built-in', name: 'Built-in profile', managed: false, builtIn: true },
     ]
     const mounted = await mountApp(DatasetEditorView)
+    await start(mounted.root)
     const rendered = content(mounted.root)
 
     expect(rendered).toContain('Public profile')
@@ -255,6 +322,7 @@ describe('DatasetEditorView', () => {
 
   it('validates the draft before it writes anything', async () => {
     const mounted = await mountApp(DatasetEditorView)
+    await start(mounted.root)
     await click(button(mounted.root, 'Seed dataset'))
     await click(button(mounted.root, 'Create dataset'))
     await flush()
@@ -275,6 +343,7 @@ describe('DatasetEditorView', () => {
   it('hands a refused write to the drawer with its code', async () => {
     createMetadata.mockRejectedValue(new Api.ApiError(400, 'Bad request', 'Bad request', { error: 'Bad request' }))
     const mounted = await mountApp(DatasetEditorView)
+    await start(mounted.root)
     await click(button(mounted.root, 'Seed dataset'))
     await click(button(mounted.root, 'Create dataset'))
     await flush()
@@ -289,6 +358,7 @@ describe('DatasetEditorView', () => {
       violations: [{ code: 'missing_root', message: 'No root dataset.' }],
     })
     const mounted = await mountApp(DatasetEditorView)
+    await start(mounted.root)
 
     expect(content(mounted.root)).toContain('Node issues No root dataset.')
     mounted.app.unmount()
@@ -297,6 +367,7 @@ describe('DatasetEditorView', () => {
   it('writes nothing when the node rejects the draft', async () => {
     verify.mockResolvedValue(false)
     const mounted = await mountApp(DatasetEditorView)
+    await start(mounted.root)
     await click(button(mounted.root, 'Seed dataset'))
     await click(button(mounted.root, 'Create dataset'))
     await flush()
@@ -311,6 +382,7 @@ describe('DatasetEditorView', () => {
     const verdict = deferred<boolean>()
     verify.mockReturnValue(verdict.promise)
     const mounted = await mountApp(DatasetEditorView)
+    await start(mounted.root)
     await click(button(mounted.root, 'Seed dataset'))
 
     await click(button(mounted.root, 'Create dataset'))
@@ -323,10 +395,11 @@ describe('DatasetEditorView', () => {
     mounted.app.unmount()
   })
 
-  it('swaps the editor for the graph when the browser asks', async () => {
+  it('swaps the editor for the graph from the top toggle', async () => {
     const mounted = await mountApp(DatasetEditorView)
+    await start(mounted.root)
 
-    await click(button(mounted.root, 'Show the graph'))
+    await click(element(mounted.root, (node) => node.props.role === 'tab' && content(node).trim() === 'Graph'))
 
     expect(content(mounted.root)).toContain('Graph pane')
     expect(content(mounted.root)).not.toContain('Seed dataset')
@@ -428,7 +501,7 @@ describe('DatasetEditorView', () => {
     await flush()
 
     expect(content(mounted.root)).toContain('New dataset')
-    expect(content(mounted.root)).toContain('Entities 1')
+    expect(content(mounted.root)).toContain('Start a dataset')
     expect(content(mounted.root)).not.toContain('Example dataset')
     mounted.app.unmount()
   })

@@ -2,12 +2,14 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import Select from '@/components/ui/Select.vue'
+import { cn } from '@/lib/utils'
 
 const props = defineProps<{
   modelValue: 'group' | 'public'
   groupId?: string
   /** Header form: the bare control, without its label and hint. */
   compact?: boolean
+  class?: string
 }>()
 const emit = defineEmits<{ (e: 'update:modelValue', value: 'group' | 'public'): void }>()
 
@@ -27,7 +29,7 @@ const hint = computed(() =>
     v-if="compact"
     :model-value="modelValue"
     :options="options"
-    class="h-7 w-28 text-xs"
+    :class="cn('h-7 w-28 text-xs', props.class)"
     aria-label="Dataset visibility"
     @update:model-value="(value: string) => emit('update:modelValue', value as 'group' | 'public')"
   />

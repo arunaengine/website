@@ -5,15 +5,17 @@ import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
-import GroupSelect from '@/components/groups/GroupSelect.vue'
 import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
-import VisibilitySelect from '@/components/metadata/VisibilitySelect.vue'
 import ImportCrateDialog from '@/components/metadata/ImportCrateDialog.vue'
+import DatasetHeaderBar from '@/components/metadata/editor/DatasetHeaderBar.vue'
+import DatasetStart from '@/components/metadata/editor/DatasetStart.vue'
 import EntityBrowser from '@/components/metadata/editor/EntityBrowser.vue'
 import EntityEditor from '@/components/metadata/editor/EntityEditor.vue'
 import IssueDrawer from '@/components/metadata/editor/IssueDrawer.vue'
 import NodeCheckPanel from '@/components/metadata/editor/NodeCheckPanel.vue'
 import { profileReferenceIri, useAruna } from '@/composables/useAruna'
+import { useGroupSelection } from '@/composables/useGroupSelection'
+import { usePathPrefixes } from '@/composables/usePathPrefixes'
 import { useProfilePreview } from '@/composables/useProfilePreview'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { provideEditorBridge } from '@/composables/useAssistantEditor'
@@ -24,6 +26,7 @@ import { errorMessage } from '@/lib/utils'
 import { slugify } from '@/lib/profiles/emit'
 import { loadVocabIndex, type VocabIndex } from '@/lib/profiles/vocabulary'
 import { collectIssues, rejectionIssues, type WriteIssue } from '@/lib/crate/issues'
+import { joinPath, splitPath } from '@/lib/crate/paths'
 import { applyProfile, profileExpectation } from '@/lib/crate/profileSeed'
 import {
   entityName,
@@ -38,7 +41,7 @@ import {
   typeLabel,
   type CrateDraft,
 } from '@/lib/crate/editor'
-import { FileJson2, Plus } from '@lucide/vue'
+import { FileJson2 } from '@lucide/vue'
 
 // The graph carries Vue Flow and dagre; only the Graph tab pays for them.
 const EditorGraph = defineAsyncComponent(() => import('@/components/metadata/editor/EditorGraph.vue'))
@@ -65,6 +68,8 @@ const draft = ref<CrateDraft>(newDraft())
 const vocab = shallowRef<VocabIndex | null>(null)
 const selected = ref(rootId(draft.value))
 const tab = ref<'editor' | 'graph'>('editor')
+// A new dataset starts on its own screen; the editor opens once it is named.
+const started = ref(false)
 const loading = ref(false)
 const loadError = ref<string | null>(null)
 const importOpen = ref(false)
@@ -74,6 +79,7 @@ const preferredProfileInitialized = ref(false)
 const submitError = ref<string | null>(null)
 const saveIssues = ref<WriteIssue[]>([])
 const submitting = ref(false)
+const slugTouched = ref(false)
 
 onMounted(() => void loadVocabIndex().then((index) => (vocab.value = index)))
 
@@ -88,25 +94,46 @@ const expectation = computed(() => {
   return profile ? profileExpectation(profile) : null
 })
 
-watch(groups, (available) => {
-  if (mode.value === 'create' && !draft.value.groupId && available.length) draft.value.groupId = available[0].id
+const groupId = computed({
+  get: () => draft.value.groupId ?? '',
+  set: (value: string) => {
+    draft.value = { ...draft.value, groupId: value }
+  },
+})
+useGroupSelection(groupId)
+const prefixes = usePathPrefixes(computed(() => draft.value.groupId))
+
+// The path is <prefix>/<slug>: the slug follows the name until it is edited,
+// the prefix follows the group's offer until one is picked.
+const currentPrefix = computed(() => splitPath(draft.value.path ?? '').prefix)
+function derivePath(prefix: string) {
+  const slug = slugTouched.value ? splitPath(draft.value.path ?? '').slug : slugify(rootName.value)
+  draft.value = { ...draft.value, path: slug ? joinPath(prefix, slug) : '' }
+}
+watch(rootName, () => {
+  if (mode.value === 'create' && !slugTouched.value) derivePath(currentPrefix.value)
+})
+watch([prefixes.options, prefixes.preselected], ([options, preselected]) => {
+  if (mode.value !== 'create') return
+  if (!options.some((option) => option.value === currentPrefix.value)) derivePath(preselected)
 }, { immediate: true })
 
-// The path follows the dataset name; nothing else derives it.
-watch(rootName, (name) => {
-  if (mode.value !== 'create') return
-  draft.value.path = name ? `datasets/${slugify(name)}` : ''
-})
+function setPath(path: string) {
+  draft.value = { ...draft.value, path }
+  slugTouched.value = splitPath(path).slug !== slugify(rootName.value)
+}
 
 let loadGeneration = 0
 async function load() {
   const generation = ++loadGeneration
   const id = documentId.value
   if (mode.value !== 'edit' || !id) {
-    draft.value = newDraft({ groupId: groups.value[0]?.id })
+    draft.value = newDraft({ groupId: draft.value.groupId })
     selected.value = rootId(draft.value)
     profileId.value = ''
     preferredProfileInitialized.value = false
+    started.value = false
+    slugTouched.value = false
     tab.value = 'editor'
     loading.value = false
     loadError.value = null
@@ -166,6 +193,7 @@ const canSave = computed(() => Boolean(rootName.value && draft.value.groupId))
 // What the node refused, from the last preview and the last write attempt.
 const writeIssues = computed(() => [...rejectionIssues(preview.rejection.value), ...saveIssues.value])
 const nodeIssues = computed(() => collectIssues(preview.result.value, writeIssues.value))
+const editing = computed(() => mode.value === 'edit' || started.value)
 
 // What the assistant may do to the open draft while this view is mounted. It
 // never saves: the check below is the same one the Save button runs first.
@@ -195,6 +223,13 @@ function update(next: CrateDraft) {
 function open(entityId: string) {
   selected.value = entityId
   tab.value = 'editor'
+}
+
+function imported(next: CrateDraft) {
+  draft.value = { ...next, groupId: draft.value.groupId, path: draft.value.path, visibility: draft.value.visibility }
+  selected.value = rootId(draft.value)
+  if (!draft.value.path) derivePath(prefixes.preselected.value)
+  started.value = true
 }
 
 function pickProfile(id: string) {
@@ -270,30 +305,8 @@ async function save() {
       :title="title"
       description="Describe the dataset and everything it refers to, then validate it with the node."
     >
-      <template #breadcrumbs>
-        <GroupSelect
-          v-model="draft.groupId"
-          :options="groupOptions"
-          class="h-7 w-44 text-xs"
-          placeholder="Choose a group"
-          aria-label="Group"
-          :disabled="mode === 'edit'"
-        >
-          <template #action>
-            <Button variant="link" size="sm" class="h-auto p-0 text-xs" @click="createGroupOpen = true">
-              <Plus class="h-3.5 w-3.5" /> Create a group
-            </Button>
-          </template>
-        </GroupSelect>
-        <VisibilitySelect
-          compact
-          :model-value="draft.visibility"
-          :group-id="draft.groupId"
-          @update:model-value="(value) => (draft.visibility = value)"
-        />
-      </template>
       <template #actions>
-        <Button v-if="mode === 'create'" variant="outline" size="sm" @click="importOpen = true">
+        <Button v-if="mode === 'create' && started" variant="outline" size="sm" @click="importOpen = true">
           <FileJson2 class="h-3.5 w-3.5" /> Import an RO-Crate
         </Button>
         <Button variant="outline" size="sm" @click="discard">Discard</Button>
@@ -308,7 +321,31 @@ async function save() {
       <ErrorPanel :message="loadError" @retry="load" />
     </div>
 
+    <DatasetStart
+      v-else-if="!editing"
+      :draft="draft"
+      :group-options="groupOptions"
+      :path-options="prefixes.options.value"
+      :path-loading="prefixes.loading.value"
+      @update="update"
+      @path="setPath"
+      @create-group="createGroupOpen = true"
+      @import="importOpen = true"
+      @continue="started = true"
+    />
+
     <template v-else>
+      <DatasetHeaderBar
+        :draft="draft"
+        :mode="mode"
+        :group-options="groupOptions"
+        :path-options="prefixes.options.value"
+        :path-loading="prefixes.loading.value"
+        @update="update"
+        @path="setPath"
+        @create-group="createGroupOpen = true"
+      />
+
       <div class="container flex items-start gap-5 py-6">
         <EntityBrowser
           :draft="draft"
@@ -318,7 +355,6 @@ async function save() {
           :group-id="draft.groupId"
           @select="(id) => (selected = id)"
           @update="update"
-          @graph="tab = 'graph'"
         />
         <div class="min-w-0 flex-1 space-y-5">
           <div class="inline-flex items-center rounded-md border border-border p-0.5" role="tablist">
@@ -381,14 +417,7 @@ async function save() {
       <IssueDrawer :draft="draft" :issues="issues" :node-issues="nodeIssues" @jump="open" />
     </template>
 
-    <ImportCrateDialog
-      v-if="mode === 'create'"
-      v-model:open="importOpen"
-      @imported="(imported) => {
-        draft = { ...imported, groupId: draft.groupId, visibility: draft.visibility }
-        selected = rootId(draft)
-      }"
-    />
-    <CreateGroupDialog v-model:open="createGroupOpen" @created="(group) => (draft.groupId = group.group_id)" />
+    <ImportCrateDialog v-if="mode === 'create'" v-model:open="importOpen" @imported="imported" />
+    <CreateGroupDialog v-model:open="createGroupOpen" @created="(group) => (groupId = group.group_id)" />
   </div>
 </template>
