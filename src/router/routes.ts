@@ -97,6 +97,8 @@ export function portalRoutes(): RouteRecordRaw[] {
         { path: 'datasets/:id', name: 'dataset', component: () => import('@/views/MetadataView.vue') },
         { path: 'datasets/:id/edit', name: 'dataset-edit', component: () => import('@/views/DatasetEditorView.vue') },
         { path: 'search', redirect: { name: 'datasets' } },
+        // The assistant on a page of its own; the floating panel shares its chat.
+        { path: 'assistant', name: 'assistant', component: () => import('@/views/AssistantView.vue') },
         { path: 'metadata', redirect: { name: 'datasets' } },
         {
           path: 'metadata/:id',
