@@ -70,9 +70,13 @@ export function profileExpectation(profile: MetadataProfile): ProfileExpectation
  * reference an entity of the target type carrying its own mandatory rows.
  * Rows already filled in are left untouched.
  */
-export function applyProfile(draft: CrateDraft, profile: MetadataProfile, iri?: string): CrateDraft {
+export function applyProfile(draft: CrateDraft, profile: MetadataProfile, iri?: string, previousIri?: string): CrateDraft {
   const root = rootId(draft)
-  let next = iri ? setProperty(draft, root, 'conformsTo', [{ kind: 'reference', value: iri }]) : draft
+  const declared = findEntity(draft, root)?.properties.conformsTo ?? []
+  let next = iri ? setProperty(draft, root, 'conformsTo', [
+    ...declared.filter((value) => value.value !== previousIri && value.value !== iri),
+    { kind: 'reference', value: iri },
+  ]) : draft
   for (const rule of mandatory(profile.propertyRules)) {
     if (findEntity(next, root)?.properties[rule.valueName]?.length) continue
     const target = rule.kind === 'entity' ? rule.entityTypes?.[0] : undefined

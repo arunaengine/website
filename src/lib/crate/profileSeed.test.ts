@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { applyProfile, profileExpectation } from './profileSeed'
-import { findEntity, newDraft } from './editor'
+import { findEntity, newDraft, setProperty } from './editor'
 import type { MetadataProfile } from '@/data/types'
 import type { ProfilePropertyRule } from '@/lib/profiles/types'
 
@@ -72,6 +72,23 @@ describe('profile seeding', () => {
 
     expect(applyProfile(edited, profile()).entities[0].properties.identifier)
       .toEqual([{ kind: 'text', value: 'doi:10' }])
+  })
+
+  it('replaces only the previously selected conformance profile', () => {
+    const spec = 'https://w3id.org/ro/crate/1.1'
+    const community = 'https://example.test/community-profile'
+    const previous = 'https://example.test/profiles/old'
+    const next = 'https://example.test/profiles/new'
+    const draft = setProperty(newDraft(), './', 'conformsTo', [spec, community, previous].map((value) => ({
+      kind: 'reference' as const,
+      value,
+    })))
+
+    expect(applyProfile(draft, profile(), next, previous).entities[0].properties.conformsTo).toEqual([
+      { kind: 'reference', value: spec },
+      { kind: 'reference', value: community },
+      { kind: 'reference', value: next },
+    ])
   })
 
   it('names the mandatory properties and types as expectations', () => {

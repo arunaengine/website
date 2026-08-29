@@ -173,9 +173,11 @@ function open(entityId: string) {
 
 function pickProfile(id: string) {
   preferredProfileInitialized.value = true
+  const previous = profiles.value.find((candidate) => candidate.id === profileId.value)
+  const previousIri = profileReferenceIri(previous)
   profileId.value = id
   const profile = profiles.value.find((candidate) => candidate.id === id)
-  if (profile) draft.value = applyProfile(draft.value, profile, profileReferenceIri(profile))
+  if (profile) draft.value = applyProfile(draft.value, profile, profileReferenceIri(profile), previousIri)
 }
 
 watch([mode, currentUser, selectableProfiles], ([currentMode, user, available]) => {

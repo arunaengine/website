@@ -81,11 +81,13 @@ const BrowserStub = defineComponent({
 })
 const EditorStub = defineComponent({
   props: { draft: { type: Object, required: true }, profiles: { type: Array, default: () => [] } },
-  emits: ['update'],
+  emits: ['update', 'profile'],
   setup(props, { emit }) {
     return () => h('div', [
       h('p', Editor.displayName(Editor.rootEntity(props.draft as Editor.CrateDraft))),
       h('p', `Profiles ${(props.profiles as Array<{ label: string }>).map((profile) => profile.label).join(', ')}`),
+      ...(props.profiles as Array<{ value: string; label: string }>).map((profile) =>
+        h('button', { onClick: () => emit('profile', profile.value) }, `Choose ${profile.label}`)),
       h('button', { onClick: () => emit('update', seeded(props.draft as Editor.CrateDraft)) }, 'Seed dataset'),
     ])
   },
@@ -319,6 +321,39 @@ describe('DatasetEditorView', () => {
     const saved = replaceMetadataRoCrate.mock.calls[0][1].rocrate as Record<string, unknown>
     expect((saved['@graph'] as Array<Record<string, unknown>>).some((entity) => entity['@id'] === '#ada-lovelace')).toBe(true)
     expect(routerPush).toHaveBeenCalledWith({ name: 'dataset', params: { id: 'dataset-1' } })
+    mounted.app.unmount()
+  })
+
+  it('preserves unrelated conformance declarations when changing profiles', async () => {
+    const spec = 'https://w3id.org/ro/crate/1.1'
+    const community = 'https://example.test/community-profile'
+    const oldProfile = 'https://example.test/profiles/old'
+    const newProfile = 'https://example.test/profiles/new'
+    profiles.value = [
+      { id: 'old', name: 'Old', managed: true, profileUri: oldProfile, propertyRules: [], entityRules: [] },
+      { id: 'new', name: 'New', managed: true, profileUri: newProfile, propertyRules: [], entityRules: [] },
+    ]
+    const existing = Editor.setProperty(seeded(Editor.newDraft()), './', 'conformsTo', [
+      spec,
+      community,
+      oldProfile,
+    ].map((value) => ({ kind: 'reference' as const, value })))
+    fetchRoCrateRaw.mockResolvedValue(Editor.toRoCrate(existing))
+    route.name = 'dataset-edit'
+    route.params = { id: 'dataset-1' }
+    const mounted = await mountApp(DatasetEditorView)
+    await flush()
+
+    await click(button(mounted.root, 'Choose New'))
+    await click(button(mounted.root, 'Save changes'))
+    await flush()
+
+    const saved = replaceMetadataRoCrate.mock.calls[0][1].rocrate['@graph'] as Array<Record<string, unknown>>
+    expect(saved.find((entity) => entity['@id'] === './')?.conformsTo).toEqual([
+      { '@id': spec },
+      { '@id': community },
+      { '@id': newProfile },
+    ])
     mounted.app.unmount()
   })
 
