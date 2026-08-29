@@ -259,7 +259,7 @@ async function createFolder() {
         </div>
       </section>
 
-      <section v-else-if="contextError" class="surface p-6">
+      <section v-else-if="contextError && !contextReady" class="surface p-6">
         <div class="flex items-start gap-3">
           <ShieldAlert class="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
           <div>

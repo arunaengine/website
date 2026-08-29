@@ -35,7 +35,7 @@ describe('Data view group selection', () => {
   })
 
   it('retries a failed session on request', () => {
-    const errorBranch = template.indexOf('v-else-if="contextError"')
+    const errorBranch = template.indexOf('v-else-if="contextError && !contextReady"')
     expect(errorBranch).toBeGreaterThan(-1)
     expect(template.indexOf('@click="openSelectedContext"')).toBeGreaterThan(errorBranch)
   })
