@@ -52,6 +52,7 @@ const {
   contextBusy,
   contextError,
   contextReady,
+  viewReady,
   contextMismatch,
   requiredNodeId,
   requiredNodeName,
@@ -263,6 +264,10 @@ async function createFolder() {
             <p v-if="contextError" class="mt-3 text-xs text-destructive">{{ contextError }}</p>
           </div>
         </div>
+      </section>
+
+      <section v-else-if="!viewReady" class="surface p-5">
+        <Spinner show-label label="Loading group data…" class="text-sm" />
       </section>
 
       <section v-else class="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">

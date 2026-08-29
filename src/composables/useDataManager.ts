@@ -57,6 +57,28 @@ function routeString(value: unknown): string {
   return typeof value === 'string' ? value : ''
 }
 
+/**
+ * Everything the browser waits for, in one condition: opening a group and
+ * switching between groups paint once instead of filling in panel by panel.
+ * A blocked remote node has nothing left to wait for and shows its own panel;
+ * a failed bucket list has settled too and reports itself in the sidebar.
+ */
+export function dataViewReady(state: {
+  contextReady: boolean
+  remoteBlocked: boolean
+  bucketsLoaded: boolean
+  bucketsFailed: boolean
+  bucket: string
+  listLoading: boolean
+  listedCount: number
+}): boolean {
+  if (!state.contextReady) return false
+  if (state.remoteBlocked) return true
+  // Only the first page blocks: paging must not take the listing off screen.
+  const listingPending = Boolean(state.bucket) && state.listLoading && state.listedCount === 0
+  return (state.bucketsLoaded || state.bucketsFailed) && !listingPending
+}
+
 export function useDataManager() {
   const route = useRoute()
   const router = useRouter()
@@ -810,6 +832,18 @@ export function useDataManager() {
     () => !listLoading.value && !listError.value && !folders.value.length && !objects.value.length,
   )
 
+  const viewReady = computed(() =>
+    dataViewReady({
+      contextReady: contextReady.value,
+      remoteBlocked: remoteBlocked.value,
+      bucketsLoaded: bucketsLoaded.value,
+      bucketsFailed: Boolean(bucketsError.value),
+      bucket: bucket.value,
+      listLoading: listLoading.value,
+      listedCount: folders.value.length + objects.value.length,
+    }),
+  )
+
   return {
     route,
     router,
@@ -827,6 +861,7 @@ export function useDataManager() {
     contextBusy,
     contextError,
     contextReady,
+    viewReady,
     contextMismatch,
     requiredNodeId,
     requiredNodeName,

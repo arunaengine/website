@@ -29,4 +29,11 @@ describe('Data view group selection', () => {
   it('keeps create or join for a user without groups', () => {
     expect(template).toContain("<RouterLink :to=\"{ name: 'groups' }\">Create or join a group</RouterLink>")
   })
+
+  it('gates the browser on one readiness condition', () => {
+    const gate = template.indexOf('v-else-if="!viewReady"')
+    const browser = template.indexOf('<section v-else class="grid')
+    expect(gate).toBeGreaterThan(-1)
+    expect(browser).toBeGreaterThan(gate)
+  })
 })
