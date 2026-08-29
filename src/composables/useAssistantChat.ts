@@ -38,7 +38,7 @@ const approveWrites = ref(readStored(APPROVE_KEY) !== 'off')
 let history: ModelMessage[] = []
 let counter = 0
 let session: { token: string; expiresAt: number; epoch: number } | null = null
-let sessionInFlight: { epoch: number; promise: Promise<string> } | null = null
+let sessionInFlight: { epoch: number; owner: TurnContext | null; promise: Promise<string> } | null = null
 let connection: McpConnection | null = null
 let connectionToken = ''
 let connectionUrl = ''
@@ -153,12 +153,13 @@ async function sessionToken(signal?: AbortSignal, turn?: TurnContext): Promise<s
   const epoch = sessionEpoch.value
   if (session && session.epoch === epoch && session.expiresAt - Date.now() > SESSION_MARGIN_MS) return session.token
   if (!sessionInFlight || sessionInFlight.epoch !== epoch) {
+    const owner = turn ?? null
     const promise = createSession({ kind: 'assistant', label: 'Portal chat' }, client(), signal).then((minted) => {
-      if (epoch !== sessionEpoch.value) throw abortError()
+      if (epoch !== sessionEpoch.value || (owner && !isCurrentTurn(owner))) throw abortError()
       session = { token: minted.token, expiresAt: new Date(minted.expires_at).getTime(), epoch }
       return minted.token
     })
-    sessionInFlight = { epoch, promise }
+    sessionInFlight = { epoch, owner, promise }
   }
   const pendingSession = sessionInFlight
   try {
@@ -251,6 +252,7 @@ function abortTurn(): TurnContext | null {
   turnGeneration += 1
   activeTurn = null
   turn?.controller.abort()
+  if (turn && sessionInFlight?.owner === turn) sessionInFlight = null
   drainApprovals()
   if (turn) busy.value = false
   return turn
