@@ -11,6 +11,7 @@ import GroupRoutingSection from '@/components/groups/GroupRoutingSection.vue'
 import PoliciesSection from '@/components/policies/PoliciesSection.vue'
 import EffectivePolicies from '@/components/policies/EffectivePolicies.vue'
 import GroupMembers from '@/components/groups/GroupMembers.vue'
+import GroupDetailSkeleton from '@/components/groups/GroupDetailSkeleton.vue'
 import GroupRoles from '@/components/groups/GroupRoles.vue'
 import JoinRequestButton from '@/components/groups/JoinRequestButton.vue'
 import JoinRequestsInbox from '@/components/groups/JoinRequestsInbox.vue'
@@ -62,7 +63,9 @@ const loadingDetail = ref(false)
 const usage = ref<UsageResponse | null>(null)
 const docs = ref<MetadataDocumentListItem[] | null>(null)
 const docsError = ref<string | null>(null)
-const docsLoading = ref(false)
+// Only the latest reload writes state: a group switch must not be overwritten
+// by the requests of the group left behind.
+let reloadSeq = 0
 // Approximate count served by newer nodes (estimated per group); shown with a
 // "~" so it never reads as exact. Without it a full page only proves "more
 // exist", so the badge degrades to "8+".
@@ -208,45 +211,49 @@ const tab = computed({
 })
 
 async function reload() {
+  const seq = ++reloadSeq
   loadingDetail.value = true
   loadError.value = null
   usage.value = null
   docs.value = null
   docsError.value = null
-  try {
-    group.value = await getGroup(props.groupId)
-    // Old backends have no per-group usage endpoint; a 404 just hides the block.
-    usage.value = await getGroupUsage(props.groupId).catch(() => null)
-    try {
-      members.value = (await listGroupMembers(props.groupId)).members
-      membersHidden.value = false
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 403) {
-        members.value = []
-        membersHidden.value = true
-      } else {
-        throw err
-      }
-    }
-    // Datasets are loaded separately: a failure here must not blank the panel.
+  // The four sections load together and the detail renders once they settled,
+  // so nothing pops in behind an already visible panel.
+  const [detail, groupUsage, groupMembers, metadata] = await Promise.allSettled([
+    getGroup(props.groupId),
+    getGroupUsage(props.groupId),
+    listGroupMembers(props.groupId),
     // One bounded page, never a walk; the panel only previews DOC_LIMIT rows
     // and links to Discover for the rest.
-    docsLoading.value = true
-    try {
-      const page = await listGroupMetadata(props.groupId, { limit: DOC_LIMIT + 1 })
-      docs.value = page.documents
-      docsEstimate.value = page.total_estimate ?? null
-    } catch (err) {
-      docsError.value = errorMessage(err)
-    } finally {
-      docsLoading.value = false
-    }
-  } catch (err) {
-    loadError.value = errorMessage(err)
+    listGroupMetadata(props.groupId, { limit: DOC_LIMIT + 1 }),
+  ])
+  if (seq !== reloadSeq) return
+  if (detail.status === 'fulfilled') {
+    group.value = detail.value
+  } else {
     group.value = null
-  } finally {
-    loadingDetail.value = false
+    loadError.value = errorMessage(detail.reason)
   }
+  // Old backends have no per-group usage endpoint; a 404 just hides the block.
+  usage.value = groupUsage.status === 'fulfilled' ? groupUsage.value : null
+  if (groupMembers.status === 'fulfilled') {
+    members.value = groupMembers.value.members
+    membersHidden.value = false
+  } else if (groupMembers.reason instanceof ApiError && groupMembers.reason.status === 403) {
+    members.value = []
+    membersHidden.value = true
+  } else if (!loadError.value) {
+    group.value = null
+    loadError.value = errorMessage(groupMembers.reason)
+  }
+  // Datasets fail on their own: a failure here must not blank the panel.
+  if (metadata.status === 'fulfilled') {
+    docs.value = metadata.value.documents
+    docsEstimate.value = metadata.value.total_estimate ?? null
+  } else {
+    docsError.value = errorMessage(metadata.reason)
+  }
+  loadingDetail.value = false
   // Independent usage-history endpoint, gated; no-op when off.
   void loadHistory()
   // The storage section renders only after getGroup + getGroupUsage resolve, so
@@ -263,6 +270,8 @@ watch(
   () => props.groupId,
   () => {
     leaveError.value = null
+    // The placeholder, not the previous group, covers the switch.
+    group.value = null
     connectorCount.value = null
     backendCount.value = null
     groupBackends.value = []
@@ -287,7 +296,7 @@ async function leave() {
 
 <template>
   <div class="rounded-lg border border-border bg-background/60">
-    <div v-if="loadingDetail && !group" class="px-5 py-6 text-center text-xs text-muted-foreground">Loading group…</div>
+    <GroupDetailSkeleton v-if="loadingDetail && !group" />
     <div v-else-if="loadError" class="px-5 py-6 text-center text-xs text-destructive">{{ loadError }}</div>
     <template v-else-if="group">
       <header class="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
@@ -321,7 +330,9 @@ async function leave() {
             </TabsTrigger>
             <TabsTrigger v-if="isMember" value="sources" class="gap-1.5">
               <Cable class="h-3.5 w-3.5" /> Data sources
+              <!-- The pill holds the badge's place, so a late count never moves the tabs. -->
               <Badge v-if="connectorCount !== null" variant="outline" class="tabular-nums">{{ connectorCount }}</Badge>
+              <Skeleton v-else class="h-5 w-6 rounded-full" />
             </TabsTrigger>
             <TabsTrigger v-if="policiesTabVisible" value="policies" class="gap-1.5">
               <ShieldAlert class="h-3.5 w-3.5" /> Policies
@@ -329,6 +340,7 @@ async function leave() {
             <TabsTrigger v-if="canAdminStorage" value="storage" class="gap-1.5">
               <Database class="h-3.5 w-3.5" /> Storage
               <Badge v-if="backendCount !== null" variant="outline" class="tabular-nums">{{ backendCount }}</Badge>
+              <Skeleton v-else class="h-5 w-6 rounded-full" />
             </TabsTrigger>
           </TabsList>
         </div>
@@ -450,8 +462,7 @@ async function leave() {
           </Badge>
         </div>
         <div class="px-5 py-3">
-          <p v-if="docsLoading && !docs" class="text-xs text-muted-foreground">Loading datasets…</p>
-          <p v-else-if="docsError" class="text-xs text-destructive">{{ docsError }}</p>
+          <p v-if="docsError" class="text-xs text-destructive">{{ docsError }}</p>
           <p v-else-if="docs && !docs.length" class="text-xs text-muted-foreground">This group has no datasets yet.</p>
           <ul v-else-if="docs" class="space-y-1">
             <li v-for="doc in docs.slice(0, DOC_LIMIT)" :key="doc.document_id">
