@@ -13,6 +13,7 @@ import {
 } from '@/test/clientRender'
 import { ADDABLE_PROVIDER_KINDS, PROVIDER_KIND_LABELS, type AssistantProvider } from '@/lib/api/assistant'
 import { errorMessage } from '@/lib/utils'
+import * as ModelOptions from '@/lib/assistant/modelOptions'
 
 const create = vi.fn(async (_request: Record<string, unknown>) => ({ provider_id: 'p-new' }))
 const update = vi.fn(async (_id: string, _patch: Record<string, unknown>) => ({ provider_id: 'p-new' }))
@@ -42,6 +43,17 @@ const SelectStub = defineComponent({
     )),
 })
 const NoticeStub = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
+const ComboboxStub = defineComponent({
+  props: { modelValue: { type: String, default: '' }, ariaLabel: String, suggestions: { type: Array, default: () => [] } },
+  emits: ['update:modelValue'],
+  setup: (props, { emit }) => () =>
+    h('input', {
+      'aria-label': props.ariaLabel,
+      value: props.modelValue,
+      'data-suggestions': (props.suggestions as Array<{ id: string }>).map((model) => model.id).join(','),
+      onInput: (event: { target: { value: unknown } }) => emit('update:modelValue', String(event.target.value ?? '')),
+    }),
+})
 const icons = new Proxy({}, { get: () => defineComponent(() => () => h('i')) })
 
 const ProviderForm = compileClientComponent(new URL('./ProviderForm.vue', import.meta.url), {
@@ -51,6 +63,8 @@ const ProviderForm = compileClientComponent(new URL('./ProviderForm.vue', import
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Notice.vue': moduleDefault(NoticeStub),
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
+  '@/components/assistant/ModelCombobox.vue': moduleDefault(ComboboxStub),
+  '@/lib/assistant/modelOptions': ModelOptions,
   '@/composables/useAssistantProviders': {
     useAssistantProviders: () => ({ create, update, check, models }),
   },
@@ -125,6 +139,18 @@ describe('ProviderForm', () => {
     expect(create).not.toHaveBeenCalled()
     expect(update.mock.calls[0]).toEqual(['p-1', { label: 'Work' }])
     expect(Object.keys(update.mock.calls[0][1] as object)).not.toContain('api_key')
+  })
+
+  it('stores a model id typed by hand as the default', async () => {
+    // A fine-tune or a brand-new model needs no entry in the fetched list.
+    const { root } = await mountApp(ProviderForm, { props: { provider: stored } })
+    const model = element(root, (node) => node.tag === 'input' && node.props['aria-label'] === 'Default model')
+    expect(model.props['data-suggestions']).toBe('m-1')
+
+    await typeValue(model, '  my-fine-tune ')
+    await click(button(root, 'Save provider'))
+
+    expect(update.mock.calls.at(-1)).toEqual(['p-1', { models: [{ id: 'm-1' }], default_model: 'my-fine-tune' }])
   })
 
   it('asks for a base URL only for an openai-compatible provider', async () => {

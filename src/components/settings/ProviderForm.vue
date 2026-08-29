@@ -8,6 +8,7 @@ import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Select from '@/components/ui/Select.vue'
+import ModelCombobox from '@/components/assistant/ModelCombobox.vue'
 import { useAssistantProviders } from '@/composables/useAssistantProviders'
 import {
   ADDABLE_PROVIDER_KINDS,
@@ -16,6 +17,7 @@ import {
   type AssistantProvider,
   type AssistantProviderKind,
 } from '@/lib/api'
+import { modelSuggestions, normalizeModelId } from '@/lib/assistant/modelOptions'
 import { errorMessage } from '@/lib/utils'
 import { ChevronRight, Plus, X } from '@lucide/vue'
 
@@ -42,8 +44,9 @@ const message = ref<string | null>(null)
 const failure = ref<string | null>(null)
 
 const kindOptions = ADDABLE_PROVIDER_KINDS.map((entry) => ({ value: entry, label: PROVIDER_KIND_LABELS[entry] }))
-const modelOptions = computed(() =>
-  models.value.map((model) => ({ value: model.id, label: model.display_name || model.id })))
+// Fetched ids are suggestions; any id typed by hand is accepted as well.
+const suggestions = computed(() =>
+  modelSuggestions({ kind: kind.value, models: props.provider?.models ?? [] }, models.value))
 const needsBaseUrl = computed(() => kind.value === 'openai_compatible')
 const canTest = computed(() =>
   Boolean(label.value.trim())
@@ -117,9 +120,10 @@ async function save() {
   failure.value = null
   try {
     const id = await persist()
+    const chosen = normalizeModelId(defaultModel.value)
     await update(id, {
       ...(models.value.length ? { models: models.value } : {}),
-      ...(defaultModel.value ? { default_model: defaultModel.value } : {}),
+      ...(chosen ? { default_model: chosen } : {}),
     })
     emit('done')
   } catch (cause) {
@@ -205,14 +209,14 @@ function keyChanged() {
     <div class="flex flex-wrap items-center gap-2">
       <Button variant="outline" size="sm" :disabled="!canTest || busy" @click="test">Test connection</Button>
       <Button variant="outline" size="sm" :disabled="!tested || busy" @click="loadModels">Fetch models</Button>
-      <div v-if="modelOptions.length" class="flex items-center gap-2">
+      <div class="flex items-center gap-2">
         <label class="text-xs font-medium text-foreground">Default model</label>
-        <Select
-          :model-value="defaultModel"
-          :options="modelOptions"
-          class="h-8 w-56"
+        <ModelCombobox
+          v-model="defaultModel"
+          :suggestions="suggestions"
+          class="h-8 w-64"
           aria-label="Default model"
-          @update:model-value="(value) => (defaultModel = value)"
+          placeholder="Pick a fetched model or type an id"
         />
       </div>
     </div>

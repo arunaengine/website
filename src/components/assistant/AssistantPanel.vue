@@ -10,6 +10,8 @@ import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import Textarea from '@/components/ui/Textarea.vue'
 import MessageList from '@/components/assistant/MessageList.vue'
+import ModelCombobox from '@/components/assistant/ModelCombobox.vue'
+import { modelSuggestions } from '@/lib/assistant/modelOptions'
 import { useAssistantChat } from '@/composables/useAssistantChat'
 import { useAssistantEditor } from '@/composables/useAssistantEditor'
 import { useAruna } from '@/composables/useAruna'
@@ -41,8 +43,7 @@ const input = ref('')
 
 const providerOptions = computed(() =>
   providers.value.map((entry) => ({ value: entry.provider_id, label: entry.label })))
-const modelOptions = computed(() =>
-  (provider.value?.models ?? []).map((entry) => ({ value: entry.id, label: entry.display_name || entry.id })))
+const suggestions = computed(() => (provider.value ? modelSuggestions(provider.value) : []))
 const deleteCallId = computed(() =>
   (pending.value?.always ? pending.value.request.id : undefined))
 
@@ -91,12 +92,13 @@ function onKeydown(event: KeyboardEvent) {
           aria-label="Provider"
           @update:model-value="selectProvider"
         />
-        <Select
-          v-if="modelOptions.length"
+        <ModelCombobox
+          v-if="provider"
           :model-value="model"
-          :options="modelOptions"
-          class="h-7 flex-1 text-[11px]"
+          :suggestions="suggestions"
+          class="h-7 flex-1"
           aria-label="Model"
+          required
           @update:model-value="selectModel"
         />
       </div>
@@ -125,7 +127,7 @@ function onKeydown(event: KeyboardEvent) {
           aria-label="Message"
           @keydown="onKeydown"
         />
-        <Button size="sm" :disabled="busy || !input.trim() || !provider" @click="submit">Send</Button>
+        <Button size="sm" :disabled="busy || !input.trim() || !provider || !model" @click="submit">Send</Button>
       </div>
     </div>
   </div>

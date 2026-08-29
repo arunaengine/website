@@ -129,9 +129,10 @@ export function useAssistantChat() {
     storeValue(MODEL_KEY, '')
   }
 
+  // Any id goes: a fine-tune or a model newer than the fetched list.
   function selectModel(id: string) {
-    modelId.value = id
-    storeValue(MODEL_KEY, id)
+    modelId.value = id.trim()
+    storeValue(MODEL_KEY, modelId.value)
   }
 
   function setApproveWrites(value: boolean) {
