@@ -101,6 +101,8 @@ function itemKey(item: SyncItem): string {
 
 const activeLocalRuns = computed(() => localRuns.value.filter((job) => !isTerminalJobState(job.state)))
 const activeRealmRuns = computed(() => realmRuns.jobs.value.filter((job) => !isTerminalJobState(job.state)))
+const activeDrafts = computed(() => drafts.value.filter((draft) => draft.status === 'pending' || draft.status === 'publishing'))
+const failedDrafts = computed(() => drafts.value.filter((draft) => draft.status === 'failed'))
 async function loadLocalRuns(): Promise<void> {
   const client = deviceClient.value
   if (!client) {
@@ -297,20 +299,29 @@ onMounted(() => void reload())
               subject="its drafts"
               compact
             />
-            <template v-else-if="drafts.length">
-              <p class="text-sm text-foreground">
-                <span class="font-display text-xl font-bold">{{ drafts.length }}</span>
-                waiting to be published
+            <template v-else>
+              <template v-if="activeDrafts.length">
+                <p class="text-sm text-foreground">
+                  <span class="font-display text-xl font-bold">{{ activeDrafts.length }}</span>
+                  waiting to be published
+                </p>
+                <ul class="mt-2 space-y-1">
+                  <li v-for="draft in activeDrafts.slice(0, 3)" :key="draft.draft_id" class="truncate text-[11px] text-muted-foreground">
+                    {{ draft.path || draft.draft_id }}
+                  </li>
+                </ul>
+              </template>
+              <Notice
+                v-if="failedDrafts.length"
+                tone="error"
+                class="mt-3"
+                :title="`${failedDrafts.length} ${failedDrafts.length === 1 ? 'draft' : 'drafts'} failed to publish`"
+                :lines="failedDrafts.slice(0, 3).map((draft) => draft.path || draft.draft_id)"
+              />
+              <p v-if="!activeDrafts.length && !failedDrafts.length" class="text-sm text-muted-foreground">
+                Nothing waits to be published. A dataset you write while the realm is unreachable lands here.
               </p>
-              <ul class="mt-2 space-y-1">
-                <li v-for="draft in drafts.slice(0, 3)" :key="draft.draft_id" class="truncate text-[11px] text-muted-foreground">
-                  {{ draft.path || draft.draft_id }}
-                </li>
-              </ul>
             </template>
-            <p v-else class="text-sm text-muted-foreground">
-              Nothing waits to be published. A dataset you write while the realm is unreachable lands here.
-            </p>
           </div>
         </section>
       </div>
