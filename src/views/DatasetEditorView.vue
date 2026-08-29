@@ -16,6 +16,7 @@ import NodeCheckPanel from '@/components/metadata/editor/NodeCheckPanel.vue'
 import { profileReferenceIri, useAruna } from '@/composables/useAruna'
 import { useProfilePreview } from '@/composables/useProfilePreview'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
+import { provideEditorBridge } from '@/composables/useAssistantEditor'
 import { isDesktop } from '@/lib/desktop'
 import { previewDeviceDraft, requireDevice } from '@/lib/deviceApi'
 import { ApiError, profileValidationFindings, type RoCrateStructuralViolation } from '@/lib/api'
@@ -160,6 +161,20 @@ const preview = useProfilePreview({
 })
 
 const canSave = computed(() => Boolean(rootName.value && draft.value.groupId))
+
+// What the assistant may do to the open draft while this view is mounted. It
+// never saves: the check below is the same one the Save button runs first.
+provideEditorBridge({
+  draft: () => draft.value,
+  update,
+  profileId: () => profileId.value,
+  profiles: () => selectableProfiles.value.map((profile) => ({ id: profile.id, name: profile.name })),
+  applyProfile: pickProfile,
+  validate: async () => {
+    await preview.verify(crate.value)
+    return preview.result.value
+  },
+})
 
 function update(next: CrateDraft) {
   draft.value = next

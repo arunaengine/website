@@ -295,6 +295,12 @@ function valueFrom(raw: unknown): DraftValue | undefined {
   return undefined
 }
 
+/** The rows a JSON-LD value stands for; undefined when no row can express it. */
+export function draftValues(raw: unknown): DraftValue[] | undefined {
+  const list = values(raw).map(valueFrom)
+  return list.length && list.every(Boolean) ? (list as DraftValue[]) : undefined
+}
+
 function jsonFrom(value: DraftValue): unknown {
   if (value.kind === 'reference') return { '@id': value.value }
   if (value.kind === 'boolean') return value.value === 'true'
@@ -566,8 +572,8 @@ export function fromRoCrate(
     const extra: Record<string, unknown> = {}
     for (const [property, raw] of Object.entries(node)) {
       if (property === '@id' || property === '@type') continue
-      const list = values(raw).map(valueFrom)
-      if (raw !== undefined && list.length && list.every(Boolean)) properties[property] = list as DraftValue[]
+      const list = raw === undefined ? undefined : draftValues(raw)
+      if (list) properties[property] = list
       else extra[property] = raw
     }
     entities.push({
