@@ -273,6 +273,7 @@ async function save() {
           class="h-7 w-44 text-xs"
           placeholder="Choose a group"
           aria-label="Group"
+          :disabled="mode === 'edit'"
         >
           <template #action>
             <Button variant="link" size="sm" class="h-auto p-0 text-xs" @click="createGroupOpen = true">

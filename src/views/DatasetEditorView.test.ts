@@ -61,10 +61,13 @@ const PageHeaderStub = defineComponent({
   setup: (props, { slots }) => () => h('header', [h('h1', props.title), slots.breadcrumbs?.(), slots.actions?.()]),
 })
 const GroupSelectStub = defineComponent({
-  props: { modelValue: { type: String, default: '' } },
+  props: { modelValue: { type: String, default: '' }, disabled: Boolean },
   emits: ['update:modelValue'],
-  setup: (props, { emit }) => () =>
-    h('button', { 'aria-label': 'Group', onClick: () => emit('update:modelValue', 'group-1') }, props.modelValue),
+  setup: (props, { emit }) => () => h('button', {
+    'aria-label': 'Group',
+    disabled: props.disabled,
+    onClick: () => emit('update:modelValue', 'group-1'),
+  }, props.modelValue),
 })
 const BrowserStub = defineComponent({
   props: { draft: { type: Object, required: true } },
@@ -175,6 +178,7 @@ describe('DatasetEditorView', () => {
 
     expect(content(mounted.root)).toContain('Entities 1')
     expect(content(mounted.root)).toContain('New dataset')
+    expect(element(mounted.root, (node) => node.props['aria-label'] === 'Group').props.disabled).toBe(false)
     expect(button(mounted.root, 'Create dataset').props.disabled).toBe(true)
     mounted.app.unmount()
   })
@@ -303,6 +307,7 @@ describe('DatasetEditorView', () => {
 
     expect(content(mounted.root)).toContain('Example dataset')
     expect(content(mounted.root)).toContain('Entities 2')
+    expect(element(mounted.root, (node) => node.props['aria-label'] === 'Group').props.disabled).toBe(true)
     await click(button(mounted.root, 'Save changes'))
     await flush()
 
