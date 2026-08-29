@@ -28,7 +28,7 @@ const WIDTHS = ['w-3/4', 'w-full', 'w-2/3', 'w-5/6', 'w-1/2']
       <Skeleton class="h-4 w-32" />
     </div>
     <div class="space-y-2.5 px-5 py-4">
-      <Skeleton v-for="line in lines" :key="line" :class="['h-3.5', WIDTHS[(line - 1) % WIDTHS.length]]" />
+      <Skeleton v-for="line in lines" :key="line" :class="`h-3.5 ${WIDTHS[(line - 1) % WIDTHS.length]}`" />
       <div v-if="tiles" class="grid gap-3 pt-3" :style="{ gridTemplateColumns: `repeat(${tiles}, minmax(0, 1fr))` }">
         <Skeleton v-for="tile in tiles" :key="tile" class="h-16" />
       </div>

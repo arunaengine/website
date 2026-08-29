@@ -53,7 +53,7 @@ const WIDTHS = ['w-1/3', 'w-2/5', 'w-1/4', 'w-1/2', 'w-1/3']
       <div v-for="row in rows" :key="row" class="flex items-center gap-3 px-5 py-3" data-skeleton-row>
         <Skeleton class="h-2 w-2 shrink-0 rounded-full" />
         <div class="min-w-0 flex-1 space-y-1.5">
-          <Skeleton :class="['h-3.5', WIDTHS[(row - 1) % WIDTHS.length]]" />
+          <Skeleton :class="`h-3.5 ${WIDTHS[(row - 1) % WIDTHS.length]}`" />
           <Skeleton class="h-3 w-1/2" />
         </div>
         <Skeleton class="h-5 w-16 shrink-0 rounded-full" />
