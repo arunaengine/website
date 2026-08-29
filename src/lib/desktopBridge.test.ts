@@ -5,8 +5,10 @@ type Handler = (command: string, args?: Record<string, unknown>) => unknown
 
 let opener: AuthOpener | null = null
 let invoke: ReturnType<typeof vi.fn>
+const cancelSignIn = vi.fn()
 
 vi.mock('@/composables/useAuth', () => ({
+  cancelSignIn,
   setAuthOpener: (next: AuthOpener | null) => {
     opener = next
   },
@@ -18,6 +20,7 @@ vi.mock('@/composables/useGlobalErrors', () => ({ reportGlobalError: vi.fn() }))
 async function load(injected?: unknown) {
   vi.resetModules()
   opener = null
+  cancelSignIn.mockClear()
   vi.stubGlobal('window', { __ARUNA_DESKTOP__: injected })
   return await import('./desktopBridge')
 }
@@ -218,6 +221,14 @@ describe('system-browser auth', () => {
     opener?.('https://idp.test/authorize')
     await Promise.resolve()
     expect(invoke).toHaveBeenCalledWith('open_external', { url: 'https://idp.test/authorize' })
+  })
+
+  it('cancels sign-in when the shell cannot open it', async () => {
+    const bridge = await withShell(() => Promise.reject(new Error('browser unavailable')))
+    bridge.installAuthOpener()
+    opener?.('https://idp.test/authorize')
+
+    await vi.waitFor(() => expect(cancelSignIn).toHaveBeenCalledTimes(1))
   })
 
   it('installs no opener without a bridge', async () => {

@@ -4,7 +4,7 @@
 // BridgeUnavailable instead of a stubbed value.
 import { desktopBridge } from './desktop'
 import { featureEnabled } from './config'
-import { setAuthOpener } from '@/composables/useAuth'
+import { cancelSignIn, setAuthOpener } from '@/composables/useAuth'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
 
 /** The shell exposes no such command, or injected no bridge at all. */
@@ -364,6 +364,7 @@ export function installAuthOpener(): void {
   if (!desktopBridge()) return
   setAuthOpener((url) => {
     void openSignIn(url).catch((err) => {
+      cancelSignIn()
       reportGlobalError(`Aruna Desktop could not open the sign-in: ${detail(err)}`)
     })
   })
