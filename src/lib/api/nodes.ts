@@ -27,6 +27,8 @@ export interface PortalStatus {
 export interface InterfaceServicesStatus {
   rest: InterfaceStatus
   s3: InterfaceStatus
+  // Streamable HTTP MCP endpoint. Absent means this node serves no MCP server.
+  mcp?: InterfaceStatus
 }
 
 export interface InterfaceStatus {
