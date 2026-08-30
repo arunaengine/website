@@ -23,8 +23,9 @@ import {
   userInfo,
 } from './state'
 
-export async function refresh() {
-  const context = refreshContext()
+let refreshInFlight: { epoch: number; promise: Promise<void> } | null = null
+
+async function refreshForContext(context: ReturnType<typeof refreshContext>): Promise<void> {
   loading.value = true
   error.value = null
   authError.value = null
@@ -60,6 +61,18 @@ export async function refresh() {
   }
 }
 
+export function refresh(): Promise<void> {
+  const context = refreshContext()
+  if (refreshInFlight?.epoch === context.epoch) return refreshInFlight.promise
+
+  const promise = refreshForContext(context)
+  refreshInFlight = { epoch: context.epoch, promise }
+  void promise.finally(() => {
+    if (refreshInFlight?.promise === promise) refreshInFlight = null
+  }).catch(() => undefined)
+  return promise
+}
+
 export function setAuthToken(token: string) {
   const next = token.trim()
   if (next === authToken.value) return
@@ -68,6 +81,7 @@ export function setAuthToken(token: string) {
   storeValue(TOKEN_KEY, authToken.value)
   clearIdentityState()
   loading.value = false
+  bootstrapped.value = false
 }
 
 // `keepToken` is the desktop shell moving this window between its own bases:

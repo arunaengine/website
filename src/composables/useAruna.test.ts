@@ -739,3 +739,60 @@ describe('a session the realm refused', () => {
     expect(aruna.authRejected.value).toBe(true)
   })
 })
+
+describe('initial refresh coordination', () => {
+  afterEach(() => {
+    vi.mocked(apiRequest).mockReset()
+    useAruna().setAuthToken('')
+  })
+
+  it('shares one bootstrap wave between concurrent callers', async () => {
+    const aruna = useAruna()
+    aruna.setAuthToken('')
+    vi.mocked(apiRequest).mockReset()
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    vi.mocked(apiRequest).mockImplementation(async (path) => {
+      await gate
+      if (path === '/info') {
+        return {
+          node: { status: 'ok', realm_id: 'realm', peer_id: 'peer', capabilities: 'server' },
+          my_addresses: [],
+          services: { interfaces: { rest: { status: 'ok' }, s3: { status: 'ok' } } },
+          warnings: [],
+        }
+      }
+      if (path === '/info/realm') {
+        return {
+          realm_id: 'realm',
+          metadata_replication: { default_replication_factor: null },
+          oidc_providers: [],
+          discovery: {},
+          nodes: [],
+          interfaces: { rest: { status: 'ok' }, s3: { status: 'ok' } },
+        }
+      }
+      if (path === '/info/usage') {
+        return { buckets: 0, objects: 0, stored_blobs: 0, stored_bytes: 0, referenced_bytes: 0 }
+      }
+      return { documents: [], limit: 100, offset: 0, total_returned: 0 }
+    })
+
+    const first = aruna.refresh()
+    const second = aruna.refresh()
+
+    expect(second).toBe(first)
+    expect(vi.mocked(apiRequest)).toHaveBeenCalledTimes(5)
+    release()
+    await first
+  })
+
+  it('marks the session unbootstrapped when its token changes', () => {
+    const aruna = useAruna()
+    aruna.setAuthToken('new-token')
+
+    expect(aruna.bootstrapped.value).toBe(false)
+  })
+})
