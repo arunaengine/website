@@ -17,6 +17,7 @@ import { reportGlobalError } from '@/composables/useGlobalErrors'
 import { useRefresh } from '@/composables/useRefresh'
 import { useFirstPaint } from '@/composables/useFirstPaint'
 import { providePageContext } from '@/composables/usePageContext'
+import type { PageContext } from '@/lib/assistant/prompt'
 import { useRoute, useRouter } from 'vue-router'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { Inbox, Plus, Users } from '@lucide/vue'
@@ -104,7 +105,7 @@ const pageTitle = computed(() =>
   route.name === 'group' ? (selectedGroup.value?.name ?? selectedGroupId.value) : 'Groups',
 )
 
-providePageContext(() => (selectedGroupId.value
+providePageContext((): PageContext => (selectedGroupId.value
   ? { kind: 'group', title: selectedGroup.value?.name ?? selectedGroupId.value, facts: { id: selectedGroupId.value } }
   : { kind: 'groups page', title: 'Groups', facts: { 'groups joined': String(myGroups.value.length) } }))
 
