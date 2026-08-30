@@ -22,8 +22,21 @@ export function proxyFetch(context: ModelContext): typeof globalThis.fetch {
   const base = context.fetch ?? globalThis.fetch
   return async (input, init) => {
     const headers = new Headers(init?.headers)
+    // Provider SDKs add their own User-Agent. Firefox includes it in the CORS
+    // preflight, but the browser-to-node proxy only needs the Aruna bearer and
+    // request content headers. Dropping it keeps the preflight inside the REST
+    // API's deliberately small header allowlist.
+    headers.delete('User-Agent')
     headers.set('Authorization', `Bearer ${context.token}`)
-    return base(input, { ...init, headers })
+    try {
+      return await base(input, { ...init, headers })
+    } catch (cause) {
+      if (cause instanceof DOMException && cause.name === 'AbortError') throw cause
+      throw new Error(
+        'The Aruna assistant proxy could not be reached. Check that the node is running and allows this portal origin.',
+        { cause },
+      )
+    }
   }
 }
 
