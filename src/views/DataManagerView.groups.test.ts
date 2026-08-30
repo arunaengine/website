@@ -15,8 +15,8 @@ const template = parse(viewSource, { filename: 'DataManagerView.vue' }).descript
   ?.content as string
 
 describe('Data view group selection', () => {
-  it('defaults the group through the shared selection', () => {
-    expect(managerSource).toContain('useGroupSelection(selectedGroupId)')
+  it('follows the group the top bar holds', () => {
+    expect(managerSource).toContain('useGroupContext(selectedGroupId)')
   })
 
   it('opens the selected group without a button', () => {
@@ -26,12 +26,17 @@ describe('Data view group selection', () => {
     expect(template).not.toContain('Session active')
   })
 
-  it('switches the group from the context line', () => {
+  it('shows the group without a second picker', () => {
     expect(template).toContain('Showing buckets of')
     expect(template).toContain('on {{ requiredNodeName }}')
-    expect(template).toContain('<DropdownMenuTrigger as-child>')
-    expect(template).toContain('v-for="option in groupOptions"')
-    expect(template).toContain('@click="selectedGroupId = option.value"')
+    expect(template).toContain('Switch the group in the top bar')
+    expect(template).not.toContain('groupOptions')
+    expect(template).not.toContain('DropdownMenu')
+  })
+
+  it('keeps a route group as the opened one', () => {
+    expect(managerSource).toContain("routeString(route.query.group) || s3.activeContext.value?.groupId")
+    expect(managerSource).toContain('if (next) selectedGroupId.value = next')
   })
 
   it('retries a failed session on request', () => {

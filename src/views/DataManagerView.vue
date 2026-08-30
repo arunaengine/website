@@ -4,11 +4,6 @@ import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Input from '@/components/ui/Input.vue'
-import DropdownMenu from '@/components/ui/DropdownMenu.vue'
-import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
-import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
-import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
-import DropdownMenuLabel from '@/components/ui/DropdownMenuLabel.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
@@ -37,7 +32,7 @@ import { isDesktop } from '@/lib/desktop'
 import type { BucketSearchHit } from '@/lib/api'
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { Check, ChevronsUpDown, HardDriveDownload, KeyRound, LogIn, ShieldAlert } from '@lucide/vue'
+import { HardDriveDownload, KeyRound, LogIn, ShieldAlert } from '@lucide/vue'
 
 const { bootstrapped, currentUser } = useAruna()
 const s3 = useS3()
@@ -52,7 +47,7 @@ const {
   remoteNodeId,
   realmNodes,
   selectedGroupId,
-  selectedGroupLabel,
+  selectedGroupName,
   groupsLoading,
   hasGroups,
   contextBusy,
@@ -63,7 +58,6 @@ const {
   requiredNodeId,
   requiredNodeName,
   sessionWarning,
-  groupOptions,
   keyTail,
   openSelectedContext,
   activeGroupId,
@@ -80,13 +74,6 @@ const {
   refreshSpinning,
   onRefresh,
 } = manager
-
-const selectedGroupName = computed(
-  () =>
-    groupOptions.value.find((option) => option.value === selectedGroupId.value)?.label ||
-    selectedGroupLabel.value ||
-    'Select a group',
-)
 
 providePageContext(() => ({
   kind: 'data manager',
@@ -209,31 +196,15 @@ async function createFolder() {
     >
       <template #actions>
         <template v-if="currentUser && s3.connectedEndpoint.value">
-          <!-- The sentence collapses to the group switcher on narrow screens. -->
+          <!-- The group is the top bar's context; here it only stays visible. -->
           <div class="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
             <span class="hidden lg:inline">Showing buckets of</span>
-            <DropdownMenu>
-              <DropdownMenuTrigger as-child>
-                <button
-                  class="inline-flex h-8 max-w-[12rem] items-center gap-1 rounded-md border border-border bg-card px-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:border-primary/40"
-                  aria-label="Switch group"
-                >
-                  <span class="truncate">{{ selectedGroupName }}</span>
-                  <ChevronsUpDown class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" class="w-64">
-                <DropdownMenuLabel>Switch group</DropdownMenuLabel>
-                <DropdownMenuItem
-                  v-for="option in groupOptions"
-                  :key="option.value"
-                  @click="selectedGroupId = option.value"
-                >
-                  <span class="min-w-0 flex-1 truncate">{{ option.label }}</span>
-                  <Check v-if="option.value === selectedGroupId" class="h-3.5 w-3.5 shrink-0 text-primary" />
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <span
+              class="inline-flex h-8 max-w-[12rem] items-center rounded-md border border-border bg-muted/40 px-2 text-sm font-medium text-foreground"
+              :title="`${selectedGroupId} · Switch the group in the top bar`"
+            >
+              <span class="truncate">{{ selectedGroupName }}</span>
+            </span>
             <span class="hidden lg:inline" :title="requiredNodeId ?? undefined">on {{ requiredNodeName }}</span>
           </div>
         </template>

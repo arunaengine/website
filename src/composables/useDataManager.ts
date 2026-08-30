@@ -8,7 +8,7 @@ import { contextKey, shouldOpenContext } from './s3/context'
 import { useAruna } from './useAruna'
 import { useBuckets } from './useBuckets'
 import { useBucketShortcuts } from './useBucketShortcuts'
-import { useGroupSelection } from './useGroupSelection'
+import { useGroupContext } from './useGroupSelection'
 import { useRealmNodes } from './useRealmNodes'
 import { useRefresh } from './useRefresh'
 import { useStagingReferences } from './useStagingReferences'
@@ -112,7 +112,7 @@ export function useDataManager() {
     return nodeId
   })
   const selectedGroupId = ref(routeString(route.query.group) || s3.activeContext.value?.groupId || '')
-  const { groupsLoading, hasGroups } = useGroupSelection(selectedGroupId)
+  const { groupsLoading, hasGroups } = useGroupContext(selectedGroupId)
   const selectedGroupLabel = ref('')
   const contextBusy = ref(false)
   const contextError = ref<string | null>(null)
@@ -136,16 +136,15 @@ export function useDataManager() {
   const sessionWarning = computed(() =>
     contextReady.value ? s3.activeContext.value?.session.warning ?? null : null,
   )
-  const groupOptions = computed(() => {
-    const options = myGroups.value.map((group) => ({ value: group.id, label: group.name }))
-    if (selectedGroupId.value && !options.some((option) => option.value === selectedGroupId.value)) {
-      options.push({
-        value: selectedGroupId.value,
-        label: selectedGroupLabel.value || selectedGroupId.value,
-      })
-    }
-    return options
-  })
+  // A search hit may browse a group the user is not a member of, so the label
+  // falls back to the name the hit carried.
+  const selectedGroupName = computed(
+    () =>
+      myGroups.value.find((group) => group.id === selectedGroupId.value)?.name ||
+      selectedGroupLabel.value ||
+      selectedGroupId.value ||
+      'No group',
+  )
   const requiredNodeName = computed(() =>
     requiredNodeId.value ? realmNodes.displayName(requiredNodeId.value) : 'the selected node',
   )
@@ -885,6 +884,7 @@ export function useDataManager() {
     shortcuts,
     selectedGroupId,
     selectedGroupLabel,
+    selectedGroupName,
     groupsLoading,
     hasGroups,
     contextBusy,
@@ -897,7 +897,6 @@ export function useDataManager() {
     requiredNodeName,
     issuerNodeName,
     sessionWarning,
-    groupOptions,
     keyTail,
     openSelectedContext,
     activeGroupId,
