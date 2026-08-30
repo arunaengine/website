@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
@@ -16,7 +16,7 @@ import {
   type LiveIssue,
 } from '@/lib/crate/editor'
 import type { VocabIndex } from '@/lib/profiles/vocabulary'
-import { Plus, Upload } from '@lucide/vue'
+import { ChevronDown, ChevronRight, Plus, Upload } from '@lucide/vue'
 
 const props = defineProps<{
   draft: CrateDraft
@@ -33,6 +33,12 @@ const emit = defineEmits<{
 const query = ref('')
 const addOpen = ref(false)
 const filesOpen = ref(false)
+// Below md the browser sits above the form, so its list starts folded and
+// folds again on a pick; from md up the class stays unused and the list shows.
+const listOpen = ref(false)
+watch(query, (text) => {
+  if (text) listOpen.value = true
+})
 
 function iconFor(entity: DraftEntity) {
   return entityIcon(entity, entity.id === props.draft.entities[0]?.id)
@@ -61,11 +67,26 @@ function countFor(entityId: string) {
   const own = props.issues.filter((issue) => issue.entityId === entityId)
   return { total: own.length, blocking: own.some((issue) => issue.severity === 'error') }
 }
+
+function pick(entityId: string) {
+  listOpen.value = false
+  emit('select', entityId)
+}
 </script>
 
 <template>
-  <aside class="w-72 shrink-0">
-    <div class="surface sticky top-4 flex max-h-[calc(100vh-7rem)] flex-col">
+  <aside class="w-full shrink-0 md:w-72">
+    <div class="surface flex flex-col md:sticky md:top-4 md:max-h-[calc(100vh-7rem)]">
+      <button
+        type="button"
+        class="flex items-center gap-2 border-b border-border px-3 py-2 text-left text-xs font-medium text-foreground md:hidden"
+        :aria-expanded="listOpen"
+        @click="listOpen = !listOpen"
+      >
+        <component :is="listOpen ? ChevronDown : ChevronRight" class="h-3.5 w-3.5 text-muted-foreground" />
+        Entities · {{ draft.entities.length }}
+      </button>
+
       <div class="space-y-2 border-b border-border p-3">
         <Input
           v-model="query"
@@ -83,7 +104,10 @@ function countFor(entityId: string) {
         </div>
       </div>
 
-      <div class="min-h-0 flex-1 overflow-y-auto">
+      <div
+        class="min-h-0 max-h-64 flex-1 overflow-y-auto md:max-h-none md:block"
+        :class="listOpen ? '' : 'hidden'"
+      >
         <section v-for="group in groups" :key="group.key">
           <p class="px-3 pb-1 pt-2.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             {{ group.title }}
@@ -95,7 +119,7 @@ function countFor(entityId: string) {
                 class="flex w-full items-center gap-2 px-3 py-2 text-left"
                 :class="entity.id === selected ? 'bg-primary/10 text-foreground' : 'hover:bg-muted/40'"
                 :aria-current="entity.id === selected ? 'true' : undefined"
-                @click="emit('select', entity.id)"
+                @click="pick(entity.id)"
               >
                 <component :is="iconFor(entity)" class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                 <span class="min-w-0 flex-1">
@@ -129,7 +153,7 @@ function countFor(entityId: string) {
       exclude-data
       offer-link
       @update:open="(value) => (addOpen = value)"
-      @created="(created) => { emit('update', created.draft); emit('select', created.entity.id) }"
+      @created="(created) => { emit('update', created.draft); pick(created.entity.id) }"
     />
     <AddFilesDialog
       v-if="filesOpen"

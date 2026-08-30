@@ -73,7 +73,8 @@ describe('EntityBrowser', () => {
     const text = content(mounted.root)
 
     expect(text.indexOf('This dataset')).toBeLessThan(text.indexOf('Files'))
-    expect(text.indexOf('Files')).toBeLessThan(text.indexOf('Entities'))
+    // The fold header names the entities too, so the group title is the last one.
+    expect(text.indexOf('Files')).toBeLessThan(text.lastIndexOf('Entities'))
     expect(text.indexOf('reads.csv')).toBeLessThan(text.indexOf('Ada Lovelace'))
     mounted.app.unmount()
   })
@@ -110,6 +111,22 @@ describe('EntityBrowser', () => {
     expect(button(mounted.root, 'Add entity')).toBeDefined()
     // The graph is switched from the page's own toggle, never from here.
     expect(() => button(mounted.root, 'Graph')).toThrow()
+    mounted.app.unmount()
+  })
+
+  it('folds the list below the md breakpoint', async () => {
+    // Narrow screens stack the browser above the form, so the list starts folded
+    // and folds again once a row is picked; md and up ignores the class.
+    const mounted = await mount()
+    const list = () => element(mounted.root, (node) => String(node.props.class ?? '').includes('overflow-y-auto'))
+
+    expect(String(list().props.class)).toContain('hidden')
+
+    await click(element(mounted.root, (node) => node.props['aria-expanded'] === false))
+    expect(String(list().props.class)).not.toContain('hidden')
+
+    await click(row(mounted.root, 'reads.csv'))
+    expect(String(list().props.class)).toContain('hidden')
     mounted.app.unmount()
   })
 

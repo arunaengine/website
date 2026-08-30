@@ -350,7 +350,7 @@ async function save() {
     </div>
 
     <template v-else>
-      <div class="container flex items-start gap-5 py-6">
+      <div class="container flex flex-col gap-4 py-6 md:flex-row md:items-start md:gap-5">
         <EntityBrowser
           :draft="draft"
           :vocab="vocab"
