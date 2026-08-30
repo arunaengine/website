@@ -1,10 +1,10 @@
 <script lang="ts">
 /**
- * Below the md breakpoint the inline input is squeezed between the realm
+ * Below the lg breakpoint the inline input is squeezed between the realm
  * switcher and the top-bar icons, so those widths use the compact trigger and
  * the full-width search panel instead.
  */
-export const TOP_BAR_SEARCH_COLLAPSE_PX = 768
+export const TOP_BAR_SEARCH_COLLAPSE_PX = 1024
 </script>
 
 <script setup lang="ts">

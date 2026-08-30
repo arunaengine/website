@@ -27,25 +27,27 @@ function onSignIn() {
       <nav
         class="hidden items-center gap-7 text-sm font-medium text-muted-foreground md:flex"
       >
-        <a href="#overview" class="transition-colors hover:text-foreground">Overview</a>
-        <a href="#capabilities" class="transition-colors hover:text-foreground">What's inside</a>
+        <a href="#overview" class="whitespace-nowrap transition-colors hover:text-foreground">Overview</a>
+        <a href="#capabilities" class="whitespace-nowrap transition-colors hover:text-foreground">What's inside</a>
       </nav>
 
       <div class="flex items-center gap-2">
-        <Button variant="ghost" size="sm" class="hidden sm:inline-flex" as-child>
+        <Button variant="ghost" size="sm" as-child>
           <a
             href="https://github.com/ArunaStorage"
             target="_blank"
             rel="noopener"
+            aria-label="GitHub"
+            title="GitHub"
           >
             <GithubIcon class="h-4 w-4" />
-            GitHub
+            <span class="hidden sm:inline">GitHub</span>
           </a>
         </Button>
-        <Button variant="ghost" size="sm" class="hidden sm:inline-flex" as-child>
-          <RouterLink to="/app/docs/v1">
+        <Button variant="ghost" size="sm" as-child>
+          <RouterLink to="/app/docs/v1" aria-label="Documentation" title="Documentation">
             <BookOpen class="h-4 w-4" />
-            Docs
+            <span class="hidden sm:inline">Docs</span>
           </RouterLink>
         </Button>
         <Button variant="ghost" size="icon" :aria-label="isDark ? 'Use light mode' : 'Use dark mode'" @click="toggleTheme">

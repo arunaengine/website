@@ -90,7 +90,7 @@ function onLoadMore(event: Event) {
       <Button
         variant="ghost"
         size="icon"
-        class="relative"
+        class="relative shrink-0"
         :aria-label="unreadDisplay ? `Notifications (${unreadDisplay} unread)` : 'Notifications'"
       >
         <Bell class="h-4 w-4" />

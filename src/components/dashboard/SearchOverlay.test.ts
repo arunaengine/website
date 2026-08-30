@@ -404,7 +404,7 @@ describe('narrow TopBar search panel', () => {
   it('renders the compact trigger below the measured breakpoint and keeps the narrow input padding responsive', async () => {
     const mounted = await mount()
 
-    expect(TOP_BAR_SEARCH_COLLAPSE_PX).toBe(768)
+    expect(TOP_BAR_SEARCH_COLLAPSE_PX).toBe(1024)
     expect(mediaQuery).toHaveBeenCalledWith(`(max-width: ${TOP_BAR_SEARCH_COLLAPSE_PX - 0.02}px)`)
     expect(findElement(mounted.root, (node) => node.props['aria-label'] === 'Open global search')).toBeDefined()
     expect(findElement(mounted.root, (node) => node.tag === 'input')).toBeUndefined()

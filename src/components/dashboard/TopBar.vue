@@ -97,6 +97,7 @@ async function handleSignOut() {
         v-if="assistantAvailable"
         variant="ghost"
         size="icon"
+        class="shrink-0"
         aria-label="Open the assistant"
         title="Assistant"
         @click="openAssistant"
@@ -108,15 +109,23 @@ async function handleSignOut() {
         v-if="currentUser && !desktop"
         variant="outline"
         size="sm"
-        class="hidden h-9 md:inline-flex"
+        class="hidden h-9 shrink-0 md:inline-flex"
+        aria-label="Create dataset"
+        title="Create dataset"
         @click="router.push({ name: 'dataset-new' })"
       >
-        <Plus class="h-4 w-4" /> Create dataset
+        <Plus class="h-4 w-4" /><span class="hidden lg:inline">Create dataset</span>
       </Button>
 
       <NotificationBell />
 
-      <Button variant="ghost" size="icon" :aria-label="isDark ? 'Use light mode' : 'Use dark mode'" @click="toggleTheme">
+      <Button
+        variant="ghost"
+        size="icon"
+        class="shrink-0"
+        :aria-label="isDark ? 'Use light mode' : 'Use dark mode'"
+        @click="toggleTheme"
+      >
         <Sun v-if="isDark" class="h-4 w-4" />
         <Moon v-else class="h-4 w-4" />
       </Button>
@@ -127,7 +136,7 @@ async function handleSignOut() {
             class="flex h-9 items-center gap-2 rounded-md border border-transparent px-1.5 text-sm hover:border-border hover:bg-muted"
           >
             <Avatar :user="currentUser" size="sm" class="ring-0" />
-            <div class="hidden min-w-0 flex-col text-left leading-none sm:flex">
+            <div class="hidden min-w-0 max-w-40 flex-col text-left leading-none sm:flex">
               <div class="truncate text-[13px] font-medium leading-none text-foreground">{{ currentUser.name }}</div>
               <div class="mt-0.5 truncate text-[11px] leading-none text-muted-foreground">
                 {{ realm.shortName }} · {{ role.replace('realm-', '') }}

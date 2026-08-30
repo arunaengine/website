@@ -7,6 +7,7 @@ import { useAssistantChat } from '@/composables/useAssistantChat'
 import { isDesktop } from '@/lib/desktop'
 import { navEntries, navItemActive, navRowClass, type NavEntry, type NavItem } from '@/components/layout/nav'
 import { ArrowLeft, ChevronsLeft, ChevronsRight } from '@lucide/vue'
+import { useMediaQuery } from '@vueuse/core'
 
 // A layout that owns its own destinations (the desktop shell) passes them in;
 // without them the sidebar builds the portal's own from the one definition.
@@ -37,10 +38,14 @@ function isActive(item: NavItem): boolean {
 }
 
 const COLLAPSE_KEY = 'aruna.sidebarCollapsed'
-const collapsed = ref(
+const narrow = useMediaQuery('(max-width: 1279.98px)')
+const manualCollapsed = ref(
   typeof window !== 'undefined' && window.localStorage.getItem(COLLAPSE_KEY) === '1',
 )
-watch(collapsed, (value) => window.localStorage.setItem(COLLAPSE_KEY, value ? '1' : '0'))
+watch(manualCollapsed, (value) => window.localStorage.setItem(COLLAPSE_KEY, value ? '1' : '0'))
+
+// Narrow viewports force the rail; the stored choice only applies above it.
+const collapsed = computed(() => narrow.value || manualCollapsed.value)
 </script>
 
 <template>
@@ -88,6 +93,7 @@ watch(collapsed, (value) => window.localStorage.setItem(COLLAPSE_KEY, value ? '1
 
     <div class="border-t border-border/60 px-2.5 py-3 text-xs">
       <button
+        v-if="!narrow"
         type="button"
         :title="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
         :aria-label="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
@@ -95,7 +101,7 @@ watch(collapsed, (value) => window.localStorage.setItem(COLLAPSE_KEY, value ? '1
           navRowClass(collapsed),
           'text-muted-foreground/80 hover:bg-foreground/[0.04] hover:text-foreground',
         ]"
-        @click="collapsed = !collapsed"
+        @click="manualCollapsed = !manualCollapsed"
       >
         <ChevronsRight v-if="collapsed" class="h-4 w-4 shrink-0" />
         <ChevronsLeft v-else class="h-4 w-4 shrink-0" />
