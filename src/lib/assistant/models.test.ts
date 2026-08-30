@@ -14,8 +14,10 @@ describe('assistant proxy fetch', () => {
       method: 'POST',
       headers: {
         Authorization: 'Bearer proxied',
+        'Anthropic-Version': '2023-06-01',
         'Content-Type': 'application/json',
         'User-Agent': 'ai-sdk/openai/test',
+        'x-api-key': 'proxied',
       },
     })
 
@@ -23,6 +25,8 @@ describe('assistant proxy fetch', () => {
     expect(headers.get('authorization')).toBe('Bearer aruna-token')
     expect(headers.get('content-type')).toBe('application/json')
     expect(headers.get('user-agent')).toBeNull()
+    expect(headers.get('x-api-key')).toBeNull()
+    expect(headers.get('anthropic-version')).toBeNull()
   })
 
   it('names an unreachable node proxy without masking cancellation', async () => {
