@@ -13,6 +13,12 @@ const permissions = {
   isManagementNode: ref(false),
 }
 const enabledFeatures = new Set(['tes', 'jobs'])
+const portalConfig = () => ({
+  apiBaseUrl: '/api/v1',
+  authCallbackOrigin: '',
+  features: {} as Record<string, boolean>,
+  terminology: { gatewayUrl: 'https://terminology.example/api-gateway' },
+})
 
 const RouterLinkStub = defineComponent({
   props: { to: { type: [String, Object], required: true } },
@@ -32,7 +38,10 @@ beforeAll(async () => {
     useRoute: () => route,
   }))
   vi.doMock('@/composables/useAruna', () => ({ useAruna: () => permissions }))
-  vi.doMock('@/lib/config', () => ({ featureEnabled: (flag: string) => enabledFeatures.has(flag) }))
+  vi.doMock('@/lib/config', () => ({
+    featureEnabled: (flag: string) => enabledFeatures.has(flag),
+    portalConfig,
+  }))
   vi.doMock('@/components/layout/AppLogo.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/components/ui/Sheet.vue', () => ({ default: PassthroughStub }))
   vi.doMock('@/components/ui/SheetContent.vue', () => ({ default: PassthroughStub }))

@@ -9,6 +9,7 @@ import * as ProfileUri from '@/lib/profiles/uri'
 import * as EntityTypes from '@/lib/profiles/entityTypes'
 import * as Lift from '@/lib/shacl/lift'
 import * as Utils from '@/lib/utils'
+import * as FirstPaint from '@/composables/useFirstPaint'
 import type { MetadataProfile } from '@/data/types'
 
 const profile: MetadataProfile = {
@@ -33,6 +34,8 @@ const userInfo = ref({ groups: [{ group_id: 'group-1' }] })
 const profileCrateParses = ref<Record<string, unknown>>({ 'doc-1': { entityRules: [] } })
 const fullCrates = ref<Record<string, unknown>>({})
 const saving = ref(false)
+const loading = ref(false)
+const bootstrapped = ref(true)
 const routerPush = vi.fn(async () => undefined)
 const route = reactive({ name: 'profiles', params: {} as Record<string, string> })
 
@@ -66,7 +69,10 @@ const ProfilesView = compileClientComponent(new URL('./ProfilesView.vue', import
   '@/components/ui/Notice.vue': moduleDefault(Passthrough),
   '@/components/ui/Spinner.vue': moduleDefault(EmptyStub),
   '@/components/ui/EmptyState.vue': moduleDefault(Passthrough),
+  '@/components/ui/ListSkeleton.vue': moduleDefault(EmptyStub),
+  '@/components/ui/SectionSkeleton.vue': moduleDefault(EmptyStub),
   '@/components/metadata/profile-builder/LiftNotesPanel.vue': moduleDefault(EmptyStub),
+  '@/composables/useFirstPaint': FirstPaint,
   '@/composables/useAruna': {
     profileRulesLoadState: () => 'ready',
     useAruna: () => ({
@@ -74,6 +80,8 @@ const ProfilesView = compileClientComponent(new URL('./ProfilesView.vue', import
       profileItems,
       currentUser,
       userInfo,
+      loading,
+      bootstrapped,
       updateUserProfile: vi.fn(),
       saving,
       loadRoCrate: vi.fn(),

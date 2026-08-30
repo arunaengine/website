@@ -43,6 +43,12 @@ const TopBarStub = defineComponent({
   setup: (props) => () => h('div', `topbar:${props.variant}`),
 })
 const icons = new Proxy({}, { get: () => EmptyStub })
+const portalConfig = () => ({
+  apiBaseUrl: '/api/v1',
+  authCallbackOrigin: '',
+  features: {} as Record<string, boolean>,
+  terminology: { gatewayUrl: 'https://terminology.example/api-gateway' },
+})
 
 const Notice = compileClientComponent(new URL('../components/ui/Notice.vue', import.meta.url), {
   vue: VueRuntime,
@@ -72,7 +78,7 @@ const DesktopLayoutClient = compileClientComponent(new URL('./DesktopLayout.vue'
       stop: unwatchNode,
     }),
   },
-  '@/lib/config': { featureEnabled: () => true },
+  '@/lib/config': { featureEnabled: () => true, portalConfig },
   '@/lib/desktopBridge': { appQuit },
   '@/lib/desktopBoot': { probeRealm, realmReach },
   '@/lib/utils': Utils,
@@ -98,7 +104,7 @@ beforeAll(async () => {
       stop: unwatchNode,
     }),
   }))
-  vi.doMock('@/lib/config', () => ({ featureEnabled: () => true }))
+  vi.doMock('@/lib/config', () => ({ featureEnabled: () => true, portalConfig }))
   vi.doMock('@/lib/desktopBridge', () => ({ appQuit }))
   vi.doMock('@/lib/desktopBoot', () => ({ probeRealm, realmReach }))
   vi.doMock('@/components/dashboard/TopBar.vue', () => ({ default: TopBarStub }))

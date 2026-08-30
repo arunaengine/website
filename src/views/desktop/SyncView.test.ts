@@ -167,7 +167,7 @@ const Notice = compileClientComponent(new URL('../../components/ui/Notice.vue', 
 
 const ListShell = compileClientComponent(new URL('../../components/ui/ListShell.vue', import.meta.url), {
   vue: VueRuntime,
-  '@/components/ui/Skeleton.vue': moduleDefault(Blank),
+  '@/components/ui/ListSkeleton.vue': moduleDefault(Blank),
   '@/components/ui/ErrorPanel.vue': moduleDefault(RefusalStub),
   '@/components/ui/EmptyState.vue': moduleDefault(EmptyStateStub),
 })
@@ -204,7 +204,6 @@ const SyncView = compileClientComponent(new URL('./SyncView.vue', import.meta.ur
   '@/components/ui/Progress.vue': moduleDefault(ProgressStub),
   '@/components/ui/RefreshButton.vue': moduleDefault(refreshButton()),
   '@/components/ui/RefusalNote.vue': moduleDefault(RefusalStub),
-  '@/components/ui/Skeleton.vue': moduleDefault(Blank),
   '@/components/dashboard/PageHeader.vue': moduleDefault(PageHeaderStub),
   '@/components/desktop/BindFolderDialog.vue': moduleDefault(Blank),
   '@/components/desktop/DeviceSurfaceState.vue': moduleDefault(Blank),
