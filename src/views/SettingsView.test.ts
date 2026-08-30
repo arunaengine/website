@@ -2,7 +2,22 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { baseParse, NodeTypes } from '@vue/compiler-dom'
 import { parse } from '@vue/compiler-sfc'
-import { describe, expect, it } from 'vitest'
+import * as VueRuntime from 'vue'
+import { defineComponent, h, ref } from 'vue'
+import * as RouterRuntime from 'vue-router'
+import { createMemoryHistory, createRouter, type Router } from 'vue-router'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  compileClientComponent,
+  content,
+  element,
+  flush,
+  moduleDefault,
+  mountApp,
+  type HostNode,
+} from '@/test/clientRender'
+import * as RouteTab from '@/composables/useRouteTab'
+import * as Utils from '@/lib/utils'
 
 interface AstNode {
   type: number
@@ -83,7 +98,7 @@ describe('SettingsView responsive geometry', () => {
   })
 
   it('offers every settings section as a shareable tab', () => {
-    const tabIds = ['profile', 'groups', 'access', 'sessions', 'assistant', 'connection', 'appearance']
+    const tabIds = ['profile', 'groups', 'access', 'assistant', 'appearance']
     const tabList = source.match(/const settingsTabs = \[([\s\S]*?)\] as const/)?.[1] ?? ''
     const declaredIds = Array.from(tabList.matchAll(/\{ id: '([^']+)'/g), (match) => match[1])
     const panelIds = collectElements(root, (node) => node.tag === 'TabsContent')
@@ -93,7 +108,8 @@ describe('SettingsView responsive geometry', () => {
     expect(declaredIds).toEqual(tabIds)
     expect(panelIds.sort()).toEqual([...tabIds].sort())
     // Tabs live in ?tab= so a section is a link a person can share or reload into.
-    expect(source).toContain("useRouteTab(\n  settingsTabs.map((entry) => entry.id),\n  'profile',\n)")
+    expect(source).toContain('const routeTab = useRouteTab(')
+    expect(source).toContain("legacyTabs: Record<string, string> = { sessions: 'access', connection: 'access' }")
     expect(source).not.toContain('settingsSections')
     expect(source).not.toContain('onMobileTabsKeydown')
   })
@@ -135,5 +151,204 @@ describe('SettingsView responsive geometry', () => {
     expect(tableParent?.tag).toBe('div')
     expect(classTokens(tableParent!)).toEqual(expect.arrayContaining(['min-w-0', 'overflow-x-auto']))
     expect(classTokens(credentialsSection!)).toContain('overflow-hidden')
+  })
+})
+
+const isAuthenticated = ref(true)
+const authPending = ref(false)
+const currentUser = ref<Record<string, unknown> | null>({ id: 'user-1', name: 'Ada' })
+const userInfo = ref<Record<string, unknown> | null>({ user: { user_id: 'user-1' } })
+const authToken = ref('token')
+const apiBaseUrl = ref('/api/v1')
+
+const aruna = {
+  apiBaseUrl,
+  authToken,
+  currentUser,
+  nodeInfo: ref(null),
+  userInfo,
+  myGroups: ref([]),
+  discoverableGroups: ref([]),
+  profiles: ref([]),
+  credentials: ref([]),
+  authError: ref<string | null>(null),
+  bootstrapped: ref(true),
+  loading: ref(false),
+  sessionEpoch: ref(1),
+  saving: ref(false),
+  refresh: vi.fn(async () => undefined),
+  setAuthToken: vi.fn(),
+  setApiBaseUrl: vi.fn(),
+  updateUserProfile: vi.fn(async () => undefined),
+  revokeS3Credential: vi.fn(async () => undefined),
+}
+const auth = {
+  signIn: vi.fn(async () => undefined),
+  isAuthenticated,
+  authPending,
+  stage: ref('idle'),
+  stageError: ref<string | null>(null),
+}
+
+const Empty = defineComponent(() => () => null)
+const icons = new Proxy({}, { get: () => Empty })
+const Passthrough = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
+const ButtonStub = defineComponent({
+  inheritAttrs: false,
+  setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()),
+})
+const InputStub = defineComponent({
+  props: { modelValue: { type: String, default: '' } },
+  setup: (props, { attrs }) => () => h('input', { ...attrs, value: props.modelValue }),
+})
+const PageHeaderStub = defineComponent({
+  props: { title: String },
+  setup: (props, { slots }) => () => h('header', [h('h1', props.title), slots.actions?.()]),
+})
+const TabsStub = defineComponent({
+  props: { modelValue: { type: String, default: '' } },
+  setup: (props, { attrs, slots }) => () => h('div', { ...attrs, 'data-active': props.modelValue }, slots.default?.()),
+})
+const PanelStub = defineComponent({
+  props: { value: { type: String, default: '' } },
+  setup: (props, { slots }) => () => h('section', { 'data-panel': props.value }, slots.default?.()),
+})
+const TriggerStub = defineComponent({
+  props: { value: { type: String, default: '' } },
+  setup: (props, { slots }) => () => h('button', { 'data-tab': props.value }, slots.default?.()),
+})
+const labelled = (label: string) => defineComponent(() => () => h('div', label))
+const RouteStub = defineComponent(() => () => h('div'))
+
+const SettingsView = compileClientComponent(new URL('./SettingsView.vue', import.meta.url), {
+  vue: VueRuntime,
+  'vue-router': RouterRuntime,
+  '@lucide/vue': icons,
+  '@/lib/api': { apiOrigin: () => 'https://node.example' },
+  '@/lib/utils': Utils,
+  '@/composables/useRouteTab': RouteTab,
+  '@/composables/useAruna': { useAruna: () => aruna },
+  '@/composables/useAuth': { useAuth: () => auth },
+  '@/composables/useTheme': { useTheme: () => ({ mode: ref('system'), setTheme: vi.fn() }) },
+  '@/composables/useRefresh': { useRefresh: () => ({ busy: ref(false), refresh: vi.fn() }) },
+  '@/composables/useFirstPaint': { useFirstPaint: () => ref(true) },
+  '@/composables/useWatches': { useWatches: () => ({ available: ref(false) }) },
+  '@/components/dashboard/PageHeader.vue': moduleDefault(PageHeaderStub),
+  '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+  '@/components/ui/RefreshButton.vue': moduleDefault(Empty),
+  '@/components/ui/Badge.vue': moduleDefault(Passthrough),
+  '@/components/ui/Input.vue': moduleDefault(InputStub),
+  '@/components/ui/Avatar.vue': moduleDefault(Empty),
+  '@/components/ui/AccessBadge.vue': moduleDefault(Empty),
+  '@/components/ui/Skeleton.vue': moduleDefault(Empty),
+  '@/components/ui/Separator.vue': moduleDefault(Empty),
+  '@/components/ui/CopyButton.vue': moduleDefault(Empty),
+  '@/components/ui/SectionSkeleton.vue': moduleDefault(Empty),
+  '@/components/ui/EmptyState.vue': moduleDefault(Passthrough),
+  '@/components/ui/Tabs.vue': moduleDefault(TabsStub),
+  '@/components/ui/TabsList.vue': moduleDefault(Passthrough),
+  '@/components/ui/TabsTrigger.vue': moduleDefault(TriggerStub),
+  '@/components/ui/TabsContent.vue': moduleDefault(PanelStub),
+  '@/components/groups/CreateGroupDialog.vue': moduleDefault(Empty),
+  '@/components/groups/GroupDetail.vue': moduleDefault(Empty),
+  '@/components/data/CreateCredentialDialog.vue': moduleDefault(Empty),
+  '@/components/onboarding/DevicesPanel.vue': moduleDefault(labelled('Devices panel')),
+  '@/components/settings/SessionsPanel.vue': moduleDefault(labelled('Sessions panel')),
+  '@/components/settings/AssistantProviders.vue': moduleDefault(Empty),
+  '@/components/settings/McpConnect.vue': moduleDefault(Empty),
+})
+
+async function mount(query: string) {
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/app/settings', name: 'settings', component: RouteStub },
+      { path: '/app/settings/watches', name: 'settings-watches', component: RouteStub },
+      { path: '/app/profiles', name: 'profiles', component: RouteStub },
+    ],
+  })
+  await router.push(`/app/settings${query}`)
+  await router.isReady()
+  return { ...(await mountApp(SettingsView, { router })), router }
+}
+
+function tabsRoot(node: HostNode): HostNode {
+  return element(node, (candidate) => candidate.props['data-active'] !== undefined)
+}
+
+function panelText(node: HostNode, value: string): string {
+  return content(element(node, (candidate) => candidate.props['data-panel'] === value))
+}
+
+// The tab setter replaces the route, so wait for the navigation, not a delay.
+async function selectTab(router: Router, root: HostNode, value: string) {
+  const settled = new Promise<void>((resolve) => {
+    const stop = router.afterEach(() => {
+      stop()
+      resolve()
+    })
+  })
+  ;(tabsRoot(root).props['onUpdate:modelValue'] as (next: string) => void)(value)
+  await settled
+  await flush()
+}
+
+describe('SettingsView access tab', () => {
+  beforeEach(() => {
+    isAuthenticated.value = true
+    authPending.value = false
+    currentUser.value = { id: 'user-1', name: 'Ada' }
+    userInfo.value = { user: { user_id: 'user-1' } }
+  })
+
+  it('stacks connection, sessions, keys, devices and interop', async () => {
+    const { root, errors } = await mount('?tab=access')
+
+    const text = panelText(root, 'access')
+    const markers = ['API connection', 'Sessions panel', 'CLI and service access', 'Devices panel', 'Interoperability']
+    const positions = markers.map((marker) => text.indexOf(marker))
+    expect(errors).toEqual([])
+    expect(positions.every((position) => position >= 0)).toBe(true)
+    expect(positions).toEqual([...positions].sort((first, second) => first - second))
+  })
+
+  it('resolves legacy tab links to the merged panel', async () => {
+    for (const query of ['?tab=sessions', '?tab=connection', '?tab=access']) {
+      const { root } = await mount(query)
+      expect(tabsRoot(root).props['data-active']).toBe('access')
+    }
+    expect(tabsRoot((await mount('?tab=profile')).root).props['data-active']).toBe('profile')
+    expect(tabsRoot((await mount('?tab=nowhere')).root).props['data-active']).toBe('profile')
+  })
+
+  it('writes only current ids back to the query', async () => {
+    const { root, router } = await mount('?tab=sessions')
+
+    await selectTab(router, root, 'appearance')
+    expect(router.currentRoute.value.query.tab).toBe('appearance')
+
+    await selectTab(router, root, 'profile')
+    expect(router.currentRoute.value.query.tab).toBeUndefined()
+  })
+
+  it('drops the signed-in row the sessions panel repeats', async () => {
+    const { root } = await mount('?tab=access')
+
+    const text = panelText(root, 'access')
+    expect(text).not.toContain('Signed in as')
+    expect(text).not.toContain('Sign out')
+    expect(text).toContain('Identity details')
+  })
+
+  it('keeps the signed-out entry point', async () => {
+    isAuthenticated.value = false
+    currentUser.value = null
+    userInfo.value = null
+
+    const text = panelText((await mount('?tab=access')).root, 'access')
+    expect(text).toContain('Not signed in')
+    expect(text).toContain('Sign in')
+    expect(text).toContain('Onboarding secret')
+    expect(text).toContain('Existing API token')
   })
 })

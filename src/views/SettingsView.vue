@@ -32,7 +32,7 @@ import { RouterLink } from 'vue-router'
 import { apiOrigin } from '@/lib/api'
 import { errorMessage, relativeTime } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
-import { ChevronRight, ExternalLink, Eye, KeyRound, Palette, Rss, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, LogOut, Plus, Save } from '@lucide/vue'
+import { ChevronRight, ExternalLink, Eye, KeyRound, Palette, Rss, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, Plus, Save } from '@lucide/vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 
 const {
@@ -56,7 +56,7 @@ const {
   updateUserProfile,
   revokeS3Credential,
 } = useAruna()
-const { signIn, signOut, isAuthenticated, authPending, stage, stageError } = useAuth()
+const { signIn, isAuthenticated, authPending, stage, stageError } = useAuth()
 // Account-dependent panels paint together with the shared session bootstrap;
 // later refreshes update the rendered tab in place.
 const painted = useFirstPaint(
@@ -69,16 +69,20 @@ const { available: watchesAvailable } = useWatches()
 const settingsTabs = [
   { id: 'profile', label: 'Profile' },
   { id: 'groups', label: 'Groups' },
-  { id: 'access', label: 'Access' },
-  { id: 'sessions', label: 'Sessions' },
+  { id: 'access', label: 'Access & connection' },
   { id: 'assistant', label: 'Assistant' },
-  { id: 'connection', label: 'Connection' },
   { id: 'appearance', label: 'Appearance' },
 ] as const
-const tab = useRouteTab(
-  settingsTabs.map((entry) => entry.id),
+// Links and bookmarks still carry the ids of the tabs merged into `access`.
+const legacyTabs: Record<string, string> = { sessions: 'access', connection: 'access' }
+const routeTab = useRouteTab(
+  [...settingsTabs.map((entry) => entry.id), ...Object.keys(legacyTabs)],
   'profile',
 )
+const tab = computed({
+  get: () => legacyTabs[routeTab.value] ?? routeTab.value,
+  set: (next: string) => (routeTab.value = next),
+})
 
 const { busy: refreshBusy, refresh: onRefresh } = useRefresh(refresh)
 const apiBaseDraft = ref(apiBaseUrl.value)
@@ -265,7 +269,7 @@ function toggleGroup(groupId: string) {
       </div>
 
       <template v-else>
-      <TabsContent value="connection" class="container mt-0 min-w-0 space-y-5 py-6">
+      <TabsContent value="access" class="container mt-0 min-w-0 space-y-5 py-6">
         <section class="surface">
           <header class="border-b border-border px-5 py-4">
             <h3 class="font-display text-sm font-semibold text-aruna-navy">Session &amp; API connection</h3>
@@ -279,13 +283,14 @@ function toggleGroup(groupId: string) {
               <Skeleton class="h-3 w-64" />
             </div>
           </div>
-          <div v-else class="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
+          <!-- Signed in, the sessions panel below already names this browser's
+               session and revoking it is the sign-out. -->
+          <div v-else-if="!isAuthenticated" class="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
             <div class="text-sm">
-              <div class="font-medium text-foreground">{{ isAuthenticated ? `Signed in as ${currentUser?.name}` : 'Not signed in' }}</div>
-              <div class="text-xs text-muted-foreground">{{ isAuthenticated ? 'Authenticated endpoints are available.' : 'Public endpoints only, sign in to manage data.' }}</div>
+              <div class="font-medium text-foreground">Not signed in</div>
+              <div class="text-xs text-muted-foreground">Public endpoints only, sign in to manage data.</div>
             </div>
-            <Button v-if="isAuthenticated" variant="outline" size="sm" @click="signOut"><LogOut class="h-3.5 w-3.5" /> Sign out</Button>
-            <Button v-else size="sm" :disabled="signingIn" @click="startSignIn"><LogIn class="h-3.5 w-3.5" /> Sign in</Button>
+            <Button size="sm" :disabled="signingIn" @click="startSignIn"><LogIn class="h-3.5 w-3.5" /> Sign in</Button>
           </div>
           <div v-if="isAuthenticated && userInfo" class="border-b border-border px-5 py-3">
             <button
@@ -338,6 +343,51 @@ function toggleGroup(groupId: string) {
             </div>
             <Button size="sm" variant="outline" @click="saveConnection">Apply connection</Button>
           </div>
+        </section>
+
+        <SessionsPanel />
+
+        <section class="surface overflow-hidden">
+          <header class="flex items-center justify-between border-b border-border px-5 py-4">
+            <div class="flex items-center gap-2">
+              <KeyRound class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">CLI and service access</h3><Badge size="sm" variant="secondary" class="uppercase">Advanced</Badge><Badge variant="outline">{{ visibleCredentials.length }}</Badge>
+              <button
+                v-if="inactiveCredentials.length"
+                type="button"
+                class="text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                @click="showInactiveCredentials = !showInactiveCredentials"
+              >
+                {{ showInactiveCredentials ? 'Hide inactive' : `Show inactive (${inactiveCredentials.length})` }}
+              </button>
+            </div>
+            <Button size="sm" :disabled="!currentUser" @click="createCredentialOpen = true"><Plus class="h-4 w-4" /> Create key</Button>
+          </header>
+          <p class="border-b border-border px-5 py-3 text-xs leading-relaxed text-muted-foreground">
+            Long-lived keys are for command-line tools and services on this node. Their secret is shown once and is never stored or activated by the portal. Portal storage uses temporary in-memory sessions.
+          </p>
+          <div class="min-w-0 overflow-x-auto">
+            <table class="min-w-max w-full text-sm">
+              <thead class="bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground"><tr><th class="px-5 py-2 text-left font-semibold">Access key</th><th class="px-5 py-2 text-left font-semibold">Group</th><th class="px-5 py-2 text-left font-semibold">Status</th><th class="px-5 py-2 text-left font-semibold">Expires</th><th class="px-5 py-2"></th></tr></thead>
+              <tbody>
+                <tr v-for="credential in visibleCredentials" :key="credential.access_key_id" class="border-t border-border"><td class="px-5 py-2.5 font-mono text-[11px] text-foreground">{{ credential.access_key_id }}</td><td class="px-5 py-2.5 text-[11px] text-muted-foreground" :title="credential.group_id">{{ groupLabel(credential.group_id) }}</td><td class="px-5 py-2.5"><Badge size="sm" :variant="credential.status === 'active' ? 'accent' : credential.status === 'revoked' ? 'destructive' : 'secondary'" class="uppercase">{{ credential.status }}</Badge></td><td class="px-5 py-2.5 text-[11px]" :class="isExpired(credential.expires_at) ? 'text-destructive' : 'text-muted-foreground'" :title="new Date(credential.expires_at).toLocaleString()">{{ isExpired(credential.expires_at) ? `expired ${relativeTime(credential.expires_at)}` : relativeTime(credential.expires_at) }}</td><td class="px-5 py-2.5 text-right"><Button v-if="credential.status === 'active'" variant="ghost" size="sm" class="text-destructive hover:text-destructive" :disabled="saving" @click="revoke(credential.access_key_id)">Revoke</Button></td></tr>
+                <tr v-if="!visibleCredentials.length">
+                  <td colspan="5" class="px-5 py-6 text-center text-xs text-muted-foreground">
+                    <template v-if="inactiveCredentials.length">
+                      No active CLI or service keys.
+                      <button type="button" class="text-primary hover:underline" @click="showInactiveCredentials = true">Show inactive ({{ inactiveCredentials.length }})</button>
+                    </template>
+                    <template v-else>No CLI or service keys for the authenticated user.</template>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p v-if="revokeError" class="border-t border-border px-5 py-2 text-xs text-destructive">{{ revokeError }}</p>
+          <CreateCredentialDialog v-model:open="createCredentialOpen" />
+        </section>
+
+        <section class="surface overflow-hidden">
+          <DevicesPanel />
         </section>
 
         <section class="surface">
@@ -460,55 +510,6 @@ function toggleGroup(groupId: string) {
           </div>
           <CreateGroupDialog v-model:open="createGroupOpen" @created="(group) => (selectedGroupId = group.group_id)" />
         </section>
-      </TabsContent>
-
-      <TabsContent value="access" class="container mt-0 min-w-0 space-y-5 py-6">
-        <section class="surface overflow-hidden">
-          <header class="flex items-center justify-between border-b border-border px-5 py-4">
-            <div class="flex items-center gap-2">
-              <KeyRound class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">CLI and service access</h3><Badge size="sm" variant="secondary" class="uppercase">Advanced</Badge><Badge variant="outline">{{ visibleCredentials.length }}</Badge>
-              <button
-                v-if="inactiveCredentials.length"
-                type="button"
-                class="text-[11px] text-muted-foreground transition-colors hover:text-foreground"
-                @click="showInactiveCredentials = !showInactiveCredentials"
-              >
-                {{ showInactiveCredentials ? 'Hide inactive' : `Show inactive (${inactiveCredentials.length})` }}
-              </button>
-            </div>
-            <Button size="sm" :disabled="!currentUser" @click="createCredentialOpen = true"><Plus class="h-4 w-4" /> Create key</Button>
-          </header>
-          <p class="border-b border-border px-5 py-3 text-xs leading-relaxed text-muted-foreground">
-            Long-lived keys are for command-line tools and services on this node. Their secret is shown once and is never stored or activated by the portal. Portal storage uses temporary in-memory sessions.
-          </p>
-          <div class="min-w-0 overflow-x-auto">
-            <table class="min-w-max w-full text-sm">
-              <thead class="bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground"><tr><th class="px-5 py-2 text-left font-semibold">Access key</th><th class="px-5 py-2 text-left font-semibold">Group</th><th class="px-5 py-2 text-left font-semibold">Status</th><th class="px-5 py-2 text-left font-semibold">Expires</th><th class="px-5 py-2"></th></tr></thead>
-              <tbody>
-                <tr v-for="credential in visibleCredentials" :key="credential.access_key_id" class="border-t border-border"><td class="px-5 py-2.5 font-mono text-[11px] text-foreground">{{ credential.access_key_id }}</td><td class="px-5 py-2.5 text-[11px] text-muted-foreground" :title="credential.group_id">{{ groupLabel(credential.group_id) }}</td><td class="px-5 py-2.5"><Badge size="sm" :variant="credential.status === 'active' ? 'accent' : credential.status === 'revoked' ? 'destructive' : 'secondary'" class="uppercase">{{ credential.status }}</Badge></td><td class="px-5 py-2.5 text-[11px]" :class="isExpired(credential.expires_at) ? 'text-destructive' : 'text-muted-foreground'" :title="new Date(credential.expires_at).toLocaleString()">{{ isExpired(credential.expires_at) ? `expired ${relativeTime(credential.expires_at)}` : relativeTime(credential.expires_at) }}</td><td class="px-5 py-2.5 text-right"><Button v-if="credential.status === 'active'" variant="ghost" size="sm" class="text-destructive hover:text-destructive" :disabled="saving" @click="revoke(credential.access_key_id)">Revoke</Button></td></tr>
-                <tr v-if="!visibleCredentials.length">
-                  <td colspan="5" class="px-5 py-6 text-center text-xs text-muted-foreground">
-                    <template v-if="inactiveCredentials.length">
-                      No active CLI or service keys.
-                      <button type="button" class="text-primary hover:underline" @click="showInactiveCredentials = true">Show inactive ({{ inactiveCredentials.length }})</button>
-                    </template>
-                    <template v-else>No CLI or service keys for the authenticated user.</template>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p v-if="revokeError" class="border-t border-border px-5 py-2 text-xs text-destructive">{{ revokeError }}</p>
-          <CreateCredentialDialog v-model:open="createCredentialOpen" />
-        </section>
-
-        <section class="surface overflow-hidden">
-          <DevicesPanel />
-        </section>
-      </TabsContent>
-
-      <TabsContent value="sessions" class="container mt-0 min-w-0 space-y-5 py-6">
-        <SessionsPanel />
       </TabsContent>
 
       <TabsContent value="assistant" class="container mt-0 min-w-0 space-y-5 py-6">
