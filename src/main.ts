@@ -4,6 +4,7 @@ import router from './router'
 import { bootRuntimeConfig } from './lib/desktop'
 import { isChunkError, recoverFromChunkError } from './lib/chunk-recovery'
 import { reportGlobalError } from './composables/useGlobalErrors'
+import { useTheme } from './composables/useTheme'
 import './assets/main.css'
 
 router.onError((error, to) => {
@@ -26,6 +27,8 @@ window.addEventListener('vite:preloadError', (event) => {
   const target = pendingTarget ?? window.location.pathname + window.location.search
   if (recoverFromChunkError(target)) event.preventDefault()
 })
+
+useTheme()
 
 void bootRuntimeConfig().finally(() => {
   createApp(App).use(router).mount('#app')
