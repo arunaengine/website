@@ -43,6 +43,26 @@ export const KIND_OPTIONS: Array<{ id: SearchKind; label: string }> = [
   { id: 'people', label: 'Users' },
 ]
 
+/**
+ * Which result section renders. A picked chip always shows its section, empty
+ * state included. Under "All" the object section must earn its space: with
+ * nothing to report it disappears, and the dataset section carries the single
+ * empty answer for the whole page.
+ */
+export function kindVisible(
+  kind: Exclude<SearchKind, 'all'>,
+  filter: SearchKind,
+  query: string,
+  objectsAnswered: boolean,
+): boolean {
+  // A profile filter alone lists documents server-side; buckets, groups and
+  // people need an actual query term.
+  if (!query) return kind === 'datasets'
+  if (filter === kind) return true
+  if (filter !== 'all') return false
+  return kind !== 'objects' || objectsAnswered
+}
+
 // Browse renders ONE page at a time: GET /metadata takes limit and offset, so
 // any page is reachable directly and the group facet rides the same request.
 // Favourites are a small curated id list, fetched whole and sliced client-side.
@@ -492,10 +512,7 @@ export function useDatasetSearch(searchBox: Ref<{ focus: () => void } | null>) {
   const kindFilter = ref<SearchKind>('all')
   const textQuery = computed(() => q.value.trim())
   function showKind(kind: Exclude<SearchKind, 'all'>): boolean {
-    // A profile filter alone lists documents server-side; buckets, groups and
-    // people need an actual query term.
-    if (!textQuery.value) return kind === 'datasets'
-    return kindFilter.value === 'all' || kindFilter.value === kind
+    return kindVisible(kind, kindFilter.value, textQuery.value, objectsAnswered.value)
   }
 
   // A metadata request is in flight, including the debounce window before it
@@ -514,6 +531,11 @@ export function useDatasetSearch(searchBox: Ref<{ focus: () => void } | null>) {
 
   const objectInventoryPartial = computed(() =>
     Boolean(objectCoverage.value) && !coverageComplete(objectCoverage.value),
+  )
+  // Hits, a failed search or incomplete coverage: each is an answer the object
+  // section owes the user, so none of them may be hidden under "All".
+  const objectsAnswered = computed(() =>
+    Boolean(objectResults.value.length || objectError.value || objectInventoryPartial.value),
   )
   const objectCoverageShown = computed(() => Boolean(objectCoverage.value || objectError.value))
   const objectCoverageComplete = computed(() => !objectError.value && coverageComplete(objectCoverage.value))

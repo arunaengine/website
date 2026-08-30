@@ -76,7 +76,7 @@ function bucketHitRoute(hit: BucketSearchHit): RouteLocationRaw {
     </button>
   </div>
 
-  <DatasetObjectResults v-if="showKind('objects') && textQuery" :state="state" />
+  <DatasetObjectResults v-if="showKind('objects')" :state="state" />
 
   <section v-if="showKind('groups') && groupMatches.length">
     <div class="mb-3 flex items-center gap-2">
