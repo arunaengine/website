@@ -83,13 +83,19 @@ const PropertyRow = compileClientComponent(new URL('./PropertyRow.vue', import.m
   '@/lib/crate/editor': Editor,
 })
 
+const PropertyEditor = compileClientComponent(new URL('./PropertyEditor.vue', import.meta.url), {
+  vue: VueRuntime,
+  './PropertyRow.vue': moduleDefault(PropertyRow),
+  '@/lib/crate/editor': Editor,
+})
+
 const RootForm = compileClientComponent(new URL('./RootForm.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
   '@/components/ui/Input.vue': moduleDefault(FieldStub('input')),
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/components/ui/Textarea.vue': moduleDefault(FieldStub('textarea')),
-  './PropertyEditor.vue': moduleDefault(EmptyStub),
+  './PropertyEditor.vue': moduleDefault(PropertyEditor),
   './PropertyRow.vue': moduleDefault(PropertyRow),
   './IssueMark.vue': moduleDefault(EmptyStub),
   './grid': Grid,
@@ -123,34 +129,33 @@ async function choose(node: HostNode, value: string) {
 }
 
 describe('RootForm', () => {
-  it('shows every dedicated field, the linked ones included', async () => {
+  it('keeps the dedicated fields to what every dataset has', async () => {
     const mounted = await mount([])
     const text = content(mounted.root)
 
-    for (const label of ['Name', 'Description', 'Date published', 'License', 'Keywords', 'Publisher', 'Contact point', 'Funder']) {
+    for (const label of ['Name', 'Description', 'Date published', 'License', 'Keywords', 'Profile']) {
       expect(text).toContain(label)
+    }
+    for (const label of ['Publisher', 'Contact point', 'Funder']) {
+      expect(text).not.toContain(label)
     }
     mounted.app.unmount()
   })
 
-  it('offers More details only once a value is typed', async () => {
-    const updates: Editor.CrateDraft[] = []
-    const mounted = await mount(updates)
-    expect(content(mounted.root)).not.toContain('More details')
+  it('shows an added publisher among the other properties', async () => {
+    const draft = Editor.addValue(Editor.newDraft(), './', 'publisher', { kind: 'text', value: 'ACME Research' })
+    const mounted = await mount([], draft)
 
-    await typeValue(field(mounted.root, 'Publisher'), 'ACME Research')
-    expect(updates[0].entities[0].properties.publisher).toEqual([{ kind: 'text', value: 'ACME Research' }])
-
-    const typed = await mount([], updates[0])
-    expect(content(typed.root)).toContain('More details')
-    typed.app.unmount()
+    expect(content(mounted.root)).toContain('More properties')
+    expect(field(mounted.root, 'Publisher').props.value).toBe('ACME Research')
     mounted.app.unmount()
   })
 
-  it('promotes a publisher into a linked organization', async () => {
+  it('promotes a license into a linked work', async () => {
     const updates: Editor.CrateDraft[] = []
     const selections: string[] = []
-    const draft = Editor.setProperty(Editor.newDraft(), './', 'publisher', [{ kind: 'text', value: 'ACME Research' }])
+    const license = 'https://creativecommons.org/licenses/by/4.0/'
+    const draft = Editor.setProperty(Editor.newDraft(), './', 'license', [{ kind: 'url', value: license }])
     const mounted = await mountApp(RootForm, {
       props: {
         draft,
@@ -165,12 +170,12 @@ describe('RootForm', () => {
 
     await click(element(mounted.root, (node) => node.tag === 'button' && content(node).trim() === 'More details'))
 
-    expect(updates[0].entities[0].properties.publisher).toEqual([{ kind: 'reference', value: '#acme-research' }])
-    expect(Editor.findEntity(updates[0], '#acme-research')).toMatchObject({
-      types: ['Organization'],
-      properties: { name: [{ kind: 'text', value: 'ACME Research' }] },
+    expect(updates[0].entities[0].properties.license).toEqual([{ kind: 'reference', value: license }])
+    expect(Editor.findEntity(updates[0], license)).toMatchObject({
+      types: ['CreativeWork'],
+      properties: { name: [{ kind: 'text', value: 'CC BY 4.0' }] },
     })
-    expect(selections).toEqual(['#acme-research'])
+    expect(selections).toEqual([license])
     mounted.app.unmount()
   })
 

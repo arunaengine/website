@@ -22,8 +22,8 @@ import {
 import type { VocabIndex } from '@/lib/profiles/vocabulary'
 import { X } from '@lucide/vue'
 
-// The dataset's own form: the fields every dataset has, each one promotable
-// into a linked entity, followed by whatever else the root carries as rows.
+// The dataset's own form: the fields every dataset has, followed by whatever
+// else the root carries as rows.
 const props = defineProps<{
   draft: CrateDraft
   vocab: VocabIndex | null
@@ -36,8 +36,6 @@ const emit = defineEmits<{
   (e: 'select', entityId: string): void
   (e: 'profile', profileId: string): void
 }>()
-
-const LINKED = ['publisher', 'contactPoint', 'funder']
 
 const keywordDraft = ref('')
 
@@ -152,22 +150,6 @@ function addKeyword() {
         <div :class="ROW_ACTIONS"><IssueMark :issues="issuesFor('keywords')" /></div>
       </div>
 
-      <template v-if="root">
-        <PropertyRow
-          v-for="property in LINKED"
-          :key="property"
-          :draft="draft"
-          :entity="root"
-          :property="property"
-          :vocab="vocab"
-          :issues="issuesFor(property)"
-          always
-          :promote-to="PROMOTED_TYPES[property]"
-          @update="(next) => emit('update', next)"
-          @select="(entityId) => emit('select', entityId)"
-        />
-      </template>
-
       <div :class="ROW_GRID">
         <span :class="ROW_LABEL">Profile</span>
         <div class="min-w-0">
@@ -188,7 +170,7 @@ function addKeyword() {
 
     <div class="border-t border-border">
       <p class="px-5 pb-1 pt-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-        Everything else
+        More properties
       </p>
       <PropertyEditor
         v-if="root"

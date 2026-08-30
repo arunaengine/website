@@ -163,18 +163,12 @@ export const ROOT_FORM_PROPERTIES = [
   'datePublished',
   'license',
   'keywords',
-  'publisher',
-  'contactPoint',
-  'funder',
   'conformsTo',
 ]
 
 /** The entity type a root form value is promoted to for "More details". */
 export const PROMOTED_TYPES: Readonly<Record<string, string>> = {
   license: 'CreativeWork',
-  publisher: 'Organization',
-  funder: 'Organization',
-  contactPoint: 'ContactPoint',
 }
 
 /** The types that describe stored data; a contextual entity is none of them. */

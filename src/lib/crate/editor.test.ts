@@ -70,10 +70,8 @@ describe('crate draft', () => {
   })
 
   it('promotes a license preset under its URL with the preset name', () => {
-    const draft = addValue(newDraft(), './', 'license', {
-      kind: 'url',
-      value: 'https://creativecommons.org/licenses/by/4.0/',
-    })
+    // newDraft seeds an empty license row; the preset replaces it in place.
+    const draft = updateValue(newDraft(), './', 'license', 0, 'https://creativecommons.org/licenses/by/4.0/')
     const promoted = promoteValue(draft, './', 'license', 0, 'CreativeWork')
 
     expect(promoted?.entity).toMatchObject({
