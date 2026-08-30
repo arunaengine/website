@@ -68,9 +68,8 @@ function move(step: number): void {
         </span>
       </button>
     </div>
-    <p v-if="props.modelValue === 'local'" class="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
-      Inputs that live in the realm are copied to this computer before the run starts, and the results stay here until
-      you publish them.
+    <p v-if="props.modelValue === 'local'" class="mt-1.5 text-[11px] text-muted-foreground">
+      Realm inputs are copied to this computer first; results stay here until you publish them.
     </p>
   </div>
 </template>

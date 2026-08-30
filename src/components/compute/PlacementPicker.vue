@@ -181,7 +181,7 @@ function removeConstraint(index: number) {
       </Button>
     </Notice>
     <label class="mt-2 block">
-      <span class="text-xs font-medium text-foreground">Run on node</span>
+      <span class="text-xs font-medium text-foreground">Node</span>
       <Select
         v-model="nodeSelection"
         :options="nodeOptions"
@@ -191,62 +191,57 @@ function removeConstraint(index: number) {
       />
     </label>
 
-    <details class="mt-2 text-xs" :open="rows.length > 0 || undefined">
-      <summary class="cursor-pointer select-none font-medium text-foreground">
-        Label constraints<span v-if="rows.length"> ({{ rows.length }})</span>
-      </summary>
-      <div class="mt-2 space-y-2">
-        <datalist :id="labelKeysId">
-          <option
-            v-for="suggestion in suggestions"
-            :key="`${suggestion.key}=${suggestion.value}`"
-            :value="suggestion.key"
-            :label="suggestion.value"
-          />
+    <div class="mt-2 space-y-2 text-xs">
+      <datalist :id="labelKeysId">
+        <option
+          v-for="suggestion in suggestions"
+          :key="`${suggestion.key}=${suggestion.value}`"
+          :value="suggestion.key"
+          :label="suggestion.value"
+        />
+      </datalist>
+      <div
+        v-for="(row, index) in rows"
+        :key="row.id"
+        class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_1.75rem] gap-2"
+      >
+        <Input
+          :model-value="row.key"
+          :list="labelKeysId"
+          class="h-8 font-mono text-xs"
+          placeholder="label key"
+          :aria-label="`Label key ${index + 1}`"
+          @update:model-value="updateKey(row, String($event))"
+        />
+        <Input
+          :model-value="row.value"
+          :list="labelValuesId(row.id)"
+          class="h-8 font-mono text-xs"
+          placeholder="value"
+          :aria-label="`Label value ${index + 1}`"
+          @update:model-value="updateValue(row, String($event))"
+        />
+        <datalist :id="labelValuesId(row.id)">
+          <option v-for="value in valuesFor(row.key)" :key="value" :value="value" />
         </datalist>
-        <div
-          v-for="(row, index) in rows"
-          :key="row.id"
-          class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_1.75rem] gap-2"
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          class="h-8 w-7"
+          :aria-label="`Remove label constraint ${index + 1}`"
+          @click="removeConstraint(index)"
         >
-          <Input
-            :model-value="row.key"
-            :list="labelKeysId"
-            class="h-8 font-mono text-xs"
-            placeholder="label key"
-            :aria-label="`Label key ${index + 1}`"
-            @update:model-value="updateKey(row, String($event))"
-          />
-          <Input
-            :model-value="row.value"
-            :list="labelValuesId(row.id)"
-            class="h-8 font-mono text-xs"
-            placeholder="value"
-            :aria-label="`Label value ${index + 1}`"
-            @update:model-value="updateValue(row, String($event))"
-          />
-          <datalist :id="labelValuesId(row.id)">
-            <option v-for="value in valuesFor(row.key)" :key="value" :value="value" />
-          </datalist>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            class="h-8 w-7"
-            :aria-label="`Remove label constraint ${index + 1}`"
-            @click="removeConstraint(index)"
-          >
-            <X class="h-3.5 w-3.5" />
-          </Button>
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" :disabled="atLimit" @click="addConstraint">
-            <Plus class="h-3.5 w-3.5" /> Add constraint
-          </Button>
-          <span class="text-[11px] text-muted-foreground">
-            Up to {{ MAX_LABEL_CONSTRAINTS }} constraints including a selected node.
-          </span>
-        </div>
+          <X class="h-3.5 w-3.5" />
+        </Button>
       </div>
-    </details>
+      <div class="flex flex-wrap items-center gap-2">
+        <Button variant="outline" size="sm" :disabled="atLimit" @click="addConstraint">
+          <Plus class="h-3.5 w-3.5" /> Add constraint
+        </Button>
+        <span v-if="atLimit" class="text-[11px] text-muted-foreground">
+          Limit of {{ MAX_LABEL_CONSTRAINTS }} reached.
+        </span>
+      </div>
+    </div>
   </section>
 </template>

@@ -53,7 +53,7 @@ const anything = computed(
         executor <span class="font-mono text-foreground">{{ placement.executorKind }}</span>
       </span>
       <span v-if="placement.estimatedTransferBytes !== undefined" class="text-muted-foreground">
-        estimated transfer {{ formatBytes(placement.estimatedTransferBytes) }}
+        transfer ~{{ formatBytes(placement.estimatedTransferBytes) }}
       </span>
       <Badge
         v-for="[key, value] in labelConstraints"
