@@ -37,7 +37,7 @@ describe('ROR affiliation matching', () => {
   })
 
   it('asks the affiliation endpoint and answers null for an empty name', async () => {
-    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => affiliationFixture }))
+    const fetchMock = vi.fn(async (url: unknown) => ({ ok: true, url, json: async () => affiliationFixture }))
     vi.stubGlobal('fetch', fetchMock)
 
     expect(await matchRorByName('  ')).toBeNull()
