@@ -117,7 +117,7 @@ describe('ProviderForm', () => {
     const { root } = await mountApp(ProviderForm)
     await typeValue(field(root, 'Work account'), 'Work')
     await typeValue(field(root, 'Paste the Anthropic key'), 'sk-1')
-    await typeValue(element(root, (node) => node.props['aria-label'] === 'Model'), 'claude-sonnet')
+    await typeValue(element(root, (node) => node.props['aria-label'] === 'Default model'), 'claude-sonnet')
 
     expect(button(root, 'Save provider').props.disabled).toBe(true)
 
@@ -136,7 +136,7 @@ describe('ProviderForm', () => {
     const { root } = await mountApp(ProviderForm)
     await typeValue(field(root, 'Work account'), 'Work')
     await typeValue(field(root, 'Paste the Anthropic key'), 'sk-1')
-    await typeValue(element(root, (node) => node.props['aria-label'] === 'Model'), 'claude-sonnet')
+    await typeValue(element(root, (node) => node.props['aria-label'] === 'Default model'), 'claude-sonnet')
     await click(button(root, 'Test connection'))
 
     expect(content(root)).toContain('bad key')
@@ -148,7 +148,7 @@ describe('ProviderForm', () => {
     const { root } = await mountApp(ProviderForm)
     await typeValue(field(root, 'Work account'), 'Work')
     await typeValue(field(root, 'Paste the Anthropic key'), 'sk-1')
-    await typeValue(element(root, (node) => node.props['aria-label'] === 'Model'), 'claude-sonnet')
+    await typeValue(element(root, (node) => node.props['aria-label'] === 'Default model'), 'claude-sonnet')
     await click(button(root, 'Test connection'))
     await click(button(root, 'Fetch models'))
 
@@ -175,7 +175,7 @@ describe('ProviderForm', () => {
     // A fine-tune or a brand-new model needs no entry in the fetched list.
     direct.mockReturnValue({ kind: 'anthropic', id: 'p-1', label: 'Work', model: 'm-1', apiKey: 'stored-key' })
     const { root } = await mountApp(ProviderForm, { props: { provider: stored } })
-    const model = element(root, (node) => node.tag === 'input' && node.props['aria-label'] === 'Model')
+    const model = element(root, (node) => node.tag === 'input' && node.props['aria-label'] === 'Default model')
     expect(model.props['data-suggestions']).toBe('m-1')
 
     await typeValue(model, '  my-fine-tune ')

@@ -120,8 +120,10 @@ function candidate(modelOverride = defaultModel.value, listing = false): Browser
   }
 }
 
+// The discovered suggestion list is not part of what the connection test
+// covers, so fetching models must not silently disable Save again.
 function fingerprint(provider: BrowserProvider): string {
-  return JSON.stringify(provider)
+  return JSON.stringify({ ...provider, models: undefined })
 }
 
 const testedForCurrent = computed(() => {
