@@ -13,6 +13,12 @@ const active = ref('group-a')
 const setActiveGroup = vi.fn((id: string) => {
   active.value = id
 })
+const setRealm = vi.fn()
+const realm = ref({ id: 'realm-1', name: 'Demo realm', shortName: 'Demo', color: '#336699' })
+const realms = ref([
+  { id: 'realm-1', name: 'Demo realm', shortName: 'Demo', color: '#336699' },
+  { id: 'realm-2', name: 'Archive realm', shortName: 'Archive', color: '#993366' },
+])
 
 const Passthrough = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
 const ButtonStub = defineComponent({
@@ -29,7 +35,7 @@ const RouterLinkStub = defineComponent({
 })
 const icons = new Proxy({}, { get: () => defineComponent(() => () => h('i')) })
 
-const GroupSwitcher = compileClientComponent(new URL('./GroupSwitcher.vue', import.meta.url), {
+const ContextSwitcher = compileClientComponent(new URL('./ContextSwitcher.vue', import.meta.url), {
   vue: VueRuntime,
   'vue-router': { RouterLink: RouterLinkStub },
   '@lucide/vue': icons,
@@ -39,8 +45,22 @@ const GroupSwitcher = compileClientComponent(new URL('./GroupSwitcher.vue', impo
   '@/components/ui/DropdownMenuItem.vue': moduleDefault(ButtonStub),
   '@/components/ui/DropdownMenuLabel.vue': moduleDefault(Passthrough),
   '@/components/ui/DropdownMenuSeparator.vue': moduleDefault(Passthrough),
+  '@/components/ui/DropdownMenuSub.vue': moduleDefault(Passthrough),
+  '@/components/ui/DropdownMenuSubTrigger.vue': moduleDefault(ButtonStub),
+  '@/components/ui/DropdownMenuSubContent.vue': moduleDefault(Passthrough),
   '@/components/ui/CopyButton.vue': moduleDefault(CopyStub),
   '@/composables/useAruna': { useAruna: () => ({ currentUser, myGroups }) },
+  '@/composables/useRealm': {
+    useRealm: () => ({
+      realm,
+      realmDisplayName: computed(() => realm.value.name),
+      realmId: computed(() => realm.value.id),
+      activeRealmId: computed(() => realm.value.id),
+      accessibleRealms: realms,
+      myMemberships: ref([{ userId: 'u-1', realmId: 'realm-1', role: 'realm-admin', since: '' }]),
+      setRealm,
+    }),
+  },
   '@/composables/useGroupSelection': {
     activeGroupId: computed(() => active.value),
     setActiveGroup,
@@ -55,13 +75,16 @@ beforeEach(() => {
     { id: 'group-b', name: 'Soil archive' },
   ]
   active.value = 'group-a'
+  realm.value = { id: 'realm-1', name: 'Demo realm', shortName: 'Demo', color: '#336699' }
   setActiveGroup.mockClear()
+  setRealm.mockClear()
 })
 
-describe('GroupSwitcher', () => {
+describe('ContextSwitcher', () => {
   it('names the active group and switches to another', async () => {
-    const { root } = await mountApp(GroupSwitcher)
+    const { root } = await mountApp(ContextSwitcher)
     expect(content(root)).toContain('Water quality')
+    expect(content(root)).toContain('Group · Demo')
 
     await click(element(root, (node) => content(node).includes('Soil archive') && node.tag === 'button'))
 
@@ -69,8 +92,19 @@ describe('GroupSwitcher', () => {
     expect(content(root)).toContain('Soil archive')
   })
 
+  it('switches the realm from the submenu', async () => {
+    const { root } = await mountApp(ContextSwitcher)
+    expect(content(root)).toContain('Realm: Demo realm')
+
+    await click(element(root, (node) => content(node).includes('Archive realm') && node.tag === 'button'))
+
+    expect(setRealm).toHaveBeenCalledWith('realm-2')
+    expect(element(root, (node) => node.props['aria-label'] === 'Copy realm id').props['data-value'])
+      .toBe('realm-1')
+  })
+
   it('offers the group id and the groups page', async () => {
-    const { root } = await mountApp(GroupSwitcher)
+    const { root } = await mountApp(ContextSwitcher)
 
     expect(element(root, (node) => node.props['aria-label'] === 'Copy group id').props['data-value'])
       .toBe('group-a')
@@ -78,16 +112,27 @@ describe('GroupSwitcher', () => {
       .toEqual({ name: 'groups' })
   })
 
-  it('stays out of the bar without a membership', async () => {
+  it('hides the label on a narrow bar', async () => {
+    const { root } = await mountApp(ContextSwitcher)
+
+    const label = element(root, (node) => String(node.props.class ?? '').includes('sm:flex'))
+    expect(String(label.props.class)).toContain('hidden')
+    expect(content(label)).toContain('Water quality')
+  })
+
+  it('falls back to the realm without a membership', async () => {
     myGroups.value = []
-    const without = await mountApp(GroupSwitcher)
-    expect(content(without.root)).toBe('')
+    const without = await mountApp(ContextSwitcher)
+    expect(content(without.root)).toContain('Active realm')
+    expect(content(without.root)).toContain('Demo realm')
+    expect(content(without.root)).not.toContain('Switch group')
     without.app.unmount()
 
     myGroups.value = [{ id: 'group-a', name: 'Water quality' }]
     currentUser.value = null
-    const signedOut = await mountApp(GroupSwitcher)
-    expect(content(signedOut.root)).toBe('')
+    const signedOut = await mountApp(ContextSwitcher)
+    expect(content(signedOut.root)).toContain('Active realm')
+    expect(content(signedOut.root)).not.toContain('Manage groups')
     signedOut.app.unmount()
   })
 })

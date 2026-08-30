@@ -47,8 +47,7 @@ const TopBar = compileClientComponent(new URL('./TopBar.vue', import.meta.url), 
   '@/components/ui/DropdownMenuItem.vue': moduleDefault(ButtonStub),
   '@/components/ui/DropdownMenuLabel.vue': moduleDefault(Passthrough),
   '@/components/ui/DropdownMenuSeparator.vue': moduleDefault(Passthrough),
-  '@/components/layout/RealmSwitcher.vue': moduleDefault(Marker('realm switcher')),
-  '@/components/layout/GroupSwitcher.vue': moduleDefault(Marker('group switcher')),
+  '@/components/layout/ContextSwitcher.vue': moduleDefault(Marker('context switcher')),
   '@/components/dashboard/NotificationBell.vue': moduleDefault(Marker('bell')),
   '@/components/dashboard/SearchOverlay.vue': moduleDefault(Marker('datasets')),
   '@/components/ui/StatusDot.vue': moduleDefault(StatusDotStub),
@@ -94,12 +93,11 @@ function launcher(root: Parameters<typeof content>[0]) {
 }
 
 describe('portal chrome', () => {
-  it('keeps the realm switcher and the dataset shortcut', async () => {
+  it('keeps the context switcher and the dataset shortcut', async () => {
     const mounted = await mountApp(TopBar)
     const html = content(mounted.root)
 
-    expect(html).toContain('realm switcher')
-    expect(html).toContain('group switcher')
+    expect(html).toContain('context switcher')
     expect(html).toContain('Create dataset')
     expect(html).toContain('datasets')
     expect(watchNode).not.toHaveBeenCalled()
@@ -137,8 +135,7 @@ describe('desktop chrome', () => {
     const mounted = await mountApp(TopBar, { props: { variant: 'desktop' } })
     const html = content(mounted.root)
 
-    expect(html).not.toContain('realm switcher')
-    expect(html).not.toContain('group switcher')
+    expect(html).not.toContain('context switcher')
     expect(html).not.toContain('Create dataset')
     expect(html).toContain('online')
     expect(html).toContain('Testrealm')
