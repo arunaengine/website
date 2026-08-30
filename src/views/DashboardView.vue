@@ -18,22 +18,36 @@ import { useAuth } from '@/composables/useAuth'
 import { useDocumentVisibility, useIntervalFn } from '@vueuse/core'
 import { useNotifications } from '@/composables/useNotifications'
 import { useRefresh } from '@/composables/useRefresh'
+import { useFirstPaint } from '@/composables/useFirstPaint'
 import { formatCount } from '@/lib/formatCount'
 import { formatBytes, formatNumber, relativeTime } from '@/lib/utils'
 
 const router = useRouter()
-const { currentUser, metadata, profiles, myGroups, discoverableGroups, realm, nodeInfo, realmInfo, usageInfo, bootstrapped, refresh, loadInfo, listRecentMetadata } = useAruna()
+const { currentUser, metadata, profiles, myGroups, discoverableGroups, realm, nodeInfo, realmInfo, usageInfo, loading, bootstrapped, sessionEpoch, refresh, loadInfo, listRecentMetadata } = useAruna()
 const { authPending } = useAuth()
 const { dashboardRevision } = useNotifications()
 const refreshing = ref(false)
 const quotaRevision = ref(0)
 const recentDocs = ref<MetadataDoc[] | null>(null)
+const recentSettled = ref(false)
+let recentGeneration = 0
 let refreshQueued = false
+
+watch(sessionEpoch, () => {
+  recentGeneration++
+  recentSettled.value = false
+}, { flush: 'sync' })
 
 // Null keeps the tile on the window-derived list, so a node that cannot order
 // by recency degrades to the old behaviour instead of an empty panel.
 async function loadRecent() {
-  recentDocs.value = await listRecentMetadata().catch(() => null)
+  const epoch = sessionEpoch.value
+  const generation = ++recentGeneration
+  recentSettled.value = false
+  const recent = await listRecentMetadata().catch(() => null)
+  if (epoch !== sessionEpoch.value || generation !== recentGeneration) return
+  recentDocs.value = recent
+  recentSettled.value = true
 }
 
 async function refreshDashboard() {
@@ -56,7 +70,31 @@ async function refreshDashboard() {
 const { busy: refreshBusy, refresh: onRefresh } = useRefresh(refreshDashboard)
 const spinning = computed(() => refreshBusy.value || refreshing.value)
 
-watch(dashboardRevision, () => void refreshDashboard(), { immediate: true })
+// The dashboard has one critical bootstrap wave. Hold its sections in a
+// single skeleton until the shared session and identity data have settled;
+// later refreshes update the rendered content in place. A session change starts
+// a fresh first paint through the epoch key.
+const dashboardSettled = () => bootstrapped.value && !loading.value && !authPending.value && recentSettled.value
+const painted = useFirstPaint(
+  dashboardSettled,
+  () => String(sessionEpoch.value),
+)
+
+let initialDashboardWatch = true
+function watchDashboard() {
+  const initial = initialDashboardWatch
+  initialDashboardWatch = false
+  // The module-level bootstrap may already have settled before this view is
+  // mounted; in that case its initial refresh is all the core data needs, but
+  // the independently ordered recent window still has to be loaded.
+  if (initial && bootstrapped.value && !loading.value) {
+    void loadRecent()
+    return
+  }
+  void refreshDashboard()
+}
+
+watch([dashboardRevision, sessionEpoch], watchDashboard, { immediate: true })
 
 // Node heartbeats republish every 60s but never bump the SSE revision; poll
 // the light info endpoints so the realm nodes panel stays current.
@@ -182,7 +220,33 @@ const pageDescription = computed(() =>
     </PageHeader>
 
     <div class="container space-y-6 py-8">
-      <SignInPanel v-if="bootstrapped && !currentUser && !authPending" />
+      <div v-if="!painted" class="space-y-6" aria-busy="true">
+        <span class="sr-only">Loading dashboard</span>
+        <section class="space-y-3.5">
+          <header class="space-y-2">
+            <Skeleton class="h-5 w-36" />
+            <Skeleton class="h-3 w-24" />
+          </header>
+          <div class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+            <Skeleton v-for="n in 4" :key="n" class="h-16" />
+          </div>
+          <div class="grid gap-3.5 sm:grid-cols-3">
+            <Skeleton v-for="n in 3" :key="n" class="h-[108px]" />
+          </div>
+        </section>
+        <section class="space-y-3.5">
+          <Skeleton class="h-5 w-24" />
+          <Skeleton class="h-28 w-full" />
+        </section>
+        <Skeleton class="h-40 w-full" />
+        <section class="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+          <Skeleton class="h-64 w-full" />
+          <Skeleton class="h-44 w-full" />
+        </section>
+      </div>
+
+      <template v-else>
+      <SignInPanel v-if="!currentUser" />
 
       <section aria-labelledby="realm-statistics-heading" class="space-y-3.5">
         <header>
@@ -308,6 +372,7 @@ const pageDescription = computed(() =>
           </section>
         </div>
       </section>
+      </template>
     </div>
 
   </div>

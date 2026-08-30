@@ -1,6 +1,13 @@
+import * as VueRuntime from 'vue'
 import { createSSRApp, defineComponent, h, ref, type Component } from 'vue'
 import { renderToString } from '@vue/server-renderer'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { content, compileClientComponent, flush, moduleDefault, mountApp } from '@/test/clientRender'
+
+const firstPaintMock = vi.hoisted(() => ({
+  useFirstPaint: () => ({ value: true }),
+}))
+vi.mock('@/composables/useFirstPaint', () => firstPaintMock)
 
 const currentUser = ref<Record<string, unknown> | null>(null)
 const metadata = ref<unknown[]>([])
@@ -12,7 +19,9 @@ const realm = ref({ id: 'realm-id', name: 'Test realm', description: 'Public res
 const nodeInfo = ref<Record<string, unknown> | null>(null)
 const realmInfo = ref<Record<string, any> | null>(null)
 const usageInfo = ref<Record<string, any> | null>(null)
+const loading = ref(false)
 const bootstrapped = ref(true)
+const sessionEpoch = ref(0)
 const authPending = ref(false)
 const authStage = ref('idle')
 const authStageError = ref<string | null>(null)
@@ -49,8 +58,11 @@ const FederationPanelStub = defineComponent({
     ]),
 })
 const EmptyStub = defineComponent(() => () => null)
+const RefreshButtonStub = defineComponent((_, { attrs }) => () => h('button', attrs, 'Refresh'))
+const icons = new Proxy({}, { get: () => EmptyStub })
 
 let DashboardView: Component
+let DashboardClient: Component
 
 beforeAll(async () => {
   vi.doMock('vue-router', () => ({
@@ -69,7 +81,9 @@ beforeAll(async () => {
       nodeInfo,
       realmInfo,
       usageInfo,
+      loading,
       bootstrapped,
+      sessionEpoch,
       refresh,
       loadInfo,
       listRecentMetadata,
@@ -94,6 +108,61 @@ beforeAll(async () => {
   vi.doMock('@/components/ui/StatCard.vue', () => ({ default: StatCardStub }))
   vi.doMock('@/components/ui/Skeleton.vue', () => ({ default: SkeletonStub }))
   DashboardView = (await import('./DashboardView.vue')).default
+  const FirstPaint = await vi.importActual<typeof import('@/composables/useFirstPaint')>('@/composables/useFirstPaint')
+
+  DashboardClient = compileClientComponent(new URL('./DashboardView.vue', import.meta.url), {
+    vue: VueRuntime,
+    'vue-router': {
+      RouterLink: RouterLinkStub,
+      useRouter: () => ({ push: vi.fn() }),
+    },
+    '@lucide/vue': icons,
+    '@/composables/useAruna': {
+      useAruna: () => ({
+        currentUser,
+        metadata,
+        profiles,
+        myGroups,
+        discoverableGroups,
+        realm,
+        nodeInfo,
+        realmInfo,
+        usageInfo,
+        loading,
+        bootstrapped,
+        sessionEpoch,
+        refresh,
+        loadInfo,
+        listRecentMetadata,
+      }),
+    },
+    '@/composables/useAuth': { useAuth: () => ({ authPending }) },
+    '@vueuse/core': {
+      useDocumentVisibility: () => ref('hidden'),
+      useIntervalFn: () => ({ pause: vi.fn(), resume: vi.fn() }),
+    },
+    '@/composables/useNotifications': { useNotifications: () => ({ dashboardRevision }) },
+    '@/composables/useRefresh': {
+      useRefresh: (run: () => unknown) => ({ busy: ref(false), refresh: run }),
+    },
+    '@/composables/useFirstPaint': FirstPaint,
+    '@/lib/formatCount': { formatCount: (value: number) => String(value) },
+    '@/lib/utils': {
+      formatBytes: (value: number) => String(value),
+      formatNumber: (value: number) => String(value),
+      relativeTime: (value: string) => value,
+    },
+    '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+    '@/components/ui/RefreshButton.vue': moduleDefault(RefreshButtonStub),
+    '@/components/dashboard/PageHeader.vue': moduleDefault(PageHeaderStub),
+    '@/components/dashboard/FederationPanel.vue': moduleDefault(FederationPanelStub),
+    '@/components/dashboard/GroupQuotaCards.vue': moduleDefault(GroupQuotaCardsStub),
+    '@/components/metadata/ProfileChip.vue': moduleDefault(EmptyStub),
+    '@/components/auth/SignInPanel.vue': moduleDefault(EmptyStub),
+    '@/components/ui/StatCard.vue': moduleDefault(StatCardStub),
+    '@/components/ui/Skeleton.vue': moduleDefault(SkeletonStub),
+    '@/components/ui/EmptyState.vue': moduleDefault(EmptyStub),
+  })
 })
 
 beforeEach(() => {
@@ -110,7 +179,9 @@ beforeEach(() => {
     nodes: [],
   }
   usageInfo.value = null
+  loading.value = false
   bootstrapped.value = true
+  sessionEpoch.value = 0
   authPending.value = false
   authStage.value = 'idle'
   authStageError.value = null
@@ -131,6 +202,48 @@ async function renderedText(): Promise<string> {
 }
 
 describe('guest dashboard truth', () => {
+  it('holds the dashboard body in one skeleton during bootstrap', async () => {
+    vi.stubGlobal('window', {})
+    loading.value = true
+    bootstrapped.value = false
+    authPending.value = true
+
+    const mounted = await mountApp(DashboardClient)
+    const text = content(mounted.root)
+
+    expect(text).toContain('Loading dashboard')
+    expect(text).not.toContain('Realm statistics')
+    mounted.app.unmount()
+    vi.unstubAllGlobals()
+  })
+
+  it('loads the recency window when shared bootstrap already settled', async () => {
+    await renderedText()
+
+    expect(listRecentMetadata).toHaveBeenCalledOnce()
+    expect(refresh).not.toHaveBeenCalled()
+  })
+
+  it('keeps the client body in its skeleton until recency settles', async () => {
+    vi.stubGlobal('window', {})
+    let resolveRecent!: (value: never[]) => void
+    const pendingRecent = new Promise<never[]>((resolve) => {
+      resolveRecent = resolve
+    })
+    listRecentMetadata.mockImplementationOnce(() => pendingRecent)
+
+    const mounted = await mountApp(DashboardClient)
+    expect(content(mounted.root)).toContain('Loading dashboard')
+    expect(content(mounted.root)).not.toContain('Realm statistics')
+
+    resolveRecent([])
+    await flush()
+
+    expect(content(mounted.root)).toContain('Realm statistics')
+    mounted.app.unmount()
+    vi.unstubAllGlobals()
+  })
+
   it('renders the three public_overview counts instead of guest-filtered zeros', async () => {
     realm.value = { id: 'realm-public', name: 'Gaia realm', description: 'Shared science data' }
     realmInfo.value = {
