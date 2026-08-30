@@ -15,7 +15,7 @@ withDefaults(defineProps<{ size?: 'compact' | 'full' }>(), { size: 'compact' })
 const route = useRoute()
 const { profiles } = useAruna()
 const { bridge } = useAssistantEditor()
-const { busy, error, toolsNote, provider, model, historyReady, send } = useAssistantChat()
+const { busy, toolsNote, provider, model, historyReady, send } = useAssistantChat()
 
 const input = ref('')
 
@@ -40,7 +40,6 @@ function onKeydown(event: KeyboardEvent) {
 <template>
   <div class="space-y-2">
     <Notice v-if="toolsNote" tone="info">{{ toolsNote }}</Notice>
-    <Notice v-if="error" tone="error">{{ error }}</Notice>
     <div class="flex items-end gap-2">
       <Textarea
         v-model="input"

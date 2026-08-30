@@ -16,7 +16,7 @@ import { MessageSquare, Minimize2, Plus } from '@lucide/vue'
 
 const router = useRouter()
 const { currentUser } = useAruna()
-const { busy, messages, pending, available, hidePanel, openPanel, newChat, ensureProviders } = useAssistantChat()
+const { busy, messages, pending, available, historyReady, hidePanel, openPanel, newChat, ensureProviders } = useAssistantChat()
 
 const deleteCallId = computed(() =>
   (pending.value?.always ? pending.value.request.id : undefined))
@@ -38,7 +38,7 @@ function continueInPanel() {
   <div class="flex min-h-full flex-col">
     <PageHeader title="Assistant" description="Ask about your data, or let the assistant work on the dataset you have open.">
       <template #actions>
-        <Button variant="outline" size="sm" @click="newChat"><Plus class="h-3.5 w-3.5" /> New chat</Button>
+        <Button variant="outline" size="sm" :disabled="!available || !historyReady" @click="newChat"><Plus class="h-3.5 w-3.5" /> New chat</Button>
         <Button variant="outline" size="sm" @click="continueInPanel"><Minimize2 class="h-3.5 w-3.5" /> Continue in the panel</Button>
       </template>
     </PageHeader>
@@ -55,16 +55,16 @@ function continueInPanel() {
       </EmptyState>
     </div>
 
-    <div v-else class="container flex min-h-0 flex-1 flex-col py-6">
+    <div v-if="historyReady" class="container flex min-h-0 flex-1 flex-col py-6">
       <div class="mx-auto flex w-full max-w-3xl min-h-0 flex-1 flex-col">
-        <AssistantHistory />
-        <div class="surface px-4 py-3">
+        <AssistantHistory :read-only="!available" />
+        <div v-if="available" class="surface px-4 py-3">
           <ChatControls size="full" />
         </div>
         <MessageList
           size="full"
           :messages="messages"
-          :busy="busy"
+          :busy="available && busy"
           :delete-call-id="deleteCallId"
           class="pb-40"
           @decide="(approved) => pending?.decide(approved)"
@@ -72,7 +72,7 @@ function continueInPanel() {
       </div>
     </div>
 
-    <div v-if="available" class="sticky bottom-0 z-20 border-t border-border bg-background/95 backdrop-blur">
+    <div v-if="available && historyReady" class="sticky bottom-0 z-20 border-t border-border bg-background/95 backdrop-blur">
       <div class="container py-3">
         <div class="mx-auto w-full max-w-3xl">
           <ChatComposer size="full" />

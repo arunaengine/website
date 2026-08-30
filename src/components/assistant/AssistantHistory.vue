@@ -7,19 +7,23 @@ import Input from '@/components/ui/Input.vue'
 import { useAssistantChat } from '@/composables/useAssistantChat'
 import { Check, Pencil, Trash2, X } from '@lucide/vue'
 
-withDefaults(defineProps<{ compact?: boolean }>(), { compact: false })
+const props = withDefaults(defineProps<{ compact?: boolean; readOnly?: boolean }>(), {
+  compact: false,
+  readOnly: false,
+})
 
 const { chats, activeChatId, historyReady, selectChat, deleteChat, renameChat } = useAssistantChat()
 const editingId = ref<string | null>(null)
 const draftTitle = ref('')
 
 function beginRename(id: string, title: string) {
+  if (props.readOnly) return
   editingId.value = id
   draftTitle.value = title
 }
 
 function commitRename() {
-  if (!editingId.value) return
+  if (props.readOnly || !editingId.value) return
   renameChat(editingId.value, draftTitle.value)
   editingId.value = null
 }
@@ -34,7 +38,7 @@ function cancelRename() {
   <section
     aria-label="Assistant chats"
     class="border-b border-border bg-background/30 px-3 py-2"
-    :class="compact ? 'text-[11px]' : 'text-xs'"
+    :class="props.compact ? 'text-[11px]' : 'text-xs'"
   >
     <div class="mb-1 flex items-center justify-between gap-2">
       <span class="font-medium text-muted-foreground">Chats</span>
@@ -45,7 +49,7 @@ function cancelRename() {
     <div v-if="historyReady" class="scrollbar-thin max-h-28 space-y-0.5 overflow-y-auto">
       <div v-for="chat in chats" :key="chat.id" class="group flex min-w-0 items-center gap-1 rounded-md">
         <Input
-          v-if="editingId === chat.id"
+          v-if="editingId === chat.id && !props.readOnly"
           v-model="draftTitle"
           class="h-7 min-w-0 flex-1 px-2 text-xs"
           aria-label="Chat name"
@@ -62,7 +66,7 @@ function cancelRename() {
           @dblclick="beginRename(chat.id, chat.title)"
         >{{ chat.title }}</button>
         <Button
-          v-if="editingId === chat.id"
+          v-if="editingId === chat.id && !props.readOnly"
           variant="ghost"
           size="icon-sm"
           class="shrink-0"
@@ -71,7 +75,7 @@ function cancelRename() {
           @click="commitRename"
         ><Check class="size-3.5" /></Button>
         <Button
-          v-if="editingId === chat.id"
+          v-if="editingId === chat.id && !props.readOnly"
           variant="ghost"
           size="icon-sm"
           class="shrink-0"
@@ -79,7 +83,7 @@ function cancelRename() {
           title="Cancel"
           @click="cancelRename"
         ><X class="size-3.5" /></Button>
-        <template v-else>
+        <template v-else-if="!props.readOnly">
           <Button
             variant="ghost"
             size="icon-sm"
