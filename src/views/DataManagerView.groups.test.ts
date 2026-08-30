@@ -34,6 +34,11 @@ describe('Data view group selection', () => {
     expect(template).not.toContain('DropdownMenu')
   })
 
+  it('links the shown group to its page', () => {
+    expect(template).toContain(":to=\"{ name: 'group', params: { id: selectedGroupId } }\"")
+    expect(template).toContain('<span v-else class="text-muted-foreground">No group</span>')
+  })
+
   it('keeps a route group as the opened one', () => {
     expect(managerSource).toContain("routeString(route.query.group) || s3.activeContext.value?.groupId")
     expect(managerSource).toContain('if (next) selectedGroupId.value = next')

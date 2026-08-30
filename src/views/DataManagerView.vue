@@ -199,12 +199,15 @@ async function createFolder() {
           <!-- The group is the top bar's context; here it only stays visible. -->
           <div class="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
             <span class="hidden lg:inline">Showing buckets of</span>
-            <span
-              class="inline-flex h-8 max-w-[12rem] items-center rounded-md border border-border bg-muted/40 px-2 text-sm font-medium text-foreground"
+            <RouterLink
+              v-if="selectedGroupId"
+              :to="{ name: 'group', params: { id: selectedGroupId } }"
+              class="max-w-[12rem] truncate font-medium text-foreground hover:underline"
               :title="`${selectedGroupId} · Switch the group in the top bar`"
             >
-              <span class="truncate">{{ selectedGroupName }}</span>
-            </span>
+              {{ selectedGroupName }}
+            </RouterLink>
+            <span v-else class="text-muted-foreground">No group</span>
             <span class="hidden lg:inline" :title="requiredNodeId ?? undefined">on {{ requiredNodeName }}</span>
           </div>
         </template>
