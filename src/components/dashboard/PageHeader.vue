@@ -37,8 +37,8 @@ const { realm } = useRealm()
           <h1 class="font-display text-2xl font-semibold tracking-tight text-aruna-navy md:text-[28px]">
             {{ title }}
           </h1>
-          <p v-if="description" class="mt-1 max-w-2xl text-sm text-muted-foreground">
-            {{ description }}
+          <p v-if="description || $slots.description" class="mt-1 max-w-2xl text-sm text-muted-foreground">
+            <slot name="description">{{ description }}</slot>
           </p>
         </div>
         <div class="flex flex-wrap items-center gap-2">

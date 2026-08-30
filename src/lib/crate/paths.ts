@@ -25,6 +25,11 @@ export interface PathPrefixes {
 // Folders the node gives a meaning of their own; never offered for a dataset.
 const RESERVED = new Set(['profiles', 'runs'])
 
+/** True for a top-level folder name the node reserves for itself. */
+export function isReservedFolder(name: string): boolean {
+  return RESERVED.has(name)
+}
+
 function trimSlashes(value: string): string {
   return value.replace(/^\/+|\/+$/g, '')
 }
@@ -57,13 +62,14 @@ export function documentPrefixes(paths: string[]): string[] {
   for (const path of paths) {
     const segments = trimSlashes(path).split('/').filter(Boolean)
     segments.pop()
-    if (RESERVED.has(segments[0] ?? '')) continue
+    if (isReservedFolder(segments[0] ?? '')) continue
     for (let depth = 1; depth <= segments.length; depth += 1) found.add(segments.slice(0, depth).join('/'))
   }
   return [...found].sort()
 }
 
-function covered(prefix: string, grants: string[]): boolean {
+/** True when one of the grants reaches the prefix; no grant means unknown. */
+export function covered(prefix: string, grants: string[]): boolean {
   return grants.some((grant) => grant === '' || prefix === grant || prefix.startsWith(`${grant}/`))
 }
 

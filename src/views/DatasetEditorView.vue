@@ -7,8 +7,7 @@ import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
 import ImportCrateDialog from '@/components/metadata/ImportCrateDialog.vue'
-import DatasetHeaderBar from '@/components/metadata/editor/DatasetHeaderBar.vue'
-import DatasetStart from '@/components/metadata/editor/DatasetStart.vue'
+import DatasetLocationDialog from '@/components/metadata/editor/DatasetLocationDialog.vue'
 import EntityBrowser from '@/components/metadata/editor/EntityBrowser.vue'
 import EntityEditor from '@/components/metadata/editor/EntityEditor.vue'
 import IssueDrawer from '@/components/metadata/editor/IssueDrawer.vue'
@@ -26,7 +25,7 @@ import { errorMessage } from '@/lib/utils'
 import { slugify } from '@/lib/profiles/emit'
 import { loadVocabIndex, type VocabIndex } from '@/lib/profiles/vocabulary'
 import { collectIssues, rejectionIssues, type WriteIssue } from '@/lib/crate/issues'
-import { joinPath, splitPath } from '@/lib/crate/paths'
+import { joinPath, prefixLabel, splitPath } from '@/lib/crate/paths'
 import { applyProfile, profileExpectation } from '@/lib/crate/profileSeed'
 import {
   entityName,
@@ -41,7 +40,7 @@ import {
   typeLabel,
   type CrateDraft,
 } from '@/lib/crate/editor'
-import { FileJson2 } from '@lucide/vue'
+import { FileJson2, FolderTree } from '@lucide/vue'
 
 // The graph carries Vue Flow and dagre; only the Graph tab pays for them.
 const EditorGraph = defineAsyncComponent(() => import('@/components/metadata/editor/EditorGraph.vue'))
@@ -68,24 +67,25 @@ const draft = ref<CrateDraft>(newDraft())
 const vocab = shallowRef<VocabIndex | null>(null)
 const selected = ref(rootId(draft.value))
 const tab = ref<'editor' | 'graph'>('editor')
-// A new dataset starts on its own screen; the editor opens once it is named.
-const started = ref(false)
 const loading = ref(false)
 const loadError = ref<string | null>(null)
 const importOpen = ref(false)
+const locationOpen = ref(false)
 const createGroupOpen = ref(false)
 const profileId = ref('')
 const preferredProfileInitialized = ref(false)
 const submitError = ref<string | null>(null)
 const saveIssues = ref<WriteIssue[]>([])
 const submitting = ref(false)
-const slugTouched = ref(false)
 
 onMounted(() => void loadVocabIndex().then((index) => (vocab.value = index)))
 
 const rootName = computed(() => entityName(rootEntity(draft.value)))
 const title = computed(() => rootName.value || (mode.value === 'edit' ? 'Edit dataset' : 'New dataset'))
 const groupOptions = computed(() => groups.value.map((group) => ({ value: group.id, label: group.name })))
+const groupName = computed(() => groups.value.find((group) => group.id === draft.value.groupId)?.name ?? '')
+const visibilityText = computed(() =>
+  draft.value.visibility === 'public' ? 'Public' : 'Visible to the group')
 const selectableProfiles = computed(() => profiles.value.filter((profile) => profile.managed || profile.builtIn))
 const profileOptions = computed(() =>
   selectableProfiles.value.map((profile) => ({ value: profile.id, label: profile.name })))
@@ -103,25 +103,17 @@ const groupId = computed({
 useGroupSelection(groupId)
 const prefixes = usePathPrefixes(computed(() => draft.value.groupId))
 
-// The path is <prefix>/<slug>: the slug follows the name until it is edited,
-// the prefix follows the group's offer until one is picked.
-const currentPrefix = computed(() => splitPath(draft.value.path ?? '').prefix)
-function derivePath(prefix: string) {
-  const slug = slugTouched.value ? splitPath(draft.value.path ?? '').slug : slugify(rootName.value)
-  draft.value = { ...draft.value, path: slug ? joinPath(prefix, slug) : '' }
-}
-watch(rootName, () => {
-  if (mode.value === 'create' && !slugTouched.value) derivePath(currentPrefix.value)
-})
-watch([prefixes.options, prefixes.preselected], ([options, preselected]) => {
-  if (mode.value !== 'create') return
-  if (!options.some((option) => option.value === currentPrefix.value)) derivePath(preselected)
+// A new dataset lands at <folder>/<slug>: the folder follows the group's
+// offer and the slug follows the name until the location dialog sets them.
+const folder = ref<string | null>(null)
+const slug = ref<string | null>(null)
+const location = computed(() => (mode.value === 'create'
+  ? { prefix: folder.value ?? prefixes.preselected.value, slug: slug.value ?? slugify(rootName.value) }
+  : splitPath(draft.value.path ?? '')))
+watch(location, ({ prefix, slug: name }) => {
+  if (mode.value === 'create') draft.value = { ...draft.value, path: name ? joinPath(prefix, name) : '' }
 }, { immediate: true })
-
-function setPath(path: string) {
-  draft.value = { ...draft.value, path }
-  slugTouched.value = splitPath(path).slug !== slugify(rootName.value)
-}
+watch(() => draft.value.groupId, () => (folder.value = null))
 
 let loadGeneration = 0
 async function load() {
@@ -132,8 +124,8 @@ async function load() {
     selected.value = rootId(draft.value)
     profileId.value = ''
     preferredProfileInitialized.value = false
-    started.value = false
-    slugTouched.value = false
+    folder.value = null
+    slug.value = null
     tab.value = 'editor'
     loading.value = false
     loadError.value = null
@@ -149,11 +141,14 @@ async function load() {
       fetchRoCrateRaw(id),
     ])
     if (generation !== loadGeneration || mode.value !== 'edit' || documentId.value !== id) return
-    draft.value = fromRoCrate(crate, {
-      groupId: summary.group_id,
-      path: summary.document_path,
-      visibility: summary.public ? 'public' : 'group',
-    })
+    draft.value = {
+      ...fromRoCrate(crate, {
+        groupId: summary.group_id,
+        path: summary.document_path,
+        visibility: summary.public ? 'public' : 'group',
+      }),
+      documentId: summary.document_id,
+    }
     selected.value = rootId(draft.value)
     profileId.value = declaredProfile()
   } catch (error) {
@@ -189,11 +184,10 @@ const preview = useProfilePreview({
     : {}),
 })
 
-const canSave = computed(() => Boolean(rootName.value && draft.value.groupId))
+const canSave = computed(() => Boolean(rootName.value && draft.value.groupId && draft.value.path))
 // What the node refused, from the last preview and the last write attempt.
 const writeIssues = computed(() => [...rejectionIssues(preview.rejection.value), ...saveIssues.value])
 const nodeIssues = computed(() => collectIssues(preview.result.value, writeIssues.value))
-const editing = computed(() => mode.value === 'edit' || started.value)
 
 // What the assistant may do to the open draft while this view is mounted. It
 // never saves: the check below is the same one the Save button runs first.
@@ -228,8 +222,6 @@ function open(entityId: string) {
 function imported(next: CrateDraft) {
   draft.value = { ...next, groupId: draft.value.groupId, path: draft.value.path, visibility: draft.value.visibility }
   selected.value = rootId(draft.value)
-  if (!draft.value.path) derivePath(prefixes.preselected.value)
-  started.value = true
 }
 
 function pickProfile(id: string) {
@@ -300,13 +292,37 @@ async function save() {
 
 <template>
   <div>
-    <PageHeader
-      eyebrow="Datasets"
-      :title="title"
-      description="Describe the dataset and everything it refers to, then validate it with the node."
-    >
+    <PageHeader eyebrow="Datasets" :title="title">
+      <template #description>
+        <span class="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
+          <span v-if="groupName">{{ groupName }}</span>
+          <Button
+            v-else
+            variant="link"
+            size="sm"
+            class="h-auto p-0 text-sm"
+            @click="locationOpen = true"
+          >
+            Choose a group
+          </Button>
+          <span>›</span>
+          <span>{{ prefixLabel(location.prefix) }}</span>
+          <template v-if="location.slug">
+            <span>›</span>
+            <span class="font-mono text-xs">{{ location.slug }}</span>
+          </template>
+          <span>·</span>
+          <span>{{ visibilityText }}</span>
+          <Button variant="link" size="sm" class="h-auto p-0 text-sm" @click="locationOpen = true">
+            Change
+          </Button>
+        </span>
+      </template>
       <template #actions>
-        <Button v-if="mode === 'create' && started" variant="outline" size="sm" @click="importOpen = true">
+        <Button variant="outline" size="sm" @click="locationOpen = true">
+          <FolderTree class="h-3.5 w-3.5" /> Location
+        </Button>
+        <Button v-if="mode === 'create'" variant="outline" size="sm" @click="importOpen = true">
           <FileJson2 class="h-3.5 w-3.5" /> Import an RO-Crate
         </Button>
         <Button variant="outline" size="sm" @click="discard">Discard</Button>
@@ -321,31 +337,7 @@ async function save() {
       <ErrorPanel :message="loadError" @retry="load" />
     </div>
 
-    <DatasetStart
-      v-else-if="!editing"
-      :draft="draft"
-      :group-options="groupOptions"
-      :path-options="prefixes.options.value"
-      :path-loading="prefixes.loading.value"
-      @update="update"
-      @path="setPath"
-      @create-group="createGroupOpen = true"
-      @import="importOpen = true"
-      @continue="started = true"
-    />
-
     <template v-else>
-      <DatasetHeaderBar
-        :draft="draft"
-        :mode="mode"
-        :group-options="groupOptions"
-        :path-options="prefixes.options.value"
-        :path-loading="prefixes.loading.value"
-        @update="update"
-        @path="setPath"
-        @create-group="createGroupOpen = true"
-      />
-
       <div class="container flex items-start gap-5 py-6">
         <EntityBrowser
           :draft="draft"
@@ -417,6 +409,21 @@ async function save() {
       <IssueDrawer :draft="draft" :issues="issues" :node-issues="nodeIssues" @jump="open" />
     </template>
 
+    <DatasetLocationDialog
+      v-model:open="locationOpen"
+      :draft="draft"
+      :mode="mode"
+      :group-options="groupOptions"
+      :folder="location.prefix"
+      :slug="location.slug"
+      :document-paths="prefixes.documentPaths.value"
+      :grants="prefixes.grants.value"
+      :loading="prefixes.loading.value"
+      @update="update"
+      @folder="(value) => (folder = value)"
+      @slug="(value) => (slug = value || null)"
+      @create-group="createGroupOpen = true"
+    />
     <ImportCrateDialog v-if="mode === 'create'" v-model:open="importOpen" @imported="imported" />
     <CreateGroupDialog v-model:open="createGroupOpen" @created="(group) => (groupId = group.group_id)" />
   </div>

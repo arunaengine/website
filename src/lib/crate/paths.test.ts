@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { ApiRole } from '@/lib/api'
-import { documentPrefixes, joinPath, pathPrefixOptions, splitPath, writablePrefixes } from './paths'
+import {
+  covered,
+  documentPrefixes,
+  isReservedFolder,
+  joinPath,
+  pathPrefixOptions,
+  splitPath,
+  writablePrefixes,
+} from './paths'
 
 const REALM = 'realm-1'
 const GROUP = 'group-1'
@@ -82,6 +90,23 @@ describe('pathPrefixOptions', () => {
     const result = pathPrefixOptions({ roles: [], realmId: REALM, groupId: GROUP, documentPaths: ['datasets/b'] })
     expect(result.options.map((option) => option.value)).toEqual(['datasets', ''])
     expect(result.preselected).toBe('')
+  })
+})
+
+describe('folder rules', () => {
+  it('names the top-level folders the node keeps', () => {
+    expect(isReservedFolder('profiles')).toBe(true)
+    expect(isReservedFolder('runs')).toBe(true)
+    expect(isReservedFolder('datasets')).toBe(false)
+  })
+
+  it('covers a folder only through a grant at or above it', () => {
+    expect(covered('projects', ['projects'])).toBe(true)
+    expect(covered('projects/sub', ['projects'])).toBe(true)
+    expect(covered('projectsx', ['projects'])).toBe(false)
+    expect(covered('anything', [''])).toBe(true)
+    // No grant is no answer: the caller decides what an empty list means.
+    expect(covered('projects', [])).toBe(false)
   })
 })
 
