@@ -3,9 +3,31 @@
 // needs are exposed, so the rest of the portal never sees the SDK types.
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
+import type {
+  JsonSchemaType,
+  JsonSchemaValidator,
+  jsonSchemaValidator,
+} from '@modelcontextprotocol/sdk/validation'
 import type { McpToolDescriptor, McpToolSource } from './tools'
 
 const CLIENT_INFO = { name: 'aruna-portal', version: '1' }
+
+/**
+ * The SDK's default validator compiles output schemas with `new Function`,
+ * which the portal's CSP forbids. The node validates tool input itself and the
+ * structured output comes from that same node, so a shape check is enough.
+ */
+export const shapeValidator: jsonSchemaValidator = {
+  getValidator<T>(schema: JsonSchemaType): JsonSchemaValidator<T> {
+    const wantsObject = (schema as { type?: unknown } | undefined)?.type === 'object'
+    return (input: unknown) => {
+      if (wantsObject && (typeof input !== 'object' || input === null || Array.isArray(input))) {
+        return { valid: false, data: undefined, errorMessage: 'Expected a JSON object.' }
+      }
+      return { valid: true, data: input as T, errorMessage: undefined }
+    }
+  },
+}
 
 export interface McpConnection extends McpToolSource {
   close(): Promise<void>
@@ -48,7 +70,7 @@ export async function connectMcp(url: string, token: string): Promise<McpConnect
   const transport = new StreamableHTTPClientTransport(new URL(url), {
     requestInit: { headers: { Authorization: `Bearer ${token}` } },
   })
-  const client = new Client(CLIENT_INFO)
+  const client = new Client(CLIENT_INFO, { jsonSchemaValidator: shapeValidator })
   await client.connect(transport)
   return {
     async listTools() {
