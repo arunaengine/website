@@ -9,7 +9,7 @@ import { RouterLink } from 'vue-router'
 import type { DatasetViewState } from '@/composables/useDatasetView'
 import type { MetadataDoc } from '@/data/types'
 import { isHttpUrl, relativeTime } from '@/lib/utils'
-import { Layers, ListChecks } from '@lucide/vue'
+import { CircleHelp, Layers, ListChecks } from '@lucide/vue'
 
 const props = defineProps<{ doc: MetadataDoc; state: DatasetViewState }>()
 const {
@@ -67,12 +67,14 @@ const {
       <div class="surface-muted p-3">
         <dt class="flex flex-wrap items-center gap-x-2 text-[11px] uppercase tracking-wider text-muted-foreground">
           <span>Profile reference</span>
-          <span class="normal-case tracking-normal">What is this?
-            <RouterLink
-              :to="{ name: 'docs', params: { topic: 'profiles-conformance' } }"
-              class="font-medium text-primary hover:underline"
-            >Learn more</RouterLink>
-          </span>
+          <RouterLink
+            :to="{ name: 'docs', params: { topic: 'profiles-conformance' } }"
+            class="text-muted-foreground hover:text-primary"
+            aria-label="What is a profile reference? Learn more"
+            title="What is a profile reference? Learn more"
+          >
+            <CircleHelp class="h-3.5 w-3.5" />
+          </RouterLink>
         </dt>
         <dd class="mt-1 break-all text-sm font-medium text-foreground" :title="conformsTitle || undefined">{{ profileShortName }}</dd>
         <dd class="mt-2"><ProfileChip :doc="doc" status-only /></dd>
