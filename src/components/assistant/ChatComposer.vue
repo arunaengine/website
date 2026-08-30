@@ -15,11 +15,12 @@ withDefaults(defineProps<{ size?: 'compact' | 'full' }>(), { size: 'compact' })
 const route = useRoute()
 const { profiles } = useAruna()
 const { bridge } = useAssistantEditor()
-const { busy, error, toolsNote, provider, model, send } = useAssistantChat()
+const { busy, error, toolsNote, provider, model, historyReady, send } = useAssistantChat()
 
 const input = ref('')
 
 function submit() {
+  if (!historyReady.value || busy.value || !provider.value || !model.value || !input.value.trim()) return
   const text = input.value
   input.value = ''
   void send(text, {
@@ -50,7 +51,7 @@ function onKeydown(event: KeyboardEvent) {
         aria-label="Message"
         @keydown="onKeydown"
       />
-      <Button :size="size === 'full' ? 'default' : 'sm'" :disabled="busy || !input.trim() || !provider || !model" @click="submit">
+      <Button :size="size === 'full' ? 'default' : 'sm'" :disabled="busy || !historyReady || !input.trim() || !provider || !model" @click="submit">
         Send
       </Button>
     </div>

@@ -5,6 +5,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
+import AssistantHistory from '@/components/assistant/AssistantHistory.vue'
 import ChatComposer from '@/components/assistant/ChatComposer.vue'
 import ChatControls from '@/components/assistant/ChatControls.vue'
 import MessageList from '@/components/assistant/MessageList.vue'
@@ -49,6 +50,8 @@ function openFullView() {
       </div>
       <ChatControls />
     </header>
+
+    <AssistantHistory compact />
 
     <MessageList
       :messages="messages"

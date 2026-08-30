@@ -6,6 +6,7 @@ import { RouterLink, useRouter } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import AssistantHistory from '@/components/assistant/AssistantHistory.vue'
 import ChatComposer from '@/components/assistant/ChatComposer.vue'
 import ChatControls from '@/components/assistant/ChatControls.vue'
 import MessageList from '@/components/assistant/MessageList.vue'
@@ -56,6 +57,7 @@ function continueInPanel() {
 
     <div v-else class="container flex min-h-0 flex-1 flex-col py-6">
       <div class="mx-auto flex w-full max-w-3xl min-h-0 flex-1 flex-col">
+        <AssistantHistory />
         <div class="surface px-4 py-3">
           <ChatControls size="full" />
         </div>

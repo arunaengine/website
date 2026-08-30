@@ -4,13 +4,29 @@
 import { computed, ref, watch } from 'vue'
 import type { ModelMessage, ToolSet } from 'ai'
 import { createSession, providerModelId, type AssistantProvider } from '@/lib/api'
-import { apiBaseUrl, authToken, readStored, realmInfo, sessionEpoch, storeValue } from './aruna/state'
+import {
+  apiBaseUrl,
+  authToken,
+  readStored,
+  realmInfo,
+  sessionEpoch,
+  storeValue,
+  userInfo,
+} from './aruna/state'
 import { loadRoCrate } from './aruna/crates'
 import { useAssistantProviders } from './useAssistantProviders'
 import { useAssistantEditor } from './useAssistantEditor'
 import type { McpConnection } from '@/lib/assistant/mcpClient'
 import type { PromptContext } from '@/lib/assistant/prompt'
 import type { ApprovalGate, ApprovalRequest, ChatMessage, ToolCallView } from '@/lib/assistant/types'
+import {
+  assistantChatScopeKey,
+  createAssistantChatStore,
+  newAssistantChat,
+  type AssistantChatRecord,
+  type AssistantChatScope,
+  type AssistantChatState,
+} from '@/lib/assistant/chatHistory'
 import { errorMessage } from '@/lib/utils'
 
 const PROVIDER_KEY = 'aruna.assistant.provider'
@@ -31,11 +47,17 @@ const messages = ref<ChatMessage[]>([])
 const error = ref<string | null>(null)
 const toolsNote = ref<string | null>(null)
 const pending = ref<PendingApproval | null>(null)
+const chats = ref<AssistantChatRecord[]>([])
+const activeChatId = ref('')
+const historyReady = ref(false)
 const providerId = ref(readStored(PROVIDER_KEY))
 const modelId = ref(readStored(MODEL_KEY))
 const approveWrites = ref(readStored(APPROVE_KEY) !== 'off')
 
 let history: ModelMessage[] = []
+let chatState: AssistantChatState = { activeChatId: '', chats: [] }
+let chatStore: ReturnType<typeof createAssistantChatStore> | null = null
+let chatScopeKey = ''
 let counter = 0
 let session: { token: string; expiresAt: number; epoch: number } | null = null
 let sessionInFlight: { epoch: number; owner: TurnContext | null; promise: Promise<string> } | null = null
@@ -69,8 +91,84 @@ function client() {
 }
 
 function nextId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return `m-${crypto.randomUUID()}`
   counter += 1
-  return `m${counter}`
+  return `m-${Date.now().toString(36)}-${counter.toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+function currentChatScope(): AssistantChatScope | null {
+  const token = authToken.value.trim()
+  const userId = userInfo.value?.user.user_id ?? ''
+  const realmId = userInfo.value?.realm.realm_id ?? realmInfo.value?.realm_id ?? ''
+  if (!token || !userId || !realmId || !apiBaseUrl.value) return null
+  return { apiBaseUrl: apiBaseUrl.value, realmId, userId }
+}
+
+function updateChatList() {
+  chats.value = [...chatState.chats]
+}
+
+function activeChat(): AssistantChatRecord | null {
+  return chatState.chats.find((chat) => chat.id === activeChatId.value) ?? null
+}
+
+function applyChatState(next: AssistantChatState) {
+  chatState = next
+  activeChatId.value = next.activeChatId
+  const current = activeChat()
+  error.value = null
+  toolsNote.value = null
+  messages.value = current?.messages ?? []
+  history = current?.history ?? []
+  updateChatList()
+}
+
+function clearChatState() {
+  chatState = { activeChatId: '', chats: [] }
+  activeChatId.value = ''
+  chats.value = []
+  history = []
+  messages.value = []
+  error.value = null
+  toolsNote.value = null
+}
+
+function persistChatState() {
+  if (!chatStore || !chatScopeKey) return
+  chatState = chatStore.save(chatState)
+  activeChatId.value = chatState.activeChatId
+  updateChatList()
+}
+
+function persistCurrentChat() {
+  const current = activeChat()
+  if (!chatStore || !current || !chatScopeKey) return
+  current.messages = messages.value
+  current.history = history
+  current.updatedAt = Date.now()
+  persistChatState()
+}
+
+function chatTitle(prompt: string): string {
+  const compact = prompt.replace(/\s+/g, ' ').trim()
+  return compact.slice(0, 80) || 'New chat'
+}
+
+function startFreshChat() {
+  if (!chatStore || !historyReady.value) {
+    resetConversation()
+    return
+  }
+  const current = activeChat()
+  if (current && !current.messages.length && !current.history.length) {
+    resetConversation()
+    persistCurrentChat()
+    return
+  }
+  const chat = newAssistantChat()
+  chatState = { activeChatId: chat.id, chats: [chat, ...chatState.chats] }
+  applyChatState(chatState)
+  persistCurrentChat()
 }
 
 function isCurrentTurn(turn: TurnContext): boolean {
@@ -265,7 +363,7 @@ function discardTurn(turn: TurnContext | null) {
 }
 
 function resetAssistantSession() {
-  abortTurn()
+  discardTurn(abortTurn())
   session = null
   sessionInFlight = null
   void closeConnection()
@@ -283,13 +381,39 @@ function resetConversation() {
   toolsNote.value = null
 }
 
+function syncChatScope() {
+  const scope = currentChatScope()
+  const nextKey = scope ? assistantChatScopeKey(scope) : ''
+  if (nextKey === chatScopeKey && (Boolean(scope) === historyReady.value)) return
+
+  // A changed realm, API base, or authenticated user must never leave the
+  // previous transcript visible while the replacement scope is loading.
+  if (chatScopeKey && nextKey !== chatScopeKey) discardTurn(abortTurn())
+  chatScopeKey = ''
+  chatStore = null
+  historyReady.value = false
+  clearChatState()
+  if (!scope) return
+
+  const nextStore = createAssistantChatStore(scope)
+  chatStore = nextStore
+  chatScopeKey = nextStore.key
+  historyReady.value = true
+  applyChatState(nextStore.load())
+}
+
 function syncEpoch() {
   if (assistantEpoch === sessionEpoch.value) return
   assistantEpoch = sessionEpoch.value
   resetAssistantSession()
 }
 
-watch(sessionEpoch, () => syncEpoch())
+watch(sessionEpoch, () => syncEpoch(), { flush: 'sync' })
+watch(
+  [apiBaseUrl, authToken, () => userInfo.value?.user.user_id ?? '', () => userInfo.value?.realm.realm_id ?? '', realmInfo],
+  () => syncChatScope(),
+  { flush: 'sync', immediate: true },
+)
 
 export function useAssistantChat() {
   const providers = useAssistantProviders()
@@ -303,8 +427,9 @@ export function useAssistantChat() {
   function selectProvider(id: string) {
     syncEpoch()
     if (providerId.value === id) return
-    abortTurn()
-    resetConversation()
+    discardTurn(abortTurn())
+    persistCurrentChat()
+    startFreshChat()
     providerId.value = id
     storeValue(PROVIDER_KEY, id)
     modelId.value = ''
@@ -316,8 +441,9 @@ export function useAssistantChat() {
     syncEpoch()
     const next = id.trim()
     if (modelId.value === next) return
-    abortTurn()
-    resetConversation()
+    discardTurn(abortTurn())
+    persistCurrentChat()
+    startFreshChat()
     modelId.value = next
     storeValue(MODEL_KEY, modelId.value)
   }
@@ -329,8 +455,50 @@ export function useAssistantChat() {
 
   function newChat() {
     syncEpoch()
-    abortTurn()
-    resetConversation()
+    discardTurn(abortTurn())
+    persistCurrentChat()
+    if (!chatStore || !historyReady.value) {
+      resetConversation()
+      return
+    }
+    startFreshChat()
+  }
+
+  function selectChat(id: string) {
+    syncEpoch()
+    if (!chatStore || !historyReady.value || !chatState.chats.some((chat) => chat.id === id)) return
+    if (activeChatId.value === id) return
+    discardTurn(abortTurn())
+    persistCurrentChat()
+    chatState = { ...chatState, activeChatId: id }
+    applyChatState(chatState)
+  }
+
+  function deleteChat(id: string) {
+    syncEpoch()
+    if (!chatStore || !historyReady.value || !chatState.chats.some((chat) => chat.id === id)) return
+    const wasActive = activeChatId.value === id
+    if (wasActive) discardTurn(abortTurn())
+    const remaining = chatState.chats.filter((chat) => chat.id !== id)
+    const replacement = remaining[0] ?? newAssistantChat()
+    chatState = {
+      activeChatId: wasActive ? replacement.id : activeChatId.value,
+      chats: remaining.length ? remaining : [replacement],
+    }
+    applyChatState(chatState)
+    if (wasActive) persistCurrentChat()
+    else persistChatState()
+  }
+
+  function renameChat(id: string, title: string) {
+    syncEpoch()
+    if (!chatStore || !historyReady.value) return
+    const chat = chatState.chats.find((entry) => entry.id === id)
+    if (!chat) return
+    chat.title = title.trim().slice(0, 80) || 'New chat'
+    chat.updatedAt = Date.now()
+    chatState = chatStore.save(chatState)
+    updateChatList()
   }
 
   function openPanel() {
@@ -352,6 +520,7 @@ export function useAssistantChat() {
     syncEpoch()
     open.value = false
     discardTurn(abortTurn())
+    persistCurrentChat()
   }
 
   async function send(text: string, context: PromptContext) {
@@ -359,7 +528,9 @@ export function useAssistantChat() {
     syncEpoch()
     const selectedProvider = provider.value
     const selectedModel = model.value
-    if (!prompt || busy.value || !selectedProvider || !selectedModel) return
+    if (!prompt || busy.value || !selectedProvider || !selectedModel || !chatStore || !historyReady.value) return
+    const current = activeChat()
+    if (!current) return
     error.value = null
     busy.value = true
     const messageId = nextId()
@@ -376,6 +547,8 @@ export function useAssistantChat() {
       { id: messageId, role: 'user', text: prompt, calls: [] },
       { id: assistantMessageId, role: 'assistant', text: '', calls: [] },
     ]
+    if (current.title === 'New chat') current.title = chatTitle(prompt)
+    updateChatList()
     const turnMessages: ModelMessage[] = [...history, { role: 'user', content: prompt }]
     const modelContext = { apiBaseUrl: apiBaseUrl.value, token: authToken.value }
     try {
@@ -441,6 +614,7 @@ export function useAssistantChat() {
       if (activeTurn === turn) {
         activeTurn = null
         busy.value = false
+        persistCurrentChat()
       }
     }
   }
@@ -452,6 +626,9 @@ export function useAssistantChat() {
     error,
     toolsNote,
     pending,
+    chats,
+    activeChatId,
+    historyReady,
     provider,
     providers: ready,
     model,
@@ -464,6 +641,9 @@ export function useAssistantChat() {
     hidePanel,
     closePanel,
     newChat,
+    selectChat,
+    deleteChat,
+    renameChat,
     send,
     ensureProviders: providers.ensureLoaded,
   }
