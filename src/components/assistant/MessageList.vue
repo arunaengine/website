@@ -39,50 +39,54 @@ onMounted(() => follow(true))
 </script>
 
 <template>
-  <div
-    ref="scroller"
-    class="scrollbar-thin min-h-0 flex-1 overflow-y-auto"
-    :class="props.size === 'full' ? 'space-y-6 px-1 py-4' : 'space-y-4 px-3 py-3'"
-  >
-    <p v-if="!messages.length" class="px-1 text-muted-foreground" :class="props.size === 'full' ? 'text-sm' : 'text-xs'">
-      Ask about your data, or let the assistant fill in the dataset you have open.
-    </p>
+  <div ref="scroller" class="scrollbar-thin min-h-0 flex-1 overflow-y-auto">
+    <div
+      class="mx-auto w-full"
+      :class="props.size === 'full' ? 'max-w-[52rem] space-y-6 px-4 py-6' : 'space-y-4 px-3 py-3'"
+    >
+      <p
+        v-if="!messages.length && props.size !== 'full'"
+        class="text-xs text-muted-foreground"
+      >
+        Ask about your data, or let the assistant fill in the dataset you have open.
+      </p>
 
-    <div v-for="message in messages" :key="message.id" class="min-w-0">
-      <div v-if="message.role === 'user'" class="flex justify-end">
-        <div
-          class="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-sm bg-primary/10 px-3.5 py-2 leading-relaxed text-foreground"
-          :class="props.size === 'full' ? 'text-sm' : 'text-xs'"
-        >{{ message.text }}</div>
-      </div>
+      <div v-for="message in messages" :key="message.id" class="min-w-0">
+        <div v-if="message.role === 'user'" class="flex justify-end">
+          <div
+            class="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-sm bg-primary/10 px-3.5 py-2 leading-relaxed text-foreground"
+            :class="props.size === 'full' ? 'text-sm' : 'text-xs'"
+          >{{ message.text }}</div>
+        </div>
 
-      <div v-else class="min-w-0" :class="props.size === 'full' ? 'space-y-2.5' : 'space-y-1.5'">
-        <p class="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
-          <Sparkles class="size-3.5 shrink-0 text-primary" aria-hidden="true" />
-          Assistant
-        </p>
-        <template v-for="call in message.calls" :key="call.id">
-          <TableCard v-if="call.view?.kind === 'table'" v-bind="call.view" />
-          <ChartCard v-else-if="call.view?.kind === 'chart'" v-bind="call.view" />
-          <StatsCard v-else-if="call.view?.kind === 'stats'" v-bind="call.view" />
-          <CrateCard v-else-if="call.view?.kind === 'crate'" :title="call.view.title" :crate="call.view.crate" :document-id="call.view.documentId" />
-          <ToolCallCard
-            v-else
-            :call="call"
-            :awaiting-delete="deleteCallId === call.id"
-            :collapsed="props.size === 'full'"
-            @decide="(approved) => emit('decide', approved)"
+        <div v-else class="min-w-0" :class="props.size === 'full' ? 'space-y-2.5' : 'space-y-1.5'">
+          <p class="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+            <Sparkles class="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+            Assistant
+          </p>
+          <template v-for="call in message.calls" :key="call.id">
+            <TableCard v-if="call.view?.kind === 'table'" v-bind="call.view" />
+            <ChartCard v-else-if="call.view?.kind === 'chart'" v-bind="call.view" />
+            <StatsCard v-else-if="call.view?.kind === 'stats'" v-bind="call.view" />
+            <CrateCard v-else-if="call.view?.kind === 'crate'" :title="call.view.title" :crate="call.view.crate" :document-id="call.view.documentId" />
+            <ToolCallCard
+              v-else
+              :call="call"
+              :awaiting-delete="deleteCallId === call.id"
+              :collapsed="props.size === 'full'"
+              @decide="(approved) => emit('decide', approved)"
+            />
+          </template>
+          <AssistantMarkdown
+            v-if="message.text"
+            :text="message.text"
+            :size="props.size"
           />
-        </template>
-        <AssistantMarkdown
-          v-if="message.text"
-          :text="message.text"
-          :size="props.size"
-        />
-        <Notice v-if="message.error" tone="error">{{ message.error }}</Notice>
+          <Notice v-if="message.error" tone="error">{{ message.error }}</Notice>
+        </div>
       </div>
-    </div>
 
-    <Spinner v-if="busy" class="px-1" label="Working…" show-label />
+      <Spinner v-if="busy" label="Working…" show-label />
+    </div>
   </div>
 </template>

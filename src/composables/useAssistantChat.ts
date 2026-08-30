@@ -44,6 +44,9 @@ export interface PendingApproval {
 
 const open = ref(false)
 const busy = ref(false)
+// One message box shared by the page and the panel, so a suggestion chip and
+// a half-typed question survive the move between them.
+const draft = ref('')
 const messages = ref<ChatMessage[]>([])
 const error = ref<string | null>(null)
 const toolsNote = ref<string | null>(null)
@@ -369,6 +372,7 @@ function resetAssistantSession() {
   sessionInFlight = null
   void closeConnection()
   resetConversation()
+  draft.value = ''
   providerId.value = ''
   modelId.value = ''
   storeValue(PROVIDER_KEY, '')
@@ -633,6 +637,7 @@ export function useAssistantChat() {
   return {
     open,
     busy,
+    draft,
     messages,
     error,
     toolsNote,

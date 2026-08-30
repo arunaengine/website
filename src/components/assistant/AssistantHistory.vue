@@ -45,7 +45,7 @@ function when(updatedAt: number): string {
   <section
     aria-label="Assistant chats"
     class="flex min-h-0 flex-col"
-    :class="props.compact ? 'max-h-32 border-b border-border bg-background/30' : 'surface overflow-hidden'"
+    :class="props.compact ? 'max-h-32 border-b border-border bg-background/30' : 'overflow-hidden'"
   >
     <div class="flex shrink-0 items-center justify-between gap-2 px-3 py-2">
       <span class="text-xs font-medium text-muted-foreground">Chats</span>

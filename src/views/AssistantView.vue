@@ -1,47 +1,85 @@
 <script setup lang="ts">
-// The assistant on a page of its own: one full-height column with the chat
-// history beside it, sharing conversation, provider and approvals with the
-// floating panel.
+// The assistant on a page of its own: a chat list that folds away beside one
+// full-height chat column whose message list is the only scroller on the page.
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
-import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import Input from '@/components/ui/Input.vue'
 import AssistantHistory from '@/components/assistant/AssistantHistory.vue'
+import AssistantSettings from '@/components/assistant/AssistantSettings.vue'
 import ChatComposer from '@/components/assistant/ChatComposer.vue'
 import MessageList from '@/components/assistant/MessageList.vue'
 import { useAssistantChat } from '@/composables/useAssistantChat'
+import { useAssistantEditor } from '@/composables/useAssistantEditor'
 import { useAruna } from '@/composables/useAruna'
-import { History, MessageSquare, Minimize2, Plus } from '@lucide/vue'
+import { readStored, storeValue } from '@/composables/aruna/state'
+import { MessageSquare, Minimize2, PanelLeft, Plus, Sparkles } from '@lucide/vue'
+
+const SIDEBAR_KEY = 'aruna.assistant.sidebar'
 
 const router = useRouter()
 const { currentUser } = useAruna()
+const { bridge } = useAssistantEditor()
 const {
   busy,
+  draft,
   messages,
   pending,
   available,
   chats,
   activeChatId,
   historyReady,
+  provider,
+  model,
+  loadModels,
   hidePanel,
   openPanel,
   newChat,
+  renameChat,
   ensureProviders,
 } = useAssistantChat()
 
-const historyOpen = ref(true)
+const sidebarOpen = ref(readStored(SIDEBAR_KEY) === 'open')
+const renaming = ref(false)
+const titleDraft = ref('')
 const chatName = computed<string>(() => {
   for (const chat of chats.value) if (chat.id === activeChatId.value) return chat.title
   return 'New chat'
 })
 const deleteCallId = computed(() =>
   (pending.value?.always ? pending.value.request.id : undefined))
+const prompts = computed(() => [
+  ...(bridge.value ? ['Explain the draft I have open.'] : []),
+  'Help me describe a dataset I want to publish.',
+  'Search my realm for datasets about water quality.',
+  'Which buckets hold the most data right now?',
+])
 
 onMounted(() => {
   hidePanel()
   if (currentUser.value) ensureProviders()
 })
+
+function toggleSidebar() {
+  sidebarOpen.value = !sidebarOpen.value
+  storeValue(SIDEBAR_KEY, sidebarOpen.value ? 'open' : '')
+}
+
+function beginRename() {
+  if (!available.value || !historyReady.value) return
+  titleDraft.value = chatName.value
+  renaming.value = true
+}
+
+function commitRename() {
+  if (renaming.value && activeChatId.value) renameChat(activeChatId.value, titleDraft.value)
+  renaming.value = false
+}
+
+function useSuggestion(prompt: string) {
+  draft.value = prompt
+}
 
 // Back to wherever the chat was opened from, with the panel showing it.
 function continueInPanel() {
@@ -52,26 +90,79 @@ function continueInPanel() {
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 flex-col">
-    <PageHeader title="Assistant" class="shrink-0">
-      <template #breadcrumbs>
-        <span aria-hidden="true">·</span>
-        <span class="max-w-48 truncate">{{ chatName }}</span>
-      </template>
-      <template #actions>
-        <Button variant="outline" size="sm" :disabled="!available || !historyReady" @click="newChat">
-          <Plus class="h-3.5 w-3.5" /> New chat
+  <div class="flex h-full min-h-0 overflow-hidden">
+    <aside
+      v-if="sidebarOpen"
+      aria-label="Chat list"
+      class="flex w-72 max-w-[80vw] shrink-0 flex-col border-r border-border bg-muted/20"
+    >
+      <div class="flex h-12 shrink-0 items-center border-b border-border px-3">
+        <Button
+          variant="outline"
+          size="sm"
+          class="w-full"
+          :disabled="!available || !historyReady"
+          @click="newChat"
+        >
+          <Plus class="size-3.5" /> New chat
         </Button>
+      </div>
+      <AssistantHistory v-if="historyReady" :read-only="!available" class="min-h-0 flex-1" />
+    </aside>
+
+    <div class="flex min-w-0 flex-1 flex-col">
+      <header class="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3">
         <Button
           variant="ghost"
-          size="sm"
-          :aria-pressed="historyOpen"
-          aria-label="Toggle the chat history"
-          title="Toggle the chat history"
-          @click="historyOpen = !historyOpen"
+          size="icon-sm"
+          :aria-pressed="sidebarOpen"
+          aria-label="Toggle the chat list"
+          title="Toggle the chat list"
+          @click="toggleSidebar"
         >
-          <History class="h-3.5 w-3.5" /> Chats
+          <PanelLeft class="size-4" />
         </Button>
+        <Button
+          v-if="!sidebarOpen"
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Start a new chat"
+          title="Start a new chat"
+          :disabled="!available || !historyReady"
+          @click="newChat"
+        >
+          <Plus class="size-4" />
+        </Button>
+        <div class="flex min-w-0 flex-1 items-baseline gap-2">
+          <span class="eyebrow hidden shrink-0 sm:inline">Assistant</span>
+          <Input
+            v-if="renaming"
+            v-model="titleDraft"
+            class="h-7 min-w-0 max-w-64 text-sm"
+            aria-label="Chat name"
+            @keydown.enter.prevent="commitRename"
+            @keydown.esc.prevent="renaming = false"
+            @blur="commitRename"
+          />
+          <button
+            v-else
+            type="button"
+            class="min-w-0 truncate rounded px-1 text-sm font-medium text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            :title="`Rename ${chatName}`"
+            @click="beginRename"
+          >{{ chatName }}</button>
+        </div>
+        <AssistantSettings side="bottom" align="end">
+          <button
+            type="button"
+            class="chip max-w-[14rem] hover:bg-muted"
+            aria-label="Model and provider"
+            @click="loadModels"
+          >
+            <Sparkles class="size-3 shrink-0 text-primary" aria-hidden="true" />
+            <span class="truncate font-mono">{{ model || 'Choose a model' }}</span>
+          </button>
+        </AssistantSettings>
         <Button
           variant="ghost"
           size="icon-sm"
@@ -81,19 +172,10 @@ function continueInPanel() {
         >
           <Minimize2 class="size-3.5" />
         </Button>
-      </template>
-    </PageHeader>
+      </header>
 
-    <div class="container flex min-h-0 flex-1 flex-col gap-4 py-4 md:flex-row">
-      <AssistantHistory
-        v-if="historyOpen && historyReady"
-        :read-only="!available"
-        class="max-h-40 shrink-0 md:max-h-none md:w-64"
-      />
-
-      <div class="mx-auto flex w-full min-w-0 max-w-3xl min-h-0 flex-1 flex-col">
+      <div v-if="!available" class="flex min-h-0 flex-1 items-center justify-center p-6">
         <EmptyState
-          v-if="!available"
           title="No AI provider is ready yet."
           description="Add a provider under Settings, test it, and the assistant appears here and in the top bar."
         >
@@ -102,20 +184,43 @@ function continueInPanel() {
             <RouterLink :to="{ name: 'settings', query: { tab: 'assistant' } }">Open the assistant settings</RouterLink>
           </Button>
         </EmptyState>
+      </div>
 
-        <template v-else-if="historyReady">
-          <MessageList
-            size="full"
-            :messages="messages"
-            :busy="busy"
-            :delete-call-id="deleteCallId"
-            @decide="(approved) => pending?.decide(approved)"
-          />
-          <div class="shrink-0 pt-3">
+      <template v-else-if="historyReady">
+        <MessageList
+          v-if="messages.length"
+          size="full"
+          :messages="messages"
+          :busy="busy"
+          :delete-call-id="deleteCallId"
+          @decide="(approved) => pending?.decide(approved)"
+        />
+        <div v-else class="flex min-h-0 flex-1 flex-col items-center justify-center gap-5 px-4 text-center">
+          <div class="space-y-2">
+            <h1 class="font-display text-2xl font-semibold tracking-tight text-aruna-navy md:text-3xl">
+              What can I help you with?
+            </h1>
+            <p class="text-xs text-muted-foreground">
+              {{ provider?.label ?? 'No provider' }} · <span class="font-mono">{{ model || 'no model' }}</span>
+            </p>
+          </div>
+          <div class="flex max-w-[52rem] flex-wrap justify-center gap-2">
+            <button
+              v-for="prompt in prompts"
+              :key="prompt"
+              type="button"
+              class="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-sm hover:border-primary/40 hover:text-foreground"
+              @click="useSuggestion(prompt)"
+            >{{ prompt }}</button>
+          </div>
+        </div>
+
+        <div class="shrink-0 pb-4 pt-2">
+          <div class="mx-auto w-full max-w-[52rem] px-4">
             <ChatComposer size="full" />
           </div>
-        </template>
-      </div>
+        </div>
+      </template>
     </div>
   </div>
 </template>
