@@ -20,11 +20,15 @@ const NON_TEXT_MODEL_TERMS = [
   'embed',
   'whisper',
   'tts',
+  'transcribe',
   'image',
   'dall-e',
+  'sora',
   'audio',
   'moderation',
   'realtime',
+  'davinci',
+  'babbage',
 ]
 
 function modelsUrl(baseUrl: string): string {
@@ -70,24 +74,29 @@ export async function fetchBrowserProviderModels(
             : []) as unknown[]),
         ]
       : []
-  return entries.flatMap((entry) => {
-    if (!entry || typeof entry !== 'object') return []
-    const item = entry as Record<string, unknown>
-    const id = typeof item.id === 'string'
-      ? item.id
-      : typeof item.slug === 'string'
-        ? item.slug
-        : typeof item.name === 'string'
+  return entries
+    .flatMap((entry) => {
+      if (!entry || typeof entry !== 'object') return []
+      const item = entry as Record<string, unknown>
+      const id = typeof item.id === 'string'
+        ? item.id
+        : typeof item.slug === 'string'
+          ? item.slug
+          : typeof item.name === 'string'
+            ? item.name
+            : ''
+      if (!id || !textModel(id)) return []
+      const displayName = typeof item.display_name === 'string'
+        ? item.display_name
+        : typeof item.name === 'string' && item.name !== id
           ? item.name
-          : ''
-    if (!id || !textModel(id)) return []
-    const displayName = typeof item.display_name === 'string'
-      ? item.display_name
-      : typeof item.name === 'string' && item.name !== id
-        ? item.name
-        : undefined
-    return [{ id, ...(displayName ? { display_name: displayName } : {}) }]
-  })
+          : undefined
+      const created = typeof item.created === 'number' ? item.created : 0
+      return [{ created, model: { id, ...(displayName ? { display_name: displayName } : {}) } }]
+    })
+    // OpenAI lists in no useful order; newest first keeps the picker relevant.
+    .sort((left, right) => right.created - left.created)
+    .map((entry) => entry.model)
 }
 
 function fetchWithOptionalAuth(

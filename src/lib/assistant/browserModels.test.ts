@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   ANTHROPIC_DIRECT_BROWSER_HEADER,
   buildBrowserModel,
+  fetchBrowserProviderModels,
 } from './browserModels'
 import type { BrowserProvider } from './browserProviders'
 
@@ -102,4 +103,47 @@ describe('browser model builders', () => {
     expect(requestHeaders(request).get('authorization')).toBeNull()
   })
 
+})
+
+const OPENAI: BrowserProvider = {
+  kind: 'openai_compatible',
+  id: 'official',
+  label: 'OpenAI',
+  model: 'gpt-5.6-sol',
+  baseUrl: 'https://api.openai.com/v1',
+  protocol: 'responses',
+  apiKey: 'sk-openai',
+}
+
+function listing(payload: unknown, calls: FetchCall[] = []): typeof globalThis.fetch {
+  return (async (input: RequestInfo | URL, init?: RequestInit) => {
+    calls.push({ input, init })
+    return new Response(JSON.stringify(payload), { status: 200 })
+  }) as typeof globalThis.fetch
+}
+
+describe('fetchBrowserProviderModels', () => {
+  it('lists the chat models an OpenAI key can reach, newest first', async () => {
+    const calls: FetchCall[] = []
+    const models = await fetchBrowserProviderModels(OPENAI, listing({
+      data: [
+        { id: 'gpt-4.1', created: 10 },
+        { id: 'text-embedding-3-large', created: 40 },
+        { id: 'gpt-5.6-sol', created: 30 },
+        { id: 'gpt-4o-transcribe', created: 35 },
+        { id: 'dall-e-3', created: 20 },
+        { id: 'gpt-5.5', created: 20 },
+      ],
+    }, calls))
+
+    expect(models.map((model) => model.id)).toEqual(['gpt-5.6-sol', 'gpt-5.5', 'gpt-4.1'])
+    expect(String(calls[0].input)).toBe('https://api.openai.com/v1/models')
+    expect(new Headers(calls[0].init?.headers).get('authorization')).toBe('Bearer sk-openai')
+  })
+
+  it('answers with nothing when the endpoint serves no model list', async () => {
+    const empty = (async () => new Response('', { status: 404 })) as typeof globalThis.fetch
+
+    expect(await fetchBrowserProviderModels(OPENAI, empty)).toEqual([])
+  })
 })

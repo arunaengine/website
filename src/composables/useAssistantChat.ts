@@ -19,6 +19,7 @@ import { useAssistantEditor } from './useAssistantEditor'
 import type { McpConnection } from '@/lib/assistant/mcpClient'
 import type { PromptContext } from '@/lib/assistant/prompt'
 import type { ApprovalGate, ApprovalRequest, ChatMessage, ToolCallView } from '@/lib/assistant/types'
+import { modelSuggestions } from '@/lib/assistant/modelOptions'
 import {
   assistantChatScopeKey,
   createAssistantChatStore,
@@ -423,6 +424,16 @@ export function useAssistantChat() {
     ready.value.find((entry) => entry.provider_id === providerId.value) ?? ready.value[0] ?? null)
   const model = computed(() => (provider.value ? providerModelId(provider.value, modelId.value) : ''))
   const available = computed(() => ready.value.length > 0)
+  // What the provider offers now, ahead of the ids stored when it was added.
+  const modelChoices = computed(() => (provider.value
+    ? modelSuggestions(provider.value, providers.listedModels.value[provider.value.provider_id] ?? [])
+    : []))
+  const modelsError = computed(() =>
+    (provider.value ? providers.modelErrors.value[provider.value.provider_id] ?? null : null))
+
+  function loadModels() {
+    if (provider.value) void providers.listModels(provider.value.provider_id)
+  }
 
   function selectProvider(id: string) {
     syncEpoch()
@@ -632,6 +643,9 @@ export function useAssistantChat() {
     provider,
     providers: ready,
     model,
+    modelChoices,
+    modelsError,
+    loadModels,
     available,
     approveWrites,
     selectProvider,

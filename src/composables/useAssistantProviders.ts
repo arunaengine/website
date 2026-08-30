@@ -4,6 +4,7 @@ import { computed, ref, watch } from 'vue'
 import {
   apiErrorMessage,
   deleteAssistantProvider,
+  fetchAssistantModels,
   listAssistantProviders,
   type AssistantModel,
   type AssistantProvider,
@@ -27,6 +28,9 @@ const providers = ref<AssistantProvider[]>([])
 const loading = ref(false)
 const loaded = ref(false)
 const error = ref<string | null>(null)
+const listedModels = ref<Record<string, AssistantModel[]>>({})
+const modelErrors = ref<Record<string, string>>({})
+const modelLoads = new Map<string, Promise<AssistantModel[]>>()
 let nodeGeneration = 0
 let inFlight: { epoch: number; generation: number; identity: string; promise: Promise<void> } | null = null
 
@@ -108,6 +112,9 @@ function resetNodeCache() {
   loading.value = false
   error.value = null
   inFlight = null
+  listedModels.value = {}
+  modelErrors.value = {}
+  modelLoads.clear()
   rebuild()
 }
 
@@ -215,6 +222,34 @@ export function useAssistantProviders() {
     return fetchBrowserProviderModels(validateBrowserProvider(provider))
   }
 
+  async function fetchModels(providerId: string): Promise<AssistantModel[]> {
+    const local = direct(providerId)
+    if (local) return models(local)
+    const response = await fetchAssistantModels(providerId, client())
+    return response.models
+  }
+
+  /** Lists what a configured provider offers today, once per session. */
+  function listModels(providerId: string): Promise<AssistantModel[]> {
+    if (!providerId) return Promise.resolve([])
+    const cached = listedModels.value[providerId]
+    if (cached) return Promise.resolve(cached)
+    const running = modelLoads.get(providerId)
+    if (running) return running
+    const load = fetchModels(providerId)
+      .then((listed) => {
+        listedModels.value = { ...listedModels.value, [providerId]: listed }
+        return listed
+      })
+      .catch((cause: unknown) => {
+        modelErrors.value = { ...modelErrors.value, [providerId]: apiErrorMessage(cause) }
+        return []
+      })
+      .finally(() => modelLoads.delete(providerId))
+    modelLoads.set(providerId, load)
+    return load
+  }
+
   rebuild()
   return {
     providers,
@@ -229,6 +264,9 @@ export function useAssistantProviders() {
     remove,
     check,
     models,
+    listedModels,
+    modelErrors,
+    listModels,
     direct,
   }
 }
