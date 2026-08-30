@@ -22,6 +22,13 @@ describe('AssistantMarkdown', () => {
     expect(markup).toContain('class="assistant-markdown')
   })
 
+  it('gives every fenced block a copy control', async () => {
+    const markup = await render('```sh\nls -la\n```')
+
+    expect(markup).toContain('class="assistant-code"')
+    expect(markup).toContain('<button type="button" data-copy class="assistant-copy">Copy</button>')
+  })
+
   it('escapes raw HTML and rejects unsafe link protocols', async () => {
     const markup = await render('<script>alert(1)</script>\n\n[bad](javascript:alert(1))')
 

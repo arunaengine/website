@@ -7,7 +7,6 @@ import { useRouter } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
 import AssistantHistory from '@/components/assistant/AssistantHistory.vue'
 import ChatComposer from '@/components/assistant/ChatComposer.vue'
-import ChatControls from '@/components/assistant/ChatControls.vue'
 import MessageList from '@/components/assistant/MessageList.vue'
 import { useAssistantChat } from '@/composables/useAssistantChat'
 import { Maximize2, MessageSquare, Plus, X } from '@lucide/vue'
@@ -32,7 +31,7 @@ function openFullView() {
     role="dialog"
     aria-label="Aruna assistant"
   >
-    <header class="space-y-2 border-b border-border bg-muted/40 px-3 py-2">
+    <header class="border-b border-border bg-muted/40 px-3 py-2">
       <div class="flex items-center gap-2">
         <MessageSquare class="h-4 w-4 shrink-0 text-primary" />
         <span class="text-xs font-semibold text-foreground">Assistant</span>
@@ -48,7 +47,6 @@ function openFullView() {
           </Button>
         </span>
       </div>
-      <ChatControls />
     </header>
 
     <AssistantHistory compact />

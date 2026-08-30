@@ -19,7 +19,29 @@ md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
   return renderLink(tokens, idx, options, env, self)
 }
 
+const renderFence = md.renderer.rules.fence
+  ?? ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options))
+md.renderer.rules.fence = (tokens, idx, options, env, self) =>
+  `<div class="assistant-code">${renderFence(tokens, idx, options, env, self)}`
+  + '<button type="button" data-copy class="assistant-copy">Copy</button></div>'
+
 const html = computed(() => md.render(props.text))
+
+// The copy control lives in rendered Markdown, so the block reads its code back
+// out of the DOM instead of holding a second copy of it.
+function onCopy(event: MouseEvent) {
+  const target = event.target
+  if (!(target instanceof HTMLElement)) return
+  const trigger = target.closest('button[data-copy]')
+  if (!(trigger instanceof HTMLElement)) return
+  const code = trigger.parentElement?.querySelector('pre')?.textContent ?? ''
+  const clipboard = navigator.clipboard
+  if (!code || !clipboard) return
+  void clipboard.writeText(code).then(() => {
+    trigger.textContent = 'Copied'
+    setTimeout(() => (trigger.textContent = 'Copy'), 1500)
+  }).catch(() => undefined)
+}
 </script>
 
 <template>
@@ -27,6 +49,7 @@ const html = computed(() => md.render(props.text))
   <div
     class="assistant-markdown min-w-0 max-w-full break-words px-1 leading-relaxed text-foreground"
     :class="size === 'full' ? 'text-sm' : 'text-xs'"
+    @click="onCopy"
     v-html="html"
   />
 </template>
@@ -41,7 +64,8 @@ const html = computed(() => md.render(props.text))
 .assistant-markdown :deep(ol),
 .assistant-markdown :deep(blockquote),
 .assistant-markdown :deep(pre),
-.assistant-markdown :deep(table) {
+.assistant-markdown :deep(table),
+.assistant-markdown :deep(.assistant-code) {
   margin: 0.55em 0;
 }
 
@@ -96,6 +120,33 @@ const html = computed(() => md.render(props.text))
   padding: 0.1em 0.3em;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.9em;
+}
+
+.assistant-markdown :deep(.assistant-code) {
+  position: relative;
+}
+
+.assistant-markdown :deep(.assistant-code pre) {
+  margin: 0;
+}
+
+.assistant-markdown :deep(.assistant-copy) {
+  position: absolute;
+  top: 0.4em;
+  right: 0.4em;
+  border-radius: 0.25rem;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--background));
+  padding: 0.1em 0.45em;
+  font-size: 0.75em;
+  color: hsl(var(--muted-foreground));
+  opacity: 0;
+  transition: opacity 0.12s ease-in-out;
+}
+
+.assistant-markdown :deep(.assistant-code:hover .assistant-copy),
+.assistant-markdown :deep(.assistant-copy:focus-visible) {
+  opacity: 1;
 }
 
 .assistant-markdown :deep(pre) {

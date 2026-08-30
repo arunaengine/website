@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // The conversation: what was asked, what the model wrote, the tool calls it
 // made along the way, and the cards a render tool asked to show.
+import { nextTick, onMounted, ref, watch } from 'vue'
 import ChartCard from '@/components/assistant/cards/ChartCard.vue'
 import CrateCard from '@/components/assistant/cards/CrateCard.vue'
 import StatsCard from '@/components/assistant/cards/StatsCard.vue'
@@ -8,9 +9,11 @@ import TableCard from '@/components/assistant/cards/TableCard.vue'
 import AssistantMarkdown from '@/components/assistant/AssistantMarkdown.vue'
 import ToolCallCard from '@/components/assistant/ToolCallCard.vue'
 import Notice from '@/components/ui/Notice.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import type { ChatMessage } from '@/lib/assistant/types'
+import { Sparkles } from '@lucide/vue'
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   messages: ChatMessage[]
   busy: boolean
   deleteCallId?: string
@@ -18,25 +21,46 @@ withDefaults(defineProps<{
   size?: 'compact' | 'full'
 }>(), { deleteCallId: undefined, size: 'compact' })
 const emit = defineEmits<{ (e: 'decide', approved: boolean): void }>()
+
+const scroller = ref<HTMLElement | null>(null)
+
+// Follow the newest turn, but leave a reader who scrolled up where they are.
+function follow(force: boolean) {
+  const element = scroller.value
+  if (!element || typeof element.scrollTo !== 'function') return
+  const near = element.scrollHeight - element.scrollTop - element.clientHeight < 160
+  if (force || near) element.scrollTo({ top: element.scrollHeight })
+}
+
+// A new turn or another chat jumps to the end; streamed text only follows on.
+watch(() => `${props.messages.length}:${props.messages.at(-1)?.id ?? ''}`, () => void nextTick(() => follow(true)))
+watch(() => props.messages.at(-1)?.text ?? '', () => void nextTick(() => follow(false)))
+onMounted(() => follow(true))
 </script>
 
 <template>
   <div
-    class="scrollbar-thin flex-1 overflow-y-auto"
-    :class="size === 'full' ? 'space-y-5 px-1 py-4' : 'space-y-3 px-3 py-3'"
+    ref="scroller"
+    class="scrollbar-thin min-h-0 flex-1 overflow-y-auto"
+    :class="props.size === 'full' ? 'space-y-6 px-1 py-4' : 'space-y-4 px-3 py-3'"
   >
-    <p v-if="!messages.length" class="px-1 text-muted-foreground" :class="size === 'full' ? 'text-sm' : 'text-xs'">
+    <p v-if="!messages.length" class="px-1 text-muted-foreground" :class="props.size === 'full' ? 'text-sm' : 'text-xs'">
       Ask about your data, or let the assistant fill in the dataset you have open.
     </p>
 
-    <div v-for="message in messages" :key="message.id" :class="size === 'full' ? 'space-y-2.5' : 'space-y-1.5'">
-      <div
-        v-if="message.role === 'user'"
-        class="rounded-lg bg-primary/10 px-3 py-2 leading-relaxed text-foreground"
-        :class="size === 'full' ? 'ml-12 text-sm' : 'ml-6 text-xs'"
-      >{{ message.text }}</div>
+    <div v-for="message in messages" :key="message.id" class="min-w-0">
+      <div v-if="message.role === 'user'" class="flex justify-end">
+        <div
+          class="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-sm bg-primary/10 px-3.5 py-2 leading-relaxed text-foreground"
+          :class="props.size === 'full' ? 'text-sm' : 'text-xs'"
+        >{{ message.text }}</div>
+      </div>
 
-      <template v-else>
+      <div v-else class="min-w-0" :class="props.size === 'full' ? 'space-y-2.5' : 'space-y-1.5'">
+        <p class="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+          <Sparkles class="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+          Assistant
+        </p>
         <template v-for="call in message.calls" :key="call.id">
           <TableCard v-if="call.view?.kind === 'table'" v-bind="call.view" />
           <ChartCard v-else-if="call.view?.kind === 'chart'" v-bind="call.view" />
@@ -46,19 +70,19 @@ const emit = defineEmits<{ (e: 'decide', approved: boolean): void }>()
             v-else
             :call="call"
             :awaiting-delete="deleteCallId === call.id"
-            :collapsed="size === 'full'"
+            :collapsed="props.size === 'full'"
             @decide="(approved) => emit('decide', approved)"
           />
         </template>
         <AssistantMarkdown
           v-if="message.text"
           :text="message.text"
-          :size="size"
+          :size="props.size"
         />
         <Notice v-if="message.error" tone="error">{{ message.error }}</Notice>
-      </template>
+      </div>
     </div>
 
-    <p v-if="busy" class="px-1 text-[11px] text-muted-foreground">Working…</p>
+    <Spinner v-if="busy" class="px-1" label="Working…" show-label />
   </div>
 </template>

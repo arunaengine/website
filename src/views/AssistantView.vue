@@ -1,23 +1,40 @@
 <script setup lang="ts">
-// The assistant on a page of its own: the same conversation, provider and
-// approvals as the floating panel, with room to read.
-import { computed, onMounted } from 'vue'
+// The assistant on a page of its own: one full-height column with the chat
+// history beside it, sharing conversation, provider and approvals with the
+// floating panel.
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import AssistantHistory from '@/components/assistant/AssistantHistory.vue'
 import ChatComposer from '@/components/assistant/ChatComposer.vue'
-import ChatControls from '@/components/assistant/ChatControls.vue'
 import MessageList from '@/components/assistant/MessageList.vue'
 import { useAssistantChat } from '@/composables/useAssistantChat'
 import { useAruna } from '@/composables/useAruna'
-import { MessageSquare, Minimize2, Plus } from '@lucide/vue'
+import { History, MessageSquare, Minimize2, Plus } from '@lucide/vue'
 
 const router = useRouter()
 const { currentUser } = useAruna()
-const { busy, messages, pending, available, historyReady, hidePanel, openPanel, newChat, ensureProviders } = useAssistantChat()
+const {
+  busy,
+  messages,
+  pending,
+  available,
+  chats,
+  activeChatId,
+  historyReady,
+  hidePanel,
+  openPanel,
+  newChat,
+  ensureProviders,
+} = useAssistantChat()
 
+const historyOpen = ref(true)
+const chatName = computed<string>(() => {
+  for (const chat of chats.value) if (chat.id === activeChatId.value) return chat.title
+  return 'New chat'
+})
 const deleteCallId = computed(() =>
   (pending.value?.always ? pending.value.request.id : undefined))
 
@@ -35,48 +52,69 @@ function continueInPanel() {
 </script>
 
 <template>
-  <div class="flex min-h-full flex-col">
-    <PageHeader title="Assistant" description="Ask about your data, or let the assistant work on the dataset you have open.">
+  <div class="flex h-full min-h-0 flex-col">
+    <PageHeader title="Assistant" class="shrink-0">
+      <template #breadcrumbs>
+        <span aria-hidden="true">·</span>
+        <span class="max-w-48 truncate">{{ chatName }}</span>
+      </template>
       <template #actions>
-        <Button variant="outline" size="sm" :disabled="!available || !historyReady" @click="newChat"><Plus class="h-3.5 w-3.5" /> New chat</Button>
-        <Button variant="outline" size="sm" @click="continueInPanel"><Minimize2 class="h-3.5 w-3.5" /> Continue in the panel</Button>
+        <Button variant="outline" size="sm" :disabled="!available || !historyReady" @click="newChat">
+          <Plus class="h-3.5 w-3.5" /> New chat
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          :aria-pressed="historyOpen"
+          aria-label="Toggle the chat history"
+          title="Toggle the chat history"
+          @click="historyOpen = !historyOpen"
+        >
+          <History class="h-3.5 w-3.5" /> Chats
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Continue in the panel"
+          title="Continue in the panel"
+          @click="continueInPanel"
+        >
+          <Minimize2 class="size-3.5" />
+        </Button>
       </template>
     </PageHeader>
 
-    <div v-if="!available" class="container py-8">
-      <EmptyState
-        title="No AI provider is ready yet."
-        description="Add a provider under Settings, test it, and the assistant appears here and in the top bar."
-      >
-        <template #icon><MessageSquare class="h-6 w-6" /></template>
-        <Button variant="outline" size="sm" as-child>
-          <RouterLink :to="{ name: 'settings', query: { tab: 'assistant' } }">Open the assistant settings</RouterLink>
-        </Button>
-      </EmptyState>
-    </div>
+    <div class="container flex min-h-0 flex-1 flex-col gap-4 py-4 md:flex-row">
+      <AssistantHistory
+        v-if="historyOpen && historyReady"
+        :read-only="!available"
+        class="max-h-40 shrink-0 md:max-h-none md:w-64"
+      />
 
-    <div v-if="historyReady" class="container flex min-h-0 flex-1 flex-col py-6">
-      <div class="mx-auto flex w-full max-w-3xl min-h-0 flex-1 flex-col">
-        <AssistantHistory :read-only="!available" />
-        <div v-if="available" class="surface px-4 py-3">
-          <ChatControls size="full" />
-        </div>
-        <MessageList
-          size="full"
-          :messages="messages"
-          :busy="available && busy"
-          :delete-call-id="deleteCallId"
-          class="pb-40"
-          @decide="(approved) => pending?.decide(approved)"
-        />
-      </div>
-    </div>
+      <div class="mx-auto flex w-full min-w-0 max-w-3xl min-h-0 flex-1 flex-col">
+        <EmptyState
+          v-if="!available"
+          title="No AI provider is ready yet."
+          description="Add a provider under Settings, test it, and the assistant appears here and in the top bar."
+        >
+          <template #icon><MessageSquare class="h-6 w-6" /></template>
+          <Button variant="outline" size="sm" as-child>
+            <RouterLink :to="{ name: 'settings', query: { tab: 'assistant' } }">Open the assistant settings</RouterLink>
+          </Button>
+        </EmptyState>
 
-    <div v-if="available && historyReady" class="sticky bottom-0 z-20 border-t border-border bg-background/95 backdrop-blur">
-      <div class="container py-3">
-        <div class="mx-auto w-full max-w-3xl">
-          <ChatComposer size="full" />
-        </div>
+        <template v-else-if="historyReady">
+          <MessageList
+            size="full"
+            :messages="messages"
+            :busy="busy"
+            :delete-call-id="deleteCallId"
+            @decide="(approved) => pending?.decide(approved)"
+          />
+          <div class="shrink-0 pt-3">
+            <ChatComposer size="full" />
+          </div>
+        </template>
       </div>
     </div>
   </div>
