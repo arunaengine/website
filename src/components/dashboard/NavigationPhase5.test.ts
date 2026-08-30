@@ -8,8 +8,6 @@ const route = { path: '/app' }
 const permissions = {
   isRealmAdmin: ref(false),
   canInspectUsers: ref(false),
-  canManageOnboarding: ref(false),
-  canManageQuarantine: ref(false),
   isManagementNode: ref(false),
 }
 const enabledFeatures = new Set(['tes', 'jobs'])
@@ -114,36 +112,21 @@ describe('Phase 5 navigation parity', () => {
     expect(mobilePaths).toEqual(desktopPaths)
     // The admin block earns a separator of its own once it has entries.
     expect(sidebar.match(/role="separator"/g)).toHaveLength(2)
-    expect(desktopPaths).toEqual(expect.arrayContaining([
-      '/app/admin',
-      '/app/admin/users',
-      '/app/admin/onboarding',
-    ]))
+    expect(desktopPaths).toEqual(expect.arrayContaining(['/app/admin', '/app/admin/users']))
   })
 
-  it('offers node onboarding on a node that is not a management node', async () => {
-    // The onboarding routes are relayed, so the permission alone decides.
-    permissions.canManageOnboarding.value = true
-
-    for (const html of [await render(SideNav), await render(MobileNav)]) {
-      expect(portalPaths(html)).toContain('/app/admin/onboarding')
-    }
-  })
-
-  it('keeps quarantine in the permission-gated admin block', async () => {
+  it('leaves onboarding and quarantine to the Admin view', async () => {
+    // Both keep their routes and their permission gate, only inside Admin.
+    for (const permission of Object.values(permissions)) permission.value = true
     const adminSource = readFileSync(fileURLToPath(new URL('../../views/AdminView.vue', import.meta.url)), 'utf8')
-    const navSource = readFileSync(fileURLToPath(new URL('../layout/nav.ts', import.meta.url)), 'utf8')
 
-    // Without the permission the entry does not exist at all.
     for (const html of [await render(SideNav), await render(MobileNav)]) {
+      expect(portalPaths(html)).not.toContain('/app/admin/onboarding')
       expect(portalPaths(html)).not.toContain('/app/admin/quarantine')
     }
-    permissions.canManageQuarantine.value = true
-    for (const html of [await render(SideNav), await render(MobileNav)]) {
-      expect(portalPaths(html)).toContain('/app/admin/quarantine')
-    }
-    expect(navSource).toContain('canManageQuarantine')
+    expect(adminSource).toContain('v-if="canManageOnboarding"')
     expect(adminSource).toContain('v-if="canManageQuarantine"')
+    expect(adminSource).toContain("{ name: 'admin-onboarding' }")
     expect(adminSource).toContain("{ name: 'admin-quarantine' }")
   })
 

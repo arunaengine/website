@@ -13,12 +13,7 @@ import { MoreHorizontal } from '@lucide/vue'
 
 const route = useRoute()
 const moreOpen = ref(false)
-const {
-  isRealmAdmin,
-  canInspectUsers,
-  canManageOnboarding,
-  canManageQuarantine,
-} = useAruna()
+const { isRealmAdmin, canInspectUsers } = useAruna()
 const { available: assistant } = useAssistantChat()
 
 // The same list the sidebar renders, in the same order: the bottom bar takes
@@ -28,8 +23,6 @@ const items = computed<NavItem[]>(() =>
     desktop: isDesktop(),
     isRealmAdmin: isRealmAdmin.value,
     canInspectUsers: canInspectUsers.value,
-    canManageOnboarding: canManageOnboarding.value,
-    canManageQuarantine: canManageQuarantine.value,
     assistant: assistant.value,
   }).filter((entry): entry is NavItem => !('separator' in entry)),
 )

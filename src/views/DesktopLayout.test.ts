@@ -10,8 +10,6 @@ const route = { name: 'dashboard', path: '/app', hash: '' }
 const permissions = {
   isRealmAdmin: ref(false),
   canInspectUsers: ref(false),
-  canManageOnboarding: ref(false),
-  canManageQuarantine: ref(false),
   isManagementNode: ref(false),
 }
 const probeRealm = vi.fn(async () => undefined)
@@ -211,14 +209,14 @@ describe('desktop shell', () => {
 
   it('adds the admin destinations a realm admin may reach', async () => {
     permissions.isRealmAdmin.value = true
-    permissions.canManageQuarantine.value = true
+    permissions.canInspectUsers.value = true
 
     const html = await renderToString(createSSRApp(DesktopLayout))
 
-    expect(destinations(html)).toEqual(expect.arrayContaining(['/app/admin', '/app/admin/quarantine']))
+    expect(destinations(html)).toEqual(expect.arrayContaining(['/app/admin', '/app/admin/users']))
     expect(html.match(/role="separator"/g)).toHaveLength(3)
     expect(html).toContain('Admin')
-    expect(html).toContain('Quarantine')
+    expect(html).not.toContain('Quarantine')
   })
 
   it('carries one navigation and no mobile bar', async () => {

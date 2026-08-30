@@ -37,7 +37,7 @@ const unreachable = computed(() => realmReach.value === 'unreachable')
 const quitting = ref(false)
 const quitError = ref<string | null>(null)
 
-const { isRealmAdmin, canInspectUsers, canManageOnboarding, canManageQuarantine } = useAruna()
+const { isRealmAdmin, canInspectUsers } = useAruna()
 const { available: assistant, open: assistantOpen } = useAssistantChat()
 const { status, loaded, state, start: watchNode, stop: unwatchNode } = useDeviceStatus()
 const nodeDown = computed(
@@ -64,8 +64,6 @@ const items = computed<NavEntry[]>(() =>
     desktop: true,
     isRealmAdmin: isRealmAdmin.value,
     canInspectUsers: canInspectUsers.value,
-    canManageOnboarding: canManageOnboarding.value,
-    canManageQuarantine: canManageQuarantine.value,
     assistant: assistant.value,
   }),
 )

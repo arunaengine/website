@@ -12,12 +12,7 @@ import { ArrowLeft, ChevronsLeft, ChevronsRight } from '@lucide/vue'
 // without them the sidebar builds the portal's own from the one definition.
 const props = defineProps<{ items?: NavEntry[]; backLink?: boolean }>()
 
-const {
-  isRealmAdmin,
-  canInspectUsers,
-  canManageOnboarding,
-  canManageQuarantine,
-} = useAruna()
+const { isRealmAdmin, canInspectUsers } = useAruna()
 const { available: assistant } = useAssistantChat()
 
 // The shell has no landing page to go back to.
@@ -30,8 +25,6 @@ const items = computed<NavEntry[]>(
       desktop: false,
       isRealmAdmin: isRealmAdmin.value,
       canInspectUsers: canInspectUsers.value,
-      canManageOnboarding: canManageOnboarding.value,
-      canManageQuarantine: canManageQuarantine.value,
       assistant: assistant.value,
     }),
 )

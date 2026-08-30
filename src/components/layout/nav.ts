@@ -12,7 +12,6 @@ import {
   Play,
   RefreshCw,
   Settings,
-  ShieldAlert,
   ShieldCheck,
   Users,
   Workflow,
@@ -43,8 +42,6 @@ export interface NavOptions {
   desktop: boolean
   isRealmAdmin: boolean
   canInspectUsers: boolean
-  canManageOnboarding: boolean
-  canManageQuarantine: boolean
   /** At least one AI provider is ready, the same gate as the top-bar launcher. */
   assistant?: boolean
 }
@@ -54,16 +51,12 @@ function computeEnabled(): boolean {
   return featureEnabled('tes') || featureEnabled('jobs')
 }
 
+// Onboarding and quarantine stay out of the sidebar; the Admin view's own side
+// nav is the one place that reaches them.
 function adminItems(options: NavOptions): NavItem[] {
   return [
     ...(options.isRealmAdmin ? [{ to: '/app/admin', icon: ShieldCheck, label: 'Admin', exact: true }] : []),
     ...(options.canInspectUsers ? [{ to: '/app/admin/users', icon: Users, label: 'Users' }] : []),
-    ...(options.canManageOnboarding
-      ? [{ to: '/app/admin/onboarding', icon: Workflow, label: 'Node onboarding' }]
-      : []),
-    ...(options.canManageQuarantine
-      ? [{ to: '/app/admin/quarantine', icon: ShieldAlert, label: 'Quarantine' }]
-      : []),
   ]
 }
 
