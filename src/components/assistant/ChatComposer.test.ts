@@ -25,6 +25,8 @@ const openai: AssistantProvider = {
   created_at: '2026-08-01T00:00:00Z',
 }
 
+const page = { kind: 'dataset', title: 'Water quality', facts: { 'document id': '01H' } }
+
 const chat = {
   busy: ref(false),
   draft: ref(''),
@@ -65,6 +67,7 @@ const ChatComposer = compileClientComponent(new URL('./ChatComposer.vue', import
   '@/composables/useAruna': { useAruna: () => ({ profiles: ref([]) }) },
   '@/composables/useAssistantChat': { useAssistantChat: () => chat },
   '@/composables/useAssistantEditor': { useAssistantEditor: () => ({ bridge: ref(null) }) },
+  '@/composables/usePageContext': { usePageContext: () => ({ currentPage: () => page }) },
 })
 
 function control(root: Parameters<typeof content>[0], label: string) {
@@ -89,6 +92,7 @@ describe('ChatComposer', () => {
 
     expect(send).toHaveBeenCalledOnce()
     expect(send.mock.calls[0][0]).toBe('hi')
+    expect(send.mock.calls[0][1].page).toBe(page)
     expect(chat.draft.value).toBe('')
   })
 

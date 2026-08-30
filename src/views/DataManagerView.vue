@@ -29,6 +29,7 @@ import UploadPanel from '@/components/data/manager/UploadPanel.vue'
 import PreviewPane from '@/components/preview/PreviewPane.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDataManager } from '@/composables/useDataManager'
+import { providePageContext } from '@/composables/usePageContext'
 import { useStaging } from '@/composables/useStaging'
 import { useS3, s3ErrorMessage } from '@/composables/useS3'
 import { featureEnabled } from '@/lib/config'
@@ -86,6 +87,17 @@ const selectedGroupName = computed(
     selectedGroupLabel.value ||
     'Select a group',
 )
+
+providePageContext(() => ({
+  kind: 'data manager',
+  title: bucket.value ? `${bucket.value}/${s3Prefix.value}` : 'No bucket open',
+  facts: {
+    group: selectedGroupId.value,
+    bucket: bucket.value,
+    prefix: s3Prefix.value,
+    'listed objects': String(listedKeys.value.size),
+  },
+}))
 
 const deletion = ref<InstanceType<typeof DeletionFlow> | null>(null)
 

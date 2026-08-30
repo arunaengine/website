@@ -16,6 +16,7 @@ import { useJoinRequests } from '@/composables/useJoinRequests'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
 import { useRefresh } from '@/composables/useRefresh'
 import { useFirstPaint } from '@/composables/useFirstPaint'
+import { providePageContext } from '@/composables/usePageContext'
 import { useRoute, useRouter } from 'vue-router'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { Inbox, Plus, Users } from '@lucide/vue'
@@ -102,6 +103,10 @@ const selectedGroup = computed(() =>
 const pageTitle = computed(() =>
   route.name === 'group' ? (selectedGroup.value?.name ?? selectedGroupId.value) : 'Groups',
 )
+
+providePageContext(() => (selectedGroupId.value
+  ? { kind: 'group', title: selectedGroup.value?.name ?? selectedGroupId.value, facts: { id: selectedGroupId.value } }
+  : { kind: 'groups page', title: 'Groups', facts: { 'groups joined': String(myGroups.value.length) } }))
 
 // While a stored session restores, keep the signed-in copy so the sign-in
 // hint never flashes for users who are actually signed in.

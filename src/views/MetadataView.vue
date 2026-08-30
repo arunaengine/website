@@ -31,6 +31,7 @@ import { ref } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
 import { useDatasetView } from '@/composables/useDatasetView'
+import { providePageContext } from '@/composables/usePageContext'
 import { useFirstPaint } from '@/composables/useFirstPaint'
 import { type MetadataDocumentSummary } from '@/lib/api'
 import { errorMessage, truncateMiddle } from '@/lib/utils'
@@ -72,6 +73,25 @@ const painted = useFirstPaint(
   () => docState.value !== 'loading' && !(docState.value === 'found' && loadingCrate.value),
   () => detailId.value,
 )
+
+providePageContext(() => {
+  const summary = fetchedSummary.value
+  const doc = current.value
+  if (!summary && !doc) return null
+  const graph = (currentCrate.value as { '@graph'?: unknown[] })?.['@graph']
+  return {
+    kind: 'dataset',
+    title: doc?.title ?? summary?.document_path ?? '',
+    facts: {
+      'document id': summary?.document_id ?? doc?.ulid ?? '',
+      path: currentPath.value,
+      group: summary?.group_id ?? doc?.realmId ?? '',
+      profile: profileName.value,
+      visibility: summary ? (summary.public ? 'public' : 'private') : '',
+      entities: Array.isArray(graph) ? String(graph.length) : '',
+    },
+  }
+})
 
 const showCrateExport = ref(false)
 const showDelete = ref(false)

@@ -11,6 +11,7 @@ import AssistantSettings from '@/components/assistant/AssistantSettings.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useAssistantChat } from '@/composables/useAssistantChat'
 import { useAssistantEditor } from '@/composables/useAssistantEditor'
+import { usePageContext } from '@/composables/usePageContext'
 import { SendHorizontal, Settings2 } from '@lucide/vue'
 
 /** About eight rows; the card scrolls inside itself beyond that. */
@@ -21,6 +22,7 @@ const props = withDefaults(defineProps<{ size?: 'compact' | 'full' }>(), { size:
 const route = useRoute()
 const { profiles } = useAruna()
 const { bridge } = useAssistantEditor()
+const { currentPage } = usePageContext()
 const {
   busy,
   draft,
@@ -52,6 +54,7 @@ function submit() {
   draft.value = ''
   void send(text, {
     route: route.fullPath,
+    page: currentPage(),
     draft: bridge.value?.summary() ?? null,
     profiles: profiles.value.map((profile) => ({ id: profile.id, name: profile.name })),
   })

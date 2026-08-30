@@ -10,8 +10,16 @@ export interface DraftContext {
   types: string[]
 }
 
+/** What the open view is showing: short facts only, ids, paths and counts. */
+export interface PageContext {
+  kind: string
+  title: string
+  facts: Record<string, string>
+}
+
 export interface PromptContext {
   route: string
+  page?: PageContext | null
   draft?: DraftContext | null
   /** Realm profiles as id and name, when the portal already has them. */
   profiles?: Array<{ id: string; name: string }>
@@ -32,6 +40,14 @@ const UNTRUSTED =
 const SHOW =
   'Show tabular data with show_table, numbers with show_stats or show_chart, and a dataset with show_crate instead of writing JSON or long lists.'
 
+function pageLine(page: PageContext): string {
+  const facts = Object.entries(page.facts)
+    .filter(([, value]) => value)
+    .map(([name, value]) => `${name} ${value}`)
+  const title = page.title ? ` "${page.title}"` : ''
+  return `The user is looking at the ${page.kind}${title}${facts.length ? ` (${facts.join(', ')})` : ''}.`
+}
+
 function draftLines(draft: DraftContext): string[] {
   const lines = [
     `An RO-Crate draft is open in the dataset editor: ${draft.entityCount} entities, ${draft.partCount} of them data entities.`,
@@ -51,6 +67,7 @@ export function systemPrompt(context: PromptContext): string {
     SHOW,
     `The user is on the route ${context.route}.`,
   ]
+  if (context.page) lines.push(pageLine(context.page))
   if (context.draft) lines.push(...draftLines(context.draft))
   if (context.profiles?.length) {
     lines.push(`Realm profiles: ${context.profiles.map((profile) => `${profile.id} (${profile.name})`).join(', ')}.`)
