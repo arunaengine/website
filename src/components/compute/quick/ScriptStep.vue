@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Script editor and the data it works on; mounts sit next to the editor so
 // container paths are visible while the script is written.
-import { defineAsyncComponent } from 'vue'
+import { defineAsyncComponent, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
@@ -15,7 +15,7 @@ import ContainerDataPanel from '@/components/compute/quick/ContainerDataPanel.vu
 import DependenciesTab from '@/components/compute/quick/DependenciesTab.vue'
 import { injectQuickRun } from '@/composables/useQuickRun'
 import { asyncChunkError } from '@/lib/chunk-recovery'
-import { FolderOpen, KeyRound, Plus } from '@lucide/vue'
+import { FolderOpen, FolderPlus, KeyRound, Plus } from '@lucide/vue'
 
 // CodeMirror lands on its own async chunk, mounted only at the script step.
 const ScriptEditor = defineAsyncComponent({
@@ -35,6 +35,9 @@ const {
   buckets,
   bucketsLoaded,
   bucketsLoading,
+  createBucket,
+  creatingBucket,
+  createBucketError,
   stagingBucket,
   stagingBucketValid,
   scriptKey,
@@ -50,6 +53,8 @@ const {
   commandPreview,
   loadScriptOpen,
 } = injectQuickRun()
+
+const newBucket = ref('')
 </script>
 
 <template>
@@ -98,9 +103,22 @@ const {
           <p v-if="stagingBucket.trim() && !stagingBucketValid" class="mt-1 text-[11px] text-destructive">
             This bucket does not exist. Files can only be staged into one of your buckets.
           </p>
-          <p v-else-if="bucketsLoaded && !buckets.length" class="mt-1 text-[11px] text-destructive">
-            You have no buckets yet. Create one in Data first.
-          </p>
+          <div v-else-if="bucketsLoaded && !buckets.length" class="mt-1 space-y-1.5">
+            <p class="text-[11px] text-destructive">You have no buckets yet. Create one to stage the script.</p>
+            <div class="flex items-center gap-2">
+              <Input
+                v-model="newBucket"
+                class="h-8 w-40 shrink-0 font-mono"
+                placeholder="new-bucket-name"
+                aria-label="New bucket name"
+                @keyup.enter="createBucket(newBucket)"
+              />
+              <Button variant="outline" size="sm" :disabled="creatingBucket || !newBucket.trim()" @click="createBucket(newBucket)">
+                <FolderPlus class="h-3.5 w-3.5" /> Create bucket
+              </Button>
+            </div>
+            <p v-if="createBucketError" class="text-[11px] text-destructive">{{ createBucketError }}</p>
+          </div>
           <p v-else-if="!scriptKeyValid" class="mt-1 text-[11px] text-destructive">
             Use an object key without a leading slash or empty segments, ending in a file name.
           </p>

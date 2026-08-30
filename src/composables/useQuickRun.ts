@@ -45,7 +45,7 @@ import { targetProblems as collectTargetProblems } from '@/lib/runTarget'
 import type { useAruna } from '@/composables/useAruna'
 import type { useComputeDataView } from '@/composables/useComputeDataView'
 import type { useRunTarget } from '@/composables/useRunTarget'
-import type { useS3 } from '@/composables/useS3'
+import { s3ErrorMessage, type useS3 } from '@/composables/useS3'
 import type { useTes } from '@/composables/useTes'
 
 export interface QuickRunDeps {
@@ -567,6 +567,30 @@ function createStore(deps: QuickRunDeps) {
     }
   }
 
+  // Creating the first bucket from the wizard; the quick run always stages on
+  // the connected node, so the session check needs no node id.
+  const creatingBucket = ref(false)
+  const createBucketError = ref<string | null>(null)
+  async function createBucket(name: string) {
+    const wanted = name.trim()
+    if (!wanted || creatingBucket.value) return
+    createBucketError.value = null
+    if (!s3.canWrite(wanted)) {
+      createBucketError.value = 'This session does not allow creating that bucket.'
+      return
+    }
+    creatingBucket.value = true
+    try {
+      await s3.createBucket(wanted)
+      await loadBuckets()
+      stagingBucket.value = wanted
+    } catch (err) {
+      createBucketError.value = s3ErrorMessage(err)
+    } finally {
+      creatingBucket.value = false
+    }
+  }
+
   // Runs only write into existing buckets; once the listing is known, a typed
   // name must match it (with a failed listing only non-empty is enforceable).
   function knownBucket(name: string): boolean {
@@ -798,6 +822,9 @@ function createStore(deps: QuickRunDeps) {
     buckets,
     bucketsLoading,
     bucketsLoaded,
+    createBucket,
+    creatingBucket,
+    createBucketError,
     scriptContainerPath,
     normalizedScriptKey,
     scriptKeyValid,
