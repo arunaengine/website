@@ -3,6 +3,7 @@
 // arrows move over every `[role="option"]` in the list, Enter picks the active
 // one. Hosts render the options; a dialog around it handles Escape.
 import { nextTick, onMounted, onUpdated, ref, watch } from 'vue'
+import { Search } from '@lucide/vue'
 import Input from '@/components/ui/Input.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 
@@ -63,8 +64,12 @@ onUpdated(mark)
 </script>
 
 <template>
-  <div class="flex min-h-0 flex-col">
-    <div class="relative border-b border-border px-3 py-2">
+  <div class="flex min-h-0 min-w-0 flex-col">
+    <div class="relative border-b border-border bg-muted/40 px-3 py-2">
+      <Search
+        class="pointer-events-none absolute left-5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+        aria-hidden="true"
+      />
       <Input
         :model-value="modelValue"
         autofocus
@@ -72,16 +77,16 @@ onUpdated(mark)
         aria-autocomplete="list"
         :aria-label="ariaLabel ?? placeholder"
         :placeholder="placeholder"
-        class="h-9 border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
+        class="h-9 border-0 bg-transparent pl-7 pr-8 shadow-none focus-visible:ring-0"
         @update:model-value="(value: string | number) => emit('update:modelValue', String(value))"
         @keydown="onKeydown"
       />
       <Spinner v-if="busy" class="absolute right-4 top-1/2 -translate-y-1/2" label="Searching" />
     </div>
-    <div ref="list" role="listbox" class="scrollbar-thin max-h-[50vh] min-h-0 flex-1 overflow-y-auto p-2">
+    <div ref="list" role="listbox" class="scrollbar-thin max-h-[50vh] min-h-0 min-w-0 flex-1 overflow-y-auto p-2">
       <slot />
     </div>
-    <div v-if="$slots.footer" class="border-t border-border px-3 py-2">
+    <div v-if="$slots.footer" class="min-w-0 border-t border-border px-3 py-2">
       <slot name="footer" />
     </div>
   </div>

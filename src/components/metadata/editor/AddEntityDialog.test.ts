@@ -68,6 +68,7 @@ const TypeBrowser = compileClientComponent(new URL('./TypeBrowser.vue', import.m
 
 const LookupBox = compileClientComponent(new URL('../LookupBox.vue', import.meta.url), {
   vue: VueRuntime,
+  '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Spinner.vue': moduleDefault(EmptyStub),
   '@/lib/lookup/registry': Registry,
@@ -217,9 +218,28 @@ describe('AddEntityDialog', () => {
     await click(button(mounted.root, 'Person'))
     expect(content(mounted.root)).toContain('Search ORCID by name or id')
 
-    await click(button(mounted.root, 'Change type'))
+    await click(button(mounted.root, 'Back'))
     await click(button(mounted.root, 'Organization'))
     expect(content(mounted.root)).toContain('Search ROR by name or id')
+    mounted.app.unmount()
+  })
+
+  it('keeps a long identifier inside the dialog', async () => {
+    // Everything under the type header must wrap or truncate, never widen it.
+    const mounted = await mount()
+
+    await click(button(mounted.root, 'Person'))
+    await typeValue(field(mounted.root, 'Name'), 'https://orcid.org/0000-0002-1825-0097')
+
+    const body = element(mounted.root, (node) => String(node.props.class ?? '').includes('space-y-4'))
+    expect(String(body.props.class)).toContain('min-w-0')
+
+    const imported = element(mounted.root, (node) => String(node.props.title ?? '').startsWith('Use ORCID'))
+    expect(String(imported.props.class)).toContain('min-w-0')
+    expect(String(imported.props.class)).toContain('truncate')
+
+    const hint = element(mounted.root, (node) => node.tag === 'p' && content(node).includes('Starts with:'))
+    expect(String(hint.props.class)).toContain('break-words')
     mounted.app.unmount()
   })
 

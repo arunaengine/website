@@ -1,5 +1,5 @@
 import * as VueRuntime from 'vue'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   button,
@@ -38,10 +38,28 @@ const EmptyStub = defineComponent(() => () => null)
 
 const LookupBox = compileClientComponent(new URL('./LookupBox.vue', import.meta.url), {
   vue: VueRuntime,
+  '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Spinner.vue': moduleDefault(EmptyStub),
   '@/lib/lookup/registry': { cancelLookup, searchLookups },
 })
+
+// A host that writes the picked label back into the shared field, as the entity
+// dialog does; the box must not read that answer as the next query.
+function hostBox(picked: LookupHit[]) {
+  return defineComponent(() => {
+    const name = ref('')
+    return () => h(LookupBox, {
+      kind: 'person',
+      modelValue: name.value,
+      'onUpdate:modelValue': (value: string) => (name.value = value),
+      onSelect: (hit: LookupHit) => {
+        picked.push(hit)
+        name.value = hit.label
+      },
+    })
+  })
+}
 
 function personHit(orcid: string, label: string): LookupHit {
   const id = `https://orcid.org/${orcid}`
@@ -147,7 +165,55 @@ describe('LookupBox', () => {
     const line = element(mounted.root, (node) => node.props.title === affiliation)
     expect(content(line)).toBe(affiliation)
     expect(String(line.props.class)).toContain('line-clamp-1')
-    expect(content(button(mounted.root, 'Ada Example'))).toContain('https://orcid.org/0000-0002-1825-0097')
+
+    const row = button(mounted.root, 'Ada Example')
+    expect(content(row)).toContain('https://orcid.org/0000-0002-1825-0097')
+    expect(String(row.props.class)).toContain('min-w-0')
+    const identity = element(mounted.root, (node) => String(node.props.title ?? '').startsWith('Ada Example · '))
+    expect(String(identity.props.class)).toContain('truncate')
+    mounted.app.unmount()
+  })
+
+  it('stops searching once a hit is chosen', async () => {
+    const picked: LookupHit[] = []
+    hits = [personHit('0000-0002-1825-0097', 'Ada Example')]
+    const mounted = await mountApp(hostBox(picked), {})
+    const query = element(mounted.root, (node) => node.tag === 'input')
+
+    await typeValue(query, 'Ada')
+    await vi.advanceTimersByTimeAsync(300)
+    await flush()
+    await click(button(mounted.root, 'Ada Example'))
+    await vi.advanceTimersByTimeAsync(600)
+    await flush()
+
+    expect(picked).toHaveLength(1)
+    expect(searchLookups).toHaveBeenCalledTimes(1)
+    expect(nodes(mounted.root).filter((node) => node.props.role === 'option')).toHaveLength(0)
+    expect(content(mounted.root)).toContain('https://orcid.org/0000-0002-1825-0097')
+    mounted.app.unmount()
+  })
+
+  it('searches again after the chosen id is cleared', async () => {
+    const picked: LookupHit[] = []
+    hits = [personHit('0000-0002-1825-0097', 'Ada Example')]
+    const mounted = await mountApp(hostBox(picked), {})
+    const query = element(mounted.root, (node) => node.tag === 'input')
+
+    await typeValue(query, 'Ada')
+    await vi.advanceTimersByTimeAsync(300)
+    await flush()
+    await click(button(mounted.root, 'Ada Example'))
+    await click(element(mounted.root, (node) => node.props['aria-label'] === 'Clear the selected ORCID'))
+
+    expect(content(mounted.root)).not.toContain('https://orcid.org/0000-0002-1825-0097')
+
+    await typeValue(query, 'Bob')
+    await vi.advanceTimersByTimeAsync(300)
+    await flush()
+
+    expect(searchLookups).toHaveBeenCalledTimes(2)
+    expect(nodes(mounted.root).filter((node) => node.props.role === 'option')).toHaveLength(1)
     mounted.app.unmount()
   })
 

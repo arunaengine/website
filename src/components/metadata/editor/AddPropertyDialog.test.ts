@@ -23,18 +23,30 @@ beforeAll(async () => {
 })
 
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
-// The dialog shell reduced to its search box and its two slots.
+// The dialog shell reduced to its header, its search box and its slots. The
+// search box goes away once the host has picked something, as it does live.
 const CommandDialogStub = defineComponent({
-  props: { modelValue: { type: String, default: '' }, ariaLabel: String, placeholder: String, description: String },
+  props: {
+    modelValue: { type: String, default: '' },
+    ariaLabel: String,
+    placeholder: String,
+    title: String,
+    description: String,
+    picked: Boolean,
+  },
   emits: ['update:modelValue'],
   setup(props, { emit, slots }) {
     return () => h('div', [
+      h('h2', props.title),
       h('p', props.description),
-      h('input', {
-        'aria-label': props.ariaLabel ?? props.placeholder,
-        value: props.modelValue,
-        onInput: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value),
-      }),
+      slots.subtitle?.(),
+      props.picked
+        ? null
+        : h('input', {
+            'aria-label': props.ariaLabel ?? props.placeholder,
+            value: props.modelValue,
+            onInput: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value),
+          }),
       slots.default?.(),
       slots.footer?.(),
     ])
@@ -118,8 +130,26 @@ describe('AddPropertyDialog', () => {
 
     expect(content(mounted.root)).toContain('What kind of value does license take?')
     await click(row(mounted.root, 'URL'))
+    await click(row(mounted.root, 'Add property'))
 
     expect(picked).toEqual([{ key: 'license', kind: 'url' }])
+    mounted.app.unmount()
+  })
+
+  it('names the property it is asking about', async () => {
+    // The search goes away, so the header has to say what was picked.
+    const mounted = await mount(dataset)
+    await typeValue(search(mounted.root), 'license')
+    await click(row(mounted.root, 'License'))
+    await flush()
+
+    expect(() => search(mounted.root)).toThrow()
+    expect(content(element(mounted.root, (node) => node.tag === 'h2'))).toBe('License')
+    expect(content(element(mounted.root, (node) => String(node.props.class ?? '').includes('hash')))).toBe('license')
+
+    await click(row(mounted.root, 'Back'))
+
+    expect(content(search(mounted.root))).toBe('')
     mounted.app.unmount()
   })
 })

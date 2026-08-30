@@ -4,6 +4,7 @@ import Button from '@/components/ui/Button.vue'
 import CommandDialog from '@/components/ui/CommandDialog.vue'
 import {
   propertyKey,
+  propertyTerm,
   typeLabel,
   valueKindsFor,
   VALUE_KIND_LABELS,
@@ -49,12 +50,16 @@ const OPTION =
 const query = ref('')
 const showAll = ref(false)
 const pending = ref<{ key: string; kinds: DraftValueKind[] } | null>(null)
+const kind = ref<DraftValueKind>('text')
 
 watch(() => props.open, (open) => {
   if (!open) return
   query.value = ''
   pending.value = null
 })
+
+const chosen = computed(() => (pending.value ? propertyTerm(props.vocab, pending.value.key) : undefined))
+const chosenLabel = computed(() => chosen.value?.label ?? pending.value?.key ?? '')
 
 const used = computed(() => new Set(Object.keys(props.entity.properties)))
 const text = computed(() => query.value.trim())
@@ -94,14 +99,19 @@ function choose(key: string) {
   const kinds = valueKindsFor(props.vocab, key)
   if (kinds.length > 1) {
     pending.value = { key, kinds }
+    kind.value = kinds[0]
     return
   }
   pick(key, kinds[0])
 }
 
-function pick(key: string, kind: DraftValueKind) {
-  emit('pick', { key, kind })
+function pick(key: string, value: DraftValueKind) {
+  emit('pick', { key, kind: value })
   emit('update:open', false)
+}
+
+function add() {
+  if (pending.value) pick(pending.value.key, kind.value)
 }
 </script>
 
@@ -109,21 +119,31 @@ function pick(key: string, kind: DraftValueKind) {
   <CommandDialog
     :open="open"
     v-model="query"
-    title="Add a property"
-    :description="`Suggested for ${entity.types.map(typeLabel).join(', ')} first, then everything else.`"
+    :title="pending ? chosenLabel : 'Add a property'"
+    :description="pending ? undefined : `Suggested for ${entity.types.map(typeLabel).join(', ')} first, then everything else.`"
+    :picked="Boolean(pending)"
     placeholder="Search properties"
     aria-label="Search properties"
     @update:open="(value) => emit('update:open', value)"
   >
+    <template v-if="pending" #subtitle>
+      <p class="hash mt-0.5 break-all">{{ pending.key }}</p>
+      <p v-if="chosen?.description" class="mt-1 break-words text-xs text-muted-foreground">{{ chosen.description }}</p>
+    </template>
+
     <template v-if="pending">
-      <p class="px-2.5 py-1.5 text-xs text-muted-foreground">What kind of value does {{ pending.key }} take?</p>
-      <div class="flex flex-wrap gap-2 px-2.5 py-1.5">
-        <Button v-for="kind in pending.kinds" :key="kind" variant="outline" size="sm" @click="pick(pending.key, kind)">
-          {{ VALUE_KIND_LABELS[kind] }}
+      <p class="text-xs text-muted-foreground">What kind of value does {{ pending.key }} take?</p>
+      <div class="mt-2 flex flex-wrap gap-2">
+        <Button
+          v-for="option in pending.kinds"
+          :key="option"
+          :variant="option === kind ? 'default' : 'outline'"
+          size="sm"
+          :aria-pressed="option === kind"
+          @click="kind = option"
+        >
+          {{ VALUE_KIND_LABELS[option] }}
         </Button>
-      </div>
-      <div class="px-2.5 py-1.5">
-        <Button variant="ghost" size="sm" @click="pending = null">Back</Button>
       </div>
     </template>
 
@@ -175,7 +195,11 @@ function pick(key: string, kind: DraftValueKind) {
     </template>
 
     <template #footer>
-      <label class="flex items-center gap-2 text-xs text-muted-foreground">
+      <div v-if="pending" class="flex justify-end gap-2">
+        <Button variant="outline" size="sm" @click="pending = null">Back</Button>
+        <Button size="sm" @click="add">Add property</Button>
+      </div>
+      <label v-else class="flex items-center gap-2 text-xs text-muted-foreground">
         <input
           type="checkbox"
           :checked="showAll"

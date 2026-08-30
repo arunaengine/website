@@ -2,7 +2,6 @@
 import { computed, ref, watch } from 'vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
-import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
@@ -25,6 +24,7 @@ import {
   rootEntity,
   rootId,
   typeLabel,
+  vocabTypeUri,
   type CrateDraft,
   type DraftEntity,
   type DraftValue,
@@ -88,6 +88,8 @@ const registry = computed(() => {
   return label === 'Organization' ? { kind: 'organization' as const, label: 'ROR' } : null
 })
 
+const typeAbout = computed(() => props.vocab?.class(vocabTypeUri(type.value))?.description ?? '')
+
 // A typed ORCID or ROR id fetches the record instead of searching by name.
 const typedId = computed(() => {
   if (!registry.value) return ''
@@ -109,10 +111,13 @@ watch(() => props.open, (open) => {
   linkAs.value = ''
 }, { immediate: true })
 
+function refreshId() {
+  identifier.value = autoId(name.value || typeLabel(type.value), props.draft.entities.map((entity) => entity.id))
+}
+
 // The identifier follows the name until someone edits it themselves.
 watch([name, type], () => {
-  if (idTouched.value) return
-  identifier.value = autoId(name.value || typeLabel(type.value), props.draft.entities.map((entity) => entity.id))
+  if (!idTouched.value) refreshId()
 })
 
 function text(value: string): DraftValue[] {
@@ -162,6 +167,14 @@ function useHit(hit: LookupHit) {
   related.value = hit.relatedEntities
 }
 
+// Dropping the registry id gives the entity back its generated identifier.
+function forgetHit() {
+  extra.value = {}
+  related.value = []
+  idTouched.value = false
+  refreshId()
+}
+
 const startsWith = computed(() => defaultProperties(props.vocab, type.value)
   .map((entry) => propertyTerm(props.vocab, entry.key)?.label ?? entry.key))
 
@@ -195,7 +208,7 @@ function create() {
 <template>
   <Dialog :open="open" @update:open="(value: boolean) => emit('update:open', value)">
     <DialogContent v-if="!type" class="max-w-lg gap-0 overflow-hidden p-0">
-      <div class="border-b border-border px-4 py-3 pr-10">
+      <div class="min-w-0 border-b border-border px-4 py-3 pr-10">
         <DialogTitle class="text-sm">Add an entity</DialogTitle>
         <DialogDescription class="mt-0.5 text-xs">
           Search for the kind of thing this is. Everything in the dataset is described the same way.
@@ -213,46 +226,50 @@ function create() {
       </CommandPane>
     </DialogContent>
 
-    <DialogContent v-else class="max-w-lg">
-      <DialogHeader>
-        <DialogTitle>Add {{ /^[aeiou]/i.test(typeLabel(type)) ? 'an' : 'a' }} {{ typeLabel(type) }}</DialogTitle>
-        <DialogDescription>
-          <button type="button" class="font-medium text-primary hover:underline" @click="type = ''">Change type</button>
-        </DialogDescription>
-      </DialogHeader>
+    <DialogContent v-else class="max-w-lg gap-0 overflow-hidden p-0">
+      <div class="min-w-0 border-b border-border px-4 py-3 pr-10">
+        <DialogTitle class="text-sm">
+          Add {{ /^[aeiou]/i.test(typeLabel(type)) ? 'an' : 'a' }} {{ typeLabel(type) }}
+        </DialogTitle>
+        <DialogDescription v-if="typeAbout" class="mt-0.5 break-words text-xs">{{ typeAbout }}</DialogDescription>
+      </div>
 
-      <div class="space-y-4">
-        <div>
+      <div class="scrollbar-thin max-h-[60vh] min-w-0 space-y-4 overflow-y-auto p-4">
+        <div class="min-w-0">
           <label class="text-xs font-medium text-foreground">Name</label>
-          <div v-if="registry" class="mt-1 space-y-2">
+          <div v-if="registry" class="mt-1 min-w-0 space-y-2">
             <LookupBox
               v-model="name"
               :kind="registry.kind"
               aria-label="Name"
               :placeholder="`Search ${registry.label} by name or id`"
               @select="useHit"
+              @clear="forgetHit"
             />
-            <p class="text-[11px] text-muted-foreground">
+            <p class="break-words text-[11px] text-muted-foreground">
               Search {{ registry.label }} by name or id, or simply type the name yourself.
             </p>
-            <div v-if="typedId" class="flex items-center gap-2">
+            <div v-if="typedId" class="flex min-w-0 items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
+                class="max-w-full"
                 aria-label="Import this record"
                 :disabled="importing"
                 @click="importRecord"
               >
                 <Spinner v-if="importing" class="text-current" aria-hidden="true" />
-                Use {{ registry.label }} {{ typedId }}
+                <span class="min-w-0 truncate" :title="`Use ${registry.label} ${typedId}`">
+                  Use {{ registry.label }} {{ typedId }}
+                </span>
               </Button>
             </div>
-            <Notice v-if="lookupError" tone="warning">{{ lookupError }}</Notice>
+            <Notice v-if="lookupError" tone="warning" class="break-words">{{ lookupError }}</Notice>
           </div>
           <Input v-else v-model="name" class="mt-1" aria-label="Name" autofocus @keydown.enter="create" />
         </div>
 
-        <div>
+        <div class="min-w-0">
           <label class="text-xs font-medium text-foreground">Identifier</label>
           <Input
             :model-value="identifier"
@@ -260,17 +277,17 @@ function create() {
             aria-label="Identifier"
             @update:model-value="(value: string | number) => { identifier = String(value); idTouched = true }"
           />
-          <p class="mt-1 text-[11px] text-muted-foreground">{{ idHint(type) }}</p>
-          <p v-if="startsWith.length" class="mt-1 text-[11px] text-muted-foreground">
+          <p class="mt-1 break-words text-[11px] text-muted-foreground">{{ idHint(type) }}</p>
+          <p v-if="startsWith.length" class="mt-1 break-words text-[11px] text-muted-foreground">
             Starts with: {{ startsWith.join(', ') }}
           </p>
         </div>
 
-        <div v-if="linkedFrom" class="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+        <div v-if="linkedFrom" class="min-w-0 break-words rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
           Linked from <span class="font-medium text-foreground">{{ linkedFrom.entity }}</span>
           as <span class="font-medium text-foreground">{{ linkedFrom.property }}</span>.
         </div>
-        <div v-else-if="offerLink && linkOptions.length">
+        <div v-else-if="offerLink && linkOptions.length" class="min-w-0">
           <label class="text-xs font-medium text-foreground">Link from the dataset as</label>
           <Select
             :model-value="linkAs"
@@ -280,14 +297,14 @@ function create() {
             aria-label="Link from the dataset as"
             @update:model-value="(value: string) => (linkAs = value)"
           />
-          <p class="mt-1 text-[11px] text-muted-foreground">
+          <p class="mt-1 break-words text-[11px] text-muted-foreground">
             {{ linkAs ? 'The dataset will point at this entity.' : 'Nothing points at this entity until you pick a property.' }}
           </p>
         </div>
       </div>
 
-      <DialogFooter>
-        <Button variant="outline" @click="emit('update:open', false)">Cancel</Button>
+      <DialogFooter class="min-w-0 border-t border-border px-4 py-3">
+        <Button variant="outline" @click="type = ''">Back</Button>
         <Button :disabled="!canCreate" @click="create">Create</Button>
       </DialogFooter>
     </DialogContent>

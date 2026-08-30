@@ -76,7 +76,7 @@ function isSelected(type: string): boolean {
 </script>
 
 <template>
-  <div class="space-y-2">
+  <div class="min-w-0 space-y-2">
     <div v-if="query === undefined || range?.length" class="flex flex-wrap items-center gap-3 px-1">
       <Input
         v-if="query === undefined"
@@ -106,12 +106,16 @@ function isSelected(type: string): boolean {
         :key="option.type"
         type="button"
         role="option"
-        class="flex w-full flex-col items-start gap-0.5 rounded-md px-2.5 py-1.5 text-left hover:bg-muted/40 data-[active=true]:bg-muted"
+        class="flex w-full min-w-0 flex-col items-start gap-0.5 rounded-md px-2.5 py-1.5 text-left hover:bg-muted/40 data-[active=true]:bg-muted"
         :class="isSelected(option.type) ? 'bg-primary/10' : ''"
         @click="emit('update:modelValue', option.type)"
       >
-        <span class="text-sm font-medium text-foreground">{{ typeLabel(option.label) }}</span>
-        <span v-if="option.description" class="line-clamp-1 text-[11px] text-muted-foreground">{{ option.description }}</span>
+        <span class="break-words text-sm font-medium text-foreground">{{ typeLabel(option.label) }}</span>
+        <span
+          v-if="option.description"
+          class="line-clamp-1 w-full text-[11px] text-muted-foreground"
+          :title="option.description"
+        >{{ option.description }}</span>
       </button>
     </div>
 
