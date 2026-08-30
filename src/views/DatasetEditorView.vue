@@ -40,6 +40,7 @@ import {
   toRoCrate,
   typeLabel,
   type CrateDraft,
+  type LiveIssue,
 } from '@/lib/crate/editor'
 import { FileJson2, FolderTree } from '@lucide/vue'
 
@@ -179,7 +180,19 @@ function declaredProfile(): string {
 }
 
 const crate = computed(() => toRoCrate(draft.value))
-const issues = computed(() => liveIssues(draft.value, vocab.value, expectation.value))
+// A taken path blocks the save, so it belongs on the name that derives it, not
+// only in the header line.
+const issues = computed<LiveIssue[]>(() => {
+  const live = liveIssues(draft.value, vocab.value, expectation.value)
+  if (!pathTaken.value) return live
+  return [...live, {
+    key: 'path:taken',
+    severity: 'error',
+    message: `A dataset already exists at ${locationPath.value}. Change the name or pick another location.`,
+    entityId: rootId(draft.value),
+    property: 'name',
+  }]
+})
 
 const desktop = isDesktop()
 const deviceStatus = desktop ? useDeviceStatus() : null
