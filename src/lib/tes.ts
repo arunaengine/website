@@ -264,9 +264,10 @@ const TES_STATE_LABEL: Record<TesState, string> = {
   INITIALIZING: 'Initializing',
   RUNNING: 'Running',
   PAUSED: 'Paused',
-  COMPLETE: 'Complete',
-  EXECUTOR_ERROR: 'Executor error',
-  SYSTEM_ERROR: 'System error',
+  COMPLETE: 'Completed',
+  // Both failure states read as one headline; the detail view names the cause.
+  EXECUTOR_ERROR: 'Failed',
+  SYSTEM_ERROR: 'Failed',
   CANCELING: 'Cancelling',
   CANCELED: 'Cancelled',
   PREEMPTED: 'Preempted',

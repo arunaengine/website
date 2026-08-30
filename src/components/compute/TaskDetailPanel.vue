@@ -2,6 +2,7 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import DetailDialog from '@/components/ui/DetailDialog.vue'
+import DialogTitle from '@/components/ui/DialogTitle.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Button from '@/components/ui/Button.vue'
@@ -196,11 +197,11 @@ function stagesFor(state: TesState | undefined): WatchStage[] {
     case 'COMPLETE':
       return s('done', 'done', 'done', 'done')
     case 'EXECUTOR_ERROR':
-      return s('done', 'done', 'done', 'failed', undefined, 'executor error')
+      return s('done', 'done', 'done', 'failed', undefined, 'the script failed')
     case 'SYSTEM_ERROR':
-      return s('done', 'done', 'done', 'failed', undefined, 'system error')
+      return s('done', 'done', 'done', 'failed', undefined, 'the node failed to run it')
     case 'CANCELED':
-      return s('done', 'done', 'done', 'failed', undefined, 'canceled')
+      return s('done', 'done', 'done', 'failed', undefined, 'cancelled')
     case 'PREEMPTED':
       return s('done', 'done', 'done', 'failed', undefined, 'preempted')
     default:
@@ -208,6 +209,23 @@ function stagesFor(state: TesState | undefined): WatchStage[] {
   }
 }
 const stages = computed(() => stagesFor(task.value?.state))
+
+// One sentence naming the cause of a failure, so the badge, the stages and this
+// line tell the same story instead of three competing ones.
+const failureCause = computed(() => {
+  const state = task.value?.state
+  if (state === 'EXECUTOR_ERROR') {
+    const code = latestLog.value?.logs?.find((log) => log.exit_code)?.exit_code
+    const cause = code === undefined ? 'The script failed' : `The script exited with code ${code}`
+    return `${cause}; its output is under Executors below.`
+  }
+  if (state !== 'SYSTEM_ERROR') return null
+  const system = latestLog.value?.system_logs
+  const message = system?.length ? system[system.length - 1] : undefined
+  return message
+    ? `The node could not run it: ${message}`
+    : 'The node could not run it; the system logs are under Executors below.'
+})
 
 // ── Output links ─────────────────────────────────────────────────────────────
 type ResolvedLink =
@@ -331,9 +349,21 @@ async function confirmDelete() {
 
 <template>
   <DetailDialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-    <div class="scrollbar-thin min-h-0 flex-1 overflow-y-auto pr-1">
+    <template #header>
+      <DialogTitle class="sr-only">Run details</DialogTitle>
+      <TaskHeader
+        v-if="task"
+        :title="headerTitle"
+        :run-id="task.id || taskId"
+        :state="task.state"
+        :tags="task.tags"
+        :description="task.description"
+      />
+      <Skeleton v-else-if="loadState === 'loading'" class="h-6 w-2/3" />
+    </template>
+
+    <div>
       <div v-if="loadState === 'loading'" class="space-y-4">
-        <Skeleton class="h-8 w-2/3" />
         <Skeleton class="h-40 w-full" />
         <Skeleton class="h-40 w-full" />
       </div>
@@ -345,17 +375,11 @@ async function confirmDelete() {
       <ErrorPanel v-else-if="loadState === 'error'" :message="loadError || 'Failed to load the run.'" @retry="initialLoad" />
 
       <div v-else-if="task" class="space-y-6">
-        <TaskHeader
-          class="pr-8"
-          :title="headerTitle"
-          :run-id="task.id || taskId"
-          :state="task.state"
-          :tags="task.tags"
-          :description="task.description"
-        />
-
-        <!-- State progression -->
-        <ClaimWatchStep :stages="stages" :error="lastPollError" />
+        <!-- State progression, then the cause when it ended badly -->
+        <div class="space-y-2">
+          <ClaimWatchStep :stages="stages" :error="lastPollError" />
+          <p v-if="failureCause" class="text-xs text-destructive">{{ failureCause }}</p>
+        </div>
 
         <!-- Details -->
         <dl class="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-xs">

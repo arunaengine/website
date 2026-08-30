@@ -32,6 +32,13 @@ describe('state vocabulary', () => {
     expect(TES_STATE_META.CANCELING.label).toBe('Cancelling')
   })
 
+  it('gives a failed run one headline', () => {
+    // The run detail names the cause; the badge only says it failed.
+    expect(TES_STATE_META.EXECUTOR_ERROR.label).toBe('Failed')
+    expect(TES_STATE_META.SYSTEM_ERROR.label).toBe('Failed')
+    expect(TES_STATE_META.SYSTEM_ERROR.variant).toBe(JOB_STATE_META.failed.variant)
+  })
+
   it('falls back to a neutral count', () => {
     expect(stateVariant('something the backend invented')).toBe('outline')
   })
