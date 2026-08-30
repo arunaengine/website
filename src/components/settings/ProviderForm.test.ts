@@ -16,6 +16,7 @@ import { errorMessage } from '@/lib/utils'
 import * as ModelOptions from '@/lib/assistant/modelOptions'
 import * as BrowserProviders from '@/lib/assistant/browserProviders'
 import type { BrowserProvider } from '@/lib/assistant/browserProviders'
+import * as ProviderKinds from './providerKinds'
 
 const create = vi.fn(async (provider: Record<string, unknown>) => ({
   provider_id: provider.id,
@@ -60,6 +61,7 @@ const SelectStub = defineComponent({
     )),
 })
 const NoticeStub = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
+const SpinnerStub = defineComponent(() => () => h('span', { 'data-spinner': '' }))
 const ComboboxStub = defineComponent({
   props: { modelValue: { type: String, default: '' }, ariaLabel: String, suggestions: { type: Array, default: () => [] } },
   emits: ['update:modelValue'],
@@ -71,7 +73,9 @@ const ComboboxStub = defineComponent({
       onInput: (event: { target: { value: unknown } }) => emit('update:modelValue', String(event.target.value ?? '')),
     }),
 })
-const icons = new Proxy({}, { get: () => defineComponent(() => () => h('i')) })
+const IconStub = defineComponent(() => () => h('i'))
+const LoginStub = defineComponent(() => () => h('div', { 'data-login': '' }, 'Sign in with Codex'))
+const icons = new Proxy({}, { get: () => IconStub })
 
 const ProviderForm = compileClientComponent(new URL('./ProviderForm.vue', import.meta.url), {
   vue: VueRuntime,
@@ -80,7 +84,11 @@ const ProviderForm = compileClientComponent(new URL('./ProviderForm.vue', import
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Notice.vue': moduleDefault(NoticeStub),
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
+  '@/components/ui/Spinner.vue': moduleDefault(SpinnerStub),
   '@/components/assistant/ModelCombobox.vue': moduleDefault(ComboboxStub),
+  './ChatGptLogin.vue': moduleDefault(LoginStub),
+  './ProviderIcon.vue': moduleDefault(IconStub),
+  './providerKinds': ProviderKinds,
   '@/lib/assistant/modelOptions': ModelOptions,
   '@/lib/assistant/browserProviders': BrowserProviders,
   '@/composables/useAssistantProviders': {
@@ -93,6 +101,10 @@ function field(root: Parameters<typeof content>[0], placeholder: string) {
   return element(root, (node) => node.tag === 'input' && node.props.placeholder === placeholder)
 }
 
+function modelField(root: Parameters<typeof content>[0]) {
+  return element(root, (node) => node.props['aria-label'] === 'Default model')
+}
+
 const stored: AssistantProvider = {
   provider_id: 'p-1',
   kind: 'anthropic',
@@ -103,6 +115,16 @@ const stored: AssistantProvider = {
   created_at: '2026-08-01T00:00:00Z',
 }
 
+/** Adding starts on the kind step; Claude is the browser-held key provider. */
+async function addClaude() {
+  const mounted = await mountApp(ProviderForm)
+  await click(button(mounted.root, 'Claude'))
+  await typeValue(field(mounted.root, 'Work account'), 'Work')
+  await typeValue(field(mounted.root, 'Paste the key'), 'sk-1')
+  await typeValue(modelField(mounted.root), 'claude-sonnet')
+  return mounted
+}
+
 beforeEach(() => {
   create.mockClear()
   update.mockClear()
@@ -110,14 +132,12 @@ beforeEach(() => {
   models.mockClear()
   direct.mockClear()
   check.mockResolvedValue({ ok: true, message: 'ok' })
+  direct.mockReturnValue(null)
 })
 
 describe('ProviderForm', () => {
   it('keeps Save disabled until the connection test passes', async () => {
-    const { root } = await mountApp(ProviderForm)
-    await typeValue(field(root, 'Work account'), 'Work')
-    await typeValue(field(root, 'Paste the Anthropic key'), 'sk-1')
-    await typeValue(element(root, (node) => node.props['aria-label'] === 'Default model'), 'claude-sonnet')
+    const { root } = await addClaude()
 
     expect(button(root, 'Save provider').props.disabled).toBe(true)
 
@@ -133,10 +153,7 @@ describe('ProviderForm', () => {
 
   it('keeps Save disabled when the provider refuses the credentials', async () => {
     check.mockResolvedValueOnce({ ok: false, message: 'bad key' })
-    const { root } = await mountApp(ProviderForm)
-    await typeValue(field(root, 'Work account'), 'Work')
-    await typeValue(field(root, 'Paste the Anthropic key'), 'sk-1')
-    await typeValue(element(root, (node) => node.props['aria-label'] === 'Default model'), 'claude-sonnet')
+    const { root } = await addClaude()
     await click(button(root, 'Test connection'))
 
     expect(content(root)).toContain('bad key')
@@ -145,10 +162,7 @@ describe('ProviderForm', () => {
   })
 
   it('keeps testing and model discovery side effect free until save', async () => {
-    const { root } = await mountApp(ProviderForm)
-    await typeValue(field(root, 'Work account'), 'Work')
-    await typeValue(field(root, 'Paste the Anthropic key'), 'sk-1')
-    await typeValue(element(root, (node) => node.props['aria-label'] === 'Default model'), 'claude-sonnet')
+    const { root } = await addClaude()
     await click(button(root, 'Test connection'))
     await click(button(root, 'Fetch models'))
 
@@ -175,7 +189,7 @@ describe('ProviderForm', () => {
     // A fine-tune or a brand-new model needs no entry in the fetched list.
     direct.mockReturnValue({ kind: 'anthropic', id: 'p-1', label: 'Work', model: 'm-1', apiKey: 'stored-key' })
     const { root } = await mountApp(ProviderForm, { props: { provider: stored } })
-    const model = element(root, (node) => node.tag === 'input' && node.props['aria-label'] === 'Default model')
+    const model = modelField(root)
     expect(model.props['data-suggestions']).toBe('m-1')
 
     await typeValue(model, '  my-fine-tune ')
@@ -185,13 +199,41 @@ describe('ProviderForm', () => {
     expect(update.mock.calls.at(-1)?.[1]).toEqual(expect.objectContaining({ model: 'my-fine-tune' }))
   })
 
-  it('asks for a base URL only for an openai-compatible provider', async () => {
+  it('shows only the fields the chosen kind needs', async () => {
     const { root } = await mountApp(ProviderForm)
-    expect(() => field(root, 'https://api.example.org/v1')).toThrow()
+    expect(() => field(root, 'Work account')).toThrow()
 
-    await click(button(root, 'OpenAI-compatible'))
+    await click(button(root, 'Claude'))
+    expect(() => field(root, 'http://localhost:11434/v1')).toThrow()
 
-    expect(field(root, 'https://api.openai.com/v1')).toBeDefined()
+    await click(button(root, 'Change'))
+    await click(button(root, 'OpenAI-compatible or local'))
+
+    expect(field(root, 'http://localhost:11434/v1')).toBeDefined()
     expect(content(root)).toContain('Responses')
+  })
+
+  it('offers the ChatGPT sign-in instead of a key form', async () => {
+    const { root } = await mountApp(ProviderForm)
+    await click(button(root, 'ChatGPT subscription'))
+
+    expect(content(root)).toContain('Sign in with Codex')
+    expect(() => button(root, 'Save provider')).toThrow()
+  })
+
+  it('sends the official OpenAI root without asking for it', async () => {
+    const { root } = await mountApp(ProviderForm)
+    await click(button(root, 'OpenAI'))
+    await typeValue(field(root, 'Work account'), 'Team')
+    await typeValue(field(root, 'Paste the key'), 'sk-2')
+    await typeValue(modelField(root), 'gpt-5')
+    await click(button(root, 'Test connection'))
+
+    expect(check).toHaveBeenCalledWith(expect.objectContaining({
+      kind: 'openai_compatible',
+      baseUrl: 'https://api.openai.com/v1',
+      protocol: 'responses',
+      apiKey: 'sk-2',
+    }))
   })
 })

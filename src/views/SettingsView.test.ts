@@ -111,6 +111,16 @@ describe('SettingsView responsive geometry', () => {
     expect(source).not.toContain('scroll-mt-20')
   })
 
+  it('keeps the assistant tab holding the provider list', () => {
+    // The chat's cogwheel links here with ?tab=assistant.
+    const panel = collectElements(root, (node) => node.tag === 'TabsContent')
+      .find((node) => staticAttribute(node, 'value') === 'assistant')
+
+    expect(panel).toBeDefined()
+    expect(collectElements(panel!, (node) => node.tag === 'AssistantProviders')).toHaveLength(1)
+    expect(collectElements(panel!, (node) => node.tag === 'McpConnect')).toHaveLength(1)
+  })
+
   it('keeps the watched resources page reachable from the settings header', () => {
     expect(source).toContain("{ name: 'settings-watches' }")
     expect(source).toContain('Watched resources')
