@@ -65,8 +65,8 @@ const counts = computed(() => {
 })
 const summary = computed(() => {
   const total = entries.value.length
-  if (!total) return 'Nothing outstanding'
-  return total === 1 ? '1 problem' : `${total} problems`
+  if (!total) return 'No issues found'
+  return total === 1 ? '1 issue' : `${total} issues`
 })
 
 const groups = computed(() => {
@@ -125,7 +125,7 @@ function jump(entityId: string) {
       <Badge v-if="counts.error" variant="destructive" size="sm">{{ counts.error }} to fix</Badge>
       <Badge v-if="counts.warning" variant="warn" size="sm">{{ counts.warning }} to consider</Badge>
       <Badge v-if="counts.advisory" variant="secondary" size="sm">{{ counts.advisory }} advisory</Badge>
-      <Badge v-if="!entries.length" variant="success" size="sm">Nothing outstanding</Badge>
+      <Badge v-if="!entries.length" variant="success" size="sm">No issues</Badge>
     </div>
   </section>
 </template>

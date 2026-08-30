@@ -35,16 +35,16 @@ function mount(draft: Editor.CrateDraft, jumps: string[] = []) {
 }
 
 describe('IssueDrawer', () => {
-  it('counts the problems without listing them', async () => {
+  it('counts the issues without listing them', async () => {
     const mounted = await mount(seeded())
     const text = content(mounted.root)
 
-    expect(text).toContain('problems')
+    expect(text).toContain('issues')
     expect(text).not.toContain('has no name')
     mounted.app.unmount()
   })
 
-  it('expands into the problems grouped per entity', async () => {
+  it('expands into the issues grouped per entity', async () => {
     const jumps: string[] = []
     const mounted = await mount(seeded(), jumps)
 
@@ -83,7 +83,7 @@ describe('IssueDrawer', () => {
     mounted.app.unmount()
   })
 
-  it('says so when a dataset has nothing outstanding', async () => {
+  it('says so when a dataset has no issues', async () => {
     const complete = Editor.updateValue(
       Editor.updateValue(
         Editor.updateValue(Editor.newDraft(), './', 'name', 0, 'Example dataset'),
@@ -93,7 +93,7 @@ describe('IssueDrawer', () => {
     )
     const mounted = await mount(complete)
 
-    expect(content(mounted.root)).toContain('Nothing outstanding')
+    expect(content(mounted.root)).toContain('No issues')
     mounted.app.unmount()
   })
 })
