@@ -280,7 +280,7 @@ describe('guest dashboard truth', () => {
 })
 
 describe('authenticated dashboard ordering', () => {
-  it('orders Realm statistics, My groups, and Node health and reports placement coverage', async () => {
+  it('orders Realm statistics, My groups, and the nodes panel with placement coverage', async () => {
     currentUser.value = { id: 'user-id', name: 'Ada Lovelace' }
     profiles.value = [{}, {}]
     nodes.value = [{ status: 'healthy' }, { status: 'offline' }]
@@ -297,11 +297,11 @@ describe('authenticated dashboard ordering', () => {
     const text = await renderedText()
     const realmIndex = text.indexOf('Realm statistics')
     const groupsIndex = text.indexOf('My groups')
-    const healthIndex = text.indexOf('Node health')
+    const nodesIndex = text.indexOf('federation panel')
 
     expect(realmIndex).toBeGreaterThanOrEqual(0)
     expect(groupsIndex).toBeGreaterThan(realmIndex)
-    expect(healthIndex).toBeGreaterThan(groupsIndex)
+    expect(nodesIndex).toBeGreaterThan(groupsIndex)
     expect(text).toContain('Loaded profiles')
     expect(text).toContain('Replica-inclusive placement records held')
     expect(text).toContain('1 of 2 nodes reporting')

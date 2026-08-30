@@ -315,8 +315,7 @@ const pageDescription = computed(() =>
         <EmptyState v-else compact title="You do not belong to any groups yet." />
       </section>
 
-      <section v-if="currentUser" aria-labelledby="node-health-heading" class="space-y-3.5">
-        <h2 id="node-health-heading" class="font-display text-[15px] font-semibold text-foreground/85">Node health</h2>
+      <section v-if="currentUser" aria-label="Realm nodes" class="space-y-3.5">
         <FederationPanel
           :nodes="infraNodes"
           :devices="deviceNodes"
