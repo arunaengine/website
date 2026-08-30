@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useNow } from '@vueuse/core'
 import Badge from '@/components/ui/Badge.vue'
+import LabelChip from '@/components/ui/LabelChip.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
 import StatusDot from '@/components/ui/StatusDot.vue'
 import type { RealmNodeInfo } from '@/lib/api'
@@ -78,63 +79,68 @@ function labelChips(node: RealmNodeInfo): string[] {
 
 <template>
   <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
-    <button
+    <div
       v-for="node in nodes"
       :key="node.node_id"
-      type="button"
-      class="rounded-lg border border-border bg-background p-3.5 text-left transition-colors hover:border-primary/40"
-      :aria-label="`View ${truncateMiddle(node.node_id)} on the status page`"
-      @click="$emit('select', node.node_id)"
+      class="rounded-lg border border-border bg-background p-3.5 transition-colors hover:border-primary/40"
     >
-      <div class="flex items-center gap-2">
-        <StatusDot :tone="connectionTone(node)" :label="connectionLabel(node)" />
-        <NodeLabel :node-id="node.node_id" class="font-semibold text-foreground" />
-        <Badge
-          v-if="localPeerId && node.node_id === localPeerId"
-          :variant="toneVariant('info')"
-          size="sm"
-          class="uppercase tracking-wider"
-        >
-          this node
-        </Badge>
-        <Badge :variant="kindVariant[node.kind]" size="sm" class="ml-auto shrink-0 uppercase">{{ kindLabel[node.kind] }}</Badge>
-      </div>
+      <button
+        type="button"
+        class="block w-full text-left"
+        :aria-label="`View ${truncateMiddle(node.node_id)} on the status page`"
+        @click="$emit('select', node.node_id)"
+      >
+        <div class="flex items-center gap-2">
+          <StatusDot :tone="connectionTone(node)" :label="connectionLabel(node)" />
+          <NodeLabel :node-id="node.node_id" class="font-semibold text-foreground" />
+          <Badge
+            v-if="localPeerId && node.node_id === localPeerId"
+            :variant="toneVariant('info')"
+            size="sm"
+            class="uppercase tracking-wider"
+          >
+            this node
+          </Badge>
+          <Badge :variant="kindVariant[node.kind]" size="sm" class="ml-auto shrink-0 uppercase">{{ kindLabel[node.kind] }}</Badge>
+        </div>
 
-      <div class="mt-3">
-        <template v-if="node.info">
-          <div class="h-1.5 w-full overflow-hidden rounded-full bg-muted/50">
-            <div class="h-full rounded-full bg-primary/70" :style="{ width: storageWidth(node) }" />
-          </div>
-          <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11px] text-muted-foreground">
-            <span>{{ formatBytes(node.info.utilization.storage_bytes_used) }}</span>
-            <span
-              v-if="node.info.utilization.documents_held !== undefined"
-              title="Datasets this node holds by placement shard"
-            >
-              · {{ formatNumber(node.info.utilization.documents_held) }} datasets
-            </span>
-            <span
-              v-if="node.info.utilization.load_permille !== undefined"
-              class="inline-flex items-center gap-1"
-              :title="`1-minute load average at ${loadPercent(node)}% of CPU cores (1000‰ = one runnable process per core)`"
-            >
-              ·
-              <span class="inline-block h-1.5 w-8 overflow-hidden rounded-full bg-muted">
-                <span class="block h-full rounded-full" :class="loadFill(node)" :style="{ width: loadWidth(node) }" />
+        <div class="mt-3">
+          <template v-if="node.info">
+            <div class="h-1.5 w-full overflow-hidden rounded-full bg-muted/50">
+              <div class="h-full rounded-full bg-primary/70" :style="{ width: storageWidth(node) }" />
+            </div>
+            <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11px] text-muted-foreground">
+              <span>{{ formatBytes(node.info.utilization.storage_bytes_used) }}</span>
+              <span
+                v-if="node.info.utilization.documents_held !== undefined"
+                title="Datasets this node holds by placement shard"
+              >
+                · {{ formatNumber(node.info.utilization.documents_held) }} datasets
               </span>
-              <span :class="loadTextTone(node)">{{ loadPercent(node) }}%</span>
-            </span>
-            <span v-if="heartbeat(node)" class="ml-auto" title="Last heartbeat">♥ {{ heartbeat(node) }}</span>
-          </div>
-        </template>
-        <p v-else class="text-[11px] text-muted-foreground">No published info yet.</p>
-      </div>
+              <span
+                v-if="node.info.utilization.load_permille !== undefined"
+                class="inline-flex items-center gap-1"
+                :title="`1-minute load average at ${loadPercent(node)}% of CPU cores (1000‰ = one runnable process per core)`"
+              >
+                ·
+                <span class="inline-block h-1.5 w-8 overflow-hidden rounded-full bg-muted">
+                  <span class="block h-full rounded-full" :class="loadFill(node)" :style="{ width: loadWidth(node) }" />
+                </span>
+                <span :class="loadTextTone(node)">{{ loadPercent(node) }}%</span>
+              </span>
+              <span v-if="heartbeat(node)" class="ml-auto" title="Last heartbeat">♥ {{ heartbeat(node) }}</span>
+            </div>
+          </template>
+          <p v-else class="text-[11px] text-muted-foreground">No published info yet.</p>
+        </div>
+      </button>
 
+      <!-- Outside the card button: a chip is itself a button and must not nest. -->
       <div class="mt-2 flex flex-wrap items-center gap-1">
         <Badge :variant="connectionVariant(node)" size="sm" class="uppercase">{{ connectionLabel(node) }}</Badge>
-        <span v-for="chip in labelChips(node).slice(0, 3)" :key="chip" class="chip text-[10px]">{{ chip }}</span>
+        <LabelChip v-for="chip in labelChips(node).slice(0, 3)" :key="chip" :value="chip" class="text-[10px]" />
         <span v-if="labelChips(node).length > 3" class="text-[10px] text-muted-foreground">+{{ labelChips(node).length - 3 }}</span>
       </div>
-    </button>
+    </div>
   </div>
 </template>

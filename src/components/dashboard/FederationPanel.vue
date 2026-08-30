@@ -4,6 +4,7 @@ import { useNow } from '@vueuse/core'
 import { RouterLink, useRouter } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import LabelChip from '@/components/ui/LabelChip.vue'
 import NodesHealth from '@/components/dashboard/NodesHealth.vue'
 import type { RealmNodeInfo } from '@/lib/api'
 import { connectionLabel, connectionVariant, kindLabel, kindVariant } from '@/components/nodes/node-display'
@@ -383,7 +384,7 @@ function loadArc(cx: number, cy: number, permille: number): string {
         <div class="flex flex-wrap items-center gap-2 border-b border-border/60 px-5 py-3">
           <span class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Labels</span>
           <template v-if="labelCounts.length">
-            <span v-for="[label, count] in labelCounts" :key="label" class="chip">{{ label }} · {{ count }}</span>
+            <LabelChip v-for="[label, count] in labelCounts" :key="label" :value="label" :count="count" />
           </template>
           <span v-else class="text-[11px] text-muted-foreground">No nodes have published labels yet.</span>
         </div>
