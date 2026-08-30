@@ -21,6 +21,7 @@ import {
   idHint,
   linkProperties,
   propertyKey,
+  propertyTerm,
   rootEntity,
   rootId,
   typeLabel,
@@ -28,6 +29,7 @@ import {
   type DraftEntity,
   type DraftValue,
 } from '@/lib/crate/editor'
+import { defaultProperties, defaultRows } from '@/lib/crate/typeDefaults'
 import { fetchOrcidRecord, normalizeOrcidId } from '@/lib/lookup/orcid'
 import { fetchRorRecord, normalizeRorId } from '@/lib/lookup/ror'
 import type { ContextEntity, LookupHit, RegistryRecord } from '@/lib/lookup/types'
@@ -160,6 +162,9 @@ function useHit(hit: LookupHit) {
   related.value = hit.relatedEntities
 }
 
+const startsWith = computed(() => defaultProperties(props.vocab, type.value)
+  .map((entry) => propertyTerm(props.vocab, entry.key)?.label ?? entry.key))
+
 const canCreate = computed(() => Boolean(type.value && identifier.value.trim()))
 
 function create() {
@@ -174,7 +179,7 @@ function create() {
     type: type.value,
     name: name.value,
     id: identifier.value,
-    properties: extra.value,
+    properties: { ...defaultRows(props.vocab, type.value), ...extra.value },
   })
   const linked = linkAs.value
     ? addValue(created.draft, rootId(created.draft), linkAs.value, {
@@ -256,6 +261,9 @@ function create() {
             @update:model-value="(value: string | number) => { identifier = String(value); idTouched = true }"
           />
           <p class="mt-1 text-[11px] text-muted-foreground">{{ idHint(type) }}</p>
+          <p v-if="startsWith.length" class="mt-1 text-[11px] text-muted-foreground">
+            Starts with: {{ startsWith.join(', ') }}
+          </p>
         </div>
 
         <div v-if="linkedFrom" class="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">

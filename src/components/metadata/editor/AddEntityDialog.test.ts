@@ -15,6 +15,7 @@ import {
   type HostNode,
 } from '@/test/clientRender'
 import * as Editor from '@/lib/crate/editor'
+import * as TypeDefaults from '@/lib/crate/typeDefaults'
 import * as Uri from '@/lib/profiles/uri'
 import * as Orcid from '@/lib/lookup/orcid'
 import * as Ror from '@/lib/lookup/ror'
@@ -106,6 +107,7 @@ const AddEntityDialog = compileClientComponent(new URL('./AddEntityDialog.vue', 
   '@/components/metadata/LookupBox.vue': moduleDefault(LookupBox),
   './TypeBrowser.vue': moduleDefault(TypeBrowser),
   '@/lib/crate/editor': Editor,
+  '@/lib/crate/typeDefaults': TypeDefaults,
   '@/lib/lookup/orcid': Orcid,
   '@/lib/lookup/ror': Ror,
   '@/lib/utils': Utils,
@@ -180,6 +182,23 @@ describe('AddEntityDialog', () => {
       properties: { name: [{ kind: 'text', value: 'Giessen' }] },
     })
     expect(Editor.findEntity(created[0].draft, '#giessen')).toBeDefined()
+    mounted.app.unmount()
+  })
+
+  it('starts a person with the properties most people fill in', async () => {
+    const created: Created[] = []
+    const mounted = await mount({}, created)
+
+    await click(button(mounted.root, 'Person'))
+    expect(content(mounted.root)).toContain('Starts with: Given name, Family name, Affiliation')
+
+    await click(button(mounted.root, 'Create'))
+
+    expect(created[0].entity.properties).toEqual({
+      givenName: [{ kind: 'text', value: '' }],
+      familyName: [{ kind: 'text', value: '' }],
+      affiliation: [{ kind: 'reference', value: '' }],
+    })
     mounted.app.unmount()
   })
 
@@ -313,6 +332,32 @@ describe('AddEntityDialog', () => {
       id: 'https://orcid.org/0000-0001-2345-6789',
       properties: { name: [{ value: 'Grace Hopper' }] },
     })
+    mounted.app.unmount()
+  })
+
+  it('keeps an imported value instead of its empty default', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        person: { name: { 'given-names': { value: 'Grace' }, 'family-name': { value: 'Hopper' } } },
+      }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    const created: Created[] = []
+    const mounted = await mount({}, created)
+
+    await click(button(mounted.root, 'Person'))
+    await typeValue(field(mounted.root, 'Name'), 'https://orcid.org/0000-0001-2345-6789')
+    await click(element(mounted.root, (node) => node.props['aria-label'] === 'Import this record'))
+    await flush()
+    await click(button(mounted.root, 'Create'))
+
+    expect(created[0].entity.properties.givenName).toEqual([{ kind: 'text', value: 'Grace' }])
+    expect(created[0].entity.properties.affiliation).toEqual([{ kind: 'reference', value: '' }])
+
+    const graph = Editor.toRoCrate(created[0].draft)['@graph'] as Array<Record<string, unknown>>
+    const person = graph.find((node) => node['@id'] === created[0].entity.id)
+    expect(Object.keys(person ?? {})).toEqual(['@id', '@type', 'name', 'givenName', 'familyName'])
     mounted.app.unmount()
   })
 })
