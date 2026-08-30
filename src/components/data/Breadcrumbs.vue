@@ -11,19 +11,21 @@ const parts = computed(() => (props.path ? props.path.split('/') : []))
 </script>
 
 <template>
-  <nav class="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
+  <nav class="flex min-w-0 flex-wrap items-center gap-1 text-sm text-muted-foreground">
     <button
-      class="inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 hover:bg-muted hover:text-foreground"
+      class="inline-flex min-w-0 items-center gap-1.5 rounded px-1.5 py-0.5 hover:bg-muted hover:text-foreground"
+      :title="bucket"
       @click="emit('navigate', '')"
     >
-      <Home class="h-3.5 w-3.5" />
-      <span class="font-medium">{{ bucket }}</span>
+      <Home class="h-3.5 w-3.5 shrink-0" />
+      <span class="truncate font-medium">{{ bucket }}</span>
     </button>
     <template v-for="(p, idx) in parts" :key="idx">
-      <ChevronRight class="h-3.5 w-3.5 text-muted-foreground/60" />
+      <ChevronRight class="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
       <button
-        class="rounded px-1.5 py-0.5 hover:bg-muted hover:text-foreground"
+        class="truncate rounded px-1.5 py-0.5 hover:bg-muted hover:text-foreground"
         :class="idx === parts.length - 1 ? 'font-medium text-foreground' : ''"
+        :title="p"
         @click="emit('navigate', parts.slice(0, idx + 1).join('/'))"
       >
         {{ p }}

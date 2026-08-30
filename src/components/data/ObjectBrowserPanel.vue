@@ -345,7 +345,7 @@ const isEmpty = computed(
 </script>
 
 <template>
-  <div class="space-y-3">
+  <div class="min-w-0 space-y-3">
     <!-- Same context line as the Data view header: the group switches here. -->
     <div v-if="currentUser && groupOptions.length" class="flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
       <span>{{ controlled ? 'Browsing as' : 'Showing buckets of' }}</span>
@@ -428,16 +428,18 @@ const isEmpty = computed(
             <Breadcrumbs :bucket="activeBucket" :path="prefix" @navigate="navigateTo" />
             <Spinner v-if="listLoading" label="Loading objects" class="shrink-0" />
           </div>
-          <div class="overflow-hidden rounded-md border border-border">
+          <!-- Fixed columns plus a truncating name keep the table inside narrow
+               dialogs; Modified only appears once the container has room. -->
+          <div class="@container overflow-hidden rounded-md border border-border">
             <p v-if="listError" class="border-b border-border px-3 py-2 text-xs text-destructive">{{ listError }}</p>
             <div tabindex="0" role="region" aria-label="Objects" class="max-h-[260px] overflow-y-auto">
-              <table class="w-full text-sm">
+              <table class="w-full table-fixed text-sm">
                 <thead class="bg-muted/50 text-[11px] uppercase tracking-wider text-muted-foreground">
                   <tr>
-                    <th v-if="selectable" class="w-8 px-3 py-1.5"></th>
+                    <th v-if="selectable" class="w-10 px-3 py-1.5"></th>
                     <th scope="col" class="px-3 py-1.5 text-left font-semibold">Name</th>
-                    <th scope="col" class="px-3 py-1.5 text-right font-semibold">Size</th>
-                    <th scope="col" class="px-3 py-1.5 text-left font-semibold">Modified</th>
+                    <th scope="col" class="w-24 px-3 py-1.5 text-right font-semibold">Size</th>
+                    <th scope="col" class="hidden w-24 px-3 py-1.5 text-left font-semibold @sm:table-cell">Modified</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -447,7 +449,7 @@ const isEmpty = computed(
                     class="cursor-pointer border-t border-border hover:bg-muted/50"
                     @click="openFolder(folder)"
                   >
-                    <td v-if="selectable" class="w-8 px-3 py-2" @click.stop>
+                    <td v-if="selectable" class="w-10 px-3 py-2" @click.stop>
                       <input
                         type="checkbox"
                         class="h-3.5 w-3.5 rounded border-border accent-primary"
@@ -457,8 +459,9 @@ const isEmpty = computed(
                       />
                     </td>
                     <td class="px-3 py-2">
-                      <span class="flex items-center gap-2 text-xs">
-                        <ObjectIcon :name="folder.name" folder class="h-4 w-4" /> {{ folder.name }}/
+                      <span class="flex min-w-0 items-center gap-2 text-xs">
+                        <ObjectIcon :name="folder.name" folder class="h-4 w-4 shrink-0" />
+                        <span class="truncate" :title="folder.name">{{ folder.name }}/</span>
   <!-- Tooltip lives on a span: title on inline svg is unreliable. -->
                         <span
                           v-if="references.prefixHasReferences(folder.prefix)"
@@ -472,8 +475,8 @@ const isEmpty = computed(
                         </span>
                       </span>
                     </td>
-                    <td class="px-3 py-2 text-right text-xs text-muted-foreground">-</td>
-                    <td class="px-3 py-2 text-xs text-muted-foreground">-</td>
+                    <td class="w-24 whitespace-nowrap px-3 py-2 text-right text-xs text-muted-foreground">-</td>
+                    <td class="hidden w-24 whitespace-nowrap px-3 py-2 text-xs text-muted-foreground @sm:table-cell">-</td>
                   </tr>
                   <tr
                     v-for="object in objects"
@@ -481,7 +484,7 @@ const isEmpty = computed(
                     class="cursor-pointer border-t border-border hover:bg-muted/30"
                     @click="pick(object)"
                   >
-                    <td v-if="selectable" class="w-8 px-3 py-2" @click.stop>
+                    <td v-if="selectable" class="w-10 px-3 py-2" @click.stop>
                       <input
                         type="checkbox"
                         class="h-3.5 w-3.5 rounded border-border accent-primary"
@@ -491,8 +494,9 @@ const isEmpty = computed(
                       />
                     </td>
                     <td class="px-3 py-2">
-                      <span class="flex items-center gap-2 text-xs">
-                        <ObjectIcon :name="object.name" class="h-4 w-4" /> <span class="truncate">{{ object.name }}</span>
+                      <span class="flex min-w-0 items-center gap-2 text-xs">
+                        <ObjectIcon :name="object.name" class="h-4 w-4 shrink-0" />
+                        <span class="truncate" :title="object.name">{{ object.name }}</span>
   <span
                           v-if="references.keyIsReferenced(object.key)"
                           class="shrink-0"
@@ -505,8 +509,8 @@ const isEmpty = computed(
                         </span>
                       </span>
                     </td>
-                    <td class="px-3 py-2 text-right font-mono text-xs text-muted-foreground">{{ object.size !== undefined ? formatBytes(object.size) : '-' }}</td>
-                    <td class="px-3 py-2 text-xs text-muted-foreground">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '-' }}</td>
+                    <td class="w-24 whitespace-nowrap px-3 py-2 text-right font-mono text-xs text-muted-foreground">{{ object.size !== undefined ? formatBytes(object.size) : '-' }}</td>
+                    <td class="hidden w-24 whitespace-nowrap px-3 py-2 text-xs text-muted-foreground @sm:table-cell">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '-' }}</td>
                   </tr>
                   <tr v-if="isEmpty">
                     <td :colspan="selectable ? 4 : 3" class="px-3 py-6 text-center text-xs text-muted-foreground">This prefix is empty.</td>

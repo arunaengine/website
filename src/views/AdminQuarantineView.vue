@@ -454,7 +454,7 @@ async function runPrunePass() {
               <Skeleton v-if="inspectLoading && !inspected.event" class="h-10" />
               <pre
                 v-else-if="inspected.event"
-                class="scrollbar-thin overflow-x-auto rounded-md bg-muted/40 px-3 py-2 font-mono text-[11px] leading-relaxed text-foreground"
+                class="whitespace-pre-wrap break-words rounded-md bg-muted/40 px-3 py-2 font-mono text-[11px] leading-relaxed text-foreground"
                 >{{ inspected.event }}</pre>
               <p v-else class="text-xs text-muted-foreground">The retained bytes do not decode into a sync event.</p>
             </section>
