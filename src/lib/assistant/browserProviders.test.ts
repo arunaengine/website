@@ -7,6 +7,7 @@ import {
   createBrowserProviderStore,
   emptyBrowserProviderState,
   loadBrowserProviderState,
+  missingBrowserKey,
   parseBrowserProviderState,
   validateBrowserProvider,
 } from './browserProviders'
@@ -161,6 +162,27 @@ describe('browser provider session store', () => {
     store.upsert({ kind: 'anthropic', id: 'a', label: 'Claude', model: 'claude', apiKey: 'key' })
     store.remove('a')
     expect(store.state).toEqual(emptyBrowserProviderState())
+  })
+
+  it('reports a key the tab no longer holds', () => {
+    // Only an endpoint that authenticates can report the key as missing.
+    expect(missingBrowserKey({ kind: 'anthropic', id: 'a', label: 'Claude', model: 'm', apiKey: '' })).toBe(true)
+    expect(missingBrowserKey({
+      kind: 'openai_compatible',
+      id: 'o',
+      label: 'OpenAI',
+      model: 'm',
+      baseUrl: 'https://api.openai.com/v1',
+      protocol: 'responses',
+    })).toBe(true)
+    expect(missingBrowserKey({
+      kind: 'openai_compatible',
+      id: 'l',
+      label: 'Local',
+      model: 'm',
+      baseUrl: 'http://127.0.0.1:11434/v1',
+      protocol: 'chat_completions',
+    })).toBe(false)
   })
 
   it('validates parsed state deterministically', () => {

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { modelSuggestions } from '@/lib/assistant/modelOptions'
 
 const fetchAssistantModels = vi.fn(async () => ({ models: [{ id: 'gpt-5.6-sol' }, { id: 'gpt-5.5' }] }))
 
@@ -60,6 +61,27 @@ describe('assistant model listing', () => {
 
     expect(fetchAssistantModels).toHaveBeenCalledWith('chatgpt-1', expect.anything())
     expect(listed.map((model) => model.id)).toEqual(['gpt-5.6-sol', 'gpt-5.5'])
+  })
+
+  it('offers every chat model an OpenAI key can reach', async () => {
+    // The realistic listing: only the non-text families may be dropped.
+    const catalog = [
+      'gpt-5.6-sol', 'gpt-5.6-luna', 'gpt-5.5', 'gpt-5.4', 'gpt-5.3-codex', 'gpt-5',
+      'gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'o3', 'o4-mini', 'chatgpt-4o-latest',
+      'text-embedding-3-large', 'whisper-1', 'tts-1', 'dall-e-3', 'gpt-image-1',
+      'omni-moderation-latest',
+    ]
+    vi.stubGlobal('fetch', async () => new Response(JSON.stringify({
+      data: catalog.map((id, index) => ({ id, created: catalog.length - index })),
+    }), { status: 200 }))
+    const providers = useAssistantProviders()
+    const summary = await providers.create({ ...openai, id: 'browser-catalog' })
+
+    const listed = await providers.listModels('browser-catalog')
+    const choices = modelSuggestions(summary, providers.listedModels.value['browser-catalog'] ?? [])
+
+    expect(listed.map((model) => model.id)).toEqual(catalog.slice(0, 12))
+    expect(choices.map((model) => model.id)).toEqual(catalog.slice(0, 12))
   })
 
   it('keeps the failure so the picker can explain an empty list', async () => {

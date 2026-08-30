@@ -11,6 +11,7 @@ import {
 } from '@/lib/api'
 import {
   createBrowserProviderStore,
+  missingBrowserKey,
   validateBrowserProvider,
   type BrowserProvider,
 } from '@/lib/assistant/browserProviders'
@@ -21,6 +22,8 @@ export interface BrowserProviderTestResponse {
   ok: boolean
   message: string
 }
+
+const KEY_GONE = 'Enter the key again in settings to list models.'
 
 const browserStore = createBrowserProviderStore()
 const nodeProviders = ref<AssistantProvider[]>([])
@@ -234,6 +237,13 @@ export function useAssistantProviders() {
     if (!providerId) return Promise.resolve([])
     const cached = listedModels.value[providerId]
     if (cached) return Promise.resolve(cached)
+    const local = direct(providerId)
+    // Without the tab-held key the listing cannot run, and the stored id alone
+    // would look like the only model this provider offers.
+    if (local && missingBrowserKey(local)) {
+      modelErrors.value = { ...modelErrors.value, [providerId]: KEY_GONE }
+      return Promise.resolve([])
+    }
     const running = modelLoads.get(providerId)
     if (running) return running
     const load = fetchModels(providerId)
@@ -242,7 +252,8 @@ export function useAssistantProviders() {
         return listed
       })
       .catch((cause: unknown) => {
-        modelErrors.value = { ...modelErrors.value, [providerId]: apiErrorMessage(cause) }
+        const message = `The model list could not be read: ${apiErrorMessage(cause)}`
+        modelErrors.value = { ...modelErrors.value, [providerId]: message }
         return []
       })
       .finally(() => modelLoads.delete(providerId))

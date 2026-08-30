@@ -119,6 +119,12 @@ function isOfficialOpenAiRoot(value: string): boolean {
   return value.replace(/\/+$/, '') === OFFICIAL_OPENAI_ROOT
 }
 
+/** True when the endpoint cannot be reached without the key this tab holds. */
+export function missingBrowserKey(provider: BrowserProvider): boolean {
+  if (provider.kind === 'anthropic') return !provider.apiKey
+  return isOfficialOpenAiRoot(provider.baseUrl) && !provider.apiKey
+}
+
 function headers(value: unknown, path: string): Record<string, string> | undefined {
   if (value === undefined) return undefined
   const input = record(value, path)
