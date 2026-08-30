@@ -66,9 +66,10 @@ const DesktopLayoutClient = compileClientComponent(new URL('./DesktopLayout.vue'
   '@/components/layout/NodeDown.vue': moduleDefault(NodeDownStub),
   '@/components/data/TransfersPanel.vue': moduleDefault(EmptyStub),
   '@/components/assistant/AssistantPanel.vue': moduleDefault(EmptyStub),
+  '@/lib/chunk-recovery': { asyncChunkError: vi.fn() },
   '@/components/ui/Notice.vue': moduleDefault(Notice),
   '@/composables/useAruna': { useAruna: () => permissions },
-  '@/composables/useAssistantChat': { useAssistantChat: () => ({ available: ref(false) }) },
+  '@/composables/useAssistantChat': { useAssistantChat: () => ({ available: ref(false), open: ref(false) }) },
   '@/composables/useDeviceStatus': {
     useDeviceStatus: () => ({
       status: nodeStatus,
@@ -93,6 +94,7 @@ beforeAll(async () => {
     RouterLink: RouterLinkStub,
     RouterView: RouterViewStub,
     useRoute: () => route,
+    useRouter: () => ({ resolve: vi.fn(() => ({ fullPath: '/app', matched: [] })) }),
   }))
   vi.doMock('@/composables/useAruna', () => ({ useAruna: () => permissions }))
   vi.doMock('@/composables/useDeviceStatus', () => ({

@@ -9,17 +9,22 @@ import RealmUnreachable from '@/components/layout/RealmUnreachable.vue'
 import NodeDown from '@/components/layout/NodeDown.vue'
 import Notice from '@/components/ui/Notice.vue'
 import TransfersPanel from '@/components/data/TransfersPanel.vue'
-import AssistantPanel from '@/components/assistant/AssistantPanel.vue'
 import { RouterView, useRoute } from 'vue-router'
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { useAssistantChat } from '@/composables/useAssistantChat'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { appQuit } from '@/lib/desktopBridge'
 import { probeRealm, realmReach } from '@/lib/desktopBoot'
+import { asyncChunkError } from '@/lib/chunk-recovery'
 import { errorMessage } from '@/lib/utils'
 import { navEntries, navRowClass, type NavEntry } from '@/components/layout/nav'
 import { Power } from '@lucide/vue'
+
+const AssistantPanel = defineAsyncComponent({
+  loader: () => import('@/components/assistant/AssistantPanel.vue'),
+  onError: asyncChunkError,
+})
 
 const route = useRoute()
 const mainEl = ref<HTMLElement | null>(null)
@@ -28,7 +33,7 @@ const quitting = ref(false)
 const quitError = ref<string | null>(null)
 
 const { isRealmAdmin, canInspectUsers, canManageOnboarding, canManageQuarantine } = useAruna()
-const { available: assistant } = useAssistantChat()
+const { available: assistant, open: assistantOpen } = useAssistantChat()
 const { status, loaded, state, start: watchNode, stop: unwatchNode } = useDeviceStatus()
 const nodeDown = computed(
   () =>
@@ -113,6 +118,6 @@ watch(
       </main>
     </div>
     <TransfersPanel />
-    <AssistantPanel />
+    <AssistantPanel v-if="assistantOpen" />
   </div>
 </template>
