@@ -13,11 +13,8 @@ import {
   useAruna,
 } from '@/composables/useAruna'
 import { useMetadataSearch } from '@/composables/useMetadataSearch'
-import {
-  coverageComplete,
-  DEFAULT_OBJECT_SEARCH_MODE,
-  useUnifiedSearch,
-} from '@/composables/useUnifiedSearch'
+import { coverageComplete, useUnifiedSearch } from '@/composables/useUnifiedSearch'
+import { useSearchSettings } from '@/composables/useSearchSettings'
 import { useCatalogBrowse, type CatalogPageParams } from '@/composables/useCatalogBrowse'
 import { datasetPurposeMatches, datasetPurposeOf, type DatasetPurpose } from '@/lib/datasetPurpose'
 import { errorMessage, formatNumber, truncateMiddle } from '@/lib/utils'
@@ -27,7 +24,6 @@ import type {
   BucketSearchHit,
   ListMetadataResponse,
   MetadataDocumentListItem,
-  ObjectSearchMode,
   UserSearchHit,
 } from '@/lib/api'
 import type { FilterModel } from '@/components/search/SearchFilterBar.vue'
@@ -143,7 +139,7 @@ export function useDatasetSearch(searchBox: Ref<{ focus: () => void } | null>) {
     goToPage: goToSearchPage,
     retry: retrySearch,
   } = useMetadataSearch(q, { groupId: groupFilter, conformsTo: conformsToIri }, { cached: true })
-  const objectSearchMode = ref<ObjectSearchMode>(DEFAULT_OBJECT_SEARCH_MODE)
+  const { objectSearchMode } = useSearchSettings()
   const {
     objects: objectResults,
     objectCursor,

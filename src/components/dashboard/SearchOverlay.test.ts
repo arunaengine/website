@@ -21,12 +21,16 @@ const SelectStub = defineComponent({
     ))
   },
 })
+// The real Popover portals its content and only mounts it while open; the stub
+// keeps both slots on screen so the settings control stays queryable.
+const PopoverStub = defineComponent((_, { slots }) => () => h('div', {}, [slots.default?.(), slots.content?.()]))
 const IconStub = defineComponent(() => () => h('svg'))
 const icons = new Proxy({}, { get: () => IconStub })
 const moduleDefault = (component: Component) => ({ __esModule: true, default: component })
 
 const narrow = ref(true)
 const authToken = ref<string | null>('token-a')
+const objectSearchMode = ref('distributed_best_effort')
 const mediaQuery = vi.fn(() => narrow)
 const routerPush = vi.fn()
 let configuredObjectMode: Ref<string> | undefined
@@ -94,6 +98,7 @@ const compiled = compileClientComponent(new URL('./SearchOverlay.vue', import.me
   '@lucide/vue': icons,
   '@/components/ui/Badge.vue': moduleDefault(defineComponent((_, { attrs, slots }) => () => h('span', attrs, slots.default?.()))),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+  '@/components/ui/Popover.vue': moduleDefault(PopoverStub),
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/components/ui/Spinner.vue': moduleDefault(SpinnerStub),
   '@/composables/useAruna': { useAruna: () => ({ authToken }) },
@@ -108,11 +113,9 @@ const compiled = compileClientComponent(new URL('./SearchOverlay.vue', import.me
     relativeTime: (value: string) => `relative ${value}`,
     truncateMiddle: (value: string) => value,
   },
+  '@/composables/useSearchSettings': { useSearchSettings: () => ({ objectSearchMode }) },
   '@/composables/useUnifiedSearch': {
-    DEFAULT_OBJECT_SEARCH_MODE: 'distributed_best_effort',
     OBJECT_SEARCH_MODE_LABELS,
-    coverageComplete: (coverage: { complete?: boolean; truncated?: boolean } | null) =>
-      Boolean(coverage?.complete && !coverage.truncated),
     useUnifiedSearch: (_query: unknown, config: { objectMode?: Ref<string> }) => {
       configuredObjectMode = config.objectMode
       return search
@@ -391,6 +394,7 @@ beforeEach(() => {
   activeElement = null
   narrow.value = true
   authToken.value = 'token-a'
+  objectSearchMode.value = 'distributed_best_effort'
   mediaQuery.mockClear()
   routerPush.mockReset()
   resetSearch()
@@ -400,7 +404,7 @@ describe('narrow TopBar search panel', () => {
   it('renders the compact trigger below the measured breakpoint and keeps the narrow input padding responsive', async () => {
     const mounted = await mount()
 
-    expect(TOP_BAR_SEARCH_COLLAPSE_PX).toBe(480)
+    expect(TOP_BAR_SEARCH_COLLAPSE_PX).toBe(768)
     expect(mediaQuery).toHaveBeenCalledWith(`(max-width: ${TOP_BAR_SEARCH_COLLAPSE_PX - 0.02}px)`)
     expect(findElement(mounted.root, (node) => node.props['aria-label'] === 'Open global search')).toBeDefined()
     expect(findElement(mounted.root, (node) => node.tag === 'input')).toBeUndefined()
@@ -495,16 +499,30 @@ describe('narrow TopBar search panel', () => {
     mounted.app.unmount()
   })
 
-  it('shows object inventory mode only for authenticated search', async () => {
+  it('offers object inventory mode only for authenticated search', async () => {
+    // The setting sits behind the cogwheel, so it needs no typed query.
     authToken.value = null
     const mounted = await mount()
     await click(element(mounted.root, (node) => node.props['aria-label'] === 'Open global search'))
-    await inputValue(element(mounted.root, (node) => node.tag === 'input'), 'sample')
+    expect(findElement(mounted.root, (node) => node.props['aria-label'] === 'Search settings')).toBeUndefined()
     expect(findElement(mounted.root, (node) => node.props['aria-label'] === 'Object inventory search mode')).toBeUndefined()
 
     authToken.value = 'token-a'
     await flush()
+    expect(findElement(mounted.root, (node) => node.props['aria-label'] === 'Search settings')).toBeDefined()
     expect(findElement(mounted.root, (node) => node.props['aria-label'] === 'Object inventory search mode')).toBeDefined()
+    mounted.app.unmount()
+  })
+
+  it('writes the picked mode to the shared setting', async () => {
+    const mounted = await mount()
+    await click(element(mounted.root, (node) => node.props['aria-label'] === 'Open global search'))
+    const select = element(mounted.root, (node) => node.props['aria-label'] === 'Object inventory search mode')
+    await inputValue(select, 'local')
+
+    expect(objectSearchMode.value).toBe('local')
+    expect(configuredObjectMode).toBe(objectSearchMode)
+    expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })
 
@@ -589,8 +607,30 @@ describe('narrow TopBar search panel', () => {
     expect(text).not.toContain('Groups')
     expect(text).not.toContain('Users')
     expect(text).not.toContain('Partial object inventory')
+    expect(text).toContain('1 dataset · 1 object · 1 group · 1 user')
     expect(text).toContain('Distributed best-effort · Node: Storage node B · Group: group-a · Bucket: raw-data')
     expect(text).not.toContain('Object · Distributed best-effort')
+    expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('summarizes the answer and drops empty kinds', async () => {
+    search.documents.value = [
+      { document_id: 'doc-1', document_path: 'datasets/one', title: 'One' },
+      { document_id: 'doc-2', document_path: 'datasets/two', title: 'Two' },
+      { document_id: 'doc-3', document_path: 'datasets/three', title: 'Three' },
+    ]
+    search.groups.value = [{ group_id: 'group-a', display_name: 'Group A' }]
+    search.objectSearched.value = true
+    search.searched.value = true
+    const mounted = await mount()
+    await click(element(mounted.root, (node) => node.props['aria-label'] === 'Open global search'))
+    await inputValue(element(mounted.root, (node) => node.tag === 'input'), 'sample')
+
+    const text = content(element(mounted.root, (node) => node.props.role === 'dialog'))
+    expect(text).toContain('3 datasets · 1 group')
+    expect(text).not.toContain('0 object')
+    expect(text).not.toContain('No visible live object')
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })
@@ -640,8 +680,8 @@ describe('narrow TopBar search panel', () => {
     }]
     const mounted = await mount()
     await click(element(mounted.root, (node) => node.props['aria-label'] === 'Open global search'))
-    if (!configuredObjectMode) throw new Error('Object mode was not configured')
-    configuredObjectMode.value = 'distributed_strict'
+    await inputValue(element(mounted.root, (node) => node.tag === 'input'), 'sample')
+    objectSearchMode.value = 'distributed_strict'
     search.objectSearched.value = true
     search.objectError.value = 'Strict coverage unavailable'
     search.complete.value = false

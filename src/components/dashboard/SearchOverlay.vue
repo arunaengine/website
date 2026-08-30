@@ -1,30 +1,26 @@
 <script lang="ts">
 /**
- * Browser measurements found the inline input overlapping adjacent controls at
- * 414 px, while it and its wrapper both fit at 480 px. Widths below this value
- * therefore use the compact trigger and top search panel.
+ * Below the md breakpoint the inline input is squeezed between the realm
+ * switcher and the top-bar icons, so those widths use the compact trigger and
+ * the full-width search panel instead.
  */
-export const TOP_BAR_SEARCH_COLLAPSE_PX = 480
+export const TOP_BAR_SEARCH_COLLAPSE_PX = 768
 </script>
 
 <script setup lang="ts">
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
+import Popover from '@/components/ui/Popover.vue'
 import Select from '@/components/ui/Select.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import CoverageIcon from '@/components/search/CoverageIcon.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealm } from '@/composables/useRealm'
 import { useRealmNodes } from '@/composables/useRealmNodes'
-import {
-  coverageComplete,
-  DEFAULT_OBJECT_SEARCH_MODE,
-  OBJECT_SEARCH_MODE_LABELS,
-  useUnifiedSearch,
-} from '@/composables/useUnifiedSearch'
+import { useSearchSettings } from '@/composables/useSearchSettings'
+import { OBJECT_SEARCH_MODE_LABELS, useUnifiedSearch } from '@/composables/useUnifiedSearch'
 import { truncateMiddle } from '@/lib/utils'
-import type { ObjectSearchMode } from '@/lib/api'
-import { Search, X } from '@lucide/vue'
+import { Search, Settings2, X } from '@lucide/vue'
 import { useMediaQuery } from '@vueuse/core'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -40,10 +36,6 @@ interface QuickItem {
   routeParams: Record<string, string>
   routeQuery?: Record<string, string>
 }
-
-type QuickListEntry =
-  | { kind: 'item'; item: QuickItem }
-  | { kind: 'object-notes'; key: 'object-notes' }
 
 const QUICK_KIND_LABELS: Record<QuickSection, string> = {
   datasets: 'Dataset',
@@ -69,7 +61,7 @@ const { realm } = useRealm()
 const { authToken } = useAruna()
 const { displayName: nodeDisplayName, isLocalNode } = useRealmNodes()
 const router = useRouter()
-const quickObjectMode = ref<ObjectSearchMode>(DEFAULT_OBJECT_SEARCH_MODE)
+const { objectSearchMode } = useSearchSettings()
 const objectModeOptions = Object.entries(OBJECT_SEARCH_MODE_LABELS).map(([value, label]) => ({ value, label }))
 
 // Quick search is server-backed only: the catalog is paged, so a client-side
@@ -79,7 +71,6 @@ const {
   groups: quickGroups,
   users: quickUsers,
   objects: quickObjects,
-  objectCoverage: quickObjectCoverage,
   objectError: quickObjectError,
   objectSearched: quickObjectSearched,
   pending: quickPending,
@@ -87,7 +78,7 @@ const {
   error: quickError,
   complete: quickComplete,
   retry: retrySearch,
-} = useUnifiedSearch(q, { limit: 5, includeObjects: true, objectMode: quickObjectMode })
+} = useUnifiedSearch(q, { limit: 5, includeObjects: true, objectMode: objectSearchMode })
 
 function objectParentPrefix(key: string): string | undefined {
   const separator = key.lastIndexOf('/')
@@ -139,24 +130,25 @@ const quickStale = computed(() => quickPending.value && items.value.length > 0)
 const quickCoverageShown = computed(() =>
   quickSearched.value || quickObjectSearched.value || Boolean(quickError.value),
 )
-const quickObjectPartial = computed(() =>
-  Boolean(quickObjectCoverage.value) && !coverageComplete(quickObjectCoverage.value),
-)
 const quickObjectErrorDetail = computed(() => {
   if (!quickObjectError.value) return ''
-  const strict = quickObjectMode.value === 'distributed_strict'
+  const strict = objectSearchMode.value === 'distributed_strict'
     ? ' Strict mode did not fall back to best-effort.'
     : ''
-  return `${OBJECT_SEARCH_MODE_LABELS[quickObjectMode.value]} unavailable.${strict} ${quickObjectError.value}`.trim()
+  return `${OBJECT_SEARCH_MODE_LABELS[objectSearchMode.value]} unavailable.${strict} ${quickObjectError.value}`.trim()
 })
-const quickListEntries = computed<QuickListEntry[]>(() => {
-  const entries: QuickListEntry[] = items.value.map((item) => ({ kind: 'item', item }))
-  entries.splice(quickDocuments.value.length + quickObjects.value.length, 0, {
-    kind: 'object-notes',
-    key: 'object-notes',
-  })
-  return entries
-})
+// One line for the whole answer, so the flat list needs no section headers.
+const quickSummary = computed(() =>
+  ([
+    ['datasets', quickDocuments.value.length],
+    ['objects', quickObjects.value.length],
+    ['groups', quickGroups.value.length],
+    ['people', quickUsers.value.length],
+  ] as Array<[QuickSection, number]>)
+    .filter(([, count]) => count > 0)
+    .map(([section, count]) => `${count} ${QUICK_KIND_LABELS[section].toLowerCase()}${count === 1 ? '' : 's'}`)
+    .join(' · '),
+)
 const activeKey = computed(() => items.value[activeIndex.value]?.key ?? null)
 
 watch(items, () => (activeIndex.value = -1))
@@ -387,6 +379,29 @@ onBeforeUnmount(() => {
                 ⌘K
               </kbd>
             </div>
+            <Popover v-if="authToken" align="end">
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-9 w-9 shrink-0"
+                aria-label="Search settings"
+                title="Search settings"
+              >
+                <Settings2 class="h-4 w-4" aria-hidden="true" />
+              </Button>
+              <template #content>
+                <p class="mb-2 text-xs font-medium text-foreground">Object inventory mode</p>
+                <Select
+                  v-model="objectSearchMode"
+                  :options="objectModeOptions"
+                  aria-label="Object inventory search mode"
+                  class="h-8 text-xs"
+                />
+                <p class="mt-2 text-[11px] text-muted-foreground">
+                  How far data object search reaches across the realm's nodes, here and on the search page.
+                </p>
+              </template>
+            </Popover>
             <Button
               v-if="isNarrowSearch"
               variant="ghost"
@@ -408,18 +423,13 @@ onBeforeUnmount(() => {
                 : 'absolute top-11 overflow-hidden',
             ]"
           >
-            <div
-              v-if="authToken && q.trim().length >= 2"
-              class="flex items-center justify-between gap-2 border-b border-border/70 px-3 py-1.5"
+            <p
+              v-if="quickSummary"
+              class="border-b border-border/70 px-3 py-1.5 text-[11px] text-muted-foreground transition-opacity"
+              :class="quickStale ? 'opacity-40' : ''"
             >
-              <span class="text-[10px] font-medium text-muted-foreground">Object inventory mode</span>
-              <Select
-                v-model="quickObjectMode"
-                :options="objectModeOptions"
-                aria-label="Object inventory search mode"
-                class="h-7 w-auto text-[10px]"
-              />
-            </div>
+              {{ quickSummary }}
+            </p>
             <div
               id="quick-search-results"
               role="listbox"
@@ -427,87 +437,75 @@ onBeforeUnmount(() => {
               class="transition-opacity"
               :class="quickStale ? 'opacity-40' : ''"
             >
-              <template
-                v-for="entry in quickListEntries"
-                :key="entry.kind === 'item' ? entry.item.key : entry.key"
+              <button
+                v-for="item in items"
+                :id="'qs-' + item.key"
+                :key="item.key"
+                role="option"
+                :aria-selected="activeKey === item.key"
+                :class="[
+                  'flex w-full items-start gap-3 border-b border-border/70 px-3 py-2.5 text-left text-sm last:border-0 hover:bg-muted',
+                  activeKey === item.key ? 'bg-muted' : '',
+                ]"
+                @mousedown.prevent
+                @click="openItem(item)"
               >
-                <button
-                  v-if="entry.kind === 'item'"
-                  :id="'qs-' + entry.item.key"
-                  role="option"
-                  :aria-selected="activeKey === entry.item.key"
-                  :class="[
-                    'flex w-full items-start gap-3 border-b border-border/70 px-3 py-2.5 text-left text-sm last:border-0 hover:bg-muted',
-                    activeKey === entry.item.key ? 'bg-muted' : '',
-                  ]"
-                  @mousedown.prevent
-                  @click="openItem(entry.item)"
-                >
-                  <div class="flex-1 overflow-hidden">
-                    <div class="flex min-w-0 items-center gap-2">
-                      <div class="min-w-0 flex-1 truncate font-medium text-foreground">
-                        {{ entry.item.title }}
-                      </div>
-                      <Badge variant="outline" size="sm" class="shrink-0">
-                        {{ QUICK_KIND_LABELS[entry.item.section] }}
-                      </Badge>
+                <div class="flex-1 overflow-hidden">
+                  <div class="flex min-w-0 items-center gap-2">
+                    <div class="min-w-0 flex-1 truncate font-medium text-foreground">
+                      {{ item.title }}
                     </div>
-                    <div v-if="entry.item.subtitle" class="truncate text-xs text-muted-foreground">
-                      {{ entry.item.subtitle }}
-                    </div>
+                    <Badge variant="outline" size="sm" class="shrink-0">
+                      {{ QUICK_KIND_LABELS[item.section] }}
+                    </Badge>
                   </div>
-                </button>
-                <template v-else>
-                  <p
-                    v-if="quickObjectError"
-                    role="status"
-                    class="border-b border-border/70 bg-muted/20 px-3 py-2 text-[10px] text-muted-foreground"
-                  >
-                    {{ quickObjectErrorDetail }}
-                  </p>
-                  <p
-                    v-if="quickObjectSearched && !quickObjects.length && !quickPending && !quickObjectError"
-                    class="border-b border-border/70 px-3 py-2.5 text-xs text-muted-foreground"
-                  >
-                    {{ quickObjectPartial
-                      ? 'No visible live object was returned. Coverage is incomplete.'
-                      : 'No visible live object matched this query.' }}
-                  </p>
-                </template>
-              </template>
+                  <div v-if="item.subtitle" class="truncate text-xs text-muted-foreground">
+                    {{ item.subtitle }}
+                  </div>
+                </div>
+              </button>
             </div>
             <div v-if="quickPending && !items.length" class="px-3 py-2.5 text-xs text-muted-foreground">
               Searching…
             </div>
-            <div
-              v-if="q"
-              class="flex w-full items-center gap-2 border-t border-border bg-muted/30 px-3 py-2.5 text-left text-xs font-medium text-primary hover:bg-muted"
-            >
-              <button
-                class="min-w-0 flex-1 truncate text-left"
-                @mousedown.prevent
-                @click="openSearchPage"
-              >
-                See all results for "{{ q }}" in Search →
-              </button>
+            <div v-if="q" class="border-t border-border bg-muted/30">
               <div
-                v-if="quickCoverageShown"
-                role="status"
-                class="ml-auto flex shrink-0 items-center gap-1"
+                class="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs font-medium text-primary hover:bg-muted"
               >
-                <CoverageIcon compact :complete="quickComplete" @mousedown.prevent @click="openSearchPage" />
-                <Button
-                  v-if="!quickComplete"
-                  variant="ghost"
-                  size="sm"
-                  class="h-8 shrink-0 px-2 text-[10px]"
-                  :disabled="quickPending"
+                <button
+                  class="min-w-0 flex-1 truncate text-left"
                   @mousedown.prevent
-                  @click="retrySearch"
+                  @click="openSearchPage"
                 >
-                  Retry
-                </Button>
+                  See all results for "{{ q }}" in Search →
+                </button>
+                <div
+                  v-if="quickCoverageShown"
+                  role="status"
+                  class="ml-auto flex shrink-0 items-center gap-1"
+                >
+                  <CoverageIcon compact :complete="quickComplete" @mousedown.prevent @click="openSearchPage" />
+                  <Button
+                    v-if="!quickComplete"
+                    variant="ghost"
+                    size="sm"
+                    class="h-8 shrink-0 px-2 text-[10px]"
+                    :disabled="quickPending"
+                    @mousedown.prevent
+                    @click="retrySearch"
+                  >
+                    Retry
+                  </Button>
+                </div>
               </div>
+              <p
+                v-if="quickObjectError"
+                role="status"
+                :title="quickObjectErrorDetail"
+                class="truncate border-t border-border/70 px-3 py-1.5 text-[10px] text-muted-foreground"
+              >
+                {{ quickObjectErrorDetail }}
+              </p>
             </div>
           </div>
         </div>
