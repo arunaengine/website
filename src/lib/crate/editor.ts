@@ -42,6 +42,8 @@ export interface CrateDraft {
   visibility: 'group' | 'public'
   groupId?: string
   path?: string
+  /** The node's id for a stored dataset; the node mints it when it is created. */
+  documentId?: string
   /** The imported crate's @context and descriptor entity, preserved on save. */
   context?: unknown
   descriptor?: Record<string, unknown>

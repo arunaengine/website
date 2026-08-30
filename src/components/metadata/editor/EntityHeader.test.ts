@@ -21,6 +21,10 @@ const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', at
 const EmptyStub = defineComponent(() => () => null)
 const BadgeStub = defineComponent((_, { attrs, slots }) => () => h('span', attrs, slots.default?.()))
 const PopoverStub = defineComponent((_, { slots }) => () => h('div', [slots.default?.(), slots.content?.()]))
+const CopyStub = defineComponent({
+  props: { value: String, label: String },
+  setup: (props) => () => h('button', { 'aria-label': props.label }, props.value),
+})
 const InputStub = defineComponent({
   props: { modelValue: { type: [String, Number], default: '' } },
   emits: ['update:modelValue'],
@@ -38,9 +42,11 @@ const EntityHeader = compileClientComponent(new URL('./EntityHeader.vue', import
   '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
   '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+  '@/components/ui/CopyButton.vue': moduleDefault(CopyStub),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Notice.vue': moduleDefault(BadgeStub),
   '@/components/ui/Popover.vue': moduleDefault(PopoverStub),
+  '@/components/ui/Separator.vue': moduleDefault(EmptyStub),
   './TypeDialog.vue': moduleDefault(EmptyStub),
   '@/lib/crate/editor': Editor,
   '@/lib/utils': Utils,
@@ -70,6 +76,10 @@ function has(root: HostNode, label: string): boolean {
   return nodes(root).some((node) => node.props['aria-label'] === label)
 }
 
+function control(root: HostNode, label: string): HostNode {
+  return element(root, (node) => node.props['aria-label'] === label)
+}
+
 describe('EntityHeader', () => {
   it('counts what points at this entity and opens the pick', async () => {
     const selections: string[] = []
@@ -93,9 +103,30 @@ describe('EntityHeader', () => {
     const mounted = await mount('#ada-lovelace')
 
     expect(has(mounted.root, 'Identifier')).toBe(false)
-    await click(button(mounted.root, 'Edit identifier'))
+    await click(control(mounted.root, 'Edit identifier'))
 
     expect(has(mounted.root, 'Identifier')).toBe(true)
+    mounted.app.unmount()
+  })
+
+  it('offers no identifier for a dataset the node has not minted', async () => {
+    const mounted = await mount('./')
+
+    expect(has(mounted.root, 'Edit identifier')).toBe(false)
+    expect(has(mounted.root, 'Copy the dataset id')).toBe(false)
+    expect(content(mounted.root)).toContain('Dataset')
+    mounted.app.unmount()
+  })
+
+  it('shows the stored dataset id with a way to copy it', async () => {
+    const documentId = '01JD8ZK9YQ7X3F0ABCDEF'
+    const draft = { ...seeded(), documentId }
+    const mounted = await mountApp(EntityHeader, {
+      props: { draft, entity: Editor.rootEntity(draft), vocab: null },
+    })
+
+    expect(content(mounted.root)).toContain(Utils.truncateMiddle(documentId, 12, 8))
+    expect(control(mounted.root, 'Copy the dataset id').props['aria-label']).toBe('Copy the dataset id')
     mounted.app.unmount()
   })
 
@@ -104,8 +135,8 @@ describe('EntityHeader', () => {
     const selections: string[] = []
     const mounted = await mount('#ada-lovelace', updates, selections)
 
-    await click(button(mounted.root, 'Edit identifier'))
-    const input = element(mounted.root, (node) => node.props['aria-label'] === 'Identifier')
+    await click(control(mounted.root, 'Edit identifier'))
+    const input = control(mounted.root, 'Identifier')
     await typeValue(input, 'https://orcid.org/0000-0002-1825-0097')
     await (input.props.onKeydown as (event: { key: string }) => void)({ key: 'Enter' })
     await flush()

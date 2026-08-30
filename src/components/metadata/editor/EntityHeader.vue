@@ -2,9 +2,11 @@
 import { computed, ref } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import CopyButton from '@/components/ui/CopyButton.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Popover from '@/components/ui/Popover.vue'
+import Separator from '@/components/ui/Separator.vue'
 import TypeDialog from './TypeDialog.vue'
 import {
   displayName,
@@ -21,7 +23,7 @@ import {
 } from '@/lib/crate/editor'
 import { truncateMiddle } from '@/lib/utils'
 import type { VocabIndex } from '@/lib/profiles/vocabulary'
-import { Plus, Trash2, X } from '@lucide/vue'
+import { Pencil, Plus, Trash2, X } from '@lucide/vue'
 
 const props = defineProps<{ draft: CrateDraft; entity: DraftEntity; vocab: VocabIndex | null }>()
 const emit = defineEmits<{
@@ -36,10 +38,12 @@ const confirmRemove = ref(false)
 
 const group = computed(() => entityGroup(props.draft, props.entity))
 const badge = computed(() => {
-  if (group.value === 'root') return 'Root'
+  if (group.value === 'root') return 'Dataset'
   if (group.value !== 'data') return 'Contextual'
   return props.entity.types.map(typeLabel).includes('File') ? 'File' : 'Dataset'
 })
+// A new dataset has no id yet: the node mints one when it is created.
+const datasetId = computed(() => (group.value === 'root' ? props.draft.documentId ?? '' : ''))
 const uses = computed(() => referencesTo(props.draft, props.entity.id).map((use) => ({
   ...use,
   name: displayName(findEntity(props.draft, use.entityId)) || use.entityId,
@@ -71,62 +75,36 @@ function remove() {
 </script>
 
 <template>
-  <header class="space-y-3 border-b border-border px-5 py-4">
-    <div class="flex flex-wrap items-start justify-between gap-3">
-      <div class="min-w-0 flex-1 space-y-1">
-        <div class="flex min-w-0 items-center gap-2">
-          <Badge :variant="group === 'root' ? 'default' : group === 'data' ? 'sky' : 'secondary'">
-            {{ badge }}
-          </Badge>
-          <h2 class="min-w-0 truncate font-display text-sm font-semibold text-aruna-navy">
-            {{ displayName(entity) }}
-          </h2>
-          <Popover v-if="uses.length" align="start">
-            <button
-              type="button"
-              class="chip h-6 shrink-0 hover:text-foreground"
-              :aria-label="`Used by ${uses.length}`"
-            >
-              Used by {{ uses.length }}
-            </button>
-            <template #content>
-              <ul class="space-y-1">
-                <li v-for="use in uses" :key="`${use.entityId}:${use.property}:${use.index}`">
-                  <button
-                    type="button"
-                    class="w-full truncate rounded-sm px-1 py-1 text-left text-xs text-muted-foreground hover:bg-muted/40 hover:text-foreground"
-                    @click="emit('select', use.entityId)"
-                  >
-                    {{ use.name }} · {{ use.label }}
-                  </button>
-                </li>
-              </ul>
-            </template>
-          </Popover>
-        </div>
-        <div class="flex items-center gap-2 pl-1">
-          <Input
-            v-if="idEditing"
-            v-model="idDraft"
-            class="h-8 font-mono text-xs"
-            aria-label="Identifier"
-            @keydown.enter="commitId"
-            @blur="commitId"
-          />
-          <template v-else>
-            <span class="hash truncate" :title="entity.id">{{ truncateMiddle(entity.id, 18, 10) }}</span>
-            <Button
-              variant="link"
-              size="sm"
-              class="h-auto p-0 text-[11px]"
-              aria-label="Edit identifier"
-              @click="startIdEdit"
-            >
-              Edit identifier
-            </Button>
-          </template>
-        </div>
-      </div>
+  <header class="space-y-2.5 border-b border-border px-5 py-4">
+    <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+      <Badge :variant="group === 'root' ? 'default' : group === 'data' ? 'sky' : 'secondary'">
+        {{ badge }}
+      </Badge>
+      <h2 class="min-w-0 flex-1 truncate font-display text-sm font-semibold text-aruna-navy">
+        {{ displayName(entity) }}
+      </h2>
+      <Popover v-if="uses.length" align="start">
+        <button
+          type="button"
+          class="chip h-6 shrink-0 hover:text-foreground"
+          :aria-label="`Used by ${uses.length}`"
+        >
+          Used by {{ uses.length }}
+        </button>
+        <template #content>
+          <ul class="space-y-1">
+            <li v-for="use in uses" :key="`${use.entityId}:${use.property}:${use.index}`">
+              <button
+                type="button"
+                class="w-full truncate rounded-sm px-1 py-1 text-left text-xs text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                @click="emit('select', use.entityId)"
+              >
+                {{ use.name }} · {{ use.label }}
+              </button>
+            </li>
+          </ul>
+        </template>
+      </Popover>
       <div class="flex shrink-0 items-center gap-2">
         <slot name="view" />
         <Button
@@ -142,6 +120,29 @@ function remove() {
     </div>
 
     <div class="flex flex-wrap items-center gap-1.5">
+      <template v-if="group !== 'root'">
+        <Input
+          v-if="idEditing"
+          v-model="idDraft"
+          class="h-8 w-72 max-w-full font-mono text-xs"
+          aria-label="Identifier"
+          @keydown.enter="commitId"
+          @blur="commitId"
+        />
+        <template v-else>
+          <span class="hash truncate" :title="entity.id">{{ truncateMiddle(entity.id, 18, 10) }}</span>
+          <Button variant="ghost" size="icon-sm" aria-label="Edit identifier" @click="startIdEdit">
+            <Pencil class="h-3.5 w-3.5" />
+          </Button>
+        </template>
+        <Separator orientation="vertical" class="mx-1 h-4" />
+      </template>
+      <template v-else-if="datasetId">
+        <span class="hash truncate" :title="datasetId">{{ truncateMiddle(datasetId, 12, 8) }}</span>
+        <CopyButton :value="datasetId" label="Copy the dataset id" />
+        <Separator orientation="vertical" class="mx-1 h-4" />
+      </template>
+
       <span v-for="type in entity.types" :key="type" class="chip h-6">
         {{ typeLabel(type) }}
         <button
