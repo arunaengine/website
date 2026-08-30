@@ -117,6 +117,34 @@ const AddEntityDialog = compileClientComponent(new URL('./AddEntityDialog.vue', 
 const draft = Editor.newDraft()
 type Created = { draft: Editor.CrateDraft; entity: Editor.DraftEntity }
 
+// An organization typed by hand: same name as the ORCID affiliation, other id.
+function withInstitute(): Editor.CrateDraft {
+  return Editor.addEntity(draft, { type: 'Organization', name: 'Example Institute', id: '#institute' }).draft
+}
+
+function orcidPayload(institution: string) {
+  return {
+    'expanded-result': [{
+      'orcid-id': '0000-0002-1825-0097',
+      'given-names': 'Ada',
+      'family-names': 'Lovelace',
+      'institution-name': [institution],
+    }],
+  }
+}
+
+const ROR_AFFILIATION = {
+  items: [{
+    chosen: true,
+    organization: {
+      id: 'https://ror.org/03yrm5c26',
+      names: [{ value: 'Example Institute', types: ['ror_display'] }],
+      links: [{ type: 'website', value: 'https://example.test' }],
+      locations: [{ geonames_details: { country_name: 'Germany' } }],
+    },
+  }],
+}
+
 function mount(props: Record<string, unknown> = {}, created: Created[] = []) {
   return mountApp(AddEntityDialog, {
     props: { open: true, draft, vocab, onCreated: (value: Created) => created.push(value), ...props },
@@ -352,6 +380,71 @@ describe('AddEntityDialog', () => {
       id: 'https://orcid.org/0000-0001-2345-6789',
       properties: { name: [{ value: 'Grace Hopper' }] },
     })
+    mounted.app.unmount()
+  })
+
+  it('reuses the organization a person is affiliated with', async () => {
+    // Two people of one institute must not leave two Organization entities.
+    vi.useFakeTimers()
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => orcidPayload('Example  institute') })))
+    const created: Created[] = []
+    const mounted = await mount({ draft: withInstitute() }, created)
+
+    await click(button(mounted.root, 'Person'))
+    await typeValue(field(mounted.root, 'Name'), 'ada lovelace')
+    vi.advanceTimersByTime(300)
+    for (let round = 0; round < 6; round += 1) await flush()
+    await click(element(mounted.root, (node) => node.props.role === 'option'))
+    await click(button(mounted.root, 'Create'))
+
+    const organizations = created[0].draft.entities.filter((entity) => entity.types.includes('Organization'))
+    expect(organizations.map((entity) => entity.id)).toEqual(['#institute'])
+    expect(created[0].entity.properties.affiliation).toEqual([{ kind: 'reference', value: '#institute' }])
+    mounted.app.unmount()
+  })
+
+  it('reuses an entity the typed name already stands for', async () => {
+    vi.useFakeTimers()
+    const seeded = withInstitute()
+    const created: Created[] = []
+    const mounted = await mount({ draft: seeded }, created)
+
+    await click(button(mounted.root, 'Organization'))
+    await typeValue(field(mounted.root, 'Name'), '  example institute ')
+    expect(content(mounted.root)).toContain('Matches Example Institute already in this dataset; it will be reused.')
+
+    await click(button(mounted.root, 'Create'))
+
+    expect(created[0].entity.id).toBe('#institute')
+    expect(created[0].draft.entities).toHaveLength(seeded.entities.length)
+    mounted.app.unmount()
+  })
+
+  it('upgrades an ORCID affiliation to its ROR record', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('fetch', vi.fn(async (url: unknown) => ({
+      ok: true,
+      json: async () => (String(url).includes('ror.org') ? ROR_AFFILIATION : orcidPayload('Example Institute')),
+    })))
+    const created: Created[] = []
+    const mounted = await mount({}, created)
+
+    await click(button(mounted.root, 'Person'))
+    await typeValue(field(mounted.root, 'Name'), 'ada lovelace')
+    vi.advanceTimersByTime(300)
+    for (let round = 0; round < 6; round += 1) await flush()
+    await click(element(mounted.root, (node) => node.props.role === 'option'))
+    for (let round = 0; round < 6; round += 1) await flush()
+    await click(button(mounted.root, 'Create'))
+
+    expect(created[0].entity.properties.affiliation)
+      .toEqual([{ kind: 'reference', value: 'https://ror.org/03yrm5c26' }])
+    expect(Editor.findEntity(created[0].draft, 'https://ror.org/03yrm5c26')?.properties).toMatchObject({
+      name: [{ value: 'Example Institute' }],
+      url: [{ kind: 'url', value: 'https://example.test' }],
+      addressCountry: [{ value: 'Germany' }],
+    })
+    expect(Editor.findEntity(created[0].draft, '#org-example-institute')).toBeUndefined()
     mounted.app.unmount()
   })
 

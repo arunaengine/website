@@ -1,6 +1,6 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h } from 'vue'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   button,
   click,
@@ -16,6 +16,20 @@ import {
 } from '@/test/clientRender'
 import * as Editor from '@/lib/crate/editor'
 import * as Utils from '@/lib/utils'
+import type { LookupHit } from '@/lib/lookup/types'
+
+const ROR_HIT: LookupHit = {
+  id: 'https://ror.org/03yrm5c26',
+  label: 'Example Institute',
+  providerId: 'ror',
+  entity: {
+    id: 'https://ror.org/03yrm5c26',
+    type: 'Organization',
+    properties: { name: 'Example Institute' },
+    roles: ['publisher'],
+  },
+  relatedEntities: [],
+}
 
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
 const EmptyStub = defineComponent(() => () => null)
@@ -37,6 +51,12 @@ const InputStub = defineComponent({
   },
 })
 
+const rorMatch = vi.fn<(name: string) => Promise<LookupHit | null>>(async () => null)
+afterEach(() => {
+  rorMatch.mockReset()
+  rorMatch.mockResolvedValue(null)
+})
+
 const EntityHeader = compileClientComponent(new URL('./EntityHeader.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
@@ -49,6 +69,7 @@ const EntityHeader = compileClientComponent(new URL('./EntityHeader.vue', import
   '@/components/ui/Separator.vue': moduleDefault(EmptyStub),
   './TypeDialog.vue': moduleDefault(EmptyStub),
   '@/lib/crate/editor': Editor,
+  '@/lib/lookup/ror': { matchRorByName: rorMatch },
   '@/lib/utils': Utils,
 })
 
@@ -68,6 +89,21 @@ function mount(entityId: string, updates: Editor.CrateDraft[] = [], selections: 
       vocab: null,
       onUpdate: (next: Editor.CrateDraft) => updates.push(next),
       onSelect: (id: string) => selections.push(id),
+    },
+  })
+}
+
+function mountOrg(
+  properties: Record<string, Editor.DraftValue[]> = {},
+  updates: Editor.CrateDraft[] = [],
+) {
+  const added = Editor.addEntity(seeded(), { type: 'Organization', name: 'Example Institute', properties })
+  return mountApp(EntityHeader, {
+    props: {
+      draft: added.draft,
+      entity: added.entity,
+      vocab: null,
+      onUpdate: (next: Editor.CrateDraft) => updates.push(next),
     },
   })
 }
@@ -128,6 +164,43 @@ describe('EntityHeader', () => {
     expect(content(mounted.root)).toContain(Utils.truncateMiddle(documentId, 12, 8))
     expect(control(mounted.root, 'Copy the dataset id').props['aria-label']).toBe('Copy the dataset id')
     mounted.app.unmount()
+  })
+
+  it('adds a confident ROR to the identifiers', async () => {
+    rorMatch.mockResolvedValue(ROR_HIT)
+    const updates: Editor.CrateDraft[] = []
+    const mounted = await mountOrg({}, updates)
+
+    await click(button(mounted.root, 'Find ROR'))
+    expect(rorMatch).toHaveBeenCalledWith('Example Institute')
+    expect(content(mounted.root)).toContain('Example Institute, ror.org/03yrm5c26')
+
+    await click(button(mounted.root, 'Apply'))
+
+    expect(Editor.findEntity(updates[0], '#example-institute')).toMatchObject({
+      id: '#example-institute',
+      properties: { identifier: [{ kind: 'url', value: 'https://ror.org/03yrm5c26' }] },
+    })
+    mounted.app.unmount()
+  })
+
+  it('says when no ROR is confident enough', async () => {
+    const mounted = await mountOrg()
+
+    await click(button(mounted.root, 'Find ROR'))
+
+    expect(content(mounted.root)).toContain('No confident ROR match for this name.')
+    mounted.app.unmount()
+  })
+
+  it('asks for a ROR only where one is missing', async () => {
+    const withRor = await mountOrg({ identifier: [{ kind: 'url', value: 'https://ror.org/03yrm5c26' }] })
+    expect(content(withRor.root)).not.toContain('Find ROR')
+    withRor.app.unmount()
+
+    const person = await mount('#ada-lovelace')
+    expect(content(person.root)).not.toContain('Find ROR')
+    person.app.unmount()
   })
 
   it('rewrites every reference when the identifier changes', async () => {

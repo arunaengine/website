@@ -17,6 +17,8 @@ import {
   addEntity,
   addValue,
   autoId,
+  displayName,
+  findSimilarEntity,
   idHint,
   linkProperties,
   propertyKey,
@@ -31,7 +33,7 @@ import {
 } from '@/lib/crate/editor'
 import { defaultProperties, defaultRows } from '@/lib/crate/typeDefaults'
 import { fetchOrcidRecord, normalizeOrcidId } from '@/lib/lookup/orcid'
-import { fetchRorRecord, normalizeRorId } from '@/lib/lookup/ror'
+import { fetchRorRecord, matchRorByName, normalizeRorId } from '@/lib/lookup/ror'
 import type { ContextEntity, LookupHit, RegistryRecord } from '@/lib/lookup/types'
 import type { VocabIndex } from '@/lib/profiles/vocabulary'
 import { errorMessage } from '@/lib/utils'
@@ -69,6 +71,8 @@ const extra = ref<Record<string, DraftValue[]>>({})
 const related = ref<ContextEntity[]>([])
 // Empty means the entity is created without any link; a link is always a choice.
 const linkAs = ref('')
+// A ROR match belongs to the hit it was started for, and to no later one.
+let hitToken = 0
 
 const linkOptions = computed(() => {
   if (!props.offerLink || !type.value) return []
@@ -109,6 +113,7 @@ watch(() => props.open, (open) => {
   extra.value = {}
   related.value = []
   linkAs.value = ''
+  hitToken += 1
 }, { immediate: true })
 
 function refreshId() {
@@ -165,6 +170,46 @@ function useHit(hit: LookupHit) {
     extra.value = { ...extra.value, affiliation: [{ kind: 'reference', value: String(affiliation['@id']) }] }
   }
   related.value = hit.relatedEntities
+  hitToken += 1
+  void enrichRelated(hitToken)
+}
+
+/** Points every reference at `to` instead of the identifier it was given. */
+function retarget(
+  properties: Record<string, DraftValue[]>,
+  from: string,
+  to: string,
+): Record<string, DraftValue[]> {
+  if (from === to) return properties
+  return Object.fromEntries(Object.entries(properties).map(([key, list]) => [
+    key,
+    list.map((value) => (value.kind === 'reference' && value.value === from ? { ...value, value: to } : value)),
+  ]))
+}
+
+function stubName(stub: ContextEntity): string {
+  return typeof stub.properties.name === 'string' ? stub.properties.name : ''
+}
+
+function stubProperties(stub: ContextEntity): Record<string, DraftValue[]> {
+  const value = (key: string) => (typeof stub.properties[key] === 'string' ? String(stub.properties[key]) : '')
+  return {
+    ...(value('url') ? { url: [{ kind: 'url' as const, value: value('url') }] } : {}),
+    ...(value('addressCountry') ? { addressCountry: text(value('addressCountry')) } : {}),
+  }
+}
+
+// An ORCID affiliation carries no ROR. A confident registry match upgrades the
+// stub to the real organization; one that arrives after Create changes nothing.
+async function enrichRelated(token: number) {
+  for (const stub of related.value) {
+    if (normalizeRorId(stub.id) || !stubName(stub)) continue
+    const match = await matchRorByName(stubName(stub)).catch(() => null)
+    if (token !== hitToken) return
+    if (!match) continue
+    related.value = related.value.map((entity) => (entity.id === stub.id ? match.entity : entity))
+    extra.value = retarget(extra.value, stub.id, match.entity.id)
+  }
 }
 
 // Dropping the registry id gives the entity back its generated identifier.
@@ -172,6 +217,7 @@ function forgetHit() {
   extra.value = {}
   related.value = []
   idTouched.value = false
+  hitToken += 1
   refreshId()
 }
 
@@ -180,27 +226,44 @@ const startsWith = computed(() => defaultProperties(props.vocab, type.value)
 
 const canCreate = computed(() => Boolean(type.value && identifier.value.trim()))
 
+// A registry id names one specific record, so it decides against a namesake.
+const registryId = computed(() => normalizeOrcidId(identifier.value) ?? normalizeRorId(identifier.value) ?? '')
+
+const reuse = computed(() => {
+  if (!type.value) return undefined
+  const match = findSimilarEntity(props.draft, type.value, name.value)
+  if (!match || match.id === rootId(props.draft)) return undefined
+  return registryId.value && registryId.value !== match.id ? undefined : match
+})
+
 function create() {
   if (!canCreate.value) return
   let base = props.draft
-  for (const entity of related.value) {
-    const types = Array.isArray(entity.type) ? entity.type : [entity.type]
-    const label = typeof entity.properties.name === 'string' ? entity.properties.name : ''
-    base = addEntity(base, { type: types[0] ?? 'Thing', id: entity.id, name: label }).draft
+  let entity = reuse.value
+  if (!entity) {
+    let properties: Record<string, DraftValue[]> = { ...defaultRows(props.vocab, type.value), ...extra.value }
+    for (const stub of related.value) {
+      const types = Array.isArray(stub.type) ? stub.type : [stub.type]
+      const known = findSimilarEntity(base, types[0] ?? 'Thing', stubName(stub))
+      if (known) {
+        properties = retarget(properties, stub.id, known.id)
+        continue
+      }
+      base = addEntity(base, {
+        type: types[0] ?? 'Thing',
+        id: stub.id,
+        name: stubName(stub),
+        properties: stubProperties(stub),
+      }).draft
+    }
+    const created = addEntity(base, { type: type.value, name: name.value, id: identifier.value, properties })
+    base = created.draft
+    entity = created.entity
   }
-  const created = addEntity(base, {
-    type: type.value,
-    name: name.value,
-    id: identifier.value,
-    properties: { ...defaultRows(props.vocab, type.value), ...extra.value },
-  })
   const linked = linkAs.value
-    ? addValue(created.draft, rootId(created.draft), linkAs.value, {
-        kind: 'reference',
-        value: created.entity.id,
-      })
-    : created.draft
-  emit('created', { draft: linked, entity: created.entity })
+    ? addValue(base, rootId(base), linkAs.value, { kind: 'reference', value: entity.id })
+    : base
+  emit('created', { draft: linked, entity })
   emit('update:open', false)
 }
 </script>
@@ -267,6 +330,9 @@ function create() {
             <Notice v-if="lookupError" tone="warning" class="break-words">{{ lookupError }}</Notice>
           </div>
           <Input v-else v-model="name" class="mt-1" aria-label="Name" autofocus @keydown.enter="create" />
+          <Notice v-if="reuse" tone="info" class="mt-2 break-words">
+            Matches {{ displayName(reuse) }} already in this dataset; it will be reused.
+          </Notice>
         </div>
 
         <div class="min-w-0">

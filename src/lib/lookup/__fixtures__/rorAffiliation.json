@@ -1,0 +1,30 @@
+{
+  "items": [
+    {
+      "substring": "Example Institute",
+      "score": 0.5,
+      "chosen": false,
+      "matching_type": "COMMON TERMS",
+      "organization": {
+        "id": "https://ror.org/02nv7yv05",
+        "names": [{ "value": "Example Institute of Physics", "types": ["ror_display"] }]
+      }
+    },
+    {
+      "substring": "Example Institute",
+      "score": 1.0,
+      "chosen": true,
+      "matching_type": "PHRASE",
+      "organization": {
+        "id": "https://ror.org/03yrm5c26",
+        "names": [
+          { "value": "Example Institute", "types": ["ror_display"] },
+          { "value": "EI", "types": ["acronym"] }
+        ],
+        "links": [{ "type": "website", "value": "https://example.test" }],
+        "locations": [{ "geonames_details": { "country_name": "Germany" } }]
+      }
+    }
+  ],
+  "number_of_results": 2
+}

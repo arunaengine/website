@@ -25,6 +25,20 @@ interface RorSearchResponse {
   items?: RorItem[]
 }
 
+/** One entry of the affiliation endpoint: a candidate ROR scored against a name. */
+interface RorAffiliationItem {
+  chosen?: boolean
+  organization?: RorItem
+}
+
+interface RorAffiliationResponse {
+  items?: RorAffiliationItem[]
+}
+
+function normalName(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
 export function normalizeRorId(value: string): string | undefined {
   const id = rorOf(value.trim())
   return id ? `https://ror.org/${id}` : undefined
@@ -76,6 +90,34 @@ export async function fetchRorRecord(value: string, signal?: AbortSignal): Promi
   const response = await fetch(`${ROR_SEARCH_URL}/${rorOf(id)}`, { signal })
   if (!response.ok) throw new LookupResponseError(response.status, `ROR answered ${response.status}.`)
   return rorRecord(id, await response.json())
+}
+
+/**
+ * The single organization an affiliation string stands for: the item ROR marked
+ * `chosen`, or, when the response marks none, a top hit whose display name is
+ * the query itself. Anything less confident is no match at all.
+ */
+export function rorAffiliationHit(query: string, payload: unknown): LookupHit | null {
+  const items = payload && typeof payload === 'object'
+    ? (payload as RorAffiliationResponse).items
+    : undefined
+  if (!Array.isArray(items) || !items.length) return null
+  const marked = items.some((item) => typeof item.chosen === 'boolean')
+  const item = marked ? items.find((entry) => entry.chosen === true) : items[0]
+  const [hit] = item?.organization ? rorResults({ items: [item.organization] }, 1) : []
+  if (!hit) return null
+  return marked || normalName(hit.label) === normalName(query) ? hit : null
+}
+
+/** The confident ROR behind an organization name, or null when there is none. */
+export async function matchRorByName(name: string, signal?: AbortSignal): Promise<LookupHit | null> {
+  const query = name.trim()
+  if (!query) return null
+  const url = new URL(ROR_SEARCH_URL)
+  url.searchParams.set('affiliation', query)
+  const response = await fetch(url, { signal })
+  if (!response.ok) throw new LookupResponseError(response.status, `ROR answered ${response.status}.`)
+  return rorAffiliationHit(query, await response.json())
 }
 
 export const rorProvider: LookupProvider = {

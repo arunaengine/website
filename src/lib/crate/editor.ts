@@ -4,6 +4,7 @@
 // on the way out and parsed on the way in, keeping whatever this model cannot
 // express verbatim.
 
+import { rorOf } from '@/lib/identifiers'
 import { slugify, uniqueId } from '@/lib/profiles/emit'
 import { isAbsoluteUri, isRecord, normalizeTypeUri, SCHEMA_ORG, termNameFromUri } from '@/lib/profiles/uri'
 import { RO_CRATE_PROFILE_IRI, type SubcrateLink } from '@/lib/subcrates'
@@ -99,6 +100,41 @@ export function displayName(entity: DraftEntity | undefined): string {
 /** The name someone typed, without the identifier fallback of displayName. */
 export function entityName(entity: DraftEntity | undefined): string {
   return entity?.properties.name?.[0]?.value.trim() ?? ''
+}
+
+/** The form names are compared in: trimmed, casefolded, one space between words. */
+export function normalizedName(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+/** The bare ROR id an entity carries, in its identifier or as its own id. */
+export function entityRor(entity: DraftEntity): string | undefined {
+  const carried = [entity.id, ...(entity.properties.identifier ?? []).map((value) => value.value)]
+  for (const value of carried) {
+    const id = rorOf(value)
+    if (id) return id
+  }
+  return undefined
+}
+
+/**
+ * An entity already in the draft that stands for the same thing: same type, and
+ * either the same normalized name or the same ror.org id. No fuzzy scoring.
+ */
+export function findSimilarEntity(
+  draft: CrateDraft,
+  type: string,
+  name: string,
+): DraftEntity | undefined {
+  const wanted = normalizedName(name)
+  if (!wanted) return undefined
+  const label = typeLabel(type)
+  const ror = rorOf(name.trim())
+  return draft.entities.find((entity) => {
+    if (!entity.types.some((candidate) => typeLabel(candidate) === label)) return false
+    if (ror && entityRor(entity) === ror) return true
+    return normalizedName(entityName(entity)) === wanted
+  })
 }
 
 export function typeLabel(type: string): string {

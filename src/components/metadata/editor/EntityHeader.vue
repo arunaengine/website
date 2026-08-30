@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
@@ -9,8 +9,10 @@ import Popover from '@/components/ui/Popover.vue'
 import Separator from '@/components/ui/Separator.vue'
 import TypeDialog from './TypeDialog.vue'
 import {
+  addValue,
   displayName,
   entityGroup,
+  entityRor,
   findEntity,
   propertyTerm,
   referencesTo,
@@ -21,7 +23,9 @@ import {
   type CrateDraft,
   type DraftEntity,
 } from '@/lib/crate/editor'
+import { matchRorByName } from '@/lib/lookup/ror'
 import { truncateMiddle } from '@/lib/utils'
+import type { LookupHit } from '@/lib/lookup/types'
 import type { VocabIndex } from '@/lib/profiles/vocabulary'
 import { Pencil, Plus, Trash2, X } from '@lucide/vue'
 
@@ -71,6 +75,38 @@ function remove() {
   confirmRemove.value = false
   emit('update', removeEntity(props.draft, props.entity.id).draft)
   emit('select', props.draft.entities[0]?.id ?? '')
+}
+
+const rorBusy = ref(false)
+const rorHit = ref<LookupHit | null>(null)
+const rorNote = ref('')
+const needsRor = computed(() =>
+  props.entity.types.some((type) => typeLabel(type) === 'Organization') && !entityRor(props.entity))
+
+watch(() => props.entity.id, () => {
+  rorHit.value = null
+  rorNote.value = ''
+})
+
+async function findRor() {
+  rorBusy.value = true
+  rorNote.value = ''
+  rorHit.value = null
+  try {
+    rorHit.value = await matchRorByName(displayName(props.entity))
+    if (!rorHit.value) rorNote.value = 'No confident ROR match for this name.'
+  } catch {
+    rorNote.value = 'ROR could not be reached.'
+  } finally {
+    rorBusy.value = false
+  }
+}
+
+// The ROR joins the identifiers; the entity keeps the @id everything points at.
+function applyRor() {
+  const hit = rorHit.value
+  rorHit.value = null
+  if (hit) emit('update', addValue(props.draft, props.entity.id, 'identifier', { kind: 'url', value: hit.id }))
 }
 </script>
 
@@ -158,8 +194,27 @@ function remove() {
       <Button variant="ghost" size="sm" class="h-6 px-2 text-[11px]" @click="typeOpen = true">
         <Plus class="h-3 w-3" /> Add type
       </Button>
+      <Button
+        v-if="needsRor"
+        variant="ghost"
+        size="sm"
+        class="h-6 px-2 text-[11px] text-muted-foreground"
+        :disabled="rorBusy"
+        @click="findRor"
+      >
+        {{ rorBusy ? 'Searching ROR' : 'Find ROR' }}
+      </Button>
       <TypeDialog v-if="typeOpen" :open="typeOpen" :vocab="vocab" @update:open="(value) => (typeOpen = value)" @pick="addType" />
     </div>
+
+    <Notice v-if="rorHit" tone="info">
+      {{ rorHit.label }}, {{ rorHit.id.replace('https://', '') }}
+      <span class="mt-1 flex gap-2">
+        <Button variant="outline" size="sm" @click="applyRor">Apply</Button>
+        <Button variant="ghost" size="sm" @click="rorHit = null">Dismiss</Button>
+      </span>
+    </Notice>
+    <Notice v-else-if="rorNote" tone="info">{{ rorNote }}</Notice>
 
     <Notice v-if="confirmRemove" tone="warning">
       Removing this also drops {{ uses.length === 1 ? '1 reference' : `${uses.length} references` }} to it.
