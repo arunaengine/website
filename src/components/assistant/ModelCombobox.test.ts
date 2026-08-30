@@ -16,9 +16,28 @@ import { isValidModelId, normalizeModelId } from '@/lib/assistant/modelOptions'
 import { cn } from '@/lib/utils'
 
 const CHAT_MODELS = [
-  'gpt-5.6-sol', 'gpt-5.6-luna', 'gpt-5.5', 'gpt-5.4', 'gpt-5.3-codex', 'gpt-5',
+  'gpt-5.6-sol', 'gpt-5.6-luna', 'gpt-5.6-terra', 'gpt-5.5', 'gpt-5.4', 'gpt-5.3-codex', 'gpt-5',
   'gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'o3', 'o4-mini', 'chatgpt-4o-latest',
 ]
+
+// The list is portaled in the browser; here the stubs only keep it mounted
+// while the combobox says it is open.
+const OPEN = Symbol('popover-open')
+const RootStub = defineComponent({
+  props: { open: Boolean },
+  setup: (props, { slots }) => {
+    provide(OPEN, () => props.open)
+    return () => h('div', slots.default?.())
+  },
+})
+const PortalStub = defineComponent((_, { slots }) => {
+  const isOpen = inject<() => boolean>(OPEN, () => true)
+  return () => (isOpen() ? h('div', slots.default?.()) : null)
+})
+const SlotStub = defineComponent({
+  inheritAttrs: false,
+  setup: (_, { attrs, slots }) => () => h('div', attrs, slots.default?.()),
+})
 
 const InputStub = defineComponent({
   props: { modelValue: { type: String, default: '' } },
