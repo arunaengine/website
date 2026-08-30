@@ -189,7 +189,7 @@
 }
 
 @layer utilities {
-  /* Subtle brand gradient: hero/splash surfaces only */
+  /* Subtle brand gradient: hero, splash and page-header accents only */
   .wash-primary {
     background-image: radial-gradient(
         ellipse at 15% -10%,

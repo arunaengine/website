@@ -24,8 +24,14 @@ const { realm } = useRealm()
       cn('relative overflow-hidden border-b border-border/80 bg-background/70 backdrop-blur', $props.class)
     "
   >
+    <!-- The landing hero's grid and wash, dimmed to a page accent. -->
+    <div
+      aria-hidden="true"
+      class="grid-faint pointer-events-none absolute inset-0 opacity-60 [mask-image:radial-gradient(ellipse_at_50%_0%,black_20%,transparent_75%)]"
+    />
+    <div aria-hidden="true" class="wash-primary pointer-events-none absolute inset-0 opacity-60" />
     <div class="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-aruna-aqua/60 to-transparent" />
-    <div class="container flex flex-col gap-3 pb-5 pt-6">
+    <div class="container relative flex flex-col gap-3 pb-5 pt-6">
       <div class="flex items-center gap-2 text-[11px] text-muted-foreground">
         <span class="eyebrow">{{ eyebrow }}</span>
         <span>·</span>
