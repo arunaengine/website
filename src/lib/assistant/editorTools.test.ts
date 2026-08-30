@@ -137,6 +137,42 @@ describe('draft tools', () => {
     expect(scene.current().entities.some((entity) => entity.id === '#lab')).toBe(true)
   })
 
+  it('reuses an entity of the same type and name instead of adding a twin', async () => {
+    const output = await runTool(scene.tools.create_entity, {
+      types: ['Person'],
+      properties: { name: '  alice ', affiliation: 'Lab' },
+    }) as Record<string, unknown>
+
+    expect(output['@id']).toBe('#alice')
+    expect(output.note).toContain('#alice')
+    expect(output).not.toHaveProperty('affiliation')
+    expect(scene.current().entities).toHaveLength(2)
+  })
+
+  it('creates a namesake of another type, and edits the reused entity after the reuse', async () => {
+    const created = await runTool(scene.tools.create_entity, {
+      types: ['Organization'],
+      properties: { name: 'Alice' },
+    }) as Record<string, unknown>
+    expect(created['@id']).not.toBe('#alice')
+
+    await runTool(scene.tools.create_entity, { types: ['Person'], properties: { name: 'Alice' } })
+    const edited = await runTool(scene.tools.edit_entity, { id: '#alice', set: { jobTitle: 'PI' } })
+
+    expect(edited).toMatchObject({ '@id': '#alice', jobTitle: 'PI' })
+  })
+
+  it('keeps creating when the input names its own identifier', async () => {
+    const output = await runTool(scene.tools.create_entity, {
+      types: ['Person'],
+      id: '#alice-2',
+      properties: { name: 'Alice' },
+    })
+
+    expect(output).toMatchObject({ '@id': '#alice-2', name: 'Alice' })
+    expect(scene.current().entities).toHaveLength(3)
+  })
+
   it('summarizes the draft with the profile and the realm profiles', async () => {
     const output = await runTool(scene.tools.crate_summary, {}) as Record<string, unknown>
 

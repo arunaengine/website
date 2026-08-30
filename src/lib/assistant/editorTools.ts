@@ -6,6 +6,7 @@ import {
   addEntity,
   draftValues,
   findEntity,
+  findSimilarEntity,
   liveIssues,
   partIds,
   removeEntity,
@@ -147,7 +148,9 @@ export function editorTools(bridge: EditorBridge, gate: ApprovalGate): ToolSet {
     }),
 
     create_entity: tool({
-      description: 'Adds an entity to the open draft. Link it from another entity with edit_entity.',
+      description:
+        'Adds an entity to the open draft, or answers the entity that already carries that type and '
+        + 'name. Link it from another entity with edit_entity.',
       inputSchema: schema<{ types: string[]; id?: string; properties?: Record<string, unknown> }>({
         types: { type: 'array', items: STRING },
         id: STRING,
@@ -159,8 +162,22 @@ export function editorTools(bridge: EditorBridge, gate: ApprovalGate): ToolSet {
           const list = rows(value)
           if (list) properties[property] = list
         }
+        const type = input.types[0] ?? 'Thing'
+        const name = properties.name?.[0]?.value ?? ''
+        // A named entity without an explicit id reuses the match the Add dialog
+        // would have offered, so one chat cannot mint two entities for one thing.
+        if (!input.id?.trim() && name) {
+          const known = findSimilarEntity(bridge.draft(), type, name)
+          if (known) {
+            remember(known)
+            return {
+              ...entityJson(known),
+              note: `reused the existing entity ${known.id} with the same name`,
+            }
+          }
+        }
         const added = addEntity(bridge.draft(), {
-          type: input.types[0] ?? 'Thing',
+          type,
           ...(input.id ? { id: input.id } : {}),
           properties,
         })
