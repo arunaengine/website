@@ -20,7 +20,13 @@ import { useAruna } from '@/composables/useAruna'
 import { useRefresh } from '@/composables/useRefresh'
 import { useUserDirectory } from '@/composables/useUserDirectory'
 import { NEVER_EXPIRES_AFTER, secretStatus, useNodeOnboarding } from '@/composables/useNodeOnboarding'
-import { buildComposeSnippet, buildEnvBlock, normalizeSeedUrl, type NodeConfigInput } from '@/lib/onboarding-config'
+import {
+  buildComposeSnippet,
+  buildEnvBlock,
+  buildRunCommand,
+  normalizeSeedUrl,
+  type NodeConfigInput,
+} from '@/lib/onboarding-config'
 import { kindLabel, kindVariant } from '@/components/nodes/node-display'
 import { shortUserId, truncateMiddle } from '@/lib/utils'
 import { apiOrigin, type CreateOnboardingSecretResponse, type OnboardingMode, type RealmNodeInfo } from '@/lib/api'
@@ -177,9 +183,22 @@ function text(value: string | number): string {
 
 const weight = ref<string | number>('')
 const labels = ref('')
+const apiPublicUrl = ref('')
+const s3PublicUrl = ref('')
+const logLevel = ref('info')
+const opsPort = ref<string | number>('')
+
+const LOG_LEVEL_OPTIONS = [
+  { value: 'error', label: 'error' },
+  { value: 'warn', label: 'warn' },
+  { value: 'info', label: 'info' },
+  { value: 'debug', label: 'debug' },
+  { value: 'trace', label: 'trace' },
+]
 
 const configInput = computed<NodeConfigInput>(() => {
   const normalizedWeight = text(weight.value)
+  const normalizedOps = text(opsPort.value)
   return {
     secret: minted.value?.onboarding_secret ?? '',
     httpPort: Number(httpPort.value) || 3000,
@@ -189,10 +208,15 @@ const configInput = computed<NodeConfigInput>(() => {
     location: location.value || undefined,
     weight: normalizedWeight === '' ? undefined : Number(normalizedWeight),
     labels: labels.value || undefined,
+    apiPublicUrl: apiPublicUrl.value || undefined,
+    s3PublicUrl: s3PublicUrl.value || undefined,
+    logLevel: logLevel.value,
+    opsPort: normalizedOps === '' ? undefined : Number(normalizedOps),
   }
 })
 const envBlock = computed(() => buildEnvBlock(configInput.value))
 const composeSnippet = computed(() => buildComposeSnippet(configInput.value))
+const runCommand = computed(() => buildRunCommand(configInput.value))
 
 function goToWatch() {
   if (!minted.value) return
@@ -461,7 +485,39 @@ const secretRows = computed<SecretRow[]>(() =>
                 <Input v-model="labels" placeholder="k=v,k2=v2" class="mt-1 font-mono" />
               </div>
             </div>
+            <div>
+              <label class="text-xs font-medium text-foreground">Public API URL <span class="text-muted-foreground">(optional)</span></label>
+              <Input v-model="apiPublicUrl" placeholder="https://node.example.org" class="mt-1 font-mono" />
+              <p class="mt-1 text-[11px] text-muted-foreground">
+                The REST URL this node advertises to the realm. Required if the node serves the portal
+                (<code class="font-mono">PORTAL_MODE=artifact</code>), because the SPA is loaded from another origin.
+              </p>
+            </div>
+            <div>
+              <label class="text-xs font-medium text-foreground">Public S3 URL <span class="text-muted-foreground">(optional)</span></label>
+              <Input v-model="s3PublicUrl" placeholder="https://s3.example.org" class="mt-1 font-mono" />
+              <p class="mt-1 text-[11px] text-muted-foreground">
+                The S3 endpoint this node advertises. Defaults to the S3 bind address, which is only reachable if
+                clients share the node's network.
+              </p>
+            </div>
+            <div class="grid gap-4 sm:grid-cols-3">
+              <div>
+                <label class="text-xs font-medium text-foreground">Log level</label>
+                <Select v-model="logLevel" :options="LOG_LEVEL_OPTIONS" aria-label="Log level" class="mt-1" />
+              </div>
+              <div>
+                <label class="text-xs font-medium text-foreground">Ops port <span class="text-muted-foreground">(optional)</span></label>
+                <Input v-model="opsPort" type="number" min="1" placeholder="3002" class="mt-1" />
+                <p class="mt-1 text-[11px] text-muted-foreground">Health endpoint, bound to loopback only.</p>
+              </div>
+            </div>
 
+            <CodeSnippet
+              title="docker run"
+              :code="runCommand"
+              hint="One command, same configuration as the compose file below."
+            />
             <CodeSnippet
               title=".env"
               :code="envBlock"

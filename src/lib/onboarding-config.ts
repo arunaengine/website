@@ -18,6 +18,10 @@ export interface NodeConfigInput {
   location?: string // → ARUNA_NODE_LOCATION
   weight?: number // → ARUNA_NODE_WEIGHT
   labels?: string // → ARUNA_NODE_LABELS, raw 'k=v,k2=v2'
+  apiPublicUrl?: string // → API_PUBLIC_URL, advertised REST url
+  s3PublicUrl?: string // → S3_PUBLIC_URL, advertised S3 endpoint
+  logLevel?: string // → RUST_LOG, 'info' when unset
+  opsPort?: number // → OPS_SOCKET_ADDRESS on loopback
 }
 
 import type { RealmInfoResponse } from './api'
@@ -46,28 +50,36 @@ export function managementPortals(
   return portals.filter((portal) => portal.url && !seen.has(portal.url) && seen.add(portal.url))
 }
 
-// Optional placement hints, appended only when the admin set them. Weight must
-// be a finite number; blank location/labels are skipped.
-function optionalEnvLines(input: NodeConfigInput, format: (key: string, value: string) => string): string[] {
-  const lines: string[] = []
-  if (input.location?.trim()) lines.push(format('ARUNA_NODE_LOCATION', input.location.trim()))
-  if (input.weight != null && Number.isFinite(input.weight)) lines.push(format('ARUNA_NODE_WEIGHT', String(input.weight)))
-  if (input.labels?.trim()) lines.push(format('ARUNA_NODE_LABELS', input.labels.trim()))
-  return lines
+// The single ordered key/value set every snippet renders, so the .env, the
+// compose file, and the docker run line always configure the same node. Optional
+// entries appear only when the admin set them; weight must be a finite number.
+function configEntries(input: NodeConfigInput): Array<[string, string]> {
+  const entries: Array<[string, string]> = [
+    ['STORAGE_PATH', '/data'],
+    ['SOCKET_ADDRESS', `0.0.0.0:${input.httpPort}`],
+    ['P2P_SOCKET_ADDRESS', `0.0.0.0:${input.p2pPort}`],
+  ]
+  // The ops endpoint is a local health/readiness listener, never exposed.
+  if (input.opsPort != null && Number.isFinite(input.opsPort)) {
+    entries.push(['OPS_SOCKET_ADDRESS', `127.0.0.1:${input.opsPort}`])
+  }
+  if (input.apiPublicUrl?.trim()) entries.push(['API_PUBLIC_URL', input.apiPublicUrl.trim()])
+  entries.push(['S3_HOST', `0.0.0.0:${input.s3Port}`], ['S3_ADDRESS', `0.0.0.0:${input.s3Port}`])
+  if (input.s3PublicUrl?.trim()) entries.push(['S3_PUBLIC_URL', input.s3PublicUrl.trim()])
+  entries.push(['ONBOARDING_SECRET', input.secret], ['RUST_LOG', input.logLevel?.trim() || 'info'])
+  if (input.location?.trim()) entries.push(['ARUNA_NODE_LOCATION', input.location.trim()])
+  if (input.weight != null && Number.isFinite(input.weight)) {
+    entries.push(['ARUNA_NODE_WEIGHT', String(input.weight)])
+  }
+  if (input.labels?.trim()) entries.push(['ARUNA_NODE_LABELS', input.labels.trim()])
+  return entries
 }
 
 // dotenv-style block for `.env` / process env. dotenvy accepts '#' comments.
 export function buildEnvBlock(input: NodeConfigInput): string {
   const lines = [
     '# Aruna node: realm join configuration',
-    'STORAGE_PATH=/data',
-    `SOCKET_ADDRESS=0.0.0.0:${input.httpPort}`,
-    `P2P_SOCKET_ADDRESS=0.0.0.0:${input.p2pPort}`,
-    `S3_HOST=0.0.0.0:${input.s3Port}`,
-    `S3_ADDRESS=0.0.0.0:${input.s3Port}`,
-    `ONBOARDING_SECRET=${input.secret}`,
-    'RUST_LOG=info',
-    ...optionalEnvLines(input, (key, value) => `${key}=${value}`),
+    ...configEntries(input).map(([key, value]) => `${key}=${value}`),
   ]
   return lines.join('\n')
 }
@@ -77,16 +89,6 @@ export function buildEnvBlock(input: NodeConfigInput): string {
 // process env, so this works identically to an .env file).
 export function buildComposeSnippet(input: NodeConfigInput): string {
   const dataDir = input.dataDir.trim() || './aruna-data'
-  const env = [
-    '      STORAGE_PATH: /data',
-    `      SOCKET_ADDRESS: "0.0.0.0:${input.httpPort}"`,
-    `      P2P_SOCKET_ADDRESS: "0.0.0.0:${input.p2pPort}"`,
-    `      S3_HOST: "0.0.0.0:${input.s3Port}"`,
-    `      S3_ADDRESS: "0.0.0.0:${input.s3Port}"`,
-    `      ONBOARDING_SECRET: "${input.secret}"`,
-    '      RUST_LOG: info',
-    ...optionalEnvLines(input, (key, value) => `      ${key}: "${value}"`),
-  ]
   return [
     'services:',
     '  aruna:',
@@ -96,8 +98,33 @@ export function buildComposeSnippet(input: NodeConfigInput): string {
     '    volumes:',
     `      - ${dataDir}:/data`,
     '    environment:',
-    ...env,
+    ...configEntries(input).map(([key, value]) => `      ${key}: "${value}"`),
   ].join('\n')
+}
+
+// Values a POSIX shell passes through untouched; anything else is single-quoted.
+const SHELL_SAFE = /^[A-Za-z0-9_@%+=:,./-]+$/
+
+function shellQuote(value: string, force = false): string {
+  if (!force && value !== '' && SHELL_SAFE.test(value)) return value
+  return `'${value.replace(/'/g, "'\\''")}'`
+}
+
+// One-line equivalent of the compose file for admins without compose. Same env
+// set, same volume and restart policy; the secret is always quoted so it can
+// never split into extra shell words.
+export function buildRunCommand(input: NodeConfigInput): string {
+  const dataDir = input.dataDir.trim() || './aruna-data'
+  return [
+    'docker run -d --name aruna',
+    '--network host',
+    '--restart unless-stopped',
+    `-v ${shellQuote(`${dataDir}:/data`)}`,
+    ...configEntries(input).map(
+      ([key, value]) => `-e ${key}=${shellQuote(value, key === 'ONBOARDING_SECRET')}`,
+    ),
+    'aruna:latest',
+  ].join(' \\\n  ')
 }
 
 // --- User device agent (aruna#271) ------------------------------------------
