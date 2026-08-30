@@ -326,6 +326,23 @@ export async function activateContext(nodeId: string | null, groupId: string): P
   return session
 }
 
+/** Reuses the active session when it already serves the group. */
+// Single-flighted: concurrent callers would race the activation generation
+// and the server-side mint, leaving no active session behind.
+const ensureFlights = new Map<string, Promise<void>>()
+export async function ensureSession(groupId: string): Promise<void> {
+  if (activeKey.value && activeContext.value?.groupId === groupId) return
+  const inFlight = ensureFlights.get(groupId)
+  if (inFlight) return inFlight
+  const flight = activateContext(null, groupId)
+    .then(() => undefined)
+    .finally(() => {
+      ensureFlights.delete(groupId)
+    })
+  ensureFlights.set(groupId, flight)
+  return flight
+}
+
 export function clearSessions(): void {
   boundaryGeneration++
   activationGeneration++

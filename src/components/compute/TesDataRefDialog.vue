@@ -15,6 +15,7 @@ import ObjectBrowserPanel from '@/components/data/ObjectBrowserPanel.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import { useS3, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
 import { useAruna } from '@/composables/useAruna'
+import { activeGroupId } from '@/composables/useGroupSelection'
 import { errorMessage } from '@/lib/utils'
 import {
   normalizeContainerDir,
@@ -38,7 +39,7 @@ const emit = defineEmits<{
 }>()
 
 const s3 = useS3()
-const { currentUser } = useAruna()
+const { currentUser, myGroups } = useAruna()
 const credentialDialogOpen = ref(false)
 
 // Folder handling: the TES facade stages FILE inputs only, so a folder pick is
@@ -144,6 +145,10 @@ watch(
     folderError.value = null
     mountDir.value = props.mountDefault
     pendingSelection.value = null
+    // The browser needs a session; without one the picker only offers credentials.
+    if (!currentUser.value) return
+    const gid = activeGroupId.value || myGroups.value[0]?.id
+    if (gid) void s3.ensureSession(gid).catch(() => {})
   },
   { immediate: true },
 )

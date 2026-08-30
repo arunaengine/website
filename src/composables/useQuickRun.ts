@@ -612,6 +612,16 @@ function createStore(deps: QuickRunDeps) {
   })
   watch([currentUser, () => s3.hasActiveKey.value, myGroups], initDefaults)
 
+  // The script stage needs a session for the run's group; failures keep the notice.
+  watch(
+    [groupId, currentUser],
+    () => {
+      if (!currentUser.value || !groupId.value) return
+      void s3.ensureSession(groupId.value).catch(() => {})
+    },
+    { immediate: true },
+  )
+
   // ── Validity ───────────────────────────────────────────────────────────────
   const inputsValid = computed(() => {
     for (const entry of inputs.value) {

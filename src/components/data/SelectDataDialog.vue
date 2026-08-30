@@ -18,6 +18,7 @@ import ObjectBrowserPanel from '@/components/data/ObjectBrowserPanel.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import { useS3 } from '@/composables/useS3'
 import { useAruna } from '@/composables/useAruna'
+import { activeGroupId } from '@/composables/useGroupSelection'
 import {
   arunaContentReference,
   externalContentReference,
@@ -39,7 +40,7 @@ const emit = defineEmits<{
 }>()
 
 const s3 = useS3()
-const { currentUser, getBlobLocations, nodeInfo, apiBaseUrl, authToken } = useAruna()
+const { currentUser, myGroups, getBlobLocations, nodeInfo, apiBaseUrl, authToken } = useAruna()
 
 const tab = ref('node')
 const credentialDialogOpen = ref(false)
@@ -62,6 +63,10 @@ watch(
     externalLabel.value = ''
     externalUrl.value = ''
     externalUrlInvalid.value = false
+    // The node tab needs a session; without one the picker only offers credentials.
+    if (!currentUser.value) return
+    const gid = activeGroupId.value || myGroups.value[0]?.id
+    if (gid) void s3.ensureSession(gid).catch(() => {})
   },
   { immediate: true },
 )
