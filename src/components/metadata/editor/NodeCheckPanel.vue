@@ -6,7 +6,7 @@ import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import type { ProfileValidationPreviewResponse } from '@/lib/api'
 import { collectIssues, type WriteIssue } from '@/lib/crate/issues'
-import { displayName, findEntity, rootId, type CrateDraft } from '@/lib/crate/editor'
+import { displayName, entityName, findEntity, rootId, type CrateDraft } from '@/lib/crate/editor'
 import { truncateMiddle } from '@/lib/utils'
 import { Check, RefreshCw, Send, TriangleAlert } from '@lucide/vue'
 
@@ -36,7 +36,7 @@ const emit = defineEmits<{
   (e: 'jump', entityId: string): void
 }>()
 
-const issues = computed(() => collectIssues(props.previewResult, props.writeIssues ?? []))
+const issues = computed(() => collectIssues(props.previewResult, props.writeIssues ?? [], props.draft))
 const violations = computed(() => issues.value.filter((issue) => issue.severity === 'violation'))
 
 const issueGroups = computed(() => {
@@ -44,7 +44,9 @@ const issueGroups = computed(() => {
   for (const issue of issues.value) grouped.set(issue.entityId, [...(grouped.get(issue.entityId) ?? []), issue])
   return [...grouped.entries()].map(([entityId, entries]) => ({
     entityId,
-    name: entityName(entityId),
+    name: groupName(entityId),
+    isRoot: entityId === rootId(props.draft),
+    resolved: entries.every((entry) => entry.resolved),
     violations: entries.filter((entry) => entry.severity === 'violation'),
     advisory: entries.filter((entry) => entry.severity !== 'violation'),
   }))
@@ -73,8 +75,8 @@ const problemCount = computed(() => {
   return count === 1 ? '1 problem' : `${count} problems`
 })
 
-function entityName(entityId: string): string {
-  if (entityId === rootId(props.draft)) return displayName(props.draft.entities[0]) || 'This dataset'
+function groupName(entityId: string): string {
+  if (entityId === rootId(props.draft)) return entityName(props.draft.entities[0]) || 'This dataset'
   const entity = findEntity(props.draft, entityId)
   return entity ? displayName(entity) : entityId
 }
@@ -109,7 +111,7 @@ function entityName(entityId: string): string {
         <header class="flex items-center justify-between gap-3 border-b border-border px-3 py-2">
           <div class="min-w-0">
             <p class="truncate text-xs font-medium text-foreground">{{ group.name }}</p>
-            <span class="hash" :title="group.entityId">{{ truncateMiddle(group.entityId, 12, 8) }}</span>
+            <span v-if="!group.resolved" class="hash" :title="group.entityId">{{ truncateMiddle(group.entityId, 12, 8) }}</span>
           </div>
           <Badge variant="secondary">Advisory</Badge>
         </header>
@@ -132,9 +134,11 @@ function entityName(entityId: string): string {
         <header class="flex items-center justify-between gap-3 border-b border-border px-3 py-2">
           <div class="min-w-0">
             <p class="truncate text-xs font-medium text-foreground">{{ group.name }}</p>
-            <span class="hash" :title="group.entityId">{{ truncateMiddle(group.entityId, 12, 8) }}</span>
+            <span v-if="!group.resolved" class="hash" :title="group.entityId">{{ truncateMiddle(group.entityId, 12, 8) }}</span>
           </div>
-          <Button variant="ghost" size="sm" @click="emit('jump', group.entityId)">Open</Button>
+          <Button variant="ghost" size="sm" @click="emit('jump', group.entityId)">
+            {{ group.isRoot ? 'Open dataset' : 'Open' }}
+          </Button>
         </header>
         <ul class="divide-y divide-border">
           <li v-for="issue in group.violations" :key="issue.key" class="px-3 py-2 text-xs">

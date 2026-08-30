@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { collectIssues, isNodeRejection, rejectionIssues } from './issues'
+import { collectIssues, isNodeRejection, rejectionIssues, resolveEntityId, VALIDATION_GRAPH_IRI } from './issues'
+import { addEntity, newDraft, updateValue, type CrateDraft } from '@/lib/crate/editor'
+import { CRATE_BASE_IRI } from '@/lib/shacl/crateIri'
 import { ApiError, type ProfileValidationPreviewResponse } from '@/lib/api'
 
 function response(overrides: Partial<ProfileValidationPreviewResponse> = {}): ProfileValidationPreviewResponse {
@@ -13,6 +15,40 @@ function response(overrides: Partial<ProfileValidationPreviewResponse> = {}): Pr
     ...overrides,
   }
 }
+
+function draft(): CrateDraft {
+  const named = updateValue(newDraft(), './', 'name', 0, 'Example dataset')
+  const person = addEntity(named, { type: 'Person', name: 'Ada Example', id: '#person' })
+  return addEntity(person.draft, { type: 'File', id: 'data.csv' }).draft
+}
+
+describe('resolveEntityId', () => {
+  it('reads the validation graph IRI as the root', () => {
+    expect(resolveEntityId(draft(), VALIDATION_GRAPH_IRI)).toEqual({ id: './', resolved: true })
+    expect(resolveEntityId(draft(), `<${VALIDATION_GRAPH_IRI}>`)).toEqual({ id: './', resolved: true })
+  })
+
+  it('keeps a crate-local id the draft carries', () => {
+    expect(resolveEntityId(draft(), '#person')).toEqual({ id: '#person', resolved: true })
+  })
+
+  it('drops the anchor of a relative file id', () => {
+    expect(resolveEntityId(draft(), './data.csv')).toEqual({ id: 'data.csv', resolved: true })
+    expect(resolveEntityId(draft(), 'https://craqle.invalid/data.csv')).toEqual({ id: 'data.csv', resolved: true })
+  })
+
+  it('reads the legacy portal base as the root', () => {
+    expect(resolveEntityId(draft(), CRATE_BASE_IRI)).toEqual({ id: './', resolved: true })
+    expect(resolveEntityId(draft(), `${CRATE_BASE_IRI}#person`)).toEqual({ id: '#person', resolved: true })
+  })
+
+  it('leaves an id no entity carries unresolved', () => {
+    expect(resolveEntityId(draft(), 'https://orcid.org/0000-0002')).toEqual({
+      id: 'https://orcid.org/0000-0002',
+      resolved: false,
+    })
+  })
+})
 
 describe('collectIssues', () => {
   it('merges structural, profile and write issues onto their entities', () => {
@@ -30,17 +66,59 @@ describe('collectIssues', () => {
         }],
       }),
       [{ code: 'write', message: 'The path is taken.', entityId: './' }],
+      draft(),
     )
 
-    expect(issues.map((issue) => [issue.entityId, issue.severity])).toEqual([
-      ['./', 'violation'],
-      ['#person-ada', 'warning'],
-      ['./', 'violation'],
+    expect(issues.map((issue) => [issue.entityId, issue.severity, issue.resolved])).toEqual([
+      ['./', 'violation', true],
+      ['#person-ada', 'warning', false],
+      ['./', 'violation', true],
     ])
   })
 
+  it('names the property a required-property violation is about', () => {
+    const issues = collectIssues(
+      response({
+        structural_violations: [{
+          code: 'missing_required_property',
+          message: 'missing required property `schema:description` on entity `https://craqle.invalid/validation/document`',
+          entity_id: VALIDATION_GRAPH_IRI,
+          pointer: '/@graph/0',
+        }],
+      }),
+      [],
+      draft(),
+    )
+
+    expect(issues[0]).toMatchObject({
+      entityId: './',
+      resolved: true,
+      path: 'description',
+      message: 'Missing required property: description',
+    })
+    expect(issues[0].detail).toContain('schema:description')
+  })
+
+  it('puts the entity name where the node wrote its IRI', () => {
+    const issues = collectIssues(
+      response({
+        structural_violations: [{
+          code: 'invalid_date',
+          message: `\`${VALIDATION_GRAPH_IRI}\` has no usable datePublished.`,
+          entity_id: VALIDATION_GRAPH_IRI,
+          pointer: null,
+        }],
+      }),
+      [],
+      draft(),
+    )
+
+    expect(issues[0].message).toBe('Example dataset has no usable datePublished.')
+    expect(issues[0].detail).toContain(VALIDATION_GRAPH_IRI)
+  })
+
   it('reports nothing without a result', () => {
-    expect(collectIssues(null)).toEqual([])
+    expect(collectIssues(null, [], draft())).toEqual([])
   })
 })
 

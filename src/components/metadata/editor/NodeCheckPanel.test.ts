@@ -113,6 +113,46 @@ describe('NodeCheckPanel', () => {
     mounted.app.unmount()
   })
 
+  it('attaches a finding on the scratch graph to the dataset', async () => {
+    const mounted = await mount({
+      previewResult: verdict({
+        accepted: false,
+        state: 'invalid',
+        structural_violations: [{
+          code: 'missing_required_property',
+          message: `missing required property \`schema:description\` on entity \`${Issues.VALIDATION_GRAPH_IRI}\``,
+          entity_id: Issues.VALIDATION_GRAPH_IRI,
+          pointer: '/@graph/0',
+        }],
+      }),
+    })
+    const text = content(mounted.root)
+
+    expect(text).toContain('Example dataset')
+    expect(text).toContain('Missing required property: description')
+    expect(text).not.toContain('craqle.invalid')
+    expect(button(mounted.root, 'Open dataset')).toBeDefined()
+    mounted.app.unmount()
+  })
+
+  it('keeps the raw id of an entity the draft does not carry', async () => {
+    const mounted = await mount({
+      previewResult: verdict({
+        accepted: false,
+        state: 'invalid',
+        structural_violations: [{
+          code: 'missing_required_property',
+          message: 'missing required property `schema:name` on entity `https://orcid.org/0000-0002`',
+          entity_id: 'https://orcid.org/0000-0002',
+          pointer: null,
+        }],
+      }),
+    })
+
+    expect(element(mounted.root, (node) => node.props.title === 'https://orcid.org/0000-0002')).toBeDefined()
+    mounted.app.unmount()
+  })
+
   it('explains a run that could not happen', async () => {
     const mounted = await mount({ previewUnavailable: true })
 

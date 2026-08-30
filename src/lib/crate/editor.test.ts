@@ -224,7 +224,8 @@ describe('live issues', () => {
   it('asks the root for the four things a dataset needs', () => {
     const issues = liveIssues(newDraft())
 
-    expect(issues.filter((issue) => issue.severity === 'error').map((issue) => issue.property)).toEqual(['name'])
+    // The node rejects a crate without name or description; a license only reads badly.
+    expect(issues.filter((issue) => issue.severity === 'error').map((issue) => issue.property)).toEqual(['name', 'description'])
     expect(issues.map((issue) => issue.property)).toEqual(['name', 'description', 'license'])
   })
 

@@ -187,7 +187,7 @@ const preview = useProfilePreview({
 const canSave = computed(() => Boolean(rootName.value && draft.value.groupId && draft.value.path))
 // What the node refused, from the last preview and the last write attempt.
 const writeIssues = computed(() => [...rejectionIssues(preview.rejection.value), ...saveIssues.value])
-const nodeIssues = computed(() => collectIssues(preview.result.value, writeIssues.value))
+const nodeIssues = computed(() => collectIssues(preview.result.value, writeIssues.value, draft.value))
 
 // What the assistant may do to the open draft while this view is mounted. It
 // never saves: the check below is the same one the Save button runs first.

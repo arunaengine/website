@@ -647,11 +647,13 @@ export function fromRoCrate(
 // Advisory issues
 // ---------------------------------------------------------------------------
 
-const ROOT_EXPECTED: Array<{ property: string; message: string }> = [
-  { property: 'name', message: 'The dataset needs a name.' },
-  { property: 'description', message: 'Describe what the dataset contains.' },
-  { property: 'license', message: 'State a license so others know the terms of reuse.' },
-  { property: 'datePublished', message: 'Add the date the dataset was published.' },
+// The node rejects a crate without name, description or datePublished; a
+// missing license only reads badly.
+const ROOT_EXPECTED: Array<{ property: string; message: string; severity: IssueSeverity }> = [
+  { property: 'name', message: 'The dataset needs a name.', severity: 'error' },
+  { property: 'description', message: 'Describe what the dataset contains.', severity: 'error' },
+  { property: 'license', message: 'State a license so others know the terms of reuse.', severity: 'warning' },
+  { property: 'datePublished', message: 'Add the date the dataset was published.', severity: 'error' },
 ]
 
 function filled(entity: DraftEntity | undefined, property: string): boolean {
@@ -680,7 +682,7 @@ export function liveIssues(
     if (filled(root, expected.property)) continue
     issues.push({
       key: `root:${expected.property}`,
-      severity: expected.property === 'name' ? 'error' : 'warning',
+      severity: expected.severity,
       message: expected.message,
       entityId: rootId(draft),
       property: expected.property,
