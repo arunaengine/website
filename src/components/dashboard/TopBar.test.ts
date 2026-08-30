@@ -48,6 +48,7 @@ const TopBar = compileClientComponent(new URL('./TopBar.vue', import.meta.url), 
   '@/components/ui/DropdownMenuLabel.vue': moduleDefault(Passthrough),
   '@/components/ui/DropdownMenuSeparator.vue': moduleDefault(Passthrough),
   '@/components/layout/RealmSwitcher.vue': moduleDefault(Marker('realm switcher')),
+  '@/components/layout/GroupSwitcher.vue': moduleDefault(Marker('group switcher')),
   '@/components/dashboard/NotificationBell.vue': moduleDefault(Marker('bell')),
   '@/components/dashboard/SearchOverlay.vue': moduleDefault(Marker('datasets')),
   '@/components/ui/StatusDot.vue': moduleDefault(StatusDotStub),
@@ -98,6 +99,7 @@ describe('portal chrome', () => {
     const html = content(mounted.root)
 
     expect(html).toContain('realm switcher')
+    expect(html).toContain('group switcher')
     expect(html).toContain('Create dataset')
     expect(html).toContain('datasets')
     expect(watchNode).not.toHaveBeenCalled()
@@ -136,6 +138,7 @@ describe('desktop chrome', () => {
     const html = content(mounted.root)
 
     expect(html).not.toContain('realm switcher')
+    expect(html).not.toContain('group switcher')
     expect(html).not.toContain('Create dataset')
     expect(html).toContain('online')
     expect(html).toContain('Testrealm')

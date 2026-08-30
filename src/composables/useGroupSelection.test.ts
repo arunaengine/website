@@ -137,6 +137,22 @@ describe('shared group selection', () => {
     expect(selected.value).toBe('group-b')
   })
 
+  it('keeps a plain selection when the active group moves', async () => {
+    myGroups.value = [
+      { id: 'group-a', name: 'A' },
+      { id: 'group-b', name: 'B' },
+    ]
+    const { useGroupSelection, setActiveGroup } = await loadModule('group-a')
+    const selected = ref('')
+
+    useGroupSelection(selected)
+    await nextTick()
+    setActiveGroup('group-b')
+    await nextTick()
+
+    expect(selected.value).toBe('group-a')
+  })
+
   it('remembers an explicit switch and keeps it', async () => {
     myGroups.value = [
       { id: 'group-a', name: 'A' },
@@ -152,5 +168,51 @@ describe('shared group selection', () => {
 
     expect(storage.getItem(STORED_KEY)).toBe('group-b')
     expect(selected.value).toBe('group-b')
+  })
+})
+
+describe('portal group context', () => {
+  it('follows a later switch of the active group', async () => {
+    myGroups.value = [
+      { id: 'group-a', name: 'A' },
+      { id: 'group-b', name: 'B' },
+    ]
+    const { useGroupContext, setActiveGroup } = await loadModule('group-a')
+    const selected = ref('')
+
+    useGroupContext(selected)
+    await nextTick()
+    expect(selected.value).toBe('group-a')
+
+    setActiveGroup('group-b')
+    await nextTick()
+
+    expect(selected.value).toBe('group-b')
+  })
+
+  it('keeps a deep link through the first resolution', async () => {
+    // The view opened on a group from its route before memberships arrived.
+    const { useGroupContext } = await loadModule()
+    const selected = ref('group-x')
+
+    useGroupContext(selected)
+    myGroups.value = [
+      { id: 'group-a', name: 'A' },
+      { id: 'group-b', name: 'B' },
+    ]
+    await nextTick()
+
+    expect(selected.value).toBe('group-x')
+  })
+
+  it('ignores a group without a membership', async () => {
+    myGroups.value = [{ id: 'group-a', name: 'A' }]
+    const { activeGroupId, setActiveGroup } = await loadModule('group-a')
+
+    setActiveGroup('group-z')
+    await nextTick()
+
+    expect(activeGroupId.value).toBe('group-a')
+    expect(storage.getItem(STORED_KEY)).toBe('group-a')
   })
 })

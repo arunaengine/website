@@ -9,6 +9,7 @@ import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
 import DropdownMenuLabel from '@/components/ui/DropdownMenuLabel.vue'
 import DropdownMenuSeparator from '@/components/ui/DropdownMenuSeparator.vue'
 import RealmSwitcher from '@/components/layout/RealmSwitcher.vue'
+import GroupSwitcher from '@/components/layout/GroupSwitcher.vue'
 import NotificationBell from '@/components/dashboard/NotificationBell.vue'
 import StatusDot from '@/components/ui/StatusDot.vue'
 import SearchOverlay from '@/components/dashboard/SearchOverlay.vue'
@@ -88,7 +89,10 @@ async function handleSignOut() {
           realm.shortName
         }}</span>
       </RouterLink>
-      <RealmSwitcher v-else class="max-w-36 min-[480px]:max-w-none" />
+      <template v-else>
+        <RealmSwitcher class="max-w-36 min-[480px]:max-w-none" />
+        <GroupSwitcher />
+      </template>
 
       <SearchOverlay />
 
