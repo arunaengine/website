@@ -489,6 +489,15 @@ export function useAssistantChat() {
     applyChatState(chatState)
   }
 
+  // Reopening the assistant lands on the conversation last written to.
+  function selectLatestChat() {
+    syncEpoch()
+    if (busy.value || !chatStore || !historyReady.value) return
+    let latest: AssistantChatRecord | null = null
+    for (const chat of chatState.chats) if (!latest || chat.updatedAt > latest.updatedAt) latest = chat
+    if (latest) selectChat(latest.id)
+  }
+
   function deleteChat(id: string) {
     syncEpoch()
     if (!chatStore || !historyReady.value || !chatState.chats.some((chat) => chat.id === id)) return
@@ -519,6 +528,7 @@ export function useAssistantChat() {
   function openPanel() {
     syncEpoch()
     open.value = true
+    selectLatestChat()
     void providers.load()
     if (realmInfo.value?.interfaces.mcp?.url) {
       void sessionToken().catch(() => {
@@ -661,6 +671,7 @@ export function useAssistantChat() {
     closePanel,
     newChat,
     selectChat,
+    selectLatestChat,
     deleteChat,
     renameChat,
     send,

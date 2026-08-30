@@ -1,11 +1,14 @@
 <script setup lang="ts">
 // The assistant on a page of its own: a chat list that folds away beside one
 // full-height chat column whose message list is the only scroller on the page.
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onScopeDispose, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import Input from '@/components/ui/Input.vue'
+import Sheet from '@/components/ui/Sheet.vue'
+import SheetContent from '@/components/ui/SheetContent.vue'
+import DialogTitle from '@/components/ui/DialogTitle.vue'
 import AssistantHistory from '@/components/assistant/AssistantHistory.vue'
 import AssistantSettings from '@/components/assistant/AssistantSettings.vue'
 import ChatComposer from '@/components/assistant/ChatComposer.vue'
@@ -37,10 +40,23 @@ const {
   openPanel,
   newChat,
   renameChat,
+  selectLatestChat,
   ensureProviders,
 } = useAssistantChat()
 
 const sidebarOpen = ref(readStored(SIDEBAR_KEY) === 'open')
+const drawerOpen = ref(false)
+// Below md the chat list is a drawer; the inline column only exists above it.
+const wide = ref(true)
+if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+  const query = window.matchMedia('(min-width: 768px)')
+  const onChange = (event: MediaQueryListEvent) => {
+    wide.value = event.matches
+  }
+  wide.value = query.matches
+  query.addEventListener('change', onChange)
+  onScopeDispose(() => query.removeEventListener('change', onChange))
+}
 const renaming = ref(false)
 const titleDraft = ref('')
 const chatName = computed<string>(() => {
@@ -57,13 +73,23 @@ const prompts = computed(() => [
 ])
 
 onMounted(() => {
+  selectLatestChat()
   hidePanel()
   if (currentUser.value) ensureProviders()
 })
 
 function toggleSidebar() {
+  if (!wide.value) {
+    drawerOpen.value = !drawerOpen.value
+    return
+  }
   sidebarOpen.value = !sidebarOpen.value
   storeValue(SIDEBAR_KEY, sidebarOpen.value ? 'open' : '')
+}
+
+function startChat() {
+  drawerOpen.value = false
+  newChat()
 }
 
 function beginRename() {
@@ -94,7 +120,7 @@ function continueInPanel() {
     <aside
       v-if="sidebarOpen"
       aria-label="Chat list"
-      class="flex w-72 max-w-[80vw] shrink-0 flex-col border-r border-border bg-muted/20"
+      class="hidden w-72 max-w-[80vw] shrink-0 flex-col border-r border-border bg-muted/20 md:flex"
     >
       <div class="flex h-12 shrink-0 items-center border-b border-border px-3">
         <Button
@@ -102,7 +128,7 @@ function continueInPanel() {
           size="sm"
           class="w-full"
           :disabled="!available || !historyReady"
-          @click="newChat"
+          @click="startChat"
         >
           <Plus class="size-3.5" /> New chat
         </Button>
@@ -110,11 +136,30 @@ function continueInPanel() {
       <AssistantHistory v-if="historyReady" :read-only="!available" class="min-h-0 flex-1" />
     </aside>
 
+    <Sheet :open="drawerOpen && !wide" @update:open="(value: boolean) => (drawerOpen = value)">
+      <SheetContent side="left" class="flex w-80 max-w-[85vw] flex-col gap-0 p-0">
+        <div class="flex h-12 shrink-0 items-center border-b border-border px-3 pr-12">
+          <DialogTitle class="sr-only">Chats</DialogTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            class="w-full"
+            :disabled="!available || !historyReady"
+            @click="startChat"
+          >
+            <Plus class="size-3.5" /> New chat
+          </Button>
+        </div>
+        <AssistantHistory v-if="historyReady" :read-only="!available" class="min-h-0 flex-1" />
+      </SheetContent>
+    </Sheet>
+
     <div class="flex min-w-0 flex-1 flex-col">
       <header class="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3">
         <Button
           variant="ghost"
           size="icon-sm"
+          class="shrink-0"
           :aria-pressed="sidebarOpen"
           aria-label="Toggle the chat list"
           title="Toggle the chat list"
@@ -126,10 +171,11 @@ function continueInPanel() {
           v-if="!sidebarOpen"
           variant="ghost"
           size="icon-sm"
+          class="shrink-0"
           aria-label="Start a new chat"
           title="Start a new chat"
           :disabled="!available || !historyReady"
-          @click="newChat"
+          @click="startChat"
         >
           <Plus class="size-4" />
         </Button>
@@ -155,7 +201,7 @@ function continueInPanel() {
         <AssistantSettings side="bottom" align="end">
           <button
             type="button"
-            class="chip max-w-[14rem] hover:bg-muted"
+            class="chip min-w-0 max-w-[8rem] hover:bg-muted sm:max-w-[14rem]"
             aria-label="Model and provider"
             @click="loadModels"
           >
@@ -166,6 +212,7 @@ function continueInPanel() {
         <Button
           variant="ghost"
           size="icon-sm"
+          class="shrink-0"
           aria-label="Continue in the panel"
           title="Continue in the panel"
           @click="continueInPanel"
@@ -216,7 +263,7 @@ function continueInPanel() {
         </div>
 
         <div class="shrink-0 pb-4 pt-2">
-          <div class="mx-auto w-full max-w-[52rem] px-4">
+          <div class="mx-auto w-full max-w-[52rem] px-2 sm:px-4">
             <ChatComposer size="full" />
           </div>
         </div>

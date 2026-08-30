@@ -5,20 +5,29 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
-import AssistantHistory from '@/components/assistant/AssistantHistory.vue'
 import ChatComposer from '@/components/assistant/ChatComposer.vue'
 import MessageList from '@/components/assistant/MessageList.vue'
 import { useAssistantChat } from '@/composables/useAssistantChat'
 import { Maximize2, MessageSquare, Plus, X } from '@lucide/vue'
 
 const router = useRouter()
-const { open, busy, messages, pending, hidePanel, closePanel, newChat } = useAssistantChat()
+const {
+  open,
+  busy,
+  messages,
+  pending,
+  hidePanel,
+  closePanel,
+  newChat,
+  selectLatestChat,
+} = useAssistantChat()
 
 const deleteCallId = computed(() =>
   (pending.value?.always ? pending.value.request.id : undefined))
 
 // The same conversation continues on the page; the panel steps aside.
 function openFullView() {
+  selectLatestChat()
   hidePanel()
   void router.push({ name: 'assistant' })
 }
@@ -27,7 +36,7 @@ function openFullView() {
 <template>
   <div
     v-if="open"
-    class="fixed bottom-4 right-4 z-50 flex h-[32rem] max-h-[calc(100vh-2rem)] w-96 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-lg border border-border bg-card shadow-lg md:bottom-6 md:right-6"
+    class="fixed inset-x-2 bottom-20 z-50 flex h-[min(32rem,calc(100dvh-9.5rem))] flex-col overflow-hidden rounded-lg border border-border bg-card shadow-lg md:inset-x-auto md:bottom-6 md:right-6 md:h-[min(32rem,calc(100dvh-6rem))] md:w-96"
     role="dialog"
     aria-label="Aruna assistant"
   >
@@ -48,8 +57,6 @@ function openFullView() {
         </span>
       </div>
     </header>
-
-    <AssistantHistory compact />
 
     <MessageList
       :messages="messages"

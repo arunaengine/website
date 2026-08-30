@@ -10,10 +10,7 @@ import { useAssistantChat } from '@/composables/useAssistantChat'
 import { relativeTime } from '@/lib/utils'
 import { Check, Pencil, Trash2, X } from '@lucide/vue'
 
-const props = withDefaults(defineProps<{ compact?: boolean; readOnly?: boolean }>(), {
-  compact: false,
-  readOnly: false,
-})
+const props = withDefaults(defineProps<{ readOnly?: boolean }>(), { readOnly: false })
 
 const { chats, activeChatId, historyReady, selectChat, deleteChat, renameChat } = useAssistantChat()
 const editingId = ref<string | null>(null)
@@ -42,11 +39,7 @@ function when(updatedAt: number): string {
 </script>
 
 <template>
-  <section
-    aria-label="Assistant chats"
-    class="flex min-h-0 flex-col"
-    :class="props.compact ? 'max-h-32 border-b border-border bg-background/30' : 'overflow-hidden'"
-  >
+  <section aria-label="Assistant chats" class="flex min-h-0 flex-col overflow-hidden">
     <div class="flex shrink-0 items-center justify-between gap-2 px-3 py-2">
       <span class="text-xs font-medium text-muted-foreground">Chats</span>
       <span v-if="historyReady" class="text-[11px] tabular-nums text-muted-foreground">{{ chats.length }}</span>

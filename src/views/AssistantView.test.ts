@@ -18,6 +18,7 @@ const hidePanel = vi.fn()
 const ensureProviders = vi.fn()
 const loadModels = vi.fn()
 const renameChat = vi.fn()
+const selectLatestChat = vi.fn()
 const stored = new Map<string, string>()
 
 const chat = {
@@ -36,6 +37,7 @@ const chat = {
   openPanel: vi.fn(),
   newChat,
   renameChat,
+  selectLatestChat,
   ensureProviders,
 }
 
@@ -52,6 +54,11 @@ const EmptyStateStub = defineComponent({
   props: { title: { type: String, default: '' } },
   setup: (props, { slots }) => () => h('div', { 'data-empty': '' }, [props.title, slots.default?.()]),
 })
+const SheetStub = defineComponent({
+  props: { open: Boolean },
+  setup: (props, { slots }) => () => (props.open ? h('div', { 'data-sheet': '' }, slots.default?.()) : null),
+})
+const PassthroughStub = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
 const HistoryStub = defineComponent({
   props: { readOnly: { type: Boolean, default: false } },
   setup: (props) => () => h('nav', { 'data-history': String(props.readOnly) }, 'chats'),
@@ -72,6 +79,9 @@ const AssistantView = compileClientComponent(new URL('./AssistantView.vue', impo
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/EmptyState.vue': moduleDefault(EmptyStateStub),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
+  '@/components/ui/Sheet.vue': moduleDefault(SheetStub),
+  '@/components/ui/SheetContent.vue': moduleDefault(PassthroughStub),
+  '@/components/ui/DialogTitle.vue': moduleDefault(PassthroughStub),
   '@/components/assistant/AssistantHistory.vue': moduleDefault(HistoryStub),
   '@/components/assistant/AssistantSettings.vue': moduleDefault(SettingsStub),
   '@/components/assistant/ChatComposer.vue': moduleDefault(ComposerStub),
@@ -98,6 +108,7 @@ function control(root: Parameters<typeof content>[0], label: string) {
 
 beforeEach(() => {
   newChat.mockClear()
+  selectLatestChat.mockClear()
   renameChat.mockClear()
   loadModels.mockClear()
   stored.clear()
@@ -135,6 +146,25 @@ describe('AssistantView', () => {
 
     expect(has(root, 'data-messages')).toBe(true)
     expect(content(root)).not.toContain('What can I help you with?')
+  })
+
+  it('opens the most recent chat when the page mounts', async () => {
+    await mountApp(AssistantView)
+
+    expect(selectLatestChat).toHaveBeenCalledOnce()
+  })
+
+  it('shows the chat list in a drawer on a phone', async () => {
+    // Below md the inline column is replaced by a left drawer.
+    vi.stubGlobal('window', {
+      matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }),
+    })
+    const { root } = await mountApp(AssistantView)
+    await click(control(root, 'Toggle the chat list'))
+
+    expect(has(root, 'data-sheet')).toBe(true)
+    expect(stored.size).toBe(0)
+    vi.unstubAllGlobals()
   })
 
   it('remembers the chat list toggle', async () => {
