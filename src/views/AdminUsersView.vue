@@ -362,7 +362,7 @@ const sharedGroups = computed(() => {
     </div>
 
     <Dialog :open="detailOpen" @update:open="(v: boolean) => (detailOpen = v)">
-      <DialogContent class="flex max-h-[85vh] w-[92vw] max-w-xl flex-col gap-0 overflow-hidden bg-background p-0">
+      <DialogContent class="flex w-[calc(100%-2rem)] max-w-xl flex-col gap-0 overflow-hidden bg-background p-0 sm:w-[92vw]">
         <div class="scrollbar-thin min-h-0 flex-1 overflow-y-auto p-6">
           <DialogTitle class="sr-only">User details</DialogTitle>
 

@@ -80,7 +80,7 @@ const groups = computed<StatGroup[]>(() => {
 
 <template>
   <Dialog :open="open" @update:open="(v: boolean) => emit('update:open', v)">
-    <DialogContent class="max-h-[85vh] max-w-md overflow-y-auto">
+    <DialogContent class="max-w-md">
       <DialogHeader>
         <DialogTitle>Query coverage</DialogTitle>
         <DialogDescription>What this answer covered, and how long it took.</DialogDescription>

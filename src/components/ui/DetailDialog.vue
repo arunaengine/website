@@ -10,7 +10,7 @@ const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
 
 <template>
   <Dialog :open="open" @update:open="(v) => emit('update:open', v)">
-    <DialogContent class="flex h-[88vh] w-[92vw] max-w-6xl flex-col gap-0 overflow-hidden bg-background p-6">
+    <DialogContent class="flex h-[88dvh] w-[calc(100%-2rem)] max-w-6xl flex-col gap-0 overflow-hidden bg-background p-6 sm:w-[92vw]">
       <slot />
     </DialogContent>
   </Dialog>

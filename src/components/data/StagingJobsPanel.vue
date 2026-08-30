@@ -178,7 +178,7 @@ function jobPercent(job: StagingJob): number {
 
 <template>
   <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-    <DialogContent class="flex max-h-[85vh] max-w-xl flex-col">
+    <DialogContent class="flex max-w-xl flex-col">
       <DialogHeader>
         <div class="flex items-center justify-between gap-2 pr-8">
           <DialogTitle class="flex items-center gap-2">

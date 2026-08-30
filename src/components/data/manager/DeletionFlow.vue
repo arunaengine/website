@@ -522,7 +522,7 @@ defineExpose({
   <BulkDeleteDialog ref="bulkDelete" :manager="props.manager" :preflight="preflight" />
 
   <Dialog :open="deleteTarget !== null" @update:open="(v: boolean) => { if (!v) closeDeleteDialog() }">
-    <DialogContent class="max-h-[90vh] max-w-md overflow-y-auto">
+    <DialogContent class="max-w-md">
       <DialogHeader>
         <DialogTitle>{{ deleteTarget?.type === 'folder' ? 'Delete folder' : 'Delete object' }}</DialogTitle>
         <DialogDescription v-if="deleteTarget?.type === 'folder'">
@@ -582,7 +582,7 @@ defineExpose({
   </Dialog>
 
   <Dialog :open="permanentDeleteTarget !== null" @update:open="(v: boolean) => { if (!v) closePermanentDelete() }">
-    <DialogContent class="max-h-[90vh] max-w-md overflow-y-auto">
+    <DialogContent class="max-w-md">
       <DialogHeader>
         <DialogTitle>{{ permanentDeleteActionLabel }}</DialogTitle>
         <DialogDescription v-if="permanentDeleteTarget?.type === 'file'">

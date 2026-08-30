@@ -386,7 +386,7 @@ defineExpose({ openBulkDelete })
 
 <template>
   <Dialog :open="bulkDeleteTarget !== null" @update:open="(v: boolean) => { if (!v) closeBulkDelete() }">
-    <DialogContent class="max-h-[90vh] max-w-md overflow-y-auto">
+    <DialogContent class="max-w-md">
       <DialogHeader>
         <DialogTitle>
           Delete {{ bulkDeleteTarget?.keys.length ?? 0 }} selected key{{ bulkDeleteTarget?.keys.length === 1 ? '' : 's' }}
