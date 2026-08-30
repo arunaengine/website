@@ -2,6 +2,7 @@
 // A model id field: free text, with every id the provider is known to offer
 // listed underneath. Any non-empty id is a valid choice.
 import { computed, ref } from 'vue'
+import { PopoverAnchor, PopoverContent, PopoverPortal, PopoverRoot } from 'radix-vue'
 import Input from '@/components/ui/Input.vue'
 import type { AssistantModel } from '@/lib/api'
 import { isValidModelId, normalizeModelId } from '@/lib/assistant/modelOptions'
@@ -30,6 +31,7 @@ const shown = computed(() => {
   return props.suggestions.filter((model) =>
     `${model.id} ${model.display_name ?? ''}`.toLowerCase().includes(needle))
 })
+const listOpen = computed(() => open.value && shown.value.length > 0)
 const invalid = computed(() => props.required && !isValidModelId(props.modelValue))
 
 function close() {
@@ -83,46 +85,62 @@ function onBlur() {
 </script>
 
 <template>
-  <div :class="cn('relative min-w-0', props.class)">
-    <Input
-      :model-value="modelValue"
-      :placeholder="placeholder ?? 'Model id'"
-      :aria-label="ariaLabel ?? 'Model'"
-      :invalid="invalid ? 'error' : undefined"
-      role="combobox"
-      aria-autocomplete="list"
-      :aria-expanded="open && shown.length > 0"
-      class="h-full font-mono text-xs"
-      autocomplete="off"
-      spellcheck="false"
-      @update:model-value="onInput"
-      @focus="onFocus"
-      @blur="onBlur"
-      @keydown="onKeydown"
-    />
-    <ul
-      v-if="open && shown.length"
-      role="listbox"
-      aria-label="Suggested models"
-      class="scrollbar-thin absolute left-0 right-0 top-full z-50 mt-1 max-h-72 overflow-y-auto rounded-md border border-border bg-popover py-1 shadow-md"
-    >
-      <li v-for="(model, index) in shown" :key="model.id">
-        <!-- mousedown.prevent keeps the input focused so the click still lands. -->
-        <button
-          type="button"
-          role="option"
-          :aria-selected="index === active"
-          class="flex w-full items-baseline gap-2 px-2.5 py-1.5 text-left text-xs"
-          :class="index === active ? 'bg-muted' : 'hover:bg-muted/40'"
-          @mousedown.prevent
-          @click="choose(index)"
+  <div :class="cn('min-w-0', props.class)">
+    <PopoverRoot :open="listOpen">
+      <PopoverAnchor as="div" class="h-full">
+        <Input
+          :model-value="modelValue"
+          :placeholder="placeholder ?? 'Model id'"
+          :aria-label="ariaLabel ?? 'Model'"
+          :invalid="invalid ? 'error' : undefined"
+          role="combobox"
+          aria-autocomplete="list"
+          :aria-expanded="listOpen"
+          class="h-full font-mono text-xs"
+          autocomplete="off"
+          spellcheck="false"
+          @update:model-value="onInput"
+          @focus="onFocus"
+          @blur="onBlur"
+          @keydown="onKeydown"
+        />
+      </PopoverAnchor>
+      <!-- Portaled so the list floats over a dialog instead of growing its scroll area. -->
+      <PopoverPortal>
+        <PopoverContent
+          side="bottom"
+          align="start"
+          :side-offset="4"
+          data-portal-list
+          class="z-50 w-[var(--radix-popover-trigger-width)] outline-none"
+          @open-auto-focus.prevent
+          @close-auto-focus.prevent
         >
-          <span class="font-mono text-foreground">{{ model.id }}</span>
-          <span v-if="model.display_name && model.display_name !== model.id" class="truncate text-muted-foreground">
-            {{ model.display_name }}
-          </span>
-        </button>
-      </li>
-    </ul>
+          <ul
+            role="listbox"
+            aria-label="Suggested models"
+            class="scrollbar-thin max-h-[min(18rem,var(--radix-popover-content-available-height,18rem))] overflow-y-auto rounded-md border border-border bg-popover py-1 shadow-md"
+          >
+            <li v-for="(model, index) in shown" :key="model.id">
+              <!-- mousedown.prevent keeps the input focused so the click still lands. -->
+              <button
+                type="button"
+                role="option"
+                :aria-selected="index === active"
+                class="flex w-full items-baseline gap-2 px-2.5 py-1.5 text-left text-xs"
+                :class="index === active ? 'bg-muted' : 'hover:bg-muted/40'"
+                @mousedown.prevent
+                @click="choose(index)"
+              >
+                <span class="font-mono text-foreground">{{ model.id }}</span>
+                <span v-if="model.display_name && model.display_name !== model.id" class="truncate text-muted-foreground">
+                  {{ model.display_name }}
+                </span>
+              </button>
+            </li>
+          </ul>
+        </PopoverContent>
+      </PopoverPortal>
+    </PopoverRoot>
   </div>
 </template>

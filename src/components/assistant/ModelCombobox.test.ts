@@ -1,5 +1,5 @@
 import * as VueRuntime from 'vue'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, inject, provide } from 'vue'
 import { describe, expect, it } from 'vitest'
 import {
   compileClientComponent,
@@ -33,6 +33,12 @@ const InputStub = defineComponent({
 
 const ModelCombobox = compileClientComponent(new URL('./ModelCombobox.vue', import.meta.url), {
   vue: VueRuntime,
+  'radix-vue': {
+    PopoverRoot: RootStub,
+    PopoverAnchor: SlotStub,
+    PopoverPortal: PortalStub,
+    PopoverContent: SlotStub,
+  },
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/lib/assistant/modelOptions': { isValidModelId, normalizeModelId },
   '@/lib/utils': { cn },
@@ -74,6 +80,17 @@ describe('ModelCombobox', () => {
     expect(options(root)).toHaveLength(40)
     expect(String(element(root, (node) => node.props.role === 'listbox').props.class))
       .toContain('overflow-y-auto')
+  })
+
+  it('floats the list in a portal and closes it on Escape', async () => {
+    const { root, field } = await open('gpt-5.6-sol')
+    expect(element(root, (node) => 'data-portal-list' in node.props)).toBeDefined()
+
+    ;(field.props.onKeydown as (event: KeyboardEvent) => void)(
+      { key: 'Escape', preventDefault: () => {} } as KeyboardEvent)
+    await flush()
+
+    expect(options(root)).toEqual([])
   })
 
   it('marks an empty id invalid only where one is required', async () => {
