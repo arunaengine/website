@@ -211,19 +211,20 @@ async function save() {
 <template>
   <div v-if="!kind" class="space-y-3">
     <p class="text-xs text-muted-foreground">Pick what this provider connects to.</p>
-    <div class="grid gap-2 sm:grid-cols-2">
+    <div class="space-y-2">
       <button
         v-for="option in PROVIDER_KINDS"
         :key="option.id"
         type="button"
-        class="flex items-start gap-3 rounded-lg border border-border bg-background/60 p-3 text-left transition-colors hover:border-primary/50 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        class="flex w-full items-center gap-3.5 rounded-lg border border-border bg-background/60 px-4 py-3.5 text-left transition-colors hover:border-primary/50 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         @click="pick(option.id)"
       >
         <ProviderIcon :choice="option.id" />
-        <span class="min-w-0">
+        <span class="min-w-0 flex-1">
           <span class="block text-sm font-medium text-foreground">{{ option.title }}</span>
-          <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground">{{ option.summary }}</span>
+          <span class="mt-1 block text-xs leading-relaxed text-muted-foreground">{{ option.summary }}</span>
         </span>
+        <ChevronRight class="size-4 shrink-0 text-muted-foreground" />
       </button>
     </div>
     <div class="flex justify-end border-t border-border pt-3">
@@ -244,7 +245,7 @@ async function save() {
     </div>
 
     <template v-if="kind.id === 'chatgpt'">
-      <ChatGptLogin />
+      <ChatGptLogin @ready="emit('done')" />
       <div class="flex justify-end border-t border-border pt-3">
         <Button variant="ghost" size="sm" @click="emit('cancel')">Close</Button>
       </div>

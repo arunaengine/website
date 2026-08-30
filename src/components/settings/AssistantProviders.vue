@@ -210,7 +210,7 @@ async function confirmRemove() {
     </template>
 
     <Dialog :open="dialogOpen" @update:open="setDialog">
-      <DialogContent class="max-w-lg">
+      <DialogContent class="max-w-2xl">
         <DialogHeader>
           <DialogTitle>{{ editingProvider ? 'Edit provider' : 'Add provider' }}</DialogTitle>
           <DialogDescription>

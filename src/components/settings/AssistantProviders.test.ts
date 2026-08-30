@@ -67,7 +67,11 @@ const EmptyStateStub = defineComponent({
   props: { title: { type: String, default: '' } },
   setup: (props, { slots }) => () => h('div', { 'data-empty': '' }, [props.title, slots.default?.()]),
 })
-const FormStub = defineComponent(() => () => h('div', { 'data-form': '' }, 'provider form'))
+const FormStub = defineComponent({
+  emits: ['done', 'cancel'],
+  setup: (_, { emit }) => () =>
+    h('div', { 'data-form': '' }, [h('button', { onClick: () => emit('done') }, 'Save provider')]),
+})
 const RefreshStub = defineComponent(() => () => h('button', { 'aria-label': 'Refresh providers' }))
 const SpinnerStub = defineComponent(() => () => h('span', { 'data-spinner': '' }))
 const IconStub = defineComponent(() => () => h('i'))
@@ -156,6 +160,14 @@ describe('AssistantProviders', () => {
 
     expect(element(root, (node) => node.props['data-form'] !== undefined)).toBeDefined()
     expect(content(root)).toContain('Add provider')
+  })
+
+  it('closes the dialog once the form reports a saved provider', async () => {
+    const { root } = await mountApp(AssistantProviders)
+    await click(button(root, 'Add provider'))
+    await click(button(root, 'Save provider'))
+
+    expect(() => element(root, (node) => node.props['data-form'] !== undefined)).toThrow()
   })
 
   it('asks for confirmation before removing a provider', async () => {

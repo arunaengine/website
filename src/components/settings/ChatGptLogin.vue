@@ -12,6 +12,8 @@ import { isDesktop } from '@/lib/desktop'
 import { errorMessage } from '@/lib/utils'
 import { ExternalLink } from '@lucide/vue'
 
+const emit = defineEmits<{ (e: 'ready'): void }>()
+
 const { load } = useAssistantProviders()
 
 const userCode = ref('')
@@ -62,7 +64,10 @@ async function poll(providerId: string, intervalSeconds: number, context: { epoc
       schedule(providerId, intervalSeconds, context)
       return
     }
-    if (result.status === 'ready') await load()
+    if (result.status === 'ready') {
+      await load()
+      emit('ready')
+    }
   } catch (cause) {
     if (!isCurrent(context)) {
       stopPolling()
