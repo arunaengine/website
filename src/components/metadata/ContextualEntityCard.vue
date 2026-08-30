@@ -6,7 +6,7 @@ import ExternalLink from '@/components/ui/ExternalLink.vue'
 import { orcidOf, rorOf } from '@/lib/identifiers'
 import { isHttpUrl } from '@/lib/utils'
 import type { ContextualEntity } from '@/lib/contextualEntities'
-import { Building2, User } from '@lucide/vue'
+import { Building2, Search, User } from '@lucide/vue'
 
 // Fixed three-slot layout (identity / context / identifiers): the context line
 // keeps a minimum height even when empty so the identifier row aligns across
@@ -39,6 +39,17 @@ const idLink = computed(() => {
   const id = props.entity.id
   if (!isHttpUrl(id) || orcidOf(id) || rorOf(id)) return undefined
   return id
+})
+
+// A globally resolvable identifier finds the same person or organization across
+// crates; a local id only ever names one, so its search falls back to the name.
+const searchTerm = computed(() => {
+  const id = props.entity.id
+  const orcid = orcidOf(id)
+  if (orcid) return `https://orcid.org/${orcid}`
+  const ror = rorOf(id)
+  if (ror) return `https://ror.org/${ror}`
+  return isHttpUrl(id) ? id : props.entity.name
 })
 </script>
 
@@ -91,6 +102,13 @@ const idLink = computed(() => {
         Portal profile
       </RouterLink>
       <ExternalLink v-if="idLink" :href="idLink" :label="hostOf(idLink)" :title="entity.id" />
+      <RouterLink
+        :to="{ name: 'datasets', query: { q: searchTerm } }"
+        class="inline-flex items-center gap-1 text-primary hover:underline"
+        :title="`Find datasets that name ${entity.name}`"
+      >
+        <Search class="h-3 w-3" /> Find datasets
+      </RouterLink>
     </div>
   </div>
 </template>

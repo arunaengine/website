@@ -85,13 +85,17 @@ export interface PresentOptions {
 }
 
 // Root properties whose content the hero already shows.
-const HERO_REF_PROPS = ['author', 'creator', 'contributor', 'license', 'conformsTo']
+const HERO_REF_PROPS = ['license', 'conformsTo']
 const HERO_PROPS = new Set(['name', 'description', 'keywords', ...HERO_REF_PROPS])
 // Root reference properties owned by the related-resources list and data table.
 const RELATED_PROPS = ['mentions', 'citation', 'about']
 const DATA_PROPS = ['hasPart']
-// Root roles that badge card entities (hero-owned roles never render cards).
+// Root roles that badge card entities. Authorship also rides the hero chips, so
+// its cards repeat what the chips name, with the full description behind them.
 const CARD_ROLES: Array<[string, string]> = [
+  ['author', 'Author'],
+  ['creator', 'Author'],
+  ['contributor', 'Contributor'],
   ['publisher', 'Publisher'],
   ['sdPublisher', 'Publisher'],
   ['funder', 'Funder'],
@@ -99,6 +103,8 @@ const CARD_ROLES: Array<[string, string]> = [
   ['copyrightHolder', 'Copyright holder'],
 ]
 const ROLE_KINDS: Record<string, 'people' | 'organizations'> = {
+  Author: 'people',
+  Contributor: 'people',
   Publisher: 'organizations',
   Funder: 'organizations',
   'Copyright holder': 'organizations',

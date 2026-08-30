@@ -93,7 +93,7 @@ describe('presentCrate', () => {
   })
 
   it('claims hero entities', () => {
-    // Author, license and conformsTo render in the hero; never again below.
+    // License and conformsTo stay in the hero; the author also earns a card.
     const result = presentCrate(
       crate(
         {
@@ -108,11 +108,30 @@ describe('presentCrate', () => {
         ],
       ),
     )
-    expect(result.people).toEqual([])
+    expect(result.people.map((row) => [row.id, row.roles])).toEqual([['#p1', ['Author']]])
     expect(result.organizations).toEqual([])
     expect(result.entities).toEqual([])
     expect(fieldByKey(result.fields, 'license')).toBeUndefined()
     expect(fieldByKey(result.fields, 'author')).toBeUndefined()
+  })
+
+  it('merges shared roles', () => {
+    // One person in two root roles stays one card carrying both.
+    const result = presentCrate(
+      crate({ author: { '@id': '#p1' }, maintainer: { '@id': '#p1' } }, [
+        { '@id': '#p1', '@type': 'Person', name: 'Ann Author' },
+      ]),
+    )
+    expect(result.people.map((row) => [row.name, row.roles])).toEqual([['Ann Author', ['Author', 'Maintainer']]])
+    expect(result.organizations).toEqual([])
+  })
+
+  it('files organization authors', () => {
+    const result = presentCrate(
+      crate({ author: { '@id': '#lab' } }, [{ '@id': '#lab', '@type': 'Organization', name: 'Example Lab' }]),
+    )
+    expect(result.people).toEqual([])
+    expect(result.organizations.map((row) => [row.name, row.roles])).toEqual([['Example Lab', ['Author']]])
   })
 
   it('claims related refs', () => {

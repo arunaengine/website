@@ -5,7 +5,7 @@ import ContextualEntityCard from '@/components/metadata/ContextualEntityCard.vue
 import type { ContextualEntity } from '@/lib/contextualEntities'
 import { Building2, Users } from '@lucide/vue'
 
-// People and organizations the crate describes beyond the hero's author chips.
+// People and organizations the crate describes, authors included.
 const props = defineProps<{
   people: ContextualEntity[]
   organizations: ContextualEntity[]
