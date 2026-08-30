@@ -7,7 +7,7 @@ import CrateCard from '@/components/assistant/cards/CrateCard.vue'
 import StatsCard from '@/components/assistant/cards/StatsCard.vue'
 import TableCard from '@/components/assistant/cards/TableCard.vue'
 import AssistantMarkdown from '@/components/assistant/AssistantMarkdown.vue'
-import ToolCallCard from '@/components/assistant/ToolCallCard.vue'
+import ToolCallDrawer from '@/components/assistant/ToolCallDrawer.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import type { ChatMessage } from '@/lib/assistant/types'
@@ -23,6 +23,14 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{ (e: 'decide', approved: boolean): void }>()
 
 const scroller = ref<HTMLElement | null>(null)
+
+function shownCards(message: ChatMessage) {
+  return message.calls.filter((call) => call.view)
+}
+
+function foldedCalls(message: ChatMessage) {
+  return message.calls.filter((call) => !call.view)
+}
 
 // Follow the newest turn, but leave a reader who scrolled up where they are.
 function follow(force: boolean) {
@@ -64,19 +72,19 @@ onMounted(() => follow(true))
             <Sparkles class="size-3.5 shrink-0 text-primary" aria-hidden="true" />
             Assistant
           </p>
-          <template v-for="call in message.calls" :key="call.id">
+          <template v-for="call in shownCards(message)" :key="call.id">
             <TableCard v-if="call.view?.kind === 'table'" v-bind="call.view" />
             <ChartCard v-else-if="call.view?.kind === 'chart'" v-bind="call.view" />
             <StatsCard v-else-if="call.view?.kind === 'stats'" v-bind="call.view" />
             <CrateCard v-else-if="call.view?.kind === 'crate'" :title="call.view.title" :crate="call.view.crate" :document-id="call.view.documentId" />
-            <ToolCallCard
-              v-else
-              :call="call"
-              :awaiting-delete="deleteCallId === call.id"
-              :collapsed="props.size === 'full'"
-              @decide="(approved) => emit('decide', approved)"
-            />
           </template>
+          <ToolCallDrawer
+            v-if="foldedCalls(message).length"
+            :calls="foldedCalls(message)"
+            :delete-call-id="deleteCallId"
+            :size="props.size"
+            @decide="(approved) => emit('decide', approved)"
+          />
           <AssistantMarkdown
             v-if="message.text"
             :text="message.text"
