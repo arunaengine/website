@@ -81,6 +81,23 @@ describe('node outage presentation', () => {
   })
 })
 
+describe('first status paint', () => {
+  it('keeps unknown realm data behind the info skeleton before the first load', async () => {
+    realmInfo.value = null
+
+    const text = await renderedText()
+
+    expect(text).toContain('Loading realm status')
+    expect(text).not.toContain('No nodes reported for this realm yet.')
+  })
+
+  it('settles the first paint on either info outcome without changing probe commits', () => {
+    expect(source).toContain('const painted = useFirstPaint(() => firstInfoReady.value)')
+    expect(source).toContain('infoSettled.value = true')
+    expect(source).toContain('probes.value = { ...probes.value, [id]: probe }')
+  })
+})
+
 describe('device summary', () => {
   it('summarizes user nodes instead of listing them among realm nodes', async () => {
     currentUser.value = { id: 'user-1' }

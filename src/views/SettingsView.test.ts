@@ -52,6 +52,20 @@ function collectElements(node: AstNode, predicate: (candidate: AstNode) => boole
 }
 
 describe('SettingsView responsive geometry', () => {
+  it('holds auth-dependent panels behind the bootstrap first-paint gate', () => {
+    expect(source).toContain("import SectionSkeleton from '@/components/ui/SectionSkeleton.vue'")
+    expect(source).toContain("import { useFirstPaint } from '@/composables/useFirstPaint'")
+    expect(source).toContain(
+      '() => bootstrapped.value && !loading.value && !authPending.value,',
+    )
+
+    const skeleton = source.indexOf('<div v-if="!painted"')
+    const firstPanel = source.indexOf('<TabsContent')
+    expect(skeleton).toBeGreaterThan(-1)
+    expect(firstPanel).toBeGreaterThan(skeleton)
+    expect(source).toContain('<template v-else>')
+  })
+
   it('does not contain the removed placeholder control or identifiers', () => {
     const removedLabel = ['Hide sensitive', 'hashes by default'].join(' ')
     const removedCopy = ['Hash display controls', 'are local UI-only preferences.'].join(' ')

@@ -16,6 +16,7 @@ import SessionsPanel from '@/components/settings/SessionsPanel.vue'
 import AssistantProviders from '@/components/settings/AssistantProviders.vue'
 import McpConnect from '@/components/settings/McpConnect.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
+import SectionSkeleton from '@/components/ui/SectionSkeleton.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
@@ -23,6 +24,7 @@ import TabsContent from '@/components/ui/TabsContent.vue'
 import { useTheme, type ThemeMode } from '@/composables/useTheme'
 import { useAruna } from '@/composables/useAruna'
 import { useRefresh } from '@/composables/useRefresh'
+import { useFirstPaint } from '@/composables/useFirstPaint'
 import { useRouteTab } from '@/composables/useRouteTab'
 import { useAuth } from '@/composables/useAuth'
 import { useWatches } from '@/composables/useWatches'
@@ -44,6 +46,9 @@ const {
   profiles,
   credentials,
   authError,
+  bootstrapped,
+  loading,
+  sessionEpoch,
   saving,
   refresh,
   setAuthToken,
@@ -52,6 +57,12 @@ const {
   revokeS3Credential,
 } = useAruna()
 const { signIn, signOut, isAuthenticated, authPending, stage, stageError } = useAuth()
+// Account-dependent panels paint together with the shared session bootstrap;
+// later refreshes update the rendered tab in place.
+const painted = useFirstPaint(
+  () => bootstrapped.value && !loading.value && !authPending.value,
+  () => String(sessionEpoch.value),
+)
 // Optimistic until a watch request answers 404/403 (mirrors the bell's probe).
 const { available: watchesAvailable } = useWatches()
 
@@ -248,6 +259,12 @@ function toggleGroup(groupId: string) {
         </div>
       </div>
 
+      <div v-if="!painted" class="container space-y-5 py-6">
+        <SectionSkeleton :lines="4" />
+        <SectionSkeleton :lines="3" />
+      </div>
+
+      <template v-else>
       <TabsContent value="connection" class="container mt-0 min-w-0 space-y-5 py-6">
         <section class="surface">
           <header class="border-b border-border px-5 py-4">
@@ -507,6 +524,7 @@ function toggleGroup(groupId: string) {
           </div>
         </section>
       </TabsContent>
+      </template>
     </Tabs>
   </div>
 </template>

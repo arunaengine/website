@@ -6,10 +6,12 @@ import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Notice from '@/components/ui/Notice.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
+import ListSkeleton from '@/components/ui/ListSkeleton.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
 import LocalNodeDetails from '@/components/nodes/LocalNodeDetails.vue'
 import NodeDetailPanel from '@/components/nodes/NodeDetailPanel.vue'
 import LocationAggregates from '@/components/placement/LocationAggregates.vue'
+import SectionSkeleton from '@/components/ui/SectionSkeleton.vue'
 import { connectionLabel, connectionVariant, isDegradedStatus, kindLabel, kindVariant, statusVariant, type BadgeVariant } from '@/components/nodes/node-display'
 import { nodeApiBase, probeNode, type NodeProbe } from '@/components/nodes/node-probe'
 import { useAruna } from '@/composables/useAruna'
@@ -21,6 +23,7 @@ import { errorMessage, formatBytes, formatNumber, relativeTime, truncateMiddle }
 import type { RealmNodeInfo } from '@/lib/api'
 import { Boxes, ChevronRight, Globe2, HardDrive, Laptop, MapPin, MapPinned } from '@lucide/vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import { useFirstPaint } from '@/composables/useFirstPaint'
 
 const route = useRoute()
 const { realm, realmInfo, nodeInfo, usageInfo, apiBaseUrl, currentUser, loadInfo } = useAruna()
@@ -34,8 +37,15 @@ const expandedId = ref('')
 const statusError = ref<string | null>(null)
 const lastUpdated = ref<Date | null>(null)
 const refreshing = ref(false)
+const infoSettled = ref(false)
 const probes = ref<Record<string, NodeProbe>>({})
 let probedOnce = false
+
+// The realm snapshot may already be available from the shared bootstrap. If
+// not, wait for this page's first /info load, including a terminal error;
+// browser latency probes continue and commit independently afterwards.
+const firstInfoReady = computed(() => infoSettled.value || Boolean(realmInfo.value))
+const painted = useFirstPaint(() => firstInfoReady.value)
 
 async function refreshStatus() {
   if (refreshing.value) return
@@ -47,9 +57,11 @@ async function refreshStatus() {
       () => {
         statusError.value = null
         lastUpdated.value = new Date()
+        infoSettled.value = true
       },
       (err) => {
         statusError.value = errorMessage(err)
+        infoSettled.value = true
       },
     )
     // The first round needs a node list; later rounds probe the last-known one.
@@ -244,6 +256,14 @@ watch(
     </PageHeader>
 
     <div class="container space-y-6 py-8">
+      <template v-if="!painted">
+        <SectionSkeleton :lines="3" />
+        <SectionSkeleton :lines="2" />
+        <ListSkeleton header :rows="5" label="Loading realm status" />
+        <SectionSkeleton :lines="4" />
+      </template>
+
+      <template v-else>
       <Notice v-if="statusError" tone="warning" class="p-4 text-sm">
         Status refresh failed: {{ statusError }}
       </Notice>
@@ -436,6 +456,7 @@ watch(
           <LocalNodeDetails :info="nodeInfo" />
         </div>
       </section>
+      </template>
     </div>
   </div>
 </template>
