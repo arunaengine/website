@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
@@ -31,6 +31,42 @@ const loadError = ref<string | null>(null)
 // than acting as an existence oracle.
 const needsSignIn = ref(false)
 
+// Registration finishes on the PID authority without notifying the portal, so a
+// pending record re-checks itself on a widening interval.
+const POLL_MIN_MS = 3000
+const POLL_MAX_MS = 15000
+let pollTimer: ReturnType<typeof setTimeout> | undefined
+let pollDelay = POLL_MIN_MS
+let errorRetried = false
+
+function stopPoll() {
+  if (pollTimer !== undefined) clearTimeout(pollTimer)
+  pollTimer = undefined
+}
+
+function resetPoll() {
+  stopPoll()
+  pollDelay = POLL_MIN_MS
+  errorRetried = false
+}
+
+function scheduleNext() {
+  stopPoll()
+  if (needsSignIn.value) return
+  if (loadError.value) {
+    // A failed read gets one slow retry rather than a tight error loop.
+    if (errorRetried) return
+    errorRetried = true
+    pollTimer = setTimeout(() => void load(), POLL_MAX_MS)
+    return
+  }
+  errorRetried = false
+  const pending = view.value?.state === 'requested' || view.value?.state === 'processing'
+  if (!pending) return
+  pollTimer = setTimeout(() => void load(), pollDelay)
+  pollDelay = Math.min(pollDelay * 2, POLL_MAX_MS)
+}
+
 let loadToken = 0
 async function load() {
   const token = ++loadToken
@@ -47,20 +83,31 @@ async function load() {
     if (err instanceof ApiError && err.status === 404 && !currentUser.value) needsSignIn.value = true
     else loadError.value = errorMessage(err)
   } finally {
-    if (token === loadToken) loading.value = false
+    if (token === loadToken) {
+      loading.value = false
+      scheduleNext()
+    }
   }
 }
 
 watch(
   () => props.documentId,
   () => {
+    resetPoll()
     view.value = null
     void load()
   },
   { immediate: true },
 )
 
-const { busy: refreshBusy, refresh: onRefresh } = useRefresh(load)
+onUnmounted(stopPoll)
+
+function reload() {
+  resetPoll()
+  return load()
+}
+
+const { busy: refreshBusy, refresh: onRefresh } = useRefresh(reload)
 const spinning = computed(() => refreshBusy.value || loading.value)
 
 const pid = computed(() => view.value?.value ?? graphIriFor(props.documentId))
