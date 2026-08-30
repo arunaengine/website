@@ -108,11 +108,19 @@ const BrowserStub = defineComponent({
   setup: (props) => () => h('p', `Entities ${(props.draft as Editor.CrateDraft).entities.length}`),
 })
 const EditorStub = defineComponent({
-  props: { draft: { type: Object, required: true }, profiles: { type: Array, default: () => [] } },
+  props: {
+    draft: { type: Object, required: true },
+    profiles: { type: Array, default: () => [] },
+    issues: { type: Array, default: () => [] },
+  },
   emits: ['update', 'profile'],
   setup(props, { emit }) {
+    const nameIssues = () => (props.issues as Editor.LiveIssue[])
+      .filter((issue) => issue.property === 'name')
+      .map((issue) => issue.message)
     return () => h('div', [
       h('p', Editor.displayName(Editor.rootEntity(props.draft as Editor.CrateDraft))),
+      h('p', `Name issues ${nameIssues().join(' | ')}`),
       h('p', `Document ${(props.draft as Editor.CrateDraft).documentId ?? 'none'}`),
       h('input', {
         'aria-label': 'Dataset name',
@@ -133,8 +141,18 @@ const EditorStub = defineComponent({
 })
 const GraphStub = defineComponent(() => () => h('p', 'Graph pane'))
 const DrawerStub = defineComponent({
-  props: { nodeIssues: { type: Array, default: () => [] } },
-  setup: (props) => () => h('p', `Node issues ${(props.nodeIssues as Array<{ message: string }>).map((issue) => issue.message).join(', ')}`),
+  props: {
+    issues: { type: Array, default: () => [] },
+    nodeIssues: { type: Array, default: () => [] },
+  },
+  setup: (props) => () => h('div', [
+    h('p', `Drawer issues ${(props.issues as unknown[]).length}`),
+    h('p', `Node issues ${(props.nodeIssues as Array<{ message: string }>).map((issue) => issue.message).join(', ')}`),
+  ]),
+})
+const WithdrawStub = defineComponent({
+  props: { documentId: { type: String, default: '' } },
+  setup: (props) => () => h('p', `Administration ${props.documentId}`),
 })
 const NodeCheckStub = defineComponent({
   props: { canSave: Boolean, actionLabel: String },
@@ -163,6 +181,7 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
   '@/components/metadata/editor/EditorGraph.vue': moduleDefault(GraphStub),
   '@/components/metadata/editor/IssueDrawer.vue': moduleDefault(DrawerStub),
   '@/components/metadata/editor/NodeCheckPanel.vue': moduleDefault(NodeCheckStub),
+  '@/components/metadata/PidWithdraw.vue': moduleDefault(WithdrawStub),
   '@/composables/useAruna': {
     profileReferenceIri: (profile: { profileUri?: string }) => profile?.profileUri,
     useAruna: () => ({
@@ -232,6 +251,10 @@ async function openLocation(root: Parameters<typeof content>[0]) {
   await click(button(root, 'Location'))
 }
 
+function drawerCount(root: Parameters<typeof content>[0]): number {
+  return Number(/Drawer issues (\d+)/.exec(content(root))?.[1] ?? -1)
+}
+
 beforeEach(() => {
   route.name = 'dataset-new'
   route.params = {}
@@ -288,6 +311,33 @@ describe('DatasetEditorView', () => {
 
     expect(content(mounted.root)).toContain('already in use')
     expect(button(mounted.root, 'Create dataset').props.disabled).toBe(true)
+    mounted.app.unmount()
+  })
+
+  it('marks a taken path on the name', async () => {
+    const mounted = await mountApp(DatasetEditorView)
+    await name(mounted.root, 'Reads 2026')
+    const before = drawerCount(mounted.root)
+
+    pathTaken.value = true
+    await flush()
+
+    expect(content(mounted.root)).toContain(
+      'Name issues A dataset already exists at datasets/reads-2026. Change the name or pick another location.',
+    )
+    expect(drawerCount(mounted.root)).toBe(before + 1)
+    mounted.app.unmount()
+  })
+
+  it('keeps the admin card out of a new dataset', async () => {
+    const mounted = await mountApp(DatasetEditorView)
+    expect(content(mounted.root)).not.toContain('Administration')
+
+    route.name = 'dataset-edit'
+    route.params = { id: 'dataset-1' }
+    await flush()
+
+    expect(content(mounted.root)).toContain('Administration dataset-1')
     mounted.app.unmount()
   })
 

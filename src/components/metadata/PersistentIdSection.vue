@@ -1,18 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
-import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
-import Dialog from '@/components/ui/Dialog.vue'
-import DialogContent from '@/components/ui/DialogContent.vue'
-import DialogHeader from '@/components/ui/DialogHeader.vue'
-import DialogTitle from '@/components/ui/DialogTitle.vue'
-import DialogDescription from '@/components/ui/DialogDescription.vue'
-import DialogFooter from '@/components/ui/DialogFooter.vue'
-import DialogClose from '@/components/ui/DialogClose.vue'
-import Input from '@/components/ui/Input.vue'
-import Notice from '@/components/ui/Notice.vue'
-import Textarea from '@/components/ui/Textarea.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
@@ -20,18 +9,16 @@ import { useAruna } from '@/composables/useAruna'
 import { useRefresh } from '@/composables/useRefresh'
 import { ApiError } from '@/lib/api'
 import { graphIriFor } from '@/lib/graphIri'
-import { listPersistentIds, pidStateMeta, withdrawPid, type PersistentIdView } from '@/lib/pid'
+import { listPersistentIds, pidStateMeta, type PersistentIdView } from '@/lib/pid'
 import { errorMessage } from '@/lib/utils'
 import { Fingerprint } from '@lucide/vue'
-
-const REASON_MAX = 1024
 
 const props = defineProps<{
   documentId: string
   isPublic: boolean
 }>()
 
-const { apiBaseUrl, authToken, currentUser, canWithdrawPids } = useAruna()
+const { apiBaseUrl, authToken, currentUser } = useAruna()
 
 function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
@@ -43,11 +30,6 @@ const loadError = ref<string | null>(null)
 // A private document has no anonymous status: the route answers 404 rather
 // than acting as an existence oracle.
 const needsSignIn = ref(false)
-const showWithdraw = ref(false)
-const withdrawing = ref(false)
-const withdrawError = ref<string | null>(null)
-const confirmValue = ref('')
-const reason = ref('')
 
 let loadToken = 0
 async function load() {
@@ -73,8 +55,6 @@ watch(
   () => props.documentId,
   () => {
     view.value = null
-    withdrawError.value = null
-    showWithdraw.value = false
     void load()
   },
   { immediate: true },
@@ -86,47 +66,6 @@ const spinning = computed(() => refreshBusy.value || loading.value)
 const pid = computed(() => view.value?.value ?? graphIriFor(props.documentId))
 const state = computed(() => view.value?.state ?? 'unknown')
 const meta = computed(() => pidStateMeta(state.value))
-
-const canWithdraw = computed(
-  () =>
-    canWithdrawPids.value &&
-    view.value !== null &&
-    ['requested', 'processing', 'active', 'failed'].includes(state.value),
-)
-
-const trimmedReason = computed(() => reason.value.trim())
-const withdrawValid = computed(
-  () =>
-    Boolean(view.value?.value) &&
-    confirmValue.value.trim() === view.value?.value?.trim() &&
-    trimmedReason.value.length > 0 &&
-    trimmedReason.value.length <= REASON_MAX,
-)
-
-function openWithdraw() {
-  withdrawError.value = null
-  confirmValue.value = ''
-  reason.value = ''
-  showWithdraw.value = true
-}
-
-async function confirmWithdraw() {
-  const stored = view.value?.value
-  if (withdrawing.value || !withdrawValid.value || !stored) return
-  withdrawError.value = null
-  withdrawing.value = true
-  try {
-    await withdrawPid(props.documentId, stored, trimmedReason.value, client())
-    showWithdraw.value = false
-    confirmValue.value = ''
-    reason.value = ''
-    await load()
-  } catch (err) {
-    withdrawError.value = errorMessage(err)
-  } finally {
-    withdrawing.value = false
-  }
-}
 </script>
 
 <template>
@@ -183,51 +122,6 @@ async function confirmWithdraw() {
           </p>
         </template>
       </template>
-
-      <div v-if="canWithdraw" class="pt-1">
-        <Button
-          size="sm"
-          variant="outline"
-          class="text-destructive hover:text-destructive"
-          title="Realm administrators only"
-          @click="openWithdraw"
-        >
-          Withdraw PID (admin)
-        </Button>
-      </div>
     </div>
-
-    <Dialog :open="showWithdraw" @update:open="(v: boolean) => (showWithdraw = v)">
-      <DialogContent class="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Withdraw persistent identifier</DialogTitle>
-          <DialogDescription>
-            Withdrawing is permanent and irreversible: <span class="font-mono text-xs">{{ pid }}</span>
-            will answer 410 Gone forever and can never be reactivated. This is an administrative action;
-            normal deletion of the dataset keeps a tombstone instead.
-          </DialogDescription>
-        </DialogHeader>
-        <div class="space-y-3">
-          <div class="space-y-1">
-            <label for="pid-withdraw-confirm" class="text-xs font-medium text-foreground">Type the identifier to confirm</label>
-            <Input id="pid-withdraw-confirm" v-model="confirmValue" class="font-mono text-xs" :placeholder="view?.value ?? ''" />
-          </div>
-          <div class="space-y-1">
-            <label for="pid-withdraw-reason" class="text-xs font-medium text-foreground">Reason</label>
-            <Textarea id="pid-withdraw-reason" v-model="reason" rows="3" :maxlength="REASON_MAX" />
-            <p class="text-[11px] text-muted-foreground">
-              Required, {{ REASON_MAX - trimmedReason.length }} characters left.
-            </p>
-          </div>
-        </div>
-        <Notice v-if="withdrawError" tone="error">{{ withdrawError }}</Notice>
-        <DialogFooter>
-          <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
-          <Button variant="destructive" :disabled="withdrawing || !withdrawValid" @click="confirmWithdraw">
-            {{ withdrawing ? 'Withdrawing…' : 'Withdraw permanently' }}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   </section>
 </template>

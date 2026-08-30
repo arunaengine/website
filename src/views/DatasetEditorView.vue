@@ -12,6 +12,7 @@ import EntityBrowser from '@/components/metadata/editor/EntityBrowser.vue'
 import EntityEditor from '@/components/metadata/editor/EntityEditor.vue'
 import IssueDrawer from '@/components/metadata/editor/IssueDrawer.vue'
 import NodeCheckPanel from '@/components/metadata/editor/NodeCheckPanel.vue'
+import PidWithdraw from '@/components/metadata/PidWithdraw.vue'
 import { profileReferenceIri, useAruna } from '@/composables/useAruna'
 import { useGroupSelection } from '@/composables/useGroupSelection'
 import { usePathPrefixes } from '@/composables/usePathPrefixes'
@@ -418,6 +419,7 @@ async function save() {
               @save="save"
               @jump="open"
             />
+            <PidWithdraw v-if="mode === 'edit'" :document-id="documentId" />
           </template>
           <EditorGraph
             v-else
