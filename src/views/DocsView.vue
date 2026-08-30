@@ -101,6 +101,17 @@ const topicGroups = computed(() => {
                 <ol v-if="section.steps" class="mt-3 list-decimal space-y-2 pl-5 text-sm leading-relaxed text-foreground/85">
                   <li v-for="step in section.steps" :key="step">{{ step }}</li>
                 </ol>
+                <figure v-if="section.image" class="mt-4">
+                  <img
+                    :src="section.image.src"
+                    :alt="section.image.alt"
+                    loading="lazy"
+                    class="w-full rounded-md border border-border"
+                  />
+                  <figcaption v-if="section.image.caption" class="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+                    {{ section.image.caption }}
+                  </figcaption>
+                </figure>
               </section>
             </article>
           </template>

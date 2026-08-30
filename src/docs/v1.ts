@@ -2,11 +2,18 @@ export const docsVersion = 'v1'
 
 export type DocsTopicKind = 'Concept' | 'Guide'
 
+export interface DocsImage {
+  src: string
+  alt: string
+  caption?: string
+}
+
 export interface DocsSection {
   title: string
   paragraphs?: string[]
   bullets?: string[]
   steps?: string[]
+  image?: DocsImage
 }
 
 export interface DocsTopic {
@@ -18,8 +25,8 @@ export interface DocsTopic {
 }
 
 export const docsScreenshots = {
-  status: 'deferred' as const,
-  note: 'Screenshots and annotated examples are deferred until the matching workflows and non-sensitive fixtures are stable. The v1 guide remains complete and usable as text.',
+  status: 'available' as const,
+  note: 'Screenshots come from a live portal walkthrough at desktop width. Highlighted frames mark the control the surrounding text refers to.',
 }
 
 export const docsTopics: DocsTopic[] = [
@@ -72,6 +79,11 @@ export const docsTopics: DocsTopic[] = [
           'A Profile describes the fields and entities expected for a kind of dataset. Requirements are minimum requirements by default, so additional metadata remains valid unless an explicit closed SHACL constraint restricts it.',
           'A conformsTo reference states which Profile a dataset claims to follow. The reference alone is not proof that the dataset passed validation.',
         ],
+        image: {
+          src: '/docs/v1/profiles.jpg',
+          alt: 'Profiles view showing the Process Run Crate profile with its required properties',
+          caption: 'The Profiles view lists every registered profile with its required properties, suggested keywords, and downloadable SHACL shapes.',
+        },
       },
       {
         title: 'Validation authority',
@@ -133,6 +145,11 @@ export const docsTopics: DocsTopic[] = [
           'Group is the ownership, role, and quota scope for datasets, data, and configured storage behavior.',
           'Membership connects a user to group roles. The node evaluates the resulting permission paths for every protected action.',
         ],
+        image: {
+          src: '/docs/v1/status.jpg',
+          alt: 'Status view with realm topology, locations, and the list of realm nodes',
+          caption: 'The Status view shows the realm, its locations, and every node with its role, latency, and connectivity.',
+        },
       },
       {
         title: 'Replication is not a unique total',
@@ -289,36 +306,255 @@ export const docsTopics: DocsTopic[] = [
     ],
   },
   {
+    slug: 'portal-tour',
+    kind: 'Guide',
+    title: 'Find your way around',
+    summary: 'The dashboard, the top bar, the sidebar, and search: where everything lives.',
+    sections: [
+      {
+        title: 'Start at the dashboard',
+        paragraphs: [
+          'After sign-in the portal opens on the dashboard. It summarizes the selected realm: how many datasets, profiles, and groups it holds, how many nodes are online, and what this node stores. The cards update live from the node your browser is connected to.',
+        ],
+        image: {
+          src: '/docs/v1/dashboard.jpg',
+          alt: 'Portal dashboard with realm statistics, storage figures, and group overview',
+          caption: 'The dashboard: realm statistics on top, node storage figures below, your groups at the bottom.',
+        },
+      },
+      {
+        title: 'The top bar',
+        bullets: [
+          'The context switcher on the left shows the active realm and, once you belong to one, the active group. Everything you create belongs to that context.',
+          'The search field reaches datasets, data objects, groups, and users in one place. Press Ctrl+K (Cmd+K on macOS) to focus it from anywhere.',
+          'Create dataset jumps straight into the dataset editor.',
+          'The bell collects notifications, the sun and moon button switches the theme, and the account menu on the right leads to your profile, access tokens, and sign-out.',
+        ],
+        image: {
+          src: '/docs/v1/quick-search.jpg',
+          alt: 'Quick search open in the top bar with dataset and object results for the query reef',
+          caption: 'Quick search groups results by kind and links to the full search page.',
+        },
+      },
+      {
+        title: 'The sidebar',
+        bullets: [
+          'Dashboard, Data, Datasets, Profiles, and Compute are the everyday working views.',
+          'Groups, Status, Settings, and Docs manage membership, health, and your account.',
+          'Admin and Users appear only for realm administrators.',
+          'On narrow windows the sidebar collapses to an icon rail by itself; the collapse button at the bottom sets your preference on wide screens.',
+        ],
+      },
+      {
+        title: 'On a phone',
+        paragraphs: [
+          'Below tablet width the sidebar gives way to a bottom bar with the primary destinations and a More sheet for the rest. Search opens as a full-width panel from the magnifier button.',
+        ],
+      },
+    ],
+  },
+  {
+    slug: 'first-group',
+    kind: 'Guide',
+    title: 'Create your group',
+    summary: 'Groups own datasets, data, and runs; create one before you upload anything.',
+    sections: [
+      {
+        title: 'Groups own your work',
+        paragraphs: [
+          'Every dataset, bucket, and compute run belongs to a group, and your role in that group decides what you may do with it. A fresh account without a group can look around but cannot store anything yet, so this is the first step after sign-in.',
+        ],
+      },
+      {
+        title: 'Create a group',
+        steps: [
+          'Open Groups in the sidebar and choose Create group.',
+          'Name the group after the team or project that will own the data.',
+          'Create it. You become the group admin and can invite members and manage roles.',
+        ],
+        image: {
+          src: '/docs/v1/group-create.jpg',
+          alt: 'Create group dialog with the group name field',
+          caption: 'One name is all a group needs to start.',
+        },
+      },
+      {
+        title: 'Inside a group',
+        paragraphs: [
+          'The group page carries tabs for live statistics, members, roles, data sources, policies, and storage. The context switcher in the top bar now shows the group, and new buckets, datasets, and runs are created in its name.',
+        ],
+        image: {
+          src: '/docs/v1/group-detail.jpg',
+          alt: 'Group detail page with stats, members, roles, data sources, policies, and storage tabs',
+          caption: 'The group page: role badge next to the name, management tabs below.',
+        },
+      },
+    ],
+  },
+  {
+    slug: 'upload-data',
+    kind: 'Guide',
+    title: 'Upload and browse data',
+    summary: 'Create a bucket, upload files from the browser, and know what to do when a transfer fails.',
+    sections: [
+      {
+        title: 'Sessions, not stored keys',
+        paragraphs: [
+          'The Data view browses buckets through the node’s S3 interface, signed in your browser. The portal mints a short-lived session for the selected group and keeps it in memory only; no long-lived credential is stored. See the storage access concept for how sessions, CLI keys, and backends differ.',
+        ],
+      },
+      {
+        title: 'Create a bucket and upload',
+        steps: [
+          'Open Data and confirm the group shown next to “Showing buckets of”.',
+          'Type a bucket name in the field under the bucket list and confirm. Bucket names are S3 names: lowercase, digits, and dashes.',
+          'Select the bucket, then drag files onto the drop zone or use Add data.',
+          'Watch the Transfers panel in the corner until every file reports done.',
+        ],
+        image: {
+          src: '/docs/v1/data-browser.jpg',
+          alt: 'Data view with the reef-survey-2026 bucket and two uploaded objects',
+          caption: 'A bucket with uploaded objects. The toolbar reaches watch, routing, residency, and sync settings for the bucket.',
+        },
+      },
+      {
+        title: 'When an upload fails',
+        paragraphs: [
+          'A failed transfer stays in the Transfers panel with its error and a Retry link, and retrying is safe. Uploads that race each other can fail with a transient conflict; retry simply sends the file again.',
+        ],
+      },
+    ],
+  },
+  {
     slug: 'first-dataset',
     kind: 'Guide',
     title: 'Create your first dataset',
-    summary: 'Create a new dataset or import an existing RO-Crate with an explicit group and purpose.',
+    summary: 'Describe your data as an RO-Crate, attach files from a bucket, and save it with a resolvable identifier.',
     sections: [
       {
         title: 'Before you start',
         bullets: [
-          'Sign in and confirm the selected Realm.',
-          'Choose the owning group explicitly. Group membership and roles determine whether the write is allowed.',
+          'Sign in, confirm the realm, and have a group; the dataset is created in the group the editor shows under the title.',
+          'Upload the files you want to attach first, so they are ready to pick from a bucket.',
           'Use Create dataset for a new description. Use Import RO-Crate dataset for an existing RO-Crate archive.',
         ],
       },
       {
-        title: 'Create',
+        title: 'Describe the dataset',
         steps: [
-          'Open datasets and choose Create dataset.',
-          'Select the owning group, then add a title, description, and other useful metadata.',
-          'Optionally choose a registered Profile. Treat the node validation preview findings as advisory and resolve violations before you save.',
-          'Save the dataset. Accepted confirms the durable write. If the detail view says Preparing, wait or use Retry instead of creating a duplicate.',
-          'Review the dataset purpose badge, group scope, conformance status, and automatic w3id status on the detail page.',
+          'Choose Create dataset in the top bar. The editor opens with a fresh, unsaved dataset.',
+          'Give it a name and a description that says what it contains and how it was made.',
+          'Pick a license and add keywords; both make the dataset far easier to find and reuse.',
+          'Optionally choose a registered Profile. The node validation preview marks findings as advisory and never blocks the form.',
         ],
+        image: {
+          src: '/docs/v1/dataset-editor.jpg',
+          alt: 'Dataset editor with name, description, license, and keyword fields filled in',
+          caption: 'The editor: entities on the left, fields in the middle, validation at the bottom of the page.',
+        },
       },
       {
-        title: 'Import',
+        title: 'Attach files from a bucket',
+        steps: [
+          'Choose Add files in the left panel.',
+          'Pick From a bucket, select the bucket, and tick the objects that belong to this dataset. Upload to a bucket and Another dataset are the alternatives.',
+          'Add the selection and close the dialog. The files appear as entities of the dataset graph.',
+        ],
+        image: {
+          src: '/docs/v1/dataset-addfiles.jpg',
+          alt: 'Add files dialog showing bucket objects with checkboxes',
+          caption: 'Attaching bucket objects references them in the RO-Crate graph; the bytes stay in the bucket.',
+        },
+      },
+      {
+        title: 'Save and verify',
+        steps: [
+          'Check the validation footer, then choose Create dataset. Accepted confirms the durable write; if the detail view says Preparing, wait or use Retry instead of creating a duplicate.',
+          'On the detail page review the purpose badge, group scope, license, and the automatic w3id persistent identifier as it becomes Active.',
+        ],
+        image: {
+          src: '/docs/v1/dataset-detail.jpg',
+          alt: 'Saved dataset detail page with metadata cards and the persistent identifier',
+          caption: 'A saved dataset: metadata up top, the resolvable w3id identifier below.',
+        },
+      },
+      {
+        title: 'Import an existing RO-Crate',
         steps: [
           'Choose Import RO-Crate dataset and select a supported RO-Crate archive.',
           'Review the detected version, file count, purpose, Profile references, and destination before you import.',
           'Confirm the new dataset and follow the preparation until it is Complete or reports a recoverable Partial state.',
         ],
+      },
+      {
+        title: 'Find it again',
+        paragraphs: [
+          'The Datasets view lists every visible RO-Crate with purpose, profile, and group filters, and quick search in the top bar reaches the same catalog from anywhere.',
+        ],
+        image: {
+          src: '/docs/v1/datasets-catalog.jpg',
+          alt: 'Datasets catalog with search, filters, and the saved dataset card',
+          caption: 'The catalog: filters by purpose, profile, and group, plus a SPARQL workbench for advanced queries.',
+        },
+      },
+    ],
+  },
+  {
+    slug: 'compute-run',
+    kind: 'Guide',
+    title: 'Start and follow a compute run',
+    summary: 'Run a script next to your data with Quick run, and read the run states it reports.',
+    sections: [
+      {
+        title: 'Choose a starting point',
+        paragraphs: [
+          'Compute offers two entry points. Quick run takes a short Python, JavaScript, or Bash script, stages it for you, and builds the container run. Custom run takes your own container image, command, and resources. Both run under a group and record their provenance the same way.',
+        ],
+        image: {
+          src: '/docs/v1/compute-new-run.jpg',
+          alt: 'Compute view with the New run menu showing Quick run and Custom run',
+          caption: 'New run: a quick script or a fully described container.',
+        },
+      },
+      {
+        title: 'Script and data',
+        steps: [
+          'Pick the runtime; the working directory defaults to /work.',
+          'Select the owning group. The run and its provenance carry that group.',
+          'Write the script in the editor, or load an existing staged script.',
+          'Use Add input to mount bucket objects into the container; the tree on the right shows the filesystem exactly as the script will see it.',
+          'Declare outputs with Add output if the run writes files worth keeping; stdout and stderr are always captured.',
+        ],
+        image: {
+          src: '/docs/v1/quick-run-script.jpg',
+          alt: 'Quick run script step with the editor and the container data tree',
+          caption: 'The script step: code on the left, the container filesystem with staged inputs on the right.',
+        },
+      },
+      {
+        title: 'Review and run',
+        steps: [
+          'The review step shows the placement choice, what goes into the container, and the exact run request that will be submitted.',
+          'Leave the node on Any node unless the run must sit on specific hardware or next to specific data.',
+          'Run it once. Accepted means the request is durable, while Preparing means scheduling or materialization is still converging.',
+        ],
+        image: {
+          src: '/docs/v1/quick-run-review.jpg',
+          alt: 'Quick run review step with placement, container manifest, and the run request',
+          caption: 'Review before launch: the request is shown verbatim, including the staged script and inputs.',
+        },
+      },
+      {
+        title: 'Follow the run',
+        paragraphs: [
+          'The run page tracks the lifecycle from Queued through Initializing and Running to Finished, and shows the distributed execution record underneath: several nodes may plan the same request family independently, and duplicate successes are reconciled to one canonical execution.',
+          'The run view reports progress without treating an unreachable node as an empty result. When the run completes, Aruna writes a Process Run dataset that records the action, tool, inputs, outputs, status, and owning group. Open it from the run detail or filter datasets by Process Run.',
+        ],
+        image: {
+          src: '/docs/v1/run-detail.jpg',
+          alt: 'Run detail page with lifecycle states and the distributed execution record',
+          caption: 'A run in flight: lifecycle on top, the distributed execution record with its eventually consistent view below.',
+        },
       },
     ],
   },
@@ -337,11 +573,16 @@ export const docsTopics: DocsTopic[] = [
       {
         title: 'Configure',
         steps: [
-          'Open Groups, select the owning group, and find Storage backends.',
+          'Open Groups, select the owning group, and open the Storage tab.',
           'Add the S3-compatible endpoint and backend credentials. Verify the endpoint and certificate information before saving.',
           'Enable the backend and choose routing only after the connection check succeeds.',
           'Confirm the group and node scope before creating or moving data. Ordinary group writers inherit the routing but cannot reveal or replace the backend secret.',
         ],
+        image: {
+          src: '/docs/v1/group-storage.jpg',
+          alt: 'Group storage tab with the storage backends section and add backend button',
+          caption: 'Storage backends live on the group: uploads route to your own object storage instead of the node.',
+        },
       },
     ],
   },
@@ -360,36 +601,17 @@ export const docsTopics: DocsTopic[] = [
       {
         title: 'Create and store safely',
         steps: [
-          'Open Settings and the CLI and service access section.',
+          'Open Settings, then Access & connection.',
           'Confirm the issuing node, group or permission restrictions, and intended client before creating the key.',
           'Copy the access key and one-time secret into the client or its secret store. The portal does not retain the secret for later display.',
           'Configure the client with the issuing node endpoint. The key is not valid on another node.',
           'Revoke the key when the client no longer needs it. Revocation does not affect short-lived portal sessions.',
         ],
-      },
-    ],
-  },
-  {
-    slug: 'compute-run',
-    kind: 'Guide',
-    title: 'Start and follow a compute run',
-    summary: 'Choose a group and inputs, start the work, and read its run and provenance states.',
-    sections: [
-      {
-        title: 'Start the run',
-        steps: [
-          'Open Compute and choose Quick run or Custom run, whichever the connected node offers.',
-          'Select the owning group. The aruna-engine.org/group label carries that accounting and provenance context.',
-          'Choose readable inputs, an output destination, the container or executable details, and resource values the node accepts.',
-          'Review the group, node, storage, command, and resource scope before you start it.',
-          'Run it once. Accepted means the request is durable, while Preparing means scheduling or materialization is still converging.',
-        ],
-      },
-      {
-        title: 'Follow results',
-        paragraphs: [
-          'The run view reports run progress without treating an unreachable node as an empty result. When the run completes, Aruna writes a Process Run dataset that records the action, tool, inputs, outputs, status, and owning group. Open that Process Run from the run detail or filter datasets by Process Run.',
-        ],
+        image: {
+          src: '/docs/v1/settings-access.jpg',
+          alt: 'Settings access and connection tab with the session, API connection, and sessions list',
+          caption: 'Access & connection: the browser session, the API endpoint, and every session issued for your account.',
+        },
       },
     ],
   },

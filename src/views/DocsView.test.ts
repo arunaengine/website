@@ -50,10 +50,13 @@ describe('versioned in-portal Docs', () => {
       'states-and-retry',
       'identifiers',
       'data-to-compute',
+      'portal-tour',
+      'first-group',
+      'upload-data',
       'first-dataset',
+      'compute-run',
       'storage-backend',
       'cli-access-key',
-      'compute-run',
     ])
 
     for (const topic of docsTopics) {
@@ -64,13 +67,24 @@ describe('versioned in-portal Docs', () => {
     }
   })
 
-  it('records screenshot work as deferred without placeholder content', async () => {
+  it('ships walkthrough screenshots', async () => {
     const html = await renderTopic('')
 
-    expect(docsScreenshots.status).toBe('deferred')
+    expect(docsScreenshots.status).toBe('available')
     expect(html).toContain('Screenshot status:')
     expect(html).toContain(docsScreenshots.note)
     expect(JSON.stringify(docsTopics)).not.toMatch(/lorem ipsum/i)
+
+    const images = docsTopics.flatMap((topic) => topic.sections.flatMap((s) => (s.image ? [s.image] : [])))
+    expect(images.length).toBeGreaterThan(0)
+    for (const image of images) {
+      expect(image.src).toMatch(/^\/docs\/v1\/[a-z0-9-]+\.jpg$/)
+      expect(image.alt.length).toBeGreaterThan(0)
+    }
+
+    const tourHtml = await renderTopic('portal-tour')
+    expect(tourHtml).toContain('<figure')
+    expect(tourHtml).toContain('/docs/v1/dashboard.jpg')
   })
 
   it('states the activated RO-Crate compatibility and 1.2 creation default', () => {
