@@ -5,6 +5,7 @@ import ChartCard from '@/components/assistant/cards/ChartCard.vue'
 import CrateCard from '@/components/assistant/cards/CrateCard.vue'
 import StatsCard from '@/components/assistant/cards/StatsCard.vue'
 import TableCard from '@/components/assistant/cards/TableCard.vue'
+import AssistantMarkdown from '@/components/assistant/AssistantMarkdown.vue'
 import ToolCallCard from '@/components/assistant/ToolCallCard.vue'
 import Notice from '@/components/ui/Notice.vue'
 import type { ChatMessage } from '@/lib/assistant/types'
@@ -49,11 +50,11 @@ const emit = defineEmits<{ (e: 'decide', approved: boolean): void }>()
             @decide="(approved) => emit('decide', approved)"
           />
         </template>
-        <p
+        <AssistantMarkdown
           v-if="message.text"
-          class="whitespace-pre-wrap px-1 leading-relaxed text-foreground"
-          :class="size === 'full' ? 'text-sm' : 'text-xs'"
-        >{{ message.text }}</p>
+          :text="message.text"
+          :size="size"
+        />
         <Notice v-if="message.error" tone="error">{{ message.error }}</Notice>
       </template>
     </div>
