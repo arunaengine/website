@@ -3,7 +3,9 @@ import {
   Boxes,
   Cpu,
   FileJson2,
+  Globe,
   KeyRound,
+  MessageSquare,
   Share2,
 } from '@lucide/vue'
 import type { FunctionalComponent } from 'vue'
@@ -44,9 +46,21 @@ const features: Feature[] = [
   },
   {
     title: 'Realm compute',
-    desc: 'Start runs from the portal: a quick-run wizard, workspace lifecycle choices, and runs that execute next to the data on any realm node.',
+    desc: 'Run scripts and container jobs on the node that already holds the data. Start them from the portal, choose how long the workspace lives, and results land back in your buckets.',
     icon: Cpu,
     tone: 'bg-aruna-indigo/15 text-aruna-indigo dark:text-aruna-tagline',
+  },
+  {
+    title: 'Assistant',
+    desc: 'Bring your own AI provider or key and chat in the portal. The assistant drives the node\'s own tools over MCP to search, read and draft datasets, and the key stays in your browser.',
+    icon: MessageSquare,
+    tone: 'bg-aruna-navy/10 text-aruna-navy dark:text-aruna-tagline',
+  },
+  {
+    title: 'Realm federation',
+    desc: 'A realm is self-contained today. Federation will connect realms to one another, so data and metadata can be discovered and shared across organizational borders.',
+    icon: Globe,
+    tone: 'bg-primary/10 text-primary',
     upcoming: true,
   },
 ]
@@ -64,7 +78,7 @@ const features: Feature[] = [
         </h2>
         <p class="mt-3 text-sm text-muted-foreground">
           Every node serves the S3 API, the REST API and this portal. These
-          five parts do the daily work.
+          parts do the daily work.
         </p>
       </div>
 

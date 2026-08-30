@@ -42,9 +42,11 @@ function onSignIn() {
             GitHub
           </a>
         </Button>
-        <Button variant="ghost" size="sm" class="hidden sm:inline-flex">
-          <BookOpen class="h-4 w-4" />
-          Docs
+        <Button variant="ghost" size="sm" class="hidden sm:inline-flex" as-child>
+          <RouterLink to="/app/docs/v1">
+            <BookOpen class="h-4 w-4" />
+            Docs
+          </RouterLink>
         </Button>
         <Button variant="ghost" size="icon" :aria-label="isDark ? 'Use light mode' : 'Use dark mode'" @click="toggleTheme">
           <Sun v-if="isDark" class="h-4 w-4" />
