@@ -209,16 +209,18 @@ watch(
 
 <template>
   <DetailDialog :open="props.open" @update:open="(value: boolean) => emit('update:open', value)">
-    <DialogHeader>
-      <DialogTitle class="flex items-center gap-2">
-        <MapPinned class="h-4 w-4 text-primary" /> Residency defaults for {{ props.bucket }}
-      </DialogTitle>
-      <DialogDescription>
-        The whole residency policy set governs versions minted after this change; existing heads keep their own refs until a successor is minted.
-      </DialogDescription>
-    </DialogHeader>
+    <template #header>
+      <DialogHeader>
+        <DialogTitle class="flex items-center gap-2">
+          <MapPinned class="h-4 w-4 text-primary" /> Residency defaults for {{ props.bucket }}
+        </DialogTitle>
+        <DialogDescription>
+          The whole residency policy set governs versions minted after this change; existing heads keep their own refs until a successor is minted.
+        </DialogDescription>
+      </DialogHeader>
+    </template>
 
-    <div class="mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto">
+    <div class="space-y-4">
       <EmptyState v-if="hidden" compact title="Bucket residency defaults require realm configuration permission." />
       <div v-else-if="loading && !placement" class="space-y-3">
         <Skeleton class="h-20" />
@@ -330,8 +332,10 @@ watch(
       </template>
     </div>
 
-    <DialogFooter class="mt-4">
-      <DialogClose as-child><Button type="button" variant="outline">Close</Button></DialogClose>
-    </DialogFooter>
+    <template #footer>
+      <DialogFooter>
+        <DialogClose as-child><Button type="button" variant="outline">Close</Button></DialogClose>
+      </DialogFooter>
+    </template>
   </DetailDialog>
 </template>

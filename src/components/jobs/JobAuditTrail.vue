@@ -155,12 +155,14 @@ watch(
 
 <template>
   <DetailDialog :open="props.open" @update:open="(value: boolean) => emit('update:open', value)">
-    <DialogHeader>
-      <DialogTitle>Audit trail</DialogTitle>
-      <DialogDescription>
-        Immutable records displayed by event time. API pages arrive in stable record-key order.
-      </DialogDescription>
-    </DialogHeader>
+    <template #header>
+      <DialogHeader>
+        <DialogTitle>Audit trail</DialogTitle>
+        <DialogDescription>
+          Immutable records displayed by event time. API pages arrive in stable record-key order.
+        </DialogDescription>
+      </DialogHeader>
+    </template>
 
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="inline-flex rounded-md border border-border p-0.5" role="group" aria-label="Audit scope">
@@ -182,7 +184,7 @@ watch(
       </p>
     </div>
 
-    <div class="scrollbar-thin min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+    <div class="mt-4 space-y-4">
       <div v-if="loading" class="space-y-2">
         <Skeleton class="h-10 w-full" />
         <Skeleton class="h-16 w-full" />
@@ -262,8 +264,10 @@ watch(
       </template>
     </div>
 
-    <DialogFooter>
-      <DialogClose as-child><Button variant="outline">Close</Button></DialogClose>
-    </DialogFooter>
+    <template #footer>
+      <DialogFooter>
+        <DialogClose as-child><Button variant="outline">Close</Button></DialogClose>
+      </DialogFooter>
+    </template>
   </DetailDialog>
 </template>

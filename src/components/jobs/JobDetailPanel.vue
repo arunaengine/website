@@ -68,11 +68,24 @@ async function confirmCancel() {
 
 <template>
   <DetailDialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-    <div class="scrollbar-thin min-h-0 flex-1 overflow-y-auto pr-1">
+    <template #header>
       <DialogTitle class="sr-only">Details</DialogTitle>
+      <div v-if="job" class="space-y-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <h2 class="font-display text-lg font-semibold text-aruna-navy">{{ jobKindLabel(job.kind) }}</h2>
+          <JobStateBadge :state="job.state" />
+          <Badge v-if="job.cancel_requested && !terminal" variant="warn">cancel requested</Badge>
+        </div>
+        <div class="flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
+          <span :title="job.job_id">{{ truncateMiddle(job.job_id) }}</span>
+          <CopyButton :value="job.job_id" label="Copy the id" />
+        </div>
+      </div>
+      <Skeleton v-else-if="loadState === 'loading'" class="h-6 w-2/3" />
+    </template>
 
+    <div>
       <div v-if="loadState === 'loading'" class="space-y-4">
-        <Skeleton class="h-8 w-2/3" />
         <Skeleton class="h-24 w-full" />
         <Skeleton class="h-24 w-full" />
       </div>
@@ -84,18 +97,6 @@ async function confirmCancel() {
       <ErrorPanel v-else-if="loadState === 'error'" :message="loadError || 'This could not be loaded.'" @retry="load" />
 
       <div v-else-if="job" class="space-y-6">
-        <div class="space-y-2 pr-8">
-          <div class="flex flex-wrap items-center gap-2">
-            <h2 class="font-display text-lg font-semibold text-aruna-navy">{{ jobKindLabel(job.kind) }}</h2>
-            <JobStateBadge :state="job.state" />
-            <Badge v-if="job.cancel_requested && !terminal" variant="warn">cancel requested</Badge>
-          </div>
-          <div class="flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
-            <span :title="job.job_id">{{ truncateMiddle(job.job_id) }}</span>
-            <CopyButton :value="job.job_id" label="Copy the id" />
-          </div>
-        </div>
-
         <section class="space-y-2">
           <h3 class="font-display text-sm font-semibold text-aruna-navy">Progress</h3>
           <Progress

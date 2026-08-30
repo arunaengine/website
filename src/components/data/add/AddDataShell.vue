@@ -112,17 +112,19 @@ function rowEditable(row: BuilderRow): boolean {
 
 <template>
   <DetailDialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-    <DialogHeader>
-      <DialogTitle class="flex items-center gap-2">
-        <Upload class="h-4 w-4 text-primary" /> Add data
-      </DialogTitle>
-      <DialogDescription>
-        Collect local files, connector sources and objects from other buckets, then add them to
-        <span class="font-mono text-xs">{{ bucket }}/{{ prefix }}</span>.
-      </DialogDescription>
-    </DialogHeader>
+    <template #header>
+      <DialogHeader>
+        <DialogTitle class="flex items-center gap-2">
+          <Upload class="h-4 w-4 text-primary" /> Add data
+        </DialogTitle>
+        <DialogDescription>
+          Collect local files, connector sources and objects from other buckets, then add them to
+          <span class="font-mono text-xs">{{ bucket }}/{{ prefix }}</span>.
+        </DialogDescription>
+      </DialogHeader>
+    </template>
 
-    <div class="scrollbar-thin mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto px-1">
+    <div class="space-y-4">
       <slot />
 
       <!-- Basket -->
@@ -251,17 +253,19 @@ function rowEditable(row: BuilderRow): boolean {
       </Notice>
     </div>
 
-    <DialogFooter class="mt-4 sm:justify-between">
-      <DialogClose as-child><Button variant="outline">Close</Button></DialogClose>
-      <Button
-        :disabled="!basket.canSubmit.value || writesDisabled"
-        :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
-        @click="submitAll"
-      >
-        <Spinner v-if="basket.busy.value" label="Adding" class="text-current" /><CloudDownload v-else class="h-4 w-4" />
-        Add {{ basket.summary.value.ready || '' }}
-      </Button>
-    </DialogFooter>
+    <template #footer>
+      <DialogFooter class="sm:justify-between">
+        <DialogClose as-child><Button variant="outline">Close</Button></DialogClose>
+        <Button
+          :disabled="!basket.canSubmit.value || writesDisabled"
+          :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
+          @click="submitAll"
+        >
+          <Spinner v-if="basket.busy.value" label="Adding" class="text-current" /><CloudDownload v-else class="h-4 w-4" />
+          Add {{ basket.summary.value.ready || '' }}
+        </Button>
+      </DialogFooter>
+    </template>
 
     <slot name="dialogs" />
   </DetailDialog>

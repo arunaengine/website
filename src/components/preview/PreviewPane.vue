@@ -96,7 +96,8 @@ async function download() {
 
 <template>
   <DetailDialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-      <div class="flex items-start justify-between gap-3 pr-8">
+    <template #header>
+      <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
           <DialogTitle class="truncate text-base font-semibold text-foreground" :title="props.name">
             {{ props.name || 'Preview' }}
@@ -137,8 +138,9 @@ async function download() {
           <Download class="h-4 w-4" /> Download
         </Button>
       </div>
+    </template>
 
-      <div class="mt-4 min-h-0 flex-1 overflow-auto">
+      <div>
         <Spinner
           v-if="preview.status.value === 'loading'"
           show-label

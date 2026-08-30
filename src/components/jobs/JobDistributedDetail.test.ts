@@ -17,8 +17,19 @@ const PassThroughStub = defineComponent((_, { slots }) => () => h('div', slots.d
 const OpenPassThroughStub = defineComponent({
   props: { open: Boolean },
   setup(props, { slots }) {
-    return () => (props.open ? h('div', slots.default?.()) : null)
+    return () =>
+      props.open ? h('div', [slots.header?.(), slots.default?.(), slots.footer?.()]) : null
   },
+})
+const StagesStub = defineComponent({
+  props: { stages: { type: Array, default: () => [] } },
+  setup: (props) => () =>
+    h(
+      'ul',
+      (props.stages as Array<{ label: string; detail?: string }>).map((stage) =>
+        h('li', `${stage.label} ${stage.detail ?? ''}`),
+      ),
+    ),
 })
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
 const BadgeStub = defineComponent((_, { slots }) => () => h('span', slots.default?.()))
@@ -190,6 +201,47 @@ const family: JobFamilyResponse = {
     omitted: 0,
     sealed_at_ms: 1755500000000,
   },
+}
+
+function taskPanel(getTask: unknown, getJob: unknown): Component {
+  return compileClientComponent(new URL('../compute/TaskDetailPanel.vue', import.meta.url), {
+    vue: VueRuntime,
+    'vue-router': { RouterLink: RouterLinkStub, useRouter: () => ({ push: vi.fn() }) },
+    '@lucide/vue': icons,
+    '@/components/ui/DetailDialog.vue': moduleDefault(OpenPassThroughStub),
+    '@/components/ui/DialogTitle.vue': moduleDefault(PassThroughStub),
+    '@/components/ui/Notice.vue': moduleDefault(PassThroughStub),
+    '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
+    '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+    '@/components/ui/RefreshButton.vue': moduleDefault(refreshButton()),
+    '@/components/ui/Skeleton.vue': moduleDefault(PassThroughStub),
+    '@/components/ui/ErrorPanel.vue': moduleDefault(ErrorPanelStub),
+    '@/components/ui/CopyButton.vue': moduleDefault(PassThroughStub),
+    '@/components/ui/ExternalLink.vue': moduleDefault(PassThroughStub),
+    '@/components/jobs/JobFamilySection.vue': moduleDefault(JobFamilyStub),
+    '@/components/compute/TaskHeader.vue': moduleDefault(PassThroughStub),
+    '@/components/compute/TaskStateBadge.vue': moduleDefault(JobStateBadgeStub),
+    '@/components/compute/TesPlacementTags.vue': moduleDefault(PassThroughStub),
+    '@/components/onboarding/ClaimWatchStep.vue': moduleDefault(StagesStub),
+    '@/composables/useTes': {
+      isTesUnsupported: () => false,
+      useTes: () => ({ getTask, cancelTask: vi.fn(), busy: ref(false) }),
+    },
+    '@/composables/useJobs': { useJobs: () => ({ getJob }) },
+    '@/composables/useRefresh': { useRefresh },
+    '@/composables/useAruna': {
+      useAruna: () => ({
+        myGroups: ref([]),
+        apiBaseUrl: ref('https://node.test/api/v1'),
+        metadataAtPath: vi.fn(async () => null),
+      }),
+    },
+    '@/composables/useHiddenTasks': { useHiddenTasks: () => ({ hide: vi.fn() }) },
+    '@/composables/useS3': { useS3: () => ({ endpoint: ref(null) }) },
+    '@/lib/quickRuntimes': { detectQuickRun: () => false },
+    '@/lib/tes': Tes,
+    '@/lib/utils': Utils,
+  })
 }
 
 describe('distributed job detail components', () => {
@@ -481,48 +533,7 @@ describe('distributed job detail components', () => {
       logs: [],
       tags: {},
     }))
-    const TaskDetailPanel = compileClientComponent(
-      new URL('../compute/TaskDetailPanel.vue', import.meta.url),
-      {
-        vue: VueRuntime,
-        'vue-router': { RouterLink: RouterLinkStub, useRouter: () => ({ push: vi.fn() }) },
-        '@lucide/vue': icons,
-        '@/components/ui/DetailDialog.vue': moduleDefault(OpenPassThroughStub),
-        '@/components/ui/Notice.vue': moduleDefault(PassThroughStub),
-        '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
-        '@/components/ui/Button.vue': moduleDefault(ButtonStub),
-        '@/components/ui/RefreshButton.vue': moduleDefault(refreshButton()),
-        '@/components/ui/Skeleton.vue': moduleDefault(PassThroughStub),
-        '@/components/ui/ErrorPanel.vue': moduleDefault(ErrorPanelStub),
-        '@/components/ui/CopyButton.vue': moduleDefault(PassThroughStub),
-        '@/components/ui/ExternalLink.vue': moduleDefault(PassThroughStub),
-        '@/components/jobs/JobFamilySection.vue': moduleDefault(JobFamilyStub),
-        '@/components/compute/TaskHeader.vue': moduleDefault(PassThroughStub),
-        '@/components/compute/TaskStateBadge.vue': moduleDefault(JobStateBadgeStub),
-        '@/components/compute/TesPlacementTags.vue': moduleDefault(PassThroughStub),
-        '@/components/onboarding/ClaimWatchStep.vue': moduleDefault(PassThroughStub),
-        '@/composables/useTes': {
-          isTesUnsupported: () => false,
-          useTes: () => ({ getTask, cancelTask: vi.fn(), busy: ref(false) }),
-        },
-        '@/composables/useJobs': { useJobs: () => ({ getJob }) },
-        '@/composables/useRefresh': { useRefresh },
-        '@/composables/useAruna': {
-          useAruna: () => ({
-            myGroups: ref([]),
-            apiBaseUrl: ref('https://node.test/api/v1'),
-            metadataAtPath: vi.fn(async () => null),
-          }),
-        },
-        '@/composables/useHiddenTasks': { useHiddenTasks: () => ({ hide: vi.fn() }) },
-        '@/composables/useS3': { useS3: () => ({ endpoint: ref(null) }) },
-        '@/lib/quickRuntimes': { detectQuickRun: () => false },
-        '@/lib/tes': Tes,
-        '@/lib/utils': Utils,
-      },
-    )
-
-    const mounted = await mount(TaskDetailPanel, { taskId: 'native-job-id', open: true })
+    const mounted = await mount(taskPanel(getTask, getJob), { taskId: 'native-job-id', open: true })
     const text = content(mounted.root)
 
     expect(mounted.errors).toEqual([])
@@ -530,6 +541,29 @@ describe('distributed job detail components', () => {
     expect(text).toContain('Distributed execution detail could not be loaded.')
     expect(text).not.toContain('native family detail')
     expect(text).not.toContain('ERROR:')
+    mounted.app.unmount()
+  })
+
+  it('tells a failure once, with its cause', async () => {
+    // The badge says Failed; only the stage and the cause line say what failed.
+    const getTask = vi.fn(async () => ({
+      id: 'failed-run',
+      state: 'EXECUTOR_ERROR',
+      executors: [{ image: 'alpine', command: ['sh'] }],
+      inputs: [],
+      outputs: [],
+      logs: [{ logs: [{ exit_code: 2 }], outputs: [] }],
+      tags: {},
+    }))
+    const getJob = vi.fn(async () => ({ family: null }))
+
+    const mounted = await mount(taskPanel(getTask, getJob), { taskId: 'failed-run', open: true })
+    const text = content(mounted.root)
+
+    expect(mounted.errors).toEqual([])
+    expect(text).toContain('Finished the script failed')
+    expect(text).toContain('The script exited with code 2')
+    expect(text).not.toContain('executor error')
     mounted.app.unmount()
   })
 })
