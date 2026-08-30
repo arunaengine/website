@@ -57,6 +57,9 @@ if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
   query.addEventListener('change', onChange)
   onScopeDispose(() => query.removeEventListener('change', onChange))
 }
+// Only the inline column carries its own toggle; the drawer opens from the
+// chat header.
+const railOpen = computed(() => sidebarOpen.value && wide.value)
 const renaming = ref(false)
 const titleDraft = ref('')
 const chatName = computed<string>(() => {
@@ -118,11 +121,25 @@ function continueInPanel() {
 <template>
   <div class="flex h-full min-h-0 overflow-hidden">
     <aside
-      v-if="sidebarOpen"
+      v-if="railOpen"
       aria-label="Chat list"
       class="hidden w-72 max-w-[80vw] shrink-0 flex-col border-r border-border bg-muted/20 md:flex"
     >
-      <div class="flex h-12 shrink-0 items-center border-b border-border px-3">
+      <div class="flex h-12 shrink-0 items-center justify-end border-b border-border px-2">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          :aria-pressed="sidebarOpen"
+          aria-label="Toggle the chat list"
+          title="Toggle the chat list"
+          @click="toggleSidebar"
+        >
+          <PanelLeft class="size-4" />
+        </Button>
+      </div>
+      <AssistantHistory v-if="historyReady" :read-only="!available" class="min-h-0 flex-1" />
+      <div v-else class="min-h-0 flex-1" aria-hidden="true" />
+      <div class="shrink-0 border-t border-border p-2">
         <Button
           variant="outline"
           size="sm"
@@ -133,13 +150,16 @@ function continueInPanel() {
           <Plus class="size-3.5" /> New chat
         </Button>
       </div>
-      <AssistantHistory v-if="historyReady" :read-only="!available" class="min-h-0 flex-1" />
     </aside>
 
     <Sheet :open="drawerOpen && !wide" @update:open="(value: boolean) => (drawerOpen = value)">
       <SheetContent side="left" class="flex w-80 max-w-[85vw] flex-col gap-0 p-0">
         <div class="flex h-12 shrink-0 items-center border-b border-border px-3 pr-12">
           <DialogTitle class="sr-only">Chats</DialogTitle>
+        </div>
+        <AssistantHistory v-if="historyReady" :read-only="!available" class="min-h-0 flex-1" />
+        <div v-else class="min-h-0 flex-1" aria-hidden="true" />
+        <div class="shrink-0 border-t border-border p-2">
           <Button
             variant="outline"
             size="sm"
@@ -150,13 +170,13 @@ function continueInPanel() {
             <Plus class="size-3.5" /> New chat
           </Button>
         </div>
-        <AssistantHistory v-if="historyReady" :read-only="!available" class="min-h-0 flex-1" />
       </SheetContent>
     </Sheet>
 
     <div class="flex min-w-0 flex-1 flex-col">
       <header class="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3">
         <Button
+          v-if="!railOpen"
           variant="ghost"
           size="icon-sm"
           class="shrink-0"
@@ -168,7 +188,7 @@ function continueInPanel() {
           <PanelLeft class="size-4" />
         </Button>
         <Button
-          v-if="!sidebarOpen"
+          v-if="!railOpen"
           variant="ghost"
           size="icon-sm"
           class="shrink-0"

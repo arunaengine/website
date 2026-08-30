@@ -162,9 +162,38 @@ describe('AssistantView', () => {
     const { root } = await mountApp(AssistantView)
     await click(control(root, 'Toggle the chat list'))
 
-    expect(has(root, 'data-sheet')).toBe(true)
+    const drawer = element(root, (node) => 'data-sheet' in node.props)
+    expect(content(drawer)).toContain('New chat')
     expect(stored.size).toBe(0)
     vi.unstubAllGlobals()
+  })
+
+  it('carries the toggle into the open list', async () => {
+    stored.set('aruna.assistant.sidebar', 'open')
+    const { root } = await mountApp(AssistantView)
+    const toggles = nodes(root).filter((node) => node.props['aria-label'] === 'Toggle the chat list')
+    const list = element(root, (node) => node.props['aria-label'] === 'Chat list')
+
+    expect(toggles).toHaveLength(1)
+    expect(nodes(list)).toContain(toggles[0])
+    expect(content(list.children[0])).toBe('')
+  })
+
+  it('pins New chat under the chat list', async () => {
+    stored.set('aruna.assistant.sidebar', 'open')
+    const { root } = await mountApp(AssistantView)
+    const list = element(root, (node) => node.props['aria-label'] === 'Chat list')
+
+    expect(content(list.children[list.children.length - 1])).toContain('New chat')
+    expect(content(list.children[1])).toContain('chats')
+  })
+
+  it('keeps the toggle in the header while collapsed', async () => {
+    const { root } = await mountApp(AssistantView)
+
+    expect(has(root, 'data-history')).toBe(false)
+    expect(control(root, 'Toggle the chat list').props['aria-pressed']).toBe(false)
+    expect(has(root, 'data-sheet')).toBe(false)
   })
 
   it('remembers the chat list toggle', async () => {
@@ -205,7 +234,7 @@ describe('AssistantView', () => {
       .toEqual({ name: 'settings', query: { tab: 'assistant' } })
   })
 
-  it('starts a new chat from the list header', async () => {
+  it('starts a new chat from the list footer', async () => {
     stored.set('aruna.assistant.sidebar', 'open')
     const { root } = await mountApp(AssistantView)
     await click(element(root, (node) => node.tag === 'button' && content(node).trim().startsWith('New chat')))
