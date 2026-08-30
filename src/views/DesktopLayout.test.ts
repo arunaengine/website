@@ -66,6 +66,7 @@ const DesktopLayoutClient = compileClientComponent(new URL('./DesktopLayout.vue'
   '@/components/layout/NodeDown.vue': moduleDefault(NodeDownStub),
   '@/components/data/TransfersPanel.vue': moduleDefault(EmptyStub),
   '@/components/assistant/AssistantPanel.vue': moduleDefault(EmptyStub),
+  '@/composables/uploadQueueState': { uploadQueueItems: ref([]) },
   '@/lib/chunk-recovery': { asyncChunkError: vi.fn() },
   '@/components/ui/Notice.vue': moduleDefault(Notice),
   '@/composables/useAruna': { useAruna: () => permissions },

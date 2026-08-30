@@ -8,10 +8,10 @@ import GlobalErrorBanner from '@/components/layout/GlobalErrorBanner.vue'
 import RealmUnreachable from '@/components/layout/RealmUnreachable.vue'
 import NodeDown from '@/components/layout/NodeDown.vue'
 import Notice from '@/components/ui/Notice.vue'
-import TransfersPanel from '@/components/data/TransfersPanel.vue'
 import { RouterView, useRoute } from 'vue-router'
 import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
+import { uploadQueueItems } from '@/composables/uploadQueueState'
 import { useAssistantChat } from '@/composables/useAssistantChat'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { appQuit } from '@/lib/desktopBridge'
@@ -20,6 +20,11 @@ import { asyncChunkError } from '@/lib/chunk-recovery'
 import { errorMessage } from '@/lib/utils'
 import { navEntries, navRowClass, type NavEntry } from '@/components/layout/nav'
 import { Power } from '@lucide/vue'
+
+const TransfersPanel = defineAsyncComponent({
+  loader: () => import('@/components/data/TransfersPanel.vue'),
+  onError: asyncChunkError,
+})
 
 const AssistantPanel = defineAsyncComponent({
   loader: () => import('@/components/assistant/AssistantPanel.vue'),
@@ -117,7 +122,7 @@ watch(
         <RouterView v-else />
       </main>
     </div>
-    <TransfersPanel />
+    <TransfersPanel v-if="uploadQueueItems.length" />
     <AssistantPanel v-if="assistantOpen" />
   </div>
 </template>

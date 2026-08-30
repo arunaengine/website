@@ -4,12 +4,17 @@ import TopBar from '@/components/dashboard/TopBar.vue'
 import GlobalErrorBanner from '@/components/layout/GlobalErrorBanner.vue'
 import MobileNav from '@/components/dashboard/MobileNav.vue'
 import RealmUnreachable from '@/components/layout/RealmUnreachable.vue'
-import TransfersPanel from '@/components/data/TransfersPanel.vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import { computed, defineAsyncComponent, nextTick, onMounted, ref, watch } from 'vue'
 import { useAssistantChat } from '@/composables/useAssistantChat'
+import { uploadQueueItems } from '@/composables/uploadQueueState'
 import { asyncChunkError } from '@/lib/chunk-recovery'
 import { probeRealm, realmReach } from '@/lib/desktopBoot'
+
+const TransfersPanel = defineAsyncComponent({
+  loader: () => import('@/components/data/TransfersPanel.vue'),
+  onError: asyncChunkError,
+})
 
 const AssistantPanel = defineAsyncComponent({
   loader: () => import('@/components/assistant/AssistantPanel.vue'),
@@ -93,7 +98,7 @@ watch(
     <MobileNav />
     <!-- Uploads run through the shared queue and survive navigation, so the
          floating transfers panel lives at the layout, bottom-right. -->
-    <TransfersPanel />
+    <TransfersPanel v-if="uploadQueueItems.length" />
     <AssistantPanel v-if="assistantOpen" />
   </div>
 </template>
