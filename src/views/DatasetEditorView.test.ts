@@ -58,8 +58,16 @@ function namedCrate(name: string) {
   return Editor.toRoCrate(Editor.updateValue(Editor.newDraft(), './', 'name', 0, name))
 }
 
+const pathTaken = ref(false)
+const pathChecking = ref(false)
+
 const EmptyStub = defineComponent(() => () => null)
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
+// Keeps the route target inspectable: the harness records every prop it sets.
+const RouterLinkStub = defineComponent({
+  props: { to: { type: Object, required: true } },
+  setup: (props, { attrs, slots }) => () => h('a', { ...attrs, to: props.to }, slots.default?.()),
+})
 const PageHeaderStub = defineComponent({
   props: { title: String },
   setup: (props, { slots }) => () =>
@@ -137,7 +145,11 @@ const NodeCheckStub = defineComponent({
 
 const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vue', import.meta.url), {
   vue: VueRuntime,
-  'vue-router': { useRoute: () => route, useRouter: () => ({ push: routerPush }) },
+  'vue-router': {
+    RouterLink: RouterLinkStub,
+    useRoute: () => route,
+    useRouter: () => ({ push: routerPush }),
+  },
   '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
   '@/components/dashboard/PageHeader.vue': moduleDefault(PageHeaderStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
@@ -182,6 +194,9 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
       grants: computed(() => []),
       loading: ref(false),
     }),
+  },
+  '@/composables/usePathTaken': {
+    usePathTaken: () => ({ taken: pathTaken, checking: pathChecking }),
   },
   '@/composables/useProfilePreview': {
     useProfilePreview: () => ({
@@ -233,6 +248,8 @@ beforeEach(() => {
   })
   fetchRoCrateRaw.mockReset().mockResolvedValue(Editor.toRoCrate(seeded(Editor.newDraft())))
   verify.mockReset().mockResolvedValue(true)
+  pathTaken.value = false
+  pathChecking.value = false
   routerPush.mockClear()
   previewResult.value = null
   previewRejection.value = null
@@ -249,6 +266,28 @@ describe('DatasetEditorView', () => {
     expect(content(mounted.root)).toContain('datasets/')
     expect(content(mounted.root)).toContain('reads-2026')
     expect(button(mounted.root, 'Create dataset').props.disabled).toBe(false)
+    mounted.app.unmount()
+  })
+
+  it('summarises the group, the path and the visibility', async () => {
+    const mounted = await mountApp(DatasetEditorView)
+    await name(mounted.root, 'Reads 2026')
+
+    const link = element(mounted.root, (node) => node.tag === 'a')
+    expect(link.props.to).toEqual({ name: 'group', params: { id: 'group-1' } })
+    expect(content(link)).toBe('Research group')
+    expect(content(mounted.root)).toContain('datasets/reads-2026')
+    expect(content(mounted.root)).toContain('Visible to the group')
+    mounted.app.unmount()
+  })
+
+  it('refuses a path the group already uses', async () => {
+    pathTaken.value = true
+    const mounted = await mountApp(DatasetEditorView)
+    await name(mounted.root, 'Reads 2026')
+
+    expect(content(mounted.root)).toContain('already in use')
+    expect(button(mounted.root, 'Create dataset').props.disabled).toBe(true)
     mounted.app.unmount()
   })
 

@@ -76,6 +76,7 @@ const DatasetLocationDialog = compileClientComponent(
     '@/components/ui/DialogHeader.vue': moduleDefault(Passthrough),
     '@/components/ui/DialogTitle.vue': moduleDefault(Passthrough),
     '@/components/ui/Input.vue': moduleDefault(InputStub),
+    '@/components/ui/Notice.vue': moduleDefault(Passthrough),
     '@/components/groups/GroupSelect.vue': moduleDefault(GroupSelectStub),
     './LocationFolderTree.vue': moduleDefault(LocationFolderTree),
     '@/composables/useAruna': { useAruna: () => ({ realm: ref({ id: 'realm-1' }) }) },
@@ -119,7 +120,12 @@ async function memoryRouter() {
   return router
 }
 
-async function mount(draft: Editor.CrateDraft, events: Seen, mode: 'create' | 'edit' = 'create') {
+async function mount(
+  draft: Editor.CrateDraft,
+  events: Seen,
+  mode: 'create' | 'edit' = 'create',
+  extra: Record<string, unknown> = {},
+) {
   return mountApp(DatasetLocationDialog, {
     router: await memoryRouter(),
     props: {
@@ -132,6 +138,7 @@ async function mount(draft: Editor.CrateDraft, events: Seen, mode: 'create' | 'e
       documentPaths: documentPaths.value,
       grants: grants.value,
       loading: loading.value,
+      ...extra,
       onUpdate: (next: Editor.CrateDraft) => events.updates.push(next),
       onFolder: (folder: string) => events.folders.push(folder),
       onSlug: (slug: string) => events.slugs.push(slug),
@@ -232,7 +239,8 @@ describe('dataset location dialog', () => {
     await click(button(root, 'datasets'))
 
     expect(content(root)).toContain('/realm-1/g/group-1/meta/datasets/…')
-    expect(input(root, 'aria-label', 'Dataset path').props.value).toBe('')
+    expect(content(element(root, (node) => node.props.title === 'datasets/…'))).toContain('datasets/…')
+    expect(nodes(root).some((node) => node.props['aria-label'] === 'Name in the path')).toBe(false)
     const row = nodes(root).find((node) => node.props.role === 'treeitem' && content(node).trim() === 'datasets')
     expect(row?.props['aria-selected']).toBe(true)
   })
@@ -241,9 +249,28 @@ describe('dataset location dialog', () => {
     const events = seen()
     const { root } = await mount(draftAt('datasets/reads'), events)
 
-    await typeValue(input(root, 'aria-label', 'Dataset path'), 'New Reads!')
+    await click(button(root, 'Customise the last part'))
+    await typeValue(input(root, 'aria-label', 'Name in the path'), 'New Reads!')
 
     expect(events.slugs).toEqual(['new-reads'])
+  })
+
+  it('warns when the group already stores the path', async () => {
+    const { root } = await mount(draftAt('datasets/reads'), seen(), 'create', { taken: true })
+
+    expect(content(root)).toContain('A dataset already uses this path in this group.')
+    expect(element(root, (node) => node.props.title === 'datasets/reads').props['aria-busy']).toBeFalsy()
+  })
+
+  it('keeps a long path inside the dialog', async () => {
+    // A path that cannot be broken must wrap rather than push the footer away.
+    const long = `datasets/${'a'.repeat(120)}`
+    const { root } = await mount(draftAt(long), seen())
+
+    const preview = element(root, (node) => node.props.title === long)
+    expect(content(preview)).toContain(long)
+    expect(String(preview.props.class)).toContain('break-all')
+    expect(button(root, 'Done')).toBeTruthy()
   })
 
   it('disables the folders no role can write to', async () => {

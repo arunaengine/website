@@ -12,6 +12,7 @@ import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import Input from '@/components/ui/Input.vue'
+import Notice from '@/components/ui/Notice.vue'
 import GroupSelect from '@/components/groups/GroupSelect.vue'
 import LocationFolderTree from './LocationFolderTree.vue'
 import { useAruna } from '@/composables/useAruna'
@@ -31,6 +32,9 @@ const props = defineProps<{
   documentPaths: string[]
   grants: string[]
   loading?: boolean
+  /** Whether the group already stores a dataset at this path, and the lookup. */
+  taken?: boolean
+  checking?: boolean
 }>()
 const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
@@ -49,6 +53,7 @@ const { realm } = useAruna()
 
 const pending = ref<string[]>([])
 const folderName = ref('')
+const customising = ref(false)
 
 watch(() => props.draft.groupId, () => {
   pending.value = []
@@ -63,6 +68,11 @@ function createFolder() {
   emit('folder', folder)
   folderName.value = ''
 }
+
+// The path a person reads; the last part waits for the dataset name.
+const previewPath = computed(() => (props.mode === 'edit'
+  ? props.draft.path || 'No path yet'
+  : joinPath(props.folder, props.slug || '…')))
 
 const fullPath = computed(() => {
   const group = props.draft.groupId || '…'
@@ -81,8 +91,8 @@ const fullPath = computed(() => {
         </DialogDescription>
       </DialogHeader>
 
-      <div class="space-y-5">
-        <section>
+      <div class="min-w-0 space-y-5">
+        <section class="min-w-0">
           <p class="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Group</p>
           <GroupSelect
             :model-value="draft.groupId"
@@ -100,67 +110,81 @@ const fullPath = computed(() => {
           </GroupSelect>
         </section>
 
-        <template v-if="mode === 'create'">
-          <section>
-            <p class="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Folder</p>
-            <p v-if="!draft.groupId" class="text-xs text-muted-foreground">Choose a group first.</p>
-            <template v-else>
-              <div class="rounded-md border border-border bg-muted/20 px-1.5">
-                <LocationFolderTree
-                  :model-value="folder"
-                  :document-paths="documentPaths"
-                  :grants="grants"
-                  :pending="pending"
-                  :loading="loading"
-                  @update:model-value="(value) => emit('folder', value)"
-                />
-              </div>
-              <div class="mt-2 flex items-center gap-1.5">
-                <Input
-                  :model-value="folderName"
-                  class="h-8 max-w-[16rem] font-mono text-xs"
-                  aria-label="New folder name"
-                  placeholder="new-folder"
-                  @update:model-value="(value: string | number) => (folderName = String(value))"
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  :disabled="!slugify(folderName)"
-                  @click="createFolder"
-                >
-                  <FolderPlus class="h-3.5 w-3.5" /> Create folder
-                </Button>
-              </div>
-            </template>
-          </section>
-
-          <section>
-            <p class="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              Last part of the path
-            </p>
-            <Input
-              :model-value="slug"
-              class="font-mono text-xs"
-              aria-label="Dataset path"
-              placeholder="dataset-name"
-              @update:model-value="(value: string | number) => emit('slug', slugify(String(value)))"
-            />
-            <p class="mt-1 text-[11px] text-muted-foreground">Follows the dataset name until you change it.</p>
-          </section>
-        </template>
-
-        <section v-else>
-          <p class="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Path</p>
-          <p
-            class="flex h-9 items-center truncate rounded-md border border-dashed border-border px-3 font-mono text-xs text-foreground"
-            :title="draft.path"
-          >
-            {{ draft.path || 'No path yet' }}
-          </p>
+        <section v-if="mode === 'create'" class="min-w-0">
+          <p class="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Folder</p>
+          <p v-if="!draft.groupId" class="text-xs text-muted-foreground">Choose a group first.</p>
+          <template v-else>
+            <div class="min-w-0 rounded-md border border-border bg-muted/20 px-1.5">
+              <LocationFolderTree
+                :model-value="folder"
+                :document-paths="documentPaths"
+                :grants="grants"
+                :pending="pending"
+                :loading="loading"
+                @update:model-value="(value) => emit('folder', value)"
+              />
+            </div>
+            <div class="mt-2 flex min-w-0 items-center gap-1.5">
+              <Input
+                :model-value="folderName"
+                class="h-8 max-w-[16rem] font-mono text-xs"
+                aria-label="New folder name"
+                placeholder="new-folder"
+                @update:model-value="(value: string | number) => (folderName = String(value))"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                :disabled="!slugify(folderName)"
+                @click="createFolder"
+              >
+                <FolderPlus class="h-3.5 w-3.5" /> Create folder
+              </Button>
+            </div>
+          </template>
         </section>
 
-        <section>
+        <section class="min-w-0">
+          <p class="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Path</p>
+          <p
+            class="break-all rounded-md border border-dashed border-border px-3 py-2 font-mono text-xs text-foreground"
+            :title="previewPath"
+            :aria-busy="checking"
+          >
+            {{ previewPath }}
+          </p>
+          <Notice v-if="taken" tone="error" class="mt-1.5">
+            A dataset already uses this path in this group. Choose another folder or name.
+          </Notice>
+          <template v-if="mode === 'create'">
+            <Button
+              v-if="!customising"
+              variant="link"
+              size="sm"
+              class="mt-1 h-auto p-0 text-xs"
+              @click="customising = true"
+            >
+              Customise the last part
+            </Button>
+            <div v-else class="mt-2 min-w-0">
+              <p class="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                Name in the path
+              </p>
+              <Input
+                :model-value="slug"
+                class="font-mono text-xs"
+                aria-label="Name in the path"
+                placeholder="dataset-name"
+                @update:model-value="(value: string | number) => emit('slug', slugify(String(value)))"
+              />
+              <p class="mt-1 text-[11px] text-muted-foreground">
+                Derived from the dataset name. Letters, numbers and dashes.
+              </p>
+            </div>
+          </template>
+        </section>
+
+        <section class="min-w-0">
           <p class="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Visibility</p>
           <div role="radiogroup" aria-label="Visibility" class="grid gap-2 sm:grid-cols-2">
             <button
@@ -191,9 +215,11 @@ const fullPath = computed(() => {
         </section>
       </div>
 
-      <DialogFooter class="items-center sm:justify-between">
-        <p class="truncate font-mono text-[11px] text-muted-foreground" :title="fullPath">{{ fullPath }}</p>
-        <Button size="sm" @click="emit('update:open', false)">Done</Button>
+      <DialogFooter class="min-w-0 items-center sm:justify-between">
+        <p class="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground" :title="fullPath">
+          {{ fullPath }}
+        </p>
+        <Button size="sm" class="shrink-0" @click="emit('update:open', false)">Done</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

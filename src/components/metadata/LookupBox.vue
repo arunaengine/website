@@ -130,15 +130,21 @@ onScopeDispose(() => {
           type="button"
           role="option"
           :aria-selected="index === active"
-          class="flex w-full items-baseline px-2.5 py-1.5 text-left text-xs"
+          class="flex w-full min-w-0 items-start px-2.5 py-1.5 text-left text-xs"
           :class="index === active ? 'bg-muted' : 'hover:bg-muted/40'"
           @mousedown.prevent
           @click="choose(index)"
         >
-          <span class="min-w-0 truncate">
-            <span class="font-medium text-foreground">{{ hit.label }}</span>
-            <span class="text-muted-foreground"> · {{ hit.id }}</span>
-            <span v-if="hit.description" class="text-muted-foreground"> · {{ hit.description }}</span>
+          <span class="flex min-w-0 flex-1 flex-col">
+            <span class="truncate">
+              <span class="font-medium text-foreground">{{ hit.label }}</span>
+              <span class="text-muted-foreground"> · {{ hit.id }}</span>
+            </span>
+            <span
+              v-if="hit.description"
+              class="line-clamp-1 text-muted-foreground"
+              :title="hit.description"
+            >{{ hit.description }}</span>
           </span>
         </button>
       </li>

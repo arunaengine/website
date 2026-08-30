@@ -135,6 +135,22 @@ describe('LookupBox', () => {
     mounted.app.unmount()
   })
 
+  it('keeps a long affiliation on its own line', async () => {
+    const affiliation = `Institute of ${'Very Long Names '.repeat(12)}Research`
+    hits = [{ ...personHit('0000-0002-1825-0097', 'Ada Example'), description: affiliation }]
+    const mounted = await mountApp(LookupBox, { props: { kind: 'person' } })
+
+    await typeValue(element(mounted.root, (node) => node.tag === 'input'), 'Ada')
+    await vi.advanceTimersByTimeAsync(300)
+    await flush()
+
+    const line = element(mounted.root, (node) => node.props.title === affiliation)
+    expect(content(line)).toBe(affiliation)
+    expect(String(line.props.class)).toContain('line-clamp-1')
+    expect(content(button(mounted.root, 'Ada Example'))).toContain('https://orcid.org/0000-0002-1825-0097')
+    mounted.app.unmount()
+  })
+
   it('keeps manual entry available when the provider is offline', async () => {
     status = 'offline'
     const mounted = await mountApp(LookupBox, { props: { kind: 'organization' } })

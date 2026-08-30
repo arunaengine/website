@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, ref, shallowRef, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
@@ -15,6 +15,7 @@ import NodeCheckPanel from '@/components/metadata/editor/NodeCheckPanel.vue'
 import { profileReferenceIri, useAruna } from '@/composables/useAruna'
 import { useGroupSelection } from '@/composables/useGroupSelection'
 import { usePathPrefixes } from '@/composables/usePathPrefixes'
+import { usePathTaken } from '@/composables/usePathTaken'
 import { useProfilePreview } from '@/composables/useProfilePreview'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { provideEditorBridge } from '@/composables/useAssistantEditor'
@@ -25,7 +26,7 @@ import { errorMessage } from '@/lib/utils'
 import { slugify } from '@/lib/profiles/emit'
 import { loadVocabIndex, type VocabIndex } from '@/lib/profiles/vocabulary'
 import { collectIssues, rejectionIssues, type WriteIssue } from '@/lib/crate/issues'
-import { joinPath, prefixLabel, splitPath } from '@/lib/crate/paths'
+import { joinPath, splitPath } from '@/lib/crate/paths'
 import { applyProfile, profileExpectation } from '@/lib/crate/profileSeed'
 import {
   entityName,
@@ -115,6 +116,14 @@ watch(location, ({ prefix, slug: name }) => {
 }, { immediate: true })
 watch(() => draft.value.groupId, () => (folder.value = null))
 
+// Only a new dataset can still collide; a stored one owns its path.
+const { taken: pathTaken, checking: pathChecking } = usePathTaken(
+  computed(() => draft.value.groupId),
+  computed(() => (mode.value === 'create' ? draft.value.path ?? '' : '')),
+  prefixes.documentPaths,
+)
+const locationPath = computed(() => joinPath(location.value.prefix, location.value.slug || '…'))
+
 let loadGeneration = 0
 async function load() {
   const generation = ++loadGeneration
@@ -184,7 +193,8 @@ const preview = useProfilePreview({
     : {}),
 })
 
-const canSave = computed(() => Boolean(rootName.value && draft.value.groupId && draft.value.path))
+const canSave = computed(() =>
+  Boolean(rootName.value && draft.value.groupId && draft.value.path) && !pathTaken.value)
 // What the node refused, from the last preview and the last write attempt.
 const writeIssues = computed(() => [...rejectionIssues(preview.rejection.value), ...saveIssues.value])
 const nodeIssues = computed(() => collectIssues(preview.result.value, writeIssues.value, draft.value))
@@ -294,8 +304,13 @@ async function save() {
   <div>
     <PageHeader eyebrow="Datasets" :title="title">
       <template #description>
-        <span class="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
-          <span v-if="groupName">{{ groupName }}</span>
+        <span class="inline-flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
+          <RouterLink
+            v-if="groupName"
+            :to="{ name: 'group', params: { id: draft.groupId } }"
+            class="font-medium text-foreground hover:underline"
+            title="Group"
+          >{{ groupName }}</RouterLink>
           <Button
             v-else
             variant="link"
@@ -306,13 +321,10 @@ async function save() {
             Choose a group
           </Button>
           <span>›</span>
-          <span>{{ prefixLabel(location.prefix) }}</span>
-          <template v-if="location.slug">
-            <span>›</span>
-            <span class="font-mono text-xs">{{ location.slug }}</span>
-          </template>
+          <span class="break-all font-mono text-xs">{{ locationPath }}</span>
           <span>·</span>
           <span>{{ visibilityText }}</span>
+          <span v-if="pathTaken" class="text-destructive">already in use</span>
           <Button variant="link" size="sm" class="h-auto p-0 text-sm" @click="locationOpen = true">
             Change
           </Button>
@@ -419,6 +431,8 @@ async function save() {
       :document-paths="prefixes.documentPaths.value"
       :grants="prefixes.grants.value"
       :loading="prefixes.loading.value"
+      :taken="pathTaken"
+      :checking="pathChecking"
       @update="update"
       @folder="(value) => (folder = value)"
       @slug="(value) => (slug = value || null)"
