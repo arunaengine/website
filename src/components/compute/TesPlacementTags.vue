@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
+import { ArrowRightLeft } from '@lucide/vue'
 import Badge from '@/components/ui/Badge.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
 import { JOB_STATE_META, placementVerdict, type JobState } from '@/lib/jobs'
@@ -24,6 +25,14 @@ const verdictVariant = computed(() =>
       ? 'sky'
       : 'secondary',
 )
+// The compact list line colors the verdict text instead of stacking badges.
+const verdictTextClass = computed(() =>
+  verdict.value?.verdict === 'compute-to-data'
+    ? 'text-emerald-600 dark:text-emerald-400'
+    : verdict.value?.verdict === 'data-to-compute'
+      ? 'text-sky-600 dark:text-sky-400'
+      : 'text-muted-foreground',
+)
 // The logical state is a JobState, so it is worded by the shared state map.
 const logicalStateLabel = computed(() => {
   const state = placement.value.logicalState
@@ -41,7 +50,24 @@ const anything = computed(
 </script>
 
 <template>
-  <div v-if="anything" class="flex flex-wrap items-center gap-1.5 text-[11px]">
+  <!-- Compact list line: one colored verdict with an icon, then the logical
+       state as muted text, so the State column stays a tidy two lines. -->
+  <div v-if="compact && anything" class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] leading-tight">
+    <span
+      v-if="verdict"
+      class="inline-flex items-center gap-1 font-medium"
+      :class="verdictTextClass"
+      :title="verdict.explanation"
+    >
+      <ArrowRightLeft class="h-3 w-3 shrink-0" />
+      {{ verdict.label }}
+    </span>
+    <span v-if="placement.logicalState" class="text-muted-foreground" title="Logical state">
+      {{ logicalStateLabel }}
+    </span>
+  </div>
+
+  <div v-else-if="anything" class="flex flex-wrap items-center gap-1.5 text-[11px]">
     <Badge v-if="verdict" :variant="verdictVariant" size="sm" :title="verdict.explanation">
       {{ verdict.label }}
     </Badge>
