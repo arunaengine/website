@@ -401,6 +401,7 @@ describe('distributed job detail components', () => {
     const modules = {
       vue: VueRuntime,
       'vue-router': { RouterLink: RouterLinkStub },
+      '@lucide/vue': icons,
       '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
       '@/components/ui/NodeLabel.vue': moduleDefault(NodeLabelStub),
       '@/lib/jobs': Jobs,
@@ -441,8 +442,9 @@ describe('distributed job detail components', () => {
     })
 
     expect(untagged.errors).toEqual([])
-    // Only the v-if placeholder comment remains, no badges and no job link.
-    expect(untagged.root.children.every((node) => node.kind === 'comment')).toBe(true)
+    // Nothing visible renders: no element (no badges, no job link); only
+    // comment placeholders and whitespace remain.
+    expect(untagged.root.children.every((node) => node.kind !== 'element')).toBe(true)
     untagged.app.unmount()
   })
 
