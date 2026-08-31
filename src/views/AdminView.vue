@@ -422,8 +422,8 @@ async function save() {
             <h3 class="font-display text-sm font-semibold text-aruna-navy">Realm usage</h3>
           </header>
           <div v-if="usageInfo?.realm" class="grid gap-3.5 p-5 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard label="Objects" :value="formatNumber(usageInfo.realm.objects)" :icon="Database" :hint="`${formatNumber(usageInfo.realm.stored_blobs)} physical blob locations`" />
-            <StatCard label="Stored data" :value="formatBytes(usageInfo.realm.stored_bytes)" :icon="HardDrive" hint="Physical blob storage" />
+            <StatCard label="Objects" :value="formatNumber(usageInfo.realm.objects)" :icon="Database" :hint="`${formatNumber(usageInfo.realm.stored_blobs ?? 0)} physical blob locations`" />
+            <StatCard label="Stored data" :value="formatBytes(usageInfo.realm.stored_bytes ?? 0)" :icon="HardDrive" hint="Physical blob storage" />
             <StatCard label="Logical data" :value="formatBytes(usageInfo.realm.logical_bytes)" :icon="Layers" hint="Counts against quotas" />
             <StatCard label="Referenced data" :value="formatBytes(usageInfo.realm.referenced_bytes)" :icon="Link2" hint="Does not count against quotas" />
             <StatCard label="Buckets" :value="formatNumber(usageInfo.realm.buckets)" :icon="Boxes" />

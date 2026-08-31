@@ -82,13 +82,13 @@ const usedBytes = computed(() => (usage.value ? quotaCountedBytes(usage.value) :
 const referenceBytes = computed(() => (usage.value ? referencedBytes(usage.value) : 0))
 const quotaAssessment = computed(() => assessQuota(quotaStatus.value, usedBytes.value))
 const quotaBadge = computed(() => QUOTA_STATE_BADGES[quotaAssessment.value.state])
-// objects/stored_blobs exist at group scope on quota-aware backends; the type
-// declares them non-optional, but older responses may omit them, so guard at
-// runtime and hide the line instead of rendering NaN.
+// Group scope omits the physical counters (copies have no group dimension),
+// so the physical clause renders only when the backend actually sent one.
 const objectCounts = computed(() => {
   const value = usage.value
-  if (!value || typeof value.objects !== 'number' || typeof value.stored_blobs !== 'number') return null
-  return { total: value.objects, physicalBlobs: value.stored_blobs }
+  if (!value || typeof value.objects !== 'number') return null
+  const stored = typeof value.stored_blobs === 'number' ? value.stored_blobs : null
+  return { total: value.objects, physicalBlobs: stored }
 })
 const purposeCounts = computed(() => [
   { label: 'Datasets', value: usage.value?.dataset_count },
@@ -389,7 +389,8 @@ async function leave() {
             label="Group storage"
           />
           <p v-if="objectCounts" class="mt-1 text-[11px] tabular-nums text-muted-foreground">
-            Objects: {{ formatNumber(objectCounts.total) }} total · {{ formatNumber(objectCounts.physicalBlobs) }} physical blob locations
+            Objects: {{ formatNumber(objectCounts.total) }} total<template v-if="objectCounts.physicalBlobs !== null">
+              · {{ formatNumber(objectCounts.physicalBlobs) }} physical blob locations</template>
           </p>
           <p v-if="quotaStatus && quotaStatus.ceiling_bytes != null" class="mt-1 text-[11px] text-muted-foreground">
             Hard cap {{ formatBytes(quotaStatus.ceiling_bytes) }}.

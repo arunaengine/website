@@ -2,8 +2,9 @@
 export interface UsageResponse {
   buckets: number
   objects: number
-  stored_blobs: number
-  stored_bytes: number
+  // Physical copies have no group dimension (dedup), so group scope omits both.
+  stored_blobs?: number
+  stored_bytes?: number
   // Newer backends add logical bytes and, for authenticated callers, realm-wide totals.
   logical_bytes?: number
   referenced_bytes: number
@@ -31,8 +32,8 @@ export interface GroupQuotaStatus {
 export interface UsageTotals {
   buckets: number
   objects: number
-  stored_blobs: number
-  stored_bytes: number
+  stored_blobs?: number
+  stored_bytes?: number
   logical_bytes: number
   referenced_bytes: number
 }

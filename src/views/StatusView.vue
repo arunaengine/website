@@ -143,7 +143,7 @@ function restBadge(node: RealmNodeInfo): { label: string; variant: BadgeVariant 
 function usageSummary(node: RealmNodeInfo): string | null {
   const usage = probeFor(node)?.usage
   if (!usage) return null
-  return `${formatNumber(usage.objects)} obj · ${formatBytes(usage.stored_bytes)}`
+  return `${formatNumber(usage.objects)} obj · ${formatBytes(usage.stored_bytes ?? 0)}`
 }
 
 // Browser-measured /info round trip (min of a cold and a warm sample), for

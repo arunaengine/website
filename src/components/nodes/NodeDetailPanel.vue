@@ -80,11 +80,11 @@ defineProps<{
         <div>
           <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Objects</dt>
           <dd class="mt-0.5 font-mono text-xs tabular-nums text-foreground/90">{{ formatNumber(probe.usage.objects) }}</dd>
-          <dd class="mt-0.5 text-[11px] text-muted-foreground">{{ formatNumber(probe.usage.stored_blobs) }} physical blob locations</dd>
+          <dd class="mt-0.5 text-[11px] text-muted-foreground">{{ formatNumber(probe.usage.stored_blobs ?? 0) }} physical blob locations</dd>
         </div>
         <div>
           <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Stored</dt>
-          <dd class="mt-0.5 font-mono text-xs tabular-nums text-foreground/90">{{ formatBytes(probe.usage.stored_bytes) }}</dd>
+          <dd class="mt-0.5 font-mono text-xs tabular-nums text-foreground/90">{{ formatBytes(probe.usage.stored_bytes ?? 0) }}</dd>
         </div>
         <div>
           <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Buckets</dt>

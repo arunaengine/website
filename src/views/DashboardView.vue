@@ -74,7 +74,7 @@ const spinning = computed(() => refreshBusy.value || refreshing.value)
 // single skeleton until the shared session and identity data have settled;
 // later refreshes update the rendered content in place. A session change starts
 // a fresh first paint through the epoch key.
-const dashboardSettled = () => bootstrapped.value && !loading.value && !authPending.value && recentSettled.value
+const dashboardSettled = () => bootstrapped.value && !loading.value && !authPending.value
 const painted = useFirstPaint(
   dashboardSettled,
   () => String(sessionEpoch.value),
@@ -277,11 +277,11 @@ const pageDescription = computed(() =>
               label="Objects"
               :value="formatNumber(usageInfo.objects)"
               :icon="Files"
-              :hint="`${formatNumber(usageInfo.stored_blobs)} physical blob locations`"
+              :hint="`${formatNumber(usageInfo.stored_blobs ?? 0)} physical blob locations`"
             />
             <StatCard
               label="Stored data"
-              :value="formatBytes(usageInfo.stored_bytes)"
+              :value="formatBytes(usageInfo.stored_bytes ?? 0)"
               :icon="Database"
               hint="Aggregate blob storage on this node"
             />
@@ -333,7 +333,7 @@ const pageDescription = computed(() =>
             </div>
             <RouterLink :to="{ name: 'datasets' }" class="text-xs font-medium text-primary hover:underline">Datasets</RouterLink>
           </header>
-          <ul v-if="!bootstrapped" class="divide-y divide-border">
+          <ul v-if="!recentSettled" class="divide-y divide-border">
             <li v-for="n in 4" :key="n" class="px-5 py-3.5">
               <Skeleton class="h-4 w-2/3" />
               <Skeleton class="mt-2 h-3 w-1/2" />
