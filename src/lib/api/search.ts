@@ -6,8 +6,9 @@
 // `cursor` is an accepted, query- and filter-bound opaque token: a cursor whose
 // fingerprint does not match the query or filters is rejected with 400.
 // Hits are ordered by descending score and deduplicated server-side per
-// (graph_iri, subject_iri), so one document may span multiple hits. `title` is
-// always served (schema:name with subject/path fallback); `snippet` is optional.
+// (graph_iri, subject_iri), so one document may span multiple hits: its root
+// dataset and each matching file entity, told apart by `subject_types`. `title`
+// is always served (schema:name with subject/path fallback); `snippet` is optional.
 // Partiality is signalled by `nodes_failed` (not a `partial` flag); `truncated`
 // marks a page that stopped at the server depth cap before exhausting matches.
 export interface MetadataSearchHit {
@@ -21,6 +22,9 @@ export interface MetadataSearchHit {
   title: string
   // Query-relevant excerpt; absent when the resource has no indexed literals.
   snippet?: string | null
+  // rdf:type IRIs of the matched subject (at most eight), which tell a file
+  // entity apart from the dataset it belongs to. Absent on older nodes.
+  subject_types?: string[]
 }
 
 export interface MetadataSearchResponse {

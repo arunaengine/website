@@ -5,6 +5,7 @@ import { ModuleKind, ScriptTarget, transpileModule } from 'typescript'
 import * as VueRuntime from 'vue'
 import { createRenderer, defineComponent, h, nextTick, ref, type App, type Component, type Ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { isLeafFile } from '@/lib/dataEntities'
 
 const ButtonStub = defineComponent({
   inheritAttrs: false,
@@ -109,6 +110,7 @@ const compiled = compileClientComponent(new URL('./SearchOverlay.vue', import.me
       isLocalNode: (nodeId: string) => nodeId === 'node-a',
     }),
   },
+  '@/lib/dataEntities': { isLeafFile },
   '@/lib/utils': {
     relativeTime: (value: string) => `relative ${value}`,
     truncateMiddle: (value: string) => value,
@@ -554,6 +556,8 @@ describe('narrow TopBar search panel', () => {
     search.documents.value = [{
       document_id: 'doc-1',
       document_path: 'datasets/one',
+      graph_iri: 'graph-1',
+      subject_iri: 'graph-1',
       title: 'One',
       snippet: 'A dataset',
     }]
@@ -592,7 +596,7 @@ describe('narrow TopBar search panel', () => {
     expect(allNodes(mounted.root).filter((node) => node.props.role === 'group')).toEqual([])
     const options = allNodes(mounted.root).filter((node) => node.props.role === 'option')
     expect(options.map((node) => node.props.id)).toEqual([
-      'qs-d:doc-1',
+      'qs-d:graph-1:graph-1',
       'qs-o:node-b:raw-data:reads/sample.fastq',
       'qs-g:group-a',
       'qs-u:user-a',
@@ -615,10 +619,11 @@ describe('narrow TopBar search panel', () => {
   })
 
   it('summarizes the answer and drops empty kinds', async () => {
+    // No subject_types: an older node's hits keep the dataset label.
     search.documents.value = [
-      { document_id: 'doc-1', document_path: 'datasets/one', title: 'One' },
-      { document_id: 'doc-2', document_path: 'datasets/two', title: 'Two' },
-      { document_id: 'doc-3', document_path: 'datasets/three', title: 'Three' },
+      { document_id: 'doc-1', document_path: 'datasets/one', graph_iri: 'g-1', subject_iri: 'g-1', title: 'One' },
+      { document_id: 'doc-2', document_path: 'datasets/two', graph_iri: 'g-2', subject_iri: 'g-2', title: 'Two' },
+      { document_id: 'doc-3', document_path: 'datasets/three', graph_iri: 'g-3', subject_iri: 'g-3', title: 'Three' },
     ]
     search.groups.value = [{ group_id: 'group-a', display_name: 'Group A' }]
     search.objectSearched.value = true
@@ -631,6 +636,62 @@ describe('narrow TopBar search panel', () => {
     expect(text).toContain('3 datasets · 1 group')
     expect(text).not.toContain('0 object')
     expect(text).not.toContain('No visible live object')
+    expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('labels file entity hits and counts them apart', async () => {
+    // One crate answers with three subjects: its root and two file entities.
+    search.documents.value = [
+      {
+        document_id: 'doc-1',
+        document_path: 'datasets/reef',
+        graph_iri: 'graph-1',
+        subject_iri: 'graph-1',
+        title: 'Coral Reef Survey 2026',
+        subject_types: ['http://schema.org/Dataset'],
+      },
+      {
+        document_id: 'doc-1',
+        document_path: 'datasets/reef',
+        graph_iri: 'graph-1',
+        subject_iri: './reef_survey_2026.csv',
+        title: 'reef_survey_2026.csv',
+        subject_types: ['http://schema.org/MediaObject'],
+      },
+      {
+        document_id: 'doc-1',
+        document_path: 'datasets/reef',
+        graph_iri: 'graph-1',
+        subject_iri: './coi_sequences.fasta',
+        title: 'coi_sequences.fasta',
+        subject_types: ['https://schema.org/File'],
+      },
+    ]
+    search.searched.value = true
+    const mounted = await mount()
+    await click(element(mounted.root, (node) => node.props['aria-label'] === 'Open global search'))
+    await inputValue(element(mounted.root, (node) => node.tag === 'input'), 'reef')
+
+    const options = allNodes(mounted.root).filter((node) => node.props.role === 'option')
+    expect(options.map((node) => node.props.id)).toEqual([
+      'qs-d:graph-1:graph-1',
+      'qs-d:graph-1:./reef_survey_2026.csv',
+      'qs-d:graph-1:./coi_sequences.fasta',
+    ])
+    expect(content(options[0])).toContain('Dataset')
+    expect(content(options[1])).toContain('File')
+    expect(content(options[2])).toContain('File')
+    expect(content(element(mounted.root, (node) => node.props.role === 'dialog')))
+      .toContain('1 dataset · 2 files')
+
+    // A file hit still opens the dataset that carries it.
+    await click(options[1])
+    expect(routerPush).toHaveBeenCalledWith({
+      name: 'dataset',
+      params: { id: 'doc-1' },
+      query: undefined,
+    })
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })

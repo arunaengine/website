@@ -19,13 +19,14 @@ import { useRealm } from '@/composables/useRealm'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useSearchSettings } from '@/composables/useSearchSettings'
 import { OBJECT_SEARCH_MODE_LABELS, useUnifiedSearch } from '@/composables/useUnifiedSearch'
+import { isLeafFile } from '@/lib/dataEntities'
 import { truncateMiddle } from '@/lib/utils'
 import { Search, Settings2, X } from '@lucide/vue'
 import { useMediaQuery } from '@vueuse/core'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
-type QuickSection = 'datasets' | 'objects' | 'groups' | 'people'
+type QuickSection = 'datasets' | 'files' | 'objects' | 'groups' | 'people'
 
 interface QuickItem {
   key: string
@@ -37,8 +38,10 @@ interface QuickItem {
   routeQuery?: Record<string, string>
 }
 
+// Declaration order is the order the summary line lists the kinds in.
 const QUICK_KIND_LABELS: Record<QuickSection, string> = {
   datasets: 'Dataset',
+  files: 'File',
   objects: 'Object',
   groups: 'Group',
   people: 'User',
@@ -86,9 +89,11 @@ function objectParentPrefix(key: string): string | undefined {
 }
 
 const items = computed<QuickItem[]>(() => [
+  // One hit is one matched RDF subject, so a crate's root and its file entities
+  // arrive as separate hits of the same document and are keyed by subject.
   ...quickDocuments.value.map((hit): QuickItem => ({
-    key: `d:${hit.document_id}`,
-    section: 'datasets',
+    key: `d:${hit.graph_iri}:${hit.subject_iri}`,
+    section: isLeafFile(hit.subject_types ?? []) ? 'files' : 'datasets',
     title: hit.title || hit.document_path,
     subtitle: hit.snippet ?? undefined,
     routeName: 'dataset',
@@ -137,18 +142,17 @@ const quickObjectErrorDetail = computed(() => {
     : ''
   return `${OBJECT_SEARCH_MODE_LABELS[objectSearchMode.value]} unavailable.${strict} ${quickObjectError.value}`.trim()
 })
-// One line for the whole answer, so the flat list needs no section headers.
-const quickSummary = computed(() =>
-  ([
-    ['datasets', quickDocuments.value.length],
-    ['objects', quickObjects.value.length],
-    ['groups', quickGroups.value.length],
-    ['people', quickUsers.value.length],
-  ] as Array<[QuickSection, number]>)
+// One line for the whole answer, so the flat list needs no section headers. It
+// counts the listed items, so a file hit is never counted as a dataset.
+const quickSummary = computed(() => {
+  const counts = new Map<QuickSection, number>()
+  for (const item of items.value) counts.set(item.section, (counts.get(item.section) ?? 0) + 1)
+  return (Object.keys(QUICK_KIND_LABELS) as QuickSection[])
+    .map((section) => [section, counts.get(section) ?? 0] as const)
     .filter(([, count]) => count > 0)
     .map(([section, count]) => `${count} ${QUICK_KIND_LABELS[section].toLowerCase()}${count === 1 ? '' : 's'}`)
-    .join(' · '),
-)
+    .join(' · ')
+})
 const activeKey = computed(() => items.value[activeIndex.value]?.key ?? null)
 
 watch(items, () => (activeIndex.value = -1))
