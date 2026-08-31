@@ -12,6 +12,7 @@ import {
   typeValue,
 } from '@/test/clientRender'
 import type { AssistantProvider } from '@/lib/api'
+import { effortLabel } from '@/lib/assistant/modelOptions'
 
 const selectModel = vi.fn()
 const selectProvider = vi.fn()
@@ -36,6 +37,7 @@ const chat = {
   modelsError: ref<string | null>(null),
   approveWrites: ref(true),
   reasoningEffort: ref('medium'),
+  effortOptions: ref<string[]>(['minimal', 'low', 'medium', 'high']),
   selectProvider,
   selectModel,
   setApproveWrites,
@@ -91,6 +93,7 @@ const AssistantSettings = compileClientComponent(new URL('./AssistantSettings.vu
   '@/components/ui/Switch.vue': moduleDefault(SwitchStub),
   '@/components/assistant/ModelCombobox.vue': moduleDefault(ComboboxStub),
   '@/composables/useAssistantChat': { useAssistantChat: () => chat },
+  '@/lib/assistant/modelOptions': { effortLabel },
 })
 
 function combobox(root: Parameters<typeof content>[0]) {
@@ -104,6 +107,7 @@ beforeEach(() => {
   setReasoningEffort.mockClear()
   chat.providers.value = [openai]
   chat.modelsError.value = null
+  chat.effortOptions.value = ['minimal', 'low', 'medium', 'high']
 })
 
 describe('AssistantSettings', () => {
@@ -158,5 +162,14 @@ describe('AssistantSettings', () => {
     await click(button(root, 'High'))
 
     expect(setReasoningEffort).toHaveBeenCalledWith('high')
+  })
+
+  it('offers and selects xhigh when the model advertises it', async () => {
+    chat.effortOptions.value = ['minimal', 'low', 'medium', 'high', 'xhigh']
+    const { root } = await mountApp(AssistantSettings)
+
+    await click(button(root, 'X-High'))
+
+    expect(setReasoningEffort).toHaveBeenCalledWith('xhigh')
   })
 })

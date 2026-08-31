@@ -9,6 +9,7 @@ import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import ModelCombobox from '@/components/assistant/ModelCombobox.vue'
 import { useAssistantChat } from '@/composables/useAssistantChat'
+import { effortLabel } from '@/lib/assistant/modelOptions'
 
 const props = withDefaults(defineProps<{
   side?: 'top' | 'bottom'
@@ -23,6 +24,7 @@ const {
   modelsError,
   approveWrites,
   reasoningEffort,
+  effortOptions,
   selectProvider,
   selectModel,
   setApproveWrites,
@@ -32,12 +34,8 @@ const {
 const providerOptions = computed(() =>
   providers.value.map((entry) => ({ value: entry.provider_id, label: entry.label })))
 
-const effortOptions = [
-  { value: 'minimal', label: 'Minimal' },
-  { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'high', label: 'High' },
-]
+const effortChoices = computed(() =>
+  effortOptions.value.map((value) => ({ value, label: effortLabel(value) })))
 </script>
 
 <template>
@@ -75,7 +73,7 @@ const effortOptions = [
           <p class="text-xs font-medium text-foreground">Reasoning</p>
           <Select
             :model-value="reasoningEffort"
-            :options="effortOptions"
+            :options="effortChoices"
             class="mt-1 h-8 text-xs"
             aria-label="Reasoning"
             @update:model-value="setReasoningEffort"

@@ -3,7 +3,7 @@
 // are only imported once a message is actually sent.
 import { computed, ref, watch } from 'vue'
 import type { ModelMessage, ToolSet } from 'ai'
-import { createSession, providerModelId, type AssistantProvider } from '@/lib/api'
+import { createSession, providerModelId, type AssistantModel, type AssistantProvider } from '@/lib/api'
 import {
   apiBaseUrl,
   authToken,
@@ -19,7 +19,7 @@ import { useAssistantEditor } from './useAssistantEditor'
 import type { McpConnection } from '@/lib/assistant/mcpClient'
 import type { PromptContext } from '@/lib/assistant/prompt'
 import type { ApprovalGate, ApprovalRequest, ChatMessage, ToolCallView } from '@/lib/assistant/types'
-import { modelSuggestions } from '@/lib/assistant/modelOptions'
+import { clampEffort, modelSuggestions, reasoningEffortOptions } from '@/lib/assistant/modelOptions'
 import {
   assistantChatScopeKey,
   createAssistantChatStore,
@@ -37,18 +37,17 @@ const APPROVE_KEY = 'aruna.assistant.approve'
 const EFFORT_KEY = 'aruna.assistant.effort'
 const SESSION_MARGIN_MS = 60_000
 
-const REASONING_EFFORTS = ['minimal', 'low', 'medium', 'high'] as const
-export type ReasoningEffort = (typeof REASONING_EFFORTS)[number]
+// Any string level the active model advertises; validated against its list.
+export type ReasoningEffort = string
 
-function readEffort(): ReasoningEffort {
-  const stored = readStored(EFFORT_KEY)
-  return (REASONING_EFFORTS as readonly string[]).includes(stored) ? (stored as ReasoningEffort) : 'medium'
+function readEffort(): string {
+  return readStored(EFFORT_KEY) || 'medium'
 }
 
 // OpenAI-responses turns carry store:false and the chosen reasoning effort; the
 // same options ride the node proxy to the chatgpt provider. Other providers get
 // none, since a reasoning effort would fault on them.
-export function turnProviderOptions(openAiResponses: boolean, effort: ReasoningEffort) {
+export function turnProviderOptions(openAiResponses: boolean, effort: string) {
   return openAiResponses ? { openai: { store: false, reasoningEffort: effort } } : undefined
 }
 
@@ -73,7 +72,7 @@ const historyReady = ref(false)
 const providerId = ref(readStored(PROVIDER_KEY))
 const modelId = ref(readStored(MODEL_KEY))
 const approveWrites = ref(readStored(APPROVE_KEY) !== 'off')
-const reasoningEffort = ref<ReasoningEffort>(readEffort())
+const storedEffort = ref<string>(readEffort())
 
 let history: ModelMessage[] = []
 let chatState: AssistantChatState = { activeChatId: '', chats: [] }
@@ -450,6 +449,18 @@ export function useAssistantChat() {
     : []))
   const modelsError = computed(() =>
     (provider.value ? providers.modelErrors.value[provider.value.provider_id] ?? null : null))
+  // The active model object, whether it came from the fetched list or storage.
+  const selectedModel = computed<AssistantModel | null>(() => {
+    const current = provider.value
+    if (!current) return null
+    const id = model.value
+    const listed = providers.listedModels.value[current.provider_id] ?? []
+    return listed.find((entry) => entry.id === id) ?? current.models.find((entry) => entry.id === id) ?? null
+  })
+  // The levels the active model offers, and the stored effort clamped to them.
+  const effortOptions = computed(() =>
+    reasoningEffortOptions(provider.value?.kind ?? '', model.value, selectedModel.value?.reasoning_efforts))
+  const reasoningEffort = computed(() => clampEffort(storedEffort.value, effortOptions.value))
 
   function loadModels() {
     if (provider.value) void providers.listModels(provider.value.provider_id)
@@ -485,8 +496,8 @@ export function useAssistantChat() {
   }
 
   function setReasoningEffort(value: string) {
-    if (!(REASONING_EFFORTS as readonly string[]).includes(value)) return
-    reasoningEffort.value = value as ReasoningEffort
+    if (!effortOptions.value.includes(value)) return
+    storedEffort.value = value
     storeValue(EFFORT_KEY, value)
   }
 
@@ -686,6 +697,7 @@ export function useAssistantChat() {
     available,
     approveWrites,
     reasoningEffort,
+    effortOptions,
     selectProvider,
     selectModel,
     setApproveWrites,

@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { OPENAI_MODELS, isValidModelId, modelSuggestions, normalizeModelId } from './modelOptions'
+import {
+  OPENAI_MODELS,
+  clampEffort,
+  effortLabel,
+  familyEfforts,
+  isValidModelId,
+  modelSuggestions,
+  normalizeModelId,
+  preferredEffort,
+  reasoningEffortOptions,
+} from './modelOptions'
 
 describe('modelSuggestions', () => {
   it('lists the fetched models first, then the stored ones, once each', () => {
@@ -22,5 +32,34 @@ describe('modelSuggestions', () => {
     expect(isValidModelId('  my-fine-tune ')).toBe(true)
     expect(isValidModelId('   ')).toBe(false)
     expect(normalizeModelId('  my-fine-tune ')).toBe('my-fine-tune')
+  })
+})
+
+describe('reasoning efforts', () => {
+  it('takes the levels the model lists first', () => {
+    expect(reasoningEffortOptions('chatgpt', 'gpt-5.6-sol', ['low', 'high'])).toEqual(['low', 'high'])
+  })
+
+  it('falls back to the family, then the default set', () => {
+    expect(reasoningEffortOptions('chatgpt', 'gpt-5.6-sol')).toEqual(['minimal', 'low', 'medium', 'high', 'xhigh'])
+    expect(reasoningEffortOptions('openai', 'gpt-5')).toEqual(['low', 'medium', 'high'])
+    expect(reasoningEffortOptions('anthropic', 'claude-3')).toEqual(['minimal', 'low', 'medium', 'high'])
+  })
+
+  it('offers nothing extra for a non-reasoning family', () => {
+    expect(familyEfforts('openai', 'claude-3')).toEqual([])
+    expect(familyEfforts('chatgpt', 'gpt-4o')).toEqual([])
+  })
+
+  it('clamps an unknown stored effort to the preferred default', () => {
+    expect(clampEffort('turbo', ['low', 'medium', 'high'])).toBe('medium')
+    expect(clampEffort('xhigh', ['minimal', 'low', 'medium', 'high', 'xhigh'])).toBe('xhigh')
+    expect(preferredEffort(['low', 'high'])).toBe('high')
+  })
+
+  it('labels raw values, title-casing the unknown', () => {
+    expect(effortLabel('xhigh')).toBe('X-High')
+    expect(effortLabel('medium')).toBe('Medium')
+    expect(effortLabel('turbo')).toBe('Turbo')
   })
 })

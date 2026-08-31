@@ -16,6 +16,8 @@ export type AssistantProviderStatus = 'ready' | 'pending' | 'error'
 export interface AssistantModel {
   id: string
   display_name?: string | null
+  /** Reasoning levels this model accepts; empty leaves the client its fallback. */
+  reasoning_efforts?: string[]
 }
 
 /** What the node serves for a provider; it never contains a secret. */

@@ -77,6 +77,13 @@ describe('reasoningEffort', () => {
   })
 })
 
+describe('effortOptions', () => {
+  it('offers the default set when no provider is selected', () => {
+    const chat = useAssistantChat()
+    expect(chat.effortOptions.value).toEqual(['minimal', 'low', 'medium', 'high'])
+  })
+})
+
 describe('turnProviderOptions', () => {
   it('sends the effort only on the openai responses branch', () => {
     expect(turnProviderOptions(true, 'high')).toEqual({ openai: { store: false, reasoningEffort: 'high' } })
