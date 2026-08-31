@@ -16,6 +16,7 @@ import type { AssistantProvider } from '@/lib/api'
 const selectModel = vi.fn()
 const selectProvider = vi.fn()
 const setApproveWrites = vi.fn()
+const setReasoningEffort = vi.fn()
 
 const openai: AssistantProvider = {
   provider_id: 'browser-1',
@@ -34,9 +35,11 @@ const chat = {
   modelChoices: ref([{ id: 'gpt-5.6-sol' }, { id: 'gpt-5.5' }, { id: 'gpt-4.1' }]),
   modelsError: ref<string | null>(null),
   approveWrites: ref(true),
+  reasoningEffort: ref('medium'),
   selectProvider,
   selectModel,
   setApproveWrites,
+  setReasoningEffort,
 }
 
 const ButtonStub = defineComponent({
@@ -98,6 +101,7 @@ beforeEach(() => {
   selectModel.mockClear()
   selectProvider.mockClear()
   setApproveWrites.mockClear()
+  setReasoningEffort.mockClear()
   chat.providers.value = [openai]
   chat.modelsError.value = null
 })
@@ -147,5 +151,12 @@ describe('AssistantSettings', () => {
     await click(element(root, (node) => node.props.role === 'switch'))
 
     expect(setApproveWrites).toHaveBeenCalledWith(false)
+  })
+
+  it('sets the reasoning effort the picker chose', async () => {
+    const { root } = await mountApp(AssistantSettings)
+    await click(button(root, 'High'))
+
+    expect(setReasoningEffort).toHaveBeenCalledWith('high')
   })
 })

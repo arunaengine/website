@@ -20,7 +20,7 @@ const MAX_HEIGHT = 200
 const props = withDefaults(defineProps<{ size?: 'compact' | 'full' }>(), { size: 'compact' })
 
 const route = useRoute()
-const { profiles } = useAruna()
+const { currentUser, profiles, myGroups, discoverableGroups, realmInfo, usageInfo } = useAruna()
 const { bridge } = useAssistantEditor()
 const { currentPage } = usePageContext()
 const {
@@ -48,6 +48,23 @@ function resize() {
 watch(draft, resize, { flush: 'post' })
 onMounted(resize)
 
+// The dashboard's realm figures, so simple count questions need no tool call.
+function realmSummary() {
+  if (!currentUser.value) return undefined
+  const infra = (realmInfo.value?.nodes ?? []).filter((node) => node.kind !== 'user')
+  const online = infra.filter((node) => node.present).length
+  const usage = usageInfo.value
+  return {
+    datasets: usage?.metadata_documents ?? undefined,
+    profiles: profiles.value.length,
+    groups: myGroups.value.length + discoverableGroups.value.length,
+    nodesOnline: infra.length ? `${online} / ${infra.length}` : undefined,
+    objects: usage?.objects,
+    buckets: usage?.buckets,
+    storedBytes: usage?.stored_bytes ?? undefined,
+  }
+}
+
 function submit() {
   if (!canSend.value) return
   const text = draft.value
@@ -57,6 +74,7 @@ function submit() {
     page: currentPage(),
     draft: bridge.value?.summary() ?? null,
     profiles: profiles.value.map((profile) => ({ id: profile.id, name: profile.name })),
+    realm: realmSummary(),
   })
 }
 

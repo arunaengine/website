@@ -17,7 +17,7 @@ vi.stubGlobal('window', {
 
 const { createAssistantChatStore, newAssistantChat } = await import('@/lib/assistant/chatHistory')
 const { apiBaseUrl, authToken, userInfo } = await import('./aruna/state')
-const { useAssistantChat } = await import('./useAssistantChat')
+const { useAssistantChat, turnProviderOptions } = await import('./useAssistantChat')
 
 const scope = { apiBaseUrl: 'https://node.test', realmId: 'r-1', userId: 'u-1' }
 
@@ -56,5 +56,30 @@ describe('selectLatestChat', () => {
 
     expect(chat.activeChatId.value).toBe('c-old')
     chat.busy.value = false
+  })
+})
+
+describe('reasoningEffort', () => {
+  it('round-trips the chosen effort through storage', () => {
+    const chat = useAssistantChat()
+    chat.setReasoningEffort('high')
+
+    expect(chat.reasoningEffort.value).toBe('high')
+    expect(stored.get('aruna.assistant.effort')).toBe('high')
+  })
+
+  it('ignores an unknown effort value', () => {
+    const chat = useAssistantChat()
+    chat.setReasoningEffort('medium')
+    chat.setReasoningEffort('turbo')
+
+    expect(chat.reasoningEffort.value).toBe('medium')
+  })
+})
+
+describe('turnProviderOptions', () => {
+  it('sends the effort only on the openai responses branch', () => {
+    expect(turnProviderOptions(true, 'high')).toEqual({ openai: { store: false, reasoningEffort: 'high' } })
+    expect(turnProviderOptions(false, 'high')).toBeUndefined()
   })
 })

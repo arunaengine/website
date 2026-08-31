@@ -27,6 +27,15 @@ const openai: AssistantProvider = {
 
 const page = { kind: 'dataset', title: 'Water quality', facts: { 'document id': '01H' } }
 
+const aruna = {
+  currentUser: ref<{ name: string } | null>(null),
+  profiles: ref<Array<{ id: string; name: string }>>([]),
+  myGroups: ref<unknown[]>([]),
+  discoverableGroups: ref<unknown[]>([]),
+  realmInfo: ref<{ nodes: Array<{ kind: string; present: boolean }> } | null>(null),
+  usageInfo: ref<{ metadata_documents?: number; objects?: number; buckets?: number; stored_bytes?: number } | null>(null),
+}
+
 const chat = {
   busy: ref(false),
   draft: ref(''),
@@ -64,7 +73,7 @@ const ChatComposer = compileClientComponent(new URL('./ChatComposer.vue', import
   '@/components/ui/Notice.vue': moduleDefault(NoticeStub),
   '@/components/ui/Textarea.vue': moduleDefault(TextareaStub),
   '@/components/assistant/AssistantSettings.vue': moduleDefault(SettingsStub),
-  '@/composables/useAruna': { useAruna: () => ({ profiles: ref([]) }) },
+  '@/composables/useAruna': { useAruna: () => aruna },
   '@/composables/useAssistantChat': { useAssistantChat: () => chat },
   '@/composables/useAssistantEditor': { useAssistantEditor: () => ({ bridge: ref(null) }) },
   '@/composables/usePageContext': { usePageContext: () => ({ currentPage: () => page }) },
@@ -80,6 +89,12 @@ beforeEach(() => {
   chat.draft.value = ''
   chat.toolsNote.value = null
   chat.busy.value = false
+  aruna.currentUser.value = null
+  aruna.profiles.value = []
+  aruna.myGroups.value = []
+  aruna.discoverableGroups.value = []
+  aruna.realmInfo.value = null
+  aruna.usageInfo.value = null
 })
 
 describe('ChatComposer', () => {
@@ -112,6 +127,26 @@ describe('ChatComposer', () => {
     await click(control(root, 'Chat settings'))
 
     expect(loadModels).toHaveBeenCalledOnce()
+  })
+
+  it('attaches the realm totals once the user is signed in', async () => {
+    aruna.currentUser.value = { name: 'Ada Lovelace' }
+    aruna.usageInfo.value = { metadata_documents: 12, objects: 40, buckets: 6 }
+    aruna.myGroups.value = [{}, {}]
+    aruna.realmInfo.value = { nodes: [{ kind: 'server', present: true }, { kind: 'user', present: false }] }
+    const { root } = await mountApp(ChatComposer, { props: { size: 'full' } })
+
+    await typeValue(control(root, 'Message'), 'count')
+    await click(control(root, 'Send'))
+
+    expect(send.mock.calls[0][1].realm).toEqual({
+      datasets: 12,
+      profiles: 0,
+      groups: 2,
+      nodesOnline: '1 / 1',
+      objects: 40,
+      buckets: 6,
+    })
   })
 
   it('explains the tool state and the send keys on the page', async () => {

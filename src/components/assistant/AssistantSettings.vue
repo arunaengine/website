@@ -22,13 +22,22 @@ const {
   modelChoices,
   modelsError,
   approveWrites,
+  reasoningEffort,
   selectProvider,
   selectModel,
   setApproveWrites,
+  setReasoningEffort,
 } = useAssistantChat()
 
 const providerOptions = computed(() =>
   providers.value.map((entry) => ({ value: entry.provider_id, label: entry.label })))
+
+const effortOptions = [
+  { value: 'minimal', label: 'Minimal' },
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' },
+]
 </script>
 
 <template>
@@ -61,6 +70,16 @@ const providerOptions = computed(() =>
             @update:model-value="selectModel"
           />
           <p v-if="modelsError" class="mt-1 text-[11px] text-muted-foreground">{{ modelsError }}</p>
+        </div>
+        <div>
+          <p class="text-xs font-medium text-foreground">Reasoning</p>
+          <Select
+            :model-value="reasoningEffort"
+            :options="effortOptions"
+            class="mt-1 h-8 text-xs"
+            aria-label="Reasoning"
+            @update:model-value="setReasoningEffort"
+          />
         </div>
         <label class="flex items-center justify-between gap-3 text-xs text-foreground">
           Approve writes

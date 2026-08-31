@@ -34,7 +34,23 @@ import { assistantAvailable as available, assistantOpen as open } from './assist
 const PROVIDER_KEY = 'aruna.assistant.provider'
 const MODEL_KEY = 'aruna.assistant.model'
 const APPROVE_KEY = 'aruna.assistant.approve'
+const EFFORT_KEY = 'aruna.assistant.effort'
 const SESSION_MARGIN_MS = 60_000
+
+const REASONING_EFFORTS = ['minimal', 'low', 'medium', 'high'] as const
+export type ReasoningEffort = (typeof REASONING_EFFORTS)[number]
+
+function readEffort(): ReasoningEffort {
+  const stored = readStored(EFFORT_KEY)
+  return (REASONING_EFFORTS as readonly string[]).includes(stored) ? (stored as ReasoningEffort) : 'medium'
+}
+
+// OpenAI-responses turns carry store:false and the chosen reasoning effort; the
+// same options ride the node proxy to the chatgpt provider. Other providers get
+// none, since a reasoning effort would fault on them.
+export function turnProviderOptions(openAiResponses: boolean, effort: ReasoningEffort) {
+  return openAiResponses ? { openai: { store: false, reasoningEffort: effort } } : undefined
+}
 
 export interface PendingApproval {
   request: ApprovalRequest
@@ -57,6 +73,7 @@ const historyReady = ref(false)
 const providerId = ref(readStored(PROVIDER_KEY))
 const modelId = ref(readStored(MODEL_KEY))
 const approveWrites = ref(readStored(APPROVE_KEY) !== 'off')
+const reasoningEffort = ref<ReasoningEffort>(readEffort())
 
 let history: ModelMessage[] = []
 let chatState: AssistantChatState = { activeChatId: '', chats: [] }
@@ -467,6 +484,12 @@ export function useAssistantChat() {
     storeValue(APPROVE_KEY, value ? 'on' : 'off')
   }
 
+  function setReasoningEffort(value: string) {
+    if (!(REASONING_EFFORTS as readonly string[]).includes(value)) return
+    reasoningEffort.value = value as ReasoningEffort
+    storeValue(EFFORT_KEY, value)
+  }
+
   function newChat() {
     syncEpoch()
     discardTurn(abortTurn())
@@ -597,7 +620,7 @@ export function useAssistantChat() {
         messages: turnMessages,
         tools,
         abortSignal: turn.controller.signal,
-        ...(openAiResponses ? { providerOptions: { openai: { store: false } } } : {}),
+        providerOptions: turnProviderOptions(openAiResponses, reasoningEffort.value),
         onText: (delta) => {
           if (!isCurrentTurn(turn)) return
           const message = messages.value.find((entry) => entry.id === assistantMessageId)
@@ -662,9 +685,11 @@ export function useAssistantChat() {
     loadModels,
     available,
     approveWrites,
+    reasoningEffort,
     selectProvider,
     selectModel,
     setApproveWrites,
+    setReasoningEffort,
     openPanel,
     hidePanel,
     closePanel,

@@ -32,4 +32,30 @@ describe('systemPrompt', () => {
 
     expect(prompt).toContain('The user is looking at the groups page.')
   })
+
+  it('asks for clear Markdown and the show_ tools', () => {
+    const prompt = systemPrompt({ route: '/app/assistant' })
+
+    expect(prompt).toContain('short Markdown')
+    expect(prompt).toContain('never dump raw JSON')
+  })
+
+  it('states the realm totals when they are known', () => {
+    const prompt = systemPrompt({
+      route: '/app',
+      realm: { datasets: 12, profiles: 3, groups: 5, nodesOnline: '2 / 4', objects: 40, buckets: 6 },
+    })
+
+    expect(prompt).toContain(
+      'This realm currently holds 12 datasets, 3 profiles, 5 groups, 40 objects, 6 buckets, with 2 / 4 nodes online.',
+    )
+    expect(prompt).toContain('answer count questions from them directly')
+  })
+
+  it('leaves the realm line out when no totals are given', () => {
+    const prompt = systemPrompt({ route: '/app' })
+
+    expect(prompt).not.toContain('This realm currently')
+    expect(prompt).not.toContain('answer count questions from them directly')
+  })
 })
