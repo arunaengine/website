@@ -28,7 +28,7 @@ const openai: AssistantProvider = {
 const page = { kind: 'dataset', title: 'Water quality', facts: { 'document id': '01H' } }
 
 const aruna = {
-  currentUser: ref<{ name: string } | null>(null),
+  currentUser: ref<{ name: string; id?: string } | null>(null),
   profiles: ref<Array<{ id: string; name: string }>>([]),
   myGroups: ref<unknown[]>([]),
   discoverableGroups: ref<unknown[]>([]),
@@ -74,6 +74,8 @@ const ChatComposer = compileClientComponent(new URL('./ChatComposer.vue', import
   '@/components/ui/Textarea.vue': moduleDefault(TextareaStub),
   '@/components/assistant/AssistantSettings.vue': moduleDefault(SettingsStub),
   '@/composables/useAruna': { useAruna: () => aruna },
+  '@/composables/useRealm': { useRealm: () => ({ realmId: ref('r-1') }) },
+  '@/composables/useGroupSelection': { activeGroupId: ref('') },
   '@/composables/useAssistantChat': { useAssistantChat: () => chat },
   '@/composables/useAssistantEditor': { useAssistantEditor: () => ({ bridge: ref(null) }) },
   '@/composables/usePageContext': { usePageContext: () => ({ currentPage: () => page }) },

@@ -9,6 +9,8 @@ import Notice from '@/components/ui/Notice.vue'
 import Textarea from '@/components/ui/Textarea.vue'
 import AssistantSettings from '@/components/assistant/AssistantSettings.vue'
 import { useAruna } from '@/composables/useAruna'
+import { useRealm } from '@/composables/useRealm'
+import { activeGroupId } from '@/composables/useGroupSelection'
 import { useAssistantChat } from '@/composables/useAssistantChat'
 import { useAssistantEditor } from '@/composables/useAssistantEditor'
 import { usePageContext } from '@/composables/usePageContext'
@@ -21,6 +23,7 @@ const props = withDefaults(defineProps<{ size?: 'compact' | 'full' }>(), { size:
 
 const route = useRoute()
 const { currentUser, profiles, myGroups, discoverableGroups, realmInfo, usageInfo } = useAruna()
+const { realmId } = useRealm()
 const { bridge } = useAssistantEditor()
 const { currentPage } = usePageContext()
 const {
@@ -65,6 +68,19 @@ function realmSummary() {
   }
 }
 
+// The signed-in user and active group, so the model reuses these ids directly.
+function identity() {
+  const user = currentUser.value
+  if (!user) return undefined
+  const group = activeGroupId.value
+  return {
+    userId: user.id,
+    realmId: realmId.value || undefined,
+    groupId: group || undefined,
+    groupName: group ? myGroups.value.find((entry) => entry.id === group)?.name : undefined,
+  }
+}
+
 function submit() {
   if (!canSend.value) return
   const text = draft.value
@@ -75,6 +91,7 @@ function submit() {
     draft: bridge.value?.summary() ?? null,
     profiles: profiles.value.map((profile) => ({ id: profile.id, name: profile.name })),
     realm: realmSummary(),
+    identity: identity(),
   })
 }
 

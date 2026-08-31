@@ -29,6 +29,14 @@ export interface RealmContext {
   storedBytes?: number
 }
 
+/** Who the caller is and where they are scoped, so ids never need a lookup. */
+export interface IdentityContext {
+  userId: string
+  realmId?: string
+  groupId?: string
+  groupName?: string
+}
+
 export interface PromptContext {
   route: string
   page?: PageContext | null
@@ -37,6 +45,8 @@ export interface PromptContext {
   profiles?: Array<{ id: string; name: string }>
   /** Realm totals the portal already holds, so counts need no tool call. */
   realm?: RealmContext | null
+  /** Signed-in user and active scope; ids the tools would otherwise re-query. */
+  identity?: IdentityContext | null
 }
 
 const CONVENTIONS = [
@@ -78,6 +88,16 @@ function realmLine(realm: RealmContext): string | null {
   return `This realm currently holds ${facts.join(', ')}${nodes}.`
 }
 
+function identityLine(identity: IdentityContext): string {
+  const parts = [`the signed-in user is ${identity.userId}`]
+  if (identity.realmId) parts.push(`the active realm is ${identity.realmId}`)
+  if (identity.groupId) {
+    const name = identity.groupName ? ` (${identity.groupName})` : ''
+    parts.push(`the active group is ${identity.groupId}${name}`)
+  }
+  return `Use these ids directly instead of looking them up: ${parts.join(', ')}.`
+}
+
 function draftLines(draft: DraftContext): string[] {
   const lines = [
     `An RO-Crate draft is open in the dataset editor: ${draft.entityCount} entities, ${draft.partCount} of them data entities.`,
@@ -99,6 +119,7 @@ export function systemPrompt(context: PromptContext): string {
     SHOW,
     `The user is on the route ${context.route}.`,
   ]
+  if (context.identity) lines.push(identityLine(context.identity))
   if (context.page) lines.push(pageLine(context.page))
   if (context.draft) lines.push(...draftLines(context.draft))
   if (context.profiles?.length) {

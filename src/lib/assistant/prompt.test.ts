@@ -33,6 +33,24 @@ describe('systemPrompt', () => {
     expect(prompt).toContain('The user is looking at the groups page.')
   })
 
+  it('gives the user and active group ids so they are not re-queried', () => {
+    const prompt = systemPrompt({
+      route: '/app/buckets',
+      identity: { userId: 'u-1@realm', realmId: 'r-1', groupId: 'g-1', groupName: 'Marine Genomics Lab' },
+    })
+
+    expect(prompt).toContain(
+      'Use these ids directly instead of looking them up: the signed-in user is u-1@realm, '
+      + 'the active realm is r-1, the active group is g-1 (Marine Genomics Lab).',
+    )
+  })
+
+  it('omits the identity line when no user is set', () => {
+    const prompt = systemPrompt({ route: '/app/assistant' })
+
+    expect(prompt).not.toContain('Use these ids directly')
+  })
+
   it('asks for clear Markdown and the show_ tools', () => {
     const prompt = systemPrompt({ route: '/app/assistant' })
 
