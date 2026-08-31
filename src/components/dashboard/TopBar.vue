@@ -113,6 +113,7 @@ async function handleSignOut() {
 
       <Button
         v-if="currentUser && !desktop"
+        data-tour="top-create-dataset"
         variant="outline"
         size="sm"
         class="hidden h-9 shrink-0 md:inline-flex"
@@ -139,6 +140,7 @@ async function handleSignOut() {
       <DropdownMenu v-if="currentUser">
         <DropdownMenuTrigger as-child>
           <button
+            data-tour="top-account"
             class="flex h-9 items-center gap-2 rounded-md border border-transparent px-1.5 text-sm hover:border-border hover:bg-muted"
           >
             <Avatar :user="currentUser" size="sm" class="ring-0" />

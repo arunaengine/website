@@ -95,7 +95,7 @@ function pick(entityId: string) {
           aria-label="Search entities"
         />
         <div class="flex gap-2">
-          <Button variant="outline" size="sm" class="flex-1" @click="filesOpen = true">
+          <Button data-tour="editor-add-files" variant="outline" size="sm" class="flex-1" @click="filesOpen = true">
             <Upload class="h-3.5 w-3.5" /> Add files
           </Button>
           <Button variant="outline" size="sm" class="flex-1" @click="addOpen = true">

@@ -11,7 +11,7 @@ const { runtimeId, commandPreview, workdir, workdirValid, workdirNotice, setWork
 <template>
   <div class="space-y-3">
     <h2 class="font-display text-sm font-semibold text-aruna-navy">Runtime</h2>
-    <div class="grid gap-3 sm:grid-cols-3">
+    <div data-tour="quickrun-runtime" class="grid gap-3 sm:grid-cols-3">
       <button
         v-for="rt in RUNTIMES"
         :key="rt.id"

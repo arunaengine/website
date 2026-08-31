@@ -34,6 +34,7 @@ function roleOf(id: string) {
   <DropdownMenu>
     <DropdownMenuTrigger as-child>
       <button
+        data-tour="context-switcher"
         class="inline-flex h-9 min-w-0 items-center gap-2 rounded-md border border-border bg-card px-2 text-left text-sm shadow-sm transition-colors hover:border-primary/40"
         aria-label="Switch group or realm"
       >

@@ -237,6 +237,7 @@ async function submit() {
         </section>
 
         <WizardNavBar
+          data-tour="quickrun-run"
           :first="step === 0"
           :last="step === WIZARD_STEPS.length - 1"
           :can-continue="canContinue"

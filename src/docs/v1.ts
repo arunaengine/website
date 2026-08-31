@@ -16,12 +16,21 @@ export interface DocsSection {
   image?: DocsImage
 }
 
+/** One stop of a guided tour: a real portal route and a real `data-tour` anchor. */
+export interface DocsTourStep {
+  route: string
+  anchor: string
+  title: string
+  body: string
+}
+
 export interface DocsTopic {
   slug: string
   kind: DocsTopicKind
   title: string
   summary: string
   sections: DocsSection[]
+  tour?: DocsTourStep[]
 }
 
 export const docsScreenshots = {
@@ -310,6 +319,38 @@ export const docsTopics: DocsTopic[] = [
     kind: 'Guide',
     title: 'Find your way around',
     summary: 'The dashboard, the top bar, the sidebar, and search: where everything lives.',
+    tour: [
+      {
+        route: '/app',
+        anchor: 'top-search',
+        title: 'Search',
+        body: 'The search field reaches datasets, data objects, groups, and users in one place.',
+      },
+      {
+        route: '/app',
+        anchor: 'top-create-dataset',
+        title: 'Create dataset',
+        body: 'Create dataset jumps straight into the dataset editor.',
+      },
+      {
+        route: '/app',
+        anchor: 'context-switcher',
+        title: 'Active context',
+        body: 'The context switcher shows the active realm and group, and everything you create belongs to that context.',
+      },
+      {
+        route: '/app',
+        anchor: 'nav-groups',
+        title: 'The sidebar',
+        body: 'Groups, Status, Settings, and Docs manage membership, health, and your account.',
+      },
+      {
+        route: '/app',
+        anchor: 'top-account',
+        title: 'Your account',
+        body: 'The account menu leads to your profile, access tokens, and sign-out.',
+      },
+    ],
     sections: [
       {
         title: 'Start at the dashboard',
@@ -358,6 +399,26 @@ export const docsTopics: DocsTopic[] = [
     kind: 'Guide',
     title: 'Create your group',
     summary: 'Groups own datasets, data, and runs; create one before you upload anything.',
+    tour: [
+      {
+        route: '/app',
+        anchor: 'nav-groups',
+        title: 'Open Groups',
+        body: 'Every dataset, bucket, and compute run belongs to a group, so this is the first step after sign-in.',
+      },
+      {
+        route: '/app/groups',
+        anchor: 'groups-create',
+        title: 'Create a group',
+        body: 'Name the group after the team or project that will own the data; you become its admin.',
+      },
+      {
+        route: '/app/groups',
+        anchor: 'group-tabs',
+        title: 'Inside a group',
+        body: 'A group page carries tabs for live statistics, members, roles, data sources, policies, and storage.',
+      },
+    ],
     sections: [
       {
         title: 'Groups own your work',
@@ -396,6 +457,26 @@ export const docsTopics: DocsTopic[] = [
     kind: 'Guide',
     title: 'Upload and browse data',
     summary: 'Create a bucket, upload files from the browser, and know what to do when a transfer fails.',
+    tour: [
+      {
+        route: '/app',
+        anchor: 'nav-data',
+        title: 'Open Data',
+        body: 'The Data view browses buckets through the node’s S3 interface, signed in your browser.',
+      },
+      {
+        route: '/app/buckets',
+        anchor: 'bucket-create',
+        title: 'Create a bucket',
+        body: 'Type a bucket name under the bucket list and confirm; bucket names are lowercase, digits, and dashes.',
+      },
+      {
+        route: '/app/buckets',
+        anchor: 'bucket-add-data',
+        title: 'Add your files',
+        body: 'Select the bucket, then drag files onto the drop zone or use Add data.',
+      },
+    ],
     sections: [
       {
         title: 'Sessions, not stored keys',

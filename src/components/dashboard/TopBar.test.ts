@@ -4,7 +4,7 @@ import * as RouterRuntime from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as NodeDisplay from '@/components/nodes/node-display'
 import * as Utils from '@/lib/utils'
-import { button, click, compileClientComponent, content, element, moduleDefault, mountApp } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, element, moduleDefault, mountApp, nodes } from '@/test/clientRender'
 
 const push = vi.fn()
 const signOut = vi.fn(async () => undefined)
@@ -104,6 +104,16 @@ describe('portal chrome', () => {
     expect(watchNode).not.toHaveBeenCalled()
     await click(button(mounted.root, 'Create dataset'))
     expect(push).toHaveBeenCalledWith({ name: 'dataset-new' })
+    mounted.app.unmount()
+  })
+
+  it('carries the tour anchors of its own controls', async () => {
+    // The search anchor belongs to SearchOverlay, which is stubbed here.
+    const mounted = await mountApp(TopBar)
+    const anchors = nodes(mounted.root).map((node) => node.props['data-tour'])
+
+    expect(anchors).toContain('top-create-dataset')
+    expect(anchors).toContain('top-account')
     mounted.app.unmount()
   })
 

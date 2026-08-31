@@ -251,7 +251,7 @@ function onDrop(event: DragEvent) {
           </Popover>
           <!-- The Add data pipeline always targets the connected node. -->
           <Button v-if="!remoteBlocked" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix" :title="writeRestrictionMessage ?? 'Create a folder'" @click="emit('new-folder')"><FolderPlus class="h-4 w-4" /> New folder</Button>
-          <Button v-if="!remoteNodeId" size="sm" :disabled="!canWriteCurrentPrefix" :title="writeRestrictionMessage ?? 'Add data'" @click="emit('add-data')"><Plus class="h-4 w-4" /> Add data</Button>
+          <Button v-if="!remoteNodeId" data-tour="bucket-add-data" size="sm" :disabled="!canWriteCurrentPrefix" :title="writeRestrictionMessage ?? 'Add data'" @click="emit('add-data')"><Plus class="h-4 w-4" /> Add data</Button>
         </div>
       </div>
       <p v-if="writeRestrictionMessage" class="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
@@ -282,6 +282,7 @@ function onDrop(event: DragEvent) {
 
       <template v-else>
       <div
+        data-tour="bucket-dropzone"
         class="surface overflow-hidden"
         :class="dragActive ? 'ring-2 ring-primary ring-offset-2' : ''"
         @dragover.prevent="dragActive = canWriteCurrentPrefix"

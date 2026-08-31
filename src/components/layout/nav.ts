@@ -97,6 +97,11 @@ export function navEntries(options: NavOptions): NavEntry[] {
   ]
 }
 
+/** Stable in-app tour anchor for a sidebar entry, derived from its label. */
+export function navAnchor(label: string): string {
+  return `nav-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+}
+
 /** True while the route sits on the entry's own destination or below it. */
 export function navItemActive(item: NavItem, path: string): boolean {
   if (item.exact) return path === item.to

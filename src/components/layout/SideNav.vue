@@ -5,7 +5,7 @@ import { computed, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { assistantAvailable } from '@/composables/assistantState'
 import { isDesktop } from '@/lib/desktop'
-import { navEntries, navItemActive, navRowClass, type NavEntry, type NavItem } from '@/components/layout/nav'
+import { navAnchor, navEntries, navItemActive, navRowClass, type NavEntry, type NavItem } from '@/components/layout/nav'
 import { ArrowLeft, ChevronsLeft, ChevronsRight } from '@lucide/vue'
 import { useMediaQuery } from '@vueuse/core'
 
@@ -72,6 +72,7 @@ const collapsed = computed(() => narrow.value || manualCollapsed.value)
           <li v-else>
             <RouterLink
               :to="item.to"
+              :data-tour="navAnchor(item.label)"
               :title="collapsed ? item.label : undefined"
               :aria-current="isActive(item) ? 'page' : undefined"
               :aria-label="collapsed ? item.label : undefined"

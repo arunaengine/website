@@ -8,7 +8,7 @@ import Sheet from '@/components/ui/Sheet.vue'
 import SheetContent from '@/components/ui/SheetContent.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
-import { navEntries, navItemActive, type NavItem } from '@/components/layout/nav'
+import { navAnchor, navEntries, navItemActive, type NavItem } from '@/components/layout/nav'
 import { MoreHorizontal } from '@lucide/vue'
 
 const route = useRoute()
@@ -50,6 +50,7 @@ const moreActive = computed(() => moreNav.value.some(isActive))
           v-for="item in primaryNav"
           :key="item.to"
           :to="item.to"
+          :data-tour="navAnchor(item.label)"
           :aria-current="isActive(item) ? 'page' : undefined"
           class="flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-0.5 py-1 text-[10px] font-medium leading-tight transition-colors hover:bg-muted hover:text-foreground"
           :class="isActive(item) ? 'bg-primary/10 text-primary' : 'text-muted-foreground'"

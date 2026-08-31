@@ -311,6 +311,7 @@ onBeforeUnmount(() => {
   <Button
     v-if="isNarrowSearch"
     v-show="!panelOpen"
+    data-tour="top-search"
     variant="outline"
     size="icon"
     class="mr-auto h-9 w-9 shrink-0"
@@ -347,6 +348,7 @@ onBeforeUnmount(() => {
       >
         <div
           ref="wrapperEl"
+          data-tour="top-search"
           class="relative"
           :class="isNarrowSearch ? 'mx-auto w-full max-w-[1400px] p-3' : ''"
           @focusout="onSearchFocusOut"

@@ -316,7 +316,7 @@ async function leave() {
       <div v-if="leaveError" class="border-b border-border px-5 py-2 text-xs text-destructive">{{ leaveError }}</div>
 
       <Tabs v-model="tab">
-        <div class="border-b border-border px-5 py-2">
+        <div data-tour="group-tabs" class="border-b border-border px-5 py-2">
           <TabsList class="h-auto flex-wrap">
             <TabsTrigger value="stats" class="gap-1.5"><ChartArea class="h-3.5 w-3.5" /> Stats</TabsTrigger>
             <TabsTrigger value="members" class="gap-1.5">

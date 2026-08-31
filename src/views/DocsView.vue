@@ -3,9 +3,10 @@ import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
-import { BookOpen, ChevronLeft, FileText, ListChecks } from '@lucide/vue'
+import { BookOpen, ChevronLeft, FileText, ListChecks, Play } from '@lucide/vue'
 import { computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+import { startTour } from '@/composables/useTour'
 import {
   docsScreenshots,
   docsTopicBySlug,
@@ -21,6 +22,7 @@ const topicSlug = computed(() => {
   return Array.isArray(value) ? value[0] ?? '' : typeof value === 'string' ? value : ''
 })
 const topic = computed(() => docsTopicBySlug(topicSlug.value))
+const tour = computed(() => topic.value?.tour ?? [])
 const topicGroups = computed(() => {
   const groups: Array<{ kind: DocsTopicKind; topics: typeof docsTopics }> = [
     { kind: 'Concept', topics: docsTopics.filter((entry) => entry.kind === 'Concept') },
@@ -50,6 +52,16 @@ const topicGroups = computed(() => {
         </Button>
       </template>
     </PageHeader>
+
+    <!-- A guide with a tour walks the reader through the real controls. -->
+    <div v-if="tour.length" class="container pt-6">
+      <Button size="lg" @click="startTour(tour)">
+        <Play class="h-4 w-4" /> Show me in the portal
+      </Button>
+      <p class="mt-1.5 text-xs text-muted-foreground">
+        {{ tour.length }} steps, highlighted in the portal itself. Esc ends the tour.
+      </p>
+    </div>
 
     <div class="container py-8">
       <div class="grid min-w-0 gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">

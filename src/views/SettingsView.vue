@@ -256,7 +256,12 @@ function toggleGroup(groupId: string) {
       <div class="container pt-6">
         <div class="overflow-x-auto">
           <TabsList aria-label="Settings sections">
-            <TabsTrigger v-for="entry in settingsTabs" :key="entry.id" :value="entry.id">
+            <TabsTrigger
+              v-for="entry in settingsTabs"
+              :key="entry.id"
+              :value="entry.id"
+              :data-tour="entry.id === 'access' ? 'settings-access' : undefined"
+            >
               {{ entry.label }}
             </TabsTrigger>
           </TabsList>

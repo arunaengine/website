@@ -88,6 +88,7 @@ function onLoadMore(event: Event) {
   <DropdownMenu v-if="available" :open="open" @update:open="onOpenChange">
     <DropdownMenuTrigger as-child>
       <Button
+        data-tour="top-bell"
         variant="ghost"
         size="icon"
         class="relative shrink-0"

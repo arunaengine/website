@@ -421,6 +421,17 @@ describe('narrow TopBar search panel', () => {
     mounted.app.unmount()
   })
 
+  it('anchors the tour on the trigger and on the field', async () => {
+    const mounted = await mount()
+    expect(element(mounted.root, (node) => node.props['data-tour'] === 'top-search').tag).toBe('button')
+
+    narrow.value = false
+    await flush()
+
+    expect(findElement(mounted.root, (node) => node.props['data-tour'] === 'top-search')).toBeDefined()
+    mounted.app.unmount()
+  })
+
   it('focuses the panel input when opened', async () => {
     const mounted = await mount()
     await click(element(mounted.root, (node) => node.props['aria-label'] === 'Open global search'))

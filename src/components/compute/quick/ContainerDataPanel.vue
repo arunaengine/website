@@ -44,7 +44,7 @@ const {
 </script>
 
 <template>
-  <div class="min-w-0 space-y-3">
+  <div data-tour="quickrun-container" class="min-w-0 space-y-3">
     <div class="flex items-center justify-between gap-2">
       <span class="text-xs font-semibold text-foreground">Container data</span>
       <FilterChips v-model="dataView" :options="DATA_VIEWS" aria-label="Container data view" />

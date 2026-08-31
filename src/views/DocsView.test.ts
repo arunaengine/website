@@ -87,6 +87,25 @@ describe('versioned in-portal Docs', () => {
     expect(tourHtml).toContain('/docs/v1/dashboard.jpg')
   })
 
+  it('offers a guided tour only on the guides that declare one', async () => {
+    expect(docsTopics.filter((topic) => topic.tour).map((topic) => topic.slug)).toEqual([
+      'portal-tour',
+      'first-group',
+      'upload-data',
+    ])
+    expect(await renderTopic('portal-tour')).toContain('Show me in the portal')
+    expect(await renderTopic('datasets')).not.toContain('Show me in the portal')
+  })
+
+  it('walks real app routes and kebab-case anchors', () => {
+    for (const step of docsTopics.flatMap((topic) => topic.tour ?? [])) {
+      expect(step.route.startsWith('/app')).toBe(true)
+      expect(step.anchor).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/)
+      expect(step.title.length).toBeGreaterThan(0)
+      expect(step.body.length).toBeGreaterThan(0)
+    }
+  })
+
   it('states the activated RO-Crate compatibility and 1.2 creation default', () => {
     const datasets = docsTopics.find((topic) => topic.slug === 'datasets')
     const copy = JSON.stringify(datasets)

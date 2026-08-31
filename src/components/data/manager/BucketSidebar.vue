@@ -148,7 +148,7 @@ const {
       </template>
       <footer class="space-y-2 border-t border-border p-3">
         <div class="flex gap-2">
-          <Input v-model="newBucketName" placeholder="new-bucket-name" class="h-8 font-mono text-xs" @keyup.enter="createBucket" />
+          <Input v-model="newBucketName" data-tour="bucket-create" placeholder="new-bucket-name" class="h-8 font-mono text-xs" @keyup.enter="createBucket" />
           <Button variant="outline" size="sm" :disabled="creatingBucket || !newBucketName.trim() || !s3.canWrite(newBucketName.trim(), undefined, remoteNodeId)" title="Create a bucket only when the session permits this path" @click="createBucket">
             <FolderPlus class="h-4 w-4" />
           </Button>

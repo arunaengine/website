@@ -139,7 +139,7 @@ const newBucket = ref('')
       <TabsContent value="work" class="mt-4">
         <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
           <!-- Script editor -->
-          <div class="min-w-0 space-y-2">
+          <div data-tour="quickrun-script" class="min-w-0 space-y-2">
             <div class="flex items-center justify-between gap-2">
               <label class="text-xs font-medium text-foreground">Script <span class="font-mono text-muted-foreground">({{ runtime.file }})</span></label>
               <div class="flex items-center gap-1.5">
