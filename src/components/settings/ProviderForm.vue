@@ -19,7 +19,7 @@ import {
   type BrowserProvider,
   type OpenAICompatibleProtocol,
 } from '@/lib/assistant/browserProviders'
-import { modelSuggestions, normalizeModelId } from '@/lib/assistant/modelOptions'
+import { OPENAI_MODELS, modelSuggestions, normalizeModelId } from '@/lib/assistant/modelOptions'
 import { errorMessage } from '@/lib/utils'
 import { ArrowLeft, ChevronRight, Plus, X } from '@lucide/vue'
 
@@ -174,18 +174,37 @@ async function test() {
   }
 }
 
+function offer(listed: AssistantModel[]) {
+  models.value = listed
+  if (!defaultModel.value && listed.length) defaultModel.value = listed[0].id
+}
+
+// An OpenAI key without the model read scope cannot list what the account
+// holds; the known ids keep the picker usable instead of leaving it empty.
+function offerKnown(): boolean {
+  if (choice.value !== 'openai') return false
+  offer([...OPENAI_MODELS])
+  return true
+}
+
 async function loadModels() {
   if (!canFetchModels.value) return
   busy.value = true
   failure.value = null
+  message.value = null
   try {
     const listed = await fetchModels(candidate(MODEL_LISTING_PLACEHOLDER, true))
-    models.value = listed
-    if (!defaultModel.value && listed.length) defaultModel.value = listed[0].id
-    if (!listed.length) message.value = 'This endpoint does not list models; enter the model id manually.'
-    else message.value = `${listed.length} model${listed.length === 1 ? '' : 's'} available.`
+    if (listed.length) {
+      offer(listed)
+      message.value = `${listed.length} model${listed.length === 1 ? '' : 's'} available.`
+      return
+    }
+    message.value = offerKnown()
+      ? 'The account lists no models; the known OpenAI models are offered.'
+      : 'This endpoint does not list models; enter the model id manually.'
   } catch (cause) {
-    failure.value = errorMessage(cause)
+    const reason = errorMessage(cause)
+    failure.value = offerKnown() ? `${reason} The known OpenAI models are offered instead.` : reason
   } finally {
     busy.value = false
   }

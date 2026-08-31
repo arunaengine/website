@@ -125,6 +125,15 @@ async function addClaude() {
   return mounted
 }
 
+/** The OpenAI choice needs only a name and a key before models can be listed. */
+async function addOpenAi() {
+  const mounted = await mountApp(ProviderForm)
+  await click(button(mounted.root, 'OpenAI'))
+  await typeValue(field(mounted.root, 'Work account'), 'Team')
+  await typeValue(field(mounted.root, 'Paste the key'), 'sk-2')
+  return mounted
+}
+
 beforeEach(() => {
   create.mockClear()
   update.mockClear()
@@ -219,6 +228,40 @@ describe('ProviderForm', () => {
 
     expect(content(root)).toContain('Sign in with Codex')
     expect(() => button(root, 'Save provider')).toThrow()
+  })
+
+  it('fills the model picker from the OpenAI listing', async () => {
+    models.mockResolvedValueOnce([{ id: 'gpt-5.6-sol' }, { id: 'gpt-4.1' }])
+    const { root } = await addOpenAi()
+    await click(button(root, 'Fetch models'))
+
+    expect(models).toHaveBeenCalledWith(expect.objectContaining({
+      baseUrl: 'https://api.openai.com/v1',
+      apiKey: 'sk-2',
+    }))
+    expect(modelField(root).props['data-suggestions']).toBe('gpt-5.6-sol,gpt-4.1')
+    expect(modelField(root).props.value).toBe('gpt-5.6-sol')
+  })
+
+  it('offers the known OpenAI models when the listing is refused', async () => {
+    // An OpenAI key without the model read scope cannot list the account.
+    models.mockRejectedValueOnce(new Error('Provider model listing failed (401).'))
+    const known = ModelOptions.OPENAI_MODELS.map((model) => model.id)
+    const { root } = await addOpenAi()
+    await click(button(root, 'Fetch models'))
+
+    expect(content(root)).toContain('Provider model listing failed (401).')
+    expect(modelField(root).props['data-suggestions']).toBe(known.join(','))
+    expect(modelField(root).props.value).toBe(known[0])
+  })
+
+  it('keeps a refused listing bare outside the OpenAI root', async () => {
+    models.mockRejectedValueOnce(new Error('fetch failed'))
+    const { root } = await addClaude()
+    await click(button(root, 'Fetch models'))
+
+    expect(content(root)).toContain('fetch failed')
+    expect(modelField(root).props['data-suggestions']).toBe('')
   })
 
   it('sends the official OpenAI root without asking for it', async () => {

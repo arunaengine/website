@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CHATGPT_MODELS, isValidModelId, modelSuggestions, normalizeModelId } from './modelOptions'
+import { OPENAI_MODELS, isValidModelId, modelSuggestions, normalizeModelId } from './modelOptions'
 
 describe('modelSuggestions', () => {
   it('lists the fetched models first, then the stored ones, once each', () => {
@@ -13,7 +13,7 @@ describe('modelSuggestions', () => {
 
   it('falls back to the gpt-5 family for a Codex subscription without a list', () => {
     // The node answers the static set when the backend does not list models.
-    expect(modelSuggestions({ kind: 'chatgpt', models: [] })).toEqual(CHATGPT_MODELS)
+    expect(modelSuggestions({ kind: 'chatgpt', models: [] })).toEqual(OPENAI_MODELS)
     expect(modelSuggestions({ kind: 'chatgpt', models: [{ id: 'gpt-5.7' }] }).map((model) => model.id)).toEqual(['gpt-5.7'])
     expect(modelSuggestions({ kind: 'anthropic', models: [] })).toEqual([])
   })

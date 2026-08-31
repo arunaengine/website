@@ -1,9 +1,9 @@
-// Which model ids a provider offers: whatever the node listed for it, and for
-// a Codex subscription the gpt-5 family the node falls back to when the
-// backend does not answer. Any non-empty id is accepted beyond that.
+// Which model ids a provider offers: whatever the node listed for it, and the
+// gpt-5 family to fall back on when OpenAI answers no listing at all. Any
+// non-empty id is accepted beyond that.
 import type { AssistantModel, AssistantProvider } from '@/lib/api'
 
-export const CHATGPT_MODELS: readonly AssistantModel[] = [
+export const OPENAI_MODELS: readonly AssistantModel[] = [
   'gpt-5.6-sol',
   'gpt-5.6-luna',
   'gpt-5.6-terra',
@@ -28,7 +28,7 @@ export function modelSuggestions(provider: ModelSource, fetched: readonly Assist
   for (const model of fetched) add(model)
   for (const model of provider.models) add(model)
   if (provider.default_model) add({ id: provider.default_model })
-  if (!out.length && provider.kind === 'chatgpt') for (const model of CHATGPT_MODELS) add(model)
+  if (!out.length && provider.kind === 'chatgpt') for (const model of OPENAI_MODELS) add(model)
   return out
 }
 
