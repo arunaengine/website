@@ -41,15 +41,8 @@ async function renderTopic(slug: string): Promise<string> {
 
 describe('versioned in-portal Docs', () => {
   it('renders every declared concept and how-to topic', async () => {
+    // Guides lead; the concept wiki follows, glossary last as the long tail.
     expect(docsTopics.map((topic) => topic.slug)).toEqual([
-      'datasets',
-      'profiles-conformance',
-      'data-and-deletion',
-      'realm-nodes-groups',
-      'storage-access',
-      'states-and-retry',
-      'identifiers',
-      'data-to-compute',
       'portal-tour',
       'first-group',
       'upload-data',
@@ -58,6 +51,15 @@ describe('versioned in-portal Docs', () => {
       'storage-backend',
       'cli-access-key',
       'assistant',
+      'datasets',
+      'realm-nodes-groups',
+      'data-and-deletion',
+      'profiles-conformance',
+      'identifiers',
+      'storage-access',
+      'states-and-retry',
+      'data-to-compute',
+      'glossary',
     ])
 
     for (const topic of docsTopics) {
@@ -65,7 +67,56 @@ describe('versioned in-portal Docs', () => {
       expect(html).toContain(topic.title)
       expect(html).toContain(topic.summary)
       for (const section of topic.sections) expect(html).toContain(section.title)
+      expect(html).not.toContain('](')
     }
+  })
+
+  it('shows an orienting home', async () => {
+    // Home: intro, the tour as entry point, the inline SVG map, group cards.
+    const html = await renderTopic('')
+
+    expect(html).toContain('every term the portal uses')
+    expect(html).toContain('Find your way around')
+    expect(html).toContain('docs-map-title')
+    expect(html).toContain('one RO-Crate bundle')
+    expect(html).toContain('query · validate · share')
+    expect(html.indexOf('How-to guides')).toBeGreaterThan(-1)
+    expect(html.indexOf('How-to guides')).toBeLessThan(html.indexOf('Concepts &amp; glossary'))
+  })
+
+  it('banners the API reference', async () => {
+    // Both the home and every topic carry the portal-vs-REST banner.
+    for (const slug of ['', 'datasets']) {
+      const html = await renderTopic(slug)
+      expect(html).toContain('This is the portal documentation.')
+      expect(html).toContain('Open the API reference')
+    }
+    expect(await renderTopic('')).toContain('REST API')
+  })
+
+  it('anchors every section', async () => {
+    // Slugified heading ids make sections directly linkable.
+    const html = await renderTopic('data-and-deletion')
+    expect(html).toContain('id="buckets-hold-the-bytes"')
+    expect(html).toContain('id="delete-markers-are-recoverable-history"')
+    expect(html).toContain('id="permanent-purge-is-separate"')
+    expect(html).toContain('aria-label="Link to this section"')
+  })
+
+  it('defines glossary terms', async () => {
+    // The wiki's long tail: one linkable section per term.
+    const html = await renderTopic('glossary')
+    for (const term of ['role', 'run-family', 'canonical-execution', 'delete-marker', 'quota', 'mcp']) {
+      expect(html).toContain(`id="${term}"`)
+    }
+  })
+
+  it('renders inline links safely', async () => {
+    // External links open in a new tab; no raw [label](target) syntax leaks.
+    const html = await renderTopic('datasets')
+    expect(html).toContain('href="https://www.researchobject.org/ro-crate/"')
+    expect(html).toContain('rel="noopener noreferrer"')
+    expect(html).not.toContain('](')
   })
 
   it('ships walkthrough screenshots', async () => {
