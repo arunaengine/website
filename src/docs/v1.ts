@@ -816,6 +816,11 @@ export const docsTopics: DocsTopic[] = [
           'Sign in to ChatGPT, or paste a key for a local or compatible model endpoint.',
           'Wait for the provider to show Ready.',
         ],
+        image: {
+          src: '/docs/v1/assistant-add.jpg',
+          alt: 'Add provider dialog with Claude, OpenAI, OpenAI-compatible, and ChatGPT options',
+          caption: 'Four provider kinds: a browser-held key, or a ChatGPT sign-in the node keeps.',
+        },
       },
       {
         title: 'Use it everywhere',
@@ -823,6 +828,11 @@ export const docsTopics: DocsTopic[] = [
           'Once a provider is ready the assistant button appears in the top bar and Assistant joins the sidebar.',
           'Each turn tells the model the route you are on, plus a few facts from the dataset, bucket, and group views. It acts through the tools this node serves over MCP and, while the dataset editor is open, on the draft; writes ask you first, and only you save the draft.',
         ],
+        image: {
+          src: '/docs/v1/assistant-chat.jpg',
+          alt: 'Assistant chat answering a datasets question with three MCP tool calls and a result table',
+          caption: 'A turn that answered by calling the node’s own MCP tools and rendering the result.',
+        },
       },
       {
         title: 'Connect an MCP client',
@@ -835,6 +845,11 @@ export const docsTopics: DocsTopic[] = [
           'Create a labeled client session and copy the token; it is shown once.',
           'The session is listed and revocable under Sessions.',
         ],
+        image: {
+          src: '/docs/v1/assistant-providers.jpg',
+          alt: 'Assistant settings with a Ready provider and the connect-an-MCP-client card',
+          caption: 'A ready provider powers the panel; the MCP endpoint below wires external clients.',
+        },
       },
     ],
   },
