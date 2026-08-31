@@ -55,12 +55,20 @@ const topicGroups = computed(() => {
 
     <!-- A guide with a tour walks the reader through the real controls. -->
     <div v-if="tour.length" class="container pt-6">
-      <Button size="lg" @click="startTour(tour)">
-        <Play class="h-4 w-4" /> Show me in the portal
-      </Button>
-      <p class="mt-1.5 text-xs text-muted-foreground">
-        {{ tour.length }} steps, highlighted in the portal itself. Esc ends the tour.
-      </p>
+      <div
+        class="flex flex-wrap items-center gap-4 rounded-lg border border-primary/25 bg-gradient-to-r from-primary/10 via-primary/[0.04] to-transparent px-4 py-3.5"
+      >
+        <span class="grid size-9 shrink-0 place-items-center rounded-md bg-primary/15 text-primary">
+          <Play class="h-4 w-4" />
+        </span>
+        <div class="min-w-0 flex-1">
+          <p class="font-display text-sm font-semibold text-aruna-navy">Guided tour</p>
+          <p class="text-xs text-muted-foreground">
+            {{ tour.length }} steps, highlighted on the real controls. Esc ends the tour.
+          </p>
+        </div>
+        <Button @click="startTour(tour)"><Play class="h-4 w-4" /> Show me in the portal</Button>
+      </div>
     </div>
 
     <div class="container py-8">
@@ -107,11 +115,18 @@ const topicGroups = computed(() => {
                 <div v-if="section.paragraphs" class="mt-3 space-y-3 text-sm leading-relaxed text-foreground/85">
                   <p v-for="paragraph in section.paragraphs" :key="paragraph">{{ paragraph }}</p>
                 </div>
-                <ul v-if="section.bullets" class="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed text-foreground/85">
+                <ul v-if="section.bullets" class="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed text-foreground/85 marker:text-primary/60">
                   <li v-for="bullet in section.bullets" :key="bullet">{{ bullet }}</li>
                 </ul>
-                <ol v-if="section.steps" class="mt-3 list-decimal space-y-2 pl-5 text-sm leading-relaxed text-foreground/85">
-                  <li v-for="step in section.steps" :key="step">{{ step }}</li>
+                <ol v-if="section.steps" class="mt-3 space-y-2 text-sm leading-relaxed text-foreground/85">
+                  <li v-for="(step, stepIndex) in section.steps" :key="step" class="flex items-start gap-3">
+                    <span
+                      class="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-primary/15 text-[11px] font-semibold tabular-nums text-primary"
+                    >
+                      {{ stepIndex + 1 }}
+                    </span>
+                    <span class="min-w-0">{{ step }}</span>
+                  </li>
                 </ol>
                 <figure v-if="section.image" class="mt-4">
                   <img

@@ -39,7 +39,7 @@ const spotStyle = computed(() =>
         left: `${spot.value.left}px`,
         width: `${spot.value.width}px`,
         height: `${spot.value.height}px`,
-        boxShadow: '0 0 0 9999px rgb(2 6 23 / 0.55)',
+        boxShadow: '0 0 0 9999px rgb(2 6 23 / 0.55), 0 0 24px rgb(59 130 246 / 0.35)',
       }
     : {},
 )
@@ -77,27 +77,39 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
         aria-hidden="true"
       />
       <Card
-        class="absolute w-80 max-w-[calc(100vw-2rem)] p-4 shadow-xl"
+        class="absolute w-80 max-w-[calc(100vw-2rem)] overflow-hidden border-primary/25 bg-card/95 p-0 shadow-xl backdrop-blur transition-[top,left] duration-200 motion-reduce:transition-none"
         :class="spot ? '' : 'left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2'"
         :style="cardStyle"
         role="dialog"
         aria-live="polite"
         :aria-label="currentStep?.title"
       >
-        <div class="flex items-start justify-between gap-3">
-          <h2 class="font-display text-sm font-semibold text-aruna-navy">{{ currentStep?.title }}</h2>
-          <Button variant="ghost" size="icon-sm" aria-label="End the tour" @click="stopTour">
-            <X class="h-3.5 w-3.5" />
-          </Button>
-        </div>
-        <p class="mt-2 text-sm leading-relaxed text-foreground/85">{{ currentStep?.body }}</p>
-        <div class="mt-4 flex items-center justify-between gap-2">
-          <span class="text-[11px] tabular-nums text-muted-foreground">
-            {{ tourIndex + 1 }} of {{ tourCount }}
-          </span>
-          <div class="flex items-center gap-2">
-            <Button variant="outline" size="sm" :disabled="tourIndex === 0" @click="prevStep">Back</Button>
-            <Button size="sm" @click="last ? stopTour() : nextStep()">{{ last ? 'Done' : 'Next' }}</Button>
+        <div class="h-0.5 w-full bg-gradient-to-r from-primary via-primary/40 to-transparent" aria-hidden="true" />
+        <div class="p-4">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">Guided tour</p>
+              <h2 class="mt-1 font-display text-sm font-semibold text-aruna-navy">{{ currentStep?.title }}</h2>
+            </div>
+            <Button variant="ghost" size="icon-sm" aria-label="End the tour" @click="stopTour">
+              <X class="h-3.5 w-3.5" />
+            </Button>
+          </div>
+          <p class="mt-2 text-sm leading-relaxed text-foreground/85">{{ currentStep?.body }}</p>
+          <div class="mt-4 flex items-center justify-between gap-2">
+            <div class="flex items-center gap-1.5" aria-hidden="true">
+              <span
+                v-for="dot in tourCount"
+                :key="dot"
+                class="h-1.5 rounded-full transition-all duration-200 motion-reduce:transition-none"
+                :class="dot === tourIndex + 1 ? 'w-5 bg-primary' : dot < tourIndex + 1 ? 'w-1.5 bg-primary/50' : 'w-1.5 bg-border'"
+              />
+            </div>
+            <span class="sr-only">Step {{ tourIndex + 1 }} of {{ tourCount }}</span>
+            <div class="flex items-center gap-2">
+              <Button variant="outline" size="sm" :disabled="tourIndex === 0" @click="prevStep">Back</Button>
+              <Button size="sm" @click="last ? stopTour() : nextStep()">{{ last ? 'Done' : 'Next' }}</Button>
+            </div>
           </div>
         </div>
       </Card>
