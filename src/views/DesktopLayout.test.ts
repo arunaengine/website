@@ -55,7 +55,7 @@ const Notice = compileClientComponent(new URL('../components/ui/Notice.vue', imp
 
 const DesktopLayoutClient = compileClientComponent(new URL('./DesktopLayout.vue', import.meta.url), {
   vue: VueRuntime,
-  'vue-router': { RouterView: RouterViewStub, useRoute: () => route },
+  'vue-router': { RouterView: RouterViewStub, useRoute: () => route, useRouter: () => ({ push: () => {} }) },
   '@lucide/vue': icons,
   '@/components/layout/SideNav.vue': moduleDefault(SideNavStub),
   '@/components/dashboard/TopBar.vue': moduleDefault(TopBarStub),
@@ -64,6 +64,7 @@ const DesktopLayoutClient = compileClientComponent(new URL('./DesktopLayout.vue'
   '@/components/layout/NodeDown.vue': moduleDefault(NodeDownStub),
   '@/components/data/TransfersPanel.vue': moduleDefault(EmptyStub),
   '@/components/assistant/AssistantPanel.vue': moduleDefault(EmptyStub),
+  '@/components/docs/TourOverlay.vue': moduleDefault(EmptyStub),
   '@/composables/uploadQueueState': { uploadQueueItems: ref([]) },
   '@/lib/chunk-recovery': { asyncChunkError: vi.fn() },
   '@/components/ui/Notice.vue': moduleDefault(Notice),
@@ -117,6 +118,7 @@ beforeAll(async () => {
   vi.doMock('@/components/layout/NodeDown.vue', () => ({ default: NodeDownStub }))
   vi.doMock('@/components/data/TransfersPanel.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/components/assistant/AssistantPanel.vue', () => ({ default: EmptyStub }))
+  vi.doMock('@/components/docs/TourOverlay.vue', () => ({ default: EmptyStub }))
   DesktopLayout = (await import('./DesktopLayout.vue')).default
   AppLayout = (await import('./AppLayout.vue')).default
 })

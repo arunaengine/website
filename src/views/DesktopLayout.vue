@@ -8,11 +8,12 @@ import GlobalErrorBanner from '@/components/layout/GlobalErrorBanner.vue'
 import RealmUnreachable from '@/components/layout/RealmUnreachable.vue'
 import NodeDown from '@/components/layout/NodeDown.vue'
 import Notice from '@/components/ui/Notice.vue'
-import { RouterView, useRoute } from 'vue-router'
+import { RouterView, useRoute, useRouter } from 'vue-router'
 import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { uploadQueueItems } from '@/composables/uploadQueueState'
 import { assistantAvailable, assistantOpen } from '@/composables/assistantState'
+import { bindTourRouter, tourActive } from '@/composables/useTour'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { appQuit } from '@/lib/desktopBridge'
 import { probeRealm, realmReach } from '@/lib/desktopBoot'
@@ -31,7 +32,13 @@ const AssistantPanel = defineAsyncComponent({
   onError: asyncChunkError,
 })
 
+const TourOverlay = defineAsyncComponent({
+  loader: () => import('@/components/docs/TourOverlay.vue'),
+  onError: asyncChunkError,
+})
+
 const route = useRoute()
+bindTourRouter(useRouter())
 const mainEl = ref<HTMLElement | null>(null)
 const unreachable = computed(() => realmReach.value === 'unreachable')
 const quitting = ref(false)
@@ -122,5 +129,6 @@ watch(
     </div>
     <TransfersPanel v-if="uploadQueueItems.length" />
     <AssistantPanel v-if="assistantOpen" />
+    <TourOverlay v-if="tourActive" />
   </div>
 </template>
