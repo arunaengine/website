@@ -8,8 +8,8 @@ import {
   Laptop,
   LayoutDashboard,
   ListChecks,
-  MessageSquare,
   Play,
+  Sparkles,
   RefreshCw,
   Settings,
   ShieldCheck,
@@ -26,6 +26,8 @@ export interface NavItem {
   match?: string[]
   /** Rides the mobile bottom bar; everything else lands in its More sheet. */
   primary?: boolean
+  /** Tints the icon in the brand accent so the entry stands out at rest. */
+  accent?: boolean
 }
 
 /** A break between blocks of destinations, drawn as a rule and never labelled. */
@@ -74,7 +76,7 @@ export function navEntries(options: NavOptions): NavEntry[] {
     { to: '/app/datasets', icon: FileJson2, label: 'Datasets', match: ['/app/datasets'], primary: true },
     { to: '/app/profiles', icon: ListChecks, label: 'Profiles' },
     ...(computeEnabled() ? [{ to: '/app/compute', icon: Workflow, label: 'Compute', primary: true }] : []),
-    ...(options.assistant ? [{ to: '/app/assistant', icon: MessageSquare, label: 'Assistant' }] : []),
+    ...(options.assistant ? [{ to: '/app/assistant', icon: Sparkles, label: 'Assistant', accent: true }] : []),
     navSeparator,
     ...(options.desktop
       ? [

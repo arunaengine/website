@@ -83,7 +83,11 @@ const collapsed = computed(() => narrow.value || manualCollapsed.value)
                   : 'text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground',
               ]"
             >
-              <component :is="item.icon" class="h-4 w-4 shrink-0" />
+              <component
+                :is="item.icon"
+                class="h-4 w-4 shrink-0"
+                :class="item.accent && !isActive(item) ? 'text-primary' : ''"
+              />
               <span v-if="!collapsed">{{ item.label }}</span>
             </RouterLink>
           </li>

@@ -12,7 +12,7 @@ import ContextSwitcher from '@/components/layout/ContextSwitcher.vue'
 import NotificationBell from '@/components/dashboard/NotificationBell.vue'
 import StatusDot from '@/components/ui/StatusDot.vue'
 import SearchOverlay from '@/components/dashboard/SearchOverlay.vue'
-import { ChevronDown, MessageSquare, Plus, User, LogIn, LogOut, Key, Moon, Sun, RefreshCw } from '@lucide/vue'
+import { ChevronDown, Sparkles, Plus, User, LogIn, LogOut, Key, Moon, Sun, RefreshCw } from '@lucide/vue'
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useRealm } from '@/composables/useRealm'
@@ -109,7 +109,7 @@ async function handleSignOut() {
         title="Assistant"
         @click="openAssistant"
       >
-        <MessageSquare class="h-4 w-4" />
+        <Sparkles class="h-4 w-4 text-primary" />
       </Button>
 
       <Button
