@@ -41,7 +41,10 @@ describe('reasoning efforts', () => {
   })
 
   it('falls back to the family, then the default set', () => {
-    expect(reasoningEffortOptions('chatgpt', 'gpt-5.6-sol')).toEqual(['minimal', 'low', 'medium', 'high', 'xhigh'])
+    expect(reasoningEffortOptions('chatgpt', 'gpt-5.6-sol')).toEqual([
+      'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra',
+    ])
+    expect(reasoningEffortOptions('chatgpt', 'gpt-5.5')).toEqual(['minimal', 'low', 'medium', 'high', 'xhigh'])
     expect(reasoningEffortOptions('openai', 'gpt-5')).toEqual(['low', 'medium', 'high'])
     expect(reasoningEffortOptions('anthropic', 'claude-3')).toEqual(['minimal', 'low', 'medium', 'high'])
   })
@@ -59,6 +62,8 @@ describe('reasoning efforts', () => {
 
   it('labels raw values, title-casing the unknown', () => {
     expect(effortLabel('xhigh')).toBe('X-High')
+    expect(effortLabel('max')).toBe('Max')
+    expect(effortLabel('ultra')).toBe('Ultra')
     expect(effortLabel('medium')).toBe('Medium')
     expect(effortLabel('turbo')).toBe('Turbo')
   })

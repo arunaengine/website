@@ -45,6 +45,7 @@ export function isValidModelId(id: string): boolean {
 // falls back to a family catalog mirroring the node, then to this default set.
 export const DEFAULT_REASONING_EFFORTS: readonly string[] = ['minimal', 'low', 'medium', 'high']
 
+const CODEX_FLAGSHIP_EFFORTS: readonly string[] = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra']
 const CODEX_EFFORTS: readonly string[] = ['minimal', 'low', 'medium', 'high', 'xhigh']
 const OPENAI_EFFORTS: readonly string[] = ['low', 'medium', 'high']
 
@@ -54,7 +55,10 @@ function isOpenAiReasoning(id: string): boolean {
 
 /** Levels a model family accepts when the node lists none; empty otherwise. */
 export function familyEfforts(kind: string, id: string): string[] {
-  if (kind === 'chatgpt') return id.startsWith('gpt-5') ? [...CODEX_EFFORTS] : []
+  if (kind === 'chatgpt') {
+    if (id.startsWith('gpt-5.6')) return [...CODEX_FLAGSHIP_EFFORTS]
+    return id.startsWith('gpt-5') ? [...CODEX_EFFORTS] : []
+  }
   return isOpenAiReasoning(id) ? [...OPENAI_EFFORTS] : []
 }
 
@@ -83,6 +87,7 @@ const EFFORT_LABELS: Readonly<Record<string, string>> = {
   high: 'High',
   xhigh: 'X-High',
   max: 'Max',
+  ultra: 'Ultra',
   none: 'None',
 }
 
