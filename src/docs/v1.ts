@@ -769,6 +769,75 @@ export const docsTopics: DocsTopic[] = [
       },
     ],
   },
+  {
+    slug: 'assistant',
+    kind: 'Guide',
+    title: 'Turn on the assistant',
+    summary: 'Wire your own AI provider into the portal and connect an outside MCP client to this node.',
+    tour: [
+      {
+        route: '/app/settings?tab=assistant',
+        anchor: 'settings-assistant',
+        title: 'The Assistant tab',
+        body: 'Providers and MCP clients are configured here; the assistant stays off until a provider is ready.',
+      },
+      {
+        route: '/app/settings?tab=assistant',
+        anchor: 'assistant-providers',
+        title: 'Providers',
+        body: 'API keys stay in this browser tab and are never sent to Aruna; only a ChatGPT sign-in is kept by the node.',
+      },
+      {
+        route: '/app/settings?tab=assistant',
+        anchor: 'assistant-mcp',
+        title: 'Connect an MCP client',
+        body: 'Outside clients reach this node over MCP with a session of their own, listed and revocable under Sessions.',
+      },
+      {
+        route: '/app',
+        anchor: 'top-assistant',
+        title: 'The assistant button',
+        body: 'The top bar carries the assistant once a provider is ready; without one it is not shown.',
+      },
+    ],
+    sections: [
+      {
+        title: 'Bring your own provider',
+        paragraphs: [
+          'The in-portal assistant runs on a provider you configure: Claude, OpenAI, an OpenAI-compatible or local endpoint, or a ChatGPT subscription.',
+          'API keys stay in this browser tab and are never sent to Aruna; only a ChatGPT sign-in is kept by the node.',
+        ],
+      },
+      {
+        title: 'Add a provider',
+        steps: [
+          'Open Settings, then the Assistant tab.',
+          'Choose Add provider.',
+          'Sign in to ChatGPT, or paste a key for a local or compatible model endpoint.',
+          'Wait for the provider to show Ready.',
+        ],
+      },
+      {
+        title: 'Use it everywhere',
+        paragraphs: [
+          'Once a provider is ready the assistant button appears in the top bar and Assistant joins the sidebar.',
+          'Each turn tells the model the route you are on, plus a few facts from the dataset, bucket, and group views. It acts through the tools this node serves over MCP and, while the dataset editor is open, on the draft; writes ask you first, and only you save the draft.',
+        ],
+      },
+      {
+        title: 'Connect an MCP client',
+        paragraphs: [
+          'The client authenticates with a session token of its own, so revoking it never signs you out of the portal.',
+        ],
+        steps: [
+          'Copy the MCP endpoint of this node.',
+          'Pick the client, for example Claude Code.',
+          'Create a labeled client session and copy the token; it is shown once.',
+          'The session is listed and revocable under Sessions.',
+        ],
+      },
+    ],
+  },
 ]
 
 export function docsTopicBySlug(slug: string): DocsTopic | undefined {

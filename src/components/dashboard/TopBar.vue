@@ -101,6 +101,7 @@ async function handleSignOut() {
       <!-- Only offered once a provider is configured and ready. -->
       <Button
         v-if="assistantAvailable"
+        data-tour="top-assistant"
         variant="ghost"
         size="icon"
         class="shrink-0"

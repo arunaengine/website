@@ -124,7 +124,7 @@ async function confirmRemove() {
 </script>
 
 <template>
-  <section class="surface overflow-hidden">
+  <section data-tour="assistant-providers" class="surface overflow-hidden">
     <header class="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
       <div class="min-w-0">
         <h3 class="font-display text-sm font-semibold text-aruna-navy">Providers</h3>

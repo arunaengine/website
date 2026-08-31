@@ -109,11 +109,13 @@ describe('portal chrome', () => {
 
   it('carries the tour anchors of its own controls', async () => {
     // The search anchor belongs to SearchOverlay, which is stubbed here.
+    assistantAvailable.value = true
     const mounted = await mountApp(TopBar)
     const anchors = nodes(mounted.root).map((node) => node.props['data-tour'])
 
     expect(anchors).toContain('top-create-dataset')
     expect(anchors).toContain('top-account')
+    expect(anchors).toContain('top-assistant')
     mounted.app.unmount()
   })
 

@@ -75,6 +75,7 @@ const settingsTabs = [
 ] as const
 // Links and bookmarks still carry the ids of the tabs merged into `access`.
 const legacyTabs: Record<string, string> = { sessions: 'access', connection: 'access' }
+const tabAnchors: Record<string, string> = { access: 'settings-access', assistant: 'settings-assistant' }
 const routeTab = useRouteTab(
   [...settingsTabs.map((entry) => entry.id), ...Object.keys(legacyTabs)],
   'profile',
@@ -260,7 +261,7 @@ function toggleGroup(groupId: string) {
               v-for="entry in settingsTabs"
               :key="entry.id"
               :value="entry.id"
-              :data-tour="entry.id === 'access' ? 'settings-access' : undefined"
+              :data-tour="tabAnchors[entry.id]"
             >
               {{ entry.label }}
             </TabsTrigger>

@@ -51,7 +51,7 @@ async function mint() {
 </script>
 
 <template>
-  <section class="surface overflow-hidden">
+  <section data-tour="assistant-mcp" class="surface overflow-hidden">
     <header class="border-b border-border px-5 py-4">
       <div class="flex items-center gap-2">
         <Plug class="h-4 w-4 text-primary" />

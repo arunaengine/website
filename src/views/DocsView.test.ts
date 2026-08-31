@@ -57,6 +57,7 @@ describe('versioned in-portal Docs', () => {
       'compute-run',
       'storage-backend',
       'cli-access-key',
+      'assistant',
     ])
 
     for (const topic of docsTopics) {
@@ -92,6 +93,11 @@ describe('versioned in-portal Docs', () => {
       'portal-tour',
       'first-group',
       'upload-data',
+      'first-dataset',
+      'compute-run',
+      'storage-backend',
+      'cli-access-key',
+      'assistant',
     ])
     expect(await renderTopic('portal-tour')).toContain('Show me in the portal')
     expect(await renderTopic('datasets')).not.toContain('Show me in the portal')
