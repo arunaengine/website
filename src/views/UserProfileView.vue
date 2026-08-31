@@ -6,6 +6,7 @@ import Avatar from '@/components/ui/Avatar.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import Button from '@/components/ui/Button.vue'
+import AskAiButton from '@/components/assistant/AskAiButton.vue'
 import { useAruna, colorFor, initials } from '@/composables/useAruna'
 import { useUserDirectory } from '@/composables/useUserDirectory'
 import { shortUserId } from '@/lib/utils'
@@ -38,6 +39,11 @@ watch(userId, (id) => { if (id) void load(id) }, { immediate: true })
 
 const attributes = computed(() => user.value?.attributes ?? {})
 const isSelf = computed(() => currentUser.value?.id === userId.value)
+const askPrompt = computed(() =>
+  user.value
+    ? `Summarize the datasets and activity of "${user.value.name}" in this realm.`
+    : 'Summarize this user and their datasets in this realm.',
+)
 </script>
 
 <template>
@@ -69,6 +75,7 @@ const isSelf = computed(() => currentUser.value?.id === userId.value)
             </h2>
             <div v-if="attributes.affiliation" class="mt-0.5 text-sm text-muted-foreground">{{ attributes.affiliation }}</div>
             <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm">
+              <AskAiButton :prompt="askPrompt" />
               <a v-if="attributes.email" :href="`mailto:${attributes.email}`" class="text-primary hover:underline">{{ attributes.email }}</a>
               <a
                 v-if="attributes.orcid"

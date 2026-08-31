@@ -15,6 +15,7 @@ import GroupDetailSkeleton from '@/components/groups/GroupDetailSkeleton.vue'
 import GroupRoles from '@/components/groups/GroupRoles.vue'
 import JoinRequestButton from '@/components/groups/JoinRequestButton.vue'
 import JoinRequestsInbox from '@/components/groups/JoinRequestsInbox.vue'
+import AskAiButton from '@/components/assistant/AskAiButton.vue'
 import UsageHistoryChart from '@/components/groups/UsageHistoryChart.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsList from '@/components/ui/TabsList.vue'
@@ -283,6 +284,12 @@ watch(
 )
 watch(historyRange, () => void loadHistory())
 
+const askPrompt = computed(() => {
+  const detail = group.value
+  if (!detail) return 'Summarize this group: its datasets, members, and usage.'
+  return `Summarize the group "${detail.display_name}" (${detail.group_id}): its datasets, members, and usage.`
+})
+
 async function leave() {
   leaveError.value = null
   try {
@@ -308,10 +315,13 @@ async function leave() {
           </div>
           <div class="truncate font-mono text-[10px] text-muted-foreground">{{ group.group_id }}</div>
         </div>
-        <Button v-if="isMember" variant="outline" size="sm" :disabled="saving" @click="leave">
-          <LogOut class="h-3.5 w-3.5" /> Leave group
-        </Button>
-        <JoinRequestButton v-if="group" :group-id="group.group_id" :group-name="group.display_name" />
+        <div class="flex flex-wrap items-center gap-2">
+          <AskAiButton :prompt="askPrompt" />
+          <Button v-if="isMember" variant="outline" size="sm" :disabled="saving" @click="leave">
+            <LogOut class="h-3.5 w-3.5" /> Leave group
+          </Button>
+          <JoinRequestButton v-if="group" :group-id="group.group_id" :group-name="group.display_name" />
+        </div>
       </header>
       <div v-if="leaveError" class="border-b border-border px-5 py-2 text-xs text-destructive">{{ leaveError }}</div>
 

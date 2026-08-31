@@ -594,6 +594,13 @@ export function useAssistantChat() {
     }
   }
 
+  // Seeds the composer, then opens the panel. The draft is set after openPanel
+  // so an epoch reset inside it cannot wipe the seed; nothing is auto-sent.
+  function openWith(prompt: string) {
+    openPanel()
+    draft.value = prompt.trim()
+  }
+
   function hidePanel() {
     open.value = false
   }
@@ -732,6 +739,7 @@ export function useAssistantChat() {
     setApproveWrites,
     setReasoningEffort,
     openPanel,
+    openWith,
     hidePanel,
     closePanel,
     newChat,

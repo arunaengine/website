@@ -17,7 +17,8 @@ import DatasetBrowse from '@/components/datasets/DatasetBrowse.vue'
 import DatasetResults from '@/components/datasets/DatasetResults.vue'
 import DatasetSearch from '@/components/datasets/DatasetSearch.vue'
 import SparqlWorkbench from '@/components/datasets/SparqlWorkbench.vue'
-import { ref } from 'vue'
+import AskAiButton from '@/components/assistant/AskAiButton.vue'
+import { computed, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
 import { useDatasetSearch } from '@/composables/useDatasetSearch'
@@ -47,6 +48,12 @@ const {
 const sparqlState = useSparqlWorkbench(documentScope)
 
 const showCrateImport = ref(false)
+
+const askPrompt = computed(() =>
+  q.value.trim()
+    ? `Help me refine my search for "${q.value.trim()}" in this realm and summarize the results.`
+    : 'Help me find datasets in this realm.',
+)
 </script>
 
 <template>
@@ -70,6 +77,7 @@ const showCrateImport = ref(false)
         >Learn more</RouterLink>
       </template>
       <template #actions>
+        <AskAiButton :prompt="askPrompt" />
         <Button :disabled="!currentUser" @click="router.push({ name: 'dataset-new' })"><Plus class="h-4 w-4" /> Create dataset</Button>
         <!-- Importing an archive registers a NEW document, so it lives here next
              to Create dataset rather than on a single dataset's page. -->

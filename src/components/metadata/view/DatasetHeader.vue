@@ -5,13 +5,19 @@ import Badge from '@/components/ui/Badge.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
 import AuthorChips from '@/components/metadata/AuthorChips.vue'
 import ProfileChip from '@/components/metadata/ProfileChip.vue'
+import AskAiButton from '@/components/assistant/AskAiButton.vue'
 import { RouterLink } from 'vue-router'
 import type { DatasetViewState } from '@/composables/useDatasetView'
 import type { MetadataDoc } from '@/data/types'
 import { isHttpUrl, relativeTime } from '@/lib/utils'
 import { CircleHelp, Layers, ListChecks } from '@lucide/vue'
+import { computed } from 'vue'
 
 const props = defineProps<{ doc: MetadataDoc; state: DatasetViewState }>()
+
+const askPrompt = computed(
+  () => `Summarize the dataset "${props.doc.title}" (${props.doc.ulid}): its files, license, and how it was made.`,
+)
 const {
   currentCrate,
   currentProfile,
@@ -54,6 +60,7 @@ const {
         <AuthorChips :crate="currentCrate" class="mt-4" />
       </div>
       <div class="flex shrink-0 flex-col items-end gap-1.5">
+        <AskAiButton :prompt="askPrompt" />
         <Badge variant="secondary">{{ relativeTime(doc.updatedAt) }}</Badge>
         <Badge v-if="projectCrate" variant="outline" size="sm" class="gap-1 uppercase"><Layers class="h-3 w-3" /> Project dataset</Badge>
       </div>

@@ -12,6 +12,7 @@ import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
 import JobFamilySection from '@/components/jobs/JobFamilySection.vue'
 import TaskHeader from '@/components/compute/TaskHeader.vue'
+import AskAiButton from '@/components/assistant/AskAiButton.vue'
 import ClaimWatchStep, { type WatchStage } from '@/components/onboarding/ClaimWatchStep.vue'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useJobs } from '@/composables/useJobs'
@@ -136,6 +137,9 @@ onUnmounted(stopPolling)
 
 // ── Derived ──────────────────────────────────────────────────────────────────
 const headerTitle = computed(() => task.value?.name || truncateMiddle(props.taskId))
+const askPrompt = computed(
+  () => `Explain this compute run ${task.value?.id || props.taskId}: its current state, placement verdict, and outputs.`,
+)
 
 const groupTagId = computed(() => task.value?.tags?.[TES_GROUP_TAG])
 const groupTagLabel = computed(() => {
@@ -351,14 +355,16 @@ async function confirmDelete() {
   <DetailDialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
     <template #header>
       <DialogTitle class="sr-only">Run details</DialogTitle>
-      <TaskHeader
-        v-if="task"
-        :title="headerTitle"
-        :run-id="task.id || taskId"
-        :state="task.state"
-        :tags="task.tags"
-        :description="task.description"
-      />
+      <div v-if="task" class="flex items-start justify-between gap-3">
+        <TaskHeader
+          :title="headerTitle"
+          :run-id="task.id || taskId"
+          :state="task.state"
+          :tags="task.tags"
+          :description="task.description"
+        />
+        <AskAiButton :prompt="askPrompt" icon-only class="shrink-0" />
+      </div>
       <Skeleton v-else-if="loadState === 'loading'" class="h-6 w-2/3" />
     </template>
 

@@ -220,6 +220,7 @@ function taskPanel(getTask: unknown, getJob: unknown): Component {
     '@/components/ui/ExternalLink.vue': moduleDefault(PassThroughStub),
     '@/components/jobs/JobFamilySection.vue': moduleDefault(JobFamilyStub),
     '@/components/compute/TaskHeader.vue': moduleDefault(PassThroughStub),
+    '@/components/assistant/AskAiButton.vue': moduleDefault(PassThroughStub),
     '@/components/compute/TaskStateBadge.vue': moduleDefault(JobStateBadgeStub),
     '@/components/compute/TesPlacementTags.vue': moduleDefault(PassThroughStub),
     '@/components/onboarding/ClaimWatchStep.vue': moduleDefault(StagesStub),
