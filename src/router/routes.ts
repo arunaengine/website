@@ -109,7 +109,13 @@ export function portalRoutes(): RouteRecordRaw[] {
         { path: 'profiles/new', name: 'profile-new', component: () => import('@/views/ProfileNewView.vue') },
         { path: 'profiles/:profileId', name: 'profile', component: () => import('@/views/ProfilesView.vue') },
         { path: 'profiles/:profileId/edit', name: 'profile-edit', component: () => import('@/views/ProfileNewView.vue') },
-        // Versioned, repository-owned portal guidance.
+        // Versioned, repository-owned portal guidance. The static api path wins
+        // over the topic param, so the reference never collides with a slug.
+        {
+          path: 'docs/v1/api',
+          name: 'api-reference',
+          component: () => import('@/views/ApiReferenceView.vue'),
+        },
         { path: 'docs/v1/:topic?', name: 'docs', component: () => import('@/views/DocsView.vue') },
         // Groups: dedicated management page
         { path: 'groups', name: 'groups', component: () => import('@/views/GroupsView.vue') },
