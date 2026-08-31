@@ -53,20 +53,29 @@ function isOpenAiReasoning(id: string): boolean {
   return id.startsWith('o3') || id.startsWith('o4') || id.startsWith('gpt-5')
 }
 
+const ANTHROPIC_EFFORTS: readonly string[] = ['off', 'low', 'medium', 'high']
+
 /** Levels a model family accepts when the node lists none; empty otherwise. */
 export function familyEfforts(kind: string, id: string): string[] {
   if (kind === 'chatgpt') {
     if (id.startsWith('gpt-5.6')) return [...CODEX_FLAGSHIP_EFFORTS]
     return id.startsWith('gpt-5') ? [...CODEX_EFFORTS] : []
   }
+  // Haiku models have no extended thinking.
+  if (kind === 'anthropic') return id.includes('claude') && !id.includes('haiku') ? [...ANTHROPIC_EFFORTS] : []
   return isOpenAiReasoning(id) ? [...OPENAI_EFFORTS] : []
 }
+
+// Kinds whose effort catalog is authoritative: listing nothing means the model
+// does not reason. An opaque or unset provider instead gets the guess set.
+const AUTHORITATIVE_KINDS = new Set(['chatgpt', 'openai', 'anthropic', 'openrouter'])
 
 /** The levels to offer: what the model lists, else its family, else the default. */
 export function reasoningEffortOptions(kind: string, id: string, listed?: readonly string[]): string[] {
   if (listed?.length) return [...listed]
   const family = familyEfforts(kind, id)
-  return family.length ? family : [...DEFAULT_REASONING_EFFORTS]
+  if (family.length) return family
+  return AUTHORITATIVE_KINDS.has(kind) ? [] : [...DEFAULT_REASONING_EFFORTS]
 }
 
 /** The list's preferred default: medium when offered, else its middle element. */
@@ -81,6 +90,7 @@ export function clampEffort(stored: string, options: readonly string[]): string 
 }
 
 const EFFORT_LABELS: Readonly<Record<string, string>> = {
+  off: 'Off',
   minimal: 'Minimal',
   low: 'Low',
   medium: 'Medium',

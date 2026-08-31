@@ -10,7 +10,7 @@ import {
 } from 'ai'
 import { errorMessage } from '@/lib/utils'
 
-type StreamProviderOptions = Parameters<typeof streamText>[0]['providerOptions']
+export type StreamProviderOptions = Parameters<typeof streamText>[0]['providerOptions']
 
 /** Bound on one turn, so a looping model cannot run away with the session. */
 export const MAX_STEPS = 16
@@ -30,6 +30,7 @@ export interface TurnOptions extends TurnHandlers {
   maxSteps?: number
   abortSignal?: AbortSignal
   providerOptions?: StreamProviderOptions
+  maxOutputTokens?: number
 }
 
 export interface TurnResult {
@@ -56,6 +57,7 @@ export async function runTurn(options: TurnOptions): Promise<TurnResult> {
     stopWhen: stepCountIs(options.maxSteps ?? MAX_STEPS),
     abortSignal: options.abortSignal,
     providerOptions: options.providerOptions,
+    maxOutputTokens: options.maxOutputTokens,
   })
 
   let failure: string | undefined

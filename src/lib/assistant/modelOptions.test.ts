@@ -46,7 +46,12 @@ describe('reasoning efforts', () => {
     ])
     expect(reasoningEffortOptions('chatgpt', 'gpt-5.5')).toEqual(['minimal', 'low', 'medium', 'high', 'xhigh'])
     expect(reasoningEffortOptions('openai', 'gpt-5')).toEqual(['low', 'medium', 'high'])
-    expect(reasoningEffortOptions('anthropic', 'claude-3')).toEqual(['minimal', 'low', 'medium', 'high'])
+    expect(reasoningEffortOptions('anthropic', 'claude-sonnet-4')).toEqual(['off', 'low', 'medium', 'high'])
+    // A known family that reasons about nothing offers nothing; only an opaque
+    // endpoint gets the guess set.
+    expect(reasoningEffortOptions('anthropic', 'claude-3-5-haiku')).toEqual([])
+    expect(reasoningEffortOptions('openai', 'gpt-4o')).toEqual([])
+    expect(reasoningEffortOptions('openai_compatible', 'mystery-1')).toEqual(['minimal', 'low', 'medium', 'high'])
   })
 
   it('offers nothing extra for a non-reasoning family', () => {
@@ -64,6 +69,7 @@ describe('reasoning efforts', () => {
     expect(effortLabel('xhigh')).toBe('X-High')
     expect(effortLabel('max')).toBe('Max')
     expect(effortLabel('ultra')).toBe('Ultra')
+    expect(effortLabel('off')).toBe('Off')
     expect(effortLabel('medium')).toBe('Medium')
     expect(effortLabel('turbo')).toBe('Turbo')
   })

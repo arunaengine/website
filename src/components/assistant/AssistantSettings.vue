@@ -69,7 +69,7 @@ const effortChoices = computed(() =>
           />
           <p v-if="modelsError" class="mt-1 text-[11px] text-muted-foreground">{{ modelsError }}</p>
         </div>
-        <div>
+        <div v-if="effortChoices.length">
           <p class="text-xs font-medium text-foreground">Reasoning</p>
           <Select
             :model-value="reasoningEffort"

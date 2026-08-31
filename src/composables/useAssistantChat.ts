@@ -20,6 +20,7 @@ import type { McpConnection } from '@/lib/assistant/mcpClient'
 import type { PromptContext } from '@/lib/assistant/prompt'
 import type { ApprovalGate, ApprovalRequest, ChatMessage, ToolCallView } from '@/lib/assistant/types'
 import { clampEffort, modelSuggestions, reasoningEffortOptions } from '@/lib/assistant/modelOptions'
+import type { StreamProviderOptions } from '@/lib/assistant/chat'
 import {
   assistantChatScopeKey,
   createAssistantChatStore,
@@ -44,11 +45,34 @@ function readEffort(): string {
   return readStored(EFFORT_KEY) || 'medium'
 }
 
-// OpenAI-responses turns carry store:false and the chosen reasoning effort; the
-// same options ride the node proxy to the chatgpt provider. Other providers get
-// none, since a reasoning effort would fault on them.
-export function turnProviderOptions(openAiResponses: boolean, effort: string) {
-  return openAiResponses ? { openai: { store: false, reasoningEffort: effort } } : undefined
+// Off/Low/Medium/High map to a thinking-token budget for providers without
+// native effort tiers.
+const THINK_BUDGET: Record<string, number> = { low: 2000, medium: 6000, high: 12000 }
+
+export interface TurnRequest {
+  providerOptions?: StreamProviderOptions
+  maxOutputTokens?: number
+}
+
+// How one turn carries its reasoning effort: OpenAI responses and chatgpt add
+// store:false, openai chat sends it alone, anthropic maps it to a thinking
+// budget under the output cap, openrouter keys it by the provider name.
+export function turnRequest(kind: string, openAiResponses: boolean, effort: string): TurnRequest {
+  if (openAiResponses) return { providerOptions: { openai: { store: false, reasoningEffort: effort } } }
+  if (kind === 'openai') return { providerOptions: { openai: { reasoningEffort: effort } } }
+  if (kind === 'anthropic') {
+    if (effort === 'off') return {}
+    const budget = THINK_BUDGET[effort] ?? THINK_BUDGET.medium
+    return {
+      providerOptions: { anthropic: { thinking: { type: 'enabled', budgetTokens: budget } } },
+      maxOutputTokens: budget + 8000,
+    }
+  }
+  if (kind === 'openrouter' || kind === 'openai_compatible') {
+    if (effort === 'off') return {}
+    return { providerOptions: { [kind]: { reasoning: { effort } } } }
+  }
+  return {}
 }
 
 export interface PendingApproval {
@@ -625,13 +649,18 @@ export function useAssistantChat() {
         : buildModel(selectedProvider, selectedModel, modelContext)
       const openAiResponses = (direct?.kind === 'openai_compatible' && direct.protocol === 'responses')
         || selectedProvider.kind === 'chatgpt'
+      // No offered effort means the model does not reason; sending one would fault.
+      const req = effortOptions.value.length
+        ? turnRequest(direct?.kind ?? selectedProvider.kind, openAiResponses, reasoningEffort.value)
+        : {}
       const result = await runTurn({
         model: languageModel,
         system: systemPrompt(context),
         messages: turnMessages,
         tools,
         abortSignal: turn.controller.signal,
-        providerOptions: turnProviderOptions(openAiResponses, reasoningEffort.value),
+        providerOptions: req.providerOptions,
+        maxOutputTokens: req.maxOutputTokens,
         onText: (delta) => {
           if (!isCurrentTurn(turn)) return
           const message = messages.value.find((entry) => entry.id === assistantMessageId)

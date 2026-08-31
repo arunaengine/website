@@ -17,7 +17,7 @@ vi.stubGlobal('window', {
 
 const { createAssistantChatStore, newAssistantChat } = await import('@/lib/assistant/chatHistory')
 const { apiBaseUrl, authToken, userInfo } = await import('./aruna/state')
-const { useAssistantChat, turnProviderOptions } = await import('./useAssistantChat')
+const { useAssistantChat, turnRequest } = await import('./useAssistantChat')
 
 const scope = { apiBaseUrl: 'https://node.test', realmId: 'r-1', userId: 'u-1' }
 
@@ -84,9 +84,33 @@ describe('effortOptions', () => {
   })
 })
 
-describe('turnProviderOptions', () => {
-  it('sends the effort only on the openai responses branch', () => {
-    expect(turnProviderOptions(true, 'high')).toEqual({ openai: { store: false, reasoningEffort: 'high' } })
-    expect(turnProviderOptions(false, 'high')).toBeUndefined()
+describe('turnRequest', () => {
+  it('carries store:false and the effort on the openai responses branch', () => {
+    expect(turnRequest('chatgpt', true, 'high')).toEqual({
+      providerOptions: { openai: { store: false, reasoningEffort: 'high' } },
+    })
+  })
+
+  it('sends the effort alone for openai chat completions', () => {
+    expect(turnRequest('openai', false, 'high')).toEqual({
+      providerOptions: { openai: { reasoningEffort: 'high' } },
+    })
+  })
+
+  it('maps anthropic effort to a thinking budget under the output cap', () => {
+    expect(turnRequest('anthropic', false, 'high')).toEqual({
+      providerOptions: { anthropic: { thinking: { type: 'enabled', budgetTokens: 12000 } } },
+      maxOutputTokens: 20000,
+    })
+  })
+
+  it('sends no thinking for anthropic off', () => {
+    expect(turnRequest('anthropic', false, 'off')).toEqual({})
+  })
+
+  it('passes a reasoning effort for openrouter', () => {
+    expect(turnRequest('openrouter', false, 'medium')).toEqual({
+      providerOptions: { openrouter: { reasoning: { effort: 'medium' } } },
+    })
   })
 })
