@@ -70,6 +70,7 @@ const DesktopLayoutClient = compileClientComponent(new URL('./DesktopLayout.vue'
   '@/components/ui/Notice.vue': moduleDefault(Notice),
   '@/composables/useAruna': { useAruna: () => permissions },
   '@/composables/assistantState': { assistantAvailable: ref(false), assistantOpen: ref(false) },
+  '@/composables/useTour': { bindTourRouter: () => {}, tourActive: ref(false) },
   '@/composables/useDeviceStatus': {
     useDeviceStatus: () => ({
       status: nodeStatus,
@@ -98,6 +99,7 @@ beforeAll(async () => {
   }))
   vi.doMock('@/composables/useAruna', () => ({ useAruna: () => permissions }))
   vi.doMock('@/composables/assistantState', () => ({ assistantAvailable: ref(false), assistantOpen: ref(false) }))
+  vi.doMock('@/composables/useTour', () => ({ bindTourRouter: () => {}, tourActive: ref(false) }))
   vi.doMock('@/composables/useDeviceStatus', () => ({
     useDeviceStatus: () => ({
       status: nodeStatus,
