@@ -43,19 +43,19 @@ export const docsTopics: DocsTopic[] = [
     slug: 'datasets',
     kind: 'Concept',
     title: 'Datasets and purpose types',
-    summary: 'How the datasets catalog presents every RO-Crate and distinguishes its purpose.',
+    summary: 'Every entry in the catalog is an RO-Crate; its purpose decides how it is shown.',
     sections: [
       {
         title: 'One catalog, three purposes',
         paragraphs: [
-          'A Dataset is the portal term for every RO-Crate in the datasets catalog. An RO-Crate is a structured description whose root identifies the dataset and whose graph can describe people, files, software, places, and related research objects.',
-          'Dataset is the default purpose. Profile and Process Run are specialized purposes, not separate storage systems. A Profile purpose takes precedence when the RO-Crate root declares the Profile type. A Process Run is recognized by conformance to the supported Process Run Crate profile. Every other RO-Crate is shown as dataset.',
+          'A Dataset is an RO-Crate: a structured description whose graph can cover people, files, software, and related research objects.',
+          'Dataset is the default purpose. A root that declares the Profile type is shown as Profile; a crate conforming to the Process Run Crate profile is shown as Process Run. Neither is a separate storage system.',
         ],
       },
       {
         title: 'Description and data are separate',
         paragraphs: [
-          'The dataset record is the RO-Crate graph. Data files live in buckets or at external locations and are referenced by the graph. Editing or deleting the dataset record does not silently edit or delete those files.',
+          'The dataset record is the graph. File bytes live in buckets or external locations; editing or deleting the record never silently touches them.',
         ],
       },
       {
@@ -80,33 +80,33 @@ export const docsTopics: DocsTopic[] = [
     slug: 'profiles-conformance',
     kind: 'Concept',
     title: 'Profiles and conformance',
-    summary: 'What a Profile requires, what conformance means, and which check is authoritative.',
+    summary: 'What a Profile requires, and which validation check is the authoritative one.',
     sections: [
       {
         title: 'Profiles define minimum requirements',
         paragraphs: [
-          'A Profile describes the fields and entities expected for a kind of dataset. Requirements are minimum requirements by default, so additional metadata remains valid unless an explicit closed SHACL constraint restricts it.',
-          'A conformsTo reference states which Profile a dataset claims to follow. The reference alone is not proof that the dataset passed validation.',
+          'A Profile lists the fields and entities expected for a kind of dataset. Extra metadata stays valid unless a closed SHACL constraint forbids it.',
+          'A conformsTo reference is a claim, not proof of validation.',
         ],
         image: {
           src: '/docs/v1/profiles.jpg',
           alt: 'Profiles view showing the Process Run Crate profile with its required properties',
-          caption: 'The Profiles view lists every registered profile with its required properties, suggested keywords, and downloadable SHACL shapes.',
+          caption: 'Each registered profile shows its required properties, suggested keywords, and downloadable SHACL shapes.',
         },
       },
       {
         title: 'Validation authority',
         bullets: [
-          'The node validation preview in the dataset dialogs checks a draft against the registered Profile before it is saved. It is advisory and never blocks the form.',
-          'The node validates the exact saved RO-Crate against the exact registered Profile revision before accepting a tagged write.',
-          'A registered Profile that is unavailable or still preparing fails closed for that tagged write. Retry the check or remove the Profile tag and save an unprofiled dataset.',
-          'External and unregistered Profile references remain readable, but they cannot currently be used as enforceable write tags.',
+          'The editor preview checks drafts early; it advises and never blocks the form.',
+          'The node validates the exact saved crate against the exact registered Profile revision before accepting a tagged write.',
+          'An unavailable or still-preparing Profile fails closed for tagged writes: retry, or save unprofiled.',
+          'External and unregistered Profile references stay readable but cannot be enforced as write tags.',
         ],
       },
       {
         title: 'Changing Profile',
         paragraphs: [
-          'Changing a saved dataset to another Profile is a semantic change. The replacement dataset must pass authoritative validation, and unmatched existing metadata remains available for explicit review instead of being discarded silently.',
+          'Switching a saved dataset to another Profile must pass authoritative validation; unmatched metadata is kept for review, never dropped silently.',
         ],
       },
     ],
@@ -115,27 +115,27 @@ export const docsTopics: DocsTopic[] = [
     slug: 'data-and-deletion',
     kind: 'Concept',
     title: 'Data, buckets, references, and deletion',
-    summary: 'How dataset records relate to S3 data and what ordinary delete and permanent purge affect.',
+    summary: 'What ordinary delete touches, what permanent purge touches, and what references mean.',
     sections: [
       {
         title: 'Data and dataset references',
         paragraphs: [
-          'Data means buckets and S3 objects or files. A Dataset can reference a file identity or location, but that reference does not make the dataset record own the stored bytes. One content identity can have several resolvable locations or replicas.',
-          'Deletion checks can warn about visible dataset references, restricted references, and whether the selected operation removes the last resolvable Aruna location. A reference warning informs the decision but does not replace storage permissions or block an otherwise authorized deletion.',
+          'A dataset references file identities or locations; it never owns the stored bytes. One content identity can have several replicas.',
+          'Deletion checks warn about visible references and about removing the last resolvable location. Warnings inform; storage permissions decide.',
         ],
       },
       {
         title: 'Delete markers are recoverable history',
         bullets: [
-          'Ordinary file Delete sends a version-less S3 delete. It creates a delete marker, hides the current head, and preserves historical versions and physical data.',
-          'Ordinary folder Delete applies the same delete-marker behavior to the current keys under the exact prefix. It can finish partially and reports keys that remain visible.',
-          'Deleting a dataset record removes its RO-Crate graph. It does not delete referenced S3 objects.',
+          'File Delete is a version-less S3 delete: it adds a delete marker and keeps every historical version.',
+          'Folder Delete applies the same to the current keys under the prefix, may finish partially, and reports what remains.',
+          'Deleting a dataset record removes its graph, never the referenced S3 objects.',
         ],
       },
       {
         title: 'Permanent purge is separate',
         paragraphs: [
-          'Permanently delete all versions is an explicit node-side purge operation. It removes named versions and delete markers and reports partial progress for safe retry. A complete bucket deletion also aborts open multipart uploads, handles sync relationships, proves final emptiness, and then deletes the bucket.',
+          'Permanently delete all versions is an explicit node-side purge with resumable progress. Full bucket deletion also aborts open multipart uploads, settles sync relationships, proves emptiness, then removes the bucket.',
         ],
       },
     ],
@@ -144,32 +144,32 @@ export const docsTopics: DocsTopic[] = [
     slug: 'realm-nodes-groups',
     kind: 'Concept',
     title: 'Realm, nodes, groups, membership, and replication',
-    summary: 'The scopes that control visibility, authority, ownership, permissions, and copies.',
+    summary: 'The four scopes behind every badge in the portal.',
     sections: [
       {
         title: 'Scope vocabulary',
         bullets: [
-          'Realm is the selected visibility, membership, and realm-aggregate scope.',
-          'Node is the REST and S3 authority and the scope for local storage or placement reports.',
-          'Group is the ownership, role, and quota scope for datasets, data, and configured storage behavior.',
-          'Membership connects a user to group roles. The node evaluates the resulting permission paths for every protected action.',
+          'Realm: visibility, membership, and realm-wide aggregates.',
+          'Node: the REST and S3 authority, and the scope of local storage or placement reports.',
+          'Group: ownership, roles, quota, and configured storage behavior.',
+          'Membership: connects you to group roles; the node evaluates the resulting permissions on every protected action.',
         ],
         image: {
           src: '/docs/v1/status.jpg',
           alt: 'Status view with realm topology, locations, and the list of realm nodes',
-          caption: 'The Status view shows the realm, its locations, and every node with its role, latency, and connectivity.',
+          caption: 'The Status view: the realm, its locations, and every node with role, latency, and connectivity.',
         },
       },
       {
         title: 'Replication is not a unique total',
         paragraphs: [
-          'Replication records which nodes currently hold or are responsible for copies. Node holder counts include replicas, so adding them together can exceed the number of unique datasets. A default replication factor is placement policy, not proof that every record currently has that many copies. A null default can mean all eligible nodes.',
+          'Holder counts include replicas, so summing nodes can exceed the number of unique datasets. A default replication factor is policy, not proof of current copies; a null default can mean all eligible nodes.',
         ],
       },
       {
         title: 'Read scope badges before acting',
         paragraphs: [
-          'Realm, node, and group badges identify the authority and data set an action uses. Switching a Realm, node, or group changes that context rather than merely changing a display filter.',
+          'Realm, node, and group badges name the authority an action uses. Switching one changes the context, not just a display filter.',
         ],
       },
     ],
@@ -178,25 +178,25 @@ export const docsTopics: DocsTopic[] = [
     slug: 'storage-access',
     kind: 'Concept',
     title: 'Portal sessions, CLI keys, and external backends',
-    summary: 'Three separate S3 mechanisms with different owners, lifetimes, and uses.',
+    summary: 'Three S3 mechanisms with different owners, lifetimes, and uses.',
     sections: [
       {
         title: 'Portal S3 session',
         paragraphs: [
-          'Routine portal access uses a short-lived SigV4 session derived from the signed-in identity for one explicitly selected group. It stays in memory, lasts no more than one hour or the remaining sign-in lifetime, and refreshes five minutes before expiry while active.',
-          'A portal session is issued by one node and works only on that node. Switching node is explicit and obtains a session from the selected node. Sign-out, account change, or API change clears the in-memory sessions.',
+          'Browsing uses a short-lived SigV4 session for one selected group: in memory only, at most one hour or the remaining sign-in lifetime, refreshed shortly before expiry.',
+          'A session is issued by one node and works only there. Sign-out, account change, or API change clears it.',
         ],
       },
       {
         title: 'CLI and service access key',
         paragraphs: [
-          'A CLI or service key is an optional long-lived access-key and secret pair for non-portal S3 clients. Its secret is shown once, is never stored or activated by the portal, and remains local to the node that issued it.',
+          'An optional long-lived key pair for non-portal S3 clients. The secret is shown once, is never stored by the portal, and stays local to the issuing node.',
         ],
       },
       {
         title: 'External storage backend',
         paragraphs: [
-          'An external backend is group configuration, not a browser credential. A group administrator registers an S3-compatible endpoint and write-only backend credentials so Aruna can route group bucket data there. Ordinary writers use the configured behavior but cannot view backend secrets or change routing.',
+          'Group configuration, not a browser credential: an admin registers an S3-compatible endpoint so Aruna routes group data there. Writers inherit the routing but never see the backend secret.',
         ],
       },
     ],
@@ -205,23 +205,23 @@ export const docsTopics: DocsTopic[] = [
     slug: 'states-and-retry',
     kind: 'Concept',
     title: 'Completion states and retry',
-    summary: 'How the portal distinguishes durable acceptance, convergence, completeness, uncertainty, and outages.',
+    summary: 'What Accepted, Preparing, Complete, Partial, Unknown, and Unavailable actually promise.',
     sections: [
       {
         title: 'State meanings',
         bullets: [
-          'Accepted means a write is durably accepted, but downstream projection or read readiness is not yet established.',
-          'Preparing means a bounded convergence or read retry is in progress.',
-          'Complete means the requested scope answered without known omissions.',
-          'Partial means some nodes, partitions, or items failed or were not queried.',
-          'Unknown means the available API, cache, or permission state cannot prove absence or completion.',
-          'Unavailable means the authority or check could not currently answer. It is distinct from empty or not found.',
+          'Accepted: durably written, downstream readiness not yet established.',
+          'Preparing: a bounded convergence or read retry is in progress.',
+          'Complete: the requested scope answered without known omissions.',
+          'Partial: some nodes, partitions, or items failed or were not queried.',
+          'Unknown: the available state cannot prove absence or completion.',
+          'Unavailable: the authority could not answer; distinct from empty or not found.',
         ],
       },
       {
         title: 'Retry without inventing an outcome',
         paragraphs: [
-          'Retry rechecks or resumes a safely repeatable operation. A timed-out read after Accepted does not mean creation failed. A partial query keeps its missing coverage visible. The portal does not automatically replay an uncertain mutating request because the first request may already have committed.',
+          'Retry rechecks or resumes safely repeatable work. A timed-out read after Accepted does not mean the write failed, and the portal never auto-replays an uncertain mutation because the first attempt may already have committed.',
         ],
       },
     ],
@@ -230,25 +230,25 @@ export const docsTopics: DocsTopic[] = [
     slug: 'identifiers',
     kind: 'Concept',
     title: 'Automatic w3id PIDs and external identifiers',
-    summary: 'The difference between the portal-managed primary PID and descriptive identifier metadata.',
+    summary: 'The portal-managed primary PID versus descriptive identifier metadata.',
     sections: [
       {
         title: 'One automatic primary w3id',
         paragraphs: [
-          'Every persisted dataset receives exactly one automatic conceptual w3id. Ordinary datasets and Process Runs use the general dataset identity. A Profile uses https://w3id.org/aruna/profile/{id} as its sole primary PID instead of receiving a duplicate general dataset w3id.',
-          'Minting can continue after the dataset write is accepted. Requested, processing, active, failed, administratively withdrawn, tombstoned, and unknown states remain visible. Normal dataset deletion keeps a resolvable tombstone. Ordinary dataset owners cannot withdraw the primary PID.',
+          'Every persisted dataset gets exactly one conceptual w3id; a Profile uses https://w3id.org/aruna/profile/{id} instead of a duplicate general id.',
+          'Minting can continue after the write is accepted, every PID state stays visible, deletion keeps a resolvable tombstone, and owners cannot withdraw the primary PID.',
         ],
       },
       {
         title: 'External identifier is metadata',
         paragraphs: [
-          'External identifier is an ordinary RDF metadata field for a DOI, accession, local code, or other identifier that already exists. Entering it does not request a new PID. Additional PID providers appear only when a real provider is configured.',
+          'A DOI, accession, or local code you already have is plain RDF metadata; entering it requests nothing. Extra PID providers appear only when one is configured.',
         ],
       },
       {
         title: 'File identities',
         paragraphs: [
-          'For Aruna-held content, a content-addressed https://w3id.org/aruna/data/{blake3-hex} identifies the bytes independently of a bucket location. contentUrl records a physical or download location. Imported external content keeps its source identity when Aruna does not hold the bytes.',
+          'Aruna-held bytes get a content-addressed https://w3id.org/aruna/data/{blake3-hex}; contentUrl records a location. Imported external content keeps its source identity.',
         ],
       },
     ],
@@ -257,59 +257,58 @@ export const docsTopics: DocsTopic[] = [
     slug: 'data-to-compute',
     kind: 'Concept',
     title: 'Data-to-compute and compute-to-data',
-    summary: 'How a run is placed, what the placement verdict means, and how inputs and outputs are named.',
+    summary: 'How runs are placed, what the verdict means, and how inputs and outputs are named.',
     sections: [
       {
         title: 'How placement is decided',
         paragraphs: [
-          'Every node that holds a request family plans it independently. One planning round screens every executor advertisement the realm publishes, walking members in node order and their backends by executor kind. Selection is sealed only after the last page, so a lower-ranked target seen early is never launched while a better one waits in a later page.',
-          'The plan carries a transfer estimate: the bytes the planner expected to move to the chosen executor. It is a plan-time estimate computed from configured link bandwidths, not a measurement of what was actually transferred.',
+          'Every node holding a request family plans it independently: one round screens all executor advertisements in the realm and seals its choice only after the last page.',
+          'The plan carries a transfer estimate from configured link bandwidths; it is not a measurement of moved bytes.',
         ],
         bullets: [
-          'Ranked alternatives are the other acceptable targets, capped at 8 per round.',
-          'Rejected candidates are targets the round refused, with a reason recorded, capped at 32 explanations.',
-          'Omitted counts the rejections that cap dropped. A non-zero value means the recorded rejections are incomplete, not that the remaining targets agreed.',
-          'A plan is kept by the node that made it. A run answered by another node can report no placement at all, which is not the same as an unplanned run.',
+          'Ranked alternatives: the other acceptable targets, capped at 8 per round.',
+          'Rejected candidates: refused targets with a recorded reason, capped at 32.',
+          'Omitted: rejections dropped by the cap; non-zero means the record is incomplete.',
+          'A plan stays with the node that made it; a node without one reports no placement, which is not "unplanned".',
         ],
       },
       {
         title: 'What the verdict means',
         bullets: [
-          'Compute-to-data means the estimate was zero: every input already had a usable copy on the node chosen to run the work, so the plan expected to move no bytes.',
-          'Data-to-compute means at least one input had no usable copy there, so the plan expected to move those bytes to the chosen node before the run.',
-          'Not placed means the responding node sealed no plan of its own. It is an absence of local evidence, not a statement that no plan exists.',
-          'The verdict describes the plan, not the outcome. It does not prove how many bytes actually moved.',
+          'Compute-to-data: every input already had a usable copy on the chosen node; expected transfer zero.',
+          'Data-to-compute: at least one input had to move to the chosen node first.',
+          'Not placed: the responding node sealed no plan of its own; absence of local evidence only.',
+          'The verdict describes the plan, never the measured outcome.',
         ],
       },
       {
         title: 'Input modes',
         bullets: [
-          'A snapshot input is copied as it was when the run started. The run is unaffected by later writes to that key.',
-          'A floating reference resolves the key at run time, so the run sees whatever is current then. It cannot name a version.',
-          'An exact reference pins one specific version and requires that version id.',
-          'The GA4GH task interface carries no mode of its own. A run started through it takes the mode the serving node derives from its own deployment, and never pins a version.',
+          'Snapshot: copied as it was at run start; later writes never affect the run.',
+          'Floating: resolved at run time; sees whatever is current, cannot name a version.',
+          'Exact: pins one specific version id.',
+          'GA4GH tasks carry no mode; the serving node derives one and never pins a version.',
         ],
       },
       {
         title: 'Outputs are exact versions',
         paragraphs: [
-          'Each output names the exact version that one execution wrote, the execution that wrote it, and the node-local S3 endpoint that owns that version. Reading the same key without the version id answers whatever is current instead, which a duplicate execution, a later upload, or a copy from another node can all change.',
-          'The owner endpoint can be unknown while the version and the owning execution stay exact. The portal says so rather than dropping the output; retry, or ask a node that holds that advertisement.',
+          'Each output names the exact version one execution wrote, that execution, and the owning node-local S3 endpoint. Reading the key without the version id answers whatever is current instead.',
+          'The owner endpoint can be unknown while version and execution stay exact; the portal says so rather than dropping the output.',
         ],
       },
       {
         title: 'Replicating data ahead of compute',
         paragraphs: [
-          'The storage locations view of a file reports which nodes hold a copy, which have one on the way, and which could not answer. Asking another node for a copy needs WRITE on the file and is accepted as a queued request, not as a stored copy.',
-          'Placing a copy on a node that advertises a compute backend is what makes a compute-to-data plan possible. It does not force one: the planner still screens every advertisement and seals its own decision.',
+          'The storage locations view shows which nodes hold a copy. Requesting a copy elsewhere needs WRITE and is accepted as a queued request. A copy on an executor node makes compute-to-data possible; the planner still decides.',
         ],
       },
       {
         title: 'Placement policies and the run-family strategy',
         bullets: [
-          'A residency policy is an immutable published definition. A reference to one is the pair of its id and the digest of that definition, because an id alone could be answered with other bytes.',
-          'Publishing a changed definition requires a new policy id. Policies restrict which nodes a copy may live on, and the planner only routes inputs from copies that comply.',
-          'The run-family strategy places the replicated run records themselves. It cannot be removed and its shard count is frozen, so it is shown read-only.',
+          'A residency policy is immutable; a reference is its id plus the digest of the definition.',
+          'Changing a definition means a new policy id. The planner only routes inputs from compliant copies.',
+          'The run-family strategy places the run records themselves; it cannot be removed and is shown read-only.',
         ],
       },
     ],
@@ -355,21 +354,21 @@ export const docsTopics: DocsTopic[] = [
       {
         title: 'Start at the dashboard',
         paragraphs: [
-          'After sign-in the portal opens on the dashboard. It summarizes the selected realm: how many datasets, profiles, and groups it holds, how many nodes are online, and what this node stores. The cards update live from the node your browser is connected to.',
+          'Sign-in lands on the dashboard: realm statistics, node storage, and your groups, live from the node your browser talks to.',
         ],
         image: {
           src: '/docs/v1/dashboard.jpg',
           alt: 'Portal dashboard with realm statistics, storage figures, and group overview',
-          caption: 'The dashboard: realm statistics on top, node storage figures below, your groups at the bottom.',
+          caption: 'The dashboard: realm statistics on top, node storage below, your groups at the bottom.',
         },
       },
       {
         title: 'The top bar',
         bullets: [
-          'The context switcher on the left shows the active realm and, once you belong to one, the active group. Everything you create belongs to that context.',
-          'The search field reaches datasets, data objects, groups, and users in one place. Press Ctrl+K (Cmd+K on macOS) to focus it from anywhere.',
-          'Create dataset jumps straight into the dataset editor.',
-          'The bell collects notifications, the sun and moon button switches the theme, and the account menu on the right leads to your profile, access tokens, and sign-out.',
+          'Context switcher: the active realm and group everything you create belongs to.',
+          'Search: datasets, data objects, groups, and users in one field; Ctrl+K or Cmd+K focuses it anywhere.',
+          'Create dataset: straight into the editor.',
+          'Bell, theme toggle, and the account menu with profile, tokens, and sign-out.',
         ],
         image: {
           src: '/docs/v1/quick-search.jpg',
@@ -380,16 +379,16 @@ export const docsTopics: DocsTopic[] = [
       {
         title: 'The sidebar',
         bullets: [
-          'Dashboard, Data, Datasets, Profiles, and Compute are the everyday working views.',
-          'Groups, Status, Settings, and Docs manage membership, health, and your account.',
+          'Dashboard, Data, Datasets, Profiles, and Compute: the everyday views.',
+          'Groups, Status, Settings, and Docs: membership, health, and your account.',
           'Admin and Users appear only for realm administrators.',
-          'On narrow windows the sidebar collapses to an icon rail by itself; the collapse button at the bottom sets your preference on wide screens.',
+          'Narrow windows collapse it to an icon rail automatically; the bottom button sets your wide-screen preference.',
         ],
       },
       {
         title: 'On a phone',
         paragraphs: [
-          'Below tablet width the sidebar gives way to a bottom bar with the primary destinations and a More sheet for the rest. Search opens as a full-width panel from the magnifier button.',
+          'Below tablet width a bottom bar carries the primary destinations plus a More sheet, and search opens as a full-width panel.',
         ],
       },
     ],
@@ -423,15 +422,15 @@ export const docsTopics: DocsTopic[] = [
       {
         title: 'Groups own your work',
         paragraphs: [
-          'Every dataset, bucket, and compute run belongs to a group, and your role in that group decides what you may do with it. A fresh account without a group can look around but cannot store anything yet, so this is the first step after sign-in.',
+          'Your role in a group decides what you may do with everything it owns. Without a group you can look around but store nothing.',
         ],
       },
       {
         title: 'Create a group',
         steps: [
-          'Open Groups in the sidebar and choose Create group.',
-          'Name the group after the team or project that will own the data.',
-          'Create it. You become the group admin and can invite members and manage roles.',
+          'Open Groups and choose Create group.',
+          'Name it after the team or project that will own the data.',
+          'Create it: you become the admin and can invite members and manage roles.',
         ],
         image: {
           src: '/docs/v1/group-create.jpg',
@@ -442,7 +441,7 @@ export const docsTopics: DocsTopic[] = [
       {
         title: 'Inside a group',
         paragraphs: [
-          'The group page carries tabs for live statistics, members, roles, data sources, policies, and storage. The context switcher in the top bar now shows the group, and new buckets, datasets, and runs are created in its name.',
+          'Tabs cover statistics, members, roles, data sources, policies, and storage. The context switcher now carries the group, and new buckets, datasets, and runs are created in its name.',
         ],
         image: {
           src: '/docs/v1/group-detail.jpg',
@@ -456,7 +455,7 @@ export const docsTopics: DocsTopic[] = [
     slug: 'upload-data',
     kind: 'Guide',
     title: 'Upload and browse data',
-    summary: 'Create a bucket, upload files from the browser, and know what to do when a transfer fails.',
+    summary: 'Create a bucket, upload from the browser, recover failed transfers.',
     tour: [
       {
         route: '/app',
@@ -481,27 +480,27 @@ export const docsTopics: DocsTopic[] = [
       {
         title: 'Sessions, not stored keys',
         paragraphs: [
-          'The Data view browses buckets through the node’s S3 interface, signed in your browser. The portal mints a short-lived session for the selected group and keeps it in memory only; no long-lived credential is stored. See the storage access concept for how sessions, CLI keys, and backends differ.',
+          'The browser signs S3 requests with a short-lived session for the selected group; nothing long-lived is stored. See the storage access concept for the full picture.',
         ],
       },
       {
         title: 'Create a bucket and upload',
         steps: [
-          'Open Data and confirm the group shown next to “Showing buckets of”.',
-          'Type a bucket name in the field under the bucket list and confirm. Bucket names are S3 names: lowercase, digits, and dashes.',
-          'Select the bucket, then drag files onto the drop zone or use Add data.',
-          'Watch the Transfers panel in the corner until every file reports done.',
+          'Open Data and confirm the group next to "Showing buckets of".',
+          'Type a bucket name under the bucket list and confirm (lowercase, digits, dashes).',
+          'Select the bucket, then drag files in or use Add data.',
+          'Watch the Transfers panel until every file reports done.',
         ],
         image: {
           src: '/docs/v1/data-browser.jpg',
           alt: 'Data view with the reef-survey-2026 bucket and two uploaded objects',
-          caption: 'A bucket with uploaded objects. The toolbar reaches watch, routing, residency, and sync settings for the bucket.',
+          caption: 'A bucket with uploaded objects; the toolbar reaches watch, routing, residency, and sync settings.',
         },
       },
       {
         title: 'When an upload fails',
         paragraphs: [
-          'A failed transfer stays in the Transfers panel with its error and a Retry link, and retrying is safe. Uploads that race each other can fail with a transient conflict; retry simply sends the file again.',
+          'A failed transfer stays in the Transfers panel with its error and a Retry link; retrying is always safe.',
         ],
       },
     ],
@@ -510,48 +509,74 @@ export const docsTopics: DocsTopic[] = [
     slug: 'first-dataset',
     kind: 'Guide',
     title: 'Create your first dataset',
-    summary: 'Describe your data as an RO-Crate, attach files from a bucket, and save it with a resolvable identifier.',
+    summary: 'Describe your data, attach files from a bucket, save it with a resolvable identifier.',
+    tour: [
+      {
+        route: '/app',
+        anchor: 'top-create-dataset',
+        title: 'Create dataset',
+        body: 'The top bar opens a fresh, unsaved dataset in the editor.',
+      },
+      {
+        route: '/app/datasets/new',
+        anchor: 'editor-add-files',
+        title: 'Attach files',
+        body: 'Add files references bucket objects in the dataset graph; the bytes stay in the bucket.',
+      },
+      {
+        route: '/app/datasets/new',
+        anchor: 'editor-validation',
+        title: 'Validation',
+        body: 'The node previews validation findings while you edit; findings advise and never block.',
+      },
+      {
+        route: '/app/datasets/new',
+        anchor: 'editor-save',
+        title: 'Save it',
+        body: 'Create dataset makes the write durable and mints the w3id identifier.',
+      },
+    ],
     sections: [
       {
         title: 'Before you start',
         bullets: [
-          'Sign in, confirm the realm, and have a group; the dataset is created in the group the editor shows under the title.',
-          'Upload the files you want to attach first, so they are ready to pick from a bucket.',
-          'Use Create dataset for a new description. Use Import RO-Crate dataset for an existing RO-Crate archive.',
+          'Have a group; the editor shows the owning group under the title.',
+          'Upload the files you want to attach first.',
+          'New description: Create dataset. Existing RO-Crate archive: Import RO-Crate dataset.',
         ],
       },
       {
         title: 'Describe the dataset',
         steps: [
-          'Choose Create dataset in the top bar. The editor opens with a fresh, unsaved dataset.',
-          'Give it a name and a description that says what it contains and how it was made.',
-          'Pick a license and add keywords; both make the dataset far easier to find and reuse.',
-          'Optionally choose a registered Profile. The node validation preview marks findings as advisory and never blocks the form.',
+          'Choose Create dataset in the top bar.',
+          'Add a name and a description of what it contains and how it was made.',
+          'Pick a license and keywords; both drive discovery.',
+          'Optionally pick a registered Profile; preview findings advise, never block.',
         ],
         image: {
           src: '/docs/v1/dataset-editor.jpg',
           alt: 'Dataset editor with name, description, license, and keyword fields filled in',
-          caption: 'The editor: entities on the left, fields in the middle, validation at the bottom of the page.',
+          caption: 'The editor: entities on the left, fields in the middle, validation at the bottom.',
         },
       },
       {
         title: 'Attach files from a bucket',
         steps: [
           'Choose Add files in the left panel.',
-          'Pick From a bucket, select the bucket, and tick the objects that belong to this dataset. Upload to a bucket and Another dataset are the alternatives.',
-          'Add the selection and close the dialog. The files appear as entities of the dataset graph.',
+          'Pick From a bucket, select the bucket, tick the objects.',
+          'Add the selection; the files become entities of the dataset graph.',
         ],
         image: {
           src: '/docs/v1/dataset-addfiles.jpg',
           alt: 'Add files dialog showing bucket objects with checkboxes',
-          caption: 'Attaching bucket objects references them in the RO-Crate graph; the bytes stay in the bucket.',
+          caption: 'Attaching bucket objects references them in the graph; the bytes stay in the bucket.',
         },
       },
       {
         title: 'Save and verify',
         steps: [
-          'Check the validation footer, then choose Create dataset. Accepted confirms the durable write; if the detail view says Preparing, wait or use Retry instead of creating a duplicate.',
-          'On the detail page review the purpose badge, group scope, license, and the automatic w3id persistent identifier as it becomes Active.',
+          'Check the validation footer, then choose Create dataset. On Preparing, wait or Retry; never create a duplicate.',
+          'On the detail page check the purpose badge, group, license, and the w3id turning Active.',
         ],
         image: {
           src: '/docs/v1/dataset-detail.jpg',
@@ -562,20 +587,20 @@ export const docsTopics: DocsTopic[] = [
       {
         title: 'Import an existing RO-Crate',
         steps: [
-          'Choose Import RO-Crate dataset and select a supported RO-Crate archive.',
-          'Review the detected version, file count, purpose, Profile references, and destination before you import.',
-          'Confirm the new dataset and follow the preparation until it is Complete or reports a recoverable Partial state.',
+          'Choose Import RO-Crate dataset and pick the archive.',
+          'Review detected version, files, purpose, Profile references, and destination.',
+          'Confirm and follow the preparation to Complete or a recoverable Partial.',
         ],
       },
       {
         title: 'Find it again',
         paragraphs: [
-          'The Datasets view lists every visible RO-Crate with purpose, profile, and group filters, and quick search in the top bar reaches the same catalog from anywhere.',
+          'The Datasets view filters by purpose, profile, and group; quick search reaches the same catalog from anywhere.',
         ],
         image: {
           src: '/docs/v1/datasets-catalog.jpg',
           alt: 'Datasets catalog with search, filters, and the saved dataset card',
-          caption: 'The catalog: filters by purpose, profile, and group, plus a SPARQL workbench for advanced queries.',
+          caption: 'The catalog: purpose, profile, and group filters, plus a SPARQL workbench.',
         },
       },
     ],
@@ -584,12 +609,32 @@ export const docsTopics: DocsTopic[] = [
     slug: 'compute-run',
     kind: 'Guide',
     title: 'Start and follow a compute run',
-    summary: 'Run a script next to your data with Quick run, and read the run states it reports.',
+    summary: 'Run a script next to your data with Quick run and read the states it reports.',
+    tour: [
+      {
+        route: '/app',
+        anchor: 'nav-compute',
+        title: 'Open Compute',
+        body: 'Compute lists the runs you start on this node and the system jobs it produces.',
+      },
+      {
+        route: '/app/compute/quick',
+        anchor: 'quickrun-runtime',
+        title: 'Pick a runtime',
+        body: 'Quick run stages a short Python, JavaScript, or Bash script and builds the container run for you.',
+      },
+      {
+        route: '/app/compute/quick?step=1',
+        anchor: 'quickrun-script',
+        title: 'Script and data',
+        body: 'Write the script here; Add input mounts bucket objects into the container filesystem on the right.',
+      },
+    ],
     sections: [
       {
         title: 'Choose a starting point',
         paragraphs: [
-          'Compute offers two entry points. Quick run takes a short Python, JavaScript, or Bash script, stages it for you, and builds the container run. Custom run takes your own container image, command, and resources. Both run under a group and record their provenance the same way.',
+          'Quick run: a short Python, JavaScript, or Bash script, staged for you. Custom run: your own image, command, and resources. Both run under a group and record provenance identically.',
         ],
         image: {
           src: '/docs/v1/compute-new-run.jpg',
@@ -601,40 +646,40 @@ export const docsTopics: DocsTopic[] = [
         title: 'Script and data',
         steps: [
           'Pick the runtime; the working directory defaults to /work.',
-          'Select the owning group. The run and its provenance carry that group.',
-          'Write the script in the editor, or load an existing staged script.',
-          'Use Add input to mount bucket objects into the container; the tree on the right shows the filesystem exactly as the script will see it.',
-          'Declare outputs with Add output if the run writes files worth keeping; stdout and stderr are always captured.',
+          'Select the owning group.',
+          'Write the script, or load a staged one.',
+          'Add input mounts bucket objects; the tree shows the filesystem as the script will see it.',
+          'Add output declares files worth keeping; stdout and stderr are always captured.',
         ],
         image: {
           src: '/docs/v1/quick-run-script.jpg',
           alt: 'Quick run script step with the editor and the container data tree',
-          caption: 'The script step: code on the left, the container filesystem with staged inputs on the right.',
+          caption: 'The script step: code left, the container filesystem with staged inputs right.',
         },
       },
       {
         title: 'Review and run',
         steps: [
-          'The review step shows the placement choice, what goes into the container, and the exact run request that will be submitted.',
-          'Leave the node on Any node unless the run must sit on specific hardware or next to specific data.',
-          'Run it once. Accepted means the request is durable, while Preparing means scheduling or materialization is still converging.',
+          'The review shows placement, the container manifest, and the exact request.',
+          'Leave the node on Any node unless the run must sit somewhere specific.',
+          'Run once: Accepted means durable, Preparing means scheduling is still converging.',
         ],
         image: {
           src: '/docs/v1/quick-run-review.jpg',
           alt: 'Quick run review step with placement, container manifest, and the run request',
-          caption: 'Review before launch: the request is shown verbatim, including the staged script and inputs.',
+          caption: 'Review before launch: the request is shown verbatim.',
         },
       },
       {
         title: 'Follow the run',
         paragraphs: [
-          'The run page tracks the lifecycle from Queued through Initializing and Running to Finished, and shows the distributed execution record underneath: several nodes may plan the same request family independently, and duplicate successes are reconciled to one canonical execution.',
-          'The run view reports progress without treating an unreachable node as an empty result. When the run completes, Aruna writes a Process Run dataset that records the action, tool, inputs, outputs, status, and owning group. Open it from the run detail or filter datasets by Process Run.',
+          'The run page tracks Queued, Initializing, Running, Finished, and the distributed record underneath: several nodes may plan the same family, and duplicate successes reconcile to one canonical execution.',
+          'On completion Aruna writes a Process Run dataset with action, tool, inputs, outputs, status, and group. Open it from the run detail or filter datasets by Process Run.',
         ],
         image: {
           src: '/docs/v1/run-detail.jpg',
           alt: 'Run detail page with lifecycle states and the distributed execution record',
-          caption: 'A run in flight: lifecycle on top, the distributed execution record with its eventually consistent view below.',
+          caption: 'A run in flight: lifecycle on top, the distributed execution record below.',
         },
       },
     ],
@@ -643,26 +688,40 @@ export const docsTopics: DocsTopic[] = [
     slug: 'storage-backend',
     kind: 'Guide',
     title: 'Configure a storage backend',
-    summary: 'Register an external S3-compatible backend for one group without confusing it with portal access.',
+    summary: 'Route a group’s uploads to your own S3-compatible storage.',
+    tour: [
+      {
+        route: '/app',
+        anchor: 'nav-groups',
+        title: 'Open Groups',
+        body: 'Backends are group configuration; open the group that should own the routing.',
+      },
+      {
+        route: '/app/groups',
+        anchor: 'group-tabs',
+        title: 'The Storage tab',
+        body: 'The Storage tab of a group registers backends and controls routing.',
+      },
+    ],
     sections: [
       {
         title: 'Requirements',
         paragraphs: [
-          'You need the group ADMIN role, the endpoint details, and credentials intended for Aruna routing. Backend credentials are not portal-session or CLI credentials.',
+          'Group ADMIN role, the endpoint details, and credentials meant for Aruna routing; backend credentials are neither portal sessions nor CLI keys.',
         ],
       },
       {
         title: 'Configure',
         steps: [
-          'Open Groups, select the owning group, and open the Storage tab.',
-          'Add the S3-compatible endpoint and backend credentials. Verify the endpoint and certificate information before saving.',
-          'Enable the backend and choose routing only after the connection check succeeds.',
-          'Confirm the group and node scope before creating or moving data. Ordinary group writers inherit the routing but cannot reveal or replace the backend secret.',
+          'Open the group and its Storage tab.',
+          'Add the endpoint and backend credentials; verify endpoint and certificate first.',
+          'Enable the backend and routing only after the connection check succeeds.',
+          'Writers inherit the routing but can never reveal or replace the secret.',
         ],
         image: {
           src: '/docs/v1/group-storage.jpg',
           alt: 'Group storage tab with the storage backends section and add backend button',
-          caption: 'Storage backends live on the group: uploads route to your own object storage instead of the node.',
+          caption: 'Backends live on the group: uploads route to your own object storage.',
         },
       },
     ],
@@ -671,27 +730,41 @@ export const docsTopics: DocsTopic[] = [
     slug: 'cli-access-key',
     kind: 'Guide',
     title: 'Create a CLI or service access key',
-    summary: 'Issue an optional long-lived node-local key for a non-portal S3 client.',
+    summary: 'A long-lived node-local key for a non-portal S3 client.',
+    tour: [
+      {
+        route: '/app',
+        anchor: 'nav-settings',
+        title: 'Open Settings',
+        body: 'Access keys live in your account settings.',
+      },
+      {
+        route: '/app/settings',
+        anchor: 'settings-access',
+        title: 'Access & connection',
+        body: 'This tab shows your browser session, the API endpoint, and every session issued for your account.',
+      },
+    ],
     sections: [
       {
         title: 'Use the right credential',
         paragraphs: [
-          'The portal itself uses short-lived sessions. Create a CLI or service key only for a command-line tool or service that cannot use the portal session flow.',
+          'The portal itself uses short-lived sessions. Create a key only for a tool that cannot use that flow.',
         ],
       },
       {
         title: 'Create and store safely',
         steps: [
           'Open Settings, then Access & connection.',
-          'Confirm the issuing node, group or permission restrictions, and intended client before creating the key.',
-          'Copy the access key and one-time secret into the client or its secret store. The portal does not retain the secret for later display.',
-          'Configure the client with the issuing node endpoint. The key is not valid on another node.',
-          'Revoke the key when the client no longer needs it. Revocation does not affect short-lived portal sessions.',
+          'Confirm issuing node, restrictions, and the intended client.',
+          'Copy the access key and one-time secret into the client; the portal never shows the secret again.',
+          'Point the client at the issuing node; the key is invalid elsewhere.',
+          'Revoke the key when the client no longer needs it.',
         ],
         image: {
           src: '/docs/v1/settings-access.jpg',
           alt: 'Settings access and connection tab with the session, API connection, and sessions list',
-          caption: 'Access & connection: the browser session, the API endpoint, and every session issued for your account.',
+          caption: 'Access & connection: the browser session, the API endpoint, and issued sessions.',
         },
       },
     ],
