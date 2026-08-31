@@ -38,9 +38,15 @@ async function refreshForContext(context: ReturnType<typeof refreshContext>): Pr
     if (context.epoch !== sessionEpoch.value) return
     if (publicResult.status === 'rejected') error.value = errorMessage(publicResult.reason)
     if (authResult.status === 'rejected') {
-      if (context.client.token) {
+      if (context.client.token && refusedToken(authResult.reason)) {
+        // The realm rejected the token (expired or revoked): drop the local
+        // session so the portal shows its signed-out state, not a stale banner.
+        authToken.value = ''
+        storeValue(TOKEN_KEY, '')
+        clearIdentityState()
+      } else if (context.client.token) {
         authError.value = errorMessage(authResult.reason)
-        authRejected.value = refusedToken(authResult.reason)
+        authRejected.value = false
         userInfo.value = null
         apiGroups.value = []
         credentials.value = []

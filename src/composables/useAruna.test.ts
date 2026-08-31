@@ -736,7 +736,9 @@ describe('a session the realm refused', () => {
 
     request.mockRejectedValue(new ApiError(401, 'The token is not valid.'))
     await aruna.refresh()
-    expect(aruna.authRejected.value).toBe(true)
+    // A refused token signs the session out instead of stranding a broken one.
+    expect(aruna.authToken.value).toBe('')
+    expect(aruna.currentUser.value).toBeNull()
   })
 })
 
