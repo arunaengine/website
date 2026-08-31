@@ -54,7 +54,7 @@ const features: Feature[] = [
     title: 'Assistant',
     desc: 'Bring your own AI provider or key and chat in the portal. The assistant drives the node\'s own tools over MCP to search, read and draft datasets, and the key stays in your browser.',
     icon: MessageSquare,
-    tone: 'bg-aruna-navy/10 text-aruna-navy dark:text-aruna-tagline',
+    tone: 'bg-gradient-to-br from-aruna-sky to-aruna-indigo text-white shadow-sm',
   },
   {
     title: 'Realm federation',
