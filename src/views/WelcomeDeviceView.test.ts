@@ -85,6 +85,7 @@ const WelcomeDeviceView = compileClientComponent(new URL('./WelcomeDeviceView.vu
   vue: VueRuntime,
   'vue-router': RouterRuntime,
   '@lucide/vue': icons,
+  '@/assets/brand/icon-mark.avif': '/icon-mark.avif',
   '@/components/layout/AppLogo.vue': moduleDefault(EmptyStub),
   '@/components/onboarding/ClaimWatchStep.vue': moduleDefault(ClaimWatchStub),
   '@/components/onboarding/ManagementNodeGate.vue': moduleDefault(GateStub),
@@ -94,6 +95,8 @@ const WelcomeDeviceView = compileClientComponent(new URL('./WelcomeDeviceView.vu
   '@/composables/useAruna': {
     useAruna: () => ({
       realm: ref({ name: 'Test realm', color: '#0ea5e9' }),
+      bootstrapped: ref(true),
+      refresh: vi.fn(async () => undefined),
       nodeInfo,
       isManagementNode: computed(() => nodeInfo.value?.node.capabilities === 'management'),
       realmInfo: ref(null),

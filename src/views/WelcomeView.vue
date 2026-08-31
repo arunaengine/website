@@ -12,6 +12,7 @@ import Notice from '@/components/ui/Notice.vue'
 import { errorMessage } from '@/lib/utils'
 import { validateRealm } from '@/lib/desktopBridge'
 import { awaitRealm, insecureRealm } from '@/lib/desktopWelcome'
+import iconMark from '@/assets/brand/icon-mark.avif'
 import { ArrowRight, KeyRound } from '@lucide/vue'
 
 const router = useRouter()
@@ -79,10 +80,9 @@ function toEnroll(): void {
             class="grid-faint pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_at_0%_0%,black_35%,transparent_80%)]"
           />
           <div aria-hidden="true" class="wash-primary pointer-events-none absolute inset-0" />
-          <!-- icon-mark.png pads the wave (alpha bbox 183,333–1118,870 of 1254 sq);
-               oversized and cropped so it rises out of the panel's corner. -->
+          <!-- The padded icon is oversized and cropped out of the panel's corner. -->
           <img
-            src="/brand/icon-mark.png"
+            :src="iconMark"
             alt=""
             draggable="false"
             class="pointer-events-none absolute -right-[40%] bottom-0 w-[120%] max-w-none translate-y-[55%] select-none opacity-[0.15] dark:opacity-[0.22]"

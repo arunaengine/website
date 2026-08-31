@@ -53,6 +53,7 @@ const WelcomeView = compileClientComponent(new URL('./WelcomeView.vue', import.m
   vue: VueRuntime,
   'vue-router': RouterRuntime,
   '@lucide/vue': icons,
+  '@/assets/brand/icon-mark.avif': '/icon-mark.avif',
   '@/components/layout/AppLogo.vue': moduleDefault(EmptyStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Input.vue': moduleDefault(InputStub),

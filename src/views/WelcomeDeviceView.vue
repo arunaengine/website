@@ -14,10 +14,12 @@ import RefusalNote from '@/components/ui/RefusalNote.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDeviceSetup } from '@/composables/useDeviceSetup'
 import { managementPortals } from '@/lib/onboarding-config'
+import iconMark from '@/assets/brand/icon-mark.avif'
 import { ArrowRight, Check, Laptop } from '@lucide/vue'
 
 const router = useRouter()
-const { realm, nodeInfo, isManagementNode, realmInfo } = useAruna()
+const { bootstrapped, refresh, realm, nodeInfo, isManagementNode, realmInfo } = useAruna()
+if (typeof window !== 'undefined' && !bootstrapped.value) void refresh()
 const { applying, error, watching, joined, stages, state, apply, done } = useDeviceSetup()
 const deviceName = ref('')
 
@@ -61,7 +63,7 @@ function leave(): void {
           />
           <div aria-hidden="true" class="wash-primary pointer-events-none absolute inset-0" />
           <img
-            src="/brand/icon-mark.png"
+            :src="iconMark"
             alt=""
             draggable="false"
             class="pointer-events-none absolute -right-[40%] bottom-0 w-[120%] max-w-none translate-y-[55%] select-none opacity-[0.15] dark:opacity-[0.22]"

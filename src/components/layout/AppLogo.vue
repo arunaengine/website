@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useTheme } from '@/composables/useTheme'
+import iconMark from '@/assets/brand/icon-mark.avif'
+import lockup from '@/assets/brand/lockup-horizontal.avif'
+import lockupWhite from '@/assets/brand/lockup-horizontal-white.avif'
 
 // The ARUNA wordmark is a custom typeface and must never be typed in a
-// UI font; only the pre-aligned image lockups from /brand are used.
+// UI font; only the pre-aligned bundled image lockups are used.
 const props = withDefaults(
   defineProps<{
     /** Rendered height of the mark in px */
@@ -23,10 +26,8 @@ const props = withDefaults(
 const { isDark } = useTheme()
 
 const src = computed(() => {
-  if (props.variant === 'icon') return '/brand/icon-mark.png'
-  return isDark.value
-    ? '/brand/lockup-horizontal-white.png'
-    : '/brand/lockup-horizontal.png'
+  if (props.variant === 'icon') return iconMark
+  return isDark.value ? lockupWhite : lockup
 })
 
 /* lockup-horizontal.png is 1867×342 */

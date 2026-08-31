@@ -3,10 +3,13 @@ import Button from "@/components/ui/Button.vue";
 import { ArrowRight, BookOpen } from "@lucide/vue";
 import { computed } from "vue";
 import { useTheme } from "@/composables/useTheme";
+import iconMark from "@/assets/brand/icon-mark.avif";
+import wordmarkLight from "@/assets/brand/wordmark.avif";
+import wordmarkDark from "@/assets/brand/wordmark-white.avif";
 
 const { isDark } = useTheme();
 const wordmark = computed(() =>
-  isDark.value ? "/brand/wordmark-white.png" : "/brand/wordmark.png",
+  isDark.value ? wordmarkDark : wordmarkLight,
 );
 </script>
 
@@ -26,10 +29,10 @@ const wordmark = computed(() =>
 
     <div class="container relative max-w-3xl pb-24 pt-20 text-center sm:pt-24">
       <!-- Brand lockup: wave mark + ARUNA wordmark (always the image assets, never typed) -->
-      <!-- icon-mark.png pads the wave; clip to its alpha bbox (183,333 to 1118,870 of 1254 sq) -->
+      <!-- The icon asset keeps its transparent padding; clip it to the wave. -->
       <div class="relative mx-auto aspect-[935/537] h-16 overflow-hidden sm:h-20">
         <img
-          src="/brand/icon-mark.png"
+          :src="iconMark"
           alt=""
           class="absolute left-[-19.6%] top-[-62%] w-[134.1%] max-w-none select-none"
           draggable="false"

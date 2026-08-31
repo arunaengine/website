@@ -8,6 +8,7 @@ import Notice from '@/components/ui/Notice.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { featureEnabled } from '@/lib/config'
+import iconMark from '@/assets/brand/icon-mark.avif'
 import { ChevronRight, LogIn } from '@lucide/vue'
 
 const { realm, realmInfo } = useAruna()
@@ -45,10 +46,9 @@ function startSignIn() {
           class="grid-faint pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_at_0%_0%,black_35%,transparent_80%)]"
         />
         <div aria-hidden="true" class="wash-primary pointer-events-none absolute inset-0" />
-        <!-- icon-mark.png pads the wave (alpha bbox 183,333–1118,870 of 1254 sq);
-             oversized and cropped so it rises out of the panel's corner. -->
+        <!-- The padded icon is oversized and cropped out of the panel's corner. -->
         <img
-          src="/brand/icon-mark.png"
+          :src="iconMark"
           alt=""
           draggable="false"
           class="pointer-events-none absolute -bottom-[56%] -right-[24%] w-[80%] max-w-none select-none opacity-[0.15] dark:opacity-[0.22] md:w-[64%]"
