@@ -176,12 +176,27 @@ const topic = computed(() => docsTopicBySlug(topicSlug.value))
 const tour = computed(() => topic.value?.tour ?? [])
 const topicGroups = computed(() => {
   // Guides lead: they are the way in. The concept wiki sits below them.
-  const groups: Array<{ kind: DocsTopicKind; label: string; topics: typeof docsTopics }> = [
-    { kind: 'Guide', label: 'How-to guides', topics: docsTopics.filter((entry) => entry.kind === 'Guide') },
-    { kind: 'Concept', label: 'Concepts & glossary', topics: docsTopics.filter((entry) => entry.kind === 'Concept') },
+  const groups: Array<{ kind: DocsTopicKind; label: string; blurb: string; topics: typeof docsTopics }> = [
+    {
+      kind: 'Guide',
+      label: 'How-to guides',
+      blurb: 'Step-by-step walkthroughs: create a group, upload data, build a dataset, and run compute next to it.',
+      topics: docsTopics.filter((entry) => entry.kind === 'Guide'),
+    },
+    {
+      kind: 'Concept',
+      label: 'Concepts & glossary',
+      blurb: 'How datasets, storage, replication, and compute placement work, with a glossary that defines every term.',
+      topics: docsTopics.filter((entry) => entry.kind === 'Concept'),
+    },
   ]
   return groups
 })
+
+// The home diagram's nodes deep-link into the glossary entry for each term.
+function glossaryLink(anchor: string) {
+  return { name: 'docs', params: { topic: 'glossary' }, hash: `#${anchor}` }
+}
 </script>
 
 <template>
@@ -375,90 +390,116 @@ const topicGroups = computed(() => {
                       can query, validate, and share.
                     </title>
                     <!-- data chip -->
-                    <rect x="20" y="34" width="152" height="52" rx="10" class="fill-card stroke-border" stroke-width="1.5" />
-                    <path
-                      d="M40 48 h8 l5 5 v15 h-13 z M48 48 v5 h5"
-                      fill="none"
-                      class="stroke-primary"
-                      stroke-width="1.5"
-                      stroke-linejoin="round"
-                    />
-                    <text x="64" y="57" font-size="13" font-weight="600" class="fill-foreground">Data</text>
-                    <text x="64" y="73" font-size="10.5" class="fill-muted-foreground">your files</text>
+                    <RouterLink v-slot="{ href, navigate }" :to="glossaryLink('data')" custom>
+                      <a :href="href" role="link" aria-label="Data: open glossary entry" class="group/gnode cursor-pointer" @click="navigate">
+                        <title>Data — open glossary entry</title>
+                        <rect x="20" y="34" width="152" height="52" rx="10" class="fill-card stroke-border transition-colors group-hover/gnode:stroke-primary" stroke-width="1.5" />
+                        <path
+                          d="M40 48 h8 l5 5 v15 h-13 z M48 48 v5 h5"
+                          fill="none"
+                          class="stroke-primary"
+                          stroke-width="1.5"
+                          stroke-linejoin="round"
+                        />
+                        <text x="64" y="57" font-size="13" font-weight="600" class="fill-foreground transition-colors group-hover/gnode:fill-primary">Data</text>
+                        <text x="64" y="73" font-size="10.5" class="fill-muted-foreground">your files</text>
+                      </a>
+                    </RouterLink>
                     <!-- plus -->
                     <circle cx="96" cy="104" r="11" class="fill-primary/10" />
                     <path d="M96 99 v10 M91 104 h10" class="stroke-primary" stroke-width="1.5" stroke-linecap="round" />
                     <!-- metadata chip -->
-                    <rect x="20" y="122" width="152" height="52" rx="10" class="fill-card stroke-border" stroke-width="1.5" />
-                    <path
-                      d="M39 143 l9 -9 h11 v11 l-9 9 z"
-                      fill="none"
-                      class="stroke-primary"
-                      stroke-width="1.5"
-                      stroke-linejoin="round"
-                    />
-                    <circle cx="55" cy="138" r="1.6" class="fill-primary" />
-                    <text x="66" y="145" font-size="13" font-weight="600" class="fill-foreground">Metadata</text>
-                    <text x="66" y="161" font-size="10.5" class="fill-muted-foreground">the description</text>
+                    <RouterLink v-slot="{ href, navigate }" :to="glossaryLink('metadata')" custom>
+                      <a :href="href" role="link" aria-label="Metadata: open glossary entry" class="group/gnode cursor-pointer" @click="navigate">
+                        <title>Metadata — open glossary entry</title>
+                        <rect x="20" y="122" width="152" height="52" rx="10" class="fill-card stroke-border transition-colors group-hover/gnode:stroke-primary" stroke-width="1.5" />
+                        <path
+                          d="M39 143 l9 -9 h11 v11 l-9 9 z"
+                          fill="none"
+                          class="stroke-primary"
+                          stroke-width="1.5"
+                          stroke-linejoin="round"
+                        />
+                        <circle cx="55" cy="138" r="1.6" class="fill-primary" />
+                        <text x="66" y="145" font-size="13" font-weight="600" class="fill-foreground transition-colors group-hover/gnode:fill-primary">Metadata</text>
+                        <text x="66" y="161" font-size="10.5" class="fill-muted-foreground">the description</text>
+                      </a>
+                    </RouterLink>
                     <!-- converging connectors -->
                     <path d="M172 60 C 218 60 224 104 264 104" fill="none" class="stroke-primary/50" stroke-width="1.5" />
                     <path d="M172 148 C 218 148 224 104 264 104" fill="none" class="stroke-primary/50" stroke-width="1.5" />
                     <path d="M258 98 l8 6 l-8 6" fill="none" class="stroke-primary" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
                     <!-- dataset -->
-                    <rect x="272" y="68" width="184" height="72" rx="12" class="fill-primary/10 stroke-primary" stroke-width="1.5" />
-                    <path
-                      d="M292 96 l12 -7 12 7 v14 l-12 7 -12 -7 z M292 96 l12 7 12 -7 M304 103 v14"
-                      fill="none"
-                      class="stroke-primary"
-                      stroke-width="1.5"
-                      stroke-linejoin="round"
-                    />
-                    <text x="326" y="100" font-size="14" font-weight="600" class="fill-foreground">Dataset</text>
-                    <text x="326" y="117" font-size="10.5" class="fill-muted-foreground">one RO-Crate bundle</text>
+                    <RouterLink v-slot="{ href, navigate }" :to="glossaryLink('dataset')" custom>
+                      <a :href="href" role="link" aria-label="Dataset: open glossary entry" class="group/gnode cursor-pointer" @click="navigate">
+                        <title>Dataset — open glossary entry</title>
+                        <rect x="272" y="68" width="184" height="72" rx="12" class="fill-primary/10 stroke-primary transition-[stroke-width] group-hover/gnode:[stroke-width:2.5]" stroke-width="1.5" />
+                        <path
+                          d="M292 96 l12 -7 12 7 v14 l-12 7 -12 -7 z M292 96 l12 7 12 -7 M304 103 v14"
+                          fill="none"
+                          class="stroke-primary"
+                          stroke-width="1.5"
+                          stroke-linejoin="round"
+                        />
+                        <text x="326" y="100" font-size="14" font-weight="600" class="fill-foreground">Dataset</text>
+                        <text x="326" y="117" font-size="10.5" class="fill-muted-foreground">one RO-Crate bundle</text>
+                      </a>
+                    </RouterLink>
                     <!-- arrow to the graph -->
                     <path d="M456 104 H 508" fill="none" class="stroke-primary/50" stroke-width="1.5" />
                     <path d="M502 98 l8 6 l-8 6" fill="none" class="stroke-primary" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
                     <!-- graph -->
-                    <g class="stroke-primary/40" stroke-width="1.5">
-                      <path d="M597 96 L 556 56" />
-                      <path d="M597 96 L 664 62" />
-                      <path d="M597 96 L 549 140" />
-                      <path d="M597 96 L 657 142" />
-                      <path d="M556 56 L 664 62" />
-                    </g>
-                    <circle cx="597" cy="96" r="9" class="fill-primary" />
-                    <circle cx="556" cy="56" r="6" class="fill-card stroke-primary" stroke-width="1.5" />
-                    <circle cx="664" cy="62" r="6" class="fill-card stroke-primary" stroke-width="1.5" />
-                    <circle cx="549" cy="140" r="6" class="fill-card stroke-primary" stroke-width="1.5" />
-                    <circle cx="657" cy="142" r="6" class="fill-card stroke-primary" stroke-width="1.5" />
-                    <text x="606" y="178" font-size="13" font-weight="600" text-anchor="middle" class="fill-foreground">A graph</text>
-                    <text x="606" y="195" font-size="10.5" text-anchor="middle" class="fill-muted-foreground">
-                      query · validate · share
-                    </text>
+                    <RouterLink v-slot="{ href, navigate }" :to="glossaryLink('graph')" custom>
+                      <a :href="href" role="link" aria-label="Graph: open glossary entry" class="group/gnode cursor-pointer" @click="navigate">
+                        <title>Graph — open glossary entry</title>
+                        <g class="stroke-primary/40 group-hover/gnode:stroke-primary/70" stroke-width="1.5">
+                          <path d="M597 96 L 556 56" />
+                          <path d="M597 96 L 664 62" />
+                          <path d="M597 96 L 549 140" />
+                          <path d="M597 96 L 657 142" />
+                          <path d="M556 56 L 664 62" />
+                        </g>
+                        <circle cx="597" cy="96" r="9" class="fill-primary" />
+                        <circle cx="556" cy="56" r="6" class="fill-card stroke-primary" stroke-width="1.5" />
+                        <circle cx="664" cy="62" r="6" class="fill-card stroke-primary" stroke-width="1.5" />
+                        <circle cx="549" cy="140" r="6" class="fill-card stroke-primary" stroke-width="1.5" />
+                        <circle cx="657" cy="142" r="6" class="fill-card stroke-primary" stroke-width="1.5" />
+                        <text x="606" y="178" font-size="13" font-weight="600" text-anchor="middle" class="fill-foreground transition-colors group-hover/gnode:fill-primary">A graph</text>
+                        <text x="606" y="195" font-size="10.5" text-anchor="middle" class="fill-muted-foreground">
+                          query · validate · share
+                        </text>
+                      </a>
+                    </RouterLink>
                   </svg>
                 </div>
               </div>
+              <p class="border-t border-border/60 px-6 py-2.5 text-center text-xs text-muted-foreground">
+                Select any step to open its glossary entry.
+              </p>
             </section>
 
             <div class="mt-4 grid gap-4 sm:grid-cols-2">
-              <section v-for="group in topicGroups" :key="group.kind" class="surface p-5">
-                <div class="flex items-center gap-2">
-                  <ListChecks v-if="group.kind === 'Guide'" class="h-4 w-4 text-primary" />
-                  <BookMarked v-else class="h-4 w-4 text-primary" />
+              <RouterLink
+                v-for="group in topicGroups"
+                :key="group.kind"
+                :to="{ name: 'docs', params: { topic: group.topics[0]?.slug } }"
+                class="surface group/card flex flex-col gap-3 p-5 transition-colors hover:bg-muted"
+              >
+                <div class="flex items-center gap-2.5">
+                  <span class="grid size-9 shrink-0 place-items-center rounded-md bg-primary/10 text-primary">
+                    <ListChecks v-if="group.kind === 'Guide'" class="h-4 w-4" />
+                    <BookMarked v-else class="h-4 w-4" />
+                  </span>
                   <h2 class="font-display text-base font-semibold text-aruna-navy">{{ group.label }}</h2>
+                  <ArrowRight
+                    class="ml-auto h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover/card:translate-x-0.5 group-hover/card:text-primary"
+                  />
                 </div>
-                <ul class="mt-3 space-y-2">
-                  <li v-for="entry in group.topics" :key="entry.slug">
-                    <RouterLink
-                      :to="{ name: 'docs', params: { topic: entry.slug } }"
-                      class="block rounded-md border border-border px-3 py-2.5 transition-colors hover:bg-muted"
-                    >
-                      <span class="block text-sm font-medium text-foreground">{{ entry.title }}</span>
-                      <span class="mt-0.5 block text-xs leading-relaxed text-muted-foreground">{{ entry.summary }}</span>
-                    </RouterLink>
-                  </li>
-                </ul>
-              </section>
+                <p class="text-sm leading-relaxed text-muted-foreground">{{ group.blurb }}</p>
+                <span class="text-xs font-medium text-primary">
+                  {{ group.topics.length }} {{ group.kind === 'Guide' ? 'guides' : 'topics' }} in the sidebar
+                </span>
+              </RouterLink>
             </div>
 
             <RouterLink

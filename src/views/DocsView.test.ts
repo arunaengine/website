@@ -5,9 +5,10 @@ import { docsScreenshots, docsTopics } from '@/docs/v1'
 
 const route = { params: { topic: '' } }
 const RouterLinkStub = defineComponent({
-  props: { to: { type: [String, Object], required: true } },
-  setup(_, { slots }) {
-    return () => h('a', slots.default?.())
+  props: { to: { type: [String, Object], required: true }, custom: Boolean },
+  setup(props, { slots }) {
+    const href = typeof props.to === 'string' ? props.to : JSON.stringify(props.to)
+    return () => (props.custom ? slots.default?.({ href, navigate: () => {} }) : h('a', slots.default?.()))
   },
 })
 const PageHeaderStub = defineComponent({
