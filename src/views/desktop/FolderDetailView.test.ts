@@ -70,7 +70,7 @@ const entryAction = vi.fn(
     rows.find((row) => row.path === path) ?? entry({ path }),
 )
 const sync = vi.fn(async () => folder)
-const entries = vi.fn(async () => ({ entries: rows, next_cursor: null }))
+const entries = vi.fn(async (): Promise<DeviceApi.EntryPage> => ({ entries: rows, next_cursor: null }))
 const refreshFolder = vi.fn(async () => folder)
 const actionErrors = reactive(new Map<string, string>())
 
@@ -101,6 +101,7 @@ const RefusalStub = defineComponent({
   setup: (props) => () => h('div', props.message),
 })
 const SelectStub = defineComponent({ setup: () => () => h('select') })
+const SpinnerStub = defineComponent({ props: { label: String }, setup: (props) => () => h('span', props.label) })
 const icons = new Proxy({}, { get: () => defineComponent(() => () => h('i')) })
 
 const FactList = compileClientComponent(new URL('../../components/ui/FactList.vue', import.meta.url), {
@@ -125,6 +126,7 @@ const FolderDetailView = compileClientComponent(new URL('./FolderDetailView.vue'
   '@/components/ui/Notice.vue': moduleDefault(Notice),
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/components/ui/Skeleton.vue': moduleDefault(Passthrough),
+  '@/components/ui/Spinner.vue': moduleDefault(SpinnerStub),
   '@/components/dashboard/PageHeader.vue': moduleDefault(PageHeaderStub),
   '@/components/desktop/ReplaceLocalDialog.vue': moduleDefault(ReplaceLocalDialogStub),
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: () => 'lab node' }) },
@@ -177,6 +179,7 @@ function rowButton(root: HostNode, path: string, label: string): HostNode {
 beforeEach(() => {
   entryAction.mockClear()
   sync.mockClear()
+  entries.mockReset().mockResolvedValue({ entries: rows, next_cursor: null })
   actionErrors.clear()
   folder.last_error = null
   folder.state = 'active'
@@ -194,6 +197,23 @@ describe('folder entries', () => {
     expect(paths.at(-1)).toContain('notes/kept.md')
     expect(content(mounted.root)).toContain('2 files wait for your decision')
     expect(content(mounted.root)).toContain('1 file failed')
+    mounted.app.unmount()
+  })
+
+  it('shows and guards an incremental page load', async () => {
+    let resolveMore!: (page: DeviceApi.EntryPage) => void
+    entries
+      .mockResolvedValueOnce({ entries: rows, next_cursor: 'next' })
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveMore = resolve }))
+    const mounted = await mount()
+
+    const loading = click(button(mounted.root, 'Load more'))
+    await VueRuntime.nextTick()
+
+    expect(content(mounted.root)).toContain('Loading more files')
+    expect(button(mounted.root, 'Loading more files').props.disabled).toBe(true)
+    resolveMore({ entries: [], next_cursor: null })
+    await loading
     mounted.app.unmount()
   })
 

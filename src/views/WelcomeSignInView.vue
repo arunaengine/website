@@ -8,10 +8,13 @@ import AppLogo from '@/components/layout/AppLogo.vue'
 import RealmUnreachable from '@/components/layout/RealmUnreachable.vue'
 import SignInPanel from '@/components/auth/SignInPanel.vue'
 import Button from '@/components/ui/Button.vue'
+import { useAruna } from '@/composables/useAruna'
 import { probeRealm, realmOrigin, realmReach } from '@/lib/desktopBoot'
 
 // Follows the shell: a realm switched under this window renames it in place.
 const origin = computed(() => realmOrigin())
+const { bootstrapped, refresh } = useAruna()
+if (typeof window !== 'undefined' && !bootstrapped.value) void refresh()
 const route = useRoute()
 const followed = computed(() => (typeof route.query.from === 'string' ? route.query.from : null))
 // This page boots the app for a returning owner, so a dead realm is named here

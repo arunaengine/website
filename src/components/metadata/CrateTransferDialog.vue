@@ -600,7 +600,8 @@ function rowTarget(row: TransferRow): string {
                 </tbody>
               </table>
             </div>
-            <Button v-if="reportCursor" variant="outline" size="sm" :disabled="reportLoading" @click="loadReport(reportCursor ?? undefined)">
+            <Button v-if="reportCursor" variant="outline" size="sm" :disabled="reportLoading" :aria-busy="reportLoading" @click="loadReport(reportCursor ?? undefined)">
+              <Spinner v-if="reportLoading" label="Loading more report rows" class="text-current" />
               {{ reportLoading ? 'Loading…' : 'Load more rows' }}
             </Button>
           </div>

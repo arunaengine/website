@@ -4,6 +4,7 @@ import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import { useJobs } from '@/composables/useJobs'
 import {
   isReportAbsent,
@@ -180,7 +181,9 @@ const summary = computed(() => {
       <p v-else class="text-xs text-muted-foreground">The report is empty: no entry was recorded.</p>
 
       <div v-if="nextCursor" class="flex items-center gap-2">
-        <Button variant="ghost" size="sm" :disabled="loadingMore" @click="loadMore">Load more</Button>
+        <Button variant="ghost" size="sm" :disabled="loadingMore" :aria-busy="loadingMore" @click="loadMore">
+          <Spinner v-if="loadingMore" label="Loading more report rows" class="text-current" /> Load more
+        </Button>
         <span class="text-[11px] text-muted-foreground">{{ rows.length }} rows loaded</span>
       </div>
       <p v-if="moreError" class="text-[11px] text-destructive">{{ moreError }}</p>

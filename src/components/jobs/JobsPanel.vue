@@ -9,6 +9,7 @@ import FilterChips from '@/components/ui/FilterChips.vue'
 import ListShell from '@/components/ui/ListShell.vue'
 import ListSkeleton from '@/components/ui/ListSkeleton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import Progress from '@/components/ui/Progress.vue'
 import JobStateBadge from '@/components/jobs/JobStateBadge.vue'
 import JobDetailPanel from '@/components/jobs/JobDetailPanel.vue'
@@ -217,7 +218,9 @@ onMounted(() => void list.load())
 
       <template v-if="nextCursor || moreError" #footer>
         <div class="flex flex-wrap items-center gap-2">
-          <Button variant="ghost" size="sm" :disabled="loadingMore" @click="list.loadMore()">Load more</Button>
+          <Button variant="ghost" size="sm" :disabled="loadingMore" :aria-busy="loadingMore" @click="list.loadMore()">
+            <Spinner v-if="loadingMore" label="Loading more system jobs" class="text-current" /> Load more
+          </Button>
           <span v-if="moreError" class="text-xs text-destructive">{{ moreError }}</span>
         </div>
       </template>

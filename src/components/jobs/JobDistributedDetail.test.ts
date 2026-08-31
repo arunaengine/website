@@ -499,6 +499,7 @@ describe('distributed job detail components', () => {
       '@/components/ui/DialogTitle.vue': moduleDefault(PassThroughStub),
       '@/components/ui/ErrorPanel.vue': moduleDefault(ErrorPanelStub),
       '@/components/ui/Skeleton.vue': moduleDefault(PassThroughStub),
+      '@/components/ui/Spinner.vue': moduleDefault(PassThroughStub),
       '@/composables/useJobs': { useJobs: () => ({ getJobAudit }) },
       '@/lib/utils': Utils,
     })

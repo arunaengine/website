@@ -19,6 +19,10 @@ export default defineConfig({
         codeSplitting: {
           groups: [
             {
+              name: 'icons',
+              test: /node_modules\/@lucide\/vue\//,
+            },
+            {
               // Identity-carrying editor core must stay one chunk: a second
               // @codemirror/state or @lezer/highlight instance silently breaks
               // every extension (highlighting, theme, gutters).

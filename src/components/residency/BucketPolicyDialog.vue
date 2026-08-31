@@ -14,6 +14,7 @@ import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Input from '@/components/ui/Input.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import CoverageReport from '@/components/residency/CoverageReport.vue'
 import { usePlacementPolicies } from '@/composables/usePlacementPolicies'
@@ -326,7 +327,9 @@ watch(
           <ErrorPanel v-else-if="coverageError" :message="coverageError" @retry="() => loadCoverage()" />
           <CoverageReport v-else-if="coverage" :report="coverage" />
           <div v-if="coverage?.cursor" class="flex justify-end">
-            <Button variant="outline" size="sm" :disabled="coverageLoading" @click="loadCoverage(coverage.cursor)">Next responder page</Button>
+            <Button variant="outline" size="sm" :disabled="coverageLoading" :aria-busy="coverageLoading" @click="loadCoverage(coverage.cursor)">
+              <Spinner v-if="coverageLoading" label="Loading the next coverage page" class="text-current" /> Next responder page
+            </Button>
           </div>
         </section>
       </template>

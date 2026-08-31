@@ -9,6 +9,7 @@ import RefreshButton from '@/components/ui/RefreshButton.vue'
 import ListShell from '@/components/ui/ListShell.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Progress from '@/components/ui/Progress.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import JobStateBadge from '@/components/jobs/JobStateBadge.vue'
 import JobDetailPanel from '@/components/jobs/JobDetailPanel.vue'
 import NewRunMenu from '@/components/compute/NewRunMenu.vue'
@@ -34,7 +35,7 @@ provide(JOB_CLIENT, jobClient)
 
 const reachable = computed(() => deviceClient.value !== null)
 const list = useJobsList({ client: jobClient, pageSize: 25, pollWhile: () => reachable.value })
-const { jobs, listState, listError, refreshing, nextCursor } = list
+const { jobs, listState, listError, refreshing, loadingMore, nextCursor } = list
 
 const openJobId = computed(() =>
   route.name === 'run' && route.params.jobId ? String(route.params.jobId) : '',
@@ -135,7 +136,9 @@ watch(reachable, (now) => now && reload())
         </ul>
 
         <template v-if="nextCursor" #footer>
-          <Button variant="ghost" size="sm" @click="list.loadMore()">Load more</Button>
+          <Button variant="ghost" size="sm" :disabled="loadingMore" :aria-busy="loadingMore" @click="list.loadMore()">
+            <Spinner v-if="loadingMore" label="Loading more local runs" class="text-current" /> Load more
+          </Button>
         </template>
       </ListShell>
     </template>

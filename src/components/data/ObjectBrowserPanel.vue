@@ -519,7 +519,9 @@ const isEmpty = computed(
               </table>
             </div>
             <div v-if="nextToken" class="border-t border-border px-3 py-1.5">
-              <Button variant="ghost" size="sm" :disabled="listLoading" @click="loadObjects(true)">Load more</Button>
+              <Button variant="ghost" size="sm" :disabled="listLoading" :aria-busy="listLoading" @click="loadObjects(true)">
+                <Spinner v-if="listLoading" label="Loading more objects" class="text-current" /> Load more
+              </Button>
             </div>
           </div>
 

@@ -424,7 +424,9 @@ function onDrop(event: DragEvent) {
           </tbody>
         </table>
         <div v-if="nextToken" class="border-t border-border px-4 py-2">
-          <Button variant="ghost" size="sm" :disabled="listLoading" @click="loadObjects(true)">Load more</Button>
+          <Button variant="ghost" size="sm" :disabled="listLoading" :aria-busy="listLoading" @click="loadObjects(true)">
+            <Spinner v-if="listLoading" label="Loading more objects" class="text-current" /> Load more
+          </Button>
         </div>
       </div>
 

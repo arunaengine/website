@@ -157,10 +157,6 @@ export {
   IncompleteSparqlResultError,
 } from './aruna/search'
 
-if (typeof window !== 'undefined') {
-  void refresh()
-}
-
 export function useAruna() {
   return {
     apiBaseUrl,

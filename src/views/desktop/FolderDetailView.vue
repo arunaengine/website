@@ -13,6 +13,7 @@ import FactList from '@/components/ui/FactList.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Select from '@/components/ui/Select.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import ReplaceLocalDialog from '@/components/desktop/ReplaceLocalDialog.vue'
 import { useRealmNodes } from '@/composables/useRealmNodes'
@@ -60,6 +61,7 @@ const folder = computed(() => folders.value.find((entry) => entry.folder_id === 
 const rows = ref<FolderEntry[]>([])
 const cursor = ref<string | null>(null)
 const listState = ref<'loading' | 'ready' | 'error'>('loading')
+const loadingMore = ref(false)
 const listError = ref<string | null>(null)
 const actionError = ref<string | null>(null)
 const stateFilter = ref<EntryState | ''>('')
@@ -82,10 +84,12 @@ const waiting = computed(() => (counters.value ? needsYouCount(counters.value) :
 const replaceable = computed(() => (counters.value ? replaceableCount(counters.value) : 0))
 
 async function loadPage(reset = true): Promise<void> {
-  if (!folderId.value) return
+  if (!folderId.value || (!reset && loadingMore.value)) return
   if (reset) {
     listState.value = 'loading'
     cursor.value = null
+  } else {
+    loadingMore.value = true
   }
   listError.value = null
   try {
@@ -99,6 +103,8 @@ async function loadPage(reset = true): Promise<void> {
   } catch (err) {
     listState.value = 'error'
     listError.value = errorMessage(err)
+  } finally {
+    if (!reset) loadingMore.value = false
   }
 }
 
@@ -364,7 +370,9 @@ const facts = computed(() => {
       </ul>
 
       <div v-if="cursor" class="flex justify-center">
-        <Button variant="ghost" size="sm" @click="loadPage(false)">Load more</Button>
+        <Button variant="ghost" size="sm" :disabled="loadingMore" :aria-busy="loadingMore" @click="loadPage(false)">
+          <Spinner v-if="loadingMore" label="Loading more files" class="text-current" /> Load more
+        </Button>
       </div>
 
       <section v-if="folder && folder.state !== 'deleting'" class="surface space-y-2 border-destructive/25 px-4 py-3.5">

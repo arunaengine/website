@@ -40,6 +40,7 @@ beforeAll(async () => {
         listState,
         listError: ref(null),
         refreshing: ref(false),
+        loadingMore: ref(false),
         nextCursor: ref(null),
         load,
         loadMore: vi.fn(),
@@ -60,6 +61,7 @@ beforeAll(async () => {
   vi.doMock('@/components/ui/ErrorPanel.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/components/ui/Progress.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/components/ui/Skeleton.vue', () => ({ default: EmptyStub }))
+  vi.doMock('@/components/ui/Spinner.vue', () => ({ default: EmptyStub }))
   LocalRunsPanel = (await import('./LocalRunsPanel.vue')).default
 })
 

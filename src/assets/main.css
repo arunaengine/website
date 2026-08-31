@@ -97,6 +97,32 @@
   .dark body {
     color-scheme: dark;
   }
+
+  html.route-loading::after {
+    content: '';
+    position: fixed;
+    inset: 0 auto auto 0;
+    z-index: 100;
+    width: 45%;
+    height: 2px;
+    background: hsl(var(--primary));
+    animation: route-loading 900ms ease-in-out infinite alternate;
+  }
+}
+
+@keyframes route-loading {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(225%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.route-loading::after {
+    animation: none;
+  }
 }
 
 @layer components {

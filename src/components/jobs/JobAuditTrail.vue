@@ -10,6 +10,7 @@ import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import { useJobs } from '@/composables/useJobs'
 import type { JobAuditConflict, JobAuditRecord, JobAuditScope } from '@/lib/jobs'
 import { errorMessage, truncateMiddle } from '@/lib/utils'
@@ -229,8 +230,8 @@ watch(
         <p v-else class="text-xs text-muted-foreground">No audit records are available in this scope.</p>
 
         <div v-if="nextCursor || moreError" class="flex flex-wrap items-center gap-3">
-          <Button v-if="nextCursor" variant="ghost" size="sm" :disabled="loadingMore" @click="load(false)">
-            Load more
+          <Button v-if="nextCursor" variant="ghost" size="sm" :disabled="loadingMore" :aria-busy="loadingMore" @click="load(false)">
+            <Spinner v-if="loadingMore" label="Loading more audit records" class="text-current" /> Load more
           </Button>
           <p v-if="moreError" class="text-[11px] text-destructive">{{ moreError }}</p>
         </div>

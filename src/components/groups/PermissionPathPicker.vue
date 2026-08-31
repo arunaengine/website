@@ -6,6 +6,7 @@ import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import MetaPathTree from './MetaPathTree.vue'
 import DataPathTree from './DataPathTree.vue'
 import { buildMetaPathTree, shortNodeId, type MetaPathFolder } from './permission-paths'
@@ -229,8 +230,8 @@ watch(
             />
           </div>
           <div v-if="tree && !pathsExhausted" class="mt-1.5 flex items-center gap-2">
-            <Button variant="outline" size="sm" class="h-7 text-[11px]" :disabled="loading" @click="load(true)">
-              Load more paths
+            <Button variant="outline" size="sm" class="h-7 text-[11px]" :disabled="loading" :aria-busy="loading" @click="load(true)">
+              <Spinner v-if="loading" label="Loading more paths" class="text-current" /> Load more paths
             </Button>
             <span class="text-[11px] text-muted-foreground">
               {{ pathsEstimate === null ? `${paths.length} loaded` : `${paths.length} of about ${pathsEstimate}` }}; a folder scope covers everything under it.

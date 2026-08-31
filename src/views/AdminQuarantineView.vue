@@ -16,6 +16,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Input from '@/components/ui/Input.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
 import { useAruna } from '@/composables/useAruna'
@@ -389,8 +390,11 @@ async function runPrunePass() {
         <footer
           v-if="!listError && (pageIndex > 0 || nextCursor)"
           class="flex items-center justify-between gap-3 border-t border-border bg-muted/20 px-5 py-2 text-[11px] text-muted-foreground"
+          :aria-busy="listLoading"
         >
-          <span aria-live="polite">Page {{ pageIndex + 1 }} · {{ records.length }} records shown</span>
+          <span class="flex items-center gap-2" aria-live="polite">
+            <Spinner v-if="listLoading" label="Loading the quarantine page" /> Page {{ pageIndex + 1 }} · {{ records.length }} records shown
+          </span>
           <div class="flex items-center gap-1">
             <button
               type="button"

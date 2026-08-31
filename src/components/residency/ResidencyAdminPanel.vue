@@ -15,6 +15,7 @@ import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import BucketPolicyDialog from '@/components/residency/BucketPolicyDialog.vue'
 import ResidencyPolicyEditor from '@/components/residency/ResidencyPolicyEditor.vue'
@@ -308,7 +309,8 @@ watch(
                   </template>
                 </article>
                 <div v-if="listed && listCursor" class="flex flex-wrap items-center gap-2">
-                  <Button variant="outline" size="sm" :disabled="listLoadingMore" @click="loadPolicyPage(true)">
+                  <Button variant="outline" size="sm" :disabled="listLoadingMore" :aria-busy="listLoadingMore" @click="loadPolicyPage(true)">
+                    <Spinner v-if="listLoadingMore" label="Loading more residency policies" class="text-current" />
                     {{ listLoadingMore ? 'Loading…' : 'Load more' }}
                   </Button>
                   <span class="text-[11px] text-muted-foreground">{{ libraryEntries.length }} loaded</span>
@@ -424,7 +426,9 @@ watch(
                   Complete refers only to this node's bounded copy iterator and never to realm-wide enforcement convergence.
                 </p>
                 <div v-if="diagnostics.cursor" class="flex justify-end">
-                  <Button variant="outline" size="sm" :disabled="diagnosticsLoading" @click="loadDiagnostics(diagnostics.cursor)">Next responder page</Button>
+                  <Button variant="outline" size="sm" :disabled="diagnosticsLoading" :aria-busy="diagnosticsLoading" @click="loadDiagnostics(diagnostics.cursor)">
+                    <Spinner v-if="diagnosticsLoading" label="Loading the next diagnostics page" class="text-current" /> Next responder page
+                  </Button>
                 </div>
               </template>
 

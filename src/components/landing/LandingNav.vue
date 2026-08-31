@@ -4,14 +4,26 @@ import Button from '@/components/ui/Button.vue'
 import GithubIcon from '@/components/icons/GithubIcon.vue'
 import { BookOpen, ArrowRight, LogIn, Moon, Sun } from '@lucide/vue'
 import { RouterLink } from 'vue-router'
+import { ref } from 'vue'
 import { useTheme } from '@/composables/useTheme'
-import { useAuth } from '@/composables/useAuth'
 
 const { isDark, toggleTheme } = useTheme()
-const { isAuthenticated, signIn } = useAuth()
+const signingIn = ref(false)
+let hasSession = false
+try {
+  hasSession = Boolean(window.localStorage.getItem('aruna.authToken'))
+} catch {
+  // Storage can be unavailable; the portal will resolve the session on entry.
+}
 
-function onSignIn() {
-  void signIn({ redirectTo: '/app' })
+async function onSignIn() {
+  signingIn.value = true
+  try {
+    const { useAuth } = await import('@/composables/useAuth')
+    await useAuth().signIn({ redirectTo: '/app' })
+  } finally {
+    signingIn.value = false
+  }
 }
 </script>
 
@@ -54,9 +66,9 @@ function onSignIn() {
           <Sun v-if="isDark" class="h-4 w-4" />
           <Moon v-else class="h-4 w-4" />
         </Button>
-        <Button v-if="!isAuthenticated" size="sm" @click="onSignIn">
+        <Button v-if="!hasSession" size="sm" :disabled="signingIn" :aria-busy="signingIn" @click="onSignIn">
           <LogIn class="h-3.5 w-3.5" />
-          Sign in
+          {{ signingIn ? 'Opening…' : 'Sign in' }}
         </Button>
         <Button v-else size="sm" as-child>
           <RouterLink to="/app">

@@ -224,7 +224,7 @@ describe('guest dashboard truth', () => {
     expect(refresh).not.toHaveBeenCalled()
   })
 
-  it('keeps the client body in its skeleton until recency settles', async () => {
+  it('renders the dashboard while the recency window settles', async () => {
     vi.stubGlobal('window', {})
     let resolveRecent!: (value: never[]) => void
     const pendingRecent = new Promise<never[]>((resolve) => {
@@ -233,8 +233,9 @@ describe('guest dashboard truth', () => {
     listRecentMetadata.mockImplementationOnce(() => pendingRecent)
 
     const mounted = await mountApp(DashboardClient)
-    expect(content(mounted.root)).toContain('Loading dashboard')
-    expect(content(mounted.root)).not.toContain('Realm statistics')
+    expect(content(mounted.root)).not.toContain('Loading dashboard')
+    expect(content(mounted.root)).toContain('Realm statistics')
+    expect(content(mounted.root)).toContain('Recent datasets')
 
     resolveRecent([])
     await flush()

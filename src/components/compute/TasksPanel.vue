@@ -10,6 +10,7 @@ import FilterChips from '@/components/ui/FilterChips.vue'
 import ListShell from '@/components/ui/ListShell.vue'
 import ListSkeleton from '@/components/ui/ListSkeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import TaskStateBadge from '@/components/compute/TaskStateBadge.vue'
 import TesPlacementTags from '@/components/compute/TesPlacementTags.vue'
 import TaskDetailPanel from '@/components/compute/TaskDetailPanel.vue'
@@ -485,7 +486,9 @@ onUnmounted(() => {
       </table>
 
       <template v-if="nextPageToken" #footer>
-        <Button variant="ghost" size="sm" :disabled="refreshing" @click="fetchList({ more: true })">Load more</Button>
+        <Button variant="ghost" size="sm" :disabled="refreshing" :aria-busy="refreshing" @click="fetchList({ more: true })">
+          <Spinner v-if="refreshing" label="Loading more runs" class="text-current" /> Load more
+        </Button>
       </template>
     </ListShell>
 

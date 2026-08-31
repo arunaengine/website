@@ -243,7 +243,7 @@ function jobPercent(job: StagingJob): number {
           </div>
         </div>
         <div v-if="nextCursor || loadMoreError" class="space-y-1 text-center">
-          <Button v-if="nextCursor" variant="outline" size="sm" :disabled="loadingMore" @click="loadMore">
+          <Button v-if="nextCursor" variant="outline" size="sm" :disabled="loadingMore" :aria-busy="loadingMore" @click="loadMore">
             <Spinner v-if="loadingMore" label="Loading more staging system jobs" class="text-current" /> Load more
           </Button>
           <p v-if="loadMoreError" class="text-[10px] text-destructive">{{ loadMoreError }}</p>

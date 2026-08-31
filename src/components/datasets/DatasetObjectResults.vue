@@ -143,7 +143,8 @@ function objectHitRoute(hit: ObjectSearchHit): RouteLocationRaw {
     </div>
 
     <div v-if="objectCursor" class="mt-3 flex justify-center">
-      <Button variant="outline" size="sm" :disabled="objectLoadingSection === 'objects'" @click="loadMoreUnifiedSection('objects')">
+      <Button variant="outline" size="sm" :disabled="objectLoadingSection === 'objects'" :aria-busy="objectLoadingSection === 'objects'" @click="loadMoreUnifiedSection('objects')">
+        <Spinner v-if="objectLoadingSection === 'objects'" label="Loading more objects" class="text-current" />
         {{ objectLoadingSection === 'objects' ? 'Loading…' : 'Load more objects' }}
       </Button>
     </div>
