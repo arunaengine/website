@@ -17,6 +17,7 @@ import {
 } from '@/lib/assistant/browserProviders'
 import { errorMessage } from '@/lib/utils'
 import { apiBaseUrl, authToken, sessionEpoch, userInfo } from './aruna/state'
+import { assistantAvailable } from './assistantState'
 
 export interface BrowserProviderTestResponse {
   ok: boolean
@@ -66,6 +67,7 @@ function rebuild() {
     ...browserStore.state.providers.map(directSummary),
     ...nodeProviders.value,
   ]
+  assistantAvailable.value = authenticated() && providers.value.some((provider) => provider.status === 'ready')
 }
 
 function direct(providerId: string): BrowserProvider | null {

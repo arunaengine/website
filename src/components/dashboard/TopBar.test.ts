@@ -76,6 +76,7 @@ const TopBar = compileClientComponent(new URL('./TopBar.vue', import.meta.url), 
       ensureProviders,
     }),
   },
+  '@/composables/assistantState': { assistantAvailable },
   '@/lib/utils': Utils,
 })
 

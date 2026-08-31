@@ -3,7 +3,7 @@ import AppLogo from '@/components/layout/AppLogo.vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { computed, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
-import { useAssistantChat } from '@/composables/useAssistantChat'
+import { assistantAvailable } from '@/composables/assistantState'
 import { isDesktop } from '@/lib/desktop'
 import { navEntries, navItemActive, navRowClass, type NavEntry, type NavItem } from '@/components/layout/nav'
 import { ArrowLeft, ChevronsLeft, ChevronsRight } from '@lucide/vue'
@@ -14,7 +14,6 @@ import { useMediaQuery } from '@vueuse/core'
 const props = defineProps<{ items?: NavEntry[]; backLink?: boolean }>()
 
 const { isRealmAdmin, canInspectUsers } = useAruna()
-const { available: assistant } = useAssistantChat()
 
 // The shell has no landing page to go back to.
 const desktop = isDesktop()
@@ -26,7 +25,7 @@ const items = computed<NavEntry[]>(
       desktop: false,
       isRealmAdmin: isRealmAdmin.value,
       canInspectUsers: canInspectUsers.value,
-      assistant: assistant.value,
+      assistant: assistantAvailable.value,
     }),
 )
 const showBackLink = computed(() => props.backLink ?? !desktop)

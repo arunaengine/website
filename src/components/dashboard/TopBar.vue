@@ -20,7 +20,7 @@ import { useTheme } from '@/composables/useTheme'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
-import { useAssistantChat } from '@/composables/useAssistantChat'
+import { assistantAvailable } from '@/composables/assistantState'
 import { statusTone } from '@/components/nodes/node-display'
 
 // 'desktop' is the Aruna Desktop chrome: no realm switcher and no dataset
@@ -46,7 +46,13 @@ const nodeTone = computed(() =>
   nodeState.value === 'starting' ? ('progress' as const) : statusTone(nodeState.value),
 )
 
-const { available: assistantAvailable, openPanel: openAssistant, ensureProviders } = useAssistantChat()
+function ensureProviders() {
+  void import('@/composables/useAssistantChat').then(({ useAssistantChat }) => useAssistantChat().ensureProviders())
+}
+
+function openAssistant() {
+  void import('@/composables/useAssistantChat').then(({ useAssistantChat }) => useAssistantChat().openPanel())
+}
 
 onMounted(() => {
   if (desktop.value) watchNode()

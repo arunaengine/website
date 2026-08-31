@@ -6,7 +6,8 @@ import MobileNav from '@/components/dashboard/MobileNav.vue'
 import RealmUnreachable from '@/components/layout/RealmUnreachable.vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import { computed, defineAsyncComponent, nextTick, onMounted, ref, watch } from 'vue'
-import { useAssistantChat } from '@/composables/useAssistantChat'
+import { useAruna } from '@/composables/useAruna'
+import { assistantOpen } from '@/composables/assistantState'
 import { uploadQueueItems } from '@/composables/uploadQueueState'
 import { asyncChunkError } from '@/lib/chunk-recovery'
 import { probeRealm, realmReach } from '@/lib/desktopBoot'
@@ -25,7 +26,8 @@ const route = useRoute()
 const router = useRouter()
 const mainEl = ref<HTMLElement | null>(null)
 const prefetchedRoutes = new Set<string>()
-const { open: assistantOpen } = useAssistantChat()
+const { bootstrapped, refresh } = useAruna()
+if (typeof window !== 'undefined' && !bootstrapped.value) void refresh()
 // A realm that never answered blocks every view here; on the web it never does.
 const unreachable = computed(() => realmReach.value === 'unreachable')
 

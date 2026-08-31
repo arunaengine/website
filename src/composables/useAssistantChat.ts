@@ -29,6 +29,7 @@ import {
   type AssistantChatState,
 } from '@/lib/assistant/chatHistory'
 import { errorMessage } from '@/lib/utils'
+import { assistantAvailable as available, assistantOpen as open } from './assistantState'
 
 const PROVIDER_KEY = 'aruna.assistant.provider'
 const MODEL_KEY = 'aruna.assistant.model'
@@ -42,7 +43,6 @@ export interface PendingApproval {
   decide: (approved: boolean) => void
 }
 
-const open = ref(false)
 const busy = ref(false)
 // One message box shared by the page and the panel, so a suggestion chip and
 // a half-typed question survive the move between them.
@@ -427,7 +427,6 @@ export function useAssistantChat() {
   const provider = computed<AssistantProvider | null>(() =>
     ready.value.find((entry) => entry.provider_id === providerId.value) ?? ready.value[0] ?? null)
   const model = computed(() => (provider.value ? providerModelId(provider.value, modelId.value) : ''))
-  const available = computed(() => ready.value.length > 0)
   // What the provider offers now, ahead of the ids stored when it was added.
   const modelChoices = computed(() => (provider.value
     ? modelSuggestions(provider.value, providers.listedModels.value[provider.value.provider_id] ?? [])

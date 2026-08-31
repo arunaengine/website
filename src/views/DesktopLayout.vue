@@ -12,7 +12,7 @@ import { RouterView, useRoute } from 'vue-router'
 import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { uploadQueueItems } from '@/composables/uploadQueueState'
-import { useAssistantChat } from '@/composables/useAssistantChat'
+import { assistantAvailable, assistantOpen } from '@/composables/assistantState'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { appQuit } from '@/lib/desktopBridge'
 import { probeRealm, realmReach } from '@/lib/desktopBoot'
@@ -37,8 +37,8 @@ const unreachable = computed(() => realmReach.value === 'unreachable')
 const quitting = ref(false)
 const quitError = ref<string | null>(null)
 
-const { isRealmAdmin, canInspectUsers } = useAruna()
-const { available: assistant, open: assistantOpen } = useAssistantChat()
+const { bootstrapped, refresh, isRealmAdmin, canInspectUsers } = useAruna()
+if (typeof window !== 'undefined' && !bootstrapped.value) void refresh()
 const { status, loaded, state, start: watchNode, stop: unwatchNode } = useDeviceStatus()
 const nodeDown = computed(
   () =>
@@ -64,7 +64,7 @@ const items = computed<NavEntry[]>(() =>
     desktop: true,
     isRealmAdmin: isRealmAdmin.value,
     canInspectUsers: canInspectUsers.value,
-    assistant: assistant.value,
+    assistant: assistantAvailable.value,
   }),
 )
 
