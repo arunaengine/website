@@ -9,7 +9,7 @@ import PropertyRuleRow from './PropertyRuleRow.vue'
 import PropertyTermPicker from './PropertyTermPicker.vue'
 import ClassPropertyChecklist from './ClassPropertyChecklist.vue'
 import EntityTypePicker from './EntityTypePicker.vue'
-import { ChevronDown, ChevronRight, Settings2, Trash2, TriangleAlert } from '@lucide/vue'
+import { ChevronDown, ChevronRight, Info, Settings2, Trash2 } from '@lucide/vue'
 import { PROFILE_OBLIGATION_LABELS, obligationBadgeVariant } from '@/lib/profiles/labels'
 import { entityTypeLabel } from '@/lib/profiles/entityTypes'
 import { isSchemaOrgUri } from '@/lib/profiles/propertyCatalog'
@@ -46,9 +46,19 @@ const isCustomType = computed(() => !isSchemaOrgUri(normalizeTypeUri(props.entit
 
 const references = computed(() => props.builder.entityReferences(props.entity.type))
 const derived = computed(() => props.builder.entityObligation(props.entity.type))
-const isUnreferenced = computed(
-  () => !isRoot.value && !isDatasetType(normalizeTypeUri(props.entity.type)) && references.value.length === 0,
-)
+// An imported shape stands on its own in the file it came from, so it is not
+// the "nothing links to it" case this note is about.
+const isUnreferenced = computed(() =>
+  !isRoot.value
+  && !props.entity.imported
+  && !isDatasetType(normalizeTypeUri(props.entity.type))
+  && references.value.length === 0)
+
+// A second Dataset-typed shape is emitted with sh:targetClass schema:Dataset,
+// which also matches the crate root (lib/shacl/projection.ts).
+const isSharedDataset = computed(() => !isRoot.value && isDatasetType(normalizeTypeUri(props.entity.type)))
+
+const typeName = computed(() => entityTypeLabel(props.entity.type) || 'entity')
 
 const rootEntity = computed(() => props.builder.entities.find((entity) => entity.lock === 'full') ?? props.builder.entities[0])
 
@@ -173,14 +183,26 @@ function changeType(choice: { uri: string; label: string }) {
 
     <Notice
       v-if="isUnreferenced"
-      tone="warning"
+      tone="info"
       class="flex flex-wrap items-center gap-2 rounded-none border-0 border-b px-4 py-2 text-[11px]"
     >
-      <TriangleAlert class="size-3.5 shrink-0" />
-      <span>Nothing references this shape yet, so it has no effect.</span>
+      <Info class="size-3.5 shrink-0" />
+      <span>
+        No property asks for a {{ typeName }} yet. Datasets get no {{ typeName }} field from this
+        profile, but any {{ typeName }} they do describe is still checked against these rules.
+      </span>
       <Button v-if="rootEntity && rootEntity !== entity" type="button" variant="outline" size="sm" @click="referenceFromRoot">
         Reference it from {{ rootEntity.label || 'the Root dataset' }}
       </Button>
+    </Notice>
+
+    <Notice
+      v-else-if="isSharedDataset"
+      tone="info"
+      class="flex flex-wrap items-center gap-2 rounded-none border-0 border-b px-4 py-2 text-[11px]"
+    >
+      <Info class="size-3.5 shrink-0" />
+      <span>This shape targets every Dataset, including the root, so its rules also apply there.</span>
     </Notice>
 
     <div v-if="expanded" class="space-y-1.5 p-3">

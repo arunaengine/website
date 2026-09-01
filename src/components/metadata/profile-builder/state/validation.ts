@@ -64,16 +64,16 @@ export function rulesHintsFor(drafts: DraftEntityRule[], normalized: ProfileEnti
       }
     }
   }
-  // H1: an entity rule that nothing references is inert; it generates no dataset
-  // inputs and no validation. Surface each unreferenced non-Dataset rule loudly so
-  // the "entity rule ignored" trap is unmissable at review. An IMPORTED rule is
-  // exempt: a class-targeted shape stands on its own in the file it came from,
-  // and flagging every one of them would bury the hints that are real mistakes.
+  // H1: an entity rule that nothing references generates no dataset input, while
+  // its SHACL shape still targets the class (lib/shacl/projection.ts), so the
+  // note is informational. An IMPORTED rule is exempt: a class-targeted shape
+  // stands on its own in the file it came from.
   const importedTypes = new Set(drafts.filter((draft) => draft.imported).map((draft) => normalizeTypeUri(draft.type)))
   for (const entity of normalized) {
     if (isDatasetType(entity.type) || importedTypes.has(entity.type)) continue
     if (!referencesToType(entity.type, normalized).length) {
-      hints.push(`"${entity.label}" is not referenced by any property, it will generate no dataset inputs or validation. Open it and use "Add reference", or add an entity-reference property that targets it.`)
+      const type = entityTypeLabel(entity.type) || entity.label
+      hints.push(`No property asks for a ${type} yet. Datasets get no ${type} field from this profile, but any ${type} they do describe is still checked against "${entity.label}".`)
     }
   }
   // L10: two entity rules sharing one type URI serialize entity references with
