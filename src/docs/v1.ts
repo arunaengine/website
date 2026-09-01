@@ -216,7 +216,7 @@ export const docsTopics: DocsTopic[] = [
         route: '/app/buckets',
         anchor: 'bucket-create',
         title: 'Create a bucket',
-        body: 'Type a bucket name under the bucket list and confirm; a name is 3 to 63 characters of lowercase letters, digits, dots and dashes, starting and ending with a letter or digit.',
+        body: 'Type a bucket name under the bucket list and confirm. A name needs 3 to 63 characters: lowercase letters, digits, dots and dashes, starting and ending with a letter or digit.',
       },
       {
         route: '/app/buckets',
@@ -244,7 +244,7 @@ export const docsTopics: DocsTopic[] = [
         icon: 'Upload',
         steps: [
           'Open [Data](page:buckets) and confirm the group next to "Showing buckets of".',
-          'Type a [bucket](concept:data-and-deletion#buckets-hold-the-bytes) name under the bucket list and confirm. A name is 3 to 63 characters of lowercase letters, digits, dots and dashes, it starts and ends with a letter or digit, it holds no two dots in a row and it never looks like an IP address.',
+          'Type a [bucket](concept:data-and-deletion#buckets-hold-the-bytes) name under the bucket list and confirm. A name needs 3 to 63 characters: lowercase letters, digits, dots and dashes, starting and ending with a letter or digit.',
           'Select the bucket, then drag files in or use Add data.',
           'Watch the Transfers panel until every file reports done.',
         ],
@@ -253,6 +253,23 @@ export const docsTopics: DocsTopic[] = [
           alt: 'Data view with the reef-survey-2026 bucket and two uploaded objects',
           caption: 'A bucket with uploaded objects; the toolbar reaches Watch and Storage.',
         },
+      },
+      {
+        title: 'Bucket names',
+        icon: 'ListChecks',
+        paragraphs: [
+          'The node checks a name before anything is created, and the portal repeats the same check while you type. A refused name is answered with the rule it breaks:',
+          'Folder names and object keys have rules of their own: no slash in a folder name, no empty or dot-only segment in a key, and at most 1024 bytes.',
+        ],
+        bullets: [
+          'Bucket names must contain at least 3 characters.',
+          'Bucket names must contain at most 63 characters.',
+          'Bucket names may only contain lowercase letters, digits, dots and dashes.',
+          'Bucket names must start and end with a letter or a digit.',
+          'Bucket names must not contain two dots in a row.',
+          'Bucket names must not look like an IP address.',
+          'Bucket names must not start with xn--.',
+        ],
       },
       {
         title: 'When an upload fails',
