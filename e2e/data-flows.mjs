@@ -147,6 +147,22 @@ try {
     page.url(),
   )
 
+  // Renaming the group relabels it everywhere the portal caches the name; the
+  // second rename restores the fixture so the script can run again.
+  const switcher = page.getByRole('button', { name: 'Switch group or realm' })
+  async function renameGroup(next) {
+    await page.getByRole('button', { name: 'Rename group' }).first().click()
+    await page.waitForSelector('text=Rename group')
+    const renameDialog = page.locator('[role="dialog"]')
+    await renameDialog.locator('input').first().fill(next)
+    await renameDialog.getByRole('button', { name: /^Save$/ }).click()
+    await page.waitForTimeout(2500)
+  }
+  await renameGroup('Genomics lab v2')
+  step('rename shows in the context switcher', (await switcher.textContent()).includes('Genomics lab v2'))
+  await renameGroup('Genomics lab')
+  step('group name restored', (await switcher.textContent()).includes('Genomics lab'))
+
   // Deep-link to a nonexistent dataset gives an honest not-found panel, not a redirect
   await page.goto(BASE + '/app/metadata/01UNKNOWNDOCID0000000000000')
   await page.waitForTimeout(1500)

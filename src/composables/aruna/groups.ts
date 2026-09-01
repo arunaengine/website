@@ -8,6 +8,7 @@ import {
   type GroupDetailResponse,
   type GroupMembersResponse,
   type GroupRolesResponse,
+  type UpdateGroupRequest,
   type UsageHistoryResolution,
   type UsageHistoryResponse,
   type UsageResponse,
@@ -28,6 +29,25 @@ export async function createGroup(name: string): Promise<GroupDetailResponse> {
     })
     await loadAuthenticated().catch(() => undefined)
     return created
+  } finally {
+    saving.value = false
+  }
+}
+
+// Only the label changes; the reload keeps /access/users/me, the group list and
+// every name the switcher, search and admin tables render in step.
+export async function updateGroup(
+  groupId: string,
+  input: UpdateGroupRequest,
+): Promise<GroupDetailResponse> {
+  saving.value = true
+  try {
+    const updated = await request<GroupDetailResponse>(`/access/groups/${groupId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    })
+    await loadAuthenticated().catch(() => undefined)
+    return updated
   } finally {
     saving.value = false
   }

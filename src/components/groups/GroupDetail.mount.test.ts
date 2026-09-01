@@ -2,8 +2,8 @@ import * as VueRuntime from 'vue'
 import { defineComponent, h, inject, provide, ref } from 'vue'
 import * as RouterRuntime from 'vue-router'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
-import { describe, expect, it, vi } from 'vitest'
-import { click, compileClientComponent, element, flush, moduleDefault, mountApp } from '@/test/clientRender'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { click, compileClientComponent, element, flush, moduleDefault, mountApp, nodes } from '@/test/clientRender'
 import * as RouteTab from '@/composables/useRouteTab'
 import * as Api from '@/lib/api'
 import * as Quota from '@/lib/quota'
@@ -11,19 +11,19 @@ import * as Utils from '@/lib/utils'
 
 const TAB_NAMES = ['stats', 'members', 'roles', 'sources', 'storage', 'policies']
 const REALM = 'realm-1'
-const GROUP = {
-  display_name: 'Genomics lab',
-  group_id: 'g1',
-  realm_id: REALM,
-  roles: [
-    {
-      role_id: 'r1',
-      name: 'admin',
-      permissions: { [`/${REALM}/g/g1/admin/**`]: 'write', [`/${REALM}/g/g1/data/**`]: 'write' },
-      assigned_users: ['user-1'],
-    },
-  ],
+const ADMIN_ROLE = {
+  role_id: 'r1',
+  name: 'admin',
+  permissions: { [`/${REALM}/g/g1/admin/**`]: 'write', [`/${REALM}/g/g1/data/**`]: 'write' },
+  assigned_users: ['user-1'],
 }
+const MEMBER_ROLE = {
+  role_id: 'r2',
+  name: 'member',
+  permissions: { [`/${REALM}/g/g1/data/**`]: 'read' },
+  assigned_users: ['user-1'],
+}
+const group = ref({ display_name: 'Genomics lab', group_id: 'g1', realm_id: REALM, roles: [ADMIN_ROLE] })
 
 const Empty = defineComponent(() => () => null)
 const icons = new Proxy({}, { get: () => Empty })
@@ -61,7 +61,7 @@ const GroupDetail = compileClientComponent(new URL('./GroupDetail.vue', import.m
   '@/composables/useJoinRequests': { useJoinRequests: () => ({ joinRequestsEnabled: ref(false) }) },
   '@/composables/useAruna': {
     useAruna: () => ({
-      getGroup: vi.fn(async () => GROUP),
+      getGroup: vi.fn(async () => group.value),
       getGroupUsage: vi.fn(async () => ({ quota: null })),
       getGroupUsageHistory: vi.fn(async () => ({ points: [] })),
       listGroupMembers: vi.fn(async () => ({ members: [] })),
@@ -124,6 +124,10 @@ async function settled(router: Router, expected: string | undefined) {
 }
 
 describe('Group detail tabs', () => {
+  beforeEach(() => {
+    group.value = { display_name: 'Genomics lab', group_id: 'g1', realm_id: REALM, roles: [ADMIN_ROLE] }
+  })
+
   it('keeps every tab on the group route', async () => {
     const { root, router, errors } = await mount('/app/groups/g1?tab=members')
     expect(errors).toEqual([])
@@ -142,5 +146,19 @@ describe('Group detail tabs', () => {
   it('opens the tab a deep link names', async () => {
     const { root } = await mount('/app/groups/g1?tab=roles')
     expect(element(root, (node) => node.props['data-active'] !== undefined).props['data-active']).toBe('roles')
+  })
+})
+
+describe('Group rename control', () => {
+  function renameButtons(root: Parameters<typeof nodes>[0]) {
+    return nodes(root).filter((node) => node.props['aria-label'] === 'Rename group')
+  }
+
+  it('offers the rename only to a group admin', async () => {
+    group.value = { display_name: 'Genomics lab', group_id: 'g1', realm_id: REALM, roles: [ADMIN_ROLE] }
+    expect(renameButtons((await mount('/app/groups/g1')).root)).toHaveLength(1)
+
+    group.value = { display_name: 'Genomics lab', group_id: 'g1', realm_id: REALM, roles: [MEMBER_ROLE] }
+    expect(renameButtons((await mount('/app/groups/g1')).root)).toHaveLength(0)
   })
 })

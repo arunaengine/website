@@ -51,6 +51,7 @@ import {
   listGroupMembers,
   myGroups,
   removeGroupMember,
+  updateGroup,
 } from './aruna/groups'
 import {
   canInspectUsers,
@@ -221,6 +222,7 @@ export function useAruna() {
     updateUserProfile,
     setRealmQuota,
     createGroup,
+    updateGroup,
     getGroup,
     getGroupUsage,
     getGroupUsageHistory,

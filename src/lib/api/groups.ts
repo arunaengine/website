@@ -16,6 +16,14 @@ export interface CreateGroupRequest {
   name: string
 }
 
+// PATCH /access/groups/{id}: the display name is a label, never an identifier,
+// so a rename leaves permissions, buckets and datasets untouched.
+export interface UpdateGroupRequest {
+  display_name: string
+}
+
+export const GROUP_NAME_MAX_LENGTH = 256
+
 export interface GroupDetailResponse {
   display_name: string
   group_id: string

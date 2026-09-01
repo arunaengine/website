@@ -15,6 +15,7 @@ import GroupDetailSkeleton from '@/components/groups/GroupDetailSkeleton.vue'
 import GroupRoles from '@/components/groups/GroupRoles.vue'
 import JoinRequestButton from '@/components/groups/JoinRequestButton.vue'
 import JoinRequestsInbox from '@/components/groups/JoinRequestsInbox.vue'
+import RenameGroupDialog from '@/components/groups/RenameGroupDialog.vue'
 import AskAiButton from '@/components/assistant/AskAiButton.vue'
 import UsageHistoryChart from '@/components/groups/UsageHistoryChart.vue'
 import Tabs from '@/components/ui/Tabs.vue'
@@ -23,7 +24,7 @@ import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { Cable, ChartArea, Database, FileJson2, HardDrive, Inbox, LogOut, Route, ShieldAlert, ShieldCheck, Users } from '@lucide/vue'
+import { Cable, ChartArea, Database, FileJson2, HardDrive, Inbox, LogOut, Pencil, Route, ShieldAlert, ShieldCheck, Users } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useJoinRequests } from '@/composables/useJoinRequests'
 import { assessQuota, quotaCountedBytes, referencedBytes, QUOTA_STATE_BADGES } from '@/lib/quota'
@@ -54,6 +55,7 @@ let storageAnchorPending = false
 
 const DOC_LIMIT = 8
 const joinRequestCount = ref(0)
+const renameOpen = ref(false)
 
 const group = ref<GroupDetailResponse | null>(null)
 const members = ref<GroupMember[]>([])
@@ -310,6 +312,16 @@ async function leave() {
         <div class="min-w-0">
           <div class="flex items-center gap-2">
             <h4 class="truncate text-sm font-semibold text-foreground">{{ group.display_name }}</h4>
+            <Button
+              v-if="canAdminGroup"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Rename group"
+              title="Rename group"
+              @click="renameOpen = true"
+            >
+              <Pencil class="h-3.5 w-3.5" />
+            </Button>
             <Badge v-if="canManage" size="sm" variant="royal" class="uppercase"><ShieldCheck class="mr-0.5 h-3 w-3" /> admin</Badge>
             <Badge v-else-if="isMember" size="sm" variant="secondary" class="uppercase">member</Badge>
           </div>
@@ -324,6 +336,12 @@ async function leave() {
         </div>
       </header>
       <div v-if="leaveError" class="border-b border-border px-5 py-2 text-xs text-destructive">{{ leaveError }}</div>
+      <RenameGroupDialog
+        v-model:open="renameOpen"
+        :group-id="group.group_id"
+        :name="group.display_name"
+        @renamed="reload"
+      />
 
       <Tabs v-model="tab">
         <div data-tour="group-tabs" class="border-b border-border px-5 py-2">
