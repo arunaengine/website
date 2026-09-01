@@ -11,13 +11,20 @@ import * as Utils from '@/lib/utils'
 
 const TAB_NAMES = ['stats', 'members', 'roles', 'sources', 'storage', 'policies']
 const REALM = 'realm-1'
-const ADMIN_ROLE = {
+interface Role {
+  role_id: string
+  name: string
+  permissions: Record<string, string>
+  assigned_users: string[]
+}
+
+const ADMIN_ROLE: Role = {
   role_id: 'r1',
   name: 'admin',
   permissions: { [`/${REALM}/g/g1/admin/**`]: 'write', [`/${REALM}/g/g1/data/**`]: 'write' },
   assigned_users: ['user-1'],
 }
-const MEMBER_ROLE = {
+const MEMBER_ROLE: Role = {
   role_id: 'r2',
   name: 'member',
   permissions: { [`/${REALM}/g/g1/data/**`]: 'read' },
