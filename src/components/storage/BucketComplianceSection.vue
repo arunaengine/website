@@ -55,7 +55,7 @@ async function load(cursor?: string) {
     coverage.value = null
     if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
       refusal.value =
-        error.message || 'This node refused to report the compliance of this bucket.'
+        error.message || 'This node refused to report the coverage of this bucket.'
     } else loadError.value = placementPoliciesErrorMessage(error)
   } finally {
     if (request === sequence) loading.value = false
@@ -120,14 +120,14 @@ async function applyToExisting() {
   <section class="surface">
     <header class="flex items-center gap-2 border-b border-border px-5 py-4">
       <ClipboardCheck class="size-4 text-primary" />
-      <h2 class="font-display text-sm font-semibold text-aruna-navy">Compliance on this node</h2>
+      <h2 class="font-display text-sm font-semibold text-aruna-navy">Coverage on this node</h2>
     </header>
 
     <div class="space-y-4 px-5 py-4">
       <p class="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
         <span>
           Counted on this node only. A covered object carries the rules; that is not proof that
-          every copy of it complies.
+          every copy of it sits in an allowed place.
         </span>
         <DocsLink topic="where-data-lives" section="Placement policies" label="Learn what coverage means" />
       </p>
