@@ -1,0 +1,259 @@
+<script setup lang="ts">
+// Per-file placement rules (decision Q33). Saving mints a successor version
+// that carries exactly the chosen set; the versions before it keep theirs.
+import { computed, ref, watch } from 'vue'
+import Badge from '@/components/ui/Badge.vue'
+import Button from '@/components/ui/Button.vue'
+import Dialog from '@/components/ui/Dialog.vue'
+import DialogContent from '@/components/ui/DialogContent.vue'
+import DialogDescription from '@/components/ui/DialogDescription.vue'
+import DialogFooter from '@/components/ui/DialogFooter.vue'
+import DialogHeader from '@/components/ui/DialogHeader.vue'
+import DialogTitle from '@/components/ui/DialogTitle.vue'
+import DocsLink from '@/components/ui/DocsLink.vue'
+import RefusalNote from '@/components/ui/RefusalNote.vue'
+import Select from '@/components/ui/Select.vue'
+import Skeleton from '@/components/ui/Skeleton.vue'
+import { useAruna } from '@/composables/useAruna'
+import { usePlacementPolicies } from '@/composables/usePlacementPolicies'
+import { useS3 } from '@/composables/useS3'
+import { ApiError, type GroupDetailResponse } from '@/lib/api'
+import { isGroupAdmin } from '@/lib/groupAdmin'
+import {
+  createOperationId,
+  placementPoliciesErrorMessage,
+  policyOwnerLabel,
+  policyRefKey,
+} from '@/lib/placementPolicies'
+import type { PolicyRefBody, PolicyResponse } from '@/lib/placementPolicies'
+import { ShieldCheck, Trash2 } from '@lucide/vue'
+
+const props = defineProps<{
+  bucket: string
+  objectKey: string
+  /** The version the successor is minted from; without one nothing can be saved. */
+  versionId: string | null
+  groupId: string | null
+  nodeId?: string | null
+}>()
+const emit = defineEmits<{ (e: 'saved'): void }>()
+
+const { currentUser, getGroup, isRealmAdmin } = useAruna()
+const { getBucketPlacement, listPoliciesForGroup, mintObjectPlacement, policyName } =
+  usePlacementPolicies()
+const s3 = useS3()
+
+const group = ref<GroupDetailResponse | null>(null)
+const open = ref(false)
+const loading = ref(false)
+const draft = ref<PolicyRefBody[]>([])
+const library = ref<PolicyResponse[]>([])
+const generation = ref<number | null>(null)
+const attachChoice = ref('')
+const saving = ref(false)
+const refusal = ref<string | null>(null)
+const saved = ref<string | null>(null)
+
+watch(
+  () => props.groupId,
+  async (id) => {
+    group.value = id ? await getGroup(id).catch(() => null) : null
+  },
+  { immediate: true },
+)
+
+// Whoever may attach rules to the bucket may set them per file: realm admins,
+// and group admins of the group that owns the bucket.
+const canEdit = computed(
+  () =>
+    !props.nodeId
+    && Boolean(props.versionId)
+    && (isRealmAdmin.value || isGroupAdmin(group.value, currentUser.value?.id ?? '')),
+)
+
+const attachable = computed(() => {
+  const attached = new Set(draft.value.map(policyRefKey))
+  return library.value
+    .filter((policy) => !attached.has(policyRefKey(policy)))
+    .map((policy) => {
+      const owner = ownerLabel(policy)
+      return { value: policyRefKey(policy), label: owner ? `${policy.name} (${owner})` : policy.name }
+    })
+})
+
+function ownerLabel(policy: { owner_group_id?: string | null }): string | undefined {
+  return policyOwnerLabel(
+    policy.owner_group_id,
+    policy.owner_group_id && policy.owner_group_id === props.groupId
+      ? (group.value?.display_name ?? null)
+      : null,
+  )
+}
+
+// This node exposes no per-file rule set to read, so the bucket default is the
+// starting set, and the head advanced once per stored version or marker.
+async function load() {
+  loading.value = true
+  refusal.value = null
+  saved.value = null
+  attachChoice.value = ''
+  const [placement, versions] = await Promise.all([
+    getBucketPlacement(props.bucket).catch(() => null),
+    s3.listObjectVersions(props.bucket, props.objectKey, null).catch(() => null),
+  ])
+  draft.value = (placement?.policies ?? []).map((policy) => ({ ...policy }))
+  generation.value = versions ? versions.versions.length : null
+  library.value = await listPoliciesForGroup(props.groupId).catch(() => [])
+  loading.value = false
+}
+
+function start() {
+  open.value = true
+  void load()
+}
+
+function attach(key: string) {
+  attachChoice.value = ''
+  const chosen = library.value.find((policy) => policyRefKey(policy) === key)
+  if (!chosen) return
+  draft.value = [
+    ...draft.value,
+    {
+      policy_id: chosen.policy_id,
+      digest: chosen.digest,
+      name: chosen.name,
+      owner_group_id: chosen.owner_group_id,
+    },
+  ]
+}
+
+function detach(index: number) {
+  draft.value = draft.value.filter((_, position) => position !== index)
+}
+
+async function save() {
+  if (!props.versionId || generation.value === null || saving.value) return
+  saving.value = true
+  refusal.value = null
+  saved.value = null
+  try {
+    const response = await mintObjectPlacement(props.bucket, {
+      key: props.objectKey,
+      mutation_id: createOperationId(),
+      expected_version_id: props.versionId,
+      expected_generation: generation.value,
+      policies: draft.value.map((policy) => ({
+        policy_id: policy.policy_id,
+        digest: policy.digest,
+      })),
+    })
+    if (response.outcome === 'blocked') {
+      refusal.value = `This node wrote nothing: ${response.blocked_reason ?? 'it does not admit the file under these rules'}.`
+      return
+    }
+    saved.value = 'Saved. This file now has a new version carrying exactly these rules.'
+    emit('saved')
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 409) {
+      refusal.value =
+        'This file changed while the rules were open.\nClose this dialog, reopen it and choose the rules again.'
+    } else if (error instanceof ApiError && error.status === 403) {
+      refusal.value = `This node refused the change.\n${error.message}`
+    } else {
+      refusal.value = placementPoliciesErrorMessage(error)
+    }
+  } finally {
+    saving.value = false
+  }
+}
+</script>
+
+<template>
+  <div v-if="canEdit">
+    <Button variant="outline" size="sm" @click="start">
+      <ShieldCheck class="size-3.5" /> Edit rules for this file…
+    </Button>
+
+    <Dialog :open="open" @update:open="(value: boolean) => (open = value)">
+      <DialogContent class="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Rules for this file</DialogTitle>
+          <DialogDescription>
+            Saving creates a new version of this file that carries exactly these rules; older
+            versions keep theirs.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div class="space-y-3 text-xs">
+          <template v-if="loading">
+            <Skeleton class="h-8" />
+            <Skeleton class="h-8" />
+          </template>
+          <template v-else>
+            <ul v-if="draft.length" class="divide-y divide-border rounded-md border border-border">
+              <li
+                v-for="(policy, index) in draft"
+                :key="policyRefKey(policy)"
+                class="flex items-center justify-between gap-2 px-3 py-2"
+              >
+                <span class="min-w-0 truncate text-foreground">
+                  {{ policyName(policy) }}
+                  <Badge v-if="ownerLabel(policy)" variant="outline" size="sm" class="ml-1">
+                    {{ ownerLabel(policy) }}
+                  </Badge>
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  class="text-destructive hover:text-destructive"
+                  :aria-label="`Remove rule ${index + 1}`"
+                  @click="detach(index)"
+                >
+                  <Trash2 class="size-3.5" />
+                </Button>
+              </li>
+            </ul>
+            <p v-else class="text-muted-foreground">
+              None: copies of this file would not be governed.
+            </p>
+
+            <Select
+              v-if="attachable.length"
+              :model-value="attachChoice"
+              :options="attachable"
+              class="max-w-sm"
+              placeholder="Add a rule…"
+              aria-label="Add a placement policy to this file"
+              @update:model-value="attach"
+            />
+            <p v-else class="text-muted-foreground">
+              No further policy of this realm or group is available here.
+            </p>
+
+            <p class="flex flex-wrap items-center gap-2 text-muted-foreground">
+              <span>A copy has to be allowed by all of them.</span>
+              <DocsLink
+                topic="where-data-lives"
+                section="Placement policies"
+                label="Learn about placement policies"
+              />
+            </p>
+          </template>
+
+          <p v-if="!loading && generation === null" class="text-muted-foreground">
+            This node did not list the versions of this file, so its rules cannot be saved here.
+          </p>
+          <RefusalNote v-if="refusal" :message="refusal" />
+          <p v-else-if="saved" class="text-emerald-700 dark:text-emerald-300">{{ saved }}</p>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" :disabled="saving" @click="open = false">Close</Button>
+          <Button :disabled="saving || loading || generation === null" @click="save">
+            {{ saving ? 'Saving…' : 'Save rules' }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </div>
+</template>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// One surface for a file: the facts, the preview, the version history and the
-// copies. The open tab lives in the route (`?object=&tab=`), so a details view
-// is a link a person can share or reload into.
+// One surface for a file: the facts, the preview, the version history, and the
+// rules and copies of the chosen version. The open tab lives in the route
+// (`?object=&tab=`), so a details view is a link a person can share or reload.
 import Badge from '@/components/ui/Badge.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import DetailDialog from '@/components/ui/DetailDialog.vue'
@@ -13,6 +13,8 @@ import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import ObjectLocationsPanel from '@/components/data/ObjectLocationsPanel.vue'
 import ObjectVersionsPanel from '@/components/data/ObjectVersionsPanel.vue'
+import ObjectRulesEditor from '@/components/storage/ObjectRulesEditor.vue'
+import PolicyColumn from '@/components/storage/PolicyColumn.vue'
 import PreviewBody from '@/components/preview/PreviewBody.vue'
 import { useS3, s3ErrorMessage } from '@/composables/useS3'
 import type { DeleteRequest } from '@/lib/deletion/request'
@@ -182,14 +184,27 @@ const facts = computed(() => [
       </TabsContent>
 
       <TabsContent value="storage">
-        <ObjectLocationsPanel
-          :active="props.open && props.tab === 'storage'"
-          :bucket="props.bucket"
-          :object-key="props.objectKey"
-          :version-id="pinnedVersion"
-          :node-id="props.nodeId"
-          :group-id="props.groupId"
-        />
+        <div class="grid gap-4 lg:grid-cols-2">
+          <div class="space-y-3">
+            <PolicyColumn :bucket="props.bucket" :node-id="props.nodeId ?? null" />
+            <ObjectRulesEditor
+              :bucket="props.bucket"
+              :object-key="props.objectKey"
+              :version-id="currentVersion"
+              :group-id="props.groupId"
+              :node-id="props.nodeId"
+              @saved="emit('changed')"
+            />
+          </div>
+          <ObjectLocationsPanel
+            :active="props.open && props.tab === 'storage'"
+            :bucket="props.bucket"
+            :object-key="props.objectKey"
+            :version-id="pinnedVersion"
+            :node-id="props.nodeId"
+            :group-id="props.groupId"
+          />
+        </div>
       </TabsContent>
     </Tabs>
   </DetailDialog>
