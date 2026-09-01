@@ -263,7 +263,7 @@ describe('revision-bound Profile validation presentation', () => {
     expect(profileValidationStatuses.value['stale-doc']).toMatchObject({ status: 'verified', stale: false })
     expect(vi.mocked(apiRequest)).toHaveBeenNthCalledWith(
       2,
-      '/metadata/stale-doc/profile-validation/revalidate',
+      '/metadata/stale-doc/profile/validation/revalidate',
       { method: 'POST' },
       expect.any(Object),
     )
@@ -281,7 +281,7 @@ describe('revision-bound Profile validation presentation', () => {
 
     await expect(loadProfileValidationCapabilities(true)).resolves.toEqual(capabilities)
     expect(vi.mocked(apiRequest)).toHaveBeenCalledWith(
-      '/metadata/profile-validation/capabilities',
+      '/metadata/profile/validation/capabilities',
       {},
       expect.any(Object),
     )
@@ -298,7 +298,7 @@ describe('revision-bound Profile validation presentation', () => {
     vi.mocked(apiRequest).mockImplementation(async (path, options) => {
       if (path === '/metadata/write-status-doc/rocrate' && options?.method === 'PUT') return summary
       if (path === '/metadata/write-status-doc') return summary
-      if (path === '/metadata/write-status-doc/profile-validation') {
+      if (path === '/metadata/write-status-doc/profile/validation') {
         return validationStatus({ document_id: 'write-status-doc' })
       }
       if (path === '/metadata') {
@@ -313,7 +313,7 @@ describe('revision-bound Profile validation presentation', () => {
 
     expect(profileValidationStatuses.value['write-status-doc']?.status).toBe('verified')
     expect(vi.mocked(apiRequest).mock.calls.some(([path]) =>
-      path === '/metadata/write-status-doc/profile-validation',
+      path === '/metadata/write-status-doc/profile/validation',
     )).toBe(true)
   })
 
@@ -324,13 +324,13 @@ describe('revision-bound Profile validation presentation', () => {
     }
     let datasetStatusReads = 0
     vi.mocked(apiRequest).mockImplementation(async (path, options) => {
-      if (path === '/metadata/dependent-dataset/profile-validation') {
+      if (path === '/metadata/dependent-dataset/profile/validation') {
         datasetStatusReads += 1
         return validationStatus({ document_id: 'dependent-dataset', profile_id: 'profile-write-doc' })
       }
       if (path === '/metadata/profile-write-doc/rocrate' && options?.method === 'PUT') return profileSummary
       if (path === '/metadata/profile-write-doc') return profileSummary
-      if (path === '/metadata/profile-write-doc/profile-validation') {
+      if (path === '/metadata/profile-write-doc/profile/validation') {
         return validationStatus({
           document_id: 'profile-write-doc',
           state: 'not_profiled',
@@ -758,7 +758,7 @@ describe('initial refresh coordination', () => {
     })
     vi.mocked(apiRequest).mockImplementation(async (path) => {
       await gate
-      if (path === '/info') {
+      if (path === '/system/info') {
         return {
           node: { status: 'ok', realm_id: 'realm', peer_id: 'peer', capabilities: 'server' },
           my_addresses: [],
@@ -766,7 +766,7 @@ describe('initial refresh coordination', () => {
           warnings: [],
         }
       }
-      if (path === '/info/realm') {
+      if (path === '/system/realm') {
         return {
           realm_id: 'realm',
           metadata_replication: { default_replication_factor: null },
@@ -776,7 +776,7 @@ describe('initial refresh coordination', () => {
           interfaces: { rest: { status: 'ok' }, s3: { status: 'ok' } },
         }
       }
-      if (path === '/info/usage') {
+      if (path === '/system/usage') {
         return { buckets: 0, objects: 0, stored_blobs: 0, stored_bytes: 0, referenced_bytes: 0 }
       }
       return { documents: [], limit: 100, offset: 0, total_returned: 0 }

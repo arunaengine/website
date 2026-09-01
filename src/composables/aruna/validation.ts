@@ -129,7 +129,7 @@ export async function loadProfileValidationCapabilities(
   if (!force && pending) return pending
   const context = refreshContext()
   const load = apiRequest<ProfileValidationCapabilitiesResponse>(
-    '/metadata/profile-validation/capabilities',
+    '/metadata/profile/validation/capabilities',
     {},
     context.client,
   ).then((capabilities) => {
@@ -162,7 +162,7 @@ export async function loadProfileValidationStatus(
   }
   const context = refreshContext()
   const load = apiRequest<ProfileValidationStatusResponse>(
-    `/metadata/${encodeURIComponent(documentId)}/profile-validation`,
+    `/metadata/${encodeURIComponent(documentId)}/profile/validation`,
     {},
     context.client,
   ).then((response) => {
@@ -210,7 +210,7 @@ export async function revalidateProfileValidationStatus(
   })
   try {
     const response = await request<ProfileValidationStatusResponse>(
-      `/metadata/${encodeURIComponent(documentId)}/profile-validation/revalidate`,
+      `/metadata/${encodeURIComponent(documentId)}/profile/validation/revalidate`,
       { method: 'POST' },
     )
     if ((profileValidationStatusGenerations.get(documentId) ?? 0) !== generation) {

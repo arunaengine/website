@@ -58,7 +58,7 @@ export interface ProfileValidationPreviewResponse {
 }
 
 /**
- * POST /metadata/profile-validation/preview: advisory validation of a draft
+ * POST /metadata/profile/validation/preview: advisory validation of a draft
  * crate before it is saved. Rate limited like revalidate; 404/405 means the
  * node does not serve the preview at all.
  */
@@ -68,7 +68,7 @@ export function previewProfileValidation(
   signal?: AbortSignal,
 ): Promise<ProfileValidationPreviewResponse> {
   return apiRequest<ProfileValidationPreviewResponse>(
-    '/metadata/profile-validation/preview',
+    '/metadata/profile/validation/preview',
     { method: 'POST', body: JSON.stringify({ rocrate }), signal },
     client,
   )

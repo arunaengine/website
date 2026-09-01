@@ -71,7 +71,7 @@ describe('server profile validation preview', () => {
     expect(preview.running.value).toBe(true)
 
     const [url, init] = vi.mocked(fetch).mock.calls[0] as [URL, RequestInit]
-    expect(String(url)).toBe('https://api.test/api/v1/metadata/profile-validation/preview')
+    expect(String(url)).toBe('https://api.test/api/v1/metadata/profile/validation/preview')
     expect(init.method).toBe('POST')
     expect(init.body).toBe(JSON.stringify({ rocrate: CRATE }))
     expect(new Headers(init.headers).get('Authorization')).toBe('Bearer bearer-token')
