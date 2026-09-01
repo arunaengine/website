@@ -184,9 +184,9 @@ function onDrop(event: DragEvent) {
             <Trash2 class="h-4 w-4" />
           </Button>
           <WatchButton
-            v-if="watchPathPrefix"
+            surface="bucket"
             :path-prefix="watchPathPrefix"
-            event-kind="data_uploaded"
+            :group-id="activeGroupId"
             :resource-label="`${bucket}/${s3Prefix}`"
             size="sm"
           />

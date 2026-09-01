@@ -85,9 +85,10 @@ async function toggleFav() {
     <Star class="h-4 w-4" :class="isFav ? 'text-amber-500' : ''" :fill="isFav ? 'currentColor' : 'none'" />
   </Button>
   <WatchButton
-    v-if="watchPathPrefix"
+    v-if="docState === 'found'"
+    surface="dataset"
     :path-prefix="watchPathPrefix"
-    event-kind="metadata_created"
+    :group-id="current?.realmId ?? null"
     :resource-label="currentPath"
   />
   <!-- One entry point for every transfer; each entry names what it moves,
