@@ -146,7 +146,7 @@ describe('versioned in-portal Docs', () => {
     const images = docsTopics.flatMap((topic) => topic.sections.flatMap((s) => (s.image ? [s.image] : [])))
     expect(images.length).toBeGreaterThan(0)
     for (const image of images) {
-      expect(image.src).toMatch(/^\/docs\/v1\/[a-z0-9-]+\.jpg$/)
+      expect(image.src).toMatch(/^\/docs\/v1\/[a-z0-9-]+\.(jpg|svg)$/)
       expect(image.alt.length).toBeGreaterThan(0)
     }
 

@@ -178,24 +178,39 @@ export const glossaryTopic: DocsTopic = {
       ],
     },
     {
-      title: 'Placement',
-      icon: 'Copy',
+      title: 'Placement policy',
+      icon: 'ShieldCheck',
       paragraphs: [
-        'Where copies of a bucket\'s data are kept across [nodes](concept:glossary#node). A placement policy is a realm-published rule such as "keep two copies"; attaching it in the [bucket settings](page:buckets) declares where the copies of that bucket must live. See [Where your data lives](concept:where-data-lives#placement-copies-across-nodes).',
+        'A published, immutable rule listing where copies of governed data may be stored: a node, a location, a node label, an executor kind. It allows or refuses a copy and never creates, moves or removes one. Attaching it to a bucket governs the objects written afterwards; see [Where your data lives](concept:where-data-lives#placement-policies).',
       ],
     },
     {
-      title: 'Routing',
-      icon: 'Route',
+      title: 'Copy',
+      icon: 'Copy',
       paragraphs: [
-        'Which physical storage receives the bytes one node accepts: the node\'s own store or a [storage backend](concept:glossary#storage-backend) your group runs. Rules apply per key, per prefix, per bucket, or as a group default, with [the most specific rule winning](concept:where-data-lives#routing-backends-behind-this-node).',
+        'One stored piece of an object version that a node can serve. Copies come from an upload, a [bucket sync](concept:glossary#bucket-sync), an explicit copy request, or staging a compute input.',
+      ],
+    },
+    {
+      title: 'Storage location',
+      icon: 'MapPin',
+      paragraphs: [
+        'Where the copies of one version are right now, per node, with a state of present, pending, unreachable, denied or not stored. It is [the answering node\'s view](concept:where-data-lives#storage-locations) and can be incomplete.',
+      ],
+    },
+    {
+      title: 'Record placement',
+      icon: 'Layers',
+      paragraphs: [
+        'Which nodes hold a dataset record or a system job, decided by a realm strategy with a replica count, shard count and label affinity. It never decides where files are stored; that is the [storage backend](concept:glossary#storage-backend) and [placement policies](concept:glossary#placement-policy).',
       ],
     },
     {
       title: 'Bucket sync',
       icon: 'Share2',
       paragraphs: [
-        'A relationship that mirrors a source bucket into a second bucket on a target node, which writes and owns its own copies from then on. It runs once, continuously as versions are written, or in a reference mode that preserves references instead of copying bytes; [placement](concept:where-data-lives#sync-or-placement) replicates one bucket instead of creating a second one.',
+        'A standing, one way mapping that mirrors a source bucket into a second bucket on a target node, which writes, owns and serves its own copies from then on. It runs once, continuously as versions are written, or in a reference mode that keeps pointers instead of data; see [Syncs](concept:where-data-lives#syncs).',
+        'Aruna Desktop uses the word Sync for something else: a folder on your computer kept in step with a bucket. A bucket sync connects two buckets and involves no computer of yours.',
       ],
     },
     {
@@ -244,7 +259,8 @@ export const glossaryTopic: DocsTopic = {
       title: 'Storage backend',
       icon: 'HardDrive',
       paragraphs: [
-        'An S3-compatible endpoint registered on a group so Aruna [routes the group data there](concept:storage-access#external-storage-backend). Writers inherit the routing but never see the backend secret.',
+        'The physical store behind one node that receives an upload: the node operator\'s own store, or an S3-compatible endpoint [registered on a group](concept:storage-access#external-storage-backend). Writers inherit it but never see the backend secret.',
+        'Which backend takes a write is decided per write by routing rules, most specific first: exact key, longest key prefix, bucket default, group default, then the node\'s own rules. See [Storage backend](concept:where-data-lives#storage-backend).',
       ],
     },
     {
@@ -293,7 +309,7 @@ export const glossaryTopic: DocsTopic = {
       title: 'Run placement',
       icon: 'Route',
       paragraphs: [
-        'The decision where a run executes: [next to its data when possible, moving data when it must](concept:data-to-compute). The placement record tells you which happened, and why. It is decided per run, unlike [placement](concept:glossary#placement) policies, which govern a bucket.',
+        'The decision where a run executes: [next to its data when possible, moving data when it must](concept:data-to-compute). The placement record tells you which happened, and why. It is decided per run, unlike a [placement policy](concept:glossary#placement-policy), which governs a bucket.',
       ],
     },
     {
