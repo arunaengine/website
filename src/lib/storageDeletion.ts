@@ -144,7 +144,7 @@ export function getStorageDeletionPreflight(
   options: StorageDeletionPreflightOptions = {},
 ): Promise<StorageDeletionPreflight> {
   return apiRequest<StorageDeletionPreflight>(
-    '/storage/deletion-preflight',
+    '/data/storage/deletion/preflight',
     { method: 'POST', body: JSON.stringify({ scope, ...options }) },
     client,
   )
@@ -155,7 +155,7 @@ export function startStoragePurge(
   client: ApiClientOptions,
 ): Promise<StoragePurgeSubmission> {
   return apiRequest<StoragePurgeSubmission>(
-    '/storage/purge-jobs',
+    '/data/storage/purge/jobs',
     {
       method: 'POST',
       body: JSON.stringify({
@@ -171,7 +171,7 @@ export function getStoragePurgeJob(
   jobId: string,
   client: ApiClientOptions,
 ): Promise<StoragePurgeJobStatus> {
-  return apiRequest<StoragePurgeJobStatus>(`/jobs/${encodeURIComponent(jobId)}`, {}, client)
+  return apiRequest<StoragePurgeJobStatus>(`/compute/jobs/${encodeURIComponent(jobId)}`, {}, client)
 }
 
 export function retainStoragePurgeProgress(

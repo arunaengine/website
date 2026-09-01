@@ -220,22 +220,22 @@ export interface GetJobAuditParams {
   limit?: number
 }
 
-// GET /jobs/: the caller's jobs, newest first. There is NO kind filter.
+// GET /compute/jobs: the caller's jobs, newest first. There is NO kind filter.
 export function listJobs(params: ListJobsParams, client: ApiClientOptions): Promise<JobListResponse> {
   return apiRequest<JobListResponse>(
-    '/jobs/',
+    '/compute/jobs',
     { query: { limit: params.limit, cursor: params.cursor, state: params.state } },
     client,
   )
 }
 
-// GET /jobs/{job_id}: 404 here means THIS job is unknown (foreign or pruned),
+// GET /compute/jobs/{job_id}: 404 here means THIS job is unknown (foreign or pruned),
 // not necessarily an absent endpoint.
 export function getJob(jobId: string, client: ApiClientOptions): Promise<JobStatusResponse> {
-  return apiRequest<JobStatusResponse>(`/jobs/${encodeURIComponent(jobId)}`, {}, client)
+  return apiRequest<JobStatusResponse>(`/compute/jobs/${encodeURIComponent(jobId)}`, {}, client)
 }
 
-// GET /jobs/{job_id}/audit: stable-key pagination. Consumers must sort by
+// GET /compute/jobs/{job_id}/audit: stable-key pagination. Consumers must sort by
 // `at_ms` when presenting the records as a timeline.
 export function getJobAudit(
   jobId: string,
@@ -243,20 +243,20 @@ export function getJobAudit(
   client: ApiClientOptions,
 ): Promise<JobAuditResponse> {
   return apiRequest<JobAuditResponse>(
-    `/jobs/${encodeURIComponent(jobId)}/audit`,
+    `/compute/jobs/${encodeURIComponent(jobId)}/audit`,
     { query: { scope: params.scope, cursor: params.cursor, limit: params.limit } },
     client,
   )
 }
 
-// POST /jobs/{job_id}/cancel: idempotent; 202 while live, 200 once terminal.
+// POST /compute/jobs/{job_id}/cancel: idempotent; 202 while live, 200 once terminal.
 // There is no restart endpoint.
 export function cancelJob(jobId: string, client: ApiClientOptions): Promise<JobStatusResponse> {
-  return apiRequest<JobStatusResponse>(`/jobs/${encodeURIComponent(jobId)}/cancel`, { method: 'POST' }, client)
+  return apiRequest<JobStatusResponse>(`/compute/jobs/${encodeURIComponent(jobId)}/cancel`, { method: 'POST' }, client)
 }
 
 // ── Native submission ────────────────────────────────────────────────────────
-// POST /jobs/: the surface the GA4GH facade maps onto. It expresses what TES
+// POST /compute/jobs: the surface the GA4GH facade maps onto. It expresses what TES
 // cannot: per-input composition modes, an exact version pin, the collision
 // policy, workspace prefixes to inventory, and the workspace mode.
 
@@ -340,7 +340,7 @@ export function submitJob(
   client: ApiClientOptions,
 ): Promise<SubmitJobResponse> {
   return apiRequest<SubmitJobResponse>(
-    '/jobs/',
+    '/compute/jobs',
     { method: 'POST', body: JSON.stringify(request) },
     client,
   )
@@ -413,7 +413,7 @@ export interface GetJobReportParams {
   cursor?: string
 }
 
-// GET /jobs/{job_id}/report. A 404 carrying code `report_pending` means the
+// GET /compute/jobs/{job_id}/report. A 404 carrying code `report_pending` means the
 // job is not terminal yet and the caller should poll; any other 404 means
 // there is no readable report at all. A 409 means the cursor was issued for a
 // different job or a different frozen snapshot.
@@ -423,7 +423,7 @@ export function getJobReport(
   client: ApiClientOptions,
 ): Promise<JobReportResponse> {
   return apiRequest<JobReportResponse>(
-    `/jobs/${encodeURIComponent(jobId)}/report`,
+    `/compute/jobs/${encodeURIComponent(jobId)}/report`,
     { query: { limit: params.limit, cursor: params.cursor } },
     client,
   )
@@ -449,7 +449,7 @@ export function isReportCursorConflict(error: unknown): boolean {
 }
 
 // ── Run crate artifact ───────────────────────────────────────────────────────
-// GET|HEAD /jobs/{job_id}/artifacts/rocrate. Binary application/zip behind
+// GET|HEAD /compute/jobs/{job_id}/artifacts/rocrate. Binary application/zip behind
 // bearer auth, so it cannot be a plain link: fetch it and hand the caller a
 // Blob. `pending` and `expired` are honest states, not failures.
 
@@ -469,7 +469,7 @@ export interface JobArtifactStatus {
 const ARTIFACT_TIMEOUT_MS = 120_000
 
 function artifactPath(jobId: string): string {
-  return `/jobs/${encodeURIComponent(jobId)}/artifacts/rocrate`
+  return `/compute/jobs/${encodeURIComponent(jobId)}/artifacts/rocrate`
 }
 
 function unquote(value: string | null): string | undefined {

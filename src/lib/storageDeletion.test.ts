@@ -67,7 +67,7 @@ describe('storage deletion adapter', () => {
     ).resolves.toBe(preflight)
 
     expect(apiRequest).toHaveBeenCalledWith(
-      '/storage/deletion-preflight',
+      '/data/storage/deletion/preflight',
       {
         method: 'POST',
         body: JSON.stringify({
@@ -95,7 +95,7 @@ describe('storage deletion adapter', () => {
     expect(apiRequest).toHaveBeenCalledTimes(2)
     for (const call of apiRequest.mock.calls) {
       expect(call).toEqual([
-        '/storage/purge-jobs',
+        '/data/storage/purge/jobs',
         {
           method: 'POST',
           body: JSON.stringify({
@@ -125,7 +125,7 @@ describe('storage deletion adapter', () => {
     apiRequest.mockResolvedValueOnce(failed)
 
     await expect(getStoragePurgeJob('01JOB', client)).resolves.toBe(failed)
-    expect(apiRequest).toHaveBeenCalledWith('/jobs/01JOB', {}, client)
+    expect(apiRequest).toHaveBeenCalledWith('/compute/jobs/01JOB', {}, client)
     expect(
       retainStoragePurgeProgress(
         { current: 1000, total: 2401, unit: 'entries' },

@@ -18,25 +18,25 @@ function request<T>(path: string, options: ApiRequestOptions = {}) {
 }
 
 async function getComputeConfig(): Promise<ComputeConfigBody> {
-  return request<ComputeConfigBody>('/admin/compute/config')
+  return request<ComputeConfigBody>('/compute/config')
 }
 
 async function putComputeConfig(config: ComputeConfigBody): Promise<ComputeConfigBody> {
-  return request<ComputeConfigBody>('/admin/compute/config', {
+  return request<ComputeConfigBody>('/compute/config', {
     method: 'PUT',
     body: JSON.stringify(config),
   })
 }
 
 async function getComputeSnapshots(groupId?: string): Promise<ComputeSnapshotsResponse> {
-  return request<ComputeSnapshotsResponse>('/admin/compute/snapshots', {
+  return request<ComputeSnapshotsResponse>('/compute/snapshots', {
     query: { group_id: groupId?.trim() || undefined },
   })
 }
 
 async function setComputeDrain(draining: boolean): Promise<DrainResponse> {
   const body: DrainRequest = { draining }
-  return request<DrainResponse>('/admin/compute/drain', {
+  return request<DrainResponse>('/compute/drain', {
     method: 'POST',
     body: JSON.stringify(body),
   })

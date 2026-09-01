@@ -267,7 +267,7 @@ watch(
           <section v-else-if="unsupported" class="surface p-5">
             <EmptyState
               title="Compute configuration is unavailable"
-              description="This node returned no compute configuration; it may not hold the realm configuration or may not serve /admin/compute/config."
+              description="This node returned no compute configuration; it may not hold the realm configuration or may not serve /compute/config."
             >
               <Button @click="loadConfig">Try again</Button>
             </EmptyState>

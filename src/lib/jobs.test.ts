@@ -95,7 +95,7 @@ describe('distributed job API', () => {
     expect(job.family).toEqual(familyFixture.family)
     expect(job.family?.placement?.estimated_transfer_bytes).toBe(4194304)
     expect(job.family?.outputs[0]?.version_id).toBe('01JJRSVERSION0123456789ABC')
-    expect(urls).toEqual([`https://node.test/api/v1/jobs/${familyFixture.job_id}`])
+    expect(urls).toEqual([`https://node.test/api/v1/compute/jobs/${familyFixture.job_id}`])
   })
 
   it('passes audit scope, cursor, and limit verbatim', async () => {
@@ -120,7 +120,7 @@ describe('distributed job API', () => {
     )
 
     expect(urls).toEqual([
-      'https://node.test/api/v1/jobs/job%2Fid/audit?scope=submission&cursor=opaque-cursor&limit=12',
+      'https://node.test/api/v1/compute/jobs/job%2Fid/audit?scope=submission&cursor=opaque-cursor&limit=12',
     ])
   })
 })
@@ -179,7 +179,7 @@ describe('job report', () => {
 
     await getJobReport('job/id', { limit: 25, cursor: 'opaque' }, client)
 
-    expect(calls[0].url).toBe('https://node.test/api/v1/jobs/job%2Fid/report?limit=25&cursor=opaque')
+    expect(calls[0].url).toBe('https://node.test/api/v1/compute/jobs/job%2Fid/report?limit=25&cursor=opaque')
   })
 
   it('separates a pending report from an absent one', () => {
@@ -289,7 +289,7 @@ function submitBody(created: boolean, state: string) {
     canonical_job_id: '01JOB',
     state,
     origin_node_url: 'https://node.test/api/v1',
-    status_url: 'https://node.test/api/v1/jobs/01JOB',
+    status_url: 'https://node.test/api/v1/compute/jobs/01JOB',
   }
 }
 
@@ -299,7 +299,7 @@ describe('native job submission', () => {
 
     const created = await submitJob(submission, client)
 
-    expect(calls[0].url).toBe('https://node.test/api/v1/jobs/')
+    expect(calls[0].url).toBe('https://node.test/api/v1/compute/jobs')
     expect(calls[0].method).toBe('POST')
     expect(calls[0].auth).toBe('Bearer token')
     expect(created.created).toBe(true)

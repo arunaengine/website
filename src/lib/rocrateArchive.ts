@@ -285,14 +285,14 @@ export async function submitExport(
   return (await response.json()) as SubmitExportResponse
 }
 
-// GET /jobs/{id}/report: a 404 carrying `code: 'report_pending'` means the job
+// GET /compute/jobs/{id}/report: a 404 carrying `code: 'report_pending'` means the job
 // has not frozen its report yet; every other 404 is a real miss.
 export async function fetchArchiveReport<T>(
   jobId: string,
   client: ApiClientOptions,
   options: { limit?: number; cursor?: string } = {},
 ): Promise<ArchiveReportResult<T>> {
-  const path = `/jobs/${encodeURIComponent(jobId)}/report`
+  const path = `/compute/jobs/${encodeURIComponent(jobId)}/report`
   const response = await fetch(archiveUrl(path, client, { limit: options.limit, cursor: options.cursor }), {
     headers: authHeaders(client),
   })
@@ -322,10 +322,10 @@ function dispositionName(header: string | null): string | null {
   return plain ? plain[1] : null
 }
 
-// GET /jobs/{id}/artifacts/rocrate: bearer-authenticated, so the browser cannot
+// GET /compute/jobs/{id}/artifacts/rocrate: bearer-authenticated, so the browser cannot
 // simply follow a link; the body is buffered into a blob and saved.
 export async function downloadArchiveArtifact(jobId: string, client: ApiClientOptions): Promise<string> {
-  const path = `/jobs/${encodeURIComponent(jobId)}/artifacts/rocrate`
+  const path = `/compute/jobs/${encodeURIComponent(jobId)}/artifacts/rocrate`
   const response = await fetch(archiveUrl(path, client), { headers: authHeaders(client) })
   if (!response.ok) throw archiveError(response, await errorBody(response), ARTIFACT_MESSAGES)
   const fileName = dispositionName(response.headers.get('content-disposition')) || `ro-crate-${jobId}.zip`
