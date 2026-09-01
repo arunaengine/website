@@ -254,7 +254,7 @@ async function onDelete() {
           :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
           @click="onDelete"
         >
-          {{ busy ? 'Removing…' : 'Stop watching' }}
+          {{ busy ? 'Stopping…' : 'Stop watching' }}
         </Button>
         <Button
           v-else

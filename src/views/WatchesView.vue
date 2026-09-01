@@ -119,14 +119,14 @@ watch(currentUser, () => void ensureLoaded())
 
           <ul class="divide-y divide-border">
             <li v-for="{ w, info, authorized, groupName } in rows" :key="w.id" class="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
-              <!-- An unauthorized row withholds its details, so it can only be removed. -->
+              <!-- An unauthorized row withholds its details, so it can only be deleted. -->
               <div v-if="!authorized" class="min-w-0 flex-1">
                 <div class="flex flex-wrap items-center gap-2">
                   <Badge variant="warn" size="sm" class="uppercase">stopped</Badge>
                   <span class="truncate text-sm font-medium text-foreground">No longer delivering: read access was removed</span>
                 </div>
                 <p class="mt-0.5 text-[11px] text-muted-foreground">
-                  Remove it to free one of your 50 watches.
+                  Delete it to free one of your 50 watches.
                 </p>
               </div>
               <div v-else class="min-w-0 flex-1">
@@ -159,10 +159,10 @@ watch(currentUser, () => void ensureLoaded())
                 class="text-destructive hover:text-destructive"
                 :disabled="deletingIds.includes(w.id) || writesDisabled"
                 :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
-                :aria-label="authorized ? `Remove watch on ${info?.label ?? w.path_prefix}` : 'Remove watch that stopped delivering'"
+                :aria-label="authorized ? `Stop watching ${info?.label ?? w.path_prefix}` : 'Delete the watch that stopped delivering'"
                 @click="onDelete(w)"
               >
-                <Trash2 class="h-4 w-4" /> Remove
+                <Trash2 class="h-4 w-4" /> {{ authorized ? 'Stop watching' : 'Delete' }}
               </Button>
             </li>
           </ul>

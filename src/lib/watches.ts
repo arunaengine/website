@@ -48,7 +48,7 @@ export const WATCH_EVENT_KINDS: WatchEventKindInfo[] = [
 // What every watch surface must state: where notifications appear, that they
 // are in-app only, how long they are kept and how they stop.
 export const WATCH_DELIVERY_NOTE =
-  'Notifications appear in the notification center under the bell icon. They are in-app only and are kept for 30 days. You can stop watching here or under Settings, Watched resources. If you lose read access, notifications stop.'
+  'Notifications appear under the bell icon in the top bar. They are in-app only and are kept for 30 days. You can stop watching here or under Settings, Watched resources. If you lose read access, notifications stop.'
 
 // Mirrors the backend rule in watch_permission_path: `meta/` accepts exactly
 // metadata_created, `s3/` any non-empty subset of the three data kinds.

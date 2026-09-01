@@ -116,9 +116,9 @@ describe('watched resources page', () => {
     const text = content(root)
 
     expect(text).toContain('No longer delivering: read access was removed')
-    expect(text).toContain('Remove it to free one of your 50 watches.')
+    expect(text).toContain('Delete it to free one of your 50 watches.')
 
-    await click(element(root, (node) => node.props['aria-label'] === 'Remove watch that stopped delivering'))
+    await click(element(root, (node) => node.props['aria-label'] === 'Delete the watch that stopped delivering'))
 
     expect(deleteWatch).toHaveBeenCalledWith('dead')
   })
