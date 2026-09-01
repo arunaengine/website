@@ -1026,7 +1026,7 @@ export const docsTopics: DocsTopic[] = [
         icon: 'Eraser',
         paragraphs: [
           'Delete permanently removes every version and delete marker of a file, folder or bucket on the node you are connected to, aborts its open uploads, and reports what it committed. Nothing brings them back, and a node that holds its own copy keeps it.',
-          'Delete bucket lives in the bucket settings. It also settles the sync relationships that point at the bucket, proves the bucket is empty, and only then removes it.',
+          'Delete bucket lives in the danger zone of the bucket\'s Storage page. It also settles the sync relationships that point at the bucket, proves the bucket is empty, and only then removes it.',
           'Everything destructive starts in the same dialog: it names the target and the node, shows what the target contains, and asks you to type the name for a folder or a bucket.',
         ],
       },

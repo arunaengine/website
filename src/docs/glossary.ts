@@ -221,10 +221,24 @@ export const glossaryTopic: DocsTopic = {
       ],
     },
     {
-      title: 'Purge',
+      title: 'Show deleted',
+      icon: 'Eye',
+      paragraphs: [
+        'The object browser toggle that lists the files whose newest version is a [delete marker](concept:glossary#delete-marker), each with a Restore action.',
+      ],
+    },
+    {
+      title: 'Restore',
+      icon: 'RotateCcw',
+      paragraphs: [
+        'Deletes the delete marker of a file, so the newest earlier version is the current one again. Nothing is copied and the quota does not change.',
+      ],
+    },
+    {
+      title: 'Delete permanently',
       icon: 'Eraser',
       paragraphs: [
-        'The node\'s own word for removing every version of an object or bucket. The portal calls it [Delete permanently](concept:data-and-deletion#delete-permanently-is-separate): it is node-local, resumable, and nothing brings the data back.',
+        'Removes every version and delete marker of a file, folder or bucket on this node; other nodes keep their copies. It runs as a system job the API calls a purge, and nothing brings the data back; see [Delete permanently is separate](concept:data-and-deletion#delete-permanently-is-separate).',
       ],
     },
     {
