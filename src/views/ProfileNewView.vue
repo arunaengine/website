@@ -23,6 +23,8 @@ import { CheckCircle2, ArrowLeft, ArrowRight, FileUp, KeyRound, Lock, Plus } fro
 import { useAruna } from '@/composables/useAruna'
 import { useS3 } from '@/composables/useS3'
 import { useProfilePublish } from '@/composables/useProfilePublish'
+import { useProfileReferences } from '@/composables/useProfileReferences'
+import { profileReferenceIri } from '@/composables/aruna/profileIri'
 import type { MetadataProfile } from '@/data/types'
 import { buildProfileArtifactTexts, buildProfileCrate } from '@/lib/profiles/rocrate'
 import { entityRulesToMode } from '@/lib/profiles/mode'
@@ -149,6 +151,17 @@ const blockers = computed(() => profileBlockers({
   publishing: publishing.value,
 }))
 const blockerMessages = computed(() => blockers.value.map((blocker) => blocker.message))
+
+// Turning a stored public profile back into a group profile leaves the datasets
+// of other groups that declare it unable to save (decision Q14), so the edit
+// flow names them. The IRI stays null everywhere else, and nothing is looked up.
+const referenceIri = computed(() =>
+  isEditing.value && editProfile.value?.managed && !builder.isPublic
+    ? profileReferenceIri(editProfile.value) ?? null
+    : null,
+)
+const { warning: referenceWarning } = useProfileReferences(referenceIri)
+const referenceWarnings = computed(() => (referenceWarning.value ? [referenceWarning.value.message] : []))
 
 // Fetch the group's buckets when the publish destination block first appears.
 watch(
@@ -414,7 +427,12 @@ async function submit() {
       <WizardSteps :steps="steps" :current="step - 1" />
 
       <div class="surface space-y-4 p-5">
-        <ProfileBasicsStep v-if="step === 1 && isEditing" :builder="builder" locked />
+        <ProfileBasicsStep
+          v-if="step === 1 && isEditing"
+          :builder="builder"
+          :reference-warning="referenceWarning"
+          locked
+        />
         <Tabs v-else-if="step === 1" v-model="startTab">
           <TabsList>
             <TabsTrigger value="create"><Plus class="mr-1 size-3.5" /> Create</TabsTrigger>
@@ -439,7 +457,13 @@ async function submit() {
           </TabsContent>
         </Tabs>
         <ProfileEntityRulesStep v-else-if="step === 2" :builder="builder" />
-        <ProfileReviewStep v-else :builder="builder" :blockers="blockers" @step="(target: number) => (step = target)" />
+        <ProfileReviewStep
+          v-else
+          :builder="builder"
+          :blockers="blockers"
+          :warnings="referenceWarnings"
+          @step="(target: number) => (step = target)"
+        />
 
         <Notice v-if="builder.submitError" tone="error">{{ builder.submitError }}</Notice>
       </div>

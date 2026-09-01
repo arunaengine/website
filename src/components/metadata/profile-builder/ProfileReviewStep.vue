@@ -24,8 +24,9 @@ import type { ProfileBlocker } from './state/blockers'
 import type { ProfileBuilder } from './useProfileBuilder'
 
 const props = withDefaults(
-  defineProps<{ builder: ProfileBuilder; blockers?: ProfileBlocker[] }>(),
-  { blockers: () => [] },
+  // `warnings` read like blockers but gate nothing: saving stays allowed.
+  defineProps<{ builder: ProfileBuilder; blockers?: ProfileBlocker[]; warnings?: string[] }>(),
+  { blockers: () => [], warnings: () => [] },
 )
 const emit = defineEmits<{ (e: 'step', step: number): void }>()
 const builder = props.builder
@@ -181,6 +182,14 @@ function violationsFor(property: string) {
     <div v-else data-tour="profile-review" class="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm font-medium text-emerald-700 dark:text-emerald-300">
       <CheckCircle2 class="h-4 w-4" /> This profile is ready to create.
     </div>
+
+    <!-- What saving changes for someone else, in the same shape as the blockers
+         above; the button stays enabled. -->
+    <Notice v-if="warnings.length" tone="warning" :lines="warnings" class="rounded-lg p-3">
+      <div class="flex items-center gap-2 text-sm font-medium">
+        <AlertTriangle class="h-4 w-4" /> Check before saving
+      </div>
+    </Notice>
 
     <!-- Visibility is chosen once, on the basics step; here it is only stated. -->
     <div class="rounded-lg border border-border p-3">

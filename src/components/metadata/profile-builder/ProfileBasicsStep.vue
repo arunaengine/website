@@ -14,11 +14,16 @@ import { useArtifactFetch } from './useArtifactFetch'
 import { sameSchemaOrgType } from '@/lib/profiles/uri'
 import { errorMessage } from '@/lib/utils'
 import type { ProfileEntityRule } from '@/lib/profiles/types'
+import type { ProfileReferenceWarning } from '@/composables/useProfileReferences'
 import type { ProfileBuilder } from './useProfileBuilder'
 
 // `locked` freezes the profile's stored identity (owning group and slug/path)
 // while editing an existing document; all other fields stay editable.
-const props = defineProps<{ builder: ProfileBuilder; locked?: boolean }>()
+const props = defineProps<{
+  builder: ProfileBuilder
+  locked?: boolean
+  referenceWarning?: ProfileReferenceWarning | null
+}>()
 const builder = props.builder
 
 // Inline error per basics input, from the same field-keyed validation that
@@ -202,7 +207,7 @@ watch(
       <p v-if="fieldError('description')" class="mt-1 text-[11px] text-destructive">{{ fieldError('description') }}</p>
     </div>
 
-    <ProfileVisibility :builder="builder" />
+    <ProfileVisibility :builder="builder" :reference-warning="referenceWarning" />
 
     <!-- SHACL shapes (advanced): optional expert attachment, collapsed by default. -->
     <div class="rounded-md border border-border">
