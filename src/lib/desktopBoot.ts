@@ -45,7 +45,7 @@ export function realmOrigin(): string {
 // Reachable means the origin answered with a JSON document: a proxy error page
 // or a captive portal is not this realm's API, whatever status it carries.
 async function unreachable(): Promise<string | null> {
-  const url = `${portalConfig().apiBaseUrl.replace(/\/+$/, '')}/info`
+  const url = `${portalConfig().apiBaseUrl.replace(/\/+$/, '')}/system/info`
   try {
     const response = await fetchWithTimeout(url, { headers: { Accept: 'application/json' } }, ATTEMPT_TIMEOUT_MS)
     JSON.parse(await response.text())

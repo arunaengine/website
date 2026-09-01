@@ -35,7 +35,7 @@ describe('realm probe', () => {
     await boot.probeRealm()
     expect(boot.realmReach.value).toBe('reachable')
     expect(answered).toHaveBeenCalledTimes(1)
-    expect(String(answered.mock.calls[0][0])).toBe(`${REALM}/info`)
+    expect(String(answered.mock.calls[0][0])).toBe(`${REALM}/system/info`)
   })
 
   it('condemns a realm only once every attempt failed', async () => {

@@ -5,7 +5,7 @@ export interface NodeProbe {
   state: 'ok' | 'unreachable'
   info: InfoResponse | null
   usage: UsageResponse | null
-  /** Browser-measured duration of the /info request, in milliseconds. */
+  /** Browser-measured duration of the /system/info request, in milliseconds. */
   latencyMs?: number
   error?: string
 }
@@ -37,17 +37,17 @@ export async function probeNode(apiBase: string): Promise<NodeProbe> {
     // sequential samples are taken: the first pays DNS/TCP/TLS setup, the
     // second reuses the warm connection; the reported latency is the minimum.
     const coldStart = performance.now()
-    const info = await fetchJson<InfoResponse>(`${apiBase}/info`)
+    const info = await fetchJson<InfoResponse>(`${apiBase}/system/info`)
     let latencyMs = performance.now() - coldStart
     try {
       const warmStart = performance.now()
-      await fetchJson<InfoResponse>(`${apiBase}/info`)
+      await fetchJson<InfoResponse>(`${apiBase}/system/info`)
       latencyMs = Math.min(latencyMs, performance.now() - warmStart)
     } catch {
       // The warm sample is best-effort; keep the cold measurement.
     }
-    // /info/usage is still rolling out; a 404 must not mark the node unreachable.
-    const usage = await fetchJson<UsageResponse>(`${apiBase}/info/usage`).catch(() => null)
+    // /system/usage is still rolling out; a 404 must not mark the node unreachable.
+    const usage = await fetchJson<UsageResponse>(`${apiBase}/system/usage`).catch(() => null)
     return { state: 'ok', info, usage, latencyMs }
   } catch (err) {
     const timedOut = err instanceof DOMException && err.name === 'AbortError'
