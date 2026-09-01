@@ -14,6 +14,7 @@ import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import WatchButton from '@/components/watches/WatchButton.vue'
 import { useAruna } from '@/composables/useAruna'
 import type { DataManager } from '@/composables/useDataManager'
+import type { DeletionResult } from '@/lib/deletion/request'
 import { useS3, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
 import { usePlacementPolicies } from '@/composables/usePlacementPolicies'
 import { featureEnabled } from '@/lib/config'
@@ -99,6 +100,7 @@ const {
   restoringKey,
   restoreObject,
   requestDelete,
+  onDeleteCompleted,
 } = props.manager
 
 // One entry for everything this bucket stores: the Storage page. The badge
@@ -183,6 +185,7 @@ function deleteRestorable(key: string) {
     nodeId: remoteNodeId.value,
     key,
     headState: 'marker',
+    option: 'delete-permanently',
   })
 }
 

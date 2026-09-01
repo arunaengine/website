@@ -28,6 +28,7 @@ import {
   requestNoun,
   requestScope,
   type DeleteRequest,
+  type DeletionResult,
 } from '@/lib/deletion/request'
 import {
   createStoragePurgeOperation,
@@ -42,7 +43,7 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 const props = defineProps<{ request: DeleteRequest | null; syncApplies?: boolean }>()
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'completed', result: { request: DeleteRequest; option: DeletionOption; committed: string[] }): void
+  (e: 'completed', result: DeletionResult): void
 }>()
 
 const s3 = useS3()

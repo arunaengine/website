@@ -12,7 +12,7 @@ import Notice from '@/components/ui/Notice.vue'
 import RefusalNote from '@/components/ui/RefusalNote.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { useS3, s3ErrorMessage } from '@/composables/useS3'
-import { deletionOptions } from '@/lib/deletion/options'
+import { deletionOptions, type DeletionOptionId } from '@/lib/deletion/options'
 import type { DeleteRequest } from '@/lib/deletion/request'
 import type { ObjectVersionEntry } from '@/lib/objectVersions'
 import { stateVariant } from '@/lib/stateBadge'
@@ -79,8 +79,9 @@ function badgeLabel(entry: ObjectVersionEntry): string {
   return entry.isLatest ? 'Current' : 'Older'
 }
 
-function target(entry: ObjectVersionEntry): DeleteRequest {
+function target(entry: ObjectVersionEntry, option: DeletionOptionId): DeleteRequest {
   return {
+    option,
     kind: entry.deleteMarker ? 'marker' : 'version',
     bucket: props.bucket,
     nodeId: props.nodeId ?? null,
@@ -198,7 +199,7 @@ Its S3 endpoint does not allow cross-origin browsing from this portal, so its ve
               size="sm"
               :disabled="Boolean(option(entry, 'make-current')?.disabledReason)"
               :title="option(entry, 'make-current')?.description"
-              @click="emit('delete', target(entry))"
+              @click="emit('delete', target(entry, 'make-current'))"
             >
               Make current
             </Button>
@@ -207,7 +208,7 @@ Its S3 endpoint does not allow cross-origin browsing from this portal, so its ve
               label="Delete this version…"
               class="text-destructive hover:text-destructive"
               :disabled-reason="option(entry, 'delete-version')?.disabledReason ?? null"
-              @click="emit('delete', target(entry))"
+              @click="emit('delete', target(entry, 'delete-version'))"
             >
               <Trash2 class="size-3.5" />
             </IconButton>

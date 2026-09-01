@@ -2,7 +2,12 @@
 // dialog needs to name, price and perform the deletion is in here; the
 // applicable outcomes come from deletionOptions.
 import type { StorageDeletionScope } from '@/lib/storageDeletion'
-import type { DeletionHeadState, DeletionKind, DeletionOptionId } from './options'
+import type {
+  DeletionHeadState,
+  DeletionKind,
+  DeletionOption,
+  DeletionOptionId,
+} from './options'
 
 export interface DeleteRequest {
   kind: DeletionKind
@@ -21,6 +26,14 @@ export interface DeleteRequest {
   bytes?: number
   /** Which applicable outcome the control that opened the dialog meant. */
   option?: DeletionOptionId
+}
+
+/** What a finished deletion reports back to the surface that asked for it. */
+export interface DeletionResult {
+  request: DeleteRequest
+  option: DeletionOption
+  /** Keys (or the bucket name) the node confirmed as done. */
+  committed: string[]
 }
 
 /** The REST preflight and purge scope, or null for a kind that has none. */

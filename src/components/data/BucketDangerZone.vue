@@ -6,12 +6,12 @@ import Button from '@/components/ui/Button.vue'
 import RefusalNote from '@/components/ui/RefusalNote.vue'
 import DeleteDialog from '@/components/data/DeleteDialog.vue'
 import { useS3 } from '@/composables/useS3'
-import type { DeleteRequest } from '@/lib/deletion/request'
+import type { DeleteRequest, DeletionResult } from '@/lib/deletion/request'
 import { computed, ref } from 'vue'
 import { Trash2 } from '@lucide/vue'
 
 const props = defineProps<{ bucket: string; nodeId?: string | null }>()
-const emit = defineEmits<{ (e: 'deleted', bucket: string): void }>()
+const emit = defineEmits<{ (e: 'deleted', result: DeletionResult): void }>()
 
 const s3 = useS3()
 const request = ref<DeleteRequest | null>(null)
@@ -53,7 +53,7 @@ function open() {
     <DeleteDialog
       :request="request"
       @close="request = null"
-      @completed="emit('deleted', props.bucket)"
+      @completed="(result: DeletionResult) => emit('deleted', result)"
     />
   </section>
 </template>

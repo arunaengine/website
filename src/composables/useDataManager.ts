@@ -23,8 +23,7 @@ import {
 } from './useS3'
 import { bucketNameProblem } from '@/lib/bucketName'
 import { readStored, storeValue } from './aruna/state'
-import type { DeletionOption } from '@/lib/deletion/options'
-import { requestScope, type DeleteRequest } from '@/lib/deletion/request'
+import { requestScope, type DeleteRequest, type DeletionResult } from '@/lib/deletion/request'
 import type { DeletedObjectEntry } from '@/lib/objectVersions'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
 import type { StorageDeletionScope } from '@/lib/storageDeletion'
@@ -991,14 +990,12 @@ export function useDataManager() {
     return keyIsSynced(request.key ?? '')
   })
 
-  async function onDeleteCompleted(result: {
-    request: DeleteRequest
-    option: DeletionOption
-    committed: string[]
-  }) {
+  // Called after every attempt, committed or not: a partly failed folder delete
+  // still changed the listing.
+  async function onDeleteCompleted(result: DeletionResult) {
     const { request, option, committed } = result
-    if (!committed.length) return
     if (request.kind === 'bucket') {
+      if (!committed.length) return
       shortcuts.remove(request.bucket, request.nodeId)
       if (bucket.value === request.bucket && remoteNodeId.value === request.nodeId) {
         await router.push({ name: 'buckets' })
@@ -1007,16 +1004,18 @@ export function useDataManager() {
       void loadSyncOverview()
       return
     }
-    const scope = requestScope(request)
-    if (scope) pruneSelectedObjectKeys(scope, request.nodeId)
     const done = new Set(committed)
-    if (request.kind === 'selection') {
-      selectedObjectKeys.value = new Set(
-        [...selectedObjectKeys.value].filter((key) => !done.has(key)),
-      )
+    if (committed.length) {
+      const scope = requestScope(request)
+      if (scope) pruneSelectedObjectKeys(scope, request.nodeId)
+      if (request.kind === 'selection') {
+        selectedObjectKeys.value = new Set(
+          [...selectedObjectKeys.value].filter((key) => !done.has(key)),
+        )
+      }
     }
     if (request.bucket !== bucket.value || request.nodeId !== remoteNodeId.value) return
-    if (option.id === 'delete' || option.id === 'delete-permanently') {
+    if (committed.length && (option.id === 'delete' || option.id === 'delete-permanently')) {
       dropPreviewUnder((key) =>
         request.kind === 'folder'
           ? key.startsWith(request.key ?? '')
