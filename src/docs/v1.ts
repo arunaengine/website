@@ -329,7 +329,7 @@ export const docsTopics: DocsTopic[] = [
         route: '/app/datasets/new',
         anchor: 'editor-add-files',
         title: 'Attach files',
-        body: 'Add files references bucket objects in the dataset graph; the bytes stay in the bucket.',
+        body: 'Add files records bucket objects as parts of the dataset; the bytes stay in the bucket.',
       },
       {
         route: '/app/datasets/new',
@@ -373,9 +373,11 @@ export const docsTopics: DocsTopic[] = [
         title: 'Attach files from a bucket',
         icon: 'Files',
         steps: [
-          'Choose Add files in the left panel.',
+          'Choose Add files in the left panel, or Add files on the Has part row of any dataset or folder.',
           'Pick From a bucket, select the [bucket](concept:data-and-deletion#buckets-hold-the-bytes), tick the [objects](concept:glossary#object).',
-          'Add the selection; the files become entities of the dataset [graph](concept:glossary#graph).',
+          'Add the selection; the files become entities of the dataset [graph](concept:glossary#graph) and appear on the Has part row.',
+          'The same dialog uploads new objects, links another dataset, reuses something already here, or records an external URL.',
+          'Has part is an ordinary row: its menu unlinks an entry, and unlinking the last link to a file offers to remove the file as well. A file the dataset cannot reach is flagged, because the node refuses it.',
         ],
         image: {
           src: '/docs/v1/dataset-addfiles.jpg',
