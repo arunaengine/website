@@ -221,7 +221,7 @@ function onDrop(event: DragEvent) {
             size="sm"
             class="text-destructive hover:text-destructive"
             :disabled="selectedObjectCount === 0"
-            :title="`Delete ${selectedObjectCount} selected key${selectedObjectCount === 1 ? '' : 's'}`"
+            :title="selectedObjectCount === 0 ? 'Tick objects in the list to delete them.' : `Delete ${selectedObjectCount} selected object${selectedObjectCount === 1 ? '' : 's'}`"
             @click="deleteSelection"
           >
             <Trash2 class="h-4 w-4" /> Delete selected ({{ selectedObjectCount }})
