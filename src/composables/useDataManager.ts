@@ -21,6 +21,7 @@ import {
   type FolderEntry,
   type ObjectEntry,
 } from './useS3'
+import { bucketNameProblem } from '@/lib/bucketName'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
 import type { StorageDeletionScope } from '@/lib/storageDeletion'
 import { isWorkspaceBucket } from '@/lib/workspaces'
@@ -403,6 +404,20 @@ export function useDataManager() {
   const newBucketName = ref('')
   const creatingBucket = ref(false)
   const createBucketError = ref<string | null>(null)
+  // The rule the typed name breaks, and the session's own refusal, both shown
+  // under the input so the disabled button always states why.
+  const newBucketProblem = computed(() => {
+    const name = newBucketName.value.trim()
+    return name ? bucketNameProblem(name) : null
+  })
+  const newBucketRefusal = computed(() => {
+    const name = newBucketName.value.trim()
+    if (!name || newBucketProblem.value) return null
+    return s3.canWrite(name, undefined, remoteNodeId.value)
+      ? null
+      : 'This session does not allow creating that bucket.'
+  })
+  const createBucketBlocker = computed(() => newBucketProblem.value ?? newBucketRefusal.value)
 
   const uploadRestrictionError = ref<string | null>(null)
 
@@ -596,7 +611,7 @@ export function useDataManager() {
 
   async function createBucket() {
     const name = newBucketName.value.trim()
-    if (!name || !contextReady.value || !s3.canWrite(name, undefined, remoteNodeId.value)) return
+    if (!name || !contextReady.value || createBucketBlocker.value) return
     creatingBucket.value = true
     createBucketError.value = null
     try {
@@ -605,7 +620,7 @@ export function useDataManager() {
       await bucketList.refresh()
       openBucket(name)
     } catch (err) {
-      createBucketError.value = s3ErrorMessage(err)
+      createBucketError.value = s3ErrorMessage(err, name)
     } finally {
       creatingBucket.value = false
     }
@@ -927,6 +942,9 @@ export function useDataManager() {
     workspaceBuckets,
     workspacesOpen,
     newBucketName,
+    newBucketProblem,
+    newBucketRefusal,
+    createBucketBlocker,
     creatingBucket,
     createBucketError,
     createBucket,

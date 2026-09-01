@@ -39,6 +39,7 @@ import {
   inlineDependencies,
   type DependencyVerificationResult,
 } from '@/lib/quickDependencies'
+import { bucketNameProblem, objectKeyProblem } from '@/lib/bucketName'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import { errorMessage } from '@/lib/utils'
 import { targetProblems as collectTargetProblems } from '@/lib/runTarget'
@@ -212,11 +213,8 @@ function createStore(deps: QuickRunDeps) {
   // command works no matter what the uploaded key is called.
   const scriptContainerPath = computed(() => `${activeWorkdir.value}/${runtime.value.file}`)
   const normalizedScriptKey = computed(() => scriptKey.value.trim())
-  // A canonical object key: no leading slash, no empty or dot segments, and a
-  // non-empty basename (a key ending in / has an empty last segment).
-  const scriptKeyValid = computed(() =>
-    normalizedScriptKey.value.split('/').every((segment) => segment && segment !== '.' && segment !== '..'),
-  )
+  const scriptKeyProblem = computed(() => objectKeyProblem(normalizedScriptKey.value))
+  const scriptKeyValid = computed(() => !scriptKeyProblem.value)
   const stagingScriptUrl = computed(() => `s3://${stagingBucket.value.trim()}/${normalizedScriptKey.value}`)
   const dependencyConfigPath = computed(() => `${activeWorkdir.value}/deno.json`)
   // The generated deno.json sits next to the script object, whatever directory
@@ -575,6 +573,11 @@ function createStore(deps: QuickRunDeps) {
     const wanted = name.trim()
     if (!wanted || creatingBucket.value) return
     createBucketError.value = null
+    const problem = bucketNameProblem(wanted)
+    if (problem) {
+      createBucketError.value = problem
+      return
+    }
     if (!s3.canWrite(wanted)) {
       createBucketError.value = 'This session does not allow creating that bucket.'
       return
@@ -585,7 +588,7 @@ function createStore(deps: QuickRunDeps) {
       await loadBuckets()
       stagingBucket.value = wanted
     } catch (err) {
-      createBucketError.value = s3ErrorMessage(err)
+      createBucketError.value = s3ErrorMessage(err, wanted)
     } finally {
       creatingBucket.value = false
     }
@@ -838,6 +841,7 @@ function createStore(deps: QuickRunDeps) {
     scriptContainerPath,
     normalizedScriptKey,
     scriptKeyValid,
+    scriptKeyProblem,
     dependencyConfig,
     dependencyConfigKey,
     stagedScript,

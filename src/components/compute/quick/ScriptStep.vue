@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Script editor and the data it works on; mounts sit next to the editor so
 // container paths are visible while the script is written.
-import { defineAsyncComponent, ref } from 'vue'
+import { computed, defineAsyncComponent, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
@@ -15,6 +15,7 @@ import ContainerDataPanel from '@/components/compute/quick/ContainerDataPanel.vu
 import DependenciesTab from '@/components/compute/quick/DependenciesTab.vue'
 import { injectQuickRun } from '@/composables/useQuickRun'
 import { asyncChunkError } from '@/lib/chunk-recovery'
+import { BUCKET_NAME_REQUIREMENT, bucketNameProblem } from '@/lib/bucketName'
 import { FolderOpen, FolderPlus, KeyRound, Plus } from '@lucide/vue'
 
 // CodeMirror lands on its own async chunk, mounted only at the script step.
@@ -42,6 +43,7 @@ const {
   stagingBucketValid,
   scriptKey,
   scriptKeyValid,
+  scriptKeyProblem,
   defaultScriptKey,
   setScriptKey,
   stagedFileUrl,
@@ -55,6 +57,11 @@ const {
 } = injectQuickRun()
 
 const newBucket = ref('')
+// The node's own bucket rule, checked before the request leaves the browser.
+const newBucketProblem = computed(() => {
+  const name = newBucket.value.trim()
+  return name ? bucketNameProblem(name) : null
+})
 </script>
 
 <template>
@@ -111,17 +118,18 @@ const newBucket = ref('')
                 class="h-8 w-40 shrink-0 font-mono"
                 placeholder="new-bucket-name"
                 aria-label="New bucket name"
+                :invalid="newBucketProblem ? 'error' : undefined"
                 @keyup.enter="createBucket(newBucket)"
               />
-              <Button variant="outline" size="sm" :disabled="creatingBucket || !newBucket.trim()" @click="createBucket(newBucket)">
+              <Button variant="outline" size="sm" :disabled="creatingBucket || !newBucket.trim() || Boolean(newBucketProblem)" @click="createBucket(newBucket)">
                 <FolderPlus class="h-3.5 w-3.5" /> Create bucket
               </Button>
             </div>
             <p v-if="createBucketError" class="text-[11px] text-destructive">{{ createBucketError }}</p>
+            <p v-else-if="newBucketProblem" class="text-[11px] text-destructive">{{ newBucketProblem }}</p>
+            <p v-else class="text-[11px] text-muted-foreground">{{ BUCKET_NAME_REQUIREMENT }}</p>
           </div>
-          <p v-else-if="!scriptKeyValid" class="mt-1 text-[11px] text-destructive">
-            Use an object key without a leading slash or empty segments, ending in a file name.
-          </p>
+          <p v-else-if="scriptKeyProblem" class="mt-1 text-[11px] text-destructive">{{ scriptKeyProblem }}</p>
           <p v-else class="mt-1 truncate font-mono text-[11px] text-muted-foreground" :title="stagedFileUrl">{{ stagedFileUrl }}</p>
           <p class="mt-1 text-[11px] text-muted-foreground">
             {{ reuseSelectedScript ? 'Generated dependency files are uploaded here.' : "The default key keeps each run's copy separate, so a repeat never overwrites a script an earlier run references." }}

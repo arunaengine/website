@@ -11,6 +11,7 @@ import {
   mountApp,
   typeValue,
 } from '@/test/clientRender'
+import * as BucketName from '@/lib/bucketName'
 
 const createBucket = vi.fn(async () => undefined)
 
@@ -31,6 +32,7 @@ function quickRun() {
     stagingBucketValid: ref(false),
     scriptKey: ref('quickruns/main.py'),
     scriptKeyValid: ref(true),
+    scriptKeyProblem: ref<string | null>(null),
     defaultScriptKey: ref('quickruns/main.py'),
     setScriptKey: vi.fn(),
     stagedFileUrl: ref('s3://results/quickruns/main.py'),
@@ -83,6 +85,7 @@ const ScriptStep = compileClientComponent(new URL('./ScriptStep.vue', import.met
   '@/components/compute/ScriptEditor.vue': moduleDefault(EmptyStub),
   '@/composables/useQuickRun': { injectQuickRun: () => scene },
   '@/lib/chunk-recovery': { asyncChunkError: () => {} },
+  '@/lib/bucketName': BucketName,
 })
 
 function nameField(root: Parameters<typeof content>[0]) {
@@ -103,6 +106,16 @@ describe('ScriptStep bucket creation', () => {
     await click(button(mounted.root, 'Create bucket'))
 
     expect(createBucket).toHaveBeenCalledWith('results')
+    mounted.app.unmount()
+  })
+
+  it('names the broken rule before the request', async () => {
+    const mounted = await mountApp(ScriptStep)
+
+    await typeValue(nameField(mounted.root), 'b1')
+
+    expect(content(mounted.root)).toContain('Bucket names must contain at least 3 characters.')
+    expect(button(mounted.root, 'Create bucket').props.disabled).toBe(true)
     mounted.app.unmount()
   })
 

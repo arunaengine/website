@@ -9,6 +9,7 @@ import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
 import { useS3 } from '@/composables/useS3'
 import type { DataManager } from '@/composables/useDataManager'
 import type { BucketSearchHit } from '@/lib/api'
+import { BUCKET_NAME_REQUIREMENT } from '@/lib/bucketName'
 import { Boxes, ChevronRight, FolderPlus, History, KeyRound, Trash2 } from '@lucide/vue'
 
 const props = defineProps<{ manager: DataManager }>()
@@ -37,6 +38,9 @@ const {
   bucketsError,
   bucketsAuthError,
   newBucketName,
+  newBucketProblem,
+  newBucketRefusal,
+  createBucketBlocker,
   creatingBucket,
   createBucket,
   createBucketError,
@@ -148,13 +152,23 @@ const {
       </template>
       <footer class="space-y-2 border-t border-border p-3">
         <div class="flex gap-2">
-          <Input v-model="newBucketName" data-tour="bucket-create" placeholder="new-bucket-name" class="h-8 font-mono text-xs" @keyup.enter="createBucket" />
-          <Button variant="outline" size="sm" :disabled="creatingBucket || !newBucketName.trim() || !s3.canWrite(newBucketName.trim(), undefined, remoteNodeId)" title="Create a bucket only when the session permits this path" @click="createBucket">
+          <Input
+            v-model="newBucketName"
+            data-tour="bucket-create"
+            placeholder="new-bucket-name"
+            class="h-8 font-mono text-xs"
+            :invalid="newBucketProblem ? 'error' : undefined"
+            aria-label="New bucket name"
+            @keyup.enter="createBucket"
+          />
+          <Button variant="outline" size="sm" aria-label="Create bucket" :disabled="creatingBucket || !newBucketName.trim() || Boolean(createBucketBlocker)" @click="createBucket">
             <FolderPlus class="h-4 w-4" />
           </Button>
         </div>
         <p v-if="createBucketError" class="text-xs text-destructive">{{ createBucketError }}</p>
-        <p v-else-if="newBucketName.trim() && !s3.canWrite(newBucketName.trim(), undefined, remoteNodeId)" class="text-xs text-muted-foreground">This session does not allow creating that bucket.</p>
+        <p v-else-if="newBucketProblem" class="text-xs text-destructive">{{ newBucketProblem }}</p>
+        <p v-else-if="newBucketRefusal" class="text-xs text-muted-foreground">{{ newBucketRefusal }}</p>
+        <p v-else class="text-xs text-muted-foreground">{{ BUCKET_NAME_REQUIREMENT }}</p>
       </footer>
     </div>
   </aside>

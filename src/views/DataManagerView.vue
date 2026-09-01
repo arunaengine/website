@@ -27,6 +27,7 @@ import { useDataManager } from '@/composables/useDataManager'
 import { providePageContext } from '@/composables/usePageContext'
 import { useStaging } from '@/composables/useStaging'
 import { useS3, s3ErrorMessage } from '@/composables/useS3'
+import { folderNameProblem } from '@/lib/bucketName'
 import { featureEnabled } from '@/lib/config'
 import { isDesktop } from '@/lib/desktop'
 import type { BucketSearchHit } from '@/lib/api'
@@ -153,10 +154,9 @@ const newFolderOpen = ref(false)
 const newFolderName = ref('')
 const newFolderBusy = ref(false)
 const newFolderError = ref<string | null>(null)
-const newFolderInvalid = computed(() => {
-  const name = newFolderName.value.trim()
-  return !name || name.includes('/')
-})
+// An empty name is invalid too, but says nothing until a person types.
+const newFolderProblem = computed(() => folderNameProblem(newFolderName.value.trim()))
+const newFolderInvalid = computed(() => Boolean(newFolderProblem.value))
 
 function openNewFolder() {
   if (!canWriteCurrentPrefix.value) return
@@ -366,8 +366,20 @@ async function createFolder() {
           </DialogDescription>
         </DialogHeader>
         <div class="space-y-2">
-          <Input v-model="newFolderName" placeholder="folder-name" class="font-mono text-xs" @keyup.enter="createFolder" />
-          <p v-if="newFolderName.trim().includes('/')" class="text-xs text-destructive">The folder name cannot contain '/'.</p>
+          <Input
+            v-model="newFolderName"
+            placeholder="folder-name"
+            class="font-mono text-xs"
+            :invalid="newFolderName.trim() && newFolderProblem ? 'error' : undefined"
+            @keyup.enter="createFolder"
+          />
+          <p v-if="newFolderName.trim() && newFolderProblem" class="text-xs text-destructive">{{ newFolderProblem }}</p>
+          <p
+            v-else-if="newFolderName.trim() && !s3.canWrite(bucket, `${s3Prefix}${newFolderName.trim()}/`, remoteNodeId)"
+            class="text-xs text-muted-foreground"
+          >
+            This session does not allow creating a folder here.
+          </p>
           <Notice v-if="newFolderError" tone="error">{{ newFolderError }}</Notice>
         </div>
         <DialogFooter>
