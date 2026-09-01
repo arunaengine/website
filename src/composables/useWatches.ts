@@ -11,13 +11,12 @@ import { useAruna } from '@/composables/useAruna'
 import { errorMessage } from '@/lib/utils'
 
 // Module-singleton state shared by every watch surface (buttons, settings
-// list), mirroring useNotifications: 404/405 marks the endpoints absent and
-// 403 marks the token unauthorized; both hide the feature for the session.
+// list). Only 404/405 on the list hides the feature: a refused create is one
+// resource saying no, not the endpoint being absent.
 
 const { apiBaseUrl, authToken, currentUser } = useAruna()
 
 const supported = ref(true)
-const forbidden = ref(false)
 const watches = ref<ApiWatch[]>([])
 const listLoaded = ref(false)
 const listLoading = ref(false)
@@ -25,19 +24,15 @@ const listError = ref<string | null>(null)
 const creating = ref(false)
 const deletingIds = ref<string[]>([])
 
-const available = computed(() => supported.value && !forbidden.value && Boolean(currentUser.value))
+const available = computed(() => supported.value && Boolean(currentUser.value))
 
 function request<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
   return apiRequest<T>(path, options, { baseUrl: apiBaseUrl.value, token: authToken.value })
 }
 
-function noteUnavailable(err: unknown): boolean {
+function noteUnsupported(err: unknown): boolean {
   if (err instanceof ApiError && (err.status === 404 || err.status === 405)) {
     supported.value = false
-    return true
-  }
-  if (err instanceof ApiError && err.status === 403) {
-    forbidden.value = true
     return true
   }
   return false
@@ -52,7 +47,7 @@ async function loadWatches(): Promise<void> {
     watches.value = [...res.watches].sort((a, b) => b.created_at_ms - a.created_at_ms)
     listLoaded.value = true
   } catch (err) {
-    if (!noteUnavailable(err)) listError.value = errorMessage(err)
+    if (!noteUnsupported(err)) listError.value = errorMessage(err)
   } finally {
     listLoading.value = false
   }
@@ -64,8 +59,8 @@ async function ensureLoaded(): Promise<void> {
   await loadWatches()
 }
 
-// Throws upward so dialogs can render the message (e.g. the 409 cap error)
-// verbatim; unavailability is still recorded to hide the feature.
+// Throws upward so the dialog renders the message (a refused create, the 409
+// cap error) instead of the feature disappearing for the session.
 async function createWatch(pathPrefix: string, events: string[]): Promise<ApiWatch> {
   creating.value = true
   try {
@@ -76,9 +71,6 @@ async function createWatch(pathPrefix: string, events: string[]): Promise<ApiWat
     })
     watches.value = [created, ...watches.value.filter((w) => w.id !== created.id)]
     return created
-  } catch (err) {
-    noteUnavailable(err)
-    throw err
   } finally {
     creating.value = false
   }
@@ -89,9 +81,6 @@ async function deleteWatch(id: string): Promise<void> {
   try {
     await request<void>(`/system/notifications/watches/${encodeURIComponent(id)}`, { method: 'DELETE' })
     watches.value = watches.value.filter((w) => w.id !== id)
-  } catch (err) {
-    noteUnavailable(err)
-    throw err
   } finally {
     deletingIds.value = deletingIds.value.filter((d) => d !== id)
   }
@@ -110,7 +99,6 @@ if (typeof window !== 'undefined') {
     (id, prev) => {
       if (id === prev) return
       supported.value = true
-      forbidden.value = false
       watches.value = []
       listLoaded.value = false
       listError.value = null
