@@ -6,12 +6,12 @@ import {
 } from '@/lib/api'
 import { request, saving } from './state'
 
-// ── Group storage backends (GET/POST /groups/{gid}/storage-backends) ────────
+// ── Group storage backends (GET/POST /data/groups/{gid}/storage/backends) ────────
 // Every route takes group ADMIN. Secrets are write-only: no response echoes
 // them back, so a caller can only replace them, never read them.
 
 export async function listGroupBackends(groupId: string): Promise<ListGroupBackendsResponse> {
-  return request<ListGroupBackendsResponse>(`/groups/${groupId}/storage-backends`)
+  return request<ListGroupBackendsResponse>(`/data/groups/${groupId}/storage/backends`)
 }
 
 export async function createGroupBackend(
@@ -20,7 +20,7 @@ export async function createGroupBackend(
 ): Promise<GroupBackendResponse> {
   saving.value = true
   try {
-    return await request<GroupBackendResponse>(`/groups/${groupId}/storage-backends`, {
+    return await request<GroupBackendResponse>(`/data/groups/${groupId}/storage/backends`, {
       method: 'POST',
       body: JSON.stringify(input),
     })
@@ -39,7 +39,7 @@ export async function replaceGroupBackend(
   saving.value = true
   try {
     return await request<GroupBackendResponse>(
-      `/groups/${groupId}/storage-backends/${encodeURIComponent(backendId)}`,
+      `/data/groups/${groupId}/storage/backends/${encodeURIComponent(backendId)}`,
       { method: 'PUT', body: JSON.stringify(input) },
     )
   } finally {
@@ -53,7 +53,7 @@ export async function replaceGroupBackend(
 export async function disableGroupBackend(groupId: string, backendId: string): Promise<void> {
   saving.value = true
   try {
-    await request<void>(`/groups/${groupId}/storage-backends/${encodeURIComponent(backendId)}`, {
+    await request<void>(`/data/groups/${groupId}/storage/backends/${encodeURIComponent(backendId)}`, {
       method: 'DELETE',
     })
   } finally {
@@ -69,7 +69,7 @@ export async function enableGroupBackend(
   saving.value = true
   try {
     return await request<GroupBackendResponse>(
-      `/groups/${groupId}/storage-backends/${encodeURIComponent(backendId)}/enable`,
+      `/data/groups/${groupId}/storage/backends/${encodeURIComponent(backendId)}/enable`,
       { method: 'POST' },
     )
   } finally {

@@ -1,5 +1,5 @@
 // ── Group storage backends ──────────────────────────────────────────────────
-// GET/POST /groups/{gid}/storage-backends, GET/PUT/DELETE .../{bid}: verified
+// GET/POST /data/groups/{gid}/storage/backends, GET/PUT/DELETE .../{bid}: verified
 // against aruna api/src/routes/group_backends.rs, with the per-kind key
 // allowlists in operations/src/group_backends/validation.rs. Every route takes
 // group ADMIN. Secrets live in their own keyspace and are never returned.

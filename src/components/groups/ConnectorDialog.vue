@@ -192,7 +192,7 @@ function requestBody() {
 }
 
 // "Test connection" runs the inline-config check BEFORE anything is saved
-// (agreed contract: POST /groups/{gid}/connectors/check with the current form
+// (agreed contract: POST /data/groups/{gid}/connectors/check with the current form
 // values, secrets included). Older nodes without the endpoint hide the button.
 const testing = ref(false)
 const testResult = ref<ConnectorCheckResponse | null>(null)

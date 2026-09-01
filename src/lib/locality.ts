@@ -1,4 +1,4 @@
-// Reads GET /blobs/locations together with the executor kinds nodes advertise
+// Reads GET /data/blobs/locations together with the executor kinds nodes advertise
 // in GET /info/realm, and says whether the work could run where the data
 // already is. This is a hint about the inputs a run declares, not the plan:
 // the planner screens every advertisement itself and seals its own decision.

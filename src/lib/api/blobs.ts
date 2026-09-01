@@ -1,5 +1,5 @@
 // ── Object storage locations ────────────────────────────────────────────────
-// GET /blobs/locations?bucket=&path=&version_id=. Verified against aruna
+// GET /data/blobs/locations?bucket=&path=&version_id=. Verified against aruna
 // api/src/routes/blobs.rs. Reports where the copies of ONE version physically
 // live, one entry per destination: `node_id` repeats when a node holds the
 // version under several paths, so only `(node_id, bucket, key)` identifies one.
@@ -48,7 +48,7 @@ export interface BlobLocationsResponse {
   limits: LocationScanLimit[]
 }
 
-// POST /blobs/replicate: asks one node to fetch a copy. Answered 202: the
+// POST /data/blobs/replicate: asks one node to fetch a copy. Answered 202: the
 // copy is queued, not stored yet. Needs WRITE on the object (or the bucket
 // when `path` is omitted). `version_id` without `path` is a 400.
 export interface ReplicateBlobRequest {

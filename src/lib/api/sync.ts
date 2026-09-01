@@ -1,12 +1,12 @@
 // ---------------------------------------------------------------------------
 // Bucket sync relationships (verified against aruna api/src/routes/sync.rs on
 // feat/portal_extensions):
-//   POST   /data/sync-relationships          201 SyncRelationship; 409 duplicate;
+//   POST   /data/sync/relationships          201 SyncRelationship; 409 duplicate;
 //                                            502 target unreachable
-//   GET    /data/sync-relationships          ?bucket=&prefix=&direction=out|in|both
-//   GET    /data/sync-relationships/{id}     SyncRelationshipDetail
-//   POST   /data/sync-relationships/{id}/run 202 (re-run once / backfill continuous)
-//   DELETE /data/sync-relationships/{id}     204 (synced data is retained)
+//   GET    /data/sync/relationships          ?bucket=&prefix=&direction=out|in|both
+//   GET    /data/sync/relationships/{id}     SyncRelationshipDetail
+//   POST   /data/sync/relationships/{id}/run 202 (re-run once / backfill continuous)
+//   DELETE /data/sync/relationships/{id}     204 (synced data is retained)
 // Listing and detail only surface relationships CREATED BY the caller; run and
 // delete are creator-only too (403 otherwise).
 // ---------------------------------------------------------------------------

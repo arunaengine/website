@@ -13,7 +13,7 @@ import { ApiError, type ConnectorEntry } from '@/lib/api'
 import { ChevronRight, Folder, Home } from '@lucide/vue'
 
 // Remote listing of a source connector's entries (agreed contract:
-// GET /groups/{gid}/connectors/{cid}/entries?path=&limit=). Optionally
+// GET /data/groups/{gid}/connectors/{cid}/entries?path=&limit=). Optionally
 // multi-selectable (files and whole folders) for staged imports. On a node
 // without the endpoint it emits `unsupported` so the caller can fall back to a
 // typed source path; a 502/504 from the node (the source itself refused or

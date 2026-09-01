@@ -1,6 +1,6 @@
 import type { SourceConnectorKind } from './connectors'
 
-// Batch staging (agreed contract): POST /staging/batch stages many items (and
+// Batch staging (agreed contract): POST /data/staging/batch stages many items (and
 // whole prefixes) through one connector in a single call.
 export interface StagingBatchItem {
   source_path: string
@@ -33,7 +33,7 @@ export interface StagingBatchResponse {
   results: StagingBatchResult[]
 }
 
-// Blob staging (POST /staging/, verified against aruna api/src/routes/staging.rs).
+// Blob staging (POST /data/staging, verified against aruna api/src/routes/staging.rs).
 // Internally tagged: the `strategy` discriminant sits beside the flattened
 // target fields. Synchronous one-shot materialization (201 on success);
 // 'sync' exists in the API enum but returns 501 on today's backends.
@@ -109,7 +109,7 @@ export interface CreateStagingJobResponse {
 
 // ---------------------------------------------------------------------------
 // Reference visibility (agreed contract):
-//   GET /staging/references?bucket=<b>&prefix=<p>&limit=&cursor=
+//   GET /data/staging/references?bucket=<b>&prefix=<p>&limit=&cursor=
 // reports which keys in a bucket are backed by a reference (an external
 // connector source or another Aruna node) instead of node-local bytes. The
 // listing MAY include non-referenced entries (referenced: false); consumers

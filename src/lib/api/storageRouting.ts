@@ -1,5 +1,5 @@
 // ── Storage routing ─────────────────────────────────────────────────────────
-// GET/PUT /buckets/{bucket}/storage-routing and /groups/{gid}/storage-routing:
+// GET/PUT /data/buckets/{bucket}/storage/routing and /data/groups/{gid}/storage/routing:
 // verified against aruna api/src/routes/storage_routing.rs. Group ADMIN.
 // A target names exactly one of `backend_id` (binds that group backend) or
 // `class` (a preference that may fall through to the node default); operator

@@ -277,7 +277,7 @@ export function useDataManager() {
   )
 
   // ── Reference visibility ──────────────────────────────────────────────────
-  // One /staging/references load per opened LOCAL bucket (staging references
+  // One /data/staging/references load per opened LOCAL bucket (staging references
   // live on the connected node); remote browsing skips the listing entirely.
   const references = useStagingReferences(
     bucket,
@@ -828,7 +828,7 @@ export function useDataManager() {
       originNodeId: entry.origin_node_id ?? null,
     }
   })
-  // HEAD fallback for remote buckets: the connected node's /staging/references
+  // HEAD fallback for remote buckets: the connected node's /data/staging/references
   // listing does not cover them, so probe the single previewed object instead.
   const previewProbeReference = computed(() => Boolean(remoteNodeId.value))
 

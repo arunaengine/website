@@ -1,5 +1,5 @@
 // Per-bucket reference visibility shared by the data manager and the object
-// picker: ONE cursor-following /staging/references load per opened bucket
+// picker: ONE cursor-following /data/staging/references load per opened bucket
 // feeds the row indicators, the preview origin line and the header stats.
 import { computed, onScopeDispose, ref, watch, type Ref } from 'vue'
 import { useAruna } from './useAruna'

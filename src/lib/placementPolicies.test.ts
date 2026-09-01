@@ -102,8 +102,8 @@ describe('residency policy listing', () => {
     const second = await listPlacementPolicies({ limit: 50, cursor: first.next_cursor! }, client)
 
     expect(urls).toEqual([
-      'https://node.test/api/v1/admin/placement-policies?limit=50',
-      'https://node.test/api/v1/admin/placement-policies?limit=50&cursor=page-two',
+      'https://node.test/api/v1/data/placement/policies?limit=50',
+      'https://node.test/api/v1/data/placement/policies?limit=50&cursor=page-two',
     ])
     expect(first.complete).toBe(false)
     expect(second.next_cursor).toBeNull()

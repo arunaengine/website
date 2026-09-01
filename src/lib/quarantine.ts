@@ -61,17 +61,17 @@ export function isHexKey(value: string): boolean {
 }
 
 export function listQuarantine(query: QuarantineQuery, client: ApiClientOptions): Promise<QuarantinePage> {
-  return apiRequest<QuarantinePage>('/admin/sync-quarantine', { query: { ...query } }, client)
+  return apiRequest<QuarantinePage>('/data/sync/quarantine', { query: { ...query } }, client)
 }
 
 export function readQuarantine(recordId: string, client: ApiClientOptions): Promise<QuarantineInspect> {
-  return apiRequest<QuarantineInspect>(`/admin/sync-quarantine/${encodeURIComponent(recordId)}`, {}, client)
+  return apiRequest<QuarantineInspect>(`/data/sync/quarantine/${encodeURIComponent(recordId)}`, {}, client)
 }
 
 // POST acknowledge: idempotent; returns the updated record.
 export function ackQuarantine(recordId: string, client: ApiClientOptions): Promise<QuarantineRecord> {
   return apiRequest<QuarantineRecord>(
-    `/admin/sync-quarantine/${encodeURIComponent(recordId)}/acknowledge`,
+    `/data/sync/quarantine/${encodeURIComponent(recordId)}/acknowledge`,
     { method: 'POST' },
     client,
   )
@@ -81,5 +81,5 @@ export function ackQuarantine(recordId: string, client: ApiClientOptions): Promi
 // the acknowledged ones and returns `next_cursor` when rows remain unscanned,
 // so a full prune is a caller-driven loop of passes.
 export function pruneQuarantine(query: QuarantineQuery, client: ApiClientOptions): Promise<QuarantinePruneResult> {
-  return apiRequest<QuarantinePruneResult>('/admin/sync-quarantine', { method: 'DELETE', query: { ...query } }, client)
+  return apiRequest<QuarantinePruneResult>('/data/sync/quarantine', { method: 'DELETE', query: { ...query } }, client)
 }

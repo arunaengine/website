@@ -1,5 +1,5 @@
 // Reference-visibility helpers: the HeadObject metadata fallback, display
-// labels and client-side aggregation over GET /staging/references listings.
+// labels and client-side aggregation over GET /data/staging/references listings.
 // Wire types live in lib/api.ts.
 import type { SourceConnectorKind, StagingReferenceEntry } from './api'
 

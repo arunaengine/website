@@ -58,7 +58,7 @@ function rememberPolicy(policy: PolicyResponse) {
 }
 
 async function createPlacementPolicy(body: CreatePolicyRequest): Promise<PolicyResponse> {
-  const policy = await request<PolicyResponse>('/admin/placement-policies', {
+  const policy = await request<PolicyResponse>('/data/placement/policies', {
     method: 'POST',
     body: JSON.stringify(body),
   })
@@ -120,7 +120,7 @@ async function loadPolicyPage(more = false): Promise<void> {
 
 async function getPlacementPolicy(policy: PolicyRefBody): Promise<PolicyResponse> {
   const stored = await request<PolicyResponse>(
-    `/admin/placement-policies/${encodeURIComponent(policy.policy_id)}`,
+    `/data/placement/policies/${encodeURIComponent(policy.policy_id)}`,
     { query: { digest: policy.digest } },
   )
   rememberPolicy(stored)
@@ -129,7 +129,7 @@ async function getPlacementPolicy(policy: PolicyRefBody): Promise<PolicyResponse
 
 async function getBucketPlacement(bucket: string): Promise<BucketPlacementResponse> {
   const stored = await request<BucketPlacementResponse>(
-    `/buckets/${encodeURIComponent(bucket)}/placement`,
+    `/data/buckets/${encodeURIComponent(bucket)}/placement`,
   )
   rememberRefs(stored.policies)
   return stored
@@ -140,7 +140,7 @@ async function putBucketPlacement(
   body: BucketPlacementRequest,
 ): Promise<BucketPlacementResponse> {
   const stored = await request<BucketPlacementResponse>(
-    `/buckets/${encodeURIComponent(bucket)}/placement`,
+    `/data/buckets/${encodeURIComponent(bucket)}/placement`,
     { method: 'PUT', body: JSON.stringify(body) },
   )
   rememberRefs(stored.policies)
@@ -152,7 +152,7 @@ async function mintObjectPlacement(
   body: ObjectPlacementRequest,
 ): Promise<ObjectPlacementResponse> {
   const stored = await request<ObjectPlacementResponse>(
-    `/buckets/${encodeURIComponent(bucket)}/placement/objects`,
+    `/data/buckets/${encodeURIComponent(bucket)}/placement/objects`,
     { method: 'POST', body: JSON.stringify(body) },
   )
   rememberRefs(stored.policies)
@@ -161,7 +161,7 @@ async function mintObjectPlacement(
 
 async function runBucketPlacement(bucket: string, body: BulkRunRequest): Promise<BulkRunResponse> {
   const response = await request<BulkRunResponse>(
-    `/buckets/${encodeURIComponent(bucket)}/placement/runs`,
+    `/data/buckets/${encodeURIComponent(bucket)}/placement/runs`,
     { method: 'POST', body: JSON.stringify(body) },
   )
   rememberRefs(response.target_policies)
@@ -173,7 +173,7 @@ async function getPlacementCoverage(
   query: CoverageQuery = {},
 ): Promise<CoverageResponse> {
   const response = await request<CoverageResponse>(
-    `/buckets/${encodeURIComponent(bucket)}/placement/coverage`,
+    `/data/buckets/${encodeURIComponent(bucket)}/placement/coverage`,
     { query: { scope: query.scope, cursor: query.cursor, limit: query.limit } },
   )
   rememberRefs(response.target_policies)
@@ -181,7 +181,7 @@ async function getPlacementCoverage(
 }
 
 async function getPlacementDiagnostics(query: DiagnosticsQuery = {}): Promise<DiagnosticsResponse> {
-  return request<DiagnosticsResponse>('/admin/placement-diagnostics', {
+  return request<DiagnosticsResponse>('/data/placement/diagnostics', {
     query: { cursor: query.cursor, limit: query.limit },
   })
 }
@@ -189,7 +189,7 @@ async function getPlacementDiagnostics(query: DiagnosticsQuery = {}): Promise<Di
 async function resolvePlacementQuarantine(
   body: QuarantineResolveRequest,
 ): Promise<QuarantineResolveResponse> {
-  return request<QuarantineResolveResponse>('/admin/placement-quarantine', {
+  return request<QuarantineResolveResponse>('/data/placement/quarantine', {
     method: 'POST',
     body: JSON.stringify(body),
   })

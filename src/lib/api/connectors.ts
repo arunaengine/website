@@ -1,4 +1,4 @@
-// Source connectors (GET/POST /groups/{group_id}/connectors, verified against
+// Source connectors (GET/POST /data/groups/{group_id}/connectors, verified against
 // aruna api/src/routes/connectors.rs). Real, served contract; no gating.
 export type SourceConnectorKind = 'http' | 's3' | 'webdav' | 'ftp' | 'aruna_native'
 
@@ -34,9 +34,9 @@ export interface SourceConnectorRequest {
 // Connector check & browse (agreed portal↔backend contract; the endpoints are
 // new; older nodes answer 404/501 and callers degrade by hiding/disabling the
 // affordance with a short hint):
-//   POST /groups/{gid}/connectors/check            (inline config, incl. secrets)
-//   POST /groups/{gid}/connectors/{cid}/check      (stored config + secrets)
-//   GET  /groups/{gid}/connectors/{cid}/entries?path=&limit=
+//   POST /data/groups/{gid}/connectors/check            (inline config, incl. secrets)
+//   POST /data/groups/{gid}/connectors/{cid}/check      (stored config + secrets)
+//   GET  /data/groups/{gid}/connectors/{cid}/entries?path=&limit=
 export interface ConnectorCheckResponse {
   ok: boolean
   latency_ms?: number

@@ -19,7 +19,7 @@ export interface StagingSubmission {
 }
 
 // Module-singleton in-memory session log. Deliberately NOT persisted: POST
-// /staging/ is synchronous and the backend keeps no queryable job registry, so
+// /data/staging is synchronous and the backend keeps no queryable job registry, so
 // after a reload there is no server truth to reconcile against.
 const submissions = ref<StagingSubmission[]>([]) // newest first
 let counter = 0

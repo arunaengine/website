@@ -12,7 +12,7 @@ import { request, saving } from './state'
 // ── Storage routing (group default and per-bucket rules) ────────────────────
 
 export async function getGroupRouting(groupId: string): Promise<GroupRoutingResponse> {
-  return request<GroupRoutingResponse>(`/groups/${groupId}/storage-routing`)
+  return request<GroupRoutingResponse>(`/data/groups/${groupId}/storage/routing`)
 }
 
 // An omitted target clears the group default, falling back to node routing.
@@ -22,7 +22,7 @@ export async function putGroupRouting(
 ): Promise<GroupRoutingResponse> {
   saving.value = true
   try {
-    return await request<GroupRoutingResponse>(`/groups/${groupId}/storage-routing`, {
+    return await request<GroupRoutingResponse>(`/data/groups/${groupId}/storage/routing`, {
       method: 'PUT',
       body: JSON.stringify(target ? { default_target: target } : {}),
     })
@@ -32,7 +32,7 @@ export async function putGroupRouting(
 }
 
 export async function getBucketRouting(bucket: string): Promise<BucketRoutingResponse> {
-  return request<BucketRoutingResponse>(`/buckets/${encodeURIComponent(bucket)}/storage-routing`)
+  return request<BucketRoutingResponse>(`/data/buckets/${encodeURIComponent(bucket)}/storage/routing`)
 }
 
 export async function putBucketRouting(
@@ -42,7 +42,7 @@ export async function putBucketRouting(
   saving.value = true
   try {
     return await request<BucketRoutingResponse>(
-      `/buckets/${encodeURIComponent(bucket)}/storage-routing`,
+      `/data/buckets/${encodeURIComponent(bucket)}/storage/routing`,
       { method: 'PUT', body: JSON.stringify({ rules }) },
     )
   } finally {
@@ -57,7 +57,7 @@ export async function getBlobLocations(
   path: string,
   versionId?: string,
 ): Promise<BlobLocationsResponse> {
-  return request<BlobLocationsResponse>('/blobs/locations', {
+  return request<BlobLocationsResponse>('/data/blobs/locations', {
     query: { bucket, path, version_id: versionId },
   })
 }
@@ -65,7 +65,7 @@ export async function getBlobLocations(
 // Asks one node to fetch a copy. Answered 202: the copy is queued, not stored
 // yet. Needs WRITE on the object, or on the bucket when `path` is omitted.
 export async function replicateBlob(input: ReplicateBlobRequest): Promise<ReplicateBlobResponse> {
-  return request<ReplicateBlobResponse>('/blobs/replicate', {
+  return request<ReplicateBlobResponse>('/data/blobs/replicate', {
     method: 'POST',
     body: JSON.stringify(input),
   })

@@ -32,7 +32,7 @@ export async function listSyncRelationships(
   opts: { baseUrl?: string } = {},
 ): Promise<SyncRelationshipListResponse> {
   return syncRequest<SyncRelationshipListResponse>(
-    '/data/sync-relationships',
+    '/data/sync/relationships',
     { query: { bucket: query.bucket, prefix: query.prefix, direction: query.direction } },
     opts.baseUrl,
   )
@@ -43,7 +43,7 @@ export async function getSyncRelationship(
   opts: { baseUrl?: string } = {},
 ): Promise<SyncRelationshipDetail> {
   return syncRequest<SyncRelationshipDetail>(
-    `/data/sync-relationships/${encodeURIComponent(id)}`,
+    `/data/sync/relationships/${encodeURIComponent(id)}`,
     {},
     opts.baseUrl,
   )
@@ -62,7 +62,7 @@ export async function createSyncRelationship(
   try {
     const context = refreshContext()
     const response = await apiRequest<SyncRelationship>(
-      '/data/sync-relationships',
+      '/data/sync/relationships',
       { method: 'POST', body: JSON.stringify(input) },
       opts.baseUrl ? { ...context.client, baseUrl: opts.baseUrl } : context.client,
     )
@@ -80,7 +80,7 @@ export async function runSyncRelationship(
   opts: { baseUrl?: string } = {},
 ): Promise<SyncRunResponse> {
   return syncRequest<SyncRunResponse>(
-    `/data/sync-relationships/${encodeURIComponent(id)}/run`,
+    `/data/sync/relationships/${encodeURIComponent(id)}/run`,
     { method: 'POST' },
     opts.baseUrl,
   )
@@ -92,7 +92,7 @@ export async function updateSyncReferenceHandling(
   opts: { baseUrl?: string } = {},
 ): Promise<SyncRelationship> {
   return syncRequest<SyncRelationship>(
-    `/data/sync-relationships/${encodeURIComponent(id)}`,
+    `/data/sync/relationships/${encodeURIComponent(id)}`,
     { method: 'PATCH', body: JSON.stringify({ reference_handling: referenceHandling }) },
     opts.baseUrl,
   )
@@ -100,7 +100,7 @@ export async function updateSyncReferenceHandling(
 
 export async function deleteSyncRelationship(id: string, opts: { baseUrl?: string } = {}): Promise<void> {
   return syncRequest<void>(
-    `/data/sync-relationships/${encodeURIComponent(id)}`,
+    `/data/sync/relationships/${encodeURIComponent(id)}`,
     { method: 'DELETE' },
     opts.baseUrl,
   )
