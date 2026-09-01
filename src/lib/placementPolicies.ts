@@ -277,6 +277,13 @@ export function policyRefKey(policy: PolicyRefBody): string {
   return `${policy.policy_id}:${policy.digest}`
 }
 
+/** True when both sides name the same references, whatever their order. */
+export function sameRefSet(left: PolicyRefBody[], right: PolicyRefBody[]): boolean {
+  const chosen = new Set(left.map(policyRefKey))
+  const other = new Set(right.map(policyRefKey))
+  return chosen.size === other.size && [...chosen].every((key) => other.has(key))
+}
+
 export function emptySelector(): SelectorBody {
   return { labels: [] }
 }

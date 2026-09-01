@@ -1,6 +1,7 @@
 import { computed, defineComponent, h, ref } from 'vue'
 import * as VueRuntime from 'vue'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ApiError } from '@/lib/api'
 import * as PlacementPolicies from '@/lib/placementPolicies'
 import * as Utils from '@/lib/utils'
 import { compileClientComponent, content, flush, mountApp, moduleDefault } from '@/test/clientRender'
@@ -10,6 +11,7 @@ const Slotted = (tag: string) =>
   defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h(tag, attrs, slots.default?.()) })
 
 const getBucketPlacement = vi.fn()
+const getObjectPlacement = vi.fn()
 
 const column = compileClientComponent(new URL('./PolicyColumn.vue', import.meta.url), {
   vue: VueRuntime,
@@ -24,6 +26,7 @@ const column = compileClientComponent(new URL('./PolicyColumn.vue', import.meta.
   '@/composables/usePlacementPolicies': {
     usePlacementPolicies: () => ({
       getBucketPlacement,
+      getObjectPlacement,
       policyName: (policy: { name?: string | null; policy_id: string }) => policy.name ?? policy.policy_id,
     }),
   },
@@ -31,21 +34,27 @@ const column = compileClientComponent(new URL('./PolicyColumn.vue', import.meta.
   '@/lib/utils': Utils,
 })
 
+const EU_POLICY = { policy_id: 'p-eu', digest: 'a'.repeat(64), name: 'Copies inside the EU', owner_group_id: null }
+const GROUP_POLICY = { policy_id: 'p-own', digest: 'b'.repeat(64), name: 'Only our own nodes', owner_group_id: 'g-1' }
+
 async function render(props: Record<string, unknown> = {}) {
-  const { root } = await mountApp(column, { props: { bucket: 'reef-survey', nodeId: null, ...props } })
+  const { root } = await mountApp(column, {
+    props: { bucket: 'reef-survey', objectKey: 'raw/reads.fastq', nodeId: null, ...props },
+  })
   await flush()
   return content(root)
 }
 
 describe('policy column', () => {
+  beforeEach(() => {
+    getObjectPlacement.mockRejectedValue(new ApiError(404, 'Not found'))
+  })
+
   it('names the policies with the owner the node reported', async () => {
     getBucketPlacement.mockResolvedValue({
       bucket: 'reef-survey',
       generation: 2,
-      policies: [
-        { policy_id: 'p-eu', digest: 'a'.repeat(64), name: 'Copies inside the EU', owner_group_id: null },
-        { policy_id: 'p-own', digest: 'b'.repeat(64), name: 'Only our own nodes', owner_group_id: 'g-1' },
-      ],
+      policies: [EU_POLICY, GROUP_POLICY],
     })
 
     const text = await render()
@@ -78,10 +87,45 @@ describe('policy column', () => {
 
   it('does not answer for a bucket hosted on another node', async () => {
     getBucketPlacement.mockClear()
+    getObjectPlacement.mockClear()
 
     const text = await render({ nodeId: 'node-far' })
 
     expect(text).toContain('This bucket is hosted on another node.')
     expect(getBucketPlacement).not.toHaveBeenCalled()
+    expect(getObjectPlacement).not.toHaveBeenCalled()
+  })
+
+  it('prefers the set the file itself carries over the bucket default', async () => {
+    getBucketPlacement.mockResolvedValue({ bucket: 'reef-survey', generation: 2, policies: [EU_POLICY] })
+    getObjectPlacement.mockResolvedValue({
+      bucket: 'reef-survey',
+      key: 'raw/reads.fastq',
+      version_id: '01J000000000000000000HEAD',
+      generation: 7,
+      policies: [GROUP_POLICY],
+    })
+
+    const text = await render()
+
+    expect(text).toContain('Only our own nodes')
+    expect(text).not.toContain('Copies inside the EU')
+    expect(text).toContain('This file carries its own rules.')
+  })
+
+  it('keeps the note away from a file that follows the bucket default', async () => {
+    getBucketPlacement.mockResolvedValue({ bucket: 'reef-survey', generation: 2, policies: [EU_POLICY] })
+    getObjectPlacement.mockResolvedValue({
+      bucket: 'reef-survey',
+      key: 'raw/reads.fastq',
+      version_id: '01J000000000000000000HEAD',
+      generation: 7,
+      policies: [EU_POLICY],
+    })
+
+    const text = await render()
+
+    expect(text).toContain('Copies inside the EU')
+    expect(text).not.toContain('This file carries its own rules.')
   })
 })

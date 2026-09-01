@@ -186,7 +186,11 @@ const facts = computed(() => [
       <TabsContent value="storage">
         <div class="grid gap-4 lg:grid-cols-2">
           <div class="space-y-3">
-            <PolicyColumn :bucket="props.bucket" :node-id="props.nodeId ?? null" />
+            <PolicyColumn
+              :bucket="props.bucket"
+              :object-key="props.objectKey"
+              :node-id="props.nodeId ?? null"
+            />
             <ObjectRulesEditor
               :bucket="props.bucket"
               :object-key="props.objectKey"

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// The rules a bucket puts on its objects, as a column beside a file's copies.
-// Policy only: it says where a copy MAY be, never where one is.
+// The rules an object carries, as a column beside a file's copies. Policy only:
+// it says where a copy MAY be, never where one is.
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
@@ -8,23 +8,27 @@ import DocsLink from '@/components/ui/DocsLink.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import { useAruna } from '@/composables/useAruna'
 import { usePlacementPolicies } from '@/composables/usePlacementPolicies'
-import { policyOwnerLabel } from '@/lib/placementPolicies'
+import { policyOwnerLabel, sameRefSet } from '@/lib/placementPolicies'
 import type { PolicyRefBody } from '@/lib/placementPolicies'
 import { truncateMiddle } from '@/lib/utils'
 
-const props = defineProps<{ bucket: string; nodeId: string | null }>()
+const props = defineProps<{ bucket: string; objectKey: string; nodeId: string | null }>()
 
 const { myGroups } = useAruna()
-const { getBucketPlacement, policyName } = usePlacementPolicies()
+const { getBucketPlacement, getObjectPlacement, policyName } = usePlacementPolicies()
 
 const policies = ref<PolicyRefBody[] | null>(null)
+const ownSet = ref(false)
 const state = ref<'loading' | 'ready' | 'unknown'>('loading')
 const groupName = computed(() => new Map(myGroups.value.map((group) => [group.id, group.name])))
 
 let sequence = 0
+// The file's own set wins when this node serves it; the bucket default is what
+// a file without one follows anyway.
 async function load() {
   const request = ++sequence
   policies.value = null
+  ownSet.value = false
   // A bucket on another node is a different bucket here, so this node's answer
   // for the same name would describe the wrong thing.
   if (props.nodeId) {
@@ -32,17 +36,22 @@ async function load() {
     return
   }
   state.value = 'loading'
-  try {
-    const placement = await getBucketPlacement(props.bucket)
-    if (request !== sequence) return
-    policies.value = placement.policies
+  const [fallback, own] = await Promise.all([
+    getBucketPlacement(props.bucket).then((placement) => placement.policies).catch(() => null),
+    getObjectPlacement(props.bucket, props.objectKey).then((head) => head.policies).catch(() => null),
+  ])
+  if (request !== sequence) return
+  if (own) {
+    policies.value = own
+    ownSet.value = Boolean(fallback) && !sameRefSet(own, fallback ?? [])
     state.value = 'ready'
-  } catch {
-    if (request === sequence) state.value = 'unknown'
-  }
+  } else if (fallback) {
+    policies.value = fallback
+    state.value = 'ready'
+  } else state.value = 'unknown'
 }
 
-watch(() => [props.bucket, props.nodeId], () => void load(), { immediate: true })
+watch(() => [props.bucket, props.objectKey, props.nodeId], () => void load(), { immediate: true })
 
 function owner(policy: PolicyRefBody): string | undefined {
   return policyOwnerLabel(
@@ -76,6 +85,7 @@ function label(policy: PolicyRefBody): string {
       <p class="text-[11px] text-muted-foreground">A copy has to be allowed by all of them.</p>
     </template>
     <p v-else class="text-xs text-muted-foreground">None: copies of this file are not governed.</p>
+    <p v-if="ownSet" class="text-[11px] text-muted-foreground">This file carries its own rules.</p>
 
     <div class="flex flex-wrap items-center gap-3">
       <RouterLink

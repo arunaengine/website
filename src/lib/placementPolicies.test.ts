@@ -9,6 +9,7 @@ import {
   placementPoliciesErrorMessage,
   policyOwnerLabel,
   runBulkToCompletion,
+  sameRefSet,
   type BulkRunResponse,
   type ListPoliciesResponse,
 } from './placementPolicies'
@@ -146,6 +147,22 @@ describe('placement policy ownership', () => {
     expect(policyOwnerLabel(undefined)).toBeUndefined()
     expect(policyOwnerLabel(null)).toBe('Realm')
     expect(policyOwnerLabel('g-1', 'Reef survey')).toBe('Reef survey')
+  })
+})
+
+describe('object placement reads', () => {
+  const eu = { policy_id: 'p-eu', digest: 'a'.repeat(64) }
+  const own = { policy_id: 'p-own', digest: 'b'.repeat(64) }
+
+  it('compares two reference sets whatever their order', () => {
+    expect(sameRefSet([eu, own], [own, eu])).toBe(true)
+    expect(sameRefSet([], [])).toBe(true)
+    expect(sameRefSet([eu], [own])).toBe(false)
+    expect(sameRefSet([eu], [eu, own])).toBe(false)
+  })
+
+  it('treats a redigested policy as a different reference', () => {
+    expect(sameRefSet([eu], [{ policy_id: 'p-eu', digest: 'c'.repeat(64) }])).toBe(false)
   })
 })
 
