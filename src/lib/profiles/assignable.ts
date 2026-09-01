@@ -4,13 +4,10 @@ import type { MetadataProfile } from '@/data/types'
 
 /**
  * Group-scoped assignment: a private profile is usable by datasets of its own
- * group. The node still resolves PUBLIC profiles only
- * (operations/src/metadata/profile_validation.rs reads the profile without a
- * caller identity), so the portal keeps the rule off until that lands. Flip
- * this constant, and the sentence under the editor's profile select, when it
- * does.
+ * group, and public profiles by everyone (DECISIONS P9; the node resolves group
+ * profiles through its validation channel). Off only for a node that predates it.
  */
-export const GROUP_SCOPED_PROFILES: boolean = false
+export const GROUP_SCOPED_PROFILES: boolean = true
 
 export type ProfileScope = 'Public' | 'Group only' | 'Built-in'
 

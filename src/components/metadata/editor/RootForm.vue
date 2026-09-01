@@ -162,8 +162,8 @@ function addKeyword() {
           />
           <p class="mt-1 text-[11px] text-muted-foreground">
             A profile pre-fills what it asks for and checks the draft against it. Nothing is locked,
-            and "No profile" removes it again. Only public profiles can be assigned to a dataset, so
-            private drafts are not listed.
+            and "No profile" removes it again. Public profiles and the profiles of this dataset's group
+            can be assigned; other groups' profiles are not listed.
           </p>
         </div>
         <div :class="ROW_ACTIONS"><IssueMark :issues="issuesFor('conformsTo')" /></div>

@@ -278,7 +278,7 @@ describe('RootForm', () => {
   it('says why private profiles are missing from the list', async () => {
     const mounted = await mount([])
 
-    expect(content(mounted.root)).toContain('Only public profiles can be assigned to a dataset')
+    expect(content(mounted.root)).toContain("profiles of this dataset's group")
     mounted.app.unmount()
   })
 })

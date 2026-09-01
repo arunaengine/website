@@ -115,7 +115,7 @@ describe('ProfilesView', () => {
     const text = content(mounted.root)
 
     expect(text).toContain('Group only')
-    expect(text).toContain('No dataset can declare it yet')
+    expect(text).toContain('datasets of this group may declare it')
 
     await click(button(mounted.root, 'Make public'))
     expect(routerPush).toHaveBeenCalledWith({
