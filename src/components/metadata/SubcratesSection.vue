@@ -5,32 +5,22 @@ import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
-import SubcratePickerDialog from '@/components/metadata/SubcratePickerDialog.vue'
-import { Layers, Plus, X } from '@lucide/vue'
-import Spinner from '@/components/ui/Spinner.vue'
+import { Layers, Pencil } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
-import { ApiError, type MetadataDocumentListItem, type MetadataDocumentSummary } from '@/lib/api'
-import { addSubcrateLink, isProjectCrate, removeSubcrateLink, subcrateLinksOf, type SubcrateLink } from '@/lib/subcrates'
+import type { MetadataDocumentListItem } from '@/lib/api'
+import { isProjectCrate, subcrateLinksOf, type SubcrateLink } from '@/lib/subcrates'
 import { documentIdFromIri, isDocumentId } from '@/lib/graphIri'
-import { errorMessage, isHttpUrl } from '@/lib/utils'
+import { isHttpUrl } from '@/lib/utils'
 
+// What this dataset links, shown only. Parts are edited in one place, the
+// dataset editor, so no second writer of hasPart exists.
 const props = defineProps<{
-  // The displayed (resolved) crate; writes always go through a fresh raw fetch.
   crate: unknown
   documentId: string
   canWrite: boolean
 }>()
-// The changed event carries the summary the write returned, so the host view
-// can adopt the new updated_at without a second fetch.
-const emit = defineEmits<{ (e: 'changed', summary: MetadataDocumentSummary): void }>()
 
-const { toMetadataDoc, apiBaseUrl, saving, fetchRoCrateRaw, replaceMetadataRoCrate, metadataItems, getMetadataItem } = useAruna()
-
-// The spec's subjectOf fallback needs a URL that resolves to the child's crate
-// JSON; the portal serves it at GET /metadata/{id}/rocrate.
-function crateJsonUrl(documentId: string): string {
-  return `${apiBaseUrl.value.replace(/\/+$/, '')}/metadata/${encodeURIComponent(documentId)}/rocrate`
-}
+const { toMetadataDoc, metadataItems, getMetadataItem } = useAruna()
 
 const links = computed(() => subcrateLinksOf(props.crate))
 const isProject = computed(() => isProjectCrate(props.crate))
@@ -76,63 +66,6 @@ function displayName(link: SubcrateLink): string {
   const documentId = resolveDocumentId(link)
   return (documentId && liveNames.value[documentId]) || link.name
 }
-
-const error = ref<string | null>(null)
-const busy = ref(false)
-const removingIri = ref<string | null>(null)
-
-// ── Picker (shared SubcratePickerDialog; this section owns the crate write) ──
-const pickerOpen = ref(false)
-const linkedIris = computed(() => links.value.map((link) => link.iri))
-
-function openPicker() {
-  error.value = null
-  pickerOpen.value = true
-}
-
-async function linkSelected(items: MetadataDocumentListItem[]) {
-  if (!items.length || busy.value) return
-  busy.value = true
-  error.value = null
-  try {
-    // Always mutate a fresh RAW crate: the displayed crate may carry resolved
-    // artifacts that must never be written back.
-    const clone = structuredClone(await fetchRoCrateRaw(props.documentId)) as unknown
-    for (const item of items) {
-      addSubcrateLink(clone, {
-        iri: item.graph_iri,
-        name: titleOf(item),
-        identifier: item.document_id,
-        subjectOf: crateJsonUrl(item.document_id),
-      })
-    }
-    const summary = await replaceMetadataRoCrate(props.documentId, { rocrate: clone })
-    pickerOpen.value = false
-    emit('changed', summary)
-  } catch (err) {
-    if (err instanceof ApiError && err.status === 403) error.value = 'You need write permission in the owning group.'
-    else error.value = errorMessage(err)
-  } finally {
-    busy.value = false
-  }
-}
-
-async function unlink(link: SubcrateLink) {
-  if (removingIri.value) return
-  removingIri.value = link.iri
-  error.value = null
-  try {
-    const clone = structuredClone(await fetchRoCrateRaw(props.documentId)) as unknown
-    removeSubcrateLink(clone, link.iri)
-    const summary = await replaceMetadataRoCrate(props.documentId, { rocrate: clone })
-    emit('changed', summary)
-  } catch (err) {
-    if (err instanceof ApiError && err.status === 403) error.value = 'You need write permission in the owning group.'
-    else error.value = errorMessage(err)
-  } finally {
-    removingIri.value = null
-  }
-}
 </script>
 
 <template>
@@ -143,7 +76,11 @@ async function unlink(link: SubcrateLink) {
         <span v-if="links.length" class="text-xs font-normal text-muted-foreground">{{ links.length }}</span>
         <Badge v-if="isProject" variant="outline" size="sm" class="uppercase">Project dataset</Badge>
       </div>
-      <Button v-if="canWrite" variant="outline" size="sm" @click="openPicker"><Plus class="size-3.5" /> Link dataset</Button>
+      <Button v-if="canWrite" as-child variant="outline" size="sm">
+        <RouterLink :to="{ name: 'dataset-edit', params: { id: documentId } }">
+          <Pencil class="size-3.5" /> Edit
+        </RouterLink>
+      </Button>
     </div>
 
     <ul v-if="links.length" class="divide-y divide-border">
@@ -164,39 +101,14 @@ async function unlink(link: SubcrateLink) {
             <span class="block truncate font-mono text-[11px] text-muted-foreground" :title="link.identifier || link.iri">{{ link.identifier || link.iri }}</span>
           </div>
         </div>
-        <div class="flex shrink-0 items-center gap-1.5">
-          <Badge variant="outline" size="sm" class="uppercase">{{ resolveDocumentId(link) ? 'linked' : 'external' }}</Badge>
-          <Button
-            v-if="canWrite"
-            variant="ghost"
-            size="icon-sm"
-            class="text-muted-foreground hover:text-destructive"
-            :disabled="removingIri !== null || saving"
-            :aria-label="`Unlink ${link.name}`"
-            title="Unlink (the child dataset itself is kept)"
-            @click="unlink(link)"
-          >
-            <Spinner v-if="removingIri === link.iri" class="text-current" aria-hidden="true" />
-            <X v-else class="size-3.5" />
-          </Button>
-        </div>
+        <Badge variant="outline" size="sm" class="uppercase">{{ resolveDocumentId(link) ? 'linked' : 'external' }}</Badge>
       </li>
     </ul>
     <EmptyState
       v-else
       compact
       title="No datasets linked yet."
-      description="Link existing datasets to make this a project-level dataset that groups them."
-    />
-    <p v-if="error" class="border-t border-border px-5 py-2.5 text-xs text-destructive">{{ error }}</p>
-
-    <SubcratePickerDialog
-      v-model:open="pickerOpen"
-      :excluded-iris="linkedIris"
-      :exclude-document-id="documentId"
-      :busy="busy || saving"
-      :error="error"
-      @select="linkSelected"
+      description="Link existing datasets in the editor to make this a project-level dataset that groups them."
     />
   </section>
 </template>

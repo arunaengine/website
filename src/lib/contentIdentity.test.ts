@@ -4,31 +4,20 @@ import {
   arunaContentReference,
   contentIdentityFromBlake3,
   externalContentReference,
-  fileEntityForReference,
   resolveContentIdentity,
-  stageSelectedContentReference,
-  takeSelectedContentReference,
 } from './contentIdentity'
+import { newDraft, toRoCrate } from './crate/editor'
+import { addFilePart } from './crate/references'
 
 const BLAKE3 = 'ab'.repeat(32)
 
+// A crate the editor could have written for this reference.
 function crateWith(reference: ReturnType<typeof arunaContentReference>, name = 'reads.fastq.gz') {
-  return {
-    '@context': 'https://w3id.org/ro/crate/1.2/context',
-    '@graph': [
-      {
-        '@id': 'ro-crate-metadata.json',
-        '@type': 'CreativeWork',
-        about: { '@id': './' },
-      },
-      {
-        '@id': './',
-        '@type': 'Dataset',
-        hasPart: [{ '@id': reference.id }],
-      },
-      fileEntityForReference(reference, name),
-    ],
-  }
+  return toRoCrate(addFilePart(newDraft(), {
+    id: reference.id,
+    name,
+    ...(reference.contentUrl ? { contentUrl: reference.contentUrl } : {}),
+  }))
 }
 
 describe('canonical content identity authoring', () => {
@@ -60,15 +49,15 @@ describe('canonical content identity authoring', () => {
   it('round-trips Aruna-held content with a W3ID and separate location', () => {
     const location = 's3://raw-data/runs/reads.fastq.gz'
     const reference = arunaContentReference(location, contentIdentityFromBlake3(BLAKE3))
-    const crate = crateWith(reference)
+    const graph = crateWith(reference)['@graph'] as Array<Record<string, unknown>>
 
     expect(reference).toEqual({
       id: `https://w3id.org/aruna/data/${BLAKE3}`,
       contentUrl: location,
       identity: 'content',
     })
-    expect(crate['@graph'][1].hasPart).toEqual([{ '@id': reference.id }])
-    expect(dataEntitiesOf(crate)).toEqual([{
+    expect(graph.find((node) => node['@id'] === './')?.hasPart).toEqual({ '@id': reference.id })
+    expect(dataEntitiesOf(crateWith(reference))).toEqual([{
       id: reference.id,
       name: 'reads.fastq.gz',
       types: ['File'],
@@ -88,12 +77,13 @@ describe('canonical content identity authoring', () => {
     })
     const reference = arunaContentReference(location, resolution)
 
+    // The read side must list the location form exactly as it lists the w3id one.
     expect(reference).toEqual({ id: location, identity: 'location' })
-    expect(fileEntityForReference(reference, 'unresolved.fastq.gz')).toEqual({
-      '@id': location,
-      '@type': 'File',
+    expect(dataEntitiesOf(crateWith(reference, 'unresolved.fastq.gz'))).toMatchObject([{
+      id: location,
       name: 'unresolved.fastq.gz',
-    })
+      types: ['File'],
+    }])
   })
 
   it('preserves an external source identity untouched', () => {
@@ -101,18 +91,6 @@ describe('canonical content identity authoring', () => {
     const reference = externalContentReference(source)
 
     expect(reference).toEqual({ id: source, identity: 'external' })
-    expect(fileEntityForReference(reference, 'External archive')['@id']).toBe(source)
-  })
-
-  it('hands resolved picker details to the existing editor event synchronously', () => {
-    const reference = arunaContentReference(
-      's3://raw-data/reads.fastq.gz',
-      contentIdentityFromBlake3(BLAKE3),
-    )
-    const clear = stageSelectedContentReference(reference)
-
-    expect(takeSelectedContentReference(reference.id)).toEqual(reference)
-    clear()
-    expect(takeSelectedContentReference(reference.id)).toBeUndefined()
+    expect(dataEntitiesOf(crateWith(reference, 'External archive'))[0].id).toBe(source)
   })
 })

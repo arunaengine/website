@@ -82,37 +82,6 @@ export function externalContentReference(id: string): AuthoredContentReference {
   return { id, identity: 'external' }
 }
 
-export function fileEntityForReference(
-  reference: AuthoredContentReference,
-  name: string,
-): Record<string, unknown> {
-  return {
-    '@id': reference.id,
-    '@type': 'File',
-    name: name || reference.id,
-    ...(reference.contentUrl ? { contentUrl: reference.contentUrl } : {}),
-  }
-}
-
-const stagedSelections = new Map<string, { token: symbol; reference: AuthoredContentReference }>()
-
-// The shared files editor narrows picker events to id + name. This synchronous
-// handoff lets its host retain the resolved contentUrl and identity marker.
-export function stageSelectedContentReference(reference: AuthoredContentReference): () => void {
-  const token = Symbol(reference.id)
-  stagedSelections.set(reference.id, { token, reference: { ...reference } })
-  return () => {
-    if (stagedSelections.get(reference.id)?.token === token) stagedSelections.delete(reference.id)
-  }
-}
-
-export function takeSelectedContentReference(id: string): AuthoredContentReference | undefined {
-  const staged = stagedSelections.get(id)
-  if (!staged) return undefined
-  stagedSelections.delete(id)
-  return { ...staged.reference }
-}
-
 function encodeObjectKey(key: string): string {
   return key
     .split('/')

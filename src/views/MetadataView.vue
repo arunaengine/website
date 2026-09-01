@@ -202,11 +202,10 @@ function openInfo(entityId: string) {
         />
 
         <SubcratesSection
-          v-if="subcrateIris.size || (Boolean(current) && canWrite)"
+          v-if="subcrateIris.size"
           :crate="currentCrate"
           :document-id="detailId"
           :can-write="Boolean(current) && canWrite"
-          @changed="onSaved"
         />
 
         <RunProvenancePanel v-if="runProvenance" :run="runProvenance" />
