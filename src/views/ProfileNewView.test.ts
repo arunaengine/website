@@ -1,5 +1,5 @@
 import * as VueRuntime from 'vue'
-import { defineComponent, h, reactive, ref } from 'vue'
+import { defineComponent, h, reactive, ref, type Ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   button,
@@ -21,6 +21,7 @@ vi.mock('@/composables/useAruna', () => ({
   profileReferenceIri: () => undefined,
 }))
 
+import * as ProfileIri from '@/composables/aruna/profileIri'
 import * as ProfileMode from '@/lib/profiles/mode'
 import * as Rocrate from '@/lib/profiles/rocrate'
 import * as Tes from '@/lib/tes'
@@ -28,6 +29,7 @@ import * as Utils from '@/lib/utils'
 import * as ProfileBuilder from '@/components/metadata/profile-builder/useProfileBuilder'
 import * as Blockers from '@/components/metadata/profile-builder/state/blockers'
 import { DX_PROFILE, RO_CRATE_PROFILE, type ProfileEntityRule } from '@/lib/profiles/types'
+import type { ProfileReferenceWarning } from '@/composables/useProfileReferences'
 import type { MetadataProfile } from '@/data/types'
 
 const groups = ref([{ id: 'group-1', name: 'Research group' }])
@@ -49,6 +51,9 @@ const route = reactive({
   query: {} as Record<string, string>,
 })
 let leaveGuard: (() => Promise<boolean>) | null = null
+// The profile IRI the view looks up references for, captured as it is passed.
+let referenceIri: Ref<string | null> | null = null
+const referenceWarning = ref<ProfileReferenceWarning | null>(null)
 
 arunaModule.value = {
   groups,
@@ -119,9 +124,19 @@ const DiscardStub = defineComponent({
 // Drives the real builder the way the basics step does, so the draft the view
 // submits is the one the composable produced.
 const BasicsStub = defineComponent({
-  props: { builder: { type: Object, required: true }, locked: Boolean },
+  props: {
+    builder: { type: Object, required: true },
+    locked: Boolean,
+    referenceWarning: { type: Object, default: null },
+  },
   setup: (props) => () => h('div', [
     h('span', props.locked ? 'Basics locked' : 'Basics editable'),
+    ...(props.referenceWarning
+      ? [
+          h('p', (props.referenceWarning as ProfileReferenceWarning).message),
+          ...(props.referenceWarning as ProfileReferenceWarning).datasets.map((dataset) => h('a', dataset.title)),
+        ]
+      : []),
     h('span', `Group ${props.builder.groupId}`),
     h('input', {
       'data-field': 'name',
@@ -139,13 +154,14 @@ const BasicsStub = defineComponent({
 // Renders the blocker list the view computed, so a test can read the same
 // sentences the summary shows.
 const ReviewStub = defineComponent({
-  props: { blockers: { type: Array, default: () => [] } },
+  props: { blockers: { type: Array, default: () => [] }, warnings: { type: Array, default: () => [] } },
   emits: ['step'],
   setup: (props) => () => h('div', [
     h('p', (props.blockers as Array<{ message: string }>).length
       ? 'This profile cannot be created yet.'
       : 'This profile is ready to create.'),
     ...(props.blockers as Array<{ message: string }>).map((blocker) => h('p', blocker.message)),
+    ...(props.warnings as string[]).map((warning) => h('p', warning)),
   ]),
 })
 const RulesStub = defineComponent({
@@ -191,6 +207,13 @@ const ProfileNewView = compileClientComponent(new URL('./ProfileNewView.vue', im
     useS3: () => ({ endpoint: s3Endpoint, hasActiveKey: s3HasKey, listBuckets }),
   },
   '@/composables/useProfilePublish': { useProfilePublish: () => ({ publishProfileArtifacts }) },
+  '@/composables/useProfileReferences': {
+    useProfileReferences: (iri: Ref<string | null>) => {
+      referenceIri = iri
+      return { warning: referenceWarning, pending: ref(false) }
+    },
+  },
+  '@/composables/aruna/profileIri': ProfileIri,
   '@/lib/profiles/rocrate': Rocrate,
   '@/lib/profiles/mode': ProfileMode,
   '@/lib/tes': Tes,
@@ -263,6 +286,8 @@ beforeEach(() => {
   s3HasKey.value = true
   routerPush.mockClear()
   stored.value = ''
+  referenceIri = null
+  referenceWarning.value = null
 })
 
 describe('ProfileNewView create', () => {
@@ -451,6 +476,78 @@ describe('ProfileNewView edit', () => {
     await click(button(mounted.root, 'Save profile'))
     await flush()
     expect(replaceMetadataRoCrate).toHaveBeenCalledWith('doc-2', expect.anything())
+    mounted.app.unmount()
+  })
+
+  it('warns with the datasets that declare a public profile', async () => {
+    profiles.value = [{ ...storedProfile, managed: true }]
+    const mounted = await mountApp(ProfileNewView)
+    await flush()
+    // Still public, so no dataset can be stranded and nothing is looked up.
+    expect(referenceIri?.value).toBeNull()
+
+    await click(button(mounted.root, 'Toggle visibility'))
+    expect(referenceIri?.value).toBe('https://w3id.org/aruna/profile/doc-1')
+
+    referenceWarning.value = {
+      message: '2 datasets declare this profile. Datasets of other groups will no longer be able to save until they remove it or the profile is public again.',
+      failed: false,
+      incomplete: false,
+      datasets: [
+        { documentId: 'doc-a', groupId: 'group-2', title: 'Imaging set' },
+        { documentId: 'doc-b', groupId: 'group-1', title: 'Sequencing run' },
+      ],
+    }
+    await flush()
+
+    const text = content(mounted.root)
+    expect(text).toContain('2 datasets declare this profile.')
+    expect(text).toContain('Imaging set')
+    expect(text).toContain('Sequencing run')
+
+    await click(button(mounted.root, 'Next'))
+    await click(button(mounted.root, 'Next'))
+    expect(content(mounted.root)).toContain('2 datasets declare this profile.')
+    expect(button(mounted.root, 'Save profile').props.disabled).toBe(false)
+    mounted.app.unmount()
+  })
+
+  it('looks up nothing unless a stored public profile narrows', async () => {
+    // Stored as a group profile: saving it again strands nobody.
+    const groupOnly = await mountApp(ProfileNewView)
+    await flush()
+    expect(referenceIri?.value).toBeNull()
+    groupOnly.app.unmount()
+
+    route.name = 'profile-new'
+    route.params = {}
+    const creating = await mountApp(ProfileNewView)
+    await fillBasics(creating.root)
+    await click(button(creating.root, 'Toggle visibility'))
+
+    expect(referenceIri?.value).toBeNull()
+    expect(content(creating.root)).not.toContain('declare this profile')
+    creating.app.unmount()
+  })
+
+  it('allows the change when the lookup fails', async () => {
+    profiles.value = [{ ...storedProfile, managed: true }]
+    const mounted = await mountApp(ProfileNewView)
+    await flush()
+    await click(button(mounted.root, 'Toggle visibility'))
+    referenceWarning.value = {
+      message: 'Could not check which datasets declare this profile.',
+      failed: true,
+      incomplete: false,
+      datasets: [],
+    }
+    await flush()
+
+    expect(content(mounted.root)).toContain('Could not check which datasets declare this profile.')
+    await click(button(mounted.root, 'Next'))
+    await click(button(mounted.root, 'Next'))
+    expect(content(mounted.root)).toContain('Could not check which datasets declare this profile.')
+    expect(button(mounted.root, 'Save profile').props.disabled).toBe(false)
     mounted.app.unmount()
   })
 
