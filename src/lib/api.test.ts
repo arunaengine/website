@@ -24,17 +24,17 @@ afterEach(() => {
 
 describe('apiRequest url building', () => {
   it('keeps the path segment of an absolute base', async () => {
-    // new URL('/info', base) would drop '/api/v1'; the split serves an
+    // new URL('/system/info', base) would drop '/api/v1'; the split serves an
     // absolute base, so the join must concatenate instead.
     const urls = stubBrowser()
-    await apiRequest('/info', {}, { baseUrl: 'https://api.test/api/v1' })
-    expect(urls).toEqual(['https://api.test/api/v1/info'])
+    await apiRequest('/system/info', {}, { baseUrl: 'https://api.test/api/v1' })
+    expect(urls).toEqual(['https://api.test/api/v1/system/info'])
   })
 
   it('does not double the slash on a trailing-slash base', async () => {
     const urls = stubBrowser()
-    await apiRequest('/info', {}, { baseUrl: 'https://api.test/api/v1/' })
-    expect(urls).toEqual(['https://api.test/api/v1/info'])
+    await apiRequest('/system/info', {}, { baseUrl: 'https://api.test/api/v1/' })
+    expect(urls).toEqual(['https://api.test/api/v1/system/info'])
   })
 
   it('appends query to an absolute base', async () => {
@@ -45,8 +45,8 @@ describe('apiRequest url building', () => {
 
   it('resolves a relative base against the page origin', async () => {
     const urls = stubBrowser()
-    await apiRequest('/info', {}, { baseUrl: '/api/v1' })
-    expect(urls).toEqual([`${PAGE_ORIGIN}/api/v1/info`])
+    await apiRequest('/system/info', {}, { baseUrl: '/api/v1' })
+    expect(urls).toEqual([`${PAGE_ORIGIN}/api/v1/system/info`])
   })
 
   it('preserves structured quota errors for surface-specific messages', async () => {

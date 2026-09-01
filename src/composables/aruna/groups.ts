@@ -48,7 +48,7 @@ export async function getGroupUsageHistory(
   groupId: string,
   opts: { from?: string; to?: string; resolution?: UsageHistoryResolution } = {},
 ): Promise<UsageHistoryResponse> {
-  return request<UsageHistoryResponse>(`/groups/${groupId}/usage/history`, { query: { ...opts } })
+  return request<UsageHistoryResponse>(`/access/groups/${groupId}/usage/history`, { query: { ...opts } })
 }
 
 export async function listGroupMembers(groupId: string): Promise<GroupMembersResponse> {

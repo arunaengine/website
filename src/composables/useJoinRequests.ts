@@ -69,14 +69,14 @@ function request<T>(path: string, options = {}) {
   return apiRequest<T>(path, options, { baseUrl: apiBaseUrl.value, token: authToken.value })
 }
 
-// GET /users/join-requests: own pending + recently decided requests.
+// GET /access/users/join-requests: own pending + recently decided requests.
 // not yet provided by the backend (aruna#248). A missing backend must degrade
 // to an inline notice, so this catches and stores the error rather than throwing.
 async function loadOwnRequests(): Promise<void> {
   assertEnabled()
   ownRequestsError.value = null
   try {
-    const response = await request<ListJoinRequestsResponse>('/users/join-requests')
+    const response = await request<ListJoinRequestsResponse>('/access/users/join-requests')
     ownRequests.value = response.requests
     ownRequestsLoaded.value = true
   } catch (err) {
@@ -99,14 +99,14 @@ async function ensureOwnRequestsLoaded(): Promise<void> {
   await ownRequestsInflight
 }
 
-// POST /groups/{groupId}/join-requests: not yet provided by the backend (aruna#248).
+// POST /access/groups/{groupId}/join-requests: not yet provided by the backend (aruna#248).
 async function requestJoin(groupId: string, message?: string): Promise<JoinRequest> {
   assertEnabled()
   busy.value = true
   try {
     const body: CreateJoinRequestRequest = {}
     if (message && message.trim()) body.message = message.trim()
-    const created = await request<JoinRequest>(`/groups/${groupId}/join-requests`, {
+    const created = await request<JoinRequest>(`/access/groups/${groupId}/join-requests`, {
       method: 'POST',
       body: JSON.stringify(body),
     })
@@ -117,13 +117,13 @@ async function requestJoin(groupId: string, message?: string): Promise<JoinReque
   }
 }
 
-// DELETE /groups/{group_id}/join-requests/{request_id}: not yet provided by
+// DELETE /access/groups/{group_id}/join-requests/{request_id}: not yet provided by
 // the backend (aruna#248). Requester withdraws a still-pending request (204).
 async function withdrawRequest(req: JoinRequest): Promise<void> {
   assertEnabled()
   busy.value = true
   try {
-    await request<void>(`/groups/${req.group_id}/join-requests/${req.request_id}`, {
+    await request<void>(`/access/groups/${req.group_id}/join-requests/${req.request_id}`, {
       method: 'DELETE',
     })
     ownRequests.value = ownRequests.value.filter((r) => r.request_id !== req.request_id)
@@ -132,18 +132,18 @@ async function withdrawRequest(req: JoinRequest): Promise<void> {
   }
 }
 
-// GET /groups/{groupId}/join-requests?status=pending: admin inbox. The status
+// GET /access/groups/{groupId}/join-requests?status=pending: admin inbox. The status
 // filter is part of the assumed contract; the client additionally filters
 // status === 'pending' defensively. not yet provided by the backend (aruna#248).
 async function listGroupJoinRequests(groupId: string): Promise<JoinRequest[]> {
   assertEnabled()
-  const response = await request<ListJoinRequestsResponse>(`/groups/${groupId}/join-requests`, {
+  const response = await request<ListJoinRequestsResponse>(`/access/groups/${groupId}/join-requests`, {
     query: { status: 'pending' },
   })
   return response.requests.filter((r) => r.status === 'pending')
 }
 
-// POST /groups/{groupId}/join-requests/{requestId}/decide: approve (assigns
+// POST /access/groups/{groupId}/join-requests/{requestId}/decide: approve (assigns
 // role_ids, defaulting to the "user" role like AddGroupMemberRequest) or deny.
 // not yet provided by the backend (aruna#248).
 async function decideJoinRequest(
@@ -155,7 +155,7 @@ async function decideJoinRequest(
   busy.value = true
   try {
     const response = await request<DecideJoinRequestResponse>(
-      `/groups/${groupId}/join-requests/${requestId}/decide`,
+      `/access/groups/${groupId}/join-requests/${requestId}/decide`,
       { method: 'POST', body: JSON.stringify(input) },
     )
     // Harmless cross-account safety: if this id happens to be in our own list,
