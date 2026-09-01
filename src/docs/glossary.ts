@@ -174,7 +174,7 @@ export const glossaryTopic: DocsTopic = {
       title: 'Replication',
       icon: 'Share2',
       paragraphs: [
-        'Keeping copies of data on more than one node, driven by policy defaults and explicit copy requests. A [replication factor is policy](concept:realm-nodes-groups#replication-is-not-a-unique-total), not proof of current copies.',
+        'Keeping copies on more than one node. Dataset records replicate by [record placement](concept:glossary#record-placement); file copies come from uploads, [bucket syncs](concept:glossary#bucket-sync) and explicit copy requests, never from a placement policy. A [replica count is a target](concept:realm-nodes-groups#replication-is-not-a-unique-total), not proof of current copies.',
       ],
     },
     {
@@ -239,6 +239,13 @@ export const glossaryTopic: DocsTopic = {
       icon: 'Eraser',
       paragraphs: [
         'Removes every version and delete marker of a file, folder or bucket on this node; other nodes keep their copies. It runs as a system job the API calls a purge, and nothing brings the data back; see [Delete permanently is separate](concept:data-and-deletion#delete-permanently-is-separate).',
+      ],
+    },
+    {
+      title: 'Watch',
+      icon: 'Eye',
+      paragraphs: [
+        'A subscription to a bucket folder or a dataset path: new uploads under the folder, or new datasets under the path, appear as notifications under the bell. Notifications are in-app only and kept for 30 days. Stop a watch from its Watch button or under [Settings](page:settings), Watched resources.',
       ],
     },
     {

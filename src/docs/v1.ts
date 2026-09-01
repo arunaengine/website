@@ -258,7 +258,7 @@ export const docsTopics: DocsTopic[] = [
         title: 'Bucket names',
         icon: 'ListChecks',
         paragraphs: [
-          'The node checks a name before anything is created, and the portal repeats the same check while you type. A refused name is answered with the rule it breaks:',
+          'The node checks a name before anything is created, and the portal repeats the same check while you type. A refused name is answered with the rule it breaks.',
           'Folder names and object keys have rules of their own: no slash in a folder name, no empty or dot-only segment in a key, and at most 1024 bytes.',
         ],
         bullets: [
@@ -974,7 +974,7 @@ export const docsTopics: DocsTopic[] = [
         icon: 'Copy',
         paragraphs: [
           'A dataset can be held by several nodes at once; each copy is a replica. Holder counts include replicas, so summing nodes can exceed the number of unique datasets.',
-          'A default replication factor is policy, not proof of current copies, and an unset default can mean all eligible nodes.',
+          'A default replica count in [record placement](concept:glossary#record-placement) is a target, not proof of current copies, and an unset default can mean all eligible nodes.',
         ],
       },
       {
