@@ -3,8 +3,11 @@
 // table and any future surface share one list.
 import { computed, ref } from 'vue'
 import {
+  createSession,
   listSessions,
   revokeSession,
+  type CreateSessionRequest,
+  type CreateSessionResponse,
   type UserSession,
 } from '@/lib/api'
 import { apiBaseUrl, authToken } from './aruna/state'
@@ -37,6 +40,13 @@ export function useUserSessions() {
     }
   }
 
+  /** Mints a session; the token it carries is shown once and never stored. */
+  async function create(request: CreateSessionRequest): Promise<CreateSessionResponse> {
+    const response = await createSession(request, client())
+    await load()
+    return response
+  }
+
   /** Answers whether the revoked session was the one this browser is using. */
   async function revoke(sessionId: string): Promise<boolean> {
     const wasCurrent = sessions.value.find((entry) => entry.session_id === sessionId)?.current === true
@@ -61,6 +71,7 @@ export function useUserSessions() {
     error,
     busyIds: computed(() => busyIds.value),
     load,
+    create,
     revoke,
   }
 }

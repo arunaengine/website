@@ -13,6 +13,7 @@ import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue
 import GroupDetail from '@/components/groups/GroupDetail.vue'
 import DevicesPanel from '@/components/onboarding/DevicesPanel.vue'
 import SessionsPanel from '@/components/settings/SessionsPanel.vue'
+import S3SessionsPanel from '@/components/settings/S3SessionsPanel.vue'
 import AssistantProviders from '@/components/settings/AssistantProviders.vue'
 import McpConnect from '@/components/settings/McpConnect.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
@@ -356,7 +357,7 @@ function toggleGroup(groupId: string) {
         <section class="surface overflow-hidden">
           <header class="flex items-center justify-between border-b border-border px-5 py-4">
             <div class="flex items-center gap-2">
-              <KeyRound class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">CLI and service access</h3><Badge size="sm" variant="secondary" class="uppercase">Advanced</Badge><Badge variant="outline">{{ visibleCredentials.length }}</Badge>
+              <KeyRound class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">S3 access keys</h3><Badge size="sm" variant="secondary" class="uppercase">Advanced</Badge><Badge variant="outline" size="count">{{ visibleCredentials.length }}</Badge>
               <button
                 v-if="inactiveCredentials.length"
                 type="button"
@@ -369,7 +370,9 @@ function toggleGroup(groupId: string) {
             <Button size="sm" :disabled="!currentUser" @click="createCredentialOpen = true"><Plus class="h-4 w-4" /> Create key</Button>
           </header>
           <p class="border-b border-border px-5 py-3 text-xs leading-relaxed text-muted-foreground">
-            Long-lived keys are for command-line tools and services on this node. Their secret is shown once and is never stored or activated by the portal. Portal storage uses temporary in-memory sessions.
+            Long-lived S3 access keys for command-line tools and services against this node. They also authenticate the GA4GH TES
+            facade over HTTP Basic. They never authenticate the REST API, which takes bearer tokens managed as sessions above.
+            A key's secret is shown once and is never stored or activated by the portal; portal storage uses temporary in-memory sessions.
           </p>
           <div class="min-w-0 overflow-x-auto">
             <table class="min-w-max w-full text-sm">
@@ -379,10 +382,10 @@ function toggleGroup(groupId: string) {
                 <tr v-if="!visibleCredentials.length">
                   <td colspan="5" class="px-5 py-6 text-center text-xs text-muted-foreground">
                     <template v-if="inactiveCredentials.length">
-                      No active CLI or service keys.
+                      No active S3 access keys.
                       <button type="button" class="text-primary hover:underline" @click="showInactiveCredentials = true">Show inactive ({{ inactiveCredentials.length }})</button>
                     </template>
-                    <template v-else>No CLI or service keys for the authenticated user.</template>
+                    <template v-else>No S3 access keys for the authenticated user.</template>
                   </td>
                 </tr>
               </tbody>
@@ -391,6 +394,8 @@ function toggleGroup(groupId: string) {
           <p v-if="revokeError" class="border-t border-border px-5 py-2 text-xs text-destructive">{{ revokeError }}</p>
           <CreateCredentialDialog v-model:open="createCredentialOpen" />
         </section>
+
+        <S3SessionsPanel />
 
         <section class="surface overflow-hidden">
           <DevicesPanel />

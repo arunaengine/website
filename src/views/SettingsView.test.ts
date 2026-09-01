@@ -254,6 +254,7 @@ const SettingsView = compileClientComponent(new URL('./SettingsView.vue', import
   '@/components/data/CreateCredentialDialog.vue': moduleDefault(Empty),
   '@/components/onboarding/DevicesPanel.vue': moduleDefault(labelled('Devices panel')),
   '@/components/settings/SessionsPanel.vue': moduleDefault(labelled('Sessions panel')),
+  '@/components/settings/S3SessionsPanel.vue': moduleDefault(Empty),
   '@/components/settings/AssistantProviders.vue': moduleDefault(Empty),
   '@/components/settings/McpConnect.vue': moduleDefault(Empty),
 })
@@ -305,7 +306,7 @@ describe('SettingsView access tab', () => {
     const { root, errors } = await mount('?tab=access')
 
     const text = panelText(root, 'access')
-    const markers = ['API connection', 'Sessions panel', 'CLI and service access', 'Devices panel', 'Interoperability']
+    const markers = ['API connection', 'Sessions panel', 'S3 access keys', 'Devices panel', 'Interoperability']
     const positions = markers.map((marker) => text.indexOf(marker))
     expect(errors).toEqual([])
     expect(positions.every((position) => position >= 0)).toBe(true)

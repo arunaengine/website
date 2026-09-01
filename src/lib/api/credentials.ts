@@ -1,3 +1,5 @@
+import { apiRequest, type ApiClientOptions } from './client'
+
 export interface S3CredentialSummary {
   access_key_id: string
   group_id: string
@@ -43,4 +45,41 @@ export interface S3SessionResponse {
     node_id: string
     s3_endpoint?: string | null
   }
+}
+
+// One live S3 session of the caller, as listed by GET /access/s3/sessions.
+// Nodes carry no secret here, and everything but the key id is optional so a
+// node that keeps less than another still lists.
+export interface S3SessionSummary {
+  access_key_id: string
+  group_id?: string
+  group_name?: string
+  group?: { id?: string; name?: string }
+  node_id?: string
+  created_at?: string
+  expires_at?: string
+}
+
+export interface ListS3SessionsResponse {
+  sessions?: S3SessionSummary[]
+}
+
+export function listS3Sessions(
+  client: ApiClientOptions = {},
+  signal?: AbortSignal,
+): Promise<ListS3SessionsResponse> {
+  return apiRequest<ListS3SessionsResponse>('/access/s3/sessions', { signal }, client)
+}
+
+/** Revokes one of the caller's own sessions; a foreign key answers 404. */
+export function revokeS3Session(
+  accessKeyId: string,
+  client: ApiClientOptions = {},
+  signal?: AbortSignal,
+): Promise<void> {
+  return apiRequest<void>(
+    `/access/s3/sessions/${encodeURIComponent(accessKeyId)}`,
+    { method: 'DELETE', signal },
+    client,
+  )
 }
