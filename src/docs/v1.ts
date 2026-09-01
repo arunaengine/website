@@ -215,7 +215,7 @@ export const docsTopics: DocsTopic[] = [
         route: '/app/buckets',
         anchor: 'bucket-create',
         title: 'Create a bucket',
-        body: 'Type a bucket name under the bucket list and confirm; bucket names are lowercase, digits, and dashes.',
+        body: 'Type a bucket name under the bucket list and confirm; a name is 3 to 63 characters of lowercase letters, digits, dots and dashes, starting and ending with a letter or digit.',
       },
       {
         route: '/app/buckets',
@@ -243,7 +243,7 @@ export const docsTopics: DocsTopic[] = [
         icon: 'Upload',
         steps: [
           'Open [Data](page:buckets) and confirm the group next to "Showing buckets of".',
-          'Type a [bucket](concept:data-and-deletion#buckets-hold-the-bytes) name under the bucket list and confirm. Names use lowercase letters, digits, and dashes.',
+          'Type a [bucket](concept:data-and-deletion#buckets-hold-the-bytes) name under the bucket list and confirm. A name is 3 to 63 characters of lowercase letters, digits, dots and dashes, it starts and ends with a letter or digit, it holds no two dots in a row and it never looks like an IP address.',
           'Select the bucket, then drag files in or use Add data.',
           'Watch the Transfers panel until every file reports done.',
         ],
