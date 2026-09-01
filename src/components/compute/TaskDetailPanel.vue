@@ -10,6 +10,7 @@ import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
+import Tooltip from '@/components/ui/Tooltip.vue'
 import JobFamilySection from '@/components/jobs/JobFamilySection.vue'
 import TaskHeader from '@/components/compute/TaskHeader.vue'
 import AskAiButton from '@/components/assistant/AskAiButton.vue'
@@ -475,7 +476,9 @@ async function confirmDelete() {
               <RouterLink v-if="row.link.kind === 's3'" class="font-mono text-primary hover:underline" :to="{ name: 'bucket', params: { bucketId: row.link.bucketId }, query: row.link.prefix ? { prefix: row.link.prefix } : {} }">{{ row.url }}</RouterLink>
               <template v-else-if="row.link.kind === 'drs'">
                 <a class="inline-flex items-center gap-1 font-mono text-primary hover:underline" :href="row.link.object" target="_blank" rel="noopener noreferrer">{{ truncateMiddle(row.url, 24, 12) }} <ExternalLinkIcon class="h-3 w-3" /></a>
-                <a class="text-muted-foreground hover:text-foreground" :href="row.link.download" target="_blank" rel="noopener noreferrer" aria-label="Download"><Download class="h-3.5 w-3.5" /></a>
+                <Tooltip label="Download this output">
+                  <a class="text-muted-foreground hover:text-foreground" :href="row.link.download" target="_blank" rel="noopener noreferrer" aria-label="Download this output" title="Download this output"><Download class="h-3.5 w-3.5" /></a>
+                </Tooltip>
               </template>
               <ExternalLink v-else :href="row.url" :label="row.url" class="font-mono text-muted-foreground hover:text-primary" />
             </div>
@@ -490,7 +493,9 @@ async function confirmDelete() {
               <RouterLink v-if="row.link.kind === 's3'" class="font-mono text-primary hover:underline" :to="{ name: 'bucket', params: { bucketId: row.link.bucketId }, query: row.link.prefix ? { prefix: row.link.prefix } : {} }">{{ row.url }}</RouterLink>
               <template v-else-if="row.link.kind === 'drs'">
                 <a class="inline-flex items-center gap-1 font-mono text-primary hover:underline" :href="row.link.object" target="_blank" rel="noopener noreferrer">{{ truncateMiddle(row.url, 24, 12) }} <ExternalLinkIcon class="h-3 w-3" /></a>
-                <a class="text-muted-foreground hover:text-foreground" :href="row.link.download" target="_blank" rel="noopener noreferrer" aria-label="Download"><Download class="h-3.5 w-3.5" /></a>
+                <Tooltip label="Download this output">
+                  <a class="text-muted-foreground hover:text-foreground" :href="row.link.download" target="_blank" rel="noopener noreferrer" aria-label="Download this output" title="Download this output"><Download class="h-3.5 w-3.5" /></a>
+                </Tooltip>
               </template>
               <ExternalLink v-else :href="row.url" :label="row.url" class="font-mono text-muted-foreground hover:text-primary" />
             </div>

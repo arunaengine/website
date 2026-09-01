@@ -5,6 +5,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import IconButton from '@/components/ui/IconButton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import { useAruna } from '@/composables/useAruna'
@@ -247,12 +248,12 @@ function openPreview(row: DataEntity) {
                   >
                     <Link2 class="size-3.5" /> Referenced by
                   </Button>
-                  <Button variant="ghost" size="icon-sm" :aria-label="`Show metadata of ${row.name}`" title="File metadata" @click.stop="emit('info', row.id)">
+                  <IconButton :label="`Show metadata of ${row.name}`" @click.stop="emit('info', row.id)">
                     <Info class="size-3.5" />
-                  </Button>
-                  <Button v-if="canPreview(row)" variant="ghost" size="icon-sm" aria-label="Preview" @click.stop="openPreview(row)">
+                  </IconButton>
+                  <IconButton v-if="canPreview(row)" label="Preview" @click.stop="openPreview(row)">
                     <Eye class="size-3.5" />
-                  </Button>
+                  </IconButton>
                   <a v-if="entityLink(row)" :href="entityLink(row)" target="_blank" rel="noopener noreferrer" class="inline-flex text-primary hover:opacity-80" :aria-label="`Open the location of ${row.name} in a new tab`" @click.stop>
                     <ExternalLinkIcon class="h-3.5 w-3.5" />
                   </a>
