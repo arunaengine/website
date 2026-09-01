@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { HardDrive } from '@lucide/vue'
 import Badge from '@/components/ui/Badge.vue'
@@ -8,53 +8,20 @@ import RefreshButton from '@/components/ui/RefreshButton.vue'
 import QuotaBar from '@/components/ui/QuotaBar.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
-import { useAruna } from '@/composables/useAruna'
+import { useMyGroupsUsage, entryState, QUOTA_SEVERITY, type GroupUsageEntry } from '@/composables/useMyGroupsUsage'
 import { useRefresh } from '@/composables/useRefresh'
-import { assessQuota, quotaCountedBytes, referencedBytes, QUOTA_STATE_BADGES, type QuotaState } from '@/lib/quota'
-import { errorMessage, formatBytes } from '@/lib/utils'
-import type { GroupQuotaStatus } from '@/lib/api'
+import { QUOTA_STATE_BADGES } from '@/lib/quota'
+import { formatBytes } from '@/lib/utils'
 
-const { myGroups, getGroupUsage } = useAruna()
+const { entries, membershipKey, refresh, retry } = useMyGroupsUsage()
 const props = defineProps<{ refreshRevision: number }>()
 
-interface CardEntry {
-  groupId: string
-  name: string
-  status: 'loading' | 'ready' | 'error'
-  error?: string
-  quota?: GroupQuotaStatus | null
-  usedBytes?: number
-  referencedBytes?: number
-  datasetCount?: number | null
-  profileCount?: number | null
-  processRunCount?: number | null
-}
-
-const entries = ref<CardEntry[]>([])
-
-// Guard stale loads (same pattern as AdminView's userSearchSeq).
-let loadSeq = 0
-
-// Severity ordering so the groups that need attention float to the top.
-const SEVERITY: Record<QuotaState, number> = {
-  'over-ceiling': 0,
-  'over-quota': 1,
-  warning: 2,
-  ok: 3,
-  unlimited: 4,
-  'no-policy': 5,
-}
-
-function entryState(entry: CardEntry): QuotaState {
-  return assessQuota(entry.quota, entry.usedBytes ?? 0).state
-}
-
-function badgeFor(entry: CardEntry) {
+function badgeFor(entry: GroupUsageEntry) {
   return QUOTA_STATE_BADGES[entryState(entry)]
 }
 
 // Percentage of the soft quota in use (matches the QuotaBar's own reading).
-function quotaPct(entry: CardEntry): number {
+function quotaPct(entry: GroupUsageEntry): number {
   const quota = entry.quota?.quota_bytes
   if (quota == null || quota <= 0) return 0
   return Math.round(((entry.usedBytes ?? 0) / quota) * 100)
@@ -62,14 +29,14 @@ function quotaPct(entry: CardEntry): number {
 
 // Muted tail of the primary usage line. Separators live inside the string so
 // spacing survives template whitespace condensing (" 9.9 MB" + this).
-function quotaRemainder(entry: CardEntry): string {
+function quotaRemainder(entry: GroupUsageEntry): string {
   const quota = entry.quota?.quota_bytes
   return quota != null ? ` / ${formatBytes(quota)}` : ' · unlimited'
 }
 
 // Secondary detail moved off the primary usage line: the hard cap (when it
 // differs from the quota) and any referenced-but-not-counted footprint.
-function quotaDetail(entry: CardEntry): string {
+function quotaDetail(entry: GroupUsageEntry): string {
   const parts: string[] = []
   const quota = entry.quota?.quota_bytes
   const cap = entry.quota?.ceiling_bytes
@@ -83,82 +50,27 @@ function purposeCountLabel(value: number | null | undefined): string {
   return value == null ? 'Unknown' : String(value.toLocaleString())
 }
 
-async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
-  const queue = [...items]
-  const workers = Array.from({ length: Math.min(limit, queue.length) }, async () => {
-    for (let next = queue.shift(); next !== undefined; next = queue.shift()) await fn(next)
-  })
-  await Promise.all(workers)
-}
-
-async function fetchEntry(entry: CardEntry, seq: number) {
-  try {
-    const usage = await getGroupUsage(entry.groupId)
-    if (seq !== loadSeq) return
-    entry.usedBytes = quotaCountedBytes(usage)
-    entry.referencedBytes = referencedBytes(usage)
-    entry.datasetCount = usage.dataset_count ?? null
-    entry.profileCount = usage.profile_count ?? null
-    entry.processRunCount = usage.process_run_count ?? null
-    entry.quota = usage.quota ?? null
-    entry.status = 'ready'
-  } catch (err) {
-    if (seq !== loadSeq) return
-    entry.status = 'error'
-    entry.error = errorMessage(err)
-  }
-  entries.value = [...entries.value]
-}
-
-async function load() {
-  const seq = ++loadSeq
-  const groups = [...myGroups.value]
-    .sort((a, b) => a.name.localeCompare(b.name))
-  // Preserve already-loaded cards across a reload so a dashboard refresh
-  // updates their quota bars in place instead of flashing every card back to a
-  // skeleton (the revision-driven reloads fire on mount, on interval and on
-  // manual refresh).
-  const previous = new Map(entries.value.map((entry) => [entry.groupId, entry]))
-  entries.value = groups.map((group): CardEntry => {
-    const prior = previous.get(group.id)
-    if (prior && prior.status === 'ready') return { ...prior, name: group.name }
-    return { groupId: group.id, name: group.name, status: 'loading' }
-  })
-  // Every membership is represented immediately; usage loads incrementally
-  // with only three requests in flight at once.
-  await mapLimit(entries.value, 3, (entry) => fetchEntry(entry, seq))
-}
-
-const { busy: refreshBusy, refresh: onRefresh } = useRefresh(load)
-
-function retry(entry: CardEntry) {
-  entry.status = 'loading'
-  entry.error = undefined
-  entries.value = [...entries.value]
-  void fetchEntry(entry, loadSeq)
-}
+const { busy: refreshBusy, refresh: onRefresh } = useRefresh(refresh)
 
 // Ready entries first, sorted by severity then name; then loading; then errors.
-const RANK: Record<CardEntry['status'], number> = { ready: 0, loading: 1, error: 2 }
+const RANK: Record<GroupUsageEntry['status'], number> = { ready: 0, loading: 1, error: 2 }
 function sortedEntries() {
   return [...entries.value].sort((a, b) => {
     if (a.status !== b.status) return RANK[a.status] - RANK[b.status]
     if (a.status === 'ready') {
-      const severity = SEVERITY[entryState(a)] - SEVERITY[entryState(b)]
+      const severity = QUOTA_SEVERITY[entryState(a)] - QUOTA_SEVERITY[entryState(b)]
       if (severity !== 0) return severity
     }
     return a.name.localeCompare(b.name)
   })
 }
 
-watch(
-  () => myGroups.value.map((group) => group.id).join(','),
-  () => void load(),
-  { immediate: true },
-)
+// This card owns the freshness of the shared usage: mounting the dashboard
+// reloads it, and the personal tiles join the same round.
+watch(membershipKey, () => void refresh(), { immediate: true })
 
 watch(() => props.refreshRevision, (revision, previousRevision) => {
-  if (revision > previousRevision) void load()
+  if (revision > previousRevision) void refresh()
 })
 </script>
 
@@ -167,7 +79,7 @@ watch(() => props.refreshRevision, (revision, previousRevision) => {
     <header class="flex items-center justify-between border-b border-border px-5 py-4">
       <div class="flex items-center gap-2">
         <HardDrive class="h-4 w-4 text-primary" />
-        <h2 class="font-display text-sm font-semibold text-aruna-navy">Group statistics</h2>
+        <h2 class="font-display text-sm font-semibold text-aruna-navy">Per group</h2>
         <Badge variant="outline" size="count">{{ entries.length }}</Badge>
       </div>
       <RefreshButton :busy="refreshBusy" sr-label="Refresh group statistics" @click="onRefresh" />
@@ -177,7 +89,7 @@ watch(() => props.refreshRevision, (revision, previousRevision) => {
       v-if="entries.length && entries.filter((e) => e.status === 'error').length * 2 > entries.length"
       message="Could not load storage for most of your groups."
       class="m-5"
-      @retry="load"
+      @retry="refresh"
     />
 
     <div class="grid gap-3.5 p-5 sm:grid-cols-2 xl:grid-cols-3">

@@ -4,7 +4,7 @@ import { compile } from '@vue/compiler-dom'
 import { compileScript, parse } from '@vue/compiler-sfc'
 import { ModuleKind, ScriptTarget, transpileModule } from 'typescript'
 import * as VueRuntime from 'vue'
-import { createRenderer, defineComponent, h, nextTick, ref, type App, type Component } from 'vue'
+import { createRenderer, defineComponent, h, nextTick, type App, type Component } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useRefresh } from '@/composables/useRefresh'
 import { refreshButton } from '@/test/clientRender'
@@ -12,8 +12,16 @@ import type { UsageResponse } from '@/lib/api'
 import * as Quota from '@/lib/quota'
 import * as Utils from '@/lib/utils'
 
-const myGroups = ref<Array<{ id: string; name: string }>>([])
-const getGroupUsage = vi.fn<(groupId: string) => Promise<UsageResponse>>()
+// The cards read the shared composable, so the fetch mock sits one level down
+// at the API call the composable makes.
+const aruna = vi.hoisted(() => ({
+  myGroups: { value: [] as Array<{ id: string; name: string }> },
+  getGroupUsage: vi.fn<(groupId: string) => Promise<UsageResponse>>(),
+}))
+vi.mock('@/composables/useAruna', () => ({ useAruna: () => aruna }))
+
+const MyGroupsUsage = await import('@/composables/useMyGroupsUsage')
+const { myGroups, getGroupUsage } = aruna
 
 const SlotStub = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
@@ -64,7 +72,7 @@ const GroupQuotaCards = compileClientComponent(new URL('./GroupQuotaCards.vue', 
   '@/components/ui/QuotaBar.vue': moduleDefault(SlotStub),
   '@/components/ui/Skeleton.vue': moduleDefault(SkeletonStub),
   '@/components/ui/ErrorPanel.vue': moduleDefault(ErrorPanelStub),
-  '@/composables/useAruna': { useAruna: () => ({ myGroups, getGroupUsage }) },
+  '@/composables/useMyGroupsUsage': MyGroupsUsage,
   '@/composables/useRefresh': { useRefresh },
   '@/lib/quota': Quota,
   '@/lib/utils': Utils,
@@ -178,8 +186,19 @@ function usage(overrides: Partial<UsageResponse> = {}): UsageResponse {
 }
 
 describe('group purpose counts', () => {
+  it('names itself as the per-group breakdown of the personal tiles', async () => {
+    myGroups.value = [{ id: 'header-1', name: 'Research group' }]
+    getGroupUsage.mockResolvedValue(usage({ dataset_count: 1, profile_count: 1, process_run_count: 1 }))
+    const mounted = mountCards()
+
+    await flush()
+
+    expect(content(mounted.root)).toContain('Per group')
+    expect(content(mounted.root)).not.toContain('Group statistics')
+  })
+
   it('renders null as unknown while preserving an explicit zero and exact count', async () => {
-    myGroups.value = [{ id: 'group-1', name: 'Research group' }]
+    myGroups.value = [{ id: 'counts-1', name: 'Research group' }]
     getGroupUsage.mockResolvedValue(
       usage({ dataset_count: null, profile_count: 0, process_run_count: 12 }),
     )
