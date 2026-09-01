@@ -7,9 +7,11 @@
 import { rorOf } from '@/lib/identifiers'
 import { slugify, uniqueId } from '@/lib/profiles/emit'
 import { isAbsoluteUri, isRecord, normalizeTypeUri, SCHEMA_ORG, termNameFromUri } from '@/lib/profiles/uri'
-import { RO_CRATE_PROFILE_IRI, type SubcrateLink } from '@/lib/subcrates'
 import { datatypeKind, type VocabIndex, type VocabTerm } from '@/lib/profiles/vocabulary'
+import { orphanedDataEntities } from './orphans'
 import { contextIri, contextVersion, DEFAULT_CRATE_VERSION, normalizeContext, specIri } from './version'
+
+export { DATA_TYPES, isDataType } from './orphans'
 
 export const ROOT_ID = './'
 export const DESCRIPTOR_ID = 'ro-crate-metadata.json'
@@ -207,13 +209,6 @@ export const PROMOTED_TYPES: Readonly<Record<string, string>> = {
   license: 'CreativeWork',
 }
 
-/** The types that describe stored data; a contextual entity is none of them. */
-export const DATA_TYPES = ['File', 'Dataset', 'MediaObject']
-
-export function isDataType(type: string): boolean {
-  return DATA_TYPES.includes(typeLabel(type))
-}
-
 export const LICENSE_PRESETS: ReadonlyArray<{ value: string; label: string }> = [
   { value: 'https://creativecommons.org/licenses/by/4.0/', label: 'CC BY 4.0' },
   { value: 'https://creativecommons.org/licenses/by-sa/4.0/', label: 'CC BY-SA 4.0' },
@@ -320,7 +315,8 @@ export function defaultValue(kind: DraftValueKind): DraftValue {
   return { kind, value: kind === 'boolean' ? 'false' : '' }
 }
 
-function textKind(value: string): DraftValueKind {
+/** What a plain string looks like: a date, a URL, or short or long text. */
+export function textKind(value: string): DraftValueKind {
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return 'date'
   if (/^\d{4}-\d{2}-\d{2}T/.test(value)) return 'datetime'
   if (/^https?:\/\//.test(value)) return 'url'
@@ -340,7 +336,19 @@ function valueFrom(raw: unknown): DraftValue | undefined {
 /** The rows a JSON-LD value stands for; undefined when no row can express it. */
 export function draftValues(raw: unknown): DraftValue[] | undefined {
   const list = values(raw).map(valueFrom)
-  return list.length && list.every(Boolean) ? (list as DraftValue[]) : undefined
+  if (!list.length || !list.every(Boolean)) return undefined
+  return dedupeReferences(list as DraftValue[])
+}
+
+/** A crate may name the same target twice; the first occurrence wins. */
+function dedupeReferences(list: DraftValue[]): DraftValue[] {
+  const seen = new Set<string>()
+  return list.filter((value) => {
+    if (value.kind !== 'reference') return true
+    if (seen.has(value.value)) return false
+    seen.add(value.value)
+    return true
+  })
 }
 
 function jsonFrom(value: DraftValue): unknown {
@@ -550,64 +558,6 @@ export function referencesTo(draft: CrateDraft, id: string): ReferenceUse[] {
 }
 
 // ---------------------------------------------------------------------------
-// Data entities
-// ---------------------------------------------------------------------------
-
-export interface FilePart {
-  id: string
-  name: string
-  /** `Dataset` for a picked folder; `File` for a single object. */
-  type?: string
-  contentUrl?: string
-  encodingFormat?: string
-  contentSize?: string
-}
-
-function reference(id: string): DraftValue[] {
-  return [{ kind: 'reference', value: id }]
-}
-
-function textValue(value: string): DraftValue[] {
-  return [{ kind: textKind(value), value }]
-}
-
-function linkPart(draft: CrateDraft, id: string): CrateDraft {
-  const root = rootEntity(draft)
-  if (!root || root.properties.hasPart?.some((value) => value.value === id)) return draft
-  return addValue(draft, root.id, 'hasPart', { kind: 'reference', value: id })
-}
-
-export function addFilePart(draft: CrateDraft, part: FilePart): CrateDraft {
-  const properties: Record<string, DraftValue[]> = {
-    name: textValue(part.name || part.id),
-    ...(part.contentUrl ? { contentUrl: textValue(part.contentUrl) } : {}),
-    ...(part.encodingFormat ? { encodingFormat: textValue(part.encodingFormat) } : {}),
-    ...(part.contentSize ? { contentSize: textValue(part.contentSize) } : {}),
-  }
-  const added = addEntity(draft, { type: part.type ?? 'File', id: part.id, properties })
-  return linkPart(added.draft, part.id)
-}
-
-/** A referenced dataset, per the RO-Crate rules for linking another crate. */
-export function addSubcratePart(draft: CrateDraft, link: SubcrateLink): CrateDraft {
-  const properties: Record<string, DraftValue[]> = {
-    name: textValue(link.name),
-    conformsTo: reference(RO_CRATE_PROFILE_IRI),
-    ...(link.identifier ? { identifier: textValue(link.identifier) } : {}),
-    ...(link.subjectOf ? { subjectOf: reference(link.subjectOf) } : {}),
-  }
-  let next = addEntity(draft, { type: 'Dataset', id: link.iri, properties }).draft
-  if (link.subjectOf) {
-    next = addEntity(next, {
-      type: 'CreativeWork',
-      id: link.subjectOf,
-      properties: { encodingFormat: textValue('application/ld+json') },
-    }).draft
-  }
-  return linkPart(next, link.iri)
-}
-
-// ---------------------------------------------------------------------------
 // RO-Crate conversion
 // ---------------------------------------------------------------------------
 
@@ -775,6 +725,17 @@ export function liveIssues(
         })
       }
     }
+  }
+
+  // The node refuses a data entity it cannot reach from the root through
+  // hasPart, so the editor names it before Validate does.
+  for (const entity of orphanedDataEntities(draft)) {
+    issues.push({
+      key: `orphan:${entity.id}`,
+      severity: 'error',
+      message: `${displayName(entity)} is not part of this dataset. Link it as a part or remove it.`,
+      entityId: entity.id,
+    })
   }
 
   for (const property of profile?.properties ?? []) {

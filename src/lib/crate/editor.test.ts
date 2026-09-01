@@ -2,8 +2,6 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import {
   addEntity,
   allowedKinds,
-  addFilePart,
-  addSubcratePart,
   addValue,
   autoId,
   changeKind,
@@ -25,6 +23,7 @@ import {
   valueKindsFor,
   type CrateDraft,
 } from './editor'
+import { addFilePart, addSubcratePart } from './references'
 import { loadVocabIndex, type VocabIndex } from '@/lib/profiles/vocabulary'
 
 let vocab: VocabIndex
@@ -120,6 +119,22 @@ describe('crate draft', () => {
     expect(draft.entities[0].types).toEqual(['Dataset', 'UnknownThing'])
     expect(graph.find((node) => node['@id'] === './')).toMatchObject({ weird: { nested: { deep: [1, 2] } } })
     expect(graph.find((node) => node['@id'] === '#odd')).toMatchObject({ retained: true, count: 3 })
+  })
+
+  it('keeps one entry when an imported crate names a part twice', () => {
+    const crate = {
+      '@context': 'https://w3id.org/ro/crate/1.1/context',
+      '@graph': [
+        { '@id': 'ro-crate-metadata.json', '@type': 'CreativeWork', conformsTo: { '@id': 'x' }, about: { '@id': './' } },
+        { '@id': './', '@type': 'Dataset', hasPart: [{ '@id': 's3://bucket/one.csv' }, { '@id': 's3://bucket/one.csv' }] },
+        { '@id': 's3://bucket/one.csv', '@type': 'File', name: 'one.csv' },
+      ],
+    }
+    const draft = fromRoCrate(crate)
+
+    expect(draft.entities[0].properties.hasPart).toEqual([
+      { kind: 'reference', value: 's3://bucket/one.csv' },
+    ])
   })
 
   it('keeps an absolute class IRI while editing types', () => {
@@ -265,6 +280,14 @@ describe('live issues', () => {
     expect(keys).toContain('profile:identifier')
     expect(keys).toContain('profileType:Place')
     expect(keys).not.toContain('profileType:Person')
+  })
+
+  it('reports a file the dataset cannot reach, as the node would', () => {
+    const draft = addEntity(seeded(), { type: 'File', id: 's3://bucket/stray.csv', name: 'stray.csv' }).draft
+    const issue = liveIssues(draft).find((entry) => entry.key.startsWith('orphan:'))
+
+    expect(issue).toMatchObject({ severity: 'error', entityId: 's3://bucket/stray.csv' })
+    expect(issue?.message).toContain('stray.csv')
   })
 
   it('warns about a value left empty', () => {

@@ -64,6 +64,18 @@ describe('profile seeding', () => {
     expect(person?.properties.affiliation).toEqual([{ kind: 'text', value: '' }])
   })
 
+  it('seeds a parts row rather than an empty file the node would refuse', () => {
+    const withParts = profile()
+    withParts.propertyRules = [
+      ...withParts.propertyRules,
+      rule({ valueName: 'hasPart', label: 'Has part', kind: 'entity', entityTypes: ['http://schema.org/MediaObject'] }),
+    ]
+    const draft = applyProfile(newDraft(), withParts)
+
+    expect(draft.entities[0].properties.hasPart).toEqual([{ kind: 'reference', value: '' }])
+    expect(draft.entities.some((entity) => entity.types.includes('http://schema.org/MediaObject'))).toBe(false)
+  })
+
   it('leaves a filled row alone', () => {
     const first = applyProfile(newDraft(), profile())
     const edited = { ...first, entities: first.entities.map((entity) => (entity.id === './'

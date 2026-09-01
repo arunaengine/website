@@ -6,9 +6,9 @@ import type { MetadataProfile } from '@/data/types'
 import type { ProfileEntityRule, ProfilePropertyRule, ProfileValueKind } from '@/lib/profiles/types'
 import {
   addEntity,
-  addValue,
   defaultValue,
   findEntity,
+  isDataType,
   rootId,
   setProperty,
   typeLabel,
@@ -17,6 +17,7 @@ import {
   type DraftValueKind,
   type ProfileExpectation,
 } from './editor'
+import { linkReference } from './references'
 
 const KINDS: Readonly<Record<ProfileValueKind, DraftValueKind>> = {
   text: 'text',
@@ -80,8 +81,10 @@ export function clearProfile(draft: CrateDraft, previousIri?: string): CrateDraf
 
 /**
  * Pre-adds one empty row per mandatory root property, and for a mandatory
- * reference an entity of the target type carrying its own mandatory rows.
- * Rows already filled in are left untouched.
+ * reference an entity of the target type carrying its own mandatory rows. A
+ * data entity is seeded as an empty row instead: an empty file would be the
+ * orphan the node refuses, and a row prompts for Create or Link like any
+ * other reference. Rows already filled in are left untouched.
  */
 export function applyProfile(draft: CrateDraft, profile: MetadataProfile, iri?: string, previousIri?: string): CrateDraft {
   const root = rootId(draft)
@@ -93,10 +96,9 @@ export function applyProfile(draft: CrateDraft, profile: MetadataProfile, iri?: 
   for (const rule of mandatory(profile.propertyRules)) {
     if (findEntity(next, root)?.properties[rule.valueName]?.length) continue
     const target = rule.kind === 'entity' ? rule.entityTypes?.[0] : undefined
-    if (rule.kind === 'entity' && !target) continue
-    if (target) {
+    if (target && !isDataType(target)) {
       const created = addEntity(next, { type: target, properties: seededRows(ruleFor(profile, target)) })
-      next = addValue(created.draft, root, rule.valueName, { kind: 'reference', value: created.entity.id })
+      next = linkReference(created.draft, root, rule.valueName, created.entity.id)
       continue
     }
     next = setProperty(next, root, rule.valueName, [defaultValue(draftKind(rule.kind))])
