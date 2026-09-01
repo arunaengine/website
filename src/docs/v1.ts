@@ -223,6 +223,12 @@ export const docsTopics: DocsTopic[] = [
         title: 'Add your files',
         body: 'Select the bucket, then drag files onto the drop zone or use Add data.',
       },
+      {
+        route: '/app/buckets',
+        anchor: 'bucket-settings',
+        title: 'Bucket settings',
+        body: 'The cogwheel holds routing, which storage backend takes the writes, and placement, where copies of the data are kept.',
+      },
     ],
     sections: [
       {
@@ -244,7 +250,7 @@ export const docsTopics: DocsTopic[] = [
         image: {
           src: '/docs/v1/data-browser.jpg',
           alt: 'Data view with the reef-survey-2026 bucket and two uploaded objects',
-          caption: 'A bucket with uploaded objects; the toolbar reaches watch, routing, residency, and sync settings.',
+          caption: 'A bucket with uploaded objects; the toolbar reaches watch, bucket settings, and sync.',
         },
       },
       {
@@ -252,6 +258,57 @@ export const docsTopics: DocsTopic[] = [
         icon: 'RefreshCw',
         paragraphs: [
           'A failed transfer stays in the Transfers panel with its error and a Retry link. [Retrying](concept:states-and-retry#retry-without-inventing-an-outcome) is always safe.',
+        ],
+      },
+    ],
+  },
+  {
+    slug: 'where-data-lives',
+    kind: 'Concept',
+    title: 'Where your data lives',
+    summary: 'Placement, routing, and sync: which nodes hold copies, which backend takes the writes, and when a second bucket is the answer.',
+    sections: [
+      {
+        title: 'Names stay local, bytes travel',
+        icon: 'Server',
+        paragraphs: [
+          'The S3 name of an [object](concept:glossary#object), its bucket and key on one node, is served only by that node: an S3 request against node-x always goes to node-x, and placement never changes that.',
+          'The bytes underneath are different: they are content-addressed blobs that can hold verified copies on other [realm](concept:realm-nodes-groups#nodes-and-the-realm) nodes. Losing a node loses its names, not the data, as long as copies exist elsewhere.',
+        ],
+      },
+      {
+        title: 'Placement: copies across nodes',
+        icon: 'Copy',
+        paragraphs: [
+          'A placement policy is a realm-published rule such as "keep two copies" or "keep a copy at institute X". Attaching policies to a bucket, in the [bucket settings](page:buckets) behind the cogwheel, declares where copies of its data must live.',
+          'New objects follow the policies as they are written; the coverage view shows how many existing objects already comply, and a catch-up run applies the policies to everything older.',
+          'Copies exist for three reasons: durability when a node dies, [compute scheduling](concept:data-to-compute), and location-aware reads for tools that fetch by content rather than by name.',
+        ],
+      },
+      {
+        title: 'Routing: backends behind this node',
+        icon: 'Route',
+        paragraphs: [
+          'Routing decides which physical storage receives the bytes a node accepts: the node\'s own store or a [storage backend](concept:storage-access#external-storage-backend) your group runs, such as an S3 or Azure account.',
+          'It answers a different question than placement: placement chooses across nodes, routing chooses behind one node. Rules apply per key, per prefix, per bucket, or as a group default, with the most specific rule winning.',
+        ],
+      },
+      {
+        title: 'Data to compute, compute to data',
+        icon: 'Send',
+        paragraphs: [
+          'A [compute run](concept:compute-run) that names inputs like node-x/bucket/key is not pinned to node-x. The planner routes the job to any node that holds the input blobs, so more placement copies mean more candidate nodes for a run.',
+          'If no reachable node holds the inputs, submission is refused and asks you to replicate first: submit from a node that holds the inputs, or attach a placement policy and let the copies catch up.',
+          'The same mechanism works in both directions: [bring data to where compute is available, or send compute to where the data already lives](concept:data-to-compute#what-the-verdict-means).',
+        ],
+      },
+      {
+        title: 'Sync or placement?',
+        icon: 'Split',
+        paragraphs: [
+          'Both move data between nodes, but they answer different needs. Placement replicates the bytes of one bucket so its copies satisfy your durability and compute rules; nothing new appears anywhere, the bucket stays the single place where the data is named and served.',
+          'A bucket sync relationship instead mirrors a source bucket into a second bucket on a target node: the target checks its own write permission, writes its own copies, and owns them from then on as an independently served bucket with its own lifecycle.',
+          'Use placement when you care about one dataset surviving node loss, feeding compute, or being read by content. Use sync when another node or group should hold a real, name-addressable copy of its own: a partner mirror, a hand-off, or a migration. Sync runs once, continuously as versions are written, or in a reference mode that preserves references instead of copying bytes.',
         ],
       },
     ],
@@ -469,7 +526,7 @@ export const docsTopics: DocsTopic[] = [
         title: 'Requirements',
         icon: 'ListChecks',
         paragraphs: [
-          'Group ADMIN [role](concept:glossary#role), the endpoint details, and credentials meant for Aruna routing. Backend credentials are neither [portal sessions](concept:storage-access#portal-s3-session) nor [CLI keys](concept:storage-access#cli-and-service-access-key).',
+          'Group ADMIN [role](concept:glossary#role), the endpoint details, and credentials meant for Aruna routing. Backend credentials are neither [portal sessions](concept:storage-access#portal-s3-session) nor [S3 access keys](concept:storage-access#s3-access-key).',
         ],
       },
       {
@@ -492,8 +549,8 @@ export const docsTopics: DocsTopic[] = [
   {
     slug: 'cli-access-key',
     kind: 'Guide',
-    title: 'Create a CLI or service access key',
-    summary: 'A long-lived node-local key for a non-portal S3 client.',
+    title: 'Create an S3 access key',
+    summary: 'A long-lived, node-local S3 key for a client outside the portal.',
     tour: [
       {
         route: '/app',
@@ -513,7 +570,8 @@ export const docsTopics: DocsTopic[] = [
         title: 'Use the right credential',
         icon: 'Shield',
         paragraphs: [
-          'The portal itself uses short-lived [sessions](concept:storage-access#portal-s3-session). Create an [access key](concept:storage-access#cli-and-service-access-key) only for a tool that cannot use that flow.',
+          'The portal itself uses short-lived [sessions](concept:storage-access#portal-s3-session). Create an [S3 access key](concept:storage-access#s3-access-key) only for a tool that cannot use that flow.',
+          'The key signs S3 requests and authenticates the GA4GH TES facade over HTTP Basic. It never authenticates the REST API, which takes a bearer token issued as a session.',
         ],
       },
       {
@@ -854,10 +912,11 @@ export const docsTopics: DocsTopic[] = [
         ],
       },
       {
-        title: 'CLI and service access key',
+        title: 'S3 access key',
         icon: 'KeyRound',
         paragraphs: [
           'An optional long-lived key pair for S3 clients outside the portal, created under [Settings](page:settings). The secret is shown once, is never stored by the portal, and stays local to the issuing node.',
+          'The same key authenticates the GA4GH TES facade over HTTP Basic. It never authenticates the REST API: that takes a bearer token, issued and revoked as a session.',
         ],
       },
       {
@@ -959,7 +1018,7 @@ export const docsTopics: DocsTopic[] = [
         title: 'Placement policies and the run-family strategy',
         icon: 'MapPin',
         bullets: [
-          'A residency policy is immutable; a reference is its id plus the digest of the definition.',
+          'A [placement policy](concept:where-data-lives#placement-copies-across-nodes) is immutable; a reference is its id plus the digest of the definition.',
           'Changing a definition means a new policy id. The planner only routes inputs from compliant copies.',
           'The run-family strategy places the run records themselves; it cannot be removed and is shown read-only.',
         ],

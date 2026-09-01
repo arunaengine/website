@@ -136,6 +136,27 @@ export const glossaryTopic: DocsTopic = {
       ],
     },
     {
+      title: 'Placement',
+      icon: 'Copy',
+      paragraphs: [
+        'Where copies of a bucket\'s data are kept across [nodes](concept:glossary#node). A placement policy is a realm-published rule such as "keep two copies"; attaching it in the [bucket settings](page:buckets) declares where the copies of that bucket must live. See [Where your data lives](concept:where-data-lives#placement-copies-across-nodes).',
+      ],
+    },
+    {
+      title: 'Routing',
+      icon: 'Route',
+      paragraphs: [
+        'Which physical storage receives the bytes one node accepts: the node\'s own store or a [storage backend](concept:glossary#storage-backend) your group runs. Rules apply per key, per prefix, per bucket, or as a group default, with [the most specific rule winning](concept:where-data-lives#routing-backends-behind-this-node).',
+      ],
+    },
+    {
+      title: 'Bucket sync',
+      icon: 'Share2',
+      paragraphs: [
+        'A relationship that mirrors a source bucket into a second bucket on a target node, which writes and owns its own copies from then on. It runs once, continuously as versions are written, or in a reference mode that preserves references instead of copying bytes; [placement](concept:where-data-lives#sync-or-placement) replicates one bucket instead of creating a second one.',
+      ],
+    },
+    {
       title: 'Delete marker',
       icon: 'Trash2',
       paragraphs: [
@@ -174,7 +195,7 @@ export const glossaryTopic: DocsTopic = {
       title: 'Access key',
       icon: 'KeyRound',
       paragraphs: [
-        'A long-lived, node-local S3 key pair for [tools outside the portal](concept:storage-access#cli-and-service-access-key). The secret is shown once and never stored by the portal.',
+        'A long-lived, node-local S3 key pair for [tools outside the portal](concept:storage-access#s3-access-key). The secret is shown once and never stored by the portal. It does not authenticate the REST API, which takes a bearer token.',
       ],
     },
     {
@@ -227,10 +248,10 @@ export const glossaryTopic: DocsTopic = {
       ],
     },
     {
-      title: 'Placement',
+      title: 'Run placement',
       icon: 'Route',
       paragraphs: [
-        'The decision where a run executes: [next to its data when possible, moving data when it must](concept:data-to-compute). The placement record tells you which happened, and why.',
+        'The decision where a run executes: [next to its data when possible, moving data when it must](concept:data-to-compute). The placement record tells you which happened, and why. It is decided per run, unlike [placement](concept:glossary#placement) policies, which govern a bucket.',
       ],
     },
     {

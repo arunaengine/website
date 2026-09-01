@@ -47,6 +47,7 @@ describe('versioned in-portal Docs', () => {
       'portal-tour',
       'first-group',
       'upload-data',
+      'where-data-lives',
       'first-dataset',
       'compute-run',
       'storage-backend',
