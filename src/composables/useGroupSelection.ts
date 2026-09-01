@@ -1,6 +1,7 @@
 // The group a selector starts on: the last one the user worked in, remembered
 // in the browser and shared by every view that defaults a group.
 import { computed, readonly, ref, watch, type Ref } from 'vue'
+import { onWake } from '@/lib/poll'
 import { readStored, storeValue } from './aruna/state'
 import { useAruna } from './useAruna'
 
@@ -29,6 +30,26 @@ export function setActiveGroup(groupId: string) {
   rememberGroup(groupId)
 }
 
+let pendingReload: Promise<unknown> | null = null
+let wakeBound = false
+
+/**
+ * Re-reads the memberships. They are fetched once at bootstrap, so a group
+ * created in another tab stays invisible to this one until they are read again.
+ * Every view that gates on group existence calls this when it opens, and once
+ * more whenever the window comes back to the front.
+ */
+export function reloadGroups() {
+  const { currentUser, loadAuthenticated } = useAruna()
+  if (!wakeBound) {
+    wakeBound = true
+    onWake(reloadGroups)
+  }
+  if (!currentUser.value || pendingReload) return
+  pendingReload = loadAuthenticated().catch(() => undefined)
+  void pendingReload.finally(() => (pendingReload = null))
+}
+
 /**
  * Keeps `selected` on a group without asking: an empty selection takes the
  * remembered group, or the first membership when that group is gone, and every
@@ -41,6 +62,8 @@ export function useGroupSelection(selected: Ref<string>) {
   // show its loading state rather than the "no group" one until then.
   const groupsLoading = computed(() => !bootstrapped.value || loading.value)
   const hasGroups = computed(() => myGroups.value.length > 0)
+
+  reloadGroups()
 
   watch(
     activeGroupId,

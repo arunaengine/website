@@ -4,6 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const myGroups = ref<Array<{ id: string; name: string }>>([])
 const loading = ref(false)
 const bootstrapped = ref(true)
+const currentUser = ref<{ id: string } | null>({ id: 'u1' })
+const loadAuthenticated = vi.fn(async () => undefined)
+// Both the window focus and the document visibility listener onWake registers.
+let wakeListeners: Array<() => void> = []
 
 class MemoryStorage implements Storage {
   readonly values = new Map<string, string>()
@@ -42,12 +46,18 @@ async function loadModule(stored = '') {
   vi.resetModules()
   storage = new MemoryStorage()
   if (stored) storage.setItem(STORED_KEY, stored)
+  wakeListeners = []
+  const listen = (_type: string, listener: () => void) => wakeListeners.push(listener)
   Object.defineProperty(globalThis, 'window', {
     configurable: true,
-    value: { localStorage: storage },
+    value: { localStorage: storage, addEventListener: listen, removeEventListener: () => {} },
+  })
+  Object.defineProperty(globalThis, 'document', {
+    configurable: true,
+    value: { hidden: false, addEventListener: listen, removeEventListener: () => {} },
   })
   vi.doMock('./useAruna', () => ({
-    useAruna: () => ({ myGroups, loading, bootstrapped }),
+    useAruna: () => ({ myGroups, loading, bootstrapped, currentUser, loadAuthenticated }),
   }))
   return import('./useGroupSelection')
 }
@@ -56,11 +66,14 @@ beforeEach(() => {
   myGroups.value = []
   loading.value = false
   bootstrapped.value = true
+  currentUser.value = { id: 'u1' }
+  loadAuthenticated.mockClear()
 })
 
 afterEach(() => {
   vi.doUnmock('./useAruna')
   Reflect.deleteProperty(globalThis, 'window')
+  Reflect.deleteProperty(globalThis, 'document')
 })
 
 describe('shared group selection', () => {
@@ -168,6 +181,38 @@ describe('shared group selection', () => {
 
     expect(storage.getItem(STORED_KEY)).toBe('group-b')
     expect(selected.value).toBe('group-b')
+  })
+})
+
+describe('membership freshness', () => {
+  it('reads memberships when a view opens', async () => {
+    const { useGroupSelection } = await loadModule()
+
+    useGroupSelection(ref(''))
+
+    expect(loadAuthenticated).toHaveBeenCalledTimes(1)
+  })
+
+  it('reads them again when the window comes back', async () => {
+    // A group created in another tab is invisible here until they are re-read.
+    const { useGroupSelection } = await loadModule()
+    useGroupSelection(ref(''))
+    await nextTick()
+    await nextTick()
+
+    for (const wake of wakeListeners) wake()
+
+    expect(wakeListeners.length).toBeGreaterThan(0)
+    expect(loadAuthenticated).toHaveBeenCalledTimes(2)
+  })
+
+  it('reads nothing for a signed-out visitor', async () => {
+    currentUser.value = null
+    const { useGroupSelection } = await loadModule()
+
+    useGroupSelection(ref(''))
+
+    expect(loadAuthenticated).not.toHaveBeenCalled()
   })
 })
 

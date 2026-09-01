@@ -14,6 +14,7 @@ import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useJoinRequests } from '@/composables/useJoinRequests'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
+import { reloadGroups } from '@/composables/useGroupSelection'
 import { useRefresh } from '@/composables/useRefresh'
 import { useFirstPaint } from '@/composables/useFirstPaint'
 import { providePageContext } from '@/composables/usePageContext'
@@ -59,6 +60,8 @@ async function loadOwnJoinRequests() {
   }
 }
 onMounted(loadOwnJoinRequests)
+// A group created in another tab must show up here without a page reload.
+onMounted(reloadGroups)
 // A post-mount sign-in must also load the requests.
 watch(currentUser, loadOwnJoinRequests)
 
@@ -157,7 +160,7 @@ const shellState = computed<'loading' | 'empty' | 'ready'>(() => {
         <template #filters>
           <Users class="h-4 w-4 text-primary" />
           <h2 class="font-display text-sm font-semibold text-aruna-navy">Your groups</h2>
-          <Badge variant="outline" class="tabular-nums">{{ myGroups.length }}</Badge>
+          <Badge variant="outline" size="count">{{ myGroups.length }}</Badge>
         </template>
 
         <ul class="divide-y divide-border">

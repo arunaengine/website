@@ -59,6 +59,7 @@ import {
   canWithdrawPids,
   currentUser,
   isRealmAdmin,
+  loadAuthenticated,
 } from './aruna/identity'
 import { mapMetadataDoc, metadata, profiles } from './aruna/mapping'
 import { isManagementNode, loadInfo, nodes, realm, setRealmQuota } from './aruna/realm'
@@ -195,6 +196,7 @@ export function useAruna() {
     profileValidationStatuses: readonly(profileValidationStatuses),
     profileValidationCapabilities: readonly(profileValidationCapabilities),
     refresh,
+    loadAuthenticated,
     loadInfo,
     loadMetadata,
     refreshProfiles,
