@@ -48,7 +48,7 @@ export interface ObjectHead {
   contentType?: string
   etag?: string
   lastModified?: Date
-  /** Names the exact stored version, what a content lookup is keyed by. */
+  /** The version this HEAD resolved to; versioning is always on. */
   versionId?: string
   /** User metadata; the SDK strips the x-amz-meta- prefix from the keys. */
   metadata: Record<string, string>
@@ -397,8 +397,15 @@ export async function deletePrefix(
 
 // Single-object HEAD, mainly for the user metadata: reference-backed objects
 // expose aruna-last-refresh / aruna-source-etag there (lib/references.ts).
-export async function headObject(bucket: string, key: string, nodeId?: string | null): Promise<ObjectHead> {
-  const response = await client(nodeId).send(new HeadObjectCommand({ Bucket: bucket, Key: key }))
+export async function headObject(
+  bucket: string,
+  key: string,
+  nodeId?: string | null,
+  versionId?: string,
+): Promise<ObjectHead> {
+  const response = await client(nodeId).send(
+    new HeadObjectCommand({ Bucket: bucket, Key: key, VersionId: versionId }),
+  )
   return {
     size: response.ContentLength,
     contentType: response.ContentType,
@@ -409,29 +416,53 @@ export async function headObject(bucket: string, key: string, nodeId?: string | 
   }
 }
 
-export async function downloadUrl(bucket: string, key: string, nodeId?: string | null): Promise<string> {
-  return getSignedUrl(client(nodeId), new GetObjectCommand({ Bucket: bucket, Key: key }), {
-    expiresIn: 900,
-  })
+// A version id belongs in the signed request, never appended afterwards: the
+// query string is part of what SigV4 signs.
+export async function downloadUrl(
+  bucket: string,
+  key: string,
+  nodeId?: string | null,
+  versionId?: string,
+): Promise<string> {
+  return getSignedUrl(
+    client(nodeId),
+    new GetObjectCommand({ Bucket: bucket, Key: key, VersionId: versionId }),
+    { expiresIn: 900 },
+  )
 }
 
 // Fetch an object's bytes in the browser through a short-lived presigned GET so
 // previews can read content directly. A cross-origin fetch needs the bucket to
 // allow this portal's origin (CORS); when it does not the browser rejects with
 // a TypeError, which the caller treats as the known CORS gap.
-async function fetchObject(bucket: string, key: string, nodeId?: string | null): Promise<Response> {
-  const url = await downloadUrl(bucket, key, nodeId)
+async function fetchObject(
+  bucket: string,
+  key: string,
+  nodeId?: string | null,
+  versionId?: string,
+): Promise<Response> {
+  const url = await downloadUrl(bucket, key, nodeId, versionId)
   const response = await fetch(url)
   if (!response.ok) throw new Error(`The object could not be fetched (HTTP ${response.status}).`)
   return response
 }
 
-export async function getObjectText(bucket: string, key: string, nodeId?: string | null): Promise<string> {
-  return (await fetchObject(bucket, key, nodeId)).text()
+export async function getObjectText(
+  bucket: string,
+  key: string,
+  nodeId?: string | null,
+  versionId?: string,
+): Promise<string> {
+  return (await fetchObject(bucket, key, nodeId, versionId)).text()
 }
 
-export async function getObjectBlob(bucket: string, key: string, nodeId?: string | null): Promise<Blob> {
-  return (await fetchObject(bucket, key, nodeId)).blob()
+export async function getObjectBlob(
+  bucket: string,
+  key: string,
+  nodeId?: string | null,
+  versionId?: string,
+): Promise<Blob> {
+  return (await fetchObject(bucket, key, nodeId, versionId)).blob()
 }
 
 // One profile artifact (or a pasted document itself) fetched as text. A URL that
