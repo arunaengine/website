@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Button from '@/components/ui/Button.vue'
+import DocsLink from '@/components/ui/DocsLink.vue'
 import Input from '@/components/ui/Input.vue'
 import Switch from '@/components/ui/Switch.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
@@ -192,15 +193,10 @@ async function save() {
         <span>{{ warning }}</span>
       </Notice>
 
-      <details class="rounded-md border border-border px-3 py-2">
-        <summary class="cursor-pointer text-xs font-medium text-foreground">How a rule is picked</summary>
-        <p class="mt-2 text-[11px] text-muted-foreground">
-          The most specific rule wins: a rule for one exact key first, then the longest matching
-          prefix, then a rule with an empty prefix, then the group default, then this node's own
-          routing. Naming a backend is binding, so an upload that cannot reach it fails; naming a
-          storage class is only a preference, and a node without that class stores the file itself.
-        </p>
-      </details>
+      <p class="flex flex-wrap items-center gap-x-2 text-[11px] text-muted-foreground">
+        <span>The most specific rule wins.</span>
+        <DocsLink topic="where-data-lives" section="Storage backend" label="Learn how a rule is picked" />
+      </p>
     </template>
   </section>
 </template>

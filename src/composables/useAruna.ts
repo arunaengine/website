@@ -118,7 +118,7 @@ import {
   getSyncRelationship,
   listSyncRelationships,
   runSyncRelationship,
-  updateSyncReferenceHandling,
+  updateSyncRelationship,
 } from './aruna/sync'
 import {
   createS3Credentials,
@@ -272,7 +272,7 @@ export function useAruna() {
     getSyncRelationship,
     createSyncRelationship,
     runSyncRelationship,
-    updateSyncReferenceHandling,
+    updateSyncRelationship,
     deleteSyncRelationship,
     setAuthToken,
     setApiBaseUrl,

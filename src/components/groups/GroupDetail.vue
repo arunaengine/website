@@ -27,6 +27,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import { Cable, ChartArea, Database, FileJson2, HardDrive, Inbox, LogOut, Pencil, Route, ShieldAlert, ShieldCheck, Users } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useJoinRequests } from '@/composables/useJoinRequests'
+import { hasGroupWrite } from '@/lib/groupAdmin'
 import { assessQuota, quotaCountedBytes, referencedBytes, QUOTA_STATE_BADGES } from '@/lib/quota'
 import { featureEnabled } from '@/lib/config'
 import { errorMessage, formatBytes, formatNumber, relativeTime } from '@/lib/utils'
@@ -156,26 +157,11 @@ const connectorCount = ref<number | null>(null)
 const backendCount = ref<number | null>(null)
 const groupBackends = ref<GroupBackendResponse[]>([])
 
-// Mirrors the backend permission gates. Public roles apply to every principal,
-// so they count too.
-function hasWrite(detail: GroupDetailResponse, target: string, userId: string): boolean {
-  return detail.roles.some((role) => {
-    if (!(role.public || role.assigned_users?.includes(userId))) return false
-    return Object.entries(role.permissions).some(([key, value]) => {
-      if (value.toLowerCase() !== 'write') return false
-      if (key === target) return true
-      if (!key.endsWith('/**')) return false
-      const base = key.slice(0, -3)
-      return target === base || target.startsWith(`${base}/`)
-    })
-  })
-}
-
 // Connector management: WRITE on /{realm}/g/{gid}/data/**.
 const canWriteData = computed(() => {
   const detail = group.value
   if (!detail) return false
-  return hasWrite(detail, `/${detail.realm_id}/g/${detail.group_id}/data/**`, currentUser.value?.id ?? '')
+  return hasGroupWrite(detail, `/${detail.realm_id}/g/${detail.group_id}/data/**`, currentUser.value?.id ?? '')
 })
 
 // Group admin (api ensure_group_admin), the gate storage, routing and request
@@ -183,7 +169,7 @@ const canWriteData = computed(() => {
 const canAdminGroup = computed(() => {
   const detail = group.value
   if (!detail) return false
-  return hasWrite(detail, `/${detail.realm_id}/g/${detail.group_id}/admin/**`, currentUser.value?.id ?? '')
+  return hasGroupWrite(detail, `/${detail.realm_id}/g/${detail.group_id}/admin/**`, currentUser.value?.id ?? '')
 })
 const canAdminStorage = canAdminGroup
 

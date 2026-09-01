@@ -5,6 +5,7 @@
 //                                            502 target unreachable
 //   GET    /data/sync/relationships          ?bucket=&prefix=&direction=out|in|both
 //   GET    /data/sync/relationships/{id}     SyncRelationshipDetail
+//   PATCH  /data/sync/relationships/{id}     reference_handling and/or state
 //   POST   /data/sync/relationships/{id}/run 202 (re-run once / backfill continuous)
 //   DELETE /data/sync/relationships/{id}     204 (synced data is retained)
 // Listing and detail only surface relationships CREATED BY the caller; run and
@@ -74,8 +75,11 @@ export interface CreateSyncRelationshipRequest {
   replicate_deletes?: boolean
 }
 
+// Both fields are optional in practice; a node that predates pausing refuses
+// a body carrying `state`, so the caller hides the control after that answer.
 export interface UpdateSyncRelationshipRequest {
-  reference_handling: SyncReferenceHandling
+  reference_handling?: SyncReferenceHandling
+  state?: 'enabled' | 'paused'
 }
 
 export interface SyncRelationshipListQuery {

@@ -81,6 +81,12 @@ export function portalRoutes(): RouteRecordRaw[] {
         // Data: buckets and objects, the primary research surface.
         { path: 'buckets', name: 'buckets', component: () => import('@/views/DataManagerView.vue') },
         { path: 'buckets/:bucketId', name: 'bucket', component: () => import('@/views/DataManagerView.vue') },
+        // Everything one bucket stores: backend, placement policies and syncs.
+        {
+          path: 'buckets/:bucketId/storage',
+          name: 'bucket-storage',
+          component: () => import('@/views/BucketStorageView.vue'),
+        },
         // Retired bucket-builder route: the consolidated Add data dialog replaced
         // the full-page builder; old links land in the bucket view with it open.
         {

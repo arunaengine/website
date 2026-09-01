@@ -422,10 +422,10 @@ export async function runBulkToCompletion(
 
 export function coverageLimitLabel(limit: string): string {
   const normalized = limit.replaceAll('-', '_')
-  if (normalized === 'responder_local') return 'Responder-local view only'
-  if (normalized === 'bounded_page') return 'Bounded page'
-  if (normalized === 'historical_excluded') return 'Historical versions excluded'
-  if (normalized === 'concurrent_writes') return 'Concurrent writes may not be reflected'
+  if (normalized === 'responder_local') return 'Counted on this node only'
+  if (normalized === 'bounded_page') return 'One page of a longer listing'
+  if (normalized === 'historical_excluded') return 'Older versions not counted'
+  if (normalized === 'concurrent_writes') return 'Writes during the count may be missing'
   return limit.replaceAll('_', ' ')
 }
 

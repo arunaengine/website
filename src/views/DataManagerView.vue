@@ -16,7 +16,6 @@ import AddDataDialog from '@/components/data/AddDataDialog.vue'
 import DataViewSkeleton from '@/components/data/DataViewSkeleton.vue'
 import StagingJobsPanel from '@/components/data/StagingJobsPanel.vue'
 import SyncBucketDialog from '@/components/data/SyncBucketDialog.vue'
-import SyncStatusPanel from '@/components/data/SyncStatusPanel.vue'
 import BucketSidebar from '@/components/data/manager/BucketSidebar.vue'
 import DeletionFlow from '@/components/data/manager/DeletionFlow.vue'
 import ObjectBrowser from '@/components/data/manager/ObjectBrowser.vue'
@@ -96,7 +95,6 @@ const syncSource = ref<{ bucket: string; prefix: string; nodeId: string | null }
   prefix: '',
   nodeId: null,
 })
-const syncPanelOpen = ref(false)
 
 function openSyncDialog() {
   syncSource.value = { bucket: bucket.value, prefix: s3Prefix.value, nodeId: remoteNodeId.value }
@@ -116,13 +114,6 @@ function openSyncFromHit(hit: BucketSearchHit) {
 function onSyncChanged() {
   void bucketList.refresh()
   void loadSyncOverview()
-}
-
-// "New sync" inside the status panel: swap the centered dialogs instead of
-// stacking them.
-function onNewSyncRequested() {
-  syncPanelOpen.value = false
-  openSyncDialog()
 }
 
 const addDataOpen = ref(false)
@@ -300,7 +291,6 @@ async function createFolder() {
           :manager="manager"
           @add-data="addDataOpen = true"
           @new-folder="openNewFolder"
-          @syncs="syncPanelOpen = true"
           @sync-to-node="openSyncDialog"
           @bulk-delete="deletion?.openBulkDelete()"
           @delete-bucket="(name: string, nodeId: string | null) => deletion?.openDeleteBucket(name, nodeId)"
@@ -333,14 +323,6 @@ async function createFolder() {
       :source-prefix="syncSource.prefix"
       :source-node-id="syncSource.nodeId"
       @created="onSyncChanged"
-    />
-
-    <SyncStatusPanel
-      v-model:open="syncPanelOpen"
-      :bucket="bucket"
-      :node-id="remoteNodeId"
-      @changed="onSyncChanged"
-      @new-sync="onNewSyncRequested"
     />
 
     <PreviewPane

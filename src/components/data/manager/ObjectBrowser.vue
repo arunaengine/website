@@ -9,15 +9,15 @@ import Spinner from '@/components/ui/Spinner.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
 import Breadcrumbs from '@/components/data/Breadcrumbs.vue'
 import ObjectIcon from '@/components/data/ObjectIcon.vue'
-import BucketSettingsDialog from '@/components/data/BucketSettingsDialog.vue'
 import ObjectLocationsDialog from '@/components/data/ObjectLocationsDialog.vue'
 import WatchButton from '@/components/watches/WatchButton.vue'
 import { useAruna } from '@/composables/useAruna'
 import type { DataManager } from '@/composables/useDataManager'
 import { useS3, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
+import { usePlacementPolicies } from '@/composables/usePlacementPolicies'
 import { featureEnabled } from '@/lib/config'
 import { formatBytes, relativeTime } from '@/lib/utils'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
   ArrowLeftRight,
@@ -38,7 +38,6 @@ const props = defineProps<{ manager: DataManager }>()
 const emit = defineEmits<{
   (e: 'add-data'): void
   (e: 'new-folder'): void
-  (e: 'syncs'): void
   (e: 'sync-to-node'): void
   (e: 'bulk-delete'): void
   (e: 'delete-bucket', bucket: string, nodeId: string | null): void
@@ -50,6 +49,7 @@ const emit = defineEmits<{
 
 const s3 = useS3()
 const { isRealmAdmin } = useAruna()
+const { getBucketPlacement } = usePlacementPolicies()
 const placementPoliciesEnabled = featureEnabled('placementAdmin')
 const {
   bucket,
@@ -96,10 +96,37 @@ const {
   requestUpload,
 } = props.manager
 
-// Per-bucket routing and placement; local buckets only, like the bucket delete
-// affordance, because both are read and written on the connected node.
-const settingsDialogOpen = ref(false)
-const showPlacement = computed(() => placementPoliciesEnabled && isRealmAdmin.value)
+// One entry for everything this bucket stores: the Storage page. The badge
+// counts what the browser already knows about, plus the attached policies when
+// the viewer may read them at all.
+const showStorageButton = computed(() => Boolean(bucket.value))
+const bucketPolicyCount = ref(0)
+const storageCount = computed(() => bucketSyncCount.value + bucketPolicyCount.value)
+const storageTitle = computed(() =>
+  storageCount.value
+    ? `Storage for ${bucket.value}: ${bucketSyncCount.value} sync${bucketSyncCount.value === 1 ? '' : 's'}, ${bucketPolicyCount.value} placement polic${bucketPolicyCount.value === 1 ? 'y' : 'ies'}`
+    : `Storage for ${bucket.value}`,
+)
+const storageLink = computed(() => ({
+  name: 'bucket-storage',
+  params: { bucketId: bucket.value },
+  query: {
+    ...(remoteNodeId.value ? { node: remoteNodeId.value } : {}),
+    ...(activeGroupId.value ? { group: activeGroupId.value } : {}),
+  },
+}))
+
+// Only a viewer the node lets read bucket placement pays for this request.
+watch(
+  [bucket, remoteNodeId, isRealmAdmin],
+  async () => {
+    bucketPolicyCount.value = 0
+    if (!bucket.value || remoteNodeId.value || !placementPoliciesEnabled || !isRealmAdmin.value) return
+    const placement = await getBucketPlacement(bucket.value).catch(() => null)
+    if (placement && placement.bucket === bucket.value) bucketPolicyCount.value = placement.policies.length
+  },
+  { immediate: true },
+)
 // Per-version copy list; the connected node answers for its own objects only.
 const locationsKey = ref<string | null>(null)
 
@@ -163,25 +190,11 @@ function onDrop(event: DragEvent) {
             :resource-label="`${bucket}/${s3Prefix}`"
             size="sm"
           />
-          <Button
-            v-if="!remoteNodeId"
-            data-tour="bucket-settings"
-            variant="outline"
-            size="sm"
-            title="Routing and placement for this bucket"
-            @click="settingsDialogOpen = true"
-          >
-            <Settings class="h-4 w-4" /> Bucket settings
-          </Button>
-          <Button
-            v-if="showSyncButton"
-            variant="outline"
-            size="sm"
-            :title="bucketSyncCount ? `${bucketSyncCount} sync relationship${bucketSyncCount === 1 ? '' : 's'}, open sync status` : 'Sync relationships for this bucket'"
-            @click="emit('syncs')"
-          >
-            <ArrowLeftRight class="h-4 w-4" :class="bucketSyncCount ? 'text-primary' : ''" /> Syncs
-            <Badge v-if="bucketSyncCount" variant="secondary" size="count" class="ml-1">{{ bucketSyncCount }}</Badge>
+          <Button v-if="showStorageButton" data-tour="bucket-settings" variant="outline" size="sm" as-child>
+            <RouterLink :to="storageLink" :title="storageTitle">
+              <Settings class="h-4 w-4" /> Storage
+              <Badge v-if="storageCount" variant="secondary" size="count" class="ml-1">{{ storageCount }}</Badge>
+            </RouterLink>
           </Button>
           <Popover v-if="showReferenceStats">
             <Button
@@ -424,14 +437,6 @@ function onDrop(event: DragEvent) {
       <slot />
       </template>
     </template>
-
-    <BucketSettingsDialog
-      v-model:open="settingsDialogOpen"
-      :bucket="bucket"
-      :group-id="activeGroupId"
-      :show-routing="true"
-      :show-placement="showPlacement"
-    />
 
     <ObjectLocationsDialog
       :open="locationsKey !== null"

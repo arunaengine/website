@@ -80,6 +80,9 @@ const STATE_TONE: Record<string, StateTone> = {
   // Transfers.
   retrying: 'attention',
   done: 'done',
+  // Bucket sync relationship states.
+  enabled: 'done',
+  detached: 'idle',
   // Node reachability.
   connected: 'done',
   seen: 'done',

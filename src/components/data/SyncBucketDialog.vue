@@ -11,6 +11,7 @@ import DialogContent from '@/components/ui/DialogContent.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
+import DocsLink from '@/components/ui/DocsLink.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
@@ -114,9 +115,9 @@ const MODE_OPTIONS: ModeOption[] = [
   },
 ]
 const REFERENCE_HANDLING_OPTIONS: Array<{ value: SyncReferenceHandling; label: string; description: string }> = [
-  { value: 'materialize', label: 'Materialize', description: 'Download referenced source data on the sender and copy the bytes to the target.' },
-  { value: 'preserve', label: 'Preserve references', description: 'Send reference metadata so the target keeps the objects lazy.' },
-  { value: 'skip', label: 'Skip references', description: 'Sync materialized objects only and leave referenced objects out.' },
+  { value: 'materialize', label: 'Fetch the data and send it', description: 'The sender downloads the data the source only points at, then sends it.' },
+  { value: 'preserve', label: 'Send the pointer unchanged', description: 'The target points at the original data instead of holding it.' },
+  { value: 'skip', label: 'Leave those objects out', description: 'Only objects that hold their own data are synced.' },
 ]
 
 function pickSuggestion(hit: BucketSearchHit) {
@@ -199,9 +200,8 @@ async function submit() {
       <DialogHeader>
         <DialogTitle>{{ pullMode ? 'Sync to this node' : 'Sync bucket' }}</DialogTitle>
         <DialogDescription>
-          Replicates objects from
-          <span class="font-mono text-xs">{{ sourceBucket }}{{ sourcePrefix ? `/${sourcePrefix.replace(/\/$/, '')}` : '' }}</span>
-          on {{ sourceNodeLabel }} to another bucket in this realm.
+          A sync creates a second, independently owned copy in another bucket. To govern where
+          copies of <em>this</em> bucket may live, use a placement policy instead.
         </DialogDescription>
       </DialogHeader>
 
@@ -288,7 +288,10 @@ async function submit() {
         </fieldset>
 
         <fieldset v-if="mode !== 'reference'" class="space-y-2">
-          <legend class="text-xs font-medium text-foreground">Source references</legend>
+          <legend class="flex flex-wrap items-center gap-x-2 text-xs font-medium text-foreground">
+            <span>When a source object points at data elsewhere</span>
+            <DocsLink topic="where-data-lives" section="Syncs" label="Learn about syncs" />
+          </legend>
           <label v-for="option in REFERENCE_HANDLING_OPTIONS" :key="option.value" class="flex items-start gap-2 text-sm">
             <input v-model="referenceHandling" type="radio" :value="option.value" class="mt-1 h-3.5 w-3.5 shrink-0 accent-primary" />
             <span>

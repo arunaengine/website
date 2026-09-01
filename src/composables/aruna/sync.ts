@@ -1,7 +1,7 @@
 import {
   apiRequest,
   type CreateSyncRelationshipRequest,
-  type SyncReferenceHandling,
+  type UpdateSyncRelationshipRequest,
   type SyncRelationship,
   type SyncRelationshipDetail,
   type SyncRelationshipListQuery,
@@ -86,14 +86,16 @@ export async function runSyncRelationship(
   )
 }
 
-export async function updateSyncReferenceHandling(
+// Reference handling, the enabled/paused state, or both. A node that does not
+// serve pausing answers 4xx for a body carrying `state`.
+export async function updateSyncRelationship(
   id: string,
-  referenceHandling: SyncReferenceHandling,
+  patch: UpdateSyncRelationshipRequest,
   opts: { baseUrl?: string } = {},
 ): Promise<SyncRelationship> {
   return syncRequest<SyncRelationship>(
     `/data/sync/relationships/${encodeURIComponent(id)}`,
-    { method: 'PATCH', body: JSON.stringify({ reference_handling: referenceHandling }) },
+    { method: 'PATCH', body: JSON.stringify(patch) },
     opts.baseUrl,
   )
 }

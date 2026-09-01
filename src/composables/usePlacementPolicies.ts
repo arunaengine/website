@@ -24,7 +24,7 @@ import type {
   QuarantineResolveRequest,
   QuarantineResolveResponse,
 } from '@/lib/placementPolicies'
-import { errorMessage } from '@/lib/utils'
+import { errorMessage, truncateMiddle } from '@/lib/utils'
 
 const placementAdminEnabled = computed(() => featureEnabled('placementAdmin'))
 const sessionPolicies = ref<PolicyResponse[]>([])
@@ -133,6 +133,20 @@ async function listPoliciesForGroup(groupId: string | null): Promise<PolicyRespo
   return page.policies
 }
 
+// Names come from the ref itself on newer nodes, from the realm listing or the
+// session library otherwise; an unresolved ref falls back to its id.
+const knownNames = computed(() => {
+  const names = new Map<string, string>()
+  for (const policy of [...sessionPolicies.value, ...listedPolicies.value]) {
+    names.set(policyRefKey(policy), policy.name)
+  }
+  return names
+})
+
+function policyName(policy: PolicyRefBody): string {
+  return policy.name?.trim() || knownNames.value.get(policyRefKey(policy)) || truncateMiddle(policy.policy_id)
+}
+
 async function getPlacementPolicy(policy: PolicyRefBody): Promise<PolicyResponse> {
   const stored = await request<PolicyResponse>(
     `/data/placement/policies/${encodeURIComponent(policy.policy_id)}`,
@@ -235,6 +249,7 @@ export function usePlacementPolicies() {
     listLoadingMore,
     loadPolicyPage,
     listPoliciesForGroup,
+    policyName,
     createPlacementPolicy,
     getPlacementPolicy,
     getBucketPlacement,
