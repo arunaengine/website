@@ -440,7 +440,7 @@ export const docsTopics: DocsTopic[] = [
           'Choose [Create dataset](page:dataset-new) in the top bar.',
           'Add a name and a description of what it contains and how it was made.',
           'Pick a license and keywords; both drive discovery.',
-          'Optionally pick a registered [Profile](concept:profiles-conformance); preview findings advise, never block.',
+          'Optionally pick a [Profile](concept:profiles-conformance), public or from the dataset\'s group; preview findings advise, never block.',
         ],
         image: {
           src: '/docs/v1/dataset-editor.jpg',
@@ -546,7 +546,7 @@ export const docsTopics: DocsTopic[] = [
         route: '/app/profiles/new',
         anchor: 'profile-visibility',
         title: 'Visibility',
-        body: 'Only a public profile is registered, so only a public profile can be declared by a dataset. A group-only profile stays with its group.',
+        body: 'A public profile is registered and any dataset in the realm may declare it. A group-only profile may be declared by the datasets of its own group only.',
       },
       {
         route: '/app/profiles/new',
@@ -587,8 +587,8 @@ export const docsTopics: DocsTopic[] = [
         icon: 'Globe',
         paragraphs: [
           'A public profile is registered: it gets a permanent https://w3id.org/aruna/profile/ address, its files are published so any tool can fetch them, and datasets may declare it.',
-          'A group-only profile is stored and editable, but it is not registered, so a dataset that declares it is refused. Publish it when it is ready to be used.',
-          'A profile that stops being public makes the datasets that declare it stale, and their next tagged write is refused until the tag is removed or the profile is public again.',
+          'A group-only profile is stored and editable, and only the datasets of its own group may declare it. Other groups do not see it. Make it public when everyone should be able to use it.',
+          'A public profile may go back to group only. Datasets of other groups that declare it turn stale, and their next tagged write is refused until the tag is removed or the profile is public again.',
         ],
       },
       {
@@ -1057,9 +1057,9 @@ export const docsTopics: DocsTopic[] = [
         icon: 'ShieldCheck',
         bullets: [
           'The editor preview checks drafts early; it advises and never blocks the form.',
-          'The [node](concept:realm-nodes-groups) validates the exact saved crate against the exact registered Profile revision before accepting a tagged write.',
+          'The [node](concept:realm-nodes-groups) validates the exact saved crate against the exact Profile revision it declares before accepting a tagged write.',
           'An unavailable or still-preparing Profile fails closed for tagged writes: retry, or save unprofiled.',
-          'External and unregistered Profile references stay readable but cannot be enforced as write tags.',
+          'External Profile references, and group-only Profiles of another group, stay readable but cannot be enforced as write tags; see [Visibility and registration](concept:build-a-profile#visibility-and-registration).',
         ],
       },
       {

@@ -83,7 +83,7 @@ export const glossaryTopic: DocsTopic = {
       title: 'Group-only profile',
       icon: 'Shield',
       paragraphs: [
-        'A profile that is stored but not registered, so no dataset can declare it yet. [Making it public](concept:build-a-profile#visibility-and-registration) registers it.',
+        'A profile only the datasets of its own group may declare. [Making it public](concept:build-a-profile#visibility-and-registration) registers it under a permanent address for every dataset in the realm.',
       ],
     },
     {
