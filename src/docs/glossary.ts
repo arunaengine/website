@@ -217,14 +217,14 @@ export const glossaryTopic: DocsTopic = {
       title: 'Delete marker',
       icon: 'Trash2',
       paragraphs: [
-        'What a plain S3 delete leaves behind: the object looks gone while [every historical version stays recoverable](concept:data-and-deletion#delete-markers-are-recoverable-history).',
+        'The version a plain Delete writes: the file leaves the listing while [every earlier version stays](concept:data-and-deletion#delete-is-recoverable). Show deleted lists such files, and Restore removes the marker.',
       ],
     },
     {
       title: 'Purge',
       icon: 'Eraser',
       paragraphs: [
-        'The explicit, permanent removal of all versions of an object or bucket, [separate from a plain delete](concept:data-and-deletion#permanent-purge-is-separate) and resumable.',
+        'The node\'s own word for removing every version of an object or bucket. The portal calls it [Delete permanently](concept:data-and-deletion#delete-permanently-is-separate): it is node-local, resumable, and nothing brings the data back.',
       ],
     },
     {

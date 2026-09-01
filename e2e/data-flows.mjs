@@ -195,6 +195,56 @@ try {
   await page.waitForTimeout(2000)
   step('dataset deleted and removed from Discover', !(await page.textContent('body')).includes('Coral genome assembly'))
 
+  // Data manager: delete an object, find it again with Show deleted, restore it
+  await page.goto(BASE + '/app/buckets')
+  await page.waitForTimeout(2500)
+  const bucketName = 'e2e-deletion-' + Date.now()
+  await page.getByPlaceholder('new-bucket-name').fill(bucketName)
+  await page.getByRole('button', { name: /^Create$/ }).first().click()
+  await page.waitForURL(new RegExp('/app/buckets/' + bucketName), { timeout: 20000 })
+  await page.waitForTimeout(1500)
+
+  // Upload one small file through Add data so the row is ours to delete
+  await page.getByRole('button', { name: /Add data/ }).first().click()
+  await page.waitForSelector('text=Local files')
+  await page.locator('[role="dialog"] input[type="file"]').first().setInputFiles({
+    name: 'restore-me.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('portal e2e deletion flow'),
+  })
+  await page.getByRole('button', { name: /Add|Upload/ }).last().click()
+  await page.waitForTimeout(4000)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(2500)
+  step('object uploaded into the new bucket', (await page.textContent('body')).includes('restore-me.txt'))
+
+  // The row keeps ONE destructive entry, and it opens the shared dialog
+  await page.getByRole('button', { name: 'Delete…' }).first().click()
+  await page.waitForSelector('text=What should happen')
+  const deleteDialog = page.locator('[role="dialog"]')
+  step(
+    'delete dialog states the marker is recoverable',
+    (await deleteDialog.textContent()).includes('Show deleted brings it back'),
+  )
+  await deleteDialog.getByRole('button', { name: /^Delete$/ }).click()
+  await page.waitForTimeout(2500)
+  step('deleted object leaves the listing', !(await page.textContent('body')).includes('restore-me.txt'))
+
+  // Show deleted brings the marker-headed key back into view
+  await page.getByText('Show deleted').click()
+  await page.waitForTimeout(2500)
+  const deletedBody = await page.textContent('body')
+  step(
+    'show deleted lists the deleted object',
+    deletedBody.includes('restore-me.txt') && deletedBody.includes('Deleted'),
+  )
+
+  await page.getByRole('button', { name: 'Restore' }).first().click()
+  await page.waitForTimeout(3000)
+  await page.getByText('Show deleted').click()
+  await page.waitForTimeout(2000)
+  step('restored object is listed again', (await page.textContent('body')).includes('restore-me.txt'))
+
   // Join requests (aruna#248) are config-gated OFF by default: with no
   // features.joinRequests flag, no join UI renders on the groups page.
   await page.goto(BASE + '/app/groups')

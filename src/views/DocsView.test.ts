@@ -114,8 +114,9 @@ describe('versioned in-portal Docs', () => {
     // Slugified heading ids make sections directly linkable.
     const html = await renderTopic('data-and-deletion')
     expect(html).toContain('id="buckets-hold-the-bytes"')
-    expect(html).toContain('id="delete-markers-are-recoverable-history"')
-    expect(html).toContain('id="permanent-purge-is-separate"')
+    expect(html).toContain('id="delete-is-recoverable"')
+    expect(html).toContain('id="every-write-keeps-a-version"')
+    expect(html).toContain('id="delete-permanently-is-separate"')
     expect(html).toContain('aria-label="Link to this section"')
   })
 

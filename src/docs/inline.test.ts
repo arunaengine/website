@@ -23,13 +23,13 @@ describe('docs inline links', () => {
 
   it('links section anchors', () => {
     // A valid anchor becomes a hash; a stale one degrades to the topic link.
-    expect(parseInline('[markers](concept:data-and-deletion#delete-markers-are-recoverable-history)')).toEqual([
+    expect(parseInline('[markers](concept:data-and-deletion#delete-is-recoverable)')).toEqual([
       {
         label: 'markers',
         to: {
           name: 'docs',
           params: { topic: 'data-and-deletion' },
-          hash: '#delete-markers-are-recoverable-history',
+          hash: '#delete-is-recoverable',
         },
       },
     ])
