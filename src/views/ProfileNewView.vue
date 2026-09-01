@@ -2,6 +2,7 @@
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import WizardSteps from '@/components/onboarding/WizardSteps.vue'
 import DiscardDraftConfirm from '@/components/ui/DiscardDraftConfirm.vue'
+import DocsLink from '@/components/ui/DocsLink.vue'
 import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Select from '@/components/ui/Select.vue'
@@ -17,7 +18,7 @@ import ProfileReviewStep from '@/components/metadata/profile-builder/ProfileRevi
 import { profileBlockers } from '@/components/metadata/profile-builder/state/blockers'
 import { useProfileBuilder } from '@/components/metadata/profile-builder/useProfileBuilder'
 import { computed, ref, watch } from 'vue'
-import { onBeforeRouteLeave, RouterLink, useRoute, useRouter } from 'vue-router'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { CheckCircle2, ArrowLeft, ArrowRight, FileUp, KeyRound, Lock, Plus } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useS3 } from '@/composables/useS3'
@@ -398,9 +399,13 @@ async function submit() {
         <div class="min-w-0 flex-1 space-y-0.5">
           <p>A profile is the checklist a dataset of one kind should meet: which properties it must, should or may carry.</p>
           <p>The Root dataset shape describes the dataset itself; shared shapes (Person, File) hold the rules for the things it references.</p>
-          <p>
-            The node validates every tagged write against it.
-            <RouterLink :to="{ name: 'docs', params: { topic: 'build-a-profile' } }" class="font-medium text-primary hover:underline">Learn how profiles work</RouterLink>
+          <p class="flex flex-wrap items-center gap-2">
+            <span>The node validates every tagged write against it.</span>
+            <DocsLink
+              topic="build-a-profile"
+              section="The root dataset shape"
+              label="Learn how profiles work"
+            />
           </p>
         </div>
         <Button variant="ghost" size="sm" @click="dismissIntro">Got it</Button>

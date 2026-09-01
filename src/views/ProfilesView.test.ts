@@ -66,6 +66,7 @@ const ProfilesView = compileClientComponent(new URL('./ProfilesView.vue', import
   '@/components/ui/DialogFooter.vue': moduleDefault(Passthrough),
   '@/components/ui/DialogHeader.vue': moduleDefault(Passthrough),
   '@/components/ui/DialogTitle.vue': moduleDefault(Passthrough),
+  '@/components/ui/DocsLink.vue': moduleDefault(EmptyStub),
   '@/components/ui/ExternalLink.vue': moduleDefault(Passthrough),
   '@/components/ui/Notice.vue': moduleDefault(Passthrough),
   '@/components/ui/Spinner.vue': moduleDefault(EmptyStub),

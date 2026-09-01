@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { RouterLink } from 'vue-router'
+import DocsLink from '@/components/ui/DocsLink.vue'
 import EntityShapeSection from './EntityShapeSection.vue'
 import EntityTypePicker from './EntityTypePicker.vue'
 import LiftNotesPanel from './LiftNotesPanel.vue'
@@ -55,10 +55,11 @@ function scrollToShape(uid: number) {
       <h4 class="text-sm font-semibold text-foreground">Rules</h4>
       <p class="text-xs text-muted-foreground">
         Each rule reads as a sentence: <em>Root dataset must have Creator, a Person</em>.
-        <RouterLink
-          :to="{ name: 'docs', params: { topic: 'build-a-profile' } }"
-          class="font-medium text-primary hover:underline"
-        >Learn how profiles work</RouterLink>
+        <DocsLink
+          topic="build-a-profile"
+          section="Properties and obligations"
+          label="Learn how profiles work"
+        />
       </p>
     </div>
 

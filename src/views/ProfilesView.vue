@@ -31,6 +31,7 @@ import { cloneLiftNotes } from '@/lib/shacl/lift'
 import type { MetadataProfile } from '@/data/types'
 import type { ProfilePropertyRule } from '@/lib/profiles/types'
 import { errorMessage } from '@/lib/utils'
+import DocsLink from '@/components/ui/DocsLink.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
@@ -303,6 +304,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
       description="Profiles are ordinary RO-Crate datasets stored under profiles/."
     >
       <template #actions>
+        <DocsLink topic="build-a-profile" label="Learn how profiles work" />
         <Button @click="openCreate" :disabled="!currentUser">
           <Plus class="h-4 w-4" /> New profile
         </Button>

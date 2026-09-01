@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
+import DocsLink from '@/components/ui/DocsLink.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsList from '@/components/ui/TabsList.vue'
@@ -314,10 +315,11 @@ function violationsFor(property: string) {
         <p class="text-xs text-muted-foreground">
           Your rules generate these files inside the profile RO-Crate; the node validates datasets against
           <b class="text-foreground">shapes.ttl</b>.
-          <RouterLink
-            :to="{ name: 'docs', params: { topic: 'build-a-profile' } }"
-            class="font-medium text-primary hover:underline"
-          >Learn how profiles work</RouterLink>
+          <DocsLink
+            topic="build-a-profile"
+            section="Generated files and what the node enforces"
+            label="Learn how profiles work"
+          />
         </p>
         <div class="mt-2 flex flex-wrap items-center gap-1.5">
           <span class="text-[11px] font-medium text-muted-foreground">Download:</span>

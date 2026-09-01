@@ -170,6 +170,7 @@ const ProfileNewView = compileClientComponent(new URL('./ProfileNewView.vue', im
   '@/components/dashboard/PageHeader.vue': moduleDefault(PageHeaderStub),
   '@/components/onboarding/WizardSteps.vue': moduleDefault(WizardStepsStub),
   '@/components/ui/DiscardDraftConfirm.vue': moduleDefault(DiscardStub),
+  '@/components/ui/DocsLink.vue': moduleDefault(Passthrough),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Notice.vue': moduleDefault(NoticeStub),
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
