@@ -2,19 +2,22 @@
 import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
+import DashboardScopeToggle from '@/components/dashboard/DashboardScopeToggle.vue'
 import FederationPanel from '@/components/dashboard/FederationPanel.vue'
 import GroupQuotaCards from '@/components/dashboard/GroupQuotaCards.vue'
+import MyStatsCards from '@/components/dashboard/MyStatsCards.vue'
 import ProfileChip from '@/components/metadata/ProfileChip.vue'
 import SignInPanel from '@/components/auth/SignInPanel.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import type { MetadataDoc } from '@/data/types'
-import { ArrowRight, Boxes, Database, FileJson2, Files, FolderOpen, ListChecks, Plus, Activity, Users } from '@lucide/vue'
+import { ArrowRight, Boxes, Database, FileJson2, Files, FolderOpen, Plus, Activity, Users } from '@lucide/vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { computed, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
+import { useDashboardScope } from '@/composables/useDashboardScope'
 import { useDocumentVisibility, useIntervalFn } from '@vueuse/core'
 import { useNotifications } from '@/composables/useNotifications'
 import { useRefresh } from '@/composables/useRefresh'
@@ -23,9 +26,10 @@ import { formatCount } from '@/lib/formatCount'
 import { formatBytes, formatNumber, relativeTime } from '@/lib/utils'
 
 const router = useRouter()
-const { currentUser, metadata, profiles, myGroups, discoverableGroups, realm, nodeInfo, realmInfo, usageInfo, loading, bootstrapped, sessionEpoch, refresh, loadInfo, listRecentMetadata } = useAruna()
+const { currentUser, metadata, myGroups, realm, nodeInfo, realmInfo, usageInfo, loading, bootstrapped, sessionEpoch, refresh, loadInfo, listRecentMetadata } = useAruna()
 const { authPending } = useAuth()
 const { dashboardRevision } = useNotifications()
+const { scope, setScope } = useDashboardScope()
 const refreshing = ref(false)
 const quotaRevision = ref(0)
 const recentDocs = ref<MetadataDoc[] | null>(null)
@@ -124,6 +128,15 @@ const docsHeld = computed(() => {
 const realmDocuments = computed(() => usageInfo.value?.metadata_documents ?? null)
 const publicOverview = computed(() => realmInfo.value?.public_overview)
 
+// Realm-wide totals the same /system/usage response carries; the top-level
+// counters next to them belong to this node and live on the Status page.
+const realmTotals = computed(() => usageInfo.value?.realm ?? null)
+
+// Personal statistics lead unless the caller stored the other order.
+const sectionOrder = computed(() =>
+  scope.value === 'realm' ? (['realm', 'personal'] as const) : (['personal', 'realm'] as const),
+)
+
 function publicCount(value: number | null | undefined): string {
   return value == null ? 'Unknown' : formatCount(value)
 }
@@ -138,14 +151,8 @@ const stats = computed(() =>
           tone: 'bg-aruna-royal/15 text-aruna-royal dark:text-aruna-tagline',
         },
         {
-          label: 'Loaded profiles',
-          value: formatCount(profiles.value.length),
-          icon: ListChecks,
-          tone: 'bg-aruna-sky/15 text-aruna-sky',
-        },
-        {
           label: 'Realm groups',
-          value: formatCount(myGroups.value.length + discoverableGroups.value.length),
+          value: publicCount(publicOverview.value?.groups),
           icon: Users,
           tone: 'bg-aruna-aqua/15 text-aruna-aqua',
         },
@@ -227,11 +234,8 @@ const pageDescription = computed(() =>
             <Skeleton class="h-5 w-36" />
             <Skeleton class="h-3 w-24" />
           </header>
-          <div class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
-            <Skeleton v-for="n in 4" :key="n" class="h-16" />
-          </div>
-          <div class="grid gap-3.5 sm:grid-cols-3">
-            <Skeleton v-for="n in 3" :key="n" class="h-[108px]" />
+          <div class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+            <Skeleton v-for="n in 6" :key="n" class="h-[108px]" />
           </div>
         </section>
         <section class="space-y-3.5">
@@ -248,15 +252,41 @@ const pageDescription = computed(() =>
       <template v-else>
       <SignInPanel v-if="!currentUser" />
 
-      <section aria-labelledby="realm-statistics-heading" class="space-y-3.5">
-        <header>
-          <h2 id="realm-statistics-heading" class="font-display text-[15px] font-semibold text-foreground/85">Realm statistics</h2>
-          <p class="mt-0.5 text-xs text-muted-foreground">{{ realm.name }}</p>
+      <template v-for="section in sectionOrder" :key="section">
+      <section v-if="section === 'personal' && currentUser" aria-labelledby="my-statistics-heading" class="space-y-3.5">
+        <header class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 id="my-statistics-heading" class="font-display text-[15px] font-semibold text-foreground/85">My statistics</h2>
+            <p class="mt-0.5 text-xs text-muted-foreground">Aggregated across the groups you belong to.</p>
+          </div>
+          <DashboardScopeToggle
+            v-if="sectionOrder[0] === 'personal'"
+            :model-value="scope"
+            @update:model-value="setScope"
+          />
         </header>
 
-        <div :class="['grid gap-3.5 sm:grid-cols-2', currentUser ? 'lg:grid-cols-4' : 'lg:grid-cols-3']">
+        <MyStatsCards />
+        <GroupQuotaCards v-if="myGroups.length" :refresh-revision="quotaRevision" />
+        <EmptyState v-else compact title="You do not belong to any groups yet." />
+      </section>
+
+      <section v-else-if="section === 'realm'" aria-labelledby="realm-statistics-heading" class="space-y-3.5">
+        <header class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 id="realm-statistics-heading" class="font-display text-[15px] font-semibold text-foreground/85">Realm statistics</h2>
+            <p class="mt-0.5 text-xs text-muted-foreground">{{ realm.name }}</p>
+          </div>
+          <DashboardScopeToggle
+            v-if="currentUser && sectionOrder[0] === 'realm'"
+            :model-value="scope"
+            @update:model-value="setScope"
+          />
+        </header>
+
+        <div class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
           <template v-if="!bootstrapped">
-            <Skeleton v-for="n in currentUser ? 4 : 3" :key="n" class="h-16" />
+            <Skeleton v-for="n in 3" :key="n" class="h-16" />
           </template>
           <template v-else>
             <div v-for="stat in stats" :key="stat.label" class="surface flex items-center gap-3.5 px-4 py-4">
@@ -271,25 +301,25 @@ const pageDescription = computed(() =>
           </template>
         </div>
 
-        <div v-if="currentUser && (!bootstrapped || usageInfo)" class="grid gap-3.5 sm:grid-cols-3">
-          <template v-if="usageInfo">
+        <div v-if="currentUser && (!bootstrapped || realmTotals)" class="grid gap-3.5 sm:grid-cols-3">
+          <template v-if="realmTotals">
             <StatCard
               label="Objects"
-              :value="formatNumber(usageInfo.objects)"
+              :value="formatNumber(realmTotals.objects)"
               :icon="Files"
-              :hint="`${formatNumber(usageInfo.stored_blobs ?? 0)} physical blob locations`"
+              hint="Data objects across the realm"
             />
             <StatCard
               label="Stored data"
-              :value="formatBytes(usageInfo.stored_bytes ?? 0)"
+              :value="formatBytes(realmTotals.logical_bytes)"
               :icon="Database"
-              hint="Aggregate blob storage on this node"
+              hint="Logical size across the realm; physical copies are not counted"
             />
             <StatCard
               label="Buckets"
-              :value="formatNumber(usageInfo.buckets)"
+              :value="formatNumber(realmTotals.buckets)"
               :icon="FolderOpen"
-              hint="Node-reported total; may include per-run system workspaces (ws-…)"
+              hint="Realm-wide; may include per-run system workspaces (ws-…)"
             />
           </template>
           <template v-else>
@@ -308,12 +338,7 @@ const pageDescription = computed(() =>
           </div>
         </div>
       </section>
-
-      <section v-if="currentUser" aria-labelledby="my-groups-heading" class="space-y-3.5">
-        <h2 id="my-groups-heading" class="font-display text-[15px] font-semibold text-foreground/85">My groups</h2>
-        <GroupQuotaCards v-if="myGroups.length" :refresh-revision="quotaRevision" />
-        <EmptyState v-else compact title="You do not belong to any groups yet." />
-      </section>
+      </template>
 
       <section v-if="currentUser" aria-label="Realm nodes" class="space-y-3.5">
         <FederationPanel

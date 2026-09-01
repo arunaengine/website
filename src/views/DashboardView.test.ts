@@ -26,6 +26,8 @@ const authPending = ref(false)
 const authStage = ref('idle')
 const authStageError = ref<string | null>(null)
 const dashboardRevision = ref(0)
+const scope = ref<'personal' | 'realm'>('personal')
+const setScope = vi.fn(async () => undefined)
 const refresh = vi.fn(async () => undefined)
 const loadInfo = vi.fn(async () => undefined)
 const listRecentMetadata = vi.fn(async () => [])
@@ -47,6 +49,11 @@ const StatCardStub = defineComponent({
 })
 const SkeletonStub = defineComponent(() => () => h('span', 'loading'))
 const GroupQuotaCardsStub = defineComponent(() => () => h('div', 'group quota cards'))
+const MyStatsCardsStub = defineComponent(() => () => h('div', 'my stats cards'))
+const ScopeToggleStub = defineComponent({
+  props: { modelValue: String },
+  setup: (props) => () => h('div', `lead with ${props.modelValue}`),
+})
 // Renders what it was handed, so the view's own node/device split is testable.
 const FederationPanelStub = defineComponent({
   props: { nodes: { type: Array, default: () => [] }, devices: { type: Array, default: () => [] } },
@@ -95,6 +102,9 @@ beforeAll(async () => {
   vi.doMock('@/composables/useNotifications', () => ({
     useNotifications: () => ({ dashboardRevision }),
   }))
+  vi.doMock('@/composables/useDashboardScope', () => ({
+    useDashboardScope: () => ({ scope, setScope }),
+  }))
   vi.doMock('@vueuse/core', () => ({
     useDocumentVisibility: () => ref('hidden'),
     useIntervalFn: () => ({ pause: vi.fn(), resume: vi.fn() }),
@@ -104,6 +114,8 @@ beforeAll(async () => {
   vi.doMock('@/components/dashboard/PageHeader.vue', () => ({ default: PageHeaderStub }))
   vi.doMock('@/components/dashboard/FederationPanel.vue', () => ({ default: FederationPanelStub }))
   vi.doMock('@/components/dashboard/GroupQuotaCards.vue', () => ({ default: GroupQuotaCardsStub }))
+  vi.doMock('@/components/dashboard/MyStatsCards.vue', () => ({ default: MyStatsCardsStub }))
+  vi.doMock('@/components/dashboard/DashboardScopeToggle.vue', () => ({ default: ScopeToggleStub }))
   vi.doMock('@/components/metadata/ProfileChip.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/components/ui/StatCard.vue', () => ({ default: StatCardStub }))
   vi.doMock('@/components/ui/Skeleton.vue', () => ({ default: SkeletonStub }))
@@ -142,6 +154,7 @@ beforeAll(async () => {
       useIntervalFn: () => ({ pause: vi.fn(), resume: vi.fn() }),
     },
     '@/composables/useNotifications': { useNotifications: () => ({ dashboardRevision }) },
+    '@/composables/useDashboardScope': { useDashboardScope: () => ({ scope, setScope }) },
     '@/composables/useRefresh': {
       useRefresh: (run: () => unknown) => ({ busy: ref(false), refresh: run }),
     },
@@ -157,6 +170,8 @@ beforeAll(async () => {
     '@/components/dashboard/PageHeader.vue': moduleDefault(PageHeaderStub),
     '@/components/dashboard/FederationPanel.vue': moduleDefault(FederationPanelStub),
     '@/components/dashboard/GroupQuotaCards.vue': moduleDefault(GroupQuotaCardsStub),
+    '@/components/dashboard/MyStatsCards.vue': moduleDefault(MyStatsCardsStub),
+    '@/components/dashboard/DashboardScopeToggle.vue': moduleDefault(ScopeToggleStub),
     '@/components/metadata/ProfileChip.vue': moduleDefault(EmptyStub),
     '@/components/auth/SignInPanel.vue': moduleDefault(EmptyStub),
     '@/components/ui/StatCard.vue': moduleDefault(StatCardStub),
@@ -182,6 +197,8 @@ beforeEach(() => {
   loading.value = false
   bootstrapped.value = true
   sessionEpoch.value = 0
+  scope.value = 'personal'
+  setScope.mockClear()
   authPending.value = false
   authStage.value = 'idle'
   authStageError.value = null
@@ -265,7 +282,9 @@ describe('guest dashboard truth', () => {
     expect(text).not.toContain('Loaded profiles')
     expect(text).not.toContain('Nodes online')
     expect(text).not.toContain('0 / 0')
-    expect(text).not.toContain('My groups')
+    expect(text).not.toContain('My statistics')
+    expect(text).not.toContain('my stats cards')
+    expect(text).not.toContain('lead with')
     expect(text).not.toContain('federation panel')
   })
 
@@ -281,31 +300,73 @@ describe('guest dashboard truth', () => {
 })
 
 describe('authenticated dashboard ordering', () => {
-  it('orders Realm statistics, My groups, and the nodes panel with placement coverage', async () => {
+  function signedInRealm() {
     currentUser.value = { id: 'user-id', name: 'Ada Lovelace' }
     profiles.value = [{}, {}]
     nodes.value = [{ status: 'healthy' }, { status: 'offline' }]
     myGroups.value = [{ id: 'group-id', name: 'Research group' }]
-    usageInfo.value = { buckets: 2, objects: 5, stored_blobs: 7, stored_bytes: 1024, metadata_documents: 9 }
+    usageInfo.value = {
+      buckets: 2,
+      objects: 5,
+      stored_blobs: 7,
+      stored_bytes: 1024,
+      metadata_documents: 9,
+      realm: { buckets: 3, objects: 11, logical_bytes: 2048, referenced_bytes: 64 },
+    }
     realmInfo.value = {
       metadata_replication: { default_replication_factor: null },
+      public_overview: { live_datasets: 9, groups: 8, nodes_configured: 2 },
       nodes: [
         { node_id: 'node-a', info: { utilization: { documents_held: 6 } } },
         { node_id: 'node-b', info: { utilization: {} } },
       ],
     }
+  }
+
+  it('leads with My statistics, then the realm, then the nodes panel', async () => {
+    signedInRealm()
 
     const text = await renderedText()
+    const personalIndex = text.indexOf('My statistics')
     const realmIndex = text.indexOf('Realm statistics')
-    const groupsIndex = text.indexOf('My groups')
     const nodesIndex = text.indexOf('federation panel')
 
-    expect(realmIndex).toBeGreaterThanOrEqual(0)
-    expect(groupsIndex).toBeGreaterThan(realmIndex)
-    expect(nodesIndex).toBeGreaterThan(groupsIndex)
-    expect(text).toContain('Loaded profiles')
+    expect(personalIndex).toBeGreaterThanOrEqual(0)
+    expect(text.indexOf('my stats cards')).toBeGreaterThan(personalIndex)
+    expect(text.indexOf('group quota cards')).toBeGreaterThan(personalIndex)
+    expect(realmIndex).toBeGreaterThan(personalIndex)
+    expect(nodesIndex).toBeGreaterThan(realmIndex)
+    expect(text).toContain('lead with personal')
     expect(text).toContain('Replica-inclusive placement records held')
     expect(text).toContain('1 of 2 nodes reporting')
+  })
+
+  it('leads with the realm section when the account stored that order', async () => {
+    signedInRealm()
+    scope.value = 'realm'
+
+    const text = await renderedText()
+
+    expect(text.indexOf('Realm statistics')).toBeLessThan(text.indexOf('My statistics'))
+    expect(text).toContain('lead with realm')
+  })
+
+  it('keeps the realm section to realm-wide figures only', async () => {
+    signedInRealm()
+
+    const text = await renderedText()
+
+    expect(text).toMatch(/9 Realm datasets/)
+    expect(text).toMatch(/8 Realm groups/)
+    expect(text).toMatch(/11 Objects/)
+    expect(text).toMatch(/2 KB Stored data/)
+    expect(text).toMatch(/3 Buckets/)
+    expect(text).toContain('Logical size across the realm')
+    // Node-local counters and the client-window tile moved out of the section.
+    expect(text).not.toContain('Loaded profiles')
+    expect(text).not.toContain('physical blob locations')
+    expect(text).not.toContain('Aggregate blob storage on this node')
+    expect(text).not.toContain('Node-reported total')
   })
 
   it('keeps devices out of node health and counts them apart', async () => {
