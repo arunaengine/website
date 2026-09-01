@@ -2,26 +2,27 @@
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import IconButton from '@/components/ui/IconButton.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Popover from '@/components/ui/Popover.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Spinner from '@/components/ui/Spinner.vue'
+import Switch from '@/components/ui/Switch.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
 import Breadcrumbs from '@/components/data/Breadcrumbs.vue'
 import ObjectIcon from '@/components/data/ObjectIcon.vue'
-import ObjectLocationsDialog from '@/components/data/ObjectLocationsDialog.vue'
 import WatchButton from '@/components/watches/WatchButton.vue'
 import { useAruna } from '@/composables/useAruna'
 import type { DataManager } from '@/composables/useDataManager'
 import { useS3, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
 import { usePlacementPolicies } from '@/composables/usePlacementPolicies'
 import { featureEnabled } from '@/lib/config'
+import { stateVariant } from '@/lib/stateBadge'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
   ArrowLeftRight,
-  Bomb,
   CloudOff,
   Download,
   Eye,
@@ -32,6 +33,7 @@ import {
   Plus,
   Settings,
   Trash2,
+  Undo2,
 } from '@lucide/vue'
 
 const props = defineProps<{ manager: DataManager }>()
@@ -39,12 +41,6 @@ const emit = defineEmits<{
   (e: 'add-data'): void
   (e: 'new-folder'): void
   (e: 'sync-to-node'): void
-  (e: 'bulk-delete'): void
-  (e: 'delete-bucket', bucket: string, nodeId: string | null): void
-  (e: 'delete-object', object: ObjectEntry): void
-  (e: 'delete-folder', folder: FolderEntry): void
-  (e: 'purge-object', object: ObjectEntry): void
-  (e: 'purge-folder', folder: FolderEntry): void
 }>()
 
 const s3 = useS3()
@@ -74,7 +70,7 @@ const {
   loadObjects,
   navigateTo,
   openFolder,
-  openPreview,
+  openDetails,
   download,
   keyIsSynced,
   bucketSyncCount,
@@ -94,6 +90,15 @@ const {
   retrySpinning,
   onRetryObjects,
   requestUpload,
+  showDeleted,
+  setShowDeleted,
+  deletedObjects,
+  deletedLoading,
+  deletedTruncated,
+  deletedError,
+  restoringKey,
+  restoreObject,
+  requestDelete,
 } = props.manager
 
 // One entry for everything this bucket stores: the Storage page. The badge
@@ -127,10 +132,59 @@ watch(
   },
   { immediate: true },
 )
-// Per-version copy list; the connected node answers for its own objects only.
-const locationsKey = ref<string | null>(null)
 
 const dragActive = ref(false)
+
+function objectReason(key: string): string | null {
+  return s3.canWrite(bucket.value, key, remoteNodeId.value)
+    ? null
+    : 'This session cannot delete this object.'
+}
+
+function folderReason(folderPrefix: string): string | null {
+  return s3.canDeletePrefix(bucket.value, folderPrefix, remoteNodeId.value)
+    ? null
+    : 'This session cannot delete this entire folder.'
+}
+
+function deleteObject(object: ObjectEntry) {
+  requestDelete({
+    kind: 'object',
+    bucket: bucket.value,
+    nodeId: remoteNodeId.value,
+    key: object.key,
+    headState: 'live',
+    bytes: object.size,
+  })
+}
+
+function deleteFolder(folder: FolderEntry) {
+  requestDelete({
+    kind: 'folder',
+    bucket: bucket.value,
+    nodeId: remoteNodeId.value,
+    key: folder.prefix,
+  })
+}
+
+function deleteSelection() {
+  requestDelete({
+    kind: 'selection',
+    bucket: bucket.value,
+    nodeId: remoteNodeId.value,
+    keys: [...selectedObjectKeys.value],
+  })
+}
+
+function deleteRestorable(key: string) {
+  requestDelete({
+    kind: 'deleted-object',
+    bucket: bucket.value,
+    nodeId: remoteNodeId.value,
+    key,
+    headState: 'marker',
+  })
+}
 
 function onDrop(event: DragEvent) {
   dragActive.value = false
@@ -165,23 +219,9 @@ function onDrop(event: DragEvent) {
             class="text-destructive hover:text-destructive"
             :disabled="selectedObjectCount === 0"
             :title="`Delete ${selectedObjectCount} selected key${selectedObjectCount === 1 ? '' : 's'}`"
-            @click="emit('bulk-delete')"
+            @click="deleteSelection"
           >
             <Trash2 class="h-4 w-4" /> Delete selected ({{ selectedObjectCount }})
-          </Button>
-          <!-- Same local-only gating as the sidebar delete: remote S3
-               endpoints are usually CORS-blocked from this origin. -->
-          <Button
-            v-if="!remoteNodeId"
-            variant="outline"
-            size="icon-sm"
-            class="h-8 w-8 text-destructive hover:text-destructive"
-            :title="`Delete ${bucket}`"
-            aria-label="Delete bucket"
-            :disabled="!s3.canDeletePrefix(bucket, '', null)"
-            @click="emit('delete-bucket', bucket, null)"
-          >
-            <Trash2 class="h-4 w-4" />
           </Button>
           <WatchButton
             surface="bucket"
@@ -257,6 +297,22 @@ function onDrop(event: DragEvent) {
           <Button v-if="!remoteNodeId" data-tour="bucket-add-data" size="sm" :disabled="!canWriteCurrentPrefix" :title="writeRestrictionMessage ?? 'Add data'" @click="emit('add-data')"><Plus class="h-4 w-4" /> Add data</Button>
         </div>
       </div>
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <!-- Deleted keys are listed by the node that holds the bucket, so the
+             toggle only applies to a bucket on the connected node. -->
+        <label v-if="!remoteNodeId && !remoteBlocked" class="flex items-center gap-2 text-xs text-muted-foreground">
+          <Switch :checked="showDeleted" @update:checked="setShowDeleted" />
+          Show deleted
+        </label>
+        <p v-else-if="!remoteBlocked" class="text-xs text-muted-foreground">
+          Deleted objects are listed by the node that holds this bucket, so they are unavailable here.
+        </p>
+        <Spinner v-if="deletedLoading" label="Loading deleted objects" />
+        <p v-if="showDeleted && deletedTruncated" class="text-xs text-muted-foreground">
+          Only the first deleted objects of this folder are listed.
+        </p>
+      </div>
+      <Notice v-if="deletedError" tone="warning">{{ deletedError }}</Notice>
       <p v-if="writeRestrictionMessage" class="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
         {{ writeRestrictionMessage }}
       </p>
@@ -347,25 +403,22 @@ function onDrop(event: DragEvent) {
               <td class="px-4 py-2.5 text-muted-foreground">-</td>
               <td class="px-4 py-2.5">
                 <div class="flex items-center justify-end gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
+                  <IconButton
+                    label="Delete folder…"
                     class="text-destructive hover:text-destructive"
-                    aria-label="Permanently delete folder and all versions"
-                    :disabled="!s3.canDeletePrefix(bucket, folder.prefix, remoteNodeId)"
-                    :title="s3.canDeletePrefix(bucket, folder.prefix, remoteNodeId) ? 'Permanently delete folder and all versions' : 'This session cannot delete this entire folder'"
-                    @click.stop="emit('purge-folder', folder)"
-                  ><Bomb class="size-3.5" /></Button>
-                  <Button variant="ghost" size="icon-sm" class="text-destructive hover:text-destructive" aria-label="Delete folder" :disabled="!s3.canDeletePrefix(bucket, folder.prefix, remoteNodeId)" :title="s3.canDeletePrefix(bucket, folder.prefix, remoteNodeId) ? 'Delete folder' : 'This session cannot delete this entire folder'" @click.stop="emit('delete-folder', folder)"><Trash2 class="size-3.5" /></Button>
+                    :disabled-reason="folderReason(folder.prefix)"
+                    @click.stop="deleteFolder(folder)"
+                  ><Trash2 class="size-3.5" /></IconButton>
                 </div>
               </td>
             </tr>
-            <!-- Row click previews; the action buttons stop propagation. -->
+            <!-- Row click opens the file details; the action buttons stop
+                 propagation and open the tab they name. -->
             <tr
               v-for="object in objects"
               :key="object.key"
               class="cursor-pointer border-t border-border hover:bg-muted/30"
-              @click="openPreview(object)"
+              @click="openDetails(object)"
             >
               <td class="w-10 px-4 py-2.5" @click.stop>
                 <input
@@ -397,26 +450,53 @@ function onDrop(event: DragEvent) {
               <td class="px-4 py-2.5 text-xs text-muted-foreground">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '-' }}</td>
               <td class="px-4 py-2.5">
                 <div class="flex items-center justify-end gap-1">
-                  <Button variant="ghost" size="icon-sm" aria-label="Preview" @click.stop="openPreview(object)"><Eye class="size-3.5" /></Button>
-                  <Button variant="ghost" size="icon-sm" aria-label="Download" @click.stop="download(object)"><Download class="size-3.5" /></Button>
-                  <Button
+                  <IconButton label="Preview" @click.stop="openDetails(object, 'preview')"><Eye class="size-3.5" /></IconButton>
+                  <IconButton label="Download" @click.stop="download(object)"><Download class="size-3.5" /></IconButton>
+                  <IconButton
                     v-if="!remoteNodeId"
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label="Storage locations"
-                    title="Storage locations: where this file is stored"
-                    @click.stop="locationsKey = object.key"
-                  ><HardDrive class="size-3.5" /></Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
+                    label="Storage locations: where this file is stored"
+                    @click.stop="openDetails(object, 'storage')"
+                  ><HardDrive class="size-3.5" /></IconButton>
+                  <IconButton
+                    label="Delete…"
                     class="text-destructive hover:text-destructive"
-                    aria-label="Permanently delete all versions"
-                    :disabled="!s3.canWrite(bucket, object.key, remoteNodeId)"
-                    :title="s3.canWrite(bucket, object.key, remoteNodeId) ? 'Permanently delete all versions' : 'This session cannot delete this object'"
-                    @click.stop="emit('purge-object', object)"
-                  ><Bomb class="size-3.5" /></Button>
-                  <Button variant="ghost" size="icon-sm" class="text-destructive hover:text-destructive" aria-label="Delete" :disabled="!s3.canWrite(bucket, object.key, remoteNodeId)" :title="s3.canWrite(bucket, object.key, remoteNodeId) ? 'Delete object' : 'This session cannot delete this object'" @click.stop="emit('delete-object', object)"><Trash2 class="size-3.5" /></Button>
+                    :disabled-reason="objectReason(object.key)"
+                    @click.stop="deleteObject(object)"
+                  ><Trash2 class="size-3.5" /></IconButton>
+                </div>
+              </td>
+            </tr>
+            <!-- Marker-headed keys: hidden by an ordinary listing, offered back
+                 here so a restore never leaves the browser. -->
+            <tr
+              v-for="entry in showDeleted ? deletedObjects : []"
+              :key="`deleted:${entry.key}`"
+              class="border-t border-border bg-muted/20 text-muted-foreground"
+            >
+              <td class="w-10 px-4 py-2.5"></td>
+              <td class="px-4 py-2.5">
+                <span class="flex items-center gap-2">
+                  <ObjectIcon :name="entry.name" class="h-4 w-4 opacity-60" />
+                  <span class="truncate line-through">{{ entry.name }}</span>
+                  <Badge :variant="stateVariant('deleted')" size="sm">Deleted</Badge>
+                </span>
+              </td>
+              <td class="px-4 py-2.5 text-right font-mono text-xs">-</td>
+              <td class="px-4 py-2.5 text-xs">{{ entry.lastModified ? relativeTime(entry.lastModified.toISOString()) : '-' }}</td>
+              <td class="px-4 py-2.5">
+                <div class="flex items-center justify-end gap-1">
+                  <Spinner v-if="restoringKey === entry.key" label="Restoring the object" />
+                  <IconButton
+                    label="Restore"
+                    :disabled-reason="objectReason(entry.key)"
+                    @click.stop="restoreObject(entry)"
+                  ><Undo2 class="size-3.5" /></IconButton>
+                  <IconButton
+                    label="Delete permanently…"
+                    class="text-destructive hover:text-destructive"
+                    :disabled-reason="objectReason(entry.key)"
+                    @click.stop="deleteRestorable(entry.key)"
+                  ><Trash2 class="size-3.5" /></IconButton>
                 </div>
               </td>
             </tr>
@@ -438,12 +518,5 @@ function onDrop(event: DragEvent) {
       </template>
     </template>
 
-    <ObjectLocationsDialog
-      :open="locationsKey !== null"
-      :bucket="bucket"
-      :object-key="locationsKey ?? ''"
-      :group-id="activeGroupId"
-      @update:open="(v: boolean) => { if (!v) locationsKey = null }"
-    />
   </div>
 </template>

@@ -3,7 +3,7 @@
 // sources and the upload entry point. The view and its panels read this one
 // instance instead of passing the same values down as props.
 import { computed, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { contextKey, shouldOpenContext } from './s3/context'
 import { useAruna } from './useAruna'
 import { useBuckets } from './useBuckets'
@@ -22,6 +22,10 @@ import {
   type ObjectEntry,
 } from './useS3'
 import { bucketNameProblem } from '@/lib/bucketName'
+import { readStored, storeValue } from './aruna/state'
+import type { DeletionOption } from '@/lib/deletion/options'
+import { requestScope, type DeleteRequest } from '@/lib/deletion/request'
+import type { DeletedObjectEntry } from '@/lib/objectVersions'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
 import type { StorageDeletionScope } from '@/lib/storageDeletion'
 import { isWorkspaceBucket } from '@/lib/workspaces'
@@ -401,6 +405,75 @@ export function useDataManager() {
     selectedObjectKeys.value = next
   }
 
+  // ListObjectsV2 hides a key whose head is a delete marker, so the toggle
+  // lists them through ListObjectVersions and offers them back. The choice is
+  // this viewer's alone and survives a reload.
+  const SHOW_DELETED_KEY = 'aruna.data.showDeleted'
+  const showDeleted = ref(readStored(SHOW_DELETED_KEY) === '1')
+  const deletedObjects = ref<DeletedObjectEntry[]>([])
+  const deletedLoading = ref(false)
+  const deletedTruncated = ref(false)
+  const deletedError = ref<string | null>(null)
+  const restoringKey = ref<string | null>(null)
+  let deletedRequestId = 0
+
+  function setShowDeleted(next: boolean) {
+    showDeleted.value = next
+    storeValue(SHOW_DELETED_KEY, next ? '1' : '')
+  }
+
+  async function loadDeleted() {
+    const id = ++deletedRequestId
+    deletedError.value = null
+    if (!showDeleted.value || remoteNodeId.value || !bucket.value || !contextReady.value) {
+      deletedObjects.value = []
+      deletedTruncated.value = false
+      return
+    }
+    deletedLoading.value = true
+    try {
+      const page = await s3.listDeletedObjects(bucket.value, s3Prefix.value, remoteNodeId.value)
+      if (id !== deletedRequestId) return
+      deletedObjects.value = page.deleted
+      deletedTruncated.value = page.truncated
+    } catch (err) {
+      if (id !== deletedRequestId) return
+      deletedObjects.value = []
+      deletedError.value = s3ErrorMessage(err)
+    } finally {
+      if (id === deletedRequestId) deletedLoading.value = false
+    }
+  }
+
+  watch(
+    [bucket, s3Prefix, remoteNodeId, showDeleted, contextReady],
+    () => {
+      void loadDeleted()
+    },
+    { immediate: true },
+  )
+
+  // Deleting the delete marker moves the head back to the newest stored
+  // version: the restore is one call and needs no confirmation.
+  async function restoreObject(entry: DeletedObjectEntry) {
+    if (!s3.canWrite(bucket.value, entry.key, remoteNodeId.value)) return
+    restoringKey.value = entry.key
+    deletedError.value = null
+    try {
+      await s3.deleteObjectVersion(
+        bucket.value,
+        entry.key,
+        entry.markerVersionId,
+        remoteNodeId.value,
+      )
+      await Promise.all([loadObjects(), loadDeleted()])
+    } catch (err) {
+      deletedError.value = s3ErrorMessage(err)
+    } finally {
+      restoringKey.value = null
+    }
+  }
+
   const newBucketName = ref('')
   const creatingBucket = ref(false)
   const createBucketError = ref<string | null>(null)
@@ -755,11 +828,44 @@ export function useDataManager() {
     }
   }
 
-  const previewOpen = ref(false)
-  const previewObject = ref<ObjectEntry | null>(null)
-  function openPreview(object: ObjectEntry) {
-    previewObject.value = object
-    previewOpen.value = true
+  // The open file and its tab live in the route (`?object=&tab=`), so a details
+  // view is a link a person can share or reload into.
+  const DETAIL_TABS = ['general', 'preview', 'versions', 'storage'] as const
+  const detailsKey = computed(() => routeString(route.query.object))
+  const detailsTab = computed(() => {
+    const value = routeString(route.query.tab)
+    return (DETAIL_TABS as readonly string[]).includes(value) ? value : 'general'
+  })
+  const detailsObject = computed<ObjectEntry | null>(() => {
+    const key = detailsKey.value
+    if (!key) return null
+    return (
+      objects.value.find((object) => object.key === key) ?? {
+        key,
+        name: key.slice(s3Prefix.value.length) || key,
+      }
+    )
+  })
+
+  function openDetails(object: ObjectEntry, tab = 'general') {
+    const query: LocationQueryRaw = { ...route.query, object: object.key }
+    if (tab && tab !== 'general') query.tab = tab
+    else delete query.tab
+    void router.push({ query })
+  }
+
+  function setDetailsTab(tab: string) {
+    if (!detailsKey.value || tab === detailsTab.value) return
+    const query: LocationQueryRaw = { ...route.query }
+    if (tab === 'general') delete query.tab
+    else query.tab = tab
+    void router.replace({ query })
+  }
+
+  function closeDetails() {
+    if (!detailsKey.value) return
+    const { object: _object, tab: _tab, ...rest } = route.query
+    void router.replace({ query: rest })
   }
 
   // Connector names for the preview origin line and the stats breakdown: ONE
@@ -820,15 +926,15 @@ export function useDataManager() {
     return `Contains ${entries.length} referenced object${entries.length === 1 ? '' : 's'} from ${[...sources].join(', ') || 'external sources'}. Open the folder for exact source paths.`
   }
 
-  const previewReference = computed(() =>
-    previewObject.value
-      ? (references.referencedByKey.value.get(previewObject.value.key) ?? null)
+  const detailsReference = computed(() =>
+    detailsObject.value
+      ? (references.referencedByKey.value.get(detailsObject.value.key) ?? null)
       : null,
   )
-  // Structured provenance so the preview pane can render a real connector link
+  // Structured provenance so the details view can render a real connector link
   // (group-scoped deep link) instead of plain text.
   const previewReferencedFrom = computed(() => {
-    const entry = previewReference.value
+    const entry = detailsReference.value
     if (!entry) return null
     return {
       label: referenceSourceLabel(entry, {
@@ -847,12 +953,9 @@ export function useDataManager() {
   // listing does not cover them, so probe the single previewed object instead.
   const previewProbeReference = computed(() => Boolean(remoteNodeId.value))
 
-  // Closes a preview the deletion of `scope` invalidated.
+  // Closes a details view the deletion of `scope` invalidated.
   function dropPreviewUnder(match: (key: string) => boolean) {
-    if (previewObject.value && match(previewObject.value.key)) {
-      previewOpen.value = false
-      previewObject.value = null
-    }
+    if (detailsKey.value && match(detailsKey.value)) closeDetails()
   }
 
   async function download(object: ObjectEntry) {
@@ -870,8 +973,69 @@ export function useDataManager() {
     }
   }
 
+  // Every destructive control in the Data views hands its target here, and the
+  // one delete dialog decides what may happen to it.
+  const deleteRequest = ref<DeleteRequest | null>(null)
+
+  function requestDelete(request: DeleteRequest) {
+    deleteRequest.value = request
+  }
+
+  function closeDelete() {
+    deleteRequest.value = null
+  }
+
+  const deleteSyncApplies = computed(() => {
+    const request = deleteRequest.value
+    if (!request || request.kind === 'bucket' || request.bucket !== bucket.value) return false
+    return keyIsSynced(request.key ?? '')
+  })
+
+  async function onDeleteCompleted(result: {
+    request: DeleteRequest
+    option: DeletionOption
+    committed: string[]
+  }) {
+    const { request, option, committed } = result
+    if (!committed.length) return
+    if (request.kind === 'bucket') {
+      shortcuts.remove(request.bucket, request.nodeId)
+      if (bucket.value === request.bucket && remoteNodeId.value === request.nodeId) {
+        await router.push({ name: 'buckets' })
+      }
+      await bucketList.refresh()
+      void loadSyncOverview()
+      return
+    }
+    const scope = requestScope(request)
+    if (scope) pruneSelectedObjectKeys(scope, request.nodeId)
+    const done = new Set(committed)
+    if (request.kind === 'selection') {
+      selectedObjectKeys.value = new Set(
+        [...selectedObjectKeys.value].filter((key) => !done.has(key)),
+      )
+    }
+    if (request.bucket !== bucket.value || request.nodeId !== remoteNodeId.value) return
+    if (option.id === 'delete' || option.id === 'delete-permanently') {
+      dropPreviewUnder((key) =>
+        request.kind === 'folder'
+          ? key.startsWith(request.key ?? '')
+          : request.kind === 'selection'
+            ? done.has(key)
+            : key === request.key,
+      )
+    }
+    await Promise.all([loadObjects(), loadDeleted()])
+    if (request.kind === 'folder') void references.reload()
+  }
+
   const isEmpty = computed(
-    () => !listLoading.value && !listError.value && !folders.value.length && !objects.value.length,
+    () =>
+      !listLoading.value &&
+      !listError.value &&
+      !folders.value.length &&
+      !objects.value.length &&
+      !deletedObjects.value.length,
   )
 
   const viewReady = computed(() =>
@@ -979,12 +1143,29 @@ export function useDataManager() {
     requestUpload,
     precheck,
     confirmPrecheckUpload,
-    previewOpen,
-    previewObject,
-    openPreview,
+    detailsKey,
+    detailsTab,
+    detailsObject,
+    openDetails,
+    setDetailsTab,
+    closeDetails,
     previewReferencedFrom,
     previewProbeReference,
     dropPreviewUnder,
+    showDeleted,
+    setShowDeleted,
+    deletedObjects,
+    deletedLoading,
+    deletedTruncated,
+    deletedError,
+    restoringKey,
+    restoreObject,
+    loadDeleted,
+    deleteRequest,
+    deleteSyncApplies,
+    requestDelete,
+    closeDelete,
+    onDeleteCompleted,
     refreshSpinning,
     onRefresh,
     retrySpinning,

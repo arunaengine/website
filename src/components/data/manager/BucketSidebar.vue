@@ -10,13 +10,10 @@ import { useS3 } from '@/composables/useS3'
 import type { DataManager } from '@/composables/useDataManager'
 import type { BucketSearchHit } from '@/lib/api'
 import { BUCKET_NAME_REQUIREMENT } from '@/lib/bucketName'
-import { Boxes, ChevronRight, FolderPlus, History, KeyRound, Trash2 } from '@lucide/vue'
+import { Boxes, ChevronRight, FolderPlus, History, KeyRound } from '@lucide/vue'
 
 const props = defineProps<{ manager: DataManager }>()
-const emit = defineEmits<{
-  (e: 'sync', hit: BucketSearchHit): void
-  (e: 'delete-bucket', bucket: string, nodeId: string | null): void
-}>()
+const emit = defineEmits<{ (e: 'sync', hit: BucketSearchHit): void }>()
 
 const s3 = useS3()
 const {
@@ -85,24 +82,7 @@ const {
               :active="entry.bucket === bucket && (entry.nodeId ?? null) === remoteNodeId"
               @open="openBucketOn(entry.bucket, entry.nodeId)"
               @toggle-pin="shortcuts.togglePin(entry.bucket, entry.nodeId)"
-            >
-              <!-- Delete is offered for local buckets only; remote S3
-                   endpoints are usually CORS-blocked from this origin. -->
-              <template v-if="entry.nodeId === null" #actions>
-                <button
-                  type="button"
-                  class="shrink-0 rounded p-1 text-muted-foreground hover:text-destructive"
-                  :class="!s3.canDeletePrefix(entry.bucket, '', entry.nodeId) && 'cursor-not-allowed opacity-40'"
-                  :title="`Delete ${entry.bucket}`"
-                  :aria-label="`Delete bucket ${entry.bucket}`"
-                  :disabled="!s3.canDeletePrefix(entry.bucket, '', entry.nodeId)"
-                  @mousedown.prevent
-                  @click="emit('delete-bucket', entry.bucket, entry.nodeId)"
-                >
-                  <Trash2 class="h-3 w-3" />
-                </button>
-              </template>
-            </BucketRow>
+            />
           </li>
         </ul>
         <p v-else class="px-4 py-4 text-xs text-muted-foreground">No buckets in this group yet.</p>

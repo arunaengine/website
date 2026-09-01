@@ -17,10 +17,10 @@ import DataViewSkeleton from '@/components/data/DataViewSkeleton.vue'
 import StagingJobsPanel from '@/components/data/StagingJobsPanel.vue'
 import SyncBucketDialog from '@/components/data/SyncBucketDialog.vue'
 import BucketSidebar from '@/components/data/manager/BucketSidebar.vue'
-import DeletionFlow from '@/components/data/manager/DeletionFlow.vue'
+import DeleteDialog from '@/components/data/DeleteDialog.vue'
+import FileDetailsDialog from '@/components/data/FileDetailsDialog.vue'
 import ObjectBrowser from '@/components/data/manager/ObjectBrowser.vue'
 import UploadPanel from '@/components/data/manager/UploadPanel.vue'
-import PreviewPane from '@/components/preview/PreviewPane.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDataManager } from '@/composables/useDataManager'
 import { providePageContext } from '@/composables/usePageContext'
@@ -67,10 +67,18 @@ const {
   loadObjects,
   loadSyncOverview,
   bucketList,
-  previewOpen,
-  previewObject,
+  detailsKey,
+  detailsTab,
+  detailsObject,
+  setDetailsTab,
+  closeDetails,
   previewReferencedFrom,
   previewProbeReference,
+  deleteRequest,
+  deleteSyncApplies,
+  requestDelete,
+  closeDelete,
+  onDeleteCompleted,
   refreshSpinning,
   onRefresh,
 } = manager
@@ -86,7 +94,13 @@ providePageContext(() => ({
   },
 }))
 
-const deletion = ref<InstanceType<typeof DeletionFlow> | null>(null)
+// Bumped after every deletion so the open file details reload their panels.
+const detailsRevision = ref(0)
+
+async function onDeleted(result: Parameters<typeof onDeleteCompleted>[0]) {
+  await onDeleteCompleted(result)
+  detailsRevision.value += 1
+}
 
 // ── Bucket sync ─────────────────────────────────────────────────────────────
 const syncDialogOpen = ref(false)
@@ -281,23 +295,13 @@ async function createFolder() {
           {{ sessionWarning }}
         </Notice>
 
-        <BucketSidebar
-          :manager="manager"
-          @sync="openSyncFromHit"
-          @delete-bucket="(name: string, nodeId: string | null) => deletion?.openDeleteBucket(name, nodeId)"
-        />
+        <BucketSidebar :manager="manager" @sync="openSyncFromHit" />
 
         <ObjectBrowser
           :manager="manager"
           @add-data="addDataOpen = true"
           @new-folder="openNewFolder"
           @sync-to-node="openSyncDialog"
-          @bulk-delete="deletion?.openBulkDelete()"
-          @delete-bucket="(name: string, nodeId: string | null) => deletion?.openDeleteBucket(name, nodeId)"
-          @delete-object="(object) => deletion?.openDeleteObject(object)"
-          @delete-folder="(folder) => deletion?.openDeleteFolder(folder)"
-          @purge-object="(object) => deletion?.openPermanentDeleteObject(object)"
-          @purge-folder="(folder) => deletion?.openPermanentDeleteFolder(folder)"
         >
           <UploadPanel :manager="manager" />
         </ObjectBrowser>
@@ -325,18 +329,31 @@ async function createFolder() {
       @created="onSyncChanged"
     />
 
-    <PreviewPane
-      v-model:open="previewOpen"
+    <FileDetailsDialog
+      :open="Boolean(detailsKey)"
+      :tab="detailsTab"
       :bucket="bucket"
-      :object-key="previewObject?.key ?? ''"
-      :name="previewObject?.name ?? ''"
-      :size="previewObject?.size"
+      :object-key="detailsObject?.key ?? ''"
+      :name="detailsObject?.name ?? ''"
+      :size="detailsObject?.size"
+      :last-modified="detailsObject?.lastModified"
       :node-id="remoteNodeId"
+      :group-id="activeGroupId"
       :referenced-from="previewReferencedFrom"
       :probe-reference="previewProbeReference"
+      :revision="detailsRevision"
+      @update:open="(value: boolean) => { if (!value) closeDetails() }"
+      @update:tab="setDetailsTab"
+      @delete="requestDelete"
+      @changed="detailsRevision += 1"
     />
 
-    <DeletionFlow ref="deletion" :manager="manager" />
+    <DeleteDialog
+      :request="deleteRequest"
+      :sync-applies="deleteSyncApplies"
+      @close="closeDelete"
+      @completed="onDeleted"
+    />
 
     <Dialog :open="newFolderOpen" @update:open="(v: boolean) => (newFolderOpen = v)">
       <DialogContent class="max-w-md">

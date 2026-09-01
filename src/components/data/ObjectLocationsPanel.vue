@@ -1,29 +1,35 @@
 <script setup lang="ts">
-import Dialog from '@/components/ui/Dialog.vue'
-import DialogContent from '@/components/ui/DialogContent.vue'
-import DialogHeader from '@/components/ui/DialogHeader.vue'
-import DialogTitle from '@/components/ui/DialogTitle.vue'
-import DialogDescription from '@/components/ui/DialogDescription.vue'
+// Where the copies of ONE version of a file physically live, and how to ask
+// another node for one. The connected node answers for its own objects only.
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
-import Select from '@/components/ui/Select.vue'
-import Skeleton from '@/components/ui/Skeleton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Notice from '@/components/ui/Notice.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
+import RefusalNote from '@/components/ui/RefusalNote.vue'
+import Select from '@/components/ui/Select.vue'
+import Skeleton from '@/components/ui/Skeleton.vue'
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { Copy, HardDrive, Server, ShieldAlert, TriangleAlert } from '@lucide/vue'
+import { Copy, Server, ShieldAlert, TriangleAlert } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { copyState, scanLimitText } from '@/lib/storage'
 import { stateVariant, toneVariant } from '@/lib/stateBadge'
-import { errorMessage } from '@/lib/utils'
+import { truncateMiddle, errorMessage } from '@/lib/utils'
 import { ApiError, type BlobCopyResponse, type BlobLocationsResponse } from '@/lib/api'
 
-const props = defineProps<{ open: boolean; bucket: string; objectKey: string; groupId: string | null }>()
-const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
+const props = defineProps<{
+  active: boolean
+  bucket: string
+  objectKey: string
+  /** The version to ask about; omitted asks about the current one. */
+  versionId?: string | null
+  /** Node hosting the bucket; only the connected node can answer. */
+  nodeId?: string | null
+  groupId: string | null
+}>()
 
 const { getBlobLocations, replicateBlob } = useAruna()
 const realmNodes = useRealmNodes()
@@ -32,6 +38,8 @@ const summary = ref<BlobLocationsResponse | null>(null)
 const loading = ref(false)
 const loadError = ref<string | null>(null)
 const missing = ref(false)
+
+const remote = computed(() => Boolean(props.nodeId))
 
 // A copy on the group's own storage sits on machines the node does not run, so
 // it cannot vouch for it. Saying that plainly is the point of this panel.
@@ -58,7 +66,7 @@ async function load() {
   loadError.value = null
   missing.value = false
   try {
-    const response = await getBlobLocations(props.bucket, props.objectKey)
+    const response = await getBlobLocations(props.bucket, props.objectKey, props.versionId ?? undefined)
     if (seq !== loadSeq) return
     summary.value = response
   } catch (err) {
@@ -74,9 +82,9 @@ async function load() {
 }
 
 watch(
-  () => [props.open, props.bucket, props.objectKey],
+  () => [props.active, props.bucket, props.objectKey, props.versionId],
   () => {
-    if (props.open) void load()
+    if (props.active && !remote.value) void load()
     else summary.value = null
   },
   { immediate: true },
@@ -101,7 +109,6 @@ function copyVariant(state: string) {
   return stateVariant(state)
 }
 
-// ── Replication ──────────────────────────────────────────────────────────────
 // Asks one node to fetch a copy. The node answers as soon as the request is
 // recorded, so a success here means queued, never stored.
 const replicaTarget = ref('')
@@ -151,17 +158,15 @@ async function replicate() {
 </script>
 
 <template>
-  <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-    <DialogContent class="max-w-xl">
-      <DialogHeader>
-        <DialogTitle class="flex items-center gap-2">
-          <HardDrive class="h-4 w-4 text-primary" /> Storage locations
-        </DialogTitle>
-        <DialogDescription>
-          Where <span class="font-mono">{{ props.bucket }}/{{ props.objectKey }}</span> is stored.
-        </DialogDescription>
-      </DialogHeader>
+  <div class="space-y-3">
+    <RefusalNote
+      v-if="remote"
+      tone="warning"
+      message="This bucket is served by another node.
+Only the node that holds a file can say where its copies are; open the bucket on that node."
+    />
 
+    <template v-else>
       <Skeleton v-if="loading && !summary" class="h-24" />
       <EmptyState
         v-else-if="missing"
@@ -172,7 +177,10 @@ async function replicate() {
       <ErrorPanel v-else-if="loadError" :message="loadError" @retry="load" />
       <template v-else-if="summary">
         <div class="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-          <span :title="`Version ${summary.version_id}`">Newest version</span>
+          <span :title="`Version ${summary.version_id}`">
+            {{ props.versionId ? 'Version' : 'Newest version' }}
+            <span class="hash">{{ truncateMiddle(summary.version_id, 8, 6) }}</span>
+          </span>
           <span>·</span>
           <span>{{ storedCount }} {{ storedCount === 1 ? 'copy' : 'copies' }} stored</span>
         </div>
@@ -286,6 +294,6 @@ async function replicate() {
           <RefreshButton :busy="loading" @click="load" />
         </div>
       </template>
-    </DialogContent>
-  </Dialog>
+    </template>
+  </div>
 </template>
