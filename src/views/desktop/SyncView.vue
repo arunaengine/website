@@ -241,7 +241,7 @@ async function findOfflineDataset(): Promise<void> {
         <header class="flex flex-wrap items-center gap-2">
           <Upload class="h-4 w-4 text-primary" />
           <h2 class="font-display text-sm font-semibold text-aruna-navy">Uploads from this window</h2>
-          <Badge variant="outline" size="sm">{{ uploadItems.length }}</Badge>
+          <Badge variant="outline" size="count">{{ uploadItems.length }}</Badge>
         </header>
         <div class="surface space-y-2 px-5 py-3.5">
           <div v-for="item in uploadItems.slice(0, 3)" :key="item.id" class="flex items-center gap-3 text-[11px]">

@@ -29,6 +29,8 @@ const badgeVariants = cva(
       size: {
         md: '',
         sm: 'text-[10px] px-1.5 py-0 leading-4',
+        // A bare count: a true circle up to three digits, a pill beyond.
+        count: 'h-5 min-w-5 justify-center px-0 py-0 leading-none tabular-nums',
       },
     },
     defaultVariants: { variant: 'default', size: 'md' },

@@ -401,7 +401,7 @@ const isEmpty = computed(
       <aside v-if="!controlled" class="overflow-hidden rounded-md border border-border">
         <header class="flex items-center justify-between border-b border-border px-3 py-2">
           <span class="text-xs font-semibold text-foreground">Buckets</span>
-          <Badge variant="outline">{{ visibleBuckets.length }}</Badge>
+          <Badge variant="outline" size="count">{{ visibleBuckets.length }}</Badge>
         </header>
         <Spinner v-if="bucketsLoading" show-label label="Loading…" class="px-3 py-3" />
         <p v-else-if="bucketsError" class="px-3 py-2 text-xs text-destructive">{{ bucketsError }}</p>

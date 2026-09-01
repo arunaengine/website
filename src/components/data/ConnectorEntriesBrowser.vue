@@ -156,12 +156,7 @@ defineExpose({ reload: load })
             </button>
           </template>
         </nav>
-        <RefreshButton
-          :busy="spinning"
-          label="Reload"
-          class="h-6 shrink-0 px-1.5 text-[10px]"
-          @click="onReload"
-        />
+        <RefreshButton :busy="spinning" size="xs" label="Reload" class="shrink-0" @click="onReload" />
       </div>
 
       <div class="overflow-hidden rounded-md border border-border">

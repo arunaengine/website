@@ -13,7 +13,7 @@ withDefaults(defineProps<{ sidebar?: boolean }>(), { sidebar: true })
     <aside v-if="sidebar" class="overflow-hidden rounded-md border border-border">
       <header class="flex items-center justify-between border-b border-border px-3 py-2">
         <Skeleton class="h-3.5 w-14" />
-        <Skeleton class="h-4 w-6 rounded-full" />
+        <Skeleton class="size-5 rounded-full" />
       </header>
       <div class="py-1">
         <div v-for="row in 4" :key="row" class="px-3 py-1.5"><Skeleton class="h-5 w-full" /></div>

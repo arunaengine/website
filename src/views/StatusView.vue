@@ -339,7 +339,7 @@ watch(
             <Boxes class="h-4 w-4 text-primary" />
             <h2 class="font-display text-sm font-semibold text-aruna-navy">Realm nodes</h2>
           </div>
-          <Badge variant="outline" class="tabular-nums">{{ sortedNodes.length }}</Badge>
+          <Badge variant="outline" size="count">{{ sortedNodes.length }}</Badge>
         </header>
         <ul class="divide-y divide-border">
           <li v-for="node in sortedNodes" :id="`status-node-${node.node_id}`" :key="node.node_id">

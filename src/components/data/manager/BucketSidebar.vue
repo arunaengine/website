@@ -55,7 +55,7 @@ const {
         <div class="flex items-center gap-2">
           <!-- Background revalidation only: the cached list stays readable behind it. -->
           <Spinner v-if="bucketsRefreshing" label="Refreshing buckets…" />
-          <Badge variant="outline">{{ sidebarBuckets.length }}</Badge>
+          <Badge variant="outline" size="count">{{ sidebarBuckets.length }}</Badge>
         </div>
       </header>
       <Spinner v-if="bucketsLoading" show-label label="Loading buckets…" class="px-4 py-4" />
@@ -130,7 +130,7 @@ const {
           >
             <ChevronRight :class="['h-3.5 w-3.5 shrink-0 transition-transform', workspacesOpen && 'rotate-90']" />
             System workspaces
-            <Badge variant="outline" class="ml-auto">{{ workspaceBuckets.length }}</Badge>
+            <Badge variant="outline" size="count" class="ml-auto">{{ workspaceBuckets.length }}</Badge>
           </button>
           <ul v-if="workspacesOpen" class="max-h-56 overflow-y-auto pb-1">
             <li v-for="entry in workspaceBuckets" :key="entry.name">

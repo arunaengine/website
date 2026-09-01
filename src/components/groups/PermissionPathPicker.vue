@@ -205,7 +205,7 @@ watch(
       <section v-if="customMode === 'meta'" class="mt-2 rounded-lg border border-border bg-background">
         <div class="flex items-center justify-between border-b border-border/70 px-3 py-2">
           <h2 class="font-display text-sm font-semibold text-aruna-navy">Datasets</h2>
-          <RefreshButton :busy="spinning" label="Reload" class="h-6 px-1.5 text-[10px]" @click="onReload" />
+          <RefreshButton :busy="spinning" size="xs" label="Reload" @click="onReload" />
         </div>
         <div class="px-3 pb-3 pt-2">
           <p class="text-[11px] text-muted-foreground">

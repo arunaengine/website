@@ -133,7 +133,7 @@ function rowEditable(row: BuilderRow): boolean {
           <div class="flex items-center gap-2">
             <FolderInput class="h-4 w-4 text-primary" />
             <h3 class="text-sm font-semibold text-foreground">Basket</h3>
-            <Badge variant="outline">{{ basket.summary.value.total }}</Badge>
+            <Badge variant="outline" size="count">{{ basket.summary.value.total }}</Badge>
           </div>
           <div class="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
             <span v-if="basket.summary.value.ready">{{ basket.summary.value.ready }} ready</span>

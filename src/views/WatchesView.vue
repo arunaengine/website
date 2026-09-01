@@ -114,7 +114,7 @@ watch(currentUser, () => void ensureLoaded())
             <h2 class="text-sm font-semibold text-foreground">Active watches</h2>
           </template>
           <template #tools>
-            <Badge variant="outline">{{ watches.length }}</Badge>
+            <Badge variant="outline" size="count">{{ watches.length }}</Badge>
           </template>
 
           <ul class="divide-y divide-border">

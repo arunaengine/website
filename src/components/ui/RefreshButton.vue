@@ -6,6 +6,7 @@ import { computed } from 'vue'
 import { RefreshCw } from '@lucide/vue'
 import Button from '@/components/ui/Button.vue'
 import type { ButtonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 const props = withDefaults(
   defineProps<{
@@ -13,7 +14,9 @@ const props = withDefaults(
     label?: string
     srLabel?: string
     disabled?: boolean
-    size?: 'sm' | 'default'
+    // `xs` is the compact toolbar control: it keeps the icon down to the size
+    // of the small glyphs it sits beside.
+    size?: 'xs' | 'sm' | 'default'
     variant?: ButtonVariants['variant']
     class?: string
   }>(),
@@ -27,8 +30,13 @@ const props = withDefaults(
   },
 )
 
-const buttonSize = computed<ButtonVariants['size']>(() =>
-  props.srLabel ? (props.size === 'sm' ? 'icon-sm' : 'icon') : props.size,
+const compact = computed(() => props.size === 'xs')
+const buttonSize = computed<ButtonVariants['size']>(() => {
+  if (props.srLabel) return props.size === 'default' ? 'icon' : 'icon-sm'
+  return props.size === 'default' ? 'default' : 'sm'
+})
+const buttonClasses = computed(() =>
+  cn(compact.value && (props.srLabel ? 'h-6 w-6' : 'h-6 px-1.5 text-[10px]'), props.class),
 )
 </script>
 
@@ -36,12 +44,12 @@ const buttonSize = computed<ButtonVariants['size']>(() =>
   <Button
     :variant="variant"
     :size="buttonSize"
-    :class="props.class"
+    :class="buttonClasses"
     :disabled="disabled || busy"
     :aria-busy="busy"
     :aria-label="srLabel"
   >
-    <RefreshCw :class="busy ? 'animate-spin' : ''" />
+    <RefreshCw :class="[compact ? 'size-3' : 'size-4', busy ? 'animate-spin' : '']" />
     <template v-if="!srLabel">{{ label }}</template>
   </Button>
 </template>

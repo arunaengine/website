@@ -222,7 +222,7 @@ async function createFolder() {
           <!-- Staging jobs are connected-node global, not per bucket. -->
           <Button v-if="stagingJobsEnabled" variant="outline" size="sm" @click="stagingPanelOpen = true">
             <HardDriveDownload class="h-4 w-4" /> Staging
-            <Badge v-if="staging.runningCount.value" variant="secondary" class="ml-1">{{ staging.runningCount.value }}</Badge>
+            <Badge v-if="staging.runningCount.value" variant="secondary" size="count" class="ml-1">{{ staging.runningCount.value }}</Badge>
           </Button>
         </template>
       </template>

@@ -74,7 +74,7 @@ async function createOtherRelationships() {
       <div class="flex items-center gap-2">
         <ArrowLeftRight class="h-4 w-4 text-primary" />
         <h3 class="text-sm font-semibold text-foreground">Imports</h3>
-        <Badge variant="outline">{{ otherRows.length }}</Badge>
+        <Badge variant="outline" size="count">{{ otherRows.length }}</Badge>
       </div>
       <Button
         size="sm"

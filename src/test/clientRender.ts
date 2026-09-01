@@ -8,6 +8,7 @@ import { ModuleKind, ScriptTarget, transpileModule } from 'typescript'
 import * as VueRuntime from 'vue'
 import { createRenderer, defineComponent, h, nextTick, type App, type Component } from 'vue'
 import type { Router } from 'vue-router'
+import * as Utils from '@/lib/utils'
 
 /** Wraps a component so a test module map can hand it back as an import. */
 export function moduleDefault(component: Component) {
@@ -58,6 +59,7 @@ export function refreshButton(): Component {
       vue: VueRuntime,
       '@lucide/vue': new Proxy({}, { get: () => IconStub }),
       '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+      '@/lib/utils': Utils,
     },
   )
   return refreshControl

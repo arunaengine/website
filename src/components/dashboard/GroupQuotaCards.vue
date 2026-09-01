@@ -168,7 +168,7 @@ watch(() => props.refreshRevision, (revision, previousRevision) => {
       <div class="flex items-center gap-2">
         <HardDrive class="h-4 w-4 text-primary" />
         <h2 class="font-display text-sm font-semibold text-aruna-navy">Group statistics</h2>
-        <Badge variant="outline" class="tabular-nums">{{ entries.length }}</Badge>
+        <Badge variant="outline" size="count">{{ entries.length }}</Badge>
       </div>
       <RefreshButton :busy="refreshBusy" sr-label="Refresh group statistics" @click="onRefresh" />
     </header>
