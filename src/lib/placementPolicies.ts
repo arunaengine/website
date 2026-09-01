@@ -88,6 +88,16 @@ export interface BucketPlacementResponse {
   generation: number
 }
 
+// GET /data/buckets/{bucket}/placement/objects: what the object's current head
+// carries here. 404 means this node holds no head for that key.
+export interface ObjectPlacementView {
+  bucket: string
+  key: string
+  version_id: string
+  generation: number
+  policies: PolicyRefBody[]
+}
+
 export interface ObjectPlacementRequest {
   key: string
   mutation_id: string

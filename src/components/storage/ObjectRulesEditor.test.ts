@@ -30,10 +30,9 @@ const SelectStub = defineComponent({
 
 const isRealmAdmin = ref(false)
 const group = ref<GroupDetailResponse | null>(null)
-const getBucketPlacement = vi.fn()
+const getObjectPlacement = vi.fn()
 const listPoliciesForGroup = vi.fn()
 const mintObjectPlacement = vi.fn()
-const listObjectVersions = vi.fn()
 
 const editor = compileClientComponent(new URL('./ObjectRulesEditor.vue', import.meta.url), {
   vue: VueRuntime,
@@ -59,13 +58,12 @@ const editor = compileClientComponent(new URL('./ObjectRulesEditor.vue', import.
   },
   '@/composables/usePlacementPolicies': {
     usePlacementPolicies: () => ({
-      getBucketPlacement,
+      getObjectPlacement,
       listPoliciesForGroup,
       mintObjectPlacement,
       policyName: (policy: { name?: string | null; policy_id: string }) => policy.name ?? policy.policy_id,
     }),
   },
-  '@/composables/useS3': { useS3: () => ({ listObjectVersions }) },
   '@/lib/api': Api,
   '@/lib/groupAdmin': GroupAdmin,
   '@/lib/placementPolicies': PlacementPolicies,
@@ -89,23 +87,27 @@ function groupDetail(admin: boolean): GroupDetailResponse {
   }
 }
 
-const BUCKET_POLICY = { policy_id: 'p-eu', digest: 'a'.repeat(64), name: 'Copies inside the EU', owner_group_id: null }
+const EU_POLICY = { policy_id: 'p-eu', digest: 'a'.repeat(64), name: 'Copies inside the EU', owner_group_id: null }
 const GROUP_POLICY = { policy_id: 'p-own', digest: 'b'.repeat(64), name: 'Only our own nodes', owner_group_id: 'g-1' }
+const HEAD_VERSION = '01J000000000000000000HEAD'
 
 async function render(options: { admin?: boolean; realmAdmin?: boolean; versionId?: string | null } = {}) {
   group.value = groupDetail(options.admin ?? true)
   isRealmAdmin.value = options.realmAdmin ?? false
-  getBucketPlacement.mockResolvedValue({ bucket: 'reef-survey', generation: 3, policies: [BUCKET_POLICY] })
-  listPoliciesForGroup.mockResolvedValue([BUCKET_POLICY, GROUP_POLICY])
-  listObjectVersions.mockResolvedValue({
-    versions: [{ versionId: 'v-2' }, { versionId: 'v-1' }],
-    truncated: false,
+  getObjectPlacement.mockResolvedValue({
+    bucket: 'reef-survey',
+    key: 'raw/reads.fastq',
+    version_id: HEAD_VERSION,
+    generation: 7,
+    policies: [EU_POLICY],
   })
+  listPoliciesForGroup.mockResolvedValue([EU_POLICY, GROUP_POLICY])
   const { root } = await mountApp(editor, {
     props: {
       bucket: 'reef-survey',
       objectKey: 'raw/reads.fastq',
-      versionId: options.versionId === undefined ? '01J000000000000000000HEAD' : options.versionId,
+      // A pinned version in the dialog must not decide what the mint is against.
+      versionId: options.versionId === undefined ? '01J00000000000000PINNED' : options.versionId,
       groupId: 'g-1',
       nodeId: null,
     },
@@ -115,7 +117,7 @@ async function render(options: { admin?: boolean; realmAdmin?: boolean; versionI
 }
 
 describe('object rules editor', () => {
-  it('offers the bucket rules as the starting set plus what is attachable', async () => {
+  it('offers the rules the head carries plus what is attachable', async () => {
     const root = await render()
 
     await click(button(root, 'Edit rules for this file…'))
@@ -139,14 +141,37 @@ describe('object rules editor', () => {
     const [bucket, body] = mintObjectPlacement.mock.calls[0]
     expect(bucket).toBe('reef-survey')
     expect(body.key).toBe('raw/reads.fastq')
-    expect(body.expected_version_id).toBe('01J000000000000000000HEAD')
-    expect(body.expected_generation).toBe(2)
+    expect(body.expected_version_id).toBe(HEAD_VERSION)
+    expect(body.expected_generation).toBe(7)
     expect(body.mutation_id).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/)
     expect(body.policies).toEqual([
       { policy_id: 'p-eu', digest: 'a'.repeat(64) },
       { policy_id: 'p-own', digest: 'b'.repeat(64) },
     ])
     expect(content(root)).toContain('a new version carrying exactly these rules')
+  })
+
+  it('refuses to save a key this node holds no head for', async () => {
+    const root = await render()
+    getObjectPlacement.mockRejectedValue(new Api.ApiError(404, 'Not found'))
+
+    await click(button(root, 'Edit rules for this file…'))
+
+    expect(content(root)).toContain('This file has no current version on this node.')
+    expect(button(root, 'Save rules').props.disabled).toBe(true)
+    expect(content(root)).not.toContain('Add a rule…')
+  })
+
+  it('shows a failed read instead of a starting set it does not know', async () => {
+    const root = await render()
+    getObjectPlacement.mockRejectedValue(new Api.ApiError(503, 'This node is still starting.'))
+
+    await click(button(root, 'Edit rules for this file…'))
+
+    const text = content(root)
+    expect(text).toContain('This node is still starting.')
+    expect(text).not.toContain('Copies inside the EU')
+    expect(button(root, 'Save rules').props.disabled).toBe(true)
   })
 
   it('shows the refusal this node gave instead of a saved message', async () => {

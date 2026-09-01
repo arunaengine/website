@@ -19,6 +19,7 @@ import type {
   DiagnosticsResponse,
   ObjectPlacementRequest,
   ObjectPlacementResponse,
+  ObjectPlacementView,
   PolicyRefBody,
   PolicyResponse,
   QuarantineResolveRequest,
@@ -164,6 +165,15 @@ async function getBucketPlacement(bucket: string): Promise<BucketPlacementRespon
   return stored
 }
 
+async function getObjectPlacement(bucket: string, key: string): Promise<ObjectPlacementView> {
+  const stored = await request<ObjectPlacementView>(
+    `/data/buckets/${encodeURIComponent(bucket)}/placement/objects`,
+    { query: { key } },
+  )
+  rememberRefs(stored.policies)
+  return stored
+}
+
 async function putBucketPlacement(
   bucket: string,
   body: BucketPlacementRequest,
@@ -253,6 +263,7 @@ export function usePlacementPolicies() {
     createPlacementPolicy,
     getPlacementPolicy,
     getBucketPlacement,
+    getObjectPlacement,
     putBucketPlacement,
     mintObjectPlacement,
     runBucketPlacement,

@@ -16,7 +16,6 @@ import Select from '@/components/ui/Select.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import { useAruna } from '@/composables/useAruna'
 import { usePlacementPolicies } from '@/composables/usePlacementPolicies'
-import { useS3 } from '@/composables/useS3'
 import { ApiError, type GroupDetailResponse } from '@/lib/api'
 import { isGroupAdmin } from '@/lib/groupAdmin'
 import {
@@ -31,7 +30,7 @@ import { ShieldCheck, Trash2 } from '@lucide/vue'
 const props = defineProps<{
   bucket: string
   objectKey: string
-  /** The version the successor is minted from; without one nothing can be saved. */
+  /** The head this file has here; without one there is nothing to edit. */
   versionId: string | null
   groupId: string | null
   nodeId?: string | null
@@ -39,16 +38,16 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: 'saved'): void }>()
 
 const { currentUser, getGroup, isRealmAdmin } = useAruna()
-const { getBucketPlacement, listPoliciesForGroup, mintObjectPlacement, policyName } =
+const { getObjectPlacement, listPoliciesForGroup, mintObjectPlacement, policyName } =
   usePlacementPolicies()
-const s3 = useS3()
 
 const group = ref<GroupDetailResponse | null>(null)
 const open = ref(false)
 const loading = ref(false)
 const draft = ref<PolicyRefBody[]>([])
 const library = ref<PolicyResponse[]>([])
-const generation = ref<number | null>(null)
+const head = ref<{ versionId: string; generation: number } | null>(null)
+const unavailable = ref<string | null>(null)
 const attachChoice = ref('')
 const saving = ref(false)
 const refusal = ref<string | null>(null)
@@ -90,19 +89,26 @@ function ownerLabel(policy: { owner_group_id?: string | null }): string | undefi
   )
 }
 
-// This node exposes no per-file rule set to read, so the bucket default is the
-// starting set, and the head advanced once per stored version or marker.
+// The head this node holds decides everything: the rules it already carries and
+// the version and generation the successor has to be minted against.
 async function load() {
   loading.value = true
   refusal.value = null
   saved.value = null
+  unavailable.value = null
   attachChoice.value = ''
-  const [placement, versions] = await Promise.all([
-    getBucketPlacement(props.bucket).catch(() => null),
-    s3.listObjectVersions(props.bucket, props.objectKey, null).catch(() => null),
-  ])
-  draft.value = (placement?.policies ?? []).map((policy) => ({ ...policy }))
-  generation.value = versions ? versions.versions.length : null
+  head.value = null
+  draft.value = []
+  try {
+    const placement = await getObjectPlacement(props.bucket, props.objectKey)
+    head.value = { versionId: placement.version_id, generation: placement.generation }
+    draft.value = placement.policies.map((policy) => ({ ...policy }))
+  } catch (error) {
+    unavailable.value =
+      error instanceof ApiError && error.status === 404
+        ? 'This file has no current version on this node.'
+        : placementPoliciesErrorMessage(error, 'lookup')
+  }
   library.value = await listPoliciesForGroup(props.groupId).catch(() => [])
   loading.value = false
 }
@@ -132,7 +138,8 @@ function detach(index: number) {
 }
 
 async function save() {
-  if (!props.versionId || generation.value === null || saving.value) return
+  const current = head.value
+  if (!current || saving.value) return
   saving.value = true
   refusal.value = null
   saved.value = null
@@ -140,8 +147,8 @@ async function save() {
     const response = await mintObjectPlacement(props.bucket, {
       key: props.objectKey,
       mutation_id: createOperationId(),
-      expected_version_id: props.versionId,
-      expected_generation: generation.value,
+      expected_version_id: current.versionId,
+      expected_generation: current.generation,
       policies: draft.value.map((policy) => ({
         policy_id: policy.policy_id,
         digest: policy.digest,
@@ -189,6 +196,7 @@ async function save() {
             <Skeleton class="h-8" />
             <Skeleton class="h-8" />
           </template>
+          <RefusalNote v-else-if="unavailable" :message="unavailable" />
           <template v-else>
             <ul v-if="draft.length" class="divide-y divide-border rounded-md border border-border">
               <li
@@ -240,16 +248,13 @@ async function save() {
             </p>
           </template>
 
-          <p v-if="!loading && generation === null" class="text-muted-foreground">
-            This node did not list the versions of this file, so its rules cannot be saved here.
-          </p>
           <RefusalNote v-if="refusal" :message="refusal" />
           <p v-else-if="saved" class="text-emerald-700 dark:text-emerald-300">{{ saved }}</p>
         </div>
 
         <DialogFooter>
           <Button variant="outline" :disabled="saving" @click="open = false">Close</Button>
-          <Button :disabled="saving || loading || generation === null" @click="save">
+          <Button :disabled="saving || loading || !head" @click="save">
             {{ saving ? 'Saving…' : 'Save rules' }}
           </Button>
         </DialogFooter>
