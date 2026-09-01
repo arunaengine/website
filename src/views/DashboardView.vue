@@ -74,7 +74,7 @@ async function refreshDashboard() {
 const { busy: refreshBusy, refresh: onRefresh } = useRefresh(refreshDashboard)
 const spinning = computed(() => refreshBusy.value || refreshing.value)
 
-// The dashboard has one critical bootstrap wave. Hold its sections in a
+// The dashboard has one critical bootstrap round. Hold its sections in a
 // single skeleton until the shared session and identity data have settled;
 // later refreshes update the rendered content in place. A session change starts
 // a fresh first paint through the epoch key.
