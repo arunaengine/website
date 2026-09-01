@@ -24,7 +24,7 @@ describe('quota counter contract', () => {
 
 describe('physical blob labels', () => {
   it.each([
-    '../views/DashboardView.vue',
+    '../views/StatusView.vue',
     '../views/AdminView.vue',
     '../components/groups/GroupDetail.vue',
     '../components/nodes/NodeDetailPanel.vue',
