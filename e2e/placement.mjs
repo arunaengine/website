@@ -139,7 +139,7 @@ try {
         const placementTab = await page.textContent('body')
         step('the placement tab separates the rules from the compliance count',
           placementTab.includes('Where copies may be stored')
-            && placementTab.includes('Compliance on this node')
+            && placementTab.includes('Coverage on this node')
             && placementTab.includes('Counted on this node only'))
 
         const attach = page.getByLabel('Attach a placement policy')
