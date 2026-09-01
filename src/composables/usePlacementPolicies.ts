@@ -118,6 +118,21 @@ async function loadPolicyPage(more = false): Promise<void> {
   }
 }
 
+// The bucket surfaces need realm-wide policies plus the ones the bucket's own
+// group owns. That is a different set from the shared realm listing, so it is
+// fetched per call and only feeds the name cache.
+async function listPoliciesForGroup(groupId: string | null): Promise<PolicyResponse[]> {
+  const { apiBaseUrl, authToken, sessionEpoch } = useAruna()
+  const epoch = sessionEpoch.value
+  const page = await listPlacementPolicies(
+    { limit: POLICY_PAGE_SIZE, groupId: groupId ?? undefined },
+    { baseUrl: apiBaseUrl.value, token: authToken.value },
+  )
+  if (epoch !== sessionEpoch.value) return []
+  for (const policy of page.policies) rememberPolicy(policy)
+  return page.policies
+}
+
 async function getPlacementPolicy(policy: PolicyRefBody): Promise<PolicyResponse> {
   const stored = await request<PolicyResponse>(
     `/data/placement/policies/${encodeURIComponent(policy.policy_id)}`,
@@ -219,6 +234,7 @@ export function usePlacementPolicies() {
     listError,
     listLoadingMore,
     loadPolicyPage,
+    listPoliciesForGroup,
     createPlacementPolicy,
     getPlacementPolicy,
     getBucketPlacement,

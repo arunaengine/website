@@ -63,6 +63,12 @@ export interface RealmTransitionHealth {
   overdue: number
 }
 
+/** One key/value a node publishes for placement selectors to match. */
+export interface RealmNodeLabel {
+  key: string
+  value: string
+}
+
 export type RealmPlacementMutationRequest =
   | { mutation: 'upsert_strategy'; strategy: RealmPlacementStrategy }
   | { mutation: 'remove_strategy'; strategy_id: string }
@@ -71,3 +77,6 @@ export type RealmPlacementMutationRequest =
   | { mutation: 'remove_binding'; scope: RealmPlacementBindingScope }
   | { mutation: 'set_override'; placement_override: RealmPlacementOverride }
   | { mutation: 'remove_override'; subject: string }
+  // An absent field stays unchanged. A changed location or label makes that
+  // node re-check the copies it holds. Older nodes refuse the whole mutation.
+  | { mutation: 'set_node_attributes'; node_id: string; location?: string; labels?: RealmNodeLabel[] }

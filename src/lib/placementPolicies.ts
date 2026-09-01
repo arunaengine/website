@@ -1,10 +1,14 @@
 import { ApiError, apiRequest, type ApiClientOptions } from '@/lib/api'
 import { quotaDimensionLabel } from '@/lib/computeAdmin'
-import { errorMessage } from '@/lib/utils'
+import { errorMessage, truncateMiddle } from '@/lib/utils'
 
 export interface PolicyRefBody {
   policy_id: string
   digest: string
+  /** Served by nodes that hold the policy; absent on older nodes. */
+  name?: string | null
+  /** null = realm wide. Absent means the node does not report an owner. */
+  owner_group_id?: string | null
 }
 
 export interface LabelMatchBody {
@@ -23,6 +27,8 @@ export interface CreatePolicyRequest {
   policy_id?: string
   name: string
   allowed: SelectorBody[]
+  /** Omitted or null publishes a realm-wide policy; a group id publishes for that group. */
+  owner_group_id?: string | null
 }
 
 export interface PolicyResponse {
@@ -33,6 +39,8 @@ export interface PolicyResponse {
   publisher: string
   created_by: string
   created_at_ms: number
+  /** null = realm wide. Absent on nodes that predate group-owned policies. */
+  owner_group_id?: string | null
 }
 
 // GET /data/placement/policies: the realm-config read view, ordered by
@@ -50,6 +58,8 @@ export interface ListPoliciesParams {
   // Server default 50, clamped to 200.
   limit?: number
   cursor?: string
+  /** Lists realm-wide policies plus the ones this group owns. Ignored by older nodes. */
+  groupId?: string
 }
 
 export function listPlacementPolicies(
@@ -58,7 +68,7 @@ export function listPlacementPolicies(
 ): Promise<ListPoliciesResponse> {
   return apiRequest<ListPoliciesResponse>(
     '/data/placement/policies',
-    { query: { limit: params.limit, cursor: params.cursor } },
+    { query: { limit: params.limit, cursor: params.cursor, group_id: params.groupId } },
     client,
   )
 }
@@ -317,7 +327,18 @@ export function normalizeCreatePolicyRequest(request: CreatePolicyRequest): Crea
     allowed: request.allowed.map(normalizedSelector),
   }
   if (request.policy_id?.trim()) normalized.policy_id = request.policy_id.trim()
+  if (request.owner_group_id?.trim()) normalized.owner_group_id = request.owner_group_id.trim()
   return normalized
+}
+
+/** Owner badge text; undefined when the node reports no owner at all. */
+export function policyOwnerLabel(
+  ownerGroupId: string | null | undefined,
+  groupName?: string | null,
+): string | undefined {
+  if (ownerGroupId === undefined) return undefined
+  if (ownerGroupId === null) return 'Realm'
+  return groupName?.trim() || truncateMiddle(ownerGroupId)
 }
 
 export function policyRefProblems(policies: PolicyRefBody[]): string[] {
