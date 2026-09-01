@@ -310,7 +310,7 @@ describe('Data Manager explicit multi-file deletion', () => {
     ]
       .join('\n')
       .replace(/<!--[\s\S]*?-->/g, '')
-    expect(renderedTemplate).not.toContain('—')
+    expect(renderedTemplate).not.toContain('\u2014')
     for (const source of [
       dataManagerSource,
       managerSource,

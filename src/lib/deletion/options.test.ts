@@ -167,7 +167,7 @@ describe('deletion options', () => {
           expect(new Set(options.map((option) => option.id)).size).toBe(options.length)
           for (const option of options) {
             expect(option.label).not.toContain('Purge')
-            expect(option.description).not.toContain('—')
+            expect(option.description).not.toContain('\u2014')
           }
         }
       }
