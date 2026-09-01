@@ -36,6 +36,9 @@ const tab = compileClientComponent(new URL('./StorageOverviewTab.vue', import.me
   '@/components/ui/DocsLink.vue': moduleDefault(Slotted('a')),
   '@/components/ui/FactList.vue': moduleDefault(FactListStub),
   '@/components/ui/Skeleton.vue': moduleDefault(Slotted('div')),
+  '@/components/data/BucketDangerZone.vue': moduleDefault(
+    defineComponent({ setup: () => () => h('div', 'Delete bucket permanently…') }),
+  ),
   '@/composables/useAruna': {
     useAruna: () => ({ getBucketRouting, getGroupRouting, listGroupBackends }),
   },
@@ -121,6 +124,20 @@ describe('bucket storage overview', () => {
 
     expect(text).toContain('Only admins of the group that owns this bucket may read it.')
     expect(text).toContain('Only group admins of this bucket and realm admins may read it.')
+  })
+
+  it('carries the danger zone with the bucket deletion control', async () => {
+    getBucketRouting.mockResolvedValue({ bucket: 'reef-survey', rules: [], warnings: [] })
+    getGroupRouting.mockResolvedValue({ group_id: 'g-1', warnings: [] })
+    listGroupBackends.mockResolvedValue({ backends: [] })
+    getBucketPlacement.mockResolvedValue({ bucket: 'reef-survey', policies: [], generation: 1 })
+    syncRows.value = []
+
+    const text = await render()
+
+    expect(text).toContain('Danger zone')
+    expect(text).toContain('nothing brings them back')
+    expect(text).toContain('Delete bucket permanently…')
   })
 
   it('does not answer for a bucket hosted on another node', async () => {

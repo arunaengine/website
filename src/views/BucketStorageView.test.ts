@@ -3,7 +3,7 @@ import * as VueRuntime from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import * as GroupAdmin from '@/lib/groupAdmin'
 import type { GroupDetailResponse } from '@/lib/api'
-import { compileClientComponent, content, mountApp, moduleDefault } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, mountApp, moduleDefault } from '@/test/clientRender'
 
 const route = reactive<{ params: Record<string, string>; query: Record<string, string> }>({
   params: { bucketId: 'reef-survey' },
@@ -58,10 +58,28 @@ const TabsTriggerStub = defineComponent({
   setup: (props, { slots }) => () => h('button', { 'data-tab': props.value }, slots.default?.()),
 })
 const Marker = (text: string) => defineComponent({ setup: () => () => h('section', text) })
+// The overview owns the danger zone, so its `deleted` event is what the page
+// reacts to; the button stands in for the finished delete dialog.
+const OverviewStub = defineComponent({
+  emits: ['deleted'],
+  setup: (_, { emit }) => () =>
+    h('section', [
+      'overview facts',
+      h(
+        'button',
+        { onClick: () => emit('deleted', { committed: ['reef-survey'] }) },
+        'finish deletion',
+      ),
+    ]),
+})
+
+const push = vi.fn()
+const refresh = vi.fn()
+const removeShortcut = vi.fn()
 
 const view = compileClientComponent(new URL('./BucketStorageView.vue', import.meta.url), {
   vue: VueRuntime,
-  'vue-router': { RouterLink: Slotted('a'), useRoute: () => route },
+  'vue-router': { RouterLink: Slotted('a'), useRoute: () => route, useRouter: () => ({ push }) },
   '@lucide/vue': new Proxy({}, { get: () => IconStub }),
   '@/components/dashboard/PageHeader.vue': moduleDefault(PageHeaderStub),
   '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
@@ -76,8 +94,10 @@ const view = compileClientComponent(new URL('./BucketStorageView.vue', import.me
   '@/components/storage/BucketBackendTab.vue': moduleDefault(Marker('backend rules')),
   '@/components/storage/BucketComplianceSection.vue': moduleDefault(Marker('compliance on this node')),
   '@/components/storage/BucketPolicySection.vue': moduleDefault(Marker('where copies may be stored')),
-  '@/components/storage/StorageOverviewTab.vue': moduleDefault(Marker('overview facts')),
+  '@/components/storage/StorageOverviewTab.vue': moduleDefault(OverviewStub),
   '@/components/storage/SyncsTab.vue': moduleDefault(Marker('sync rows')),
+  '@/composables/useBuckets': { useBuckets: () => ({ refresh }) },
+  '@/composables/useBucketShortcuts': { useBucketShortcuts: () => ({ remove: removeShortcut }) },
   '@/composables/useAruna': {
     useAruna: () => ({
       currentUser: ref({ id: 'u-1' }),
@@ -153,6 +173,19 @@ describe('bucket storage page', () => {
 
     expect(tabs(root)).toEqual(['overview', 'placement', 'syncs'])
     expect(content(root)).toContain('where copies may be stored')
+  })
+
+  it('returns to the bucket list and reloads it after the bucket is deleted', async () => {
+    push.mockClear()
+    refresh.mockClear()
+    removeShortcut.mockClear()
+    const root = await render({ query: { group: 'g-1' } })
+
+    await click(button(root, 'finish deletion'))
+
+    expect(removeShortcut).toHaveBeenCalledWith('reef-survey', null)
+    expect(push).toHaveBeenCalledWith({ name: 'buckets', query: { group: 'g-1' } })
+    expect(refresh).toHaveBeenCalled()
   })
 
   it('hides the node-local tabs for a bucket hosted elsewhere', async () => {

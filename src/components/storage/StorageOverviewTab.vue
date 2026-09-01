@@ -8,15 +8,18 @@ import Badge from '@/components/ui/Badge.vue'
 import DocsLink from '@/components/ui/DocsLink.vue'
 import FactList from '@/components/ui/FactList.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
+import BucketDangerZone from '@/components/data/BucketDangerZone.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useBucketSyncs } from '@/composables/useBucketSyncs'
 import { usePlacementPolicies } from '@/composables/usePlacementPolicies'
 import { ApiError, type GroupBackendResponse, type RoutingTarget, type StorageRoutingRule } from '@/lib/api'
+import type { DeletionResult } from '@/lib/deletion/request'
 import type { PolicyRefBody } from '@/lib/placementPolicies'
 import { targetLabel } from '@/lib/storage'
-import { HardDrive, ShieldCheck } from '@lucide/vue'
+import { HardDrive, ShieldCheck, Trash2 } from '@lucide/vue'
 
 const props = defineProps<{ bucket: string; groupId: string | null; nodeId: string | null }>()
+const emit = defineEmits<{ (e: 'deleted', result: DeletionResult): void }>()
 
 const { getBucketRouting, getGroupRouting, listGroupBackends } = useAruna()
 const { getBucketPlacement, policyName } = usePlacementPolicies()
@@ -228,7 +231,22 @@ const observedFacts = computed(() => [
       </div>
     </section>
 
-    <!-- Danger zone: the bucket deletion surface mounts here after merge.
-         BucketDangerZone mounts here after merge -->
+    <section class="surface lg:col-span-2">
+      <header class="flex items-center gap-2 border-b border-border px-5 py-4">
+        <Trash2 class="size-4 text-destructive" />
+        <h2 class="font-display text-sm font-semibold text-aruna-navy">Danger zone</h2>
+      </header>
+      <div class="space-y-3 px-5 py-4">
+        <p class="text-xs text-muted-foreground">
+          Deleting the bucket removes every object, every earlier version and every delete marker it
+          holds on this node, and nothing brings them back.
+        </p>
+        <BucketDangerZone
+          :bucket="props.bucket"
+          :node-id="props.nodeId"
+          @deleted="(result: DeletionResult) => emit('deleted', result)"
+        />
+      </div>
+    </section>
   </div>
 </template>

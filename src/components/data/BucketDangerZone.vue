@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// Bucket deletion has exactly one home. It is separated from the rest of the
-// bucket settings because it removes the bucket and everything in it on this
-// node, and it always goes through the shared delete dialog.
+// Bucket deletion has exactly one home: the danger zone of the bucket's
+// Storage overview, which carries the heading and the warning. It always goes
+// through the shared delete dialog.
 import Button from '@/components/ui/Button.vue'
 import RefusalNote from '@/components/ui/RefusalNote.vue'
 import DeleteDialog from '@/components/data/DeleteDialog.vue'
@@ -33,18 +33,7 @@ function open() {
 </script>
 
 <template>
-  <section class="space-y-3">
-    <div>
-      <h3 class="flex items-center gap-2 text-sm font-semibold text-destructive">
-        <Trash2 class="h-4 w-4" /> Danger zone
-      </h3>
-      <p class="mt-1 text-xs text-muted-foreground">
-        Deleting the bucket removes every object, every earlier version and every delete marker it
-        holds on this node, aborts its open uploads and removes the sync relationships that point at
-        it. Nothing brings them back.
-      </p>
-    </div>
-
+  <div class="space-y-3">
     <RefusalNote v-if="reason" tone="warning" :message="reason" />
     <Button variant="destructive" size="sm" :disabled="Boolean(reason)" @click="open">
       <Trash2 class="h-4 w-4" /> Delete bucket permanently…
@@ -55,5 +44,5 @@ function open() {
       @close="request = null"
       @completed="(result: DeletionResult) => emit('deleted', result)"
     />
-  </section>
+  </div>
 </template>

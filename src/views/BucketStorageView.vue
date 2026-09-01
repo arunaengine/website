@@ -4,7 +4,7 @@
 // write; the overview and the sync list are readable by anyone who reads the
 // bucket, and every observed line names the node it came from.
 import { computed, ref, watch } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
@@ -21,17 +21,23 @@ import BucketPolicySection from '@/components/storage/BucketPolicySection.vue'
 import StorageOverviewTab from '@/components/storage/StorageOverviewTab.vue'
 import SyncsTab from '@/components/storage/SyncsTab.vue'
 import { useAruna } from '@/composables/useAruna'
+import { useBuckets } from '@/composables/useBuckets'
+import { useBucketShortcuts } from '@/composables/useBucketShortcuts'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useRouteTab } from '@/composables/useRouteTab'
 import { useS3 } from '@/composables/useS3'
 import { isGroupAdmin } from '@/lib/groupAdmin'
 import type { GroupDetailResponse } from '@/lib/api'
+import type { DeletionResult } from '@/lib/deletion/request'
 import { ChevronLeft } from '@lucide/vue'
 
 const route = useRoute()
+const router = useRouter()
 const { currentUser, getGroup, isRealmAdmin } = useAruna()
 const { activeContext } = useS3()
 const realmNodes = useRealmNodes()
+const bucketList = useBuckets()
+const shortcuts = useBucketShortcuts()
 
 const bucket = computed(() => String(route.params.bucketId ?? ''))
 const nodeId = computed(() => {
@@ -82,6 +88,15 @@ function onSyncCreated() {
   syncReloadKey.value += 1
 }
 
+// The page it describes is gone, so it leaves for the list the same way the
+// data manager does after a bucket delete.
+async function onBucketDeleted(result: DeletionResult) {
+  if (!result.committed.length) return
+  shortcuts.remove(bucket.value, nodeId.value)
+  await router.push({ name: 'buckets', query: groupId.value ? { group: groupId.value } : {} })
+  await bucketList.refresh()
+}
+
 const browserLink = computed(() => ({
   name: 'bucket',
   params: { bucketId: bucket.value },
@@ -123,7 +138,12 @@ const browserLink = computed(() => ({
       </div>
 
       <TabsContent value="overview" class="mt-0">
-        <StorageOverviewTab :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
+        <StorageOverviewTab
+          :bucket="bucket"
+          :group-id="groupId"
+          :node-id="nodeId"
+          @deleted="onBucketDeleted"
+        />
       </TabsContent>
 
       <TabsContent v-if="backendVisible" value="backend" class="mt-0">
