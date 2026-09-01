@@ -7,11 +7,11 @@ import { useRouteTab } from './useRouteTab'
 const ALLOWED = ['node', 'local', 'danger'] as const
 
 /** Mounts a view that binds one route tab and hands the binding back. */
-async function mounted(initial: string): Promise<{ router: Router; tab: WritableComputedRef<string> }> {
+async function mounted(initial: string, key?: string): Promise<{ router: Router; tab: WritableComputedRef<string> }> {
   let tab!: WritableComputedRef<string>
   const View = defineComponent({
     setup() {
-      tab = useRouteTab(ALLOWED, 'node')
+      tab = useRouteTab(ALLOWED, 'node', key)
       return () => h('span', tab.value)
     },
   })
@@ -27,9 +27,9 @@ async function mounted(initial: string): Promise<{ router: Router; tab: Writable
 
 // The setter fires a router.replace it cannot await, so the test drains
 // microtasks until the navigation lands rather than waiting on a clock.
-async function navigated(router: Router, expected: string | undefined) {
+async function navigated(router: Router, expected: string | undefined, key = 'tab') {
   for (let round = 0; round < 20; round += 1) {
-    if (router.currentRoute.value.query.tab === expected) return
+    if (router.currentRoute.value.query[key] === expected) return
     await flush()
   }
 }
@@ -65,5 +65,22 @@ describe('route tab', () => {
     tab.value = 'nonsense'
     await navigated(router, 'nonsense')
     expect(router.currentRoute.value.query.tab).toBe('local')
+  })
+
+  it('reads and writes the key it was given', async () => {
+    // A tabbed component inside a tabbed page takes its own key, so neither
+    // binding reads or overwrites the other's value.
+    const { router, tab } = await mounted('/?tab=danger&inner=local', 'inner')
+    expect(tab.value).toBe('local')
+
+    tab.value = 'danger'
+    await navigated(router, 'danger', 'inner')
+    expect(router.currentRoute.value.query.inner).toBe('danger')
+    expect(router.currentRoute.value.query.tab).toBe('danger')
+
+    tab.value = 'node'
+    await navigated(router, undefined, 'inner')
+    expect(router.currentRoute.value.query.inner).toBeUndefined()
+    expect(router.currentRoute.value.query.tab).toBe('danger')
   })
 })
