@@ -10,8 +10,6 @@ const props = defineProps<{
   vocab: VocabIndex | null
   /** Properties another surface renders (the root form's own fields). */
   skip?: string[]
-  /** Properties shown but not editable here (the root's parts list). */
-  locked?: string[]
   issues?: LiveIssue[]
 }>()
 const emit = defineEmits<{
@@ -49,7 +47,6 @@ function issuesFor(property: string): LiveIssue[] {
       :property="property"
       :vocab="vocab"
       :issues="issuesFor(property)"
-      :locked="(locked ?? []).includes(property)"
       @update="(next) => emit('update', next)"
       @select="(id) => emit('select', id)"
     />

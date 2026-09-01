@@ -9,7 +9,13 @@ import { ExternalLink, Link2, Plus } from '@lucide/vue'
 
 // A reference is one of four things: nothing yet, an entity of this crate, a
 // URL outside it, or an identifier nothing answers to.
-const props = defineProps<{ draft: CrateDraft; value: string; label: string; locked?: boolean }>()
+const props = defineProps<{
+  draft: CrateDraft
+  value: string
+  label: string
+  /** One picker owns this property: it is offered instead of Create and Link. */
+  addLabel?: string
+}>()
 const emit = defineEmits<{
   (e: 'select', entityId: string): void
   (e: 'create'): void
@@ -23,21 +29,18 @@ const icon = computed(() => entityIcon(target.value, target.value?.id === rootId
 </script>
 
 <template>
-  <p
-    v-if="locked"
-    class="flex h-9 min-w-0 items-center gap-2 truncate rounded-md border border-dashed border-border px-2.5 text-sm"
-  >
-    <component :is="icon" class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-    <span class="min-w-0 flex-1 truncate">{{ target ? displayName(target) : value }}</span>
-  </p>
-
-  <div v-else-if="!value.trim()" class="flex items-center gap-2">
-    <Button variant="outline" size="sm" :aria-label="`Create a ${label}`" @click="emit('create')">
-      <Plus class="h-3.5 w-3.5" /> Create
+  <div v-if="!value.trim()" class="flex items-center gap-2">
+    <Button v-if="addLabel" variant="outline" size="sm" @click="emit('link')">
+      <Plus class="h-3.5 w-3.5" /> {{ addLabel }}
     </Button>
-    <Button variant="outline" size="sm" :aria-label="`Link a ${label}`" @click="emit('link')">
-      <Link2 class="h-3.5 w-3.5" /> Link
-    </Button>
+    <template v-else>
+      <Button variant="outline" size="sm" :aria-label="`Create a ${label}`" @click="emit('create')">
+        <Plus class="h-3.5 w-3.5" /> Create
+      </Button>
+      <Button variant="outline" size="sm" :aria-label="`Link a ${label}`" @click="emit('link')">
+        <Link2 class="h-3.5 w-3.5" /> Link
+      </Button>
+    </template>
   </div>
 
   <div v-else class="flex min-w-0 items-center gap-1">
@@ -72,7 +75,7 @@ const icon = computed(() => entityIcon(target.value, target.value?.id === rootId
     </p>
 
     <Button
-      v-if="unresolved"
+      v-if="unresolved && !addLabel"
       variant="ghost"
       size="icon-sm"
       :aria-label="`Create the missing ${label}`"

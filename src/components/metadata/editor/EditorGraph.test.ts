@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as Editor from '@/lib/crate/editor'
+import { addFilePart, linkReference } from '@/lib/crate/references'
 import { crateGraph, layoutGraph, NODE_HEIGHT } from '@/lib/crate/graph'
 
 // The graph tab draws exactly what this model answers, so the model is what
@@ -11,7 +12,7 @@ function seeded(): Editor.CrateDraft {
     kind: 'reference',
     value: person.entity.id,
   })
-  const withFile = Editor.addFilePart(authored, { id: 's3://bucket/reads.csv', name: 'reads.csv' })
+  const withFile = addFilePart(authored, { id: 's3://bucket/reads.csv', name: 'reads.csv' })
   return Editor.addValue(withFile, '#ada-lovelace', 'affiliation', {
     kind: 'reference',
     value: 'https://ror.org/03yrm5c26',
@@ -53,6 +54,15 @@ describe('crateGraph', () => {
     } as never)
 
     expect(model.edges.find((edge) => edge.property === 'author')?.label).toBe('The author')
+  })
+
+  it('draws one edge however often a connection is dragged', () => {
+    // Drag-connect writes through linkReference, so a repeat is not a new part.
+    const once = linkReference(seeded(), './', 'hasPart', '#ada-lovelace')
+    const twice = linkReference(once, './', 'hasPart', '#ada-lovelace')
+    const edges = crateGraph(twice).edges.filter((edge) => edge.property === 'hasPart')
+
+    expect(edges.map((edge) => edge.target)).toEqual(['s3://bucket/reads.csv', '#ada-lovelace'])
   })
 
   it('leaves an empty reference out of the graph', () => {

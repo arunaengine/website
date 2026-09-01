@@ -3,6 +3,7 @@ import { defineComponent, h } from 'vue'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { compileClientComponent, content, moduleDefault, mountApp } from '@/test/clientRender'
 import * as Editor from '@/lib/crate/editor'
+import { addFilePart } from '@/lib/crate/references'
 import { loadVocabIndex, type VocabIndex } from '@/lib/profiles/vocabulary'
 
 let vocab: VocabIndex
@@ -33,7 +34,7 @@ describe('PropertyEditor', () => {
   })
 
   it('leaves out the properties the card renders itself', async () => {
-    const draft = Editor.addFilePart(Editor.newDraft(), { id: 's3://bucket/one.csv', name: 'one.csv' })
+    const draft = addFilePart(Editor.newDraft(), { id: 's3://bucket/one.csv', name: 'one.csv' })
     const mounted = await mountApp(PropertyEditor, {
       props: { draft, entity: draft.entities[0], vocab, skip: ['hasPart'] },
     })

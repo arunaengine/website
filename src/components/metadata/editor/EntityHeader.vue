@@ -23,6 +23,8 @@ import {
   type CrateDraft,
   type DraftEntity,
 } from '@/lib/crate/editor'
+import { orphanedDataEntities } from '@/lib/crate/orphans'
+import { linkReference, rootParts } from '@/lib/crate/references'
 import { matchRorByName } from '@/lib/lookup/ror'
 import { truncateMiddle } from '@/lib/utils'
 import type { LookupHit } from '@/lib/lookup/types'
@@ -53,6 +55,16 @@ const uses = computed(() => referencesTo(props.draft, props.entity.id).map((use)
   name: displayName(findEntity(props.draft, use.entityId)) || use.entityId,
   label: propertyTerm(props.vocab, use.property)?.label ?? use.property,
 })))
+
+// The node refuses a data entity no hasPart chain reaches, so the two ways out
+// sit on the entity itself.
+const stranded = computed(() =>
+  orphanedDataEntities(props.draft).some((entity) => entity.id === props.entity.id))
+
+function linkAsPart() {
+  const target = rootParts(props.draft)
+  emit('update', linkReference(props.draft, target.entityId, target.property, props.entity.id))
+}
 
 function startIdEdit() {
   idDraft.value = props.entity.id
@@ -215,6 +227,15 @@ function applyRor() {
       </span>
     </Notice>
     <Notice v-else-if="rorNote" tone="info">{{ rorNote }}</Notice>
+
+    <Notice v-if="stranded" tone="warning">
+      Nothing in this dataset holds {{ displayName(entity) }}. The node refuses a file it cannot
+      reach from the dataset.
+      <span class="mt-1 flex gap-2">
+        <Button variant="outline" size="sm" @click="linkAsPart">Link as part</Button>
+        <Button variant="ghost" size="sm" @click="remove">Remove</Button>
+      </span>
+    </Notice>
 
     <Notice v-if="confirmRemove" tone="warning">
       Removing this also drops {{ uses.length === 1 ? '1 reference' : `${uses.length} references` }} to it.

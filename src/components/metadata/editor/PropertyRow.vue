@@ -9,10 +9,12 @@ import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
 import DropdownMenuSub from '@/components/ui/DropdownMenuSub.vue'
 import DropdownMenuSubTrigger from '@/components/ui/DropdownMenuSubTrigger.vue'
 import DropdownMenuSubContent from '@/components/ui/DropdownMenuSubContent.vue'
+import Notice from '@/components/ui/Notice.vue'
 import ValueInput from './ValueInput.vue'
 import ReferenceValue from './ReferenceValue.vue'
 import LinkEntityDialog from './LinkEntityDialog.vue'
 import AddEntityDialog from './AddEntityDialog.vue'
+import AddFilesDialog from './AddFilesDialog.vue'
 import IssueMark from './IssueMark.vue'
 import { ROW_ACTIONS, ROW_GRID, ROW_LABEL } from './grid'
 import {
@@ -34,6 +36,8 @@ import {
   type DraftValueKind,
   type LiveIssue,
 } from '@/lib/crate/editor'
+import { orphanAfterUnlink, unlinkReference } from '@/lib/crate/references'
+import { DATA_PICKER_LABEL, pickerFor } from '@/lib/crate/pickers'
 import type { VocabIndex } from '@/lib/profiles/vocabulary'
 import { Info, MoreHorizontal, Plus } from '@lucide/vue'
 
@@ -43,8 +47,6 @@ const props = defineProps<{
   property: string
   vocab: VocabIndex | null
   issues?: LiveIssue[]
-  /** The root's parts list is maintained by the files dialog, not by hand. */
-  locked?: boolean
   /** Root form field: one input is shown even before the property exists. */
   always?: boolean
   /** "More details" promotes a literal value into a linked entity of this type. */
@@ -57,7 +59,12 @@ const emit = defineEmits<{
 
 const linkFor = ref(-1)
 const createFor = ref(-1)
+const filesOpen = ref(false)
+// An unlink waiting for an answer about the data entity it would strand.
+const stranding = ref<{ index: number; dropRow: boolean; entity: DraftEntity } | null>(null)
 
+const picker = computed(() => pickerFor(props.property))
+const target = computed(() => ({ entityId: props.entity.id, property: props.property }))
 const term = computed(() => propertyTerm(props.vocab, props.property))
 const label = computed(() => term.value?.label ?? props.property)
 const kinds = computed(() => allowedKinds(props.vocab, props.property))
@@ -89,16 +96,62 @@ function promotable(value: DraftValue): boolean {
 }
 
 function addEntry(kind: DraftValueKind) {
+  if (kind === 'reference' && picker.value === 'data') {
+    filesOpen.value = true
+    return
+  }
   emit('update', addValue(props.draft, props.entity.id, props.property, defaultValue(kind)))
+}
+
+// Unlinking clears the value; Remove entry takes the row. Either way a data
+// entity nothing else reaches is one the node refuses, so it is offered too.
+function unlink(index: number, dropRow: boolean) {
+  const entity = orphanAfterUnlink(props.draft, props.entity.id, props.property, index)
+  if (entity) {
+    stranding.value = { index, dropRow, entity }
+    return
+  }
+  emit('update', unlinkReference(props.draft, props.entity.id, props.property, index, { dropRow }))
+}
+
+function resolveStranding(removeTarget: boolean) {
+  const pending = stranding.value
+  stranding.value = null
+  if (!pending) return
+  emit('update', unlinkReference(props.draft, props.entity.id, props.property, pending.index, {
+    dropRow: pending.dropRow,
+    removeTarget,
+  }))
 }
 
 // Removing the last value takes the property with it.
 function removeEntry(index: number) {
+  const value = values.value[index]
+  if (value?.kind === 'reference' && value.value.trim()) {
+    unlink(index, true)
+    return
+  }
   emit('update', removeValue(props.draft, props.entity.id, props.property, index))
 }
 
 function retype(index: number, kind: DraftValueKind) {
   emit('update', changeKind(props.draft, props.entity.id, props.property, index, kind))
+}
+
+// One picker owns some properties; every other reference offers Create and Link.
+function openLink(index: number) {
+  if (picker.value === 'data') filesOpen.value = true
+  else linkFor.value = index
+}
+
+function openCreate(index: number) {
+  if (picker.value === 'data') filesOpen.value = true
+  else createFor.value = index
+}
+
+function clearOrUnlink(index: number) {
+  if (values.value[index]?.kind === 'reference') unlink(index, false)
+  else set(index, '')
 }
 
 function link(id: string) {
@@ -138,10 +191,10 @@ function created(next: CrateDraft, entityId: string) {
             :draft="draft"
             :value="value.value"
             :label="label"
-            :locked="locked"
+            :add-label="picker === 'data' ? DATA_PICKER_LABEL : undefined"
             @select="(id) => emit('select', id)"
-            @create="createFor = index"
-            @link="linkFor = index"
+            @create="openCreate(index)"
+            @link="openLink(index)"
           />
           <ValueInput
             v-else
@@ -163,7 +216,7 @@ function created(next: CrateDraft, entityId: string) {
           More details
         </Button>
 
-        <DropdownMenu v-if="!locked && stored.length">
+        <DropdownMenu v-if="stored.length">
           <DropdownMenuTrigger as-child>
             <Button
               variant="ghost"
@@ -175,7 +228,7 @@ function created(next: CrateDraft, entityId: string) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem @select="set(index, '')">
+            <DropdownMenuItem @select="clearOrUnlink(index)">
               {{ value.kind === 'reference' ? 'Unlink' : 'Clear' }}
             </DropdownMenuItem>
             <DropdownMenuSub>
@@ -196,7 +249,7 @@ function created(next: CrateDraft, entityId: string) {
         </DropdownMenu>
       </div>
 
-      <div v-if="!locked && stored.length">
+      <div v-if="stored.length">
         <Button v-if="kinds.length === 1" variant="ghost" size="sm" class="h-7 px-2 text-xs" @click="addEntry(kinds[0])">
           <Plus class="h-3.5 w-3.5" /> Add entry
         </Button>
@@ -219,6 +272,26 @@ function created(next: CrateDraft, entityId: string) {
       <IssueMark :issues="issues ?? []" />
     </div>
 
+    <Notice v-if="stranding" tone="warning" class="col-span-full">
+      Nothing else in this dataset holds {{ displayName(stranding.entity) }}. The node refuses a file
+      it cannot reach from the dataset.
+      <span class="mt-1 flex gap-2">
+        <Button variant="destructive" size="sm" @click="resolveStranding(true)">
+          Remove {{ displayName(stranding.entity) }} too
+        </Button>
+        <Button variant="outline" size="sm" @click="resolveStranding(false)">Keep it</Button>
+      </span>
+    </Notice>
+
+    <AddFilesDialog
+      v-if="filesOpen"
+      open
+      :draft="draft"
+      :target="target"
+      :group-id="draft.groupId"
+      @update:open="(value) => (filesOpen = value)"
+      @update="(next) => emit('update', next)"
+    />
     <LinkEntityDialog
       v-if="linkFor >= 0"
       open

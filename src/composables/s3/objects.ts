@@ -39,6 +39,8 @@ export interface ObjectHead {
   contentType?: string
   etag?: string
   lastModified?: Date
+  /** Names the exact stored version, what a content lookup is keyed by. */
+  versionId?: string
   /** User metadata; the SDK strips the x-amz-meta- prefix from the keys. */
   metadata: Record<string, string>
 }
@@ -281,6 +283,7 @@ export async function headObject(bucket: string, key: string, nodeId?: string | 
     contentType: response.ContentType,
     etag: response.ETag?.replaceAll('"', ''),
     lastModified: response.LastModified,
+    versionId: response.VersionId,
     metadata: response.Metadata ?? {},
   }
 }

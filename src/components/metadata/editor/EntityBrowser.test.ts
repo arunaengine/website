@@ -14,10 +14,16 @@ import {
   type HostNode,
 } from '@/test/clientRender'
 import * as Editor from '@/lib/crate/editor'
+import * as References from '@/lib/crate/references'
 
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
 const EmptyStub = defineComponent(() => () => null)
 const BadgeStub = defineComponent((_, { attrs, slots }) => () => h('span', attrs, slots.default?.()))
+// The picker, reduced to the target it is bound to.
+const FilesStub = defineComponent({
+  props: { target: { type: Object, required: true } },
+  setup: (props) => () => h('p', `Picker ${(props.target as { entityId: string }).entityId} ${(props.target as { property: string }).property}`),
+})
 const InputStub = defineComponent({
   props: { modelValue: { type: [String, Number], default: '' } },
   emits: ['update:modelValue'],
@@ -38,14 +44,15 @@ const EntityBrowser = compileClientComponent(new URL('./EntityBrowser.vue', impo
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   './icons': { entityIcon: () => EmptyStub },
   './AddEntityDialog.vue': moduleDefault(EmptyStub),
-  './AddFilesDialog.vue': moduleDefault(EmptyStub),
+  './AddFilesDialog.vue': moduleDefault(FilesStub),
   '@/lib/crate/editor': Editor,
+  '@/lib/crate/references': References,
 })
 
 function seeded() {
   const named = Editor.updateValue(Editor.newDraft(), './', 'name', 0, 'Example dataset')
   const person = Editor.addEntity(named, { type: 'Person', name: 'Ada Lovelace' })
-  return Editor.addFilePart(person.draft, { id: 's3://bucket/reads.csv', name: 'reads.csv' })
+  return References.addFilePart(person.draft, { id: 's3://bucket/reads.csv', name: 'reads.csv' })
 }
 
 function mount(props: Record<string, unknown> = {}, selections: string[] = []) {
@@ -111,6 +118,14 @@ describe('EntityBrowser', () => {
     expect(button(mounted.root, 'Add entity')).toBeDefined()
     // The graph is switched from the page's own toggle, never from here.
     expect(() => button(mounted.root, 'Graph')).toThrow()
+    mounted.app.unmount()
+  })
+
+  it('points Add files at the dataset own parts list', async () => {
+    const mounted = await mount()
+
+    await click(button(mounted.root, 'Add files'))
+    expect(content(mounted.root)).toContain('Picker ./ hasPart')
     mounted.app.unmount()
   })
 

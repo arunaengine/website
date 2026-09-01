@@ -8,12 +8,12 @@ import Button from '@/components/ui/Button.vue'
 import { entityIcon } from './icons'
 import { crateGraph, layoutGraph, type GraphNode } from '@/lib/crate/graph'
 import {
-  addValue,
   findEntity,
   linkProperties,
   propertyKey,
   type CrateDraft,
 } from '@/lib/crate/editor'
+import { linkReference } from '@/lib/crate/references'
 import type { VocabIndex } from '@/lib/profiles/vocabulary'
 import { ExternalLink } from '@lucide/vue'
 
@@ -64,10 +64,7 @@ function pick(key: string) {
   const connection = pending.value
   pending.value = null
   if (!connection) return
-  emit('update', addValue(props.draft, connection.source, key, {
-    kind: 'reference',
-    value: connection.target,
-  }))
+  emit('update', linkReference(props.draft, connection.source, key, connection.target))
 }
 
 function iconFor(node: GraphNode) {

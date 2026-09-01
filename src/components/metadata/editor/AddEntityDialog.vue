@@ -15,7 +15,6 @@ import LookupBox from '@/components/metadata/LookupBox.vue'
 import TypeBrowser from './TypeBrowser.vue'
 import {
   addEntity,
-  addValue,
   autoId,
   displayName,
   findSimilarEntity,
@@ -31,6 +30,7 @@ import {
   type DraftEntity,
   type DraftValue,
 } from '@/lib/crate/editor'
+import { linkReference } from '@/lib/crate/references'
 import { defaultProperties, defaultRows } from '@/lib/crate/typeDefaults'
 import { fetchOrcidRecord, normalizeOrcidId } from '@/lib/lookup/orcid'
 import { fetchRorRecord, matchRorByName, normalizeRorId } from '@/lib/lookup/ror'
@@ -261,7 +261,7 @@ function create() {
     entity = created.entity
   }
   const linked = linkAs.value
-    ? addValue(base, rootId(base), linkAs.value, { kind: 'reference', value: entity.id })
+    ? linkReference(base, rootId(base), linkAs.value, entity.id)
     : base
   emit('created', { draft: linked, entity })
   emit('update:open', false)

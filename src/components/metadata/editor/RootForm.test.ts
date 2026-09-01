@@ -13,6 +13,8 @@ import {
   type HostNode,
 } from '@/test/clientRender'
 import * as Editor from '@/lib/crate/editor'
+import * as References from '@/lib/crate/references'
+import * as Pickers from '@/lib/crate/pickers'
 import * as Uri from '@/lib/profiles/uri'
 import * as Utils from '@/lib/utils'
 import * as Grid from './grid'
@@ -25,7 +27,13 @@ beforeAll(async () => {
 
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
 const EmptyStub = defineComponent(() => () => null)
+// The data picker, reduced to the target it is bound to.
+const FilesStub = defineComponent({
+  props: { target: { type: Object, required: true } },
+  setup: (props) => () => h('p', `Picker ${(props.target as { entityId: string }).entityId} ${(props.target as { property: string }).property}`),
+})
 const Passthrough = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
+const BadgeStub = defineComponent((_, { attrs, slots }) => () => h('span', attrs, slots.default?.()))
 const MenuItemStub = defineComponent({
   emits: ['select'],
   setup: (_, { attrs, emit, slots }) => () =>
@@ -62,6 +70,17 @@ const ValueInput = compileClientComponent(new URL('./ValueInput.vue', import.met
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
 })
 
+const ReferenceValue = compileClientComponent(new URL('./ReferenceValue.vue', import.meta.url), {
+  vue: VueRuntime,
+  '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
+  '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
+  '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+  './icons': { entityIcon: () => EmptyStub },
+  '@/lib/crate/editor': Editor,
+  '@/lib/profiles/uri': Uri,
+  '@/lib/utils': Utils,
+})
+
 const PropertyRow = compileClientComponent(new URL('./PropertyRow.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
@@ -75,9 +94,13 @@ const PropertyRow = compileClientComponent(new URL('./PropertyRow.vue', import.m
   '@/components/ui/DropdownMenuSubTrigger.vue': moduleDefault(Passthrough),
   '@/components/ui/DropdownMenuSubContent.vue': moduleDefault(Passthrough),
   './ValueInput.vue': moduleDefault(ValueInput),
-  './ReferenceValue.vue': moduleDefault(EmptyStub),
+  './ReferenceValue.vue': moduleDefault(ReferenceValue),
   './LinkEntityDialog.vue': moduleDefault(EmptyStub),
   './AddEntityDialog.vue': moduleDefault(EmptyStub),
+  './AddFilesDialog.vue': moduleDefault(FilesStub),
+  '@/components/ui/Notice.vue': moduleDefault(Passthrough),
+  '@/lib/crate/references': References,
+  '@/lib/crate/pickers': Pickers,
   './IssueMark.vue': moduleDefault(EmptyStub),
   './grid': Grid,
   '@/lib/crate/editor': Editor,
@@ -148,6 +171,18 @@ describe('RootForm', () => {
 
     expect(content(mounted.root)).toContain('More properties')
     expect(field(mounted.root, 'Publisher').props.value).toBe('ACME Research')
+    mounted.app.unmount()
+  })
+
+  it('lists the parts as an ordinary row with its own menu', async () => {
+    const draft = References.addFilePart(Editor.newDraft(), { id: 's3://bucket/one.csv', name: 'one.csv' })
+    const mounted = await mount([], draft)
+    const text = content(mounted.root)
+
+    expect(text).toContain('one.csv')
+    for (const action of ['Unlink', 'Change type', 'Remove entry', 'Add entry']) {
+      expect(text).toContain(action)
+    }
     mounted.app.unmount()
   })
 

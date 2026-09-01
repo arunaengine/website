@@ -7,6 +7,7 @@ import RootForm from './RootForm.vue'
 import EntityHeader from './EntityHeader.vue'
 import PropertyEditor from './PropertyEditor.vue'
 import AddPropertyDialog from './AddPropertyDialog.vue'
+import AddFilesDialog from './AddFilesDialog.vue'
 import {
   addValue,
   defaultValue,
@@ -17,6 +18,7 @@ import {
   type DraftValueKind,
   type LiveIssue,
 } from '@/lib/crate/editor'
+import { pickerFor } from '@/lib/crate/pickers'
 import type { VocabIndex } from '@/lib/profiles/vocabulary'
 import { Plus } from '@lucide/vue'
 
@@ -37,13 +39,20 @@ const emit = defineEmits<{
 }>()
 
 const propertyOpen = ref(false)
+const filesFor = ref('')
 
 const entity = computed(() => findEntity(props.draft, props.selected))
 const isRoot = computed(() => props.selected === rootId(props.draft))
 const json = computed(() => JSON.stringify(toRoCrate(props.draft), null, 2))
 
+// A property owned by a picker is added by picking a value, never as an empty
+// row nothing could fill or remove.
 function addProperty(picked: { key: string; kind: DraftValueKind }) {
   if (!entity.value) return
+  if (pickerFor(picked.key) === 'data') {
+    filesFor.value = picked.key
+    return
+  }
   emit('update', addValue(props.draft, entity.value.id, picked.key, defaultValue(picked.kind)))
 }
 </script>
@@ -90,6 +99,15 @@ function addProperty(picked: { key: string; kind: DraftValueKind }) {
         :vocab="vocab"
         @update:open="(value) => (propertyOpen = value)"
         @pick="addProperty"
+      />
+      <AddFilesDialog
+        v-if="filesFor"
+        open
+        :draft="draft"
+        :target="{ entityId: entity.id, property: filesFor }"
+        :group-id="draft.groupId"
+        @update:open="(value) => { if (!value) filesFor = '' }"
+        @update="(next) => emit('update', next)"
       />
     </div>
 

@@ -15,6 +15,7 @@ import {
   type DraftEntity,
   type LiveIssue,
 } from '@/lib/crate/editor'
+import { rootParts } from '@/lib/crate/references'
 import type { VocabIndex } from '@/lib/profiles/vocabulary'
 import { ChevronDown, ChevronRight, Plus, Upload } from '@lucide/vue'
 
@@ -159,6 +160,7 @@ function pick(entityId: string) {
       v-if="filesOpen"
       :open="filesOpen"
       :draft="draft"
+      :target="rootParts(draft)"
       :group-id="groupId"
       @update:open="(value) => (filesOpen = value)"
       @update="(next) => emit('update', next)"

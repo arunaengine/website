@@ -21,18 +21,44 @@ import SubcratePickerDialog from '@/components/metadata/SubcratePickerDialog.vue
 import { useAruna } from '@/composables/useAruna'
 import { useS3, s3ErrorMessage, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
 import { useUploadQueue } from '@/composables/useUploadQueue'
-import { addFilePart, addSubcratePart, partIds, type CrateDraft } from '@/lib/crate/editor'
+import { externalContentReference, type ContentIdentityOptions } from '@/lib/contentIdentity'
+import { dataEntityIdentity, objectLocation } from '@/lib/crate/dataIdentity'
+import {
+  addFilePart,
+  addSubcratePart,
+  linkReference,
+  type FilePart,
+  type ReferenceTarget,
+} from '@/lib/crate/references'
+import {
+  displayName,
+  findEntity,
+  isDataType,
+  orderedEntities,
+  rootId,
+  typeLabel,
+  type CrateDraft,
+  type DraftEntity,
+} from '@/lib/crate/editor'
+import { isAbsoluteUri } from '@/lib/profiles/uri'
 import type { MetadataDocumentListItem } from '@/lib/api'
 import { formatBytes } from '@/lib/utils'
 import { FileJson2 } from '@lucide/vue'
 
-const props = defineProps<{ open: boolean; draft: CrateDraft; groupId?: string }>()
+// The data entity picker: every source that can become a part, writing into
+// the one property that asked for it.
+const props = defineProps<{
+  open: boolean
+  draft: CrateDraft
+  target: ReferenceTarget
+  groupId?: string
+}>()
 const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
   (e: 'update', draft: CrateDraft): void
 }>()
 
-const { apiBaseUrl } = useAruna()
+const { apiBaseUrl, authToken, nodeInfo } = useAruna()
 const s3 = useS3()
 const queue = useUploadQueue()
 
@@ -60,13 +86,42 @@ const bucketError = ref('')
 const uploading = ref<number[]>([])
 const linked = ref(new Set<number>())
 const datasetsOpen = ref(false)
+const query = ref('')
+const url = ref('')
+const urlName = ref('')
 
 const uploads = computed(() => queue.items.value.filter((item) => uploading.value.includes(item.id)))
+const targetEntity = computed(() => findEntity(props.draft, props.target.entityId))
+const targetName = computed(() =>
+  (props.target.entityId === rootId(props.draft) ? '' : displayName(targetEntity.value)))
+const held = computed(() => new Set((targetEntity.value?.properties[props.target.property] ?? [])
+  .filter((value) => value.kind === 'reference')
+  .map((value) => value.value)))
+
+// Everything already here that is not the target itself: data entities first,
+// the rest still reachable because a parts list accepts any entity.
+const listed = computed(() => {
+  const text = query.value.trim().toLowerCase()
+  const candidates = orderedEntities(props.draft).filter((entity) => {
+    if (entity.id === props.target.entityId || entity.id === rootId(props.draft)) return false
+    if (held.value.has(entity.id)) return false
+    if (!text) return true
+    return `${displayName(entity)} ${entity.id} ${entity.types.join(' ')}`.toLowerCase().includes(text)
+  })
+  return [
+    ...candidates.filter((entity) => entity.types.some(isDataType)),
+    ...candidates.filter((entity) => !entity.types.some(isDataType)),
+  ]
+})
+const urlInvalid = computed(() => Boolean(url.value.trim()) && !isAbsoluteUri(url.value.trim()))
 
 watch(() => props.open, (open) => {
   if (!open) return
   tab.value = 'bucket'
   prefix.value = ''
+  query.value = ''
+  url.value = ''
+  urlName.value = ''
   uploading.value = []
   linked.value = new Set()
   void loadBuckets()
@@ -87,23 +142,45 @@ function formatOf(name: string): string | undefined {
   return FORMATS[name.split('.').pop()?.toLowerCase() ?? '']
 }
 
-function addObjects(selection: { bucket: string; objects: ObjectEntry[]; folders: FolderEntry[] }) {
+// What the node needs to answer with a content identity; without it the
+// location stays the identity.
+function identityOptions(): ContentIdentityOptions {
+  return {
+    realmId: nodeInfo.value?.node.realm_id ?? null,
+    nodeId: nodeInfo.value?.node.peer_id ?? null,
+    apiBaseUrl: apiBaseUrl.value,
+    authToken: authToken.value ?? null,
+    getVersionId: async (name: string, key: string) => (await s3.headObject(name, key)).versionId ?? null,
+  }
+}
+
+async function filePart(bucketName: string, key: string, name: string, size?: number): Promise<FilePart> {
+  const identity = await dataEntityIdentity(bucketName, key, identityOptions())
+  return {
+    id: identity.id,
+    name,
+    contentUrl: identity.contentUrl,
+    ...(formatOf(name) ? { encodingFormat: formatOf(name) } : {}),
+    ...(size === undefined ? {} : { contentSize: String(size) }),
+  }
+}
+
+function apply(parts: FilePart[]) {
   let next = props.draft
+  for (const part of parts) next = addFilePart(next, part, props.target)
+  emit('update', next)
+}
+
+async function addObjects(selection: { bucket: string; objects: ObjectEntry[]; folders: FolderEntry[] }) {
+  const parts: FilePart[] = []
   for (const object of selection.objects) {
-    const location = `s3://${selection.bucket}/${object.key}`
-    next = addFilePart(next, {
-      id: location,
-      name: object.name,
-      contentUrl: location,
-      ...(formatOf(object.name) ? { encodingFormat: formatOf(object.name) } : {}),
-      ...(object.size === undefined ? {} : { contentSize: String(object.size) }),
-    })
+    parts.push(await filePart(selection.bucket, object.key, object.name, object.size))
   }
   for (const folder of selection.folders) {
-    const location = `s3://${selection.bucket}/${folder.prefix}`
-    next = addFilePart(next, { id: location, name: folder.name, type: 'Dataset', contentUrl: location })
+    const location = objectLocation(selection.bucket, folder.prefix)
+    parts.push({ id: location, name: folder.name, type: 'Dataset', contentUrl: location })
   }
-  emit('update', next)
+  apply(parts)
 }
 
 function upload(files: File[]) {
@@ -122,25 +199,18 @@ function upload(files: File[]) {
 }
 
 // An upload becomes a part only once the object exists on the node.
-watch(uploads, (items) => {
-  let next = props.draft
-  let changed = false
-  for (const item of items) {
-    if (item.state !== 'done' || linked.value.has(item.id)) continue
+watch(uploads, (items) => void linkUploads(items), { deep: true })
+
+async function linkUploads(items: Array<{ id: number; bucket: string; key: string; name: string; size: number; state: string }>) {
+  const ready = items.filter((item) => item.state === 'done' && !linked.value.has(item.id))
+  if (!ready.length) return
+  const parts: FilePart[] = []
+  for (const item of ready) {
     linked.value.add(item.id)
-    const location = `s3://${item.bucket}/${item.key}`
-    if (partIds(next).has(location)) continue
-    changed = true
-    next = addFilePart(next, {
-      id: location,
-      name: item.name,
-      contentUrl: location,
-      ...(formatOf(item.name) ? { encodingFormat: formatOf(item.name) } : {}),
-      contentSize: String(item.size),
-    })
+    parts.push(await filePart(item.bucket, item.key, item.name, item.size))
   }
-  if (changed) emit('update', next)
-}, { deep: true })
+  apply(parts)
+}
 
 function addDatasets(items: MetadataDocumentListItem[]) {
   let next = props.draft
@@ -151,10 +221,24 @@ function addDatasets(items: MetadataDocumentListItem[]) {
       name: item.document_path,
       identifier: item.document_id,
       subjectOf: `${apiBaseUrl.value.replace(/\/+$/, '')}/metadata/${encodeURIComponent(item.document_id)}/rocrate`,
-    })
+    }, props.target)
   }
   datasetsOpen.value = false
   emit('update', next)
+}
+
+function linkExisting(entity: DraftEntity) {
+  emit('update', linkReference(props.draft, props.target.entityId, props.target.property, entity.id))
+}
+
+function addUrl() {
+  const value = url.value.trim()
+  if (!value || urlInvalid.value) return
+  const reference = externalContentReference(value)
+  const name = urlName.value.trim() || value
+  url.value = ''
+  urlName.value = ''
+  apply([{ id: reference.id, name }])
 }
 </script>
 
@@ -164,8 +248,9 @@ function addDatasets(items: MetadataDocumentListItem[]) {
       <DialogHeader>
         <DialogTitle>Add files</DialogTitle>
         <DialogDescription>
-          Reference objects stored in a bucket, upload new ones, or link another dataset. Everything
-          added here becomes a part of this dataset.
+          Reference objects stored in a bucket, upload new ones, link another dataset, or point at
+          something already here. Everything added becomes a part of
+          {{ targetName ? targetName : 'this dataset' }}.
         </DialogDescription>
       </DialogHeader>
 
@@ -174,6 +259,8 @@ function addDatasets(items: MetadataDocumentListItem[]) {
           <TabsTrigger value="bucket">From a bucket</TabsTrigger>
           <TabsTrigger value="upload">Upload to a bucket</TabsTrigger>
           <TabsTrigger value="dataset">Another dataset</TabsTrigger>
+          <TabsTrigger value="crate">In this dataset</TabsTrigger>
+          <TabsTrigger value="url">External URL</TabsTrigger>
         </TabsList>
 
         <TabsContent value="bucket">
@@ -221,6 +308,50 @@ function addDatasets(items: MetadataDocumentListItem[]) {
             <FileJson2 class="h-3.5 w-3.5" /> Choose a dataset
           </Button>
         </TabsContent>
+
+        <TabsContent value="crate" class="space-y-2">
+          <Input v-model="query" aria-label="Search this dataset" placeholder="Search this dataset" />
+          <ul v-if="listed.length" class="max-h-64 divide-y divide-border overflow-y-auto rounded-md border border-border">
+            <li v-for="entity in listed" :key="entity.id">
+              <button
+                type="button"
+                class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-muted/40"
+                @click="linkExisting(entity)"
+              >
+                <span class="min-w-0 flex-1 truncate font-medium text-foreground">{{ displayName(entity) }}</span>
+                <span class="shrink-0 text-muted-foreground">{{ entity.types.map(typeLabel).join(', ') }}</span>
+              </button>
+            </li>
+          </ul>
+          <p v-else class="px-1 py-2 text-xs text-muted-foreground">
+            Nothing else in this dataset can be added here yet.
+          </p>
+        </TabsContent>
+
+        <TabsContent value="url" class="space-y-3">
+          <p class="text-xs text-muted-foreground">
+            A file that lives outside this node stays where it is; only its address is recorded.
+          </p>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label class="text-xs font-medium text-foreground">Address</label>
+              <Input
+                v-model="url"
+                class="mt-1"
+                aria-label="External URL"
+                placeholder="https://example.org/reads.fastq.gz"
+                :invalid="urlInvalid ? 'error' : undefined"
+                @keydown.enter="addUrl"
+              />
+            </div>
+            <div>
+              <label class="text-xs font-medium text-foreground">Name</label>
+              <Input v-model="urlName" class="mt-1" aria-label="External file name" placeholder="Optional" />
+            </div>
+          </div>
+          <p v-if="urlInvalid" class="text-[11px] text-destructive">That is not an absolute URL.</p>
+          <Button size="sm" :disabled="!url.trim() || urlInvalid" @click="addUrl">Add file</Button>
+        </TabsContent>
       </Tabs>
 
       <DialogFooter>
@@ -229,7 +360,7 @@ function addDatasets(items: MetadataDocumentListItem[]) {
 
       <SubcratePickerDialog
         v-model:open="datasetsOpen"
-        :excluded-iris="[...partIds(draft)]"
+        :excluded-iris="[...held]"
         @select="addDatasets"
       />
     </DialogContent>

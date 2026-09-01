@@ -13,6 +13,8 @@ import {
   type HostNode,
 } from '@/test/clientRender'
 import * as Editor from '@/lib/crate/editor'
+import * as References from '@/lib/crate/references'
+import * as Pickers from '@/lib/crate/pickers'
 import * as Uri from '@/lib/profiles/uri'
 import * as Utils from '@/lib/utils'
 import * as Grid from './grid'
@@ -25,6 +27,11 @@ beforeAll(async () => {
 
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
 const EmptyStub = defineComponent(() => () => null)
+// The data picker, reduced to the target it is bound to.
+const FilesStub = defineComponent({
+  props: { target: { type: Object, required: true } },
+  setup: (props) => () => h('p', `Picker ${(props.target as { entityId: string }).entityId} ${(props.target as { property: string }).property}`),
+})
 const Passthrough = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
 const BadgeStub = defineComponent((_, { attrs, slots }) => () => h('span', attrs, slots.default?.()))
 const MenuItemStub = defineComponent({
@@ -94,6 +101,10 @@ const PropertyRow = compileClientComponent(new URL('./PropertyRow.vue', import.m
   './ReferenceValue.vue': moduleDefault(ReferenceValue),
   './LinkEntityDialog.vue': moduleDefault(EmptyStub),
   './AddEntityDialog.vue': moduleDefault(EmptyStub),
+  './AddFilesDialog.vue': moduleDefault(FilesStub),
+  '@/components/ui/Notice.vue': moduleDefault(Passthrough),
+  '@/lib/crate/references': References,
+  '@/lib/crate/pickers': Pickers,
   './IssueMark.vue': moduleDefault(IssueMarkStub),
   './grid': Grid,
   '@/lib/crate/editor': Editor,
@@ -218,6 +229,53 @@ describe('PropertyRow', () => {
     expect(updates[0].entities[0].properties.license).toEqual([
       { kind: 'url', value: 'https://creativecommons.org/publicdomain/zero/1.0/' },
     ])
+    mounted.app.unmount()
+  })
+
+  it('gives the parts row a menu and the data picker', async () => {
+    const draft = References.addFilePart(seeded(), { id: 's3://bucket/one.csv', name: 'one.csv' })
+    const mounted = await mount('hasPart', [], draft)
+
+    expect(labels(mounted.root)).toEqual(expect.arrayContaining(['Unlink', 'Remove entry', 'Add entry']))
+
+    await click(button(mounted.root, 'Add entry'))
+    expect(content(mounted.root)).toContain('Picker ./ hasPart')
+    mounted.app.unmount()
+  })
+
+  it('offers the picker instead of Create and Link on an empty parts row', async () => {
+    const draft = Editor.addValue(seeded(), './', 'hasPart', { kind: 'reference', value: '' })
+    const mounted = await mount('hasPart', [], draft)
+
+    expect(labels(mounted.root)).toContain('Add files')
+    expect(labels(mounted.root)).not.toContain('Create')
+    mounted.app.unmount()
+  })
+
+  it('offers to remove the file that unlinking would strand', async () => {
+    const updates: Editor.CrateDraft[] = []
+    const draft = References.addFilePart(seeded(), { id: 's3://bucket/one.csv', name: 'one.csv' })
+    const mounted = await mount('hasPart', updates, draft)
+
+    await click(button(mounted.root, 'Unlink'))
+    expect(updates).toHaveLength(0)
+    expect(content(mounted.root)).toContain('Nothing else in this dataset holds one.csv')
+
+    await click(button(mounted.root, 'Remove one.csv too'))
+    expect(Editor.findEntity(updates[0], 's3://bucket/one.csv')).toBeUndefined()
+    mounted.app.unmount()
+  })
+
+  it('keeps the file when only the link is dropped', async () => {
+    const updates: Editor.CrateDraft[] = []
+    const draft = References.addFilePart(seeded(), { id: 's3://bucket/one.csv', name: 'one.csv' })
+    const mounted = await mount('hasPart', updates, draft)
+
+    await click(button(mounted.root, 'Unlink'))
+    await click(button(mounted.root, 'Keep it'))
+
+    expect(Editor.findEntity(updates[0], 's3://bucket/one.csv')).toBeDefined()
+    expect(updates[0].entities[0].properties.hasPart).toEqual([{ kind: 'reference', value: '' }])
     mounted.app.unmount()
   })
 

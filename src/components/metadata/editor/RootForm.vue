@@ -180,7 +180,6 @@ function addKeyword() {
         :entity="root"
         :vocab="vocab"
         :skip="ROOT_FORM_PROPERTIES"
-        :locked="['hasPart']"
         :issues="issues"
         @update="(next) => emit('update', next)"
         @select="(entityId) => emit('select', entityId)"
