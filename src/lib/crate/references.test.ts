@@ -5,6 +5,7 @@ import {
   linkReference,
   orphanAfterUnlink,
   rootParts,
+  setReference,
   unlinkReference,
 } from './references'
 import { orphanedDataEntities } from './orphans'
@@ -55,6 +56,26 @@ describe('linkReference', () => {
 
   it('points the dataset at its own parts list by default', () => {
     expect(rootParts(newDraft())).toEqual({ entityId: './', property: 'hasPart' })
+  })
+})
+
+describe('setReference', () => {
+  it('changes one row without leaving a second entry for the same target', () => {
+    const two = linkReference(seeded(), './', 'hasPart', 's3://bucket/two.csv')
+    const same = setReference(two, './', 'hasPart', 1, 's3://bucket/one.csv')
+
+    expect(findEntity(same, './')?.properties.hasPart).toEqual([
+      { kind: 'reference', value: 's3://bucket/one.csv' },
+    ])
+  })
+
+  it('fills an empty row the property already carries', () => {
+    const prompted = addValue(newDraft(), './', 'author', { kind: 'reference', value: '' })
+    const linked = setReference(prompted, './', 'author', 0, '#ada-lovelace')
+
+    expect(findEntity(linked, './')?.properties.author).toEqual([
+      { kind: 'reference', value: '#ada-lovelace' },
+    ])
   })
 })
 

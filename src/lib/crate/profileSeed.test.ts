@@ -131,6 +131,7 @@ describe('profile seeding', () => {
       name: 'Genomics',
       properties: ['identifier', 'author'],
       types: ['http://schema.org/Person'],
+      contents: [],
     })
   })
 })

@@ -47,6 +47,23 @@ export function linkReference(
     (index === blank ? { kind: 'reference' as const, value: target } : value)))
 }
 
+/** Points one row at a target, dropping any other row that already held it. */
+export function setReference(
+  draft: CrateDraft,
+  entityId: string,
+  property: string,
+  index: number,
+  targetId: string,
+): CrateDraft {
+  const list = findEntity(draft, entityId)?.properties[property] ?? []
+  if (!list.length) return linkReference(draft, entityId, property, targetId)
+  const kept = list
+    .map((value, position) => (position === index ? { kind: 'reference' as const, value: targetId } : value))
+    .filter((value, position) =>
+      position === index || !(value.kind === 'reference' && value.value === targetId))
+  return setProperty(draft, entityId, property, kept)
+}
+
 /** The data entity that would stop being reachable once this reference goes. */
 export function orphanAfterUnlink(
   draft: CrateDraft,

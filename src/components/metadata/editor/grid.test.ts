@@ -3,6 +3,8 @@ import { defineComponent, h } from 'vue'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { compileClientComponent, moduleDefault, mountApp, nodes } from '@/test/clientRender'
 import * as Editor from '@/lib/crate/editor'
+import * as References from '@/lib/crate/references'
+import * as Pickers from '@/lib/crate/pickers'
 import * as Grid from './grid'
 import { loadVocabIndex, type VocabIndex } from '@/lib/profiles/vocabulary'
 
@@ -46,6 +48,10 @@ const PropertyRow = compileClientComponent(new URL('./PropertyRow.vue', import.m
   './ReferenceValue.vue': moduleDefault(EmptyStub),
   './LinkEntityDialog.vue': moduleDefault(EmptyStub),
   './AddEntityDialog.vue': moduleDefault(EmptyStub),
+  './AddFilesDialog.vue': moduleDefault(EmptyStub),
+  '@/components/ui/Notice.vue': moduleDefault(Passthrough),
+  '@/lib/crate/references': References,
+  '@/lib/crate/pickers': Pickers,
 })
 
 const RootForm = compileClientComponent(new URL('./RootForm.vue', import.meta.url), {

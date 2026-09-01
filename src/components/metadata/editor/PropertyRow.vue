@@ -36,7 +36,7 @@ import {
   type DraftValueKind,
   type LiveIssue,
 } from '@/lib/crate/editor'
-import { orphanAfterUnlink, unlinkReference } from '@/lib/crate/references'
+import { orphanAfterUnlink, setReference, unlinkReference } from '@/lib/crate/references'
 import { DATA_PICKER_LABEL, pickerFor } from '@/lib/crate/pickers'
 import type { VocabIndex } from '@/lib/profiles/vocabulary'
 import { Info, MoreHorizontal, Plus } from '@lucide/vue'
@@ -157,14 +157,14 @@ function clearOrUnlink(index: number) {
 function link(id: string) {
   const index = linkFor.value
   linkFor.value = -1
-  if (index >= 0) set(index, id)
+  if (index >= 0) emit('update', setReference(props.draft, props.entity.id, props.property, index, id))
 }
 
 function created(next: CrateDraft, entityId: string) {
   const index = createFor.value
   createFor.value = -1
   if (index < 0) return
-  emit('update', updateValue(next, props.entity.id, props.property, index, entityId))
+  emit('update', setReference(next, props.entity.id, props.property, index, entityId))
 }
 </script>
 

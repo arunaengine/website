@@ -274,12 +274,36 @@ describe('live issues', () => {
   })
 
   it('passes on what a selected profile asks for', () => {
-    const profile = { name: 'Genomics', properties: ['identifier'], types: ['Person', 'Place'] }
+    const profile = { name: 'Genomics', properties: ['identifier'], types: ['Person', 'Place'], contents: [] }
     const keys = liveIssues(seeded(), null, profile).map((issue) => issue.key)
 
     expect(keys).toContain('profile:identifier')
     expect(keys).toContain('profileType:Place')
     expect(keys).not.toContain('profileType:Person')
+  })
+
+  it('names the entry a profile wants the parts list to hold', () => {
+    // A required instance is checked against the row, not against a hidden list.
+    const profile = {
+      name: 'Genomics',
+      properties: [],
+      types: [],
+      contents: [{
+        id: 'parts',
+        label: 'Has part',
+        description: '',
+        kind: 'entity' as const,
+        propertyUri: 'http://schema.org/hasPart',
+        valueName: 'hasPart',
+        obligation: 'MUST' as const,
+        requiredInstances: [{ name: 'index.html', hint: 'The landing page.' }],
+      }],
+    }
+    const issue = liveIssues(seeded(), null, profile).find((entry) => entry.key.startsWith('contents:'))
+
+    expect(issue).toMatchObject({ severity: 'error', property: 'hasPart' })
+    expect(issue?.message).toContain('index.html')
+    expect(issue?.message).toContain('The landing page.')
   })
 
   it('reports a file the dataset cannot reach, as the node would', () => {

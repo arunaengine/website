@@ -8,6 +8,8 @@ import { rorOf } from '@/lib/identifiers'
 import { slugify, uniqueId } from '@/lib/profiles/emit'
 import { isAbsoluteUri, isRecord, normalizeTypeUri, SCHEMA_ORG, termNameFromUri } from '@/lib/profiles/uri'
 import { datatypeKind, type VocabIndex, type VocabTerm } from '@/lib/profiles/vocabulary'
+import { validateRequiredInstances } from '@/lib/profiles/validate'
+import type { ProfilePropertyRule } from '@/lib/profiles/types'
 import { orphanedDataEntities } from './orphans'
 import { contextIri, contextVersion, DEFAULT_CRATE_VERSION, normalizeContext, specIri } from './version'
 
@@ -651,6 +653,15 @@ export interface ProfileExpectation {
   name: string
   properties: string[]
   types: string[]
+  /** List rules naming the entries their property must contain, e.g. hasPart. */
+  contents: ProfilePropertyRule[]
+}
+
+/** The rows of one property as the profile validator reads them. */
+function ruleEntries(draft: CrateDraft, property: string): Array<{ id: string; name?: string }> {
+  return (rootEntity(draft)?.properties[property] ?? [])
+    .filter((value) => value.value.trim())
+    .map((value) => ({ id: value.value, name: entityName(findEntity(draft, value.value)) || undefined }))
 }
 
 /** Everything the editor can say about a draft on its own, all advisory. */
@@ -747,6 +758,18 @@ export function liveIssues(
       entityId: rootId(draft),
       property,
     })
+  }
+  // What a profile asks a parts list to contain, on the row that holds it.
+  for (const rule of profile?.contents ?? []) {
+    for (const found of validateRequiredInstances(rule, ruleEntries(draft, rule.valueName))) {
+      issues.push({
+        key: `contents:${rule.valueName}:${found.message}`,
+        severity: found.severity,
+        message: `${profile?.name}: ${found.message}${found.hint ? ` ${found.hint}` : ''}`,
+        entityId: rootId(draft),
+        property: rule.valueName,
+      })
+    }
   }
   for (const type of profile?.types ?? []) {
     const label = typeLabel(type)

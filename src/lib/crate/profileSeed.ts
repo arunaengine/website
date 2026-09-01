@@ -63,6 +63,7 @@ export function profileExpectation(profile: MetadataProfile): ProfileExpectation
     name: profile.name,
     properties: rules.map((rule) => rule.valueName),
     types: [...new Set(rules.filter((rule) => rule.kind === 'entity').flatMap((rule) => rule.entityTypes ?? []))],
+    contents: profile.propertyRules.filter((rule) => rule.requiredInstances?.length),
   }
 }
 
