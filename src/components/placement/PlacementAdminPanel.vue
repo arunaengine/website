@@ -131,7 +131,7 @@ function createStrategy() {
   selectedStrategyId.value = ''
   strategyDraft.value = {
     strategy_id: '',
-    name: 'New strategy',
+    name: 'New rule',
     replica_count: 3,
     distinct_locations: true,
     affinity: [],

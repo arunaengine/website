@@ -112,7 +112,7 @@ async function save() {
     <EmptyState
       v-if="hidden"
       compact
-      title="Storage routing is only visible to admins of the group that owns this bucket."
+      title="The rules for this bucket are only visible to admins of the group that owns it."
     />
     <Skeleton v-else-if="loading && !rules.length" class="h-24" />
     <ErrorPanel v-else-if="loadError" :message="loadError" @retry="load" />
@@ -160,7 +160,7 @@ async function save() {
           v-if="!rules.length"
           compact
           title="No rules yet."
-          description="New files follow the group default, and then this node's own routing."
+          description="New uploads follow the group default, and then this node's own default."
         />
       </div>
 
@@ -174,10 +174,11 @@ async function save() {
           :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
           @click="save"
         >
-          {{ saving ? 'Saving…' : 'Save routing' }}
+          {{ saving ? 'Saving…' : 'Save rules' }}
         </Button>
       </div>
 
+      <p v-if="writesDisabled" class="text-xs text-muted-foreground">{{ OFFLINE_WRITE_HINT }}</p>
       <p v-if="duplicate" class="text-xs text-destructive">
         Two rules use the same key and match type; the node rejects that.
       </p>

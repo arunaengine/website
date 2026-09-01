@@ -13,7 +13,7 @@ const props = withDefaults(
     allowDefault?: boolean
     ariaLabel?: string
   }>(),
-  { allowDefault: false, ariaLabel: 'Routing target' },
+  { allowDefault: false, ariaLabel: 'Storage backend' },
 )
 const emit = defineEmits<{ (e: 'update:modelValue', v: RoutingTarget | null): void }>()
 

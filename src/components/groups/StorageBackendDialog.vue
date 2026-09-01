@@ -157,7 +157,8 @@ async function submit() {
           {{ isEdit ? 'Edit storage backend' : 'Add storage backend' }}
         </DialogTitle>
         <DialogDescription>
-          Files routed here are written to storage your group runs, not to this node's own storage.
+          New uploads that pick this backend are written to storage your group runs, not to this
+          node's own storage.
         </DialogDescription>
       </DialogHeader>
 
@@ -196,12 +197,12 @@ async function submit() {
           </div>
 
           <p v-if="isEdit" class="flex items-start gap-2 text-[11px] text-muted-foreground">
-            <Lock class="mt-0.5 h-3 w-3 shrink-0" />
-            <span>
-              The type and the fields that say where this backend lives cannot change: files already
-              stored there are recorded against them, and pointing this entry somewhere else would
-              make that data unreadable. Add a second backend instead.
-            </span>
+            <Lock
+              class="mt-0.5 h-3 w-3 shrink-0"
+              aria-label="Locked"
+              title="Files already stored here are recorded against this type and address; pointing the entry elsewhere would make them unreadable."
+            />
+            <span>The type and the address cannot change. Add a second backend instead.</span>
           </p>
 
           <div v-for="field in schema.public" :key="field.key">

@@ -255,7 +255,7 @@ function onPublished(policy: PolicyResponse) {
             {{
               libraryRead
                 ? 'No further policy of this realm or group is available to attach here.'
-                : 'This node lists no policies. Reference one by id and digest under Advanced.'
+                : 'This node lists no policies. Add one under Advanced.'
             }}
           </p>
         </div>

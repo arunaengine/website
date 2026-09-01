@@ -70,7 +70,7 @@ async function save() {
       <DocsLink topic="where-data-lives" section="Storage backend" label="Learn about storage backends" />
     </p>
     <div v-if="hidden" class="text-xs text-muted-foreground">
-      Storage routing is only visible to group admins.
+      The default storage backend is only visible to group admins.
     </div>
     <Skeleton v-else-if="loading && !draft && !stored" class="h-9" />
     <ErrorPanel v-else-if="loadError" :message="loadError" @retry="load" />
@@ -96,6 +96,7 @@ async function save() {
         <Button v-if="dirty" variant="ghost" size="sm" :disabled="saving" @click="draft = stored">Reset</Button>
       </div>
       <p v-else class="text-xs text-foreground">New uploads go to: {{ targetLabel(stored, props.backends) }}</p>
+      <p v-if="writesDisabled" class="text-xs text-muted-foreground">{{ OFFLINE_WRITE_HINT }}</p>
       <p v-if="saveError" class="text-xs text-destructive">{{ saveError }}</p>
       <Notice v-if="warnings.length" tone="warning" :lines="warnings" />
     </template>
