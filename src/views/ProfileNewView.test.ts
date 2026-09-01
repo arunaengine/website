@@ -26,6 +26,7 @@ import * as Rocrate from '@/lib/profiles/rocrate'
 import * as Tes from '@/lib/tes'
 import * as Utils from '@/lib/utils'
 import * as ProfileBuilder from '@/components/metadata/profile-builder/useProfileBuilder'
+import * as Blockers from '@/components/metadata/profile-builder/state/blockers'
 import { DX_PROFILE, RO_CRATE_PROFILE, type ProfileEntityRule } from '@/lib/profiles/types'
 import type { MetadataProfile } from '@/data/types'
 
@@ -39,6 +40,8 @@ const replaceMetadataRoCrate = vi.fn()
 const loadProfileCrate = vi.fn()
 const publishProfileArtifacts = vi.fn()
 const listBuckets = vi.fn()
+const s3Endpoint = ref('https://s3.test')
+const s3HasKey = ref(true)
 const routerPush = vi.fn(async () => undefined)
 const route = reactive({ name: 'profile-new', params: {} as Record<string, string> })
 let leaveGuard: (() => Promise<boolean>) | null = null
@@ -73,13 +76,6 @@ const InputStub = defineComponent({
 const SelectStub = defineComponent({
   props: { modelValue: { type: String, default: '' } },
   setup: (props, { attrs }) => () => h('select', { ...attrs, value: props.modelValue }),
-})
-const SwitchStub = defineComponent({
-  props: { checked: Boolean },
-  emits: ['update:checked'],
-  setup: (props, { emit }) => () => h('button', {
-    onClick: () => emit('update:checked', !props.checked),
-  }, 'Toggle public'),
 })
 const NoticeStub = defineComponent({
   props: { title: String, lines: { type: Array, default: () => [] } },
@@ -127,6 +123,19 @@ const BasicsStub = defineComponent({
       value: props.builder.description,
       onInput: (event: { target: { value: string } }) => (props.builder.description = event.target.value),
     }),
+    h('button', { onClick: () => (props.builder.isPublic = !props.builder.isPublic) }, 'Toggle visibility'),
+  ]),
+})
+// Renders the blocker list the view computed, so a test can read the same
+// sentences the summary shows.
+const ReviewStub = defineComponent({
+  props: { blockers: { type: Array, default: () => [] } },
+  emits: ['step'],
+  setup: (props) => () => h('div', [
+    h('p', (props.blockers as Array<{ message: string }>).length
+      ? 'This profile cannot be created yet.'
+      : 'This profile is ready to create.'),
+    ...(props.blockers as Array<{ message: string }>).map((blocker) => h('p', blocker.message)),
   ]),
 })
 const RulesStub = defineComponent({
@@ -154,7 +163,6 @@ const ProfileNewView = compileClientComponent(new URL('./ProfileNewView.vue', im
   '@/components/ui/Notice.vue': moduleDefault(NoticeStub),
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
-  '@/components/ui/Switch.vue': moduleDefault(SwitchStub),
   '@/components/ui/Tabs.vue': moduleDefault(Passthrough),
   '@/components/ui/TabsList.vue': moduleDefault(Passthrough),
   '@/components/ui/TabsTrigger.vue': moduleDefault(Passthrough),
@@ -162,12 +170,12 @@ const ProfileNewView = compileClientComponent(new URL('./ProfileNewView.vue', im
   '@/components/metadata/profile-builder/ImportProfileSection.vue': moduleDefault(EmptyStub),
   '@/components/metadata/profile-builder/ProfileBasicsStep.vue': moduleDefault(BasicsStub),
   '@/components/metadata/profile-builder/ProfileEntityRulesStep.vue': moduleDefault(RulesStub),
-  '@/components/metadata/profile-builder/ProfileReviewStep.vue': moduleDefault(EmptyStub),
-  '@/components/data/CreateCredentialDialog.vue': moduleDefault(EmptyStub),
+  '@/components/metadata/profile-builder/ProfileReviewStep.vue': moduleDefault(ReviewStub),
+  '@/components/metadata/profile-builder/state/blockers': Blockers,
   '@/components/metadata/profile-builder/useProfileBuilder': ProfileBuilder,
   '@/composables/useAruna': { useAruna: () => arunaModule.value },
   '@/composables/useS3': {
-    useS3: () => ({ endpoint: ref('https://s3.test'), hasActiveKey: ref(true), listBuckets }),
+    useS3: () => ({ endpoint: s3Endpoint, hasActiveKey: s3HasKey, listBuckets }),
   },
   '@/composables/useProfilePublish': { useProfilePublish: () => ({ publishProfileArtifacts }) },
   '@/lib/profiles/rocrate': Rocrate,
@@ -237,6 +245,8 @@ beforeEach(() => {
   loadProfileCrate.mockReset().mockResolvedValue({})
   publishProfileArtifacts.mockReset().mockResolvedValue(undefined)
   listBuckets.mockReset().mockResolvedValue([])
+  s3Endpoint.value = 'https://s3.test'
+  s3HasKey.value = true
   routerPush.mockClear()
 })
 
@@ -270,6 +280,56 @@ describe('ProfileNewView create', () => {
       name: 'Example profile',
     })
     expect(routerPush).toHaveBeenCalledWith({ name: 'profile', params: { profileId: 'example-profile' } })
+    mounted.app.unmount()
+  })
+
+  it('gates the summary and the button on one blocker list', async () => {
+    // Every scenario asserts the readiness sentence and `disabled` together.
+    const scenarios = [
+      { name: 'public without an S3 key', setup: () => { s3HasKey.value = false }, blocker: 'Publishing a public profile needs S3 credentials for this group.' },
+      { name: 'public on a node without S3', setup: () => { s3Endpoint.value = '' }, blocker: 'Publishing a public profile needs S3 storage, and this node advertises no S3 endpoint.' },
+      // A name taken while the author was on a later step: step 1 already
+      // refuses Next, so the review summary is where it has to show up.
+      { name: 'a name already taken', late: true, setup: () => { profiles.value = [storedProfile] }, blocker: 'A profile with this name already exists.' },
+    ]
+
+    for (const scenario of scenarios) {
+      s3Endpoint.value = 'https://s3.test'
+      s3HasKey.value = true
+      profiles.value = []
+      if (!scenario.late) scenario.setup()
+      const mounted = await mountApp(ProfileNewView)
+      await fillBasics(mounted.root)
+      await click(button(mounted.root, 'Next'))
+      await click(button(mounted.root, 'Next'))
+      if (scenario.late) {
+        scenario.setup()
+        await flush()
+      }
+
+      const text = content(mounted.root)
+      expect(text, scenario.name).toContain('This profile cannot be created yet.')
+      expect(text, scenario.name).toContain(scenario.blocker)
+      expect(button(mounted.root, 'Create profile').props.disabled, scenario.name).toBe(true)
+      mounted.app.unmount()
+    }
+  })
+
+  it('creates a group profile without any S3 credentials', async () => {
+    s3HasKey.value = false
+    const mounted = await mountApp(ProfileNewView)
+    await fillBasics(mounted.root)
+    await click(button(mounted.root, 'Toggle visibility'))
+    await click(button(mounted.root, 'Next'))
+    await click(button(mounted.root, 'Next'))
+
+    expect(content(mounted.root)).toContain('This profile is ready to create.')
+    expect(button(mounted.root, 'Create profile').props.disabled).toBe(false)
+
+    await click(button(mounted.root, 'Create profile'))
+    await flush()
+    expect(createMetadata.mock.calls[0]?.[0]).toMatchObject({ public: false })
+    expect(publishProfileArtifacts).not.toHaveBeenCalled()
     mounted.app.unmount()
   })
 

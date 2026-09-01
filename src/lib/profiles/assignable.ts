@@ -30,3 +30,8 @@ export function profileScope(profile: MetadataProfile): ProfileScope {
 export const PROFILE_SCOPE_REASON = GROUP_SCOPED_PROFILES
   ? "Only public profiles and profiles of this dataset's group can be assigned."
   : 'Only public profiles can be assigned to a dataset.'
+
+/** What a group-only profile is good for, while the node resolves public ones only. */
+export const GROUP_PROFILE_HINT = GROUP_SCOPED_PROFILES
+  ? 'Saved for this group, and datasets of this group may declare it.'
+  : 'Saved for this group. No dataset can declare it yet, the node resolves public profiles only.'

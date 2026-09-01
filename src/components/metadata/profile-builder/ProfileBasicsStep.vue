@@ -2,11 +2,12 @@
 import { ref, watch } from 'vue'
 import Input from '@/components/ui/Input.vue'
 import Textarea from '@/components/ui/Textarea.vue'
-import Switch from '@/components/ui/Switch.vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Notice from '@/components/ui/Notice.vue'
+import Tooltip from '@/components/ui/Tooltip.vue'
 import GroupSelect from '@/components/groups/GroupSelect.vue'
+import ProfileVisibility from './ProfileVisibility.vue'
 import { ChevronDown, FileCode2, Globe, Upload, X } from '@lucide/vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { useArtifactFetch } from './useArtifactFetch'
@@ -149,7 +150,7 @@ watch(
       <p class="text-xs text-muted-foreground">Name the profile and choose the group that owns it. These describe the profile itself, not the metadata it validates.</p>
     </div>
 
-    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <div data-tour="profile-basics" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       <div>
         <label class="text-xs font-medium text-foreground">Group</label>
         <GroupSelect v-model="builder.groupId" :options="builder.groupOptions" class="mt-1" placeholder="Choose a group" :disabled="locked" :invalid="fieldError('group') ? 'error' : undefined" />
@@ -161,7 +162,9 @@ watch(
         <p v-if="fieldError('name')" class="mt-1 text-[11px] text-destructive">{{ fieldError('name') }}</p>
       </div>
       <div>
-        <label class="text-xs font-medium text-foreground">Slug</label>
+        <Tooltip label="The short name in the profile's path and in the w3id address datasets point at. It cannot change once the profile is stored.">
+          <label class="text-xs font-medium text-foreground">Slug</label>
+        </Tooltip>
         <Input
           :model-value="builder.slug"
           class="mt-1"
@@ -199,13 +202,7 @@ watch(
       <p v-if="fieldError('description')" class="mt-1 text-[11px] text-destructive">{{ fieldError('description') }}</p>
     </div>
 
-    <label class="flex items-center justify-between rounded-md border border-border p-3 text-sm">
-      <span>
-        Public profile
-        <span class="block text-[11px] text-muted-foreground">Only public profiles are registered for dataset validation. A private profile is saved as a draft that datasets cannot reference.</span>
-      </span>
-      <Switch :checked="builder.isPublic" @update:checked="(value: boolean) => (builder.isPublic = value)" />
-    </label>
+    <ProfileVisibility :builder="builder" />
 
     <!-- SHACL shapes (advanced): optional expert attachment, collapsed by default. -->
     <div class="rounded-md border border-border">

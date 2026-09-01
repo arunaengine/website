@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
+import Tooltip from '@/components/ui/Tooltip.vue'
 import ProfileControlField from '@/components/metadata/ProfileControlField.vue'
 import LiftNotesPanel from './LiftNotesPanel.vue'
+import ProfileVisibility from './ProfileVisibility.vue'
 import { CheckCircle2, AlertTriangle, ChevronDown, Download, FileCode2, Lightbulb, Repeat2 } from '@lucide/vue'
 import { controlsFromRules, defaultControlValues, normalizeProfileValues } from '@/lib/profiles/controls'
 import { buildProfileArtifactTexts, parseProfileCrate } from '@/lib/profiles/rocrate'
@@ -16,9 +19,14 @@ import { obligationBadgeVariant, PROFILE_ENTITY_SOURCE_LABELS, PROFILE_OBLIGATIO
 import { entityTypeLabel } from '@/lib/profiles/entityTypes'
 import { errorMessage } from '@/lib/utils'
 import type { ProfilePropertyRule } from '@/lib/profiles/types'
+import type { ProfileBlocker } from './state/blockers'
 import type { ProfileBuilder } from './useProfileBuilder'
 
-const props = defineProps<{ builder: ProfileBuilder }>()
+const props = withDefaults(
+  defineProps<{ builder: ProfileBuilder; blockers?: ProfileBlocker[] }>(),
+  { blockers: () => [] },
+)
+const emit = defineEmits<{ (e: 'step', step: number): void }>()
 const builder = props.builder
 
 // Readable rule sentences (the plan 6.2 outline shape), leading the review so
@@ -146,14 +154,36 @@ function violationsFor(property: string) {
 
 <template>
   <section class="space-y-4">
-    <!-- Validation summary -->
-    <Notice v-if="builder.allErrors.length" tone="error" :lines="builder.allErrors" class="rounded-lg p-3">
+    <!-- Everything that keeps the Create button disabled, from the same list the
+         button reads, each with the next step where one exists. -->
+    <Notice v-if="blockers.length" tone="warning" class="rounded-lg p-3" data-tour="profile-review">
       <div class="flex items-center gap-2 text-sm font-medium">
-        <AlertTriangle class="h-4 w-4" /> {{ builder.allErrors.length }} {{ builder.allErrors.length === 1 ? 'issue' : 'issues' }} to fix before creating
+        <AlertTriangle class="h-4 w-4" /> This profile cannot be created yet.
       </div>
+      <ul class="mt-1 list-disc space-y-0.5 pl-4">
+        <li v-for="blocker in blockers" :key="blocker.message">
+          {{ blocker.message }}
+          <RouterLink
+            v-if="blocker.action?.route"
+            :to="blocker.action.route"
+            class="font-medium underline-offset-2 hover:underline"
+          >{{ blocker.action.label }}</RouterLink>
+          <button
+            v-else-if="blocker.action?.step"
+            type="button"
+            class="font-medium underline-offset-2 hover:underline"
+            @click="emit('step', blocker.action.step)"
+          >{{ blocker.action.label }}</button>
+        </li>
+      </ul>
     </Notice>
-    <div v-else class="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm font-medium text-emerald-700 dark:text-emerald-300">
+    <div v-else data-tour="profile-review" class="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm font-medium text-emerald-700 dark:text-emerald-300">
       <CheckCircle2 class="h-4 w-4" /> This profile is ready to create.
+    </div>
+
+    <!-- Visibility is chosen once, on the basics step; here it is only stated. -->
+    <div class="rounded-lg border border-border p-3">
+      <ProfileVisibility :builder="builder" readonly @change="emit('step', 1)" />
     </div>
 
     <!-- Non-blocking authoring suggestions (e.g. prefer a schema.org term). -->
@@ -269,7 +299,9 @@ function violationsFor(property: string) {
         @click="generatedFilesOpen = !generatedFilesOpen"
       >
         <span class="flex flex-wrap items-center gap-2 text-sm font-medium text-foreground">
-          Generated files
+          <Tooltip label="Your rules are written out as four files that travel inside the profile; the node validates against shapes.ttl.">
+            <span>Generated files</span>
+          </Tooltip>
           <Badge variant="secondary" size="sm">profile.html · mode.json · schema.json · shapes.ttl</Badge>
           <!-- Imported source shapes: read-only chip with count. -->
           <Badge v-if="builder.customShapesMeta" variant="secondary" size="sm" class="inline-flex items-center gap-1">
@@ -280,12 +312,12 @@ function violationsFor(property: string) {
       </button>
       <div v-if="generatedFilesOpen" class="border-t border-border p-3">
         <p class="text-xs text-muted-foreground">
-          Your rules generate these files, all traveling together in the profile RO-Crate:
-          <b class="text-foreground">profile.html</b> is the human-readable specification,
-          <b class="text-foreground">mode.json</b> the editor form structure (Describo/Crate-O-compatible),
-          <b class="text-foreground">schema.json</b> the validation rules, and
-          <b class="text-foreground">shapes.ttl</b> the unified generated and imported SHACL shapes the node validates against.
-          Editors read the mode file; validation reads the validation rules, mode files have no vocabulary for constraints or recommended levels.
+          Your rules generate these files inside the profile RO-Crate; the node validates datasets against
+          <b class="text-foreground">shapes.ttl</b>.
+          <RouterLink
+            :to="{ name: 'docs', params: { topic: 'build-a-profile' } }"
+            class="font-medium text-primary hover:underline"
+          >Learn how profiles work</RouterLink>
         </p>
         <div class="mt-2 flex flex-wrap items-center gap-1.5">
           <span class="text-[11px] font-medium text-muted-foreground">Download:</span>

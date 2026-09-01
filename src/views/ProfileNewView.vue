@@ -6,7 +6,6 @@ import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Select from '@/components/ui/Select.vue'
 import Input from '@/components/ui/Input.vue'
-import Switch from '@/components/ui/Switch.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
@@ -15,7 +14,7 @@ import ImportProfileSection from '@/components/metadata/profile-builder/ImportPr
 import ProfileBasicsStep from '@/components/metadata/profile-builder/ProfileBasicsStep.vue'
 import ProfileEntityRulesStep from '@/components/metadata/profile-builder/ProfileEntityRulesStep.vue'
 import ProfileReviewStep from '@/components/metadata/profile-builder/ProfileReviewStep.vue'
-import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
+import { profileBlockers } from '@/components/metadata/profile-builder/state/blockers'
 import { useProfileBuilder } from '@/components/metadata/profile-builder/useProfileBuilder'
 import { computed, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
@@ -38,7 +37,6 @@ const {
   createMetadata,
   replaceMetadataRoCrate,
   loadProfileCrate,
-  saving,
 } = useAruna()
 
 // The edit route carries the profile slug; the create route carries none. The
@@ -56,7 +54,6 @@ const builder = useProfileBuilder()
 // bucket at create time, so publishing needs an active S3 key.
 const publishBlocked = computed(() => builder.isPublic && (!s3.endpoint.value || !s3.hasActiveKey.value))
 const publishing = ref(false)
-const credentialDialogOpen = ref(false)
 
 // Publish destination (public profiles only). `destBucket` is an override: an
 // empty string means "use the dedicated default bucket", so it stays correct
@@ -129,7 +126,17 @@ const duplicateNameError = computed(() => {
     ? 'A profile with this name already exists.'
     : ''
 })
-const formErrors = computed(() => duplicateNameError.value ? [...builder.allErrors, duplicateNameError.value] : builder.allErrors)
+// One list behind both the review summary and the Create button, so the page
+// can never call a profile ready while the button refuses it.
+const blockers = computed(() => profileBlockers({
+  errors: builder.allErrors,
+  duplicateName: duplicateNameError.value,
+  isPublic: builder.isPublic,
+  hasEndpoint: Boolean(s3.endpoint.value),
+  hasKey: Boolean(s3.hasActiveKey.value),
+  publishing: publishing.value,
+}))
+const blockerMessages = computed(() => blockers.value.map((blocker) => blocker.message))
 
 // Fetch the group's buckets when the publish destination block first appears.
 watch(
@@ -176,7 +183,7 @@ function cancel() {
 const currentStepErrors = computed(() => {
   if (step.value === 1) return duplicateNameError.value ? [...builder.basicsErrors, duplicateNameError.value] : builder.basicsErrors
   if (step.value === 2) return builder.rulesErrors
-  return formErrors.value
+  return blockerMessages.value
 })
 
 // The step callout only lists errors with no field anchor; basics errors are
@@ -192,7 +199,7 @@ const currentStepCallout = computed(() => {
     return unanchored
   }
   if (step.value === 2) return builder.rulesErrors
-  return formErrors.value
+  return blockerMessages.value
 })
 
 // Seed once: a create page starts on the RO-Crate baseline, an edit page waits
@@ -287,7 +294,7 @@ function goNext() {
 }
 
 async function submit() {
-  if (!seeded.value || formErrors.value.length || saving.value || publishing.value || publishBlocked.value) return
+  if (!seeded.value || blockers.value.length || publishing.value) return
   builder.submitError = null
   publishing.value = true
   try {
@@ -401,7 +408,7 @@ async function submit() {
           </TabsContent>
         </Tabs>
         <ProfileEntityRulesStep v-else-if="step === 2" :builder="builder" />
-        <ProfileReviewStep v-else :builder="builder" />
+        <ProfileReviewStep v-else :builder="builder" :blockers="blockers" @step="(target: number) => (step = target)" />
 
         <Notice v-if="builder.submitError" tone="error">{{ builder.submitError }}</Notice>
       </div>
@@ -418,47 +425,22 @@ async function submit() {
            looking for "which bucket does this go to" must find an answer rather
            than an absent control. -->
       <div v-if="step === 3" class="surface px-3 py-2">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <div class="text-xs font-medium text-foreground">Publish destination</div>
-            <p class="mt-0.5 text-[11px] text-muted-foreground">
-              Where this profile's artifacts (mode.json, schema.json, profile.html, shapes.ttl) are stored.
-            </p>
-          </div>
-          <label class="flex items-center gap-2 text-[11px] font-medium text-muted-foreground">
-            Public profile
-            <Switch :checked="builder.isPublic" @update:checked="(value: boolean) => (builder.isPublic = value)" />
-          </label>
-        </div>
-
-        <!-- Private: nothing is uploaded, so there is no bucket to choose. -->
-        <p v-if="!builder.isPublic" class="mt-2 flex items-start gap-1.5 text-[11px] text-muted-foreground">
-          <Lock class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span>
-            This profile is private, so its artifacts stay embedded in the profile and no bucket is used.
-            Turn on <b class="text-foreground">Public profile</b> to publish them where other tools can fetch them without a token.
-          </span>
+        <div class="text-xs font-medium text-foreground">Publish destination</div>
+        <p class="mt-0.5 text-[11px] text-muted-foreground">
+          Where this profile's artifacts (mode.json, schema.json, profile.html, shapes.ttl) are stored.
         </p>
 
-        <!-- Public, but nothing to publish with yet. -->
-        <Notice
-          v-else-if="publishBlocked"
-          tone="warning"
-          class="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px]"
-        >
-          <span class="flex items-center gap-2">
-            <KeyRound class="h-3.5 w-3.5 shrink-0" />
-            <template v-if="!s3.endpoint.value">
-              Public profiles publish their artifacts to this node's S3 storage, but the node does not advertise an S3 endpoint.
-            </template>
-            <template v-else>
-              Choosing a bucket needs S3 credentials for this group, create them to pick a destination and publish.
-            </template>
-          </span>
-          <Button v-if="s3.endpoint.value" variant="outline" size="sm" @click="credentialDialogOpen = true">
-            <Plus class="size-3.5" /> Create credentials
-          </Button>
-        </Notice>
+        <!-- Group only: nothing is uploaded, so there is no bucket to choose. -->
+        <p v-if="!builder.isPublic" class="mt-2 flex items-start gap-1.5 text-[11px] text-muted-foreground">
+          <Lock class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>This profile stays with its group, so its artifacts travel inside it and no bucket is used.</span>
+        </p>
+
+        <!-- Public, but nothing to publish with yet; the blocker list above says why. -->
+        <p v-else-if="publishBlocked" class="mt-2 flex items-start gap-1.5 text-[11px] text-muted-foreground">
+          <KeyRound class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>No destination can be chosen until this group can write to S3 storage.</span>
+        </p>
 
         <div v-else class="mt-2 grid gap-2 sm:grid-cols-2">
           <div>
@@ -501,14 +483,17 @@ async function submit() {
           <Button v-if="step < 3" :disabled="currentStepErrors.length > 0" @click="goNext">
             Next <ArrowRight class="h-3.5 w-3.5" />
           </Button>
-          <Button v-else :disabled="formErrors.length > 0 || saving || publishing || publishBlocked" @click="submit">
-            {{ publishing ? 'Publishing…' : saving ? 'Saving…' : isEditing ? 'Save profile' : 'Create profile' }}
+          <Button
+            v-else
+            data-tour="profile-create"
+            :disabled="blockers.length > 0 || publishing"
+            @click="submit"
+          >
+            {{ publishing ? 'Publishing…' : isEditing ? 'Save profile' : 'Create profile' }}
           </Button>
         </div>
       </div>
     </div>
-
-    <CreateCredentialDialog v-model:open="credentialDialogOpen" />
 
     <DiscardDraftConfirm :open="confirmDiscardOpen" @keep="keepDraft" @discard="discardDraft" />
   </div>
