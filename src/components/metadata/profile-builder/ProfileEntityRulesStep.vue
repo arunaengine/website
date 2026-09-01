@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { RouterLink } from 'vue-router'
 import EntityShapeSection from './EntityShapeSection.vue'
 import EntityTypePicker from './EntityTypePicker.vue'
 import LiftNotesPanel from './LiftNotesPanel.vue'
-import { PROFILE_OBLIGATION_LABELS } from '@/lib/profiles/labels'
 import { entityTypeLabel } from '@/lib/profiles/entityTypes'
 import { normalizeTypeUri, sameSchemaOrgType } from '@/lib/profiles/uri'
 import type { DraftEntityRule, ProfileBuilder } from './useProfileBuilder'
@@ -55,9 +55,10 @@ function scrollToShape(uid: number) {
       <h4 class="text-sm font-semibold text-foreground">Rules</h4>
       <p class="text-xs text-muted-foreground">
         Each rule reads as a sentence: <em>Root dataset must have Creator, a Person</em>.
-        Start from the Root dataset, add properties from common terms or terminology search, then set each rule's obligation,
-        <b>Required</b>: {{ PROFILE_OBLIGATION_LABELS.MUST.help }}; <b>Recommended</b>: {{ PROFILE_OBLIGATION_LABELS.SHOULD.help }}; <b>Optional</b>: {{ PROFILE_OBLIGATION_LABELS.MAY.help }}.
-        Rules for a Person, Organization or File apply when one is described; entity-valued rules link to those shared shapes.
+        <RouterLink
+          :to="{ name: 'docs', params: { topic: 'build-a-profile' } }"
+          class="font-medium text-primary hover:underline"
+        >Learn how profiles work</RouterLink>
       </p>
     </div>
 

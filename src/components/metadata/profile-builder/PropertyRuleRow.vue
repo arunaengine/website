@@ -2,9 +2,10 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import Select from '@/components/ui/Select.vue'
 import Button from '@/components/ui/Button.vue'
+import Tooltip from '@/components/ui/Tooltip.vue'
 import PropertyRuleCard from './PropertyRuleCard.vue'
 import { ChevronDown, ChevronRight, ChevronUp, CornerDownRight, GripVertical, ListPlus, Lock, Trash2 } from '@lucide/vue'
-import { OBLIGATION_ACCENT, PROFILE_VALUE_KIND_LABELS } from '@/lib/profiles/labels'
+import { OBLIGATION_ACCENT, OBLIGATION_HELP, PROFILE_VALUE_KIND_LABELS } from '@/lib/profiles/labels'
 import { entityTypeLabel } from '@/lib/profiles/entityTypes'
 import { normalizeTypeUri, sameSchemaOrgType } from '@/lib/profiles/uri'
 import { obligationEditDisabled, obligationOptionsFor, type DraftEntityRule, type DraftPropertyRule, type ProfileBuilder } from './useProfileBuilder'
@@ -159,15 +160,17 @@ async function goToTarget() {
           <ChevronDown class="size-3.5" />
         </button>
       </div>
-      <div :class="obligationDisabled ? 'opacity-60' : ''">
-        <Select
-          v-model="obligationModel"
-          :options="obligationOptions"
-          :disabled="obligationDisabled"
-          class="h-7 w-[132px] text-[11px]"
-          :aria-label="`Obligation for ${property.label || 'untitled property'}`"
-        />
-      </div>
+      <Tooltip :label="OBLIGATION_HELP">
+        <div data-tour="profile-obligation" :class="obligationDisabled ? 'opacity-60' : ''">
+          <Select
+            v-model="obligationModel"
+            :options="obligationOptions"
+            :disabled="obligationDisabled"
+            class="h-7 w-[132px] text-[11px]"
+            :aria-label="`Obligation for ${property.label || 'untitled property'}`"
+          />
+        </div>
+      </Tooltip>
       <button
         type="button"
         class="flex min-w-0 flex-1 items-center gap-2 py-0.5 text-left"

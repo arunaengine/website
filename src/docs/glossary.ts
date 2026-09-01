@@ -45,6 +45,48 @@ export const glossaryTopic: DocsTopic = {
       ],
     },
     {
+      title: 'Root dataset',
+      icon: 'Package',
+      paragraphs: [
+        'The one entity every [RO-Crate](concept:datasets#the-bundle-is-an-ro-crate) describes itself with. A [profile](concept:build-a-profile) keeps its rules in the Root dataset shape.',
+      ],
+    },
+    {
+      title: 'Shape',
+      icon: 'Waypoints',
+      paragraphs: [
+        'The rules for one kind of thing in a profile, for example a Person. Every rule that references that type [reuses the same shape](concept:build-a-profile#entity-shapes-and-references).',
+      ],
+    },
+    {
+      title: 'Rule',
+      icon: 'ListChecks',
+      paragraphs: [
+        'One property a shape asks for: which term, which kind of value, how many entries, and [how strictly](concept:build-a-profile#properties-and-obligations) it applies.',
+      ],
+    },
+    {
+      title: 'Obligation',
+      icon: 'Scale',
+      paragraphs: [
+        'How strictly a rule applies: Required fails validation when missing, Recommended warns, Optional never complains.',
+      ],
+    },
+    {
+      title: 'Reference',
+      icon: 'Link2',
+      paragraphs: [
+        'A rule whose value is another entity rather than text, for example an author that is a Person. It is what pulls a [shape](concept:build-a-profile#entity-shapes-and-references) into the dataset form.',
+      ],
+    },
+    {
+      title: 'Group-only profile',
+      icon: 'Shield',
+      paragraphs: [
+        'A profile that is stored but not registered, so no dataset can declare it yet. [Making it public](concept:build-a-profile#visibility-and-registration) registers it.',
+      ],
+    },
+    {
       title: 'Purpose type',
       icon: 'Tag',
       paragraphs: [

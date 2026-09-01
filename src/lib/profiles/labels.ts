@@ -43,6 +43,10 @@ export const PROFILE_OBLIGATION_LABELS: Record<ProfileObligation, { label: strin
   MAY: { label: 'Optional', help: 'Optional' },
 }
 
+// One sentence for the obligation control itself, beside the per-level help.
+export const OBLIGATION_HELP =
+  'How strictly the profile asks for this property: Required fails validation when missing, Recommended warns, Optional never complains.'
+
 // The order obligations are grouped/listed in throughout the UI.
 export const OBLIGATION_ORDER: ProfileObligation[] = ['MUST', 'SHOULD', 'MAY']
 

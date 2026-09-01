@@ -43,7 +43,11 @@ const listBuckets = vi.fn()
 const s3Endpoint = ref('https://s3.test')
 const s3HasKey = ref(true)
 const routerPush = vi.fn(async () => undefined)
-const route = reactive({ name: 'profile-new', params: {} as Record<string, string> })
+const route = reactive({
+  name: 'profile-new',
+  params: {} as Record<string, string>,
+  query: {} as Record<string, string>,
+})
 let leaveGuard: (() => Promise<boolean>) | null = null
 
 arunaModule.value = {
@@ -64,6 +68,12 @@ const ButtonStub = defineComponent({
   setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()),
 })
 const Passthrough = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
+const RouterLinkStub = defineComponent({
+  props: { to: { type: Object, required: true } },
+  setup: (_, { slots }) => () => h('a', slots.default?.()),
+})
+// Stands in for the shared localStorage helpers the intro card remembers with.
+const stored = ref('')
 const InputStub = defineComponent({
   props: { modelValue: { type: [String, Number], default: '' } },
   emits: ['update:modelValue'],
@@ -151,6 +161,7 @@ const RulesStub = defineComponent({
 const ProfileNewView = compileClientComponent(new URL('./ProfileNewView.vue', import.meta.url), {
   vue: VueRuntime,
   'vue-router': {
+    RouterLink: RouterLinkStub,
     useRoute: () => route,
     useRouter: () => ({ push: routerPush }),
     onBeforeRouteLeave: (guard: () => Promise<boolean>) => { leaveGuard = guard },
@@ -174,6 +185,7 @@ const ProfileNewView = compileClientComponent(new URL('./ProfileNewView.vue', im
   '@/components/metadata/profile-builder/state/blockers': Blockers,
   '@/components/metadata/profile-builder/useProfileBuilder': ProfileBuilder,
   '@/composables/useAruna': { useAruna: () => arunaModule.value },
+  '@/composables/aruna/state': { readStored: () => stored.value, storeValue: (_key: string, value: string) => (stored.value = value) },
   '@/composables/useS3': {
     useS3: () => ({ endpoint: s3Endpoint, hasActiveKey: s3HasKey, listBuckets }),
   },
@@ -230,6 +242,7 @@ async function fillBasics(root: Parameters<typeof content>[0]) {
 beforeEach(() => {
   route.name = 'profile-new'
   route.params = {}
+  route.query = {}
   groups.value = [{ id: 'group-1', name: 'Research group' }]
   profiles.value = []
   profileItems.value = []
@@ -248,6 +261,7 @@ beforeEach(() => {
   s3Endpoint.value = 'https://s3.test'
   s3HasKey.value = true
   routerPush.mockClear()
+  stored.value = ''
 })
 
 describe('ProfileNewView create', () => {
@@ -333,6 +347,20 @@ describe('ProfileNewView create', () => {
     mounted.app.unmount()
   })
 
+  it('introduces profiles once, until the reader dismisses it', async () => {
+    const mounted = await mountApp(ProfileNewView)
+    expect(content(mounted.root)).toContain('A profile is the checklist')
+
+    await click(button(mounted.root, 'Got it'))
+    expect(content(mounted.root)).not.toContain('A profile is the checklist')
+    expect(stored.value).toBe('true')
+    mounted.app.unmount()
+
+    const returning = await mountApp(ProfileNewView)
+    expect(content(returning.root)).not.toContain('A profile is the checklist')
+    returning.app.unmount()
+  })
+
   it('fills the default group once the group list arrives', async () => {
     groups.value = []
     const mounted = await mountApp(ProfileNewView)
@@ -376,6 +404,20 @@ describe('ProfileNewView edit', () => {
     }))
     expect(createMetadata).not.toHaveBeenCalled()
     expect(routerPush).toHaveBeenCalledWith({ name: 'profile', params: { profileId: 'example' } })
+    mounted.app.unmount()
+  })
+
+  it('opens on the public choice when Make public sent the author here', async () => {
+    route.query = { visibility: 'public' }
+    const mounted = await mountApp(ProfileNewView)
+    await flush()
+
+    await click(button(mounted.root, 'Next'))
+    await click(button(mounted.root, 'Next'))
+    await click(button(mounted.root, 'Save profile'))
+    await flush()
+
+    expect(replaceMetadataRoCrate).toHaveBeenCalledWith('doc-1', expect.objectContaining({ public: true }))
     mounted.app.unmount()
   })
 

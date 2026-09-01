@@ -17,7 +17,7 @@ import ProfileReviewStep from '@/components/metadata/profile-builder/ProfileRevi
 import { profileBlockers } from '@/components/metadata/profile-builder/state/blockers'
 import { useProfileBuilder } from '@/components/metadata/profile-builder/useProfileBuilder'
 import { computed, ref, watch } from 'vue'
-import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
+import { onBeforeRouteLeave, RouterLink, useRoute, useRouter } from 'vue-router'
 import { CheckCircle2, ArrowLeft, ArrowRight, FileUp, KeyRound, Lock, Plus } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useS3 } from '@/composables/useS3'
@@ -27,6 +27,7 @@ import { buildProfileArtifactTexts, buildProfileCrate } from '@/lib/profiles/roc
 import { entityRulesToMode } from '@/lib/profiles/mode'
 import { parseS3Url } from '@/lib/tes'
 import { errorMessage } from '@/lib/utils'
+import { readStored, storeValue } from '@/composables/aruna/state'
 
 const route = useRoute()
 const router = useRouter()
@@ -115,6 +116,16 @@ async function loadDestBuckets() {
 }
 
 const steps = ['Basics', 'Rules', 'Review']
+
+// The intro is for the first profile someone writes; the dismissal sticks.
+const INTRO_KEY = 'aruna.profileIntroDismissed'
+const introDismissed = ref(readStored(INTRO_KEY) === 'true')
+const showIntro = computed(() => !isEditing.value && !introDismissed.value)
+
+function dismissIntro() {
+  introDismissed.value = true
+  storeValue(INTRO_KEY, 'true')
+}
 
 const step = ref(1)
 // Step 1 mode switch: author from scratch or import an existing profile.
@@ -382,6 +393,19 @@ async function submit() {
     />
 
     <div class="container space-y-5 py-6">
+      <!-- First visit to a fresh create page: what a profile is, in three lines. -->
+      <Notice v-if="showIntro" tone="info" class="flex flex-wrap items-start gap-x-3 gap-y-1 p-3">
+        <div class="min-w-0 flex-1 space-y-0.5">
+          <p>A profile is the checklist a dataset of one kind should meet: which properties it must, should or may carry.</p>
+          <p>The Root dataset shape describes the dataset itself; shared shapes (Person, File) hold the rules for the things it references.</p>
+          <p>
+            The node validates every tagged write against it.
+            <RouterLink :to="{ name: 'docs', params: { topic: 'build-a-profile' } }" class="font-medium text-primary hover:underline">Learn how profiles work</RouterLink>
+          </p>
+        </div>
+        <Button variant="ghost" size="sm" @click="dismissIntro">Got it</Button>
+      </Notice>
+
       <WizardSteps :steps="steps" :current="step - 1" />
 
       <div class="surface space-y-4 p-5">

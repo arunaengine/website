@@ -5,6 +5,7 @@ import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Textarea from '@/components/ui/Textarea.vue'
+import Tooltip from '@/components/ui/Tooltip.vue'
 import PropertyRuleRow from './PropertyRuleRow.vue'
 import PropertyTermPicker from './PropertyTermPicker.vue'
 import ClassPropertyChecklist from './ClassPropertyChecklist.vue'
@@ -114,23 +115,29 @@ function changeType(choice: { uri: string; label: string }) {
         @click="open = !expanded"
       >
         <component :is="expanded ? ChevronDown : ChevronRight" class="size-3.5 shrink-0 text-muted-foreground" />
-        <h4 class="text-sm font-semibold text-foreground">{{ entity.label || 'Untitled entity' }}</h4>
+        <Tooltip label="An entity shape holds the rules for one kind of thing. Every property that references that type reuses this one shape.">
+          <h4 data-tour="profile-shape" class="text-sm font-semibold text-foreground">{{ entity.label || 'Untitled entity' }}</h4>
+        </Tooltip>
       </button>
       <span class="text-[11px] text-muted-foreground">{{ entityTypeLabel(entity.type) }}</span>
       <span class="text-[11px] text-muted-foreground">
         {{ entity.properties.length }} {{ entity.properties.length === 1 ? 'rule' : 'rules' }}
       </span>
       <Badge v-if="isRoot" variant="royal">Root dataset</Badge>
-      <Badge
+      <Tooltip
         v-else-if="!isUnreferenced"
-        :variant="obligationBadgeVariant(derived.obligation)"
-        :title="derived.via ? `Derived from ${derived.via.valueName} on ${derived.via.entityLabel}` : undefined"
+        :label="derived.via
+          ? `Not chosen here: it follows the ${derived.via.valueName} rule on ${derived.via.entityLabel} that references this shape.`
+          : 'Not chosen here: it follows the rules that reference this shape.'"
       >
-        {{ PROFILE_OBLIGATION_LABELS[derived.obligation].label }}
-      </Badge>
+        <Badge :variant="obligationBadgeVariant(derived.obligation)">
+          {{ PROFILE_OBLIGATION_LABELS[derived.obligation].label }}
+        </Badge>
+      </Tooltip>
       <span
         v-for="reference in references"
         :key="`${reference.entityLabel}-${reference.valueName}`"
+        data-tour="profile-reference"
         class="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground"
       >
         via {{ reference.valueName }} on {{ reference.entityLabel }}
@@ -162,7 +169,9 @@ function changeType(choice: { uri: string; label: string }) {
         <Input v-model="entity.label" class="mt-0.5" :disabled="isRoot" />
       </div>
       <div v-if="isCustomType">
-        <label class="text-[11px] font-medium text-muted-foreground">Class name</label>
+        <Tooltip label="The short name this custom type gets in the generated files, e.g. Specimen. It must stay distinct from every property name.">
+          <label class="text-[11px] font-medium text-muted-foreground">Class name</label>
+        </Tooltip>
         <Input v-model="entity.className" class="mt-0.5" placeholder="e.g. Specimen" />
       </div>
       <div class="sm:col-span-2">
@@ -224,7 +233,7 @@ function changeType(choice: { uri: string; label: string }) {
       <p v-if="!entity.properties.length" class="rounded-md border border-dashed border-border px-3 py-2 text-[11px] text-muted-foreground">
         No rules yet. Add the properties a {{ entity.label || entityTypeLabel(entity.type) }} must, should or may carry.
       </p>
-      <div class="space-y-1.5 pt-1">
+      <div data-tour="profile-add-property" class="space-y-1.5 pt-1">
         <PropertyTermPicker :builder="builder" :entity="entity" />
         <ClassPropertyChecklist :builder="builder" :entity="entity" />
       </div>

@@ -420,6 +420,117 @@ export const docsTopics: DocsTopic[] = [
     ],
   },
   {
+    slug: 'build-a-profile',
+    kind: 'Guide',
+    title: 'Build a profile',
+    summary: 'Write the checklist other datasets of your kind should meet, and know what the node enforces.',
+    tour: [
+      {
+        route: '/app/profiles/new',
+        anchor: 'profile-basics',
+        title: 'Name it',
+        body: 'The name is what authors pick in the dataset editor; the slug becomes the stored path and the address datasets point at, and it cannot change later.',
+      },
+      {
+        route: '/app/profiles/new',
+        anchor: 'profile-add-property',
+        title: 'Add a property',
+        body: 'Rules are added from the common terms of the shape, or found through terminology search when no common term fits.',
+      },
+      {
+        route: '/app/profiles/new',
+        anchor: 'profile-obligation',
+        title: 'Set how strictly it applies',
+        body: 'Required fails validation when the value is missing, Recommended warns, Optional never complains.',
+      },
+      {
+        route: '/app/profiles/new',
+        anchor: 'profile-shape',
+        title: 'Shapes hold the rules for one kind of thing',
+        body: 'Root dataset describes the dataset itself. A rule whose value is a Person reuses the Person shape, which every other rule pointing at a Person shares.',
+      },
+      {
+        route: '/app/profiles/new',
+        anchor: 'profile-reference',
+        title: 'What reaches this shape',
+        body: 'The via chip names the rule that leads here. A shape nothing reaches generates no field, though the node still checks entities of that type.',
+      },
+      {
+        route: '/app/profiles/new',
+        anchor: 'profile-review',
+        title: 'Review',
+        body: 'The summary either says the profile is ready or lists everything that still blocks it, with the next step for each.',
+      },
+      {
+        route: '/app/profiles/new',
+        anchor: 'profile-visibility',
+        title: 'Visibility',
+        body: 'Only a public profile is registered, so only a public profile can be declared by a dataset. A group-only profile stays with its group.',
+      },
+      {
+        route: '/app/profiles/new',
+        anchor: 'profile-create',
+        title: 'Create it',
+        body: 'Creating stores the profile as a dataset under profiles/, with its generated files inside.',
+      },
+    ],
+    sections: [
+      {
+        title: 'The root dataset shape',
+        icon: 'Package',
+        paragraphs: [
+          'A profile is itself a [dataset](concept:datasets), stored under profiles/, that describes what other datasets should carry.',
+          'Its Root dataset shape holds the rules for the dataset itself: name, description, license, and whatever else your kind of data needs. Every RO-Crate has exactly one root, so this shape is bound to it when the node validates.',
+        ],
+      },
+      {
+        title: 'Properties and obligations',
+        icon: 'ListChecks',
+        bullets: [
+          'Required: validation fails when the value is missing.',
+          'Recommended: validation warns, and the write still succeeds.',
+          'Optional: the field is offered and never complained about.',
+          'A rule names a property term, a value kind, and, for lists, how many entries are allowed.',
+        ],
+      },
+      {
+        title: 'Entity shapes and references',
+        icon: 'Waypoints',
+        paragraphs: [
+          'A rule whose value is an entity (a Person, an Organization, a File) points at that type. The rules for that type live in one shared shape, so every rule pointing at a Person gets the same Person rules.',
+          'A shape that no rule points at produces no field in the dataset form. It is not inert, though: its SHACL shape targets the class, so any Person a dataset does describe is still checked against it.',
+        ],
+      },
+      {
+        title: 'Visibility and registration',
+        icon: 'Globe',
+        paragraphs: [
+          'A public profile is registered: it gets a permanent https://w3id.org/aruna/profile/ address, its files are published so any tool can fetch them, and datasets may declare it.',
+          'A group-only profile is stored and editable, but it is not registered, so a dataset that declares it is refused. Publish it when it is ready to be used.',
+          'A profile that stops being public makes the datasets that declare it stale, and their next tagged write is refused until the tag is removed or the profile is public again.',
+        ],
+      },
+      {
+        title: 'Generated files and what the node enforces',
+        icon: 'Braces',
+        bullets: [
+          'profile.html: the human-readable specification of the rules.',
+          'mode.json: the form structure, compatible with Describo and Crate-O.',
+          'schema.json: the value rules the portal checks while you type.',
+          'shapes.ttl: the SHACL shapes the [node](concept:realm-nodes-groups) validates a tagged write against, and the only one with the final word.',
+        ],
+      },
+      {
+        title: 'Importing SHACL',
+        icon: 'Import',
+        paragraphs: [
+          'An existing profile RO-Crate, a mode file, or a SHACL file can be imported: everything the builder can express becomes editable rules, and the original file travels on inside shapes.ttl.',
+          'What has no form equivalent is listed beside the rules, so the parts of the file without a field are visible rather than silently dropped.',
+        ],
+      },
+    ],
+  },
+  {
     slug: 'compute-run',
     kind: 'Guide',
     title: 'Start and follow a compute run',

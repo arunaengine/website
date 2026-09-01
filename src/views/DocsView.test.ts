@@ -1,7 +1,20 @@
 import { createSSRApp, defineComponent, h, type Component } from 'vue'
 import { renderToString } from '@vue/server-renderer'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
+import { readdirSync, readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 import { docsScreenshots, docsTopics } from '@/docs/v1'
+import { navAnchor, navEntries } from '@/components/layout/nav'
+
+// Every source file that can carry a data-tour anchor.
+function sourceFiles(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name)
+    if (entry.isDirectory()) return sourceFiles(path)
+    return /\.(vue|ts)$/.test(entry.name) ? [path] : []
+  })
+}
 
 const route = { params: { topic: '' } }
 const RouterLinkStub = defineComponent({
@@ -49,6 +62,7 @@ describe('versioned in-portal Docs', () => {
       'upload-data',
       'where-data-lives',
       'first-dataset',
+      'build-a-profile',
       'compute-run',
       'storage-backend',
       'cli-access-key',
@@ -147,6 +161,7 @@ describe('versioned in-portal Docs', () => {
       'first-group',
       'upload-data',
       'first-dataset',
+      'build-a-profile',
       'compute-run',
       'storage-backend',
       'cli-access-key',
@@ -154,6 +169,28 @@ describe('versioned in-portal Docs', () => {
     ])
     expect(await renderTopic('portal-tour')).toContain('Show me in the portal')
     expect(await renderTopic('datasets')).not.toContain('Show me in the portal')
+  })
+
+  it('spotlights anchors the portal actually renders', () => {
+    // A tour stop whose anchor no components carries would spotlight nothing.
+    const rendered = new Set<string>()
+    const sourceRoot = fileURLToPath(new URL('..', import.meta.url))
+    for (const file of sourceFiles(sourceRoot)) {
+      const text = readFileSync(file, 'utf8')
+      if (!text.includes('data-tour')) continue
+      for (const match of text.matchAll(/data-tour="([a-z0-9-]+)"/g)) rendered.add(match[1])
+      // A bound anchor (:data-tour) comes from a map in the same file.
+      for (const match of text.matchAll(/'([a-z0-9]+(?:-[a-z0-9]+)+)'/g)) rendered.add(match[1])
+    }
+    // The sidebar derives its anchors from the one nav definition.
+    for (const entry of navEntries({ desktop: true, isRealmAdmin: true, canInspectUsers: true, assistant: true })) {
+      if ('separator' in entry) continue
+      rendered.add(navAnchor(entry.label))
+    }
+
+    for (const step of docsTopics.flatMap((topic) => topic.tour ?? [])) {
+      expect(rendered.has(step.anchor), `${step.anchor} (${step.title})`).toBe(true)
+    }
   })
 
   it('walks real app routes and kebab-case anchors', () => {
