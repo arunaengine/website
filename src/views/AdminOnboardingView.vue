@@ -123,7 +123,7 @@ const KIND_OPTIONS: KindOption[] = [
 const selectedMode = ref<OnboardingMode | null>(null)
 
 // Seed URL defaults to the local node's published API url (origin without
-// /api/v1); the node appends /api/v1/onboarding/bootstrap itself.
+// /api/v1); the node appends /api/v1/access/onboarding/bootstrap itself.
 const defaultSeedUrl = computed(() => {
   const localId = nodeInfo.value?.node.peer_id
   const published = realmInfo.value?.nodes.find((n) => n.node_id === localId)?.info?.urls?.api

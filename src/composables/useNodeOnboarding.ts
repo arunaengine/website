@@ -81,7 +81,7 @@ export function useNodeOnboarding() {
   async function refreshSecrets(): Promise<void> {
     listing.value = true
     try {
-      const response = await request<ListOnboardingSecretsResponse>('/admin/onboarding/secrets')
+      const response = await request<ListOnboardingSecretsResponse>('/access/onboarding/secrets')
       secrets.value = response.secrets
       listError.value = null
     } catch (err) {
@@ -119,7 +119,7 @@ export function useNodeOnboarding() {
       // the POST is our secret.
       await refreshSecrets().catch(() => undefined)
       const before = new Set(secrets.value.map((s) => s.enrollment_id))
-      const response = await request<CreateOnboardingSecretResponse>('/admin/onboarding/secrets', {
+      const response = await request<CreateOnboardingSecretResponse>('/access/onboarding/secrets', {
         method: 'POST',
         body: JSON.stringify(input),
       })
@@ -144,7 +144,7 @@ export function useNodeOnboarding() {
     markRevoking(id, true)
     let failure: string | null = null
     try {
-      await request<void>(`/admin/onboarding/secrets/${encodeURIComponent(id)}`, { method: 'DELETE' })
+      await request<void>(`/access/onboarding/secrets/${encodeURIComponent(id)}`, { method: 'DELETE' })
     } catch (err) {
       // A 404 means the secret was already pruned or claimed-and-expired; the
       // row is gone either way, so treat it as a successful revoke.

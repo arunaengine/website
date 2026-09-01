@@ -11,11 +11,11 @@ export interface UsageResponse {
   realm?: UsageTotals
   // Realm-wide total of live metadata documents; only on GET /info/usage.
   metadata_documents?: number
-  // Exact lifecycle-live purpose counts; only on GET /groups/{id}/usage.
+  // Exact lifecycle-live purpose counts; only on GET /access/groups/{id}/usage.
   dataset_count?: number | null
   profile_count?: number | null
   process_run_count?: number | null
-  // Present on GET /groups/{id}/usage from quota-aware backends.
+  // Present on GET /access/groups/{id}/usage from quota-aware backends.
   quota?: GroupQuotaStatus
 }
 
@@ -42,7 +42,7 @@ export interface UsageTotals {
 // Usage history: arunaengine/aruna#250 workplan item 3 ("history snapshots
 // with their endpoint"). The backend does NOT serve this yet; the types below
 // document the assumed contract so the portal side flips on trivially:
-//   GET /groups/{id}/usage/history?from=<rfc3339>&to=<rfc3339>&resolution=hour|day|week
+//   GET /access/groups/{id}/usage/history?from=<rfc3339>&to=<rfc3339>&resolution=hour|day|week
 //   -> 200 UsageHistoryResponse
 // Callers MUST gate on featureEnabled('usageHistory'); the flag ships off.
 // ---------------------------------------------------------------------------

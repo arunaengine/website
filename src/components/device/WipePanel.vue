@@ -31,7 +31,7 @@ async function evictRealmDevice(): Promise<void> {
   const nodeId = identity.value?.nodeId ?? status.value.nodeId
   if (!nodeId) throw new Error('The realm could not identify this device. Retry when it is reachable.')
   try {
-    await apiRequest<void>(`/users/me/devices/${encodeURIComponent(nodeId)}`, { method: 'DELETE' }, {
+    await apiRequest<void>(`/access/users/me/devices/${encodeURIComponent(nodeId)}`, { method: 'DELETE' }, {
       baseUrl: apiBaseUrl.value,
       token: authToken.value,
     })

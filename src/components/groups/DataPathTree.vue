@@ -6,7 +6,7 @@ import { ApiError, listGroupDataPaths, type DataPathEntry } from '@/lib/api'
 import { useAruna } from '@/composables/useAruna'
 import { errorMessage } from '@/lib/utils'
 
-// Lazy data-path browser: each level fetches GET /groups/{id}/data-paths for its
+// Lazy data-path browser: each level fetches GET /access/groups/{id}/data/paths for its
 // own prefix, so expanding a folder loads exactly one page of that folder. An
 // empty `prefix` lists the group's buckets; nested levels pass a folder's
 // permission path (trailing-slash normalized) as the prefix.

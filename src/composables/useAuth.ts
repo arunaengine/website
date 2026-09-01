@@ -78,7 +78,7 @@ async function resolveProvider() {
   const { realmInfo, apiBaseUrl } = useAruna()
   let info = realmInfo.value
   if (!info) {
-    info = await apiRequest<RealmInfoResponse>('/info/realm', {}, { baseUrl: apiBaseUrl.value })
+    info = await apiRequest<RealmInfoResponse>('/system/realm', {}, { baseUrl: apiBaseUrl.value })
   }
   const provider = info.oidc_providers[0]
   if (!provider) {
@@ -169,14 +169,14 @@ async function completeSignIn(params: URLSearchParams): Promise<string> {
     const client = { baseUrl: aruna.apiBaseUrl.value, token: oidcToken }
     const onboardingSecret = window.sessionStorage.getItem(ONBOARDING_KEY)
     await apiRequest<RegisterUserResponse>(
-      '/users/register',
+      '/access/users/register',
       {
         method: 'POST',
         body: JSON.stringify(onboardingSecret ? { onboarding_secret: onboardingSecret } : {}),
       },
       client,
     )
-    const issued = await apiRequest<GetTokenResponse>('/users/token', {}, client)
+    const issued = await apiRequest<GetTokenResponse>('/access/token', {}, client)
     aruna.setAuthToken(issued.token)
     appliedArunaToken = true
     await aruna.refresh()

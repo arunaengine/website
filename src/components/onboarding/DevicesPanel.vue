@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// My devices (aruna#271). Self-scoped: /users/me/devices only ever answers with
+// My devices (aruna#271). Self-scoped: /access/users/me/devices only ever answers with
 // the caller's own user nodes and the enrollments still in flight, so this
 // needs no admin gate. Rows reuse SecretsTable through its view-model props.
 import { computed, ref, watch } from 'vue'

@@ -182,7 +182,7 @@ describe('portal S3 session signing and refresh', () => {
     await vi.advanceTimersByTimeAsync(1)
     expect(apiRequest).toHaveBeenCalledTimes(2)
     expect(apiRequest.mock.calls[1]?.[0]).toBe(
-      '/users/s3-sessions/session-key-a/refresh',
+      '/access/s3/sessions/session-key-a/refresh',
     )
     expect(apiRequest.mock.calls[1]?.[1]).toEqual({ method: 'POST' })
 
@@ -199,7 +199,7 @@ describe('portal S3 session signing and refresh', () => {
     await vi.advanceTimersByTimeAsync(1)
     expect(apiRequest).toHaveBeenCalledTimes(3)
     expect(apiRequest.mock.calls[2]?.[0]).toBe(
-      '/users/s3-sessions/session-key-a/refresh',
+      '/access/s3/sessions/session-key-a/refresh',
     )
   })
 

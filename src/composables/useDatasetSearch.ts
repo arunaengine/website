@@ -29,7 +29,7 @@ import type {
 import type { FilterModel } from '@/components/search/SearchFilterBar.vue'
 
 // Beyond metadata, an active query also discovers groups (client-side over the
-// loaded group lists, like the top bar), people (server /users/search) and
+// loaded group lists, like the top bar), people (server /access/users/search) and
 // buckets across the realm's nodes (the `buckets` section of the unified
 // GET /search).
 export type SearchKind = 'all' | 'datasets' | 'objects' | 'buckets' | 'groups' | 'people'
@@ -612,7 +612,7 @@ export function useDatasetSearch(searchBox: Ref<{ focus: () => void } | null>) {
   let peopleSeq = 0
   const runPeopleSearch = useDebounceFn(async (term: string) => {
     const seq = ++peopleSeq
-    // /users/search needs an authenticated session and at least two characters.
+    // /access/users/search needs an authenticated session and at least two characters.
     if (term.length < 2 || !currentUser.value) {
       peopleResults.value = []
       peopleSearching.value = false

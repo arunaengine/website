@@ -57,7 +57,7 @@ export interface CreateGroupRoleRequest {
   public?: boolean
 }
 
-// GET /groups/{id}/data-paths: browsable data permission paths that feed the
+// GET /access/groups/{id}/data/paths: browsable data permission paths that feed the
 // role picker's data/ tree. Verified against aruna api/src/routes/groups.rs on
 // branch feat/pb-datapaths (in flight, 2026-07-17): member-gated (403 for
 // non-members, 401 unauthenticated), local node only in v1, and permission
@@ -93,7 +93,7 @@ export async function listGroupDataPaths(
   client: ApiClientOptions = {},
 ): Promise<DataPathsResponse> {
   return apiRequest<DataPathsResponse>(
-    `/groups/${encodeURIComponent(groupId)}/data-paths`,
+    `/access/groups/${encodeURIComponent(groupId)}/data/paths`,
     {
       query: {
         prefix: params.prefix,

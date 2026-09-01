@@ -4,7 +4,7 @@ import type { GetUserResponse, ResolveUserResult } from '@/lib/api'
 
 // Resolves `{ulid}@{realm}` user ids to display names, with module-level caches
 // so member lists and author chips share results. Batch lookups use POST
-// /users/resolve (chunked, safe attributes only); profile pages that need the
+// /access/users/resolve (chunked, safe attributes only); profile pages that need the
 // full record (subject_ids included) still use single GET /users/{id}.
 // Failures cache as null so unknown or foreign-realm ids stay unresolved.
 const RESOLVE_CHUNK = 100

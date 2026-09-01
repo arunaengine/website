@@ -58,7 +58,7 @@ describe('WipePanel', () => {
   it('evicts the realm device before wiping it locally', async () => {
     const mounted = await confirmWipe()
 
-    expect(apiRequest).toHaveBeenCalledWith('/users/me/devices/node-1', { method: 'DELETE' }, {
+    expect(apiRequest).toHaveBeenCalledWith('/access/users/me/devices/node-1', { method: 'DELETE' }, {
       baseUrl: '/api/v1',
       token: 'token',
     })

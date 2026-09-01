@@ -431,7 +431,7 @@ function toggleGroup(groupId: string) {
         <section class="surface">
           <header class="border-b border-border px-5 py-4">
             <h3 class="font-display text-sm font-semibold text-aruna-navy">Profile</h3>
-            <p class="text-xs text-muted-foreground">Loaded from /users/info and saved with PATCH /users/info.</p>
+            <p class="text-xs text-muted-foreground">Loaded from /access/users/me and saved with PATCH /access/users/me.</p>
           </header>
           <div v-if="currentUser" class="flex items-center gap-4 border-b border-border px-5 py-5">
             <Avatar :user="currentUser" size="lg" />

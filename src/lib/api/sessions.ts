@@ -1,4 +1,4 @@
-// --- User sessions (POST+GET /users/sessions, DELETE /users/sessions/{id}) ---
+// --- User sessions (POST+GET /access/sessions, DELETE /access/sessions/{id}) ---
 // Every bearer the realm mints is bound to a session the user can list and
 // revoke. The portal login is itself a `portal` session; an AI client or a
 // chat panel gets a child session of kind `assistant`.
@@ -41,7 +41,7 @@ export function listSessions(
   client: ApiClientOptions = {},
   signal?: AbortSignal,
 ): Promise<ListSessionsResponse> {
-  return apiRequest<ListSessionsResponse>('/users/sessions', { signal }, client)
+  return apiRequest<ListSessionsResponse>('/access/sessions', { signal }, client)
 }
 
 export function createSession(
@@ -50,7 +50,7 @@ export function createSession(
   signal?: AbortSignal,
 ): Promise<CreateSessionResponse> {
   return apiRequest<CreateSessionResponse>(
-    '/users/sessions',
+    '/access/sessions',
     { method: 'POST', body: JSON.stringify(request), signal },
     client,
   )
@@ -62,7 +62,7 @@ export function revokeSession(
   signal?: AbortSignal,
 ): Promise<void> {
   return apiRequest<void>(
-    `/users/sessions/${encodeURIComponent(sessionId)}`,
+    `/access/sessions/${encodeURIComponent(sessionId)}`,
     { method: 'DELETE', signal },
     client,
   )

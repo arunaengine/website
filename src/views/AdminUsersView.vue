@@ -74,7 +74,7 @@ function prevPage() {
   if (pageIndex.value > 0 && !listLoading.value) void loadPage(pageIndex.value - 1)
 }
 
-// ── Search (GET /users/search, min 2 chars, backend caps limit at 20) ───────
+// ── Search (GET /access/users/search, min 2 chars, backend caps limit at 20) ───────
 const query = ref('')
 const searching = computed(() => query.value.trim().length >= 2)
 const searchRows = ref<UserRow[]>([])

@@ -1,5 +1,5 @@
-// --- Node onboarding (POST+GET /admin/onboarding/secrets, DELETE /admin/onboarding/secrets/{id},
-// GET /onboarding/secrets/{id}/status) ---
+// --- Node onboarding (POST+GET /access/onboarding/secrets, DELETE /access/onboarding/secrets/{id},
+// GET /access/onboarding/secrets/{id}/status) ---
 // Verified against aruna api/src/routes/onboarding.rs. Management nodes only.
 // The admin routes need WRITE on /{realm_id}/admin/onboarding; a 'User' mint is
 // self-service for any realm member holding an unrestricted token, and the
@@ -11,7 +11,7 @@ export type OnboardingMode = 'Management' | 'Server' | 'User'
 
 export interface CreateOnboardingSecretRequest {
   // Origin-style base URL of a management node reachable by the joiner; the
-  // node calls {seed_url}/api/v1/onboarding/bootstrap; never include /api/v1.
+  // node calls {seed_url}/api/v1/access/onboarding/bootstrap; never include /api/v1.
   // Empty means "the node serving this request", which is what a device sends.
   seed_url: string
   mode: OnboardingMode

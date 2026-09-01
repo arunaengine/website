@@ -89,7 +89,7 @@ describe('device mint', () => {
     // not be consulted to guess one.
     const other = device({ id: 'enr-old', node_id: null, enrollment_id: 'enr-old', status: 'pending', expires_at: 1800 })
     serve((url, method) => {
-      if (url.endsWith('/users/me/devices')) return json({ devices: [other] })
+      if (url.endsWith('/access/users/me/devices')) return json({ devices: [other] })
       if (method === 'POST') {
         return json(
           { onboarding_secret: 'S3CRET', enrollment_id: 'enr-new', mode: 'User', expires_at: 1800 },
@@ -110,7 +110,7 @@ describe('device mint', () => {
     const stale = device({ id: 'enr-old', node_id: null, enrollment_id: 'enr-old', status: 'pending', expires_at: 900 })
     let minted = false
     const calls = serve((url, method) => {
-      if (url.endsWith('/users/me/devices')) return json({ devices: minted ? [stale, pending] : [stale] })
+      if (url.endsWith('/access/users/me/devices')) return json({ devices: minted ? [stale, pending] : [stale] })
       if (method === 'POST') {
         minted = true
         return json({ onboarding_secret: 'S3CRET', mode: 'User', expires_at: 1800, enroll_url: ENROLL_URL }, 201)
@@ -124,14 +124,14 @@ describe('device mint', () => {
     expect(result.enrollmentId).toBe('enr-new')
     expect(result.response.enroll_url).toBe(ENROLL_URL)
     const post = calls.find((call) => call.method === 'POST')
-    expect(post?.url).toBe(`${PAGE_ORIGIN}/api/v1/admin/onboarding/secrets`)
+    expect(post?.url).toBe(`${PAGE_ORIGIN}/api/v1/access/onboarding/secrets`)
     expect(JSON.parse(post?.body ?? '{}')).toEqual({ seed_url: '', mode: 'User', expires_in_seconds: 1800 })
   })
 
   it('explains a refusal at the device cap', async () => {
     realmInfo.value = realm([], 2)
     serve((url, method) => {
-      if (url.endsWith('/users/me/devices')) return json({ devices: [device(), device({ id: 'node-2', node_id: 'node-2' })] })
+      if (url.endsWith('/access/users/me/devices')) return json({ devices: [device(), device({ id: 'node-2', node_id: 'node-2' })] })
       if (method === 'POST') return json({ message: 'device cap reached' }, 409)
       return json({}, 404)
     })
@@ -147,7 +147,7 @@ describe('device mint', () => {
 
   it('does not count expired enrollments against the device cap', async () => {
     realmInfo.value = realm([], 2)
-    serve((url) => url.endsWith('/users/me/devices')
+    serve((url) => url.endsWith('/access/users/me/devices')
       ? json({ devices: [device(), device({ id: 'enr-old', status: 'expired', node_id: null })] })
       : json({}, 404))
 
@@ -160,7 +160,7 @@ describe('device mint', () => {
 
   it('names the token restriction behind a refusal', async () => {
     serve((url, method) => {
-      if (url.endsWith('/users/me/devices')) return json({ devices: [] })
+      if (url.endsWith('/access/users/me/devices')) return json({ devices: [] })
       if (method === 'POST') return json({ message: 'forbidden' }, 403)
       return json({}, 404)
     })
@@ -189,7 +189,7 @@ describe('claim watch', () => {
     const expiresAt = Date.now() / 1000 + 600
     let claimed = false
     serve((url) => {
-      if (url.includes('/onboarding/secrets/enr-1/status')) {
+      if (url.includes('/access/onboarding/secrets/enr-1/status')) {
         return json({
           enrollment_id: 'enr-1',
           mode: 'User',
@@ -283,7 +283,7 @@ describe('device removal', () => {
 
     expect(devices.value).toHaveLength(0)
     expect(devicesError.value).toBeNull()
-    expect(calls.some((call) => call.method === 'DELETE' && call.url.endsWith('/users/me/devices/node-1'))).toBe(true)
+    expect(calls.some((call) => call.method === 'DELETE' && call.url.endsWith('/access/users/me/devices/node-1'))).toBe(true)
   })
 
   it('keeps a refusal visible after the list reloads', async () => {

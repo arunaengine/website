@@ -32,11 +32,11 @@ export function isStaleWrite(err: unknown): boolean {
 }
 
 function getRealmPolicies(): Promise<PoliciesResponse> {
-  return request<PoliciesResponse>('/policies/realm')
+  return request<PoliciesResponse>('/access/policies/realm')
 }
 
 function getGroupPolicies(groupId: string): Promise<PoliciesResponse> {
-  return request<PoliciesResponse>(`/policies/group/${encodeURIComponent(groupId)}`)
+  return request<PoliciesResponse>(`/access/policies/group/${encodeURIComponent(groupId)}`)
 }
 
 // The API replaces a whole scope per write, so every save round-trips the
@@ -61,28 +61,28 @@ async function setPolicies(
 }
 
 function setRealmPolicies(policies: Policy[], expectedHash?: string) {
-  return setPolicies('/policies/realm', policies, expectedHash)
+  return setPolicies('/access/policies/realm', policies, expectedHash)
 }
 
 function setGroupPolicies(groupId: string, policies: Policy[], expectedHash?: string) {
-  return setPolicies(`/policies/group/${encodeURIComponent(groupId)}`, policies, expectedHash)
+  return setPolicies(`/access/policies/group/${encodeURIComponent(groupId)}`, policies, expectedHash)
 }
 
 function getEffective(groupId?: string): Promise<EffectivePoliciesResponse> {
-  return request<EffectivePoliciesResponse>('/policies/effective', {
+  return request<EffectivePoliciesResponse>('/access/policies/effective', {
     query: groupId ? { group_id: groupId } : {},
   })
 }
 
 function validatePolicy(body: ValidatePolicyRequest): Promise<ValidatePolicyResponse> {
-  return request<ValidatePolicyResponse>('/policies/validate', {
+  return request<ValidatePolicyResponse>('/access/policies/validate', {
     method: 'POST',
     body: JSON.stringify(body),
   })
 }
 
 function dryRun(body: DryRunRequest): Promise<DryRunResponse> {
-  return request<DryRunResponse>('/policies/dry-run', {
+  return request<DryRunResponse>('/access/policies/dryrun', {
     method: 'POST',
     body: JSON.stringify({
       ...body,

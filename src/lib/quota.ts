@@ -1,5 +1,5 @@
 // Client-side interpretation of the server-computed GroupQuotaStatus
-// (GET /groups/{id}/usage). The server owns the warn flag and the limits;
+// (GET /access/groups/{id}/usage). The server owns the warn flag and the limits;
 // this module only classifies "where usage sits relative to those limits"
 // so the quota bar, dashboard cards and upload precheck all say the same
 // thing. The QuotaGate enforces against the group's REALM-WIDE

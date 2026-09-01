@@ -12,14 +12,14 @@ import { profileIdFromPath } from './profileIri'
 import { apiGroups, credentials, refreshContext, sessionEpoch, userInfo } from './state'
 
 export async function loadAuthenticated(context = refreshContext()) {
-  // /users/info is the authentication authority. Optional group and credential
+  // /access/users/me is the authentication authority. Optional group and credential
   // capabilities must not turn a valid session into a signed-out one.
-  const me = await apiRequest<UserInfoResponse>('/users/info', {}, context.client)
+  const me = await apiRequest<UserInfoResponse>('/access/users/me', {}, context.client)
   if (context.epoch !== sessionEpoch.value) return
   userInfo.value = me
   const [groups, credentialList] = await Promise.allSettled([
     listGroups(context),
-    apiRequest<ListS3CredentialsResponse>('/users/credentials', {}, context.client),
+    apiRequest<ListS3CredentialsResponse>('/access/credentials', {}, context.client),
   ])
   if (context.epoch !== sessionEpoch.value) return
   apiGroups.value = groups.status === 'fulfilled' ? groups.value.groups : []
@@ -32,7 +32,7 @@ export async function listGroups(context = refreshContext()): Promise<ListGroups
   let offset = 0
   while (true) {
     const page = await apiRequest<ListGroupsResponse>(
-      '/groups',
+      '/access/groups',
       { query: { include: 'roles', limit, offset } },
       context.client,
     )

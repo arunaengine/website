@@ -61,7 +61,7 @@ export interface GetUserResponse {
   attributes: Record<string, string>
 }
 
-// POST /users/resolve: batch id → profile resolution (cap 100 ids). `attributes`
+// POST /access/users/resolve: batch id → profile resolution (cap 100 ids). `attributes`
 // is the safe scholarly subset only; sensitive keys (e.g. email) are excluded.
 export interface ResolveUserResult {
   user_id: string

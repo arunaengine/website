@@ -22,7 +22,7 @@ import { apiGroups, request, saving, userInfo } from './state'
 export async function createGroup(name: string): Promise<GroupDetailResponse> {
   saving.value = true
   try {
-    const created = await request<GroupDetailResponse>('/groups', {
+    const created = await request<GroupDetailResponse>('/access/groups', {
       method: 'POST',
       body: JSON.stringify({ name }),
     })
@@ -34,11 +34,11 @@ export async function createGroup(name: string): Promise<GroupDetailResponse> {
 }
 
 export async function getGroup(groupId: string): Promise<GroupDetailResponse> {
-  return request<GroupDetailResponse>(`/groups/${groupId}`)
+  return request<GroupDetailResponse>(`/access/groups/${groupId}`)
 }
 
 export async function getGroupUsage(groupId: string): Promise<UsageResponse> {
-  return request<UsageResponse>(`/groups/${groupId}/usage`)
+  return request<UsageResponse>(`/access/groups/${groupId}/usage`)
 }
 
 // STUB against the assumed #250 history endpoint (see api.ts). On today's
@@ -52,13 +52,13 @@ export async function getGroupUsageHistory(
 }
 
 export async function listGroupMembers(groupId: string): Promise<GroupMembersResponse> {
-  return request<GroupMembersResponse>(`/groups/${groupId}/members`)
+  return request<GroupMembersResponse>(`/access/groups/${groupId}/members`)
 }
 
 export async function addGroupMember(groupId: string, input: AddGroupMemberRequest): Promise<GroupRolesResponse> {
   saving.value = true
   try {
-    const response = await request<GroupRolesResponse>(`/groups/${groupId}/members`, {
+    const response = await request<GroupRolesResponse>(`/access/groups/${groupId}/members`, {
       method: 'POST',
       body: JSON.stringify(input),
     })
@@ -72,7 +72,7 @@ export async function addGroupMember(groupId: string, input: AddGroupMemberReque
 export async function removeGroupMember(groupId: string, userId: string, roleId?: string): Promise<void> {
   saving.value = true
   try {
-    await request<void>(`/groups/${groupId}/members/${userId}`, {
+    await request<void>(`/access/groups/${groupId}/members/${userId}`, {
       method: 'DELETE',
       query: { role_id: roleId },
     })
@@ -85,7 +85,7 @@ export async function removeGroupMember(groupId: string, userId: string, roleId?
 export async function leaveGroup(groupId: string): Promise<void> {
   saving.value = true
   try {
-    await request<void>(`/groups/${groupId}/leave`, { method: 'POST' })
+    await request<void>(`/access/groups/${groupId}/leave`, { method: 'POST' })
     await loadAuthenticated().catch(() => undefined)
   } finally {
     saving.value = false
@@ -95,7 +95,7 @@ export async function leaveGroup(groupId: string): Promise<void> {
 export async function createGroupRole(groupId: string, input: CreateGroupRoleRequest): Promise<ApiRole> {
   saving.value = true
   try {
-    const role = await request<ApiRole>(`/groups/${groupId}/roles`, {
+    const role = await request<ApiRole>(`/access/groups/${groupId}/roles`, {
       method: 'POST',
       body: JSON.stringify(input),
     })
@@ -109,14 +109,14 @@ export async function createGroupRole(groupId: string, input: CreateGroupRoleReq
 export async function deleteGroupRole(groupId: string, roleId: string): Promise<void> {
   saving.value = true
   try {
-    await request<void>(`/groups/${groupId}/roles/${roleId}`, { method: 'DELETE' })
+    await request<void>(`/access/groups/${groupId}/roles/${roleId}`, { method: 'DELETE' })
     await loadAuthenticated().catch(() => undefined)
   } finally {
     saving.value = false
   }
 }
 
-// Distinct member ids per group, from /groups?include=roles. Only counted
+// Distinct member ids per group, from /access/groups?include=roles. Only counted
 // when the caller can see assigned_users (i.e. is a member of the group).
 export const groupMemberCounts = computed<Map<string, number>>(() => {
   const counts = new Map<string, number>()
@@ -127,7 +127,7 @@ export const groupMemberCounts = computed<Map<string, number>>(() => {
   return counts
 })
 
-// "My groups" come from /users/info; their roles are the caller's own roles.
+// "My groups" come from /access/users/me; their roles are the caller's own roles.
 export const myGroups = computed<Group[]>(() =>
   (userInfo.value?.groups ?? []).map((group) =>
     mapGroup({
@@ -139,7 +139,7 @@ export const myGroups = computed<Group[]>(() =>
   ),
 )
 
-// Realm groups the caller is not a member of, from the open GET /groups.
+// Realm groups the caller is not a member of, from the open GET /access/groups.
 export const discoverableGroups = computed<Group[]>(() => {
   const mine = new Set((userInfo.value?.groups ?? []).map((group) => group.group_id))
   return apiGroups.value.filter((group) => !mine.has(group.group_id)).map(mapGroup)

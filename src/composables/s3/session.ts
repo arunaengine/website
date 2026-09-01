@@ -235,7 +235,7 @@ async function mintSession(nodeId: string, groupId: string, userId: string): Pro
   const request = (async () => {
     const body: CreateS3SessionRequest = { group_id: groupId }
     const response = await apiRequest<S3SessionResponse>(
-      '/users/s3-sessions',
+      '/access/s3/sessions',
       { method: 'POST', body: JSON.stringify(body) },
       { baseUrl: apiBase, token: authToken.value },
     )
@@ -264,7 +264,7 @@ async function refreshSession(key: string): Promise<void> {
   putSession(key, { ...session, state: 'refreshing', warning: null })
   try {
     const response = await apiRequest<S3SessionResponse>(
-      `/users/s3-sessions/${encodeURIComponent(session.accessKeyId)}/refresh`,
+      `/access/s3/sessions/${encodeURIComponent(session.accessKeyId)}/refresh`,
       { method: 'POST' },
       { baseUrl: session.apiBase, token: authToken.value },
     )

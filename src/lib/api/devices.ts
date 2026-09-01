@@ -1,4 +1,4 @@
-// --- User devices (GET /users/me/devices, DELETE /users/me/devices/{id}) ---
+// --- User devices (GET /access/users/me/devices, DELETE /access/users/me/devices/{id}) ---
 // Self-scoped: always the caller's own devices, never another user's. An
 // enrolled device is addressed by its node id, an in-flight enrollment by its
 // enrollment id, and one device is listed once.

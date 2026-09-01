@@ -110,7 +110,7 @@ export function useDeviceEnrollment() {
   async function loadDevices(): Promise<void> {
     loadingDevices.value = true
     try {
-      const response = await request<UserDevicesResponse>('/users/me/devices')
+      const response = await request<UserDevicesResponse>('/access/users/me/devices')
       devices.value = response.devices
       devicesError.value = null
     } catch (err) {
@@ -138,7 +138,7 @@ export function useDeviceEnrollment() {
       await loadDevices()
       const before = new Set(devices.value.map((device) => device.id))
       // seed_url '' asks the node to fill in its own published REST base URL.
-      const response = await request<CreateOnboardingSecretResponse>('/admin/onboarding/secrets', {
+      const response = await request<CreateOnboardingSecretResponse>('/access/onboarding/secrets', {
         method: 'POST',
         body: JSON.stringify({ seed_url: '', mode: 'User', expires_in_seconds: expiresInSeconds }),
       })
@@ -166,7 +166,7 @@ export function useDeviceEnrollment() {
     markBusy(id, true)
     let failure: string | null = null
     try {
-      await request<void>(`/users/me/devices/${encodeURIComponent(id)}`, { method: 'DELETE' })
+      await request<void>(`/access/users/me/devices/${encodeURIComponent(id)}`, { method: 'DELETE' })
     } catch (err) {
       // A 404 means the device is already gone; the row disappears either way.
       if (!(err instanceof ApiError && err.status === 404)) failure = message(err)
@@ -218,7 +218,7 @@ export function useDeviceEnrollment() {
   async function tick(): Promise<void> {
     try {
       if (!watch.value.enrollmentId) return await settleFromDevices()
-      const path = `/onboarding/secrets/${encodeURIComponent(watch.value.enrollmentId)}/status`
+      const path = `/access/onboarding/secrets/${encodeURIComponent(watch.value.enrollmentId)}/status`
       const status = await request<OnboardingSecretStatus>(path)
       patch({ lastError: null })
       if (status.status === 'expired') return finish('expired')

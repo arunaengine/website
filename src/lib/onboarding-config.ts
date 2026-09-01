@@ -27,7 +27,7 @@ export interface NodeConfigInput {
 import type { RealmInfoResponse } from './api'
 
 // Trim, drop trailing slashes, and drop one trailing '/api/v1': the node appends
-// /api/v1/onboarding/bootstrap itself (aruna/src/config.rs), so seed_url must be
+// /api/v1/access/onboarding/bootstrap itself (aruna/src/config.rs), so seed_url must be
 // an origin-style URL without the API prefix.
 export function normalizeSeedUrl(raw: string): string {
   const trimmed = raw.trim().replace(/\/+$/, '')
