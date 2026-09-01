@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, toRaw, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import LocationAggregates from '@/components/placement/LocationAggregates.vue'
 import StrategyEditor from '@/components/placement/StrategyEditor.vue'
+import NodeAttributesSection from '@/components/storage/NodeAttributesSection.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
@@ -20,18 +20,16 @@ import {
 } from '@/composables/usePlacement'
 import { apiErrorMessage, type RealmPlacementBinding, type RealmPlacementStrategy } from '@/lib/api'
 import {
-  aggregateByLocation,
   knownLocations as computeKnownLocations,
   type RealmPlacementConfigResponse,
 } from '@/lib/placement'
-import { Link2, MapPinned, Plus, SlidersHorizontal } from '@lucide/vue'
+import { Layers, Link2, Plus, SlidersHorizontal } from '@lucide/vue'
 
 // Realm-admin access is gated by the parent AdminView; this panel only guards
 // the placement feature flag.
 const { bootstrapped, currentUser, isRealmAdmin, realmInfo } = useAruna()
 const { placementAdminEnabled, busy, getRealmPlacement, mutateRealmPlacement } = usePlacement()
 
-const locationAggregates = computed(() => aggregateByLocation(realmInfo.value?.nodes ?? []))
 const knownLocations = computed(() => computeKnownLocations(realmInfo.value?.nodes ?? []))
 const ready = computed(
   () =>
@@ -156,14 +154,14 @@ async function saveStrategy() {
   saveMessage.value = null
   const strategy = cloneStrategy(strategyDraft.value)
   if (!strategy.strategy_id.trim()) {
-    saveError.value = 'A valid strategy id is required.'
+    saveError.value = 'A new rule needs an id.'
     return
   }
   try {
     const next = await mutateRealmPlacement({ mutation: 'upsert_strategy', strategy })
     creatingStrategy.value = false
     applyConfig(next, strategy.strategy_id)
-    saveMessage.value = 'Placement strategy saved.'
+    saveMessage.value = 'Record placement rule saved.'
   } catch (err) {
     saveError.value = placementMutationErrorMessage(err)
   }
@@ -179,7 +177,7 @@ async function setDefaultStrategy() {
       await mutateRealmPlacement({ mutation: 'set_default_strategy', strategy_id: strategyId }),
       strategyId,
     )
-    saveMessage.value = 'Realm default strategy updated.'
+    saveMessage.value = 'This rule is now the realm default.'
   } catch (err) {
     saveError.value = placementMutationErrorMessage(err)
   }
@@ -192,7 +190,7 @@ async function removeStrategy() {
   saveMessage.value = null
   try {
     applyConfig(await mutateRealmPlacement({ mutation: 'remove_strategy', strategy_id: strategyId }))
-    saveMessage.value = 'Placement strategy removed.'
+    saveMessage.value = 'Record placement rule removed.'
   } catch (err) {
     saveError.value = placementMutationErrorMessage(err)
   }
@@ -267,36 +265,35 @@ watch(
 
     <div v-else-if="!placementAdminEnabled" class="container py-8">
       <section class="surface mx-auto max-w-xl p-8">
-        <EmptyState title="Placement administration is not enabled" description="Enable features.placementAdmin in portal-config.json for a backend that serves the realm placement API.">
-          <template #icon><MapPinned class="h-8 w-8" /></template>
+        <EmptyState
+          title="Record placement is not enabled on this portal"
+          description="Set features.placementAdmin in portal-config.json for a backend that serves the realm placement API."
+        >
+          <template #icon><Layers class="h-8 w-8" /></template>
         </EmptyState>
       </section>
     </div>
 
-    <div v-else class="container grid gap-6 py-8 lg:grid-cols-[260px_1fr]">
-      <nav class="flex flex-col gap-1 text-sm lg:sticky lg:top-20 lg:self-start">
-        <a href="#locations" class="rounded-md bg-primary/5 px-3 py-2 font-medium text-primary">Locations</a>
-        <a href="#strategies" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Strategies</a>
-        <a href="#group-bindings" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Group bindings</a>
-      </nav>
+    <div v-else class="container space-y-5 py-6">
+      <div class="surface flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+        <p class="max-w-3xl text-sm text-muted-foreground">
+          Record placement decides which nodes hold dataset records and system jobs. It never
+          decides where files are stored: that is the storage backend of the node taking the upload,
+          and the placement policies the bucket carries.
+        </p>
+        <RouterLink :to="{ name: 'status' }" class="text-xs font-medium text-primary hover:underline">
+          See the realm locations on Status
+        </RouterLink>
+      </div>
 
-      <div class="space-y-6">
-        <section id="locations" class="surface scroll-mt-24">
-          <header class="flex items-center justify-between border-b border-border px-5 py-4">
-            <div class="flex items-center gap-2">
-              <MapPinned class="h-4 w-4 text-primary" />
-              <h3 class="font-display text-sm font-semibold text-aruna-navy">Locations</h3>
-            </div>
-            <RouterLink :to="{ name: 'status' }" class="text-xs font-medium text-primary hover:underline">Node status →</RouterLink>
-          </header>
-          <div class="px-5 py-4"><LocationAggregates :aggregates="locationAggregates" /></div>
-        </section>
+      <NodeAttributesSection />
 
+      <div class="space-y-5">
         <section id="strategies" class="surface scroll-mt-24">
           <header class="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-4">
             <div class="flex items-center gap-2">
               <SlidersHorizontal class="h-4 w-4 text-primary" />
-              <h3 class="font-display text-sm font-semibold text-aruna-navy">Strategies</h3>
+              <h3 class="font-display text-sm font-semibold text-aruna-navy">Record placement rules</h3>
             </div>
             <RefreshButton :busy="spinning" :disabled="busy" label="Reload" @click="onReload" />
           </header>
@@ -305,18 +302,18 @@ watch(
               <Skeleton class="h-8" />
               <Skeleton class="h-32" />
             </template>
-            <EmptyState v-else-if="unsupported" compact title="This backend does not serve /info/realm/placement." />
+            <EmptyState v-else-if="unsupported" compact title="This node does not serve record placement." />
             <ErrorPanel v-else-if="loadError" :message="loadError" @retry="loadPlacement" />
             <template v-else-if="config">
               <div class="flex flex-wrap items-center gap-2">
                 <Select v-if="strategyOptions.length" v-model="selectedStrategyId" :options="strategyOptions" class="min-w-56" :disabled="busy" />
-                <Button variant="outline" size="sm" :disabled="busy" @click="createStrategy"><Plus class="h-3.5 w-3.5" /> New strategy</Button>
+                <Button variant="outline" size="sm" :disabled="busy" @click="createStrategy"><Plus class="h-3.5 w-3.5" /> New rule</Button>
               </div>
 
               <template v-if="strategyDraft">
                 <div v-if="creatingStrategy">
-                  <label class="text-xs font-medium text-foreground">Strategy ID</label>
-                  <Input v-model="strategyDraft.strategy_id" class="mt-1 font-mono" placeholder="Strategy id" :disabled="busy" />
+                  <label class="text-xs font-medium text-foreground">Rule id</label>
+                  <Input v-model="strategyDraft.strategy_id" class="mt-1 font-mono" placeholder="A new id" :disabled="busy" />
                 </div>
                 <div v-else>
                   <div class="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
@@ -325,7 +322,7 @@ watch(
                     <Badge v-if="selectedIsJobFamily" variant="accent">Run family</Badge>
                   </div>
                   <p v-if="selectedIsJobFamily" class="mt-1 text-[11px] text-muted-foreground">
-                    Routes run-family records. It cannot be removed, and its shard count is frozen.
+                    Places run family records. It cannot be removed, and its shard count is frozen.
                   </p>
                 </div>
 
@@ -338,18 +335,18 @@ watch(
                 <p v-if="saveError" class="text-xs text-destructive">{{ saveError }}</p>
                 <p v-else-if="saveMessage" class="text-xs text-emerald-700 dark:text-emerald-300">{{ saveMessage }}</p>
                 <div class="flex flex-wrap items-center gap-2">
-                  <Button size="sm" :disabled="!strategyDirty || busy" @click="saveStrategy">Save strategy</Button>
+                  <Button size="sm" :disabled="!strategyDirty || busy" @click="saveStrategy">Save rule</Button>
                   <Button variant="ghost" size="sm" :disabled="!strategyDirty || busy" @click="resetStrategy">Reset</Button>
-                  <Button variant="outline" size="sm" :disabled="selectedIsDefault || strategyDirty || busy" @click="setDefaultStrategy">Set realm default</Button>
+                  <Button variant="outline" size="sm" :disabled="selectedIsDefault || strategyDirty || busy" @click="setDefaultStrategy">Use for the whole realm</Button>
                   <Button
                     v-if="!creatingStrategy"
                     variant="destructive"
                     size="sm"
                     :disabled="selectedIsJobFamily || strategyDirty || busy"
-                    :title="selectedIsJobFamily ? 'The run-family strategy cannot be removed, and its shard count is frozen.' : undefined"
+                    :title="selectedIsJobFamily ? 'The run family rule cannot be removed, and its shard count is frozen.' : undefined"
                     @click="removeStrategy"
                   >
-                    Remove strategy
+                    Remove rule
                   </Button>
                 </div>
               </template>
@@ -370,9 +367,10 @@ watch(
             </div>
             <p v-if="bindingError" class="text-xs text-destructive">{{ bindingError }}</p>
             <p v-if="otherBindingCount || config?.overrides.length" class="text-[11px] text-muted-foreground">
-              {{ otherBindingCount }} non-group binding(s) and {{ config?.overrides.length ?? 0 }} subject override(s) are preserved and visible through the API.
+              {{ otherBindingCount }} binding(s) that are not per group and
+              {{ config?.overrides.length ?? 0 }} node pin(s) are kept and stay readable through the API.
             </p>
-            <EmptyState v-if="config && !groupBindings.length" title="No group-specific bindings" description="Groups inherit the realm or class strategy until a binding is added." />
+            <EmptyState v-if="config && !groupBindings.length" compact title="No group uses a rule of its own." description="Every group follows the realm default until a binding is added here." />
             <ul v-else class="divide-y divide-border rounded-md border border-border">
               <li v-for="binding in groupBindings" :key="binding.scope.group_id" class="flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-xs">
                 <div>

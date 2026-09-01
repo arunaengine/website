@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ApiError } from './api'
 import {
+  coverageLimitLabel,
   createOperationId,
   isPolicyListUnsupported,
   listPlacementPolicies,
+  normalizeCreatePolicyRequest,
   placementPoliciesErrorMessage,
+  policyOwnerLabel,
   runBulkToCompletion,
   type BulkRunResponse,
   type ListPoliciesResponse,
@@ -99,11 +102,14 @@ describe('placement policy listing', () => {
     const client = { baseUrl: 'https://node.test/api/v1' }
 
     const first = await listPlacementPolicies({ limit: 50 }, client)
-    const second = await listPlacementPolicies({ limit: 50, cursor: first.next_cursor! }, client)
+    const second = await listPlacementPolicies(
+      { limit: 50, cursor: first.next_cursor!, groupId: 'g-1' },
+      client,
+    )
 
     expect(urls).toEqual([
       'https://node.test/api/v1/data/placement/policies?limit=50',
-      'https://node.test/api/v1/data/placement/policies?limit=50&cursor=page-two',
+      'https://node.test/api/v1/data/placement/policies?limit=50&cursor=page-two&group_id=g-1',
     ])
     expect(first.complete).toBe(false)
     expect(second.next_cursor).toBeNull()
@@ -114,5 +120,39 @@ describe('placement policy listing', () => {
     expect(isPolicyListUnsupported(new ApiError(404, 'Not found'))).toBe(true)
     expect(isPolicyListUnsupported(new ApiError(405, 'Method not allowed'))).toBe(true)
     expect(isPolicyListUnsupported(new ApiError(403, 'Forbidden'))).toBe(false)
+  })
+})
+
+describe('placement policy ownership', () => {
+  it('carries a trimmed owner into the create request', () => {
+    const request = normalizeCreatePolicyRequest({
+      name: '  Copies inside the EU ',
+      allowed: [{ location: ' eu-west ', labels: [{ key: ' tier ', value: ' cold ' }] }],
+      owner_group_id: ' g-1 ',
+    })
+
+    expect(request).toEqual({
+      name: 'Copies inside the EU',
+      allowed: [{ location: 'eu-west', labels: [{ key: 'tier', value: 'cold' }] }],
+      owner_group_id: 'g-1',
+    })
+  })
+
+  it('publishes realm wide when no owner is given', () => {
+    expect(normalizeCreatePolicyRequest({ name: 'Any', allowed: [] }).owner_group_id).toBeUndefined()
+  })
+
+  it('labels an owner only when the node reports one', () => {
+    expect(policyOwnerLabel(undefined)).toBeUndefined()
+    expect(policyOwnerLabel(null)).toBe('Realm')
+    expect(policyOwnerLabel('g-1', 'Reef survey')).toBe('Reef survey')
+  })
+})
+
+describe('coverage caveats', () => {
+  it('says what a limit means without implementation words', () => {
+    expect(coverageLimitLabel('responder_local')).toBe('Counted on this node only')
+    expect(coverageLimitLabel('bounded-page')).toBe('One page of a longer listing')
+    expect(coverageLimitLabel('unknown_limit')).toBe('unknown limit')
   })
 })

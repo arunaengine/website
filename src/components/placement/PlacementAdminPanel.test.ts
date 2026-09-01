@@ -127,7 +127,7 @@ const PlacementAdminPanel = compileClientComponent(
   {
     vue: VueRuntime,
     'vue-router': { RouterLink: RouterLinkStub },
-    '@/components/placement/LocationAggregates.vue': moduleDefault(PassThroughStub),
+    '@/components/storage/NodeAttributesSection.vue': moduleDefault(PassThroughStub),
     '@/components/placement/StrategyEditor.vue': moduleDefault(StrategyEditor),
     '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
     '@/components/ui/Button.vue': moduleDefault(ButtonStub),
@@ -250,14 +250,14 @@ async function mountPanel(defaultStrategyId: string) {
   return { app, root, errors }
 }
 
-describe('placement on a node that is not a management node', () => {
-  it('renders the strategy form', async () => {
+describe('record placement on a node that is not a management node', () => {
+  it('renders the rule form', async () => {
     // The backend relays the placement routes, so the panel no longer asks
     // which kind of node serves it.
     const mounted = await mountPanel(familyId)
 
-    expect(content(mounted.root)).toContain('Strategies')
-    expect(button(mounted.root, 'Remove strategy')).toBeDefined()
+    expect(content(mounted.root)).toContain('Record placement rules')
+    expect(button(mounted.root, 'Remove rule')).toBeDefined()
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })
@@ -274,37 +274,37 @@ describe('placement on a node that is not a management node', () => {
   })
 })
 
-describe('placement run-family strategy controls', () => {
-  it('badges the matching strategy and explains its immutable role', async () => {
+describe('record placement run family controls', () => {
+  it('badges the run family rule and explains its immutable role', async () => {
     const mounted = await mountPanel(familyId)
 
     expect(content(mounted.root)).toContain('Run family')
     expect(content(mounted.root)).toContain(
-      'Routes run-family records. It cannot be removed, and its shard count is frozen.',
+      'Places run family records. It cannot be removed, and its shard count is frozen.',
     )
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })
 
-  it('disables removal for the run-family strategy and enables it for another strategy', async () => {
+  it('disables removal for the run family rule and allows it for another', async () => {
     const family = await mountPanel(familyId)
-    expect(button(family.root, 'Remove strategy').props.disabled).toBe(true)
+    expect(button(family.root, 'Remove rule').props.disabled).toBe(true)
     family.app.unmount()
 
     const other = await mountPanel(otherId)
-    expect(button(other.root, 'Remove strategy').props.disabled).toBe(false)
+    expect(button(other.root, 'Remove rule').props.disabled).toBe(false)
     expect(other.errors).toEqual([])
     other.app.unmount()
   })
 
-  it('locks the shard-count input while editing the run-family strategy', async () => {
+  it('locks the shard count while the run family rule is edited', async () => {
     const mounted = await mountPanel(familyId)
     const shardCount = nodes(mounted.root).find(
       (node) => node.kind === 'element' && node.tag === 'input' && node.props.max === '4096',
     )
 
     expect(shardCount?.props.disabled).toBe(true)
-    expect(content(mounted.root)).toContain('Frozen for the run-family strategy.')
+    expect(content(mounted.root)).toContain('Frozen for the run family.')
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })

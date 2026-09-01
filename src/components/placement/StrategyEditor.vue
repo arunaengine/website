@@ -107,10 +107,10 @@ function ruleLabel(rule: RealmPlacementStrategy['affinity'][number]): string {
           step="1"
           class="mt-1"
           :disabled="disabled || shardCountLocked"
-          :title="shardCountLocked ? 'The run-family strategy shard count is frozen.' : undefined"
+          :title="shardCountLocked ? 'The run family shard count is frozen.' : undefined"
         />
         <p class="mt-1 text-[11px] text-muted-foreground">
-          {{ shardCountLocked ? 'Frozen for the run-family strategy.' : 'Power of two, at most 4096.' }}
+          {{ shardCountLocked ? 'Frozen for the run family.' : 'Power of two, at most 4096.' }}
         </p>
       </div>
     </div>

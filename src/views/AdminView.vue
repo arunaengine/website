@@ -9,7 +9,7 @@ import Switch from '@/components/ui/Switch.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ComputeAdminPanel from '@/components/compute-admin/ComputeAdminPanel.vue'
 import PlacementAdminPanel from '@/components/placement/PlacementAdminPanel.vue'
-import PlacementPolicyPanel from '@/components/placement/PlacementPolicyPanel.vue'
+import DataPlacementPanel from '@/components/storage/DataPlacementPanel.vue'
 import PoliciesSection from '@/components/policies/PoliciesSection.vue'
 import EffectivePolicies from '@/components/policies/EffectivePolicies.vue'
 import Tabs from '@/components/ui/Tabs.vue'
@@ -17,6 +17,7 @@ import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import { useRouteTab } from '@/composables/useRouteTab'
+import { adminTabs } from '@/views/adminTabs'
 import { RouterLink } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
@@ -37,22 +38,14 @@ const { resolveUsers, cachedUser } = useUserDirectory()
 
 const { busy: refreshBusy, refresh: onRefresh } = useRefresh(refresh)
 
-// Placement admin is a tab of this view (config-gated); the legacy
-// /app/admin/placement route redirects here with ?tab=placement.
+// Record placement and data placement are tabs of this view (config-gated);
+// the legacy /app/admin/placement route redirects here with ?tab=placement.
 const placementAdminEnabled = featureEnabled('placementAdmin')
 const policiesEnabled = featureEnabled('policies')
 
-// A tab a feature gate turns off is not offered and not reachable by URL.
-const adminTabs = [
-  { id: 'realm', label: 'Quota & usage' },
-  { id: 'compute', label: 'Compute' },
-  // The tab id stays 'residency' so saved ?tab= links keep resolving.
-  ...(placementAdminEnabled ? [{ id: 'placement', label: 'Placement strategies' }] : []),
-  ...(placementAdminEnabled ? [{ id: 'residency', label: 'Placement policies' }] : []),
-  ...(policiesEnabled ? [{ id: 'policies', label: 'Policies' }] : []),
-]
+const tabs = adminTabs({ placement: placementAdminEnabled, policies: policiesEnabled })
 const tab = useRouteTab(
-  adminTabs.map((entry) => entry.id),
+  tabs.map((entry) => entry.id),
   'realm',
 )
 
@@ -341,7 +334,7 @@ async function save() {
 
 <template>
   <div>
-    <PageHeader title="Realm administration" description="Realm-wide usage, quotas, compute, placement strategies and placement policies.">
+    <PageHeader title="Realm administration" description="Realm-wide usage, quotas, compute, where records are placed and where data may be stored.">
       <template #actions>
         <RefreshButton :busy="refreshBusy" size="default" @click="onRefresh" />
       </template>
@@ -375,7 +368,7 @@ async function save() {
       <div class="container pt-6">
         <div class="overflow-x-auto">
           <TabsList aria-label="Realm administration sections">
-            <TabsTrigger v-for="entry in adminTabs" :key="entry.id" :value="entry.id">
+            <TabsTrigger v-for="entry in tabs" :key="entry.id" :value="entry.id">
               {{ entry.label }}
             </TabsTrigger>
           </TabsList>
@@ -386,7 +379,7 @@ async function save() {
 
       <TabsContent v-if="placementAdminEnabled" value="placement" class="mt-0"><PlacementAdminPanel /></TabsContent>
 
-      <TabsContent v-if="placementAdminEnabled" value="residency" class="mt-0"><PlacementPolicyPanel /></TabsContent>
+      <TabsContent v-if="placementAdminEnabled" value="data-placement" class="mt-0"><DataPlacementPanel /></TabsContent>
 
       <TabsContent v-if="policiesEnabled" value="policies" class="container mt-0 space-y-8 py-8">
         <PoliciesSection scope="realm" :can-admin="isRealmAdmin" />

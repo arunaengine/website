@@ -5,31 +5,15 @@ import * as VueRuntime from 'vue'
 import { createSSRApp, effectScope, h, nextTick, reactive } from 'vue'
 import { renderToString } from '@vue/server-renderer'
 import { describe, expect, it, vi } from 'vitest'
-import { useRefresh } from '@/composables/useRefresh'
 import * as Api from '@/lib/api'
 import * as PlacementPolicies from '@/lib/placementPolicies'
 import * as Utils from '@/lib/utils'
-import ComputeAdminPanel from '@/components/compute-admin/ComputeAdminPanel.vue'
-import ComputeQuotaFields from '@/components/compute-admin/ComputeQuotaFields.vue'
-import BucketPlacementSection from './BucketPlacementSection.vue'
 import CoverageReport from './CoverageReport.vue'
-import PlacementPolicyPanel from './PlacementPolicyPanel.vue'
-import PlacementPolicyEditor from './PlacementPolicyEditor.vue'
 import type { BulkRunResponse, CoverageResponse } from '@/lib/placementPolicies'
 
-const placementPolicyMocks = {
-  getBucketPlacement: vi.fn(),
+const placementMocks = {
   getPlacementCoverage: vi.fn(),
-  putBucketPlacement: vi.fn(),
   runBucketPlacement: vi.fn(),
-  loadPolicyPage: vi.fn(),
-}
-
-const placementPolicyState = {
-  sessionPolicies: { value: [] },
-  sessionPolicyRefs: { value: [] },
-  listedPolicies: { value: [] },
-  listState: { value: 'ready' },
 }
 
 function compileSetupComponent(url: URL, modules: Record<string, unknown>) {
@@ -47,23 +31,24 @@ function compileSetupComponent(url: URL, modules: Record<string, unknown>) {
   }
   new Function('require', 'exports', 'module', javascript)(localRequire, cjs.exports, cjs)
   return cjs.exports.default as {
-    setup: (props: { open: boolean; bucket: string }, context: Record<string, unknown>) => {
-      startBulkRun: () => Promise<void>
-    }
+    setup: (
+      props: { bucket: string; canApply: boolean; blockedReason: string | null },
+      context: Record<string, unknown>,
+    ) => { applyToExisting: () => Promise<void> }
   }
 }
 
-const BucketPlacementSetup = compileSetupComponent(new URL('./BucketPlacementSection.vue', import.meta.url), {
-  vue: VueRuntime,
-  '@lucide/vue': new Proxy({}, { get: () => ({}) }),
-  '@/composables/usePlacementPolicies': {
-    usePlacementPolicies: () => ({ ...placementPolicyMocks, ...placementPolicyState }),
+const ComplianceSetup = compileSetupComponent(
+  new URL('../storage/BucketComplianceSection.vue', import.meta.url),
+  {
+    vue: VueRuntime,
+    '@lucide/vue': new Proxy({}, { get: () => ({}) }),
+    '@/composables/usePlacementPolicies': { usePlacementPolicies: () => placementMocks },
+    '@/lib/api': Api,
+    '@/lib/placementPolicies': PlacementPolicies,
+    '@/lib/utils': Utils,
   },
-  '@/composables/useRefresh': { useRefresh },
-  '@/lib/api': Api,
-  '@/lib/placementPolicies': PlacementPolicies,
-  '@/lib/utils': Utils,
-})
+)
 
 const report: CoverageResponse = {
   bucket: 'datasets',
@@ -72,12 +57,14 @@ const report: CoverageResponse = {
   target_policies: [],
   observed: 10,
   deleted: 1,
-  gaps: [{
-    key: 'raw/sample.fastq',
-    version_id: '01J00000000000000000000000',
-    attachment: 'missing',
-    copy: 'quarantined',
-  }],
+  gaps: [
+    {
+      key: 'raw/sample.fastq',
+      version_id: '01J00000000000000000000000',
+      attachment: 'missing',
+      copy: 'quarantined',
+    },
+  ],
   registered: 7,
   quarantined: 1,
   absent: 1,
@@ -86,44 +73,42 @@ const report: CoverageResponse = {
   limits: ['responder_local', 'bounded_page', 'concurrent_writes'],
 }
 
-describe('CoverageReport', () => {
-  it('compiles the new admin panel components', () => {
-    expect([
-      ComputeAdminPanel,
-      ComputeQuotaFields,
-      BucketPlacementSection,
-      PlacementPolicyPanel,
-      PlacementPolicyEditor,
-    ]).toHaveLength(5)
-  })
-
-  it('always renders every backend limit as an inline caveat', async () => {
+describe('coverage report', () => {
+  it('renders every backend caveat in plain words', async () => {
     const html = await renderToString(createSSRApp({ render: () => h(CoverageReport, { report }) }))
 
-    expect(html).toContain('Report caveats:')
-    expect(html).toContain('Responder-local view only')
-    expect(html).toContain('Bounded page')
-    expect(html).toContain('Concurrent writes may not be reflected')
-    expect(html).toContain('never means realm-wide convergence')
+    expect(html).toContain('Counted on this node only')
+    expect(html).toContain('One page of a longer listing')
+    expect(html).toContain('Writes during the count may be missing')
+    expect(html).not.toContain('responder')
+    expect(html).not.toContain('convergence')
   })
 
-  it('stops a bucket bulk run after the section closes', async () => {
+  it('names the gap without implementation words', async () => {
+    const html = await renderToString(createSSRApp({ render: () => h(CoverageReport, { report }) }))
+
+    expect(html).toContain('raw/sample.fastq')
+    expect(html).toContain('none attached')
+    expect(html).toContain('held back here')
+  })
+
+  it('stops a catch-up run once the section moved to another bucket', async () => {
     let resolvePage!: (value: BulkRunResponse) => void
-    placementPolicyMocks.getBucketPlacement.mockResolvedValue({ bucket: 'datasets', policies: [], generation: 1 })
-    placementPolicyMocks.getPlacementCoverage.mockResolvedValue(report)
-    placementPolicyMocks.runBucketPlacement.mockImplementationOnce(() => new Promise((resolve) => { resolvePage = resolve }))
-    const props = reactive({ open: true, bucket: 'datasets' })
+    placementMocks.getPlacementCoverage.mockResolvedValue(report)
+    placementMocks.runBucketPlacement.mockImplementationOnce(
+      () => new Promise((resolve) => { resolvePage = resolve }),
+    )
+    const props = reactive({ bucket: 'datasets', canApply: true, blockedReason: null })
     const scope = effectScope()
-    const bindings = scope.run(() => BucketPlacementSetup.setup(
-      props,
-      { emit: vi.fn(), expose: vi.fn(), attrs: {}, slots: {} },
-    ))!
+    const bindings = scope.run(() =>
+      ComplianceSetup.setup(props, { emit: vi.fn(), expose: vi.fn(), attrs: {}, slots: {} }),
+    )!
 
-    const run = bindings.startBulkRun()
+    const run = bindings.applyToExisting()
     await Promise.resolve()
-    expect(placementPolicyMocks.runBucketPlacement).toHaveBeenCalledTimes(1)
+    expect(placementMocks.runBucketPlacement).toHaveBeenCalledTimes(1)
 
-    props.open = false
+    props.bucket = 'another'
     await nextTick()
     resolvePage({
       operation_id: '01J00000000000000000000000',
@@ -140,7 +125,7 @@ describe('CoverageReport', () => {
     })
     await run
 
-    expect(placementPolicyMocks.runBucketPlacement).toHaveBeenCalledTimes(1)
+    expect(placementMocks.runBucketPlacement).toHaveBeenCalledTimes(1)
     scope.stop()
   })
 })
