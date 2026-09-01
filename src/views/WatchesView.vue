@@ -6,6 +6,7 @@ import Badge from '@/components/ui/Badge.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ListShell from '@/components/ui/ListShell.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import NodeLabel from '@/components/ui/NodeLabel.vue'
 import { computed, onMounted, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
@@ -13,7 +14,7 @@ import { useWatches } from '@/composables/useWatches'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
 import { useRefresh } from '@/composables/useRefresh'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
-import { parseWatchPath, watchEventLabel } from '@/lib/watches'
+import { parseWatchPath, watchEventLabel, WATCH_DELIVERY_NOTE } from '@/lib/watches'
 import { errorMessage, relativeTime, truncateMiddle } from '@/lib/utils'
 import type { ApiWatch } from '@/lib/api'
 import { ArrowLeft, Eye, Trash2 } from '@lucide/vue'
@@ -38,6 +39,8 @@ const rows = computed(() =>
     return {
       w,
       info,
+      // Absent field: the backend still filters unauthorized watches out.
+      authorized: w.authorized !== false,
       groupName: info ? (groupsById.value.get(info.groupId) ?? truncateMiddle(info.groupId)) : undefined,
     }
   }),
@@ -70,10 +73,7 @@ watch(currentUser, () => void ensureLoaded())
 
 <template>
   <div>
-    <PageHeader
-      title="Watched resources"
-      description="Watches deliver a notification when data is uploaded or a dataset is created under a path you follow."
-    >
+    <PageHeader title="Watched resources" :description="WATCH_DELIVERY_NOTE">
       <template #actions>
         <RefreshButton :busy="spinning" @click="onRefresh" />
         <Button variant="outline" size="sm" as-child>
@@ -111,15 +111,25 @@ watch(currentUser, () => void ensureLoaded())
         >
           <template #icon><Eye class="h-6 w-6" /></template>
           <template #filters>
-            <h2 class="text-sm font-semibold text-foreground">Active watches</h2>
+            <h2 class="text-sm font-semibold text-foreground">Your watches</h2>
           </template>
           <template #tools>
             <Badge variant="outline" size="count">{{ watches.length }}</Badge>
           </template>
 
           <ul class="divide-y divide-border">
-            <li v-for="{ w, info, groupName } in rows" :key="w.id" class="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
-              <div class="min-w-0 flex-1">
+            <li v-for="{ w, info, authorized, groupName } in rows" :key="w.id" class="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
+              <!-- An unauthorized row withholds its details, so it can only be removed. -->
+              <div v-if="!authorized" class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2">
+                  <Badge variant="warn" size="sm" class="uppercase">stopped</Badge>
+                  <span class="truncate text-sm font-medium text-foreground">No longer delivering: read access was removed</span>
+                </div>
+                <p class="mt-0.5 text-[11px] text-muted-foreground">
+                  Remove it to free one of your 50 watches.
+                </p>
+              </div>
+              <div v-else class="min-w-0 flex-1">
                 <div class="flex flex-wrap items-center gap-2">
                   <Badge variant="secondary" size="sm" class="uppercase">{{ info?.namespace === 'meta' ? 'dataset' : info?.namespace === 's3' ? 'data' : 'watch' }}</Badge>
                   <RouterLink
@@ -129,19 +139,18 @@ watch(currentUser, () => void ensureLoaded())
                     :title="w.path_prefix"
                   >{{ info.label }}</RouterLink>
                   <span v-else class="truncate text-sm font-medium text-foreground" :title="w.path_prefix">{{ info?.label ?? w.path_prefix }}</span>
-                  <!-- Optional per-watch health from newer backends. -->
-                  <Badge
-                    v-if="w.health === 'needs_attention'"
-                    variant="warn"
-                    size="sm"
-                    class="uppercase"
-                    title="This watch may not be delivering events, remove and re-create it if notifications stay silent."
-                  >needs attention</Badge>
                 </div>
-                <p class="mt-0.5 text-[11px] text-muted-foreground">
-                  <span v-for="(event, i) in w.events" :key="event">{{ i ? ', ' : '' }}{{ watchEventLabel(event) }}</span>
-                  <span v-if="groupName"> · {{ groupName }}</span>
-                  · created {{ timeOf(w) }}
+                <p class="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
+                  <span>
+                    <span v-for="(event, i) in w.events" :key="event">{{ i ? ', ' : '' }}{{ watchEventLabel(event) }}</span>
+                    <span v-if="groupName"> · {{ groupName }}</span>
+                  </span>
+                  <!-- Data watches are node-scoped: the same bucket on another node is a different watch. -->
+                  <template v-if="info?.nodeId">
+                    <span>· on</span>
+                    <NodeLabel :node-id="info.nodeId" size="sm" />
+                  </template>
+                  <span>· created {{ timeOf(w) }}</span>
                 </p>
               </div>
               <Button
@@ -150,7 +159,7 @@ watch(currentUser, () => void ensureLoaded())
                 class="text-destructive hover:text-destructive"
                 :disabled="deletingIds.includes(w.id) || writesDisabled"
                 :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
-                :aria-label="`Remove watch on ${info?.label ?? w.path_prefix}`"
+                :aria-label="authorized ? `Remove watch on ${info?.label ?? w.path_prefix}` : 'Remove watch that stopped delivering'"
                 @click="onDelete(w)"
               >
                 <Trash2 class="h-4 w-4" /> Remove
@@ -161,9 +170,9 @@ watch(currentUser, () => void ensureLoaded())
 
         <!-- What each watch kind actually covers. -->
         <div class="surface-muted space-y-1.5 px-4 py-3 text-[11px] leading-relaxed text-muted-foreground">
-          <p><span class="font-medium text-foreground">Data watches</span> cover a bucket folder: every object uploaded under it, your own uploads included, across all folders below, triggers a notification; never just a single object.</p>
-          <p><span class="font-medium text-foreground">Dataset watches</span> cover a catalog path: you are notified when a new dataset, profile or run record is created under it.</p>
-          <p>Events arrive in the notification bell; delivery can lag a few seconds. Each account can hold up to 50 watches; hover a watch to see its technical path.</p>
+          <p><span class="font-medium text-foreground">Data watches</span> cover a bucket folder on one node: every object uploaded under it, your own uploads included, across all folders below, triggers a notification; a sync out of that folder can be watched as well.</p>
+          <p><span class="font-medium text-foreground">Dataset watches</span> cover a catalog path: you are notified when a new dataset is created under it, never when an existing dataset is edited.</p>
+          <p>Delivery can lag a few seconds. Each account can hold up to 50 watches; hover a watch to see its technical path.</p>
         </div>
       </template>
     </div>

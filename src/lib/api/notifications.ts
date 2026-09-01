@@ -56,15 +56,17 @@ export interface MarkReadResponse {
 // --- Notification watches (GET/POST /system/notifications/watches, DELETE /system/notifications/watches/{id}) ---
 
 // Backend WatchResponse. `events` carries stable WatchEventKind names
-// (metadata_created, data_uploaded); the list stays open for future kinds.
+// (metadata_created, data_uploaded, sync_completed, sync_failed); the list
+// stays open for future kinds.
 export interface ApiWatch {
   id: string
   path_prefix: string
   events: string[]
   created_at_ms: number
-  // Agreed contract addition: newer backends MAY report per-watch health;
-  // render it when present, kept an open string for forward compatibility.
-  health?: 'active' | 'needs_attention' | string
+  // Contract addition: whether the watch still delivers. A false row withholds
+  // its details (empty path_prefix, no events, no timestamp) and only its id is
+  // usable; an absent field means the backend still filters and the row is live.
+  authorized?: boolean
 }
 
 export interface WatchListResponse {
