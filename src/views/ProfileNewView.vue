@@ -231,7 +231,9 @@ function seedDraft(profile: MetadataProfile | null) {
     builder.setSlug(profile.id)
     const item = profileItems.value.find((entry) => entry.document_id === profile.documentId)
     if (item) builder.groupId = item.group_id
-    builder.isPublic = profile.managed
+    // "Make public" on the profile page arrives with the choice preselected;
+    // saving is still what applies it.
+    builder.isPublic = route.query.visibility === 'public' || profile.managed
     // The import chip is meant for the import tab, not the edit seeding.
     builder.importSummary = null
   }

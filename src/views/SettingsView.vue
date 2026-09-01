@@ -16,6 +16,7 @@ import S3SessionsPanel from '@/components/settings/S3SessionsPanel.vue'
 import AssistantProviders from '@/components/settings/AssistantProviders.vue'
 import McpConnect from '@/components/settings/McpConnect.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
+import { isAssignableProfile, PROFILE_SCOPE_REASON } from '@/lib/profiles/assignable'
 import SectionSkeleton from '@/components/ui/SectionSkeleton.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsList from '@/components/ui/TabsList.vue'
@@ -133,6 +134,12 @@ watch(profileDirty, (dirty) => {
 })
 
 const preferredProfile = computed(() => profiles.value.find((profile) => profile.id === preferredProfileId.value))
+
+// Only a profile a dataset of yours could actually declare can be the default;
+// the editor would silently ignore any other one.
+const defaultProfiles = computed(() => profiles.value.filter((profile) =>
+  isAssignableProfile(profile) || myGroups.value.some((group) => isAssignableProfile(profile, group.id))))
+const hiddenProfiles = computed(() => profiles.value.length - defaultProfiles.value.length)
 
 // The backend advertises {api_base_url}/oai as its OAI-PMH base (aruna
 // api/src/routes/oai.rs base_url): prefer the node's own configured REST base
@@ -463,12 +470,15 @@ async function revoke(accessKeyId: string) {
             <Button variant="outline" size="sm" as-child><RouterLink :to="{ name: 'profiles' }">Browse profiles <ArrowRight class="h-3.5 w-3.5" /></RouterLink></Button>
           </header>
           <div class="grid gap-2 p-5 sm:grid-cols-2">
-            <button v-for="profile in profiles" :key="profile.id" type="button" class="flex items-start gap-3 rounded-lg border border-border bg-background p-3 text-left transition-colors hover:border-primary/40" :class="preferredProfileId === profile.id ? 'border-primary/60 ring-1 ring-primary/30' : ''" @click="preferredProfileId = profile.id">
+            <button v-for="profile in defaultProfiles" :key="profile.id" type="button" class="flex items-start gap-3 rounded-lg border border-border bg-background p-3 text-left transition-colors hover:border-primary/40" :class="preferredProfileId === profile.id ? 'border-primary/60 ring-1 ring-primary/30' : ''" @click="preferredProfileId = profile.id">
               <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-white" :style="{ backgroundColor: profile.iconColor }"><ListChecks class="h-4 w-4" /></span>
               <div class="min-w-0 flex-1"><div class="flex items-center gap-2"><span class="text-sm font-medium text-foreground">{{ profile.name }}</span><Badge v-if="preferredProfileId === profile.id" size="sm" variant="accent" class="uppercase">default</Badge></div><p class="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground">{{ profile.description }}</p></div>
             </button>
-            <div v-if="!profiles.length" class="text-sm text-muted-foreground">No profiles are visible to you.</div>
+            <div v-if="!defaultProfiles.length" class="text-sm text-muted-foreground">No profile you can use is visible to you.</div>
           </div>
+          <p v-if="hiddenProfiles" class="px-5 pb-3 text-[11px] text-muted-foreground">
+            {{ PROFILE_SCOPE_REASON }} {{ hiddenProfiles }} {{ hiddenProfiles === 1 ? 'profile is' : 'profiles are' }} not listed here.
+          </p>
           <div v-if="preferredProfile" class="border-t border-border bg-muted/20 px-5 py-3 text-[11px] text-muted-foreground">Selected: <span class="font-medium text-foreground">{{ preferredProfile.name }}</span><span v-if="profileDirty">, apply with "Save profile" above.</span></div>
         </section>
       </TabsContent>

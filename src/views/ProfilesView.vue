@@ -14,7 +14,8 @@ import ExternalLink from '@/components/ui/ExternalLink.vue'
 import { computed, ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { profileRulesLoadState, useAruna } from '@/composables/useAruna'
-import { ListChecks, Pencil, Plus, Star, Lock, Download, Trash2 } from '@lucide/vue'
+import { ListChecks, Pencil, Plus, Star, Lock, Download, Globe, Trash2 } from '@lucide/vue'
+import { GROUP_PROFILE_HINT, profileScope } from '@/lib/profiles/assignable'
 import {
   OBLIGATION_ACCENT,
   OBLIGATION_ORDER,
@@ -85,6 +86,12 @@ function openEdit(profile: MetadataProfile) {
 
 function openCreate() {
   router.push({ name: 'profile-new' })
+}
+
+// Opens the builder on this profile with the public choice preselected; the
+// author still confirms it by saving.
+function makePublic(profile: MetadataProfile) {
+  router.push({ name: 'profile-edit', params: { profileId: profile.id }, query: { visibility: 'public' } })
 }
 
 async function confirmDelete() {
@@ -327,7 +334,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
                 <div class="flex items-center gap-1.5">
                   <span class="truncate text-sm font-medium text-foreground">{{ profile.name }}</span>
                   <Star v-if="preferredId === profile.id" class="h-3.5 w-3.5 shrink-0 text-amber-500" fill="currentColor" />
-                  <Lock v-if="profile.managed" class="h-3 w-3 shrink-0 text-muted-foreground" title="Public profile" />
+                  <Badge size="sm" :variant="profile.managed ? 'royal' : 'secondary'">{{ profileScope(profile) }}</Badge>
                 </div>
                 <div class="text-[11px] text-muted-foreground">{{ profile.domain }} · {{ propertyCount(profile) }} properties</div>
                 <p class="mt-1 line-clamp-2 text-[11px] text-muted-foreground/90">{{ profile.description || 'No description in RO-Crate.' }}</p>
@@ -350,10 +357,15 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
               <div class="min-w-0">
                 <div class="flex items-center gap-2 text-[11px] uppercase tracking-wider text-muted-foreground">
                   <span>{{ selected.domain }}</span>
-                  <span v-if="selected.managed" class="inline-flex items-center gap-1"><Lock class="h-3 w-3" /> public</span>
+                  <span class="inline-flex items-center gap-1">
+                    <Lock v-if="!selected.managed" class="h-3 w-3" />{{ profileScope(selected) }}
+                  </span>
                 </div>
                 <h2 class="mt-1 font-display text-2xl font-semibold tracking-tight text-aruna-navy">{{ selected.name }}</h2>
                 <p class="mt-1 max-w-3xl text-sm text-muted-foreground">{{ selected.description || 'No description in RO-Crate.' }}</p>
+                <p v-if="!selected.managed && !selected.builtIn" class="mt-1 max-w-3xl text-[11px] text-muted-foreground">
+                  {{ GROUP_PROFILE_HINT }}
+                </p>
               </div>
             </div>
             <div class="flex flex-wrap items-center gap-2">
@@ -366,6 +378,14 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
                 @click="openEdit(selected)"
               >
                 <Pencil class="h-3.5 w-3.5" /> Edit
+              </Button>
+              <Button
+                v-if="canEditSelected && !selected.managed && !selected.builtIn"
+                variant="outline"
+                size="sm"
+                @click="makePublic(selected)"
+              >
+                <Globe class="h-3.5 w-3.5" /> Make public
               </Button>
               <Button
                 v-if="canEditSelected"

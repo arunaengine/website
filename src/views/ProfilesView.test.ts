@@ -1,7 +1,8 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h, reactive, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { button, click, compileClientComponent, moduleDefault, mountApp } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, moduleDefault, mountApp } from '@/test/clientRender'
+import * as Assignable from '@/lib/profiles/assignable'
 import * as Labels from '@/lib/profiles/labels'
 import * as ProfileMode from '@/lib/profiles/mode'
 import * as Rocrate from '@/lib/profiles/rocrate'
@@ -92,6 +93,7 @@ const ProfilesView = compileClientComponent(new URL('./ProfilesView.vue', import
       refreshProfiles: vi.fn(async () => undefined),
     }),
   },
+  '@/lib/profiles/assignable': Assignable,
   '@/lib/profiles/labels': Labels,
   '@/lib/profiles/mode': ProfileMode,
   '@/lib/profiles/rocrate': Rocrate,
@@ -103,9 +105,35 @@ const ProfilesView = compileClientComponent(new URL('./ProfilesView.vue', import
 
 beforeEach(() => {
   routerPush.mockClear()
+  profiles.value = [profile]
 })
 
 describe('ProfilesView', () => {
+  it('marks a group profile and offers to publish it', async () => {
+    const mounted = await mountApp(ProfilesView)
+    const text = content(mounted.root)
+
+    expect(text).toContain('Group only')
+    expect(text).toContain('No dataset can declare it yet')
+
+    await click(button(mounted.root, 'Make public'))
+    expect(routerPush).toHaveBeenCalledWith({
+      name: 'profile-edit',
+      params: { profileId: 'example' },
+      query: { visibility: 'public' },
+    })
+    mounted.app.unmount()
+  })
+
+  it('marks a public profile as public', async () => {
+    profiles.value = [{ ...profile, managed: true }]
+    const mounted = await mountApp(ProfilesView)
+
+    expect(content(mounted.root)).toContain('Public')
+    expect(() => button(mounted.root, 'Make public')).toThrow()
+    mounted.app.unmount()
+  })
+
   it('routes the create and edit actions to the profile wizard', async () => {
     const mounted = await mountApp(ProfilesView)
 

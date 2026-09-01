@@ -18,6 +18,7 @@ import {
   type HostNode,
 } from '@/test/clientRender'
 import * as RouteTab from '@/composables/useRouteTab'
+import * as Assignable from '@/lib/profiles/assignable'
 import * as Utils from '@/lib/utils'
 
 interface AstNode {
@@ -164,6 +165,9 @@ const apiBaseUrl = ref('/api/v1')
 const myGroups = ref<Array<Record<string, unknown>>>([])
 const discoverableGroups = ref<Array<Record<string, unknown>>>([])
 
+const profiles = ref<Array<Record<string, unknown>>>([])
+const myGroups = ref<Array<Record<string, unknown>>>([])
+
 const aruna = {
   apiBaseUrl,
   authToken,
@@ -172,7 +176,7 @@ const aruna = {
   userInfo,
   myGroups,
   discoverableGroups,
-  profiles: ref([]),
+  profiles,
   credentials: ref([]),
   authError: ref<string | null>(null),
   bootstrapped: ref(true),
@@ -231,6 +235,7 @@ const SettingsView = compileClientComponent(new URL('./SettingsView.vue', import
   '@/lib/utils': Utils,
   '@/composables/useRouteTab': RouteTab,
   '@/composables/useAruna': { useAruna: () => aruna },
+  '@/lib/profiles/assignable': Assignable,
   '@/composables/useAuth': { useAuth: () => auth },
   '@/composables/useTheme': { useTheme: () => ({ mode: ref('system'), setTheme: vi.fn() }) },
   '@/composables/useRefresh': { useRefresh: () => ({ busy: ref(false), refresh: vi.fn() }) },
@@ -377,5 +382,24 @@ describe('SettingsView groups tab', () => {
     expect(links).toContain('/app/groups/g2')
     expect(source).not.toContain('GroupDetail')
     expect(panelText(root, 'groups')).toContain('Create group')
+  })
+})
+
+describe('SettingsView default profile', () => {
+  beforeEach(() => {
+    myGroups.value = [{ id: 'group-1', name: 'Research group' }]
+    profiles.value = [
+      { id: 'public', name: 'Public profile', description: '', iconColor: '#fff', managed: true },
+      // Another group's private profile: never assignable, under either rule.
+      { id: 'other', name: 'Other group profile', description: '', iconColor: '#fff', managed: false, groupId: 'group-2' },
+    ]
+  })
+
+  it('offers only profiles a dataset could declare', async () => {
+    const text = panelText((await mount('?tab=profile')).root, 'profile')
+
+    expect(text).toContain('Public profile')
+    expect(text).not.toContain('Other group profile')
+    expect(text).toContain('1 profile is not listed here.')
   })
 })
