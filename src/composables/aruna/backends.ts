@@ -1,5 +1,4 @@
 import {
-  type BackendCredentialsRequest,
   type GroupBackendRequest,
   type GroupBackendResponse,
   type ListGroupBackendsResponse,
@@ -71,22 +70,6 @@ export async function enableGroupBackend(
     return await request<GroupBackendResponse>(
       `/data/groups/${groupId}/storage/backends/${encodeURIComponent(backendId)}/enable`,
       { method: 'POST' },
-    )
-  } finally {
-    saving.value = false
-  }
-}
-
-export async function replaceBackendCredentials(
-  groupId: string,
-  backendId: string,
-  input: BackendCredentialsRequest,
-): Promise<GroupBackendResponse> {
-  saving.value = true
-  try {
-    return await request<GroupBackendResponse>(
-      `/groups/${groupId}/storage-backends/${encodeURIComponent(backendId)}/credentials`,
-      { method: 'POST', body: JSON.stringify(input) },
     )
   } finally {
     saving.value = false

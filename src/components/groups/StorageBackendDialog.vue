@@ -12,7 +12,7 @@ import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import { computed, ref, useId, watch } from 'vue'
 import { Database, Lock } from '@lucide/vue'
-import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
+import { useAruna } from '@/composables/useAruna'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { BACKEND_KINDS, BACKEND_KIND_SCHEMAS, backendSchema } from '@/lib/storage'
 import type { GroupBackendKind, GroupBackendResponse } from '@/lib/api'
@@ -29,7 +29,7 @@ const emit = defineEmits<{
   (e: 'saved', backend: GroupBackendResponse): void
 }>()
 
-const { createGroupBackend, replaceGroupBackend, replaceBackendCredentials, saving } = useAruna()
+const { createGroupBackend, replaceGroupBackend, saving } = useAruna()
 const { writesDisabled } = useConnectivity()
 const uid = useId()
 
@@ -135,9 +135,7 @@ async function submit() {
   const existing = props.backend
   try {
     let saved: GroupBackendResponse
-    if (existing && !settingsChanged.value) {
-      saved = await changeCredentials(existing)
-    } else if (existing) {
+    if (existing) {
       saved = await replaceGroupBackend(props.groupId, existing.backend_id, fullBody())
     } else {
       saved = await createGroupBackend(props.groupId, fullBody())
@@ -146,19 +144,6 @@ async function submit() {
     emit('update:open', false)
   } catch (err) {
     submitError.value = errorMessage(err)
-  }
-}
-
-// Nodes without the credentials route take the full replace instead; the body
-// carries the unchanged settings, so the result is the same.
-async function changeCredentials(existing: GroupBackendResponse): Promise<GroupBackendResponse> {
-  try {
-    return await replaceBackendCredentials(props.groupId, existing.backend_id, {
-      secret_config: credentials(),
-    })
-  } catch (err) {
-    if (!isUnsupportedEndpoint(err)) throw err
-    return replaceGroupBackend(props.groupId, existing.backend_id, fullBody())
   }
 }
 </script>

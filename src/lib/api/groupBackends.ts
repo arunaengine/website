@@ -34,9 +34,3 @@ export interface GroupBackendRequest {
   public_config: Record<string, string>
   secret_config: Record<string, string>
 }
-
-// POST .../{bid}/credentials: writes the credentials alone, allowed on a
-// disabled backend too so a leaked key can always be invalidated.
-export interface BackendCredentialsRequest {
-  secret_config: Record<string, string>
-}

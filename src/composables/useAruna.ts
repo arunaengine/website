@@ -4,7 +4,6 @@ import {
   disableGroupBackend,
   enableGroupBackend,
   listGroupBackends,
-  replaceBackendCredentials,
   replaceGroupBackend,
 } from './aruna/backends'
 import {
@@ -237,7 +236,6 @@ export function useAruna() {
     replaceGroupBackend,
     disableGroupBackend,
     enableGroupBackend,
-    replaceBackendCredentials,
     getGroupRouting,
     putGroupRouting,
     getBucketRouting,
