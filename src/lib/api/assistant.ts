@@ -1,4 +1,4 @@
-// --- Assistant providers (/users/assistant/providers) ---
+// --- Assistant providers (/system/assistant/providers) ---
 // Bring-your-own AI: every provider record belongs to one user and its secret
 // is sealed on the node, never returned. The browser talks to a provider only
 // through the node proxy, which injects the real credentials.
@@ -74,7 +74,7 @@ export interface ChatGptPollResponse {
   status: ChatGptLoginStatus
 }
 
-const BASE = '/users/assistant/providers'
+const BASE = '/system/assistant/providers'
 
 function providerPath(providerId: string, suffix = ''): string {
   return `${BASE}/${encodeURIComponent(providerId)}${suffix}`

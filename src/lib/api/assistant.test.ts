@@ -53,7 +53,7 @@ describe('session clients', () => {
     const response = await createSession({ kind: 'assistant', label: 'Chat' }, CLIENT)
 
     expect(response.token).toBe('t')
-    expect(calls[0].url).toBe('https://api.test/api/v1/users/sessions')
+    expect(calls[0].url).toBe('https://api.test/api/v1/access/sessions')
     expect(calls[0].method).toBe('POST')
     expect(calls[0].body).toEqual({ kind: 'assistant', label: 'Chat' })
     expect(calls[0].authorization).toBe('Bearer bearer-1')
@@ -67,7 +67,7 @@ describe('session clients', () => {
     expect(calls[0].method).toBe('GET')
     expect(calls[1].method).toBe('DELETE')
     // The id is a path segment, so a slash in it must not open a new one.
-    expect(calls[1].url).toBe('https://api.test/api/v1/users/sessions/01J%2FID')
+    expect(calls[1].url).toBe('https://api.test/api/v1/access/sessions/01J%2FID')
   })
 })
 
@@ -81,11 +81,11 @@ describe('assistant provider clients', () => {
     await fetchAssistantModels('p1', CLIENT)
 
     expect(calls.map((call) => `${call.method} ${call.url}`)).toEqual([
-      'GET https://api.test/api/v1/users/assistant/providers',
-      'POST https://api.test/api/v1/users/assistant/providers',
-      'PATCH https://api.test/api/v1/users/assistant/providers/p1',
-      'POST https://api.test/api/v1/users/assistant/providers/p1/test',
-      'GET https://api.test/api/v1/users/assistant/providers/p1/models',
+      'GET https://api.test/api/v1/system/assistant/providers',
+      'POST https://api.test/api/v1/system/assistant/providers',
+      'PATCH https://api.test/api/v1/system/assistant/providers/p1',
+      'POST https://api.test/api/v1/system/assistant/providers/p1/test',
+      'GET https://api.test/api/v1/system/assistant/providers/p1/models',
     ])
     expect(calls[1].body).toEqual({ kind: 'anthropic', label: 'Work', api_key: 'sk-1' })
   })
@@ -109,9 +109,9 @@ describe('assistant provider clients', () => {
     const start = await startChatGptLogin('My subscription', CLIENT)
     await pollChatGptLogin(start.provider_id, CLIENT)
 
-    expect(calls[0].url).toBe('https://api.test/api/v1/users/assistant/providers/chatgpt/login')
+    expect(calls[0].url).toBe('https://api.test/api/v1/system/assistant/providers/chatgpt/login')
     expect(calls[0].body).toEqual({ label: 'My subscription' })
-    expect(calls[1].url).toBe('https://api.test/api/v1/users/assistant/providers/p2/login/poll')
+    expect(calls[1].url).toBe('https://api.test/api/v1/system/assistant/providers/p2/login/poll')
     expect(calls[1].method).toBe('POST')
   })
 })
@@ -119,11 +119,11 @@ describe('assistant provider clients', () => {
 describe('assistantProxyBaseUrl', () => {
   it('builds the proxy base the AI SDK provider is pointed at', () => {
     expect(assistantProxyBaseUrl('https://api.test/api/v1', 'p1'))
-      .toBe('https://api.test/api/v1/users/assistant/providers/p1/proxy')
+      .toBe('https://api.test/api/v1/system/assistant/providers/p1/proxy')
   })
 
   it('does not double the slash on a trailing-slash base', () => {
     expect(assistantProxyBaseUrl('/api/v1/', 'p1'))
-      .toBe('/api/v1/users/assistant/providers/p1/proxy')
+      .toBe('/api/v1/system/assistant/providers/p1/proxy')
   })
 })

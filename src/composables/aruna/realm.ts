@@ -23,11 +23,11 @@ export async function loadInfo(context = refreshContext()) {
   // Partial tolerance: one endpoint failing or degrading (e.g. realm
   // discovery with offline nodes) must not blank the others' data; keep the
   // last-known values and only fail when both core calls are down.
-  // /info/usage is not deployed everywhere yet; hide the stats on failure.
+  // /system/usage is not deployed everywhere yet; hide the stats on failure.
   const [info, realm, usage] = await Promise.allSettled([
-    apiRequest<InfoResponse>('/info', {}, context.client),
-    apiRequest<RealmInfoResponse>('/info/realm', {}, context.client),
-    apiRequest<UsageResponse>('/info/usage', {}, context.client),
+    apiRequest<InfoResponse>('/system/info', {}, context.client),
+    apiRequest<RealmInfoResponse>('/system/realm', {}, context.client),
+    apiRequest<UsageResponse>('/system/usage', {}, context.client),
   ])
   if (context.epoch !== sessionEpoch.value) return
   if (info.status === 'fulfilled') nodeInfo.value = info.value
@@ -39,7 +39,7 @@ export async function loadInfo(context = refreshContext()) {
 export async function setRealmQuota(config: RealmQuotaConfig): Promise<RealmQuotaConfig> {
   saving.value = true
   try {
-    const stored = await request<RealmQuotaConfig>('/info/realm/quota', {
+    const stored = await request<RealmQuotaConfig>('/system/realm/quota', {
       method: 'PUT',
       body: JSON.stringify(config),
     })

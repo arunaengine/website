@@ -1,6 +1,6 @@
 import type { RouteLocationRaw } from 'vue-router'
 
-// Watch subscriptions (backend /notifications/watches). Path prefixes are
+// Watch subscriptions (backend /system/notifications/watches). Path prefixes are
 // canonical resource identities: data events live under
 // `s3/{group_id}/{node_id}/{bucket}/{key-prefix}` and metadata events under
 // `meta/{group_id}/{document-path-prefix}`. The two namespaces carry distinct

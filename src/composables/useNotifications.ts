@@ -66,7 +66,7 @@ function noteUnavailable(err: unknown): boolean {
 async function fetchUnread(): Promise<void> {
   if (!currentUser.value || !supported.value || forbidden.value) return
   try {
-    const res = await request<UnreadCountResponse>('/notifications/unread')
+    const res = await request<UnreadCountResponse>('/system/notifications/unread')
     unreadCount.value = res.count
     unreadCapped.value = res.capped
   } catch (err) {
@@ -81,7 +81,7 @@ async function loadNotifications(): Promise<void> {
   listLoading.value = true
   listError.value = null
   try {
-    const page = await request<NotificationListResponse>('/notifications', {
+    const page = await request<NotificationListResponse>('/system/notifications', {
       query: { limit: PAGE_SIZE },
     })
     items.value = page.notifications
@@ -98,7 +98,7 @@ async function loadMore(): Promise<void> {
   if (!available.value || !nextCursor.value || loadingMore.value) return
   loadingMore.value = true
   try {
-    const page = await request<NotificationListResponse>('/notifications', {
+    const page = await request<NotificationListResponse>('/system/notifications', {
       query: { limit: PAGE_SIZE, cursor: nextCursor.value },
     })
     const known = new Set(items.value.map((n) => n.id))
@@ -138,7 +138,7 @@ async function markRead(ids: string[]): Promise<void> {
   markingCount.value++
   try {
     const body: MarkReadRequest = { ids: targets }
-    await request<MarkReadResponse>('/notifications/read', {
+    await request<MarkReadResponse>('/system/notifications/read', {
       method: 'POST',
       body: JSON.stringify(body),
     })
@@ -169,7 +169,7 @@ async function markAllRead(): Promise<void> {
   markingCount.value++
   try {
     const body: MarkReadRequest = { ids: [], up_to_ms: upTo }
-    await request<MarkReadResponse>('/notifications/read', {
+    await request<MarkReadResponse>('/system/notifications/read', {
       method: 'POST',
       body: JSON.stringify(body),
     })
@@ -268,7 +268,7 @@ async function connectStream(generation: number) {
   streamAbort = controller
   try {
     const baseUrl = apiBaseUrl.value.replace(/\/$/, '')
-    const response = await fetch(new URL(`${baseUrl}/notifications/stream`, window.location.origin), {
+    const response = await fetch(new URL(`${baseUrl}/system/notifications/stream`, window.location.origin), {
       headers: {
         Accept: 'text/event-stream',
         Authorization: `Bearer ${authToken.value}`,

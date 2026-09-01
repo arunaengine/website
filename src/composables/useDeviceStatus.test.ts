@@ -142,7 +142,7 @@ describe('watching the node', () => {
     device.start()
 
     await vi.waitFor(() => expect(device.identity.value?.nodeId).toBe('peer-1'))
-    expect(apiRequest).toHaveBeenCalledWith('/info', {}, { baseUrl: RUNNING.apiBaseUrl, token: 'token' })
+    expect(apiRequest).toHaveBeenCalledWith('/system/info', {}, { baseUrl: RUNNING.apiBaseUrl, token: 'token' })
     device.stop()
   })
 

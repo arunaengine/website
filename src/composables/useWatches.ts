@@ -48,7 +48,7 @@ async function loadWatches(): Promise<void> {
   listLoading.value = true
   listError.value = null
   try {
-    const res = await request<WatchListResponse>('/notifications/watches')
+    const res = await request<WatchListResponse>('/system/notifications/watches')
     watches.value = [...res.watches].sort((a, b) => b.created_at_ms - a.created_at_ms)
     listLoaded.value = true
   } catch (err) {
@@ -70,7 +70,7 @@ async function createWatch(pathPrefix: string, events: string[]): Promise<ApiWat
   creating.value = true
   try {
     const body: CreateWatchRequest = { path_prefix: pathPrefix, events }
-    const created = await request<ApiWatch>('/notifications/watches', {
+    const created = await request<ApiWatch>('/system/notifications/watches', {
       method: 'POST',
       body: JSON.stringify(body),
     })
@@ -87,7 +87,7 @@ async function createWatch(pathPrefix: string, events: string[]): Promise<ApiWat
 async function deleteWatch(id: string): Promise<void> {
   deletingIds.value = [...deletingIds.value, id]
   try {
-    await request<void>(`/notifications/watches/${encodeURIComponent(id)}`, { method: 'DELETE' })
+    await request<void>(`/system/notifications/watches/${encodeURIComponent(id)}`, { method: 'DELETE' })
     watches.value = watches.value.filter((w) => w.id !== id)
   } catch (err) {
     noteUnavailable(err)

@@ -1,4 +1,4 @@
-// --- Notifications (GET /notifications, /notifications/unread, POST /notifications/read) ---
+// --- Notifications (GET /system/notifications, /system/notifications/unread, POST /system/notifications/read) ---
 
 // Backend NotificationResponse. Kind-specific fields are omitted (not null)
 // when absent; new kinds appear over time, so `kind`/`category` stay open strings.
@@ -53,7 +53,7 @@ export interface MarkReadResponse {
   marked: number
 }
 
-// --- Notification watches (GET/POST /notifications/watches, DELETE /notifications/watches/{id}) ---
+// --- Notification watches (GET/POST /system/notifications/watches, DELETE /system/notifications/watches/{id}) ---
 
 // Backend WatchResponse. `events` carries stable WatchEventKind names
 // (metadata_created, data_uploaded); the list stays open for future kinds.

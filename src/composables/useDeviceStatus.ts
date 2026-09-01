@@ -128,7 +128,7 @@ const deviceClient = computed<DeviceClient | null>(() =>
 // a realm token, so it is read from the node's own API with the owner's.
 async function readIdentity(client: DeviceClient): Promise<void> {
   try {
-    const info = await apiRequest<InfoResponse>('/info', {}, client)
+    const info = await apiRequest<InfoResponse>('/system/info', {}, client)
     identity.value = { nodeId: info.node.peer_id, realm: info.node.realm_id }
     identityError.value = null
   } catch (err) {

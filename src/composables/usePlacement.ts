@@ -44,7 +44,7 @@ export function placementMutationErrorMessage(err: unknown): string {
 
 async function getRealmPlacement(): Promise<RealmPlacementConfigResponse> {
   assertEnabled()
-  return request<RealmPlacementConfigResponse>('/info/realm/placement')
+  return request<RealmPlacementConfigResponse>('/system/realm/placement')
 }
 
 async function mutateRealmPlacement(
@@ -53,7 +53,7 @@ async function mutateRealmPlacement(
   assertEnabled()
   busy.value = true
   try {
-    return await request<RealmPlacementConfigResponse>('/info/realm/placement', {
+    return await request<RealmPlacementConfigResponse>('/system/realm/placement', {
       method: 'PATCH',
       body: JSON.stringify(mutation),
     })
