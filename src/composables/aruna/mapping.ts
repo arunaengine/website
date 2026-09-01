@@ -109,6 +109,7 @@ export function mapProfile(item: MetadataDocumentListItem): MetadataProfile {
     customShapesText: parsed.customShapesText,
     artifactUrl: parsed.artifactUrl,
     suggestedKeywords: arrayText(entity?.keywords ?? entity?.keyword),
+    groupId: item.group_id,
     managed: item.public,
   }
 }

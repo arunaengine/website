@@ -155,13 +155,15 @@ function addKeyword() {
         <div class="min-w-0">
           <Select
             :model-value="profileId"
-            :options="profiles"
+            :options="[{ value: '', label: 'No profile' }, ...profiles]"
             placeholder="No profile"
             aria-label="Profile"
             @update:model-value="(value: string) => emit('profile', value)"
           />
           <p class="mt-1 text-[11px] text-muted-foreground">
-            A profile pre-fills what it asks for and checks the draft against it. Nothing is locked.
+            A profile pre-fills what it asks for and checks the draft against it. Nothing is locked,
+            and "No profile" removes it again. Only public profiles can be assigned to a dataset, so
+            private drafts are not listed.
           </p>
         </div>
         <div :class="ROW_ACTIONS"><IssueMark :issues="issuesFor('conformsTo')" /></div>

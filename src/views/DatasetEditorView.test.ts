@@ -18,6 +18,7 @@ import * as Issues from '@/lib/crate/issues'
 import * as Paths from '@/lib/crate/paths'
 import * as Api from '@/lib/api'
 import * as Emit from '@/lib/profiles/emit'
+import * as Assignable from '@/lib/profiles/assignable'
 import * as Utils from '@/lib/utils'
 
 const route = reactive<{ name: string; params: Record<string, string> }>({ name: 'dataset-new', params: {} })
@@ -111,6 +112,7 @@ const EditorStub = defineComponent({
   props: {
     draft: { type: Object, required: true },
     profiles: { type: Array, default: () => [] },
+    profileId: { type: String, default: '' },
     issues: { type: Array, default: () => [] },
   },
   emits: ['update', 'profile'],
@@ -133,8 +135,10 @@ const EditorStub = defineComponent({
         )),
       }),
       h('p', `Profiles ${(props.profiles as Array<{ label: string }>).map((profile) => profile.label).join(', ')}`),
+      h('p', `Declared ${props.profileId || 'none'}`),
       ...(props.profiles as Array<{ value: string; label: string }>).map((profile) =>
         h('button', { onClick: () => emit('profile', profile.value) }, `Choose ${profile.label}`)),
+      h('button', { onClick: () => emit('profile', '') }, 'Choose no profile'),
       h('button', { onClick: () => emit('update', seeded(props.draft as Editor.CrateDraft)) }, 'Seed dataset'),
     ])
   },
@@ -236,6 +240,7 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
   '@/lib/api': Api,
   '@/lib/utils': Utils,
   '@/lib/profiles/emit': Emit,
+  '@/lib/profiles/assignable': Assignable,
   '@/lib/profiles/vocabulary': { loadVocabIndex: () => Promise.resolve(null) },
   '@/lib/crate/editor': Editor,
   '@/lib/crate/profileSeed': ProfileSeed,
@@ -426,6 +431,105 @@ describe('DatasetEditorView', () => {
     expect(root).toMatchObject({ conformsTo: { '@id': 'https://example.test/profiles/genomics' } })
     // The seeded identifier row stays empty, so it must not reach the crate.
     expect(root).not.toHaveProperty('identifier')
+    mounted.app.unmount()
+  })
+
+  it('clears a chosen profile again', async () => {
+    profiles.value = [{
+      id: 'genomics',
+      name: 'Genomics',
+      managed: true,
+      profileUri: 'https://example.test/profiles/genomics',
+      propertyRules: [{
+        id: 'identifier',
+        label: 'Identifier',
+        description: '',
+        kind: 'text',
+        propertyUri: 'http://schema.org/identifier',
+        valueName: 'identifier',
+        obligation: 'MUST',
+      }],
+      entityRules: [],
+    }]
+    const mounted = await mountApp(DatasetEditorView)
+    await click(button(mounted.root, 'Seed dataset'))
+    await click(button(mounted.root, 'Choose Genomics'))
+    await click(button(mounted.root, 'Choose no profile'))
+    await click(button(mounted.root, 'Create dataset'))
+    await flush()
+
+    const graph = createMetadata.mock.calls[0][0].rocrate['@graph'] as Array<Record<string, unknown>>
+    expect(graph.find((entity) => entity['@id'] === './')).not.toHaveProperty('conformsTo')
+    expect(content(mounted.root)).toContain('Declared none')
+    mounted.app.unmount()
+  })
+
+  it('leaves neither profile behind after switching and clearing', async () => {
+    const oldProfile = 'https://example.test/profiles/old'
+    const newProfile = 'https://example.test/profiles/new'
+    profiles.value = [
+      { id: 'old', name: 'Old', managed: true, profileUri: oldProfile, propertyRules: [], entityRules: [] },
+      { id: 'new', name: 'New', managed: true, profileUri: newProfile, propertyRules: [], entityRules: [] },
+    ]
+    const mounted = await mountApp(DatasetEditorView)
+    await click(button(mounted.root, 'Seed dataset'))
+    await click(button(mounted.root, 'Choose Old'))
+    await click(button(mounted.root, 'Choose New'))
+    await click(button(mounted.root, 'Choose no profile'))
+    await click(button(mounted.root, 'Create dataset'))
+    await flush()
+
+    const graph = createMetadata.mock.calls[0][0].rocrate['@graph'] as Array<Record<string, unknown>>
+    expect(JSON.stringify(graph)).not.toContain(oldProfile)
+    expect(JSON.stringify(graph)).not.toContain(newProfile)
+    mounted.app.unmount()
+  })
+
+  it('keeps the preferred profile away after an explicit clear', async () => {
+    profiles.value = [{
+      id: 'genomics',
+      name: 'Genomics',
+      managed: true,
+      profileUri: 'https://example.test/profiles/genomics',
+      propertyRules: [],
+      entityRules: [],
+    }]
+    currentUser.value = { preferredProfileId: 'genomics' }
+    const mounted = await mountApp(DatasetEditorView)
+    expect(content(mounted.root)).toContain('Declared genomics')
+
+    await click(button(mounted.root, 'Choose no profile'))
+    profiles.value = [...profiles.value]
+    await flush()
+
+    expect(content(mounted.root)).toContain('Declared none')
+    mounted.app.unmount()
+  })
+
+  it('clears a stored profile while editing', async () => {
+    const spec = 'https://w3id.org/ro/crate/1.1'
+    const stored = 'https://example.test/profiles/old'
+    profiles.value = [
+      { id: 'old', name: 'Old', managed: true, profileUri: stored, propertyRules: [], entityRules: [] },
+    ]
+    const existing = Editor.setProperty(seeded(Editor.newDraft()), './', 'conformsTo', [spec, stored].map((value) => ({
+      kind: 'reference' as const,
+      value,
+    })))
+    fetchRoCrateRaw.mockResolvedValue(Editor.toRoCrate(existing))
+    route.name = 'dataset-edit'
+    route.params = { id: 'dataset-1' }
+    const mounted = await mountApp(DatasetEditorView)
+    await flush()
+    expect(content(mounted.root)).toContain('Declared old')
+
+    await click(button(mounted.root, 'Choose no profile'))
+    expect(content(mounted.root)).toContain('Declared none')
+    await click(button(mounted.root, 'Save changes'))
+    await flush()
+
+    const saved = replaceMetadataRoCrate.mock.calls[0][1].rocrate['@graph'] as Array<Record<string, unknown>>
+    expect(saved.find((entity) => entity['@id'] === './')?.conformsTo).toEqual({ '@id': spec })
     mounted.app.unmount()
   })
 

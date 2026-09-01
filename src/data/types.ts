@@ -215,6 +215,8 @@ export interface MetadataProfile {
   artifactUrl?: string
   // Suggested keywords / vocabularies that are pre-populated when this profile is used
   suggestedKeywords: string[]
+  // Owning group of the stored profile document; absent for bundled profiles.
+  groupId?: string
   // Whether this profile is editable by the current user (some are realm-managed templates)
   managed: boolean
   // Bundled with the portal (e.g. Process Run Crate): read-only, no stored document.

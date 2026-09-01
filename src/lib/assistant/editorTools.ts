@@ -276,10 +276,10 @@ export function editorTools(bridge: EditorBridge, gate: ApprovalGate): ToolSet {
     }),
 
     apply_profile: tool({
-      description: 'Declares a realm metadata profile on the draft and seeds the rows it requires.',
+      description: 'Declares a realm metadata profile on the draft and seeds the rows it requires. An empty profile_id removes the declared profile again.',
       inputSchema: schema<{ profile_id: string }>({ profile_id: STRING }, ['profile_id']),
       execute: ({ profile_id: profileId }) => {
-        if (!bridge.profiles().some((profile) => profile.id === profileId)) {
+        if (profileId && !bridge.profiles().some((profile) => profile.id === profileId)) {
           return { error: `No profile ${profileId} in this realm.` }
         }
         bridge.applyProfile(profileId)

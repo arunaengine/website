@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyProfile, profileExpectation } from './profileSeed'
+import { applyProfile, clearProfile, profileExpectation } from './profileSeed'
 import { findEntity, newDraft, setProperty } from './editor'
 import type { MetadataProfile } from '@/data/types'
 import type { ProfilePropertyRule } from '@/lib/profiles/types'
@@ -89,6 +89,29 @@ describe('profile seeding', () => {
       { kind: 'reference', value: community },
       { kind: 'reference', value: next },
     ])
+  })
+
+  it('removes only the cleared profile from the declarations', () => {
+    const spec = 'https://w3id.org/ro/crate/1.1'
+    const previous = 'https://example.test/profiles/old'
+    const draft = setProperty(newDraft(), './', 'conformsTo', [spec, previous].map((value) => ({
+      kind: 'reference' as const,
+      value,
+    })))
+
+    expect(clearProfile(draft, previous).entities[0].properties.conformsTo)
+      .toEqual([{ kind: 'reference', value: spec }])
+  })
+
+  it('drops conformsTo when the cleared profile was its only value', () => {
+    const iri = 'https://example.test/profiles/only'
+    const seeded = applyProfile(newDraft(), profile(), iri)
+    const cleared = clearProfile(seeded, iri)
+
+    expect(cleared.entities[0].properties.conformsTo).toBeUndefined()
+    // Seeded rows and the entity a mandatory reference created stay behind.
+    expect(cleared.entities[0].properties.identifier).toEqual([{ kind: 'text', value: '' }])
+    expect(findEntity(cleared, '#person')).toBeDefined()
   })
 
   it('names the mandatory properties and types as expectations', () => {

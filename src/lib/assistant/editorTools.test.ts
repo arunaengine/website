@@ -199,4 +199,9 @@ describe('draft tools', () => {
     expect(await runTool(scene.tools.apply_profile, { profile_id: 'p-1' })).toEqual({ profile_id: 'p-1' })
     expect(scene.applyProfile).toHaveBeenCalledWith('p-1')
   })
+
+  it('removes the declared profile for an empty id', async () => {
+    expect(await runTool(scene.tools.apply_profile, { profile_id: '' })).toEqual({ profile_id: '' })
+    expect(scene.applyProfile).toHaveBeenCalledWith('')
+  })
 })

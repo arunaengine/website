@@ -18,6 +18,8 @@ export interface UseProfilePreviewOptions {
   client: () => ApiClientOptions
   debounceMs?: number
   request?: (rocrate: unknown, signal: AbortSignal) => Promise<ProfileValidationPreviewResponse>
+  /** Owning group of the draft, so a group-scoped profile can be resolved. */
+  groupId?: () => string | undefined
 }
 
 export function useProfilePreview(options: UseProfilePreviewOptions) {
@@ -58,7 +60,7 @@ export function useProfilePreview(options: UseProfilePreviewOptions) {
     // leaving `running` stuck.
     const request = options.request
       ? Promise.resolve().then(() => options.request!(rocrate, controller.signal))
-      : previewProfileValidation(rocrate, options.client(), controller.signal)
+      : previewProfileValidation(rocrate, options.client(), controller.signal, options.groupId?.())
     return request
       .then((response) => {
         if (current !== generation || disposed) return

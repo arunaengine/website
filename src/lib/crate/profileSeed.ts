@@ -66,6 +66,19 @@ export function profileExpectation(profile: MetadataProfile): ProfileExpectation
 }
 
 /**
+ * Removes one profile's IRI from the root `conformsTo`, leaving every other
+ * declaration (the RO-Crate specification, an external profile) in place and
+ * dropping the property when nothing is left. Rows the profile seeded stay:
+ * they are empty rows the author can remove, exactly as when switching profiles.
+ */
+export function clearProfile(draft: CrateDraft, previousIri?: string): CrateDraft {
+  if (!previousIri) return draft
+  const root = rootId(draft)
+  const declared = findEntity(draft, root)?.properties.conformsTo ?? []
+  return setProperty(draft, root, 'conformsTo', declared.filter((value) => value.value !== previousIri))
+}
+
+/**
  * Pre-adds one empty row per mandatory root property, and for a mandatory
  * reference an entity of the target type carrying its own mandatory rows.
  * Rows already filled in are left untouched.

@@ -57,21 +57,39 @@ export interface ProfileValidationPreviewResponse {
   structural_violations: RoCrateStructuralViolation[]
 }
 
+// A node that predates group-scoped profiles refuses the extra field instead of
+// ignoring it; that answer means "not supported yet", not "bad draft".
+function unknownFieldRefusal(cause: unknown): boolean {
+  if (!(cause instanceof ApiError) || cause.status !== 400) return false
+  return /unknown|unexpected|unsupported/i.test(cause.message) && /group_id|field/i.test(cause.message)
+}
+
 /**
  * POST /metadata/profile/validation/preview: advisory validation of a draft
  * crate before it is saved. Rate limited like revalidate; 404/405 means the
- * node does not serve the preview at all.
+ * node does not serve the preview at all. `groupId` names the owning group so
+ * the node can resolve a group-scoped profile; it is retried once without the
+ * field when the node does not know it yet.
  */
-export function previewProfileValidation(
+export async function previewProfileValidation(
   rocrate: unknown,
   client: ApiClientOptions = {},
   signal?: AbortSignal,
+  groupId?: string,
 ): Promise<ProfileValidationPreviewResponse> {
-  return apiRequest<ProfileValidationPreviewResponse>(
-    '/metadata/profile/validation/preview',
-    { method: 'POST', body: JSON.stringify({ rocrate }), signal },
-    client,
-  )
+  const post = (body: Record<string, unknown>) =>
+    apiRequest<ProfileValidationPreviewResponse>(
+      '/metadata/profile/validation/preview',
+      { method: 'POST', body: JSON.stringify(body), signal },
+      client,
+    )
+  if (!groupId) return post({ rocrate })
+  try {
+    return await post({ rocrate, group_id: groupId })
+  } catch (cause) {
+    if (!unknownFieldRefusal(cause)) throw cause
+    return post({ rocrate })
+  }
 }
 
 export function profileValidationFindings(error: unknown): ProfileValidationFinding[] {

@@ -228,4 +228,22 @@ describe('RootForm', () => {
     expect(picked).toEqual(['profile-1'])
     mounted.app.unmount()
   })
+
+  it('offers no profile as an explicit choice', async () => {
+    const picked: string[] = []
+    const mounted = await mount([], Editor.newDraft(), picked)
+    const select = field(mounted.root, 'Profile')
+
+    expect(content(select)).toContain('No profile')
+    await choose(select, '')
+    expect(picked).toEqual([''])
+    mounted.app.unmount()
+  })
+
+  it('says why private profiles are missing from the list', async () => {
+    const mounted = await mount([])
+
+    expect(content(mounted.root)).toContain('Only public profiles can be assigned to a dataset')
+    mounted.app.unmount()
+  })
 })

@@ -25,10 +25,11 @@ import { previewDeviceDraft, requireDevice } from '@/lib/deviceApi'
 import { apiErrorMessage } from '@/lib/api'
 import { errorMessage } from '@/lib/utils'
 import { slugify } from '@/lib/profiles/emit'
+import { isAssignableProfile } from '@/lib/profiles/assignable'
 import { loadVocabIndex, type VocabIndex } from '@/lib/profiles/vocabulary'
 import { collectIssues, rejectionIssues, type WriteIssue } from '@/lib/crate/issues'
 import { joinPath, splitPath } from '@/lib/crate/paths'
-import { applyProfile, profileExpectation } from '@/lib/crate/profileSeed'
+import { applyProfile, clearProfile, profileExpectation } from '@/lib/crate/profileSeed'
 import {
   entityName,
   findEntity,
@@ -89,7 +90,8 @@ const groupOptions = computed(() => groups.value.map((group) => ({ value: group.
 const groupName = computed(() => groups.value.find((group) => group.id === draft.value.groupId)?.name ?? '')
 const visibilityText = computed(() =>
   draft.value.visibility === 'public' ? 'Public' : 'Visible to the group')
-const selectableProfiles = computed(() => profiles.value.filter((profile) => profile.managed || profile.builtIn))
+const selectableProfiles = computed(() =>
+  profiles.value.filter((profile) => isAssignableProfile(profile, draft.value.groupId)))
 const profileOptions = computed(() =>
   selectableProfiles.value.map((profile) => ({ value: profile.id, label: profile.name })))
 const expectation = computed(() => {
@@ -199,6 +201,7 @@ const desktop = isDesktop()
 const deviceStatus = desktop ? useDeviceStatus() : null
 const preview = useProfilePreview({
   client: () => ({ baseUrl: apiBaseUrl.value, token: authToken.value ?? undefined }),
+  groupId: () => draft.value.groupId,
   ...(desktop
     ? {
         request: (rocrate: unknown, signal: AbortSignal) =>
@@ -254,7 +257,9 @@ function pickProfile(id: string) {
   const previousIri = profileReferenceIri(previous)
   profileId.value = id
   const profile = profiles.value.find((candidate) => candidate.id === id)
-  if (profile) draft.value = applyProfile(draft.value, profile, profileReferenceIri(profile), previousIri)
+  draft.value = profile
+    ? applyProfile(draft.value, profile, profileReferenceIri(profile), previousIri)
+    : clearProfile(draft.value, previousIri)
 }
 
 watch([mode, currentUser, selectableProfiles], ([currentMode, user, available]) => {
