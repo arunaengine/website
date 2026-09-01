@@ -392,7 +392,7 @@ function glossaryLink(anchor: string) {
                     <!-- data chip -->
                     <RouterLink v-slot="{ href, navigate }" :to="glossaryLink('data')" custom>
                       <a :href="href" role="link" aria-label="Data: open glossary entry" class="group/gnode cursor-pointer" @click="navigate">
-                        <title>Data — open glossary entry</title>
+                        <title>Data: open glossary entry</title>
                         <rect x="20" y="34" width="152" height="52" rx="10" class="fill-card stroke-border transition-colors group-hover/gnode:stroke-primary" stroke-width="1.5" />
                         <path
                           d="M40 48 h8 l5 5 v15 h-13 z M48 48 v5 h5"
@@ -411,7 +411,7 @@ function glossaryLink(anchor: string) {
                     <!-- metadata chip -->
                     <RouterLink v-slot="{ href, navigate }" :to="glossaryLink('metadata')" custom>
                       <a :href="href" role="link" aria-label="Metadata: open glossary entry" class="group/gnode cursor-pointer" @click="navigate">
-                        <title>Metadata — open glossary entry</title>
+                        <title>Metadata: open glossary entry</title>
                         <rect x="20" y="122" width="152" height="52" rx="10" class="fill-card stroke-border transition-colors group-hover/gnode:stroke-primary" stroke-width="1.5" />
                         <path
                           d="M39 143 l9 -9 h11 v11 l-9 9 z"
@@ -432,7 +432,7 @@ function glossaryLink(anchor: string) {
                     <!-- dataset -->
                     <RouterLink v-slot="{ href, navigate }" :to="glossaryLink('dataset')" custom>
                       <a :href="href" role="link" aria-label="Dataset: open glossary entry" class="group/gnode cursor-pointer" @click="navigate">
-                        <title>Dataset — open glossary entry</title>
+                        <title>Dataset: open glossary entry</title>
                         <rect x="272" y="68" width="184" height="72" rx="12" class="fill-primary/10 stroke-primary transition-[stroke-width] group-hover/gnode:[stroke-width:2.5]" stroke-width="1.5" />
                         <path
                           d="M292 96 l12 -7 12 7 v14 l-12 7 -12 -7 z M292 96 l12 7 12 -7 M304 103 v14"
@@ -451,7 +451,7 @@ function glossaryLink(anchor: string) {
                     <!-- graph -->
                     <RouterLink v-slot="{ href, navigate }" :to="glossaryLink('graph')" custom>
                       <a :href="href" role="link" aria-label="Graph: open glossary entry" class="group/gnode cursor-pointer" @click="navigate">
-                        <title>Graph — open glossary entry</title>
+                        <title>Graph: open glossary entry</title>
                         <g class="stroke-primary/40 group-hover/gnode:stroke-primary/70" stroke-width="1.5">
                           <path d="M597 96 L 556 56" />
                           <path d="M597 96 L 664 62" />
