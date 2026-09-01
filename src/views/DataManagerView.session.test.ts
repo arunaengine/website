@@ -37,8 +37,11 @@ describe('Data view session affordances', () => {
 
   it('disables write, upload, and delete affordances from session restrictions', () => {
     expect(managerBrowser).toContain(':disabled="!canWriteCurrentPrefix"')
-    expect(managerBrowser).toContain(':disabled="!s3.canWrite(bucket, object.key, remoteNodeId)"')
-    expect(managerBrowser).toContain(':disabled="!s3.canDeletePrefix(bucket, folder.prefix, remoteNodeId)"')
+    // The row's one destructive entry carries the reason, not just a state.
+    expect(managerBrowser).toContain(':disabled-reason="objectReason(object.key)"')
+    expect(managerBrowser).toContain(':disabled-reason="folderReason(folder.prefix)"')
+    expect(managerBrowser).toContain('This session cannot delete this object.')
+    expect(managerBrowser).toContain('This session cannot delete this entire folder.')
     expect(uploadPanel).toContain(':disabled="!canWriteCurrentPrefix"')
     expect(uploadPanel).toContain('Uploads are unavailable for')
     expect(managerBrowser).toContain('This session is read-only')

@@ -218,6 +218,7 @@ function taskPanel(getTask: unknown, getJob: unknown): Component {
     '@/components/ui/ErrorPanel.vue': moduleDefault(ErrorPanelStub),
     '@/components/ui/CopyButton.vue': moduleDefault(PassThroughStub),
     '@/components/ui/ExternalLink.vue': moduleDefault(PassThroughStub),
+    '@/components/ui/Tooltip.vue': moduleDefault(PassThroughStub),
     '@/components/jobs/JobFamilySection.vue': moduleDefault(JobFamilyStub),
     '@/components/compute/TaskHeader.vue': moduleDefault(PassThroughStub),
     '@/components/assistant/AskAiButton.vue': moduleDefault(PassThroughStub),
