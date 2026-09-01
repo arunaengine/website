@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   backendQuota,
   backendSummary,
+  copyHeldBack,
+  copyOrigin,
   copyState,
-  scanLimitText,
   targetLabel,
   tenantClasses,
 } from './storage'
@@ -111,15 +112,27 @@ describe('backendQuota', () => {
 })
 
 describe('wording fallbacks', () => {
-  it('explains known and unknown scan limits', () => {
-    expect(scanLimitText('holder-path-unknown')).toContain('could not be asked')
-    expect(scanLimitText('relationship-scan-failed')).toContain('sync rules')
-    expect(scanLimitText('holder-unreachable')).toContain('is unreachable')
-    expect(scanLimitText('future-limit')).toBe('The search was limited: future-limit.')
-  })
-
   it('labels known and unknown copy states', () => {
     expect(copyState('not-stored').label).toBe('not stored')
     expect(copyState('future')).toEqual({ label: 'future', description: '' })
+  })
+
+  it('says why a copy is there, and stays silent when the node did not say', () => {
+    expect(copyOrigin('write', { local: true })).toBe('this node, storage backend')
+    expect(copyOrigin('write')).toBe('written here')
+    expect(copyOrigin('sync', { path: 'mirror/reads.fastq' })).toBe('via sync into mirror/reads.fastq')
+    expect(copyOrigin('sync')).toBe('via sync')
+    expect(copyOrigin('replicate')).toBe('copied on request')
+    expect(copyOrigin('staging')).toBe('staged for a run')
+    expect(copyOrigin('reference')).toBe('points at data held elsewhere')
+    expect(copyOrigin('unknown')).toBeNull()
+    expect(copyOrigin(undefined)).toBeNull()
+    expect(copyOrigin('minted-by-a-later-node')).toBeNull()
+  })
+
+  it('names a held-back copy and nothing else', () => {
+    expect(copyHeldBack('quarantined')).toBe('Held back: no longer matches its rules')
+    expect(copyHeldBack('allowed')).toBeNull()
+    expect(copyHeldBack(undefined)).toBeNull()
   })
 })

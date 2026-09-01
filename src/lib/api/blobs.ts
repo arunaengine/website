@@ -13,6 +13,12 @@ export type BlobCopyState =
 
 export type BlobCopyStorage = 'node-managed' | 'group-backend'
 
+/** Why the copy is on that node. Absent on nodes that do not record it. */
+export type BlobCopyOrigin = 'write' | 'sync' | 'replicate' | 'staging' | 'reference' | 'unknown'
+
+/** Whether the holding node still admits the copy under its rules. */
+export type BlobCopyCompliance = 'allowed' | 'quarantined' | 'unknown'
+
 export type LocationScanLimit =
   | 'queued-scan-truncated'
   | 'queued-scan-failed'
@@ -36,6 +42,10 @@ export interface BlobCopyResponse {
   storage_class?: string | null
   group_backend_id?: string | null
   group_backend_name?: string | null
+  origin?: BlobCopyOrigin | null
+  /** Set when `origin` is `sync`: the relationship that put the copy there. */
+  sync_relationship_id?: string | null
+  compliance?: BlobCopyCompliance | null
 }
 
 export interface BlobLocationsResponse {

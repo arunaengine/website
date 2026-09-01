@@ -187,17 +187,32 @@ export function copyState(state: string): { label: string; description: string }
   return COPY_STATES[state as BlobCopyState] ?? { label: state, description: '' }
 }
 
-const SCAN_LIMITS: Record<string, string> = {
-  'queued-scan-truncated': 'The list of copies still being made was too long to read to the end.',
-  'queued-scan-failed': 'The list of copies still being made could not be read.',
-  'relationship-scan-failed': 'The sync rules that place copies on other nodes could not be read.',
-  'queued-record-unreadable': 'Some entries in that list could not be read and were skipped.',
-  'candidate-cap-reached': 'More nodes could have a copy than one request asks; the rest were not contacted.',
-  'holder-lookup-failed': 'The index of nodes that have this file could not be searched.',
-  'holder-path-unknown': 'A node that has a copy could not be asked in a way it understood.',
-  'holder-unreachable': 'A node is unreachable, so whether it has a copy is unknown.',
+/**
+ * One line saying why a copy is on its node. An origin the node did not report,
+ * or one this portal does not know, returns null so nothing is claimed.
+ */
+export function copyOrigin(
+  origin: string | null | undefined,
+  where: { local?: boolean; path?: string | null } = {},
+): string | null {
+  switch (origin) {
+    case 'write':
+      return where.local ? 'this node, storage backend' : 'written here'
+    case 'sync':
+      return where.path ? `via sync into ${where.path}` : 'via sync'
+    case 'replicate':
+      return 'copied on request'
+    case 'staging':
+      return 'staged for a run'
+    case 'reference':
+      return 'points at data held elsewhere'
+    default:
+      return null
+  }
 }
 
-export function scanLimitText(limit: string): string {
-  return SCAN_LIMITS[limit] ?? `The search was limited: ${limit}.`
+/** Badge text for a copy its node holds back; null when allowed or unsaid. */
+export function copyHeldBack(compliance: string | null | undefined): string | null {
+  return compliance === 'quarantined' ? 'Held back: no longer matches its rules' : null
 }
+
