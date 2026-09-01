@@ -368,7 +368,7 @@ describe('ordinary operation errors', () => {
         message: 'backend detail',
         $metadata: { httpStatusCode: 503 },
       }),
-    ).toBe('A purge is running for this location; retry when it completes.')
+    ).toBe('A permanent deletion is running here; retry when it completes.')
     expect(
       sessionModule.isS3PurgeInProgressError({
         name: 'S3ServiceException',

@@ -50,7 +50,7 @@ export function s3ErrorMessage(err: unknown, bucket?: string): string {
 }
 
 export const PURGE_IN_PROGRESS_MESSAGE =
-  'A purge is running for this location; retry when it completes.'
+  'A permanent deletion is running here; retry when it completes.'
 
 export function isS3PurgeInProgressError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false

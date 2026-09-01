@@ -201,14 +201,14 @@ export function useSelectionDelete() {
       const started = await startStoragePurge(scope.operation, client)
       for (;;) {
         if (id !== runId) {
-          return { key: scope.key, status: 'unknown', message: 'The purge result is no longer being tracked.' }
+          return { key: scope.key, status: 'unknown', message: 'The result of this permanent deletion is no longer being tracked.' }
         }
         const status = await getStoragePurgeJob(started.job_id, client)
         if (status.kind !== 'storage_purge') {
           return {
             key: scope.key,
             status: 'failed',
-            message: `System job ${started.job_id} is not a storage purge.`,
+            message: `System job ${started.job_id} is not a permanent deletion.`,
           }
         }
         if (isTerminalStoragePurgeJob(status.state)) {
@@ -216,7 +216,7 @@ export function useSelectionDelete() {
           return {
             key: scope.key,
             status: 'failed',
-            message: status.error?.message ?? `The purge was ${status.state}.`,
+            message: status.error?.message ?? `The permanent deletion was ${status.state}.`,
           }
         }
         await new Promise((resolve) => setTimeout(resolve, 1_000))

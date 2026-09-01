@@ -42,7 +42,7 @@ export function usePurgeJob() {
       const next = await getStoragePurgeJob(started.job_id, client)
       if (id !== runId) return null
       if (next.kind !== 'storage_purge') {
-        throw new Error(`System job ${started.job_id} is not a storage purge.`)
+        throw new Error(`System job ${started.job_id} is not a permanent deletion.`)
       }
       status.value = next
       progress.value = retainStoragePurgeProgress(progress.value, next.progress)

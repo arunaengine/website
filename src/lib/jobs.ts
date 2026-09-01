@@ -654,7 +654,7 @@ const JOB_KIND_LABEL: Record<string, string> = {
   export_rocrate: 'Export RO-Crate',
   harvest: 'Harvest',
   mint_persistent_id: 'Mint persistent id',
-  storage_purge: 'Storage purge',
+  storage_purge: 'Permanent deletion',
 }
 
 // `kind` stays open for kinds the backend adds, so an unknown one reads as its
