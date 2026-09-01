@@ -39,6 +39,13 @@ describe('state vocabulary', () => {
     expect(TES_STATE_META.SYSTEM_ERROR.variant).toBe(JOB_STATE_META.failed.variant)
   })
 
+  it('separates a current version from history and markers', () => {
+    expect(stateVariant('Current')).toBe('success')
+    expect(stateVariant('Older')).toBe('secondary')
+    expect(stateVariant('Delete marker')).toBe('warn')
+    expect(stateVariant('Deleted')).toBe('warn')
+  })
+
   it('falls back to a neutral count', () => {
     expect(stateVariant('something the backend invented')).toBe('outline')
   })

@@ -1,13 +1,22 @@
 import {
+  CopyObjectCommand,
   DeleteObjectCommand,
   DeleteObjectsCommand,
   GetObjectCommand,
   HeadObjectCommand,
   ListObjectsV2Command,
+  ListObjectVersionsCommand,
   PutObjectCommand,
 } from '@aws-sdk/client-s3'
 import { Upload } from '@aws-sdk/lib-storage'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import {
+  deletedEntries,
+  keyVersions,
+  sortVersions,
+  type DeletedObjectEntry,
+  type ObjectVersionEntry,
+} from '@/lib/objectVersions'
 import { drsDownloadHref, isDrsReference } from '@/lib/tes'
 import { useAruna } from '../useAruna'
 import { client } from './client'
@@ -200,6 +209,118 @@ export async function createFolder(
 
 export async function deleteObject(bucket: string, key: string, nodeId?: string | null): Promise<void> {
   await client(nodeId).send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))
+}
+
+// One page holds 1000 rows and one key rarely has more; the cap keeps a
+// pathological history from paging forever and is reported to the caller.
+const VERSION_PAGE_SIZE = 1000
+const VERSION_LIMIT = 1000
+
+export interface ObjectVersionList {
+  versions: ObjectVersionEntry[]
+  truncated: boolean
+}
+
+/** Every version and delete marker of one key, newest first. */
+export async function listObjectVersions(
+  bucket: string,
+  key: string,
+  nodeId?: string | null,
+): Promise<ObjectVersionList> {
+  const versions: ObjectVersionEntry[] = []
+  let keyMarker: string | undefined
+  let versionMarker: string | undefined
+  for (;;) {
+    const page = await client(nodeId).send(
+      new ListObjectVersionsCommand({
+        Bucket: bucket,
+        Prefix: key,
+        KeyMarker: keyMarker,
+        VersionIdMarker: versionMarker,
+        MaxKeys: VERSION_PAGE_SIZE,
+      }),
+    )
+    versions.push(...keyVersions(page, key))
+    if (versions.length >= VERSION_LIMIT) {
+      return { versions: sortVersions(versions).slice(0, VERSION_LIMIT), truncated: true }
+    }
+    keyMarker = page.NextKeyMarker
+    versionMarker = page.NextVersionIdMarker
+    if (!page.IsTruncated || (!keyMarker && !versionMarker)) {
+      return { versions: sortVersions(versions), truncated: false }
+    }
+  }
+}
+
+export interface DeletedObjectList {
+  deleted: DeletedObjectEntry[]
+  truncated: boolean
+}
+
+/**
+ * Keys directly under `prefix` whose head is a delete marker. ListObjectsV2
+ * hides them, so this is the only way the browser can offer them back.
+ */
+export async function listDeletedObjects(
+  bucket: string,
+  prefix: string,
+  nodeId?: string | null,
+): Promise<DeletedObjectList> {
+  const deleted: DeletedObjectEntry[] = []
+  let keyMarker: string | undefined
+  let versionMarker: string | undefined
+  for (;;) {
+    const page = await client(nodeId).send(
+      new ListObjectVersionsCommand({
+        Bucket: bucket,
+        Prefix: prefix || undefined,
+        Delimiter: '/',
+        KeyMarker: keyMarker,
+        VersionIdMarker: versionMarker,
+        MaxKeys: VERSION_PAGE_SIZE,
+      }),
+    )
+    deleted.push(...deletedEntries(page, prefix))
+    if (deleted.length >= VERSION_LIMIT) {
+      return { deleted: deleted.slice(0, VERSION_LIMIT), truncated: true }
+    }
+    keyMarker = page.NextKeyMarker
+    versionMarker = page.NextVersionIdMarker
+    if (!page.IsTruncated || (!keyMarker && !versionMarker)) return { deleted, truncated: false }
+  }
+}
+
+// A hard delete of exactly one version, marker included. When it was the head
+// the head moves to the newest remaining version, so deleting a delete marker
+// restores the object. Node-local: no other node is told.
+export async function deleteObjectVersion(
+  bucket: string,
+  key: string,
+  versionId: string,
+  nodeId?: string | null,
+): Promise<void> {
+  await client(nodeId).send(
+    new DeleteObjectCommand({ Bucket: bucket, Key: key, VersionId: versionId }),
+  )
+}
+
+// Makes an older version current by copying it onto the key, which mints a new
+// version. The source version keeps its bytes until it is deleted.
+export async function copyObjectVersion(
+  bucket: string,
+  key: string,
+  versionId: string,
+  nodeId?: string | null,
+): Promise<{ versionId: string | null }> {
+  const response = await client(nodeId).send(
+    new CopyObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      CopySource: `${encodeURIComponent(bucket)}/${encodeURI(key)}?versionId=${encodeURIComponent(versionId)}`,
+      MetadataDirective: 'COPY',
+    }),
+  )
+  return { versionId: response.VersionId ?? null }
 }
 
 // Applies version-less deletes to every current key under `prefix`, including

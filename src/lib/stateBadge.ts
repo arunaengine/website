@@ -83,6 +83,11 @@ const STATE_TONE: Record<string, StateTone> = {
   // Bucket sync relationship states.
   enabled: 'done',
   detached: 'idle',
+  // Object versions.
+  current: 'done',
+  older: 'idle',
+  'delete marker': 'attention',
+  deleted: 'attention',
   // Node reachability.
   connected: 'done',
   seen: 'done',

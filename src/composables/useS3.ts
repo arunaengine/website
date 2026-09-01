@@ -4,16 +4,20 @@
 import { allowPublicReadCors, createBucket, deleteBucket, listBuckets } from './s3/buckets'
 import { connectedEndpoint, endpointForNode, resolveObjectUrl } from './s3/endpoints'
 import {
+  copyObjectVersion,
   createFolder,
   deleteObject,
+  deleteObjectVersion,
   deletePrefix,
   downloadUrl,
   fetchUrlText,
   getObjectBlob,
   getObjectText,
   headObject,
+  listDeletedObjects,
   listObjects,
   listObjectsRecursive,
+  listObjectVersions,
   putTextObject,
   uploadObject,
 } from './s3/objects'
@@ -61,13 +65,16 @@ export {
 } from './s3/session'
 export { fetchUrlText } from './s3/objects'
 export type {
+  DeletedObjectList,
   DeletePrefixResult,
   FolderEntry,
   ObjectEntry,
   ObjectHead,
   ObjectPage,
+  ObjectVersionList,
   UploadHandle,
 } from './s3/objects'
+export type { DeletedObjectEntry, ObjectVersionEntry } from '@/lib/objectVersions'
 export type { BucketEntry } from './s3/buckets'
 
 export function useS3() {
@@ -101,9 +108,13 @@ export function useS3() {
     putTextObject,
     listObjects,
     listObjectsRecursive,
+    listObjectVersions,
+    listDeletedObjects,
     createFolder,
     uploadObject,
     deleteObject,
+    deleteObjectVersion,
+    copyObjectVersion,
     deletePrefix,
     deleteBucket,
     headObject,
