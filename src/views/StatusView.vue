@@ -363,7 +363,7 @@ watch(
                   {{ kindLabel[node.kind] }}
                 </Badge>
                 <template v-if="node.placement">
-                  <span class="chip hidden shrink-0 sm:inline-flex" :title="`Placement location: ${node.placement.location}`">
+                  <span class="chip hidden shrink-0 sm:inline-flex" :title="`Location: ${node.placement.location}`">
                     <MapPin class="h-3 w-3" />
                     {{ node.placement.location }}
                   </span>

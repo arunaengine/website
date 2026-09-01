@@ -37,7 +37,7 @@ defineProps<{
     </dl>
 
     <div class="border-t border-border/70 pt-3">
-      <h2 class="font-display text-sm font-semibold text-aruna-navy">Placement</h2>
+      <h2 class="font-display text-sm font-semibold text-aruna-navy">Record placement</h2>
       <dl v-if="node.placement" class="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
         <div>
           <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Location</dt>
@@ -56,7 +56,7 @@ defineProps<{
           <dd class="mt-0.5 text-xs text-foreground/90">{{ node.placement.draining ? 'yes' : 'no' }}</dd>
         </div>
       </dl>
-      <p v-else class="mt-1 text-xs text-muted-foreground">Not in the realm's placement map.</p>
+      <p v-else class="mt-1 text-xs text-muted-foreground">Not in the realm's record placement map.</p>
     </div>
 
     <div>

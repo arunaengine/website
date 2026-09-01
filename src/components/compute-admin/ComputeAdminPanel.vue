@@ -244,7 +244,7 @@ watch(
 
     <div v-else class="container py-8">
       <p class="surface mb-6 px-5 py-3 text-sm text-muted-foreground">
-        Compute administration controls execution admission and capacity signals, while placement strategies separately govern data placement.
+        Compute administration controls execution admission and capacity signals, while record placement separately decides which nodes hold records and system jobs.
       </p>
 
       <div class="grid gap-6 lg:grid-cols-[260px_1fr]">

@@ -82,7 +82,7 @@ watch(() => props.refreshRevision, (revision, previousRevision) => {
         <h2 class="font-display text-sm font-semibold text-aruna-navy">Per group</h2>
         <Badge variant="outline" size="count">{{ entries.length }}</Badge>
       </div>
-      <RefreshButton :busy="refreshBusy" sr-label="Refresh group statistics" @click="onRefresh" />
+      <RefreshButton :busy="refreshBusy" sr-label="Refresh the per-group figures" @click="onRefresh" />
     </header>
 
     <ErrorPanel

@@ -455,7 +455,7 @@ function onDrop(event: DragEvent) {
                   <IconButton label="Download" @click.stop="download(object)"><Download class="size-3.5" /></IconButton>
                   <IconButton
                     v-if="!remoteNodeId"
-                    label="Storage locations: where this file is stored"
+                    label="Storage: copies of this file and its rules"
                     @click.stop="openDetails(object, 'storage')"
                   ><HardDrive class="size-3.5" /></IconButton>
                   <IconButton

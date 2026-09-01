@@ -36,7 +36,7 @@ export function placementMutationErrorMessage(err: unknown): string {
       return 'The job-family strategy cannot be removed, and its shard count is frozen.'
     }
     if (/currently referenced/i.test(err.message)) {
-      return 'This placement strategy is currently referenced and cannot be removed. Remove or update its references first.'
+      return 'This record placement rule is still referenced and cannot be removed. Remove or update its references first.'
     }
   }
   return apiErrorMessage(err)
