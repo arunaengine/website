@@ -166,7 +166,6 @@ const myGroups = ref<Array<Record<string, unknown>>>([])
 const discoverableGroups = ref<Array<Record<string, unknown>>>([])
 
 const profiles = ref<Array<Record<string, unknown>>>([])
-const myGroups = ref<Array<Record<string, unknown>>>([])
 
 const aruna = {
   apiBaseUrl,
