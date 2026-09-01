@@ -442,18 +442,35 @@ watch(
         </div>
       </section>
 
-      <section v-if="nodeInfo" class="surface overflow-hidden">
+      <section v-if="nodeInfo || usageInfo" class="surface overflow-hidden">
         <header class="flex items-center justify-between border-b border-border px-5 py-4">
           <div class="flex items-center gap-2">
             <HardDrive class="h-4 w-4 text-primary" />
             <h2 class="font-display text-sm font-semibold text-aruna-navy">This node</h2>
           </div>
-          <Badge :variant="statusVariant(nodeInfo.node.status)" size="sm" class="uppercase">
+          <Badge v-if="nodeInfo" :variant="statusVariant(nodeInfo.node.status)" size="sm" class="uppercase">
             {{ nodeInfo.node.status || 'unknown' }}
           </Badge>
         </header>
-        <div class="p-5">
-          <LocalNodeDetails :info="nodeInfo" />
+        <div class="space-y-4 p-5">
+          <dl v-if="usageInfo" class="grid gap-3 sm:grid-cols-3">
+            <div class="surface-inline px-3 py-2">
+              <dt class="text-[11px] uppercase tracking-wide text-muted-foreground">Objects</dt>
+              <dd class="mt-0.5 font-display text-lg font-semibold tabular-nums text-aruna-navy">{{ formatNumber(usageInfo.objects) }}</dd>
+              <p class="mt-0.5 text-[11px] text-muted-foreground">{{ formatNumber(usageInfo.stored_blobs ?? 0) }} physical blob locations</p>
+            </div>
+            <div class="surface-inline px-3 py-2">
+              <dt class="text-[11px] uppercase tracking-wide text-muted-foreground">Stored data</dt>
+              <dd class="mt-0.5 font-display text-lg font-semibold tabular-nums text-aruna-navy">{{ formatBytes(usageInfo.stored_bytes ?? 0) }}</dd>
+              <p class="mt-0.5 text-[11px] text-muted-foreground">Aggregate blob storage on this node</p>
+            </div>
+            <div class="surface-inline px-3 py-2">
+              <dt class="text-[11px] uppercase tracking-wide text-muted-foreground">Buckets</dt>
+              <dd class="mt-0.5 font-display text-lg font-semibold tabular-nums text-aruna-navy">{{ formatNumber(usageInfo.buckets) }}</dd>
+              <p class="mt-0.5 text-[11px] text-muted-foreground">Node-reported total; may include per-run system workspaces (ws-…)</p>
+            </div>
+          </dl>
+          <LocalNodeDetails v-if="nodeInfo" :info="nodeInfo" />
         </div>
       </section>
       </template>

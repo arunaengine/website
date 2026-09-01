@@ -98,6 +98,32 @@ describe('first status paint', () => {
   })
 })
 
+describe('this node storage', () => {
+  it('reports the answering node figures the dashboard no longer carries', async () => {
+    nodeInfo.value = { node: { status: 'healthy', peer_id: 'local-node' }, warnings: [] }
+    usageInfo.value = { buckets: 4, objects: 12, stored_blobs: 7, stored_bytes: 2048, referenced_bytes: 0 }
+
+    const text = await renderedText()
+
+    expect(text).toContain('This node')
+    expect(text).toMatch(/Objects 12/)
+    expect(text).toContain('7 physical blob locations')
+    expect(text).toMatch(/Stored data 2 KB/)
+    expect(text).toContain('Aggregate blob storage on this node')
+    expect(text).toMatch(/Buckets 4/)
+    expect(text).toContain('Node-reported total')
+  })
+
+  it('keeps the block for a node that reports usage but no info yet', async () => {
+    usageInfo.value = { buckets: 1, objects: 2, referenced_bytes: 0 }
+
+    const text = await renderedText()
+
+    expect(text).toContain('This node')
+    expect(text).toMatch(/Objects 2/)
+  })
+})
+
 describe('device summary', () => {
   it('summarizes user nodes instead of listing them among realm nodes', async () => {
     currentUser.value = { id: 'user-1' }
