@@ -15,6 +15,7 @@ import {
   type HostNode,
 } from '@/test/clientRender'
 import * as Editor from '@/lib/crate/editor'
+import * as References from '@/lib/crate/references'
 import * as TypeDefaults from '@/lib/crate/typeDefaults'
 import * as Uri from '@/lib/profiles/uri'
 import * as Orcid from '@/lib/lookup/orcid'
@@ -108,6 +109,7 @@ const AddEntityDialog = compileClientComponent(new URL('./AddEntityDialog.vue', 
   '@/components/metadata/LookupBox.vue': moduleDefault(LookupBox),
   './TypeBrowser.vue': moduleDefault(TypeBrowser),
   '@/lib/crate/editor': Editor,
+  '@/lib/crate/references': References,
   '@/lib/crate/typeDefaults': TypeDefaults,
   '@/lib/lookup/orcid': Orcid,
   '@/lib/lookup/ror': Ror,
@@ -301,6 +303,26 @@ describe('AddEntityDialog', () => {
 
     expect(created[0].draft.entities[0].properties.author).toEqual([
       { kind: 'reference', value: created[0].entity.id },
+    ])
+    mounted.app.unmount()
+  })
+
+  it('leaves one entry when the same person is linked twice', async () => {
+    const created: Created[] = []
+    const reused = Editor.addEntity(draft, { type: 'Person', name: 'Ada Lovelace' })
+    const linked = References.linkReference(reused.draft, './', 'author', reused.entity.id)
+    const mounted = await mount({ draft: linked, offerLink: true }, created)
+
+    await click(button(mounted.root, 'Person'))
+    await typeValue(field(mounted.root, 'Name'), 'Ada Lovelace')
+    const select = element(mounted.root, (node) => node.props['aria-label'] === 'Link from the dataset as')
+    select.value = 'author'
+    await (select.props.onChange as (event: { target: HostNode }) => Promise<void>)({ target: select })
+    await flush()
+    await click(button(mounted.root, 'Create'))
+
+    expect(created[0].draft.entities[0].properties.author).toEqual([
+      { kind: 'reference', value: reused.entity.id },
     ])
     mounted.app.unmount()
   })

@@ -15,6 +15,8 @@ import {
   type HostNode,
 } from '@/test/clientRender'
 import * as Editor from '@/lib/crate/editor'
+import * as Orphans from '@/lib/crate/orphans'
+import * as References from '@/lib/crate/references'
 import * as Utils from '@/lib/utils'
 import type { LookupHit } from '@/lib/lookup/types'
 
@@ -69,6 +71,8 @@ const EntityHeader = compileClientComponent(new URL('./EntityHeader.vue', import
   '@/components/ui/Separator.vue': moduleDefault(EmptyStub),
   './TypeDialog.vue': moduleDefault(EmptyStub),
   '@/lib/crate/editor': Editor,
+  '@/lib/crate/orphans': Orphans,
+  '@/lib/crate/references': References,
   '@/lib/lookup/ror': { matchRorByName: rorMatch },
   '@/lib/utils': Utils,
 })
@@ -117,6 +121,28 @@ function control(root: HostNode, label: string): HostNode {
 }
 
 describe('EntityHeader', () => {
+  it('offers the two ways out of a file the dataset cannot reach', async () => {
+    const updates: Editor.CrateDraft[] = []
+    const added = Editor.addEntity(seeded(), { type: 'File', id: 's3://bucket/stray.csv', name: 'stray.csv' })
+    const mounted = await mountApp(EntityHeader, {
+      props: {
+        draft: added.draft,
+        entity: added.entity,
+        vocab: null,
+        onUpdate: (next: Editor.CrateDraft) => updates.push(next),
+        onSelect: () => undefined,
+      },
+    })
+
+    expect(content(mounted.root)).toContain('Nothing in this dataset holds stray.csv')
+    await click(button(mounted.root, 'Link as part'))
+
+    expect(updates[0].entities[0].properties.hasPart).toEqual([
+      { kind: 'reference', value: 's3://bucket/stray.csv' },
+    ])
+    mounted.app.unmount()
+  })
+
   it('counts what points at this entity and opens the pick', async () => {
     const selections: string[] = []
     const mounted = await mount('#ada-lovelace', [], selections)
