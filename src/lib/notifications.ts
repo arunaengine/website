@@ -1,6 +1,6 @@
 import type { Component } from 'vue'
 import type { RouteLocationRaw } from 'vue-router'
-import { AlertTriangle, ArrowLeftRight, Ban, Bell, Check, FileJson2, HardDrive, Inbox, Upload, UserMinus, UserPlus, Users } from '@lucide/vue'
+import { AlertTriangle, ArrowLeftRight, Bell, FileJson2, HardDrive, Upload, UserMinus, UserPlus, Users } from '@lucide/vue'
 import type { ApiNotification } from '@/lib/api'
 import { formatBytes, truncateMiddle } from '@/lib/utils'
 
@@ -28,11 +28,10 @@ function keyPrefix(key: string): string {
   return key.split('/').slice(0, -1).join('/')
 }
 
-// Registry of backend notification kinds (stable `name()` strings; see
-// aruna docs/design/notifications.md §9, append-only). Later portal branches
-// extend this by ADDING entries here: e.g. issue #248 adds `join_request_*`
-// kinds linking to the group's requests tab, issue #250 adds quota-transition
-// kinds linking to the admin/usage views. Never remove or rename entries.
+// Registry of the notification kinds the backend actually emits (stable
+// `name()` strings; see aruna docs/design/notifications.md §9). A kind nobody
+// emits is not registered: an unknown kind already degrades to a generic row,
+// so an entry here is a promise that the row can arrive.
 export const NOTIFICATION_KINDS: Record<string, NotificationKindDescriptor> = {
   added_to_group: {
     icon: UserPlus,
@@ -106,72 +105,6 @@ export const NOTIFICATION_KINDS: Record<string, NotificationKindDescriptor> = {
       n.bucket
         ? { name: 'bucket', params: { bucketId: n.bucket }, query: n.node_id ? { node: n.node_id } : {} }
         : null,
-  },
-  // ── Join requests (aruna#248) ──────────────────────────────────────────────
-  // NOT emitted by any backend yet. Names follow the backend's snake_case
-  // NotificationKind::name() convention (added_to_group, group_member_added, …);
-  // the dotted aliases cover the alternative naming from the portal-side design
-  // notes, so whichever the backend picks is handled. These entries are static
-  // (not wrapped in featureEnabled): the registry is a plain Record and an entry
-  // for a kind that can only arrive once the backend implements aruna#248 is
-  // inert with the flag off, so registering it unconditionally is honest.
-  // Deep links target the group workflow: created → the admin inbox in the
-  // group detail (commit 4); decided → the requester's own-requests section
-  // (commit 3) via the #join-requests anchor.
-  join_request_created: {
-    icon: Inbox,
-    title: (n, ctx) => `New join request for ${groupLabel(n, ctx)}`,
-    detail: (n) => (n.actor_user_id ? `From ${truncateMiddle(n.actor_user_id)}` : undefined),
-    link: (n) => (n.group_id ? { name: 'group', params: { id: n.group_id } } : { name: 'groups' }),
-  },
-  join_request_decided: {
-    icon: Check,
-    title: (n, ctx) => `Your join request for ${groupLabel(n, ctx)} was reviewed`,
-    detail: () => undefined,
-    link: () => ({ name: 'groups', hash: '#join-requests' }),
-  },
-  'group.join_request.created': {
-    icon: Inbox,
-    title: (n, ctx) => `New join request for ${groupLabel(n, ctx)}`,
-    detail: (n) => (n.actor_user_id ? `From ${truncateMiddle(n.actor_user_id)}` : undefined),
-    link: (n) => (n.group_id ? { name: 'group', params: { id: n.group_id } } : { name: 'groups' }),
-  },
-  'group.join_request.decided': {
-    icon: Check,
-    title: (n, ctx) => `Your join request for ${groupLabel(n, ctx)} was reviewed`,
-    detail: () => undefined,
-    link: () => ({ name: 'groups', hash: '#join-requests' }),
-  },
-  // ── Quota state (aruna#250) ─────────────────────────────────────────────────
-  // NOT emitted by any backend yet. Two spellings covered: the backend's
-  // snake_case NotificationKind::name() convention (quota_warned/quota_blocked)
-  // and the dotted names from the issue text (quota.warned/quota.blocked).
-  // Static entries (not wrapped in featureEnabled): a kind that can only arrive
-  // once the backend emits it is inert until then. Both deep-link to the
-  // group's #storage-use section (anchor added in the quota-reporting UI).
-  quota_warned: {
-    icon: AlertTriangle,
-    title: (n, ctx) => `Storage nearing quota for ${groupLabel(n, ctx)}`,
-    detail: () => undefined,
-    link: (n) => (n.group_id ? { name: 'group', params: { id: n.group_id }, hash: '#storage-use' } : { name: 'groups' }),
-  },
-  quota_blocked: {
-    icon: Ban,
-    title: (n, ctx) => `Storage quota exceeded for ${groupLabel(n, ctx)}`,
-    detail: () => 'Uploads are blocked until storage is freed or the quota is raised.',
-    link: (n) => (n.group_id ? { name: 'group', params: { id: n.group_id }, hash: '#storage-use' } : { name: 'groups' }),
-  },
-  'quota.warned': {
-    icon: AlertTriangle,
-    title: (n, ctx) => `Storage nearing quota for ${groupLabel(n, ctx)}`,
-    detail: () => undefined,
-    link: (n) => (n.group_id ? { name: 'group', params: { id: n.group_id }, hash: '#storage-use' } : { name: 'groups' }),
-  },
-  'quota.blocked': {
-    icon: Ban,
-    title: (n, ctx) => `Storage quota exceeded for ${groupLabel(n, ctx)}`,
-    detail: () => 'Uploads are blocked until storage is freed or the quota is raised.',
-    link: (n) => (n.group_id ? { name: 'group', params: { id: n.group_id }, hash: '#storage-use' } : { name: 'groups' }),
   },
 }
 
