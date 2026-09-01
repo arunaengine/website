@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Button from '@/components/ui/Button.vue'
+import DocsLink from '@/components/ui/DocsLink.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import RoutingTargetPicker from '@/components/groups/RoutingTargetPicker.vue'
@@ -64,10 +65,9 @@ async function save() {
 
 <template>
   <div class="space-y-2">
-    <p class="text-[11px] text-muted-foreground">
-      Where new uploads go when no bucket rule says otherwise. Naming a backend is binding: an
-      upload that cannot reach it fails instead of quietly landing somewhere else. Naming a storage
-      class is only a preference: a node without that class stores the upload itself.
+    <p class="flex flex-wrap items-center gap-x-2 text-[11px] text-muted-foreground">
+      <span>Where new uploads go when no bucket rule says otherwise.</span>
+      <DocsLink topic="where-data-lives" section="Storage backend" label="Learn about storage backends" />
     </p>
     <div v-if="hidden" class="text-xs text-muted-foreground">
       Storage routing is only visible to group admins.

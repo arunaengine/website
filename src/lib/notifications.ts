@@ -148,30 +148,30 @@ export const NOTIFICATION_KINDS: Record<string, NotificationKindDescriptor> = {
   // and the dotted names from the issue text (quota.warned/quota.blocked).
   // Static entries (not wrapped in featureEnabled): a kind that can only arrive
   // once the backend emits it is inert until then. Both deep-link to the
-  // group's #storage section (anchor added in the quota-reporting UI).
+  // group's #storage-use section (anchor added in the quota-reporting UI).
   quota_warned: {
     icon: AlertTriangle,
     title: (n, ctx) => `Storage nearing quota for ${groupLabel(n, ctx)}`,
     detail: () => undefined,
-    link: (n) => (n.group_id ? { name: 'group', params: { id: n.group_id }, hash: '#storage' } : { name: 'groups' }),
+    link: (n) => (n.group_id ? { name: 'group', params: { id: n.group_id }, hash: '#storage-use' } : { name: 'groups' }),
   },
   quota_blocked: {
     icon: Ban,
     title: (n, ctx) => `Storage quota exceeded for ${groupLabel(n, ctx)}`,
     detail: () => 'Uploads are blocked until storage is freed or the quota is raised.',
-    link: (n) => (n.group_id ? { name: 'group', params: { id: n.group_id }, hash: '#storage' } : { name: 'groups' }),
+    link: (n) => (n.group_id ? { name: 'group', params: { id: n.group_id }, hash: '#storage-use' } : { name: 'groups' }),
   },
   'quota.warned': {
     icon: AlertTriangle,
     title: (n, ctx) => `Storage nearing quota for ${groupLabel(n, ctx)}`,
     detail: () => undefined,
-    link: (n) => (n.group_id ? { name: 'group', params: { id: n.group_id }, hash: '#storage' } : { name: 'groups' }),
+    link: (n) => (n.group_id ? { name: 'group', params: { id: n.group_id }, hash: '#storage-use' } : { name: 'groups' }),
   },
   'quota.blocked': {
     icon: Ban,
     title: (n, ctx) => `Storage quota exceeded for ${groupLabel(n, ctx)}`,
     detail: () => 'Uploads are blocked until storage is freed or the quota is raised.',
-    link: (n) => (n.group_id ? { name: 'group', params: { id: n.group_id }, hash: '#storage' } : { name: 'groups' }),
+    link: (n) => (n.group_id ? { name: 'group', params: { id: n.group_id }, hash: '#storage-use' } : { name: 'groups' }),
   },
 }
 

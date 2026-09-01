@@ -262,10 +262,10 @@ async function reload() {
   // The storage section renders only after getGroup + getGroupUsage resolve, so
   // the router's one-shot hash retry misses it (aruna#248 review F4). Scroll here
   // once per navigation; @changed reloads keep the flag consumed.
-  if (storageAnchorPending && route.hash === '#storage' && usage.value) {
+  if (storageAnchorPending && route.hash === '#storage-use' && usage.value) {
     storageAnchorPending = false
     await nextTick()
-    document.getElementById('storage')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    document.getElementById('storage-use')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 }
 
@@ -386,10 +386,10 @@ async function leave() {
           </div>
         </dl>
       </div>
-      <div v-if="usage" id="storage" class="scroll-mt-24 border-b border-border">
+      <div v-if="usage" id="storage-use" class="scroll-mt-24 border-b border-border">
         <div class="flex items-center gap-2 px-5 pb-1 pt-4">
           <HardDrive class="h-3.5 w-3.5 text-primary" />
-          <h2 class="font-display text-sm font-semibold text-aruna-navy">Storage</h2>
+          <h2 class="font-display text-sm font-semibold text-aruna-navy">Storage use</h2>
           <Badge v-if="quotaBadge" size="sm" :variant="quotaBadge.variant" class="uppercase">{{ quotaBadge.label }}</Badge>
         </div>
         <div class="px-5 py-3">
@@ -579,7 +579,7 @@ async function leave() {
           <div>
             <div class="flex items-center gap-2 px-5 pb-1 pt-4">
               <Route class="h-3.5 w-3.5 text-primary" />
-              <h2 class="font-display text-sm font-semibold text-aruna-navy">Storage routing</h2>
+              <h2 class="font-display text-sm font-semibold text-aruna-navy">Default storage backend</h2>
             </div>
             <div class="px-5 py-3">
               <GroupRoutingSection
@@ -588,8 +588,7 @@ async function leave() {
                 :can-admin="canAdminStorage"
               />
               <p class="mt-2 text-[11px] text-muted-foreground">
-                Rules for a single bucket live with that bucket: open it in Data and
-                choose Bucket settings.
+                Rules for a single bucket live with that bucket: open it in Data and choose Storage.
               </p>
             </div>
           </div>

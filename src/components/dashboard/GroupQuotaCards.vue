@@ -188,7 +188,7 @@ watch(() => props.refreshRevision, (revision, previousRevision) => {
       >
         <div class="flex items-center justify-between gap-2">
           <RouterLink
-            :to="{ name: 'group', params: { id: entry.groupId }, hash: '#storage' }"
+            :to="{ name: 'group', params: { id: entry.groupId }, hash: '#storage-use' }"
             class="min-w-0 truncate text-xs font-medium text-foreground hover:text-primary hover:underline"
           >
             {{ entry.name }}
