@@ -14,6 +14,7 @@ import {
   flush,
   moduleDefault,
   mountApp,
+  nodes,
   type HostNode,
 } from '@/test/clientRender'
 import * as RouteTab from '@/composables/useRouteTab'
@@ -160,6 +161,8 @@ const currentUser = ref<Record<string, unknown> | null>({ id: 'user-1', name: 'A
 const userInfo = ref<Record<string, unknown> | null>({ user: { user_id: 'user-1' } })
 const authToken = ref('token')
 const apiBaseUrl = ref('/api/v1')
+const myGroups = ref<Array<Record<string, unknown>>>([])
+const discoverableGroups = ref<Array<Record<string, unknown>>>([])
 
 const aruna = {
   apiBaseUrl,
@@ -167,8 +170,8 @@ const aruna = {
   currentUser,
   nodeInfo: ref(null),
   userInfo,
-  myGroups: ref([]),
-  discoverableGroups: ref([]),
+  myGroups,
+  discoverableGroups,
   profiles: ref([]),
   credentials: ref([]),
   authError: ref<string | null>(null),
@@ -250,7 +253,6 @@ const SettingsView = compileClientComponent(new URL('./SettingsView.vue', import
   '@/components/ui/TabsTrigger.vue': moduleDefault(TriggerStub),
   '@/components/ui/TabsContent.vue': moduleDefault(PanelStub),
   '@/components/groups/CreateGroupDialog.vue': moduleDefault(Empty),
-  '@/components/groups/GroupDetail.vue': moduleDefault(Empty),
   '@/components/data/CreateCredentialDialog.vue': moduleDefault(Empty),
   '@/components/onboarding/DevicesPanel.vue': moduleDefault(labelled('Devices panel')),
   '@/components/settings/SessionsPanel.vue': moduleDefault(labelled('Sessions panel')),
@@ -266,6 +268,7 @@ async function mount(query: string) {
       { path: '/app/settings', name: 'settings', component: RouteStub },
       { path: '/app/settings/watches', name: 'settings-watches', component: RouteStub },
       { path: '/app/profiles', name: 'profiles', component: RouteStub },
+      { path: '/app/groups/:id', name: 'group', component: RouteStub },
     ],
   })
   await router.push(`/app/settings${query}`)
@@ -351,5 +354,28 @@ describe('SettingsView access tab', () => {
     expect(text).toContain('Sign in')
     expect(text).toContain('Onboarding secret')
     expect(text).toContain('Existing API token')
+  })
+})
+
+describe('SettingsView groups tab', () => {
+  beforeEach(() => {
+    myGroups.value = [{ id: 'g1', name: 'Genomics lab', tags: ['admin'], memberCount: 3 }]
+    discoverableGroups.value = [{ id: 'g2', name: 'Climate lab', tags: [] }]
+  })
+
+  it('links every row to the group page instead of embedding it', async () => {
+    // The embedded detail bound its own tabs to ?tab=, which the settings tabs
+    // already own; one surface for group management removes the collision.
+    const { root, errors } = await mount('?tab=groups')
+
+    const links = nodes(root)
+      .filter((node) => node.tag === 'a')
+      .map((node) => String(node.props.href ?? ''))
+
+    expect(errors).toEqual([])
+    expect(links).toContain('/app/groups/g1')
+    expect(links).toContain('/app/groups/g2')
+    expect(source).not.toContain('GroupDetail')
+    expect(panelText(root, 'groups')).toContain('Create group')
   })
 })

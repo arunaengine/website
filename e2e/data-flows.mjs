@@ -134,6 +134,19 @@ try {
   const settingsBody = await page.textContent('body')
   step('groups tab shows Genomics lab', settingsBody.includes('Genomics lab'))
 
+  // A group row leads to the group page, where the group's own tabs stay on
+  // that route instead of falling back to the settings tabs.
+  await page.getByRole('link', { name: /Genomics lab/ }).first().click()
+  await page.waitForURL(/\/app\/groups\//, { timeout: 15000 })
+  await page.waitForTimeout(1500)
+  await page.getByRole('tab', { name: /Members/ }).click()
+  await page.waitForTimeout(800)
+  step(
+    'group tabs stay on the group page',
+    page.url().includes('/app/groups/') && page.url().includes('tab=members'),
+    page.url(),
+  )
+
   // Deep-link to a nonexistent dataset gives an honest not-found panel, not a redirect
   await page.goto(BASE + '/app/metadata/01UNKNOWNDOCID0000000000000')
   await page.waitForTimeout(1500)
@@ -160,7 +173,7 @@ try {
   await page.waitForURL(/\/app\/metadata\//)
   await page.waitForTimeout(1500)
   await page.getByRole('button', { name: /^Delete$/ }).first().click()
-  await page.waitForSelector('text=Delete metadata document')
+  await page.waitForSelector('text=Delete dataset')
   await page.locator('[role="dialog"]').getByRole('button', { name: /^Delete$/ }).click()
   await page.waitForURL(/\/app\/search/, { timeout: 15000 })
   await page.waitForTimeout(2000)

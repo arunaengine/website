@@ -10,7 +10,6 @@ import Skeleton from '@/components/ui/Skeleton.vue'
 import Separator from '@/components/ui/Separator.vue'
 import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
-import GroupDetail from '@/components/groups/GroupDetail.vue'
 import DevicesPanel from '@/components/onboarding/DevicesPanel.vue'
 import SessionsPanel from '@/components/settings/SessionsPanel.vue'
 import S3SessionsPanel from '@/components/settings/S3SessionsPanel.vue'
@@ -29,7 +28,7 @@ import { useFirstPaint } from '@/composables/useFirstPaint'
 import { useRouteTab } from '@/composables/useRouteTab'
 import { useAuth } from '@/composables/useAuth'
 import { useWatches } from '@/composables/useWatches'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { apiOrigin } from '@/lib/api'
 import { errorMessage, relativeTime } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
@@ -200,11 +199,11 @@ const themeOptions: Array<{ id: ThemeMode; title: string; icon: unknown; preview
   { id: 'system', title: 'System', icon: Monitor, preview: 'linear-gradient(90deg, #ffffff 0 50%, #0B0B0E 50% 100%)' },
 ]
 const { mode: appearance, setTheme } = useTheme()
+const router = useRouter()
 
 const createGroupOpen = ref(false)
 const createCredentialOpen = ref(false)
 const revokeError = ref<string | null>(null)
-const selectedGroupId = ref('')
 
 // Revoked/expired credentials linger server-side (soft revoke, no purge
 // endpoint); keep the default view clean and reveal them on demand.
@@ -235,10 +234,6 @@ async function revoke(accessKeyId: string) {
   } catch (err) {
     revokeError.value = errorMessage(err)
   }
-}
-
-function toggleGroup(groupId: string) {
-  selectedGroupId.value = selectedGroupId.value === groupId ? '' : groupId
 }
 </script>
 
@@ -486,15 +481,13 @@ function toggleGroup(groupId: string) {
           </header>
           <ul class="divide-y divide-border">
             <li v-for="group in myGroups" :key="group.id">
-              <button type="button" class="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-muted/40" :class="selectedGroupId === group.id ? 'bg-muted/30' : ''" @click="toggleGroup(group.id)">
+              <RouterLink :to="{ name: 'group', params: { id: group.id } }" class="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-muted/40">
                 <span class="h-2 w-2 shrink-0 rounded-full bg-primary" />
                 <div class="min-w-0 flex-1"><div class="truncate text-sm font-medium text-foreground">{{ group.name }}</div><div class="truncate font-mono text-[10px] text-muted-foreground">{{ group.id }}</div></div>
                 <Badge v-if="group.memberCount !== undefined" variant="outline" class="shrink-0 tabular-nums">{{ group.memberCount }} {{ group.memberCount === 1 ? 'member' : 'members' }}</Badge>
                 <div class="flex flex-wrap justify-end gap-1"><AccessBadge v-for="role in group.tags" :key="role" :access="role" /></div>
-              </button>
-              <div v-if="selectedGroupId === group.id" class="border-t border-border bg-muted/10 p-4">
-                <GroupDetail :group-id="group.id" @left="selectedGroupId = ''" />
-              </div>
+                <ChevronRight class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              </RouterLink>
             </li>
             <li v-if="!myGroups.length" class="p-3">
               <EmptyState compact title="You are not a member of any group yet, create one to get started.">
@@ -508,18 +501,15 @@ function toggleGroup(groupId: string) {
             <h2 class="px-5 pb-1 pt-4 font-display text-sm font-semibold text-aruna-navy">Other groups in this realm</h2>
             <ul class="divide-y divide-border">
               <li v-for="group in discoverableGroups" :key="group.id">
-                <button type="button" class="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-muted/40" :class="selectedGroupId === group.id ? 'bg-muted/30' : ''" @click="toggleGroup(group.id)">
+                <RouterLink :to="{ name: 'group', params: { id: group.id } }" class="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-muted/40">
                   <span class="h-2 w-2 shrink-0 rounded-full bg-border" />
                   <div class="min-w-0 flex-1"><div class="truncate text-sm font-medium text-foreground">{{ group.name }}</div><div class="truncate font-mono text-[10px] text-muted-foreground">{{ group.id }}</div></div>
                   <span class="shrink-0 text-[11px] text-muted-foreground">Membership is managed by the group's admins.</span>
-                </button>
-                <div v-if="selectedGroupId === group.id" class="border-t border-border bg-muted/10 p-4">
-                  <GroupDetail :group-id="group.id" />
-                </div>
+                </RouterLink>
               </li>
             </ul>
           </div>
-          <CreateGroupDialog v-model:open="createGroupOpen" @created="(group) => (selectedGroupId = group.group_id)" />
+          <CreateGroupDialog v-model:open="createGroupOpen" @created="(group) => router.push({ name: 'group', params: { id: group.group_id } })" />
         </section>
       </TabsContent>
 
