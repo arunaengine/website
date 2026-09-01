@@ -97,8 +97,9 @@ async function deleteWatch(id: string): Promise<void> {
   }
 }
 
-function findWatch(pathPrefix: string, event: string): ApiWatch | undefined {
-  return watches.value.find((w) => w.path_prefix === pathPrefix && w.events.includes(event))
+// A watch is identified by its prefix; the event set is what the dialog edits.
+function findWatch(pathPrefix: string): ApiWatch | undefined {
+  return watches.value.find((w) => w.path_prefix === pathPrefix)
 }
 
 if (typeof window !== 'undefined') {

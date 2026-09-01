@@ -1,12 +1,18 @@
 import type { RouteLocationRaw } from 'vue-router'
 
-// Watch subscriptions (backend /system/notifications/watches). Path prefixes are
-// canonical resource identities: data events live under
-// `s3/{group_id}/{node_id}/{bucket}/{key-prefix}` and metadata events under
+// Watch subscriptions (backend /system/notifications/watches). A watch is a
+// read-authorized path prefix, never a typed resource: data events live under
+// `s3/{group_id}/{node_id}/{bucket}/{key-prefix}` and dataset events under
 // `meta/{group_id}/{document-path-prefix}`. The two namespaces carry distinct
 // event kinds, so a single watch never mixes them.
 
-export type WatchEventKind = 'metadata_created' | 'data_uploaded'
+export type WatchEventKind =
+  | 'metadata_created'
+  | 'data_uploaded'
+  | 'sync_completed'
+  | 'sync_failed'
+
+export type WatchNamespace = 's3' | 'meta'
 
 export interface WatchEventKindInfo {
   kind: WatchEventKind
@@ -19,7 +25,7 @@ export const WATCH_EVENT_KINDS: WatchEventKindInfo[] = [
     kind: 'metadata_created',
     label: 'Dataset created',
     description:
-      'Notifies you when a new dataset, profile or run record is created under this catalog path.',
+      'Notifies you when a new dataset is created under this path, including every path below it. Edits to a dataset that already exists are not covered.',
   },
   {
     kind: 'data_uploaded',
@@ -27,10 +33,38 @@ export const WATCH_EVENT_KINDS: WatchEventKindInfo[] = [
     description:
       'Notifies you when any object is uploaded under this folder, including all folders below it, a watch always covers a whole prefix, never a single object.',
   },
+  {
+    kind: 'sync_completed',
+    label: 'Sync completed',
+    description: 'Notifies you when a sync that copies data out of this folder finishes a run.',
+  },
+  {
+    kind: 'sync_failed',
+    label: 'Sync failed',
+    description: 'Notifies you when a sync that copies data out of this folder reports a failure.',
+  },
 ]
 
-export function watchKindDescription(kind: string): string {
-  return WATCH_EVENT_KINDS.find((k) => k.kind === kind)?.description ?? ''
+// What every watch surface must state: where notifications appear, that they
+// are in-app only, how long they are kept and how they stop.
+export const WATCH_DELIVERY_NOTE =
+  'Notifications appear in the notification center under the bell icon. They are in-app only and are kept for 30 days. You can stop watching here or under Settings, Watched resources. If you lose read access, notifications stop.'
+
+// Mirrors the backend rule in watch_permission_path: `meta/` accepts exactly
+// metadata_created, `s3/` any non-empty subset of the three data kinds.
+const NAMESPACE_KINDS: Record<WatchNamespace, WatchEventKind[]> = {
+  meta: ['metadata_created'],
+  s3: ['data_uploaded', 'sync_completed', 'sync_failed'],
+}
+
+export function eventsFor(namespace: WatchNamespace): WatchEventKindInfo[] {
+  return WATCH_EVENT_KINDS.filter((info) => NAMESPACE_KINDS[namespace].includes(info.kind))
+}
+
+// Sync events are emitted under the SOURCE bucket prefix, so they only ever
+// fire for a folder that a sync relationship copies data out of.
+export function isSyncEventKind(kind: string): boolean {
+  return kind === 'sync_completed' || kind === 'sync_failed'
 }
 
 export function watchEventLabel(kind: string): string {
@@ -118,7 +152,8 @@ export function parseWatchPath(pathPrefix: string): WatchPathInfo | null {
       namespace: 'meta',
       groupId,
       prefix,
-      label: prefix || '(all datasets)',
+      // An empty document prefix is the group-wide dataset watch.
+      label: prefix || 'All datasets of the group',
       link: { name: 'datasets', query: { ...(prefix ? { q: prefix } : {}), group: groupId } },
     }
   }
