@@ -37,10 +37,28 @@ try {
   await page.waitForTimeout(2000)
   step('admin signed in', (await page.textContent('body')).includes('Aruna Admin'))
 
-  // Dashboard renders the per-group storage cards for a signed-in member.
+  // Dashboard leads with the personal aggregate and the per-group breakdown.
+  const personalAt = (body) => body.indexOf('Aggregated across the groups you belong to')
+  const realmAt = (body) => body.indexOf('Realm datasets')
   await page.goto(BASE + '/app')
   await page.waitForTimeout(2000)
-  step('dashboard shows group quota cards', (await page.textContent('body')).includes("Your groups' storage"))
+  const dashboardBody = await page.textContent('body')
+  step(
+    'dashboard shows the personal statistics and the per-group breakdown',
+    dashboardBody.includes('My statistics') && dashboardBody.includes('Per group'),
+  )
+  step('personal statistics lead by default', personalAt(dashboardBody) < realmAt(dashboardBody))
+
+  // "Lead with" is stored as a user attribute, so the order survives a reload.
+  const leadWith = page.getByRole('group', { name: 'Lead with' })
+  await leadWith.getByRole('button', { name: 'Realm statistics' }).click()
+  await page.waitForTimeout(1500)
+  await page.reload()
+  await page.waitForTimeout(2500)
+  const reloadedBody = await page.textContent('body')
+  step('the lead preference survives a reload', realmAt(reloadedBody) < personalAt(reloadedBody))
+  await page.getByRole('group', { name: 'Lead with' }).getByRole('button', { name: 'My statistics' }).click()
+  await page.waitForTimeout(1500)
 
   // Group detail Storage section: a bar (finite quota shows "of"), an explicit
   // "unlimited" row, or the no-policy byte row — all three are honest outputs.

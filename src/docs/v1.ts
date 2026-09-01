@@ -96,12 +96,13 @@ export const docsTopics: DocsTopic[] = [
         title: 'Start at the dashboard',
         icon: 'LayoutDashboard',
         paragraphs: [
-          'Sign-in lands on the [dashboard](page:dashboard): [realm](concept:realm-nodes-groups#nodes-and-the-realm) statistics, node storage, and your [groups](concept:realm-nodes-groups#groups-own-your-work), live from the [node](concept:glossary#node) your browser talks to.',
+          'Sign-in lands on the [dashboard](page:dashboard): your own statistics first, aggregated over the [groups](concept:realm-nodes-groups#groups-own-your-work) you belong to, with the per-group breakdown right below them, then [realm](concept:realm-nodes-groups#nodes-and-the-realm) statistics, live from the [node](concept:glossary#node) your browser talks to.',
+          'The "Lead with" switch in the section header decides which of the two comes first, and it follows your account to every browser. Figures for the node you are connected to live on the [Status](page:status) page.',
         ],
         image: {
           src: '/docs/v1/dashboard.jpg',
-          alt: 'Portal dashboard with realm statistics, storage figures, and group overview',
-          caption: 'The dashboard: realm statistics on top, node storage below, your groups at the bottom.',
+          alt: 'Portal dashboard with personal statistics, per-group storage, and realm statistics',
+          caption: 'The dashboard: your statistics and your groups on top, realm statistics below.',
         },
       },
       {
