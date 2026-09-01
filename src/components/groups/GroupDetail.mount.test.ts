@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { click, compileClientComponent, element, flush, moduleDefault, mountApp, nodes } from '@/test/clientRender'
 import * as RouteTab from '@/composables/useRouteTab'
 import * as Api from '@/lib/api'
+import * as GroupAdmin from '@/lib/groupAdmin'
 import * as Quota from '@/lib/quota'
 import * as Utils from '@/lib/utils'
 
@@ -61,6 +62,7 @@ const GroupDetail = compileClientComponent(new URL('./GroupDetail.vue', import.m
   'vue-router': RouterRuntime,
   '@lucide/vue': icons,
   '@/lib/api': Api,
+  '@/lib/groupAdmin': GroupAdmin,
   '@/lib/quota': Quota,
   '@/lib/utils': Utils,
   '@/lib/config': { featureEnabled: () => true },
