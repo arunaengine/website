@@ -26,7 +26,7 @@ import type {
 } from '@/lib/placementPolicies'
 import { errorMessage } from '@/lib/utils'
 
-const residencyAdminEnabled = computed(() => featureEnabled('placementAdmin'))
+const placementAdminEnabled = computed(() => featureEnabled('placementAdmin'))
 const sessionPolicies = ref<PolicyResponse[]>([])
 const sessionPolicyRefs = ref<PolicyRefBody[]>([])
 let sessionWatcherInstalled = false
@@ -67,7 +67,7 @@ async function createPlacementPolicy(body: CreatePolicyRequest): Promise<PolicyR
 }
 
 // ── Realm policy listing ─────────────────────────────────────────────────────
-// The read view of the realm's published residency policies. A node that does
+// The read view of the realm's published placement policies. A node that does
 // not serve it answers 404/405, and the panel keeps its session library rather
 // than claiming the realm has none.
 
@@ -209,7 +209,7 @@ export function usePlacementPolicies() {
     })
   }
   return {
-    residencyAdminEnabled,
+    placementAdminEnabled,
     sessionPolicies,
     sessionPolicyRefs,
     listedPolicies,

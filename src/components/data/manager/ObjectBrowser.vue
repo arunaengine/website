@@ -9,8 +9,7 @@ import Spinner from '@/components/ui/Spinner.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
 import Breadcrumbs from '@/components/data/Breadcrumbs.vue'
 import ObjectIcon from '@/components/data/ObjectIcon.vue'
-import BucketRoutingDialog from '@/components/data/BucketRoutingDialog.vue'
-import BucketPolicyDialog from '@/components/residency/BucketPolicyDialog.vue'
+import BucketSettingsDialog from '@/components/data/BucketSettingsDialog.vue'
 import ObjectLocationsDialog from '@/components/data/ObjectLocationsDialog.vue'
 import WatchButton from '@/components/watches/WatchButton.vue'
 import { useAruna } from '@/composables/useAruna'
@@ -18,7 +17,7 @@ import type { DataManager } from '@/composables/useDataManager'
 import { useS3, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
 import { featureEnabled } from '@/lib/config'
 import { formatBytes, relativeTime } from '@/lib/utils'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
   ArrowLeftRight,
@@ -31,8 +30,7 @@ import {
   KeyRound,
   Link2,
   Plus,
-  Route,
-  ShieldCheck,
+  Settings,
   Trash2,
 } from '@lucide/vue'
 
@@ -52,7 +50,7 @@ const emit = defineEmits<{
 
 const s3 = useS3()
 const { isRealmAdmin } = useAruna()
-const residencyPoliciesEnabled = featureEnabled('placementAdmin')
+const placementPoliciesEnabled = featureEnabled('placementAdmin')
 const {
   bucket,
   prefix,
@@ -98,10 +96,10 @@ const {
   requestUpload,
 } = props.manager
 
-// Per-bucket storage rules; local buckets only, like the bucket delete
-// affordance, because the rules are read and written on the connected node.
-const routingDialogOpen = ref(false)
-const residencyDialogOpen = ref(false)
+// Per-bucket routing and placement; local buckets only, like the bucket delete
+// affordance, because both are read and written on the connected node.
+const settingsDialogOpen = ref(false)
+const showPlacement = computed(() => placementPoliciesEnabled && isRealmAdmin.value)
 // Per-version copy list; the connected node answers for its own objects only.
 const locationsKey = ref<string | null>(null)
 
@@ -167,21 +165,13 @@ function onDrop(event: DragEvent) {
           />
           <Button
             v-if="!remoteNodeId"
+            data-tour="bucket-settings"
             variant="outline"
             size="sm"
-            title="Where new files in this bucket are stored"
-            @click="routingDialogOpen = true"
+            title="Routing and placement for this bucket"
+            @click="settingsDialogOpen = true"
           >
-            <Route class="h-4 w-4" /> Routing
-          </Button>
-          <Button
-            v-if="!remoteNodeId && residencyPoliciesEnabled && isRealmAdmin"
-            variant="outline"
-            size="sm"
-            title="Residency policies for this bucket"
-            @click="residencyDialogOpen = true"
-          >
-            <ShieldCheck class="h-4 w-4" /> Residency
+            <Settings class="h-4 w-4" /> Bucket settings
           </Button>
           <Button
             v-if="showSyncButton"
@@ -191,7 +181,7 @@ function onDrop(event: DragEvent) {
             @click="emit('syncs')"
           >
             <ArrowLeftRight class="h-4 w-4" :class="bucketSyncCount ? 'text-primary' : ''" /> Syncs
-            <Badge v-if="bucketSyncCount" variant="secondary" class="ml-1">{{ bucketSyncCount }}</Badge>
+            <Badge v-if="bucketSyncCount" variant="secondary" size="count" class="ml-1">{{ bucketSyncCount }}</Badge>
           </Button>
           <Popover v-if="showReferenceStats">
             <Button
@@ -201,7 +191,7 @@ function onDrop(event: DragEvent) {
             >
               <Link2 class="h-4 w-4 text-primary" />
               <span class="font-mono text-xs">{{ formatBytes(referenceStats.bytes) }}</span>
-              <Badge variant="secondary" class="ml-1">{{ referenceStats.count }}</Badge>
+              <Badge variant="secondary" size="count" class="ml-1">{{ referenceStats.count }}</Badge>
             </Button>
             <template #content>
               <div class="space-y-2">
@@ -435,9 +425,13 @@ function onDrop(event: DragEvent) {
       </template>
     </template>
 
-    <BucketRoutingDialog v-model:open="routingDialogOpen" :bucket="bucket" :group-id="activeGroupId" />
-
-    <BucketPolicyDialog v-if="residencyPoliciesEnabled && isRealmAdmin" v-model:open="residencyDialogOpen" :bucket="bucket" />
+    <BucketSettingsDialog
+      v-model:open="settingsDialogOpen"
+      :bucket="bucket"
+      :group-id="activeGroupId"
+      :show-routing="true"
+      :show-placement="showPlacement"
+    />
 
     <ObjectLocationsDialog
       :open="locationsKey !== null"

@@ -11,10 +11,10 @@ import * as PlacementPolicies from '@/lib/placementPolicies'
 import * as Utils from '@/lib/utils'
 import ComputeAdminPanel from '@/components/compute-admin/ComputeAdminPanel.vue'
 import ComputeQuotaFields from '@/components/compute-admin/ComputeQuotaFields.vue'
-import BucketPolicyDialog from './BucketPolicyDialog.vue'
+import BucketPlacementSection from './BucketPlacementSection.vue'
 import CoverageReport from './CoverageReport.vue'
-import ResidencyAdminPanel from './ResidencyAdminPanel.vue'
-import ResidencyPolicyEditor from './ResidencyPolicyEditor.vue'
+import PlacementPolicyPanel from './PlacementPolicyPanel.vue'
+import PlacementPolicyEditor from './PlacementPolicyEditor.vue'
 import type { BulkRunResponse, CoverageResponse } from '@/lib/placementPolicies'
 
 const placementPolicyMocks = {
@@ -22,6 +22,14 @@ const placementPolicyMocks = {
   getPlacementCoverage: vi.fn(),
   putBucketPlacement: vi.fn(),
   runBucketPlacement: vi.fn(),
+  loadPolicyPage: vi.fn(),
+}
+
+const placementPolicyState = {
+  sessionPolicies: { value: [] },
+  sessionPolicyRefs: { value: [] },
+  listedPolicies: { value: [] },
+  listState: { value: 'ready' },
 }
 
 function compileSetupComponent(url: URL, modules: Record<string, unknown>) {
@@ -45,11 +53,11 @@ function compileSetupComponent(url: URL, modules: Record<string, unknown>) {
   }
 }
 
-const BucketPolicyDialogSetup = compileSetupComponent(new URL('./BucketPolicyDialog.vue', import.meta.url), {
+const BucketPlacementSetup = compileSetupComponent(new URL('./BucketPlacementSection.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => ({}) }),
   '@/composables/usePlacementPolicies': {
-    usePlacementPolicies: () => ({ ...placementPolicyMocks, sessionPolicyRefs: { value: [] } }),
+    usePlacementPolicies: () => ({ ...placementPolicyMocks, ...placementPolicyState }),
   },
   '@/composables/useRefresh': { useRefresh },
   '@/lib/api': Api,
@@ -83,9 +91,9 @@ describe('CoverageReport', () => {
     expect([
       ComputeAdminPanel,
       ComputeQuotaFields,
-      BucketPolicyDialog,
-      ResidencyAdminPanel,
-      ResidencyPolicyEditor,
+      BucketPlacementSection,
+      PlacementPolicyPanel,
+      PlacementPolicyEditor,
     ]).toHaveLength(5)
   })
 
@@ -99,14 +107,14 @@ describe('CoverageReport', () => {
     expect(html).toContain('never means realm-wide convergence')
   })
 
-  it('stops a bucket bulk run after the dialog closes', async () => {
+  it('stops a bucket bulk run after the section closes', async () => {
     let resolvePage!: (value: BulkRunResponse) => void
     placementPolicyMocks.getBucketPlacement.mockResolvedValue({ bucket: 'datasets', policies: [], generation: 1 })
     placementPolicyMocks.getPlacementCoverage.mockResolvedValue(report)
     placementPolicyMocks.runBucketPlacement.mockImplementationOnce(() => new Promise((resolve) => { resolvePage = resolve }))
     const props = reactive({ open: true, bucket: 'datasets' })
     const scope = effectScope()
-    const bindings = scope.run(() => BucketPolicyDialogSetup.setup(
+    const bindings = scope.run(() => BucketPlacementSetup.setup(
       props,
       { emit: vi.fn(), expose: vi.fn(), attrs: {}, slots: {} },
     ))!

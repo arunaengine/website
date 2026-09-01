@@ -331,26 +331,26 @@ async function leave() {
             <TabsTrigger value="stats" class="gap-1.5"><ChartArea class="h-3.5 w-3.5" /> Stats</TabsTrigger>
             <TabsTrigger value="members" class="gap-1.5">
               <Users class="h-3.5 w-3.5" /> Members
-              <Badge v-if="!membersHidden" variant="outline" class="tabular-nums">{{ members.length }}</Badge>
-              <Badge v-if="joinRequestCount > 0" variant="warn" class="tabular-nums" title="Pending join requests">{{ joinRequestCount }}</Badge>
+              <Badge v-if="!membersHidden" variant="outline" size="count">{{ members.length }}</Badge>
+              <Badge v-if="joinRequestCount > 0" variant="warn" size="count" title="Pending join requests">{{ joinRequestCount }}</Badge>
             </TabsTrigger>
             <TabsTrigger value="roles" class="gap-1.5">
               <ShieldCheck class="h-3.5 w-3.5" /> Roles
-              <Badge variant="outline" class="tabular-nums">{{ group.roles.length }}</Badge>
+              <Badge variant="outline" size="count">{{ group.roles.length }}</Badge>
             </TabsTrigger>
             <TabsTrigger v-if="isMember" value="sources" class="gap-1.5">
               <Cable class="h-3.5 w-3.5" /> Data sources
               <!-- The pill holds the badge's place, so a late count never moves the tabs. -->
-              <Badge v-if="connectorCount !== null" variant="outline" class="tabular-nums">{{ connectorCount }}</Badge>
-              <Skeleton v-else class="h-5 w-6 rounded-full" />
+              <Badge v-if="connectorCount !== null" variant="outline" size="count">{{ connectorCount }}</Badge>
+              <Skeleton v-else class="size-5 rounded-full" />
             </TabsTrigger>
             <TabsTrigger v-if="policiesTabVisible" value="policies" class="gap-1.5">
               <ShieldAlert class="h-3.5 w-3.5" /> Policies
             </TabsTrigger>
             <TabsTrigger v-if="canAdminStorage" value="storage" class="gap-1.5">
               <Database class="h-3.5 w-3.5" /> Storage
-              <Badge v-if="backendCount !== null" variant="outline" class="tabular-nums">{{ backendCount }}</Badge>
-              <Skeleton v-else class="h-5 w-6 rounded-full" />
+              <Badge v-if="backendCount !== null" variant="outline" size="count">{{ backendCount }}</Badge>
+              <Skeleton v-else class="size-5 rounded-full" />
             </TabsTrigger>
           </TabsList>
         </div>
@@ -514,8 +514,8 @@ async function leave() {
             <div class="flex items-center gap-2 px-5 pb-1 pt-4">
               <Inbox class="h-3.5 w-3.5 text-primary" />
               <h2 class="font-display text-sm font-semibold text-aruna-navy">Join requests</h2>
-              <Badge v-if="joinRequestCount > 0" variant="warn" class="tabular-nums">{{ joinRequestCount }}</Badge>
-              <Badge v-else variant="outline" class="tabular-nums">0</Badge>
+              <Badge v-if="joinRequestCount > 0" variant="warn" size="count">{{ joinRequestCount }}</Badge>
+              <Badge v-else variant="outline" size="count">0</Badge>
             </div>
             <JoinRequestsInbox
               :group-id="group.group_id"
@@ -571,7 +571,7 @@ async function leave() {
               />
               <p class="mt-2 text-[11px] text-muted-foreground">
                 Rules for a single bucket live with that bucket: open it in Data and
-                choose Routing.
+                choose Bucket settings.
               </p>
             </div>
           </div>

@@ -57,7 +57,7 @@ async function publish() {
 <template>
   <div class="space-y-5">
     <Notice tone="warning">
-      Residency policies are immutable and digest-identified. Publishing a changed definition requires a new policy id.
+      Placement policies are immutable and digest-identified. Publishing a changed definition requires a new policy id.
     </Notice>
 
     <div class="grid gap-4 sm:grid-cols-2">
@@ -66,7 +66,7 @@ async function publish() {
         <Input v-model="draft.name" class="mt-1" placeholder="EU research data" />
       </div>
       <div>
-        <label class="text-xs font-medium text-foreground">Residency policy id (optional)</label>
+        <label class="text-xs font-medium text-foreground">Placement policy id (optional)</label>
         <Input v-model="draft.policy_id" class="mt-1 font-mono" placeholder="Mint automatically" />
         <p class="mt-1 text-[11px] text-muted-foreground">A caller-chosen id makes an identical retry idempotent.</p>
       </div>
@@ -138,7 +138,7 @@ async function publish() {
       Published {{ published.name }} as <span class="font-mono">{{ published.policy_id }}</span> with digest <span class="font-mono">{{ published.digest }}</span>.
     </p>
     <Button :disabled="publishing || problems.length > 0" @click="publish">
-      <Send class="h-3.5 w-3.5" /> {{ publishing ? 'Publishing…' : 'Publish residency policy' }}
+      <Send class="h-3.5 w-3.5" /> {{ publishing ? 'Publishing…' : 'Publish placement policy' }}
     </Button>
   </div>
 </template>

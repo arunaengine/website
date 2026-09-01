@@ -27,7 +27,7 @@ function response(overrides: Partial<BulkRunResponse> = {}): BulkRunResponse {
   }
 }
 
-describe('residency policy admin helpers', () => {
+describe('placement policy admin helpers', () => {
   it('stops a bulk run immediately when the bucket default supersedes it', async () => {
     const post = vi.fn().mockResolvedValue(response({
       status: 'superseded',
@@ -49,11 +49,11 @@ describe('residency policy admin helpers', () => {
       'bucket-cas',
     )
     expect(message).toBe(
-      'Bucket residency policies changed by someone else. Reload the bucket defaults before saving again.',
+      'Bucket placement policies changed by someone else. Reload the bucket defaults before saving again.',
     )
   })
 
-  it('explains immutable residency policy id reuse', () => {
+  it('explains immutable placement policy id reuse', () => {
     const message = placementPoliciesErrorMessage(
       new ApiError(409, 'policy id already carries another definition', 'Conflict'),
       'create',
@@ -77,7 +77,7 @@ function stubPage(pages: ListPoliciesResponse[], urls: string[]) {
   )
 }
 
-describe('residency policy listing', () => {
+describe('placement policy listing', () => {
   it('follows next_cursor across pages', async () => {
     const urls: string[] = []
     const policy = {

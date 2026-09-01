@@ -288,7 +288,7 @@ export function policyCreationProblems(request: CreatePolicyRequest): string[] {
     problems.push(`Name must be between 1 and ${MAX_POLICY_NAME_BYTES} bytes.`)
   }
   if (!request.allowed.length || request.allowed.length > MAX_POLICY_SELECTORS) {
-    problems.push(`A residency policy needs between 1 and ${MAX_POLICY_SELECTORS} selectors.`)
+    problems.push(`A placement policy needs between 1 and ${MAX_POLICY_SELECTORS} selectors.`)
   }
   request.allowed.forEach((selector, index) => {
     if (selectorIsEmpty(selector)) problems.push(`Selector ${index + 1} must constrain at least one field.`)
@@ -327,16 +327,16 @@ export function policyRefProblems(policies: PolicyRefBody[]): string[] {
   policies.forEach((policy, index) => {
     const id = policy.policy_id.trim()
     const digest = policy.digest.trim()
-    if (!id) problems.push(`Residency policy reference ${index + 1} needs an id.`)
+    if (!id) problems.push(`Placement policy reference ${index + 1} needs an id.`)
     if (!/^[0-9a-f]{64}$/.test(digest)) {
-      problems.push(`Residency policy reference ${index + 1} needs a 64-character lowercase hex digest.`)
+      problems.push(`Placement policy reference ${index + 1} needs a 64-character lowercase hex digest.`)
     }
     const ref = `${id}:${digest}`
-    if (refs.has(ref)) problems.push(`Residency policy reference ${index + 1} is duplicated.`)
+    if (refs.has(ref)) problems.push(`Placement policy reference ${index + 1} is duplicated.`)
     refs.add(ref)
     const prior = ids.get(id)
     if (id && prior && prior !== digest) {
-      problems.push(`Residency policy id ${id} is paired with two different digests.`)
+      problems.push(`Placement policy id ${id} is paired with two different digests.`)
     }
     if (id) ids.set(id, digest)
   })
@@ -392,8 +392,8 @@ export async function runBulkToCompletion(
     progress = mergeBulkProgress(progress, response)
     onProgress(progress)
     if (response.status === 'superseded' || progress.complete) return progress
-    if (!response.cursor) throw new Error('The active residency run returned no continuation cursor.')
-    if (cursors.has(response.cursor)) throw new Error('The residency run repeated its continuation cursor.')
+    if (!response.cursor) throw new Error('The active placement run returned no continuation cursor.')
+    if (cursors.has(response.cursor)) throw new Error('The placement run repeated its continuation cursor.')
     cursors.add(response.cursor)
     cursor = response.cursor
   }
@@ -423,10 +423,10 @@ export function placementPoliciesErrorMessage(
       return 'This policy id already identifies a different immutable definition. Publishing a changed definition requires a new policy id.'
     }
     if (context === 'bucket-cas') {
-      return 'Bucket residency policies changed by someone else. Reload the bucket defaults before saving again.'
+      return 'Bucket placement policies changed by someone else. Reload the bucket defaults before saving again.'
     }
     if (context === 'bulk') {
-      return 'The bucket record changed while this residency run was being resumed. Start a new run.'
+      return 'The bucket record changed while this placement run was being resumed. Start a new run.'
     }
   }
   return errorMessage(error)

@@ -31,7 +31,7 @@ defineProps<{ report: CoverageResponse }>()
     </div>
 
     <div v-if="report.target_policies.length" class="rounded-md border border-border bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
-      <div class="font-medium text-foreground">Compared with these residency policy refs</div>
+      <div class="font-medium text-foreground">Compared with these placement policy refs</div>
       <div v-for="policy in report.target_policies" :key="`${policy.policy_id}:${policy.digest}`" class="mt-1 font-mono" :title="`${policy.policy_id}:${policy.digest}`">
         {{ policy.policy_id }} / {{ truncateMiddle(policy.digest, 10, 8) }}
       </div>

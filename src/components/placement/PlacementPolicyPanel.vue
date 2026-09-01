@@ -17,8 +17,8 @@ import Notice from '@/components/ui/Notice.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import StatCard from '@/components/ui/StatCard.vue'
-import BucketPolicyDialog from '@/components/residency/BucketPolicyDialog.vue'
-import ResidencyPolicyEditor from '@/components/residency/ResidencyPolicyEditor.vue'
+import BucketPlacementDialog from '@/components/placement/BucketPlacementDialog.vue'
+import PlacementPolicyEditor from '@/components/placement/PlacementPolicyEditor.vue'
 import { useAruna } from '@/composables/useAruna'
 import { usePlacementPolicies } from '@/composables/usePlacementPolicies'
 import { useRefresh } from '@/composables/useRefresh'
@@ -54,7 +54,7 @@ const {
   listState,
   listedPolicies,
   loadPolicyPage,
-  residencyAdminEnabled,
+  placementAdminEnabled,
   resolvePlacementQuarantine,
   sessionPolicies,
   sessionPolicyRefs,
@@ -63,7 +63,7 @@ const {
 const ready = computed(
   () =>
     bootstrapped.value
-    && residencyAdminEnabled.value
+    && placementAdminEnabled.value
     && Boolean(currentUser.value)
     && isRealmAdmin.value,
 )
@@ -130,7 +130,7 @@ function inspectBucket() {
 
 async function focusBucketInspector() {
   await nextTick()
-  document.getElementById('residency-bucket-name')?.focus()
+  document.getElementById('placement-bucket-name')?.focus()
 }
 
 const diagnostics = ref<DiagnosticsResponse | null>(null)
@@ -222,9 +222,9 @@ watch(
       <Skeleton class="h-40" />
     </div>
 
-    <div v-else-if="!residencyAdminEnabled" class="container py-8">
+    <div v-else-if="!placementAdminEnabled" class="container py-8">
       <section class="surface mx-auto max-w-xl p-8">
-        <EmptyState title="Residency policy administration is not enabled" description="Enable features.placementAdmin for a backend that serves residency policy routes.">
+        <EmptyState title="Placement policy administration is not enabled" description="Enable features.placementAdmin for a backend that serves placement policy routes.">
           <template #icon><MapPinned class="h-8 w-8" /></template>
         </EmptyState>
       </section>
@@ -232,32 +232,32 @@ watch(
 
     <div v-else class="container py-8">
       <p class="surface mb-6 px-5 py-3 text-sm text-muted-foreground">
-        Residency policies constrain where governed data may reside, while placement strategies separately rank and replicate eligible storage.
+        Placement policies constrain where governed data may reside, while placement strategies separately rank and replicate eligible storage.
       </p>
 
       <div class="grid gap-6 lg:grid-cols-[260px_1fr]">
         <nav class="flex flex-col gap-1 text-sm lg:sticky lg:top-20 lg:self-start">
-          <a href="#residency-library" class="rounded-md bg-primary/5 px-3 py-2 font-medium text-primary">Residency policy library</a>
-          <a href="#residency-publish" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Publish policy</a>
-          <a href="#residency-bucket" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Bucket defaults</a>
-          <a href="#residency-diagnostics" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Diagnostics</a>
+          <a href="#placement-library" class="rounded-md bg-primary/5 px-3 py-2 font-medium text-primary">Placement policy library</a>
+          <a href="#placement-publish" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Publish policy</a>
+          <a href="#placement-bucket" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Bucket defaults</a>
+          <a href="#placement-diagnostics" class="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground">Diagnostics</a>
         </nav>
 
         <div class="space-y-6">
-          <section id="residency-library" class="surface scroll-mt-24">
+          <section id="placement-library" class="surface scroll-mt-24">
             <header class="flex items-center gap-2 border-b border-border px-5 py-4">
               <ShieldCheck class="h-4 w-4 text-primary" />
               <h3 class="font-display text-sm font-semibold text-aruna-navy">
-                {{ listed ? 'Realm residency policy library' : 'Session residency policy library' }}
+                {{ listed ? 'Realm placement policy library' : 'Session placement policy library' }}
               </h3>
-              <Badge variant="outline">{{ libraryEntries.length }}</Badge>
+              <Badge variant="outline" size="count">{{ libraryEntries.length }}</Badge>
             </header>
             <div class="space-y-4 p-5">
               <Notice v-if="!listed" tone="warning">
                 {{
                   listState === 'loading'
                     ? 'Reading the realm policy list…'
-                    : 'This node serves no residency policy list. The library below contains only policies created this session, exact id and digest lookups, and refs found while inspecting buckets.'
+                    : 'This node serves no placement policy list. The library below contains only policies created this session, exact id and digest lookups, and refs found while inspecting buckets.'
                 }}
               </Notice>
               <p v-else class="text-xs text-muted-foreground">
@@ -266,12 +266,12 @@ watch(
               </p>
               <ErrorPanel
                 v-if="listState === 'error'"
-                :message="listError || 'The residency policy list could not be read.'"
+                :message="listError || 'The placement policy list could not be read.'"
                 @retry="loadPolicyPage()"
               />
               <div class="grid gap-2 md:grid-cols-[minmax(12rem,0.8fr)_minmax(20rem,1.4fr)_auto]">
-                <Input v-model="lookup.policy_id" class="font-mono text-xs" placeholder="Residency policy id" aria-label="Residency policy id lookup" />
-                <Input v-model="lookup.digest" class="font-mono text-xs" placeholder="64-character lowercase digest" aria-label="Residency policy digest lookup" />
+                <Input v-model="lookup.policy_id" class="font-mono text-xs" placeholder="Placement policy id" aria-label="Placement policy id lookup" />
+                <Input v-model="lookup.digest" class="font-mono text-xs" placeholder="64-character lowercase digest" aria-label="Placement policy digest lookup" />
                 <Button :disabled="lookupBusy || !lookup.policy_id.trim() || !/^[0-9a-f]{64}$/.test(lookup.digest.trim())" @click="lookupPolicy()">
                   <Search class="h-3.5 w-3.5" /> {{ lookupBusy ? 'Looking up…' : 'Look up' }}
                 </Button>
@@ -283,7 +283,7 @@ watch(
                 <article v-for="entry in libraryEntries" :key="policyRefKey(entry.ref)" class="rounded-lg border border-border bg-background p-4">
                   <div class="flex flex-wrap items-start justify-between gap-3">
                     <div class="min-w-0">
-                      <h4 class="text-sm font-semibold text-foreground">{{ entry.document?.name ?? 'Referenced residency policy' }}</h4>
+                      <h4 class="text-sm font-semibold text-foreground">{{ entry.document?.name ?? 'Referenced placement policy' }}</h4>
                       <!-- A reference is the pair: an id alone could be answered
                            with other bytes, so both halves are always shown. -->
                       <dl class="mt-1 grid grid-cols-[4rem_minmax(0,1fr)] gap-x-2 text-[11px]">
@@ -310,7 +310,7 @@ watch(
                 </article>
                 <div v-if="listed && listCursor" class="flex flex-wrap items-center gap-2">
                   <Button variant="outline" size="sm" :disabled="listLoadingMore" :aria-busy="listLoadingMore" @click="loadPolicyPage(true)">
-                    <Spinner v-if="listLoadingMore" label="Loading more residency policies" class="text-current" />
+                    <Spinner v-if="listLoadingMore" label="Loading more placement policies" class="text-current" />
                     {{ listLoadingMore ? 'Loading…' : 'Load more' }}
                   </Button>
                   <span class="text-[11px] text-muted-foreground">{{ libraryEntries.length }} loaded</span>
@@ -321,42 +321,42 @@ watch(
               </div>
               <EmptyState
                 v-else-if="listed"
-                title="No residency policies published"
-                description="This node holds no published residency policy for the realm yet."
+                title="No placement policies published"
+                description="This node holds no published placement policy for the realm yet."
               >
                 <Button @click="focusBucketInspector">Inspect a bucket</Button>
               </EmptyState>
-              <EmptyState v-else title="No session residency policies" description="Publish a policy, look up an exact ref, or inspect a bucket to populate this session-only library.">
+              <EmptyState v-else title="No session placement policies" description="Publish a policy, look up an exact ref, or inspect a bucket to populate this session-only library.">
                 <Button @click="focusBucketInspector">Inspect a bucket</Button>
               </EmptyState>
             </div>
           </section>
 
-          <section id="residency-publish" class="surface scroll-mt-24">
+          <section id="placement-publish" class="surface scroll-mt-24">
             <header class="flex items-center gap-2 border-b border-border px-5 py-4">
               <MapPinned class="h-4 w-4 text-primary" />
-              <h3 class="font-display text-sm font-semibold text-aruna-navy">Publish an immutable residency policy</h3>
+              <h3 class="font-display text-sm font-semibold text-aruna-navy">Publish an immutable placement policy</h3>
             </header>
-            <div class="p-5"><ResidencyPolicyEditor /></div>
+            <div class="p-5"><PlacementPolicyEditor /></div>
           </section>
 
-          <section id="residency-bucket" class="surface scroll-mt-24">
+          <section id="placement-bucket" class="surface scroll-mt-24">
             <header class="flex items-center gap-2 border-b border-border px-5 py-4">
               <DatabaseZap class="h-4 w-4 text-primary" />
-              <h3 class="font-display text-sm font-semibold text-aruna-navy">Inspect bucket residency</h3>
+              <h3 class="font-display text-sm font-semibold text-aruna-navy">Inspect bucket placement</h3>
             </header>
             <div class="space-y-3 p-5">
               <p class="text-[11px] text-muted-foreground">
                 Open a bucket's CAS-protected default set, responder-local coverage, and bulk application flow.
               </p>
               <div class="flex flex-wrap items-center gap-2">
-                <Input id="residency-bucket-name" v-model="inspectedBucket" class="max-w-sm" placeholder="Bucket name" aria-label="Bucket to inspect" @keydown.enter="inspectBucket" />
+                <Input id="placement-bucket-name" v-model="inspectedBucket" class="max-w-sm" placeholder="Bucket name" aria-label="Bucket to inspect" @keydown.enter="inspectBucket" />
                 <Button :disabled="!inspectedBucket.trim()" @click="inspectBucket"><Search class="h-3.5 w-3.5" /> Inspect bucket</Button>
               </div>
             </div>
           </section>
 
-          <section id="residency-diagnostics" class="surface scroll-mt-24">
+          <section id="placement-diagnostics" class="surface scroll-mt-24">
             <header class="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-4">
               <div class="flex items-center gap-2">
                 <ShieldAlert class="h-4 w-4 text-primary" />
@@ -377,7 +377,7 @@ watch(
                   <span class="font-medium text-foreground">Subject:</span>
                   <span>{{ diagnostics.subject_location ?? 'not advertised' }}</span>
                   <span v-if="diagnostics.subject_generation != null" class="text-muted-foreground">generation {{ diagnostics.subject_generation }}</span>
-                  <Badge :variant="diagnostics.policy_draining ? 'warn' : 'success'">{{ diagnostics.policy_draining ? 'residency draining' : 'not residency draining' }}</Badge>
+                  <Badge :variant="diagnostics.policy_draining ? 'warn' : 'success'">{{ diagnostics.policy_draining ? 'placement draining' : 'not placement draining' }}</Badge>
                   <Badge :variant="diagnostics.serving_blocked ? 'destructive' : 'success'">{{ diagnostics.serving_blocked ? 'serving blocked' : 'serving open' }}</Badge>
                   <Badge :variant="diagnostics.complete ? 'success' : 'warn'">{{ diagnostics.complete ? 'responder page complete' : 'more responder rows' }}</Badge>
                 </div>
@@ -391,7 +391,7 @@ watch(
 
                 <div class="rounded-md border border-border p-3">
                   <div class="flex flex-wrap items-center gap-2 text-xs">
-                    <span class="font-medium text-foreground">Residency policy cache</span>
+                    <span class="font-medium text-foreground">Placement policy cache</span>
                     <span>{{ formatNumber(diagnostics.cache_entries) }} entries</span>
                     <span>{{ formatNumber(diagnostics.cache_verified) }} verified</span>
                     <span>{{ formatNumber(diagnostics.cache_unavailable) }} unavailable</span>
@@ -399,7 +399,7 @@ watch(
                     <Badge v-if="diagnostics.cache_truncated" variant="warn">cache scan truncated</Badge>
                     <Badge v-else variant="outline">cache scan not truncated</Badge>
                   </div>
-                  <p class="mt-1 text-[11px] text-muted-foreground">Cache figures are diagnostics only and never residency policy truth.</p>
+                  <p class="mt-1 text-[11px] text-muted-foreground">Cache figures are diagnostics only and never placement policy truth.</p>
                 </div>
 
                 <div v-if="diagnostics.violations.length" class="overflow-x-auto rounded-md border border-border">
@@ -408,7 +408,7 @@ watch(
                       Exact local versions reported as quarantined or unresolved after departure.
                     </caption>
                     <thead class="border-y border-border bg-muted/40 text-muted-foreground">
-                      <tr><th class="px-3 py-2 font-medium">Bucket and key</th><th class="px-3 py-2 font-medium">Version</th><th class="px-3 py-2 font-medium">State</th><th class="px-3 py-2 font-medium">Residency refs</th><th class="px-3 py-2"><span class="sr-only">Actions</span></th></tr>
+                      <tr><th class="px-3 py-2 font-medium">Bucket and key</th><th class="px-3 py-2 font-medium">Version</th><th class="px-3 py-2 font-medium">State</th><th class="px-3 py-2 font-medium">Placement refs</th><th class="px-3 py-2"><span class="sr-only">Actions</span></th></tr>
                     </thead>
                     <tbody class="divide-y divide-border">
                       <tr v-for="violation in diagnostics.violations" :key="`${violation.bucket}:${violation.key}:${violation.version_id}`">
@@ -421,7 +421,7 @@ watch(
                     </tbody>
                   </table>
                 </div>
-                <EmptyState v-else title="No local residency violations" description="This responder did not report a quarantined or unresolved-departed copy in the current page." />
+                <EmptyState v-else title="No local placement violations" description="This responder did not report a quarantined or unresolved-departed copy in the current page." />
                 <p class="text-[11px] text-muted-foreground">
                   Complete refers only to this node's bounded copy iterator and never to realm-wide enforcement convergence.
                 </p>
@@ -443,7 +443,7 @@ watch(
         </div>
       </div>
 
-      <BucketPolicyDialog v-model:open="bucketDialogOpen" :bucket="bucketDialogName" />
+      <BucketPlacementDialog v-model:open="bucketDialogOpen" :bucket="bucketDialogName" />
 
       <Dialog :open="releaseTarget !== null" @update:open="(value: boolean) => { if (!value && !resolutionBusy) releaseTarget = null }">
         <DialogContent class="max-w-md">

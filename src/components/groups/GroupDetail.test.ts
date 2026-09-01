@@ -50,7 +50,7 @@ describe('Group detail loading', () => {
   })
 
   it('reserves the space of the tab counts', () => {
-    expect(template).toContain('<Skeleton v-else class="h-5 w-6 rounded-full" />')
-    expect(template.split('<Skeleton v-else class="h-5 w-6 rounded-full" />')).toHaveLength(3)
+    expect(template).toContain('<Skeleton v-else class="size-5 rounded-full" />')
+    expect(template.split('<Skeleton v-else class="size-5 rounded-full" />')).toHaveLength(3)
   })
 })
