@@ -1,3 +1,5 @@
+import { BUCKET_NAME_REQUIREMENT, OBJECT_KEY_MAX_BYTES, bucketNameProblem } from '@/lib/bucketName'
+
 export class S3ContextMismatchError extends Error {
   constructor(
     public issuerNodeId: string,
@@ -15,13 +17,35 @@ export class S3SessionUnavailableError extends Error {
   }
 }
 
-export function s3ErrorMessage(err: unknown): string {
+// The AWS SDK substitutes this when an S3 error carries no <Message>, which is
+// what the S3 framework's parse-time rejections send. It must never reach a
+// screen.
+const SDK_PLACEHOLDER_MESSAGE = 'UnknownError'
+
+const CODE_SENTENCES: Record<string, string> = {
+  BucketAlreadyExists: 'That bucket name is already taken on this node.',
+  BucketAlreadyOwnedByYou: 'You already own a bucket with that name.',
+  AccessDenied: 'This session is not allowed to do that.',
+  InvalidURI: 'That bucket or object address cannot be read as an S3 path.',
+  KeyTooLongError: `An object key may be at most ${OBJECT_KEY_MAX_BYTES} bytes.`,
+  NoSuchBucket: 'That bucket does not exist.',
+  NoSuchKey: 'That object does not exist.',
+}
+
+/** A sentence for an S3 failure; `bucket` names the bucket a call was about. */
+export function s3ErrorMessage(err: unknown, bucket?: string): string {
   if (isS3PurgeInProgressError(err)) return PURGE_IN_PROGRESS_MESSAGE
-  if (err && typeof err === 'object') {
-    const error = err as { name?: string; message?: string }
-    if (error.name && error.message) return `${error.name}: ${error.message}`
-    if (error.message) return error.message
+  if (!err || typeof err !== 'object') return String(err)
+  const error = err as { name?: string; Code?: string; message?: string }
+  const code = error.Code ?? error.name
+  const message = error.message && error.message !== SDK_PLACEHOLDER_MESSAGE ? error.message : null
+  if (code === 'InvalidBucketName') {
+    return message ?? (bucket ? bucketNameProblem(bucket) : null) ?? BUCKET_NAME_REQUIREMENT
   }
+  const sentence = code ? CODE_SENTENCES[code] : undefined
+  if (message) return sentence ?? (code ? `${code}: ${message}` : message)
+  if (sentence) return sentence
+  if (code) return `The node refused the request with the code ${code}.`
   return String(err)
 }
 
