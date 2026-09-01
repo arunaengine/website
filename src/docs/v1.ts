@@ -251,7 +251,7 @@ export const docsTopics: DocsTopic[] = [
         image: {
           src: '/docs/v1/data-browser.jpg',
           alt: 'Data view with the reef-survey-2026 bucket and two uploaded objects',
-          caption: 'A bucket with uploaded objects; the toolbar reaches watch, bucket settings, and sync.',
+          caption: 'A bucket with uploaded objects; the toolbar reaches Watch and Storage.',
         },
       },
       {
@@ -315,8 +315,8 @@ export const docsTopics: DocsTopic[] = [
           'A policy is immutable and identified by the digest of its definition. Publishing a change creates a new policy id, and buckets keep the old one until they are attached again.',
           'Several policies on one bucket combine by intersection: a copy has to be allowed by all of them. A copy also inherits the rules of the version it came from and never drops them, so the set only ever tightens.',
           'Attaching a policy governs the objects written afterwards. "Apply to existing files" attaches the same rules to the objects that were already there; it attaches rules and copies nothing.',
-          'A realm admin publishes realm wide policies. A group admin publishes policies owned by their group and attaches them to that group\'s buckets. A group owned policy is refused on another group\'s bucket.',
-          'The compliance figures count objects that carry the rules on the node you asked. That is not proof that every copy of them sits in an allowed place.',
+          'A realm admin publishes realm-wide policies. A group admin publishes policies owned by their group and attaches them to that group\'s buckets. A group-owned policy is refused on another group\'s bucket.',
+          'The coverage figures count objects that carry the rules on the node you asked. That is not proof that every copy of them sits in an allowed place.',
         ],
       },
       {
@@ -333,7 +333,7 @@ export const docsTopics: DocsTopic[] = [
           'Not stored: the version holds no data anywhere. It marks a deletion, or it points at data held elsewhere.',
         ],
         steps: [
-          'Open a file in [Data](page:buckets) and choose its storage locations.',
+          'Open a file in [Data](page:buckets) and choose Storage in its row; the Storage tab lists the copies of the selected version.',
           'Read the state per node, and the note that says why a list may be incomplete.',
           'Use "Add a copy" to ask a named node to fetch that exact version. It needs write permission and is answered as queued, not as stored.',
         ],
@@ -358,7 +358,7 @@ export const docsTopics: DocsTopic[] = [
         title: 'Versions and deletion',
         icon: 'History',
         paragraphs: [
-          'Every write makes a new version, and a plain delete leaves a marker with the history behind it. [Versions, deletion and purge](concept:data-and-deletion) explains what each action removes and what stays recoverable.',
+          'Every write makes a new version, and a plain delete leaves a marker with the history behind it. [Versions and deletion](concept:data-and-deletion) explains what each action removes and what stays recoverable.',
           'Deleting a sync relationship removes no data on either side: the target keeps what it already wrote. Deleting a bucket is a separate, permanent action on one node.',
           'A placement policy never deletes anything either. A copy that stops matching its rules is held back on the node that has it until an admin revalidates or releases it.',
         ],
@@ -368,7 +368,7 @@ export const docsTopics: DocsTopic[] = [
         icon: 'Lightbulb',
         bullets: [
           'A second copy at a partner institute: publish a policy that allows both institutes and attach it to the bucket, then add a copy on the partner node or set up a sync. The policy alone creates nothing.',
-          'A mirror the partner owns: create a bucket sync in "Keep in sync" mode to their node. They serve their bucket under their own name and keep it if the sync is removed.',
+          'A mirror the partner owns: create a bucket sync in "Keep in sync" mode to their node. They serve their bucket under their own name and keep it if the sync is deleted.',
           'Storage your group pays for: register a backend on the group Storage tab, set it as the default storage backend there, and override it per prefix with a bucket rule.',
           'Compute next to the data: a run goes to a node that already holds the inputs, so an extra copy on an executor node makes that possible. See [data to compute](concept:data-to-compute).',
         ],
@@ -681,13 +681,13 @@ export const docsTopics: DocsTopic[] = [
     slug: 'storage-backend',
     kind: 'Guide',
     title: 'Configure a storage backend',
-    summary: 'Route a group’s uploads to your own S3-compatible storage.',
+    summary: 'Send a group’s uploads to your own S3-compatible storage.',
     tour: [
       {
         route: '/app',
         anchor: 'nav-groups',
         title: 'Open Groups',
-        body: 'Backends are group configuration; open the group that should own the routing.',
+        body: 'Backends are group configuration; open the group that should own the backend.',
       },
       {
         route: '/app/groups',
@@ -701,7 +701,7 @@ export const docsTopics: DocsTopic[] = [
         title: 'Requirements',
         icon: 'ListChecks',
         paragraphs: [
-          'Group ADMIN [role](concept:glossary#role), the endpoint details, and credentials meant for Aruna routing. Backend credentials are neither [portal sessions](concept:storage-access#portal-s3-session) nor [S3 access keys](concept:storage-access#s3-access-key).',
+          'Group ADMIN [role](concept:glossary#role), the endpoint details, and credentials meant for Aruna. Backend credentials are neither [portal sessions](concept:storage-access#portal-s3-session) nor [S3 access keys](concept:storage-access#s3-access-key).',
         ],
       },
       {
@@ -710,13 +710,13 @@ export const docsTopics: DocsTopic[] = [
         steps: [
           'Open the group from [Groups](page:groups) and switch to its Storage tab.',
           'Add the endpoint and [backend](concept:storage-access#external-storage-backend) credentials; verify endpoint and certificate first.',
-          'Enable the backend and routing only after the connection check succeeds.',
-          'Writers inherit the routing but can never reveal or replace the secret.',
+          'Enable the backend and make it the default storage backend only after the connection check succeeds.',
+          'Writers inherit the backend but can never reveal or replace the secret.',
         ],
         image: {
           src: '/docs/v1/group-storage.jpg',
           alt: 'Group storage tab with the storage backends section and add backend button',
-          caption: 'Backends live on the group: uploads route to your own object storage.',
+          caption: 'Backends live on the group: uploads land in your own object storage.',
         },
       },
     ],
@@ -1110,7 +1110,7 @@ export const docsTopics: DocsTopic[] = [
         title: 'External storage backend',
         icon: 'HardDrive',
         paragraphs: [
-          'Group configuration, not a browser credential: an admin registers an S3-compatible endpoint so Aruna routes group data there. Writers inherit the routing but never see the backend secret.',
+          'Group configuration, not a browser credential: an admin registers an S3-compatible endpoint, and group or bucket rules send new uploads there. Writers inherit the backend but never see the secret; see [Storage backend](concept:where-data-lives#storage-backend).',
         ],
       },
     ],
