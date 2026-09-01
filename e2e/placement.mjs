@@ -131,6 +131,8 @@ try {
             && overview.includes('Storage backend for new uploads')
             && overview.includes('Observed on this node'))
         step('the overview never invents a copy count', overview.includes('Checked per file'))
+        step('bucket deletion lives in the overview danger zone',
+          overview.includes('Danger zone') && overview.includes('Delete bucket permanently'))
 
         await page.goto(page.url().split('?')[0] + '?tab=placement')
         await page.waitForTimeout(2500)

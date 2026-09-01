@@ -245,6 +245,22 @@ try {
   await page.waitForTimeout(2000)
   step('restored object is listed again', (await page.textContent('body')).includes('restore-me.txt'))
 
+  // Deleting the bucket has one home: the danger zone of its Storage overview
+  await page.goto(BASE + '/app/buckets/' + bucketName + '/storage')
+  await page.waitForTimeout(2500)
+  step('the storage overview carries the danger zone', (await page.textContent('body')).includes('Danger zone'))
+
+  await page.getByRole('button', { name: /Delete bucket permanently/ }).click()
+  await page.waitForSelector('text=What should happen')
+  await page.locator('#deletion-typed-name').fill(bucketName)
+  await page.locator('[role="dialog"]').getByRole('button', { name: /^Delete permanently$/ }).click()
+  await page.waitForURL(/\/app\/buckets(\?|$)/, { timeout: 60000 }).catch(() => {})
+  await page.waitForTimeout(2000)
+  step(
+    'deleting the bucket returns to the bucket list without it',
+    !page.url().includes(bucketName) && !(await page.textContent('body')).includes(bucketName),
+  )
+
   // Join requests (aruna#248) are config-gated OFF by default: with no
   // features.joinRequests flag, no join UI renders on the groups page.
   await page.goto(BASE + '/app/groups')
