@@ -116,8 +116,6 @@ async function look(policy: PolicyRefBody = lookup.value) {
     lookupBusy.value = false
   }
 }
-
-defineExpose({ reload: () => loadPolicyPage() })
 </script>
 
 <template>

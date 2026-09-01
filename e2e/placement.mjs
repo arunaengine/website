@@ -11,7 +11,7 @@ const FLAG_ON = process.env.ARUNA_E2E_PLACEMENT !== '0'
 const results = []
 function step(name, ok, detail = '') {
   results.push({ name, ok, detail })
-  console.log(`${ok ? 'PASS' : 'FAIL'}: ${name}${detail ? ' — ' + detail : ''}`)
+  console.log(`${ok ? 'PASS' : 'FAIL'}: ${name}${detail ? ': ' + detail : ''}`)
 }
 
 async function signIn(page, username, password) {
@@ -110,7 +110,7 @@ try {
       await page.waitForTimeout(2500)
       step('publishing adds the policy to the library', (await page.textContent('body')).includes(policyName))
     } else {
-      step('publishing adds the policy to the library', true, 'no realm condition to pick — skipped')
+      step('publishing adds the policy to the library', true, 'no realm condition to pick, skipped')
     }
 
     // ── One bucket's Storage page ────────────────────────────────────────────
@@ -152,7 +152,7 @@ try {
           step('attaching a policy is saved or refused with a reason',
             saved.includes('New objects in this bucket carry') || saved.includes('changed by someone else'))
         } else {
-          step('attaching a policy is saved or refused with a reason', true, 'nothing attachable — skipped')
+          step('attaching a policy is saved or refused with a reason', true, 'nothing attachable, skipped')
         }
 
         await page.goto(page.url().split('?')[0] + '?tab=syncs')
@@ -160,10 +160,10 @@ try {
         step('the syncs tab states that the list is creator scoped',
           (await page.textContent('body')).includes('Only syncs you created are listed'))
       } else {
-        step('the bucket storage page opens on its overview', true, 'no Storage entry — skipped')
+        step('the bucket storage page opens on its overview', true, 'no Storage entry, skipped')
       }
     } else {
-      step('the bucket storage page opens on its overview', true, 'no bucket to open — skipped')
+      step('the bucket storage page opens on its overview', true, 'no bucket to open, skipped')
     }
   } else {
     step('placement API tier skipped by runtime override', true, 'skipped by design')
