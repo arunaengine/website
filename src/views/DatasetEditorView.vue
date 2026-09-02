@@ -43,6 +43,7 @@ import {
   typeLabel,
   type CrateDraft,
   type LiveIssue,
+  type ProfileExpectation,
 } from '@/lib/crate/editor'
 import { FileJson2, FolderTree } from '@lucide/vue'
 
@@ -58,6 +59,7 @@ const {
   createMetadata,
   getMetadataItem,
   fetchRoCrateRaw,
+  loadProfileCrate,
   replaceMetadataRoCrate,
   saving,
   apiBaseUrl,
@@ -78,6 +80,10 @@ const locationOpen = ref(false)
 const createGroupOpen = ref(false)
 const profileId = ref('')
 const preferredProfileInitialized = ref(false)
+// The picked profile whose rules had not arrived yet, so it can seed once they do.
+const pendingSeed = ref('')
+const profileRulesLoading = ref(false)
+const profileRulesError = ref<string | null>(null)
 const submitError = ref<string | null>(null)
 const saveIssues = ref<WriteIssue[]>([])
 const submitting = ref(false)
@@ -94,10 +100,8 @@ const selectableProfiles = computed(() =>
   profiles.value.filter((profile) => isAssignableProfile(profile, draft.value.groupId)))
 const profileOptions = computed(() =>
   selectableProfiles.value.map((profile) => ({ value: profile.id, label: profile.name })))
-const expectation = computed(() => {
-  const profile = profiles.value.find((candidate) => candidate.id === profileId.value)
-  return profile ? profileExpectation(profile) : null
-})
+const selectedProfile = computed(() => profiles.value.find((candidate) => candidate.id === profileId.value))
+const expectation = computed(() => (selectedProfile.value ? profileExpectation(selectedProfile.value) : null))
 
 const groupId = computed({
   get: () => draft.value.groupId ?? '',
@@ -136,6 +140,7 @@ async function load() {
     draft.value = newDraft({ groupId: draft.value.groupId })
     selected.value = rootId(draft.value)
     profileId.value = ''
+    pendingSeed.value = ''
     preferredProfileInitialized.value = false
     folder.value = null
     slug.value = null
@@ -163,6 +168,7 @@ async function load() {
       documentId: summary.document_id,
     }
     selected.value = rootId(draft.value)
+    pendingSeed.value = ''
     profileId.value = declaredProfile()
   } catch (error) {
     if (generation === loadGeneration && mode.value === 'edit' && documentId.value === id) {
@@ -174,13 +180,26 @@ async function load() {
 }
 watch([mode, documentId], () => void load(), { immediate: true })
 
+function declaredIris(): Set<string> {
+  return new Set((rootEntity(draft.value)?.properties.conformsTo ?? []).map((value) => value.value))
+}
+
 function declaredProfile(): string {
-  const declared = new Set((rootEntity(draft.value)?.properties.conformsTo ?? []).map((value) => value.value))
+  const declared = declaredIris()
   return profiles.value.find((profile) => {
     const iri = profileReferenceIri(profile)
     return Boolean(iri && declared.has(iri))
   })?.id ?? ''
 }
+
+// The picker follows what the root declares, so an import, a hand-edited
+// conformsTo row or a profile list that resolves late cannot leave it stale.
+function syncProfileId() {
+  const current = profileReferenceIri(selectedProfile.value)
+  if (current && declaredIris().has(current)) return
+  profileId.value = declaredProfile()
+}
+watch([profiles, () => rootEntity(draft.value)?.properties.conformsTo], syncProfileId)
 
 const crate = computed(() => toRoCrate(draft.value))
 // A taken path blocks the save, so it belongs on the name that derives it, not
@@ -210,11 +229,34 @@ const preview = useProfilePreview({
     : {}),
 })
 
-const canSave = computed(() =>
-  Boolean(rootName.value && draft.value.groupId && draft.value.path) && !pathTaken.value)
 // What the node refused, from the last preview and the last write attempt.
 const writeIssues = computed(() => [...rejectionIssues(preview.rejection.value), ...saveIssues.value])
 const nodeIssues = computed(() => collectIssues(preview.result.value, writeIssues.value, draft.value))
+const blockers = computed(() => issues.value.filter((issue) => issue.severity === 'error'))
+const violations = computed(() => nodeIssues.value.filter((issue) => issue.severity === 'violation'))
+
+// Nothing invalid is offered to the node: what the editor found, what the node
+// last refused and a check still in flight all hold the save back.
+const canSave = computed(() => Boolean(draft.value.groupId && draft.value.path)
+  && !blockers.value.length && !violations.value.length && !preview.running.value)
+const saveBlocked = computed(() => {
+  if (canSave.value) return null
+  if (!draft.value.groupId || !draft.value.path) return 'Choose a group and a location for this dataset.'
+  if (preview.running.value) return 'Waiting for the validation to finish.'
+  if (violations.value.length) return 'The node would reject this dataset.'
+  const count = blockers.value.length
+  return `Fix ${count === 1 ? '1 problem' : `${count} problems`} before saving.`
+})
+
+// Every edit and every profile change re-checks the draft with the node, and
+// drops what the last refused write said about a draft that no longer exists.
+// A draft the editor itself still refuses is not worth the node's time; the
+// explicit Validate action runs it anyway.
+watch([crate, profileId], () => {
+  saveIssues.value = []
+  submitError.value = null
+  if (!blockers.value.length) preview.preview(crate.value)
+})
 
 // What the assistant may do to the open draft while this view is mounted. It
 // never saves: the check below is the same one the Save button runs first.
@@ -249,18 +291,72 @@ function open(entityId: string) {
 function imported(next: CrateDraft) {
   draft.value = { ...next, groupId: draft.value.groupId, path: draft.value.path, visibility: draft.value.visibility }
   selected.value = rootId(draft.value)
+  preview.reset()
+  syncProfileId()
+}
+
+function hasRules(rules: ProfileExpectation | null): boolean {
+  return Boolean(rules && (rules.properties.length || rules.types.length || rules.contents.length))
 }
 
 function pickProfile(id: string) {
   preferredProfileInitialized.value = true
-  const previous = profiles.value.find((candidate) => candidate.id === profileId.value)
-  const previousIri = profileReferenceIri(previous)
+  // Findings belong to the profile that produced them, so the change drops them.
+  preview.reset()
+  saveIssues.value = []
+  submitError.value = null
+  const previousIri = profileReferenceIri(selectedProfile.value)
   profileId.value = id
-  const profile = profiles.value.find((candidate) => candidate.id === id)
+  const profile = selectedProfile.value
   draft.value = profile
     ? applyProfile(draft.value, profile, profileReferenceIri(profile), previousIri)
     : clearProfile(draft.value, previousIri)
+  pendingSeed.value = profile && !hasRules(expectation.value) ? profile.id : ''
 }
+
+// A public profile keeps its shapes outside the catalog summary, so its rules
+// exist only after its own crate is fetched and lifted.
+let rulesGeneration = 0
+function loadProfileRules(id: string, force = false) {
+  const generation = ++rulesGeneration
+  profileRulesError.value = null
+  profileRulesLoading.value = true
+  void (force ? loadProfileCrate(id, { force: true }) : loadProfileCrate(id))
+    .catch(() => {
+      if (generation === rulesGeneration) profileRulesError.value = 'The rules of this profile could not be loaded.'
+    })
+    .finally(() => {
+      if (generation === rulesGeneration) profileRulesLoading.value = false
+    })
+}
+function retryProfileRules() {
+  const id = selectedProfile.value?.documentId
+  if (id) loadProfileRules(id, true)
+}
+watch(() => selectedProfile.value?.documentId, (id) => {
+  if (!id) {
+    rulesGeneration += 1
+    profileRulesLoading.value = false
+    profileRulesError.value = null
+    return
+  }
+  loadProfileRules(id)
+}, { immediate: true })
+
+// Seeding runs at the pick, when a public profile still has no rules; the
+// first expectation that carries them seeds the form once more.
+watch(expectation, (rules) => {
+  const profile = selectedProfile.value
+  if (!profile || profile.id !== pendingSeed.value || !hasRules(rules)) return
+  pendingSeed.value = ''
+  const iri = profileReferenceIri(profile)
+  draft.value = applyProfile(draft.value, profile, iri, iri)
+})
+
+// A profile the newly chosen group may not use cannot stay declared.
+watch(() => draft.value.groupId, () => {
+  if (profileId.value && !selectableProfiles.value.some((profile) => profile.id === profileId.value)) pickProfile('')
+})
 
 watch([mode, currentUser, selectableProfiles], ([currentMode, user, available]) => {
   if (currentMode !== 'create') {
@@ -311,8 +407,10 @@ async function save() {
     })
     await router.push({ name: 'dataset', params: { id: result.document_id } })
   } catch (error) {
-    submitError.value = apiErrorMessage(error)
-    saveIssues.value = rejectionIssues(error)
+    // A refused write states its own findings; only anything else needs a line.
+    const refused = rejectionIssues(error)
+    saveIssues.value = refused
+    submitError.value = refused.length ? null : apiErrorMessage(error)
   } finally {
     submitting.value = false
   }
@@ -410,6 +508,10 @@ async function save() {
             <NodeCheckPanel
               :draft="draft"
               :rocrate="crate"
+              :profile-name="selectedProfile?.name"
+              :profile-loading="profileRulesLoading"
+              :profile-error="profileRulesError"
+              :blocked="saveBlocked"
               :preview-result="preview.result.value"
               :preview-running="preview.running.value"
               :preview-error="preview.error.value"
@@ -421,6 +523,7 @@ async function save() {
               :action-label="mode === 'edit' ? 'Save changes' : 'Create dataset'"
               :busy-label="mode === 'edit' ? 'Saving' : 'Creating'"
               @preview="preview.previewNow(crate)"
+              @retry-profile="retryProfileRules"
               @save="save"
               @jump="open"
             />

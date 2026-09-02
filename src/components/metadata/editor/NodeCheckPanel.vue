@@ -19,6 +19,12 @@ const props = defineProps<{
   draft: CrateDraft
   rocrate: unknown
   profileName?: string | null
+  /** The picked profile's own crate is still being fetched for its rules. */
+  profileLoading?: boolean
+  /** The picked profile's rules failed to load; the form runs without them. */
+  profileError?: string | null
+  /** Why the save is unavailable, shown beside the disabled button. */
+  blocked?: string | null
   previewResult?: ProfileValidationPreviewResponse | null
   previewRunning?: boolean
   previewError?: string | null
@@ -32,6 +38,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
   (e: 'preview'): void
+  (e: 'retry-profile'): void
   (e: 'save'): void
   (e: 'jump', entityId: string): void
 }>()
@@ -96,6 +103,14 @@ function groupName(entityId: string): string {
       </Button>
     </div>
 
+    <p v-if="profileLoading" class="flex items-center gap-2 text-xs text-muted-foreground">
+      <Spinner class="text-primary" aria-hidden="true" /> Loading the profile rules…
+    </p>
+    <Notice v-else-if="profileError" tone="error">
+      {{ profileError }}
+      <Button variant="link" size="sm" class="h-auto p-0" @click="emit('retry-profile')">Try again</Button>
+    </Notice>
+
     <p v-if="outcome === 'checking'" class="flex items-center gap-2 text-xs text-muted-foreground">
       <Spinner class="text-primary" aria-hidden="true" /> Validating…
     </p>
@@ -157,7 +172,8 @@ function groupName(entityId: string): string {
     </div>
 
     <Notice v-if="submitError" tone="error">{{ submitError }}</Notice>
-    <div class="flex justify-end">
+    <div class="flex flex-wrap items-center justify-end gap-3">
+      <p v-if="blocked && !saving" class="min-w-0 text-xs text-muted-foreground">{{ blocked }}</p>
       <Button data-tour="editor-save" :disabled="!canSave || saving" @click="emit('save')">
         <Spinner v-if="saving" class="text-current" aria-hidden="true" />
         <Send v-else class="h-4 w-4" />
