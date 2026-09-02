@@ -27,6 +27,9 @@ const props = withDefaults(
   },
 )
 
+// The tooltip root renders no element, so listeners must reach the button.
+defineOptions({ inheritAttrs: false })
+
 const blocked = computed(() => props.disabled || Boolean(props.disabledReason))
 const hover = computed(() =>
   blocked.value && props.disabledReason ? props.disabledReason : props.label,
@@ -36,6 +39,7 @@ const hover = computed(() =>
 <template>
   <Tooltip :label="hover" :side="props.side">
     <Button
+      v-bind="$attrs"
       :variant="props.variant"
       :size="props.size"
       :class="props.class"

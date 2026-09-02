@@ -3,6 +3,7 @@ import * as VueRuntime from 'vue'
 import { describe, expect, it } from 'vitest'
 import * as Utils from '@/lib/utils'
 import {
+  click,
   compileClientComponent,
   content,
   element,
@@ -64,6 +65,16 @@ describe('icon button', () => {
     expect(element(root, (node) => node.props['data-tooltip'] !== undefined).props['data-tooltip']).toBe(
       'This session cannot delete this object.',
     )
+  })
+
+  it('lets a click reach the button behind the tooltip', async () => {
+    // The tooltip root renders no element, so an unforwarded listener is lost.
+    const seen: string[] = []
+    const root = await render({ label: 'Delete…', onClick: () => seen.push('clicked') })
+
+    await click(element(root, (node) => node.tag === 'button'))
+
+    expect(seen).toEqual(['clicked'])
   })
 
   it('stays enabled without a reason', async () => {
