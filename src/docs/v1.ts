@@ -968,6 +968,17 @@ export const docsTopics: DocsTopic[] = [
         ],
       },
       {
+        title: 'What the reference check covers',
+        icon: 'Search',
+        bullets: [
+          'Before a delete, the node asks every reachable [node](concept:realm-nodes-groups#nodes-and-the-realm) of the realm which datasets reference the target, under each identifier form the content is known by: its canonical content w3id and the legacy S3 and path-style addresses of the same bytes.',
+          'A form no node can resolve is reported as not queried. A reference recorded only under that form stays invisible to the check.',
+          'Index current means a node has finished indexing what it holds. A pending, mixed, or failed index can miss a reference that already exists.',
+          'A node that does not answer, a truncated page, or a partial realm view leaves the coverage incomplete. The dialog says so, and an empty result is then not proof that no dataset references the target.',
+          'The check informs the decision; storage permissions decide whether the delete is allowed.',
+        ],
+      },
+      {
         title: 'Delete permanently is separate',
         icon: 'Eraser',
         paragraphs: [

@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { Check, ChevronDown, TriangleAlert } from '@lucide/vue'
 import CompactList from '@/components/ui/CompactList.vue'
+import DocsLink from '@/components/ui/DocsLink.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
@@ -16,19 +18,31 @@ const props = withDefaults(defineProps<{
   selection: false,
 })
 
-const partial = computed(() => {
+const nodesShown = ref(false)
+
+const freshness = computed(() => props.preflight?.coverage.node_freshness ?? [])
+const failedNodes = computed(() => props.preflight?.nodes_failed ?? 0)
+
+// Everything that makes the answer less than a full realm sweep, minus the
+// per-node signals the summary line reports on their own.
+const incomplete = computed(() => {
   const response = props.preflight
   if (!response) return false
   return Boolean(
     !response.complete ||
       response.truncated ||
-      response.nodes_failed ||
       !response.coverage.target_resolution_complete ||
       !response.coverage.path_style_endpoint_coverage_complete ||
-      !response.coverage.realm_coverage_complete ||
-      response.coverage.node_freshness.some((entry) => entry.index_state !== 'current'),
+      !response.coverage.realm_coverage_complete,
   )
 })
+
+const partial = computed(
+  () =>
+    incomplete.value ||
+    Boolean(failedNodes.value) ||
+    freshness.value.some((entry) => entry.index_state !== 'current'),
+)
 
 const referencesReported = computed(() =>
   props.preflight?.targets.some(
@@ -73,9 +87,47 @@ function displayValue(value: string): string {
   return value.replaceAll('_', ' ')
 }
 
-function freshnessTime(updatedAtMs: number): string {
-  return relativeTime(new Date(updatedAtMs).toISOString())
+function nodeWord(count: number): string {
+  return count === 1 ? 'node' : 'nodes'
 }
+
+const currentNodes = computed(
+  () => freshness.value.filter((entry) => entry.index_state === 'current').length,
+)
+
+const coverageOk = computed(() => freshness.value.length > 0 && !partial.value)
+
+const coverageSummary = computed(() => {
+  const reported = freshness.value.length
+  const clauses = [
+    reported
+      ? `Index current on ${currentNodes.value} of ${reported} ${nodeWord(reported)}`
+      : 'Index freshness was not reported',
+  ]
+  if (failedNodes.value) {
+    clauses.push(`${failedNodes.value} ${nodeWord(failedNodes.value)} did not answer`)
+  }
+  if (incomplete.value) clauses.push('coverage is partial')
+  return clauses.join(', ')
+})
+
+const nodeRows = computed(() =>
+  freshness.value.map((entry) => ({
+    nodeId: entry.node_id,
+    current: entry.index_state === 'current',
+    state: displayValue(entry.index_state),
+    asOf:
+      entry.oldest_status_updated_at_ms == null
+        ? ''
+        : relativeTime(new Date(entry.oldest_status_updated_at_ms).toISOString()),
+  })),
+)
+
+const excludedForms = computed(() =>
+  (props.preflight?.coverage.excluded_forms ?? [])
+    .map((excluded) => `${displayValue(excluded.form)} (${excluded.reason})`)
+    .join(', '),
+)
 </script>
 
 <template>
@@ -120,34 +172,40 @@ function freshnessTime(updatedAtMs: number): string {
         </p>
         <CompactList label="content" :items="unknownImpactRows" />
       </Notice>
-      <dl class="grid grid-cols-2 gap-x-4 gap-y-1 text-muted-foreground">
-        <dt>Queried scope</dt>
-        <dd class="text-right text-foreground">{{ displayValue(preflight.coverage.queried_scope) }}</dd>
-        <dt>Queried forms</dt>
-        <dd class="text-right text-foreground">{{ preflight.coverage.queried_forms.map(displayValue).join(', ') }}</dd>
-        <dt>Completeness</dt>
-        <dd class="text-right text-foreground">{{ partial ? 'Partial' : 'Complete' }}</dd>
-        <dt>Nodes queried</dt>
-        <dd class="text-right font-mono text-foreground">{{ preflight.nodes_queried }}</dd>
-        <dt>Nodes failed</dt>
-        <dd class="text-right font-mono text-foreground">{{ preflight.nodes_failed }}</dd>
-      </dl>
-      <div class="space-y-1 text-muted-foreground">
-        <p class="font-medium text-foreground">Index freshness</p>
-        <ul v-if="preflight.coverage.node_freshness.length" class="space-y-1 pl-4">
-          <li v-for="freshness in preflight.coverage.node_freshness" :key="freshness.node_id" class="list-disc break-all">
-            <NodeLabel :node-id="freshness.node_id" size="sm" />: {{ displayValue(freshness.index_state) }}<template v-if="freshness.oldest_status_updated_at_ms !== null">, oldest status {{ freshnessTime(freshness.oldest_status_updated_at_ms) }}</template><template v-else>, timestamp unavailable</template>
-          </li>
-        </ul>
-        <p v-else>Unknown</p>
-      </div>
-      <div class="space-y-1 text-muted-foreground">
-        <p class="font-medium text-foreground">Coverage caveats</p>
-        <ul class="space-y-1 pl-4">
-          <li v-for="excluded in preflight.coverage.excluded_forms" :key="excluded.form" class="list-disc">
-            <code>{{ excluded.form }}</code>: {{ excluded.reason }}
-          </li>
-        </ul>
+      <div class="space-y-1">
+        <p
+          class="flex flex-wrap items-center gap-1"
+          :class="coverageOk ? 'text-muted-foreground' : 'text-amber-800 dark:text-amber-300'"
+        >
+          <Check v-if="coverageOk" class="size-3.5 shrink-0" aria-hidden="true" />
+          <TriangleAlert v-else class="size-3.5 shrink-0" aria-hidden="true" />
+          <span>{{ coverageSummary }}</span>
+          <DocsLink icon topic="data-and-deletion" section="What the reference check covers" class="ml-0.5" />
+        </p>
+        <button
+          type="button"
+          class="inline-flex items-center gap-1 font-medium text-foreground underline-offset-2 hover:underline"
+          :aria-expanded="nodesShown"
+          @click="nodesShown = !nodesShown"
+        >
+          <ChevronDown class="h-3 w-3 transition-transform" :class="nodesShown ? 'rotate-180' : ''" aria-hidden="true" />
+          {{ nodesShown ? 'Hide the nodes' : 'Show the nodes' }}
+        </button>
+        <div v-if="nodesShown" class="space-y-1 text-muted-foreground">
+          <ul v-if="nodeRows.length" class="space-y-1">
+            <li v-for="row in nodeRows" :key="row.nodeId" class="flex flex-wrap items-center gap-1">
+              <Check v-if="row.current" class="size-3.5 shrink-0" aria-hidden="true" />
+              <TriangleAlert v-else class="size-3.5 shrink-0 text-amber-800 dark:text-amber-300" aria-hidden="true" />
+              <NodeLabel :node-id="row.nodeId" size="sm" />
+              <span v-if="!row.current" class="text-amber-800 dark:text-amber-300">{{ row.state }}</span>
+              <span v-if="row.asOf">as of {{ row.asOf }}</span>
+            </li>
+          </ul>
+          <p v-else>No node reported its index state.</p>
+          <p>Scope: {{ displayValue(preflight.coverage.queried_scope) }}</p>
+          <p>Forms: {{ preflight.coverage.queried_forms.map(displayValue).join(', ') }}</p>
+          <p v-if="excludedForms">Not queried: {{ excludedForms }}</p>
+        </div>
       </div>
     </template>
     <Notice v-else tone="warning" class="font-medium">
