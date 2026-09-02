@@ -55,12 +55,10 @@ watch(
     </div>
 
     <div v-else class="container space-y-5 py-6">
-      <p class="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
-        <span>
-          A placement policy lists where copies of governed data may be stored. It allows a copy or
-          refuses it, and never creates, moves or removes one.
-        </span>
-        <DocsLink topic="where-data-lives" section="Placement policies" label="Learn about placement policies" />
+      <p class="text-sm text-muted-foreground">
+        A placement policy lists where copies of governed data may be stored; it allows or refuses
+        a copy and never creates, moves or removes one.
+        <DocsLink icon topic="where-data-lives" section="Placement policies" class="ml-0.5" />
       </p>
 
       <PolicyLibrary />

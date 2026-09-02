@@ -4,7 +4,6 @@
 // the node it came from. Nothing here invents a number the backend cannot give.
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import Badge from '@/components/ui/Badge.vue'
 import DocsLink from '@/components/ui/DocsLink.vue'
 import FactList from '@/components/ui/FactList.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
@@ -96,64 +95,64 @@ const bucketDefaultRule = computed(
   () => rules.value?.find((rule) => !rule.exact && !rule.key_prefix) ?? null,
 )
 
+const REMOTE = { value: 'Unknown here', note: 'This bucket is hosted on another node.' }
+const NO_ANSWER = { value: 'Unknown', note: 'This node did not answer.' }
+
 const backend = computed(() => {
-  if (remote.value) return { value: 'Unknown here', note: 'This bucket is hosted on another node.' }
+  if (remote.value) return REMOTE
   if (routingState.value === 'loading') return null
   if (routingState.value === 'refused') {
-    return { value: 'Not shown', note: 'Only admins of the group that owns this bucket may read it.' }
+    return { value: 'Not shown', note: 'Only admins of the owning group may read it.' }
   }
-  if (routingState.value === 'unknown') return { value: 'Unknown', note: 'This node did not answer.' }
+  if (routingState.value === 'unknown') return NO_ANSWER
+  const count = rules.value?.length ?? 0
   if (bucketDefaultRule.value) {
     return {
       value: targetLabel(bucketDefaultRule.value.target, backends.value),
-      note:
-        rules.value!.length > 1
-          ? `From a bucket rule; ${rules.value!.length} rules decide per key.`
-          : 'From the bucket rule for every key.',
+      note: count > 1 ? `Set by a bucket rule; ${count} rules decide per key.` : 'Set by the bucket rule.',
     }
   }
-  if (rules.value?.length) {
-    return {
-      value: 'Depends on the key',
-      note: `${rules.value.length} bucket rules decide per key, and the group default takes the rest.`,
-    }
+  if (count) {
+    return { value: 'Depends on the key', note: `${count} bucket rules; the group default takes the rest.` }
   }
   if (groupTarget.value) {
-    return { value: targetLabel(groupTarget.value, backends.value), note: 'From the group default.' }
+    return { value: targetLabel(groupTarget.value, backends.value), note: 'Set by the group default.' }
   }
-  return { value: 'Node default', note: 'No bucket rule and no group default, so this node decides.' }
+  return { value: 'Node default', note: 'No bucket rule and no group default.' }
 })
 
 const policySummary = computed(() => {
-  if (remote.value) return { value: 'Unknown here', note: 'This bucket is hosted on another node.' }
+  if (remote.value) return REMOTE
   if (policyState.value === 'loading') return null
   if (policyState.value === 'refused') {
-    return { value: 'Not shown', note: 'Only group admins of this bucket and realm admins may read it.' }
+    return { value: 'Not shown', note: 'Only group admins and realm admins may read it.' }
   }
-  if (policyState.value === 'unknown') return { value: 'Unknown', note: 'This node did not answer.' }
-  if (!policies.value?.length) {
-    return { value: 'None: copies of this bucket are not governed', note: 'Any node this realm allows may hold a copy.' }
-  }
+  if (policyState.value === 'unknown') return NO_ANSWER
+  if (!policies.value?.length) return { value: 'None', note: 'Copies of this bucket are not governed.' }
   return { value: policies.value.map(policyName).join(', '), note: 'A copy has to be allowed by all of them.' }
 })
 
 const syncSummary = computed(() => {
   if (syncsLoading.value && !syncRows.value.length) return null
   if (syncsError.value) return { value: 'Unknown', note: 'The sync list could not be read.' }
-  const out = syncRows.value.filter((row) => row.direction === 'outgoing').length
-  const incoming = syncRows.value.length - out
   if (!syncRows.value.length) return { value: 'None', note: 'Only syncs you created are counted.' }
-  return { value: `${out} out, ${incoming} in`, note: 'Only syncs you created are counted.' }
+  const out = syncRows.value.filter((row) => row.direction === 'outgoing').length
+  return { value: `${out} out, ${syncRows.value.length - out} in`, note: 'Only syncs you created are counted.' }
 })
 
-const policyFacts = computed(() => [
-  { key: 'backend', label: 'Storage backend for new uploads', value: backend.value?.value ?? '' },
+const ruleFacts = computed(() => [
+  { key: 'backend', label: 'Storage backend', value: backend.value?.value ?? '' },
   { key: 'policies', label: 'Placement policies', value: policySummary.value?.value ?? '' },
 ])
 const observedFacts = computed(() => [
   { key: 'copies', label: 'Copies', value: 'Checked per file' },
   { key: 'syncs', label: 'Syncs', value: syncSummary.value?.value ?? '' },
 ])
+const filesLink = computed(() => ({
+  name: 'bucket',
+  params: { bucketId: props.bucket },
+  query: props.nodeId ? { node: props.nodeId } : {},
+}))
 </script>
 
 <template>
@@ -161,35 +160,28 @@ const observedFacts = computed(() => [
     <section class="surface">
       <header class="flex items-center gap-2 border-b border-border px-5 py-4">
         <ShieldCheck class="size-4 text-primary" />
-        <h2 class="font-display text-sm font-semibold text-aruna-navy">Policy</h2>
-        <Badge variant="outline" size="sm">Rules this bucket carries</Badge>
+        <h2 class="font-display text-sm font-semibold text-aruna-navy">Rules this bucket carries</h2>
       </header>
       <div class="px-5 py-4">
-        <FactList :items="policyFacts" class="sm:grid-cols-1">
+        <FactList :items="ruleFacts" class="sm:grid-cols-1">
           <template #backend>
             <Skeleton v-if="!backend" class="h-4 w-40" />
             <template v-else>
-              <span>{{ backend.value }}</span>
-              <span class="mt-0.5 block text-[11px] text-muted-foreground">{{ backend.note }}</span>
-              <DocsLink
-                topic="where-data-lives"
-                section="Storage backend"
-                label="Learn about storage backends"
-                class="mt-1"
-              />
+              <span class="block">{{ backend.value }}</span>
+              <span class="mt-0.5 block text-[11px] text-muted-foreground">
+                {{ backend.note }}
+                <DocsLink icon topic="where-data-lives" section="Storage backend" class="ml-0.5" />
+              </span>
             </template>
           </template>
           <template #policies>
             <Skeleton v-if="!policySummary" class="h-4 w-40" />
             <template v-else>
-              <span>{{ policySummary.value }}</span>
-              <span class="mt-0.5 block text-[11px] text-muted-foreground">{{ policySummary.note }}</span>
-              <DocsLink
-                topic="where-data-lives"
-                section="Placement policies"
-                label="Learn about placement policies"
-                class="mt-1"
-              />
+              <span class="block">{{ policySummary.value }}</span>
+              <span class="mt-0.5 block text-[11px] text-muted-foreground">
+                {{ policySummary.note }}
+                <DocsLink icon topic="where-data-lives" section="Placement policies" class="ml-0.5" />
+              </span>
             </template>
           </template>
         </FactList>
@@ -200,31 +192,25 @@ const observedFacts = computed(() => [
       <header class="flex items-center gap-2 border-b border-border px-5 py-4">
         <HardDrive class="size-4 text-primary" />
         <h2 class="font-display text-sm font-semibold text-aruna-navy">Observed on this node</h2>
-        <Badge variant="outline" size="sm">What this node could see</Badge>
       </header>
       <div class="px-5 py-4">
         <FactList :items="observedFacts" class="sm:grid-cols-1">
           <template #copies>
-            <span>Checked per file</span>
+            <span class="block">Checked per file</span>
             <span class="mt-0.5 block text-[11px] text-muted-foreground">
-              This node reports no total for a bucket, so open a file to see where its copies are.
+              <RouterLink :to="filesLink" class="font-medium text-primary hover:underline">Open a file</RouterLink>
+              to see where its copies are.
+              <DocsLink icon topic="where-data-lives" section="Storage locations" class="ml-0.5" />
             </span>
-            <div class="mt-1 flex flex-wrap items-center gap-3">
-              <RouterLink
-                :to="{ name: 'bucket', params: { bucketId: props.bucket }, query: props.nodeId ? { node: props.nodeId } : {} }"
-                class="text-xs font-medium text-primary hover:underline"
-              >
-                Open the file browser
-              </RouterLink>
-              <DocsLink topic="where-data-lives" section="Storage locations" label="Learn about storage locations" />
-            </div>
           </template>
           <template #syncs>
             <Skeleton v-if="!syncSummary" class="h-4 w-24" />
             <template v-else>
-              <span>{{ syncSummary.value }}</span>
-              <span class="mt-0.5 block text-[11px] text-muted-foreground">{{ syncSummary.note }}</span>
-              <DocsLink topic="where-data-lives" section="Syncs" label="Learn about syncs" class="mt-1" />
+              <span class="block">{{ syncSummary.value }}</span>
+              <span class="mt-0.5 block text-[11px] text-muted-foreground">
+                {{ syncSummary.note }}
+                <DocsLink icon topic="where-data-lives" section="Syncs" class="ml-0.5" />
+              </span>
             </template>
           </template>
         </FactList>
@@ -238,8 +224,8 @@ const observedFacts = computed(() => [
       </header>
       <div class="space-y-3 px-5 py-4">
         <p class="text-xs text-muted-foreground">
-          Deleting the bucket removes every object, every earlier version and every delete marker it
-          holds on this node, and nothing brings them back.
+          Deleting the bucket removes every object, version and delete marker it holds on this node,
+          and nothing brings them back.
         </p>
         <BucketDangerZone
           :bucket="props.bucket"

@@ -59,6 +59,28 @@ describe('docs links', () => {
     vi.doUnmock('vue-router')
   })
 
+  it('keeps the target and moves the label into aria-label in icon mode', async () => {
+    vi.doMock('vue-router', () => ({
+      RouterLink: defineComponent({
+        props: { to: { type: Object, required: true } },
+        setup: (props, { slots, attrs }) => () =>
+          h('a', { href: JSON.stringify(props.to), ...attrs }, slots.default?.()),
+      }),
+    }))
+    const DocsLink = (await import('./DocsLink.vue')).default
+    const html = await renderToString(
+      createSSRApp({
+        render: () => h(DocsLink, { topic: 'where-data-lives', section: 'Syncs', icon: true }),
+      }),
+    )
+
+    expect(html).toContain('#syncs')
+    expect(html).toContain('aria-label="Learn about syncs"')
+    expect(html).toContain('title="Learn about syncs"')
+    expect(html).not.toContain('<span>Learn about syncs</span>')
+    vi.doUnmock('vue-router')
+  })
+
   it('points every usage at a topic and section that exist', () => {
     const usages = docsLinkUsages()
 

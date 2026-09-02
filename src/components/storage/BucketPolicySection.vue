@@ -206,9 +206,9 @@ function onPublished(policy: PolicyResponse) {
       </div>
 
       <template v-else-if="placement">
-        <p class="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-          <span>A policy allows a copy. It never creates, moves or removes one.</span>
-          <DocsLink topic="where-data-lives" section="Placement policies" label="Learn about placement policies" />
+        <p class="text-xs text-muted-foreground">
+          A policy allows a copy; it never creates, moves or removes one.
+          <DocsLink icon topic="where-data-lives" section="Placement policies" class="ml-0.5" />
         </p>
 
         <ul v-if="draft.length" class="divide-y divide-border rounded-md border border-border">

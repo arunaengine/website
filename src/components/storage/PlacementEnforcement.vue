@@ -104,7 +104,6 @@ async function releaseCopy() {
       <div class="flex items-center gap-2">
         <ShieldAlert class="size-4 text-primary" />
         <h2 class="font-display text-sm font-semibold text-aruna-navy">Placement enforcement on this node</h2>
-        <Badge variant="outline" size="sm">This node's own view</Badge>
       </div>
       <div class="flex gap-2">
         <RefreshButton :busy="spinning" label="Reload" @click="onReload" />
@@ -115,9 +114,9 @@ async function releaseCopy() {
     </header>
 
     <div class="space-y-4 px-5 py-4">
-      <p class="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-        <span>A copy that no longer fits its rules is held back here, never moved or deleted.</span>
-        <DocsLink topic="where-data-lives" section="Placement policies" label="Learn about placement policies" />
+      <p class="text-xs text-muted-foreground">
+        A copy that no longer fits its rules is held back here, never moved or deleted.
+        <DocsLink icon topic="where-data-lives" section="Placement policies" class="ml-0.5" />
       </p>
 
       <div v-if="loading && !diagnostics" class="space-y-2"><Skeleton class="h-16" /><Skeleton class="h-32" /></div>

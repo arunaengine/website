@@ -124,12 +124,10 @@ async function applyToExisting() {
     </header>
 
     <div class="space-y-4 px-5 py-4">
-      <p class="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-        <span>
-          Counted on this node only. A covered object carries the rules; that is not proof that
-          every copy of it sits in an allowed place.
-        </span>
-        <DocsLink topic="where-data-lives" section="Placement policies" label="Learn what coverage means" />
+      <p class="text-xs text-muted-foreground">
+        Counted on this node only. Covered means an object carries the rules, not that every copy
+        of it sits in an allowed place.
+        <DocsLink icon topic="where-data-lives" section="Placement policies" class="ml-0.5" />
       </p>
 
       <RefusalNote v-if="refusal" :message="refusal" />
@@ -180,8 +178,7 @@ async function applyToExisting() {
 
         <div class="space-y-2 border-t border-border pt-4">
           <p class="text-xs text-muted-foreground">
-            Applying attaches the bucket's rules to objects that were written before. It attaches
-            rules and copies nothing.
+            Applying attaches the bucket's rules to objects written before; it copies nothing.
           </p>
           <div v-if="bulkProgress" class="space-y-2">
             <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

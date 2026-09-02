@@ -109,7 +109,11 @@ const browserLink = computed(() => ({
 
 <template>
   <div>
-    <PageHeader :title="`Storage for ${bucket}`" description="Where new uploads go, which rules apply, and what this node can see.">
+    <PageHeader :title="`Storage for ${bucket}`">
+      <template #description>
+        Where new uploads go, which rules apply, and what this node can see.
+        <DocsLink icon topic="where-data-lives" class="ml-0.5" />
+      </template>
       <template #breadcrumbs>
         <span>·</span>
         <RouterLink :to="browserLink" class="hover:underline">Data</RouterLink>
@@ -123,7 +127,6 @@ const browserLink = computed(() => ({
         <Button variant="outline" size="sm" as-child>
           <RouterLink :to="browserLink"><ChevronLeft class="size-3.5" /> Back to the files</RouterLink>
         </Button>
-        <DocsLink topic="where-data-lives" label="Learn about where your data lives" />
       </template>
     </PageHeader>
 

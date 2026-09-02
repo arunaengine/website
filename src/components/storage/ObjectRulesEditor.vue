@@ -238,13 +238,9 @@ async function save() {
               No further policy of this realm or group is available here.
             </p>
 
-            <p class="flex flex-wrap items-center gap-2 text-muted-foreground">
-              <span>A copy has to be allowed by all of them.</span>
-              <DocsLink
-                topic="where-data-lives"
-                section="Placement policies"
-                label="Learn about placement policies"
-              />
+            <p class="text-muted-foreground">
+              A copy has to be allowed by all of them.
+              <DocsLink icon topic="where-data-lives" section="Placement policies" class="ml-0.5" />
             </p>
           </template>
 

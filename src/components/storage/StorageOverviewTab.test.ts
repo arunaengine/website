@@ -3,7 +3,7 @@ import * as VueRuntime from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import * as Api from '@/lib/api'
 import * as Storage from '@/lib/storage'
-import { compileClientComponent, content, flush, mountApp, moduleDefault } from '@/test/clientRender'
+import { compileClientComponent, content, flush, mountApp, moduleDefault, nodes } from '@/test/clientRender'
 import type { SyncRow } from '@/composables/useBucketSyncs'
 
 const IconStub = defineComponent((_, { attrs }) => () => h('i', attrs))
@@ -78,8 +78,9 @@ describe('bucket storage overview', () => {
 
     const text = await render()
 
-    expect(text).toContain('None: copies of this bucket are not governed')
+    expect(text).toContain('Copies of this bucket are not governed.')
     expect(text).toContain('Node default')
+    expect(text).toContain('No bucket rule and no group default.')
     expect(text).toContain('Checked per file')
     expect(text).toMatch(/Syncs.*None/s)
     expect(text).not.toMatch(/\d+ copies/)
@@ -105,9 +106,11 @@ describe('bucket storage overview', () => {
 
     const text = await render()
 
-    expect(text).toContain('Policy')
+    expect(text).toContain('Rules this bucket carries')
     expect(text).toContain('Observed on this node')
+    expect(text).not.toContain('What this node could see')
     expect(text).toContain('Class cold')
+    expect(text).toContain('Set by the bucket rule.')
     expect(text).toContain('Copies inside the EU')
     expect(text).toContain('1 out, 1 in')
     expect(text).toContain('Only syncs you created are counted.')
@@ -122,8 +125,29 @@ describe('bucket storage overview', () => {
 
     const text = await render()
 
-    expect(text).toContain('Only admins of the group that owns this bucket may read it.')
-    expect(text).toContain('Only group admins of this bucket and realm admins may read it.')
+    expect(text).toContain('Only admins of the owning group may read it.')
+    expect(text).toContain('Only group admins and realm admins may read it.')
+  })
+
+  it('points at the manual with an icon, not a labelled line', async () => {
+    getBucketRouting.mockResolvedValue({ bucket: 'reef-survey', rules: [], warnings: [] })
+    getGroupRouting.mockResolvedValue({ group_id: 'g-1', warnings: [] })
+    listGroupBackends.mockResolvedValue({ backends: [] })
+    getBucketPlacement.mockResolvedValue({ bucket: 'reef-survey', policies: [], generation: 1 })
+    syncRows.value = []
+
+    const { root } = await mountApp(tab, { props: { bucket: 'reef-survey', groupId: 'g-1', nodeId: null } })
+    await flush()
+    const links = nodes(root).filter((node) => node.tag === 'a' && node.props.topic === 'where-data-lives')
+
+    expect(links.map((node) => node.props.section)).toEqual([
+      'Storage backend',
+      'Placement policies',
+      'Storage locations',
+      'Syncs',
+    ])
+    expect(links.every((node) => node.props.icon === '' || node.props.icon === true)).toBe(true)
+    expect(content(root)).not.toContain('Learn about')
   })
 
   it('carries the danger zone with the bucket deletion control', async () => {

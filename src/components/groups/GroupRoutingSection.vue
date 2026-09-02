@@ -65,9 +65,9 @@ async function save() {
 
 <template>
   <div class="space-y-2">
-    <p class="flex flex-wrap items-center gap-x-2 text-[11px] text-muted-foreground">
-      <span>Where new uploads go when no bucket rule says otherwise.</span>
-      <DocsLink topic="where-data-lives" section="Storage backend" label="Learn about storage backends" />
+    <p class="text-[11px] text-muted-foreground">
+      Where new uploads go when no bucket rule says otherwise.
+      <DocsLink icon topic="where-data-lives" section="Storage backend" class="ml-0.5" />
     </p>
     <div v-if="hidden" class="text-xs text-muted-foreground">
       The default storage backend is only visible to group admins.

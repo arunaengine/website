@@ -53,30 +53,26 @@ const groupDefault = computed(() => targetLabel(groupTarget.value, backends.valu
         <Route class="size-4 text-primary" />
         <h2 class="font-display text-sm font-semibold text-aruna-navy">Group default</h2>
       </header>
-      <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
-        <div class="min-w-0">
-          <Skeleton v-if="!loaded" class="h-4 w-40" />
-          <p v-else class="text-sm text-foreground">
-            New uploads go to {{ groupDefault }} when no rule below says otherwise.
-          </p>
-          <p class="mt-0.5 text-[11px] text-muted-foreground">
-            The default belongs to the group, not to this bucket.
-          </p>
-        </div>
-        <RouterLink
-          v-if="props.groupId"
-          :to="{ name: 'group', params: { id: props.groupId }, query: { tab: 'storage' } }"
-          class="text-xs font-medium text-primary hover:underline"
-        >
-          Open the group Storage tab
-        </RouterLink>
+      <div class="px-5 py-4">
+        <Skeleton v-if="!loaded" class="h-4 w-40" />
+        <p v-else class="text-sm text-foreground">{{ groupDefault }}</p>
+        <p class="mt-0.5 text-[11px] text-muted-foreground">
+          Where new uploads go unless a rule below says otherwise.
+          <RouterLink
+            v-if="props.groupId"
+            :to="{ name: 'group', params: { id: props.groupId }, query: { tab: 'storage' } }"
+            class="font-medium text-primary hover:underline"
+          >
+            Change it on the group Storage tab
+          </RouterLink>
+          <DocsLink icon topic="where-data-lives" section="Storage backend" class="ml-0.5" />
+        </p>
       </div>
     </section>
 
     <section class="surface">
-      <header class="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-4">
+      <header class="flex items-center gap-2 border-b border-border px-5 py-4">
         <h2 class="font-display text-sm font-semibold text-aruna-navy">Rules for this bucket</h2>
-        <DocsLink topic="where-data-lives" section="Storage backend" label="Learn how a rule is picked" />
       </header>
       <div class="px-5 py-4">
         <BucketRoutingSection open :bucket="props.bucket" :group-id="props.groupId" />

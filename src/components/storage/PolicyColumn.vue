@@ -82,20 +82,23 @@ function label(policy: PolicyRefBody): string {
           <Badge v-if="owner(policy)" variant="outline" size="sm" class="ml-1">{{ owner(policy) }}</Badge>
         </li>
       </ul>
-      <p class="text-[11px] text-muted-foreground">A copy has to be allowed by all of them.</p>
+      <p class="text-[11px] text-muted-foreground">
+        A copy has to be allowed by all of them.
+        <DocsLink icon topic="where-data-lives" section="Placement policies" class="ml-0.5" />
+      </p>
     </template>
-    <p v-else class="text-xs text-muted-foreground">None: copies of this file are not governed.</p>
+    <p v-else class="text-xs text-muted-foreground">
+      None: copies of this file are not governed.
+      <DocsLink icon topic="where-data-lives" section="Placement policies" class="ml-0.5" />
+    </p>
     <p v-if="ownSet" class="text-[11px] text-muted-foreground">This file carries its own rules.</p>
 
-    <div class="flex flex-wrap items-center gap-3">
-      <RouterLink
-        v-if="!props.nodeId"
-        :to="{ name: 'bucket-storage', params: { bucketId: props.bucket }, query: { tab: 'placement' } }"
-        class="text-xs font-medium text-primary hover:underline"
-      >
-        Open the bucket rules
-      </RouterLink>
-      <DocsLink topic="where-data-lives" section="Placement policies" label="Learn about placement policies" />
-    </div>
+    <RouterLink
+      v-if="!props.nodeId"
+      :to="{ name: 'bucket-storage', params: { bucketId: props.bucket }, query: { tab: 'placement' } }"
+      class="inline-block text-xs font-medium text-primary hover:underline"
+    >
+      Open the bucket rules
+    </RouterLink>
   </div>
 </template>

@@ -187,9 +187,9 @@ function remove(row: SyncRow) {
 <template>
   <div class="space-y-3">
     <div class="flex flex-wrap items-center justify-between gap-2">
-      <p class="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-        <span>Only syncs you created are listed.</span>
-        <DocsLink topic="where-data-lives" section="Syncs" label="Learn about syncs" />
+      <p class="text-xs text-muted-foreground">
+        Only syncs you created are listed.
+        <DocsLink icon topic="where-data-lives" section="Syncs" class="ml-0.5" />
       </p>
       <div class="flex items-center gap-2">
         <Button variant="outline" size="sm" @click="emit('new-sync')">
