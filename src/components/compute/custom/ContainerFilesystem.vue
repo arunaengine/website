@@ -32,7 +32,7 @@ const {
 </script>
 
 <template>
-  <div class="min-w-0 space-y-3">
+  <div data-tutorial="run-filesystem" class="min-w-0 space-y-3">
     <div class="flex items-center justify-between gap-2">
       <h2 class="font-display text-sm font-semibold text-aruna-navy">Container filesystem</h2>
       <FilterChips v-model="dataView" :options="DATA_VIEWS" aria-label="Container data view" />
@@ -80,7 +80,7 @@ const {
         Every capture needs an absolute container path, one bucket and a canonical key; folder captures (path ending in /) need a key ending in /; container paths and destinations must be unique.
       </p>
       <div class="flex flex-wrap items-center gap-1.5 pt-0.5">
-        <Button variant="outline" size="sm" @click="openInputDialog"><ListPlus class="size-3.5" /> Add input</Button>
+        <Button data-tutorial="run-add-input" variant="outline" size="sm" @click="openInputDialog"><ListPlus class="size-3.5" /> Add input</Button>
         <Button variant="outline" size="sm" @click="addOutputRow"><Plus class="size-3.5" /> Add output</Button>
       </div>
       <p class="text-[11px] text-muted-foreground">A folder capture (path ending in /) uploads the files the run wrote directly in that folder. Nested subfolders are not captured.</p>

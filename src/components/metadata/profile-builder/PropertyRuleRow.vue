@@ -161,7 +161,7 @@ async function goToTarget() {
         </button>
       </div>
       <Tooltip :label="OBLIGATION_HELP">
-        <div data-tour="profile-obligation" :class="obligationDisabled ? 'opacity-60' : ''">
+        <div data-tour="profile-obligation" data-tutorial="profile-obligation" :class="obligationDisabled ? 'opacity-60' : ''">
           <Select
             v-model="obligationModel"
             :options="obligationOptions"

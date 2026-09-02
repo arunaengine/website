@@ -35,6 +35,7 @@ import { errorMessage, relativeTime } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
 import { ChevronRight, ExternalLink, Eye, KeyRound, Palette, Rss, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, Plus, Save } from '@lucide/vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import { SETTINGS_TAB_ANCHORS } from '@/components/layout/nav'
 
 const {
   apiBaseUrl,
@@ -76,7 +77,6 @@ const settingsTabs = [
 ] as const
 // Links and bookmarks still carry the ids of the tabs merged into `access`.
 const legacyTabs: Record<string, string> = { sessions: 'access', connection: 'access' }
-const tabAnchors: Record<string, string> = { access: 'settings-access', assistant: 'settings-assistant' }
 const routeTab = useRouteTab(
   [...settingsTabs.map((entry) => entry.id), ...Object.keys(legacyTabs)],
   'profile',
@@ -264,7 +264,7 @@ async function revoke(accessKeyId: string) {
               v-for="entry in settingsTabs"
               :key="entry.id"
               :value="entry.id"
-              :data-tour="tabAnchors[entry.id]"
+              :data-tour="SETTINGS_TAB_ANCHORS[entry.id]"
             >
               {{ entry.label }}
             </TabsTrigger>

@@ -116,7 +116,7 @@ function changeType(choice: { uri: string; label: string }) {
       >
         <component :is="expanded ? ChevronDown : ChevronRight" class="size-3.5 shrink-0 text-muted-foreground" />
         <Tooltip label="An entity shape holds the rules for one kind of thing. Every property that references that type reuses this one shape.">
-          <h4 data-tour="profile-shape" class="text-sm font-semibold text-foreground">{{ entity.label || 'Untitled entity' }}</h4>
+          <h4 data-tour="profile-shape" data-tutorial="profile-shape" class="text-sm font-semibold text-foreground">{{ entity.label || 'Untitled entity' }}</h4>
         </Tooltip>
       </button>
       <span class="text-[11px] text-muted-foreground">{{ entityTypeLabel(entity.type) }}</span>
@@ -137,7 +137,7 @@ function changeType(choice: { uri: string; label: string }) {
       <span
         v-for="reference in references"
         :key="`${reference.entityLabel}-${reference.valueName}`"
-        data-tour="profile-reference"
+        data-tour="profile-reference" data-tutorial="profile-reference"
         class="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground"
       >
         via {{ reference.valueName }} on {{ reference.entityLabel }}
@@ -233,7 +233,7 @@ function changeType(choice: { uri: string; label: string }) {
       <p v-if="!entity.properties.length" class="rounded-md border border-dashed border-border px-3 py-2 text-[11px] text-muted-foreground">
         No rules yet. Add the properties a {{ entity.label || entityTypeLabel(entity.type) }} must, should or may carry.
       </p>
-      <div data-tour="profile-add-property" class="space-y-1.5 pt-1">
+      <div data-tour="profile-add-property" data-tutorial="profile-add-property" class="space-y-1.5 pt-1">
         <PropertyTermPicker :builder="builder" :entity="entity" />
         <ClassPropertyChecklist :builder="builder" :entity="entity" />
       </div>

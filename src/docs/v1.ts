@@ -38,6 +38,8 @@ export interface DocsTopic {
   summary: string
   sections: DocsSection[]
   tour?: DocsTourStep[]
+  /** Hands "Show me in the portal" to the interactive tutorial of that name. */
+  tutorial?: 'compute' | 'profile'
 }
 
 /** Stable anchor id for a section heading; concept: links may target it. */
@@ -508,56 +510,7 @@ export const docsTopics: DocsTopic[] = [
     kind: 'Guide',
     title: 'Build a profile',
     summary: 'Write the checklist other datasets of your kind should meet, and know what the node enforces.',
-    tour: [
-      {
-        route: '/app/profiles/new',
-        anchor: 'profile-basics',
-        title: 'Name it',
-        body: 'The name is what authors pick in the dataset editor; the slug becomes the stored path and the address datasets point at, and it cannot change later.',
-      },
-      {
-        route: '/app/profiles/new',
-        anchor: 'profile-add-property',
-        title: 'Add a property',
-        body: 'Rules are added from the common terms of the shape, or found through terminology search when no common term fits.',
-      },
-      {
-        route: '/app/profiles/new',
-        anchor: 'profile-obligation',
-        title: 'Set how strictly it applies',
-        body: 'Required fails validation when the value is missing, Recommended warns, Optional never complains.',
-      },
-      {
-        route: '/app/profiles/new',
-        anchor: 'profile-shape',
-        title: 'Shapes hold the rules for one kind of thing',
-        body: 'Root dataset describes the dataset itself. A rule whose value is a Person reuses the Person shape, which every other rule pointing at a Person shares.',
-      },
-      {
-        route: '/app/profiles/new',
-        anchor: 'profile-reference',
-        title: 'What reaches this shape',
-        body: 'The via chip names the rule that leads here. A shape nothing reaches generates no field, though the node still checks entities of that type.',
-      },
-      {
-        route: '/app/profiles/new',
-        anchor: 'profile-review',
-        title: 'Review',
-        body: 'The summary either says the profile is ready or lists everything that still blocks it, with the next step for each.',
-      },
-      {
-        route: '/app/profiles/new',
-        anchor: 'profile-visibility',
-        title: 'Visibility',
-        body: 'A public profile is registered and any dataset in the realm may declare it. A group-only profile may be declared by the datasets of its own group only.',
-      },
-      {
-        route: '/app/profiles/new',
-        anchor: 'profile-create',
-        title: 'Create it',
-        body: 'Creating stores the profile as a dataset under profiles/, with its generated files inside.',
-      },
-    ],
+    tutorial: 'profile',
     sections: [
       {
         title: 'The root dataset shape',
@@ -619,26 +572,7 @@ export const docsTopics: DocsTopic[] = [
     kind: 'Guide',
     title: 'Start and follow a compute run',
     summary: 'Run a script next to your data with Quick run and read the states it reports.',
-    tour: [
-      {
-        route: '/app',
-        anchor: 'nav-compute',
-        title: 'Open Compute',
-        body: 'Compute lists the runs you start on this node and the system jobs it produces.',
-      },
-      {
-        route: '/app/compute/quick',
-        anchor: 'quickrun-runtime',
-        title: 'Pick a runtime',
-        body: 'Quick run stages a short Python, JavaScript, or Bash script and builds the container run for you.',
-      },
-      {
-        route: '/app/compute/quick?step=1',
-        anchor: 'quickrun-script',
-        title: 'Script and data',
-        body: 'Write the script here; Add input mounts bucket objects into the container filesystem on the right.',
-      },
-    ],
+    tutorial: 'compute',
     sections: [
       {
         title: 'Choose a starting point',

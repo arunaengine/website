@@ -37,7 +37,7 @@ const TOOLTIP = 'Public profiles are registered so any dataset can be validated 
 </script>
 
 <template>
-  <div data-tour="profile-visibility">
+  <div data-tour="profile-visibility" data-tutorial="profile-visibility">
     <div class="flex items-center gap-2">
       <Tooltip :label="TOOLTIP">
         <span class="text-xs font-medium text-foreground">Visibility</span>

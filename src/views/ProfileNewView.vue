@@ -540,7 +540,7 @@ async function submit() {
           </Button>
           <Button
             v-else
-            data-tour="profile-create"
+            data-tour="profile-create" data-tutorial="profile-create"
             :disabled="blockers.length > 0 || publishing"
             @click="submit"
           >

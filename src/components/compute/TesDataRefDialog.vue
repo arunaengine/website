@@ -156,7 +156,7 @@ watch(
 
 <template>
   <Dialog :open="props.open" @update:open="(value: boolean) => emit('update:open', value)">
-    <DialogContent class="max-w-xl">
+    <DialogContent data-tutorial="input-picker" class="max-w-xl">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <Database class="h-4 w-4 text-primary" /> Add input reference
@@ -178,7 +178,7 @@ watch(
         <p v-else class="flex items-center gap-2"><LogIn class="h-3.5 w-3.5" /> Sign in first to create credentials.</p>
       </div>
       <template v-else>
-        <div class="max-w-sm">
+        <div data-tutorial="input-mount" class="max-w-sm">
           <label class="text-xs font-medium text-foreground">Mount under</label>
           <Input
             v-model="mountDir"

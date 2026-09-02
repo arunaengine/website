@@ -5,7 +5,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import { docsScreenshots, docsTopics } from '@/docs/v1'
-import { navAnchor, navEntries } from '@/components/layout/nav'
+import { SETTINGS_TAB_ANCHORS, navAnchor, navEntries } from '@/components/layout/nav'
 
 // Every source file that can carry a data-tour anchor.
 function sourceFiles(directory: string): string[] {
@@ -184,32 +184,41 @@ describe('versioned in-portal Docs', () => {
       'first-group',
       'upload-data',
       'first-dataset',
-      'build-a-profile',
-      'compute-run',
       'storage-backend',
       'cli-access-key',
       'assistant',
     ])
+    // The two guides whose controls need driving hand over to a tutorial.
+    expect(docsTopics.filter((topic) => topic.tutorial).map((topic) => [topic.slug, topic.tutorial])).toEqual([
+      ['build-a-profile', 'profile'],
+      ['compute-run', 'compute'],
+    ])
+    expect(docsTopics.every((topic) => !(topic.tour && topic.tutorial))).toBe(true)
     expect(await renderTopic('portal-tour')).toContain('Show me in the portal')
     expect(await renderTopic('datasets')).not.toContain('Show me in the portal')
+
+    const compute = await renderTopic('compute-run')
+    expect(compute).toContain('Interactive tutorial')
+    expect(compute).toContain('Show me in the portal')
+    expect(await renderTopic('portal-tour')).toContain('Guided tour')
   })
 
   it('spotlights anchors the portal actually renders', () => {
-    // A tour stop whose anchor no components carries would spotlight nothing.
+    // A tour stop whose anchor no component carries would spotlight nothing.
+    // Only literal attributes count, plus the two maps that bind one, so a
+    // kebab-case string anywhere in a file can no longer stand in for an anchor.
     const rendered = new Set<string>()
     const sourceRoot = fileURLToPath(new URL('..', import.meta.url))
     for (const file of sourceFiles(sourceRoot)) {
       const text = readFileSync(file, 'utf8')
-      if (!text.includes('data-tour')) continue
       for (const match of text.matchAll(/data-tour="([a-z0-9-]+)"/g)) rendered.add(match[1])
-      // A bound anchor (:data-tour) comes from a map in the same file.
-      for (const match of text.matchAll(/'([a-z0-9]+(?:-[a-z0-9]+)+)'/g)) rendered.add(match[1])
     }
     // The sidebar derives its anchors from the one nav definition.
     for (const entry of navEntries({ desktop: true, isRealmAdmin: true, canInspectUsers: true, assistant: true })) {
       if ('separator' in entry) continue
       rendered.add(navAnchor(entry.label))
     }
+    for (const anchor of Object.values(SETTINGS_TAB_ANCHORS)) rendered.add(anchor)
 
     for (const step of docsTopics.flatMap((topic) => topic.tour ?? [])) {
       expect(rendered.has(step.anchor), `${step.anchor} (${step.title})`).toBe(true)

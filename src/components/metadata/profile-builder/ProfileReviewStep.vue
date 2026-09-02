@@ -158,7 +158,7 @@ function violationsFor(property: string) {
   <section class="space-y-4">
     <!-- Everything that keeps the Create button disabled, from the same list the
          button reads, each with the next step where one exists. -->
-    <Notice v-if="blockers.length" tone="warning" class="rounded-lg p-3" data-tour="profile-review">
+    <Notice v-if="blockers.length" tone="warning" class="rounded-lg p-3" data-tour="profile-review" data-tutorial="profile-review">
       <div class="flex items-center gap-2 text-sm font-medium">
         <AlertTriangle class="h-4 w-4" /> This profile cannot be created yet.
       </div>
@@ -179,7 +179,7 @@ function violationsFor(property: string) {
         </li>
       </ul>
     </Notice>
-    <div v-else data-tour="profile-review" class="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm font-medium text-emerald-700 dark:text-emerald-300">
+    <div v-else data-tour="profile-review" data-tutorial="profile-review" class="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm font-medium text-emerald-700 dark:text-emerald-300">
       <CheckCircle2 class="h-4 w-4" /> This profile is ready to create.
     </div>
 

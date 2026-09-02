@@ -231,6 +231,7 @@ const SettingsView = compileClientComponent(new URL('./SettingsView.vue', import
   'vue-router': RouterRuntime,
   '@lucide/vue': icons,
   '@/lib/api': { apiOrigin: () => 'https://node.example' },
+  '@/components/layout/nav': { SETTINGS_TAB_ANCHORS: { access: 'settings-access', assistant: 'settings-assistant' } },
   '@/lib/utils': Utils,
   '@/composables/useRouteTab': RouteTab,
   '@/composables/useAruna': { useAruna: () => aruna },

@@ -44,7 +44,7 @@ function remove(i: number) {
     <p v-if="!modelValue.length" class="text-sm text-muted-foreground">
       No inputs; the run starts with an empty working directory.
     </p>
-    <div v-else class="space-y-2">
+    <div v-else data-tutorial="run-inputs" class="space-y-2">
       <!-- Shared row grid with the outputs step (ComputeSubmitView): flexible
            content column plus a fixed 1.75rem action column so control right
            edges and remove buttons line up across both editors. -->
@@ -96,7 +96,7 @@ function remove(i: number) {
       still place it elsewhere.
     </p>
 
-    <Button variant="outline" size="sm" :disabled="disabled" @click="dialogOpen = true"><ListPlus class="size-3.5" /> Add input</Button>
+    <Button data-tutorial="run-add-input" variant="outline" size="sm" :disabled="disabled" @click="dialogOpen = true"><ListPlus class="size-3.5" /> Add input</Button>
 
     <TesDataRefDialog v-model:open="dialogOpen" mode="input" mount-default="/inputs/" @add="addEntry" />
   </div>

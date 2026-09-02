@@ -155,7 +155,7 @@ watch(
       <p class="text-xs text-muted-foreground">Name the profile and choose the group that owns it. These describe the profile itself, not the metadata it validates.</p>
     </div>
 
-    <div data-tour="profile-basics" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <div data-tour="profile-basics" data-tutorial="profile-basics" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       <div>
         <label class="text-xs font-medium text-foreground">Group</label>
         <GroupSelect v-model="builder.groupId" :options="builder.groupOptions" class="mt-1" placeholder="Choose a group" :disabled="locked" :invalid="fieldError('group') ? 'error' : undefined" />

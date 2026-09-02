@@ -9,7 +9,7 @@ const { name, description, groupId, groupOptions } = injectCustomRun()
 
 <template>
   <div class="max-w-xl space-y-4">
-    <div>
+    <div data-tutorial="run-name">
       <label class="text-xs font-medium text-foreground">Name <span class="text-muted-foreground">(optional)</span></label>
       <Input v-model="name" class="mt-1" placeholder="align-and-count" />
     </div>
@@ -17,7 +17,7 @@ const { name, description, groupId, groupOptions } = injectCustomRun()
       <label class="text-xs font-medium text-foreground">Description <span class="text-muted-foreground">(optional)</span></label>
       <Textarea v-model="description" class="mt-1" rows="3" />
     </div>
-    <div>
+    <div data-tutorial="run-group">
       <label class="text-xs font-medium text-foreground">Group</label>
       <GroupSelect v-model="groupId" :options="groupOptions" placeholder="Select a group" class="mt-1" />
       <p class="mt-1 text-[11px] leading-relaxed text-muted-foreground">

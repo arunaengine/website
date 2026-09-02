@@ -46,7 +46,7 @@ const {
     </div>
 
     <div class="grid gap-6 lg:grid-cols-2">
-      <div class="space-y-3">
+      <div data-tutorial="run-resources" class="space-y-3">
         <h2 class="font-display text-sm font-semibold text-aruna-navy">Resources</h2>
         <div class="grid gap-3 sm:grid-cols-3">
           <div>
@@ -90,7 +90,7 @@ const {
         </div>
       </div>
 
-      <div class="space-y-3">
+      <div data-tutorial="run-workspace" class="space-y-3">
         <h2 class="font-display text-sm font-semibold text-aruna-navy">Workspace</h2>
         <p class="text-[11px] text-muted-foreground">Choose how the run's scratch storage is handled.</p>
         <div class="grid gap-2 sm:grid-cols-3">

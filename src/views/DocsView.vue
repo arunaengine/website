@@ -181,6 +181,8 @@ const topicSlug = computed(() => {
 })
 const topic = computed(() => docsTopicBySlug(topicSlug.value))
 const tour = computed(() => topic.value?.tour ?? [])
+// A guide either narrates its controls or hands over to an interactive tutorial.
+const tutorial = computed(() => topic.value?.tutorial ?? null)
 const topicGroups = computed(() => {
   // Guides lead: they are the way in. The concept wiki sits below them.
   const groups: Array<{ kind: DocsTopicKind; label: string; blurb: string; topics: typeof docsTopics }> = [
@@ -246,8 +248,8 @@ function glossaryLink(anchor: string) {
       </div>
     </div>
 
-    <!-- A guide with a tour walks the reader through the real controls. -->
-    <div v-if="tour.length" class="container pt-4">
+    <!-- A guide either narrates the real controls or offers the tutorial. -->
+    <div v-if="tour.length || tutorial" class="container pt-4">
       <div
         class="flex flex-wrap items-center gap-4 rounded-lg border border-primary/25 bg-gradient-to-r from-primary/10 via-primary/[0.04] to-transparent px-4 py-3.5"
       >
@@ -255,12 +257,21 @@ function glossaryLink(anchor: string) {
           <Play class="h-4 w-4" />
         </span>
         <div class="min-w-0 flex-1">
-          <p class="font-display text-sm font-semibold text-aruna-navy">Guided tour</p>
+          <p class="font-display text-sm font-semibold text-aruna-navy">
+            {{ tutorial ? 'Interactive tutorial' : 'Guided tour' }}
+          </p>
           <p class="text-xs text-muted-foreground">
-            {{ tour.length }} steps, highlighted on the real controls. Esc ends the tour.
+            {{
+              tutorial
+                ? 'You drive the real screens against made-up data. Nothing is created.'
+                : `${tour.length} steps, highlighted on the real controls. Esc ends the tour.`
+            }}
           </p>
         </div>
-        <Button @click="startTour(tour)"><Play class="h-4 w-4" /> Show me in the portal</Button>
+        <Button v-if="tutorial" as-child>
+          <RouterLink :to="{ name: `tutorial-${tutorial}` }"><Play class="h-4 w-4" /> Show me in the portal</RouterLink>
+        </Button>
+        <Button v-else @click="startTour(tour)"><Play class="h-4 w-4" /> Show me in the portal</Button>
       </div>
     </div>
 

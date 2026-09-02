@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import DetailDialog from '@/components/ui/DetailDialog.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
@@ -36,8 +36,9 @@ import {
   type TesState,
   type TesTask,
 } from '@/lib/tes'
+import { asyncChunkError } from '@/lib/chunk-recovery'
 import { errorMessage, formatBytes, relativeTime, truncateMiddle } from '@/lib/utils'
-import { Ban, Download, ExternalLink as ExternalLinkIcon, FileText, RotateCcw, Trash2 } from '@lucide/vue'
+import { Ban, Download, Eye, ExternalLink as ExternalLinkIcon, FileText, RotateCcw, Trash2 } from '@lucide/vue'
 
 const props = defineProps<{ taskId: string; open: boolean }>()
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void; (e: 'canceled'): void; (e: 'hidden'): void }>()
@@ -234,7 +235,7 @@ const failureCause = computed(() => {
 
 // ── Output links ─────────────────────────────────────────────────────────────
 type ResolvedLink =
-  | { kind: 's3'; bucketId: string; prefix: string }
+  | { kind: 's3'; bucketId: string; prefix: string; objectKey: string }
   | { kind: 'drs'; object: string; download: string }
   | { kind: 'plain' }
 
@@ -245,7 +246,7 @@ function resolveUrl(url: string): ResolvedLink {
     // appends its own trailing '/'); a trailing slash here would list the
     // bucket at "prefix//", an always-empty folder view.
     const prefix = parsed.key.includes('/') ? parsed.key.slice(0, parsed.key.lastIndexOf('/')) : ''
-    return { kind: 's3', bucketId: parsed.bucket, prefix }
+    return { kind: 's3', bucketId: parsed.bucket, prefix, objectKey: parsed.key }
   }
   // Only node-resolvable id forms (w3id URL / content-hash ARN) get a DRS href;
   // `drs://` URIs are accepted for TES input but the node's DRS route rejects
@@ -261,6 +262,20 @@ interface OutRow {
   path: string
   size?: number
   link: ResolvedLink
+}
+
+// One captured file previewed in place, through the same viewer stack the Data
+// view uses; the viewers themselves stay in their own chunks.
+const PreviewBody = defineAsyncComponent({
+  loader: () => import('@/components/preview/PreviewBody.vue'),
+  onError: asyncChunkError,
+})
+const previewing = ref<string | null>(null)
+function togglePreview(row: OutRow) {
+  previewing.value = previewing.value === row.url ? null : row.url
+}
+function objectName(key: string): string {
+  return key.split('/').filter(Boolean).pop() || key
 }
 const declaredOutputs = computed<OutRow[]>(() =>
   (task.value?.outputs ?? []).map((o) => ({ url: o.url, path: o.path, link: resolveUrl(o.url) })),
@@ -389,7 +404,7 @@ async function confirmDelete() {
         </div>
 
         <!-- Details -->
-        <dl class="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-xs">
+        <dl data-tutorial="run-details" class="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-xs">
           <dt class="text-muted-foreground">Created</dt>
           <dd class="text-foreground">{{ task.creation_time ? relativeTime(task.creation_time) : '-' }}</dd>
           <dt class="text-muted-foreground">Group</dt>
@@ -419,7 +434,7 @@ async function confirmDelete() {
         </p>
 
         <!-- Executors & logs -->
-        <section class="space-y-2">
+        <section data-tutorial="run-executors" class="space-y-2">
           <h3 class="font-display text-sm font-semibold text-aruna-navy">Executors</h3>
           <p v-if="!task.logs?.length" class="text-xs text-muted-foreground">No execution log yet.</p>
           <div v-for="(executor, i) in task.executors" :key="i" class="surface space-y-2 p-3">
@@ -465,7 +480,7 @@ async function confirmDelete() {
         </section>
 
         <!-- Outputs -->
-        <section v-if="declaredOutputs.length || capturedOutputs.length" class="space-y-3">
+        <section v-if="declaredOutputs.length || capturedOutputs.length" data-tutorial="run-artifacts" class="space-y-3">
           <h3 class="font-display text-sm font-semibold text-aruna-navy">Outputs</h3>
 
           <div v-if="declaredOutputs.length" class="space-y-1.5">
@@ -486,18 +501,38 @@ async function confirmDelete() {
 
           <div v-if="capturedOutputs.length" class="space-y-1.5">
             <div class="text-[11px] font-medium text-foreground">Captured</div>
-            <div v-for="(row, i) in capturedOutputs" :key="'c' + i" class="flex flex-wrap items-center gap-2 text-[11px]">
-              <span class="font-mono text-muted-foreground">{{ row.path }}</span>
-              <span v-if="row.size !== undefined && !Number.isNaN(row.size)" class="text-muted-foreground">{{ formatBytes(row.size) }}</span>
-              <span class="text-muted-foreground">→</span>
-              <RouterLink v-if="row.link.kind === 's3'" class="font-mono text-primary hover:underline" :to="{ name: 'bucket', params: { bucketId: row.link.bucketId }, query: row.link.prefix ? { prefix: row.link.prefix } : {} }">{{ row.url }}</RouterLink>
-              <template v-else-if="row.link.kind === 'drs'">
-                <a class="inline-flex items-center gap-1 font-mono text-primary hover:underline" :href="row.link.object" target="_blank" rel="noopener noreferrer">{{ truncateMiddle(row.url, 24, 12) }} <ExternalLinkIcon class="h-3 w-3" /></a>
-                <Tooltip label="Download this output">
-                  <a class="text-muted-foreground hover:text-foreground" :href="row.link.download" target="_blank" rel="noopener noreferrer" aria-label="Download this output" title="Download this output"><Download class="h-3.5 w-3.5" /></a>
-                </Tooltip>
-              </template>
-              <ExternalLink v-else :href="row.url" :label="row.url" class="font-mono text-muted-foreground hover:text-primary" />
+            <div v-for="(row, i) in capturedOutputs" :key="'c' + i" class="space-y-1.5">
+              <div class="flex flex-wrap items-center gap-2 text-[11px]">
+                <Button
+                  v-if="row.link.kind === 's3'"
+                  variant="ghost"
+                  size="sm"
+                  class="h-6 px-1.5"
+                  :aria-label="`Preview ${objectName(row.link.objectKey)}`"
+                  @click="togglePreview(row)"
+                >
+                  <Eye class="h-3.5 w-3.5" /> {{ previewing === row.url ? 'Hide' : 'Preview' }}
+                </Button>
+                <span class="font-mono text-muted-foreground">{{ row.path }}</span>
+                <span v-if="row.size !== undefined && !Number.isNaN(row.size)" class="text-muted-foreground">{{ formatBytes(row.size) }}</span>
+                <span class="text-muted-foreground">→</span>
+                <RouterLink v-if="row.link.kind === 's3'" class="font-mono text-primary hover:underline" :to="{ name: 'bucket', params: { bucketId: row.link.bucketId }, query: row.link.prefix ? { prefix: row.link.prefix } : {} }">{{ row.url }}</RouterLink>
+                <template v-else-if="row.link.kind === 'drs'">
+                  <a class="inline-flex items-center gap-1 font-mono text-primary hover:underline" :href="row.link.object" target="_blank" rel="noopener noreferrer">{{ truncateMiddle(row.url, 24, 12) }} <ExternalLinkIcon class="h-3 w-3" /></a>
+                  <Tooltip label="Download this output">
+                    <a class="text-muted-foreground hover:text-foreground" :href="row.link.download" target="_blank" rel="noopener noreferrer" aria-label="Download this output" title="Download this output"><Download class="h-3.5 w-3.5" /></a>
+                  </Tooltip>
+                </template>
+                <ExternalLink v-else :href="row.url" :label="row.url" class="font-mono text-muted-foreground hover:text-primary" />
+              </div>
+              <PreviewBody
+                v-if="previewing === row.url && row.link.kind === 's3'"
+                active
+                :bucket="row.link.bucketId"
+                :object-key="row.link.objectKey"
+                :name="objectName(row.link.objectKey)"
+                :size="row.size !== undefined && !Number.isNaN(row.size) ? row.size : undefined"
+              />
             </div>
           </div>
         </section>

@@ -97,6 +97,12 @@ export function navEntries(options: NavOptions): NavEntry[] {
   ]
 }
 
+/** Tour anchors the settings tabs bind, keyed by tab id. */
+export const SETTINGS_TAB_ANCHORS: Record<string, string> = {
+  access: 'settings-access',
+  assistant: 'settings-assistant',
+}
+
 /** Stable in-app tour anchor for a sidebar entry, derived from its label. */
 export function navAnchor(label: string): string {
   return `nav-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`

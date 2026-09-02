@@ -24,7 +24,7 @@ const {
 </script>
 
 <template>
-  <div class="space-y-3 border-t border-border pt-6">
+  <div data-tutorial="run-placement" class="space-y-3 border-t border-border pt-6">
     <div>
       <h2 class="font-display text-sm font-semibold text-aruna-navy">Advanced placement</h2>
       <p class="mt-1 text-[11px] text-muted-foreground">

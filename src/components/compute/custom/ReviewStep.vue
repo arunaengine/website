@@ -56,7 +56,7 @@ const {
       A folder capture travels as a wildcard pattern. Only the files written directly in the
       captured folder are uploaded; nested subfolders are not.
     </p>
-    <TaskJsonPreview title="Run request" :task="task" />
+    <div data-tutorial="run-review"><TaskJsonPreview title="Run request" :task="task" /></div>
     <details class="text-[11px] text-muted-foreground">
       <summary class="cursor-pointer">Technical details</summary>
       <code class="mt-1 block rounded bg-muted px-2 py-1">{{ useNative ? 'POST /jobs/' : 'POST /ga4gh/tes/v1/tasks' }}</code>
