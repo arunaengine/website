@@ -223,6 +223,24 @@ export async function click(node: HostNode) {
   await flush()
 }
 
+// The host tree has no DOM, so a bubbling click is walked up by hand: a
+// handler that stops propagation ends the walk, the way a row action must.
+export async function bubbleClick(node: HostNode) {
+  let stopped = false
+  const event = {
+    target: node,
+    stopPropagation() {
+      stopped = true
+    },
+  }
+  for (let current: HostNode | null = node; current && !stopped; current = current.parent) {
+    const handler = current.props.onClick
+    if (typeof handler === 'function') await handler(event)
+    else if (Array.isArray(handler)) for (const entry of handler) await entry(event)
+  }
+  await flush()
+}
+
 export interface Mounted {
   app: App<HostNode>
   root: HostNode

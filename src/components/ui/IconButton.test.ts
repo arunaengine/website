@@ -1,9 +1,10 @@
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, withModifiers } from 'vue'
 import * as VueRuntime from 'vue'
 import { describe, expect, it } from 'vitest'
 import * as Utils from '@/lib/utils'
 import {
   click,
+  bubbleClick,
   compileClientComponent,
   content,
   element,
@@ -41,6 +42,40 @@ async function render(props: Record<string, unknown>): Promise<HostNode> {
 }
 
 describe('icon button', () => {
+  it('runs the handler the parent attached and stops there', async () => {
+    const clicks: string[] = []
+    const host = defineComponent({
+      setup: () => () =>
+        h('div', { onClick: () => clicks.push('row') }, [
+          h(
+            iconButton,
+            { label: 'Delete…', onClick: withModifiers(() => clicks.push('delete'), ['stop']) },
+            { default: () => h(IconStub) },
+          ),
+        ]),
+    })
+    const { root } = await mountApp(host)
+
+    await bubbleClick(element(root, (node) => node.tag === 'button'))
+
+    expect(clicks).toEqual(['delete'])
+  })
+
+  it('lets a click through when the handler does not stop it', async () => {
+    const clicks: string[] = []
+    const host = defineComponent({
+      setup: () => () =>
+        h('div', { onClick: () => clicks.push('row') }, [
+          h(iconButton, { label: 'Preview', onClick: () => clicks.push('preview') }, { default: () => h(IconStub) }),
+        ]),
+    })
+    const { root } = await mountApp(host)
+
+    await bubbleClick(element(root, (node) => node.tag === 'button'))
+
+    expect(clicks).toEqual(['preview', 'row'])
+  })
+
   it('names the control for readers and for the pointer', async () => {
     const root = await render({ label: 'Download' })
     const button = element(root, (node) => node.tag === 'button')
