@@ -1,3 +1,4 @@
+import { TUTORIAL_PROFILE_DOC_ID } from '../fixtures/profile'
 // The profile tutorial, stop by stop: the real profile builder, then the real
 // dataset editor validating against what the builder just wrote. The builder's
 // step lives in the query, exactly as ProfileNewView keeps it.
@@ -8,6 +9,9 @@ const BUILDER_RULES = `${TUTORIAL_PROFILE_ROUTE}?step=2`
 const BUILDER_REVIEW = `${TUTORIAL_PROFILE_ROUTE}?step=3`
 export const TUTORIAL_EDITOR_ROUTE = `${TUTORIAL_PROFILE_ROUTE}?stage=editor`
 export const TUTORIAL_SAVED_ROUTE = `${TUTORIAL_PROFILE_ROUTE}?stage=saved`
+// From the requirements on the editor is told which profile to start from, so
+// a reader who moves past the pick with the card still sees its rules.
+export const TUTORIAL_PICKED_ROUTE = `${TUTORIAL_EDITOR_ROUTE}&profile=${TUTORIAL_PROFILE_DOC_ID}`
 
 export const profileTutorialSteps: TutorialStep[] = [
   {
@@ -84,7 +88,7 @@ export const profileTutorialSteps: TutorialStep[] = [
   },
   {
     id: 'requirements',
-    route: TUTORIAL_EDITOR_ROUTE,
+    route: TUTORIAL_PICKED_ROUTE,
     target: 'dataset-issues',
     title: 'What the profile expects',
     advanceOn: 'next',
@@ -92,7 +96,7 @@ export const profileTutorialSteps: TutorialStep[] = [
   },
   {
     id: 'fill',
-    route: TUTORIAL_EDITOR_ROUTE,
+    route: TUTORIAL_PICKED_ROUTE,
     target: 'dataset-name',
     title: 'Fill the first value',
     advanceOn: 'next',
@@ -100,7 +104,7 @@ export const profileTutorialSteps: TutorialStep[] = [
   },
   {
     id: 'describe',
-    route: TUTORIAL_EDITOR_ROUTE,
+    route: TUTORIAL_PICKED_ROUTE,
     target: 'dataset-description',
     title: 'Say what it contains',
     advanceOn: 'next',
@@ -108,7 +112,7 @@ export const profileTutorialSteps: TutorialStep[] = [
   },
   {
     id: 'rejected',
-    route: TUTORIAL_EDITOR_ROUTE,
+    route: TUTORIAL_PICKED_ROUTE,
     target: 'dataset-check',
     title: 'The node would refuse this',
     advanceOn: 'next',
@@ -116,7 +120,7 @@ export const profileTutorialSteps: TutorialStep[] = [
   },
   {
     id: 'fix',
-    route: TUTORIAL_EDITOR_ROUTE,
+    route: TUTORIAL_PICKED_ROUTE,
     target: 'dataset-issues',
     title: 'Correct the draft',
     advanceOn: 'next',
@@ -124,7 +128,7 @@ export const profileTutorialSteps: TutorialStep[] = [
   },
   {
     id: 'accepted',
-    route: TUTORIAL_EDITOR_ROUTE,
+    route: TUTORIAL_PICKED_ROUTE,
     target: 'dataset-check',
     title: 'Accepted',
     advanceOn: 'next',
@@ -132,7 +136,7 @@ export const profileTutorialSteps: TutorialStep[] = [
   },
   {
     id: 'save',
-    route: TUTORIAL_EDITOR_ROUTE,
+    route: TUTORIAL_PICKED_ROUTE,
     target: 'dataset-save',
     title: 'Save the dataset',
     advanceOn: 'action',

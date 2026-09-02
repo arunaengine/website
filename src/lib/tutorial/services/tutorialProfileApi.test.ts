@@ -129,6 +129,14 @@ describe('tutorial profile API', () => {
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
+  it('lists the profile once it is marked created', async () => {
+    // The editor stage reached through the card still needs the profile.
+    fixtures.ensureCreated()
+    const listed = await apiRequest<{ documents: unknown[] }>('/metadata', { query: { path_prefix: 'profiles/' } })
+    expect(listed.documents).toHaveLength(1)
+    expect(fixtures.created()).toBe(true)
+  })
+
   it('forgets the created profile on a reset', async () => {
     await createProfile()
     expect(fixtures.created()).toBe(true)

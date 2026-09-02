@@ -21,6 +21,8 @@ export interface TutorialProfileApi {
   reset(): void
   /** True once the builder's simulated create was answered. */
   created(): boolean
+  /** Marks the practice profile created without the builder's own Create. */
+  ensureCreated(): void
 }
 
 function body(options: ApiRequestOptions): Record<string, unknown> {
@@ -87,5 +89,8 @@ export function tutorialProfileApi(groupId: () => string): TutorialProfileApi {
       profileCreated = false
     },
     created: () => profileCreated,
+    ensureCreated: () => {
+      profileCreated = true
+    },
   }
 }

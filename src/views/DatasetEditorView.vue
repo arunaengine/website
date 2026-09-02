@@ -372,6 +372,13 @@ watch([mode, currentUser, selectableProfiles], ([currentMode, user, available]) 
   if (available.some((profile) => profile.id === preferred)) pickProfile(preferred)
 }, { immediate: true })
 
+// A create link may name the profile to start from; a pick already made wins.
+watch([() => String(route.query?.profile ?? ''), selectableProfiles], ([wanted, available]) => {
+  if (mode.value !== 'create' || !wanted || profileId.value) return
+  const match = available.find((profile) => profile.documentId === wanted || profile.id === wanted)
+  if (match) pickProfile(match.id)
+}, { immediate: true })
+
 function discard() {
   void router.push(mode.value === 'edit'
     ? { name: 'dataset', params: { id: documentId.value } }

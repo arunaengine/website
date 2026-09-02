@@ -9,6 +9,7 @@ import ProfileNewView from '@/views/ProfileNewView.vue'
 import DatasetEditorView from '@/views/DatasetEditorView.vue'
 import Notice from '@/components/ui/Notice.vue'
 import { PROFILE_BUILDER, useProfileBuilder } from '@/components/metadata/profile-builder/useProfileBuilder'
+import { loadProfiles } from '@/composables/aruna/catalog'
 import { activeGroupId } from '@/composables/useGroupSelection'
 import { useOnboarding } from '@/composables/useOnboarding'
 import {
@@ -70,6 +71,14 @@ startTutorial({
   },
 })
 
+// The editor stage needs the practice profile to exist, whichever way the
+// reader got there; the list is reloaded so the picker offers it.
+watch(stage, (current) => {
+  if (current !== 'editor' || fixtures.created()) return
+  fixtures.ensureCreated()
+  void loadProfiles().catch(() => undefined)
+}, { immediate: true })
+
 // A group that resolves after the page opened still owns the draft.
 watch(activeGroupId, (groupId) => {
   if (groupId && !builder.groupId) builder.groupId = groupId
@@ -85,6 +94,7 @@ watch(tutorialStatus, (status) => {
     exitTutorial()
     void markTutorialDone('profile')
   }
+  void loadProfiles().catch(() => undefined)
   void router.push({ name: 'profiles' })
 })
 
@@ -98,7 +108,14 @@ onBeforeRouteLeave((to) => {
   return true
 })
 
-onUnmounted(exitTutorial)
+// The session answered the profile listing from fixtures; the real set comes
+// back once it is over.
+function endSession() {
+  exitTutorial()
+  void loadProfiles().catch(() => undefined)
+}
+
+onUnmounted(endSession)
 </script>
 
 <template>

@@ -16,6 +16,7 @@ import {
 import * as Utils from '@/lib/utils'
 import * as VueUse from '@vueuse/core'
 import * as Aruna from '@/composables/useAruna'
+import * as Catalog from '@/composables/aruna/catalog'
 import * as GroupSelection from '@/composables/useGroupSelection'
 import * as PathPrefixes from '@/composables/usePathPrefixes'
 import * as PathTaken from '@/composables/usePathTaken'
@@ -320,6 +321,7 @@ const TutorialProfileView = compileClientComponent(url('views/TutorialProfileVie
   vue: VueRuntime,
   'vue-router': RouterRuntime,
   ...ui,
+  '@/composables/aruna/catalog': Catalog,
   '@/views/ProfileNewView.vue': moduleDefault(ProfileNewView),
   '@/views/DatasetEditorView.vue': moduleDefault(DatasetEditorView),
   '@/components/metadata/profile-builder/useProfileBuilder': ProfileBuilder,

@@ -21,7 +21,11 @@ import * as Emit from '@/lib/profiles/emit'
 import * as Assignable from '@/lib/profiles/assignable'
 import * as Utils from '@/lib/utils'
 
-const route = reactive<{ name: string; params: Record<string, string> }>({ name: 'dataset-new', params: {} })
+const route = reactive<{ name: string; params: Record<string, string>; query: Record<string, string> }>({
+  name: 'dataset-new',
+  params: {},
+  query: {},
+})
 const groups = ref([{ id: 'group-1', name: 'Research group' }])
 const profiles = ref<Array<Record<string, unknown>>>([])
 const currentUser = ref<{ preferredProfileId?: string } | null>(null)
@@ -350,6 +354,7 @@ beforeEach(() => {
   fetchRoCrateRaw.mockReset().mockResolvedValue(Editor.toRoCrate(seeded(Editor.newDraft())))
   verify.mockReset().mockResolvedValue(true)
   loadProfileCrate.mockReset().mockResolvedValue({})
+  route.query = {}
   previewDebounced.mockClear()
   previewNow.mockClear()
   previewReset.mockClear()
@@ -952,6 +957,18 @@ describe('DatasetEditorView', () => {
 
     expect(content(mounted.root)).toContain('Declared old')
     expect(drawerSays(mounted.root)).toContain('Old expects identifier')
+    mounted.app.unmount()
+  })
+
+  it('picks the profile a link names', async () => {
+    // A create link may carry the profile to start from.
+    profiles.value = [profileFixture('genomics', 'Genomics', ['identifier'])]
+    route.query = { profile: 'doc-genomics' }
+    const mounted = await mountApp(DatasetEditorView)
+    await flush()
+
+    expect(content(mounted.root)).toContain('Declared genomics')
+    expect(drawerSays(mounted.root)).toContain('Genomics expects identifier')
     mounted.app.unmount()
   })
 
