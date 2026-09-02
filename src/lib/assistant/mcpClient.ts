@@ -48,9 +48,28 @@ function descriptors(tools: unknown): McpToolDescriptor[] {
   })
 }
 
+function base64Bytes(value: unknown): number {
+  if (typeof value !== 'string') return 0
+  return Math.floor((value.replace(/=+$/, '').length * 3) / 4)
+}
+
+/** A non-text block described rather than carried: bytes never reach the model. */
+function blockSummary(block: Record<string, unknown>): Record<string, unknown> {
+  const type = typeof block.type === 'string' ? block.type : 'unknown'
+  if (type === 'resource_link') return { type, uri: block.uri, name: block.name }
+  if (type === 'resource') {
+    const resource = (block.resource ?? {}) as Record<string, unknown>
+    if (typeof resource.text === 'string') return { type, uri: resource.uri, text: resource.text }
+    return { type, uri: resource.uri, mimeType: resource.mimeType, bytes: base64Bytes(resource.blob) }
+  }
+  return { type, mimeType: block.mimeType, bytes: base64Bytes(block.data) }
+}
+
 /**
  * What the model receives from a call: the structured content when the server
- * sent one, else the text blocks, and a plain error result for `isError`.
+ * sent one, else the text blocks, and a plain error result for `isError`. A
+ * result carrying only images, audio or resources is described, never handed
+ * over as base64.
  */
 export function toolOutput(result: unknown): unknown {
   if (!result || typeof result !== 'object') return result
@@ -62,7 +81,8 @@ export function toolOutput(result: unknown): unknown {
     .join('\n')
   if (call.isError) return { error: text || 'The tool call failed.' }
   if (call.structuredContent !== undefined && call.structuredContent !== null) return call.structuredContent
-  return text || result
+  if (text) return text
+  return { content: blocks.filter((block) => block?.type !== 'text').map(blockSummary) }
 }
 
 /** Connects and hands back the tool source; the caller closes it. */

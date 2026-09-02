@@ -73,4 +73,27 @@ describe('MCP client', () => {
 
     expect(await connection.callTool('search', { q: 'x' })).toEqual({ hits: 2 })
   })
+
+  it('describes an image-only result instead of handing over its bytes', async () => {
+    // The raw envelope would put base64 image data into the model's context.
+    const data = 'QUJDRA'.repeat(20)
+    sdk.callTool.mockResolvedValue({ content: [{ type: 'image', mimeType: 'image/png', data }] })
+    const connection = await connectMcp('https://node.example/mcp', 'token')
+
+    const output = await connection.callTool('render', {})
+
+    expect(JSON.stringify(output)).not.toContain(data.slice(0, 12))
+    expect(output).toEqual({ content: [{ type: 'image', mimeType: 'image/png', bytes: 90 }] })
+  })
+
+  it('names a linked resource by its uri', async () => {
+    sdk.callTool.mockResolvedValue({
+      content: [{ type: 'resource_link', uri: 's3://work/chart.png', name: 'chart.png' }],
+    })
+    const connection = await connectMcp('https://node.example/mcp', 'token')
+
+    expect(await connection.callTool('outputs', {})).toEqual({
+      content: [{ type: 'resource_link', uri: 's3://work/chart.png', name: 'chart.png' }],
+    })
+  })
 })
