@@ -296,7 +296,10 @@ function imported(next: CrateDraft) {
 }
 
 function hasRules(rules: ProfileExpectation | null): boolean {
-  return Boolean(rules && (rules.properties.length || rules.types.length || rules.contents.length))
+  if (!rules) return false
+  const shapes = [rules.root, ...Object.values(rules.shapes)]
+  return shapes.some((shape) => shape.required.length || shape.recommended.length || shape.optional.length)
+    || Boolean(rules.types.length || rules.contents.length)
 }
 
 function pickProfile(id: string) {
@@ -508,6 +511,7 @@ async function save() {
               :issues="issues"
               :profiles="profileOptions"
               :profile-id="profileId"
+              :profile-rules="expectation"
               @update="update"
               @select="(id) => (selected = id)"
               @profile="pickProfile"

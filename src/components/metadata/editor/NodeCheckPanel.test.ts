@@ -86,6 +86,20 @@ describe('NodeCheckPanel', () => {
     mounted.app.unmount()
   })
 
+  it('says a profile the node does not know was not evaluated', async () => {
+    // Until the node learns the bundled profiles, only the structure was checked.
+    const mounted = await mount({
+      previewResult: verdict({ state: 'not_profiled' }),
+      profileName: 'Process Run Crate',
+    })
+    const text = content(mounted.root)
+
+    expect(text).toContain('The node would accept this dataset.')
+    expect(text).toContain('The node did not evaluate Process Run Crate')
+    expect(text).not.toContain('Valid against')
+    mounted.app.unmount()
+  })
+
   it('groups the problems per entity with the advisory ones last', async () => {
     const person = Editor.addEntity(draft(), { type: 'Person', name: 'Ada Example' })
     const mounted = await mount({

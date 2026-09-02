@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import PropertyRow from './PropertyRow.vue'
-import { propertyTerm, type CrateDraft, type DraftEntity, type LiveIssue } from '@/lib/crate/editor'
+import {
+  propertyTerm,
+  shapeRule,
+  type CrateDraft,
+  type DraftEntity,
+  type LiveIssue,
+  type ProfileShape,
+} from '@/lib/crate/editor'
 import type { VocabIndex } from '@/lib/profiles/vocabulary'
 
 const props = defineProps<{
@@ -11,6 +18,8 @@ const props = defineProps<{
   /** Properties another surface renders (the root form's own fields). */
   skip?: string[]
   issues?: LiveIssue[]
+  /** The picked profile's rules for this entity's type, shown on the rows. */
+  shape?: ProfileShape | null
 }>()
 const emit = defineEmits<{
   (e: 'update', draft: CrateDraft): void
@@ -47,6 +56,7 @@ function issuesFor(property: string): LiveIssue[] {
       :property="property"
       :vocab="vocab"
       :issues="issuesFor(property)"
+      :rule="shapeRule(shape, property)"
       @update="(next) => emit('update', next)"
       @select="(id) => emit('select', id)"
     />

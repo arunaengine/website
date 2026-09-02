@@ -127,7 +127,12 @@ const RootForm = compileClientComponent(new URL('./RootForm.vue', import.meta.ur
   '@/lib/utils': Utils,
 })
 
-function mount(updates: Editor.CrateDraft[], draft = Editor.newDraft(), picked: string[] = []) {
+function mount(
+  updates: Editor.CrateDraft[],
+  draft = Editor.newDraft(),
+  picked: string[] = [],
+  shape: Editor.ProfileShape | null = null,
+) {
   return mountApp(RootForm, {
     props: {
       draft,
@@ -135,6 +140,7 @@ function mount(updates: Editor.CrateDraft[], draft = Editor.newDraft(), picked: 
       issues: [],
       profiles: [{ value: 'profile-1', label: 'Genomics' }],
       profileId: '',
+      shape,
       onUpdate: (next: Editor.CrateDraft) => updates.push(next),
       onProfile: (id: string) => picked.push(id),
     },
@@ -162,6 +168,29 @@ describe('RootForm', () => {
     for (const label of ['Publisher', 'Contact point', 'Funder']) {
       expect(text).not.toContain(label)
     }
+    mounted.app.unmount()
+  })
+
+  it('carries the profile rule of a seeded row into the form', async () => {
+    const draft = Editor.addValue(Editor.newDraft(), './', 'mentions', { kind: 'reference', value: '' })
+    const mounted = await mount([], draft, [], {
+      label: 'Root dataset',
+      required: [],
+      recommended: [{
+        id: 'mentions',
+        label: 'Process run',
+        description: 'The action that carried out the run.',
+        kind: 'entity',
+        propertyUri: 'http://schema.org/mentions',
+        valueName: 'mentions',
+        obligation: 'SHOULD',
+      }],
+      optional: [],
+    })
+    const text = content(mounted.root)
+
+    expect(text).toContain('Recommended')
+    expect(text).toContain('The action that carried out the run.')
     mounted.app.unmount()
   })
 

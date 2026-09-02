@@ -19,6 +19,7 @@ import * as Paths from '@/lib/crate/paths'
 import * as Api from '@/lib/api'
 import * as Emit from '@/lib/profiles/emit'
 import * as Assignable from '@/lib/profiles/assignable'
+import { PROCESS_RUN_CRATE_PROFILE } from '@/lib/profiles/builtinProfiles'
 import * as Utils from '@/lib/utils'
 
 const route = reactive<{ name: string; params: Record<string, string>; query: Record<string, string> }>({
@@ -49,23 +50,33 @@ const previewDebounced = vi.fn()
 const previewNow = vi.fn()
 const previewReset = vi.fn()
 
-// One mandatory text property is enough to see a profile reach the form.
-function profileFixture(id: string, name: string, required: string[] = []): Record<string, unknown> {
+// One text property is enough to see a profile reach the form; whether it is
+// required or recommended decides whether it also blocks the save.
+function profileFixture(
+  id: string,
+  name: string,
+  required: string[] = [],
+  recommended: string[] = [],
+): Record<string, unknown> {
+  const propertyRule = (valueName: string, obligation: string) => ({
+    id: valueName,
+    label: valueName,
+    description: '',
+    kind: 'text',
+    propertyUri: `http://schema.org/${valueName}`,
+    valueName,
+    obligation,
+  })
   return {
     id,
     name,
     documentId: `doc-${id}`,
     managed: true,
     profileUri: `https://example.test/profiles/${id}`,
-    propertyRules: required.map((valueName) => ({
-      id: valueName,
-      label: valueName,
-      description: '',
-      kind: 'text',
-      propertyUri: `http://schema.org/${valueName}`,
-      valueName,
-      obligation: 'MUST',
-    })),
+    propertyRules: [
+      ...required.map((valueName) => propertyRule(valueName, 'MUST')),
+      ...recommended.map((valueName) => propertyRule(valueName, 'SHOULD')),
+    ],
     entityRules: [],
   }
 }
@@ -504,7 +515,7 @@ describe('DatasetEditorView', () => {
         kind: 'text',
         propertyUri: 'http://schema.org/identifier',
         valueName: 'identifier',
-        obligation: 'MUST',
+        obligation: 'SHOULD',
       }],
       entityRules: [],
     }]
@@ -806,13 +817,13 @@ describe('DatasetEditorView', () => {
     profiles.value = [profileFixture('genomics', 'Genomics', ['identifier'])]
     const mounted = await mountApp(DatasetEditorView)
     await click(button(mounted.root, 'Seed dataset'))
-    expect(drawerSays(mounted.root)).not.toContain('Genomics expects identifier')
+    expect(drawerSays(mounted.root)).not.toContain('Genomics requires identifier')
 
     await click(button(mounted.root, 'Choose Genomics'))
 
-    expect(drawerSays(mounted.root)).toContain('Genomics expects identifier')
-    // The empty row the seeding added is what raises this second one.
-    expect(drawerSays(mounted.root)).toContain('identifier on Example dataset has no value yet')
+    expect(drawerSays(mounted.root)).toContain('Genomics requires identifier')
+    // The rule names the row it seeded; the row does not say it a second time.
+    expect(drawerSays(mounted.root)).not.toContain('identifier on Example dataset has no value yet')
     expect(content(mounted.root)).toContain('Checking Genomics')
     mounted.app.unmount()
   })
@@ -825,22 +836,22 @@ describe('DatasetEditorView', () => {
     const mounted = await mountApp(DatasetEditorView)
     await click(button(mounted.root, 'Seed dataset'))
     await click(button(mounted.root, 'Choose Old'))
-    expect(drawerSays(mounted.root)).toContain('Old expects identifier')
+    expect(drawerSays(mounted.root)).toContain('Old requires identifier')
 
     await click(button(mounted.root, 'Choose New'))
 
-    expect(drawerSays(mounted.root)).toContain('New expects sampleId')
-    expect(drawerSays(mounted.root)).not.toContain('Old expects identifier')
+    expect(drawerSays(mounted.root)).toContain('New requires sampleId')
+    expect(drawerSays(mounted.root)).not.toContain('Old requires identifier')
 
     await click(button(mounted.root, 'Choose no profile'))
 
-    expect(drawerSays(mounted.root)).not.toContain('expects')
+    expect(drawerSays(mounted.root)).not.toContain('requires')
     expect(content(mounted.root)).toContain('Checking no profile')
     mounted.app.unmount()
   })
 
   it('drops the last verdict and re-checks when the profile changes', async () => {
-    profiles.value = [profileFixture('genomics', 'Genomics', ['identifier'])]
+    profiles.value = [profileFixture('genomics', 'Genomics', [], ['identifier'])]
     const mounted = await mountApp(DatasetEditorView)
     await click(button(mounted.root, 'Seed dataset'))
     previewReset.mockClear()
@@ -956,7 +967,7 @@ describe('DatasetEditorView', () => {
     await flush()
 
     expect(content(mounted.root)).toContain('Declared old')
-    expect(drawerSays(mounted.root)).toContain('Old expects identifier')
+    expect(drawerSays(mounted.root)).toContain('Old requires identifier')
     mounted.app.unmount()
   })
 
@@ -968,7 +979,7 @@ describe('DatasetEditorView', () => {
     await flush()
 
     expect(content(mounted.root)).toContain('Declared genomics')
-    expect(drawerSays(mounted.root)).toContain('Genomics expects identifier')
+    expect(drawerSays(mounted.root)).toContain('Genomics requires identifier')
     mounted.app.unmount()
   })
 
@@ -982,7 +993,7 @@ describe('DatasetEditorView', () => {
 
     expect(loadProfileCrate).toHaveBeenCalledWith('doc-genomics')
     expect(content(mounted.root)).toContain('loading its rules')
-    expect(drawerSays(mounted.root)).not.toContain('Genomics expects')
+    expect(drawerSays(mounted.root)).not.toContain('Genomics requires')
 
     rules.resolve({})
     // The lifted rules reach the view through the profile list, as the parse cache does.
@@ -990,8 +1001,7 @@ describe('DatasetEditorView', () => {
     await flush()
 
     expect(content(mounted.root)).not.toContain('loading its rules')
-    expect(drawerSays(mounted.root)).toContain('Genomics expects identifier')
-    expect(drawerSays(mounted.root)).toContain('identifier on Example dataset has no value yet')
+    expect(drawerSays(mounted.root)).toContain('Genomics requires identifier')
     mounted.app.unmount()
   })
 
@@ -1026,7 +1036,56 @@ describe('DatasetEditorView', () => {
     await click(button(mounted.root, 'Move to Second group'))
 
     expect(content(mounted.root)).toContain('Declared none')
-    expect(drawerSays(mounted.root)).not.toContain('Own profile expects')
+    expect(drawerSays(mounted.root)).not.toContain('Own profile requires')
+    mounted.app.unmount()
+  })
+
+  it('fills the form when the process run crate is picked', async () => {
+    profiles.value = [PROCESS_RUN_CRATE_PROFILE as unknown as Record<string, unknown>]
+    const mounted = await mountApp(DatasetEditorView)
+    await click(button(mounted.root, 'Seed dataset'))
+    expect(content(mounted.root)).toContain('Entities 2')
+    previewDebounced.mockClear()
+
+    await click(button(mounted.root, 'Choose Process Run Crate'))
+
+    // The root mentions a run action, which brings its instrument and its agent.
+    expect(content(mounted.root)).toContain('Entities 5')
+    expect(drawerSays(mounted.root)).toContain('Process Run Crate recommends End time on the run action.')
+    expect(drawerSays(mounted.root)).toContain('Process Run Crate recommends Application link on the software application.')
+    // Nothing the profile only recommends may hold the save back.
+    expect(button(mounted.root, 'Create dataset').props.disabled).toBe(false)
+    expect(previewDebounced).toHaveBeenCalled()
+    mounted.app.unmount()
+  })
+
+  it('writes the run action the process run crate created', async () => {
+    profiles.value = [PROCESS_RUN_CRATE_PROFILE as unknown as Record<string, unknown>]
+    const mounted = await mountApp(DatasetEditorView)
+    await click(button(mounted.root, 'Seed dataset'))
+    await click(button(mounted.root, 'Choose Process Run Crate'))
+    await click(button(mounted.root, 'Create dataset'))
+    await flush()
+
+    const graph = createMetadata.mock.calls[0][0].rocrate['@graph'] as Array<Record<string, unknown>>
+    const action = graph.find((entity) => entity['@type'] === 'http://schema.org/CreateAction')
+    expect(graph.find((entity) => entity['@id'] === './')?.mentions).toEqual({ '@id': action?.['@id'] })
+    expect(action).toHaveProperty('instrument')
+    // The recommended rows are still empty prompts, so the crate stays without them.
+    expect(action).not.toHaveProperty('endTime')
+    mounted.app.unmount()
+  })
+
+  it('holds the save back while a required property is missing', async () => {
+    profiles.value = [profileFixture('genomics', 'Genomics', ['identifier'])]
+    const mounted = await mountApp(DatasetEditorView)
+    await click(button(mounted.root, 'Seed dataset'))
+    expect(button(mounted.root, 'Create dataset').props.disabled).toBe(false)
+
+    await click(button(mounted.root, 'Choose Genomics'))
+
+    expect(button(mounted.root, 'Create dataset').props.disabled).toBe(true)
+    expect(content(mounted.root)).toContain('Blocked Fix')
     mounted.app.unmount()
   })
 

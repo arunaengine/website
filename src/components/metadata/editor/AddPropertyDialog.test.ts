@@ -14,7 +14,9 @@ import {
   type HostNode,
 } from '@/test/clientRender'
 import * as Editor from '@/lib/crate/editor'
+import * as ProfileSeed from '@/lib/crate/profileSeed'
 import * as Uri from '@/lib/profiles/uri'
+import type { ProfilePropertyRule } from '@/lib/profiles/types'
 import { loadVocabIndex, type VocabIndex } from '@/lib/profiles/vocabulary'
 
 let vocab: VocabIndex
@@ -58,13 +60,34 @@ const AddPropertyDialog = compileClientComponent(new URL('./AddPropertyDialog.vu
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/CommandDialog.vue': moduleDefault(CommandDialogStub),
   '@/lib/crate/editor': Editor,
+  '@/lib/crate/profileSeed': ProfileSeed,
   '@/lib/profiles/uri': Uri,
 })
 
-function mount(entity: Editor.DraftEntity, picked: Array<{ key: string; kind: string }> = []) {
+function mount(
+  entity: Editor.DraftEntity,
+  picked: Array<{ key: string; kind: string }> = [],
+  profile: Record<string, unknown> = {},
+) {
   return mountApp(AddPropertyDialog, {
-    props: { open: true, entity, vocab, onPick: (value: { key: string; kind: string }) => picked.push(value) },
+    props: {
+      open: true,
+      entity,
+      vocab,
+      ...profile,
+      onPick: (value: { key: string; kind: string }) => picked.push(value),
+    },
   })
+}
+
+const startTime: ProfilePropertyRule = {
+  id: 'start-time',
+  label: 'Start time',
+  description: 'When the run started.',
+  kind: 'datetime',
+  propertyUri: 'http://schema.org/startTime',
+  valueName: 'startTime',
+  obligation: 'MAY',
 }
 
 const dataset: Editor.DraftEntity = {
@@ -133,6 +156,33 @@ describe('AddPropertyDialog', () => {
     await click(row(mounted.root, 'Add property'))
 
     expect(picked).toEqual([{ key: 'license', kind: 'url' }])
+    mounted.app.unmount()
+  })
+
+  it('offers what the profile still suggests before the vocabulary', async () => {
+    const picked: Array<{ key: string; kind: string }> = []
+    const mounted = await mount(dataset, picked, {
+      suggestions: [startTime],
+      profileName: 'Process Run Crate',
+    })
+    const text = content(mounted.root)
+
+    expect(text).toContain('Suggested by Process Run Crate')
+    expect(text).toContain('When the run started.')
+    // The profile's own suggestion is listed above the vocabulary's.
+    expect(text.indexOf('Start time')).toBeLessThan(text.indexOf('License'))
+    await click(row(mounted.root, 'Start time'))
+
+    // The rule knows the kind, so the picker does not ask again.
+    expect(picked).toEqual([{ key: 'startTime', kind: 'datetime' }])
+    mounted.app.unmount()
+  })
+
+  it('lists a suggested property once', async () => {
+    const license: ProfilePropertyRule = { ...startTime, id: 'license', label: 'License', valueName: 'license', kind: 'url' }
+    const mounted = await mount(dataset, [], { suggestions: [license], profileName: 'Process Run Crate' })
+
+    expect(content(mounted.root).match(/License/g)).toHaveLength(1)
     mounted.app.unmount()
   })
 

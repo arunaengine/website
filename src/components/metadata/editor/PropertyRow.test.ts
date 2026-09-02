@@ -114,13 +114,19 @@ function seeded() {
   return Editor.updateValue(Editor.newDraft(), './', 'name', 0, 'Example dataset')
 }
 
-function mount(property: string, updates: Editor.CrateDraft[], draft = seeded()) {
+function mount(
+  property: string,
+  updates: Editor.CrateDraft[],
+  draft = seeded(),
+  extra: Record<string, unknown> = {},
+) {
   return mountApp(PropertyRow, {
     props: {
       draft,
       entity: draft.entities[0],
       property,
       vocab,
+      ...extra,
       onUpdate: (next: Editor.CrateDraft) => updates.push(next),
     },
   })
@@ -133,6 +139,55 @@ function labels(root: HostNode): string[] {
 }
 
 describe('PropertyRow', () => {
+  it('says what the profile asks of a seeded row', async () => {
+    const draft = Editor.addValue(seeded(), './', 'citation', { kind: 'text', value: '' })
+    const mounted = await mount('citation', [], draft, {
+      rule: {
+        id: 'citation',
+        label: 'Citation',
+        description: 'The paper this dataset belongs to.',
+        kind: 'text',
+        propertyUri: 'http://schema.org/citation',
+        valueName: 'citation',
+        obligation: 'SHOULD',
+      },
+    })
+    const text = content(mounted.root)
+
+    expect(text).toContain('Recommended')
+    expect(text).toContain('The paper this dataset belongs to.')
+    expect(text).not.toContain('Required')
+    mounted.app.unmount()
+  })
+
+  it('marks a row the profile requires', async () => {
+    const draft = Editor.addValue(seeded(), './', 'citation', { kind: 'text', value: '' })
+    const mounted = await mount('citation', [], draft, {
+      rule: {
+        id: 'citation',
+        label: 'Citation',
+        description: '',
+        kind: 'text',
+        propertyUri: 'http://schema.org/citation',
+        valueName: 'citation',
+        obligation: 'MUST',
+      },
+    })
+
+    expect(content(mounted.root)).toContain('Required')
+    mounted.app.unmount()
+  })
+
+  it('stays plain without a profile rule', async () => {
+    const draft = Editor.addValue(seeded(), './', 'citation', { kind: 'text', value: '' })
+    const mounted = await mount('citation', [], draft)
+    const text = content(mounted.root)
+
+    expect(text).not.toContain('Recommended')
+    expect(text).not.toContain('Required')
+    mounted.app.unmount()
+  })
+
   it('lays the row out on the shared grid', async () => {
     const mounted = await mount('name', [])
 

@@ -73,8 +73,13 @@ const outcome = computed<'checking' | 'rejected' | 'failed' | 'accepted' | 'none
 const failureReason = computed(() => props.previewUnavailable
   ? 'This node does not offer draft validation; the save is still validated.'
   : (props.previewError ?? ''))
+// A node that does not know the picked profile checked the crate's structure
+// only; saying "valid against" it would claim a check that never ran.
 const profileLine = computed(() => {
   const referenced = props.previewResult?.profile_iri || props.previewResult?.profile_id
+  if (props.profileName && (props.previewResult?.state === 'not_profiled' || !referenced)) {
+    return `The node did not evaluate ${props.profileName}; it checked the structure of the crate only.`
+  }
   return referenced ? `Valid against ${props.profileName || referenced}` : 'No profile referenced'
 })
 const problemCount = computed(() => {

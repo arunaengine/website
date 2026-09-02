@@ -38,6 +38,7 @@ import {
 } from '@/lib/crate/editor'
 import { orphanAfterUnlink, setReference, unlinkReference } from '@/lib/crate/references'
 import { DATA_PICKER_LABEL, pickerFor } from '@/lib/crate/pickers'
+import type { ProfilePropertyRule } from '@/lib/profiles/types'
 import type { VocabIndex } from '@/lib/profiles/vocabulary'
 import { Info, MoreHorizontal, Plus } from '@lucide/vue'
 
@@ -51,6 +52,8 @@ const props = defineProps<{
   always?: boolean
   /** "More details" promotes a literal value into a linked entity of this type. */
   promoteTo?: string
+  /** The picked profile's rule for this property, shown as its badge and hint. */
+  rule?: ProfilePropertyRule | null
 }>()
 const emit = defineEmits<{
   (e: 'update', draft: CrateDraft): void
@@ -62,6 +65,11 @@ const createFor = ref(-1)
 const filesOpen = ref(false)
 // An unlink waiting for an answer about the data entity it would strand.
 const stranding = ref<{ index: number; dropRow: boolean; entity: DraftEntity } | null>(null)
+
+// How the profile builder presents a rule: what it asks for, and why.
+const OBLIGATIONS: Readonly<Record<string, string>> = { MUST: 'Required', SHOULD: 'Recommended' }
+const obligation = computed(() => (props.rule ? OBLIGATIONS[props.rule.obligation] ?? '' : ''))
+const hint = computed(() => props.rule?.description ?? '')
 
 const picker = computed(() => pickerFor(props.property))
 const target = computed(() => ({ entityId: props.entity.id, property: props.property }))
@@ -172,6 +180,10 @@ function created(next: CrateDraft, entityId: string) {
   <div :class="ROW_GRID">
     <div :class="ROW_LABEL">
       <span class="truncate" :title="property">{{ label }}</span>
+      <span
+        v-if="obligation"
+        class="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary"
+      >{{ obligation }}</span>
       <Tooltip v-if="term?.description" :label="term.description">
         <button
           type="button"
@@ -184,6 +196,7 @@ function created(next: CrateDraft, entityId: string) {
     </div>
 
     <div class="min-w-0 space-y-2">
+      <p v-if="hint" class="text-[11px] text-muted-foreground">{{ hint }}</p>
       <div v-for="(value, index) in values" :key="index" class="flex items-start gap-1">
         <div class="relative min-w-0 flex-1">
           <ReferenceValue

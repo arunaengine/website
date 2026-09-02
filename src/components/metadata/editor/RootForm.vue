@@ -15,9 +15,11 @@ import {
   ROOT_FORM_PROPERTIES,
   rootId,
   setProperty,
+  shapeRule,
   type CrateDraft,
   type DraftValueKind,
   type LiveIssue,
+  type ProfileShape,
 } from '@/lib/crate/editor'
 import type { VocabIndex } from '@/lib/profiles/vocabulary'
 import { X } from '@lucide/vue'
@@ -30,6 +32,8 @@ const props = defineProps<{
   issues: LiveIssue[]
   profiles: Array<{ value: string; label: string }>
   profileId: string
+  /** The picked profile's rules for the dataset itself. */
+  shape?: ProfileShape | null
 }>()
 const emit = defineEmits<{
   (e: 'update', draft: CrateDraft): void
@@ -117,6 +121,7 @@ function addKeyword() {
         property="license"
         :vocab="vocab"
         :issues="issuesFor('license')"
+        :rule="shapeRule(shape, 'license')"
         always
         :promote-to="PROMOTED_TYPES.license"
         @update="(next) => emit('update', next)"
@@ -181,6 +186,7 @@ function addKeyword() {
         :vocab="vocab"
         :skip="ROOT_FORM_PROPERTIES"
         :issues="issues"
+        :shape="shape"
         @update="(next) => emit('update', next)"
         @select="(entityId) => emit('select', entityId)"
       />

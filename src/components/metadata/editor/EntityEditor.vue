@@ -12,11 +12,13 @@ import {
   addValue,
   defaultValue,
   findEntity,
+  profileShape,
   rootId,
   toRoCrate,
   type CrateDraft,
   type DraftValueKind,
   type LiveIssue,
+  type ProfileExpectation,
 } from '@/lib/crate/editor'
 import { pickerFor } from '@/lib/crate/pickers'
 import type { VocabIndex } from '@/lib/profiles/vocabulary'
@@ -31,6 +33,8 @@ const props = defineProps<{
   issues: LiveIssue[]
   profiles: Array<{ value: string; label: string }>
   profileId: string
+  /** What the picked profile asks of this draft, or null when none is picked. */
+  profileRules?: ProfileExpectation | null
 }>()
 const emit = defineEmits<{
   (e: 'update', draft: CrateDraft): void
@@ -43,6 +47,11 @@ const filesFor = ref('')
 
 const entity = computed(() => findEntity(props.draft, props.selected))
 const isRoot = computed(() => props.selected === rootId(props.draft))
+const shape = computed(() =>
+  (entity.value ? profileShape(props.draft, entity.value, props.profileRules ?? null) : undefined))
+// What the profile still offers this entity, once its rows are added.
+const suggested = computed(() => (shape.value?.optional ?? [])
+  .filter((rule) => !entity.value?.properties[rule.valueName]))
 const json = computed(() => JSON.stringify(toRoCrate(props.draft), null, 2))
 
 // A property owned by a picker is added by picking a value, never as an empty
@@ -74,6 +83,7 @@ function addProperty(picked: { key: string; kind: DraftValueKind }) {
       :issues="issues"
       :profiles="profiles"
       :profile-id="profileId"
+      :shape="shape"
       @update="(next) => emit('update', next)"
       @select="(id) => emit('select', id)"
       @profile="(id) => emit('profile', id)"
@@ -84,6 +94,7 @@ function addProperty(picked: { key: string; kind: DraftValueKind }) {
       :entity="entity"
       :vocab="vocab"
       :issues="issues"
+      :shape="shape"
       @update="(next) => emit('update', next)"
       @select="(id) => emit('select', id)"
     />
@@ -97,6 +108,8 @@ function addProperty(picked: { key: string; kind: DraftValueKind }) {
         :open="propertyOpen"
         :entity="entity"
         :vocab="vocab"
+        :suggestions="suggested"
+        :profile-name="profileRules?.name"
         @update:open="(value) => (propertyOpen = value)"
         @pick="addProperty"
       />

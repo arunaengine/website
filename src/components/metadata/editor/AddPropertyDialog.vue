@@ -12,10 +12,19 @@ import {
   type DraftEntity,
   type DraftValueKind,
 } from '@/lib/crate/editor'
+import { draftKind } from '@/lib/crate/profileSeed'
 import { isAbsoluteUri } from '@/lib/profiles/uri'
+import type { ProfilePropertyRule } from '@/lib/profiles/types'
 import type { VocabIndex, VocabTerm } from '@/lib/profiles/vocabulary'
 
-const props = defineProps<{ open: boolean; entity: DraftEntity; vocab: VocabIndex | null }>()
+const props = defineProps<{
+  open: boolean
+  entity: DraftEntity
+  vocab: VocabIndex | null
+  /** The picked profile's remaining optional rules for this entity's type. */
+  suggestions?: ProfilePropertyRule[]
+  profileName?: string
+}>()
 const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
   (e: 'pick', value: { key: string; kind: DraftValueKind }): void
@@ -64,8 +73,10 @@ const chosenLabel = computed(() => chosen.value?.label ?? pending.value?.key ?? 
 const used = computed(() => new Set(Object.keys(props.entity.properties)))
 const text = computed(() => query.value.trim())
 
+// A term the profile already offers above is not repeated below.
 function unused(term: VocabTerm): boolean {
-  return !used.value.has(propertyKey(term))
+  const key = propertyKey(term)
+  return !used.value.has(key) && !profileKeys.value.has(key)
 }
 
 function matches(term: VocabTerm): boolean {
@@ -77,6 +88,18 @@ function matches(term: VocabTerm): boolean {
 function rankOf(term: VocabTerm): number {
   const position = COMMON.indexOf(term.name)
   return position < 0 ? COMMON.length : position
+}
+
+// What the picked profile still offers comes first: it knows this entity.
+const fromProfile = computed(() => (props.suggestions ?? [])
+  .filter((rule) => !used.value.has(rule.valueName) && matchesRule(rule)))
+
+const profileKeys = computed(() => new Set(fromProfile.value.map((rule) => rule.valueName)))
+
+function matchesRule(rule: ProfilePropertyRule): boolean {
+  const needle = text.value.toLowerCase()
+  if (!needle) return true
+  return `${rule.valueName} ${rule.label} ${rule.description}`.toLowerCase().includes(needle)
 }
 
 const suggested = computed(() => (props.vocab?.propertiesForTypes(vocabTypes(props.entity)) ?? [])
@@ -148,6 +171,22 @@ function add() {
     </template>
 
     <template v-else>
+      <template v-if="fromProfile.length">
+        <p class="px-2.5 pb-1 pt-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          Suggested by {{ profileName }}
+        </p>
+        <button
+          v-for="rule in fromProfile"
+          :key="rule.id"
+          type="button"
+          role="option"
+          :class="OPTION"
+          @click="pick(rule.valueName, draftKind(rule.kind))"
+        >
+          <span class="text-xs font-medium text-foreground">{{ rule.label }}</span>
+          <span v-if="rule.description" class="line-clamp-1 text-[11px] text-muted-foreground">{{ rule.description }}</span>
+        </button>
+      </template>
       <p class="px-2.5 pb-1 pt-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
         Suggested
       </p>
