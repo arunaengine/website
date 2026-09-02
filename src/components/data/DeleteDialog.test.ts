@@ -485,6 +485,7 @@ describe('delete dialog', () => {
 
     const text = content(root)
     expect(text).toContain('40 dataset references')
+    expect(text).toContain('Index current on 1 of 1 node')
     expect(text).not.toContain('Reef survey 01')
 
     const field = element(root, (node) => node.props.id === 'deletion-typed-name')

@@ -205,8 +205,8 @@ describe('Data Manager version-aware deletion', () => {
     expect(datasetReferencesTemplate).toContain('Dataset-reference coverage is partial.')
     expect(datasetReferencesTemplate).toContain('preflight.coverage.queried_scope')
     expect(datasetReferencesTemplate).toContain('preflight.coverage.queried_forms')
-    expect(datasetReferencesTemplate).toContain('preflight.coverage.node_freshness')
-    expect(datasetReferencesTemplate).toContain('preflight.coverage.excluded_forms')
+    expect(datasetReferences.script).toContain('coverage.node_freshness')
+    expect(datasetReferences.script).toContain('coverage.excluded_forms')
   })
 
   it('renders failed staging lookup as failed instead of a successful empty result', () => {
@@ -282,8 +282,8 @@ describe('Data Manager explicit multi-file deletion', () => {
     expect(datasetReferencesTemplate).toContain('Other restricted datasets reference this content')
     expect(datasetReferencesTemplate).toContain("This operation would remove this content's last resolvable Aruna location.")
     expect(datasetReferencesTemplate).toContain('Dataset-reference coverage is partial.')
-    expect(datasetReferencesTemplate).toContain('preflight.coverage.node_freshness')
-    expect(datasetReferencesTemplate).toContain('preflight.coverage.excluded_forms')
+    expect(datasetReferences.script).toContain('coverage.node_freshness')
+    expect(datasetReferences.script).toContain('coverage.excluded_forms')
   })
 
   it('caps ordinary batches and retains exact mixed-success and transport outcomes', () => {
