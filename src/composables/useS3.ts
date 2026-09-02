@@ -51,6 +51,8 @@ export {
   isS3PurgeInProgressError,
   isS3QuotaError,
   s3ErrorMessage,
+  s3ErrorReport,
+  type S3ErrorReport,
 } from './s3/errors'
 export {
   S3_SESSION_REFRESH_WINDOW_MS,

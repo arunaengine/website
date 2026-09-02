@@ -26,6 +26,7 @@ const CODE_SENTENCES: Record<string, string> = {
   BucketAlreadyExists: 'That bucket name is already taken on this node.',
   BucketAlreadyOwnedByYou: 'You already own a bucket with that name.',
   AccessDenied: 'This session is not allowed to do that.',
+  InternalError: 'The node hit an internal error and did not complete the request.',
   InvalidURI: 'That bucket or object address cannot be read as an S3 path.',
   KeyTooLongError: `An object key may be at most ${OBJECT_KEY_MAX_BYTES} bytes.`,
   NoSuchBucket: 'That bucket does not exist.',
@@ -33,21 +34,56 @@ const CODE_SENTENCES: Record<string, string> = {
   OperationAborted: 'The node is still assembling this object from its uploaded parts.',
 }
 
-/** A sentence for an S3 failure; `bucket` names the bucket a call was about. */
-export function s3ErrorMessage(err: unknown, bucket?: string): string {
-  if (isS3PurgeInProgressError(err)) return PURGE_IN_PROGRESS_MESSAGE
-  if (!err || typeof err !== 'object') return String(err)
-  const error = err as { name?: string; Code?: string; message?: string }
+const NODE_FAILURE_SENTENCE = 'The node could not complete the request.'
+
+/** A readable headline plus the technical line the node sent, when it has one. */
+export interface S3ErrorReport {
+  message: string
+  detail: string | null
+}
+
+function plain(message: string): S3ErrorReport {
+  return { message, detail: null }
+}
+
+/**
+ * What to show for an S3 failure: `message` is always a sentence, `detail`
+ * carries the node's own wording when that wording is not readable on its own.
+ */
+export function s3ErrorReport(err: unknown, bucket?: string): S3ErrorReport {
+  if (isS3PurgeInProgressError(err)) return plain(PURGE_IN_PROGRESS_MESSAGE)
+  if (!err || typeof err !== 'object') return plain(String(err))
+  const error = err as {
+    name?: string
+    Code?: string
+    message?: string
+    $metadata?: { httpStatusCode?: number }
+  }
   const code = error.Code ?? error.name
   const message = error.message && error.message !== SDK_PLACEHOLDER_MESSAGE ? error.message : null
   if (code === 'InvalidBucketName') {
-    return message ?? (bucket ? bucketNameProblem(bucket) : null) ?? BUCKET_NAME_REQUIREMENT
+    return plain(message ?? (bucket ? bucketNameProblem(bucket) : null) ?? BUCKET_NAME_REQUIREMENT)
   }
   const sentence = code ? CODE_SENTENCES[code] : undefined
-  if (message) return sentence ?? (code ? `${code}: ${message}` : message)
-  if (sentence) return sentence
-  if (code) return `The node refused the request with the code ${code}.`
-  return String(err)
+  const status = error.$metadata?.httpStatusCode ?? 0
+  // A node-side failure reports its internals, never a sentence a reader can
+  // act on, so it never becomes the headline.
+  if (code === 'InternalError' || status >= 500) {
+    return {
+      message: sentence ?? NODE_FAILURE_SENTENCE,
+      detail: message ? (code ? `${code}: ${message}` : message) : (code ?? null),
+    }
+  }
+  if (message) return plain(sentence ?? (code ? `${code}: ${message}` : message))
+  if (sentence) return plain(sentence)
+  if (code) return plain(`The node refused the request with the code ${code}.`)
+  return plain(String(err))
+}
+
+/** A sentence for an S3 failure; `bucket` names the bucket a call was about. */
+export function s3ErrorMessage(err: unknown, bucket?: string): string {
+  const report = s3ErrorReport(err, bucket)
+  return report.detail ? `${report.message}\n${report.detail}` : report.message
 }
 
 export const PURGE_IN_PROGRESS_MESSAGE =
