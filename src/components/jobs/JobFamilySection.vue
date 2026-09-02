@@ -68,7 +68,7 @@ function outputUrl(output: JobOutputResponse): string {
       </p>
     </div>
 
-    <div class="space-y-2">
+    <div data-tutorial="job-outputs" class="space-y-2">
       <div>
         <h4 class="text-xs font-medium text-foreground">Canonical outputs</h4>
         <p class="text-[11px] text-muted-foreground">
@@ -192,12 +192,6 @@ function outputUrl(output: JobOutputResponse): string {
 
     <div class="space-y-1.5">
       <div class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Responder-local caveats">
-        <Badge
-          v-if="family.eventually_consistent"
-          variant="outline"
-          size="sm"
-          class="text-muted-foreground"
-        >Eventually consistent</Badge>
         <Badge v-if="family.partial" variant="outline" size="sm" class="text-muted-foreground">
           Partial responder view
         </Badge>
@@ -211,10 +205,6 @@ function outputUrl(output: JobOutputResponse): string {
           </span>
         </span>
       </div>
-      <p v-if="family.eventually_consistent" class="text-[11px] text-muted-foreground">
-        This responder's view can change as replicated records converge. It is one node's reading,
-        not the realm's settled truth.
-      </p>
       <p v-if="family.partial" class="text-[11px] text-muted-foreground">
         This responder could not reduce every family record.
       </p>

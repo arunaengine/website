@@ -80,7 +80,6 @@ export interface JobFamilyResponse {
   outputs: JobOutputResponse[]
   revision: number
   projection_digest: string
-  eventually_consistent: boolean
   responder_node_id?: string
   partial: boolean
   locally_exhausted: boolean
@@ -108,6 +107,9 @@ export interface JobStatusResponse {
   // WorkspaceMode::name(): none | temporary | kept | existing. Always served;
   // "none" means the run had no workspace at all.
   workspace_mode: string
+  // This node spent its attempts without a job-specific verdict; not a proven
+  // failure. Served with a default, so an older node omits it.
+  locally_exhausted?: boolean
   // Set only on the node-local path; a job answered from the family omits it.
   run_crate?: unknown
   family?: JobFamilyResponse
