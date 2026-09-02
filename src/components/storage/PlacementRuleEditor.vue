@@ -20,7 +20,12 @@ import {
   placementPoliciesErrorMessage,
   policyCreationProblems,
 } from '@/lib/placementPolicies'
-import type { CreatePolicyRequest, PolicyResponse, SelectorBody } from '@/lib/placementPolicies'
+import type {
+  CreatePolicyRequest,
+  LabelMatchBody,
+  PolicyResponse,
+  SelectorBody,
+} from '@/lib/placementPolicies'
 import { advertisedExecutors, matchingNodes, publishedLabels } from '@/lib/placementRules'
 import { Plus, Send, Trash2 } from '@lucide/vue'
 
@@ -38,20 +43,48 @@ const { realmInfo } = useAruna()
 const realmNodes = useRealmNodes()
 const { createPlacementPolicy } = usePlacementPolicies()
 
+// A card allows one named node, or every node whose fields all match.
+type Mode = 'node' | 'matching'
+interface Card {
+  mode: Mode
+  selector: SelectorBody
+}
+const MODES: { value: Mode; label: string }[] = [
+  { value: 'node', label: 'One node' },
+  { value: 'matching', label: 'Nodes matching' },
+]
+// Radix rejects an empty option value, so "any" has a sentinel.
+const ANY = '*'
+// The node id label duplicates the "One node" mode, so it is not a filter.
+const NODE_LABEL_KEY = 'aruna-engine.org/node'
+
 const nodes = computed(() => realmInfo.value?.nodes ?? [])
-const nodeOptions = computed(() => [
-  { value: '', label: 'Any node' },
-  ...realmNodes.nodes.value.map((node) => ({ value: node.nodeId, label: node.label })),
-])
+const nodeOptions = computed(() =>
+  realmNodes.nodes.value.map((node) => ({ value: node.nodeId, label: node.label })),
+)
 const locations = computed(() => knownLocations(nodes.value))
 const executors = computed(() => advertisedExecutors(nodes.value))
-const labelPairs = computed(() => publishedLabels(nodes.value))
+const labelPairs = computed(() =>
+  publishedLabels(nodes.value).filter((pair) => pair.key !== NODE_LABEL_KEY),
+)
+const labelKeys = computed(() => [...new Set(labelPairs.value.map((pair) => pair.key))])
+
+function withAny(values: string[]) {
+  return [{ value: ANY, label: 'Any' }, ...asOptions(values)]
+}
+function asOptions(values: string[]) {
+  return values.map((value) => ({ value, label: value }))
+}
+function valuesFor(key: string): string[] {
+  return labelPairs.value.filter((pair) => pair.key === key).map((pair) => pair.value)
+}
 
 const name = ref('')
-const selectors = ref<SelectorBody[]>([emptySelector()])
+const cards = ref<Card[]>([newCard()])
 const publishing = ref(false)
 const publishError = ref<string | null>(null)
 
+const selectors = computed(() => cards.value.map((card) => card.selector))
 const request = computed<CreatePolicyRequest>(() => ({
   name: name.value,
   allowed: selectors.value,
@@ -60,35 +93,77 @@ const request = computed<CreatePolicyRequest>(() => ({
 const problems = computed(() => policyCreationProblems(request.value))
 const matched = computed(() => matchingNodes(selectors.value, nodes.value).length)
 
-function selectorMatches(selector: SelectorBody): number {
-  return matchingNodes([selector], nodes.value).length
+function newCard(): Card {
+  return { mode: 'node', selector: emptySelector() }
 }
 
-function addSelector() {
-  selectors.value = [...selectors.value, emptySelector()]
+function cardMatches(card: Card): number {
+  return matchingNodes([card.selector], nodes.value).length
 }
 
-function removeSelector(index: number) {
-  selectors.value = selectors.value.filter((_, position) => position !== index)
+function patch(index: number, change: (card: Card) => Card) {
+  cards.value = cards.value.map((card, position) => (position === index ? change(card) : card))
 }
 
-function setField(index: number, field: 'node_id' | 'location' | 'executor_kind', value: string) {
-  const next = value.trim()
-  selectors.value = selectors.value.map((selector, position) =>
-    position === index ? { ...selector, [field]: next || undefined } : selector,
+function addCard() {
+  cards.value = [...cards.value, newCard()]
+}
+
+function removeCard(index: number) {
+  cards.value = cards.value.filter((_, position) => position !== index)
+}
+
+// A mode switch starts the card over, so a node id never travels with fields
+// that belong to the other mode.
+function setMode(index: number, mode: Mode) {
+  if (cards.value[index]?.mode === mode) return
+  patch(index, () => ({ mode, selector: emptySelector() }))
+}
+
+function setNode(index: number, nodeId: string) {
+  patch(index, (card) => ({ ...card, selector: { labels: [], node_id: nodeId } }))
+}
+
+function setField(index: number, field: 'location' | 'executor_kind', value: string) {
+  patch(index, (card) => {
+    const selector = { ...card.selector }
+    if (value === ANY) delete selector[field]
+    else selector[field] = value
+    return { ...card, selector }
+  })
+}
+
+function setLabels(index: number, labels: LabelMatchBody[]) {
+  patch(index, (card) => ({ ...card, selector: { ...card.selector, labels } }))
+}
+
+function labelsOf(index: number): LabelMatchBody[] {
+  return cards.value[index]?.selector.labels ?? []
+}
+
+function addLabel(index: number) {
+  const first = labelPairs.value[0]
+  if (first) setLabels(index, [...labelsOf(index), { key: first.key, value: first.value }])
+}
+
+function setLabelKey(index: number, labelIndex: number, key: string) {
+  setLabels(
+    index,
+    labelsOf(index).map((label, position) =>
+      position === labelIndex ? { key, value: valuesFor(key)[0] ?? '' } : label,
+    ),
   )
 }
 
-function toggleField(index: number, field: 'location' | 'executor_kind', value: string) {
-  setField(index, field, selectors.value[index]?.[field] === value ? '' : value)
-}
-
-function addLabel(index: number, key = '', value = '') {
-  selectors.value[index]?.labels.push({ key, value })
+function setLabelValue(index: number, labelIndex: number, value: string) {
+  setLabels(
+    index,
+    labelsOf(index).map((label, position) => (position === labelIndex ? { ...label, value } : label)),
+  )
 }
 
 function removeLabel(index: number, labelIndex: number) {
-  selectors.value[index]?.labels.splice(labelIndex, 1)
+  setLabels(index, labelsOf(index).filter((_, position) => position !== labelIndex))
 }
 
 async function publish() {
@@ -98,7 +173,7 @@ async function publish() {
   try {
     const policy = await createPlacementPolicy(normalizeCreatePolicyRequest(request.value))
     name.value = ''
-    selectors.value = [emptySelector()]
+    cards.value = [newCard()]
     emit('published', policy)
   } catch (error) {
     publishError.value = placementPoliciesErrorMessage(error, 'create')
@@ -128,156 +203,141 @@ async function publish() {
         <div>
           <h4 class="text-sm font-semibold text-foreground">Copies may be stored on</h4>
           <p class="mt-1 text-[11px] text-muted-foreground">
-            A card admits a node only when every condition in it fits; a node that fits any card is
-            admitted. Anything not listed is excluded.
+            Nodes that fit any card below; anything not listed is excluded.
           </p>
         </div>
-        <Button size="sm" variant="outline" @click="addSelector">
+        <Button size="sm" variant="outline" @click="addCard">
           <Plus class="size-3.5" /> Add card
         </Button>
       </div>
 
       <article
-        v-for="(selector, index) in selectors"
+        v-for="(card, index) in cards"
         :key="index"
         class="space-y-3 rounded-lg border border-border bg-background p-4"
       >
-        <div class="flex items-center justify-between gap-2">
-          <div class="flex items-center gap-2">
-            <span class="text-xs font-semibold text-foreground">Card {{ index + 1 }}</span>
-            <Badge v-if="index" variant="outline" size="sm">or</Badge>
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-xs font-semibold text-foreground">{{ index ? 'or allow' : 'Allow' }}</span>
+          <div
+            v-if="nodes.length"
+            class="inline-flex rounded-md border border-border p-0.5"
+            role="group"
+            :aria-label="`What card ${index + 1} allows`"
+          >
+            <Button
+              v-for="mode in MODES"
+              :key="mode.value"
+              size="sm"
+              class="h-6 px-2 text-[11px]"
+              :variant="card.mode === mode.value ? 'secondary' : 'ghost'"
+              :aria-pressed="card.mode === mode.value"
+              @click="setMode(index, mode.value)"
+            >
+              {{ mode.label }}
+            </Button>
           </div>
           <Button
-            v-if="selectors.length > 1"
+            v-if="cards.length > 1"
             variant="ghost"
             size="icon-sm"
-            class="text-destructive hover:text-destructive"
+            class="ml-auto text-destructive hover:text-destructive"
             :aria-label="`Remove card ${index + 1}`"
-            @click="removeSelector(index)"
+            @click="removeCard(index)"
           >
             <Trash2 class="size-3.5" />
           </Button>
         </div>
 
-        <div class="grid gap-3 sm:grid-cols-2">
-          <div>
-            <label class="text-[11px] font-medium text-foreground">Node</label>
+        <p v-if="!nodes.length" class="text-xs text-muted-foreground">
+          No node has joined this realm yet, so there is nothing to pick.
+        </p>
+
+        <Select
+          v-else-if="card.mode === 'node'"
+          :model-value="card.selector.node_id ?? ''"
+          :options="nodeOptions"
+          label="Node"
+          placeholder="Pick a node"
+          :aria-label="`Node of card ${index + 1}`"
+          @update:model-value="(value: string) => setNode(index, value)"
+        />
+
+        <template v-else>
+          <div class="grid gap-2 sm:grid-cols-2">
             <Select
-              :model-value="selector.node_id ?? ''"
-              :options="nodeOptions"
-              class="mt-1"
-              :aria-label="`Node of card ${index + 1}`"
-              @update:model-value="(value: string) => setField(index, 'node_id', value)"
+              v-if="locations.length"
+              :model-value="card.selector.location ?? ANY"
+              :options="withAny(locations)"
+              label="Location"
+              :aria-label="`Location of card ${index + 1}`"
+              @update:model-value="(value: string) => setField(index, 'location', value)"
             />
-          </div>
-          <div>
-            <label :for="`card-${index}-executor`" class="text-[11px] font-medium text-foreground">
-              Executor kind
-            </label>
-            <Input
-              :id="`card-${index}-executor`"
-              :model-value="selector.executor_kind ?? ''"
-              class="mt-1 font-mono text-xs"
-              placeholder="Any executor"
-              @update:model-value="(value: string | number) => setField(index, 'executor_kind', String(value))"
+            <p v-else class="flex h-9 items-center text-xs text-muted-foreground">
+              No node publishes a location yet.
+            </p>
+            <Select
+              v-if="executors.length"
+              :model-value="card.selector.executor_kind ?? ANY"
+              :options="withAny(executors)"
+              label="Executor"
+              :aria-label="`Executor of card ${index + 1}`"
+              @update:model-value="(value: string) => setField(index, 'executor_kind', value)"
             />
-            <div v-if="executors.length" class="mt-1.5 flex flex-wrap gap-1">
-              <Button
-                v-for="kind in executors"
-                :key="kind"
-                size="sm"
-                class="h-6 px-2 text-[11px]"
-                :variant="selector.executor_kind === kind ? 'default' : 'outline'"
-                :aria-pressed="selector.executor_kind === kind"
-                @click="toggleField(index, 'executor_kind', kind)"
-              >
-                {{ kind }}
-              </Button>
-            </div>
+            <p v-else class="flex h-9 items-center text-xs text-muted-foreground">
+              No node advertises an executor yet.
+            </p>
           </div>
-        </div>
 
-        <div>
-          <span class="text-[11px] font-medium text-foreground">Location</span>
-          <div v-if="locations.length" class="mt-1.5 flex flex-wrap gap-1">
-            <Button
-              v-for="location in locations"
-              :key="location"
-              size="sm"
-              class="h-6 px-2 text-[11px]"
-              :variant="selector.location === location ? 'default' : 'outline'"
-              :aria-pressed="selector.location === location"
-              @click="toggleField(index, 'location', location)"
+          <div class="space-y-2">
+            <div
+              v-for="(label, labelIndex) in card.selector.labels"
+              :key="labelIndex"
+              class="flex items-center gap-2"
             >
-              {{ location }}
-            </Button>
-          </div>
-          <p v-else class="mt-1 text-[11px] text-muted-foreground">
-            No node in this realm publishes a location yet.
-          </p>
-          <Input
-            :model-value="selector.location ?? ''"
-            class="mt-1.5 font-mono text-xs"
-            placeholder="Any location"
-            :aria-label="`Location of card ${index + 1}`"
-            @update:model-value="(value: string | number) => setField(index, 'location', String(value))"
-          />
-        </div>
-
-        <div>
-          <div class="flex items-center justify-between gap-2">
-            <span class="text-[11px] font-medium text-foreground">Node labels</span>
-            <Button size="sm" variant="ghost" class="h-6 px-2 text-[11px]" @click="addLabel(index)">
-              <Plus class="size-3.5" /> Add label
-            </Button>
-          </div>
-          <div v-if="selector.labels.length" class="mt-1.5 space-y-1.5">
-            <div v-for="(label, labelIndex) in selector.labels" :key="labelIndex" class="flex items-center gap-2">
-              <Input
-                v-model="label.key"
-                class="font-mono text-xs"
-                placeholder="key"
+              <Select
+                :model-value="label.key"
+                :options="asOptions(labelKeys)"
+                label="Label"
                 :aria-label="`Label key ${labelIndex + 1} of card ${index + 1}`"
+                @update:model-value="(value: string) => setLabelKey(index, labelIndex, value)"
               />
               <span class="text-muted-foreground">=</span>
-              <Input
-                v-model="label.value"
-                class="font-mono text-xs"
-                placeholder="value"
+              <Select
+                :model-value="label.value"
+                :options="asOptions(valuesFor(label.key))"
                 :aria-label="`Label value ${labelIndex + 1} of card ${index + 1}`"
+                @update:model-value="(value: string) => setLabelValue(index, labelIndex, value)"
               />
               <Button
                 variant="ghost"
                 size="icon-sm"
-                class="text-destructive hover:text-destructive"
+                class="shrink-0 text-destructive hover:text-destructive"
                 :aria-label="`Remove label ${labelIndex + 1} from card ${index + 1}`"
                 @click="removeLabel(index, labelIndex)"
               >
                 <Trash2 class="size-3.5" />
               </Button>
             </div>
-          </div>
-          <div v-if="labelPairs.length" class="mt-1.5 flex flex-wrap gap-1">
             <Button
-              v-for="pair in labelPairs"
-              :key="`${pair.key}=${pair.value}`"
+              v-if="labelPairs.length"
               size="sm"
-              variant="outline"
-              class="h-6 px-2 font-mono text-[11px]"
-              @click="addLabel(index, pair.key, pair.value)"
+              variant="ghost"
+              class="h-6 px-2 text-[11px]"
+              @click="addLabel(index)"
             >
-              {{ pair.key }}={{ pair.value }}
+              <Plus class="size-3.5" /> Add label
             </Button>
+            <p v-else class="text-xs text-muted-foreground">No node publishes a label yet.</p>
           </div>
-        </div>
+        </template>
 
-        <p class="text-[11px] text-muted-foreground">
-          Matches {{ selectorMatches(selector) }} of {{ nodes.length }} realm nodes right now.
+        <p v-if="nodes.length" class="text-[11px] text-muted-foreground">
+          Matches {{ cardMatches(card) }} of {{ nodes.length }} nodes.
         </p>
       </article>
 
-      <p class="text-[11px] font-medium text-foreground">
-        This policy admits {{ matched }} of {{ nodes.length }} realm nodes right now.
+      <p v-if="nodes.length" class="text-[11px] font-medium text-foreground">
+        This policy admits {{ matched }} of {{ nodes.length }} nodes right now.
       </p>
     </section>
 
@@ -288,18 +348,13 @@ async function publish() {
 
     <div class="space-y-2">
       <Notice tone="info">
-        Publishing creates a new policy id. Buckets keep the policy they carry until they are
-        attached to the new one.
+        Publishing creates a new policy id. Buckets keep the one they carry until you attach the
+        new one.
+        <DocsLink icon topic="where-data-lives" section="Placement policies" class="ml-0.5" />
       </Notice>
-      <div class="flex flex-wrap items-center gap-3">
-        <Button :disabled="publishing || problems.length > 0" @click="publish">
-          <Send class="size-3.5" /> {{ publishing ? 'Publishing…' : 'Publish policy' }}
-        </Button>
-        <DocsLink topic="where-data-lives" section="Placement policies" label="Learn about placement policies" />
-      </div>
-      <p v-if="problems.length" class="text-[11px] text-muted-foreground">
-        Publishing stays disabled while the list above is not resolved.
-      </p>
+      <Button :disabled="publishing || problems.length > 0" @click="publish">
+        <Send class="size-3.5" /> {{ publishing ? 'Publishing…' : 'Publish policy' }}
+      </Button>
     </div>
   </div>
 </template>

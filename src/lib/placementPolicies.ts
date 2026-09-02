@@ -315,23 +315,23 @@ export function policyCreationProblems(request: CreatePolicyRequest): string[] {
     problems.push(`Name must be between 1 and ${MAX_POLICY_NAME_BYTES} bytes.`)
   }
   if (!request.allowed.length || request.allowed.length > MAX_POLICY_SELECTORS) {
-    problems.push(`A placement policy needs between 1 and ${MAX_POLICY_SELECTORS} selectors.`)
+    problems.push(`A placement policy needs between 1 and ${MAX_POLICY_SELECTORS} cards.`)
   }
   request.allowed.forEach((selector, index) => {
-    if (selectorIsEmpty(selector)) problems.push(`Selector ${index + 1} must constrain at least one field.`)
+    if (selectorIsEmpty(selector)) problems.push(`Card ${index + 1} must constrain at least one field.`)
     if (selector.location && byteLength(selector.location.trim()) > MAX_LOCATION_BYTES) {
-      problems.push(`Selector ${index + 1} location is longer than ${MAX_LOCATION_BYTES} bytes.`)
+      problems.push(`Card ${index + 1} location is longer than ${MAX_LOCATION_BYTES} bytes.`)
     }
     if (selector.executor_kind && byteLength(selector.executor_kind.trim()) > MAX_EXECUTOR_KIND_BYTES) {
-      problems.push(`Selector ${index + 1} executor kind is longer than ${MAX_EXECUTOR_KIND_BYTES} bytes.`)
+      problems.push(`Card ${index + 1} executor kind is longer than ${MAX_EXECUTOR_KIND_BYTES} bytes.`)
     }
     if (selector.labels.length > MAX_SELECTOR_LABELS) {
-      problems.push(`Selector ${index + 1} has more than ${MAX_SELECTOR_LABELS} labels.`)
+      problems.push(`Card ${index + 1} has more than ${MAX_SELECTOR_LABELS} labels.`)
     }
     selector.labels.forEach((label, labelIndex) => {
       const key = label.key.trim()
       if (!key || byteLength(key) > MAX_LABEL_KEY_BYTES || byteLength(label.value.trim()) > MAX_LABEL_VALUE_BYTES) {
-        problems.push(`Selector ${index + 1} label ${labelIndex + 1} has an invalid key or value.`)
+        problems.push(`Card ${index + 1} label ${labelIndex + 1} has an invalid key or value.`)
       }
     })
   })

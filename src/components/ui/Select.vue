@@ -60,19 +60,20 @@ const triggerClasses = computed(() =>
       <SelectContent
         position="popper"
         :side-offset="4"
-        class="relative z-50 max-h-96 min-w-[10rem] overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+        class="relative z-50 max-h-96 min-w-[10rem] max-w-[min(32rem,calc(100vw-2rem))] overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
       >
         <SelectViewport class="p-1">
           <SelectItem
             v-for="o in options"
             :key="o.value"
             :value="o.value"
+            :title="o.label"
             class="relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-muted data-[state=checked]:bg-muted"
           >
             <span class="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
               <SelectItemIndicator><Check class="h-3.5 w-3.5" /></SelectItemIndicator>
             </span>
-            <SelectItemText>{{ o.label }}</SelectItemText>
+            <SelectItemText class="truncate">{{ o.label }}</SelectItemText>
           </SelectItem>
         </SelectViewport>
       </SelectContent>
