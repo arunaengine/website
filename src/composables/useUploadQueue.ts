@@ -129,11 +129,17 @@ async function run(item: UploadQueueItem): Promise<void> {
       },
       item.nodeId,
       item.session,
+      (attempt, error) => {
+        // The parts are on the node; only the completion is being repeated.
+        item.error = `Finishing the upload, attempt ${attempt}… ${s3ErrorMessage(error)}`
+        touch()
+      },
     )
     handles.set(item.id, handle)
     await handle.promise
     if (item.state === 'uploading') {
       item.state = 'done'
+      item.error = undefined
       item.progress = 100
       files.delete(item.id) // free the blob; done items are not retryable
       lastCompleted.value = { bucket: item.bucket, key: item.key, nodeId: item.nodeId, at: Date.now() }
@@ -172,6 +178,7 @@ async function cancel(item: UploadQueueItem): Promise<void> {
   }
   if (item.state !== 'uploading') return
   item.state = 'canceled'
+  item.error = undefined
   touch()
   // abort() rejects handle.promise; run()'s catch sees 'canceled' and leaves the
   // state alone, and AbortMultipartUpload cleans up the parts already written.

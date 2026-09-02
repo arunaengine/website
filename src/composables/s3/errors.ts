@@ -30,6 +30,7 @@ const CODE_SENTENCES: Record<string, string> = {
   KeyTooLongError: `An object key may be at most ${OBJECT_KEY_MAX_BYTES} bytes.`,
   NoSuchBucket: 'That bucket does not exist.',
   NoSuchKey: 'That object does not exist.',
+  OperationAborted: 'The node is still assembling this object from its uploaded parts.',
 }
 
 /** A sentence for an S3 failure; `bucket` names the bucket a call was about. */

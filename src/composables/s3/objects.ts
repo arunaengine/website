@@ -1,4 +1,6 @@
 import {
+  AbortMultipartUploadCommand,
+  CompleteMultipartUploadCommand,
   CopyObjectCommand,
   DeleteObjectCommand,
   DeleteObjectsCommand,
@@ -7,6 +9,8 @@ import {
   ListObjectsV2Command,
   ListObjectVersionsCommand,
   PutObjectCommand,
+  type CompleteMultipartUploadCommandInput,
+  type S3Client,
 } from '@aws-sdk/client-s3'
 import { Upload } from '@aws-sdk/lib-storage'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
@@ -21,7 +25,7 @@ import { drsDownloadHref, isDrsReference } from '@/lib/tes'
 import { useAruna } from '../useAruna'
 import { client } from './client'
 import { resolveObjectUrl } from './endpoints'
-import { PURGE_IN_PROGRESS_MESSAGE } from './errors'
+import { isS3AuthError, isS3NetworkError, PURGE_IN_PROGRESS_MESSAGE } from './errors'
 import { hasActiveKey, type S3SessionReference } from './session'
 
 export interface ObjectEntry {
@@ -161,8 +165,143 @@ export async function listObjectsRecursive(
 
 // Files larger than one part are uploaded via S3 multipart with parallel
 // parts; abort() tells the node to drop the parts already written.
-const UPLOAD_PART_SIZE = 16 * 1024 * 1024
+export const UPLOAD_PART_SIZE = 16 * 1024 * 1024
 const UPLOAD_CONCURRENCY = 3
+
+// Composing a multi-GB object out of its parts keeps the node busy for minutes
+// and a proxy in between may drop the idle connection first. The parts are
+// already stored, so a lost completion is repeated with the same upload id
+// until the object exists or this window closes.
+const COMPLETION_WINDOW_MS = 10 * 60 * 1000
+const COMPLETION_BACKOFF_MS = 2000
+const COMPLETION_BACKOFF_CAP_MS = 30 * 1000
+
+// Faults that a repeated completion can never clear. Everything else is judged
+// by transport: a lost request, a timeout or a 5xx may be repeated, a 4xx not.
+const TERMINAL_COMPLETION_CODES = new Set([
+  'AbortError',
+  'EntityTooSmall',
+  'InvalidPart',
+  'InvalidPartOrder',
+  'MalformedXML',
+  'NoSuchBucket',
+  'NoSuchKey',
+  'NoSuchUpload',
+])
+
+// The node answers a completion that is already running with OperationAborted,
+// and a retry then joins it or returns the finished object.
+function retryableCompletion(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const error = err as { name?: string; Code?: string; $metadata?: { httpStatusCode?: number } }
+  const code = error.Code ?? error.name
+  if (code && TERMINAL_COMPLETION_CODES.has(code)) return false
+  if (code === 'OperationAborted') return true
+  if (isS3AuthError(err)) return false
+  const status = error.$metadata?.httpStatusCode
+  if (status !== undefined) return status >= 500
+  return isS3NetworkError(err) || code === 'TimeoutError'
+}
+
+interface CompletionRecorder {
+  client: S3Client
+  completion: () => CompleteMultipartUploadCommandInput | null
+}
+
+// lib-storage sends every request through the client, so wrapping send()
+// captures the completion it assembled, upload id and part list included,
+// without reading its internals.
+function recordCompletion(s3: S3Client): CompletionRecorder {
+  let completion: CompleteMultipartUploadCommandInput | null = null
+  const send = s3.send.bind(s3) as unknown as (command: unknown) => Promise<unknown>
+  const recorded = new Proxy(s3, {
+    get(target, property) {
+      if (property !== 'send') return Reflect.get(target, property)
+      return (command: unknown) => {
+        if (command instanceof CompleteMultipartUploadCommand) completion = command.input
+        return send(command)
+      }
+    },
+  })
+  return { client: recorded, completion: () => completion }
+}
+
+function pause(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+// Best effort: the original failure is what the caller must see, and a node
+// that already forgot the upload answers NoSuchUpload.
+async function abortMultipart(
+  s3: S3Client,
+  completion: CompleteMultipartUploadCommandInput,
+): Promise<void> {
+  try {
+    await s3.send(
+      new AbortMultipartUploadCommand({
+        Bucket: completion.Bucket,
+        Key: completion.Key,
+        UploadId: completion.UploadId,
+      }),
+    )
+  } catch {
+    return
+  }
+}
+
+async function retryCompletion(
+  s3: S3Client,
+  completion: CompleteMultipartUploadCommandInput,
+  first: unknown,
+  canceled: { value: boolean },
+  onRetry?: (attempt: number, error: unknown) => void,
+): Promise<void> {
+  const deadline = Date.now() + COMPLETION_WINDOW_MS
+  let failure = first
+  let delay = COMPLETION_BACKOFF_MS
+  let attempt = 1
+  while (retryableCompletion(failure) && !canceled.value && Date.now() + delay <= deadline) {
+    attempt += 1
+    onRetry?.(attempt, failure)
+    await pause(delay)
+    if (canceled.value) break
+    try {
+      await s3.send(new CompleteMultipartUploadCommand(completion))
+      return
+    } catch (err) {
+      failure = err
+    }
+    delay = Math.min(delay * 2, COMPLETION_BACKOFF_CAP_MS)
+  }
+  throw failure
+}
+
+async function finishUpload(
+  upload: Upload,
+  recorder: CompletionRecorder,
+  canceled: { value: boolean },
+  onRetry?: (attempt: number, error: unknown) => void,
+): Promise<void> {
+  try {
+    await upload.done()
+    return
+  } catch (err) {
+    const completion = recorder.completion()
+    // A part that never made it is already cleaned up by lib-storage itself,
+    // and a canceled upload was aborted by the handle.
+    if (!completion || canceled.value) throw err
+    try {
+      await retryCompletion(recorder.client, completion, err, canceled, onRetry)
+    } catch (exhausted) {
+      // Only a permanent failure justifies dropping the parts: a completion the
+      // node may still be running has to outlive the retry window.
+      if (!canceled.value && !retryableCompletion(exhausted)) {
+        await abortMultipart(recorder.client, completion)
+      }
+      throw exhausted
+    }
+  }
+}
 
 export function uploadObject(
   bucket: string,
@@ -171,9 +310,11 @@ export function uploadObject(
   onProgress?: (loaded: number, total: number) => void,
   nodeId?: string | null,
   sessionReference?: S3SessionReference,
+  onCompletionRetry?: (attempt: number, error: unknown) => void,
 ): UploadHandle {
+  const recorder = recordCompletion(client(nodeId, sessionReference))
   const upload = new Upload({
-    client: client(nodeId, sessionReference),
+    client: recorder.client,
     params: {
       Bucket: bucket,
       Key: key,
@@ -189,9 +330,15 @@ export function uploadObject(
       onProgress(progress.loaded ?? 0, progress.total ?? file.size)
     })
   }
+  const canceled = { value: false }
   return {
-    promise: upload.done().then(() => undefined),
-    abort: () => upload.abort(),
+    promise: finishUpload(upload, recorder, canceled, onCompletionRetry),
+    abort: async () => {
+      canceled.value = true
+      await upload.abort()
+      const completion = recorder.completion()
+      if (completion) await abortMultipart(recorder.client, completion)
+    },
   }
 }
 

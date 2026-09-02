@@ -138,7 +138,7 @@ function transferVariant(item: UploadQueueItem): BadgeVariant {
         <p
           v-if="item.error"
           class="break-words text-[10px]"
-          :class="item.pausedForSession ? 'text-amber-700 dark:text-amber-400' : 'text-destructive'"
+          :class="item.state === 'uploading' ? 'text-muted-foreground' : item.pausedForSession ? 'text-amber-700 dark:text-amber-400' : 'text-destructive'"
         >{{ item.error }}</p>
         <div v-if="item.state === 'error' || item.state === 'canceled'" class="flex items-center gap-2">
           <button class="text-[10px] font-medium text-primary hover:underline" @click="queue.retry(item)">Retry</button>
