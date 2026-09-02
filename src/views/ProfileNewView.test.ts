@@ -44,11 +44,20 @@ const publishProfileArtifacts = vi.fn()
 const listBuckets = vi.fn()
 const s3Endpoint = ref('https://s3.test')
 const s3HasKey = ref(true)
-const routerPush = vi.fn(async () => undefined)
 const route = reactive({
   name: 'profile-new',
   params: {} as Record<string, string>,
   query: {} as Record<string, string>,
+})
+// The wizard step lives in the query, so a push has to land there for the view
+// to move on, exactly as the real router would.
+const routerPush = vi.fn(async (to: unknown) => {
+  const query = (to as { query?: Record<string, string | undefined> })?.query
+  if (!query) return undefined
+  route.query = Object.fromEntries(
+    Object.entries(query).filter((entry): entry is [string, string] => entry[1] !== undefined),
+  )
+  return undefined
 })
 let leaveGuard: (() => Promise<boolean>) | null = null
 // The profile IRI the view looks up references for, captured as it is passed.
@@ -334,6 +343,8 @@ describe('ProfileNewView create', () => {
     ]
 
     for (const scenario of scenarios) {
+      // Each scenario is its own visit, so it starts on the first step again.
+      route.query = {}
       s3Endpoint.value = 'https://s3.test'
       s3HasKey.value = true
       profiles.value = []

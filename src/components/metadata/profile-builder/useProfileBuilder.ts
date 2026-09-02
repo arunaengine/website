@@ -26,4 +26,4 @@ export type {
   PropertyRuleTemplate,
 } from './state/drafts'
 export { draftFromEntityRule, draftFromPropertyRule } from './state/serialization'
-export { useProfileBuilder, type ProfileBuilder } from './state/builder'
+export { PROFILE_BUILDER, useProfileBuilder, type ProfileBuilder } from './state/builder'

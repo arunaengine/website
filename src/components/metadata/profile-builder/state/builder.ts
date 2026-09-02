@@ -1,4 +1,4 @@
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch, type InjectionKey } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { buildProfileCrate } from '@/lib/profiles/rocrate'
 import { schemaFromEntityRules } from '@/lib/profiles/schema'
@@ -286,4 +286,8 @@ export function useProfileBuilder() {
 }
 
 export type ProfileBuilder = ReturnType<typeof useProfileBuilder>
+
+// A host that owns the draft (the tutorial) provides its own builder; the page
+// adopts it instead of starting an empty one.
+export const PROFILE_BUILDER = Symbol('profile-builder') as InjectionKey<ProfileBuilder>
 

@@ -16,8 +16,8 @@ import ProfileBasicsStep from '@/components/metadata/profile-builder/ProfileBasi
 import ProfileEntityRulesStep from '@/components/metadata/profile-builder/ProfileEntityRulesStep.vue'
 import ProfileReviewStep from '@/components/metadata/profile-builder/ProfileReviewStep.vue'
 import { profileBlockers } from '@/components/metadata/profile-builder/state/blockers'
-import { useProfileBuilder } from '@/components/metadata/profile-builder/useProfileBuilder'
-import { computed, ref, watch } from 'vue'
+import { PROFILE_BUILDER, useProfileBuilder } from '@/components/metadata/profile-builder/useProfileBuilder'
+import { computed, inject, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { CheckCircle2, ArrowLeft, ArrowRight, FileUp, KeyRound, Lock, Plus } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
@@ -52,7 +52,10 @@ const editProfile = computed<MetadataProfile | null>(() =>
 const isEditing = computed(() => Boolean(editId.value))
 const s3 = useS3()
 const { publishProfileArtifacts } = useProfilePublish()
-const builder = useProfileBuilder()
+// A provided draft belongs to its host, which seeds it and decides what
+// leaving means; without one the page owns an empty builder of its own.
+const hostedBuilder = inject(PROFILE_BUILDER, null)
+const builder = hostedBuilder ?? useProfileBuilder()
 
 // Public profiles upload their three artifacts to the group's S3 profiles
 // bucket at create time, so publishing needs an active S3 key.
@@ -130,7 +133,19 @@ function dismissIntro() {
   storeValue(INTRO_KEY, 'true')
 }
 
-const step = ref(1)
+const STEP_COUNT = 3
+// The step lives in ?step=N so browser back/forward walks the wizard, and a
+// host driving the page (the tutorial) can put it on a step by navigating.
+const step = computed(() => {
+  const raw = Number(route.query.step)
+  return Number.isInteger(raw) && raw >= 1 && raw <= STEP_COUNT ? raw : 1
+})
+
+function goStep(target: number) {
+  if (target === step.value) return
+  void router.push({ query: { ...route.query, step: target > 1 ? String(target) : undefined } })
+}
+
 // Step 1 mode switch: author from scratch or import an existing profile.
 const startTab = ref('create')
 const duplicateNameError = computed(() => {
@@ -180,7 +195,7 @@ let leave: ((allowed: boolean) => void) | null = null
 onBeforeRouteLeave(
   () =>
     new Promise<boolean>((resolve) => {
-      if (submitted.value || !builder.hasEdits) {
+      if (submitted.value || hostedBuilder || !builder.hasEdits) {
         resolve(true)
         return
       }
@@ -232,8 +247,8 @@ const currentStepCallout = computed(() => {
 const seeded = ref(false)
 
 function resetDraft() {
-  builder.reset()
-  step.value = 1
+  // A hosted draft is the host's to seed and to clear.
+  if (!hostedBuilder) builder.reset()
   startTab.value = 'create'
   destBucket.value = ''
   destPrefix.value = ''
@@ -313,11 +328,11 @@ watch(groups, (available) => {
 })
 
 function goBack() {
-  if (step.value > 1) step.value -= 1
+  if (step.value > 1) goStep(step.value - 1)
 }
 
 function goNext() {
-  if (step.value < 3 && !currentStepErrors.value.length) step.value += 1
+  if (step.value < STEP_COUNT && !currentStepErrors.value.length) goStep(step.value + 1)
 }
 
 async function submit() {
@@ -462,7 +477,7 @@ async function submit() {
           :builder="builder"
           :blockers="blockers"
           :warnings="referenceWarnings"
-          @step="(target: number) => (step = target)"
+          @step="goStep"
         />
 
         <Notice v-if="builder.submitError" tone="error">{{ builder.submitError }}</Notice>
