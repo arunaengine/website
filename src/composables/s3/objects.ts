@@ -476,6 +476,8 @@ export async function copyObjectVersion(
 // creates delete markers and preserves historical versions. Per-key failures
 // are collected instead of aborting the walk so one locked object does not
 // strand the rest.
+const MISSING_KEY_CODES = new Set(['NoSuchKey', 'NoSuchVersion', 'NotFound'])
+
 export async function deletePrefix(
   bucket: string,
   prefix: string,
@@ -501,9 +503,11 @@ export async function deletePrefix(
     const failed = response.Errors ?? []
     deleted += keys.length - failed.length
     for (const failure of failed) {
-      // The marker often does not exist as a real object; a failed delete for
-      // that specific key must not fail the whole folder delete.
-      if (markerKey && failure.Key === markerKey && failure.Code !== 'PurgeInProgress') continue
+      // The marker often does not exist as a real object, so only that reason
+      // is skipped; every other failure on it is a real folder-delete failure.
+      if (markerKey && failure.Key === markerKey && MISSING_KEY_CODES.has(failure.Code ?? '')) {
+        continue
+      }
       errors.push({
         key: failure.Key ?? '(unknown key)',
         message:
@@ -564,16 +568,26 @@ export async function headObject(
 }
 
 // A version id belongs in the signed request, never appended afterwards: the
-// query string is part of what SigV4 signs.
+// query string is part of what SigV4 signs. `filename` makes the node answer
+// with a Content-Disposition, which is what carries the name across origins;
+// a preview reads the bytes itself and passes none.
 export async function downloadUrl(
   bucket: string,
   key: string,
   nodeId?: string | null,
   versionId?: string,
+  filename?: string,
 ): Promise<string> {
   return getSignedUrl(
     client(nodeId),
-    new GetObjectCommand({ Bucket: bucket, Key: key, VersionId: versionId }),
+    new GetObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      VersionId: versionId,
+      ResponseContentDisposition: filename
+        ? `attachment; filename="${filename.replaceAll('"', '')}"`
+        : undefined,
+    }),
     { expiresIn: 900 },
   )
 }

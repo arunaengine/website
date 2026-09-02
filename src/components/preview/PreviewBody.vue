@@ -79,12 +79,24 @@ watch(
 async function download() {
   if (!props.objectKey) return
   try {
-    const url = preview.directUrl.value ?? (await s3.downloadUrl(props.bucket, props.objectKey, props.nodeId, props.versionId ?? undefined))
+    const url =
+      preview.directUrl.value
+      ?? (await s3.downloadUrl(
+        props.bucket,
+        props.objectKey,
+        props.nodeId,
+        props.versionId ?? undefined,
+        props.name,
+      ))
+    // In the document, not detached: a detached anchor is ignored by some
+    // browsers, and the name travels in the response's Content-Disposition.
     const anchor = document.createElement('a')
     anchor.href = url
     anchor.download = props.name
     anchor.rel = 'noopener'
+    document.body.append(anchor)
     anchor.click()
+    anchor.remove()
   } catch (err) {
     preview.errorMessage.value = s3ErrorMessage(err)
     preview.status.value = 'error'

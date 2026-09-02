@@ -1064,12 +1064,18 @@ export function useDataManager() {
   async function download(object: ObjectEntry) {
     const sourceBucket = bucket.value
     try {
-      const url = await s3.downloadUrl(sourceBucket, object.key, remoteNodeId.value)
+      const name = object.name || object.key.split('/').pop() || object.key
+      const url = await s3.downloadUrl(sourceBucket, object.key, remoteNodeId.value, undefined, name)
+      // A detached anchor is ignored by some browsers, so it is clicked in the
+      // document; the presigned URL is cross-origin, so the name travels in
+      // the response's Content-Disposition rather than in `download`.
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = object.name
+      anchor.download = name
       anchor.rel = 'noopener'
+      document.body.append(anchor)
       anchor.click()
+      anchor.remove()
     } catch (err) {
       listError.value = s3ErrorMessage(err)
       listAuthError.value = isS3AuthError(err)
