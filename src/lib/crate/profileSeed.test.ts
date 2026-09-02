@@ -86,6 +86,17 @@ describe('profile seeding', () => {
       .toEqual([{ kind: 'text', value: 'doi:10' }])
   })
 
+  it('seeds the same profile twice without duplicating anything', () => {
+    // The pick seeds before a public profile's rules are known, and again after.
+    const iri = 'https://example.test/profiles/only'
+    const once = applyProfile(newDraft(), profile(), iri, iri)
+    const twice = applyProfile(once, profile(), iri, iri)
+
+    expect(twice.entities[0].properties.conformsTo).toEqual([{ kind: 'reference', value: iri }])
+    expect(twice.entities[0].properties.author).toEqual([{ kind: 'reference', value: '#person' }])
+    expect(twice.entities.filter((entity) => entity.types.includes('http://schema.org/Person'))).toHaveLength(1)
+  })
+
   it('replaces only the previously selected conformance profile', () => {
     const spec = 'https://w3id.org/ro/crate/1.1'
     const community = 'https://example.test/community-profile'

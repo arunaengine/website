@@ -1,8 +1,9 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h } from 'vue'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   button,
+  click,
   compileClientComponent,
   content,
   element,
@@ -169,9 +170,28 @@ describe('NodeCheckPanel', () => {
   })
 
   it('disables the action while the dataset cannot be saved', async () => {
-    const mounted = await mount({ canSave: false })
+    const mounted = await mount({ canSave: false, blocked: 'Fix 2 problems before saving.' })
 
     expect(button(mounted.root, 'Create dataset').props.disabled).toBe(true)
+    expect(content(mounted.root)).toContain('Fix 2 problems before saving.')
+    mounted.app.unmount()
+  })
+
+  it('says the profile rules are still being fetched', async () => {
+    const mounted = await mount({ profileLoading: true })
+
+    expect(content(mounted.root)).toContain('Loading the profile rules')
+    mounted.app.unmount()
+  })
+
+  it('offers a retry when the profile rules failed to load', async () => {
+    const retry = vi.fn()
+    const mounted = await mount({ profileError: 'The rules of this profile could not be loaded.', onRetryProfile: retry })
+
+    expect(content(mounted.root)).toContain('could not be loaded')
+    await click(button(mounted.root, 'Try again'))
+
+    expect(retry).toHaveBeenCalledTimes(1)
     mounted.app.unmount()
   })
 })

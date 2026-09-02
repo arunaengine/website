@@ -174,6 +174,23 @@ describe('server profile validation preview', () => {
     expect(preview.error.value).toBe('The local node is not running.')
   })
 
+  it('drops a refusal on reset', async () => {
+    // Findings belong to the profile that produced them; a change discards them.
+    const preview = setupPreview()
+
+    const verdict = preview.verify(CRATE)
+    answer(0, { error: 'Bad request', code: 'Bad request' }, 400)
+    await flush()
+    expect(await verdict).toBe(false)
+    expect(preview.rejection.value?.status).toBe(400)
+
+    preview.reset()
+
+    expect(preview.rejection.value).toBeNull()
+    expect(preview.result.value).toBeNull()
+    expect(preview.running.value).toBe(false)
+  })
+
   it('drops a pending preview and the last result on reset', async () => {
     const preview = setupPreview()
 

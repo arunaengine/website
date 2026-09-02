@@ -32,6 +32,7 @@ const createMetadata = vi.fn()
 const getMetadataItem = vi.fn()
 const fetchRoCrateRaw = vi.fn()
 const replaceMetadataRoCrate = vi.fn()
+const loadProfileCrate = vi.fn(async () => ({}))
 const routerPush = vi.fn(async () => undefined)
 
 const previewResult = ref<Api.ProfileValidationPreviewResponse | null>(null)
@@ -40,6 +41,51 @@ const previewError = ref<string | null>(null)
 const previewUnavailable = ref(false)
 const previewRejection = ref<unknown>(null)
 const verify = vi.fn(async () => true)
+const previewDebounced = vi.fn()
+const previewNow = vi.fn()
+const previewReset = vi.fn()
+
+// One mandatory text property is enough to see a profile reach the form.
+function profileFixture(id: string, name: string, required: string[] = []): Record<string, unknown> {
+  return {
+    id,
+    name,
+    documentId: `doc-${id}`,
+    managed: true,
+    profileUri: `https://example.test/profiles/${id}`,
+    propertyRules: required.map((valueName) => ({
+      id: valueName,
+      label: valueName,
+      description: '',
+      kind: 'text',
+      propertyUri: `http://schema.org/${valueName}`,
+      valueName,
+      obligation: 'MUST',
+    })),
+    entityRules: [],
+  }
+}
+
+function verdict(accepted: boolean): Api.ProfileValidationPreviewResponse {
+  return {
+    accepted,
+    state: accepted ? 'valid' : 'invalid',
+    profile_id: 'genomics',
+    profile_iri: 'https://example.test/profiles/genomics',
+    evaluator: 'craqle',
+    findings: accepted
+      ? []
+      : [{
+          code: 'constraint_violation',
+          severity: 'violation',
+          rule: 'http://www.w3.org/ns/shacl#minCount',
+          message: 'A required value is missing.',
+          completeness: 'complete',
+        }],
+    completeness: 'complete',
+    structural_violations: [],
+  }
+}
 
 // A dataset with a name, a description and a Person linked as its author.
 function seeded(draft: Editor.CrateDraft): Editor.CrateDraft {
@@ -151,18 +197,39 @@ const DrawerStub = defineComponent({
   },
   setup: (props) => () => h('div', [
     h('p', `Drawer issues ${(props.issues as unknown[]).length}`),
+    h('p', `Drawer says ${(props.issues as Array<{ message: string }>).map((issue) => issue.message).join(' | ')}`),
     h('p', `Node issues ${(props.nodeIssues as Array<{ message: string }>).map((issue) => issue.message).join(', ')}`),
   ]),
+})
+// The import dialog, reduced to handing the view one parsed crate.
+const importDraft = ref<Editor.CrateDraft | null>(null)
+const ImportStub = defineComponent({
+  emits: ['imported', 'update:open'],
+  setup: (_, { emit }) => () => h('button', {
+    onClick: () => importDraft.value && emit('imported', importDraft.value),
+  }, 'Import crate'),
 })
 const WithdrawStub = defineComponent({
   props: { documentId: { type: String, default: '' } },
   setup: (props) => () => h('p', `Administration ${props.documentId}`),
 })
 const NodeCheckStub = defineComponent({
-  props: { canSave: Boolean, actionLabel: String },
-  emits: ['save'],
-  setup: (props, { emit }) => () =>
+  props: {
+    canSave: Boolean,
+    actionLabel: String,
+    profileName: { type: String, default: '' },
+    profileLoading: Boolean,
+    profileError: { type: String, default: '' },
+    blocked: { type: String, default: '' },
+  },
+  emits: ['save', 'retry-profile'],
+  setup: (props, { emit }) => () => h('div', [
+    h('p', `Checking ${props.profileName || 'no profile'}${props.profileLoading ? ', loading its rules' : ''}`),
+    h('p', `Rules ${props.profileError || 'fine'}`),
+    h('p', `Blocked ${props.blocked || 'not'}`),
+    h('button', { onClick: () => emit('retry-profile') }, 'Retry profile rules'),
     h('button', { disabled: !props.canSave, onClick: () => emit('save') }, props.actionLabel),
+  ]),
 })
 
 const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vue', import.meta.url), {
@@ -178,7 +245,7 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
   '@/components/ui/Skeleton.vue': moduleDefault(EmptyStub),
   '@/components/ui/ErrorPanel.vue': moduleDefault(EmptyStub),
   '@/components/groups/CreateGroupDialog.vue': moduleDefault(EmptyStub),
-  '@/components/metadata/ImportCrateDialog.vue': moduleDefault(EmptyStub),
+  '@/components/metadata/ImportCrateDialog.vue': moduleDefault(ImportStub),
   '@/components/metadata/editor/DatasetLocationDialog.vue': moduleDefault(LocationStub),
   '@/components/metadata/editor/EntityBrowser.vue': moduleDefault(BrowserStub),
   '@/components/metadata/editor/EntityEditor.vue': moduleDefault(EditorStub),
@@ -195,6 +262,7 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
       createMetadata,
       getMetadataItem,
       fetchRoCrateRaw,
+      loadProfileCrate,
       replaceMetadataRoCrate,
       saving,
       apiBaseUrl,
@@ -228,8 +296,9 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
       error: previewError,
       unavailable: previewUnavailable,
       rejection: previewRejection,
-      preview: vi.fn(),
-      previewNow: vi.fn(),
+      preview: previewDebounced,
+      previewNow,
+      reset: previewReset,
       verify,
     }),
   },
@@ -260,6 +329,10 @@ function drawerCount(root: Parameters<typeof content>[0]): number {
   return Number(/Drawer issues (\d+)/.exec(content(root))?.[1] ?? -1)
 }
 
+function drawerSays(root: Parameters<typeof content>[0]): string {
+  return /Drawer says (.*?)Node issues/.exec(content(root))?.[1] ?? ''
+}
+
 beforeEach(() => {
   route.name = 'dataset-new'
   route.params = {}
@@ -276,11 +349,19 @@ beforeEach(() => {
   })
   fetchRoCrateRaw.mockReset().mockResolvedValue(Editor.toRoCrate(seeded(Editor.newDraft())))
   verify.mockReset().mockResolvedValue(true)
+  loadProfileCrate.mockReset().mockResolvedValue({})
+  previewDebounced.mockClear()
+  previewNow.mockClear()
+  previewReset.mockClear()
   pathTaken.value = false
   pathChecking.value = false
   routerPush.mockClear()
   previewResult.value = null
   previewRejection.value = null
+  previewRunning.value = false
+  previewError.value = null
+  previewUnavailable.value = false
+  importDraft.value = null
 })
 
 describe('DatasetEditorView', () => {
@@ -288,6 +369,7 @@ describe('DatasetEditorView', () => {
     const mounted = await mountApp(DatasetEditorView)
 
     expect(content(mounted.root)).toContain('Entities 1')
+    await click(button(mounted.root, 'Seed dataset'))
     await name(mounted.root, 'Reads 2026')
 
     expect(content(mounted.root)).toContain('Research group')
@@ -374,6 +456,7 @@ describe('DatasetEditorView', () => {
     await openLocation(mounted.root)
 
     await click(button(mounted.root, 'Move to Second group'))
+    await click(button(mounted.root, 'Seed dataset'))
     await name(mounted.root, 'Reads')
     await click(button(mounted.root, 'Create dataset'))
     await flush()
@@ -711,6 +794,222 @@ describe('DatasetEditorView', () => {
     await flush()
     expect(content(mounted.root)).toContain('Dataset B')
     expect(content(mounted.root)).not.toContain('Dataset A')
+    mounted.app.unmount()
+  })
+
+  it('seeds a picked profile and raises what it expects', async () => {
+    profiles.value = [profileFixture('genomics', 'Genomics', ['identifier'])]
+    const mounted = await mountApp(DatasetEditorView)
+    await click(button(mounted.root, 'Seed dataset'))
+    expect(drawerSays(mounted.root)).not.toContain('Genomics expects identifier')
+
+    await click(button(mounted.root, 'Choose Genomics'))
+
+    expect(drawerSays(mounted.root)).toContain('Genomics expects identifier')
+    // The empty row the seeding added is what raises this second one.
+    expect(drawerSays(mounted.root)).toContain('identifier on Example dataset has no value yet')
+    expect(content(mounted.root)).toContain('Checking Genomics')
+    mounted.app.unmount()
+  })
+
+  it('replaces the findings of the profile it leaves', async () => {
+    profiles.value = [
+      profileFixture('old', 'Old', ['identifier']),
+      profileFixture('new', 'New', ['sampleId']),
+    ]
+    const mounted = await mountApp(DatasetEditorView)
+    await click(button(mounted.root, 'Seed dataset'))
+    await click(button(mounted.root, 'Choose Old'))
+    expect(drawerSays(mounted.root)).toContain('Old expects identifier')
+
+    await click(button(mounted.root, 'Choose New'))
+
+    expect(drawerSays(mounted.root)).toContain('New expects sampleId')
+    expect(drawerSays(mounted.root)).not.toContain('Old expects identifier')
+
+    await click(button(mounted.root, 'Choose no profile'))
+
+    expect(drawerSays(mounted.root)).not.toContain('expects')
+    expect(content(mounted.root)).toContain('Checking no profile')
+    mounted.app.unmount()
+  })
+
+  it('drops the last verdict and re-checks when the profile changes', async () => {
+    profiles.value = [profileFixture('genomics', 'Genomics', ['identifier'])]
+    const mounted = await mountApp(DatasetEditorView)
+    await click(button(mounted.root, 'Seed dataset'))
+    previewReset.mockClear()
+    previewDebounced.mockClear()
+
+    await click(button(mounted.root, 'Choose Genomics'))
+
+    expect(previewReset).toHaveBeenCalledTimes(1)
+    expect(previewDebounced).toHaveBeenCalled()
+    expect(previewReset.mock.invocationCallOrder[0])
+      .toBeLessThan(previewDebounced.mock.invocationCallOrder[0]!)
+    mounted.app.unmount()
+  })
+
+  it('re-checks the draft after every edit', async () => {
+    const mounted = await mountApp(DatasetEditorView)
+    previewDebounced.mockClear()
+
+    // An incomplete draft is the editor's own problem, not the node's.
+    await name(mounted.root, 'Reads 2026')
+    expect(previewDebounced).not.toHaveBeenCalled()
+
+    await click(button(mounted.root, 'Seed dataset'))
+    await name(mounted.root, 'Reads 2027')
+
+    expect(previewDebounced).toHaveBeenCalledTimes(2)
+    const graph = previewDebounced.mock.calls[1][0]['@graph'] as Array<Record<string, unknown>>
+    expect(graph.find((entity) => entity['@id'] === './')).toMatchObject({ name: 'Reads 2027' })
+    mounted.app.unmount()
+  })
+
+  it('refuses to submit while a problem stands', async () => {
+    const mounted = await mountApp(DatasetEditorView)
+    await name(mounted.root, 'Reads 2026')
+
+    expect(button(mounted.root, 'Create dataset').props.disabled).toBe(true)
+    expect(content(mounted.root)).toContain('Blocked Fix')
+    await click(button(mounted.root, 'Create dataset'))
+    expect(verify).not.toHaveBeenCalled()
+    expect(createMetadata).not.toHaveBeenCalled()
+
+    await click(button(mounted.root, 'Seed dataset'))
+
+    expect(button(mounted.root, 'Create dataset').props.disabled).toBe(false)
+    expect(content(mounted.root)).toContain('Blocked not')
+    mounted.app.unmount()
+  })
+
+  it('holds the save back until the node accepts the draft', async () => {
+    previewResult.value = verdict(false)
+    const mounted = await mountApp(DatasetEditorView)
+    await click(button(mounted.root, 'Seed dataset'))
+
+    expect(button(mounted.root, 'Create dataset').props.disabled).toBe(true)
+    await click(button(mounted.root, 'Create dataset'))
+    expect(createMetadata).not.toHaveBeenCalled()
+
+    previewResult.value = verdict(true)
+    await flush()
+    await click(button(mounted.root, 'Create dataset'))
+    await flush()
+
+    expect(verify).toHaveBeenCalledTimes(1)
+    expect(createMetadata).toHaveBeenCalledTimes(1)
+    mounted.app.unmount()
+  })
+
+  it('waits for a running check before offering the save', async () => {
+    const mounted = await mountApp(DatasetEditorView)
+    await click(button(mounted.root, 'Seed dataset'))
+    expect(button(mounted.root, 'Create dataset').props.disabled).toBe(false)
+
+    previewRunning.value = true
+    await flush()
+
+    expect(button(mounted.root, 'Create dataset').props.disabled).toBe(true)
+    mounted.app.unmount()
+  })
+
+  it('follows the profile an imported crate declares', async () => {
+    const oldIri = 'https://example.test/profiles/old'
+    profiles.value = [profileFixture('old', 'Old'), profileFixture('new', 'New')]
+    importDraft.value = Editor.setProperty(seeded(Editor.newDraft()), './', 'conformsTo', [
+      { kind: 'reference', value: oldIri },
+    ])
+    const mounted = await mountApp(DatasetEditorView)
+
+    await click(button(mounted.root, 'Import crate'))
+    expect(content(mounted.root)).toContain('Declared old')
+
+    await click(button(mounted.root, 'Choose New'))
+    await click(button(mounted.root, 'Create dataset'))
+    await flush()
+
+    const graph = createMetadata.mock.calls[0][0].rocrate['@graph'] as Array<Record<string, unknown>>
+    expect(graph.find((entity) => entity['@id'] === './')?.conformsTo)
+      .toEqual({ '@id': 'https://example.test/profiles/new' })
+    mounted.app.unmount()
+  })
+
+  it('resolves a declared profile that loads after the dataset', async () => {
+    const stored = Editor.setProperty(seeded(Editor.newDraft()), './', 'conformsTo', [
+      { kind: 'reference', value: 'https://example.test/profiles/old' },
+    ])
+    fetchRoCrateRaw.mockResolvedValue(Editor.toRoCrate(stored))
+    route.name = 'dataset-edit'
+    route.params = { id: 'dataset-1' }
+    const mounted = await mountApp(DatasetEditorView)
+    await flush()
+    expect(content(mounted.root)).toContain('Declared none')
+
+    profiles.value = [profileFixture('old', 'Old', ['identifier'])]
+    await flush()
+
+    expect(content(mounted.root)).toContain('Declared old')
+    expect(drawerSays(mounted.root)).toContain('Old expects identifier')
+    mounted.app.unmount()
+  })
+
+  it('seeds the form once the profile rules arrive', async () => {
+    const rules = deferred<unknown>()
+    loadProfileCrate.mockReturnValue(rules.promise as Promise<Record<string, never>>)
+    profiles.value = [profileFixture('genomics', 'Genomics')]
+    const mounted = await mountApp(DatasetEditorView)
+    await click(button(mounted.root, 'Seed dataset'))
+    await click(button(mounted.root, 'Choose Genomics'))
+
+    expect(loadProfileCrate).toHaveBeenCalledWith('doc-genomics')
+    expect(content(mounted.root)).toContain('loading its rules')
+    expect(drawerSays(mounted.root)).not.toContain('Genomics expects')
+
+    rules.resolve({})
+    // The lifted rules reach the view through the profile list, as the parse cache does.
+    profiles.value = [profileFixture('genomics', 'Genomics', ['identifier'])]
+    await flush()
+
+    expect(content(mounted.root)).not.toContain('loading its rules')
+    expect(drawerSays(mounted.root)).toContain('Genomics expects identifier')
+    expect(drawerSays(mounted.root)).toContain('identifier on Example dataset has no value yet')
+    mounted.app.unmount()
+  })
+
+  it('reports rules that could not be loaded', async () => {
+    loadProfileCrate.mockRejectedValueOnce(new Error('offline'))
+    profiles.value = [profileFixture('genomics', 'Genomics')]
+    const mounted = await mountApp(DatasetEditorView)
+    await click(button(mounted.root, 'Seed dataset'))
+    await click(button(mounted.root, 'Choose Genomics'))
+    await flush()
+
+    expect(content(mounted.root)).toContain('Rules The rules of this profile could not be loaded.')
+    expect(content(mounted.root)).not.toContain('loading its rules')
+
+    await click(button(mounted.root, 'Retry profile rules'))
+    await flush()
+
+    expect(loadProfileCrate).toHaveBeenLastCalledWith('doc-genomics', { force: true })
+    expect(content(mounted.root)).toContain('Rules fine')
+    mounted.app.unmount()
+  })
+
+  it('drops a profile the new group may not use', async () => {
+    groups.value = [{ id: 'group-1', name: 'Research group' }, { id: 'group-2', name: 'Second group' }]
+    profiles.value = [{ ...profileFixture('own', 'Own profile', ['identifier']), managed: false, groupId: 'group-1' }]
+    const mounted = await mountApp(DatasetEditorView)
+    await click(button(mounted.root, 'Seed dataset'))
+    await click(button(mounted.root, 'Choose Own profile'))
+    expect(content(mounted.root)).toContain('Declared own')
+
+    await openLocation(mounted.root)
+    await click(button(mounted.root, 'Move to Second group'))
+
+    expect(content(mounted.root)).toContain('Declared none')
+    expect(drawerSays(mounted.root)).not.toContain('Own profile expects')
     mounted.app.unmount()
   })
 
