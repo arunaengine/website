@@ -114,9 +114,9 @@ export const profileTutorialSteps: TutorialStep[] = [
     id: 'rejected',
     route: TUTORIAL_PICKED_ROUTE,
     target: 'dataset-check',
-    title: 'The node would refuse this',
+    title: 'What is still missing',
     advanceOn: 'next',
-    body: 'The check runs the draft exactly as a save would, without saving. While a required property is empty it comes back refused, and every missing one is named with the entity it belongs to.',
+    body: 'The editor checks the draft against the profile as it is typed: a required value that is missing holds the save back, a recommended one is only advised. While the editor itself would refuse the draft nothing is sent to the node.',
   },
   {
     id: 'fix',
@@ -132,7 +132,7 @@ export const profileTutorialSteps: TutorialStep[] = [
     target: 'dataset-check',
     title: 'Accepted',
     advanceOn: 'next',
-    body: 'With every required value answered the verdict flips, and the panel names the profile the draft was found valid against. Only a refusal blocks the save; advisory findings never do.',
+    body: 'With every required value answered the draft goes to the node, and the panel names the profile it was found valid against. Only a refusal blocks the save; advisory findings never do.',
   },
   {
     id: 'save',

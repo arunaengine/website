@@ -50,6 +50,17 @@ function jumpButtons(): HostNode[] {
   )
 }
 
+/** Opens the bar that lists everything still outstanding. */
+async function openDrawer() {
+  await press(element(mounted.root, (node) => node.props['aria-expanded'] === false))
+}
+
+/** Jumps to the entity the line of the open bar names. */
+async function jumpTo(name: string) {
+  const line = element(mounted.root, (node) => node.tag === 'p' && content(node).trim() === name)
+  await press(button(line.parent as HostNode, 'Open'))
+}
+
 async function type(node: HostNode, value: string) {
   await typeValue(node, value)
   await settle()
@@ -126,28 +137,29 @@ describe('the dataset editor under the tutorial', () => {
   it('refuses the draft until every required value is answered', async () => {
     await reachEditor()
     await pickTutorialProfile()
+    const personId = personNode()!['@id']
 
-    // The editor's own checks come first: nothing is sent to the node until the
-    // draft has the name and description it always needs.
-    expect(jumpButtons()).toEqual([])
+    // Every rule of the profile is checked as it is typed, and nothing goes to
+    // the node while one of them is unanswered.
+    expect(saveButton().props.disabled).toBe(true)
     await type(field('Dataset name'), 'Station survey 2026')
     await type(field('Dataset description'), 'Readings from two stations.')
-
-    await until(() => jumpButtons().length > 0, 'the node check refused the draft')
+    expect(jumpButtons()).toEqual([])
     expect(saveButton().props.disabled).toBe(true)
 
     await type(row('./', 'license'), 'https://creativecommons.org/licenses/by/4.0/')
 
-    // The Person the profile added is still nameless, so the check still refuses.
-    await until(() => jumpButtons().length === 1, 'only the Person is still refused')
+    // The Person the profile added is still nameless, which its shape requires.
     expect(saveButton().props.disabled).toBe(true)
+    await openDrawer()
+    expect(content(mounted.root)).toContain('requires Name on the person')
 
-    // Jumping leaves the root form, so the Person is named from its own editor.
-    const personId = personNode()!['@id']
-    await press(jumpButtons()[0])
+    // The bar leaves the root form, so the Person is named from its own editor.
+    await jumpTo(personId)
     await type(row(personId, 'name'), 'Ada Lovelace')
 
-    await until(() => jumpButtons().length === 0, 'the node check accepted the draft')
+    await until(() => content(mounted.root).includes('would accept this dataset'), 'the node checked the draft')
+    expect(jumpButtons()).toEqual([])
     expect(saveButton().props.disabled).toBe(false)
     expect(mounted.fetchSpy).not.toHaveBeenCalled()
   })
@@ -158,9 +170,9 @@ describe('the dataset editor under the tutorial', () => {
     await type(field('Dataset name'), 'Station survey 2026')
     await type(field('Dataset description'), 'Readings from two stations.')
     await type(row('./', 'license'), 'https://creativecommons.org/licenses/by/4.0/')
-    await until(() => jumpButtons().length === 1, 'only the Person is still refused')
     const personId = personNode()!['@id']
-    await press(jumpButtons()[0])
+    await openDrawer()
+    await jumpTo(personId)
     await type(row(personId, 'name'), 'Ada Lovelace')
     await until(() => saveButton().props.disabled === false, 'the draft can be saved')
     await advanceTo('save')
