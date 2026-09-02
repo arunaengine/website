@@ -1,9 +1,10 @@
 // The Data view's object browser under the in-memory client renderer: the
 // compiled component plus a manager double, shared by the browser test and the
 // deletion flow test so both drive the same surface.
-import { computed, defineComponent, h, ref, type Component } from 'vue'
+import { computed, defineComponent, h, ref, type Component, type Ref } from 'vue'
 import * as VueRuntime from 'vue'
 import { vi } from 'vitest'
+import * as DeletionRequest from '@/lib/deletion/request'
 import * as StateBadge from '@/lib/stateBadge'
 import * as DropEntries from '@/lib/upload/dropEntries'
 import * as Utils from '@/lib/utils'
@@ -35,6 +36,17 @@ export const IconButtonStub = defineComponent({
     ),
 })
 
+/** The write answers the compiled browser sees; a test may narrow them. */
+export const s3Access = {
+  canWrite: (_bucket: string, _key: string) => true,
+  canDeletePrefix: (_bucket: string, _prefix: string) => true,
+}
+
+export function resetS3Access() {
+  s3Access.canWrite = () => true
+  s3Access.canDeletePrefix = () => true
+}
+
 let compiled: Component | null = null
 
 export function objectBrowser(): Component {
@@ -45,6 +57,7 @@ export function objectBrowser(): Component {
       'vue-router': { RouterLink: Slotted('a') },
       '@lucide/vue': new Proxy({}, { get: () => IconStub }),
       '@/lib/config': { featureEnabled: () => false },
+      '@/lib/deletion/request': DeletionRequest,
       '@/lib/stateBadge': StateBadge,
       '@/lib/upload/dropEntries': DropEntries,
       '@/lib/utils': Utils,
@@ -68,7 +81,12 @@ export function objectBrowser(): Component {
         usePlacementPolicies: () => ({ getBucketPlacement: vi.fn(async () => null) }),
       },
       '@/composables/useS3': {
-        useS3: () => ({ canWrite: () => true, canDeletePrefix: () => true, clearSessions: vi.fn() }),
+        useS3: () => ({
+          canWrite: (bucket: string, key: string) => s3Access.canWrite(bucket, key),
+          canDeletePrefix: (bucket: string, prefix: string) =>
+            s3Access.canDeletePrefix(bucket, prefix),
+          clearSessions: vi.fn(),
+        }),
       },
     },
   )
@@ -82,8 +100,23 @@ export const listedObject = {
   lastModified: new Date('2026-02-01T00:00:00Z'),
 }
 
-/** Everything the browser destructures, inert unless a test overrides it. */
+export const listedFolder = { prefix: 'raw/genomes/', name: 'genomes' }
+
+/**
+ * Everything the browser destructures, inert unless a test overrides it. The
+ * selection is a working double so a test can tick rows and read the count.
+ */
 export function fakeManager(overrides: Record<string, unknown> = {}) {
+  const folders = (overrides.folders as Ref<typeof listedFolder[]>) ?? ref([])
+  const objects = (overrides.objects as Ref<typeof listedObject[]>) ?? ref([listedObject])
+  const selectedObjectKeys = ref(new Set<string>())
+  const selectedPrefixes = ref(new Set<string>())
+  const toggle = (set: Ref<Set<string>>, id: string, selected: boolean) => {
+    const next = new Set(set.value)
+    if (selected) next.add(id)
+    else next.delete(id)
+    set.value = next
+  }
   return {
     router: { push: vi.fn() },
     bucket: ref('reef'),
@@ -98,8 +131,8 @@ export function fakeManager(overrides: Record<string, unknown> = {}) {
     referencedFrom: () => '',
     prefixReferenceSummary: () => '',
     activeGroupId: ref('g-1'),
-    folders: ref([]),
-    objects: ref([listedObject]),
+    folders,
+    objects,
     nextToken: ref(undefined),
     listLoading: ref(false),
     listError: ref(null),
@@ -113,13 +146,17 @@ export function fakeManager(overrides: Record<string, unknown> = {}) {
     keyIsSynced: () => false,
     bucketSyncCount: computed(() => 2),
     showSyncButton: computed(() => false),
-    selectedObjectKeys: ref(new Set<string>()),
-    selectedObjectCount: computed(() => 0),
-    selectableListedObjects: computed(() => [listedObject]),
-    allListedObjectsSelected: computed(() => false),
-    someListedObjectsSelected: computed(() => false),
-    setObjectSelected: vi.fn(),
-    setAllListedObjectsSelected: vi.fn(),
+    selectedObjectKeys,
+    selectedPrefixes,
+    selectedCount: computed(() => selectedObjectKeys.value.size + selectedPrefixes.value.size),
+    selectableListedCount: computed(() => folders.value.length + objects.value.length),
+    allListedSelected: computed(() => false),
+    someListedSelected: computed(() => false),
+    setObjectSelected: (key: string, selected: boolean) =>
+      toggle(selectedObjectKeys, key, selected),
+    setFolderSelected: (prefix: string, selected: boolean) =>
+      toggle(selectedPrefixes, prefix, selected),
+    setAllListedSelected: vi.fn(),
     canWriteCurrentPrefix: computed(() => true),
     writeRestrictionMessage: computed(() => null),
     watchPathPrefix: computed(() => 'reef/raw/'),

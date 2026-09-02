@@ -118,7 +118,7 @@ describe('deletion options', () => {
     ).toBe('This session cannot delete this entire folder.')
     expect(
       deletionOptions(target({ kind: 'selection', permissions: denied }))[0].disabledReason,
-    ).toBe('This session cannot delete every selected object.')
+    ).toBe('This session cannot delete everything selected.')
   })
 
   it('says why permanent deletion is unavailable', () => {

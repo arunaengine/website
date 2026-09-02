@@ -7,7 +7,9 @@ import * as DeletionRequest from '@/lib/deletion/request'
 import * as ObjectVersions from '@/lib/objectVersions'
 import * as StateBadge from '@/lib/stateBadge'
 import { s3ErrorMessage } from '@/composables/s3/errors'
+import { prefixDeleteFailure, useSelectionDelete } from './deletion/useSelectionDelete'
 import {
+  button,
   click,
   compileClientComponent,
   content,
@@ -19,6 +21,22 @@ import {
   typeValue,
   type HostNode,
 } from '@/test/clientRender'
+
+// The real selection helper drives one dialog below, so the module it asks for
+// its S3 calls is replaced with the same double that dialog is compiled with.
+const selectionS3 = vi.hoisted(() => ({
+  deleteObject: vi.fn(async (_bucket: string, _key: string, _nodeId: string | null) => undefined),
+  deletePrefix: vi.fn(async (_bucket: string, _prefix: string, _nodeId: string | null) => ({
+    deleted: 3,
+    errors: [] as { key: string; message: string }[],
+  })),
+  canWrite: () => true,
+  canDeletePrefix: () => true,
+}))
+vi.mock('@/composables/useS3', async () => {
+  const errors = await import('@/composables/s3/errors')
+  return { ...errors, useS3: () => selectionS3 }
+})
 
 const listObjectVersions = vi.fn()
 const deleteObject = vi.fn(async () => undefined)
@@ -83,7 +101,8 @@ const versionPicker = compileClientComponent(
   },
 )
 
-const dialog = compileClientComponent(new URL('./DeleteDialog.vue', import.meta.url), {
+function dialogModules(overrides: Record<string, unknown> = {}) {
+  return {
   vue: VueRuntime,
   '@/lib/utils': Utils,
   '@/lib/deletion/options': DeletionOptions,
@@ -129,6 +148,7 @@ const dialog = compileClientComponent(new URL('./DeleteDialog.vue', import.meta.
     }),
   },
   '@/components/data/deletion/useSelectionDelete': {
+    prefixDeleteFailure,
     useSelectionDelete: () => ({
       outcome: ref(null),
       scopes: ref([]),
@@ -170,7 +190,29 @@ const dialog = compileClientComponent(new URL('./DeleteDialog.vue', import.meta.
       deleteBucket,
     }),
   },
-})
+  ...overrides,
+  }
+}
+
+const dialog = compileClientComponent(
+  new URL('./DeleteDialog.vue', import.meta.url),
+  dialogModules(),
+)
+
+// The same dialog driven by the real selection helper, so a selection runs the
+// object and folder calls it would run in the app.
+const selectionDialog = compileClientComponent(
+  new URL('./DeleteDialog.vue', import.meta.url),
+  dialogModules({
+    '@/components/data/deletion/useSelectionDelete': { prefixDeleteFailure, useSelectionDelete },
+    '@/components/data/deletion/DeletionOutcome.vue': moduleDefault(
+      compileClientComponent(new URL('./deletion/DeletionOutcome.vue', import.meta.url), {
+        vue: VueRuntime,
+      }),
+    ),
+    '@/composables/useS3': { s3ErrorMessage, useS3: () => selectionS3 },
+  }),
+)
 
 const currentVersion = {
   key: 'a.txt',
@@ -189,7 +231,10 @@ const olderVersion = {
   lastModified: new Date('2026-01-01T00:00:00Z'),
 }
 
-async function open(request: DeletionRequest.DeleteRequest) {
+async function open(
+  request: DeletionRequest.DeleteRequest,
+  component: typeof dialog = dialog,
+) {
   listObjectVersions.mockResolvedValue({
     versions: [currentVersion, olderVersion],
     truncated: false,
@@ -220,7 +265,7 @@ async function open(request: DeletionRequest.DeleteRequest) {
   const closes: number[] = []
   const host = defineComponent({
     setup: () => () =>
-      h(dialog, {
+      h(component, {
         request,
         onCompleted: (result: unknown) => completed.push(result),
         onClose: () => closes.push(1),
@@ -416,5 +461,76 @@ describe('delete dialog', () => {
     // The default outcome for a folder is the recoverable one, so no typing.
     expect(content(root)).not.toContain('to confirm')
     expect(confirmButton(root).props.disabled).toBe(false)
+  })
+})
+
+describe('delete dialog selection with folders', () => {
+  const request = {
+    kind: 'selection' as const,
+    bucket: 'reef',
+    nodeId: null,
+    keys: ['a.txt'],
+    prefixes: ['raw/', 'cooked/'],
+  }
+
+  it('names the files and the folders it will delete', async () => {
+    const { root } = await open(request, selectionDialog)
+
+    expect(content(root)).toContain('Delete 1 file and 2 folders')
+    expect(content(root)).toContain('raw/')
+    expect(content(root)).toContain('cooked/')
+  })
+
+  it('deletes every selected folder through the prefix walk', async () => {
+    selectionS3.deleteObject.mockClear()
+    selectionS3.deletePrefix.mockClear()
+    const { root, completed } = await open(request, selectionDialog)
+
+    await click(confirmButton(root))
+
+    expect(selectionS3.deleteObject).toHaveBeenCalledWith('reef', 'a.txt', null)
+    expect(selectionS3.deletePrefix.mock.calls).toEqual([
+      ['reef', 'raw/', null],
+      ['reef', 'cooked/', null],
+    ])
+    expect(content(root)).toContain('Committed: 3. Failed: 0. Unknown: 0.')
+    expect(completed).toHaveLength(1)
+  })
+
+  it('keeps a failing folder in the outcome and the dialog open', async () => {
+    selectionS3.deletePrefix.mockClear()
+    selectionS3.deletePrefix.mockResolvedValueOnce({
+      deleted: 1,
+      errors: [{ key: 'raw/locked.bam', message: 'AccessDenied' }],
+    })
+    const { root, closes } = await open(request, selectionDialog)
+
+    await click(confirmButton(root))
+
+    expect(closes).toHaveLength(0)
+    expect(content(root)).toContain('Committed: 2. Failed: 1. Unknown: 0.')
+    expect(content(root)).toContain('raw/locked.bam: AccessDenied')
+    expect(content(button(root, 'Try again')).trim()).toBe('Try again')
+  })
+
+  it('retries only what is still unresolved', async () => {
+    selectionS3.deleteObject.mockClear()
+    selectionS3.deletePrefix.mockClear()
+    selectionS3.deletePrefix.mockResolvedValueOnce({
+      deleted: 0,
+      errors: [{ key: 'raw/locked.bam', message: 'AccessDenied' }],
+    })
+    const { root } = await open(request, selectionDialog)
+
+    await click(confirmButton(root))
+    await click(button(root, 'Try again'))
+
+    expect(selectionS3.deleteObject).toHaveBeenCalledTimes(1)
+    expect(selectionS3.deletePrefix.mock.calls).toEqual([
+      ['reef', 'raw/', null],
+      ['reef', 'cooked/', null],
+      ['reef', 'raw/', null],
+    ])
+    expect(content(root)).toContain('Committed: 3. Failed: 0. Unknown: 0.')
   })
 })

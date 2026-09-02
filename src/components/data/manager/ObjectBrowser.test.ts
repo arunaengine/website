@@ -1,14 +1,24 @@
-import { defineComponent, h } from 'vue'
-import { describe, expect, it, vi } from 'vitest'
+import { defineComponent, h, ref } from 'vue'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   bubbleClick,
+  button,
+  click,
   content,
   element,
+  flush,
   mountApp,
   nodes,
   type HostNode,
 } from '@/test/clientRender'
-import { fakeManager, listedObject, objectBrowser } from '@/test/dataManager'
+import {
+  fakeManager,
+  listedFolder,
+  listedObject,
+  objectBrowser,
+  resetS3Access,
+  s3Access,
+} from '@/test/dataManager'
 
 const openDetails = vi.fn()
 const download = vi.fn()
@@ -17,11 +27,23 @@ const push = vi.fn()
 
 const browser = objectBrowser()
 
-async function render() {
-  const manager = fakeManager({ openDetails, download, requestDelete, router: { push } })
+async function render(overrides: Record<string, unknown> = {}) {
+  const manager = fakeManager({ openDetails, download, requestDelete, router: { push }, ...overrides })
   const host = defineComponent({ setup: () => () => h(browser, { manager }) })
   const { root } = await mountApp(host)
   return root
+}
+
+function checkbox(root: HostNode, label: string): HostNode {
+  return element(root, (node) => node.tag === 'input' && node.props['aria-label'] === label)
+}
+
+// The host tree has no DOM, so the change event carries the new state by hand.
+async function tick(node: HostNode, checked: boolean) {
+  Object.assign(node, { checked })
+  const handler = node.props.onChange
+  if (typeof handler === 'function') await handler({ target: node })
+  await flush()
 }
 
 function action(root: HostNode, label: string): HostNode {
@@ -101,5 +123,57 @@ describe('object browser toolbar', () => {
     expect(push).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'bucket-storage', params: { bucketId: 'reef' } }),
     )
+  })
+})
+
+describe('object browser selection', () => {
+  afterEach(() => resetS3Access())
+
+  it('offers a labelled checkbox on every folder row', async () => {
+    const root = await render({ folders: ref([listedFolder]) })
+    const box = checkbox(root, 'Select genomes')
+
+    expect(box.props.type).toBe('checkbox')
+    expect(box.props.disabled).toBe(false)
+    // Icon-free control: the label is the accessible name, not visible text.
+    expect(content(box).trim()).toBe('')
+  })
+
+  it('sends the ticked folders and files to the delete dialog', async () => {
+    requestDelete.mockClear()
+    const root = await render({ folders: ref([listedFolder]) })
+
+    await tick(checkbox(root, 'Select genomes'), true)
+    await tick(checkbox(root, `Select ${listedObject.name}`), true)
+    const trigger = button(root, 'Delete selected')
+
+    expect(content(trigger)).toContain('Delete selected (2)')
+    expect(trigger.props.disabled).toBe(false)
+    await click(trigger)
+
+    expect(requestDelete).toHaveBeenCalledWith({
+      kind: 'selection',
+      bucket: 'reef',
+      nodeId: null,
+      keys: [listedObject.key],
+      prefixes: [listedFolder.prefix],
+    })
+  })
+
+  it('refuses to tick a folder this session cannot delete', async () => {
+    s3Access.canDeletePrefix = () => false
+    const root = await render({ folders: ref([listedFolder]) })
+    const box = checkbox(root, 'Select genomes')
+
+    expect(box.props.disabled).toBe(true)
+    expect(box.props.title).toContain('cannot delete this entire folder')
+  })
+
+  it('keeps the selection button disabled while nothing is ticked', async () => {
+    const root = await render({ folders: ref([listedFolder]) })
+    const trigger = button(root, 'Delete selected')
+
+    expect(content(trigger)).toContain('Delete selected (0)')
+    expect(trigger.props.disabled).toBe(true)
   })
 })
