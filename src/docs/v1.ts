@@ -4,11 +4,14 @@ export const docsVersion = 'v1'
 
 export type DocsTopicKind = 'Concept' | 'Guide'
 
-export interface DocsImage {
-  src: string
-  alt: string
-  caption?: string
-}
+/** Figures drawn inline by a component, so they take the page theme. */
+export type DocsFigure = 'where-data-lives'
+
+/** A screenshot file under /docs/v1, or a named inline figure. */
+export type DocsImage = { alt: string; caption?: string } & (
+  | { src: string; figure?: never }
+  | { figure: DocsFigure; src?: never }
+)
 
 export interface DocsSection {
   title: string
@@ -295,7 +298,7 @@ export const docsTopics: DocsTopic[] = [
           'Every figure the portal shows about copies is one node\'s view, answered by the node you asked.',
         ],
         image: {
-          src: '/docs/v1/where-data-lives.svg',
+          figure: 'where-data-lives',
           alt: 'An upload passes a storage backend and becomes a copy while a placement policy allows or refuses it; separately a sync writes a second bucket on another node',
           caption: 'A storage backend takes the write, a placement policy only allows it, and a sync is the one thing that creates a second bucket.',
         },

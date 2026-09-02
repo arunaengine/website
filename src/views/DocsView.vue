@@ -3,6 +3,7 @@ import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import WhereDataLivesFigure from '@/components/docs/WhereDataLivesFigure.vue'
 import {
   Activity,
   ArrowRight,
@@ -77,8 +78,14 @@ import {
   docsTopics,
   docsVersion,
   sectionId,
+  type DocsFigure,
   type DocsTopicKind,
 } from '@/docs/v1'
+
+/** Inline figures a section image may name instead of a file. */
+const docsFigures: Record<DocsFigure, Component> = {
+  'where-data-lives': WhereDataLivesFigure,
+}
 
 // Renders docs copy with its inline links as real vnodes; never raw HTML.
 const inlineLinkClass =
@@ -335,7 +342,13 @@ function glossaryLink(anchor: string) {
                   </li>
                 </ol>
                 <figure v-if="section.image" class="mt-4">
+                  <component
+                    :is="docsFigures[section.image.figure]"
+                    v-if="section.image.figure"
+                    class="w-full rounded-md border border-border"
+                  />
                   <img
+                    v-else
                     :src="section.image.src"
                     :alt="section.image.alt"
                     loading="lazy"

@@ -1,7 +1,7 @@
 import { createSSRApp, defineComponent, h, type Component } from 'vue'
 import { renderToString } from '@vue/server-renderer'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import { docsScreenshots, docsTopics } from '@/docs/v1'
@@ -144,16 +144,38 @@ describe('versioned in-portal Docs', () => {
     expect(html).toContain(docsScreenshots.note)
     expect(JSON.stringify(docsTopics)).not.toMatch(/lorem ipsum/i)
 
+    // Every screenshot is a shipped file; a figure is drawn inline instead.
+    const publicRoot = fileURLToPath(new URL('../../public', import.meta.url))
     const images = docsTopics.flatMap((topic) => topic.sections.flatMap((s) => (s.image ? [s.image] : [])))
     expect(images.length).toBeGreaterThan(0)
     for (const image of images) {
-      expect(image.src).toMatch(/^\/docs\/v1\/[a-z0-9-]+\.(jpg|svg)$/)
       expect(image.alt.length).toBeGreaterThan(0)
+      if (image.figure) {
+        expect(image.figure).toBe('where-data-lives')
+        continue
+      }
+      expect(image.src).toMatch(/^\/docs\/v1\/[a-z0-9-]+\.jpg$/)
+      expect(existsSync(join(publicRoot, image.src)), image.src).toBe(true)
     }
 
     const tourHtml = await renderTopic('portal-tour')
     expect(tourHtml).toContain('<figure')
     expect(tourHtml).toContain('/docs/v1/dashboard.jpg')
+  })
+
+  it('draws the where-data-lives figure inline in theme colours', async () => {
+    // Loaded through <img>, the old SVG kept a white background in dark mode.
+    const html = await renderTopic('where-data-lives')
+    const figure = html.slice(html.indexOf('<figure'), html.indexOf('</figure>'))
+
+    expect(figure).toContain('<svg')
+    expect(figure).toContain('role="img"')
+    expect(figure).toContain('How an upload becomes copies')
+    expect(figure).toContain('fill="currentColor"')
+    expect(figure).toContain('text-foreground')
+    expect(figure).not.toContain('<img')
+    expect(figure).not.toMatch(/#[0-9a-fA-F]{6}/)
+    expect(figure).toContain('A storage backend takes the write')
   })
 
   it('offers a guided tour only on the guides that declare one', async () => {
