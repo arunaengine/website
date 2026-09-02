@@ -63,6 +63,12 @@ export function keyVersions(page: VersionPage, key: string): ObjectVersionEntry[
   return entries
 }
 
+/** The one vocabulary for a row's place in the history. */
+export function versionStateLabel(entry: ObjectVersionEntry): string {
+  if (entry.deleteMarker) return 'Delete marker'
+  return entry.isLatest ? 'Current' : 'Older'
+}
+
 /**
  * Newest first. Version ids are ULIDs, so their descending order is already
  * chronological; the timestamp decides first so a store with other ids still

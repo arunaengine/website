@@ -348,6 +348,8 @@ async function createFolder() {
       @changed="detailsRevision += 1"
     />
 
+    <!-- Mounted after the details dialog, so a delete asked for inside it opens
+         on top and the file stays open behind it. -->
     <DeleteDialog
       :request="deleteRequest"
       :sync-applies="deleteSyncApplies"

@@ -1,14 +1,16 @@
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, ref } from 'vue'
 import * as VueRuntime from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import * as Utils from '@/lib/utils'
 import * as StateBadge from '@/lib/stateBadge'
 import * as DeletionOptions from '@/lib/deletion/options'
+import * as ObjectVersions from '@/lib/objectVersions'
 import {
   click,
   compileClientComponent,
   content,
   element,
+  flush,
   mountApp,
   moduleDefault,
   nodes,
@@ -48,6 +50,7 @@ const panel = compileClientComponent(new URL('./ObjectVersionsPanel.vue', import
   '@/lib/utils': Utils,
   '@/lib/stateBadge': StateBadge,
   '@/lib/deletion/options': DeletionOptions,
+  '@/lib/objectVersions': ObjectVersions,
   '@/composables/useS3': {
     s3ErrorMessage: (error: unknown) => String(error),
     useS3: () => ({ listObjectVersions, deleteObjectVersion, canWrite, downloadUrl: async () => 'url' }),
@@ -161,6 +164,25 @@ describe('object versions panel', () => {
       expect.objectContaining({ option: 'make-current', versionId: '01OLDER00000', isCurrent: false }),
       expect.objectContaining({ option: 'delete-version', versionId: '01CURRENT000', isCurrent: true }),
     ])
+  })
+
+  it('reloads when the parent bumps the revision', async () => {
+    listObjectVersions.mockClear()
+    listObjectVersions.mockResolvedValue({ versions: [current, older], truncated: false })
+    const revision = ref(0)
+    const host = defineComponent({
+      setup: () => () =>
+        h(panel, { active: true, bucket: 'reef', objectKey: 'a.txt', nodeId: null, revision: revision.value }),
+    })
+    const { root } = await mountApp(host)
+    expect(listObjectVersions).toHaveBeenCalledTimes(1)
+
+    listObjectVersions.mockResolvedValue({ versions: [marker, older], truncated: false })
+    revision.value += 1
+    await flush()
+
+    expect(listObjectVersions).toHaveBeenCalledTimes(2)
+    expect(content(root)).toContain('Delete marker')
   })
 
   it('says why a bucket on another node has no version list', async () => {

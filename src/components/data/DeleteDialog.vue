@@ -10,10 +10,11 @@ import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import Input from '@/components/ui/Input.vue'
-import Notice from '@/components/ui/Notice.vue'
+import RefusalNote from '@/components/ui/RefusalNote.vue'
 import DeletionImpact from '@/components/data/deletion/DeletionImpact.vue'
 import DeletionOutcome from '@/components/data/deletion/DeletionOutcome.vue'
 import PurgeProgress from '@/components/data/deletion/PurgeProgress.vue'
+import VersionPicker from '@/components/data/deletion/VersionPicker.vue'
 import { useDeletionPreflight } from '@/components/data/deletion/useDeletionPreflight'
 import { usePurgeJob } from '@/components/data/deletion/usePurgeJob'
 import { useSelectionDelete } from '@/components/data/deletion/useSelectionDelete'
@@ -37,7 +38,8 @@ import {
   storageDeletionErrorMessage,
   type StorageDeletionPreflight,
 } from '@/lib/storageDeletion'
-import { formatBytes } from '@/lib/utils'
+import { versionStateLabel, type ObjectVersionEntry } from '@/lib/objectVersions'
+import { formatBytes, relativeTime } from '@/lib/utils'
 import { computed, onUnmounted, ref, watch } from 'vue'
 
 const props = defineProps<{ request: DeleteRequest | null; syncApplies?: boolean }>()
@@ -64,6 +66,7 @@ const typedName = ref('')
 const busy = ref(false)
 const finished = ref(false)
 const error = ref<string | null>(null)
+const pickedVersion = ref<ObjectVersionEntry | null>(null)
 let requestId = 0
 
 const request = computed(() => props.request)
@@ -160,14 +163,51 @@ const quotaNote = computed(() => {
     ? 'A delete marker frees no storage: the data keeps using your quota until it is deleted permanently.'
     : `A delete marker frees no storage: this keeps using ${formatBytes(bytes)} of your quota until it is deleted permanently.`
 })
+// A whole file names no version, so this outcome asks for one before it runs.
+const picksVersion = computed(
+  () => selected.value?.id === 'delete-version' && !request.value?.versionId,
+)
+const targetVersionId = computed(
+  () => request.value?.versionId ?? (picksVersion.value ? pickedVersion.value?.versionId : null) ?? null,
+)
 const versionFacts = computed(() => {
   const current = request.value
-  if (!current || (current.kind !== 'version' && current.kind !== 'marker')) return []
+  if (!current) return []
+  if (current.kind === 'version' || current.kind === 'marker') {
+    return [
+      { label: 'Version', value: current.versionId ?? '' },
+      {
+        label: 'State',
+        value:
+          current.kind === 'marker' ? 'Delete marker' : current.isCurrent ? 'Current' : 'Older',
+      },
+      ...(current.bytes === undefined ? [] : [{ label: 'Size', value: formatBytes(current.bytes) }]),
+    ]
+  }
+  const picked = picksVersion.value ? pickedVersion.value : null
+  if (!picked) return []
   return [
-    { label: 'Version', value: current.versionId ?? '' },
-    { label: 'State', value: current.isCurrent ? 'Current' : 'Older' },
-    ...(current.bytes === undefined ? [] : [{ label: 'Size', value: formatBytes(current.bytes) }]),
+    { label: 'Version', value: picked.versionId },
+    { label: 'State', value: versionStateLabel(picked) },
+    ...(picked.size === undefined ? [] : [{ label: 'Size', value: formatBytes(picked.size) }]),
+    ...(picked.lastModified
+      ? [{ label: 'Written', value: relativeTime(picked.lastModified.toISOString()) }]
+      : []),
   ]
+})
+// What removing exactly this version does to the head pointer.
+const versionConsequence = computed(() => {
+  const current = request.value
+  if (!current || selected.value?.id !== 'delete-version') return null
+  const picked = picksVersion.value ? pickedVersion.value : null
+  if (picksVersion.value && !picked) return null
+  const marker = picked ? picked.deleteMarker : current.kind === 'marker'
+  const head = picked ? picked.isLatest : Boolean(current.isCurrent)
+  if (marker && head) {
+    return 'This is the delete marker: removing it makes the version below it current again, so the file is listed once more.'
+  }
+  if (head) return 'This is the current version: removing it makes the previous version current.'
+  return 'This is an older version: the current version stays as it is.'
 })
 
 function apiClient() {
@@ -185,6 +225,7 @@ function reset() {
   remainingError.value = null
   selectedId.value = null
   typedName.value = ''
+  pickedVersion.value = null
   busy.value = false
   finished.value = false
   error.value = null
@@ -334,7 +375,12 @@ async function runOption(current: DeleteRequest, option: DeletionOption): Promis
       return [current.key ?? '']
     }
     case 'delete-version':
-      await s3.deleteObjectVersion(current.bucket, current.key ?? '', current.versionId ?? '', current.nodeId)
+      await s3.deleteObjectVersion(
+        current.bucket,
+        current.key ?? '',
+        targetVersionId.value ?? '',
+        current.nodeId,
+      )
       return [current.key ?? '']
     case 'copy-version':
       await s3.copyObjectVersion(current.bucket, current.key ?? '', current.versionId ?? '', current.nodeId)
@@ -359,10 +405,18 @@ const showConfirm = computed(
   () => Boolean(selected.value) && (!finished.value || unresolved.value > 0 || Boolean(error.value)),
 )
 
+// Every outcome that removes one version needs to know which one.
+const confirmBlocked = computed(
+  () =>
+    Boolean(selected.value?.disabledReason)
+    || !typedOk.value
+    || (selected.value?.call.operation === 'delete-version' && !targetVersionId.value),
+)
+
 async function confirm() {
   const current = request.value
   const option = selected.value
-  if (!current || !option || option.disabledReason || !typedOk.value || busy.value) return
+  if (!current || !option || confirmBlocked.value || busy.value) return
   busy.value = true
   error.value = null
   const id = requestId
@@ -371,7 +425,12 @@ async function confirm() {
     if (id !== requestId) return
     emit('completed', { request: current, option, committed })
     if (staysOpen.value) finished.value = true
-    else close()
+    else {
+      // close() refuses to act while the dialog is busy, and this is the
+      // success path: a second click would write a second deletion.
+      busy.value = false
+      close()
+    }
   } catch (caught) {
     if (id !== requestId) return
     error.value = s3ErrorMessage(caught)
@@ -438,6 +497,17 @@ onUnmounted(() => {
             </span>
           </label>
         </fieldset>
+
+        <VersionPicker
+          v-if="picksVersion && request.key"
+          :bucket="request.bucket"
+          :object-key="request.key"
+          :node-id="request.nodeId"
+          :selected="targetVersionId"
+          :disabled="busy || finished"
+          @select="(entry) => (pickedVersion = entry)"
+        />
+        <p v-if="versionConsequence" class="text-muted-foreground">{{ versionConsequence }}</p>
 
         <DeletionImpact
           :preflight="preflight"
@@ -514,14 +584,15 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <Notice v-if="error" tone="error">{{ error }}</Notice>
+      <!-- The sentence is the headline; the node's own wording follows it. -->
+      <RefusalNote v-if="error" :message="error" />
 
       <DialogFooter>
         <Button variant="outline" :disabled="busy" @click="close">{{ finished ? 'Close' : 'Cancel' }}</Button>
         <Button
           v-if="showConfirm && selected"
           variant="destructive"
-          :disabled="busy || Boolean(selected.disabledReason) || !typedOk"
+          :disabled="busy || confirmBlocked"
           @click="confirm"
         >
           {{ busy ? 'Working…' : retrying ? 'Try again' : selected.label }}

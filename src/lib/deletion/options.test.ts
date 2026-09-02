@@ -39,8 +39,12 @@ const KINDS: DeletionKind[] = [
 ]
 
 describe('deletion options', () => {
-  it('offers delete and permanent deletion for a live object', () => {
-    expect(ids()).toEqual(['delete', 'delete-permanently'])
+  it('offers delete, one version and permanent deletion for a live object', () => {
+    expect(ids()).toEqual(['delete', 'delete-version', 'delete-permanently'])
+    // The file itself names no version, so this outcome has to ask for one.
+    const single = deletionOptions(target()).find((option) => option.id === 'delete-version')
+    expect(single?.label).toBe('Delete one version permanently')
+    expect(single?.description).toContain('Choose it below')
   })
 
   it('offers restore instead of delete once the head is a marker', () => {
@@ -48,6 +52,7 @@ describe('deletion options', () => {
     expect(ids({ kind: 'object', headState: 'marker' })).toEqual(['restore', 'delete-permanently'])
     expect(ids({ kind: 'deleted-object', headState: 'live' })).toEqual([
       'delete',
+      'delete-version',
       'delete-permanently',
     ])
   })
@@ -132,9 +137,11 @@ describe('deletion options', () => {
   it('keeps a marker delete available on a remote bucket', () => {
     // Only the purge job needs the holding node's API; a marker is plain S3.
     const options = deletionOptions(target({ remote: true }))
+    const reason = (id: string) =>
+      options.find((option) => option.id === id)?.disabledReason ?? null
 
-    expect(options[0].disabledReason).toBeNull()
-    expect(options[1].disabledReason).not.toBeNull()
+    expect(reason('delete')).toBeNull()
+    expect(reason('delete-permanently')).not.toBeNull()
   })
 
   it('marks every irreversible outcome and says on this node', () => {

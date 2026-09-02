@@ -14,7 +14,7 @@ import Spinner from '@/components/ui/Spinner.vue'
 import { useS3, s3ErrorMessage } from '@/composables/useS3'
 import { deletionOptions, type DeletionOptionId } from '@/lib/deletion/options'
 import type { DeleteRequest } from '@/lib/deletion/request'
-import type { ObjectVersionEntry } from '@/lib/objectVersions'
+import { versionStateLabel, type ObjectVersionEntry } from '@/lib/objectVersions'
 import { stateVariant } from '@/lib/stateBadge'
 import { formatBytes, relativeTime, truncateMiddle } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
@@ -74,11 +74,6 @@ watch(
   { immediate: true },
 )
 
-function badgeLabel(entry: ObjectVersionEntry): string {
-  if (entry.deleteMarker) return 'Delete marker'
-  return entry.isLatest ? 'Current' : 'Older'
-}
-
 function target(entry: ObjectVersionEntry, option: DeletionOptionId): DeleteRequest {
   return {
     option,
@@ -110,12 +105,23 @@ function option(entry: ObjectVersionEntry, id: string) {
 async function download(entry: ObjectVersionEntry) {
   actionError.value = null
   try {
-    const url = await s3.downloadUrl(props.bucket, props.objectKey, props.nodeId ?? null, entry.versionId)
+    const name = props.objectKey.split('/').pop() || props.objectKey
+    const url = await s3.downloadUrl(
+      props.bucket,
+      props.objectKey,
+      props.nodeId ?? null,
+      entry.versionId,
+      name,
+    )
+    // Clicked inside the document: a detached anchor is ignored by some
+    // browsers, and the name travels in the response's Content-Disposition.
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = props.objectKey.split('/').pop() ?? props.objectKey
+    anchor.download = name
     anchor.rel = 'noopener'
+    document.body.append(anchor)
     anchor.click()
+    anchor.remove()
   } catch (err) {
     actionError.value = s3ErrorMessage(err)
   }
@@ -164,7 +170,7 @@ Its S3 endpoint does not allow cross-origin browsing from this portal, so its ve
           :key="entry.versionId"
           class="flex flex-wrap items-center gap-2 rounded-md border border-border px-3 py-2 text-xs"
         >
-          <Badge :variant="stateVariant(badgeLabel(entry))" size="sm">{{ badgeLabel(entry) }}</Badge>
+          <Badge :variant="stateVariant(versionStateLabel(entry))" size="sm">{{ versionStateLabel(entry) }}</Badge>
           <span class="hash" :title="entry.versionId">{{ truncateMiddle(entry.versionId, 8, 6) }}</span>
           <CopyButton :value="entry.versionId" label="Copy version id" />
           <span class="text-muted-foreground">

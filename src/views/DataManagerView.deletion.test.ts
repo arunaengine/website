@@ -1,9 +1,27 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { parse } from '@vue/compiler-sfc'
-import { describe, expect, it } from 'vitest'
+import { computed, defineComponent, h, ref } from 'vue'
+import * as VueRuntime from 'vue'
+import { describe, expect, it, vi } from 'vitest'
+import * as DeletionOptions from '@/lib/deletion/options'
+import * as DeletionRequest from '@/lib/deletion/request'
+import * as ObjectVersions from '@/lib/objectVersions'
+import * as Utils from '@/lib/utils'
+import {
+  bubbleClick,
+  click,
+  compileClientComponent,
+  content,
+  element,
+  mountApp,
+  nodes,
+  moduleDefault,
+} from '@/test/clientRender'
+import { ButtonStub, Slotted, fakeManager, objectBrowser as compiledBrowser } from '@/test/dataManager'
 import { exactFileBacklinkPreflight, type BacklinkPreflightResponse } from '@/lib/backlinks'
 import { deletionOptions } from '@/lib/deletion/options'
+import { versionStateLabel } from '@/lib/objectVersions'
 
 function read(path: string): string {
   return readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8')
@@ -208,13 +226,15 @@ describe('Data Manager version-aware deletion', () => {
     )
   })
 
-  it('keeps warnings advisory and gates only the typed-name tier', () => {
+  it('keeps warnings advisory and gates only the typed name and the version', () => {
     const confirm = buttonOpeningTag(deleteDialog.template, 'confirm')
     expect(confirm).not.toContain('backlinkPreflight')
     expect(confirm).not.toContain('hidden_references_exist')
     expect(confirm).not.toContain('would_remove_last_resolvable_aruna_location')
-    // The only extra gate is the typed name, and it names what to type.
-    expect(confirm).toContain('!typedOk')
+    // The gates are the typed name and a named version, nothing else.
+    expect(confirm).toContain('confirmBlocked')
+    expect(deleteDialogSource).toContain('|| !typedOk.value')
+    expect(deleteDialogSource).toContain("selected.value?.call.operation === 'delete-version' && !targetVersionId.value")
     expect(deleteDialog.template).toContain('to confirm')
     expect(deleteDialogSource).toContain("typedName.value.trim() === typedTarget.value")
   })
@@ -327,11 +347,12 @@ describe('Data Manager explicit multi-file deletion', () => {
 
 describe('Data Manager versions and restore', () => {
   it('lists versions and markers with one badge vocabulary', () => {
+    const entry = { key: 'a.txt', versionId: 'v1', isLatest: true, deleteMarker: false }
     expect(versionsSource).toContain('s3.listObjectVersions(')
-    expect(functionSource(versionsSource, 'badgeLabel')).toContain("'Delete marker'")
-    expect(functionSource(versionsSource, 'badgeLabel')).toContain("'Current'")
-    expect(functionSource(versionsSource, 'badgeLabel')).toContain("'Older'")
-    expect(versionsPanel.template).toContain('stateVariant(badgeLabel(entry))')
+    expect(versionStateLabel({ ...entry, deleteMarker: true })).toBe('Delete marker')
+    expect(versionStateLabel(entry)).toBe('Current')
+    expect(versionStateLabel({ ...entry, isLatest: false })).toBe('Older')
+    expect(versionsPanel.template).toContain('stateVariant(versionStateLabel(entry))')
     expect(versionsPanel.template).toContain('truncateMiddle(entry.versionId, 8, 6)')
     expect(versionsPanel.template).toContain('label="Copy version id"')
   })
@@ -381,16 +402,16 @@ describe('Data Manager versions and restore', () => {
     expect(objectBrowser.template).toContain('Deleted objects are listed by the node that holds this bucket')
   })
 
-  it('opens the file details on the tab the control names', () => {
-    expect(objectBrowser.template).toContain('@click="openDetails(object)"')
-    expect(objectBrowser.template).toContain("openDetails(object, 'preview')")
-    expect(objectBrowser.template).toContain("openDetails(object, 'storage')")
+  it('keeps the open file and its section in the route', () => {
     expect(functionSource(managerSource, 'openDetails')).toContain('object: object.key')
-    expect(functionSource(managerSource, 'openDetails')).toContain("query.tab = tab")
+    expect(functionSource(managerSource, 'openDetails')).toContain('query.tab = tab')
+    expect(managerSource).toContain("const DETAIL_TABS = ['general', 'preview', 'versions', 'storage']")
+    // Preview is a mode of the same dialog, so it is not one of the tabs.
     expect(details.template).toContain('<TabsTrigger value="general">General</TabsTrigger>')
-    expect(details.template).toContain('<TabsTrigger value="preview">Preview</TabsTrigger>')
     expect(details.template).toContain('<TabsTrigger value="versions">Versions</TabsTrigger>')
     expect(details.template).toContain('<TabsTrigger value="storage">Storage</TabsTrigger>')
+    expect(details.template).not.toContain('<TabsTrigger value="preview">')
+    expect(details.template).toContain("previewMode ? 'general' : 'preview'")
   })
 
   it('asks the locations endpoint about the selected version', () => {
@@ -408,5 +429,141 @@ describe('Data Manager versions and restore', () => {
     for (const match of objectBrowser.template.matchAll(/<IconButton[\s\S]*?>/g)) {
       expect(match[0]).toMatch(/label="/)
     }
+  })
+})
+
+// One mounted pass through the real controls: the row action hands its target
+// to the one dialog, the dialog writes exactly that call and closes.
+const deleteObject = vi.fn(async () => undefined)
+const deleteDialogComponent = compileClientComponent(
+  new URL('../components/data/DeleteDialog.vue', import.meta.url),
+  {
+    vue: VueRuntime,
+    '@/lib/utils': Utils,
+    '@/lib/deletion/options': DeletionOptions,
+    '@/lib/deletion/request': DeletionRequest,
+    '@/lib/objectVersions': ObjectVersions,
+    '@/lib/storageDeletion': {
+      createStoragePurgeOperation: (scope: unknown) => ({ scope, idempotencyKey: 'key' }),
+      getStorageDeletionPreflight: vi.fn(async () => {
+        throw new Error('no preflight in this test')
+      }),
+      isStorageDeletionNotFound: () => false,
+      storageDeletionErrorMessage: (error: unknown) => String(error),
+    },
+    '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+    '@/components/ui/Dialog.vue': moduleDefault(
+      defineComponent({
+        props: { open: Boolean },
+        setup: (props, { slots }) => () => (props.open ? h('div', slots.default?.()) : null),
+      }),
+    ),
+    '@/components/ui/DialogContent.vue': moduleDefault(Slotted('div')),
+    '@/components/ui/DialogDescription.vue': moduleDefault(Slotted('p')),
+    '@/components/ui/DialogFooter.vue': moduleDefault(Slotted('footer')),
+    '@/components/ui/DialogHeader.vue': moduleDefault(Slotted('header')),
+    '@/components/ui/DialogTitle.vue': moduleDefault(Slotted('h2')),
+    '@/components/ui/Input.vue': moduleDefault(Slotted('input')),
+    '@/components/ui/RefusalNote.vue': moduleDefault(
+      defineComponent({ props: { message: String, tone: String }, setup: (props) => () => h('aside', props.message) }),
+    ),
+    '@/components/data/deletion/DeletionImpact.vue': moduleDefault(Slotted('section')),
+    '@/components/data/deletion/DeletionOutcome.vue': moduleDefault(Slotted('section')),
+    '@/components/data/deletion/PurgeProgress.vue': moduleDefault(Slotted('section')),
+    '@/components/data/deletion/VersionPicker.vue': moduleDefault(Slotted('section')),
+    '@/components/data/deletion/useDeletionPreflight': {
+      useDeletionPreflight: () => ({
+        backlinkPreflight: ref(null),
+        backlinkPreflightBusy: ref(false),
+        backlinkPreflightError: ref(null),
+        permanentDeleteApiBase: () => null,
+        resetBacklinkPreflightState: () => {},
+        loadBacklinkPreflight: async () => {},
+        loadBulkBacklinkPreflight: async () => {},
+      }),
+    },
+    '@/components/data/deletion/usePurgeJob': {
+      usePurgeJob: () => ({
+        submission: ref(null),
+        status: ref(null),
+        progress: ref(null),
+        reset: () => {},
+        run: vi.fn(),
+      }),
+    },
+    '@/components/data/deletion/useSelectionDelete': {
+      useSelectionDelete: () => ({
+        outcome: ref(null),
+        scopes: ref([]),
+        scopesBusy: ref(false),
+        inventory: computed(() => ({
+          current_heads: 0,
+          noncurrent_versions: 0,
+          delete_markers: 0,
+          open_multipart_uploads: 0,
+          complete: true,
+        })),
+        scopeErrors: computed(() => []),
+        deniedKeys: computed(() => []),
+        purgeReady: () => true,
+        pendingKeys: (keys: string[]) => keys,
+        reset: () => {},
+        loadScopes: async () => {},
+        deleteMarkers: async () => {},
+        purgeKeys: async () => {},
+      }),
+    },
+    '@/composables/useAruna': { useAruna: () => ({ authToken: ref('token') }) },
+    '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => id }) },
+    '@/composables/useStagingReferences': {
+      useStagingReferences: () => ({ entries: ref([]), status: ref('loaded'), error: ref(null) }),
+    },
+    '@/composables/useS3': {
+      s3ErrorMessage: (error: unknown) => String(error),
+      useS3: () => ({
+        canWrite: () => true,
+        canDeletePrefix: () => true,
+        listObjectVersions: vi.fn(),
+        deleteObject,
+        deletePrefix: vi.fn(),
+        deleteObjectVersion: vi.fn(),
+        copyObjectVersion: vi.fn(),
+        deleteBucket: vi.fn(),
+      }),
+    },
+  },
+)
+
+describe('Data Manager deletion from the object row', () => {
+  it('writes the marker the row asked for and closes the dialog', async () => {
+    deleteObject.mockClear()
+    const request = ref<DeletionRequest.DeleteRequest | null>(null)
+    const host = defineComponent({
+      setup: () => () =>
+        h('div', [
+          h(compiledBrowser(), {
+            manager: fakeManager({
+              requestDelete: (target: DeletionRequest.DeleteRequest) => (request.value = target),
+            }),
+          }),
+          h(deleteDialogComponent, {
+            request: request.value,
+            onClose: () => (request.value = null),
+          }),
+        ]),
+    })
+    const { root } = await mountApp(host)
+
+    await bubbleClick(element(root, (node) => node.props['aria-label'] === 'Delete…'))
+    expect(content(root)).toContain('reef/raw/reads.fastq')
+
+    const confirm = element(
+      root,
+      (node) => node.tag === 'button' && content(node).trim() === 'Delete',
+    )
+    await click(confirm)
+
+    expect(deleteObject).toHaveBeenCalledWith('reef', 'raw/reads.fastq', null)
+    expect(request.value).toBeNull()
   })
 })

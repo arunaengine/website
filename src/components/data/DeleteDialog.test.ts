@@ -4,11 +4,15 @@ import { describe, expect, it, vi } from 'vitest'
 import * as Utils from '@/lib/utils'
 import * as DeletionOptions from '@/lib/deletion/options'
 import * as DeletionRequest from '@/lib/deletion/request'
+import * as ObjectVersions from '@/lib/objectVersions'
+import * as StateBadge from '@/lib/stateBadge'
+import { s3ErrorMessage } from '@/composables/s3/errors'
 import {
   click,
   compileClientComponent,
   content,
   element,
+  flush,
   mountApp,
   moduleDefault,
   nodes,
@@ -16,6 +20,7 @@ import {
   type HostNode,
 } from '@/test/clientRender'
 
+const listObjectVersions = vi.fn()
 const deleteObject = vi.fn(async () => undefined)
 const deletePrefix = vi.fn(async () => ({ deleted: 1, errors: [] as { key: string; message: string }[] }))
 const deleteObjectVersion = vi.fn(async () => undefined)
@@ -57,11 +62,33 @@ const ImpactStub = defineComponent({
   setup: (props) => () => h('section', props.quotaNote ?? 'impact'),
 })
 
+const RefusalStub = defineComponent({
+  props: { message: String, tone: String },
+  setup: (props) => () => h('aside', props.message),
+})
+const versionPicker = compileClientComponent(
+  new URL('./deletion/VersionPicker.vue', import.meta.url),
+  {
+    vue: VueRuntime,
+    '@/lib/utils': Utils,
+    '@/lib/objectVersions': ObjectVersions,
+    '@/lib/stateBadge': StateBadge,
+    '@/components/ui/Badge.vue': moduleDefault(slotted('span')),
+    '@/components/ui/ErrorPanel.vue': moduleDefault(RefusalStub),
+    '@/components/ui/Spinner.vue': moduleDefault(slotted('i')),
+    '@/composables/useS3': {
+      s3ErrorMessage,
+      useS3: () => ({ listObjectVersions }),
+    },
+  },
+)
+
 const dialog = compileClientComponent(new URL('./DeleteDialog.vue', import.meta.url), {
   vue: VueRuntime,
   '@/lib/utils': Utils,
   '@/lib/deletion/options': DeletionOptions,
   '@/lib/deletion/request': DeletionRequest,
+  '@/lib/objectVersions': ObjectVersions,
   '@/lib/storageDeletion': {
     createStoragePurgeOperation: (scope: unknown) => ({ scope, idempotencyKey: 'key' }),
     getStorageDeletionPreflight: preflightResponse,
@@ -76,7 +103,8 @@ const dialog = compileClientComponent(new URL('./DeleteDialog.vue', import.meta.
   '@/components/ui/DialogHeader.vue': moduleDefault(slotted('header')),
   '@/components/ui/DialogTitle.vue': moduleDefault(slotted('h2')),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
-  '@/components/ui/Notice.vue': moduleDefault(slotted('aside')),
+  '@/components/ui/RefusalNote.vue': moduleDefault(RefusalStub),
+  '@/components/data/deletion/VersionPicker.vue': moduleDefault(versionPicker),
   '@/components/data/deletion/DeletionImpact.vue': moduleDefault(ImpactStub),
   '@/components/data/deletion/DeletionOutcome.vue': moduleDefault(PanelStub('outcome')),
   '@/components/data/deletion/PurgeProgress.vue': moduleDefault(PanelStub('progress')),
@@ -130,10 +158,11 @@ const dialog = compileClientComponent(new URL('./DeleteDialog.vue', import.meta.
     useStagingReferences: () => ({ entries: ref([]), status: ref('loaded'), error: ref(null) }),
   },
   '@/composables/useS3': {
-    s3ErrorMessage: (error: unknown) => String(error),
+    s3ErrorMessage,
     useS3: () => ({
       canWrite: () => true,
       canDeletePrefix: () => true,
+      listObjectVersions,
       deleteObject,
       deletePrefix,
       deleteObjectVersion,
@@ -143,7 +172,28 @@ const dialog = compileClientComponent(new URL('./DeleteDialog.vue', import.meta.
   },
 })
 
+const currentVersion = {
+  key: 'a.txt',
+  versionId: '01CURRENT000',
+  isLatest: true,
+  deleteMarker: false,
+  size: 2048,
+  lastModified: new Date('2026-02-01T00:00:00Z'),
+}
+const olderVersion = {
+  key: 'a.txt',
+  versionId: '01OLDER00000',
+  isLatest: false,
+  deleteMarker: false,
+  size: 1024,
+  lastModified: new Date('2026-01-01T00:00:00Z'),
+}
+
 async function open(request: DeletionRequest.DeleteRequest) {
+  listObjectVersions.mockResolvedValue({
+    versions: [currentVersion, olderVersion],
+    truncated: false,
+  })
   preflightResponse.mockResolvedValue({
     scope: { kind: 'bucket', bucket: request.bucket },
     counts: {
@@ -167,11 +217,26 @@ async function open(request: DeletionRequest.DeleteRequest) {
     },
   })
   const completed: unknown[] = []
+  const closes: number[] = []
   const host = defineComponent({
-    setup: () => () => h(dialog, { request, onCompleted: (result: unknown) => completed.push(result) }),
+    setup: () => () =>
+      h(dialog, {
+        request,
+        onCompleted: (result: unknown) => completed.push(result),
+        onClose: () => closes.push(1),
+      }),
   })
   const { root } = await mountApp(host)
-  return { root, completed }
+  await flush()
+  return { root, completed, closes }
+}
+
+// The outcome radios carry their option id as the value.
+async function choose(root: HostNode, id: string) {
+  const radio = element(root, (node) => node.tag === 'input' && node.props.value === id)
+  const handler = radio.props.onChange
+  if (typeof handler === 'function') await handler({ target: radio })
+  await flush()
 }
 
 function confirmButton(root: HostNode): HostNode {
@@ -195,7 +260,7 @@ describe('delete dialog', () => {
 
   it('offers only the applicable outcome per kind', async () => {
     const object = await open({ kind: 'object', bucket: 'reef', nodeId: null, key: 'a.txt' })
-    expect(labels(object.root)).toEqual(['delete', 'delete-permanently'])
+    expect(labels(object.root)).toEqual(['delete', 'delete-version', 'delete-permanently'])
 
     const deleted = await open({
       kind: 'deleted-object',
@@ -249,6 +314,80 @@ describe('delete dialog', () => {
     await click(confirmButton(root))
 
     expect(deleteObjectVersion).toHaveBeenCalledWith('reef', 'a.txt', 'v9', null)
+  })
+
+  it('closes once the delete marker is written', async () => {
+    deleteObject.mockClear()
+    const { root, closes } = await open({ kind: 'object', bucket: 'reef', nodeId: null, key: 'a.txt' })
+
+    await click(confirmButton(root))
+
+    expect(deleteObject).toHaveBeenCalledTimes(1)
+    expect(closes).toHaveLength(1)
+  })
+
+  it('stays open with the reason when the node fails', async () => {
+    deleteObject.mockClear()
+    deleteObject.mockRejectedValueOnce({
+      name: 'InternalError',
+      message: 'UsageCounter underflow',
+      $metadata: { httpStatusCode: 500 },
+    })
+    const { root, closes } = await open({ kind: 'object', bucket: 'reef', nodeId: null, key: 'a.txt' })
+
+    await click(confirmButton(root))
+
+    expect(closes).toHaveLength(0)
+    expect(content(root)).toContain('The node hit an internal error')
+    expect(content(root)).toContain('UsageCounter underflow')
+    expect(content(root)).toContain('Try again')
+  })
+
+  it('deletes the version picked for a whole file', async () => {
+    deleteObjectVersion.mockClear()
+    const { root } = await open({ kind: 'object', bucket: 'reef', nodeId: null, key: 'a.txt' })
+
+    await choose(root, 'delete-version')
+    // The current version is the default, and it says what removing it does.
+    expect(content(root)).toContain('makes the previous version current')
+    const older = element(
+      root,
+      (node) => node.tag === 'input' && node.props.value === '01OLDER00000',
+    )
+    await (older.props.onChange as (event: unknown) => void)({ target: older })
+    await flush()
+    await click(confirmButton(root))
+
+    expect(deleteObjectVersion).toHaveBeenCalledWith('reef', 'a.txt', '01OLDER00000', null)
+  })
+
+  it('offers the restore instead of a second marker for a deleted key', async () => {
+    deleteObjectVersion.mockClear()
+    const { root } = await open({
+      kind: 'object',
+      bucket: 'reef',
+      nodeId: null,
+      key: 'a.txt',
+      headState: 'marker',
+      versionId: '01MARKER0000',
+      option: 'restore',
+    })
+
+    expect(labels(root)).toEqual(['restore', 'delete-permanently'])
+
+    await click(confirmButton(root))
+
+    expect(deleteObjectVersion).toHaveBeenCalledWith('reef', 'a.txt', '01MARKER0000', null)
+  })
+
+  it('routes deleting everything through the purge job', async () => {
+    purgeRun.mockClear()
+    const { root } = await open({ kind: 'object', bucket: 'reef', nodeId: null, key: 'a.txt' })
+
+    await choose(root, 'delete-permanently')
+    await click(confirmButton(root))
+
+    expect(purgeRun).toHaveBeenCalledTimes(1)
   })
 
   it('holds a folder purge until the exact name is typed', async () => {

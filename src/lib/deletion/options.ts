@@ -127,12 +127,17 @@ function restoreOption(target: DeletionTarget): DeletionOption {
   }
 }
 
+// On a whole file the version is not known yet, so this outcome asks for one;
+// on a version or marker row it names the row it came from.
 function versionOption(target: DeletionTarget): DeletionOption {
+  const picks = target.kind === 'object'
   const bytes = target.bytes === undefined ? '' : ` It frees ${formatBytes(target.bytes)}.`
   return {
     id: 'delete-version',
-    label: 'Delete this version',
-    description: `Deletes this one version on this node.${bytes} Nothing brings it back.`,
+    label: picks ? 'Delete one version permanently' : 'Delete this version',
+    description: picks
+      ? 'Deletes exactly one stored version or delete marker of this file on this node. Choose it below. Nothing brings it back.'
+      : `Deletes this one version on this node.${bytes} Nothing brings it back.`,
     tier: 'confirm',
     call: { operation: 'delete-version' },
     irreversible: true,
@@ -207,7 +212,7 @@ export function deletionOptions(target: DeletionTarget): DeletionOption[] {
   const resolved: DeletionTarget = { ...target, kind }
   switch (kind) {
     case 'object':
-      return [deleteOption(resolved), permanentOption(resolved)]
+      return [deleteOption(resolved), versionOption(resolved), permanentOption(resolved)]
     case 'deleted-object':
       return [restoreOption(resolved), permanentOption(resolved)]
     case 'version':
