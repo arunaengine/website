@@ -9,6 +9,7 @@ import {
   click,
   compileClientComponent,
   content,
+  element,
   flush,
   mountApp,
   moduleDefault,
@@ -22,6 +23,17 @@ const Slotted = (tag: string) =>
 const RefusalStub = defineComponent({
   props: { message: String },
   setup: (props) => () => h('div', props.message),
+})
+// The dialog body only exists while it is open, so a close is observable.
+const DialogStub = defineComponent({
+  props: { open: Boolean },
+  setup: (props, { slots }) => () => (props.open ? h('div', slots.default?.()) : null),
+})
+const RouterLinkStub = defineComponent({
+  inheritAttrs: false,
+  props: { to: { type: Object, required: true } },
+  setup: (props, { attrs, slots }) => () =>
+    h('a', { ...attrs, to: props.to }, slots.default?.()),
 })
 // The real Select is a radix listbox; the options and the chosen value are what
 // this surface is about, so the stub renders one button per option.
@@ -49,7 +61,8 @@ const editor = compileClientComponent(new URL('./ObjectRulesEditor.vue', import.
   '@lucide/vue': new Proxy({}, { get: () => IconStub }),
   '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
   '@/components/ui/Button.vue': moduleDefault(Slotted('button')),
-  '@/components/ui/Dialog.vue': moduleDefault(Slotted('div')),
+  'vue-router': { RouterLink: RouterLinkStub },
+  '@/components/ui/Dialog.vue': moduleDefault(DialogStub),
   '@/components/ui/DialogContent.vue': moduleDefault(Slotted('div')),
   '@/components/ui/DialogDescription.vue': moduleDefault(Slotted('p')),
   '@/components/ui/DialogFooter.vue': moduleDefault(Slotted('div')),
@@ -108,6 +121,7 @@ async function render(
     versionId?: string | null
     groupFails?: boolean
     nodeId?: string | null
+    library?: typeof EU_POLICY[]
   } = {},
 ) {
   group.value = groupDetail(options.admin ?? true)
@@ -121,7 +135,7 @@ async function render(
     generation: 7,
     policies: [EU_POLICY],
   })
-  listPoliciesForGroup.mockResolvedValue([EU_POLICY, GROUP_POLICY])
+  listPoliciesForGroup.mockResolvedValue(options.library ?? [EU_POLICY, GROUP_POLICY])
   const { root } = await mountApp(editor, {
     props: {
       bucket: 'reef-survey',
@@ -139,6 +153,10 @@ async function render(
 
 function trigger(root: HostNode): HostNode {
   return button(root, 'Edit rules for this file')
+}
+
+function link(root: HostNode, label: string): HostNode {
+  return element(root, (node) => node.tag === 'a' && content(node).trim() === label)
 }
 
 describe('object rules editor', () => {
@@ -246,6 +264,53 @@ describe('object rules editor', () => {
     const root = await render({ admin: false, groupFails: true })
 
     expect(trigger(root).props.disabled).toBe(false)
+  })
+
+  it('sends a viewer to the bucket rules when none exist yet', async () => {
+    const root = await render({ library: [] })
+
+    await click(trigger(root))
+
+    expect(content(root)).toContain('No further policy of this realm or group is available here.')
+    expect(link(root, 'Create a rule for this bucket first').props.to).toEqual({
+      name: 'bucket-storage',
+      params: { bucketId: 'reef-survey' },
+      query: { tab: 'placement', group: 'g-1' },
+    })
+  })
+
+  it('keeps the bucket rules one click away when policies exist', async () => {
+    const root = await render()
+
+    await click(trigger(root))
+
+    expect(content(root)).toContain('Add a rule…')
+    expect(link(root, 'Manage bucket rules').props.to).toMatchObject({
+      name: 'bucket-storage',
+      query: { tab: 'placement' },
+    })
+  })
+
+  it('points a reader at the bucket settings it may read', async () => {
+    // The Placement tab is admin-gated, so a reader is sent to the overview.
+    const root = await render({ admin: false })
+
+    expect(link(root, 'Open the bucket settings').props.to).toEqual({
+      name: 'bucket-storage',
+      params: { bucketId: 'reef-survey' },
+      query: { group: 'g-1' },
+    })
+  })
+
+  it('closes itself instead of navigating under the dialog', async () => {
+    const root = await render()
+
+    await click(trigger(root))
+    expect(content(root)).toContain('Save rules')
+
+    await click(link(root, 'Manage bucket rules'))
+
+    expect(content(root)).not.toContain('Save rules')
   })
 
   it('says the policy listing failed instead of offering none', async () => {

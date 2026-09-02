@@ -2,6 +2,7 @@
 // Per-file placement rules (decision Q33). Saving mints a successor version
 // that carries exactly the chosen set; the versions before it keep theirs.
 import { computed, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Dialog from '@/components/ui/Dialog.vue'
@@ -72,14 +73,36 @@ watch(() => props.groupId, () => void loadGroup(), { immediate: true })
 // Whoever may attach rules to the bucket may set them per file: realm admins,
 // and group admins of the group that owns the bucket. An unread group is not a
 // refusal: the node decides when the change is saved.
+const mayAttach = computed(() => {
+  if (isRealmAdmin.value || groupFailed.value || !group.value) return true
+  return isGroupAdmin(group.value, currentUser.value?.id ?? '')
+})
+
 const blocked = computed<string | null>(() => {
   if (props.nodeId) return 'Only the node that holds this bucket can change the rules of its files.'
   if (!props.versionId) return 'This file has no current version on this node, so it carries no rules yet.'
-  if (isRealmAdmin.value || groupFailed.value || !group.value) return null
-  return isGroupAdmin(group.value, currentUser.value?.id ?? '')
+  return mayAttach.value
     ? null
     : 'Only group admins of this bucket and realm admins may change the rules of a file.'
 })
+
+// Where bucket rules are made. The Placement tab is admin-gated and local-only,
+// so anyone else is sent to the bucket's overview instead.
+const bucketRulesLink = computed(() => ({
+  name: 'bucket-storage',
+  params: { bucketId: props.bucket },
+  query: {
+    ...(mayAttach.value && !props.nodeId ? { tab: 'placement' } : {}),
+    ...(props.nodeId ? { node: props.nodeId } : {}),
+    ...(props.groupId ? { group: props.groupId } : {}),
+  },
+}))
+
+const bucketRulesLabel = computed(() =>
+  library.value.length || libraryError.value
+    ? 'Manage bucket rules'
+    : 'Create a rule for this bucket first',
+)
 
 const attachable = computed(() => {
   const attached = new Set(draft.value.map(policyRefKey))
@@ -212,6 +235,11 @@ async function save() {
       <ShieldCheck class="size-3.5" /> Edit rules for this file…
     </Button>
     <RefusalNote v-if="blocked" :message="blocked" tone="warning" class="mt-2" />
+    <RouterLink
+      v-if="blocked"
+      :to="bucketRulesLink"
+      class="mt-1 inline-block text-xs font-medium text-primary hover:underline"
+    >Open the bucket settings</RouterLink>
 
     <Dialog :open="open" @update:open="(value: boolean) => (open = value)">
       <DialogContent class="max-w-xl">
@@ -278,6 +306,14 @@ async function save() {
               A copy has to be allowed by all of them.
               <DocsLink icon topic="where-data-lives" section="Placement policies" class="ml-0.5" />
             </p>
+
+            <!-- Closes this dialog; the route change unmounts the file behind
+                 it, so nothing navigates under an open modal. -->
+            <RouterLink
+              :to="bucketRulesLink"
+              class="inline-block font-medium text-primary hover:underline"
+              @click="open = false"
+            >{{ bucketRulesLabel }}</RouterLink>
           </template>
 
           <RefusalNote v-if="refusal" :message="refusal" />
