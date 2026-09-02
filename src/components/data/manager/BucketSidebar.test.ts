@@ -34,7 +34,6 @@ const InputStub = defineComponent({
 const BucketSidebar = compileClientComponent(new URL('./BucketSidebar.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': icons,
-  '@/lib/bucketName': { BUCKET_NAME_REQUIREMENT },
   '@/composables/useS3': { useS3: () => ({ canDeletePrefix: () => true, clearSessions: vi.fn() }) },
   '@/components/ui/Badge.vue': moduleDefault(Passthrough),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
@@ -89,9 +88,9 @@ function createButton(root: Parameters<typeof content>[0]) {
 }
 
 describe('Bucket sidebar naming', () => {
-  it('states the rule before anything is typed', async () => {
+  it('shows no hint before anything is typed', async () => {
     const { root } = await mountApp(BucketSidebar, { props: { manager: manager() } })
-    expect(content(root)).toContain(BUCKET_NAME_REQUIREMENT)
+    expect(content(root)).not.toContain(BUCKET_NAME_REQUIREMENT)
   })
 
   it('names the broken rule and disables creation for b1', async () => {
@@ -109,7 +108,8 @@ describe('Bucket sidebar naming', () => {
 
     await typeValue(field(root), 'reef-survey-2026')
 
-    expect(content(root)).toContain(BUCKET_NAME_REQUIREMENT)
+    expect(content(root)).not.toContain(BUCKET_NAME_REQUIREMENT)
+    expect(content(root)).not.toContain('Bucket names')
     expect(field(root).props.invalid).toBeUndefined()
     expect(createButton(root).props.disabled).toBe(false)
   })

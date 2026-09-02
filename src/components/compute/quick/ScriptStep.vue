@@ -15,7 +15,7 @@ import ContainerDataPanel from '@/components/compute/quick/ContainerDataPanel.vu
 import DependenciesTab from '@/components/compute/quick/DependenciesTab.vue'
 import { injectQuickRun } from '@/composables/useQuickRun'
 import { asyncChunkError } from '@/lib/chunk-recovery'
-import { BUCKET_NAME_REQUIREMENT, bucketNameProblem } from '@/lib/bucketName'
+import { bucketNameProblem } from '@/lib/bucketName'
 import { FolderOpen, FolderPlus, KeyRound, Plus } from '@lucide/vue'
 
 // CodeMirror lands on its own async chunk, mounted only at the script step.
@@ -127,7 +127,6 @@ const newBucketProblem = computed(() => {
             </div>
             <p v-if="createBucketError" class="text-[11px] text-destructive">{{ createBucketError }}</p>
             <p v-else-if="newBucketProblem" class="text-[11px] text-destructive">{{ newBucketProblem }}</p>
-            <p v-else class="text-[11px] text-muted-foreground">{{ BUCKET_NAME_REQUIREMENT }}</p>
           </div>
           <p v-else-if="scriptKeyProblem" class="mt-1 text-[11px] text-destructive">{{ scriptKeyProblem }}</p>
           <p v-else class="mt-1 truncate font-mono text-[11px] text-muted-foreground" :title="stagedFileUrl">{{ stagedFileUrl }}</p>

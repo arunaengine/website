@@ -9,7 +9,6 @@ import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
 import { useS3 } from '@/composables/useS3'
 import type { DataManager } from '@/composables/useDataManager'
 import type { BucketSearchHit } from '@/lib/api'
-import { BUCKET_NAME_REQUIREMENT } from '@/lib/bucketName'
 import { Boxes, ChevronRight, FolderPlus, History, KeyRound } from '@lucide/vue'
 
 const props = defineProps<{ manager: DataManager }>()
@@ -148,7 +147,6 @@ const {
         <p v-if="createBucketError" class="text-xs text-destructive">{{ createBucketError }}</p>
         <p v-else-if="newBucketProblem" class="text-xs text-destructive">{{ newBucketProblem }}</p>
         <p v-else-if="newBucketRefusal" class="text-xs text-muted-foreground">{{ newBucketRefusal }}</p>
-        <p v-else class="text-xs text-muted-foreground">{{ BUCKET_NAME_REQUIREMENT }}</p>
       </footer>
     </div>
   </aside>
