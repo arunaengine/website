@@ -5,6 +5,7 @@ import { computed, defineComponent, h, ref, type Component } from 'vue'
 import * as VueRuntime from 'vue'
 import { vi } from 'vitest'
 import * as StateBadge from '@/lib/stateBadge'
+import * as DropEntries from '@/lib/upload/dropEntries'
 import * as Utils from '@/lib/utils'
 import { compileClientComponent, moduleDefault } from '@/test/clientRender'
 
@@ -45,6 +46,7 @@ export function objectBrowser(): Component {
       '@lucide/vue': new Proxy({}, { get: () => IconStub }),
       '@/lib/config': { featureEnabled: () => false },
       '@/lib/stateBadge': StateBadge,
+      '@/lib/upload/dropEntries': DropEntries,
       '@/lib/utils': Utils,
       '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
       '@/components/ui/Button.vue': moduleDefault(ButtonStub),

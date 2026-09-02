@@ -22,6 +22,7 @@ import {
 } from '@/composables/useS3'
 import { usePlacementPolicies } from '@/composables/usePlacementPolicies'
 import { featureEnabled } from '@/lib/config'
+import { collectDropFiles } from '@/lib/upload/dropEntries'
 import { stateVariant } from '@/lib/stateBadge'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
@@ -195,10 +196,11 @@ function deleteRestorable(entry: DeletedObjectEntry) {
   })
 }
 
-function onDrop(event: DragEvent) {
+async function onDrop(event: DragEvent) {
   dragActive.value = false
-  if (!canWriteCurrentPrefix.value || !bucket.value || !event.dataTransfer?.files.length) return
-  void requestUpload(Array.from(event.dataTransfer.files))
+  if (!canWriteCurrentPrefix.value || !bucket.value) return
+  const files = await collectDropFiles(event.dataTransfer)
+  if (files.length) void requestUpload(files)
 }
 </script>
 
