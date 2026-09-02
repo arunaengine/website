@@ -79,7 +79,9 @@ async function enter() {
   rect.value = null
   anchorEl = null
   clearPoll()
-  if (router && router.currentRoute.value.path !== step.route) {
+  // fullPath, not path: a step route carrying a query (?step=1) is a different
+  // stop, and comparing paths alone would skip it on the way back.
+  if (router && router.currentRoute.value.fullPath !== step.route) {
     await router.push(step.route).catch(() => undefined)
   }
   locate(step.anchor)

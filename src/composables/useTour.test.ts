@@ -20,19 +20,19 @@ const STEPS: TourStep[] = [
 ]
 
 const pushed: string[] = []
-const route = { value: { path: '/app' } }
+const route = { value: { fullPath: '/app' } }
 const router = {
   currentRoute: route,
   push: async (to: string) => {
     pushed.push(to)
-    route.value = { path: to }
+    route.value = { fullPath: to }
   },
 } as unknown as Router
 
 beforeEach(() => {
   stopTour()
   pushed.length = 0
-  route.value = { path: '/app' }
+  route.value = { fullPath: '/app' }
   bindTourRouter(router)
 })
 
@@ -85,6 +85,22 @@ describe('guided tour', () => {
     nextStep()
     await flush()
     expect(pushed).toEqual(['/app/groups'])
+  })
+
+  it('walks back to a step whose route differs only in its query', async () => {
+    // Comparing paths alone leaves the wizard on the later step forever.
+    const wizard: TourStep[] = [
+      { route: '/app/compute/quick', anchor: 'quickrun-runtime', title: 'Runtime', body: 'Pick one.' },
+      { route: '/app/compute/quick?step=1', anchor: 'quickrun-script', title: 'Script', body: 'Write it.' },
+    ]
+    startTour(wizard)
+    await flush()
+    nextStep()
+    await flush()
+    prevStep()
+    await flush()
+
+    expect(pushed).toEqual(['/app/compute/quick', '/app/compute/quick?step=1', '/app/compute/quick'])
   })
 
   it('clears its state when stopped', () => {
