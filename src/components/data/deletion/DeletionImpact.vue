@@ -2,6 +2,8 @@
 // What the chosen deletion touches: the node's bounded inventory, the sync
 // relationships a bucket delete removes, datasets that reference the content,
 // source bindings, and the quota a delete marker does not free.
+import { computed } from 'vue'
+import CompactList from '@/components/ui/CompactList.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import DatasetReferencesPreflightPanel from '@/components/data/DatasetReferencesPreflightPanel.vue'
@@ -24,6 +26,13 @@ const props = defineProps<{
   backlinkError: string | null
   selection?: boolean
 }>()
+
+const syncRows = computed(() =>
+  (props.preflight?.sync_relationships ?? []).map((relationship) => ({
+    key: relationship.relationship_id,
+    text: `${relationship.direction}: ${relationship.source} to ${relationship.target}`,
+  })),
+)
 
 function inventoryRows(preflight: StorageDeletionPreflight) {
   return [
@@ -77,15 +86,11 @@ function inventoryRows(preflight: StorageDeletionPreflight) {
         class="space-y-2"
       >
         <h4 class="font-medium">Sync-relationship removal</h4>
-        <template v-if="props.preflight.sync_relationships.length">
+        <template v-if="syncRows.length">
           <p>
-            Deleting this bucket also removes {{ props.preflight.sync_relationships.length }} sync relationship{{ props.preflight.sync_relationships.length === 1 ? '' : 's' }} and repairs the remote mirrors. This confirmed side effect is not a blocker.
+            Deleting this bucket also removes its sync relationships and repairs the remote mirrors. This confirmed side effect is not a blocker.
           </p>
-          <ul class="space-y-1 pl-4">
-            <li v-for="relationship in props.preflight.sync_relationships" :key="relationship.relationship_id" class="list-disc break-all">
-              {{ relationship.direction }}: {{ relationship.source }} to {{ relationship.target }}
-            </li>
-          </ul>
+          <CompactList label="sync relationship" :items="syncRows" />
         </template>
         <p v-else>No sync relationships will be removed.</p>
       </Notice>

@@ -1,4 +1,4 @@
-import { computed, defineComponent, h, ref } from 'vue'
+import { computed, defineComponent, h, ref, type Component } from 'vue'
 import * as VueRuntime from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import * as Utils from '@/lib/utils'
@@ -21,6 +21,8 @@ import {
   typeValue,
   type HostNode,
 } from '@/test/clientRender'
+import { deletionImpact, referencedContent } from '@/test/deletionImpact'
+import type { BacklinkPreflightResponse } from '@/lib/backlinks'
 
 // The real selection helper drives one dialog below, so the module it asks for
 // its S3 calls is replaced with the same double that dialog is compiled with.
@@ -46,6 +48,7 @@ const copyObjectVersion = vi.fn(async () => ({ versionId: 'new' }))
 const deleteBucket = vi.fn(async () => undefined)
 const purgeRun = vi.fn(async () => ({ state: 'succeeded' }))
 const preflightResponse = vi.fn()
+const backlinkPreflight = ref<BacklinkPreflightResponse | null>(null)
 
 function slotted(tag: string) {
   return defineComponent({
@@ -65,6 +68,7 @@ const InputStub = defineComponent({
   emits: ['update:modelValue'],
   setup: (props, { emit }) => () =>
     h('input', {
+      id: props.id,
       value: props.modelValue,
       onInput: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value),
     }),
@@ -129,7 +133,7 @@ function dialogModules(overrides: Record<string, unknown> = {}) {
   '@/components/data/deletion/PurgeProgress.vue': moduleDefault(PanelStub('progress')),
   '@/components/data/deletion/useDeletionPreflight': {
     useDeletionPreflight: () => ({
-      backlinkPreflight: ref(null),
+      backlinkPreflight,
       backlinkPreflightBusy: ref(false),
       backlinkPreflightError: ref(null),
       permanentDeleteApiBase: () => 'https://api.test',
@@ -211,6 +215,14 @@ const selectionDialog = compileClientComponent(
       }),
     ),
     '@/composables/useS3': { s3ErrorMessage, useS3: () => selectionS3 },
+  }),
+)
+
+// A second build with the real impact panel, for what its lists show.
+const impactDialog = compileClientComponent(
+  new URL('./DeleteDialog.vue', import.meta.url),
+  dialogModules({
+    '@/components/data/deletion/DeletionImpact.vue': moduleDefault(deletionImpact()),
   }),
 )
 
@@ -461,6 +473,27 @@ describe('delete dialog', () => {
     // The default outcome for a folder is the recoverable one, so no typing.
     expect(content(root)).not.toContain('to confirm')
     expect(confirmButton(root).props.disabled).toBe(false)
+  })
+
+  it('confirms a bucket delete that many datasets reference', async () => {
+    purgeRun.mockClear()
+    backlinkPreflight.value = referencedContent(40)
+    const { root, completed } = await open(
+      { kind: 'bucket', bucket: 'reef', nodeId: null },
+      impactDialog,
+    )
+
+    const text = content(root)
+    expect(text).toContain('40 dataset references')
+    expect(text).not.toContain('Reef survey 01')
+
+    const field = element(root, (node) => node.props.id === 'deletion-typed-name')
+    await typeValue(field, 'reef')
+    await click(button(root, 'Delete permanently'))
+
+    expect(purgeRun).toHaveBeenCalledTimes(1)
+    expect(completed).toHaveLength(1)
+    backlinkPreflight.value = null
   })
 })
 

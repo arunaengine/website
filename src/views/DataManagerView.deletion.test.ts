@@ -65,10 +65,8 @@ const objectBrowser = sfc(objectBrowserSource, 'ObjectBrowser.vue')
 const versionsPanel = sfc(versionsSource, 'ObjectVersionsPanel.vue')
 const details = sfc(detailsSource, 'FileDetailsDialog.vue')
 const bucketSidebar = sfc(bucketSidebarSource, 'BucketSidebar.vue')
-const datasetReferencesTemplate = sfc(
-  datasetReferencesSource,
-  'DatasetReferencesPreflightPanel.vue',
-).template
+const datasetReferences = sfc(datasetReferencesSource, 'DatasetReferencesPreflightPanel.vue')
+const datasetReferencesTemplate = datasetReferences.template
 
 // Handles both top-level and composable-scoped (indented) declarations.
 function functionSource(source: string, name: string): string {
@@ -199,10 +197,10 @@ describe('Data Manager version-aware deletion', () => {
     expect(deleteDialog.template).toContain('<DeletionImpact')
     expect(datasetReferencesTemplate).toContain('aria-label="Dataset references"')
     expect(datasetReferencesTemplate).not.toContain('RDF Dataset references')
-    expect(datasetReferencesTemplate).toContain("params: { id: reference.document_id }")
-    expect(datasetReferencesTemplate).toContain('{{ reference.title }}')
+    expect(datasetReferences.script).toContain("params: { id: reference.document_id }")
+    expect(datasetReferences.script).toContain('text: reference.title')
     expect(datasetReferencesTemplate).toContain('Other restricted datasets reference this content')
-    expect(datasetReferencesTemplate).toContain('target.would_remove_last_resolvable_aruna_location')
+    expect(datasetReferences.script).toContain('target.would_remove_last_resolvable_aruna_location')
     expect(datasetReferencesTemplate).toContain("This operation would remove this content's last resolvable Aruna location.")
     expect(datasetReferencesTemplate).toContain('Dataset-reference coverage is partial.')
     expect(datasetReferencesTemplate).toContain('preflight.coverage.queried_scope')

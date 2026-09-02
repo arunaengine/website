@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { RouterLink } from 'vue-router'
+import CompactList from '@/components/ui/CompactList.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
-import type { BacklinkPreflightResponse } from '@/lib/backlinks'
+import type { BacklinkPreflightResponse, BacklinkPreflightTargetResult } from '@/lib/backlinks'
 import { relativeTime } from '@/lib/utils'
 
 const props = withDefaults(defineProps<{
@@ -34,6 +34,39 @@ const referencesReported = computed(() =>
   props.preflight?.targets.some(
     (target) => target.visible_references.length > 0 || target.hidden_references_exist,
   ) ?? false,
+)
+
+const targets = computed(() => props.preflight?.targets ?? [])
+
+const referenceRows = computed(() =>
+  targets.value.flatMap((target) =>
+    target.visible_references.map((reference) => ({
+      key: `${target.content_w3id}\n${reference.document_id}`,
+      text: reference.title,
+      detail: target.content_w3id,
+      to: { name: 'dataset', params: { id: reference.document_id } },
+    })),
+  ),
+)
+
+const hiddenReferences = computed(() =>
+  targets.value.some((target) => target.hidden_references_exist),
+)
+
+function contentRows(matching: (target: BacklinkPreflightTargetResult) => boolean) {
+  return targets.value
+    .filter(matching)
+    .map((target) => ({ key: target.content_w3id, text: target.content_w3id }))
+}
+
+const lastLocationRows = computed(() =>
+  contentRows((target) => target.would_remove_last_resolvable_aruna_location),
+)
+
+const unknownImpactRows = computed(() =>
+  contentRows(
+    (target) => !target.would_remove_last_resolvable_aruna_location && !target.location_impact_complete,
+  ),
 )
 
 function displayValue(value: string): string {
@@ -71,30 +104,22 @@ function freshnessTime(updatedAtMs: number): string {
       <p v-if="!referencesReported" class="text-muted-foreground">
         No visible or restricted dataset references were reported for the covered forms.
       </p>
-      <div
-        v-for="target in preflight.targets"
-        :key="target.content_w3id"
-        class="space-y-1 rounded-md bg-muted/40 px-2 py-1.5"
-      >
-        <p class="break-all font-mono text-[10px] text-muted-foreground">{{ target.content_w3id }}</p>
-        <ul v-if="target.visible_references.length" class="space-y-1 pl-4">
-          <li v-for="reference in target.visible_references" :key="reference.document_id" class="list-disc">
-            <RouterLink
-              :to="{ name: 'dataset', params: { id: reference.document_id } }"
-              class="font-medium text-primary hover:underline"
-            >{{ reference.title }}</RouterLink>
-          </li>
-        </ul>
-        <p v-if="target.hidden_references_exist" class="font-medium text-amber-800 dark:text-amber-300">
-          Other restricted datasets reference this content
-        </p>
-        <Notice v-if="target.would_remove_last_resolvable_aruna_location" tone="warning" class="font-medium">
+      <CompactList v-if="referenceRows.length" label="dataset reference" :items="referenceRows" />
+      <p v-if="hiddenReferences" class="font-medium text-amber-800 dark:text-amber-300">
+        Other restricted datasets reference this content
+      </p>
+      <Notice v-if="lastLocationRows.length" tone="warning" class="space-y-1">
+        <p class="font-medium">
           This operation would remove this content's last resolvable Aruna location.
-        </Notice>
-        <Notice v-else-if="!target.location_impact_complete" tone="warning" class="font-medium">
+        </p>
+        <CompactList label="content" :items="lastLocationRows" />
+      </Notice>
+      <Notice v-if="unknownImpactRows.length" tone="warning" class="space-y-1">
+        <p class="font-medium">
           The last-resolvable-location impact is unknown for this content.
-        </Notice>
-      </div>
+        </p>
+        <CompactList label="content" :items="unknownImpactRows" />
+      </Notice>
       <dl class="grid grid-cols-2 gap-x-4 gap-y-1 text-muted-foreground">
         <dt>Queried scope</dt>
         <dd class="text-right text-foreground">{{ displayValue(preflight.coverage.queried_scope) }}</dd>
