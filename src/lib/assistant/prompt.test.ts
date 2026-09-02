@@ -58,6 +58,43 @@ describe('systemPrompt', () => {
     expect(prompt).toContain('never dump raw JSON')
   })
 
+  it('tells the model a denial is final', () => {
+    const prompt = systemPrompt({ route: '/app/assistant' })
+
+    expect(prompt).toContain(
+      "A denied tool call is the user's decision: do not retry it, say what was denied and ask what should change.",
+    )
+  })
+
+  it('tells the model how to build a dataset from a bucket', () => {
+    const prompt = systemPrompt({ route: '/app/assistant' })
+
+    expect(prompt).toContain(
+      'To build a dataset from a bucket, inventory it first: list_objects with the prefix, '
+      + 'following next_cursor until it is absent.',
+    )
+    expect(prompt).toContain(
+      'Derive what the data supports: read README, LICENSE, CITATION.cff and similar text objects, '
+      + 'and use the file names; say where each suggestion came from.',
+    )
+    expect(prompt).toContain(
+      'Ask once, in one compact message, for what the data cannot answer: name, description, '
+      + 'creator or author, license, datePublished, keywords, and the profile.',
+    )
+    expect(prompt).toContain('Offer a suggested value beside each field so the user can accept or edit it.')
+    expect(prompt).toContain(
+      'Never invent a person, an organization, an identifier, a license or a date; ask instead, once.',
+    )
+    expect(prompt).toContain(
+      'A field the user declines stays absent; optional fields are never a reason to ask again.',
+    )
+    expect(prompt).toContain('Show the planned crate with show_crate and validate it before anything is created.')
+    expect(prompt).toContain(
+      'Call create_dataset only after the user confirms; in the dataset editor use the editor tools '
+      + 'and let the user save.',
+    )
+  })
+
   it('states the realm totals when they are known', () => {
     const prompt = systemPrompt({
       route: '/app',
