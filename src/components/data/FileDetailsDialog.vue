@@ -95,6 +95,15 @@ watch(
   { immediate: true },
 )
 
+// A deep link opens the dialog before the browser holds an S3 session, so the
+// first head lookup fails; the session's arrival repeats it.
+watch(
+  () => s3.hasActiveKey.value,
+  (ready) => {
+    if (ready && props.open && !head.value) void loadHead()
+  },
+)
+
 function previewVersion(versionId: string) {
   pinnedVersion.value = versionId
   emit('update:tab', 'preview')

@@ -1,4 +1,4 @@
-import { computed, defineComponent, h, inject, provide, type ComputedRef } from 'vue'
+import { computed, defineComponent, h, inject, provide, ref, type ComputedRef } from 'vue'
 import * as VueRuntime from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import * as StateBadge from '@/lib/stateBadge'
@@ -43,6 +43,7 @@ const ButtonStub = defineComponent({
 })
 
 const headObject = vi.fn()
+const hasActiveKey = ref(true)
 
 const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.meta.url), {
   vue: VueRuntime,
@@ -62,7 +63,10 @@ const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.
   '@/components/storage/ObjectRulesEditor.vue': moduleDefault(Marker('edit rules for this file')),
   '@/components/storage/PolicyColumn.vue': moduleDefault(Marker('rules this file carries')),
   '@/components/preview/PreviewBody.vue': moduleDefault(Marker('preview')),
-  '@/composables/useS3': { useS3: () => ({ headObject }), s3ErrorMessage: (error: unknown) => String(error) },
+  '@/composables/useS3': {
+    useS3: () => ({ headObject, hasActiveKey }),
+    s3ErrorMessage: (error: unknown) => String(error),
+  },
   '@/lib/stateBadge': StateBadge,
   '@/lib/utils': Utils,
 })
@@ -93,6 +97,21 @@ async function render(tab: string) {
 }
 
 describe('file details storage tab', () => {
+  it('loads the head once the S3 session arrives', async () => {
+    // A deep link opens the dialog before the browser holds a session.
+    hasActiveKey.value = false
+    headObject.mockRejectedValueOnce(new Error('S3SessionUnavailableError: no session'))
+    const { root } = await mount('general')
+    expect(content(root)).toContain('S3SessionUnavailableError')
+
+    hasActiveKey.value = true
+    await flush()
+
+    expect(content(root)).not.toContain('S3SessionUnavailableError')
+    expect(content(root)).toContain('HEAD')
+    expect(headObject).toHaveBeenCalledTimes(2)
+  })
+
   it('puts the rules beside the copies of the chosen version', async () => {
     const text = await render('storage')
 
