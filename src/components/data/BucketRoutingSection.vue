@@ -9,9 +9,11 @@ import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Notice from '@/components/ui/Notice.vue'
 import RoutingTargetPicker from '@/components/groups/RoutingTargetPicker.vue'
 import { computed, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import { Plus, TriangleAlert, Trash2 } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
+import { tenantClasses } from '@/lib/storage'
 import { errorMessage } from '@/lib/utils'
 import {
   ApiError,
@@ -22,11 +24,12 @@ import {
 
 const props = defineProps<{ open: boolean; bucket: string; groupId: string | null }>()
 
-const { getBucketRouting, putBucketRouting, listGroupBackends, saving } = useAruna()
+const { getBucketRouting, putBucketRouting, listGroupBackends, nodeInfo, saving } = useAruna()
 const { writesDisabled } = useConnectivity()
 
 const rules = ref<StorageRoutingRule[]>([])
 const backends = ref<GroupBackendResponse[]>([])
+const backendsKnown = ref(false)
 const warnings = ref<string[]>([])
 const loading = ref(false)
 const loadError = ref<string | null>(null)
@@ -40,6 +43,14 @@ const duplicate = computed(() => {
 })
 const incomplete = computed(() =>
   rules.value.some((rule) => !rule.target.backend_id && !rule.target.class),
+)
+// A rule names an enabled group backend or a storage class this node offers
+// tenants; with neither in the group's list, a new rule has nothing to target.
+const noTarget = computed(
+  () =>
+    backendsKnown.value
+    && !backends.value.some((backend) => !backend.disabled)
+    && tenantClasses(nodeInfo.value?.services.blob?.backends).length === 0,
 )
 
 let loadSeq = 0
@@ -58,6 +69,7 @@ async function load() {
     rules.value = routing.rules
     warnings.value = routing.warnings
     backends.value = listed?.backends ?? []
+    backendsKnown.value = listed !== null
   } catch (err) {
     if (seq !== loadSeq) return
     if (err instanceof ApiError && (err.status === 403 || err.status === 401)) hidden.value = true
@@ -76,6 +88,7 @@ watch(
 )
 
 function addRule() {
+  if (noTarget.value) return
   rules.value = [...rules.value, { key_prefix: '', exact: false, target: {} }]
 }
 
@@ -165,7 +178,7 @@ async function save() {
       </div>
 
       <div class="flex flex-wrap items-center gap-2">
-        <Button variant="outline" size="sm" @click="addRule">
+        <Button variant="outline" size="sm" :disabled="noTarget" @click="addRule">
           <Plus class="h-3.5 w-3.5" /> Add rule
         </Button>
         <Button
@@ -176,6 +189,18 @@ async function save() {
         >
           {{ saving ? 'Saving…' : 'Save rules' }}
         </Button>
+        <p v-if="noTarget" class="text-[11px] text-muted-foreground">
+          Add a storage backend on the
+          <RouterLink
+            v-if="props.groupId"
+            :to="{ name: 'group', params: { id: props.groupId }, query: { tab: 'storage' } }"
+            class="font-medium text-primary hover:underline"
+          >
+            group Storage tab
+          </RouterLink>
+          <span v-else>group Storage tab</span>
+          first.
+        </p>
       </div>
 
       <p v-if="writesDisabled" class="text-xs text-muted-foreground">{{ OFFLINE_WRITE_HINT }}</p>
@@ -194,9 +219,9 @@ async function save() {
         <span>{{ warning }}</span>
       </Notice>
 
-      <p class="flex flex-wrap items-center gap-x-2 text-[11px] text-muted-foreground">
-        <span>The most specific rule wins.</span>
-        <DocsLink topic="where-data-lives" section="Storage backend" label="Learn how a rule is picked" />
+      <p class="text-[11px] text-muted-foreground">
+        The most specific rule wins.
+        <DocsLink icon topic="where-data-lives" section="Storage backend" class="ml-0.5" />
       </p>
     </template>
   </section>
