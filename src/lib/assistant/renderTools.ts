@@ -2,17 +2,47 @@
 // a dataset card. They answer the model with a short acknowledgement and hand
 // the card to the message, so the model moves on instead of echoing data.
 import { jsonSchema, tool, type JSONSchema7, type ToolSet } from 'ai'
+import type { PreviewKind } from '@/composables/useObjectPreview'
 import { crateGraph, crateRootId, stringProp } from '@/lib/dataEntities'
 import { errorMessage } from '@/lib/utils'
 import type { ChartKind, RenderView } from './types'
 
-export const RENDER_TOOL_NAMES = ['show_table', 'show_chart', 'show_stats', 'show_crate'] as const
+export const RENDER_TOOL_NAMES = [
+  'show_table',
+  'show_chart',
+  'show_stats',
+  'show_crate',
+  'show_artifact',
+] as const
+
+/** One stored object to show, as a job output or a stat_object result names it. */
+export interface ArtifactRef {
+  bucket: string
+  key: string
+  versionId?: string
+  nodeId?: string
+  endpointUrl?: string
+  contentType?: string
+  filename?: string
+  size?: number
+}
+
+/** What the host fetched: a URL the browser can show and how to show it. */
+export interface LoadedArtifact {
+  url: string
+  contentType: string
+  kind: PreviewKind
+  name: string
+  size?: number
+}
 
 export interface RenderHost {
   /** Keeps the card beside the tool call so the message can draw it. */
   keep: (toolCallId: string, view: RenderView) => void
   /** Fetches a stored dataset's RO-Crate by document id. */
   loadCrate: (documentId: string) => Promise<unknown>
+  /** Fetches one stored object for a card; bytes never reach the model. */
+  loadArtifact: (ref: ArtifactRef) => Promise<LoadedArtifact>
 }
 
 interface TableInput {
@@ -38,6 +68,19 @@ interface CrateInput {
   rocrate?: unknown
 }
 
+interface ArtifactInput {
+  bucket: string
+  key: string
+  version_id?: string
+  node_id?: string
+  endpoint_url?: string
+  content_type?: string
+  filename?: string
+  size?: number
+  job_id?: string
+  caption?: string
+}
+
 const MAX_ROWS = 500
 const MAX_POINTS = 200
 
@@ -50,6 +93,15 @@ const STRINGS = { type: 'array', items: STRING } as const
 
 function strings(values: unknown[]): string[] {
   return values.map((value) => (typeof value === 'string' ? value : String(value ?? '')))
+}
+
+function text(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function count(value: unknown): number | undefined {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined
 }
 
 function crateTitle(crate: unknown): string {
@@ -148,6 +200,64 @@ export function renderTools(host: RenderHost): ToolSet {
             crate,
           })
           return { shown: true, name: title, ...(input.document_id ? { document_id: input.document_id } : {}) }
+        } catch (cause) {
+          return { error: errorMessage(cause) }
+        }
+      },
+    }),
+
+    show_artifact: tool({
+      description:
+        'Shows a stored object in the conversation: an image, a text, JSON or CSV file, or a download row for '
+        + 'anything else. Pass a job output from list_job_outputs, or any bucket and key. The file itself is shown '
+        + 'to the user, so never paste its bytes into the answer.',
+      inputSchema: schema<ArtifactInput>({
+        bucket: STRING,
+        key: STRING,
+        version_id: STRING,
+        node_id: STRING,
+        endpoint_url: STRING,
+        content_type: STRING,
+        filename: STRING,
+        size: { type: 'number' },
+        job_id: STRING,
+        caption: STRING,
+      }, ['bucket', 'key']),
+      execute: async (input, { toolCallId }) => {
+        const bucket = text(input.bucket)
+        const key = text(input.key)
+        if (!bucket || !key) return { error: 'An artifact needs a bucket and a key.' }
+        const versionId = text(input.version_id)
+        const jobId = text(input.job_id)
+        const caption = text(input.caption)
+        try {
+          const loaded = await host.loadArtifact({
+            bucket,
+            key,
+            versionId: versionId || undefined,
+            nodeId: text(input.node_id) || undefined,
+            endpointUrl: text(input.endpoint_url) || undefined,
+            contentType: text(input.content_type) || undefined,
+            filename: text(input.filename) || undefined,
+            size: count(input.size),
+          })
+          host.keep(toolCallId, {
+            kind: 'artifact',
+            title: loaded.name,
+            caption: caption || undefined,
+            artifact: {
+              url: loaded.url,
+              contentType: loaded.contentType,
+              previewKind: loaded.kind,
+              name: loaded.name,
+              size: loaded.size,
+              bucket,
+              key,
+              versionId: versionId || undefined,
+              jobId: jobId || undefined,
+            },
+          })
+          return { shown: true, content_type: loaded.contentType, kind: loaded.kind }
         } catch (cause) {
           return { error: errorMessage(cause) }
         }

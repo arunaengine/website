@@ -85,6 +85,30 @@ describe('assistant chat history', () => {
     expect(parsed.state?.activeChatId).toBe(parsed.state?.chats[0]?.id)
   })
 
+  it('drops a restored artifact card whose bytes are gone', () => {
+    // A blob URL belongs to the tab that made it; a chart card keeps a table one.
+    const store = createAssistantChatStore(scope('user-a'), backing)
+    const chat = newAssistantChat()
+    const calls = [
+      {
+        id: 'c1',
+        name: 'show_artifact',
+        input: {},
+        state: 'done',
+        view: { kind: 'artifact', title: 'chart.png', artifact: { url: 'blob:aruna/chart' } },
+      },
+      { id: 'c2', name: 'show_table', input: {}, state: 'done', view: { kind: 'table', title: 'Buckets' } },
+    ]
+    backing.setItem(store.key, JSON.stringify({
+      version: 1,
+      state: { activeChatId: chat.id, chats: [{ ...chat, messages: [{ id: 'm1', role: 'assistant', text: '', calls }] }] },
+    }))
+
+    const restored = store.load().chats[0]?.messages[0]?.calls ?? []
+
+    expect(restored.map((call) => call.view?.kind)).toEqual([undefined, 'table'])
+  })
+
   it('ignores malformed persisted data', () => {
     const store = createAssistantChatStore(scope('user-a'), backing)
     backing.values.set(store.key, '{not json')

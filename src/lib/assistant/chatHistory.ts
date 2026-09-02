@@ -98,6 +98,14 @@ function isModelMessage(value: unknown): value is ModelMessage {
   return record(value) && typeof value.role === 'string' && MODEL_ROLES.has(value.role) && 'content' in value
 }
 
+// A blob URL dies with the tab, so a restored artifact card would draw nothing:
+// the call keeps its record in the drawer instead.
+function staleArtifact(view: Record<string, unknown>): boolean {
+  if (view.kind !== 'artifact') return false
+  const url = (view.artifact as { url?: unknown } | undefined)?.url
+  return typeof url !== 'string' || url.startsWith('blob:')
+}
+
 function normalizeCall(value: unknown): ToolCallView | null {
   if (!record(value)) return null
   const id = boundedString(value.id, '', 200)
@@ -106,7 +114,9 @@ function normalizeCall(value: unknown): ToolCallView | null {
   const call: ToolCallView = { id, name, input: value.input, state: value.state as ToolCallView['state'] }
   if ('output' in value) call.output = value.output
   if (typeof value.error === 'string') call.error = value.error.slice(0, MAX_TEXT_LENGTH)
-  if (record(value.view) && typeof value.view.kind === 'string') call.view = value.view as ToolCallView['view']
+  if (record(value.view) && typeof value.view.kind === 'string' && !staleArtifact(value.view)) {
+    call.view = value.view as ToolCallView['view']
+  }
   return call
 }
 

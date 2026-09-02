@@ -1,13 +1,20 @@
 import { describe, expect, it, vi } from 'vitest'
-import { renderTools, type RenderHost } from './renderTools'
+import { renderTools, type ArtifactRef, type LoadedArtifact, type RenderHost } from './renderTools'
 import type { RenderView } from './types'
 import { runTool } from '@/test/aiTool'
 
-function harness(crate: unknown = null) {
+function harness(crate: unknown = null, artifact: Partial<LoadedArtifact> = {}) {
   const kept: Array<[string, RenderView]> = []
   const host: RenderHost = {
     keep: (id, view) => kept.push([id, view]),
     loadCrate: vi.fn(async () => crate),
+    loadArtifact: vi.fn(async (ref: ArtifactRef): Promise<LoadedArtifact> => ({
+      url: 'blob:aruna/object',
+      contentType: ref.contentType ?? 'application/octet-stream',
+      kind: 'download',
+      name: ref.filename ?? ref.key,
+      ...artifact,
+    })),
   }
   return { tools: renderTools(host), kept, host }
 }
@@ -96,9 +103,123 @@ describe('show_crate', () => {
   })
 
   it('reports a failed fetch instead of throwing', async () => {
-    const { tools } = harness()
-    const failing = renderTools({ keep: vi.fn(), loadCrate: async () => { throw new Error('gone') } })
+    const { tools, host } = harness()
+    const failing = renderTools({
+      keep: vi.fn(),
+      loadCrate: async () => { throw new Error('gone') },
+      loadArtifact: host.loadArtifact,
+    })
     expect(await runTool(failing.show_crate, { document_id: 'doc-x' })).toEqual({ error: 'gone' })
     expect(await runTool(tools.show_crate, {})).toMatchObject({ error: expect.any(String) })
+  })
+})
+
+describe('show_artifact', () => {
+  it('shows a png as an image card and answers without its bytes', async () => {
+    const { tools, kept, host } = harness(null, {
+      url: 'blob:aruna/chart',
+      contentType: 'image/png',
+      kind: 'image',
+      name: 'chart.png',
+      size: 4096,
+    })
+
+    const output = await runTool(tools.show_artifact, {
+      bucket: 'work',
+      key: 'results/run-1/chart.png',
+      version_id: 'v-1',
+      job_id: 'job-1',
+      content_type: 'image/png',
+      caption: 'Reads per day',
+    }, 'call-9')
+
+    expect(host.loadArtifact).toHaveBeenCalledWith({
+      bucket: 'work',
+      key: 'results/run-1/chart.png',
+      versionId: 'v-1',
+      contentType: 'image/png',
+    })
+    expect(output).toEqual({ shown: true, content_type: 'image/png', kind: 'image' })
+    expect(kept).toEqual([['call-9', {
+      kind: 'artifact',
+      title: 'chart.png',
+      caption: 'Reads per day',
+      artifact: {
+        url: 'blob:aruna/chart',
+        contentType: 'image/png',
+        previewKind: 'image',
+        name: 'chart.png',
+        size: 4096,
+        bucket: 'work',
+        key: 'results/run-1/chart.png',
+        versionId: 'v-1',
+        jobId: 'job-1',
+      },
+    }]])
+  })
+
+  it('shows a json output as text', async () => {
+    const { tools, kept } = harness(null, {
+      url: 'blob:aruna/summary',
+      contentType: 'application/json',
+      kind: 'text',
+      name: 'summary.json',
+      size: 82,
+    })
+
+    const output = await runTool(tools.show_artifact, { bucket: 'work', key: 'out/summary.json' })
+
+    expect(output).toEqual({ shown: true, content_type: 'application/json', kind: 'text' })
+    expect(kept[0][1]).toMatchObject({ kind: 'artifact', artifact: { previewKind: 'text' } })
+  })
+
+  it('keeps an artifact the host capped as a download row', async () => {
+    const { tools, kept } = harness(null, {
+      url: 'https://s3.node.test/work/big.tif?signature',
+      contentType: 'image/tiff',
+      kind: 'download',
+      name: 'big.tif',
+      size: 60 * 1024 * 1024,
+    })
+
+    const output = await runTool(tools.show_artifact, { bucket: 'work', key: 'big.tif' })
+
+    expect(output).toEqual({ shown: true, content_type: 'image/tiff', kind: 'download' })
+    expect(kept[0][1]).toMatchObject({ artifact: { previewKind: 'download', size: 60 * 1024 * 1024 } })
+  })
+
+  it('carries the endpoint and node hints of a job output', async () => {
+    const { tools, host } = harness(null, { kind: 'image', contentType: 'image/png', name: 'plot.png' })
+
+    await runTool(tools.show_artifact, {
+      bucket: 'work',
+      key: 'plot.png',
+      node_id: 'node-2',
+      endpoint_url: 'https://s3.node.test',
+      filename: 'plot.png',
+      size: 12,
+    })
+
+    expect(host.loadArtifact).toHaveBeenCalledWith({
+      bucket: 'work',
+      key: 'plot.png',
+      nodeId: 'node-2',
+      endpointUrl: 'https://s3.node.test',
+      filename: 'plot.png',
+      size: 12,
+    })
+  })
+
+  it('refuses a reference without a bucket or key and reports a failed read', async () => {
+    const { tools, kept } = harness()
+    expect(await runTool(tools.show_artifact, { bucket: ' ', key: 'x' })).toMatchObject({ error: expect.any(String) })
+    expect(kept).toEqual([])
+
+    const failing = renderTools({
+      keep: vi.fn(),
+      loadCrate: vi.fn(),
+      loadArtifact: async () => { throw new Error('no S3 session') },
+    })
+    expect(await runTool(failing.show_artifact, { bucket: 'work', key: 'a.png' })).toEqual({ error: 'no S3 session' })
   })
 })

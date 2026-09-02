@@ -1,4 +1,5 @@
 // What the chat panel renders and what the tool layer hands back to the model.
+import type { PreviewKind } from '@/composables/useObjectPreview'
 
 /** What a denied tool call answers the model, as NovaCrate words it. */
 export const DENIAL_MESSAGE = 'The user has denied this operation'
@@ -7,12 +8,30 @@ export type ToolCallState = 'approval' | 'running' | 'done' | 'error' | 'denied'
 
 export type ChartKind = 'bar' | 'line' | 'pie'
 
+/**
+ * One stored object the chat shows. `url` is a blob URL for bytes already in
+ * the tab and a presigned URL for anything only offered for download; it never
+ * survives a reload, so a restored transcript shows the card's error state.
+ */
+export interface ArtifactView {
+  url: string
+  contentType: string
+  previewKind: PreviewKind
+  name: string
+  size?: number
+  bucket: string
+  key: string
+  versionId?: string
+  jobId?: string
+}
+
 /** What a render tool asked the conversation to show; kept beside the call. */
 export type RenderView =
   | { kind: 'table'; title: string; columns: string[]; rows: unknown[][] }
   | { kind: 'chart'; title: string; chart: ChartKind; labels: string[]; series: Array<{ name: string; values: number[] }> }
   | { kind: 'stats'; title: string; items: Array<{ label: string; value: string; hint?: string }> }
   | { kind: 'crate'; title: string; documentId?: string; crate: unknown }
+  | { kind: 'artifact'; title: string; caption?: string; artifact: ArtifactView }
 
 export interface ToolCallView {
   id: string

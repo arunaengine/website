@@ -18,6 +18,7 @@ import { useAssistantProviders } from './useAssistantProviders'
 import { useAssistantEditor } from './useAssistantEditor'
 import type { McpConnection } from '@/lib/assistant/mcpClient'
 import type { PromptContext } from '@/lib/assistant/prompt'
+import type { ArtifactRef, LoadedArtifact } from '@/lib/assistant/renderTools'
 import type { ApprovalGate, ApprovalRequest, ChatMessage, ToolCallView } from '@/lib/assistant/types'
 import { clampEffort, modelSuggestions, reasoningEffortOptions } from '@/lib/assistant/modelOptions'
 import type { StreamProviderOptions } from '@/lib/assistant/chat'
@@ -37,6 +38,9 @@ const MODEL_KEY = 'aruna.assistant.model'
 const APPROVE_KEY = 'aruna.assistant.approve'
 const EFFORT_KEY = 'aruna.assistant.effort'
 const SESSION_MARGIN_MS = 60_000
+// The same ceiling the object preview applies before bytes enter the tab.
+const ARTIFACT_CAP = 25 * 1024 * 1024
+const MAX_ARTIFACT_URLS = 24
 
 // Any string level the active model advertises; validated against its list.
 export type ReasoningEffort = string
@@ -130,6 +134,23 @@ let activeApproval: ApprovalEntry | null = null
 const approvalQueue: ApprovalEntry[] = []
 let assistantEpoch = sessionEpoch.value
 
+// Blob URLs the artifact cards draw from. They outlive a chat switch because
+// the cards do; the oldest goes once the list outgrows the cap, and clearing
+// the conversations frees them all.
+const artifactUrls: string[] = []
+
+function trackArtifact(url: string) {
+  artifactUrls.push(url)
+  while (artifactUrls.length > MAX_ARTIFACT_URLS) {
+    const stale = artifactUrls.shift()
+    if (stale) URL.revokeObjectURL(stale)
+  }
+}
+
+function releaseArtifacts() {
+  for (const url of artifactUrls.splice(0)) URL.revokeObjectURL(url)
+}
+
 function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
 }
@@ -168,6 +189,7 @@ function applyChatState(next: AssistantChatState) {
 }
 
 function clearChatState() {
+  releaseArtifacts()
   chatState = { activeChatId: '', chats: [] }
   activeChatId.value = ''
   chats.value = []
@@ -359,6 +381,56 @@ async function nodeToolSet(turn: TurnContext, gate: ApprovalGate): Promise<ToolS
   return nodeTools(descriptors, source, gate)
 }
 
+/** The node serving the bucket: the given id, else the endpoint the output names. */
+function artifactNode(
+  resolve: (url: string) => { nodeId: string | null } | null,
+  ref: ArtifactRef,
+): string | null {
+  if (ref.nodeId) return ref.nodeId
+  if (!ref.endpointUrl) return null
+  return resolve(`${ref.endpointUrl.replace(/\/+$/, '')}/${ref.bucket}/${ref.key}`)?.nodeId ?? null
+}
+
+const INLINE_KINDS = new Set(['image', 'text', 'markdown', 'table'])
+
+/**
+ * Fetches one stored object for an artifact card: a blob URL for bytes small
+ * enough to hold in the tab, a presigned link for everything else. The bytes
+ * stay in the browser; only the content type and kind go back to the model.
+ */
+export async function loadArtifact(ref: ArtifactRef): Promise<LoadedArtifact> {
+  const [{ useS3 }, { classifyObject }] = await Promise.all([
+    import('./useS3'),
+    import('./useObjectPreview'),
+  ])
+  const s3 = useS3()
+  // The chat is open away from the data browser too, so this can be the first
+  // S3 use of the visit.
+  if (!s3.hasActiveKey.value) {
+    const { activeGroupId } = await import('./useGroupSelection')
+    if (activeGroupId.value) await s3.ensureSession(activeGroupId.value)
+  }
+  const nodeId = artifactNode(s3.resolveObjectUrl, ref)
+  const name = ref.filename || ref.key.split('/').pop() || ref.key
+  const contentType = ref.contentType || 'application/octet-stream'
+  const classified = classifyObject({ key: name, contentType: ref.contentType })
+  const oversize = typeof ref.size === 'number' && ref.size > ARTIFACT_CAP
+
+  if (oversize || !INLINE_KINDS.has(classified.kind)) {
+    const url = await s3.downloadUrl(ref.bucket, ref.key, nodeId, ref.versionId)
+    return { url, contentType, kind: oversize ? 'download' : classified.kind, name, size: ref.size }
+  }
+
+  const blob = await s3.getObjectBlob(ref.bucket, ref.key, nodeId, ref.versionId)
+  if (blob.size > ARTIFACT_CAP) {
+    const url = await s3.downloadUrl(ref.bucket, ref.key, nodeId, ref.versionId)
+    return { url, contentType, kind: 'download', name, size: blob.size }
+  }
+  const url = URL.createObjectURL(blob)
+  trackArtifact(url)
+  return { url, contentType: ref.contentType || blob.type || contentType, kind: classified.kind, name, size: blob.size }
+}
+
 // The cards a render tool asks for stay on the call; the model only hears "shown".
 async function renderToolSet(turn: TurnContext): Promise<ToolSet> {
   const { renderTools } = await import('@/lib/assistant/renderTools')
@@ -367,6 +439,7 @@ async function renderToolSet(turn: TurnContext): Promise<ToolSet> {
       if (isCurrentTurn(turn)) patchCall(turn.messageId, id, { view })
     },
     loadCrate: loadRoCrate,
+    loadArtifact,
   })
 }
 

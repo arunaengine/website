@@ -2,6 +2,7 @@
 // The conversation: what was asked, what the model wrote, the tool calls it
 // made along the way, and the cards a render tool asked to show.
 import { nextTick, onMounted, ref, watch } from 'vue'
+import ArtifactCard from '@/components/assistant/cards/ArtifactCard.vue'
 import ChartCard from '@/components/assistant/cards/ChartCard.vue'
 import CrateCard from '@/components/assistant/cards/CrateCard.vue'
 import StatsCard from '@/components/assistant/cards/StatsCard.vue'
@@ -77,6 +78,7 @@ onMounted(() => follow(true))
             <ChartCard v-else-if="call.view?.kind === 'chart'" v-bind="call.view" />
             <StatsCard v-else-if="call.view?.kind === 'stats'" v-bind="call.view" />
             <CrateCard v-else-if="call.view?.kind === 'crate'" :title="call.view.title" :crate="call.view.crate" :document-id="call.view.documentId" />
+            <ArtifactCard v-else-if="call.view?.kind === 'artifact'" :title="call.view.title" :caption="call.view.caption" :artifact="call.view.artifact" />
           </template>
           <ToolCallDrawer
             v-if="foldedCalls(message).length"
