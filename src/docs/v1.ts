@@ -565,6 +565,15 @@ export const docsTopics: DocsTopic[] = [
           'What has no form equivalent is listed beside the rules, so the parts of the file without a field are visible rather than silently dropped.',
         ],
       },
+      {
+        title: 'Using it on a dataset',
+        icon: 'CircleCheck',
+        paragraphs: [
+          'A [dataset](concept:datasets) declares a profile in its editor. Choosing one adds a row for every property the profile requires, and an entity for every reference it asks for, so the form states the checklist instead of hiding it.',
+          'The check beside the form runs the draft exactly as a save would, without saving anything. A refusal names every missing property with the entity it belongs to, and saving runs that same check once more before the write.',
+          'The interactive tutorial above walks the whole loop on a practice profile: authoring it, applying it, being refused, and correcting the draft until the node accepts it.',
+        ],
+      },
     ],
   },
   {

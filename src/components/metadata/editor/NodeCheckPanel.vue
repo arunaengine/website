@@ -90,7 +90,7 @@ function groupName(entityId: string): string {
 </script>
 
 <template>
-  <section data-tour="editor-validation" class="surface space-y-4 p-5">
+  <section data-tour="editor-validation" data-tutorial="dataset-check" class="surface space-y-4 p-5">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
         <h2 class="font-display text-sm font-semibold text-aruna-navy">Validation</h2>
@@ -174,7 +174,7 @@ function groupName(entityId: string): string {
     <Notice v-if="submitError" tone="error">{{ submitError }}</Notice>
     <div class="flex flex-wrap items-center justify-end gap-3">
       <p v-if="blocked && !saving" class="min-w-0 text-xs text-muted-foreground">{{ blocked }}</p>
-      <Button data-tour="editor-save" :disabled="!canSave || saving" @click="emit('save')">
+      <Button data-tour="editor-save" data-tutorial="dataset-save" :disabled="!canSave || saving" @click="emit('save')">
         <Spinner v-if="saving" class="text-current" aria-hidden="true" />
         <Send v-else class="h-4 w-4" />
         {{ saving ? (busyLabel ?? 'Creating') : (actionLabel ?? 'Create dataset') }}

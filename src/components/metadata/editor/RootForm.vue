@@ -66,7 +66,7 @@ function addKeyword() {
 <template>
   <div>
     <div class="divide-y divide-border">
-      <div :class="ROW_GRID">
+      <div :class="ROW_GRID" data-tutorial="dataset-name">
         <label :class="ROW_LABEL" for="root-name">Name</label>
         <div class="min-w-0">
           <Input
@@ -80,7 +80,7 @@ function addKeyword() {
         <div :class="ROW_ACTIONS"><IssueMark :issues="issuesFor('name')" /></div>
       </div>
 
-      <div :class="ROW_GRID">
+      <div :class="ROW_GRID" data-tutorial="dataset-description">
         <label :class="ROW_LABEL" for="root-description">Description</label>
         <div class="min-w-0">
           <Textarea
@@ -150,7 +150,7 @@ function addKeyword() {
         <div :class="ROW_ACTIONS"><IssueMark :issues="issuesFor('keywords')" /></div>
       </div>
 
-      <div :class="ROW_GRID">
+      <div :class="ROW_GRID" data-tutorial="dataset-profile">
         <span :class="ROW_LABEL">Profile</span>
         <div class="min-w-0">
           <Select
