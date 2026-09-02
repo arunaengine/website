@@ -1,10 +1,11 @@
 <script setup lang="ts">
-// One page per bucket for everything about where its data goes and where it
-// already is. Policy tabs are gated by what the node will let this viewer
+// One settings page per bucket: what it holds, where its data goes and where
+// it already is. Policy tabs are gated by what the node will let this viewer
 // write; the overview and the sync list are readable by anyone who reads the
-// bucket, and every observed line names the node it came from.
+// bucket, and every observed line names the node it came from. Deleting a
+// bucket is not offered here: that lives on the bucket row in the Data view.
 import { computed, ref, watch } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
@@ -21,23 +22,17 @@ import BucketPolicySection from '@/components/storage/BucketPolicySection.vue'
 import StorageOverviewTab from '@/components/storage/StorageOverviewTab.vue'
 import SyncsTab from '@/components/storage/SyncsTab.vue'
 import { useAruna } from '@/composables/useAruna'
-import { useBuckets } from '@/composables/useBuckets'
-import { useBucketShortcuts } from '@/composables/useBucketShortcuts'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useRouteTab } from '@/composables/useRouteTab'
 import { useS3 } from '@/composables/useS3'
 import { isGroupAdmin } from '@/lib/groupAdmin'
 import type { GroupDetailResponse } from '@/lib/api'
-import type { DeletionResult } from '@/lib/deletion/request'
 import { ChevronLeft } from '@lucide/vue'
 
 const route = useRoute()
-const router = useRouter()
 const { currentUser, getGroup, isRealmAdmin } = useAruna()
 const { activeContext } = useS3()
 const realmNodes = useRealmNodes()
-const bucketList = useBuckets()
-const shortcuts = useBucketShortcuts()
 
 const bucket = computed(() => String(route.params.bucketId ?? ''))
 const nodeId = computed(() => {
@@ -88,15 +83,6 @@ function onSyncCreated() {
   syncReloadKey.value += 1
 }
 
-// The page it describes is gone, so it leaves for the list the same way the
-// data manager does after a bucket delete.
-async function onBucketDeleted(result: DeletionResult) {
-  if (!result.committed.length) return
-  shortcuts.remove(bucket.value, nodeId.value)
-  await router.push({ name: 'buckets', query: groupId.value ? { group: groupId.value } : {} })
-  await bucketList.refresh()
-}
-
 const browserLink = computed(() => ({
   name: 'bucket',
   params: { bucketId: bucket.value },
@@ -109,9 +95,9 @@ const browserLink = computed(() => ({
 
 <template>
   <div>
-    <PageHeader :title="`Storage for ${bucket}`">
+    <PageHeader :title="`Settings for ${bucket}`">
       <template #description>
-        Where new uploads go, which rules apply, and what this node can see.
+        What this bucket holds, where new uploads go, which rules apply, and what this node can see.
         <DocsLink icon topic="where-data-lives" class="ml-0.5" />
       </template>
       <template #breadcrumbs>
@@ -132,7 +118,7 @@ const browserLink = computed(() => ({
 
     <Tabs v-model="tab" class="container space-y-5 py-6">
       <div class="overflow-x-auto">
-        <TabsList aria-label="Bucket storage sections">
+        <TabsList aria-label="Bucket settings sections">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger v-if="backendVisible" value="backend">Storage backend</TabsTrigger>
           <TabsTrigger v-if="placementVisible" value="placement">Placement</TabsTrigger>
@@ -141,12 +127,7 @@ const browserLink = computed(() => ({
       </div>
 
       <TabsContent value="overview" class="mt-0">
-        <StorageOverviewTab
-          :bucket="bucket"
-          :group-id="groupId"
-          :node-id="nodeId"
-          @deleted="onBucketDeleted"
-        />
+        <StorageOverviewTab :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
       </TabsContent>
 
       <TabsContent v-if="backendVisible" value="backend" class="mt-0">

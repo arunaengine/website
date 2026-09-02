@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import IconButton from '@/components/ui/IconButton.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
@@ -9,7 +10,7 @@ import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
 import { useS3 } from '@/composables/useS3'
 import type { DataManager } from '@/composables/useDataManager'
 import type { BucketSearchHit } from '@/lib/api'
-import { Boxes, ChevronRight, FolderPlus, History, KeyRound } from '@lucide/vue'
+import { Boxes, ChevronRight, FolderPlus, History, KeyRound, Trash2 } from '@lucide/vue'
 
 const props = defineProps<{ manager: DataManager }>()
 const emit = defineEmits<{ (e: 'sync', hit: BucketSearchHit): void }>()
@@ -40,7 +41,17 @@ const {
   creatingBucket,
   createBucket,
   createBucketError,
+  requestDelete,
 } = props.manager
+
+// Bucket deletion lives on the row it destroys; the shared dialog does the rest.
+function deleteRefusal(name: string, nodeId: string | null): string | null {
+  if (nodeId) return 'Only the node that serves this bucket can delete it.'
+  if (!s3.canDeletePrefix(name, '', null)) {
+    return 'This session cannot delete this bucket: it needs write on the whole bucket.'
+  }
+  return null
+}
 </script>
 
 <template>
@@ -81,7 +92,19 @@ const {
               :active="entry.bucket === bucket && (entry.nodeId ?? null) === remoteNodeId"
               @open="openBucketOn(entry.bucket, entry.nodeId)"
               @toggle-pin="shortcuts.togglePin(entry.bucket, entry.nodeId)"
-            />
+            >
+              <template #actions>
+                <IconButton
+                  label="Delete bucket…"
+                  class="text-muted-foreground hover:text-destructive"
+                  :disabled-reason="deleteRefusal(entry.bucket, entry.nodeId)"
+                  side="right"
+                  @click="requestDelete({ kind: 'bucket', bucket: entry.bucket, nodeId: entry.nodeId })"
+                >
+                  <Trash2 class="h-3 w-3" />
+                </IconButton>
+              </template>
+            </BucketRow>
           </li>
         </ul>
         <p v-else class="px-4 py-4 text-xs text-muted-foreground">No buckets in this group yet.</p>

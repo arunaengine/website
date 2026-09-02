@@ -1,26 +1,31 @@
 <script setup lang="ts">
-// What a bucket reader needs in one look. The rules the bucket carries sit in
-// one card, what this node observed in another, and every observed line names
-// the node it came from. Nothing here invents a number the backend cannot give.
+// What a bucket reader needs in one look. What the bucket holds sits in one
+// card, the rules it carries in another, what this node observed in a third,
+// and every observed line names the node it came from. Nothing here invents a
+// number the backend cannot give.
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import DocsLink from '@/components/ui/DocsLink.vue'
 import FactList from '@/components/ui/FactList.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
-import BucketDangerZone from '@/components/data/BucketDangerZone.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useBucketSyncs } from '@/composables/useBucketSyncs'
 import { usePlacementPolicies } from '@/composables/usePlacementPolicies'
-import { ApiError, type GroupBackendResponse, type RoutingTarget, type StorageRoutingRule } from '@/lib/api'
-import type { DeletionResult } from '@/lib/deletion/request'
+import {
+  ApiError,
+  type BucketUsageResponse,
+  type GroupBackendResponse,
+  type RoutingTarget,
+  type StorageRoutingRule,
+} from '@/lib/api'
 import type { PolicyRefBody } from '@/lib/placementPolicies'
 import { targetLabel } from '@/lib/storage'
-import { HardDrive, ShieldCheck, Trash2 } from '@lucide/vue'
+import { formatBytes, formatNumber } from '@/lib/utils'
+import { Database, HardDrive, ShieldCheck } from '@lucide/vue'
 
 const props = defineProps<{ bucket: string; groupId: string | null; nodeId: string | null }>()
-const emit = defineEmits<{ (e: 'deleted', result: DeletionResult): void }>()
 
-const { getBucketRouting, getGroupRouting, listGroupBackends } = useAruna()
+const { getBucketRouting, getBucketUsage, getGroupRouting, listGroupBackends } = useAruna()
 const { getBucketPlacement, policyName } = usePlacementPolicies()
 
 const bucket = computed(() => props.bucket)
@@ -36,6 +41,9 @@ const backends = ref<GroupBackendResponse[]>([])
 const routingState = ref<'loading' | 'ready' | 'refused' | 'unknown'>('loading')
 const policies = ref<PolicyRefBody[] | null>(null)
 const policyState = ref<'loading' | 'ready' | 'refused' | 'unknown'>('loading')
+const usage = ref<BucketUsageResponse | null>(null)
+// 'missing': this node does not serve the route, so the card stays away.
+const usageState = ref<'loading' | 'ready' | 'missing' | 'failed'>('loading')
 
 // A bucket hosted on another node is a different bucket here, so this node's
 // answer for the same name would describe the wrong thing.
@@ -50,11 +58,23 @@ async function load() {
   if (remote.value) {
     routingState.value = 'unknown'
     policyState.value = 'unknown'
+    usageState.value = 'missing'
     return
   }
   routingState.value = 'loading'
   policyState.value = 'loading'
+  usageState.value = 'loading'
+  usage.value = null
   const pending: Promise<unknown>[] = [
+    getBucketUsage(props.bucket)
+      .then((counted) => {
+        usage.value = counted
+        usageState.value = 'ready'
+      })
+      .catch((error) => {
+        const older = error instanceof ApiError && error.status === 404
+        usageState.value = older ? 'missing' : 'failed'
+      }),
     getBucketRouting(props.bucket)
       .then((routing) => {
         rules.value = routing.rules
@@ -98,12 +118,13 @@ const bucketDefaultRule = computed(
 const REMOTE = { value: 'Unknown here', note: 'This bucket is hosted on another node.' }
 const NO_ANSWER = { value: 'Unknown', note: 'This node did not answer.' }
 
+// A node that refuses the routing read says nothing about the bucket, so the
+// fact is left out rather than filled with a refusal.
+const backendKnown = computed(() => routingState.value !== 'refused')
+
 const backend = computed(() => {
   if (remote.value) return REMOTE
-  if (routingState.value === 'loading') return null
-  if (routingState.value === 'refused') {
-    return { value: 'Not shown', note: 'Only admins of the owning group may read it.' }
-  }
+  if (routingState.value === 'loading' || routingState.value === 'refused') return null
   if (routingState.value === 'unknown') return NO_ANSWER
   const count = rules.value?.length ?? 0
   if (bucketDefaultRule.value) {
@@ -140,8 +161,35 @@ const syncSummary = computed(() => {
   return { value: `${out} out, ${syncRows.value.length - out} in`, note: 'Only syncs you created are counted.' }
 })
 
+// Lower bounds when the node stopped its scan at the cap.
+function counted(value: number): string {
+  const number = formatNumber(value)
+  return usage.value?.complete === false ? `at least ${number}` : number
+}
+
+const usageFacts = computed(() => {
+  const held = usage.value
+  if (!held) return []
+  const size = formatBytes(held.logical_bytes)
+  return [
+    { key: 'size', label: 'Size', value: held.complete ? size : `at least ${size}` },
+    { key: 'objects', label: 'Objects', value: counted(held.objects) },
+    { key: 'versions', label: 'Versions', value: counted(held.versions) },
+    { key: 'markers', label: 'Delete markers', value: counted(held.delete_markers) },
+    { key: 'uploads', label: 'Open multipart uploads', value: counted(held.open_multipart_uploads) },
+  ]
+})
+
+const bucketEmpty = computed(() => {
+  const held = usage.value
+  if (!held?.complete) return false
+  return !held.objects && !held.versions && !held.delete_markers && !held.open_multipart_uploads
+})
+
 const ruleFacts = computed(() => [
-  { key: 'backend', label: 'Storage backend', value: backend.value?.value ?? '' },
+  ...(backendKnown.value
+    ? [{ key: 'backend', label: 'Storage backend', value: backend.value?.value ?? '' }]
+    : []),
   { key: 'policies', label: 'Placement policies', value: policySummary.value?.value ?? '' },
 ])
 const observedFacts = computed(() => [
@@ -157,6 +205,28 @@ const filesLink = computed(() => ({
 
 <template>
   <div class="grid gap-5 lg:grid-cols-2">
+    <section v-if="usageState !== 'missing'" class="surface lg:col-span-2">
+      <header class="flex items-center gap-2 border-b border-border px-5 py-4">
+        <Database class="size-4 text-primary" />
+        <h2 class="font-display text-sm font-semibold text-aruna-navy">What this bucket holds</h2>
+      </header>
+      <div class="px-5 py-4">
+        <Skeleton v-if="usageState === 'loading'" class="h-14 w-full" />
+        <p v-else-if="usageState === 'failed'" class="text-sm text-muted-foreground">
+          This node did not answer, so the numbers are unknown right now.
+        </p>
+        <p v-else-if="bucketEmpty" class="text-sm text-muted-foreground">
+          This bucket is empty: nothing is stored in it yet.
+        </p>
+        <template v-else>
+          <FactList :items="usageFacts" class="sm:grid-cols-3 lg:grid-cols-5" />
+          <p v-if="usage && !usage.complete" class="mt-3 text-[11px] text-muted-foreground">
+            The scan stopped at its limit, so every number here is a lower bound.
+          </p>
+        </template>
+      </div>
+    </section>
+
     <section class="surface">
       <header class="flex items-center gap-2 border-b border-border px-5 py-4">
         <ShieldCheck class="size-4 text-primary" />
@@ -214,24 +284,6 @@ const filesLink = computed(() => ({
             </template>
           </template>
         </FactList>
-      </div>
-    </section>
-
-    <section class="surface lg:col-span-2">
-      <header class="flex items-center gap-2 border-b border-border px-5 py-4">
-        <Trash2 class="size-4 text-destructive" />
-        <h2 class="font-display text-sm font-semibold text-aruna-navy">Danger zone</h2>
-      </header>
-      <div class="space-y-3 px-5 py-4">
-        <p class="text-xs text-muted-foreground">
-          Deleting the bucket removes every object, version and delete marker it holds on this node,
-          and nothing brings them back.
-        </p>
-        <BucketDangerZone
-          :bucket="props.bucket"
-          :node-id="props.nodeId"
-          @deleted="(result: DeletionResult) => emit('deleted', result)"
-        />
       </div>
     </section>
   </div>

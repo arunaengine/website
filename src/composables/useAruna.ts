@@ -107,6 +107,7 @@ import {
 import {
   getBlobLocations,
   getBucketRouting,
+  getBucketUsage,
   getGroupRouting,
   putBucketRouting,
   putGroupRouting,
@@ -243,6 +244,7 @@ export function useAruna() {
     getGroupRouting,
     putGroupRouting,
     getBucketRouting,
+    getBucketUsage,
     putBucketRouting,
     getBlobLocations,
     replicateBlob,

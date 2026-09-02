@@ -1,8 +1,9 @@
 import { defineComponent, h, ref } from 'vue'
 import * as VueRuntime from 'vue'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as Api from '@/lib/api'
 import * as Storage from '@/lib/storage'
+import * as Utils from '@/lib/utils'
 import { compileClientComponent, content, flush, mountApp, moduleDefault, nodes } from '@/test/clientRender'
 import type { SyncRow } from '@/composables/useBucketSyncs'
 
@@ -22,6 +23,7 @@ const FactListStub = defineComponent({
 })
 
 const getBucketRouting = vi.fn()
+const getBucketUsage = vi.fn()
 const getGroupRouting = vi.fn()
 const listGroupBackends = vi.fn()
 const getBucketPlacement = vi.fn()
@@ -36,11 +38,8 @@ const tab = compileClientComponent(new URL('./StorageOverviewTab.vue', import.me
   '@/components/ui/DocsLink.vue': moduleDefault(Slotted('a')),
   '@/components/ui/FactList.vue': moduleDefault(FactListStub),
   '@/components/ui/Skeleton.vue': moduleDefault(Slotted('div')),
-  '@/components/data/BucketDangerZone.vue': moduleDefault(
-    defineComponent({ setup: () => () => h('div', 'Delete bucket permanently…') }),
-  ),
   '@/composables/useAruna': {
-    useAruna: () => ({ getBucketRouting, getGroupRouting, listGroupBackends }),
+    useAruna: () => ({ getBucketRouting, getBucketUsage, getGroupRouting, listGroupBackends }),
   },
   '@/composables/useBucketSyncs': {
     useBucketSyncs: () => ({
@@ -58,6 +57,25 @@ const tab = compileClientComponent(new URL('./StorageOverviewTab.vue', import.me
   },
   '@/lib/api': Api,
   '@/lib/storage': Storage,
+  '@/lib/utils': Utils,
+})
+
+function usageBody(overrides: Record<string, unknown> = {}) {
+  return {
+    bucket: 'reef-survey',
+    objects: 12,
+    versions: 20,
+    delete_markers: 3,
+    open_multipart_uploads: 1,
+    logical_bytes: 5 * 1024 * 1024,
+    complete: true,
+    ...overrides,
+  }
+}
+
+beforeEach(() => {
+  getBucketUsage.mockReset()
+  getBucketUsage.mockResolvedValue(usageBody())
 })
 
 async function render(props: Record<string, unknown> = {}) {
@@ -116,7 +134,7 @@ describe('bucket storage overview', () => {
     expect(text).toContain('Only syncs you created are counted.')
   })
 
-  it('says who may read a refused fact instead of showing nothing', async () => {
+  it('leaves out a refused fact and names who may read the rest', async () => {
     getBucketRouting.mockRejectedValue(new Api.ApiError(403, 'Forbidden'))
     getBucketPlacement.mockRejectedValue(new Api.ApiError(403, 'Forbidden'))
     getGroupRouting.mockResolvedValue({ group_id: 'g-1', warnings: [] })
@@ -125,7 +143,7 @@ describe('bucket storage overview', () => {
 
     const text = await render()
 
-    expect(text).toContain('Only admins of the owning group may read it.')
+    expect(text).not.toContain('Storage backend')
     expect(text).toContain('Only group admins and realm admins may read it.')
   })
 
@@ -150,7 +168,7 @@ describe('bucket storage overview', () => {
     expect(content(root)).not.toContain('Learn about')
   })
 
-  it('carries the danger zone with the bucket deletion control', async () => {
+  it('keeps destructive controls out of the settings view', async () => {
     getBucketRouting.mockResolvedValue({ bucket: 'reef-survey', rules: [], warnings: [] })
     getGroupRouting.mockResolvedValue({ group_id: 'g-1', warnings: [] })
     listGroupBackends.mockResolvedValue({ backends: [] })
@@ -159,9 +177,58 @@ describe('bucket storage overview', () => {
 
     const text = await render()
 
-    expect(text).toContain('Danger zone')
-    expect(text).toContain('nothing brings them back')
-    expect(text).toContain('Delete bucket permanently…')
+    expect(text).not.toContain('Danger zone')
+    expect(text).not.toContain('Delete bucket')
+  })
+
+  it('counts what the bucket holds', async () => {
+    const text = await render()
+
+    expect(text).toContain('What this bucket holds')
+    expect(text).toMatch(/Size.*5 MB/s)
+    expect(text).toMatch(/Objects.*12/s)
+    expect(text).toMatch(/Versions.*20/s)
+    expect(text).toMatch(/Delete markers.*3/s)
+    expect(text).toMatch(/Open multipart uploads.*1/s)
+    expect(text).not.toContain('at least')
+  })
+
+  it('reports a capped scan as a lower bound', async () => {
+    getBucketUsage.mockResolvedValue(usageBody({ complete: false }))
+
+    const text = await render()
+
+    expect(text).toContain('at least 5 MB')
+    expect(text).toContain('at least 12')
+    expect(text).toContain('every number here is a lower bound')
+  })
+
+  it('says a bucket is empty instead of listing zeros', async () => {
+    getBucketUsage.mockResolvedValue(
+      usageBody({ objects: 0, versions: 0, delete_markers: 0, open_multipart_uploads: 0, logical_bytes: 0 }),
+    )
+
+    const text = await render()
+
+    expect(text).toContain('This bucket is empty')
+    expect(text).not.toContain('Open multipart uploads')
+  })
+
+  it('hides the card on a node that does not serve the route', async () => {
+    getBucketUsage.mockRejectedValue(new Api.ApiError(404, 'Not Found'))
+
+    const text = await render()
+
+    expect(text).not.toContain('What this bucket holds')
+    expect(text).toContain('Rules this bucket carries')
+  })
+
+  it('reports a node that failed to count', async () => {
+    getBucketUsage.mockRejectedValue(new Api.ApiError(500, 'Internal Server Error'))
+
+    const text = await render()
+
+    expect(text).toContain('This node did not answer, so the numbers are unknown right now.')
   })
 
   it('does not answer for a bucket hosted on another node', async () => {

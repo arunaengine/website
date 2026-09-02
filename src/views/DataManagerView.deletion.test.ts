@@ -27,7 +27,7 @@ const objectBrowserSource = read('../components/data/manager/ObjectBrowser.vue')
 const versionsSource = read('../components/data/ObjectVersionsPanel.vue')
 const locationsSource = read('../components/data/ObjectLocationsPanel.vue')
 const detailsSource = read('../components/data/FileDetailsDialog.vue')
-const dangerZoneSource = read('../components/data/BucketDangerZone.vue')
+const bucketSidebarSource = read('../components/data/manager/BucketSidebar.vue')
 
 function sfc(source: string, filename: string) {
   const { descriptor } = parse(source, { filename })
@@ -45,7 +45,7 @@ const outcome = sfc(outcomeSource, 'DeletionOutcome.vue')
 const objectBrowser = sfc(objectBrowserSource, 'ObjectBrowser.vue')
 const versionsPanel = sfc(versionsSource, 'ObjectVersionsPanel.vue')
 const details = sfc(detailsSource, 'FileDetailsDialog.vue')
-const dangerZone = sfc(dangerZoneSource, 'BucketDangerZone.vue')
+const bucketSidebar = sfc(bucketSidebarSource, 'BucketSidebar.vue')
 const datasetReferencesTemplate = sfc(
   datasetReferencesSource,
   'DatasetReferencesPreflightPanel.vue',
@@ -91,8 +91,8 @@ describe('Data Manager version-aware deletion', () => {
 
   it('routes every permanent scope through one job and keeps partial progress visible', () => {
     expect(objectBrowser.template).toContain('Delete permanently…')
-    expect(dangerZone.template).toContain('Delete bucket permanently…')
-    expect(dangerZoneSource).toContain("kind: 'bucket'")
+    expect(bucketSidebar.template).toContain('label="Delete bucket…"')
+    expect(bucketSidebarSource).toContain("kind: 'bucket'")
     expect(purgeJobSource).toContain('startStoragePurge(')
     expect(purgeJobSource).toContain('getStoragePurgeJob(')
     expect(purgeJobSource).toContain('retainStoragePurgeProgress(')
@@ -305,7 +305,7 @@ describe('Data Manager explicit multi-file deletion', () => {
       objectBrowser.template,
       versionsPanel.template,
       details.template,
-      dangerZone.template,
+      bucketSidebar.template,
       datasetReferencesTemplate,
     ]
       .join('\n')

@@ -1,13 +1,15 @@
 import {
+  getBucketUsage as requestBucketUsage,
   type BlobLocationsResponse,
   type BucketRoutingResponse,
+  type BucketUsageResponse,
   type GroupRoutingResponse,
   type ReplicateBlobRequest,
   type ReplicateBlobResponse,
   type RoutingTarget,
   type StorageRoutingRule,
 } from '@/lib/api'
-import { request, saving } from './state'
+import { refreshContext, request, saving } from './state'
 
 // ── Storage routing (group default and per-bucket rules) ────────────────────
 
@@ -33,6 +35,11 @@ export async function putGroupRouting(
 
 export async function getBucketRouting(bucket: string): Promise<BucketRoutingResponse> {
   return request<BucketRoutingResponse>(`/data/buckets/${encodeURIComponent(bucket)}/storage/routing`)
+}
+
+/** What the serving node counts in one bucket; 404 means the node lacks the route. */
+export function getBucketUsage(bucket: string): Promise<BucketUsageResponse> {
+  return requestBucketUsage(bucket, refreshContext().client)
 }
 
 export async function putBucketRouting(
