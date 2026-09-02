@@ -2,7 +2,7 @@ import * as VueRuntime from 'vue'
 import { createSSRApp, defineComponent, h, ref, type Component } from 'vue'
 import { renderToString } from '@vue/server-renderer'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { content, compileClientComponent, flush, moduleDefault, mountApp } from '@/test/clientRender'
+import { button, click, content, compileClientComponent, flush, moduleDefault, mountApp } from '@/test/clientRender'
 
 const firstPaintMock = vi.hoisted(() => ({
   useFirstPaint: () => ({ value: true }),
@@ -50,9 +50,17 @@ const StatCardStub = defineComponent({
 const SkeletonStub = defineComponent(() => () => h('span', 'loading'))
 const GroupQuotaCardsStub = defineComponent(() => () => h('div', 'group quota cards'))
 const MyStatsCardsStub = defineComponent(() => () => h('div', 'my stats cards'))
+// Names the current scope and offers the other one, so the view's wiring of
+// setScope is testable without the real segmented control.
 const ScopeToggleStub = defineComponent({
   props: { modelValue: String },
-  setup: (props) => () => h('div', `lead with ${props.modelValue}`),
+  emits: ['update:modelValue'],
+  setup: (props, { emit }) => () =>
+    h('div', [
+      `scope toggle ${props.modelValue}`,
+      h('button', { onClick: () => emit('update:modelValue', 'personal') }, 'show personal'),
+      h('button', { onClick: () => emit('update:modelValue', 'realm') }, 'show realm'),
+    ]),
 })
 // Renders what it was handed, so the view's own node/device split is testable.
 const FederationPanelStub = defineComponent({
@@ -284,7 +292,7 @@ describe('guest dashboard truth', () => {
     expect(text).not.toContain('0 / 0')
     expect(text).not.toContain('My statistics')
     expect(text).not.toContain('my stats cards')
-    expect(text).not.toContain('lead with')
+    expect(text).not.toContain('scope toggle')
     expect(text).not.toContain('federation panel')
   })
 
@@ -299,7 +307,7 @@ describe('guest dashboard truth', () => {
   })
 })
 
-describe('authenticated dashboard ordering', () => {
+describe('authenticated dashboard scope', () => {
   function signedInRealm() {
     currentUser.value = { id: 'user-id', name: 'Ada Lovelace' }
     profiles.value = [{}, {}]
@@ -323,36 +331,59 @@ describe('authenticated dashboard ordering', () => {
     }
   }
 
-  it('leads with My statistics, then the realm, then the nodes panel', async () => {
+  it('shows My statistics alone by default, then the nodes panel', async () => {
     signedInRealm()
 
     const text = await renderedText()
     const personalIndex = text.indexOf('My statistics')
-    const realmIndex = text.indexOf('Realm statistics')
-    const nodesIndex = text.indexOf('federation panel')
 
     expect(personalIndex).toBeGreaterThanOrEqual(0)
     expect(text.indexOf('my stats cards')).toBeGreaterThan(personalIndex)
     expect(text.indexOf('group quota cards')).toBeGreaterThan(personalIndex)
-    expect(realmIndex).toBeGreaterThan(personalIndex)
-    expect(nodesIndex).toBeGreaterThan(realmIndex)
-    expect(text).toContain('lead with personal')
-    expect(text).toContain('Replica-inclusive placement records held')
-    expect(text).toContain('1 of 2 nodes reporting')
+    expect(text.indexOf('federation panel')).toBeGreaterThan(personalIndex)
+    expect(text).toContain('scope toggle personal')
+    expect(text).not.toContain('Realm statistics')
+    expect(text).not.toContain('Replica-inclusive placement records held')
   })
 
-  it('leads with the realm section when the account stored that order', async () => {
+  it('shows the realm section alone when the account stored that scope', async () => {
     signedInRealm()
     scope.value = 'realm'
 
     const text = await renderedText()
 
-    expect(text.indexOf('Realm statistics')).toBeLessThan(text.indexOf('My statistics'))
-    expect(text).toContain('lead with realm')
+    expect(text).toContain('Realm statistics')
+    expect(text).toContain('scope toggle realm')
+    expect(text).toContain('Replica-inclusive placement records held')
+    expect(text).toContain('1 of 2 nodes reporting')
+    expect(text).not.toContain('My statistics')
+    expect(text).not.toContain('my stats cards')
+    expect(text).not.toContain('group quota cards')
+  })
+
+  it('switches the section through the stored scope', async () => {
+    vi.stubGlobal('window', {})
+    signedInRealm()
+
+    const mounted = await mountApp(DashboardClient)
+    expect(content(mounted.root)).toContain('my stats cards')
+    expect(content(mounted.root)).not.toContain('Realm statistics')
+
+    await click(button(mounted.root, 'show realm'))
+    expect(setScope).toHaveBeenCalledWith('realm')
+
+    // The composable flips `scope` optimistically; the view follows it.
+    scope.value = 'realm'
+    await flush()
+    expect(content(mounted.root)).toContain('Realm statistics')
+    expect(content(mounted.root)).not.toContain('my stats cards')
+    mounted.app.unmount()
+    vi.unstubAllGlobals()
   })
 
   it('keeps the realm section to realm-wide figures only', async () => {
     signedInRealm()
+    scope.value = 'realm'
 
     const text = await renderedText()
 
@@ -371,6 +402,7 @@ describe('authenticated dashboard ordering', () => {
 
   it('keeps devices out of node health and counts them apart', async () => {
     currentUser.value = { id: 'user-id', name: 'Ada Lovelace' }
+    scope.value = 'realm'
     realmInfo.value = {
       metadata_replication: { default_replication_factor: null },
       nodes: [

@@ -132,11 +132,6 @@ const publicOverview = computed(() => realmInfo.value?.public_overview)
 // counters next to them belong to this node and live on the Status page.
 const realmTotals = computed(() => usageInfo.value?.realm ?? null)
 
-// Personal statistics lead unless the caller stored the other order.
-const sectionOrder = computed(() =>
-  scope.value === 'realm' ? (['realm', 'personal'] as const) : (['personal', 'realm'] as const),
-)
-
 function publicCount(value: number | null | undefined): string {
   return value == null ? 'Unknown' : formatCount(value)
 }
@@ -252,18 +247,14 @@ const pageDescription = computed(() =>
       <template v-else>
       <SignInPanel v-if="!currentUser" />
 
-      <template v-for="section in sectionOrder" :key="section">
-      <section v-if="section === 'personal' && currentUser" aria-labelledby="my-statistics-heading" class="space-y-3.5">
+      <!-- One statistics section at a time; the stored scope decides which. -->
+      <section v-if="currentUser && scope === 'personal'" aria-labelledby="my-statistics-heading" class="space-y-3.5">
         <header class="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 id="my-statistics-heading" class="font-display text-[15px] font-semibold text-foreground/85">My statistics</h2>
             <p class="mt-0.5 text-xs text-muted-foreground">Aggregated across the groups you belong to.</p>
           </div>
-          <DashboardScopeToggle
-            v-if="sectionOrder[0] === 'personal'"
-            :model-value="scope"
-            @update:model-value="setScope"
-          />
+          <DashboardScopeToggle :model-value="scope" @update:model-value="setScope" />
         </header>
 
         <MyStatsCards />
@@ -271,17 +262,13 @@ const pageDescription = computed(() =>
         <EmptyState v-else compact title="You do not belong to any groups yet." />
       </section>
 
-      <section v-else-if="section === 'realm'" aria-labelledby="realm-statistics-heading" class="space-y-3.5">
+      <section v-else aria-labelledby="realm-statistics-heading" class="space-y-3.5">
         <header class="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 id="realm-statistics-heading" class="font-display text-[15px] font-semibold text-foreground/85">Realm statistics</h2>
             <p class="mt-0.5 text-xs text-muted-foreground">{{ realm.name }}</p>
           </div>
-          <DashboardScopeToggle
-            v-if="currentUser && sectionOrder[0] === 'realm'"
-            :model-value="scope"
-            @update:model-value="setScope"
-          />
+          <DashboardScopeToggle v-if="currentUser" :model-value="scope" @update:model-value="setScope" />
         </header>
 
         <div class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
@@ -338,7 +325,6 @@ const pageDescription = computed(() =>
           </div>
         </div>
       </section>
-      </template>
 
       <section v-if="currentUser" aria-label="Realm nodes" class="space-y-3.5">
         <FederationPanel

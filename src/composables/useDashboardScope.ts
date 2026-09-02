@@ -1,4 +1,4 @@
-// Which dashboard section leads. Persisted as the user attribute
+// Which dashboard section is shown. Persisted as the user attribute
 // ui.dashboard_scope so the choice roams like the preferred profile.
 import { computed, ref } from 'vue'
 import { useAruna } from '@/composables/useAruna'
