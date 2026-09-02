@@ -1,6 +1,7 @@
 // Public surface of the portal S3 layer. The implementation lives in ./s3:
 // session (minting, refresh, restrictions), client (signed client factory),
 // endpoints (node endpoint selection), objects and buckets.
+import { getCurrentInstance, inject, type InjectionKey } from 'vue'
 import { allowPublicReadCors, createBucket, deleteBucket, listBuckets } from './s3/buckets'
 import { connectedEndpoint, endpointForNode, resolveObjectUrl } from './s3/endpoints'
 import {
@@ -79,7 +80,19 @@ export type {
 export type { DeletedObjectEntry, ObjectVersionEntry } from '@/lib/objectVersions'
 export type { BucketEntry } from './s3/buckets'
 
-export function useS3() {
+/**
+ * Storage a subtree browses instead of the signed-in node's. Provided by the
+ * tutorials so the real pickers and previews run against their fixtures; with
+ * no provider every consumer keeps the node's own storage.
+ */
+export const S3_SOURCE: InjectionKey<ReturnType<typeof nodeS3>> = Symbol('aruna.s3Source')
+
+export function useS3(): ReturnType<typeof nodeS3> {
+  const provided = getCurrentInstance() ? inject(S3_SOURCE, null) : null
+  return provided ?? nodeS3()
+}
+
+function nodeS3() {
   return {
     sessions,
     sessionRevision,

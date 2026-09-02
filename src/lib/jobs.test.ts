@@ -55,7 +55,6 @@ const familyFixture: JobStatusResponse = {
     ],
     revision: 7,
     projection_digest: '1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f',
-    eventually_consistent: true,
     responder_node_id: 'f3a1b2c3d4e5f60718293a4b5c6d7e8f9091a2b3c4d5e6f708192a3b4c5d6e7f',
     partial: false,
     locally_exhausted: false,

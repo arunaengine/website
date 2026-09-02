@@ -152,6 +152,17 @@ export function portalRoutes(): RouteRecordRaw[] {
           name: 'admin-quarantine',
           component: () => import('@/views/AdminQuarantineView.vue'),
         },
+        // Interactive tutorials: the real views, driven by fixtures.
+        {
+          path: 'tutorial/compute',
+          name: 'tutorial-compute',
+          component: () => import('@/views/TutorialComputeView.vue'),
+        },
+        {
+          path: 'tutorial/profile',
+          name: 'tutorial-profile',
+          component: () => import('@/views/TutorialProfileView.vue'),
+        },
         // Compute: runs and durable system jobs in one surface
         // (each half is feature-gated in-view)
         { path: 'compute', name: 'compute', component: () => import('@/views/ComputeView.vue') },

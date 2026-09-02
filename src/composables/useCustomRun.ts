@@ -41,7 +41,9 @@ import type { useTes } from '@/composables/useTes'
 
 export interface CustomRunDeps {
   runTarget: ReturnType<typeof useRunTarget>
-  s3: ReturnType<typeof useS3>
+  // Only the bucket options come from storage here, so a caller may hand over
+  // a narrower surface than the whole S3 layer.
+  s3: Pick<ReturnType<typeof useS3>, 'hasActiveKey' | 'endpoint' | 'listBuckets'>
   myGroups: ReturnType<typeof useAruna>['myGroups']
   executorKinds: ReturnType<typeof useRealmNodes>['executorKinds']
   getTask: ReturnType<typeof useTes>['getTask']
@@ -545,13 +547,24 @@ function createStore(deps: CustomRunDeps) {
 
 export type CustomRunStore = ReturnType<typeof createStore>
 
-const CUSTOM_RUN: InjectionKey<CustomRunStore> = Symbol('aruna.customRun')
+export const CUSTOM_RUN: InjectionKey<CustomRunStore> = Symbol('aruna.customRun')
 
-/** Creates the wizard store and provides it to the step components. */
+/**
+ * Creates the wizard store and provides it to the step components. A store
+ * provided further up (the compute tutorial seeds one) is adopted instead, so
+ * the wizard runs unchanged against a prepared draft.
+ */
 export function useCustomRun(deps: CustomRunDeps): CustomRunStore {
+  const seeded = inject(CUSTOM_RUN, null)
+  if (seeded) return seeded
   const store = createStore(deps)
   provide(CUSTOM_RUN, store)
   return store
+}
+
+/** Builds a store without providing it; the tutorial seeds one this way. */
+export function createCustomRun(deps: CustomRunDeps): CustomRunStore {
+  return createStore(deps)
 }
 
 export function injectCustomRun(): CustomRunStore {

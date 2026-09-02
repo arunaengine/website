@@ -1,5 +1,6 @@
 import { portalConfig } from '../config'
 import { RATE_LIMITED_STATUS, fetchWithRetry } from '../fetch'
+import { apiInterceptor, passesThrough } from '../tutorial/interceptor'
 import { errorMessage } from '../utils'
 
 const DEFAULT_API_BASE_URL = '/api/v1'
@@ -98,6 +99,17 @@ export async function apiRequest<T>(
   options: ApiRequestOptions = {},
   client: ApiClientOptions = {},
 ): Promise<T> {
+  // A tutorial session answers its own surfaces from fixtures and lets the
+  // shell's reads through; a write it does not know is refused, never sent.
+  const tutorial = apiInterceptor()
+  if (tutorial) {
+    const answered = tutorial(path, options, client)
+    if (answered) return (await answered) as T
+    if (!passesThrough(options)) {
+      throw new ApiError(403, 'The tutorial does not write to the node.', 'tutorial_write')
+    }
+  }
+
   const url = apiUrl(path, options.query, client)
 
   const headers = new Headers(options.headers)

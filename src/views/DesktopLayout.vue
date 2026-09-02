@@ -14,6 +14,7 @@ import { useAruna } from '@/composables/useAruna'
 import { uploadQueueItems } from '@/composables/uploadQueueState'
 import { assistantAvailable, assistantOpen } from '@/composables/assistantState'
 import { bindTourRouter, tourActive } from '@/composables/useTour'
+import { bindTutorialRouter, tutorialActive } from '@/lib/tutorial/session'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { appQuit } from '@/lib/desktopBridge'
 import { probeRealm, realmReach } from '@/lib/desktopBoot'
@@ -37,8 +38,15 @@ const TourOverlay = defineAsyncComponent({
   onError: asyncChunkError,
 })
 
+const TutorialOverlay = defineAsyncComponent({
+  loader: () => import('@/components/tutorial/TutorialOverlay.vue'),
+  onError: asyncChunkError,
+})
+
 const route = useRoute()
-bindTourRouter(useRouter())
+const router = useRouter()
+bindTourRouter(router)
+bindTutorialRouter(router)
 const mainEl = ref<HTMLElement | null>(null)
 const unreachable = computed(() => realmReach.value === 'unreachable')
 const quitting = ref(false)
@@ -130,5 +138,6 @@ watch(
     <TransfersPanel v-if="uploadQueueItems.length" />
     <AssistantPanel v-if="assistantOpen" />
     <TourOverlay v-if="tourActive" />
+    <TutorialOverlay v-if="tutorialActive" />
   </div>
 </template>
