@@ -43,12 +43,18 @@ function file(name: string): File {
   return { name, size: 10, type: 'text/plain' } as File
 }
 
-function deferredHandle(): { handle: UploadHandle; resolve: () => void } {
+function deferredHandle(): {
+  handle: UploadHandle
+  resolve: () => void
+  reject: (error: unknown) => void
+} {
   let resolve!: () => void
-  const promise = new Promise<void>((done) => {
+  let reject!: (error: unknown) => void
+  const promise = new Promise<void>((done, fail) => {
     resolve = done
+    reject = fail
   })
-  return { handle: { promise, abort: vi.fn(async () => undefined) }, resolve }
+  return { handle: { promise, abort: vi.fn(async () => undefined) }, resolve, reject }
 }
 
 describe('upload queue session attribution', () => {
@@ -126,5 +132,71 @@ describe('upload queue session attribution', () => {
     expect(panel).toContain("item.pausedForSession ? 'PAUSED' : item.state")
     expect(panel).toContain("item.pausedForSession ? 'text-amber-700 dark:text-amber-400' : 'text-destructive'")
     expect(panel).toContain("item.state === 'error' || item.state === 'canceled'")
+  })
+})
+
+describe('upload queue completion status', () => {
+  const sessionC: S3SessionReference = {
+    nodeId: 'node-c',
+    groupId: 'group-c',
+    accessKeyId: 'session-c',
+  }
+
+  function start(name: string) {
+    references.set(contextKey('node-c', 'group-c'), sessionC)
+    const deferred = deferredHandle()
+    uploadObject.mockReset()
+    uploadObject.mockReturnValueOnce(deferred.handle)
+    queue.enqueue([file(name)], {
+      bucket: 'bucket-c',
+      prefix: '',
+      groupId: 'group-c',
+      nodeId: 'node-c',
+    })
+    const item = queue.items.value.find((entry) => entry.name === name)!
+    return { item, ...deferred }
+  }
+
+  function retryReporter(): (attempt: number, error: unknown) => void {
+    return uploadObject.mock.calls[0]?.[6] as (attempt: number, error: unknown) => void
+  }
+
+  it('names the completion attempt while the node finishes the object', async () => {
+    const { item, resolve } = start('completing')
+    await vi.waitFor(() => expect(item.state).toBe('uploading'))
+
+    retryReporter()(2, new Error('connection reset'))
+
+    expect(item.state).toBe('uploading')
+    expect(item.error).toBe('Finishing the upload, attempt 2… Error: connection reset')
+
+    resolve()
+    await vi.waitFor(() => expect(item.state).toBe('done'))
+    expect(item.error).toBeUndefined()
+  })
+
+  it('replaces the attempt line with the reason the upload failed', async () => {
+    const { item, reject } = start('exhausted')
+    await vi.waitFor(() => expect(item.state).toBe('uploading'))
+
+    retryReporter()(3, new Error('connection reset'))
+    reject(new Error('NoSuchUpload'))
+
+    await vi.waitFor(() => expect(item.state).toBe('error'))
+    expect(item.error).toBe('Error: NoSuchUpload')
+  })
+
+  it('aborts the multipart upload when a completing item is canceled', async () => {
+    const { item, handle, reject } = start('canceled')
+    await vi.waitFor(() => expect(item.state).toBe('uploading'))
+    retryReporter()(2, new Error('connection reset'))
+
+    await queue.cancel(item)
+
+    expect(handle.abort).toHaveBeenCalledTimes(1)
+    expect(item.state).toBe('canceled')
+    expect(item.error).toBeUndefined()
+    reject(new Error('Upload aborted.'))
+    await vi.waitFor(() => expect(item.state).toBe('canceled'))
   })
 })
