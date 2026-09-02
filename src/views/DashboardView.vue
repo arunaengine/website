@@ -18,10 +18,12 @@ import { computed, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useDashboardScope } from '@/composables/useDashboardScope'
+import { useOnboarding } from '@/composables/useOnboarding'
 import { useDocumentVisibility, useIntervalFn } from '@vueuse/core'
 import { useNotifications } from '@/composables/useNotifications'
 import { useRefresh } from '@/composables/useRefresh'
 import { useFirstPaint } from '@/composables/useFirstPaint'
+import { featureEnabled } from '@/lib/config'
 import { formatCount } from '@/lib/formatCount'
 import { formatBytes, formatNumber, relativeTime } from '@/lib/utils'
 
@@ -30,6 +32,9 @@ const { currentUser, metadata, myGroups, realm, nodeInfo, realmInfo, usageInfo, 
 const { authPending } = useAuth()
 const { dashboardRevision } = useNotifications()
 const { scope, setScope } = useDashboardScope()
+const { isNewUser, dismissOnboarding } = useOnboarding()
+// Nothing to practise on when this deployment serves no compute.
+const computeTutorialOffered = computed(() => featureEnabled('tes'))
 const refreshing = ref(false)
 const quotaRevision = ref(0)
 const recentDocs = ref<MetadataDoc[] | null>(null)
@@ -246,6 +251,31 @@ const pageDescription = computed(() =>
 
       <template v-else>
       <SignInPanel v-if="!currentUser" />
+
+      <!-- First visit: the two interactive tutorials, offered once. -->
+      <section
+        v-if="currentUser && !authPending && isNewUser"
+        class="surface flex flex-wrap items-center justify-between gap-4 p-5"
+        aria-labelledby="welcome-tutorials-heading"
+      >
+        <div class="min-w-0">
+          <h2 id="welcome-tutorials-heading" class="font-display text-sm font-semibold text-aruna-navy">
+            New here? Practise on made-up data.
+          </h2>
+          <p class="mt-1 text-xs text-muted-foreground">
+            Both tutorials walk the real screens without creating anything.
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <Button v-if="computeTutorialOffered" size="sm" as-child>
+            <RouterLink :to="{ name: 'tutorial-compute' }">Start the compute tutorial</RouterLink>
+          </Button>
+          <Button variant="outline" size="sm" as-child>
+            <RouterLink :to="{ name: 'tutorial-profile' }">Build a profile</RouterLink>
+          </Button>
+          <Button variant="ghost" size="sm" @click="dismissOnboarding">Not now</Button>
+        </div>
+      </section>
 
       <!-- One statistics section at a time; the stored scope decides which. -->
       <section v-if="currentUser && scope === 'personal'" aria-labelledby="my-statistics-heading" class="space-y-3.5">

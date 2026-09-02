@@ -32,6 +32,9 @@ const refresh = vi.fn(async () => undefined)
 const loadInfo = vi.fn(async () => undefined)
 const listRecentMetadata = vi.fn(async () => [])
 const signIn = vi.fn(async () => undefined)
+const isNewUser = ref(false)
+const dismissOnboarding = vi.fn(async () => undefined)
+const tesEnabled = ref(true)
 
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
 const PageHeaderStub = defineComponent({
@@ -113,6 +116,13 @@ beforeAll(async () => {
   vi.doMock('@/composables/useDashboardScope', () => ({
     useDashboardScope: () => ({ scope, setScope }),
   }))
+  vi.doMock('@/composables/useOnboarding', () => ({
+    useOnboarding: () => ({ isNewUser, dismissOnboarding }),
+  }))
+  vi.doMock('@/lib/config', async () => ({
+    ...(await vi.importActual<typeof import('@/lib/config')>('@/lib/config')),
+    featureEnabled: () => tesEnabled.value,
+  }))
   vi.doMock('@vueuse/core', () => ({
     useDocumentVisibility: () => ref('hidden'),
     useIntervalFn: () => ({ pause: vi.fn(), resume: vi.fn() }),
@@ -163,6 +173,8 @@ beforeAll(async () => {
     },
     '@/composables/useNotifications': { useNotifications: () => ({ dashboardRevision }) },
     '@/composables/useDashboardScope': { useDashboardScope: () => ({ scope, setScope }) },
+    '@/composables/useOnboarding': { useOnboarding: () => ({ isNewUser, dismissOnboarding }) },
+    '@/lib/config': { featureEnabled: () => tesEnabled.value },
     '@/composables/useRefresh': {
       useRefresh: (run: () => unknown) => ({ busy: ref(false), refresh: run }),
     },
@@ -210,6 +222,9 @@ beforeEach(() => {
   authPending.value = false
   authStage.value = 'idle'
   authStageError.value = null
+  isNewUser.value = false
+  dismissOnboarding.mockClear()
+  tesEnabled.value = true
   refresh.mockClear()
   loadInfo.mockClear()
   listRecentMetadata.mockClear()
@@ -417,5 +432,58 @@ describe('authenticated dashboard scope', () => {
     expect(text).not.toContain('owned-device')
     expect(text).toContain('1 devices')
     expect(text).toMatch(/1 \/ 1 Nodes online/)
+  })
+})
+
+describe('welcome card', () => {
+  beforeEach(() => {
+    currentUser.value = { id: 'user-id', name: 'Ada Lovelace' }
+    isNewUser.value = true
+  })
+
+  it('offers both tutorials to an account that has answered nothing', async () => {
+    const text = await renderedText()
+
+    expect(text).toContain('New here? Practise on made-up data.')
+    expect(text).toContain('Start the compute tutorial')
+    expect(text).toContain('Build a profile')
+    expect(text).toContain('Not now')
+  })
+
+  it('leaves the compute tutorial out where the node runs nothing', async () => {
+    tesEnabled.value = false
+
+    const text = await renderedText()
+
+    expect(text).toContain('Build a profile')
+    expect(text).not.toContain('Start the compute tutorial')
+  })
+
+  it('stays away from an account that already answered', async () => {
+    isNewUser.value = false
+
+    expect(await renderedText()).not.toContain('New here? Practise on made-up data.')
+  })
+
+  it('stays away while a stored session is still resolving', async () => {
+    authPending.value = true
+
+    expect(await renderedText()).not.toContain('New here? Practise on made-up data.')
+  })
+
+  it('stays away from a visitor who is not signed in', async () => {
+    currentUser.value = null
+
+    expect(await renderedText()).not.toContain('New here? Practise on made-up data.')
+  })
+
+  it('records the refusal when the card is dismissed', async () => {
+    const mounted = await mountApp(DashboardClient)
+
+    await click(button(mounted.root, 'Not now'))
+
+    expect(dismissOnboarding).toHaveBeenCalledTimes(1)
+    expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
   })
 })
