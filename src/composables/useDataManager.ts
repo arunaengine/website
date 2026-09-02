@@ -84,10 +84,84 @@ export function dataViewReady(state: {
   return (state.bucketsLoaded || state.bucketsFailed) && !listingPending
 }
 
+const LAST_BUCKET_KEY = 'aruna.lastBucket'
+
+/** The bucket a connection and account last had open. */
+export interface LastBucket {
+  bucket: string
+  /** Hosting node; null = the connected node. */
+  nodeId: string | null
+  groupId: string | null
+}
+
+function optionalString(value: unknown): string | null {
+  return typeof value === 'string' && value ? value : null
+}
+
+function lastBucketStore(): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(readStored(LAST_BUCKET_KEY) || '{}') as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    return parsed as Record<string, unknown>
+  } catch {
+    return {}
+  }
+}
+
+/** The remembered bucket of one scope; anything unreadable reads as none. */
+export function readLastBucket(scope: string): LastBucket | null {
+  const entry = lastBucketStore()[scope]
+  if (!entry || typeof entry !== 'object') return null
+  const fields = entry as Record<string, unknown>
+  const bucket = optionalString(fields.bucket)
+  if (!bucket) return null
+  return { bucket, nodeId: optionalString(fields.nodeId), groupId: optionalString(fields.groupId) }
+}
+
+/** Records (or, with null, forgets) the bucket of one scope. */
+export function writeLastBucket(scope: string, entry: LastBucket | null) {
+  const store = lastBucketStore()
+  if (entry) store[scope] = entry
+  else delete store[scope]
+  storeValue(LAST_BUCKET_KEY, Object.keys(store).length ? JSON.stringify(store) : '')
+}
+
+export type StickyBucketStep =
+  | { action: 'wait' }
+  | { action: 'forget' }
+  | { action: 'open'; route: { name: string; params: { bucketId: string }; query: LocationQueryRaw } }
+
+/**
+ * What the bucket-less Data route should do with the remembered bucket: wait
+ * while the list is still loading, open it when this group still has it, and
+ * forget it otherwise so a stale name never keeps the picker away.
+ */
+export function stickyBucketStep(state: {
+  memory: LastBucket | null
+  groupId: string
+  buckets: string[]
+  bucketsLoaded: boolean
+}): StickyBucketStep {
+  const { memory } = state
+  if (!memory) return { action: 'wait' }
+  if (!state.bucketsLoaded) return { action: 'wait' }
+  if (memory.groupId && state.groupId && memory.groupId !== state.groupId) return { action: 'forget' }
+  if (memory.nodeId || !state.buckets.includes(memory.bucket)) return { action: 'forget' }
+  return {
+    action: 'open',
+    route: {
+      name: 'bucket',
+      params: { bucketId: memory.bucket },
+      query: state.groupId ? { group: state.groupId } : {},
+    },
+  }
+}
+
 export function useDataManager() {
   const route = useRoute()
   const router = useRouter()
   const {
+    apiBaseUrl,
     authToken,
     currentUser,
     myGroups,
@@ -109,6 +183,9 @@ export function useDataManager() {
   // group and node is opened automatically and kept in memory only.
   const realmNodes = useRealmNodes()
   const shortcuts = useBucketShortcuts()
+  // Same scoping as the shortcut store: another API base or account never
+  // inherits this one's remembered bucket.
+  const stickyScope = computed(() => `${apiBaseUrl.value}|${currentUser.value?.id ?? 'anon'}`)
 
   const remoteNodeId = computed(() => {
     const nodeId = routeString(route.query.node)
@@ -625,10 +702,37 @@ export function useDataManager() {
 
   // Every opened bucket (sidebar click, search hit, or deep link) lands in
   // "Recently browsed"; the shortcut store drops ws- scratch buckets itself.
+  // The same bucket is remembered per connection and account so returning to
+  // the Data view reopens it instead of asking for a bucket again.
   watch(
     [bucket, remoteNodeId],
     ([name, nodeId]) => {
-      if (name) shortcuts.recordRecent(name, nodeId)
+      if (!name) return
+      shortcuts.recordRecent(name, nodeId)
+      if (isWorkspaceBucket(name)) return
+      writeLastBucket(stickyScope.value, {
+        bucket: name,
+        nodeId,
+        groupId: selectedGroupId.value || null,
+      })
+    },
+    { immediate: true },
+  )
+
+  // The bucket-less route is the picker: it reopens the remembered bucket once
+  // this group's list can confirm it, and forgets it when the list cannot.
+  watch(
+    [bucket, bucketsLoaded, regularBuckets, selectedGroupId],
+    () => {
+      if (bucket.value) return
+      const step = stickyBucketStep({
+        memory: readLastBucket(stickyScope.value),
+        groupId: selectedGroupId.value,
+        buckets: regularBuckets.value.map((entry) => entry.name),
+        bucketsLoaded: bucketsLoaded.value,
+      })
+      if (step.action === 'forget') writeLastBucket(stickyScope.value, null)
+      else if (step.action === 'open') void router.replace(step.route)
     },
     { immediate: true },
   )
@@ -997,6 +1101,10 @@ export function useDataManager() {
     if (request.kind === 'bucket') {
       if (!committed.length) return
       shortcuts.remove(request.bucket, request.nodeId)
+      const remembered = readLastBucket(stickyScope.value)
+      if (remembered?.bucket === request.bucket && remembered.nodeId === request.nodeId) {
+        writeLastBucket(stickyScope.value, null)
+      }
       if (bucket.value === request.bucket && remoteNodeId.value === request.nodeId) {
         await router.push({ name: 'buckets' })
       }
