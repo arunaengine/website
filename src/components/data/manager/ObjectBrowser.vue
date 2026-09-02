@@ -14,7 +14,12 @@ import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import WatchButton from '@/components/watches/WatchButton.vue'
 import { useAruna } from '@/composables/useAruna'
 import type { DataManager } from '@/composables/useDataManager'
-import { useS3, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
+import {
+  useS3,
+  type DeletedObjectEntry,
+  type FolderEntry,
+  type ObjectEntry,
+} from '@/composables/useS3'
 import { usePlacementPolicies } from '@/composables/usePlacementPolicies'
 import { featureEnabled } from '@/lib/config'
 import { stateVariant } from '@/lib/stateBadge'
@@ -27,9 +32,9 @@ import {
   Download,
   Eye,
   FolderPlus,
-  HardDrive,
   KeyRound,
   Link2,
+  MoreHorizontal,
   Plus,
   Settings,
   Trash2,
@@ -48,6 +53,7 @@ const { isRealmAdmin } = useAruna()
 const { getBucketPlacement } = usePlacementPolicies()
 const placementPoliciesEnabled = featureEnabled('placementAdmin')
 const {
+  router,
   bucket,
   prefix,
   s3Prefix,
@@ -101,17 +107,12 @@ const {
   requestDelete,
 } = props.manager
 
-// One entry for everything this bucket stores: the Storage page. The badge
-// counts what the browser already knows about, plus the attached policies when
-// the viewer may read them at all.
+// One entry for everything this bucket stores: its settings page. The dot says
+// the bucket carries syncs or placement policies, which only a viewer the node
+// lets read bucket placement pays a request for.
 const showStorageButton = computed(() => Boolean(bucket.value))
 const bucketPolicyCount = ref(0)
 const storageCount = computed(() => bucketSyncCount.value + bucketPolicyCount.value)
-const storageTitle = computed(() =>
-  storageCount.value
-    ? `Storage for ${bucket.value}: ${bucketSyncCount.value} sync${bucketSyncCount.value === 1 ? '' : 's'}, ${bucketPolicyCount.value} placement polic${bucketPolicyCount.value === 1 ? 'y' : 'ies'}`
-    : `Storage for ${bucket.value}`,
-)
 const storageLink = computed(() => ({
   name: 'bucket-storage',
   params: { bucketId: bucket.value },
@@ -132,6 +133,10 @@ watch(
   },
   { immediate: true },
 )
+
+function openBucketSettings() {
+  void router.push(storageLink.value)
+}
 
 const dragActive = ref(false)
 
@@ -176,12 +181,15 @@ function deleteSelection() {
   })
 }
 
-function deleteRestorable(key: string) {
+// The marker version travels with the request: choosing Restore in the dialog
+// deletes exactly that marker.
+function deleteRestorable(entry: DeletedObjectEntry) {
   requestDelete({
     kind: 'deleted-object',
     bucket: bucket.value,
     nodeId: remoteNodeId.value,
-    key,
+    key: entry.key,
+    versionId: entry.markerVersionId,
     headState: 'marker',
     option: 'delete-permanently',
   })
@@ -231,12 +239,22 @@ function onDrop(event: DragEvent) {
             :resource-label="`${bucket}/${s3Prefix}`"
             size="sm"
           />
-          <Button v-if="showStorageButton" data-tour="bucket-settings" variant="outline" size="sm" as-child>
-            <RouterLink :to="storageLink" :title="storageTitle">
-              <Settings class="h-4 w-4" /> Storage
-              <Badge v-if="storageCount" variant="secondary" size="count" class="ml-1">{{ storageCount }}</Badge>
-            </RouterLink>
-          </Button>
+          <!-- A dot instead of a count: the settings page names what it holds. -->
+          <span v-if="showStorageButton" data-tour="bucket-settings" class="relative inline-flex">
+            <IconButton
+              label="Bucket settings"
+              variant="outline"
+              size="icon"
+              @click="openBucketSettings"
+            >
+              <Settings class="h-4 w-4" />
+            </IconButton>
+            <span
+              v-if="storageCount"
+              class="pointer-events-none absolute right-1 top-1 size-1.5 rounded-full bg-primary"
+              aria-hidden="true"
+            />
+          </span>
           <Popover v-if="showReferenceStats">
             <Button
               variant="outline"
@@ -454,16 +472,12 @@ function onDrop(event: DragEvent) {
                   <IconButton label="Preview" @click.stop="openDetails(object, 'preview')"><Eye class="size-3.5" /></IconButton>
                   <IconButton label="Download" @click.stop="download(object)"><Download class="size-3.5" /></IconButton>
                   <IconButton
-                    v-if="!remoteNodeId"
-                    label="Storage: copies of this file and its rules"
-                    @click.stop="openDetails(object, 'storage')"
-                  ><HardDrive class="size-3.5" /></IconButton>
-                  <IconButton
                     label="Delete…"
                     class="text-destructive hover:text-destructive"
                     :disabled-reason="objectReason(object.key)"
                     @click.stop="deleteObject(object)"
                   ><Trash2 class="size-3.5" /></IconButton>
+                  <IconButton label="More about this file" @click.stop="openDetails(object)"><MoreHorizontal class="size-3.5" /></IconButton>
                 </div>
               </td>
             </tr>
@@ -496,7 +510,7 @@ function onDrop(event: DragEvent) {
                     label="Delete permanently…"
                     class="text-destructive hover:text-destructive"
                     :disabled-reason="objectReason(entry.key)"
-                    @click.stop="deleteRestorable(entry.key)"
+                    @click.stop="deleteRestorable(entry)"
                   ><Trash2 class="size-3.5" /></IconButton>
                 </div>
               </td>

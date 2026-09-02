@@ -3,7 +3,15 @@ import * as VueRuntime from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import * as StateBadge from '@/lib/stateBadge'
 import * as Utils from '@/lib/utils'
-import { compileClientComponent, content, flush, mountApp, moduleDefault } from '@/test/clientRender'
+import {
+  button,
+  click,
+  compileClientComponent,
+  content,
+  flush,
+  mountApp,
+  moduleDefault,
+} from '@/test/clientRender'
 
 const Slotted = (tag: string) =>
   defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h(tag, attrs, slots.default?.()) })
@@ -27,12 +35,20 @@ const TabsContentStub = defineComponent({
   },
 })
 const Marker = (text: string) => defineComponent({ setup: () => () => h('section', text) })
+const IconStub = defineComponent((_, { attrs }) => () => h('i', attrs))
+const ButtonStub = defineComponent({
+  inheritAttrs: false,
+  props: { variant: String, size: String, class: String },
+  setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()),
+})
 
 const headObject = vi.fn()
 
 const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.meta.url), {
   vue: VueRuntime,
+  '@lucide/vue': new Proxy({}, { get: () => IconStub }),
   '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
+  '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/CopyButton.vue': moduleDefault(Slotted('button')),
   '@/components/ui/DetailDialog.vue': moduleDefault(DetailDialogStub),
   '@/components/ui/DialogTitle.vue': moduleDefault(Slotted('h2')),
@@ -51,21 +67,29 @@ const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.
   '@/lib/utils': Utils,
 })
 
-async function render(tab: string) {
+async function mount(tab: string) {
   headObject.mockResolvedValue({ contentType: 'text/plain', versionId: '01J000000000000000000HEAD' })
-  const { root } = await mountApp(dialog, {
-    props: {
-      open: true,
-      tab,
-      bucket: 'reef-survey',
-      objectKey: 'raw/reads.fastq',
-      name: 'reads.fastq',
-      nodeId: null,
-      groupId: 'g-1',
-    },
+  const tabs: string[] = []
+  const host = defineComponent({
+    setup: () => () =>
+      h(dialog, {
+        open: true,
+        tab,
+        bucket: 'reef-survey',
+        objectKey: 'raw/reads.fastq',
+        name: 'reads.fastq',
+        nodeId: null,
+        groupId: 'g-1',
+        'onUpdate:tab': (value: string) => tabs.push(value),
+      }),
   })
+  const { root } = await mountApp(host)
   await flush()
-  return content(root)
+  return { root, tabs }
+}
+
+async function render(tab: string) {
+  return content((await mount(tab)).root)
 }
 
 describe('file details storage tab', () => {
@@ -82,5 +106,33 @@ describe('file details storage tab', () => {
 
     expect(text).not.toContain('rules this file carries')
     expect(text).not.toContain('copies of this version')
+  })
+})
+
+describe('file details preview mode', () => {
+  it('fills the dialog with the preview instead of a tab', async () => {
+    const text = await render('preview')
+
+    expect(text).toContain('preview')
+    expect(text).not.toContain('Versions')
+    expect(text).not.toContain('Storage')
+  })
+
+  it('switches between the preview and the details', async () => {
+    const details = await mount('general')
+    await click(button(details.root, 'Preview'))
+    expect(details.tabs).toEqual(['preview'])
+
+    const preview = await mount('preview')
+    await click(button(preview.root, 'Details'))
+    expect(preview.tabs).toEqual(['general'])
+  })
+
+  it('keeps the details tabs without a preview trigger', async () => {
+    const text = await render('general')
+
+    expect(text).toContain('General')
+    expect(text).toContain('Versions')
+    expect(text).not.toContain('preview')
   })
 })
