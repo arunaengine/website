@@ -4,9 +4,7 @@ defineProps<{ title: string; description?: string; compact?: boolean }>()
 
 <template>
   <div v-if="compact" class="surface flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
-    <p class="text-sm text-muted-foreground">
-      {{ title }}<span v-if="description"> {{ description }}</span>
-    </p>
+    <p class="text-sm text-muted-foreground">{{ description ? `${title} ${description}` : title }}</p>
     <div v-if="$slots.default" class="shrink-0"><slot /></div>
   </div>
   <div v-else class="surface px-5 py-10 text-center">
