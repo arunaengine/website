@@ -73,8 +73,10 @@ const cardStyle = computed(() => {
   const below = box.top + box.height + GAP + CARD_HEIGHT <= window.innerHeight || box.top < CARD_HEIGHT + GAP
   const top = below ? box.top + box.height + GAP : box.top - GAP - CARD_HEIGHT
   const rightmost = Math.max(MARGIN, window.innerWidth - CARD_WIDTH - MARGIN)
+  // A spot taller than the window would push the card off screen.
+  const lowest = Math.max(MARGIN, window.innerHeight - CARD_HEIGHT - MARGIN)
   return {
-    top: `${Math.max(MARGIN, top)}px`,
+    top: `${Math.min(Math.max(MARGIN, top), lowest)}px`,
     left: `${Math.min(Math.max(box.left, MARGIN), rightmost)}px`,
   }
 })

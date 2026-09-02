@@ -109,6 +109,12 @@ startTutorial({ id: 'compute', steps: computeTutorialSteps, api: tutorialApi, re
 const showRun = computed(() => route.query.stage === 'run')
 const stageLabel = computed(() => runStageLabel(tutorialData.value.runState))
 
+// Reaching the run stage through the card instead of the Run button still
+// shows a run: the default draft is submitted to the tutorial's own API.
+watch(showRun, (on) => {
+  if (on && !tutorialData.value.runState) void tutorialApi('/ga4gh/tes/v1/tasks', { method: 'POST' })
+}, { immediate: true })
+
 // The picker is a step of its own, so the tutorial opens it and closes it again.
 watch(
   () => tutorialStep.value?.id,

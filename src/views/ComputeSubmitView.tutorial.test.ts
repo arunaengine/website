@@ -87,6 +87,24 @@ describe('compute tutorial walkthrough', () => {
     expect(mounted.fetchSpy).not.toHaveBeenCalled()
   })
 
+  it('starts a run when the stage is reached through the card', async () => {
+    // Next instead of the Run button must not leave the stage without a run.
+    while (tutorialStep.value && !tutorialStep.value.route.includes('stage=run')) {
+      nextTutorialStep()
+      await settle()
+    }
+    await flush()
+
+    const states = [statusLine()]
+    for (let stage = 0; stage < 3; stage++) {
+      await advance(RUN_STAGE_MS)
+      states.push(statusLine())
+    }
+
+    expect(states.map(stageWord)).toEqual(['Pending', 'Preparing', 'Running', 'Completed'])
+    expect(mounted.fetchSpy).not.toHaveBeenCalled()
+  })
+
   it('shows the logs, the request and the artifacts of the finished run', async () => {
     await runTheDraft()
     // Past the last stage, plus a poll of the panel's own five second timer.
