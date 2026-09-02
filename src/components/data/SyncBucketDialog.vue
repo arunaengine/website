@@ -102,23 +102,23 @@ interface ModeOption {
   description: string
 }
 const MODE_OPTIONS: ModeOption[] = [
-  { value: 'once', label: 'Once', description: 'Copies everything under the source to the target once, right now.' },
-  {
-    value: 'continuous',
-    label: 'Keep in sync',
-    description: 'Copies the existing data, then keeps following new uploads automatically.',
-  },
-  {
-    value: 'reference',
-    label: 'Reference',
-    description: 'Exposes the source objects at the target without copying the data.',
-  },
+  { value: 'once', label: 'Once', description: 'Copies everything under the source now; it can be run again later.' },
+  { value: 'continuous', label: 'Keep in sync', description: 'Copies what is there, then follows every new version.' },
+  { value: 'reference', label: 'Reference', description: 'The target gets pointers to the source, not the data.' },
 ]
 const REFERENCE_HANDLING_OPTIONS: Array<{ value: SyncReferenceHandling; label: string; description: string }> = [
-  { value: 'materialize', label: 'Fetch the data and send it', description: 'The sender downloads the data the source only points at, then sends it.' },
-  { value: 'preserve', label: 'Send the pointer unchanged', description: 'The target points at the original data instead of holding it.' },
-  { value: 'skip', label: 'Leave those objects out', description: 'Only objects that hold their own data are synced.' },
+  { value: 'materialize', label: 'Fetch the data and send it', description: 'The sender downloads that data first.' },
+  { value: 'preserve', label: 'Send the pointer unchanged', description: 'The target points at the original data.' },
+  { value: 'skip', label: 'Leave those objects out', description: 'Only objects holding their own data are synced.' },
 ]
+
+// One selectable card per option, in the shape of the placement editor's controls.
+function optionClass(selected: boolean): string[] {
+  return [
+    'rounded-md border px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+    selected ? 'border-primary/50 bg-primary/[0.08]' : 'border-border hover:bg-muted/50',
+  ]
+}
 
 function pickSuggestion(hit: BucketSearchHit) {
   targetBucket.value = hit.bucket
@@ -196,17 +196,15 @@ async function submit() {
 
 <template>
   <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-    <DialogContent class="max-w-md">
+    <DialogContent class="max-w-2xl">
       <DialogHeader>
         <DialogTitle>{{ pullMode ? 'Sync to this node' : 'Sync bucket' }}</DialogTitle>
         <DialogDescription>
-          A sync creates a second, independently owned copy in another bucket. To govern where
-          copies of <em>this</em> bucket may live, use a placement policy instead.
+          A sync writes a second, independently owned copy into another bucket.
         </DialogDescription>
       </DialogHeader>
 
-      <div class="space-y-4">
-        <!-- Direction summary -->
+      <div class="space-y-5">
         <div class="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs">
           <Badge :variant="pullMode ? 'outline' : 'accent'" size="sm">{{ sourceNodeLabel }}</Badge>
           <Badge v-if="sourceUnreachable" variant="warn" size="sm">Realm unreachable</Badge>
@@ -217,103 +215,120 @@ async function submit() {
           <span class="min-w-0 truncate font-mono">{{ targetBucket.trim() || 'target-bucket' }}{{ targetPrefix.trim() ? `/${targetPrefix.trim().replace(/\/$/, '')}` : '' }}</span>
         </div>
 
-        <div class="grid gap-3 sm:grid-cols-2">
-          <label class="space-y-1 text-xs">
-            <span class="font-medium text-foreground">Source prefix</span>
-            <Input v-model="sourcePrefix" placeholder="whole bucket" class="h-8 font-mono text-xs" />
-            <span class="block text-[11px] text-muted-foreground">Only keys under this prefix are synced. Leave empty for the whole bucket.</span>
-          </label>
-          <label class="space-y-1 text-xs">
-            <span class="font-medium text-foreground">Target prefix</span>
-            <Input v-model="targetPrefix" placeholder="bucket root" class="h-8 font-mono text-xs" />
-            <span class="block text-[11px] text-muted-foreground">Synced keys are placed under this prefix at the target.</span>
-          </label>
-        </div>
-
-        <div class="space-y-1 text-xs">
-          <span class="font-medium text-foreground">Target node</span>
-          <p v-if="pullMode" class="flex items-center gap-2">
-            <Badge variant="accent" size="sm">{{ targetNodeLabel }}</Badge>
-            <span class="text-muted-foreground">The connected node receives the data.</span>
-          </p>
-          <Select
-            v-else
-            :model-value="targetNodeId"
-            :options="nodeOptions"
-            placeholder="Select target node"
-            aria-label="Target node"
-            class="h-8 text-xs"
-            @update:model-value="(v: string) => (targetNodeId = v)"
-          />
-        </div>
-
-        <div class="space-y-1 text-xs">
-          <span class="font-medium text-foreground">Target bucket</span>
-          <!-- The picker input IS the bucket-name field: typing searches
-               existing buckets (narrowed to the chosen node) while any name,
-               matched or not, stays valid, because the backend auto-creates
-               missing target buckets. -->
-          <BucketSearchBox
-            v-model="targetBucket"
-            mode="picker"
-            :filter-node-id="pullMode ? realmNodes.localNodeId.value : targetNodeId || null"
-            allow-new
-            placeholder="bucket-name"
-            @select="pickSuggestion"
-          />
-          <p v-if="bucketInvalid" class="text-[11px] text-destructive">{{ bucketInvalid }}</p>
-          <p v-else-if="targetBucket.trim() && targetNodeId" class="text-[11px] text-muted-foreground">
-            If <span class="font-mono">{{ targetBucket.trim() }}</span> does not exist on {{ targetNodeLabel }} yet, it is created automatically.
-          </p>
-        </div>
-
-        <fieldset class="space-y-2">
-          <legend class="text-xs font-medium text-foreground">Mode</legend>
-          <label
-            v-for="option in MODE_OPTIONS"
-            :key="option.value"
-            class="flex items-start gap-2 text-sm"
-          >
-            <input
-              v-model="mode"
-              type="radio"
-              :value="option.value"
-              class="mt-1 h-3.5 w-3.5 shrink-0 accent-primary"
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div>
+            <span class="text-xs font-medium text-foreground">Target node</span>
+            <p v-if="pullMode" class="mt-1 flex h-8 items-center gap-2 text-xs">
+              <Badge variant="accent" size="sm">{{ targetNodeLabel }}</Badge>
+              <span class="text-muted-foreground">The connected node receives the data.</span>
+            </p>
+            <Select
+              v-else
+              :model-value="targetNodeId"
+              :options="nodeOptions"
+              placeholder="Pick a node"
+              aria-label="Target node"
+              class="mt-1 h-8 text-xs"
+              @update:model-value="(v: string) => (targetNodeId = v)"
             />
-            <span>
-              <span class="text-xs font-medium text-foreground">{{ option.label }}</span>
-              <span class="block text-[11px] text-muted-foreground">{{ option.description }}</span>
-            </span>
-          </label>
-        </fieldset>
+          </div>
+          <div>
+            <span class="text-xs font-medium text-foreground">Target bucket</span>
+            <!-- The picker input IS the bucket-name field: typing searches
+                 existing buckets (narrowed to the chosen node) while any name,
+                 matched or not, stays valid, because the backend auto-creates
+                 missing target buckets. -->
+            <div class="mt-1">
+              <BucketSearchBox
+                v-model="targetBucket"
+                mode="picker"
+                :filter-node-id="pullMode ? realmNodes.localNodeId.value : targetNodeId || null"
+                allow-new
+                placeholder="bucket-name"
+                @select="pickSuggestion"
+              />
+            </div>
+            <p v-if="bucketInvalid" class="mt-1 text-[11px] text-destructive">{{ bucketInvalid }}</p>
+            <p v-else-if="targetBucket.trim() && targetNodeId" class="mt-1 text-[11px] text-muted-foreground">
+              Created on {{ targetNodeLabel }} if it does not exist yet.
+            </p>
+          </div>
+        </div>
 
-        <fieldset v-if="mode !== 'reference'" class="space-y-2">
-          <legend class="flex flex-wrap items-center gap-x-2 text-xs font-medium text-foreground">
-            <span>When a source object points at data elsewhere</span>
-            <DocsLink topic="where-data-lives" section="Syncs" label="Learn about syncs" />
-          </legend>
-          <label v-for="option in REFERENCE_HANDLING_OPTIONS" :key="option.value" class="flex items-start gap-2 text-sm">
-            <input v-model="referenceHandling" type="radio" :value="option.value" class="mt-1 h-3.5 w-3.5 shrink-0 accent-primary" />
-            <span>
-              <span class="text-xs font-medium text-foreground">{{ option.label }}</span>
-              <span class="block text-[11px] text-muted-foreground">{{ option.description }}</span>
-            </span>
-          </label>
-        </fieldset>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label for="sync-source-prefix" class="text-xs font-medium text-foreground">Source prefix</label>
+            <Input id="sync-source-prefix" v-model="sourcePrefix" placeholder="whole bucket" class="mt-1 h-8 font-mono text-xs" />
+            <p class="mt-1 text-[11px] text-muted-foreground">
+              Only keys under it are synced; empty means the whole bucket.
+            </p>
+          </div>
+          <div>
+            <label for="sync-target-prefix" class="text-xs font-medium text-foreground">Target prefix</label>
+            <Input id="sync-target-prefix" v-model="targetPrefix" placeholder="bucket root" class="mt-1 h-8 font-mono text-xs" />
+            <p class="mt-1 text-[11px] text-muted-foreground">
+              Synced keys land under it at the target; empty means the root.
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <span class="text-xs font-medium text-foreground">Mode</span>
+          <div class="mt-1 grid gap-2 sm:grid-cols-3" role="group" aria-label="Mode">
+            <button
+              v-for="option in MODE_OPTIONS"
+              :key="option.value"
+              type="button"
+              :aria-pressed="mode === option.value"
+              :class="optionClass(mode === option.value)"
+              @click="mode = option.value"
+            >
+              <span class="block text-[13px] font-medium text-foreground">{{ option.label }}</span>
+              <span class="mt-0.5 block text-[11px] text-muted-foreground">{{ option.description }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div v-if="mode !== 'reference'">
+          <p class="text-xs font-medium text-foreground">
+            When a source object points at data elsewhere
+            <DocsLink icon topic="where-data-lives" section="Syncs" class="ml-0.5" />
+          </p>
+          <div
+            class="mt-1 grid gap-2 sm:grid-cols-3"
+            role="group"
+            aria-label="When a source object points at data elsewhere"
+          >
+            <button
+              v-for="option in REFERENCE_HANDLING_OPTIONS"
+              :key="option.value"
+              type="button"
+              :aria-pressed="referenceHandling === option.value"
+              :class="optionClass(referenceHandling === option.value)"
+              @click="referenceHandling = option.value"
+            >
+              <span class="block text-[13px] font-medium text-foreground">{{ option.label }}</span>
+              <span class="mt-0.5 block text-[11px] text-muted-foreground">{{ option.description }}</span>
+            </button>
+          </div>
+        </div>
 
         <label class="flex items-center justify-between gap-3 text-xs">
           <span>
             <span class="font-medium text-foreground">Replicate deletions</span>
-            <span class="block text-[11px] text-muted-foreground">Deleting a source object also writes a delete marker at the target.</span>
+            <span class="block text-[11px] text-muted-foreground">
+              Deleting a source object also writes a delete marker at the target.
+            </span>
           </span>
           <Switch :checked="replicateDeletes" @update:checked="(v: boolean) => (replicateDeletes = v)" />
         </label>
 
         <Notice v-if="sameEndpoint" tone="warning">
-          Source and target are the same bucket and prefix, pick a different node, bucket or prefix.
+          Source and target are the same bucket and prefix; pick a different node, bucket or prefix.
         </Notice>
         <Notice v-if="sourceUnreachable" tone="warning">
-          {{ sourceNodeLabel }} does not publish an API URL, so the sync cannot be created from here. Create it from that node's portal instead.
+          {{ sourceNodeLabel }} does not publish an API URL, so the sync cannot be created from here.
+          Create it from that node's portal instead.
         </Notice>
         <Notice v-if="error" tone="error">{{ error }}</Notice>
       </div>

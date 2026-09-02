@@ -16,8 +16,8 @@ const Titled = defineComponent({
   setup: (props, { slots }) => () => h('div', [props.title ?? props.message ?? '', slots.default?.()]),
 })
 const DocsLinkStub = defineComponent({
-  props: { label: String, section: String },
-  setup: (props) => () => h('a', props.label ?? props.section ?? 'docs'),
+  props: { label: String, section: String, icon: Boolean },
+  setup: (props) => () => h('a', { 'data-icon': props.icon }, props.label ?? props.section ?? 'docs'),
 })
 
 const getBlobLocations = vi.fn()
@@ -122,6 +122,7 @@ describe('object locations panel', () => {
     const text = await render([copy()], false)
 
     expect(text).toContain('This list may be incomplete')
-    expect(text).toContain('Learn about storage locations')
+    expect(text).toContain('Storage locations')
+    expect(text).not.toContain('Learn about')
   })
 })

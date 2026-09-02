@@ -246,9 +246,9 @@ Only the node that holds a file can say where its copies are; open the bucket on
                 Open the syncs of this bucket
               </RouterLink>
             </p>
-            <p v-if="heldBack(copy)" class="mt-1 flex flex-wrap items-center gap-2">
+            <p v-if="heldBack(copy)" class="mt-1 flex flex-wrap items-center gap-1.5">
               <Badge variant="warn" size="sm">{{ heldBack(copy) }}</Badge>
-              <DocsLink topic="where-data-lives" section="Placement policies" label="Learn about placement policies" />
+              <DocsLink icon topic="where-data-lives" section="Placement policies" />
             </p>
           </li>
           <li v-if="!copies.length">
@@ -256,8 +256,8 @@ Only the node that holds a file can say where its copies are; open the bucket on
           </li>
         </ul>
 
-        <Notice v-if="onGroupBackend" tone="warning" class="flex flex-wrap items-center gap-2">
-          <span>Keeping a copy on storage your group runs safe and reachable is up to you.</span>
+        <Notice v-if="onGroupBackend" tone="warning">
+          Keeping a copy on storage your group runs safe and reachable is up to you.
           <RouterLink
             v-if="props.groupId"
             :to="{ name: 'group', params: { id: props.groupId }, query: { tab: 'storage' } }"
@@ -265,20 +265,20 @@ Only the node that holds a file can say where its copies are; open the bucket on
           >
             Your group's storage
           </RouterLink>
-          <DocsLink topic="where-data-lives" section="Storage locations" label="Learn about storage locations" />
+          <DocsLink icon topic="where-data-lives" section="Storage locations" class="ml-0.5" />
         </Notice>
 
-        <Notice v-if="!summary.complete" tone="warning" class="flex flex-wrap items-center gap-2">
-          <span>This list may be incomplete: this node could not reach every place a copy could be.</span>
-          <DocsLink topic="where-data-lives" section="Storage locations" label="Learn about storage locations" />
+        <Notice v-if="!summary.complete" tone="warning">
+          This list may be incomplete: this node could not reach every place a copy could be.
+          <DocsLink icon topic="where-data-lives" section="Storage locations" class="ml-0.5" />
         </Notice>
 
         <div v-if="!replicateUnsupported" class="space-y-2 rounded-md border border-border px-3 py-2">
           <div>
             <h3 class="text-xs font-medium text-foreground">Add a copy</h3>
-            <p class="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-              <span>Ask another node to fetch this version; the copy is queued, not stored yet.</span>
-              <DocsLink topic="where-data-lives" section="Storage locations" label="Learn about storage locations" />
+            <p class="text-[11px] text-muted-foreground">
+              Ask another node to fetch this version; the copy is queued, not stored yet.
+              <DocsLink icon topic="where-data-lives" section="Storage locations" class="ml-0.5" />
             </p>
           </div>
           <div class="flex flex-wrap items-center gap-2">
