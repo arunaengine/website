@@ -11,7 +11,7 @@ import { ApiError } from '@/lib/api'
 import * as Jobs from '@/lib/jobs'
 import * as Tes from '@/lib/tes'
 import * as Utils from '@/lib/utils'
-import type { JobAuditResponse, JobFamilyResponse } from '@/lib/jobs'
+import type { JobAuditResponse, JobFamilyResponse, JobStatusResponse } from '@/lib/jobs'
 
 const PassThroughStub = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
 const OpenPassThroughStub = defineComponent({
@@ -168,7 +168,7 @@ const family: JobFamilyResponse = {
   duplicate_successes: 0,
   outputs: [
     {
-      bucket: 'ws-bucket',
+      bucket: 'results',
       key: 'reports/known.html',
       version_id: 'version-known',
       execution_id: 'canonical-execution',
@@ -178,7 +178,7 @@ const family: JobFamilyResponse = {
       endpoint_url: 'https://owner.node.test',
     },
     {
-      bucket: 'ws-bucket',
+      bucket: 'results',
       key: 'reports/orphan.html',
       version_id: 'version-orphan',
       execution_id: 'canonical-execution',
@@ -247,6 +247,41 @@ function taskPanel(getTask: unknown, getJob: unknown): Component {
   })
 }
 
+function jobPanel(job: JobStatusResponse): Component {
+  return compileClientComponent(new URL('./JobDetailPanel.vue', import.meta.url), {
+    vue: VueRuntime,
+    '@lucide/vue': icons,
+    '@/components/ui/DetailDialog.vue': moduleDefault(OpenPassThroughStub),
+    '@/components/ui/DialogTitle.vue': moduleDefault(PassThroughStub),
+    '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
+    '@/components/ui/Notice.vue': moduleDefault(PassThroughStub),
+    '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+    '@/components/ui/Progress.vue': moduleDefault(PassThroughStub),
+    '@/components/ui/Skeleton.vue': moduleDefault(PassThroughStub),
+    '@/components/ui/ErrorPanel.vue': moduleDefault(ErrorPanelStub),
+    '@/components/ui/CopyButton.vue': moduleDefault(PassThroughStub),
+    '@/components/jobs/JobArtifactButton.vue': moduleDefault(PassThroughStub),
+    '@/components/jobs/JobAuditTrail.vue': moduleDefault(PassThroughStub),
+    '@/components/jobs/JobFamilySection.vue': moduleDefault(JobFamilyStub),
+    '@/components/jobs/JobReportPanel.vue': moduleDefault(PassThroughStub),
+    '@/components/jobs/JobStateBadge.vue': moduleDefault(JobStateBadgeStub),
+    '@/composables/useJobs': {
+      useJobDetail: () => ({
+        job: ref(job),
+        loadState: ref('ready'),
+        loadError: ref(null),
+        lastPollError: ref(null),
+        cancelling: ref(false),
+        cancelError: ref(null),
+        load: vi.fn(),
+        cancel: vi.fn(),
+      }),
+    },
+    '@/lib/jobs': Jobs,
+    '@/lib/utils': Utils,
+  })
+}
+
 describe('distributed job detail components', () => {
   const familyModules = {
     vue: VueRuntime,
@@ -257,6 +292,33 @@ describe('distributed job detail components', () => {
     '@/lib/jobs': Jobs,
     '@/lib/utils': Utils,
   }
+
+  it('states no workspace fact, whatever the node reports', async () => {
+    // A node may still serve a mode and a bucket; a run owns neither any more.
+    const JobDetailPanel = jobPanel({
+      job_id: '01JJRSTVWXYZ0123456789ABCD',
+      kind: 'execution',
+      state: 'succeeded',
+      attempts: 1,
+      cancel_requested: false,
+      created_at: '2026-04-09T14:23:11.123+00:00',
+      updated_at: '2026-04-09T14:31:47.902+00:00',
+      progress: { current: 2, total: 2, unit: 'inputs' },
+      workspace_bucket: 'ws-01jjrstvwxyz0123456789abcd',
+      workspace_mode: 'kept',
+      run_crate: { '@id': 'runs/01JJRSTVWXYZ0123456789ABCD' },
+    })
+
+    const mounted = await mount(JobDetailPanel, { jobId: '01JJRSTVWXYZ0123456789ABCD', open: true })
+    const text = content(mounted.root)
+
+    expect(mounted.errors).toEqual([])
+    expect(text).not.toContain('Workspace')
+    expect(text).not.toContain('ws-01jjrstvwxyz0123456789abcd')
+    expect(text).not.toContain('kept')
+    expect(text).toContain('Run dataset')
+    mounted.app.unmount()
+  })
 
   it('labels planner transfer values as plan-time estimates', async () => {
     const JobFamilySection = compileClientComponent(

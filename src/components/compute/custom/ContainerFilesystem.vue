@@ -18,7 +18,7 @@ const {
   outputRows,
   outputsValid,
   treeOutputs,
-  workspaceBucketOptions,
+  bucketOptions,
   onOutputKeyBlur,
   addOutputRow,
   removeOutputRow,
@@ -57,9 +57,9 @@ const {
           <div v-if="outputRows[index]" class="flex items-center gap-1.5">
             <span class="shrink-0 text-[10px] font-medium text-muted-foreground">into</span>
             <Select
-              v-if="workspaceBucketOptions.length"
+              v-if="bucketOptions.length"
               v-model="outputRows[index].bucket"
-              :options="workspaceBucketOptions"
+              :options="bucketOptions"
               placeholder="Bucket"
               class="h-7 w-32 shrink-0 text-xs"
               aria-label="Destination bucket"
@@ -103,7 +103,7 @@ const {
               <span class="pb-2.5 text-xs text-muted-foreground">into</span>
               <div class="w-44">
                 <label class="text-xs font-medium text-foreground">Bucket</label>
-                <Select v-if="workspaceBucketOptions.length" v-model="row.bucket" :options="workspaceBucketOptions" placeholder="Bucket" class="mt-1" aria-label="Destination bucket" />
+                <Select v-if="bucketOptions.length" v-model="row.bucket" :options="bucketOptions" placeholder="Bucket" class="mt-1" aria-label="Destination bucket" />
                 <Input v-else v-model="row.bucket" class="mt-1 font-mono" placeholder="my-results" aria-label="Destination bucket" />
               </div>
               <div class="min-w-0 flex-1">

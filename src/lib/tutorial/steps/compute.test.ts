@@ -43,6 +43,15 @@ describe('compute tutorial steps', () => {
     expect(new Set(ids).size).toBe(ids.length)
   })
 
+  it('stops at no scratch storage step', () => {
+    // A run makes no bucket of its own, so the wizard has nothing to show here.
+    expect(computeTutorialSteps).toHaveLength(15)
+    const targets = computeTutorialSteps.map((step) => step.target)
+    expect(computeTutorialSteps.map((step) => step.id)).not.toContain('workspace')
+    expect(targets).not.toContain('run-workspace')
+    expect(anchors(mounted.root)).not.toContain('run-workspace')
+  })
+
   it('spotlights a control the step actually renders', async () => {
     // Walk the tutorial as a reader would: every stop must find its anchor in
     // the tree that stop mounts.

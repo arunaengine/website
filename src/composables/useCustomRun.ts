@@ -20,7 +20,7 @@ import {
   type TesResources,
   type TesTask,
 } from '@/lib/tes'
-import { isWorkspaceBucket, type WorkspaceMode } from '@/lib/workspaces'
+import { isWorkspaceBucket } from '@/lib/workspaces'
 import {
   droppedNativeFields,
   isNativeBlocked,
@@ -57,14 +57,6 @@ export const MIN_RESOURCE_GB = 0.000000001
 // largest f64 GB value whose conversion does not round up past that limit.
 export const MAX_RESOURCE_GB = 9_223_372_036.854_774
 
-// Workspace handling for the run's scratch storage: an explicit, required
-// choice (agreed contract; a node that predates it ignores the field and the
-// submit path reports that).
-export const WORKSPACE_OPTIONS: { mode: WorkspaceMode; label: string; hint: string }[] = [
-  { mode: 'temporary', label: 'Temporary workspace', hint: 'Scratch bucket for this run, deleted after it succeeds.' },
-  { mode: 'kept', label: 'Keep workspace', hint: 'The run’s ws-… bucket stays for inspection after completion.' },
-  { mode: 'existing', label: 'Use existing bucket…', hint: 'The run works inside a bucket you pick.' },
-]
 export const INPUT_MODE_OPTIONS = [
   { value: 'snapshot', label: 'Snapshot (default)' },
   { value: 'floating_reference', label: 'Follow current version' },
@@ -137,26 +129,18 @@ function createStore(deps: CustomRunDeps) {
   const diskGb = ref<string | number>('')
   const preemptible = ref(false)
 
-  const workspaceMode = ref<WorkspaceMode | ''>('')
-  const workspaceBucket = ref('')
-  const workspaceValid = computed(() => {
-    if (workspaceMode.value === 'temporary' || workspaceMode.value === 'kept') return true
-    return workspaceMode.value === 'existing' && !!workspaceBucket.value.trim()
-  })
-
-  // Bucket options for the workspace "existing" choice and the output
-  // destinations, best effort via the browser's S3 session; without credentials
-  // the fields fall back to free text.
-  const workspaceBucketOptions = ref<{ value: string; label: string }[]>([])
+  // Bucket options for the output destinations, best effort via the browser's
+  // S3 session; without credentials the fields fall back to free text.
+  const bucketOptions = ref<{ value: string; label: string }[]>([])
   onMounted(async () => {
     if (!s3.hasActiveKey.value || !s3.endpoint.value) return
     try {
-      workspaceBucketOptions.value = (await s3.listBuckets())
+      bucketOptions.value = (await s3.listBuckets())
         .map((b) => b.name)
         .filter((bucket) => !isWorkspaceBucket(bucket))
         .map((bucket) => ({ value: bucket, label: bucket }))
     } catch {
-      workspaceBucketOptions.value = []
+      bucketOptions.value = []
     }
   })
 
@@ -225,15 +209,6 @@ function createStore(deps: CustomRunDeps) {
       diskGb.value = r?.disk_gb != null ? String(r.disk_gb) : ''
       preemptible.value = !!r?.preemptible
 
-      // The workspace choice is a create-time extension the task record does not
-      // echo back, so it always needs a fresh pick.
-      if (source.workspace) {
-        workspaceMode.value = source.workspace.mode
-        workspaceBucket.value = source.workspace.bucket ?? ''
-      } else {
-        notes.push('The workspace choice is not part of the run record; pick one before starting it.')
-      }
-
       rerunSource.value = { id, name: source.name || id }
       rerunNotes.value = notes
     } catch (err) {
@@ -287,9 +262,6 @@ function createStore(deps: CustomRunDeps) {
         ...(executorConstraint.value.trim() ? { [TES_EXECUTOR_TAG]: executorConstraint.value.trim() } : {}),
         ...(runTarget.local.value ? {} : placementTags(placementLabels.value)),
       },
-      workspace: workspaceMode.value
-        ? { mode: workspaceMode.value, bucket: workspaceMode.value === 'existing' ? workspaceBucket.value.trim() : undefined }
-        : undefined,
     }),
   )
 
@@ -423,12 +395,6 @@ function createStore(deps: CustomRunDeps) {
     inputs: inputPlacements.value,
     collisionPolicy: collisionPolicy.value,
     outputPrefixes: outputPrefixes.value,
-    workspace: workspaceMode.value
-      ? {
-          mode: workspaceMode.value,
-          bucket: workspaceMode.value === 'existing' ? workspaceBucket.value.trim() : undefined,
-        }
-      : null,
   }))
 
   const targetProblems = computed(() =>
@@ -436,7 +402,6 @@ function createStore(deps: CustomRunDeps) {
       target: runTarget.local.value ? 'local' : 'realm',
       executorConstraint: executorConstraint.value,
       backend: runTarget.compute.value?.backend,
-      workspaceMode: workspaceMode.value,
       inputModes: advancedInputs.value.map((input) => placementFor(input.path).mode),
       realmInputsMissingVersion: advancedInputs.value.some(
         (input) => !input.source_node_id?.trim() || !input.version_id?.trim(),
@@ -495,10 +460,7 @@ function createStore(deps: CustomRunDeps) {
     ramGb,
     diskGb,
     preemptible,
-    workspaceMode,
-    workspaceBucket,
-    workspaceBucketOptions,
-    workspaceValid,
+    bucketOptions,
     onOutputKeyBlur,
     rerunSource,
     rerunNotes,

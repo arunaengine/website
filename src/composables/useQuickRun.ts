@@ -254,8 +254,8 @@ function createStore(deps: QuickRunDeps) {
       ? [...runtime.value.command, `--config=${dependencyConfigPath.value}`]
       : runtime.value.command
   })
-  // Runtime env values are cache dirs relative to the workspace; prefix them
-  // with the run's working directory.
+  // Runtime env values are cache dirs relative to the run's working directory;
+  // prefix them with it.
   const executorEnv = computed(() => {
     const env = runtime.value.env
     if (!env) return undefined
@@ -553,7 +553,7 @@ function createStore(deps: QuickRunDeps) {
     if (!s3.hasActiveKey.value || !s3.endpoint.value) return
     bucketsLoading.value = true
     try {
-      // Per-run ws-… scratch buckets are system-managed and never run targets.
+      // System-managed ws-… buckets are never run targets.
       buckets.value = (await s3.listBuckets()).map((b) => b.name).filter((name) => !isWorkspaceBucket(name))
       bucketsLoaded.value = true
       if (!stagingBucket.value && buckets.value.length) stagingBucket.value = buckets.value[0]

@@ -77,14 +77,6 @@ export const computeTutorialSteps: TutorialStep[] = [
     body: 'Cores, memory and disk are the request the planner places against. Leave a field empty to let the node decide.',
   },
   {
-    id: 'workspace',
-    route: WIZARD_WORKLOAD,
-    target: 'run-workspace',
-    title: 'Scratch storage',
-    advanceOn: 'next',
-    body: 'The workspace is where the run writes while it works. A temporary one is deleted once the run succeeds; keep it when you expect to inspect what was written.',
-  },
-  {
     id: 'placement',
     route: WIZARD_WORKLOAD,
     target: 'run-placement',

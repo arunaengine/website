@@ -1,7 +1,6 @@
 import type { BadgeVariant } from '@/components/nodes/node-display'
 import { stateVariant } from './stateBadge'
 import type { PlacementLike } from '@/lib/jobs'
-import type { WorkspaceChoice } from '@/lib/workspaces'
 
 // ── GA4GH TES v1.1 ───────────────────────────────────────────────────────────
 // Verified against the Aruna TES facade (api/src/routes/tes.rs, aruna #425).
@@ -102,12 +101,6 @@ export interface TesTask {
   tags?: Record<string, string>
   logs?: TesTaskLog[] // output only
   creation_time?: string // output only, RFC3339
-  // Aruna extension (not GA4GH): per-run workspace handling. The current
-  // facade derives the workspace from the serving node's deployment and
-  // ignores this field, so the run's effective mode is the `workspace_mode`
-  // the native job reports back. useTes.createTask degrades gracefully when a
-  // node rejects the unknown field instead.
-  workspace?: WorkspaceChoice
 }
 
 export interface TesCreateTaskResponse {
@@ -529,13 +522,6 @@ export function pruneTesTask(task: TesTask): TesTask {
   if (tags) {
     for (const key of TES_READONLY_TAGS) delete tags[key]
     if (Object.keys(tags).length) out.tags = tags
-  }
-  if (task.workspace) {
-    const bucket = trimmed(task.workspace.bucket)
-    out.workspace =
-      task.workspace.mode === 'existing' && bucket
-        ? { mode: 'existing', bucket }
-        : { mode: task.workspace.mode }
   }
   return out
 }

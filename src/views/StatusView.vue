@@ -467,7 +467,7 @@ watch(
             <div class="surface-inline px-3 py-2">
               <dt class="text-[11px] uppercase tracking-wide text-muted-foreground">Buckets</dt>
               <dd class="mt-0.5 font-display text-lg font-semibold tabular-nums text-aruna-navy">{{ formatNumber(usageInfo.buckets) }}</dd>
-              <p class="mt-0.5 text-[11px] text-muted-foreground">Node-reported total; may include per-run system workspaces (ws-…)</p>
+              <p class="mt-0.5 text-[11px] text-muted-foreground">Node-reported total; includes every bucket this node serves</p>
             </div>
           </dl>
           <LocalNodeDetails v-if="nodeInfo" :info="nodeInfo" />

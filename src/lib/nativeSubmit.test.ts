@@ -42,8 +42,6 @@ function mapped(input: NativeSubmitForm) {
 describe('native submission decision', () => {
   it('stays on TES while every option is at its default', () => {
     expect(nativeSubmitRequired(defaultPlacement())).toBe(false)
-    // `kept` is the backend's own default for an omitted workspace block.
-    expect(nativeSubmitRequired(placement({ workspace: { mode: 'kept' } }))).toBe(false)
     expect(nativeSubmitRequired(placement({ outputPrefixes: ['  '] }))).toBe(false)
   })
 
@@ -55,8 +53,6 @@ describe('native submission decision', () => {
       placement({ collisionPolicy: 'replace' }),
       placement({ collisionPolicy: 'keep_existing' }),
       placement({ outputPrefixes: ['reports/'] }),
-      placement({ workspace: { mode: 'temporary' } }),
-      placement({ workspace: { mode: 'existing', bucket: 'scratch' } }),
     ]
     for (const option of cases) expect(nativeSubmitRequired(option)).toBe(true)
   })
@@ -73,6 +69,7 @@ describe('task to execution request', () => {
       env: { T: '2' },
       tags: {},
       workdir: null,
+      workspace: { mode: 'none' },
       inputs: [
         {
           bucket: 'project',
@@ -92,15 +89,10 @@ describe('task to execution request', () => {
     })
   })
 
-  it('omits a kept workspace and sends the other two', () => {
-    expect(mapped(form({ placement: placement({ workspace: { mode: 'kept' } }) })).workspace)
-      .toBeUndefined()
-    expect(mapped(form({ placement: placement({ workspace: { mode: 'temporary' } }) })).workspace)
-      .toEqual({ mode: 'temporary' })
-    expect(
-      mapped(form({ placement: placement({ workspace: { mode: 'existing', bucket: ' scratch ' } }) }))
-        .workspace,
-    ).toEqual({ mode: 'existing', bucket: 'scratch' })
+  it('states no workspace, so the run makes no bucket of its own', () => {
+    expect(mapped(form()).workspace).toEqual({ mode: 'none' })
+    expect(mapped(form({ placement: placement({ collisionPolicy: 'replace' }) })).workspace)
+      .toEqual({ mode: 'none' })
   })
 
   it('carries a pinned version only on an exact reference', () => {

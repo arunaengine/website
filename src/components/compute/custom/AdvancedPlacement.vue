@@ -84,7 +84,7 @@ const {
         <div class="space-y-1.5">
           <label class="text-xs font-medium text-foreground">Output prefixes</label>
           <p class="text-[11px] text-muted-foreground">
-            Workspace prefixes inventoried when the run finishes. Only objects this run
+            Key prefixes inventoried when the run finishes. Only objects this run
             wrote are attributed to it.
           </p>
           <div

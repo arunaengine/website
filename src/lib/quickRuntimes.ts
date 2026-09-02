@@ -12,7 +12,7 @@ export interface Runtime {
   command: string[]
   /**
    * Extra executor environment. Values are cache dir paths RELATIVE to the
-   * run's working directory (the writable workspace); the wizard prefixes them.
+   * run's working directory, which is where it may write; the wizard prefixes them.
    */
   env?: Record<string, string>
   file: string

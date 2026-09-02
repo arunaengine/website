@@ -48,7 +48,6 @@ const {
   executorConstraint,
   executorsValid,
   outputsValid,
-  workspaceValid,
   cpuCoresValid,
   ramGbValid,
   diskGbValid,
@@ -93,7 +92,6 @@ const canContinue = computed(() => {
         groupId.value.length > 0 &&
         executorsValid.value &&
         outputsValid.value &&
-        workspaceValid.value &&
         cpuCoresValid.value &&
         ramGbValid.value &&
         diskGbValid.value
@@ -114,9 +112,6 @@ function back() {
 
 // ── Submit ───────────────────────────────────────────────────────────────────
 const submitError = ref<string | null>(null)
-// Set instead of navigating away when the node dropped the workspace choice,
-// so the hint is actually seen; the task itself was submitted fine.
-const submittedWithoutWorkspace = ref<string | null>(null)
 // Held across retries: a 503 may already have committed the submission, so the
 // same key is what makes the retry a replay instead of a duplicate.
 const idempotencyKey = ref('')
@@ -156,10 +151,6 @@ async function submit() {
       return
     }
     const created = await createTask(task.value)
-    if (created.workspaceIgnored) {
-      submittedWithoutWorkspace.value = created.id
-      return
-    }
     void router.push({ name: 'task', params: { taskId: created.id } })
   } catch (err) {
     if (useNative.value) {
@@ -215,7 +206,6 @@ async function submit() {
             v-else
             :submit-error="submitError"
             :submit-retryable="submitRetryable"
-            :submitted-without-workspace="submittedWithoutWorkspace"
           />
         </section>
 
@@ -223,7 +213,7 @@ async function submit() {
           :first="step === 0"
           :last="step === WIZARD_STEPS.length - 1"
           :can-continue="canContinue"
-          :can-run="!busy && !!groupId && executorsValid && outputsValid && workspaceValid && cpuCoresValid && ramGbValid && diskGbValid && !nativeInvalid && !submittedWithoutWorkspace && !targetProblems.length"
+          :can-run="!busy && !!groupId && executorsValid && outputsValid && cpuCoresValid && ramGbValid && diskGbValid && !nativeInvalid && !targetProblems.length"
           @back="back"
           @next="next"
           @run="submit"

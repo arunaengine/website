@@ -336,7 +336,7 @@ const pageDescription = computed(() =>
               label="Buckets"
               :value="formatNumber(realmTotals.buckets)"
               :icon="FolderOpen"
-              hint="Realm-wide; may include per-run system workspaces (ws-…)"
+              hint="Realm-wide; includes every bucket the realm's nodes serve"
             />
           </template>
           <template v-else>

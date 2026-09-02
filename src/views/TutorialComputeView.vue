@@ -99,7 +99,6 @@ function seedDraft() {
   store.cpuCores.value = 2
   store.ramGb.value = 4
   store.diskGb.value = 10
-  store.workspaceMode.value = 'kept'
   store.inputMountDefault.value = `/inputs/${DATASET_PREFIX}`
 }
 seedDraft()

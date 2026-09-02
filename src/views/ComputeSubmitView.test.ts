@@ -420,7 +420,6 @@ async function fillValidWorkload(root: HostNode) {
   await typeValue(input(root, 'aria-label', 'Container path to capture'), '/outputs/result.txt')
   await typeValue(input(root, 'aria-label', 'Destination bucket'), 'results')
   await typeValue(input(root, 'aria-label', 'Destination key'), 'runs/result.txt')
-  await click(button(root, 'Temporary workspace'))
   await typeValue(input(root, 'placeholder', '1'), '4')
   await typeValue(input(root, 'placeholder', '2'), '8.5')
   await typeValue(input(root, 'placeholder', '10'), '20.25')
@@ -502,7 +501,6 @@ describe('numeric Input consumers', () => {
 
   it('rechecks executor and output validity on a directly reached Review step', async () => {
     const mounted = await mount(ComputeSubmitView, '/app/compute/new?step=1')
-    await click(button(mounted.root, 'Temporary workspace'))
     await typeValue(input(mounted.root, 'placeholder', '1'), '1')
     await typeValue(input(mounted.root, 'placeholder', '2'), '1')
     await typeValue(input(mounted.root, 'placeholder', '10'), '1')
@@ -529,7 +527,7 @@ describe('numeric Input consumers', () => {
 
   it('picks the native jobs API only for options TES cannot carry', async () => {
     const mounted = await mount(ComputeSubmitView, '/app/compute/new?step=1')
-    await click(button(mounted.root, 'Keep workspace'))
+    await fillValidWorkload(mounted.root)
     await mounted.router!.push('/app/compute/new?step=2')
     await flush()
 
@@ -538,12 +536,25 @@ describe('numeric Input consumers', () => {
 
     await mounted.router!.push('/app/compute/new?step=1')
     await flush()
-    await click(button(mounted.root, 'Temporary workspace'))
+    await click(button(mounted.root, 'Add prefix'))
+    await typeValue(input(mounted.root, 'aria-label', 'Output prefix'), 'reports/')
     await mounted.router!.push('/app/compute/new?step=2')
     await flush()
 
     expect(content(mounted.root)).toContain('POST /jobs/')
     expect(content(mounted.root)).toContain("Aruna's native jobs API")
+    expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('offers no scratch storage choice at all', async () => {
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new?step=1')
+    await fillValidWorkload(mounted.root)
+
+    const workload = content(mounted.root)
+    expect(workload).not.toContain('Workspace')
+    expect(workload).not.toContain('Scratch')
+    expect(nodes(mounted.root).some((node) => node.props['data-tutorial'] === 'run-workspace')).toBe(false)
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })
@@ -629,7 +640,6 @@ describe('run target', () => {
     await typeValue(input(mounted.root, 'placeholder', '1'), '1')
     await typeValue(input(mounted.root, 'placeholder', '2'), '1')
     await typeValue(input(mounted.root, 'placeholder', '10'), '1')
-    await click(button(mounted.root, 'Keep workspace'))
     await mounted.router!.push('/app/compute/new?step=2')
     await flush()
 
@@ -646,7 +656,7 @@ describe('run target', () => {
     mounted.app.unmount()
   })
 
-  it('leaves a realm run on the realm API', async () => {
+  it('leaves a realm run on the task API', async () => {
     runTargetAvailable.value = true
     const mounted = await mount(ComputeSubmitView, '/app/compute/new')
 
@@ -659,11 +669,33 @@ describe('run target', () => {
     await flush()
     expect(content(mounted.root)).toContain('Run on')
     await click(submitButton(mounted.root))
+    await new Promise((resolve) => setTimeout(resolve, 0))
     await flush()
 
-    const [request, client] = submitJob.mock.calls[0] as unknown as [Record<string, unknown>, Record<string, unknown>]
-    expect(request.target).toBeUndefined()
-    expect(client).toEqual({ baseUrl: 'https://node.example.org/api/v1', token: 'realm-token' })
+    expect(submitJob).not.toHaveBeenCalled()
+    expect(createTask).toHaveBeenCalledTimes(1)
+    expect(mounted.router!.currentRoute.value.name).toBe('task')
+    expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('submits a task that names no workspace', async () => {
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new')
+
+    await typeValue(element(mounted.root, (node) => node.tag === 'select'), 'group-id')
+    await mounted.router!.push('/app/compute/new?step=1')
+    await flush()
+    await fillValidWorkload(mounted.root)
+    await mounted.router!.push('/app/compute/new?step=2')
+    await flush()
+
+    expect(content(mounted.root)).not.toContain('workspace')
+    await click(submitButton(mounted.root))
+    await flush()
+
+    const submitted = (createTask.mock.calls[0] as unknown[])[0] as Tes.TesTask
+    expect(submitted).not.toHaveProperty('workspace')
+    expect(submitted.outputs).toEqual([{ url: 's3://results/runs/result.txt', path: '/outputs/result.txt', type: 'FILE' }])
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })
@@ -685,7 +717,6 @@ describe('placement labels', () => {
     await mounted.router!.push('/app/compute/new?step=1')
     await flush()
     await fillValidWorkload(mounted.root)
-    await click(button(mounted.root, 'Keep workspace'))
     await mounted.router!.push('/app/compute/new?step=2')
     await flush()
     await click(button(mounted.root, 'Set test placement'))

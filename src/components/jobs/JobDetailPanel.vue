@@ -18,7 +18,6 @@ import { useJobDetail } from '@/composables/useJobs'
 import { formatJobProgress, isTerminalJobState, jobKindLabel, jobProgressPercent } from '@/lib/jobs'
 import { relativeTime, truncateMiddle } from '@/lib/utils'
 import { Ban, History } from '@lucide/vue'
-import { RouterLink } from 'vue-router'
 
 const props = defineProps<{ jobId: string; open: boolean }>()
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void; (e: 'changed'): void }>()
@@ -118,21 +117,6 @@ async function confirmCancel() {
           <template v-if="job.finished_at">
             <dt class="text-muted-foreground">Finished</dt>
             <dd class="text-foreground" :title="job.finished_at">{{ relativeTime(job.finished_at) }}</dd>
-          </template>
-          <template v-if="job.workspace_bucket">
-            <dt class="text-muted-foreground">Workspace</dt>
-            <dd class="break-all font-mono text-[11px] text-foreground">
-              <RouterLink
-                :to="{ name: 'bucket', params: { bucketId: job.workspace_bucket } }"
-                class="text-primary hover:underline"
-                title="Open this workspace bucket under Data"
-              >{{ job.workspace_bucket }}</RouterLink>
-              <Badge v-if="job.workspace_mode" variant="outline" size="sm" class="ml-1.5 uppercase">{{ job.workspace_mode }}</Badge>
-            </dd>
-          </template>
-          <template v-else-if="job.workspace_mode">
-            <dt class="text-muted-foreground">Workspace</dt>
-            <dd class="text-foreground">{{ job.workspace_mode }}</dd>
           </template>
         </dl>
 

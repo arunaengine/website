@@ -598,6 +598,9 @@ export const docsTopics: DocsTopic[] = [
       {
         title: 'Script and data',
         icon: 'SquareTerminal',
+        paragraphs: [
+          'A run creates no bucket of its own. It reads each input from the bucket that holds it, at the version current when the run was accepted, and writes every output into the bucket and key the run names.',
+        ],
         steps: [
           'Pick the runtime; the working directory defaults to /work.',
           'Select the owning group.',
@@ -1164,6 +1167,7 @@ export const docsTopics: DocsTopic[] = [
         title: 'Outputs are exact versions',
         icon: 'FileJson',
         paragraphs: [
+          'Outputs go to the buckets the run names, never to a bucket the run created for itself.',
           'Each output names the exact version one execution wrote, that execution, and the owning node-local S3 endpoint. Reading the key without the version id answers whatever is current instead.',
           'The owner endpoint can be unknown while version and execution stay exact; the portal says so rather than dropping the output.',
         ],

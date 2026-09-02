@@ -28,8 +28,7 @@ const familyFixture: JobStatusResponse = {
   updated_at: '2026-04-09T14:31:47.902+00:00',
   finished_at: '2026-04-09T14:31:47.902+00:00',
   progress: { current: 5, total: 5, unit: 'phases' },
-  workspace_bucket: 'ws-01jjrstvwxyz0123456789abcd',
-  workspace_mode: 'kept',
+  workspace_mode: 'none',
   family: {
     submission_id: '6b1f8c9d0e2a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4',
     request_digest: '9d3b0c1a2e4f5a6b7c8d9e0f1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d',
@@ -43,7 +42,7 @@ const familyFixture: JobStatusResponse = {
     duplicate_successes: 1,
     outputs: [
       {
-        bucket: 'ws-01jjrstvwxyz0123456789abcd',
+        bucket: 'results',
         key: 'reports/reads_fastqc.html',
         version_id: '01JJRSVERSION0123456789ABC',
         execution_id: '01JJRSEXEC0123456789ABCDEF',

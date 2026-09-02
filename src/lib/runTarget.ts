@@ -1,12 +1,10 @@
 import type { InputModeRequest } from '@/lib/jobs'
-import type { WorkspaceMode } from '@/lib/workspaces'
 
 export interface RunTargetProblemInput {
   target: 'realm' | 'local'
   dependencies?: readonly string[]
   executorConstraint?: string | null
   backend?: string | null
-  workspaceMode?: WorkspaceMode | '' | null
   inputModes?: readonly InputModeRequest[]
   realmInputsMissingVersion?: boolean
   cpuCores?: number
@@ -31,9 +29,6 @@ export function targetProblems(input: RunTargetProblemInput): string[] {
   const backend = input.backend?.trim() ?? ''
   if (constraint && constraint !== backend) {
     problems.push(`This computer cannot satisfy the ${constraint} executor constraint.`)
-  }
-  if (input.workspaceMode === 'existing') {
-    problems.push('An existing realm workspace cannot be used on this computer.')
   }
   if (input.inputModes?.some((mode) => mode !== 'snapshot')) {
     problems.push('Only snapshot inputs can run on this computer.')

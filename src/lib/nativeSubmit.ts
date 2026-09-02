@@ -12,7 +12,6 @@ import type {
   ExecutionOutputRequest,
   InputModeRequest,
   SubmitExecutionRequest,
-  WorkspaceRequest,
 } from '@/lib/jobs'
 
 export interface InputPlacement {
@@ -26,7 +25,6 @@ export interface NativePlacementOptions {
   inputs: Record<string, InputPlacement>
   collisionPolicy: CollisionPolicyRequest
   outputPrefixes: string[]
-  workspace: WorkspaceRequest | null
 }
 
 export interface NativeSubmitForm {
@@ -56,14 +54,10 @@ export function isNativeBlocked(mapping: NativeMapping): mapping is NativeBlocke
 }
 
 export function defaultPlacement(): NativePlacementOptions {
-  return { inputs: {}, collisionPolicy: 'reject', outputPrefixes: [], workspace: null }
+  return { inputs: {}, collisionPolicy: 'reject', outputPrefixes: [] }
 }
 
-/**
- * Whether the draft needs the native surface. Omitting `workspace` natively
- * defaults to `kept`, so only `temporary` and `existing` need it; the other
- * three options each have no GA4GH equivalent at all.
- */
+/** Whether the draft needs the native surface: each option has no GA4GH equivalent. */
 export function nativeSubmitRequired(placement: NativePlacementOptions): boolean {
   const pinned = Object.values(placement.inputs).some(
     (input) => input.mode !== 'snapshot' || Boolean(input.versionId?.trim()),
@@ -72,8 +66,6 @@ export function nativeSubmitRequired(placement: NativePlacementOptions): boolean
     pinned
     || placement.collisionPolicy !== 'reject'
     || placement.outputPrefixes.some((prefix) => prefix.trim())
-    || placement.workspace?.mode === 'temporary'
-    || placement.workspace?.mode === 'existing'
   )
 }
 
@@ -208,6 +200,8 @@ export function tesFormToExecutionRequest(form: NativeSubmitForm): NativeMapping
     outputs,
     output_prefixes: placement.outputPrefixes.map((prefix) => prefix.trim()).filter(Boolean),
     collision_policy: placement.collisionPolicy,
+    // Stated, not defaulted: a run must never get a bucket of its own.
+    workspace: { mode: 'none' },
   }
   const cpu = task.resources?.cpu_cores
   if (cpu !== undefined && Number.isInteger(cpu) && cpu > 0) request.cpu_cores = cpu
@@ -217,13 +211,6 @@ export function tesFormToExecutionRequest(form: NativeSubmitForm): NativeMapping
   if (constraint) request.executor_constraint = constraint
   const key = form.idempotencyKey?.trim()
   if (key) request.idempotency_key = key
-  // `kept` is the backend's own default for an omitted block, so it is left out.
-  if (placement.workspace && placement.workspace.mode !== 'kept') {
-    request.workspace =
-      placement.workspace.mode === 'existing'
-        ? { mode: 'existing', bucket: placement.workspace.bucket?.trim() }
-        : { mode: placement.workspace.mode }
-  }
   return { request }
 }
 

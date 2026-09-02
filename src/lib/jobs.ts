@@ -104,8 +104,8 @@ export interface JobStatusResponse {
   // JobResultPayload::to_public_json(): payload-specific projection.
   result?: unknown
   workspace_bucket?: string
-  // WorkspaceMode::name(): none | temporary | kept | existing. Always served;
-  // "none" means the run had no workspace at all.
+  // WorkspaceMode::name(); always served. "none" means the run worked in no
+  // bucket of its own, which is what a run the portal submits reports.
   workspace_mode: string
   // This node spent its attempts without a job-specific verdict; not a proven
   // failure. Served with a default, so an older node omits it.
@@ -260,14 +260,16 @@ export function cancelJob(jobId: string, client: ApiClientOptions): Promise<JobS
 // ── Native submission ────────────────────────────────────────────────────────
 // POST /compute/jobs: the surface the GA4GH facade maps onto. It expresses what TES
 // cannot: per-input composition modes, an exact version pin, the collision
-// policy, workspace prefixes to inventory, and the workspace mode.
+// policy, and the output prefixes to inventory.
 
 // `exact_reference` requires version_id; `floating_reference` rejects it.
 export type InputModeRequest = 'snapshot' | 'floating_reference' | 'exact_reference'
 
 export type CollisionPolicyRequest = 'reject' | 'replace' | 'keep_existing'
 
-export type WorkspaceModeRequest = 'temporary' | 'kept' | 'existing'
+// A run never creates a bucket: it either works inside a bucket the caller
+// already owns, or has no workspace at all.
+export type WorkspaceModeRequest = 'existing' | 'none'
 
 export interface ExecutionInputRequest {
   bucket: string
@@ -282,12 +284,11 @@ export interface ExecutionInputRequest {
 
 export interface ExecutionOutputRequest {
   container_path: string
-  /** Destination key inside the workspace bucket. */
+  /** Destination key inside the bucket the output names. */
   dest_key: string
 }
 
-// `bucket` belongs to `existing` alone: sending one with temporary or kept is
-// a 400, and omitting the whole block defaults to `kept`.
+// `bucket` belongs to `existing` alone; `none` names no bucket at all.
 export interface WorkspaceRequest {
   mode: WorkspaceModeRequest
   bucket?: string
@@ -307,7 +308,7 @@ export interface SubmitExecutionRequest {
   executor_constraint?: string
   inputs: ExecutionInputRequest[]
   outputs: ExecutionOutputRequest[]
-  /** Workspace prefixes inventoried at completion; at most 32. */
+  /** Output prefixes inventoried at completion; at most 32. */
   output_prefixes: string[]
   collision_policy: CollisionPolicyRequest
   /** Scoped to the caller; the same key with a different plan is a 409. */
@@ -381,7 +382,7 @@ export function submitErrorMessage(error: unknown): string {
     return error.message
   }
   if (error.status === 403) {
-    return 'This token may not start a run for that group, or may not write the workspace bucket it names.'
+    return 'This token may not start a run for that group, or may not write a bucket the run names.'
   }
   if (error.status === 401) return 'Sign in again before starting a run.'
   return error.message

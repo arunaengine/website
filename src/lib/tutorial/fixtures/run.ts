@@ -129,7 +129,7 @@ export function tutorialJob(run: TutorialRunState): JobStatusResponse {
     updated_at: iso(startedMs + RUN_STAGE_MS * RUN_STAGES.indexOf(state)),
     ...(done ? { finished_at: iso(startedMs + RUN_STAGE_MS * 3) } : {}),
     progress: { current: done ? 2 : 0, total: 2, unit: 'inputs' },
-    workspace_mode: 'temporary',
+    workspace_mode: 'none',
     locally_exhausted: false,
   }
 }

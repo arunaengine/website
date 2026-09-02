@@ -1,19 +1,14 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
-import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
 import RunPlacementSection from '@/components/compute/RunPlacementSection.vue'
 import TaskJsonPreview from '@/components/compute/TaskJsonPreview.vue'
 import { injectCustomRun } from '@/composables/useCustomRun'
-import { ArrowRight } from '@lucide/vue'
 
 defineProps<{
   submitError: string | null
   submitRetryable: boolean
-  submittedWithoutWorkspace: string | null
 }>()
 
-const router = useRouter()
 const {
   runTarget,
   realmName,
@@ -67,17 +62,6 @@ const {
         Running it again reuses the same idempotency key, so a request that already committed
         is replayed rather than duplicated.
       </span>
-    </Notice>
-    <Notice v-if="submittedWithoutWorkspace" tone="warning" class="flex flex-wrap items-center gap-2">
-      <span>The run started, but this node does not support workspace choices yet, so it runs without one.</span>
-      <Button
-        variant="outline"
-        size="sm"
-        class="shrink-0"
-        @click="router.push({ name: 'task', params: { taskId: submittedWithoutWorkspace } })"
-      >
-        View run <ArrowRight class="h-3.5 w-3.5" />
-      </Button>
     </Notice>
   </div>
 </template>
