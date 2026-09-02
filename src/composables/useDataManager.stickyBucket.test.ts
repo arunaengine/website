@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { readLastBucket, stickyBucketStep, writeLastBucket, type LastBucket } from './useDataManager'
+import {
+  readLastBucket,
+  stickyBucketStep,
+  stickyScopeFor,
+  writeLastBucket,
+  type LastBucket,
+} from './useDataManager'
 
 const KEY = 'aruna.lastBucket'
 const SCOPE = 'https://node-a/api/v1|u-1'
@@ -59,6 +65,12 @@ afterEach(() => {
 })
 
 describe('sticky bucket memory', () => {
+  it('has no scope before the account is known', () => {
+    // An early write would land in a scope no signed-in reader looks at.
+    expect(stickyScopeFor('http://node/api/v1', undefined)).toBeNull()
+    expect(stickyScopeFor('http://node/api/v1', 'user-1')).toBe('http://node/api/v1|user-1')
+  })
+
   it('remembers a bucket for its own connection and account', () => {
     writeLastBucket(SCOPE, memory())
 

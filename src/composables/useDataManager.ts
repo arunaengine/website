@@ -126,6 +126,11 @@ export function writeLastBucket(scope: string, entry: LastBucket | null) {
   storeValue(LAST_BUCKET_KEY, Object.keys(store).length ? JSON.stringify(store) : '')
 }
 
+/** The scope a remembered bucket belongs to; none until the account is known. */
+export function stickyScopeFor(apiBaseUrl: string, userId: string | undefined): string | null {
+  return userId ? `${apiBaseUrl}|${userId}` : null
+}
+
 export type StickyBucketStep =
   | { action: 'wait' }
   | { action: 'forget' }
@@ -185,7 +190,7 @@ export function useDataManager() {
   const shortcuts = useBucketShortcuts()
   // Same scoping as the shortcut store: another API base or account never
   // inherits this one's remembered bucket.
-  const stickyScope = computed(() => `${apiBaseUrl.value}|${currentUser.value?.id ?? 'anon'}`)
+  const stickyScope = computed(() => stickyScopeFor(apiBaseUrl.value, currentUser.value?.id))
 
   const remoteNodeId = computed(() => {
     const nodeId = routeString(route.query.node)
@@ -705,12 +710,13 @@ export function useDataManager() {
   // The same bucket is remembered per connection and account so returning to
   // the Data view reopens it instead of asking for a bucket again.
   watch(
-    [bucket, remoteNodeId],
+    [bucket, remoteNodeId, stickyScope],
     ([name, nodeId]) => {
       if (!name) return
       shortcuts.recordRecent(name, nodeId)
-      if (isWorkspaceBucket(name)) return
-      writeLastBucket(stickyScope.value, {
+      const scope = stickyScope.value
+      if (isWorkspaceBucket(name) || !scope) return
+      writeLastBucket(scope, {
         bucket: name,
         nodeId,
         groupId: selectedGroupId.value || null,
@@ -722,16 +728,17 @@ export function useDataManager() {
   // The bucket-less route is the picker: it reopens the remembered bucket once
   // this group's list can confirm it, and forgets it when the list cannot.
   watch(
-    [bucket, bucketsLoaded, regularBuckets, selectedGroupId],
+    [bucket, bucketsLoaded, regularBuckets, selectedGroupId, stickyScope],
     () => {
-      if (bucket.value) return
+      const scope = stickyScope.value
+      if (bucket.value || !scope) return
       const step = stickyBucketStep({
-        memory: readLastBucket(stickyScope.value),
+        memory: readLastBucket(scope),
         groupId: selectedGroupId.value,
         buckets: regularBuckets.value.map((entry) => entry.name),
         bucketsLoaded: bucketsLoaded.value,
       })
-      if (step.action === 'forget') writeLastBucket(stickyScope.value, null)
+      if (step.action === 'forget') writeLastBucket(scope, null)
       else if (step.action === 'open') void router.replace(step.route)
     },
     { immediate: true },
@@ -1107,9 +1114,10 @@ export function useDataManager() {
     if (request.kind === 'bucket') {
       if (!committed.length) return
       shortcuts.remove(request.bucket, request.nodeId)
-      const remembered = readLastBucket(stickyScope.value)
-      if (remembered?.bucket === request.bucket && remembered.nodeId === request.nodeId) {
-        writeLastBucket(stickyScope.value, null)
+      const scope = stickyScope.value
+      const remembered = scope ? readLastBucket(scope) : null
+      if (scope && remembered?.bucket === request.bucket && remembered.nodeId === request.nodeId) {
+        writeLastBucket(scope, null)
       }
       if (bucket.value === request.bucket && remoteNodeId.value === request.nodeId) {
         await router.push({ name: 'buckets' })
