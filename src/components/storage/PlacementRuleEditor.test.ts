@@ -169,6 +169,17 @@ describe('placement rule editor', () => {
     })
   })
 
+  it('asks for a name before publishing', async () => {
+    const root = await render()
+
+    expect(content(root)).toContain('A name is required.')
+    expect(element(root, (n) => n.props.id === 'policy-name').props['aria-required']).toBe('true')
+
+    await typeValue(element(root, (n) => n.props.id === 'policy-name'), 'EU only')
+
+    expect(content(root)).not.toContain('A name is required.')
+  })
+
   it('refuses a card with no condition', async () => {
     const root = await render()
 

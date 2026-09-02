@@ -311,8 +311,9 @@ function normalizedSelector(selector: SelectorBody): SelectorBody {
 export function policyCreationProblems(request: CreatePolicyRequest): string[] {
   const problems: string[] = []
   const name = request.name.trim()
-  if (!name || byteLength(name) > MAX_POLICY_NAME_BYTES) {
-    problems.push(`Name must be between 1 and ${MAX_POLICY_NAME_BYTES} bytes.`)
+  if (!name) problems.push('A name is required.')
+  else if (byteLength(name) > MAX_POLICY_NAME_BYTES) {
+    problems.push(`Name must be at most ${MAX_POLICY_NAME_BYTES} bytes.`)
   }
   if (!request.allowed.length || request.allowed.length > MAX_POLICY_SELECTORS) {
     problems.push(`A placement policy needs between 1 and ${MAX_POLICY_SELECTORS} cards.`)

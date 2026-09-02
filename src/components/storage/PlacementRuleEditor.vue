@@ -187,8 +187,18 @@ async function publish() {
   <div class="space-y-5">
     <div class="grid gap-4 sm:grid-cols-2">
       <div>
-        <label for="policy-name" class="text-xs font-medium text-foreground">Name</label>
-        <Input id="policy-name" v-model="name" class="mt-1" placeholder="Copies inside the EU" />
+        <label for="policy-name" class="text-xs font-medium text-foreground">
+          Name <span class="text-destructive" aria-hidden="true">*</span>
+          <span class="sr-only">(required)</span>
+        </label>
+        <Input
+          id="policy-name"
+          v-model="name"
+          class="mt-1"
+          placeholder="Copies inside the EU"
+          required
+          aria-required="true"
+        />
       </div>
       <div>
         <span class="text-xs font-medium text-foreground">Owner</span>
