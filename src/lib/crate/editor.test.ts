@@ -22,7 +22,10 @@ import {
   updateValue,
   valueKindsFor,
   type CrateDraft,
+  type ProfileExpectation,
+  type ProfileShape,
 } from './editor'
+import type { ProfilePropertyRule } from '@/lib/profiles/types'
 import { addFilePart, addSubcratePart } from './references'
 import { loadVocabIndex, type VocabIndex } from '@/lib/profiles/vocabulary'
 
@@ -41,6 +44,40 @@ function seeded(): CrateDraft {
   )
   const person = addEntity(named, { type: 'Person', name: 'Ada Lovelace' })
   return addValue(person.draft, './', 'author', { kind: 'reference', value: person.entity.id })
+}
+
+function propertyRule(overrides: Partial<ProfilePropertyRule>): ProfilePropertyRule {
+  const valueName = overrides.valueName ?? 'rule'
+  return {
+    id: valueName,
+    label: valueName,
+    description: '',
+    kind: 'text',
+    propertyUri: `http://schema.org/${valueName}`,
+    valueName,
+    obligation: 'MUST',
+    ...overrides,
+  }
+}
+
+function shape(label: string, rules: ProfilePropertyRule[]): ProfileShape {
+  return {
+    label,
+    required: rules.filter((rule) => rule.obligation === 'MUST'),
+    recommended: rules.filter((rule) => rule.obligation === 'SHOULD'),
+    optional: rules.filter((rule) => rule.obligation === 'MAY'),
+  }
+}
+
+function expectation(overrides: Partial<ProfileExpectation> = {}): ProfileExpectation {
+  return {
+    name: 'Genomics',
+    root: shape('Root dataset', []),
+    shapes: {},
+    types: [],
+    contents: [],
+    ...overrides,
+  }
 }
 
 describe('crate draft', () => {
@@ -274,20 +311,72 @@ describe('live issues', () => {
   })
 
   it('passes on what a selected profile asks for', () => {
-    const profile = { name: 'Genomics', properties: ['identifier'], types: ['Person', 'Place'], contents: [] }
-    const keys = liveIssues(seeded(), null, profile).map((issue) => issue.key)
+    const profile = expectation({
+      root: shape('Root dataset', [propertyRule({ valueName: 'identifier' })]),
+      types: ['Person', 'Place'],
+    })
+    const issues = liveIssues(seeded(), null, profile)
 
-    expect(keys).toContain('profile:identifier')
-    expect(keys).toContain('profileType:Place')
-    expect(keys).not.toContain('profileType:Person')
+    expect(issues.find((issue) => issue.key === 'profile:./:identifier'))
+      .toMatchObject({ severity: 'error', message: 'Genomics requires identifier.' })
+    expect(issues.map((issue) => issue.key)).toContain('profileType:Place')
+    expect(issues.map((issue) => issue.key)).not.toContain('profileType:Person')
+  })
+
+  it('advises rather than blocks on a recommended property', () => {
+    const profile = expectation({
+      root: shape('Root dataset', [propertyRule({ valueName: 'citation', obligation: 'SHOULD' })]),
+    })
+    const issue = liveIssues(seeded(), null, profile).find((entry) => entry.key === 'profile:./:citation')
+
+    expect(issue).toMatchObject({ severity: 'warning', entityId: './', property: 'citation' })
+    expect(issue?.message).toBe('Genomics recommends citation.')
+  })
+
+  it('checks a nested entity against its own shape', () => {
+    // The rules follow the type of the entity the profile's reference created.
+    const profile = expectation({
+      shapes: {
+        Person: shape('Run agent', [
+          propertyRule({ valueName: 'affiliation' }),
+          propertyRule({ valueName: 'email', obligation: 'SHOULD' }),
+        ]),
+      },
+    })
+    const issues = liveIssues(seeded(), null, profile)
+      .filter((issue) => issue.entityId === '#ada-lovelace')
+
+    expect(issues.find((issue) => issue.property === 'affiliation'))
+      .toMatchObject({ severity: 'error', message: 'Genomics requires affiliation on the run agent.' })
+    expect(issues.find((issue) => issue.property === 'email'))
+      .toMatchObject({ severity: 'warning', message: 'Genomics recommends email on the run agent.' })
+  })
+
+  it('names an empty row by the rule that asked for it', () => {
+    // One message per missing value: the rule says it better than the row does.
+    const profile = expectation({
+      shapes: { Person: shape('Run agent', [propertyRule({ valueName: 'email', obligation: 'SHOULD' })]) },
+    })
+    const draft = addValue(seeded(), '#ada-lovelace', 'email', { kind: 'text', value: '' })
+    const issues = liveIssues(draft, null, profile).filter((issue) => issue.property === 'email')
+
+    expect(issues).toHaveLength(1)
+    expect(issues[0].message).toContain('Genomics recommends')
+  })
+
+  it('leaves a linked file to its own checks', () => {
+    // A profile that describes the root must not ask a folder for the same rows.
+    const profile = expectation({ root: shape('Root dataset', [propertyRule({ valueName: 'identifier' })]) })
+    const draft = addFilePart(seeded(), { id: 's3://bucket/one.csv', name: 'one.csv', type: 'Dataset' })
+    const issues = liveIssues(draft, null, profile)
+
+    expect(issues.some((issue) => issue.entityId === 's3://bucket/one.csv' && issue.key.startsWith('profile:')))
+      .toBe(false)
   })
 
   it('names the entry a profile wants the parts list to hold', () => {
     // A required instance is checked against the row, not against a hidden list.
-    const profile = {
-      name: 'Genomics',
-      properties: [],
-      types: [],
+    const profile = expectation({
       contents: [{
         id: 'parts',
         label: 'Has part',
@@ -298,7 +387,7 @@ describe('live issues', () => {
         obligation: 'MUST' as const,
         requiredInstances: [{ name: 'index.html', hint: 'The landing page.' }],
       }],
-    }
+    })
     const issue = liveIssues(seeded(), null, profile).find((entry) => entry.key.startsWith('contents:'))
 
     expect(issue).toMatchObject({ severity: 'error', property: 'hasPart' })

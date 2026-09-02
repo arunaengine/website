@@ -648,13 +648,102 @@ function filled(entity: DraftEntity | undefined, property: string): boolean {
   return Boolean(entity?.properties[property]?.some((value) => value.value.trim()))
 }
 
+/** The rules a profile puts on one entity type, by how strongly it asks. */
+export interface ProfileShape {
+  /** What the profile calls an entity of this type, e.g. "Run action". */
+  label: string
+  required: ProfilePropertyRule[]
+  recommended: ProfilePropertyRule[]
+  optional: ProfilePropertyRule[]
+}
+
 /** What a selected profile asks of the draft, checked as suggestions. */
 export interface ProfileExpectation {
   name: string
-  properties: string[]
+  /** The rules on the dataset itself. */
+  root: ProfileShape
+  /** The rules on every other described type, by type label. */
+  shapes: Record<string, ProfileShape>
   types: string[]
   /** List rules naming the entries their property must contain, e.g. hasPart. */
   contents: ProfilePropertyRule[]
+}
+
+/** The rules a profile puts on one entity of the draft, root or contextual. */
+export function profileShape(
+  draft: CrateDraft,
+  entity: DraftEntity,
+  profile: ProfileExpectation | null,
+  parts = partIds(draft),
+): ProfileShape | undefined {
+  if (!profile) return undefined
+  if (entity.id === rootId(draft)) return profile.root
+  // A file or folder is described where it was picked, not by a root shape.
+  if (parts.has(entity.id)) return undefined
+  return entity.types.map((type) => profile.shapes[typeLabel(type)]).find(Boolean)
+}
+
+/** The rule one shape holds for a property, whatever its obligation. */
+export function shapeRule(
+  shape: ProfileShape | undefined | null,
+  property: string,
+): ProfilePropertyRule | undefined {
+  if (!shape) return undefined
+  return [...shape.required, ...shape.recommended, ...shape.optional]
+    .find((rule) => rule.valueName === property)
+}
+
+function ruleMessage(
+  profile: ProfileExpectation,
+  shape: ProfileShape,
+  rule: ProfilePropertyRule,
+  severity: IssueSeverity,
+  isRoot: boolean,
+): string {
+  const verb = severity === 'error' ? 'requires' : 'recommends'
+  return `${profile.name} ${verb} ${rule.label}${isRoot ? '' : ` on the ${shape.label.toLowerCase()}`}.`
+}
+
+/** A profile that requires what the dataset form only advises speaks for it. */
+function overridesForm(profile: ProfileExpectation, property: string): boolean {
+  const form = ROOT_EXPECTED.find((expected) => expected.property === property)
+  return form?.severity === 'warning'
+    && profile.root.required.some((rule) => rule.valueName === property)
+}
+
+/** What the profile misses on each entity: MUST blocks, SHOULD advises. */
+function shapeIssues(
+  draft: CrateDraft,
+  profile: ProfileExpectation,
+  shapes: Map<string, ProfileShape | undefined>,
+): LiveIssue[] {
+  const issues: LiveIssue[] = []
+  for (const entity of draft.entities) {
+    const shape = shapes.get(entity.id)
+    if (!shape) continue
+    const isRoot = entity.id === rootId(draft)
+    const wanted: Array<[ProfilePropertyRule[], IssueSeverity]> = [
+      [shape.required, 'error'],
+      [shape.recommended, 'warning'],
+    ]
+    for (const [rules, severity] of wanted) {
+      for (const rule of rules) {
+        if (filled(entity, rule.valueName)) continue
+        // The dataset's own form already names these, unless the profile asks harder.
+        if (isRoot
+          && ROOT_EXPECTED.some((expected) => expected.property === rule.valueName)
+          && !overridesForm(profile, rule.valueName)) continue
+        issues.push({
+          key: `profile:${entity.id}:${rule.valueName}`,
+          severity,
+          message: ruleMessage(profile, shape, rule, severity, isRoot),
+          entityId: entity.id,
+          property: rule.valueName,
+        })
+      }
+    }
+  }
+  return issues
 }
 
 /** The rows of one property as the profile validator reads them. */
@@ -674,9 +763,12 @@ export function liveIssues(
   const root = rootEntity(draft)
   const ids = new Set(draft.entities.map((entity) => entity.id))
   const parts = partIds(draft)
+  const shapes = new Map(draft.entities.map((entity) =>
+    [entity.id, profileShape(draft, entity, profile, parts)] as const))
 
   for (const expected of ROOT_EXPECTED) {
     if (filled(root, expected.property)) continue
+    if (profile && overridesForm(profile, expected.property)) continue
     issues.push({
       key: `root:${expected.property}`,
       severity: expected.severity,
@@ -688,7 +780,11 @@ export function liveIssues(
 
   for (const entity of draft.entities) {
     const isRoot = entity.id === rootId(draft)
-    if (!isRoot && !filled(entity, 'name')) {
+    const shape = shapes.get(entity.id)
+    // A row the profile asks for is named by its own rule, once.
+    const governed = new Set([...(shape?.required ?? []), ...(shape?.recommended ?? [])]
+      .map((rule) => rule.valueName))
+    if (!isRoot && !filled(entity, 'name') && !governed.has('name')) {
       issues.push({
         key: `name:${entity.id}`,
         severity: 'warning',
@@ -703,6 +799,7 @@ export function liveIssues(
       for (const [index, value] of list.entries()) {
         if (isRoot && ROOT_EXPECTED.some((expected) => expected.property === property)) continue
         if (!value.value.trim() && value.kind !== 'boolean') {
+          if (governed.has(property)) continue
           issues.push({
             key: `empty:${entity.id}:${property}:${index}`,
             severity: 'warning',
@@ -749,16 +846,7 @@ export function liveIssues(
     })
   }
 
-  for (const property of profile?.properties ?? []) {
-    if (filled(root, property) || ROOT_EXPECTED.some((expected) => expected.property === property)) continue
-    issues.push({
-      key: `profile:${property}`,
-      severity: 'warning',
-      message: `${profile?.name} expects ${property}.`,
-      entityId: rootId(draft),
-      property,
-    })
-  }
+  if (profile) issues.push(...shapeIssues(draft, profile, shapes))
   // What a profile asks a parts list to contain, on the row that holds it.
   for (const rule of profile?.contents ?? []) {
     for (const found of validateRequiredInstances(rule, ruleEntries(draft, rule.valueName))) {
