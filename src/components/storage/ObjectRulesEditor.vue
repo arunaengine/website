@@ -42,10 +42,12 @@ const { getObjectPlacement, listPoliciesForGroup, mintObjectPlacement, policyNam
   usePlacementPolicies()
 
 const group = ref<GroupDetailResponse | null>(null)
+const groupFailed = ref(false)
 const open = ref(false)
 const loading = ref(false)
 const draft = ref<PolicyRefBody[]>([])
 const library = ref<PolicyResponse[]>([])
+const libraryError = ref<string | null>(null)
 const head = ref<{ versionId: string; generation: number } | null>(null)
 const unavailable = ref<string | null>(null)
 const attachChoice = ref('')
@@ -53,22 +55,31 @@ const saving = ref(false)
 const refusal = ref<string | null>(null)
 const saved = ref<string | null>(null)
 
-watch(
-  () => props.groupId,
-  async (id) => {
-    group.value = id ? await getGroup(id).catch(() => null) : null
-  },
-  { immediate: true },
-)
+async function loadGroup() {
+  const id = props.groupId
+  group.value = null
+  groupFailed.value = false
+  if (!id) return
+  try {
+    group.value = await getGroup(id)
+  } catch {
+    groupFailed.value = true
+  }
+}
+
+watch(() => props.groupId, () => void loadGroup(), { immediate: true })
 
 // Whoever may attach rules to the bucket may set them per file: realm admins,
-// and group admins of the group that owns the bucket.
-const canEdit = computed(
-  () =>
-    !props.nodeId
-    && Boolean(props.versionId)
-    && (isRealmAdmin.value || isGroupAdmin(group.value, currentUser.value?.id ?? '')),
-)
+// and group admins of the group that owns the bucket. An unread group is not a
+// refusal: the node decides when the change is saved.
+const blocked = computed<string | null>(() => {
+  if (props.nodeId) return 'Only the node that holds this bucket can change the rules of its files.'
+  if (!props.versionId) return 'This file has no current version on this node, so it carries no rules yet.'
+  if (isRealmAdmin.value || groupFailed.value || !group.value) return null
+  return isGroupAdmin(group.value, currentUser.value?.id ?? '')
+    ? null
+    : 'Only group admins of this bucket and realm admins may change the rules of a file.'
+})
 
 const attachable = computed(() => {
   const attached = new Set(draft.value.map(policyRefKey))
@@ -109,12 +120,26 @@ async function load() {
         ? 'This file has no current version on this node.'
         : placementPoliciesErrorMessage(error, 'lookup')
   }
-  library.value = await listPoliciesForGroup(props.groupId).catch(() => [])
+  await loadLibrary()
   loading.value = false
+}
+
+// A failed listing is said out loud: an empty one would claim the realm has no
+// policy to attach.
+async function loadLibrary() {
+  libraryError.value = null
+  try {
+    library.value = await listPoliciesForGroup(props.groupId)
+  } catch (error) {
+    library.value = []
+    libraryError.value = placementPoliciesErrorMessage(error, 'lookup')
+  }
 }
 
 function start() {
   open.value = true
+  // A transient failure must not keep a group admin locked out.
+  if (groupFailed.value) void loadGroup()
   void load()
 }
 
@@ -176,10 +201,17 @@ async function save() {
 </script>
 
 <template>
-  <div v-if="canEdit">
-    <Button variant="outline" size="sm" @click="start">
+  <div>
+    <Button
+      variant="outline"
+      size="sm"
+      :disabled="Boolean(blocked)"
+      :title="blocked ?? 'Edit rules for this file'"
+      @click="start"
+    >
       <ShieldCheck class="size-3.5" /> Edit rules for this file…
     </Button>
+    <RefusalNote v-if="blocked" :message="blocked" tone="warning" class="mt-2" />
 
     <Dialog :open="open" @update:open="(value: boolean) => (open = value)">
       <DialogContent class="max-w-xl">
@@ -225,8 +257,12 @@ async function save() {
               None: copies of this file would not be governed.
             </p>
 
+            <div v-if="libraryError" class="space-y-2">
+              <RefusalNote :message="libraryError" tone="warning" />
+              <Button variant="outline" size="sm" @click="loadLibrary">Try again</Button>
+            </div>
             <Select
-              v-if="attachable.length"
+              v-else-if="attachable.length"
               :model-value="attachChoice"
               :options="attachable"
               class="max-w-sm"

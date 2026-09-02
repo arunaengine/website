@@ -4,7 +4,16 @@ import { describe, expect, it, vi } from 'vitest'
 import * as Api from '@/lib/api'
 import * as GroupAdmin from '@/lib/groupAdmin'
 import * as PlacementPolicies from '@/lib/placementPolicies'
-import { button, click, compileClientComponent, content, flush, mountApp, moduleDefault } from '@/test/clientRender'
+import {
+  button,
+  click,
+  compileClientComponent,
+  content,
+  flush,
+  mountApp,
+  moduleDefault,
+  type HostNode,
+} from '@/test/clientRender'
 import type { GroupDetailResponse } from '@/lib/api'
 
 const IconStub = defineComponent((_, { attrs }) => () => h('i', attrs))
@@ -30,6 +39,7 @@ const SelectStub = defineComponent({
 
 const isRealmAdmin = ref(false)
 const group = ref<GroupDetailResponse | null>(null)
+const getGroup = vi.fn(async () => group.value)
 const getObjectPlacement = vi.fn()
 const listPoliciesForGroup = vi.fn()
 const mintObjectPlacement = vi.fn()
@@ -52,7 +62,7 @@ const editor = compileClientComponent(new URL('./ObjectRulesEditor.vue', import.
   '@/composables/useAruna': {
     useAruna: () => ({
       currentUser: ref({ id: 'u-1' }),
-      getGroup: () => Promise.resolve(group.value),
+      getGroup,
       isRealmAdmin,
     }),
   },
@@ -91,9 +101,19 @@ const EU_POLICY = { policy_id: 'p-eu', digest: 'a'.repeat(64), name: 'Copies ins
 const GROUP_POLICY = { policy_id: 'p-own', digest: 'b'.repeat(64), name: 'Only our own nodes', owner_group_id: 'g-1' }
 const HEAD_VERSION = '01J000000000000000000HEAD'
 
-async function render(options: { admin?: boolean; realmAdmin?: boolean; versionId?: string | null } = {}) {
+async function render(
+  options: {
+    admin?: boolean
+    realmAdmin?: boolean
+    versionId?: string | null
+    groupFails?: boolean
+    nodeId?: string | null
+  } = {},
+) {
   group.value = groupDetail(options.admin ?? true)
   isRealmAdmin.value = options.realmAdmin ?? false
+  if (options.groupFails) getGroup.mockRejectedValueOnce(new Error('offline'))
+  const saves: number[] = []
   getObjectPlacement.mockResolvedValue({
     bucket: 'reef-survey',
     key: 'raw/reads.fastq',
@@ -109,11 +129,16 @@ async function render(options: { admin?: boolean; realmAdmin?: boolean; versionI
       // A pinned version in the dialog must not decide what the mint is against.
       versionId: options.versionId === undefined ? '01J00000000000000PINNED' : options.versionId,
       groupId: 'g-1',
-      nodeId: null,
+      nodeId: options.nodeId ?? null,
+      onSaved: () => saves.push(1),
     },
   })
   await flush()
-  return root
+  return Object.assign(root, { saves })
+}
+
+function trigger(root: HostNode): HostNode {
+  return button(root, 'Edit rules for this file')
 }
 
 describe('object rules editor', () => {
@@ -189,9 +214,47 @@ describe('object rules editor', () => {
     expect(text).not.toContain('a new version carrying exactly these rules')
   })
 
-  it('stays hidden for a viewer who may not attach rules', async () => {
-    expect(content(await render({ admin: false }))).toBe('')
-    expect(content(await render({ admin: false, realmAdmin: true }))).toContain('Edit rules')
-    expect(content(await render({ versionId: null }))).toBe('')
+  it('emits the change so the surrounding view reloads', async () => {
+    mintObjectPlacement.mockResolvedValue({ outcome: 'minted', version_id: 'v-3', policies: [] })
+    const root = await render()
+
+    await click(trigger(root))
+    await click(button(root, 'Save rules'))
+
+    expect(root.saves).toEqual([1])
+  })
+
+  it('stays visible with its reason for a viewer who may not attach rules', async () => {
+    const denied = await render({ admin: false })
+    expect(trigger(denied).props.disabled).toBe(true)
+    expect(content(denied)).toContain('Only group admins of this bucket and realm admins')
+
+    const allowed = await render({ admin: false, realmAdmin: true })
+    expect(trigger(allowed).props.disabled).toBe(false)
+
+    const headless = await render({ versionId: null })
+    expect(trigger(headless).props.disabled).toBe(true)
+    expect(content(headless)).toContain('no current version on this node')
+
+    const elsewhere = await render({ admin: true, nodeId: 'node-b' })
+    expect(trigger(elsewhere).props.disabled).toBe(true)
+    expect(content(elsewhere)).toContain('Only the node that holds this bucket')
+  })
+
+  it('keeps an unread group out of the refusal', async () => {
+    // A transient group lookup failure must not lock a group admin out.
+    const root = await render({ admin: false, groupFails: true })
+
+    expect(trigger(root).props.disabled).toBe(false)
+  })
+
+  it('says the policy listing failed instead of offering none', async () => {
+    listPoliciesForGroup.mockRejectedValueOnce(new Error('the node did not answer'))
+    const root = await render()
+
+    await click(trigger(root))
+
+    expect(content(root)).toContain('the node did not answer')
+    expect(button(root, 'Try again')).toBeTruthy()
   })
 })
