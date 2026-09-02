@@ -24,6 +24,7 @@ import { usePlacementPolicies } from '@/composables/usePlacementPolicies'
 import { featureEnabled } from '@/lib/config'
 import { collectDropFiles } from '@/lib/upload/dropEntries'
 import { stateVariant } from '@/lib/stateBadge'
+import { selectionNoun } from '@/lib/deletion/request'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
@@ -83,12 +84,14 @@ const {
   bucketSyncCount,
   showSyncButton,
   selectedObjectKeys,
-  selectedObjectCount,
-  selectableListedObjects,
-  allListedObjectsSelected,
-  someListedObjectsSelected,
+  selectedPrefixes,
+  selectedCount,
+  selectableListedCount,
+  allListedSelected,
+  someListedSelected,
   setObjectSelected,
-  setAllListedObjectsSelected,
+  setFolderSelected,
+  setAllListedSelected,
   canWriteCurrentPrefix,
   writeRestrictionMessage,
   watchPathPrefix,
@@ -111,6 +114,10 @@ const {
 // One entry for everything this bucket stores: its settings page. The dot says
 // the bucket carries syncs or placement policies, which only a viewer the node
 // lets read bucket placement pays a request for.
+const selectionSummary = computed(() =>
+  selectionNoun(selectedObjectKeys.value.size, selectedPrefixes.value.size),
+)
+
 const showStorageButton = computed(() => Boolean(bucket.value))
 const bucketPolicyCount = ref(0)
 const storageCount = computed(() => bucketSyncCount.value + bucketPolicyCount.value)
@@ -179,6 +186,7 @@ function deleteSelection() {
     bucket: bucket.value,
     nodeId: remoteNodeId.value,
     keys: [...selectedObjectKeys.value],
+    prefixes: [...selectedPrefixes.value],
   })
 }
 
@@ -228,11 +236,11 @@ async function onDrop(event: DragEvent) {
             variant="outline"
             size="sm"
             class="text-destructive hover:text-destructive"
-            :disabled="selectedObjectCount === 0"
-            :title="selectedObjectCount === 0 ? 'Tick objects in the list to delete them.' : `Delete ${selectedObjectCount} selected object${selectedObjectCount === 1 ? '' : 's'}`"
+            :disabled="selectedCount === 0"
+            :title="selectedCount === 0 ? 'Tick files and folders in the list to delete them.' : `Delete ${selectionSummary}`"
             @click="deleteSelection"
           >
-            <Trash2 class="h-4 w-4" /> Delete selected ({{ selectedObjectCount }})
+            <Trash2 class="h-4 w-4" /> Delete selected ({{ selectedCount }})
           </Button>
           <WatchButton
             surface="bucket"
@@ -382,11 +390,11 @@ async function onDrop(event: DragEvent) {
                 <input
                   type="checkbox"
                   class="h-3.5 w-3.5 rounded border-border accent-primary"
-                  :checked="allListedObjectsSelected"
-                  :indeterminate="someListedObjectsSelected && !allListedObjectsSelected"
-                  :disabled="selectableListedObjects.length === 0"
-                  aria-label="Select all listed objects"
-                  @change="setAllListedObjectsSelected(($event.target as HTMLInputElement).checked)"
+                  :checked="allListedSelected"
+                  :indeterminate="someListedSelected && !allListedSelected"
+                  :disabled="selectableListedCount === 0"
+                  aria-label="Select all listed folders and files"
+                  @change="setAllListedSelected(($event.target as HTMLInputElement).checked)"
                 />
               </th>
               <th class="px-4 py-2 text-left font-semibold">Name</th>
@@ -402,7 +410,17 @@ async function onDrop(event: DragEvent) {
               class="cursor-pointer border-t border-border hover:bg-muted/50"
               @click="openFolder(folder)"
             >
-              <td class="w-10 px-4 py-2.5"></td>
+              <td class="w-10 px-4 py-2.5" @click.stop>
+                <input
+                  type="checkbox"
+                  class="h-3.5 w-3.5 rounded border-border accent-primary"
+                  :checked="selectedPrefixes.has(folder.prefix)"
+                  :disabled="Boolean(folderReason(folder.prefix))"
+                  :title="folderReason(folder.prefix) ?? `Select ${folder.name}`"
+                  :aria-label="`Select ${folder.name}`"
+                  @change="setFolderSelected(folder.prefix, ($event.target as HTMLInputElement).checked)"
+                />
+              </td>
               <td class="px-4 py-2.5">
                 <span class="flex items-center gap-2">
                   <ObjectIcon :name="folder.name" folder class="h-4 w-4" /> {{ folder.name }}/
@@ -446,7 +464,8 @@ async function onDrop(event: DragEvent) {
                   type="checkbox"
                   class="h-3.5 w-3.5 rounded border-border accent-primary"
                   :checked="selectedObjectKeys.has(object.key)"
-                  :disabled="!s3.canWrite(bucket, object.key, remoteNodeId)"
+                  :disabled="Boolean(objectReason(object.key))"
+                  :title="objectReason(object.key) ?? `Select ${object.name}`"
                   :aria-label="`Select ${object.name}`"
                   @change="setObjectSelected(object.key, ($event.target as HTMLInputElement).checked)"
                 />

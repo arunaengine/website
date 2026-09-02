@@ -6,6 +6,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { contextKey, shouldOpenContext } from './s3/context'
 import { useAruna } from './useAruna'
+import { useBrowserSelection } from './useBrowserSelection'
 import { useBuckets } from './useBuckets'
 import { useBucketShortcuts } from './useBucketShortcuts'
 import { useGroupContext } from './useGroupSelection'
@@ -26,7 +27,6 @@ import { readStored, storeValue } from './aruna/state'
 import { requestScope, type DeleteRequest, type DeletionResult } from '@/lib/deletion/request'
 import type { DeletedObjectEntry } from '@/lib/objectVersions'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
-import type { StorageDeletionScope } from '@/lib/storageDeletion'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import type { BucketSearchHit, SourceConnectorSummary, UsageResponse } from '@/lib/api'
 import { referenceSourceLabel, referenceSourceName, type ReferenceSourceGroup } from '@/lib/references'
@@ -444,47 +444,23 @@ export function useDataManager() {
   const listLoading = ref(false)
   const listError = ref<string | null>(null)
   const listAuthError = ref(false)
-  const selectedObjectKeys = ref<Set<string>>(new Set())
-  const selectedObjectCount = computed(() => selectedObjectKeys.value.size)
-  const selectableListedObjects = computed(() =>
-    objects.value.filter((object) => s3.canWrite(bucket.value, object.key, remoteNodeId.value)),
-  )
-  const allListedObjectsSelected = computed(() =>
-    selectableListedObjects.value.length > 0 &&
-    selectableListedObjects.value.every((object) => selectedObjectKeys.value.has(object.key)),
-  )
-  const someListedObjectsSelected = computed(() =>
-    selectableListedObjects.value.some((object) => selectedObjectKeys.value.has(object.key)),
-  )
-
-  function setObjectSelected(key: string, selected: boolean) {
-    const next = new Set(selectedObjectKeys.value)
-    if (selected) next.add(key)
-    else next.delete(key)
-    selectedObjectKeys.value = next
-  }
-
-  function pruneSelectedObjectKeys(scope: StorageDeletionScope, nodeId: string | null) {
-    if (scope.bucket !== bucket.value || nodeId !== remoteNodeId.value) return
-    if (scope.kind === 'bucket') {
-      selectedObjectKeys.value = new Set()
-      return
-    }
-    const next = new Set(selectedObjectKeys.value)
-    for (const key of next) {
-      if (scope.kind === 'file' ? key === scope.key : key.startsWith(scope.prefix)) next.delete(key)
-    }
-    selectedObjectKeys.value = next
-  }
-
-  function setAllListedObjectsSelected(selected: boolean) {
-    const next = new Set(selectedObjectKeys.value)
-    for (const object of selectableListedObjects.value) {
-      if (selected) next.add(object.key)
-      else next.delete(object.key)
-    }
-    selectedObjectKeys.value = next
-  }
+  const selection = useBrowserSelection({
+    folders,
+    objects,
+    canSelectObject: (key) => s3.canWrite(bucket.value, key, remoteNodeId.value),
+    canSelectFolder: (prefix) => s3.canDeletePrefix(bucket.value, prefix, remoteNodeId.value),
+  })
+  const {
+    selectedObjectKeys,
+    selectedPrefixes,
+    selectedCount,
+    selectableListedCount,
+    allListedSelected,
+    someListedSelected,
+    setObjectSelected,
+    setFolderSelected,
+    setAllListedSelected,
+  } = selection
 
   // ListObjectsV2 hides a key whose head is a delete marker, so the toggle
   // lists them through ListObjectVersions and offers them back. The choice is
@@ -607,7 +583,7 @@ export function useDataManager() {
     listError.value = null
     listAuthError.value = false
     remoteBrowseBlocked.value = false
-    selectedObjectKeys.value = new Set()
+    selection.clearSelection()
     for (const listener of listingResetListeners) listener()
   }
 
@@ -1127,27 +1103,26 @@ export function useDataManager() {
       return
     }
     const done = new Set(committed)
-    if (committed.length) {
+    const donePrefixes = (request.prefixes ?? []).filter((prefix) => done.has(prefix))
+    const sameListing =
+      request.bucket === bucket.value && request.nodeId === remoteNodeId.value
+    if (committed.length && sameListing) {
       const scope = requestScope(request)
-      if (scope) pruneSelectedObjectKeys(scope, request.nodeId)
-      if (request.kind === 'selection') {
-        selectedObjectKeys.value = new Set(
-          [...selectedObjectKeys.value].filter((key) => !done.has(key)),
-        )
-      }
+      if (scope) selection.pruneSelection(scope)
+      if (request.kind === 'selection') selection.dropCommitted(done)
     }
-    if (request.bucket !== bucket.value || request.nodeId !== remoteNodeId.value) return
+    if (!sameListing) return
     if (committed.length && (option.id === 'delete' || option.id === 'delete-permanently')) {
       dropPreviewUnder((key) =>
         request.kind === 'folder'
           ? key.startsWith(request.key ?? '')
           : request.kind === 'selection'
-            ? done.has(key)
+            ? done.has(key) || donePrefixes.some((prefix) => key.startsWith(prefix))
             : key === request.key,
       )
     }
     await Promise.all([loadObjects(), loadDeleted()])
-    if (request.kind === 'folder') void references.reload()
+    if (request.kind === 'folder' || donePrefixes.length) void references.reload()
   }
 
   const isEmpty = computed(
@@ -1244,13 +1219,14 @@ export function useDataManager() {
     loadObjects,
     onListingReset,
     selectedObjectKeys,
-    selectedObjectCount,
-    selectableListedObjects,
-    allListedObjectsSelected,
-    someListedObjectsSelected,
+    selectedPrefixes,
+    selectedCount,
+    selectableListedCount,
+    allListedSelected,
+    someListedSelected,
     setObjectSelected,
-    setAllListedObjectsSelected,
-    pruneSelectedObjectKeys,
+    setFolderSelected,
+    setAllListedSelected,
     openBucketOn,
     openBucket,
     openSearchHit,

@@ -51,7 +51,7 @@ function freshnessTime(updatedAtMs: number): string {
     <Spinner
       v-if="busy"
       show-label
-      :label="selection ? 'Checking dataset references for the selected keys…' : 'Checking dataset references…'"
+      :label="selection ? 'Checking dataset references for the selection…' : 'Checking dataset references…'"
     />
     <Notice v-else-if="error" tone="warning">
       <p class="font-medium">

@@ -1,8 +1,11 @@
-// Deleting an explicit selection of keys. Both semantics run key by key, so a
-// mixed result is reported exactly: only confirmed successes count as done and
-// a transport that answered nothing stays "unknown" rather than "failed".
+// Deleting an explicit selection of objects and folders. Every entry runs on
+// its own, so a mixed result is reported exactly: only confirmed successes
+// count as done and a transport that answered nothing stays "unknown" rather
+// than "failed". A folder is identified by its prefix and deleted through the
+// same prefix walk the single-folder control uses.
 import { computed, ref } from 'vue'
 import { isS3NetworkError, s3ErrorMessage, useS3 } from '@/composables/useS3'
+import type { DeletePrefixResult } from '@/composables/s3/objects'
 import type { ApiClientOptions } from '@/lib/api'
 import {
   createStoragePurgeOperation,
@@ -17,6 +20,19 @@ import {
 import { BULK_PREFLIGHT_CONCURRENCY, type BulkDeleteIssue } from './useDeletionPreflight'
 
 const BATCH_SIZE = 1_000
+
+/** What one selection acts on: object keys and folder prefixes. */
+export interface SelectionTargets {
+  keys: string[]
+  prefixes: string[]
+}
+
+/** The sentence a partly failed prefix walk reports, or null when it all went. */
+export function prefixDeleteFailure(result: DeletePrefixResult): string | null {
+  const [first] = result.errors
+  if (!first) return null
+  return `${result.deleted} object${result.deleted === 1 ? '' : 's'} deleted, ${result.errors.length} failed. First failure: ${first.key}: ${first.message}`
+}
 
 export interface SelectionOutcome {
   committed: string[]
@@ -91,10 +107,10 @@ export function useSelectionDelete() {
     ),
   )
 
-  /** Every selected key answered a preflight that allows the purge. */
-  function purgeReady(keys: string[]): boolean {
+  /** Every selected entry answered a preflight that allows the purge. */
+  function purgeReady(ids: string[]): boolean {
     return (
-      scopes.value.length === keys.length &&
+      scopes.value.length === ids.length &&
       scopes.value.every((scope) => scope.preflight?.permissions.purge)
     )
   }
@@ -131,14 +147,26 @@ export function useSelectionDelete() {
     }
   }
 
-  async function loadScopes(bucket: string, keys: string[], client: ApiClientOptions | null) {
+  async function loadScopes(
+    bucket: string,
+    targets: SelectionTargets,
+    client: ApiClientOptions | null,
+  ) {
     const id = ++runId
-    const next: PurgeScope[] = keys.map((key) => ({
-      key,
-      operation: createStoragePurgeOperation({ kind: 'file', bucket, key }),
-      preflight: null,
-      error: null,
-    }))
+    const next: PurgeScope[] = [
+      ...targets.keys.map((key) => ({
+        key,
+        operation: createStoragePurgeOperation({ kind: 'file', bucket, key }),
+        preflight: null,
+        error: null,
+      })),
+      ...targets.prefixes.map((prefix) => ({
+        key: prefix,
+        operation: createStoragePurgeOperation({ kind: 'prefix', bucket, prefix }),
+        preflight: null,
+        error: null,
+      })),
+    ]
     scopes.value = next
     scopesBusy.value = true
     if (!client) {
@@ -168,8 +196,12 @@ export function useSelectionDelete() {
     }
   }
 
-  async function deleteMarkers(bucket: string, nodeId: string | null, keys: string[]) {
-    const all = keys
+  async function deleteMarkers(
+    bucket: string,
+    nodeId: string | null,
+    keys: string[],
+    all: string[] = keys,
+  ) {
     for (let offset = 0; offset < keys.length; offset += BATCH_SIZE) {
       const batch = keys.slice(offset, offset + BATCH_SIZE)
       const permitted = batch.map((key) => s3.canWrite(bucket, key, nodeId))
@@ -193,6 +225,32 @@ export function useSelectionDelete() {
           }
         }),
       )
+    }
+  }
+
+  // A folder runs the same prefix walk the single-folder delete runs: delete
+  // markers, never a purge, with the walk's own per-key failures reported.
+  async function deletePrefixes(
+    bucket: string,
+    nodeId: string | null,
+    prefixes: string[],
+    all: string[] = prefixes,
+  ) {
+    for (const key of prefixes) {
+      if (!s3.canDeletePrefix(bucket, key, nodeId)) {
+        record(all, [
+          { key, status: 'failed', message: 'This session no longer allows deleting this folder.' },
+        ])
+        continue
+      }
+      try {
+        const failure = prefixDeleteFailure(await s3.deletePrefix(bucket, key, nodeId))
+        record(all, [
+          failure ? { key, status: 'failed', message: failure } : { key, status: 'committed' },
+        ])
+      } catch (error) {
+        record(all, [{ key, status: failureStatus(error), message: s3ErrorMessage(error) }])
+      }
     }
   }
 
@@ -230,11 +288,11 @@ export function useSelectionDelete() {
     }
   }
 
-  async function purgeKeys(keys: string[], client: ApiClientOptions | null, all: string[]) {
+  async function purgeKeys(ids: string[], client: ApiClientOptions | null, all: string[]) {
     if (!client) {
       record(
         all,
-        keys.map((key) => ({
+        ids.map((key) => ({
           key,
           status: 'failed' as const,
           message: 'The node API endpoint for this storage location is unavailable.',
@@ -244,8 +302,8 @@ export function useSelectionDelete() {
     }
     const id = runId
     const byKey = new Map(scopes.value.map((scope) => [scope.key, scope]))
-    for (let offset = 0; offset < keys.length; offset += BATCH_SIZE) {
-      const batch = keys.slice(offset, offset + BATCH_SIZE)
+    for (let offset = 0; offset < ids.length; offset += BATCH_SIZE) {
+      const batch = ids.slice(offset, offset + BATCH_SIZE)
       const results = await Promise.all(
         batch.map((key) => {
           const scope = byKey.get(key)
@@ -275,6 +333,7 @@ export function useSelectionDelete() {
     reset,
     loadScopes,
     deleteMarkers,
+    deletePrefixes,
     purgeKeys,
   }
 }

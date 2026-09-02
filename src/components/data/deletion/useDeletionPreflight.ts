@@ -21,6 +21,37 @@ export interface BulkDeleteTarget {
   bucket: string
   nodeId: string | null
   keys: string[]
+  /** Folder prefixes in the same selection, trailing slash kept. */
+  prefixes: string[]
+}
+
+/** One lookup per selected entry; a folder asks about its whole prefix. */
+interface BulkEntry {
+  key: string
+  scope: StorageDeletionScope
+  /** A file matches its own key; a folder matches everything under it. */
+  exact: boolean
+}
+
+function bulkEntries(target: BulkDeleteTarget): BulkEntry[] {
+  return [
+    ...target.keys.map<BulkEntry>((key) => ({
+      key,
+      scope: { kind: 'file', bucket: target.bucket, key },
+      exact: true,
+    })),
+    ...target.prefixes.map<BulkEntry>((prefix) => ({
+      key: prefix,
+      scope: { kind: 'prefix', bucket: target.bucket, prefix },
+      exact: false,
+    })),
+  ]
+}
+
+function entryCovers(target: BulkDeleteTarget, entry: { key: string; exact: boolean }) {
+  return (location: { bucket: string; key: string }) =>
+    location.bucket === target.bucket &&
+    (entry.exact ? location.key === entry.key : location.key.startsWith(entry.key))
 }
 
 export interface BulkDeleteIssue {
@@ -118,21 +149,19 @@ export function useDeletionPreflight() {
     const controller = new AbortController()
     backlinkPreflightController = controller
     backlinkPreflightBusy.value = true
-    const responses: { key: string; response: BacklinkPreflightResponse }[] = []
+    const responses: BulkPreflightResponse[] = []
     const failures: BulkDeleteIssue[] = []
+    const entries = bulkEntries(target)
     try {
       // The adapter accepts one bucket/prefix target. One bounded preflight phase
-      // therefore resolves each selected file scope in small concurrent groups.
-      for (let offset = 0; offset < target.keys.length; offset += BULK_PREFLIGHT_CONCURRENCY) {
-        const keys = target.keys.slice(offset, offset + BULK_PREFLIGHT_CONCURRENCY)
+      // therefore resolves each selected file and folder scope in small groups.
+      for (let offset = 0; offset < entries.length; offset += BULK_PREFLIGHT_CONCURRENCY) {
+        const group = entries.slice(offset, offset + BULK_PREFLIGHT_CONCURRENCY)
         const settled = await Promise.allSettled(
-          keys.map((key) =>
+          group.map((entry) =>
             preflightBacklinks(
               {
-                target: backlinkTargetForScope(
-                  { kind: 'file', bucket: target.bucket, key },
-                  operation,
-                ),
+                target: backlinkTargetForScope(entry.scope, operation),
                 limit: BULK_BACKLINK_LIMIT,
               },
               { baseUrl: apiBase, token: authToken.value || undefined },
@@ -142,10 +171,11 @@ export function useDeletionPreflight() {
         )
         if (requestId !== backlinkPreflightRequestId || controller.signal.aborted) return
         settled.forEach((result, index) => {
-          const key = keys[index]
-          if (result.status === 'fulfilled') responses.push({ key, response: result.value })
-          else failures.push({
-            key,
+          const entry = group[index]
+          if (result.status === 'fulfilled') {
+            responses.push({ key: entry.key, exact: entry.exact, response: result.value })
+          } else failures.push({
+            key: entry.key,
             message: errorMessage(result.reason),
           })
         })
@@ -161,7 +191,7 @@ export function useDeletionPreflight() {
       }
       if (failures.length) {
         const first = failures[0]
-        backlinkPreflightError.value = `${failures.length} of ${target.keys.length} selected key lookups failed. First failure: ${first.key}: ${first.message}`
+        backlinkPreflightError.value = `${failures.length} of ${entries.length} selected entry lookups failed. First failure: ${first.key}: ${first.message}`
       }
     } finally {
       if (requestId === backlinkPreflightRequestId) {
@@ -184,9 +214,15 @@ export function useDeletionPreflight() {
 
 export type DeletionPreflight = ReturnType<typeof useDeletionPreflight>
 
+export interface BulkPreflightResponse {
+  key: string
+  exact: boolean
+  response: BacklinkPreflightResponse
+}
+
 export function mergeBulkBacklinkPreflights(
   target: BulkDeleteTarget,
-  responses: { key: string; response: BacklinkPreflightResponse }[],
+  responses: BulkPreflightResponse[],
   failed: number,
   operation: BacklinkPreflightStorageOperation,
 ): BacklinkPreflightResponse {
@@ -196,11 +232,10 @@ export function mergeBulkBacklinkPreflights(
   const queriedForms = new Set<string>()
   const failedPartitions = new Set<string>()
 
-  for (const { key, response } of responses) {
+  for (const { key, exact, response } of responses) {
+    const covers = entryCovers(target, { key, exact })
     for (const result of response.targets) {
-      const targetedVersions = result.targeted_versions.filter(
-        (location) => location.bucket === target.bucket && location.key === key,
-      )
+      const targetedVersions = result.targeted_versions.filter(covers)
       if (!targetedVersions.length) continue
       const existing = targets.get(result.content_w3id)
       if (!existing) {
@@ -254,15 +289,18 @@ export function mergeBulkBacklinkPreflights(
     for (const partition of response.failed_partitions) failedPartitions.add(partition)
   }
 
-  const exactResponses = responses.every(({ key, response }) =>
-    response.targets.every((result) =>
+  const exactResponses = responses.every(({ key, exact, response }) => {
+    const covers = entryCovers(target, { key, exact })
+    return response.targets.every((result) =>
       result.targeted_versions.every(
-        (location) => location.bucket !== target.bucket || location.key === key,
+        (location) => location.bucket !== target.bucket || covers(location),
       ),
-    ),
-  )
+    )
+  })
   const completeResponses =
-    failed === 0 && responses.length === target.keys.length && exactResponses
+    failed === 0 &&
+    responses.length === target.keys.length + target.prefixes.length &&
+    exactResponses
   return {
     targets: [...targets.values()],
     next_cursor: responses.find(({ response }) => response.next_cursor)?.response.next_cursor ?? null,

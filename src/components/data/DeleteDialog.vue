@@ -17,7 +17,10 @@ import PurgeProgress from '@/components/data/deletion/PurgeProgress.vue'
 import VersionPicker from '@/components/data/deletion/VersionPicker.vue'
 import { useDeletionPreflight } from '@/components/data/deletion/useDeletionPreflight'
 import { usePurgeJob } from '@/components/data/deletion/usePurgeJob'
-import { useSelectionDelete } from '@/components/data/deletion/useSelectionDelete'
+import {
+  prefixDeleteFailure,
+  useSelectionDelete,
+} from '@/components/data/deletion/useSelectionDelete'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useStagingReferences } from '@/composables/useStagingReferences'
@@ -28,6 +31,7 @@ import {
   requestName,
   requestNoun,
   requestScope,
+  selectionIds,
   type DeleteRequest,
   type DeletionResult,
 } from '@/lib/deletion/request'
@@ -72,6 +76,9 @@ let requestId = 0
 const request = computed(() => props.request)
 const scope = computed(() => (request.value ? requestScope(request.value) : null))
 const keys = computed(() => request.value?.keys ?? [])
+const prefixes = computed(() => request.value?.prefixes ?? [])
+// Objects first, then folder prefixes: one id list for the whole selection.
+const ids = computed(() => (request.value ? selectionIds(request.value) : []))
 const isSelection = computed(() => request.value?.kind === 'selection')
 
 const sourceBucket = computed(() => request.value?.bucket ?? '')
@@ -83,7 +90,12 @@ const sourceCount = computed(() => {
   return sourceReferences.entries.value.filter((entry) => {
     if (!entry.referenced) return false
     if (current.kind === 'folder') return entry.key.startsWith(current.key ?? '')
-    if (current.kind === 'selection') return keys.value.includes(entry.key)
+    if (current.kind === 'selection') {
+      return (
+        keys.value.includes(entry.key) ||
+        prefixes.value.some((prefix) => entry.key.startsWith(prefix))
+      )
+    }
     if (current.kind === 'bucket') return true
     return entry.key === current.key
   }).length
@@ -95,7 +107,10 @@ const canWrite = computed(() => {
   if (current.kind === 'folder') return s3.canDeletePrefix(current.bucket, current.key ?? '', current.nodeId)
   if (current.kind === 'bucket') return s3.canDeletePrefix(current.bucket, '', current.nodeId)
   if (current.kind === 'selection') {
-    return keys.value.every((key) => s3.canWrite(current.bucket, key, current.nodeId))
+    return (
+      keys.value.every((key) => s3.canWrite(current.bucket, key, current.nodeId)) &&
+      prefixes.value.every((prefix) => s3.canDeletePrefix(current.bucket, prefix, current.nodeId))
+    )
   }
   return s3.canWrite(current.bucket, current.key ?? '', current.nodeId)
 })
@@ -104,7 +119,7 @@ const canPurge = computed<boolean | null>(() => {
   if (isSelection.value) {
     if (selectedId.value !== 'delete-permanently') return null
     if (selection.scopesBusy.value || !selection.scopes.value.length) return null
-    return selection.purgeReady(keys.value)
+    return selection.purgeReady(ids.value)
   }
   if (preflightBusy.value) return null
   return preflight.value ? preflight.value.permissions.purge : null
@@ -133,7 +148,7 @@ const options = computed<DeletionOption[]>(() => {
     counts: counts.value,
     permissions: { canWrite: canWrite.value, canPurge: canPurge.value },
     remote: current.nodeId !== null,
-    selectionCount: keys.value.length,
+    selectionCount: ids.value.length,
   })
 })
 
@@ -264,7 +279,12 @@ function loadBacklinks(operation: 'latest_version_tombstone' | 'all_versions_pur
   if (!current) return
   if (current.kind === 'selection') {
     void preflightState.loadBulkBacklinkPreflight(
-      { bucket: current.bucket, nodeId: current.nodeId, keys: keys.value },
+      {
+        bucket: current.bucket,
+        nodeId: current.nodeId,
+        keys: keys.value,
+        prefixes: prefixes.value,
+      },
       operation,
     )
     return
@@ -294,7 +314,7 @@ const outcomeKey = computed(() => {
     current.bucket,
     current.key ?? '',
     current.versionId ?? '',
-    keys.value.length,
+    ids.value.length,
     selected.value?.id ?? '',
   ].join('\n')
 })
@@ -311,7 +331,11 @@ watch(
         : 'latest_version_tombstone',
     )
     if (id === 'delete-permanently' && isSelection.value) {
-      void selection.loadScopes(current.bucket, keys.value, apiClient())
+      void selection.loadScopes(
+        current.bucket,
+        { keys: keys.value, prefixes: prefixes.value },
+        apiClient(),
+      )
     }
   },
   { immediate: true },
@@ -342,8 +366,8 @@ async function runPurge(current: DeleteRequest): Promise<string[]> {
   const client = apiClient()
   if (!client) throw new Error('The node API endpoint for this storage location is unavailable.')
   if (current.kind === 'selection') {
-    const pending = selection.pendingKeys(keys.value)
-    await selection.purgeKeys(pending, client, keys.value)
+    const pending = selection.pendingKeys(ids.value)
+    await selection.purgeKeys(pending, client, ids.value)
     return selection.outcome.value?.committed ?? []
   }
   const target = scope.value
@@ -362,16 +386,26 @@ async function runOption(current: DeleteRequest, option: DeletionOption): Promis
       return [current.key ?? '']
     case 'write-markers': {
       if (current.kind === 'selection') {
-        await selection.deleteMarkers(current.bucket, current.nodeId, selection.pendingKeys(keys.value))
+        const all = ids.value
+        const pending = new Set(selection.pendingKeys(all))
+        await selection.deleteMarkers(
+          current.bucket,
+          current.nodeId,
+          keys.value.filter((key) => pending.has(key)),
+          all,
+        )
+        await selection.deletePrefixes(
+          current.bucket,
+          current.nodeId,
+          prefixes.value.filter((prefix) => pending.has(prefix)),
+          all,
+        )
         return selection.outcome.value?.committed ?? []
       }
-      const result = await s3.deletePrefix(current.bucket, current.key ?? '', current.nodeId)
-      if (result.errors.length) {
-        const first = result.errors[0]
-        throw new Error(
-          `${result.deleted} object${result.deleted === 1 ? '' : 's'} deleted, ${result.errors.length} failed. First failure: ${first.key}: ${first.message}`,
-        )
-      }
+      const failure = prefixDeleteFailure(
+        await s3.deletePrefix(current.bucket, current.key ?? '', current.nodeId),
+      )
+      if (failure) throw new Error(failure)
       return [current.key ?? '']
     }
     case 'delete-version':
@@ -466,10 +500,10 @@ onUnmounted(() => {
         </dl>
 
         <ul v-if="request.kind === 'selection'" class="space-y-1 rounded-md border border-border px-3 py-2">
-          <li class="font-medium text-foreground">Selected keys</li>
+          <li class="font-medium text-foreground">Selected files and folders</li>
           <li class="max-h-28 overflow-y-auto">
             <ul class="space-y-1 pl-4 font-mono text-[10px] text-muted-foreground">
-              <li v-for="key in keys" :key="key" class="list-disc break-all">{{ key }}</li>
+              <li v-for="id in ids" :key="id" class="list-disc break-all">{{ id }}</li>
             </ul>
           </li>
         </ul>
@@ -525,7 +559,7 @@ onUnmounted(() => {
         />
 
         <section v-if="request.kind === 'selection' && selected?.id === 'delete-permanently'" class="space-y-1 rounded-md border border-border px-3 py-2">
-          <h4 class="font-medium text-foreground">Per-key inventory</h4>
+          <h4 class="font-medium text-foreground">Per-entry inventory</h4>
           <dl class="grid grid-cols-2 gap-x-4 gap-y-1 text-muted-foreground">
             <dt>Current heads</dt>
             <dd class="text-right font-mono text-foreground">{{ selection.inventory.value.current_heads }}</dd>
@@ -540,7 +574,7 @@ onUnmounted(() => {
             One or more inventories are incomplete or unavailable. Totals may be more than shown.
           </p>
           <div v-if="selection.deniedKeys.value.length" class="text-destructive">
-            <p class="font-medium">Permanent deletion is not allowed for these keys</p>
+            <p class="font-medium">Permanent deletion is not allowed for these entries</p>
             <ul class="space-y-1 pl-4 font-mono text-[10px]">
               <li v-for="key in selection.deniedKeys.value" :key="key" class="list-disc break-all">{{ key }}</li>
             </ul>

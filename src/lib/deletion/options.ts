@@ -82,7 +82,7 @@ const PURGE_DENIED_REASON =
 
 function writeReason(kind: DeletionKind): string {
   if (kind === 'folder') return 'This session cannot delete this entire folder.'
-  if (kind === 'selection') return 'This session cannot delete every selected object.'
+  if (kind === 'selection') return 'This session cannot delete everything selected.'
   if (kind === 'bucket') return 'This session cannot delete this bucket.'
   return 'This session cannot delete this object.'
 }
@@ -165,7 +165,7 @@ function permanentOption(target: DeletionTarget): DeletionOption {
       : target.kind === 'folder'
         ? 'this folder'
         : target.kind === 'selection'
-          ? 'every selected object'
+          ? 'everything selected'
           : 'this object'
   return {
     id: 'delete-permanently',

@@ -20,8 +20,10 @@ export interface DeleteRequest {
   /** Version and marker rows: whether this row is the current head. */
   isCurrent?: boolean
   headState?: DeletionHeadState
-  /** Selection only: the exact selected keys. */
+  /** Selection only: the exact selected object keys. */
   keys?: string[]
+  /** Selection only: the exact selected folder prefixes, trailing slash kept. */
+  prefixes?: string[]
   /** Bytes the target uses today, when the listing knows them. */
   bytes?: number
   /** Which applicable outcome the control that opened the dialog meant. */
@@ -34,6 +36,11 @@ export interface DeletionResult {
   option: DeletionOption
   /** Keys (or the bucket name) the node confirmed as done. */
   committed: string[]
+}
+
+/** Everything a selection acts on: object keys first, then folder prefixes. */
+export function selectionIds(request: DeleteRequest): string[] {
+  return [...(request.keys ?? []), ...(request.prefixes ?? [])]
 }
 
 /** The REST preflight and purge scope, or null for a kind that has none. */
@@ -54,14 +61,21 @@ const NOUNS: Record<DeletionKind, string> = {
   version: 'version',
   marker: 'delete marker',
   folder: 'folder',
-  selection: 'selected objects',
+  selection: 'selected files and folders',
   bucket: 'bucket',
+}
+
+/** What a mixed selection is called, with the half that is empty left out. */
+export function selectionNoun(files: number, folders: number): string {
+  const parts: string[] = []
+  if (files || !folders) parts.push(`${files} file${files === 1 ? '' : 's'}`)
+  if (folders) parts.push(`${folders} folder${folders === 1 ? '' : 's'}`)
+  return parts.join(' and ')
 }
 
 export function requestNoun(request: DeleteRequest): string {
   if (request.kind === 'selection') {
-    const count = request.keys?.length ?? 0
-    return `${count} selected object${count === 1 ? '' : 's'}`
+    return selectionNoun(request.keys?.length ?? 0, request.prefixes?.length ?? 0)
   }
   return NOUNS[request.kind]
 }
