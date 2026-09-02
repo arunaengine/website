@@ -360,7 +360,6 @@ function createStore(deps: CustomRunDeps) {
   // the submission to the native jobs API rather than silently dropping them.
   const inputPlacements = ref<Record<string, InputPlacement>>({})
   const collisionPolicy = ref<CollisionPolicyRequest>('reject')
-  const outputPrefixes = ref<string[]>([])
 
   function placementFor(containerPath: string): InputPlacement {
     return inputPlacements.value[containerPath] ?? { mode: 'snapshot' }
@@ -379,12 +378,6 @@ function createStore(deps: CustomRunDeps) {
       [containerPath]: { ...placementFor(containerPath), versionId },
     }
   }
-  function addOutputPrefix() {
-    outputPrefixes.value = [...outputPrefixes.value, '']
-  }
-  function removeOutputPrefix(index: number) {
-    outputPrefixes.value = outputPrefixes.value.filter((_, position) => position !== index)
-  }
 
   // The expanded TES inputs, which is what the native request is built from: a
   // folder pick contributes one row per file, so each gets its own mode.
@@ -394,7 +387,6 @@ function createStore(deps: CustomRunDeps) {
   const placement = computed<NativePlacementOptions>(() => ({
     inputs: inputPlacements.value,
     collisionPolicy: collisionPolicy.value,
-    outputPrefixes: outputPrefixes.value,
   }))
 
   const targetProblems = computed(() =>
@@ -490,12 +482,9 @@ function createStore(deps: CustomRunDeps) {
     openInputDialog,
     inputPlacements,
     collisionPolicy,
-    outputPrefixes,
     placementFor,
     setInputMode,
     setInputVersion,
-    addOutputPrefix,
-    removeOutputPrefix,
     advancedInputs,
     hasFolderCapture,
     placement,

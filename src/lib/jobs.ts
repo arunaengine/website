@@ -259,8 +259,8 @@ export function cancelJob(jobId: string, client: ApiClientOptions): Promise<JobS
 
 // ── Native submission ────────────────────────────────────────────────────────
 // POST /compute/jobs: the surface the GA4GH facade maps onto. It expresses what TES
-// cannot: per-input composition modes, an exact version pin, the collision
-// policy, and the output prefixes to inventory.
+// cannot: per-input composition modes, an exact version pin, and the collision
+// policy.
 
 // `exact_reference` requires version_id; `floating_reference` rejects it.
 export type InputModeRequest = 'snapshot' | 'floating_reference' | 'exact_reference'
@@ -284,8 +284,14 @@ export interface ExecutionInputRequest {
 
 export interface ExecutionOutputRequest {
   container_path: string
-  /** Destination key inside the bucket the output names. */
+  /** Destination key inside the bucket the output lands in. */
   dest_key: string
+  /**
+   * Destination bucket of this one output. Required with workspace mode
+   * `none`, which has no bucket to fall back on; with `existing` an omitted
+   * bucket means the workspace bucket.
+   */
+  bucket?: string
 }
 
 // `bucket` belongs to `existing` alone; `none` names no bucket at all.
@@ -308,8 +314,11 @@ export interface SubmitExecutionRequest {
   executor_constraint?: string
   inputs: ExecutionInputRequest[]
   outputs: ExecutionOutputRequest[]
-  /** Output prefixes inventoried at completion; at most 32. */
-  output_prefixes: string[]
+  /**
+   * Workspace-relative prefixes inventoried at completion; at most 32. Only an
+   * `existing` workspace can carry them, so a run without one sends none.
+   */
+  output_prefixes?: string[]
   collision_policy: CollisionPolicyRequest
   /** Scoped to the caller; the same key with a different plan is a 409. */
   idempotency_key?: string

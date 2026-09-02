@@ -42,7 +42,7 @@ function mapped(input: NativeSubmitForm) {
 describe('native submission decision', () => {
   it('stays on TES while every option is at its default', () => {
     expect(nativeSubmitRequired(defaultPlacement())).toBe(false)
-    expect(nativeSubmitRequired(placement({ outputPrefixes: ['  '] }))).toBe(false)
+    expect(nativeSubmitRequired(placement({ inputs: { '/in/a': { mode: 'snapshot' } } }))).toBe(false)
   })
 
   it('switches for every option TES cannot carry', () => {
@@ -52,7 +52,6 @@ describe('native submission decision', () => {
       placement({ inputs: { '/in/a': { mode: 'snapshot', versionId: 'v1' } } }),
       placement({ collisionPolicy: 'replace' }),
       placement({ collisionPolicy: 'keep_existing' }),
-      placement({ outputPrefixes: ['reports/'] }),
     ]
     for (const option of cases) expect(nativeSubmitRequired(option)).toBe(true)
   })
@@ -79,8 +78,7 @@ describe('task to execution request', () => {
           mode: 'snapshot',
         },
       ],
-      outputs: [{ container_path: '/outputs/out.html', dest_key: 'reports/out.html' }],
-      output_prefixes: [],
+      outputs: [{ container_path: '/outputs/out.html', dest_key: 'reports/out.html', bucket: 'results' }],
       collision_policy: 'reject',
       cpu_cores: 2,
       ram_bytes: 4_000_000_000,
@@ -93,6 +91,33 @@ describe('task to execution request', () => {
     expect(mapped(form()).workspace).toEqual({ mode: 'none' })
     expect(mapped(form({ placement: placement({ collisionPolicy: 'replace' }) })).workspace)
       .toEqual({ mode: 'none' })
+  })
+
+  it('names the destination bucket on every output', () => {
+    // Without a workspace an output has no bucket to fall back on.
+    const request = mapped(
+      form({
+        task: task({
+          outputs: [
+            captureOutput('/outputs/result.txt', 'results', 'runs/result.txt'),
+            captureOutput('/outputs/report.html', ' reports ', '/html/report.html'),
+          ],
+        }),
+      }),
+    )
+
+    expect(request.outputs).toEqual([
+      { container_path: '/outputs/result.txt', dest_key: 'runs/result.txt', bucket: 'results' },
+      { container_path: '/outputs/report.html', dest_key: 'html/report.html', bucket: 'reports' },
+    ])
+    expect(request.outputs.every((output) => output.bucket)).toBe(true)
+  })
+
+  it('sends no output prefixes, which only a workspace can carry', () => {
+    const request = mapped(form({ placement: placement({ collisionPolicy: 'replace' }) }))
+
+    expect(Object.keys(request)).not.toContain('output_prefixes')
+    expect(request.output_prefixes).toBeUndefined()
   })
 
   it('carries a pinned version only on an exact reference', () => {

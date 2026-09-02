@@ -1,10 +1,10 @@
 // Maps the wizard's GA4GH task draft onto the native POST /jobs/ body.
 //
 // The facade fixes what TES cannot express: it always snapshots or mounts
-// inputs, never pins a version, sends no output prefixes, and leaves the
-// collision policy at `reject`. A run that needs any of those has to go
-// through the native surface, and this is the one place that translation
-// lives, so it can be tested without a component or a network.
+// inputs, never pins a version, and leaves the collision policy at `reject`. A
+// run that needs any of those has to go through the native surface, and this is
+// the one place that translation lives, so it can be tested without a component
+// or a network.
 import { parseS3Url, TES_LABEL_TAG_PREFIX, type TesInput, type TesTask } from '@/lib/tes'
 import type {
   CollisionPolicyRequest,
@@ -24,7 +24,6 @@ export interface NativePlacementOptions {
   /** Keyed by container path, which the wizard already keeps unique. */
   inputs: Record<string, InputPlacement>
   collisionPolicy: CollisionPolicyRequest
-  outputPrefixes: string[]
 }
 
 export interface NativeSubmitForm {
@@ -54,7 +53,7 @@ export function isNativeBlocked(mapping: NativeMapping): mapping is NativeBlocke
 }
 
 export function defaultPlacement(): NativePlacementOptions {
-  return { inputs: {}, collisionPolicy: 'reject', outputPrefixes: [] }
+  return { inputs: {}, collisionPolicy: 'reject' }
 }
 
 /** Whether the draft needs the native surface: each option has no GA4GH equivalent. */
@@ -62,11 +61,7 @@ export function nativeSubmitRequired(placement: NativePlacementOptions): boolean
   const pinned = Object.values(placement.inputs).some(
     (input) => input.mode !== 'snapshot' || Boolean(input.versionId?.trim()),
   )
-  return (
-    pinned
-    || placement.collisionPolicy !== 'reject'
-    || placement.outputPrefixes.some((prefix) => prefix.trim())
-  )
+  return pinned || placement.collisionPolicy !== 'reject'
 }
 
 // Last path segment; the s3 key's own last segment is the fallback for a
@@ -147,7 +142,8 @@ function mapOutput(output: {
   if (!parsed) {
     return { blocked: `The output ${output.url} is not an s3://bucket/key destination.`, kind: 'unsupported' }
   }
-  return { container_path: containerPath, dest_key: parsed.key }
+  // No workspace bucket backs the run, so each output names its own.
+  return { container_path: containerPath, dest_key: parsed.key, bucket: parsed.bucket }
 }
 
 // The backend reads ram_gb as decimal GB and truncates, so this matches it
@@ -198,7 +194,6 @@ export function tesFormToExecutionRequest(form: NativeSubmitForm): NativeMapping
     workdir: executor.workdir?.trim() || null,
     inputs,
     outputs,
-    output_prefixes: placement.outputPrefixes.map((prefix) => prefix.trim()).filter(Boolean),
     collision_policy: placement.collisionPolicy,
     // Stated, not defaulted: a run must never get a bucket of its own.
     workspace: { mode: 'none' },

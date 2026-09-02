@@ -392,6 +392,10 @@ function submitButton(root: HostNode): HostNode {
   return element(root, (node) => node.tag === 'button' && content(node).trim() === 'Run')
 }
 
+function select(root: HostNode, label: string): HostNode {
+  return element(root, (node) => node.tag === 'select' && node.props['aria-label'] === label)
+}
+
 // The wizard reads its step from the route, so every case mounts with one.
 async function mount(component: Component, path?: string) {
   const router = path
@@ -536,13 +540,24 @@ describe('numeric Input consumers', () => {
 
     await mounted.router!.push('/app/compute/new?step=1')
     await flush()
-    await click(button(mounted.root, 'Add prefix'))
-    await typeValue(input(mounted.root, 'aria-label', 'Output prefix'), 'reports/')
+    await typeValue(select(mounted.root, 'Collision policy'), 'replace')
     await mounted.router!.push('/app/compute/new?step=2')
     await flush()
 
     expect(content(mounted.root)).toContain('POST /jobs/')
     expect(content(mounted.root)).toContain("Aruna's native jobs API")
+    expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('offers no output prefix option, which needs a workspace', async () => {
+    const mounted = await mount(ComputeSubmitView, '/app/compute/new?step=1')
+    await fillValidWorkload(mounted.root)
+
+    const workload = content(mounted.root)
+    expect(workload).toContain('Collision policy')
+    expect(workload).not.toContain('Output prefixes')
+    expect(nodes(mounted.root).some((node) => node.props['aria-label'] === 'Output prefix')).toBe(false)
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })
@@ -616,6 +631,10 @@ describe('run target', () => {
     const [request, client] = submitJob.mock.calls[0] as unknown as [Record<string, unknown>, Record<string, unknown>]
     expect(request.target).toBe('local')
     expect(request.tags).toEqual({})
+    expect(request.workspace).toEqual({ mode: 'none' })
+    expect(request.outputs).toEqual([
+      { container_path: '/outputs/result.txt', dest_key: 'runs/result.txt', bucket: 'results' },
+    ])
     expect(client).toEqual({ baseUrl: 'http://127.0.0.1:9000/api/v1', token: 'owner-token' })
     expect(mounted.router!.currentRoute.value.name).toBe('run')
     expect(mounted.errors).toEqual([])

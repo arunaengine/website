@@ -274,7 +274,6 @@ const submission: SubmitExecutionRequest = {
   workdir: null,
   inputs: [],
   outputs: [],
-  output_prefixes: [],
   collision_policy: 'reject',
   idempotency_key: 'key-1',
 }
