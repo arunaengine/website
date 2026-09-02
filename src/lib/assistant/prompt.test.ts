@@ -95,6 +95,39 @@ describe('systemPrompt', () => {
     )
   })
 
+  it('tells the model to read real data and never invent one', () => {
+    const prompt = systemPrompt({ route: '/app/assistant' })
+
+    expect(prompt).toContain(
+      'Read the real data before answering: list_objects, stat_object, read_object and get_dataset hold the facts.',
+    )
+    expect(prompt).toContain(
+      'Never invent an id, key, job id, version, size or result; say plainly when a tool did not return one.',
+    )
+    expect(prompt).toContain('Check every tool result: stop on an error, report it, and never retry a denial.')
+    expect(prompt).toContain('aggregate_objects for counts and bytes over time under a prefix')
+  })
+
+  it('tells the model how to run a script and wait for it', () => {
+    const prompt = systemPrompt({ route: '/app/assistant' })
+
+    expect(prompt).toContain('Start a job only when code, a library or data too large to read is needed')
+    expect(prompt).toContain('list_runtimes')
+    expect(prompt).toContain('"container_path": "/work/chart.png"')
+    expect(prompt).toContain('A submission is not a result: poll get_job until succeeded, failed or cancelled.')
+    expect(prompt).toContain('indeterminate proves nothing')
+    expect(prompt).toContain("A failed job's error and log tails are the evidence")
+    expect(prompt).toContain('A script has no network unless dependencies are declared')
+  })
+
+  it('tells the model to show what a job produced', () => {
+    const prompt = systemPrompt({ route: '/app/assistant' })
+
+    expect(prompt).toContain('After a job succeeds, call list_job_outputs and show what it produced.')
+    expect(prompt).toContain('Show an image, a PDF or any other file with show_artifact')
+    expect(prompt).toContain('never paste file bytes into an answer')
+  })
+
   it('states the realm totals when they are known', () => {
     const prompt = systemPrompt({
       route: '/app',
