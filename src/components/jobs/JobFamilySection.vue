@@ -22,7 +22,7 @@ function formatEstimatedTime(ms: number): string {
   return ms < 1000 ? `${ms} ms` : formatDuration(ms)
 }
 
-function sealedAt(ms: number): string {
+function storedAt(ms: number): string {
   return new Date(ms).toLocaleString()
 }
 
@@ -174,9 +174,9 @@ function outputUrl(output: JobOutputResponse): string {
             class="text-foreground"
             title="Rejections dropped by that audit bound. A non-zero count means the recorded rejections are incomplete, not that the remaining targets agreed."
           >{{ family.placement.omitted }}</dd>
-          <dt class="text-muted-foreground">Plan sealed</dt>
-          <dd class="text-foreground" :title="new Date(family.placement.sealed_at_ms).toISOString()">
-            {{ sealedAt(family.placement.sealed_at_ms) }}
+          <dt class="text-muted-foreground">Plan stored</dt>
+          <dd class="text-foreground" :title="new Date(family.placement.stored_at_ms).toISOString()">
+            {{ storedAt(family.placement.stored_at_ms) }}
           </dd>
         </dl>
         <p class="text-[11px] text-muted-foreground">

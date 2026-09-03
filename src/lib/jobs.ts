@@ -62,7 +62,7 @@ export interface JobPlacementResponse {
   alternatives: number
   rejected: number
   omitted: number
-  sealed_at_ms: number
+  stored_at_ms: number
 }
 
 export interface JobFamilyResponse {
@@ -596,7 +596,7 @@ export function placementVerdict(placement?: PlacementLike | null): PlacementVer
       verdict: 'unplaced',
       label: 'Not placed',
       explanation:
-        'No executor was selected in a plan this node sealed, so there is no local verdict. Another node may have planned the request.',
+        'No executor was selected in a plan this node stored, so there is no local verdict. Another node may have planned the request.',
     }
   }
   if (placement.estimated_transfer_bytes === 0) {

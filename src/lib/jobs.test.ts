@@ -65,7 +65,7 @@ const familyFixture: JobStatusResponse = {
       alternatives: 2,
       rejected: 1,
       omitted: 0,
-      sealed_at_ms: 1755500000000,
+      stored_at_ms: 1755500000000,
     },
   },
 }

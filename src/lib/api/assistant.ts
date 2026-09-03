@@ -1,6 +1,6 @@
 // --- Assistant providers (/system/assistant/providers) ---
 // Bring-your-own AI: every provider record belongs to one user and its secret
-// is sealed on the node, never returned. The browser talks to a provider only
+// is encrypted on the node, never returned. The browser talks to a provider only
 // through the node proxy, which injects the real credentials.
 import { apiRequest, type ApiClientOptions } from './client'
 
@@ -26,7 +26,7 @@ export interface AssistantProvider {
   kind: AssistantProviderKind
   label: string
   base_url?: string | null
-  /** Header names only; values stay sealed on the node. */
+  /** Header names only; values stay encrypted on the node. */
   header_names?: string[]
   models: AssistantModel[]
   default_model?: string | null
