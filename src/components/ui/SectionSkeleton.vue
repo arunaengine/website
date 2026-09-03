@@ -9,7 +9,7 @@ const props = withDefaults(
     lines?: number
     /** The header band with an icon and a title. */
     header?: boolean
-    /** A row of fact tiles under the lines, as the dataset hero shows. */
+    /** A row of detail tiles under the lines, as the dataset hero shows. */
     tiles?: number
     label?: string
     class?: string

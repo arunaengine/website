@@ -82,7 +82,7 @@ providePageContext(() => {
   return {
     kind: 'dataset',
     title: doc?.title ?? summary?.document_path ?? '',
-    facts: {
+    details: {
       'document id': summary?.document_id ?? doc?.ulid ?? '',
       path: currentPath.value,
       group: summary?.group_id ?? doc?.realmId ?? '',

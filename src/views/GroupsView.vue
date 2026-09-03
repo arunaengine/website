@@ -109,8 +109,8 @@ const pageTitle = computed(() =>
 )
 
 providePageContext((): PageContext => (selectedGroupId.value
-  ? { kind: 'group', title: selectedGroup.value?.name ?? selectedGroupId.value, facts: { id: selectedGroupId.value } }
-  : { kind: 'groups page', title: 'Groups', facts: { 'groups joined': String(myGroups.value.length) } }))
+  ? { kind: 'group', title: selectedGroup.value?.name ?? selectedGroupId.value, details: { id: selectedGroupId.value } }
+  : { kind: 'groups page', title: 'Groups', details: { 'groups joined': String(myGroups.value.length) } }))
 
 // While a stored session restores, keep the signed-in copy so the sign-in
 // hint never flashes for users who are actually signed in.

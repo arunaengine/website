@@ -76,7 +76,7 @@ const view = compileClientComponent(new URL('./BucketStorageView.vue', import.me
   '@/components/storage/BucketBackendTab.vue': moduleDefault(Marker('backend rules')),
   '@/components/storage/BucketComplianceSection.vue': moduleDefault(Marker('compliance on this node')),
   '@/components/storage/BucketPolicySection.vue': moduleDefault(Marker('where copies may be stored')),
-  '@/components/storage/StorageOverviewTab.vue': moduleDefault(Marker('overview facts')),
+  '@/components/storage/StorageOverviewTab.vue': moduleDefault(Marker('overview details')),
   '@/components/storage/SyncsTab.vue': moduleDefault(Marker('sync rows')),
   '@/composables/useAruna': {
     useAruna: () => ({
@@ -131,7 +131,7 @@ describe('bucket storage page', () => {
 
     expect(content(root)).toContain('Settings for reef-survey')
     expect(tabs(root)).toEqual(['overview', 'syncs'])
-    expect(content(root)).toContain('overview facts')
+    expect(content(root)).toContain('overview details')
   })
 
   it('opens the tab named in the query', async () => {
@@ -142,7 +142,7 @@ describe('bucket storage page', () => {
   it('falls back to the overview when the query names a tab this viewer lacks', async () => {
     const root = await render({ query: { tab: 'placement' } })
 
-    expect(content(root)).toContain('overview facts')
+    expect(content(root)).toContain('overview details')
     expect(content(root)).not.toContain('where copies may be stored')
   })
 

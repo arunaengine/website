@@ -6,7 +6,7 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
-import FactList from '@/components/ui/FactList.vue'
+import DetailList from '@/components/ui/DetailList.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
 import Notice from '@/components/ui/Notice.vue'
@@ -71,7 +71,7 @@ const nodeFallback = computed(() => {
   return status.value?.enrolling ? 'joining the realm' : 'not set up'
 })
 
-const facts = computed(() => [
+const details = computed(() => [
   { label: 'Realm', value: realm.value.shortName },
   { label: 'Node', value: nodeId.value ?? nodeFallback.value },
   { label: 'Version', value: status.value?.version ?? 'n/a', mono: true },
@@ -178,9 +178,9 @@ onMounted(() => void reload())
 
     <div class="container space-y-5 py-5">
       <!-- The plate: what the node on this disk is. -->
-      <FactList :items="facts">
+      <DetailList :items="details">
         <template v-if="nodeId" #Node><NodeLabel :node-id="nodeId" /></template>
-      </FactList>
+      </DetailList>
 
       <Notice v-if="status?.message && !online" tone="warning">{{ status.message }}</Notice>
 

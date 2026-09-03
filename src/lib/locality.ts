@@ -1,7 +1,7 @@
 // Reads GET /data/blobs/locations together with the executor kinds nodes advertise
 // in GET /info/realm, and says whether the work could run where the data
 // already is. This is a hint about the inputs a run declares, not the plan:
-// the planner screens every advertisement itself and seals its own decision.
+// the planner screens every advertisement itself and stores its own decision.
 import type { BlobLocationsResponse } from '@/lib/api'
 
 export type LocalityVerdict = 'compute-to-data-possible' | 'data-will-move' | 'unknown'

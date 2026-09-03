@@ -86,7 +86,7 @@ const {
 providePageContext(() => ({
   kind: 'data manager',
   title: bucket.value ? `${bucket.value}/${s3Prefix.value}` : 'No bucket open',
-  facts: {
+  details: {
     group: selectedGroupId.value,
     bucket: bucket.value,
     prefix: s3Prefix.value,

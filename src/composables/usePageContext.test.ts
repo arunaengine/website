@@ -4,7 +4,7 @@ import { providePageContext, usePageContext } from './usePageContext'
 import type { PageContext } from '@/lib/assistant/prompt'
 
 function dataset(title: string): PageContext {
-  return { kind: 'dataset', title, facts: {} }
+  return { kind: 'dataset', title, details: {} }
 }
 
 describe('usePageContext', () => {

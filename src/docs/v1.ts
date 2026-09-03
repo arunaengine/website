@@ -793,7 +793,7 @@ export const docsTopics: DocsTopic[] = [
         icon: 'Sparkles',
         paragraphs: [
           'Once a provider is ready the assistant button appears in the top bar and Assistant joins the sidebar.',
-          'Each turn tells the model the route you are on, plus a few facts from the [dataset](concept:datasets), [bucket](concept:data-and-deletion#buckets-hold-the-bytes), and [group](concept:realm-nodes-groups#groups-own-your-work) views. It acts through the tools this node serves over [MCP](concept:glossary#mcp) and, while the dataset editor is open, on the draft; writes ask you first, and only you save the draft.',
+          'Each turn tells the model the route you are on, plus a few details from the [dataset](concept:datasets), [bucket](concept:data-and-deletion#buckets-hold-the-bytes), and [group](concept:realm-nodes-groups#groups-own-your-work) views. It acts through the tools this node serves over [MCP](concept:glossary#mcp) and, while the dataset editor is open, on the draft; writes ask you first, and only you save the draft.',
         ],
         image: {
           src: '/docs/v1/assistant-chat.jpg',
@@ -1133,7 +1133,7 @@ export const docsTopics: DocsTopic[] = [
         icon: 'Route',
         paragraphs: [
           'A run executes next to its data when possible and moves data to the compute when it must. The placement record tells you which happened, and why.',
-          'Every [node](concept:realm-nodes-groups) holding a request family plans it independently: one round screens all executor advertisements in the realm and seals its choice only after the last page.',
+          'Every [node](concept:realm-nodes-groups) holding a request family plans it independently: one round screens all executor advertisements in the realm and stores its choice only after the last page.',
           'The plan carries a transfer estimate from configured link bandwidths; it is not a measurement of moved bytes.',
         ],
         bullets: [
@@ -1149,7 +1149,7 @@ export const docsTopics: DocsTopic[] = [
         bullets: [
           'Compute-to-data: every input already had a usable copy on the chosen node; expected transfer zero.',
           'Data-to-compute: at least one input had to move to the chosen node first.',
-          'Not placed: the responding node sealed no plan of its own; absence of local evidence only.',
+          'Not placed: the responding node stored no plan of its own; absence of local evidence only.',
           'The verdict describes the plan, never the measured outcome.',
         ],
       },

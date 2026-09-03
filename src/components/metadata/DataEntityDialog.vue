@@ -11,7 +11,7 @@ import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import ScrollArea from '@/components/ui/ScrollArea.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
-import FactList, { type Fact } from '@/components/ui/FactList.vue'
+import DetailList, { type Detail } from '@/components/ui/DetailList.vue'
 import EntityFieldList from '@/components/metadata/EntityFieldList.vue'
 import { ArrowLeft, Check, Copy, File as FileIcon, Folder, Info } from '@lucide/vue'
 import { presentDataEntity } from '@/lib/cratePresenter'
@@ -74,7 +74,7 @@ const typeChips = computed(() =>
   })),
 )
 
-const facts = computed<Fact[]>(() =>
+const details = computed<Detail[]>(() =>
   entity.value
     ? [
         { key: 'size', label: 'Size', value: formatContentSize(entity.value.contentSize) },
@@ -128,12 +128,12 @@ async function copyId() {
           <Badge v-if="entity.profileLabel" variant="outline" size="sm">{{ entity.profileLabel }}</Badge>
         </div>
 
-        <FactList :items="facts">
+        <DetailList :items="details">
           <template #location>
             <ExternalLink v-if="entity.contentUrl" :href="entity.contentUrl" :label="entity.contentUrl" :title="entity.contentUrl" />
             <span v-else>-</span>
           </template>
-        </FactList>
+        </DetailList>
 
         <div v-if="entity.children.length" class="space-y-1">
           <h3 class="font-display text-sm font-semibold text-aruna-navy">Contents</h3>

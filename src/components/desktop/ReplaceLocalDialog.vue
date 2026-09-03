@@ -71,12 +71,12 @@ function hash(value: string | null): string {
 }
 
 // Local times are the file's stat mtime, remote times the version's.
-const localFacts = computed(() => [
+const localDetails = computed(() => [
   { label: 'Size', value: bytes(entry.value?.local?.size ?? null) },
   { label: 'Changed', value: when(entry.value?.local?.modified_at_ms ?? null) },
   { label: 'blake3', value: hash(entry.value?.local?.blake3 ?? null) },
 ])
-const remoteFacts = computed(() => [
+const remoteDetails = computed(() => [
   { label: 'Size', value: bytes(entry.value?.remote?.size ?? null) },
   { label: 'Changed', value: when(entry.value?.remote?.modified_at_ms ?? null) },
   { label: 'blake3', value: hash(entry.value?.remote?.blake3 ?? null) },
@@ -148,9 +148,9 @@ async function apply(): Promise<void> {
           <section class="surface-inline border-primary/30 bg-primary/[0.06] px-3 py-2.5">
             <h3 class="text-[11px] font-semibold uppercase tracking-wider text-foreground">On this computer</h3>
             <dl class="mt-2 space-y-1">
-              <div v-for="fact in localFacts" :key="fact.label" class="flex items-baseline justify-between gap-3">
-                <dt class="text-[11px] text-muted-foreground">{{ fact.label }}</dt>
-                <dd class="truncate font-mono text-[11px] text-foreground">{{ fact.value }}</dd>
+              <div v-for="detail in localDetails" :key="detail.label" class="flex items-baseline justify-between gap-3">
+                <dt class="text-[11px] text-muted-foreground">{{ detail.label }}</dt>
+                <dd class="truncate font-mono text-[11px] text-foreground">{{ detail.value }}</dd>
               </div>
             </dl>
           </section>
@@ -160,9 +160,9 @@ async function apply(): Promise<void> {
               Deleted. Earlier versions stay recoverable in the realm.
             </p>
             <dl v-else class="mt-2 space-y-1">
-              <div v-for="fact in remoteFacts" :key="fact.label" class="flex items-baseline justify-between gap-3">
-                <dt class="text-[11px] text-muted-foreground">{{ fact.label }}</dt>
-                <dd class="truncate font-mono text-[11px] text-foreground">{{ fact.value }}</dd>
+              <div v-for="detail in remoteDetails" :key="detail.label" class="flex items-baseline justify-between gap-3">
+                <dt class="text-[11px] text-muted-foreground">{{ detail.label }}</dt>
+                <dd class="truncate font-mono text-[11px] text-foreground">{{ detail.value }}</dd>
               </div>
             </dl>
           </section>

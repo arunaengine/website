@@ -24,7 +24,7 @@ export function proxyFetch(context: ModelContext): typeof globalThis.fetch {
     const headers = new Headers(init?.headers)
     // Provider SDKs add their own User-Agent and, for Anthropic, credential
     // markers. Firefox includes them in the CORS preflight, but the node proxy
-    // replaces provider credentials from its sealed record. Dropping them keeps
+    // replaces provider credentials from its encrypted record. Dropping them keeps
     // the browser-to-node request inside the REST API's small header allowlist.
     headers.delete('User-Agent')
     headers.delete('x-api-key')

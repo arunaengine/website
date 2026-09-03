@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// One surface for a file: the facts, the version history, and the rules and
+// One surface for a file: the details, the version history, and the rules and
 // copies of the chosen version, plus a preview mode that fills the same frame.
 // The open tab lives in the route (`?object=&tab=`), so a details view is a
 // link a person can share or reload; `tab=preview` is that mode.
@@ -109,7 +109,7 @@ function previewVersion(versionId: string) {
   emit('update:tab', 'preview')
 }
 
-const facts = computed(() => [
+const details = computed(() => [
   { label: 'Key', value: props.objectKey },
   { label: 'Size', value: props.size === undefined ? 'unknown' : formatBytes(props.size) },
   {
@@ -178,14 +178,14 @@ const facts = computed(() => [
 
       <TabsContent value="general" class="surface p-4">
         <dl class="space-y-2 text-xs">
-          <div v-for="fact in facts" :key="fact.label" class="flex items-baseline justify-between gap-4">
-            <dt class="shrink-0 text-muted-foreground">{{ fact.label }}</dt>
-            <dd class="min-w-0 break-all text-right font-mono text-foreground">{{ fact.value }}</dd>
+          <div v-for="detail in details" :key="detail.label" class="flex items-baseline justify-between gap-4">
+            <dt class="shrink-0 text-muted-foreground">{{ detail.label }}</dt>
+            <dd class="min-w-0 break-all text-right font-mono text-foreground">{{ detail.value }}</dd>
           </div>
           <div class="flex items-baseline justify-between gap-4">
             <dt class="shrink-0 text-muted-foreground">Current version</dt>
             <dd class="flex min-w-0 items-center justify-end gap-1">
-              <Spinner v-if="headBusy" label="Loading the file facts" />
+              <Spinner v-if="headBusy" label="Loading the file details" />
               <template v-else-if="currentVersion">
                 <span class="hash" :title="currentVersion">{{ truncateMiddle(currentVersion, 8, 6) }}</span>
                 <CopyButton :value="currentVersion" label="Copy version id" />

@@ -11,11 +11,11 @@ export interface DraftContext {
   types: string[]
 }
 
-/** What the open view is showing: short facts only, ids, paths and counts. */
+/** What the open view is showing: short details only, ids, paths and counts. */
 export interface PageContext {
   kind: string
   title: string
-  facts: Record<string, string>
+  details: Record<string, string>
 }
 
 /** Current portal figures the dashboard already shows for the signed-in realm. */
@@ -70,7 +70,7 @@ const DATASET_AUTHORING = [
 ]
 
 const COMPUTE = [
-  'Read the real data before answering: list_objects, stat_object, read_object and get_dataset hold the facts.',
+  'Read the real data before answering: list_objects, stat_object, read_object and get_dataset hold the details.',
   'Never invent an id, key, job id, version, size or result; say plainly when a tool did not return one.',
   'Check every tool result: stop on an error, report it, and never retry a denial.',
   'Prefer one aggregating call over paging: aggregate_objects for counts and bytes over time under a prefix, '
@@ -106,24 +106,24 @@ const REALM_NOTE =
   'These realm totals are current portal figures already provided to you; answer count questions from them directly and only call tools for details they do not cover.'
 
 function pageLine(page: PageContext): string {
-  const facts = Object.entries(page.facts)
+  const details = Object.entries(page.details)
     .filter(([, value]) => value)
     .map(([name, value]) => `${name} ${value}`)
   const title = page.title ? ` "${page.title}"` : ''
-  return `The user is looking at the ${page.kind}${title}${facts.length ? ` (${facts.join(', ')})` : ''}.`
+  return `The user is looking at the ${page.kind}${title}${details.length ? ` (${details.join(', ')})` : ''}.`
 }
 
 function realmLine(realm: RealmContext): string | null {
-  const facts: string[] = []
-  if (realm.datasets !== undefined) facts.push(`${realm.datasets} datasets`)
-  if (realm.profiles !== undefined) facts.push(`${realm.profiles} profiles`)
-  if (realm.groups !== undefined) facts.push(`${realm.groups} groups`)
-  if (realm.objects !== undefined) facts.push(`${realm.objects} objects`)
-  if (realm.buckets !== undefined) facts.push(`${realm.buckets} buckets`)
-  if (realm.storedBytes !== undefined) facts.push(`${formatBytes(realm.storedBytes)} stored`)
+  const details: string[] = []
+  if (realm.datasets !== undefined) details.push(`${realm.datasets} datasets`)
+  if (realm.profiles !== undefined) details.push(`${realm.profiles} profiles`)
+  if (realm.groups !== undefined) details.push(`${realm.groups} groups`)
+  if (realm.objects !== undefined) details.push(`${realm.objects} objects`)
+  if (realm.buckets !== undefined) details.push(`${realm.buckets} buckets`)
+  if (realm.storedBytes !== undefined) details.push(`${formatBytes(realm.storedBytes)} stored`)
   const nodes = realm.nodesOnline ? `, with ${realm.nodesOnline} nodes online` : ''
-  if (!facts.length) return realm.nodesOnline ? `This realm currently has ${realm.nodesOnline} nodes online.` : null
-  return `This realm currently holds ${facts.join(', ')}${nodes}.`
+  if (!details.length) return realm.nodesOnline ? `This realm currently has ${realm.nodesOnline} nodes online.` : null
+  return `This realm currently holds ${details.join(', ')}${nodes}.`
 }
 
 function identityLine(identity: IdentityContext): string {

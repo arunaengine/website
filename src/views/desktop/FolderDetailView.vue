@@ -9,7 +9,7 @@ import RefreshButton from '@/components/ui/RefreshButton.vue'
 import RefusalNote from '@/components/ui/RefusalNote.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
-import FactList from '@/components/ui/FactList.vue'
+import DetailList from '@/components/ui/DetailList.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Select from '@/components/ui/Select.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
@@ -191,7 +191,7 @@ function when(ms: number | null | undefined): string {
   return ms ? relativeTime(new Date(ms).toISOString()) : 'n/a'
 }
 
-const facts = computed(() => {
+const details = computed(() => {
   const current = folder.value
   if (!current) return []
   return [
@@ -260,7 +260,7 @@ const facts = computed(() => {
         :message="actionError"
       />
 
-      <FactList v-if="folder" :items="facts" />
+      <DetailList v-if="folder" :items="details" />
 
       <!-- The decision band: the only place a local file can be given up. -->
       <Notice v-if="folder && waiting > 0" tone="warning">

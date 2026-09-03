@@ -6,7 +6,7 @@
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import DocsLink from '@/components/ui/DocsLink.vue'
-import FactList from '@/components/ui/FactList.vue'
+import DetailList from '@/components/ui/DetailList.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useBucketSyncs } from '@/composables/useBucketSyncs'
@@ -119,7 +119,7 @@ const REMOTE = { value: 'Unknown here', note: 'This bucket is hosted on another 
 const NO_ANSWER = { value: 'Unknown', note: 'This node did not answer.' }
 
 // A node that refuses the routing read says nothing about the bucket, so the
-// fact is left out rather than filled with a refusal.
+// detail is left out rather than filled with a refusal.
 const backendKnown = computed(() => routingState.value !== 'refused')
 
 const backend = computed(() => {
@@ -167,7 +167,7 @@ function counted(value: number): string {
   return usage.value?.complete === false ? `at least ${number}` : number
 }
 
-const usageFacts = computed(() => {
+const usageDetails = computed(() => {
   const held = usage.value
   if (!held) return []
   const size = formatBytes(held.logical_bytes)
@@ -186,13 +186,13 @@ const bucketEmpty = computed(() => {
   return !held.objects && !held.versions && !held.delete_markers && !held.open_multipart_uploads
 })
 
-const ruleFacts = computed(() => [
+const ruleDetails = computed(() => [
   ...(backendKnown.value
     ? [{ key: 'backend', label: 'Storage backend', value: backend.value?.value ?? '' }]
     : []),
   { key: 'policies', label: 'Placement policies', value: policySummary.value?.value ?? '' },
 ])
-const observedFacts = computed(() => [
+const observedDetails = computed(() => [
   { key: 'copies', label: 'Copies', value: 'Checked per file' },
   { key: 'syncs', label: 'Syncs', value: syncSummary.value?.value ?? '' },
 ])
@@ -219,7 +219,7 @@ const filesLink = computed(() => ({
           This bucket is empty: nothing is stored in it yet.
         </p>
         <template v-else>
-          <FactList :items="usageFacts" class="sm:grid-cols-3 lg:grid-cols-5" />
+          <DetailList :items="usageDetails" class="sm:grid-cols-3 lg:grid-cols-5" />
           <p v-if="usage && !usage.complete" class="mt-3 text-[11px] text-muted-foreground">
             The scan stopped at its limit, so every number here is a lower bound.
           </p>
@@ -233,7 +233,7 @@ const filesLink = computed(() => ({
         <h2 class="font-display text-sm font-semibold text-aruna-navy">Rules this bucket carries</h2>
       </header>
       <div class="px-5 py-4">
-        <FactList :items="ruleFacts" class="sm:grid-cols-1">
+        <DetailList :items="ruleDetails" class="sm:grid-cols-1">
           <template #backend>
             <Skeleton v-if="!backend" class="h-4 w-40" />
             <template v-else>
@@ -254,7 +254,7 @@ const filesLink = computed(() => ({
               </span>
             </template>
           </template>
-        </FactList>
+        </DetailList>
       </div>
     </section>
 
@@ -264,7 +264,7 @@ const filesLink = computed(() => ({
         <h2 class="font-display text-sm font-semibold text-aruna-navy">Observed on this node</h2>
       </header>
       <div class="px-5 py-4">
-        <FactList :items="observedFacts" class="sm:grid-cols-1">
+        <DetailList :items="observedDetails" class="sm:grid-cols-1">
           <template #copies>
             <span class="block">Checked per file</span>
             <span class="mt-0.5 block text-[11px] text-muted-foreground">
@@ -283,7 +283,7 @@ const filesLink = computed(() => ({
               </span>
             </template>
           </template>
-        </FactList>
+        </DetailList>
       </div>
     </section>
   </div>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Hero for a resolved dataset: what it conforms to, what it is about, and the
-// four facts every dataset carries.
+// four details every dataset carries.
 import Badge from '@/components/ui/Badge.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
 import AuthorChips from '@/components/metadata/AuthorChips.vue'

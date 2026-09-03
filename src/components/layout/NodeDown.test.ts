@@ -32,7 +32,7 @@ const RouterLinkStub = defineComponent({
 })
 const icons = new Proxy({}, { get: () => defineComponent(() => () => h('i')) })
 
-const FactList = compileClientComponent(new URL('../ui/FactList.vue', import.meta.url), { vue: VueRuntime })
+const DetailList = compileClientComponent(new URL('../ui/DetailList.vue', import.meta.url), { vue: VueRuntime })
 const Notice = compileClientComponent(new URL('../ui/Notice.vue', import.meta.url), {
   vue: VueRuntime,
   '@/lib/utils': Utils,
@@ -48,7 +48,7 @@ const NodeDown = compileClientComponent(new URL('./NodeDown.vue', import.meta.ur
   'vue-router': { RouterLink: RouterLinkStub },
   '@lucide/vue': icons,
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
-  '@/components/ui/FactList.vue': moduleDefault(FactList),
+  '@/components/ui/DetailList.vue': moduleDefault(DetailList),
   '@/components/ui/Notice.vue': moduleDefault(Notice),
   '@/components/ui/Spinner.vue': moduleDefault(Spinner),
   '@/composables/useDeviceStatus': { useDeviceStatus: () => ({ status, state, refresh }) },

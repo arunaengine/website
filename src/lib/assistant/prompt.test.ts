@@ -8,7 +8,7 @@ describe('systemPrompt', () => {
       page: {
         kind: 'dataset',
         title: 'Water quality 2026',
-        facts: { 'document id': '01H', path: 'meta/water.json', group: 'g-1', profile: '', entities: '12' },
+        details: { 'document id': '01H', path: 'meta/water.json', group: 'g-1', profile: '', entities: '12' },
       },
     })
     const lines = prompt.split('\n')
@@ -27,8 +27,8 @@ describe('systemPrompt', () => {
     expect(prompt).toContain('The user is on the route /app/assistant.')
   })
 
-  it('names a page without facts or a title', () => {
-    const prompt = systemPrompt({ route: '/app/groups', page: { kind: 'groups page', title: '', facts: {} } })
+  it('names a page without details or a title', () => {
+    const prompt = systemPrompt({ route: '/app/groups', page: { kind: 'groups page', title: '', details: {} } })
 
     expect(prompt).toContain('The user is looking at the groups page.')
   })
@@ -99,7 +99,7 @@ describe('systemPrompt', () => {
     const prompt = systemPrompt({ route: '/app/assistant' })
 
     expect(prompt).toContain(
-      'Read the real data before answering: list_objects, stat_object, read_object and get_dataset hold the facts.',
+      'Read the real data before answering: list_objects, stat_object, read_object and get_dataset hold the details.',
     )
     expect(prompt).toContain(
       'Never invent an id, key, job id, version, size or result; say plainly when a tool did not return one.',

@@ -185,7 +185,7 @@ const picksVersion = computed(
 const targetVersionId = computed(
   () => request.value?.versionId ?? (picksVersion.value ? pickedVersion.value?.versionId : null) ?? null,
 )
-const versionFacts = computed(() => {
+const versionDetails = computed(() => {
   const current = request.value
   if (!current) return []
   if (current.kind === 'version' || current.kind === 'marker') {
@@ -492,10 +492,10 @@ onUnmounted(() => {
       </DialogHeader>
 
       <div v-if="request" class="scrollbar-thin max-h-[60dvh] space-y-3 overflow-y-auto text-xs">
-        <dl v-if="versionFacts.length" class="space-y-1 rounded-md border border-border px-3 py-2">
-          <div v-for="fact in versionFacts" :key="fact.label" class="flex items-baseline justify-between gap-3">
-            <dt class="text-muted-foreground">{{ fact.label }}</dt>
-            <dd class="break-all font-mono text-foreground">{{ fact.value }}</dd>
+        <dl v-if="versionDetails.length" class="space-y-1 rounded-md border border-border px-3 py-2">
+          <div v-for="detail in versionDetails" :key="detail.label" class="flex items-baseline justify-between gap-3">
+            <dt class="text-muted-foreground">{{ detail.label }}</dt>
+            <dd class="break-all font-mono text-foreground">{{ detail.value }}</dd>
           </div>
         </dl>
 

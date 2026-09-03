@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
-import FactList from '@/components/ui/FactList.vue'
+import DetailList from '@/components/ui/DetailList.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
@@ -31,7 +31,7 @@ const detail = computed(() =>
       : (status.value?.detail ?? status.value?.message),
 )
 
-const facts = computed(() => {
+const details = computed(() => {
   const mismatch = realmMismatch.value
   if (!mismatch) return []
   return [
@@ -68,7 +68,7 @@ async function startNode(): Promise<void> {
         <h1 class="mt-3 font-display text-lg font-semibold tracking-tight text-aruna-navy">{{ headline }}</h1>
         <p v-if="detail" class="mt-2 text-sm leading-relaxed text-muted-foreground">{{ detail }}</p>
         <template v-if="realmMismatch">
-          <FactList :items="facts" class="mt-3">
+          <DetailList :items="details" class="mt-3">
             <template #url>
               <code :title="realmMismatch.realmUrl" class="block truncate font-mono text-xs">{{
                 realmMismatch.realmUrl
@@ -84,7 +84,7 @@ async function startNode(): Promise<void> {
                 realmMismatch.actual
               }}</code>
             </template>
-          </FactList>
+          </DetailList>
           <p class="mt-3 text-sm leading-relaxed text-muted-foreground">
             This computer's data belongs to the old realm. Wipe it before setting it up with the recreated realm.
           </p>

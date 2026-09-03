@@ -1,13 +1,13 @@
 <script setup lang="ts">
 // Label/value plates. A named slot per item key overrides the plain value.
-export interface Fact {
+export interface Detail {
   key?: string
   label: string
   value: string
   mono?: boolean
 }
 
-withDefaults(defineProps<{ items: readonly Fact[]; class?: string }>(), { class: undefined })
+withDefaults(defineProps<{ items: readonly Detail[]; class?: string }>(), { class: undefined })
 </script>
 
 <template>

@@ -25,7 +25,7 @@ const openai: AssistantProvider = {
   created_at: '2026-08-01T00:00:00Z',
 }
 
-const page = { kind: 'dataset', title: 'Water quality', facts: { 'document id': '01H' } }
+const page = { kind: 'dataset', title: 'Water quality', details: { 'document id': '01H' } }
 
 const aruna = {
   currentUser: ref<{ name: string; id?: string } | null>(null),

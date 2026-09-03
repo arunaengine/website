@@ -136,7 +136,7 @@ describe('bucket policy section', () => {
     expect(text).not.toContain('None: copies of this bucket are not governed')
   })
 
-  it('states none instead of leaving the fact blank', async () => {
+  it('states none instead of leaving the detail blank', async () => {
     getBucketPlacement.mockResolvedValue({ bucket: 'reef-survey', generation: 1, policies: [] })
     listPoliciesForGroup.mockResolvedValue([])
 

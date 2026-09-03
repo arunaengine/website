@@ -293,7 +293,7 @@ describe('distributed job detail components', () => {
     '@/lib/utils': Utils,
   }
 
-  it('states no workspace fact, whatever the node reports', async () => {
+  it('states no workspace detail, whatever the node reports', async () => {
     // A node may still serve a mode and a bucket; a run owns neither any more.
     const JobDetailPanel = jobPanel({
       job_id: '01JJRSTVWXYZ0123456789ABCD',

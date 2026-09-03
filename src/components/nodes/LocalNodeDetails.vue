@@ -10,7 +10,7 @@ import Notice from '@/components/ui/Notice.vue'
 
 const props = defineProps<{ info: InfoResponse }>()
 
-interface Fact {
+interface Detail {
   label: string
   value: string
   // Optional hover tooltip; falls back to the value when omitted.
@@ -36,7 +36,7 @@ const portalTitle = computed(() =>
   portal.value ? portalValue.value : 'Portal status not reported for this node',
 )
 
-const facts = computed<Fact[]>(() => [
+const details = computed<Detail[]>(() => [
   { label: 'API version', value: props.info.api_version || '-' },
   { label: 'Portal', value: portalValue.value, title: portalTitle.value },
   { label: 'Portal source', value: portal.value?.source || '-' },
@@ -75,9 +75,9 @@ const backends = computed(() =>
 <template>
   <div class="space-y-4">
     <dl class="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
-      <div v-for="fact in facts" :key="fact.label">
-        <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{{ fact.label }}</dt>
-        <dd class="mt-0.5 truncate font-mono text-xs tabular-nums text-foreground/90" :title="fact.title ?? fact.value">{{ fact.value }}</dd>
+      <div v-for="detail in details" :key="detail.label">
+        <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{{ detail.label }}</dt>
+        <dd class="mt-0.5 truncate font-mono text-xs tabular-nums text-foreground/90" :title="detail.title ?? detail.value">{{ detail.value }}</dd>
       </div>
     </dl>
 

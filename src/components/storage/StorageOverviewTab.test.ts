@@ -10,7 +10,7 @@ import type { SyncRow } from '@/composables/useBucketSyncs'
 const IconStub = defineComponent((_, { attrs }) => () => h('i', attrs))
 const Slotted = (tag: string) =>
   defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h(tag, attrs, slots.default?.()) })
-const FactListStub = defineComponent({
+const DetailListStub = defineComponent({
   props: { items: { type: Array, default: () => [] } },
   setup: (props, { slots }) => () =>
     h(
@@ -36,7 +36,7 @@ const tab = compileClientComponent(new URL('./StorageOverviewTab.vue', import.me
   '@lucide/vue': new Proxy({}, { get: () => IconStub }),
   '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
   '@/components/ui/DocsLink.vue': moduleDefault(Slotted('a')),
-  '@/components/ui/FactList.vue': moduleDefault(FactListStub),
+  '@/components/ui/DetailList.vue': moduleDefault(DetailListStub),
   '@/components/ui/Skeleton.vue': moduleDefault(Slotted('div')),
   '@/composables/useAruna': {
     useAruna: () => ({ getBucketRouting, getBucketUsage, getGroupRouting, listGroupBackends }),
@@ -134,7 +134,7 @@ describe('bucket storage overview', () => {
     expect(text).toContain('Only syncs you created are counted.')
   })
 
-  it('leaves out a refused fact and names who may read the rest', async () => {
+  it('leaves out a refused detail and names who may read the rest', async () => {
     getBucketRouting.mockRejectedValue(new Api.ApiError(403, 'Forbidden'))
     getBucketPlacement.mockRejectedValue(new Api.ApiError(403, 'Forbidden'))
     getGroupRouting.mockResolvedValue({ group_id: 'g-1', warnings: [] })

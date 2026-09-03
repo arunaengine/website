@@ -13,7 +13,7 @@ import DialogFooter from '@/components/ui/DialogFooter.vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
-import FactList, { type Fact } from '@/components/ui/FactList.vue'
+import DetailList, { type Detail } from '@/components/ui/DetailList.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
@@ -194,7 +194,7 @@ const progressText = computed(() => (job.value ? formatJobProgress(job.value.pro
 const importResult = computed(() => importJobResult(job.value?.result))
 const exportResult = computed(() => exportJobResult(job.value?.result))
 const createdDocumentId = computed(() => importResult.value?.document_id ?? null)
-const importFacts = computed<Fact[]>(() => {
+const importDetails = computed<Detail[]>(() => {
   const r = importResult.value
   return r
     ? [
@@ -205,7 +205,7 @@ const importFacts = computed<Fact[]>(() => {
       ]
     : []
 })
-const exportFacts = computed<Fact[]>(() => {
+const exportDetails = computed<Detail[]>(() => {
   const r = exportResult.value
   return r
     ? [
@@ -557,9 +557,9 @@ function rowTarget(row: TransferRow): string {
           <p v-if="lastPollError" class="text-[11px] text-muted-foreground">Auto-refresh failed: {{ lastPollError }}</p>
           <p v-if="job?.error" class="whitespace-pre-wrap break-words text-xs text-destructive">{{ job.error.message }}</p>
 
-          <FactList v-if="importResult" :items="importFacts" />
+          <DetailList v-if="importResult" :items="importDetails" />
 
-          <FactList v-if="exportResult" :items="exportFacts" />
+          <DetailList v-if="exportResult" :items="exportDetails" />
           <p v-if="exportResult?.artifact" class="text-[11px] text-muted-foreground">
             Archive {{ formatBytes(exportResult.artifact.size) }}
             <template v-if="downloadedName"> · saved as {{ downloadedName }}</template>

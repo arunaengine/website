@@ -6,7 +6,7 @@ import { parseS3Url } from '@/lib/tes'
 import { MapPin } from '@lucide/vue'
 
 // Advisory: it says where this input already is, not where the run will go.
-// The planner screens every executor advertisement itself and seals its own
+// The planner screens every executor advertisement itself and stores its own
 // decision, which can differ from what this hint suggests.
 const props = defineProps<{ url: string }>()
 
