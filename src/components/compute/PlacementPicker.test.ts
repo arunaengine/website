@@ -70,6 +70,7 @@ const NODE_FIXTURES = [
     nodeId: '01NODEALPHA1234567890',
     label: 'Alpha',
     executorKinds: ['docker'],
+    reachable: true,
     info: {
       labels: {
         region: 'eu-central',
@@ -82,6 +83,7 @@ const NODE_FIXTURES = [
     nodeId: '01NODEBETA1234567890',
     label: 'Beta',
     executorKinds: ['slurm'],
+    reachable: false,
     info: { labels: { region: 'eu-central', tier: 'fast' } },
   },
   {
@@ -166,6 +168,23 @@ describe('PlacementPicker', () => {
       'aruna-engine.org/node': '01NODEALPHA1234567890',
       tier: 'fast',
     })
+    expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('describes the picked node as it is now', async () => {
+    const mounted = await mount()
+    const summary = () => content(element(mounted.root, (node) => node.props['data-testid'] === 'node-summary'))
+    expect(summary()).toBe('Any of 2 nodes with an executor.')
+
+    const nodeSelect = element(
+      mounted.root,
+      (node) => node.tag === 'select' && node.props['aria-label'] === 'Run on node',
+    )
+    await typeValue(nodeSelect, '01NODEBETA1234567890')
+    expect(summary()).toBe('Beta: slurm · not reachable now')
+    await typeValue(nodeSelect, '01NODEALPHA1234567890')
+    expect(summary()).toBe('Alpha: docker · reachable')
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })

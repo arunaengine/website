@@ -1,6 +1,8 @@
 <script setup lang="ts">
 // Review of the assembled quick run; mirrors the data step's in/out structure.
+import { computed } from 'vue'
 import Notice from '@/components/ui/Notice.vue'
+import NodeLabel from '@/components/ui/NodeLabel.vue'
 import ContainerIoSummary from '@/components/compute/ContainerIoSummary.vue'
 import RunPlacementSection from '@/components/compute/RunPlacementSection.vue'
 import TaskJsonPreview from '@/components/compute/TaskJsonPreview.vue'
@@ -17,9 +19,11 @@ const {
   reviewOutputs,
   commandPreview,
   runtime,
-  reuseSelectedScript,
   task,
 } = injectQuickRun()
+
+const NODE_LABEL_KEY = 'aruna-engine.org/node'
+const chosenNode = computed(() => (runTarget.local.value ? '' : placementLabels.value[NODE_LABEL_KEY] || ''))
 </script>
 
 <template>
@@ -33,15 +37,11 @@ const {
       :realm-name="realmName"
       :problems="targetProblems"
     />
-    <ContainerIoSummary
-      :inputs="reviewInputs"
-      :outputs="reviewOutputs"
-      footnote="stdout and stderr are always captured."
-    />
+    <ContainerIoSummary :inputs="reviewInputs" :outputs="reviewOutputs" />
     <p class="text-xs text-muted-foreground">
       Runs as <code class="rounded bg-muted px-1 font-mono">{{ commandPreview }}</code> in
-      <code class="rounded bg-muted px-1 font-mono">{{ runtime.image }}</code>;
-      {{ reuseSelectedScript ? 'the selected script object is reused without an upload.' : 'the script is uploaded when the run starts, because the backend does not accept inline script content.' }}
+      <code class="rounded bg-muted px-1 font-mono">{{ runtime.image }}</code> on
+      <NodeLabel v-if="chosenNode" :node-id="chosenNode" size="sm" /><template v-else>{{ runTarget.local.value ? 'this device' : 'any node' }}</template>.
     </p>
     <TaskJsonPreview title="Run request" :task="task" />
     <details class="text-[11px] text-muted-foreground">

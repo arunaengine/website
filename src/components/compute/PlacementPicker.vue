@@ -100,6 +100,18 @@ const eligibleNodes = computed(() =>
   nodes.value.filter((node) => node.executorKinds.length > 0),
 )
 
+// What the choice means right now, from the same realm document as the list.
+const nodeSummary = computed(() => {
+  if (!selectedNodeId.value) {
+    const count = eligibleNodes.value.length
+    return count ? `Any of ${count} node${count === 1 ? '' : 's'} with an executor.` : 'No node advertises an executor yet.'
+  }
+  const node = nodes.value.find((candidate) => candidate.nodeId === selectedNodeId.value)
+  if (!node) return 'This node is no longer in the realm.'
+  const kinds = node.executorKinds.length ? node.executorKinds.join(', ') : 'no executor'
+  return `${node.label}: ${kinds} · ${node.reachable ? 'reachable' : 'not reachable now'}`
+})
+
 const nodeOptions = computed(() => {
   const labelCounts = new Map<string, number>()
   for (const node of eligibleNodes.value) {
@@ -189,6 +201,7 @@ function removeConstraint(index: number) {
         aria-label="Run on node"
         :disabled="!selectedNodeId && rows.length >= MAX_LABEL_CONSTRAINTS"
       />
+      <span class="mt-1.5 block text-[11px] text-muted-foreground" data-testid="node-summary">{{ nodeSummary }}</span>
     </label>
 
     <div class="mt-2 space-y-2 text-xs">
