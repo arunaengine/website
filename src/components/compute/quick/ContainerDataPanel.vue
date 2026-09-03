@@ -100,7 +100,6 @@ const {
         <Button variant="outline" size="sm" @click="openInputDialog"><ListPlus class="size-3.5" /> Add input</Button>
         <Button variant="outline" size="sm" @click="addOutput"><Plus class="size-3.5" /> Add output</Button>
       </div>
-      <p class="text-[11px] text-muted-foreground">stdout and stderr are always captured.</p>
     </section>
 
     <template v-else>
@@ -156,7 +155,7 @@ const {
             <ArrowUpFromLine class="h-3.5 w-3.5 text-primary" /> Output data
           </div>
           <p class="mt-1 text-[11px] text-muted-foreground">
-            Captures files or folders the script writes, by default under <code class="rounded bg-muted px-1 font-mono">{{ activeWorkdir }}/out/</code>, into a bucket after the run. A container path ending in / captures the files written directly in that folder; nested subfolders are not. stdout and stderr are always captured.
+            Captures files or folders the script writes, by default under <code class="rounded bg-muted px-1 font-mono">{{ activeWorkdir }}/out/</code>, into a bucket after the run. A container path ending in / captures the files written directly in that folder; nested subfolders are not.
           </p>
         </div>
         <div v-if="outputRows.length" class="space-y-1.5">
@@ -209,12 +208,13 @@ const {
             <Button variant="ghost" size="icon-sm" class="mt-1 h-5 w-5 self-start" aria-label="Remove output" @click="removeOutput(i)"><X class="size-3" /></Button>
           </div>
         </div>
-        <p v-else class="text-[11px] text-muted-foreground">Nothing captured yet; only stdout and stderr are collected after the run.</p>
+        <p v-else class="text-[11px] text-muted-foreground">Nothing captured yet.</p>
         <p v-if="!outputsValid" class="text-[11px] text-destructive">
           Each capture needs one of your buckets, a canonical key and an absolute container path; folder captures (path ending in /) need a key ending in /; container paths and destinations must be unique.
         </p>
         <Button variant="outline" size="sm" @click="addOutput"><Plus class="size-3.5" /> Add output</Button>
       </section>
     </template>
+    <p class="text-[11px] text-muted-foreground">stdout and stderr are always captured.</p>
   </div>
 </template>

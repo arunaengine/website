@@ -52,7 +52,6 @@ const {
   dependencies,
   script,
   runtime,
-  commandPreview,
   loadScriptOpen,
 } = injectQuickRun()
 
@@ -163,9 +162,6 @@ const newBucketProblem = computed(() => {
               </template>
             </Suspense>
             <p v-if="!script.trim()" class="text-[11px] text-destructive">The script cannot be empty.</p>
-            <p class="text-[11px] text-muted-foreground">
-              Runs as <code class="rounded bg-muted px-1 font-mono">{{ commandPreview }}</code> in a fresh container.
-            </p>
           </div>
 
           <ContainerDataPanel />
