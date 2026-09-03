@@ -7,6 +7,7 @@ import * as RouterRuntime from 'vue-router'
 import { RouterView, createMemoryHistory, createRouter, type Router } from 'vue-router'
 import { vi } from 'vitest'
 import { compileClientComponent, flush, moduleDefault, mountApp, refreshButton, type Mounted } from '@/test/clientRender'
+import * as Poll from '@/lib/poll'
 import * as CustomRun from '@/composables/useCustomRun'
 import * as JobsComposable from '@/composables/useJobs'
 import * as ObjectPreview from '@/composables/useObjectPreview'
@@ -284,7 +285,10 @@ const TaskDetailPanel = compileClientComponent(url('components/compute/TaskDetai
   '@/composables/useS3': S3,
   '@/composables/useObjectPreview': ObjectPreview,
   '@/composables/useRefresh': RefreshComposable,
+  '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => id }) },
+  '@/components/ui/NodeLabel.vue': moduleDefault(GenericStub),
   '@/lib/chunk-recovery': ChunkRecovery,
+  '@/lib/poll': Poll,
   '@/lib/quickRuntimes': QuickRuntimes,
   '@/lib/tes': TesLib,
   '@/lib/utils': Utils,

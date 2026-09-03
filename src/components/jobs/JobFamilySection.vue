@@ -72,8 +72,7 @@ function outputUrl(output: JobOutputResponse): string {
       <div>
         <h4 class="text-xs font-medium text-foreground">Canonical outputs</h4>
         <p class="text-[11px] text-muted-foreground">
-          These are the canonical execution's outputs, named by their exact version. Reading the same
-          key without that version answers whatever is current instead.
+          Outputs of the canonical execution, each named by its exact version.
         </p>
       </div>
       <div v-if="family.outputs.length" class="overflow-x-auto rounded-md border border-border">
@@ -134,12 +133,7 @@ function outputUrl(output: JobOutputResponse): string {
 
     <div class="surface space-y-3 p-3">
       <div class="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h4 class="text-xs font-medium text-foreground">Placement</h4>
-          <p class="text-[11px] text-muted-foreground">
-            Where this run was scheduled, and what the planner expected it to cost.
-          </p>
-        </div>
+        <h4 class="text-xs font-medium text-foreground">Placement</h4>
         <Badge :variant="verdictVariant">{{ verdict.label }}</Badge>
       </div>
       <p class="text-[11px] text-muted-foreground">
@@ -179,23 +173,31 @@ function outputUrl(output: JobOutputResponse): string {
             {{ storedAt(family.placement.stored_at_ms) }}
           </dd>
         </dl>
-        <p class="text-[11px] text-muted-foreground">
-          Estimated at planning time, after the last page of executor advertisements was screened.
-          These are not measured transfer values.
-        </p>
+        <p class="text-[11px] text-muted-foreground">Estimated at planning time, not measured.</p>
       </template>
       <p v-else class="text-xs text-muted-foreground">
-        No local placement record for this family. The plan is kept by the node that made it, so
-        another node may hold one.
+        No local placement record for this family; the planning node keeps it.
       </p>
     </div>
 
     <div class="space-y-1.5">
       <div class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Responder-local caveats">
-        <Badge v-if="family.partial" variant="outline" size="sm" class="text-muted-foreground">
+        <Badge
+          v-if="family.partial"
+          variant="outline"
+          size="sm"
+          class="text-muted-foreground"
+          title="This responder could not reduce every family record."
+        >
           Partial responder view
         </Badge>
-        <Badge v-if="family.locally_exhausted" variant="outline" size="sm" class="text-muted-foreground">
+        <Badge
+          v-if="family.locally_exhausted"
+          variant="outline"
+          size="sm"
+          class="text-muted-foreground"
+          title="Known executions are terminal here and no local retry is armed. This does not establish a permanent failure."
+        >
           Locally exhausted
         </Badge>
         <span v-if="family.responder_node_id" class="text-[11px] text-muted-foreground">
@@ -205,12 +207,6 @@ function outputUrl(output: JobOutputResponse): string {
           </span>
         </span>
       </div>
-      <p v-if="family.partial" class="text-[11px] text-muted-foreground">
-        This responder could not reduce every family record.
-      </p>
-      <p v-if="family.locally_exhausted" class="text-[11px] text-muted-foreground">
-        Known executions are terminal here and no local retry is armed. This does not establish a permanent failure.
-      </p>
     </div>
   </section>
 </template>

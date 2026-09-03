@@ -11,6 +11,7 @@ import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
+import NodeLabel from '@/components/ui/NodeLabel.vue'
 import JobFamilySection from '@/components/jobs/JobFamilySection.vue'
 import TaskHeader from '@/components/compute/TaskHeader.vue'
 import AskAiButton from '@/components/assistant/AskAiButton.vue'
@@ -18,12 +19,14 @@ import ClaimWatchStep, { type WatchStage } from '@/components/onboarding/ClaimWa
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useJobs } from '@/composables/useJobs'
 import { useAruna } from '@/composables/useAruna'
+import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useHiddenTasks } from '@/composables/useHiddenTasks'
 import { useS3 } from '@/composables/useS3'
 import { useRefresh } from '@/composables/useRefresh'
 import type { MetadataDocumentListItem } from '@/lib/api'
-import type { JobFamilyResponse } from '@/lib/jobs'
+import type { JobStatusResponse } from '@/lib/jobs'
 import { detectQuickRun } from '@/lib/quickRuntimes'
+import { POLL_IDLE_MS, follow, onWake } from '@/lib/poll'
 import {
   TES_GROUP_TAG,
   TES_LABEL_TAG_PREFIX,
@@ -33,12 +36,15 @@ import {
   isDrsReference,
   isTerminalTesState,
   parseS3Url,
+  tesPlacementTags,
   type TesState,
   type TesTask,
 } from '@/lib/tes'
 import { asyncChunkError } from '@/lib/chunk-recovery'
-import { errorMessage, formatBytes, relativeTime, truncateMiddle } from '@/lib/utils'
+import { errorMessage, formatBytes, formatDuration, relativeTime, truncateMiddle } from '@/lib/utils'
 import { Ban, Download, Eye, ExternalLink as ExternalLinkIcon, FileText, RotateCcw, Trash2 } from '@lucide/vue'
+
+const NODE_LABEL_TAG = `${TES_LABEL_TAG_PREFIX}aruna-engine.org/node`
 
 const props = defineProps<{ taskId: string; open: boolean }>()
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void; (e: 'canceled'): void; (e: 'hidden'): void }>()
@@ -47,56 +53,62 @@ const router = useRouter()
 const { getTask, cancelTask, busy } = useTes()
 const { getJob: getNativeJob } = useJobs()
 const { myGroups, apiBaseUrl, metadataAtPath } = useAruna()
+const { displayName } = useRealmNodes()
 const { hide } = useHiddenTasks()
 const s3 = useS3()
 
 const task = ref<TesTask | null>(null)
-const nativeFamily = ref<JobFamilyResponse | null>(null)
+const nativeJob = ref<JobStatusResponse | null>(null)
 const nativeDetailUnavailable = ref(false)
 const runCrate = ref<MetadataDocumentListItem | null>(null)
 const runCrateLoading = ref(false)
 const loadState = ref<'idle' | 'loading' | 'ready' | 'error' | 'unsupported'>('idle')
 const loadError = ref<string | null>(null)
 const lastPollError = ref<string | null>(null)
+// Read again on every poll so placement, family state and outputs stay live.
+const now = ref(Date.now())
 let nativeRequestId = 0
+
+const nativeFamily = computed(() => nativeJob.value?.family ?? null)
 
 async function loadNativeJob(jobId: string, requestId: number) {
   try {
-    const nativeJob = await getNativeJob(jobId)
+    const next = await getNativeJob(jobId)
     if (requestId !== nativeRequestId) return
-    nativeFamily.value = nativeJob.family ?? null
+    nativeJob.value = next
+    nativeDetailUnavailable.value = false
   } catch {
     if (requestId !== nativeRequestId) return
-    nativeDetailUnavailable.value = true
+    if (!nativeJob.value) nativeDetailUnavailable.value = true
   }
 }
 
 // ── Load + poll (view-owned) ─────────────────────────────────────────────────
-let pollTimer: number | undefined
+let stopFollow: (() => void) | undefined
+let stopWake: (() => void) | undefined
 function stopPolling() {
-  if (pollTimer) {
-    window.clearInterval(pollTimer)
-    pollTimer = undefined
-  }
+  stopFollow?.()
+  stopWake?.()
+  stopFollow = undefined
+  stopWake = undefined
 }
 function startPolling() {
   stopPolling()
-  pollTimer = window.setInterval(() => {
-    if (document.hidden) return
-    if (!task.value || isTerminalTesState(task.value.state)) {
-      stopPolling()
-      return
-    }
-    void poll()
-  }, 5000)
+  stopFollow = follow(poll, () => POLL_IDLE_MS)
+  stopWake = onWake(() => void poll())
 }
 async function poll() {
+  const requestId = nativeRequestId
   try {
-    task.value = await getTask(props.taskId, 'FULL')
+    const [next] = await Promise.all([getTask(props.taskId, 'FULL'), loadNativeJob(props.taskId, requestId)])
+    if (requestId !== nativeRequestId) return
+    task.value = next
+    now.value = Date.now()
     lastPollError.value = null
-    if (isTerminalTesState(task.value.state)) stopPolling()
+    if (isTerminalTesState(next.state)) stopPolling()
   } catch (err) {
     // A poll error never kills the timer or the rendered task.
+    if (requestId !== nativeRequestId) return
     lastPollError.value = errorMessage(err)
   }
 }
@@ -107,6 +119,7 @@ async function initialLoad() {
   lastPollError.value = null
   try {
     task.value = await getTask(props.taskId, 'FULL')
+    now.value = Date.now()
     loadState.value = 'ready'
     if (!isTerminalTesState(task.value.state)) startPolling()
   } catch (err) {
@@ -124,7 +137,7 @@ watch(
     const requestId = ++nativeRequestId
     stopPolling()
     task.value = null
-    nativeFamily.value = null
+    nativeJob.value = null
     nativeDetailUnavailable.value = false
     runCrate.value = null
     if (!open || !id) return
@@ -180,6 +193,88 @@ function executorLog(i: number) {
   return latestLog.value?.logs?.[i]
 }
 
+// The native result carries the same bounded tails for every node, so it
+// backs the first executor when the TES log has none.
+const nativeResult = computed(() => {
+  const result = nativeJob.value?.result
+  if (!result || typeof result !== 'object') return null
+  return result as { exit_code?: number | null; stdout?: string; stderr?: string }
+})
+function executorStdout(i: number): string {
+  return executorLog(i)?.stdout || (i === 0 ? nativeResult.value?.stdout || '' : '')
+}
+function executorStderr(i: number): string {
+  return executorLog(i)?.stderr || (i === 0 ? nativeResult.value?.stderr || '' : '')
+}
+function executorExit(i: number): number | undefined {
+  const code = executorLog(i)?.exit_code
+  if (code != null) return code
+  if (i === 0 && nativeResult.value?.exit_code != null) return nativeResult.value.exit_code
+  return undefined
+}
+
+const exitCode = computed(() => executorExit(0))
+const nodeConstraint = computed(() => task.value?.tags?.[NODE_LABEL_TAG] || null)
+const executorKind = computed(
+  () => tesPlacementTags(task.value?.tags).executorKind ?? nativeFamily.value?.placement?.executor_kind ?? null,
+)
+
+const runDuration = computed(() => {
+  const log = latestLog.value
+  const start = log?.start_time ? Date.parse(log.start_time) : NaN
+  if (!Number.isFinite(start)) return null
+  const end = log?.end_time ? Date.parse(log.end_time) : now.value
+  return formatDuration(end - start) || null
+})
+
+const failed = computed(() => task.value?.state === 'EXECUTOR_ERROR' || task.value?.state === 'SYSTEM_ERROR')
+
+// The one line that says what happened; the badge, the stages and this line
+// tell the same story.
+const failureMessage = computed(() => {
+  const native = nativeJob.value?.error?.message?.trim()
+  if (native) return native
+  const system = latestLog.value?.system_logs
+  const last = system?.length ? system[system.length - 1] : ''
+  if (last) return last
+  if (task.value?.state === 'SYSTEM_ERROR') return 'The node could not run it.'
+  return exitCode.value === undefined ? 'The script failed.' : `The script exited with code ${exitCode.value}`
+})
+
+interface Summary {
+  tone: 'error' | 'warning' | 'info' | 'success'
+  headline: string
+}
+const summary = computed<Summary | null>(() => {
+  const state = task.value?.state
+  if (!state) return null
+  const duration = runDuration.value
+  const where = executorKind.value ? ` on ${executorKind.value}` : ''
+  switch (state) {
+    case 'QUEUED':
+      return { tone: 'info', headline: nodeConstraint.value ? 'Queued for the chosen node' : 'Queued, waiting for a node' }
+    case 'INITIALIZING':
+      return { tone: 'info', headline: `Preparing the run${where}` }
+    case 'RUNNING':
+      return { tone: 'info', headline: duration ? `Running for ${duration}${where}` : `Running${where}` }
+    case 'PAUSED':
+      return { tone: 'warning', headline: 'Paused' }
+    case 'CANCELING':
+      return { tone: 'warning', headline: 'Cancelling' }
+    case 'COMPLETE':
+      return { tone: 'success', headline: duration ? `Completed in ${duration}` : 'Completed' }
+    case 'EXECUTOR_ERROR':
+    case 'SYSTEM_ERROR':
+      return { tone: 'error', headline: duration ? `Failed after ${duration}` : 'Failed' }
+    case 'CANCELED':
+      return { tone: 'warning', headline: 'Cancelled' }
+    case 'PREEMPTED':
+      return { tone: 'warning', headline: 'Preempted' }
+    default:
+      return { tone: 'info', headline: 'State unknown' }
+  }
+})
+
 // The canonical TES progression IMPLIED by the current state; TES exposes no
 // recorded state history, so this is a projection, not a timeline.
 function stagesFor(state: TesState | undefined): WatchStage[] {
@@ -214,23 +309,19 @@ function stagesFor(state: TesState | undefined): WatchStage[] {
       return s('pending', 'pending', 'pending', 'pending') // UNKNOWN / undefined
   }
 }
-const stages = computed(() => stagesFor(task.value?.state))
-
-// One sentence naming the cause of a failure, so the badge, the stages and this
-// line tell the same story instead of three competing ones.
-const failureCause = computed(() => {
-  const state = task.value?.state
-  if (state === 'EXECUTOR_ERROR') {
-    const code = latestLog.value?.logs?.find((log) => log.exit_code)?.exit_code
-    const cause = code === undefined ? 'The script failed' : `The script exited with code ${code}`
-    return `${cause}; its output is under Executors below.`
-  }
-  if (state !== 'SYSTEM_ERROR') return null
-  const system = latestLog.value?.system_logs
-  const message = system?.length ? system[system.length - 1] : undefined
-  return message
-    ? `The node could not run it: ${message}`
-    : 'The node could not run it; the system logs are under Executors below.'
+const stages = computed(() => {
+  const list = stagesFor(task.value?.state)
+  const where = [
+    nodeConstraint.value ? `node ${displayName(nodeConstraint.value)}` : '',
+    executorKind.value ? `executor ${executorKind.value}` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ')
+  const queued = list[0]
+  const running = list[2]
+  if (queued && queued.state !== 'pending') queued.detail = where || 'any node with an executor'
+  if (running && running.state !== 'pending' && where) running.detail = [where, running.detail].filter(Boolean).join(' · ')
+  return list
 })
 
 // ── Output links ─────────────────────────────────────────────────────────────
@@ -305,6 +396,15 @@ const { busy: crateBusy, refresh: onFindCrate } = useRefresh(findRunCrate)
 const spinning = computed(() => crateBusy.value || runCrateLoading.value)
 
 const systemLogsOpen = ref(false)
+const showSystemLogs = computed(() => systemLogsOpen.value || failed.value)
+// The summary already prints the failure message, so a failed run lists only
+// the system log lines that add something.
+const systemLogLines = computed(() => {
+  const lines = latestLog.value?.system_logs ?? []
+  if (!failed.value) return lines
+  const message = failureMessage.value.trim()
+  return lines.filter((line) => line.trim() !== message)
+})
 
 // ── Cancel (two-step inline confirm) ─────────────────────────────────────────
 const confirmingCancel = ref(false)
@@ -327,7 +427,8 @@ async function confirmCancel() {
     cancelError.value = errorMessage(err)
   }
 }
-const canCancel = computed(() => !!task.value && !isTerminalTesState(task.value.state))
+const active = computed(() => !!task.value && !isTerminalTesState(task.value.state))
+const canCancel = active
 
 // ── Re-run ───────────────────────────────────────────────────────────────────
 // Quick runs reopen the quick-run wizard, anything else the custom-run wizard;
@@ -386,7 +487,7 @@ async function confirmDelete() {
 
     <div>
       <div v-if="loadState === 'loading'" class="space-y-4">
-        <Skeleton class="h-40 w-full" />
+        <Skeleton class="h-24 w-full" />
         <Skeleton class="h-40 w-full" />
       </div>
 
@@ -396,98 +497,83 @@ async function confirmDelete() {
 
       <ErrorPanel v-else-if="loadState === 'error'" :message="loadError || 'Failed to load the run.'" @retry="initialLoad" />
 
-      <div v-else-if="task" class="space-y-6">
-        <!-- State progression, then the cause when it ended badly -->
-        <div class="space-y-2">
-          <ClaimWatchStep :stages="stages" :error="lastPollError" />
-          <p v-if="failureCause" class="text-xs text-destructive">{{ failureCause }}</p>
+      <div v-else-if="task" class="space-y-8">
+        <!-- What happened, in one place -->
+        <Notice v-if="summary" :tone="summary.tone" class="space-y-2 px-4 py-3">
+          <p class="text-sm font-semibold">{{ summary.headline }}</p>
+          <p v-if="failed" class="whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed">{{ failureMessage }}</p>
+          <div v-if="failed || nodeConstraint" class="flex flex-wrap items-center gap-1.5 text-[11px]">
+            <Badge v-if="failed && nativeJob?.error?.kind" variant="destructive" size="sm" class="uppercase">{{ nativeJob.error.kind }}</Badge>
+            <Badge v-if="failed && exitCode !== undefined" variant="outline" size="sm">exit {{ exitCode }}</Badge>
+            <Badge v-if="failed && nativeJob?.attempts" variant="outline" size="sm">
+              {{ nativeJob.attempts }} attempt{{ nativeJob.attempts === 1 ? '' : 's' }}
+            </Badge>
+            <span v-if="nodeConstraint" class="inline-flex items-center gap-1">node <NodeLabel :node-id="nodeConstraint" size="sm" /></span>
+          </div>
+        </Notice>
+        <p v-if="lastPollError" class="text-[11px] text-muted-foreground">Refresh failed, retrying.</p>
+
+        <!-- Progress leads while the run is active, output once it ended -->
+        <div class="flex flex-col gap-8">
+          <section data-tutorial="run-executors" class="space-y-3" :class="{ 'order-1': active }">
+            <h3 class="font-display text-sm font-semibold text-aruna-navy">Output</h3>
+            <p v-if="!task.logs?.length && !nativeResult" class="text-xs text-muted-foreground">Nothing captured yet.</p>
+            <div v-for="(executor, i) in task.executors" :key="i" class="surface space-y-3 p-4">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0 space-y-0.5">
+                  <div class="font-mono text-[11px] text-foreground">{{ executor.image }}</div>
+                  <div class="whitespace-pre-wrap break-all font-mono text-[11px] text-muted-foreground">{{ executor.command.join(' ') }}</div>
+                </div>
+                <Badge
+                  v-if="executorExit(i) !== undefined"
+                  :variant="executorExit(i) === 0 ? 'success' : 'destructive'"
+                  class="shrink-0"
+                >
+                  exit {{ executorExit(i) }}
+                </Badge>
+              </div>
+              <div v-if="executorLog(i)?.start_time || executorLog(i)?.end_time" class="text-[11px] text-muted-foreground">
+                <span v-if="executorLog(i)!.start_time">started {{ relativeTime(executorLog(i)!.start_time!) }}</span>
+                <span v-if="executorLog(i)!.end_time"> · ended {{ relativeTime(executorLog(i)!.end_time!) }}</span>
+              </div>
+              <template v-if="executorStdout(i) || executorStderr(i)">
+                <div v-if="executorStdout(i)">
+                  <div class="text-[10px] uppercase tracking-wider text-muted-foreground">{{ executorStderr(i) ? 'stdout' : 'output' }}</div>
+                  <pre class="mt-1 max-h-64 overflow-y-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-3 font-mono text-[11px] leading-relaxed">{{ executorStdout(i) }}</pre>
+                </div>
+                <div v-if="executorStderr(i)">
+                  <div class="text-[10px] uppercase tracking-wider text-muted-foreground">stderr</div>
+                  <pre class="mt-1 max-h-64 overflow-y-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-3 font-mono text-[11px] leading-relaxed">{{ executorStderr(i) }}</pre>
+                </div>
+              </template>
+              <p v-else-if="executorLog(i) || nativeResult" class="text-[11px] text-muted-foreground">No output captured.</p>
+            </div>
+            <div v-if="systemLogLines.length">
+              <Button v-if="!failed" variant="ghost" size="sm" @click="systemLogsOpen = !systemLogsOpen">
+                {{ systemLogsOpen ? 'Hide' : 'Show' }} system logs ({{ systemLogLines.length }})
+              </Button>
+              <template v-if="showSystemLogs">
+                <div v-if="failed" class="text-[10px] uppercase tracking-wider text-muted-foreground">system logs</div>
+                <pre class="mt-1 max-h-48 overflow-y-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-3 font-mono text-[11px] leading-relaxed">{{ systemLogLines.join('\n') }}</pre>
+              </template>
+            </div>
+          </section>
+
+          <section class="space-y-3">
+            <h3 class="font-display text-sm font-semibold text-aruna-navy">Progress</h3>
+            <ClaimWatchStep :stages="stages" />
+          </section>
         </div>
 
-        <!-- Details -->
-        <dl data-tutorial="run-details" class="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-xs">
-          <dt class="text-muted-foreground">Created</dt>
-          <dd class="text-foreground">{{ task.creation_time ? relativeTime(task.creation_time) : '-' }}</dd>
-          <dt class="text-muted-foreground">Group</dt>
-          <dd class="text-foreground">
-            <span v-if="groupTagLabel" :class="groupTagId && !myGroups.find((g) => g.id === groupTagId) ? 'font-mono' : ''">{{ groupTagLabel }}</span>
-            <span v-else class="text-muted-foreground">-</span>
-          </dd>
-          <template v-if="resourceSummary">
-            <dt class="text-muted-foreground">Resources</dt>
-            <dd class="text-foreground">{{ resourceSummary }}</dd>
-          </template>
-          <template v-if="task.volumes?.length">
-            <dt class="text-muted-foreground">Volumes</dt>
-            <dd class="space-y-0.5 font-mono text-[11px] text-foreground">
-              <div v-for="v in task.volumes" :key="v">{{ v }}</div>
-            </dd>
-          </template>
-        </dl>
-
-        <div v-if="otherTags.length" class="flex flex-wrap items-center gap-1.5">
-          <Badge v-for="[k, v] in otherTags" :key="k" variant="outline" class="font-mono">{{ k }}={{ v }}</Badge>
-        </div>
-
-        <JobFamilySection v-if="nativeFamily" :family="nativeFamily" />
-        <p v-else-if="nativeDetailUnavailable" class="text-xs text-muted-foreground">
-          Distributed execution detail could not be loaded.
-        </p>
-
-        <!-- Executors & logs -->
-        <section data-tutorial="run-executors" class="space-y-2">
-          <h3 class="font-display text-sm font-semibold text-aruna-navy">Executors</h3>
-          <p v-if="!task.logs?.length" class="text-xs text-muted-foreground">No execution log yet.</p>
-          <div v-for="(executor, i) in task.executors" :key="i" class="surface space-y-2 p-3">
-            <div class="flex items-center justify-between gap-2">
-              <div class="min-w-0">
-                <div class="font-mono text-[11px] text-foreground">{{ executor.image }}</div>
-                <div class="whitespace-pre-wrap break-all font-mono text-[11px] text-muted-foreground">{{ executor.command.join(' ') }}</div>
-              </div>
-              <Badge
-                v-if="executorLog(i)?.exit_code != null"
-                :variant="executorLog(i)!.exit_code === 0 ? 'success' : 'destructive'"
-                class="shrink-0"
-              >
-                exit {{ executorLog(i)!.exit_code }}
-              </Badge>
-            </div>
-            <div v-if="executor.env && Object.keys(executor.env).length" class="text-[11px] text-muted-foreground">
-              {{ Object.keys(executor.env).length }} environment variable(s)
-            </div>
-            <template v-if="executorLog(i)">
-              <div class="text-[11px] text-muted-foreground">
-                <span v-if="executorLog(i)!.start_time">start {{ relativeTime(executorLog(i)!.start_time!) }}</span>
-                <span v-if="executorLog(i)!.end_time"> · end {{ relativeTime(executorLog(i)!.end_time!) }}</span>
-              </div>
-              <div>
-                <div class="text-[10px] uppercase tracking-wider text-muted-foreground">stdout</div>
-                <pre v-if="executorLog(i)!.stdout" class="mt-0.5 max-h-48 overflow-y-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-2 font-mono text-[11px]">{{ executorLog(i)!.stdout }}</pre>
-                <p v-else class="text-[11px] text-muted-foreground">no stdout captured</p>
-              </div>
-              <div>
-                <div class="text-[10px] uppercase tracking-wider text-muted-foreground">stderr</div>
-                <pre v-if="executorLog(i)!.stderr" class="mt-0.5 max-h-48 overflow-y-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-2 font-mono text-[11px]">{{ executorLog(i)!.stderr }}</pre>
-                <p v-else class="text-[11px] text-muted-foreground">no stderr captured</p>
-              </div>
-            </template>
-          </div>
-          <div v-if="latestLog?.system_logs?.length">
-            <Button variant="ghost" size="sm" @click="systemLogsOpen = !systemLogsOpen">
-              {{ systemLogsOpen ? 'Hide' : 'Show' }} system logs ({{ latestLog.system_logs.length }})
-            </Button>
-            <pre v-if="systemLogsOpen" class="mt-1 max-h-48 overflow-y-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-2 font-mono text-[11px]">{{ latestLog.system_logs.join('\n') }}</pre>
-          </div>
-        </section>
-
-        <!-- Outputs -->
-        <section v-if="declaredOutputs.length || capturedOutputs.length" data-tutorial="run-artifacts" class="space-y-3">
+        <!-- Outputs and the run dataset -->
+        <section data-tutorial="run-artifacts" class="space-y-3">
           <h3 class="font-display text-sm font-semibold text-aruna-navy">Outputs</h3>
 
           <div v-if="declaredOutputs.length" class="space-y-1.5">
             <div class="text-[11px] font-medium text-foreground">Declared</div>
             <div v-for="(row, i) in declaredOutputs" :key="'d' + i" class="flex flex-wrap items-center gap-2 text-[11px]">
               <span class="font-mono text-muted-foreground">{{ row.path }}</span>
-              <span class="text-muted-foreground">→</span>
+              <span class="text-muted-foreground">to</span>
               <RouterLink v-if="row.link.kind === 's3'" class="font-mono text-primary hover:underline" :to="{ name: 'bucket', params: { bucketId: row.link.bucketId }, query: row.link.prefix ? { prefix: row.link.prefix } : {} }">{{ row.url }}</RouterLink>
               <template v-else-if="row.link.kind === 'drs'">
                 <a class="inline-flex items-center gap-1 font-mono text-primary hover:underline" :href="row.link.object" target="_blank" rel="noopener noreferrer">{{ truncateMiddle(row.url, 24, 12) }} <ExternalLinkIcon class="h-3 w-3" /></a>
@@ -515,7 +601,7 @@ async function confirmDelete() {
                 </Button>
                 <span class="font-mono text-muted-foreground">{{ row.path }}</span>
                 <span v-if="row.size !== undefined && !Number.isNaN(row.size)" class="text-muted-foreground">{{ formatBytes(row.size) }}</span>
-                <span class="text-muted-foreground">→</span>
+                <span class="text-muted-foreground">to</span>
                 <RouterLink v-if="row.link.kind === 's3'" class="font-mono text-primary hover:underline" :to="{ name: 'bucket', params: { bucketId: row.link.bucketId }, query: row.link.prefix ? { prefix: row.link.prefix } : {} }">{{ row.url }}</RouterLink>
                 <template v-else-if="row.link.kind === 'drs'">
                   <a class="inline-flex items-center gap-1 font-mono text-primary hover:underline" :href="row.link.object" target="_blank" rel="noopener noreferrer">{{ truncateMiddle(row.url, 24, 12) }} <ExternalLinkIcon class="h-3 w-3" /></a>
@@ -535,54 +621,100 @@ async function confirmDelete() {
               />
             </div>
           </div>
-        </section>
+          <p v-if="!declaredOutputs.length && !capturedOutputs.length" class="text-xs text-muted-foreground">No files captured for this run.</p>
 
-        <!-- Run dataset -->
-        <section class="space-y-1.5">
-          <h3 class="font-display text-sm font-semibold text-aruna-navy">Run dataset</h3>
-          <RouterLink v-if="runCrate" class="inline-flex items-center gap-1.5 text-xs text-primary hover:underline" :to="{ name: 'dataset', params: { id: runCrate.document_id } }">
-            <FileText class="h-3.5 w-3.5" /> Open the run dataset
-          </RouterLink>
-          <div v-else class="flex flex-wrap items-center gap-2">
-            <p class="text-xs text-muted-foreground">No run dataset at <code class="rounded bg-muted px-1">runs/&lt;run-id&gt;</code> yet; it is written once the run completes.</p>
-            <RefreshButton :busy="spinning" label="Check again" @click="onFindCrate" />
-          </div>
-        </section>
-
-        <!-- Actions: re-run, cancel, delete -->
-        <section class="space-y-2 border-t border-border pt-4">
-          <div class="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" title="Starts a new run prefilled from this one" @click="rerun"><RotateCcw class="h-3.5 w-3.5" /> Run again</Button>
-            <template v-if="canCancel">
-              <template v-if="!confirmingCancel">
-                <Button variant="outline" size="sm" class="text-destructive hover:text-destructive" :disabled="busy" @click="requestCancel"><Ban class="h-3.5 w-3.5" /> Cancel run</Button>
-              </template>
-              <template v-else>
-                <Button variant="destructive" size="sm" :disabled="busy" @click="confirmCancel"><Ban class="h-3.5 w-3.5" /> Confirm cancel</Button>
-                <Button variant="ghost" size="sm" :disabled="busy" @click="confirmingCancel = false">Keep running</Button>
-              </template>
+          <div class="flex flex-wrap items-center gap-2 text-xs">
+            <span class="text-muted-foreground">Run dataset:</span>
+            <RouterLink v-if="runCrate" class="inline-flex items-center gap-1.5 text-primary hover:underline" :to="{ name: 'dataset', params: { id: runCrate.document_id } }">
+              <FileText class="h-3.5 w-3.5" /> Open
+            </RouterLink>
+            <template v-else>
+              <span class="text-muted-foreground">written once the run completes</span>
+              <RefreshButton :busy="spinning" label="Check again" @click="onFindCrate" />
             </template>
-            <div class="ml-auto flex items-center gap-2">
-              <template v-if="!confirmingDelete">
-                <Button variant="outline" size="sm" class="text-destructive hover:text-destructive" :disabled="deleteBusy" @click="requestDelete">
-                  <Trash2 class="h-3.5 w-3.5" /> {{ canCancel ? 'Cancel and delete' : 'Delete' }}
-                </Button>
-              </template>
-              <template v-else>
-                <Button variant="destructive" size="sm" :disabled="deleteBusy || busy" @click="confirmDelete">
-                  <Trash2 class="h-3.5 w-3.5" /> {{ deleteBusy ? 'Deleting…' : canCancel ? 'Confirm cancel and delete' : 'Confirm delete' }}
-                </Button>
-                <Button variant="ghost" size="sm" :disabled="deleteBusy" @click="confirmingDelete = false">Keep</Button>
-              </template>
-            </div>
           </div>
-          <p v-if="confirmingDelete" class="text-[11px] text-muted-foreground">
-            {{ canCancel ? 'Cancels the run first, then removes' : 'Removes' }} it from the run list in this browser only; the record stays on the node and reappears via the Deleted filter.
-          </p>
-          <p v-if="cancelError" class="text-[11px] text-destructive">{{ cancelError }}</p>
-          <p v-if="deleteError" class="text-[11px] text-destructive">{{ deleteError }}</p>
         </section>
+
+        <!-- Placement and family, folded until asked -->
+        <details v-if="nativeFamily" class="group space-y-3">
+          <summary class="cursor-pointer list-none font-display text-sm font-semibold text-aruna-navy">
+            <span class="group-open:hidden">Show placement and distributed execution</span>
+            <span class="hidden group-open:inline">Placement and distributed execution</span>
+          </summary>
+          <JobFamilySection :family="nativeFamily" />
+        </details>
+        <p v-else-if="nativeDetailUnavailable" class="text-xs text-muted-foreground">
+          Distributed execution detail could not be loaded.
+        </p>
+
+        <!-- Request details, folded until asked -->
+        <details data-tutorial="run-details" class="group space-y-3">
+          <summary class="cursor-pointer list-none font-display text-sm font-semibold text-aruna-navy">
+            <span class="group-open:hidden">Show request details</span>
+            <span class="hidden group-open:inline">Request details</span>
+          </summary>
+          <dl class="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-xs">
+            <dt class="text-muted-foreground">Created</dt>
+            <dd class="text-foreground">{{ task.creation_time ? relativeTime(task.creation_time) : '-' }}</dd>
+            <dt class="text-muted-foreground">Group</dt>
+            <dd class="text-foreground">
+              <span v-if="groupTagLabel" :class="groupTagId && !myGroups.find((g) => g.id === groupTagId) ? 'font-mono' : ''">{{ groupTagLabel }}</span>
+              <span v-else class="text-muted-foreground">-</span>
+            </dd>
+            <template v-if="resourceSummary">
+              <dt class="text-muted-foreground">Resources</dt>
+              <dd class="text-foreground">{{ resourceSummary }}</dd>
+            </template>
+            <template v-if="task.volumes?.length">
+              <dt class="text-muted-foreground">Volumes</dt>
+              <dd class="space-y-0.5 font-mono text-[11px] text-foreground">
+                <div v-for="v in task.volumes" :key="v">{{ v }}</div>
+              </dd>
+            </template>
+            <template v-if="otherTags.length">
+              <dt class="text-muted-foreground">Tags</dt>
+              <dd class="flex flex-wrap items-center gap-1.5">
+                <Badge v-for="[k, v] in otherTags" :key="k" variant="outline" class="font-mono">{{ k }}={{ v }}</Badge>
+              </dd>
+            </template>
+          </dl>
+        </details>
       </div>
     </div>
+
+    <template v-if="task" #footer>
+      <div class="space-y-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" title="Starts a new run prefilled from this one" @click="rerun"><RotateCcw class="h-3.5 w-3.5" /> Run again</Button>
+          <template v-if="canCancel">
+            <template v-if="!confirmingCancel">
+              <Button variant="outline" size="sm" class="text-destructive hover:text-destructive" :disabled="busy" @click="requestCancel"><Ban class="h-3.5 w-3.5" /> Cancel run</Button>
+            </template>
+            <template v-else>
+              <Button variant="destructive" size="sm" :disabled="busy" @click="confirmCancel"><Ban class="h-3.5 w-3.5" /> Confirm cancel</Button>
+              <Button variant="ghost" size="sm" :disabled="busy" @click="confirmingCancel = false">Keep running</Button>
+            </template>
+          </template>
+          <div class="ml-auto flex items-center gap-2">
+            <template v-if="!confirmingDelete">
+              <Button variant="outline" size="sm" class="text-destructive hover:text-destructive" :disabled="deleteBusy" @click="requestDelete">
+                <Trash2 class="h-3.5 w-3.5" /> {{ canCancel ? 'Cancel and delete' : 'Delete' }}
+              </Button>
+            </template>
+            <template v-else>
+              <Button variant="destructive" size="sm" :disabled="deleteBusy || busy" @click="confirmDelete">
+                <Trash2 class="h-3.5 w-3.5" /> {{ deleteBusy ? 'Deleting…' : canCancel ? 'Confirm cancel and delete' : 'Confirm delete' }}
+              </Button>
+              <Button variant="ghost" size="sm" :disabled="deleteBusy" @click="confirmingDelete = false">Keep</Button>
+            </template>
+          </div>
+        </div>
+        <p v-if="confirmingDelete" class="text-[11px] text-muted-foreground">
+          {{ canCancel ? 'Cancels the run first, then removes' : 'Removes' }} it from the run list in this browser only; the record stays on the node and reappears via the Deleted filter.
+        </p>
+        <p v-if="cancelError" class="text-[11px] text-destructive">{{ cancelError }}</p>
+        <p v-if="deleteError" class="text-[11px] text-destructive">{{ deleteError }}</p>
+      </div>
+    </template>
   </DetailDialog>
 </template>

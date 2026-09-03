@@ -41,14 +41,14 @@ export function follow(run: () => Promise<void>, delay: () => number, skip?: () 
 
 /** Reads once more as soon as the window is back in front. Returns the stop. */
 export function onWake(refresh: () => void): () => void {
-  if (typeof window === 'undefined') return () => {}
+  if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return () => {}
   const wake = () => {
     if (!hidden()) refresh()
   }
   window.addEventListener('focus', wake)
-  page()?.addEventListener('visibilitychange', wake)
+  page()?.addEventListener?.('visibilitychange', wake)
   return () => {
     window.removeEventListener('focus', wake)
-    page()?.removeEventListener('visibilitychange', wake)
+    page()?.removeEventListener?.('visibilitychange', wake)
   }
 }

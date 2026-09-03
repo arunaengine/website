@@ -9,6 +9,7 @@ import { useRefresh } from '@/composables/useRefresh'
 import { refreshButton } from '@/test/clientRender'
 import { ApiError } from '@/lib/api'
 import * as Jobs from '@/lib/jobs'
+import * as Poll from '@/lib/poll'
 import * as Tes from '@/lib/tes'
 import * as Utils from '@/lib/utils'
 import type { JobAuditResponse, JobFamilyResponse, JobStatusResponse } from '@/lib/jobs'
@@ -218,6 +219,7 @@ function taskPanel(getTask: unknown, getJob: unknown): Component {
     '@/components/ui/CopyButton.vue': moduleDefault(PassThroughStub),
     '@/components/ui/ExternalLink.vue': moduleDefault(PassThroughStub),
     '@/components/ui/Tooltip.vue': moduleDefault(PassThroughStub),
+    '@/components/ui/NodeLabel.vue': moduleDefault(NodeLabelStub),
     '@/components/jobs/JobFamilySection.vue': moduleDefault(JobFamilyStub),
     '@/components/compute/TaskHeader.vue': moduleDefault(PassThroughStub),
     '@/components/assistant/AskAiButton.vue': moduleDefault(PassThroughStub),
@@ -229,6 +231,7 @@ function taskPanel(getTask: unknown, getJob: unknown): Component {
       useTes: () => ({ getTask, cancelTask: vi.fn(), busy: ref(false) }),
     },
     '@/composables/useJobs': { useJobs: () => ({ getJob }) },
+    '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => id }) },
     '@/composables/useRefresh': { useRefresh },
     '@/composables/useAruna': {
       useAruna: () => ({
@@ -242,6 +245,7 @@ function taskPanel(getTask: unknown, getJob: unknown): Component {
     '@/components/preview/PreviewBody.vue': moduleDefault(PassThroughStub),
     '@/lib/chunk-recovery': { asyncChunkError: () => undefined },
     '@/lib/quickRuntimes': { detectQuickRun: () => false },
+    '@/lib/poll': Poll,
     '@/lib/tes': Tes,
     '@/lib/utils': Utils,
   })
@@ -632,6 +636,107 @@ describe('distributed job detail components', () => {
     expect(text).toContain('Finished the script failed')
     expect(text).toContain('The script exited with code 2')
     expect(text).not.toContain('executor error')
+    mounted.app.unmount()
+  })
+
+  it('puts the failure evidence first', async () => {
+    // The native error and the bounded output tail carry the cause; a merged
+    // stream is labelled output, not an empty stderr.
+    const getTask = vi.fn(async () => ({
+      id: 'failed-run',
+      state: 'EXECUTOR_ERROR',
+      executors: [{ image: 'ghcr.io/astral-sh/uv:python3.13-bookworm-slim', command: ['uv', 'run'] }],
+      inputs: [],
+      outputs: [],
+      logs: [
+        {
+          logs: [{ exit_code: 2, stdout: 'error: Failed to initialize cache' }],
+          outputs: [],
+          system_logs: ['container exited with code 2: Error: Failed to initialize cache'],
+        },
+      ],
+      tags: { 'aruna-engine.org/label/aruna-engine.org/node': 'node-2' },
+    }))
+    const getJob = vi.fn(async () => ({
+      attempts: 2,
+      error: { message: 'container exited with code 2: Error: Failed to initialize cache', kind: 'permanent' },
+      result: { exit_code: 2, stdout: 'error: Failed to initialize cache', stderr: '' },
+      family: null,
+    }))
+
+    const mounted = await mount(taskPanel(getTask, getJob), { taskId: 'failed-run', open: true })
+    const text = content(mounted.root)
+
+    expect(mounted.errors).toEqual([])
+    const message = 'container exited with code 2: Error: Failed to initialize cache'
+    expect(text.split(message)).toHaveLength(2)
+    expect(text).not.toContain('system logs')
+    expect(text).toContain('permanent')
+    expect(text).toContain('2 attempts')
+    expect(text).toContain('output')
+    expect(text).not.toContain('no stderr captured')
+    expect(text).toContain('Queued node node-2')
+    mounted.app.unmount()
+  })
+
+  it('leads with progress only while the run is active', async () => {
+    const running = vi.fn(async () => ({
+      id: 'live-run',
+      state: 'RUNNING',
+      executors: [{ image: 'alpine', command: ['sh'] }],
+      inputs: [],
+      outputs: [],
+      logs: [],
+      tags: {},
+    }))
+    const done = vi.fn(async () => ({ ...(await running()), state: 'COMPLETE' }))
+    const getJob = vi.fn(async () => ({ family: null }))
+    const wake = vi.spyOn(Poll, 'onWake').mockImplementation(() => () => {})
+    const followSpy = vi.spyOn(Poll, 'follow').mockImplementation(() => () => {})
+    const find = (node: HostNode): HostNode | null =>
+      node.props['data-tutorial'] === 'run-executors'
+        ? node
+        : node.children.map(find).find((match) => match !== null) ?? null
+    const output = (root: HostNode) => find(root)!
+
+    const live = await mount(taskPanel(running, getJob), { taskId: 'live-run', open: true })
+    expect(String(output(live.root).props.class)).toContain('order-1')
+    live.app.unmount()
+    const ended = await mount(taskPanel(done, getJob), { taskId: 'live-run', open: true })
+    expect(String(output(ended.root).props.class)).not.toContain('order-1')
+    expect(ended.errors).toEqual([])
+    wake.mockRestore()
+    followSpy.mockRestore()
+    ended.app.unmount()
+  })
+
+  it('refreshes the native job with every poll', async () => {
+    // Placement and the family state must move with the run, not freeze at open.
+    const getTask = vi.fn(async () => ({
+      id: 'live-run',
+      state: 'RUNNING',
+      executors: [{ image: 'alpine', command: ['sh'] }],
+      inputs: [],
+      outputs: [],
+      logs: [],
+      tags: {},
+    }))
+    const getJob = vi.fn(async () => ({ family: null }))
+    const wake = vi.spyOn(Poll, 'onWake').mockImplementation(() => () => {})
+    let tick: (() => Promise<void>) | undefined
+    const followSpy = vi.spyOn(Poll, 'follow').mockImplementation((run) => {
+      tick = run
+      return () => {}
+    })
+
+    const mounted = await mount(taskPanel(getTask, getJob), { taskId: 'live-run', open: true })
+    expect(getJob).toHaveBeenCalledTimes(1)
+    await tick?.()
+    expect(getTask).toHaveBeenCalledTimes(2)
+    expect(getJob).toHaveBeenCalledTimes(2)
+    expect(mounted.errors).toEqual([])
+    wake.mockRestore()
+    followSpy.mockRestore()
     mounted.app.unmount()
   })
 })
