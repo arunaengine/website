@@ -22,6 +22,7 @@ import { useHiddenTasks } from '@/composables/useHiddenTasks'
 import { useRefresh } from '@/composables/useRefresh'
 import { useFirstPaint } from '@/composables/useFirstPaint'
 import { errorMessage, formatDuration, relativeTime, truncateMiddle } from '@/lib/utils'
+import { follow, onWake } from '@/lib/poll'
 import {
   TES_GROUP_TAG,
   isActiveTesState,
@@ -326,22 +327,27 @@ watch([currentUser, authPending], ([user], [previous]) => {
   else if (user.id !== previous?.id) void init()
 })
 
-let pollTimer: number | undefined
+// Section-owned auto-refresh: only re-fetch page one (a multi-page view must
+// not silently truncate) and only while some listed task is still active.
+function pollIdle(): boolean {
+  if (!currentUser.value || refreshing.value) return true
+  if (pagesLoaded.value !== 1) return true
+  return !tasks.value.some((t) => isActiveTesState(t.state))
+}
+async function pollList() {
+  if (pollIdle()) return
+  await fetchList({ silent: true })
+}
+let stopFollow: (() => void) | undefined
+let stopWake: (() => void) | undefined
 onMounted(() => {
   void init()
-  // Section-owned auto-refresh: only re-fetch page one (a multi-page view must
-  // not silently truncate) and only while some listed task is still active.
-  pollTimer = window.setInterval(() => {
-    if (document.hidden) return
-    if (!currentUser.value) return
-    if (refreshing.value) return
-    if (pagesLoaded.value !== 1) return
-    if (!tasks.value.some((t) => isActiveTesState(t.state))) return
-    void fetchList({ silent: true })
-  }, 10_000)
+  stopFollow = follow(pollList, () => 10_000)
+  stopWake = onWake(() => void pollList())
 })
 onUnmounted(() => {
-  window.clearInterval(pollTimer)
+  stopFollow?.()
+  stopWake?.()
   window.clearTimeout(rowDeleteTimer)
 })
 </script>
@@ -383,7 +389,7 @@ onUnmounted(() => {
         <FilterChips v-model="stateGroup" :options="chipOptions" aria-label="Filter runs by state" />
       </template>
       <template #tools>
-        <span v-if="lastPollError" class="text-[11px] text-muted-foreground">Auto-refresh failed: {{ lastPollError }}</span>
+        <span v-if="lastPollError" class="text-[11px] text-muted-foreground" :title="lastPollError">Refresh failed, retrying.</span>
         <RefreshButton :busy="spinning" sr-label="Refresh runs" @click="onReload" />
       </template>
 
