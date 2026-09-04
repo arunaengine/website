@@ -84,6 +84,18 @@ function formatAuditTime(ms: number): string {
   return ms > 0 ? new Date(ms).toLocaleString() : 'Not timestamped'
 }
 
+// The record kinds as words a reader knows; the backend names stay as they are.
+const KIND_LABEL: Record<string, string> = {
+  spec: 'request',
+  claim: 'claim',
+  budget: 'budget',
+  launch: 'launch',
+  receipt: 'response',
+  update: 'update',
+  output: 'output',
+  cancel: 'cancel',
+}
+
 function auditTimeTitle(ms: number): string | undefined {
   return ms > 0 ? new Date(ms).toISOString() : undefined
 }
@@ -210,7 +222,7 @@ watch(
                   {{ formatAuditTime(record.at_ms) }}
                 </td>
                 <td class="px-3 py-2">
-                  <Badge variant="secondary" size="sm" class="uppercase">{{ record.kind }}</Badge>
+                  <Badge variant="secondary" size="sm" class="uppercase">{{ KIND_LABEL[record.kind] ?? record.kind }}</Badge>
                   <Badge
                     v-if="record.conflicting_family"
                     variant="outline"

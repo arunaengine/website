@@ -682,7 +682,7 @@ async function confirmDelete() {
                   <div
                     v-if="hidden(executorStdout(i))"
                     aria-hidden="true"
-                    class="pointer-events-none absolute inset-x-0 top-0 h-8 rounded-t bg-gradient-to-b from-background to-transparent"
+                    class="pointer-events-none absolute inset-x-0 top-0 h-8 rounded-t bg-gradient-to-b from-muted to-transparent"
                   />
                 </div>
               </div>
@@ -691,7 +691,12 @@ async function confirmDelete() {
               </p>
             </template>
             <p v-else-if="executorLog(i) || nativeResult" class="text-[11px] text-muted-foreground">No output captured.</p>
-            <Button variant="outline" size="sm" @click="openLog(i)">
+            <Button
+              v-if="executorStdout(i) || executorStderr(i) || systemLogLines.length"
+              variant="outline"
+              size="sm"
+              @click="openLog(i)"
+            >
               <FileText class="h-3.5 w-3.5" /> Open full log
             </Button>
           </div>
