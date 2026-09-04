@@ -3,21 +3,26 @@
 // previews and the run and system job detail views (side sheets are retired).
 // The header and footer stay put; the default slot is the only scroller, so the
 // close button never sits on top of a scrollbar.
+import { computed } from 'vue'
 import Dialog from './Dialog.vue'
 import DialogClose from './DialogClose.vue'
 import DialogContent from './DialogContent.vue'
+import { cn } from '@/lib/utils'
 import { X } from '@lucide/vue'
 
-defineProps<{ open: boolean }>()
+/** `contentClass` only carries layering, such as opening above the assistant. */
+const props = defineProps<{ open: boolean; contentClass?: string }>()
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
+
+const classes = computed(() => cn(
+  'flex h-[88dvh] w-[calc(100%-2rem)] max-w-6xl flex-col gap-0 overflow-hidden bg-background p-0 sm:w-[92vw]',
+  props.contentClass,
+))
 </script>
 
 <template>
   <Dialog :open="open" @update:open="(v) => emit('update:open', v)">
-    <DialogContent
-      hide-close
-      class="flex h-[88dvh] w-[calc(100%-2rem)] max-w-6xl flex-col gap-0 overflow-hidden bg-background p-0 sm:w-[92vw]"
-    >
+    <DialogContent hide-close :class="classes">
       <div class="flex shrink-0 items-start justify-between gap-3 border-b border-border px-6 py-4">
         <div class="min-w-0 flex-1"><slot name="header" /></div>
         <DialogClose

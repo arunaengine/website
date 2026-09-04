@@ -43,6 +43,13 @@
     --ring: 202 90% 42%; /* #0B85CB deep sky, 3.7:1 on bg for a visible focus ring */
 
     --radius: 0.5rem; /* cards 8 · buttons 6 · badges 4 · panels 10 */
+
+    /* What floats over the page, from the bottom up: modals and sheets, the
+       assistant panel above them so a dialog never buries it, and a dialog the
+       assistant itself opens above that panel. Used as z-[var(--z-modal)]. */
+    --z-modal: 50;
+    --z-assistant: 60;
+    --z-assistant-modal: 70;
   }
 
   .dark {
@@ -195,6 +202,16 @@
   }
   .hash {
     @apply font-mono text-[11px] tracking-tight text-muted-foreground;
+  }
+
+  /* One measurement for the chat: the message column and the composer below it
+     both use it, and the list reserves its scrollbar on both sides so the two
+     keep the same left and right edge. */
+  .chat-column {
+    @apply mx-auto w-full max-w-[52rem] px-4;
+  }
+  .chat-scroller {
+    scrollbar-gutter: stable both-edges;
   }
 
   .scrollbar-thin {

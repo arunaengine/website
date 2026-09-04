@@ -1,6 +1,7 @@
 import { computed, defineComponent, h, inject, provide, ref, type ComputedRef } from 'vue'
 import * as VueRuntime from 'vue'
 import { describe, expect, it, vi } from 'vitest'
+import * as assistantObject from '@/composables/useAssistantObject'
 import * as StateBadge from '@/lib/stateBadge'
 import * as Utils from '@/lib/utils'
 import {
@@ -48,6 +49,7 @@ const hasActiveKey = ref(true)
 const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => IconStub }),
+  'vue-router': { RouterLink: Slotted('a') },
   '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/CopyButton.vue': moduleDefault(Slotted('button')),
@@ -67,6 +69,7 @@ const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.
     useS3: () => ({ headObject, hasActiveKey }),
     s3ErrorMessage: (error: unknown) => String(error),
   },
+  '@/composables/useAssistantObject': assistantObject,
   '@/lib/stateBadge': StateBadge,
   '@/lib/utils': Utils,
 })

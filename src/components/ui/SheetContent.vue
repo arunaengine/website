@@ -10,11 +10,11 @@ import {
 import { computed } from 'vue'
 import { cva } from 'class-variance-authority'
 import { X } from '@lucide/vue'
-import { insidePortalList } from '@/components/ui/layers'
+import { allowAssistantFocus, insideFloatingLayer } from '@/components/ui/layers'
 import { cn } from '@/lib/utils'
 
 const sheetVariants = cva(
-  'fixed z-50 gap-4 bg-background shadow-xl transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-200 data-[state=open]:duration-300 scrollbar-thin overflow-y-auto',
+  'fixed z-[var(--z-modal)] gap-4 bg-background shadow-xl transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-200 data-[state=open]:duration-300 scrollbar-thin overflow-y-auto',
   {
     variants: {
       side: {
@@ -42,14 +42,16 @@ const forwarded = useForwardPropsEmits(props, emits)
 const classes = computed(() => cn(sheetVariants({ side: props.side || 'right' }), props.class))
 
 function keepOpen(event: Event) {
-  if (insidePortalList(event)) event.preventDefault()
+  if (insideFloatingLayer(event)) event.preventDefault()
 }
+
+allowAssistantFocus()
 </script>
 
 <template>
   <DialogPortal>
     <DialogOverlay
-      class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+      class="fixed inset-0 z-[var(--z-modal)] bg-black/50 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
     />
     <DialogContent
       v-bind="forwarded"

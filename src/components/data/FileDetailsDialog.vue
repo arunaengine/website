@@ -19,10 +19,12 @@ import ObjectRulesEditor from '@/components/storage/ObjectRulesEditor.vue'
 import PolicyColumn from '@/components/storage/PolicyColumn.vue'
 import PreviewBody from '@/components/preview/PreviewBody.vue'
 import { useS3, s3ErrorMessage } from '@/composables/useS3'
+import { useAssistantObject } from '@/composables/useAssistantObject'
 import type { DeleteRequest } from '@/lib/deletion/request'
 import { stateVariant } from '@/lib/stateBadge'
 import { formatBytes, relativeTime, truncateMiddle } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import { Eye, ListTree } from '@lucide/vue'
 
 const props = defineProps<{
@@ -44,6 +46,10 @@ const props = defineProps<{
   probeReference?: boolean
   /** Bumped by the view after a deletion so the panels reload. */
   revision?: number
+  /** Set where the dialog is not the data browser, so leaving is a choice. */
+  browseHref?: string
+  /** Set when it opens from the assistant, which floats above the modal layer. */
+  raised?: boolean
 }>()
 const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
@@ -53,6 +59,7 @@ const emit = defineEmits<{
 }>()
 
 const s3 = useS3()
+const { leave } = useAssistantObject()
 const head = ref<{ contentType?: string; versionId?: string } | null>(null)
 const headError = ref<string | null>(null)
 const headBusy = ref(false)
@@ -109,6 +116,13 @@ function previewVersion(versionId: string) {
   emit('update:tab', 'preview')
 }
 
+// Leaving for the data browser closes this view and takes the chat along
+// where a surface asks for it.
+function openBrowser() {
+  leave()
+  emit('update:open', false)
+}
+
 const details = computed(() => [
   { label: 'Key', value: props.objectKey },
   { label: 'Size', value: props.size === undefined ? 'unknown' : formatBytes(props.size) },
@@ -121,7 +135,11 @@ const details = computed(() => [
 </script>
 
 <template>
-  <DetailDialog :open="props.open" @update:open="(value: boolean) => emit('update:open', value)">
+  <DetailDialog
+    :open="props.open"
+    :content-class="props.raised ? 'z-[var(--z-assistant-modal)]' : undefined"
+    @update:open="(value: boolean) => emit('update:open', value)"
+  >
     <template #header>
       <div class="flex min-w-0 items-start justify-between gap-3">
         <div class="min-w-0">
@@ -133,15 +151,22 @@ const details = computed(() => [
             <span v-if="props.size !== undefined"> · {{ formatBytes(props.size) }}</span>
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          class="shrink-0"
-          @click="emit('update:tab', previewMode ? 'general' : 'preview')"
-        >
-          <component :is="previewMode ? ListTree : Eye" class="h-4 w-4" />
-          {{ previewMode ? 'Details' : 'Preview' }}
-        </Button>
+        <div class="flex shrink-0 items-center gap-2">
+          <RouterLink
+            v-if="props.browseHref"
+            :to="props.browseHref"
+            class="text-xs font-medium text-primary hover:underline"
+            @click="openBrowser"
+          >Open in the data browser</RouterLink>
+          <Button
+            variant="outline"
+            size="sm"
+            @click="emit('update:tab', previewMode ? 'general' : 'preview')"
+          >
+            <component :is="previewMode ? ListTree : Eye" class="h-4 w-4" />
+            {{ previewMode ? 'Details' : 'Preview' }}
+          </Button>
+        </div>
       </div>
     </template>
 

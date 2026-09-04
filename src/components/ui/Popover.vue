@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { PopoverArrow, PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'radix-vue'
-import { insidePortalList } from '@/components/ui/layers'
+import { insideFloatingLayer } from '@/components/ui/layers'
 
 defineProps<{ side?: 'top' | 'right' | 'bottom' | 'left'; align?: 'start' | 'center' | 'end' }>()
 
 function keepOpen(event: Event) {
-  if (insidePortalList(event)) event.preventDefault()
+  if (insideFloatingLayer(event)) event.preventDefault()
 }
 </script>
 
