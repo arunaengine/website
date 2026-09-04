@@ -13,6 +13,7 @@ import { useRealm } from '@/composables/useRealm'
 import { activeGroupId } from '@/composables/useGroupSelection'
 import { useAssistantChat } from '@/composables/useAssistantChat'
 import { useAssistantEditor } from '@/composables/useAssistantEditor'
+import { useAssistantProfileForm } from '@/composables/useAssistantProfileForm'
 import { useAssistantRunForm } from '@/composables/useAssistantRunForm'
 import { usePageContext } from '@/composables/usePageContext'
 import { SendHorizontal, Settings2 } from '@lucide/vue'
@@ -27,6 +28,7 @@ const { currentUser, profiles, myGroups, discoverableGroups, realmInfo, usageInf
 const { realmId } = useRealm()
 const { bridge } = useAssistantEditor()
 const { bridge: runForm } = useAssistantRunForm()
+const { bridge: profileForm } = useAssistantProfileForm()
 const { currentPage } = usePageContext()
 const {
   busy,
@@ -83,6 +85,19 @@ function identity() {
   }
 }
 
+// What the open profile builder is showing, so its tools have their subject.
+function profileFormContext() {
+  const form = profileForm.value?.summary()
+  if (!form) return null
+  return {
+    name: form.name,
+    group: form.group,
+    entities: form.entities.length,
+    rules: form.entities.reduce((total, entity) => total + entity.properties.length, 0),
+    problems: form.problems.length,
+  }
+}
+
 // What the open run page is showing, so the run tools have their subject.
 function runFormContext() {
   const form = runForm.value?.summary()
@@ -105,6 +120,7 @@ function submit() {
     page: currentPage(),
     draft: bridge.value?.summary() ?? null,
     runForm: runFormContext(),
+    profileForm: profileFormContext(),
     profiles: profiles.value.map((profile) => ({ id: profile.id, name: profile.name })),
     realm: realmSummary(),
     identity: identity(),

@@ -210,6 +210,9 @@ const ProfileNewView = compileClientComponent(new URL('./ProfileNewView.vue', im
   '@/components/metadata/profile-builder/ProfileReviewStep.vue': moduleDefault(ReviewStub),
   '@/components/metadata/profile-builder/state/blockers': Blockers,
   '@/components/metadata/profile-builder/useProfileBuilder': ProfileBuilder,
+  '@/components/assistant/AskAiButton.vue': moduleDefault(Passthrough),
+  '@/composables/useAssistantProfileForm': { provideProfileFormBridge: () => {} },
+  '@/lib/profileFormBridge': { createProfileFormBridge: () => ({}) },
   '@/composables/useAruna': { useAruna: () => arunaModule.value },
   '@/composables/aruna/state': { readStored: () => stored.value, storeValue: (_key: string, value: string) => (stored.value = value) },
   '@/composables/useS3': {

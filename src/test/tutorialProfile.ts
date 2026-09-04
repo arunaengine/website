@@ -150,6 +150,9 @@ const builderShared = {
   '@/lib/profiles/uri': ProfileUri,
   '@/lib/utils': Utils,
   '@/components/metadata/profile-builder/useProfileBuilder': ProfileBuilder,
+  '@/components/assistant/AskAiButton.vue': moduleDefault(GenericStub),
+  '@/composables/useAssistantProfileForm': { provideProfileFormBridge: () => {} },
+  '@/lib/profileFormBridge': { createProfileFormBridge: () => ({}) },
   './useProfileBuilder': ProfileBuilder,
 }
 

@@ -20,6 +20,15 @@ export interface RunFormContext {
   problems: number
 }
 
+/** The profile the profile page has open, if any. */
+export interface ProfileFormContext {
+  name: string
+  group: string
+  entities: number
+  rules: number
+  problems: number
+}
+
 /** What the open view is showing: short details only, ids, paths and counts. */
 export interface PageContext {
   kind: string
@@ -52,6 +61,8 @@ export interface PromptContext {
   draft?: DraftContext | null
   /** Set while the run page is open, so the run tools have their subject. */
   runForm?: RunFormContext | null
+  /** Set while the profile builder is open, so the profile tools have theirs. */
+  profileForm?: ProfileFormContext | null
   /** Realm profiles as id and name, when the portal already has them. */
   profiles?: Array<{ id: string; name: string }>
   /** Realm totals the portal already holds, so counts need no tool call. */
@@ -78,6 +89,19 @@ const DATASET_AUTHORING = [
   'A field the user declines stays absent; optional fields are never a reason to ask again.',
   'Show the planned crate with show_crate and validate it before anything is created.',
   'Call create_dataset only after the user confirms; in the dataset editor use the editor tools and let the user save.',
+]
+
+const PROFILE_AUTHORING = [
+  'A profile says what a dataset in this realm must carry. Building one is a conversation: ask what the '
+  + 'datasets are, who reads them, and what a reader must be able to trust; then propose the rules.',
+  'Look at what is already there before proposing anything: list_profiles and get_profile show the realm\'s '
+  + 'profiles, and an existing one is often the better starting point.',
+  'Propose entity rules and property rules in one compact message, each with MUST, SHOULD or MAY and why, and '
+  + 'let the user correct them before anything is written into the form.',
+  'MUST is for what a dataset is useless without; SHOULD for what a careful author supplies; MAY for the rest. '
+  + 'Do not make everything MUST.',
+  'Fill the open builder with the profile tools once the user agrees, one change at a time, and say what each '
+  + 'one did. The user presses Create; you never do.',
 ]
 
 const COMPUTE = [
@@ -205,6 +229,17 @@ function runFormLines(form: RunFormContext): string[] {
   return lines
 }
 
+function profileFormLines(form: ProfileFormContext): string[] {
+  const lines = [
+    `A profile is open in the builder: "${form.name || 'unnamed'}" for ${form.group}, `
+    + `${form.entities} entit${form.entities === 1 ? 'y' : 'ies'} and ${form.rules} `
+    + `rule${form.rules === 1 ? '' : 's'}.`,
+  ]
+  if (form.problems) lines.push(`It still needs ${form.problems} thing${form.problems === 1 ? '' : 's'}.`)
+  lines.push('Read it with read_profile_form and change it with the profile tools; the user presses Create, you never do.')
+  return lines
+}
+
 export function systemPrompt(context: PromptContext): string {
   const lines = [
     'You are the Aruna assistant inside the Aruna data portal. Answer concisely and format clearly: '
@@ -212,6 +247,7 @@ export function systemPrompt(context: PromptContext): string {
     + 'for any data; never dump raw JSON.',
     ...CONVENTIONS,
     ...DATASET_AUTHORING,
+    ...PROFILE_AUTHORING,
     ...COMPUTE,
     ...ARTIFACTS,
     WEB,
@@ -226,6 +262,7 @@ export function systemPrompt(context: PromptContext): string {
   if (context.page) lines.push(pageLine(context.page))
   if (context.draft) lines.push(...draftLines(context.draft))
   if (context.runForm) lines.push(...runFormLines(context.runForm))
+  if (context.profileForm) lines.push(...profileFormLines(context.profileForm))
   if (context.profiles?.length) {
     lines.push(`Realm profiles: ${context.profiles.map((profile) => `${profile.id} (${profile.name})`).join(', ')}.`)
   }

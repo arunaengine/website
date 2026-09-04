@@ -3,6 +3,7 @@ import PageHeader from '@/components/dashboard/PageHeader.vue'
 import WizardSteps from '@/components/onboarding/WizardSteps.vue'
 import DiscardDraftConfirm from '@/components/ui/DiscardDraftConfirm.vue'
 import DocsLink from '@/components/ui/DocsLink.vue'
+import AskAiButton from '@/components/assistant/AskAiButton.vue'
 import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Select from '@/components/ui/Select.vue'
@@ -17,6 +18,8 @@ import ProfileEntityRulesStep from '@/components/metadata/profile-builder/Profil
 import ProfileReviewStep from '@/components/metadata/profile-builder/ProfileReviewStep.vue'
 import { profileBlockers } from '@/components/metadata/profile-builder/state/blockers'
 import { PROFILE_BUILDER, useProfileBuilder } from '@/components/metadata/profile-builder/useProfileBuilder'
+import { provideProfileFormBridge } from '@/composables/useAssistantProfileForm'
+import { createProfileFormBridge } from '@/lib/profileFormBridge'
 import { computed, inject, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { CheckCircle2, ArrowLeft, ArrowRight, FileUp, KeyRound, Lock, Plus } from '@lucide/vue'
@@ -56,6 +59,8 @@ const { publishProfileArtifacts } = useProfilePublish()
 // leaving means; without one the page owns an empty builder of its own.
 const hostedBuilder = inject(PROFILE_BUILDER, null)
 const builder = hostedBuilder ?? useProfileBuilder()
+// The assistant may read and fill this form while the page is open.
+provideProfileFormBridge(createProfileFormBridge(builder))
 
 // Public profiles upload their three artifacts to the group's S3 profiles
 // bucket at create time, so publishing needs an active S3 key.
@@ -419,7 +424,11 @@ async function submit() {
       :description="isEditing
         ? 'Adjust the profile\'s rules and details; saving replaces the stored profile in place.'
         : 'Define which RO-Crate entities must, should, or may exist, and the property rules for each, step by step.'"
-    />
+    >
+      <template #actions>
+        <AskAiButton size="default" prompt="Help me build this profile." subject="the profile form" />
+      </template>
+    </PageHeader>
 
     <div class="container space-y-5 py-6">
       <!-- First visit to a fresh create page: what a profile is, in three lines. -->

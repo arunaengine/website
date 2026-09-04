@@ -42,6 +42,7 @@ const {
   loadModels,
   hidePanel,
   showPanel,
+  openWith,
   newChat,
   renameChat,
   selectLatestChat,
@@ -72,11 +73,19 @@ const chatName = computed<string>(() => {
 })
 const deleteCallId = computed(() =>
   (pending.value?.always ? pending.value.request.id : undefined))
-const prompts = computed(() => [
-  ...(bridge.value ? ['Explain the draft I have open.'] : []),
-  'Help me describe a dataset I want to publish.',
-  'Search my realm for datasets about water quality.',
-  'Which buckets hold the most data right now?',
+// A suggestion with a route opens that page first, so the tools the question
+// needs are there; the profile builder is one such page.
+interface Suggestion {
+  text: string
+  route?: { name: string }
+  subject?: string
+}
+const prompts = computed<Suggestion[]>(() => [
+  ...(bridge.value ? [{ text: 'Explain the draft I have open.' }] : []),
+  { text: 'Help me describe a dataset I want to publish.' },
+  { text: 'Build a metadata profile with me.', route: { name: 'profile-new' }, subject: 'the profile form' },
+  { text: 'Search my realm for datasets about water quality.' },
+  { text: 'Which buckets hold the most data right now?' },
 ])
 
 onMounted(() => {
@@ -115,8 +124,13 @@ function commitRename() {
   renaming.value = false
 }
 
-function useSuggestion(prompt: string) {
-  draft.value = prompt
+function useSuggestion(prompt: Suggestion) {
+  if (!prompt.route) {
+    draft.value = prompt.text
+    return
+  }
+  openWith(prompt.text, prompt.subject)
+  void router.push(prompt.route)
 }
 
 // A link that really navigates leaves this page, so the chat comes along.
@@ -291,13 +305,13 @@ function continueInPanel() {
           <div class="flex max-w-[52rem] flex-wrap justify-center gap-2">
             <button
               v-for="prompt in prompts"
-              :key="prompt"
+              :key="prompt.text"
               type="button"
               class="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-sm hover:border-primary/40 hover:text-foreground"
               @click="useSuggestion(prompt)"
             >
               <Sparkles class="size-3.5 shrink-0 text-primary" aria-hidden="true" />
-              {{ prompt }}
+              {{ prompt.text }}
             </button>
           </div>
           <DocsLink
