@@ -180,13 +180,21 @@ const otherTags = computed(() =>
   ),
 )
 
+// A limit set in GiB reaches the portal as an exact GB fraction (1 GiB is
+// 1.073741824 GB); it reads back as the whole number it was set to.
+function gbLabel(gb: number): string {
+  const gib = (gb * 1e9) / 1024 ** 3
+  const value = Math.abs(gib - Math.round(gib)) < 0.01 ? Math.round(gib) : Number(gb.toFixed(1))
+  return `${value} GB`
+}
+
 const resourceSummary = computed(() => {
   const r = task.value?.resources
   if (!r) return ''
   const parts: string[] = []
   if (r.cpu_cores != null) parts.push(`${r.cpu_cores} cores`)
-  if (r.ram_gb != null) parts.push(`${r.ram_gb} GB RAM`)
-  if (r.disk_gb != null) parts.push(`${r.disk_gb} GB disk`)
+  if (r.ram_gb != null) parts.push(`${gbLabel(r.ram_gb)} RAM`)
+  if (r.disk_gb != null) parts.push(`${gbLabel(r.disk_gb)} disk`)
   if (r.preemptible) parts.push('preemptible')
   return parts.join(' · ')
 })
