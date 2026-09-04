@@ -57,11 +57,10 @@ function addOutputFile() {
   tree.value?.newOutputFile(`${activeWorkdir.value}/out`)
 }
 
-const complete = computed(
-  () => outputRows.value.length > 0 && outputsValid.value && inputsValid.value,
-)
+// A run without a capture is allowed; it just stores nothing but the logs.
+const noOutputs = computed(() => outputRows.value.length === 0)
+const complete = computed(() => outputsValid.value && inputsValid.value)
 const checkLabel = computed(() => {
-  if (!outputRows.value.length) return 'No output captured'
   if (!outputsValid.value) return 'An output needs a bucket and key'
   if (!inputsValid.value) return 'An input path is not valid'
   return 'Complete'
@@ -80,7 +79,6 @@ const checkLabel = computed(() => {
         {{ inputs.length }} input{{ inputs.length === 1 ? '' : 's' }} ·
         {{ outputRows.length }} output{{ outputRows.length === 1 ? '' : 's' }}
       </template>
-      <template v-else-if="!outputRows.length">Capture at least one output.</template>
       <template v-else-if="!outputsValid">An output needs a bucket and a key.</template>
       <template v-else>An input path is not valid.</template>
     </template>
@@ -92,7 +90,7 @@ const checkLabel = computed(() => {
       <div class="flex items-center gap-2">
         <p class="flex-1 text-[11px] text-muted-foreground">
           What the run sees at run time. Use a folder's + menu to add things there.
-          <DocsLink topic="compute-run" label="Docs" class="inline-flex align-baseline" />
+          <DocsLink topic="compute-run" label="Docs" />
         </p>
         <Button data-tutorial="run-add-input" variant="outline" size="sm" @click="openInputDialog()">
           <ListPlus class="size-3.5" /> Add input
@@ -144,7 +142,7 @@ const checkLabel = computed(() => {
             <div class="min-w-0 space-y-2">
               <div class="flex flex-wrap items-end gap-3">
                 <div class="min-w-0 flex-1">
-                  <label class="text-xs font-medium text-foreground">Capture <span class="text-muted-foreground">(container path)</span></label>
+                  <label class="flex items-center gap-1.5 text-xs font-medium text-foreground"><span>Capture <span class="text-muted-foreground">(container path)</span></span></label>
                   <Input
                     :model-value="row.path"
                     class="mt-1 font-mono"
@@ -155,7 +153,7 @@ const checkLabel = computed(() => {
                 </div>
                 <span class="pb-2.5 text-xs text-muted-foreground">into</span>
                 <div class="w-44">
-                  <label class="text-xs font-medium text-foreground">Bucket</label>
+                  <label class="flex items-center gap-1.5 text-xs font-medium text-foreground">Bucket</label>
                   <Select
                     v-if="bucketOptions.length"
                     v-model="row.bucket"
@@ -167,7 +165,7 @@ const checkLabel = computed(() => {
                   <Input v-else v-model="row.bucket" class="mt-1 font-mono" placeholder="my-results" aria-label="Destination bucket" />
                 </div>
                 <div class="min-w-0 flex-1">
-                  <label class="text-xs font-medium text-foreground">Key</label>
+                  <label class="flex items-center gap-1.5 text-xs font-medium text-foreground">Key</label>
                   <Input
                     :model-value="row.key"
                     class="mt-1 font-mono"
@@ -200,6 +198,9 @@ const checkLabel = computed(() => {
         </div>
       </div>
     </template>
-    <p class="mt-2 text-[11px] text-muted-foreground">stdout and stderr are always captured.</p>
+    <p v-if="noOutputs" class="mt-2 text-[11px] text-amber-700 dark:text-amber-300">
+      Nothing is captured, so this run stores no outputs. Only stdout and stderr are kept.
+    </p>
+    <p v-else class="mt-2 text-[11px] text-muted-foreground">stdout and stderr are always captured.</p>
   </RunSection>
 </template>

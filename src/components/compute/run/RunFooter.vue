@@ -39,6 +39,8 @@ const summary = computed(() =>
   ].join(' · '),
 )
 const unassigned = computed(() => unassignedPaths.value.length)
+// A warning, not a problem: the run may start and simply store nothing.
+const noOutputs = computed(() => outputRows.value.length === 0)
 </script>
 
 <template>
@@ -67,6 +69,12 @@ const unassigned = computed(() => unassignedPaths.value.length)
           · {{ unassigned }} path{{ unassigned === 1 ? '' : 's' }} not assigned
         </span>
       </template>
+      <span
+        v-if="noOutputs"
+        class="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 ring-1 ring-inset ring-amber-200 dark:bg-amber-500/15 dark:text-amber-200 dark:ring-amber-400/20"
+      >
+        No output captured: this run stores nothing but the logs.
+      </span>
     </div>
     <Button data-tutorial="run-request" variant="outline" @click="emit('show-request')">
       <Braces class="size-3.5" /> Show request

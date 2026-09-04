@@ -14,16 +14,16 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import type { MetadataDoc } from '@/data/types'
 import { ArrowRight, Boxes, Database, FileJson2, Files, FolderOpen, Plus, Activity, Users } from '@lucide/vue'
 import { RouterLink, useRouter } from 'vue-router'
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useDashboardScope } from '@/composables/useDashboardScope'
 import { useOnboarding } from '@/composables/useOnboarding'
-import { useDocumentVisibility, useIntervalFn } from '@vueuse/core'
 import { useNotifications } from '@/composables/useNotifications'
 import { useRefresh } from '@/composables/useRefresh'
 import { useFirstPaint } from '@/composables/useFirstPaint'
 import { featureEnabled } from '@/lib/config'
+import { POLL_SLOW_MS, follow, onWake } from '@/lib/poll'
 import { formatCount } from '@/lib/formatCount'
 import { formatBytes, formatNumber, relativeTime } from '@/lib/utils'
 
@@ -89,28 +89,25 @@ const painted = useFirstPaint(
   () => String(sessionEpoch.value),
 )
 
-let initialDashboardWatch = true
+// Opening the dashboard reads again. The view is mounted fresh on every visit,
+// so a skip here left the node panel and the totals showing the last visit's
+// numbers until the 15s poll landed or someone pressed Refresh.
 function watchDashboard() {
-  const initial = initialDashboardWatch
-  initialDashboardWatch = false
-  // The module-level bootstrap may already have settled before this view is
-  // mounted; in that case its initial refresh is all the core data needs, but
-  // the independently ordered recent window still has to be loaded.
-  if (initial && bootstrapped.value && !loading.value) {
-    void loadRecent()
-    return
-  }
   void refreshDashboard()
 }
 
 watch([dashboardRevision, sessionEpoch], watchDashboard, { immediate: true })
 
 // Node heartbeats republish every 60s but never bump the SSE revision; poll
-// the light info endpoints so the realm nodes panel stays current.
-const visibility = useDocumentVisibility()
-useIntervalFn(() => {
-  if (visibility.value === 'visible' && !refreshing.value) void loadInfo()
-}, 30_000)
+// the light info endpoints so the realm nodes panel stays current. A failed
+// read must not end the poll, so it is swallowed here.
+const pollInfo = () => loadInfo().catch(() => undefined)
+const stopFollow = follow(pollInfo, () => POLL_SLOW_MS, () => refreshing.value)
+const stopWake = onWake(() => void pollInfo())
+onUnmounted(() => {
+  stopFollow()
+  stopWake()
+})
 
 // Devices (kind 'user') run on their owner's computer, not on realm
 // infrastructure: they are summarized only, never listed or aggregated.

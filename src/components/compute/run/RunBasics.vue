@@ -39,8 +39,8 @@ const groupName = computed(() => groupOptions.value.find((g) => g.value === grou
         />
       </div>
       <div data-tutorial="run-group" id="run-group" class="min-w-0">
-        <label class="text-xs font-medium text-foreground">
-          Group<span class="ml-0.5 text-destructive" aria-hidden="true">*</span><span class="sr-only">(required)</span>
+        <label class="flex items-center gap-1.5 text-xs font-medium text-foreground">
+          <span>Group<span class="ml-0.5 text-destructive" aria-hidden="true">*</span><span class="sr-only">(required)</span></span>
         </label>
         <GroupSelect
           v-model="groupId"

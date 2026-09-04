@@ -128,7 +128,7 @@ function addInputFor(path: string) {
 
     <div class="mb-3 grid items-start gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
       <div class="min-w-0">
-        <label class="text-xs font-medium text-foreground">Language</label>
+        <label class="flex items-center gap-1.5 text-xs font-medium text-foreground">Language</label>
         <Select
           v-if="!underRuntime"
           v-model="languageId"
@@ -136,18 +136,18 @@ function addInputFor(path: string) {
           class="mt-1 h-8 text-xs"
           aria-label="Language"
         />
-        <Input v-else :model-value="language.label" class="mt-1 h-8 text-xs" readonly aria-label="Language" />
+        <Input v-else :model-value="language.label" class="mt-1 h-8 text-xs" :disabled="true" aria-label="Language" />
         <p class="mt-1 text-[11px] text-muted-foreground">
           {{ underRuntime ? 'Set by the runtime.' : 'Highlighting and file name only.' }}
         </p>
       </div>
       <div class="min-w-0">
-        <label for="run-script-path" class="text-xs font-medium text-foreground">Mounted at</label>
+        <label for="run-script-path" class="flex items-center gap-1.5 text-xs font-medium text-foreground">Mounted at</label>
         <Input
           id="run-script-path"
           :model-value="scriptPath"
           class="mt-1 h-8 font-mono text-xs"
-          :readonly="underRuntime"
+          :disabled="underRuntime"
           aria-label="Mounted at"
           @update:model-value="(value) => setScriptPath(String(value))"
         />
@@ -157,7 +157,7 @@ function addInputFor(path: string) {
         </p>
       </div>
       <div class="min-w-0">
-        <label class="text-xs font-medium text-foreground">Stored in bucket</label>
+        <label class="flex items-center gap-1.5 text-xs font-medium text-foreground">Stored in bucket</label>
         <Select
           v-if="bucketOptions.length"
           id="run-script-bucket"
@@ -228,7 +228,7 @@ function addInputFor(path: string) {
         <OptionToggle v-model="editorTab" :options="tabs" aria-label="Script editor tabs" />
         <span class="flex-1" />
         <span v-if="dependencies.length" class="text-[11px] text-muted-foreground">
-          Dependencies need network access. <DocsLink topic="compute-run" label="Docs" class="inline-flex align-baseline" />
+          Dependencies need network access. <DocsLink topic="compute-run" label="Docs" />
         </span>
       </div>
       <div v-if="editorTab === 'script'" data-tutorial="run-script" class="min-w-0">

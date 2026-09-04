@@ -178,7 +178,8 @@ describe('script card', () => {
   it('locks the language and the mount path under a runtime', async () => {
     const mounted = await mountApp(ScriptCard)
 
-    expect(input(mounted.root, 'aria-label', 'Mounted at').props.readonly).toBe(true)
+    expect(input(mounted.root, 'aria-label', 'Mounted at').props.disabled).toBe(true)
+    expect(input(mounted.root, 'aria-label', 'Language').props.disabled).toBe(true)
     expect(content(mounted.root)).toContain('Set by the runtime.')
     mounted.app.unmount()
   })

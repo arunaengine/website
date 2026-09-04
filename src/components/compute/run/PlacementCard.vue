@@ -118,7 +118,7 @@ function isCustom(rowId: number): boolean {
   <RunSection id="section-placement" title="Placement" :complete="complete" :check-label="checkLabel">
     <template #state>
       Where the run may execute.
-      <DocsLink topic="compute-run" label="Docs" class="inline-flex align-baseline" />
+      <DocsLink topic="compute-run" label="Docs" />
     </template>
     <template #controls>
       <Button
@@ -198,7 +198,7 @@ function isCustom(rowId: number): boolean {
 
     <div v-if="editing" class="mt-3.5 space-y-3.5">
       <div>
-        <span class="text-xs font-medium text-foreground">Constraints</span>
+        <span class="flex items-center gap-1.5 text-xs font-medium text-foreground">Constraints</span>
         <div class="mt-1 space-y-1.5">
           <div
             v-for="(row, index) in constraintRows"
@@ -257,7 +257,7 @@ function isCustom(rowId: number): boolean {
           </Button>
           <p class="text-[11px] text-muted-foreground">
             Keys and values come from what the nodes advertise.
-            <DocsLink topic="compute-run" label="Docs" class="inline-flex align-baseline" />
+            <DocsLink topic="compute-run" label="Docs" />
           </p>
         </div>
       </div>

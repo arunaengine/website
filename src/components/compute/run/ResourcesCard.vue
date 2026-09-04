@@ -55,7 +55,7 @@ const checkLabel = computed(() => (resourcesValid.value ? 'Complete' : 'Check th
   >
     <template #state>
       What the node must offer the run.
-      <DocsLink topic="compute-run" label="Docs" class="inline-flex align-baseline" />
+      <DocsLink topic="compute-run" label="Docs" />
     </template>
     <template #controls>
       <Button v-if="resourcesEdited" variant="link" size="sm" class="h-auto p-0 text-[11px]" @click="resetResources">

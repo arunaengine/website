@@ -51,6 +51,39 @@ async function languageExtension(language?: string): Promise<Extension | null> {
       const { properties } = await import('@codemirror/legacy-modes/mode/properties')
       return StreamLanguage.define(properties)
     }
+    case 'c':
+    case 'cpp':
+    case 'java':
+    case 'csharp':
+    case 'kotlin': {
+      const { StreamLanguage } = await import('@codemirror/language')
+      const clike = await import('@codemirror/legacy-modes/mode/clike')
+      return StreamLanguage.define(clike[language])
+    }
+    case 'go': {
+      const { StreamLanguage } = await import('@codemirror/language')
+      return StreamLanguage.define((await import('@codemirror/legacy-modes/mode/go')).go)
+    }
+    case 'ruby': {
+      const { StreamLanguage } = await import('@codemirror/language')
+      return StreamLanguage.define((await import('@codemirror/legacy-modes/mode/ruby')).ruby)
+    }
+    case 'swift': {
+      const { StreamLanguage } = await import('@codemirror/language')
+      return StreamLanguage.define((await import('@codemirror/legacy-modes/mode/swift')).swift)
+    }
+    case 'r': {
+      const { StreamLanguage } = await import('@codemirror/language')
+      return StreamLanguage.define((await import('@codemirror/legacy-modes/mode/r')).r)
+    }
+    case 'dockerfile': {
+      const { StreamLanguage } = await import('@codemirror/language')
+      return StreamLanguage.define((await import('@codemirror/legacy-modes/mode/dockerfile')).dockerFile)
+    }
+    case 'diff': {
+      const { StreamLanguage } = await import('@codemirror/language')
+      return StreamLanguage.define((await import('@codemirror/legacy-modes/mode/diff')).diff)
+    }
     default:
       return null
   }

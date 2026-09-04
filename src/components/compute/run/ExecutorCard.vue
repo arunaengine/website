@@ -131,7 +131,7 @@ function addInputFor(path: string) {
     <div data-tutorial="run-executor" class="grid items-start gap-x-5 gap-y-3 sm:grid-cols-2">
       <div class="min-w-0">
         <label for="run-image" class="flex items-center gap-1.5 text-xs font-medium text-foreground">
-          Image<span class="text-destructive" aria-hidden="true">*</span><span class="sr-only">(required)</span>
+          <span>Image<span class="text-destructive" aria-hidden="true">*</span><span class="sr-only">(required)</span></span>
           <AiMark v-if="hasAi('image')" />
         </label>
         <Input
@@ -146,14 +146,14 @@ function addInputFor(path: string) {
           @update:model-value="onImage"
         />
         <p id="run-image-message" class="mt-1 text-[11px]" :class="imageValid ? 'text-muted-foreground' : 'text-destructive'">
-          <template v-if="imageValid">Any registry the node can reach. <DocsLink topic="compute-run" label="Docs" class="inline-flex align-baseline" /></template>
+          <template v-if="imageValid">Any registry the node can reach. <DocsLink topic="compute-run" label="Docs" /></template>
           <template v-else>An image is required.</template>
         </p>
       </div>
 
       <div class="min-w-0">
         <label for="run-command" class="flex items-center gap-1.5 text-xs font-medium text-foreground">
-          Command line<span class="text-destructive" aria-hidden="true">*</span><span class="sr-only">(required)</span>
+          <span>Command line<span class="text-destructive" aria-hidden="true">*</span><span class="sr-only">(required)</span></span>
           <AiMark v-if="hasAi('command')" />
         </label>
         <Input
@@ -171,7 +171,7 @@ function addInputFor(path: string) {
         <p id="run-command-message" class="mt-1 text-[11px]" :class="commandValid ? 'text-muted-foreground' : 'text-destructive'">
           <template v-if="commandTokens.error">{{ commandTokens.error }}</template>
           <template v-else-if="!commandValid">A command is required.</template>
-          <template v-else>Split like a shell, run without one. <DocsLink topic="compute-run" label="Docs" class="inline-flex align-baseline" /></template>
+          <template v-else>Split like a shell, run without one. <DocsLink topic="compute-run" label="Docs" /></template>
         </p>
         <PathChips
           class="mt-1.5"
@@ -185,7 +185,7 @@ function addInputFor(path: string) {
       </div>
 
       <div class="min-w-0">
-        <label for="run-workdir" class="text-xs font-medium text-foreground">Working directory</label>
+        <label for="run-workdir" class="flex items-center gap-1.5 text-xs font-medium text-foreground">Working directory</label>
         <Input
           id="run-workdir"
           :model-value="workdir"
@@ -200,7 +200,7 @@ function addInputFor(path: string) {
       </div>
 
       <div class="min-w-0">
-        <span class="text-xs font-medium text-foreground">Environment</span>
+        <span class="flex items-center gap-1.5 text-xs font-medium text-foreground">Environment</span>
         <div class="mt-1 space-y-1.5">
           <div v-for="(row, index) in envRows" :key="index" class="grid grid-cols-[1fr_1fr_2rem] items-center gap-1.5">
             <Input
@@ -245,7 +245,7 @@ function addInputFor(path: string) {
       <Button variant="outline" size="sm" @click="addCustomScript"><FilePlus2 class="size-3.5" /> Add a script</Button>
       <p class="text-xs text-muted-foreground">
         Stored in your bucket, mounted into the container, called by your command.
-        <DocsLink topic="compute-run" label="Docs" class="inline-flex align-baseline" />
+        <DocsLink topic="compute-run" label="Docs" />
       </p>
     </div>
   </RunSection>

@@ -957,9 +957,8 @@ function createStore(deps: CustomRunDeps) {
     if (hasScript.value && !scriptStaged.value) {
       list.push({ section: 'section-script', field: 'run-script-bucket', text: 'The script needs a bucket' })
     }
-    if (!outputRows.value.length) {
-      list.push({ section: 'section-data', field: 'run-add-output', text: 'Capture at least one output' })
-    } else if (!outputsValid.value) {
+    // A run with no capture is allowed; the footer warns instead of blocking.
+    if (!outputsValid.value) {
       list.push({ section: 'section-data', field: 'run-tree', text: 'An output needs a bucket and key' })
     }
     if (!inputsValid.value) {

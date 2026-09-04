@@ -34,12 +34,14 @@ const target = computed(() => ({
   >
     <BookOpen class="size-3.5" aria-hidden="true" />
   </RouterLink>
+  <!-- Inline, not a flex row: the label keeps the baseline of the text it
+       follows, and the icon is nudged onto that same baseline. -->
   <RouterLink
     v-else
     :to="target"
-    class="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+    class="text-xs font-medium text-primary hover:underline"
   >
-    <BookOpen class="size-3.5 shrink-0" aria-hidden="true" />
+    <BookOpen class="mr-1 inline-block size-3.5 shrink-0 align-[-0.2em]" aria-hidden="true" />
     <span>{{ text }}</span>
   </RouterLink>
 </template>

@@ -45,6 +45,27 @@ const CODE_LANG: Record<string, string> = {
   css: 'css',
   xml: 'xml', html: 'xml', htm: 'xml',
   toml: 'toml',
+  go: 'go',
+  rb: 'ruby',
+  java: 'java',
+  c: 'c', h: 'c',
+  cc: 'cpp', cpp: 'cpp', cxx: 'cpp', hpp: 'cpp',
+  cs: 'csharp',
+  kt: 'kotlin', kts: 'kotlin',
+  swift: 'swift',
+  r: 'r',
+  diff: 'diff', patch: 'diff',
+  dockerfile: 'dockerfile',
+}
+
+// A minified JSON object is unreadable on one line, so the preview stores the
+// formatted text instead. Anything that does not parse is left untouched.
+export function prettyJson(content: string): string {
+  try {
+    return `${JSON.stringify(JSON.parse(content), null, 2)}\n`
+  } catch {
+    return content
+  }
 }
 
 export interface Classification {
@@ -177,7 +198,7 @@ export function useObjectPreview() {
           await fallbackDownload(target, cap, content.length)
           return
         }
-        text.value = content
+        text.value = classified.language === 'json' ? prettyJson(content) : content
         if (classified.kind === 'table') delimiter.value = extensionOf(target.key) === 'tsv' ? '\t' : ','
       }
       status.value = 'ready'

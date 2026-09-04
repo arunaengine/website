@@ -442,7 +442,9 @@ describe('run page', () => {
 
     expect(content(mounted.root)).toContain('still needed')
     expect(content(mounted.root)).toContain('Image is missing')
-    expect(content(mounted.root)).toContain('Capture at least one output')
+    // A missing capture is a warning, not a problem that holds the run back.
+    expect(content(mounted.root)).not.toContain('Capture at least one output')
+    expect(content(mounted.root)).toContain('No output captured')
     // Run is never disabled; with problems it jumps instead of submitting.
     expect(runButton(mounted.root).props.disabled).toBeFalsy()
     await click(runButton(mounted.root))

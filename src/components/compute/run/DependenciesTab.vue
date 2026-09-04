@@ -23,7 +23,7 @@ const {
     Added dependencies are checked against the registry automatically (browser-only, nothing is started); uv or Deno still performs the authoritative resolution when the run starts.
   </p>
   <div class="max-w-2xl space-y-2">
-    <label class="text-xs font-medium text-foreground">
+    <label class="flex items-center gap-1.5 text-xs font-medium text-foreground">
       {{ runtimeId === 'python-uv' ? 'PyPI requirement' : 'npm package' }}
     </label>
     <div class="flex items-center gap-2">

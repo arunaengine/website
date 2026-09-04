@@ -171,6 +171,7 @@ beforeAll(async () => {
       useDocumentVisibility: () => ref('hidden'),
       useIntervalFn: () => ({ pause: vi.fn(), resume: vi.fn() }),
     },
+    '@/lib/poll': { POLL_SLOW_MS: 15_000, follow: () => () => {}, onWake: () => () => {} },
     '@/composables/useNotifications': { useNotifications: () => ({ dashboardRevision }) },
     '@/composables/useDashboardScope': { useDashboardScope: () => ({ scope, setScope }) },
     '@/composables/useOnboarding': { useOnboarding: () => ({ isNewUser, dismissOnboarding }) },
@@ -257,11 +258,13 @@ describe('guest dashboard truth', () => {
     vi.unstubAllGlobals()
   })
 
-  it('loads the recency window when shared bootstrap already settled', async () => {
+  it('reads again when the dashboard is opened', async () => {
+    // The view mounts fresh on every visit, so opening it must not show the
+    // numbers of the previous visit until the slow poll lands.
     await renderedText()
 
     expect(listRecentMetadata).toHaveBeenCalledOnce()
-    expect(refresh).not.toHaveBeenCalled()
+    expect(refresh).toHaveBeenCalledOnce()
   })
 
   it('renders the dashboard while the recency window settles', async () => {
