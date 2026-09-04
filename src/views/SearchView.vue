@@ -77,7 +77,7 @@ const askPrompt = computed(() =>
         >Learn more</RouterLink>
       </template>
       <template #actions>
-        <AskAiButton :prompt="askPrompt" />
+        <AskAiButton :prompt="askPrompt" size="default" />
         <Button :disabled="!currentUser" @click="router.push({ name: 'dataset-new' })"><Plus class="h-4 w-4" /> Create dataset</Button>
         <!-- Importing an archive registers a NEW document, so it lives here next
              to Create dataset rather than on a single dataset's page. -->

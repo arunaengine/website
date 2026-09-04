@@ -48,7 +48,11 @@ const askPrompt = computed(() =>
 
 <template>
   <div>
-    <PageHeader :title="user?.name ?? 'User profile'" description="Public profile resolved from this realm's user directory." />
+    <PageHeader :title="user?.name ?? 'User profile'" description="Public profile resolved from this realm's user directory.">
+      <template #actions>
+        <AskAiButton :prompt="askPrompt" size="default" />
+      </template>
+    </PageHeader>
 
     <div class="container py-8">
       <div v-if="loading" class="space-y-3">
@@ -75,7 +79,6 @@ const askPrompt = computed(() =>
             </h2>
             <div v-if="attributes.affiliation" class="mt-0.5 text-sm text-muted-foreground">{{ attributes.affiliation }}</div>
             <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm">
-              <AskAiButton :prompt="askPrompt" />
               <a v-if="attributes.email" :href="`mailto:${attributes.email}`" class="text-primary hover:underline">{{ attributes.email }}</a>
               <a
                 v-if="attributes.orcid"

@@ -2,11 +2,12 @@
 // Self-gating launcher: opens the assistant with a seeded question the viewer
 // can edit or send, never spending a call on click. Hidden until a provider is
 // configured, so callers drop it in without their own guard.
-import { computed } from 'vue'
 import { Sparkles } from '@lucide/vue'
 import Button from '@/components/ui/Button.vue'
+import IconButton from '@/components/ui/IconButton.vue'
 import type { ButtonVariants } from '@/components/ui/button'
 import { assistantAvailable } from '@/composables/assistantState'
+import { cn } from '@/lib/utils'
 
 const props = withDefaults(
   defineProps<{
@@ -26,10 +27,6 @@ const props = withDefaults(
   },
 )
 
-const buttonSize = computed<ButtonVariants['size']>(() =>
-  props.iconOnly ? (props.size === 'sm' ? 'icon-sm' : 'icon') : props.size,
-)
-
 // Lazy so the chat module stays out of every host view's chunk.
 function ask() {
   void import('@/composables/useAssistantChat').then(({ useAssistantChat }) => useAssistantChat().openWith(props.prompt))
@@ -37,16 +34,27 @@ function ask() {
 </script>
 
 <template>
-  <Button
-    v-if="assistantAvailable"
-    :variant="variant"
-    :size="buttonSize"
-    :class="props.class"
-    aria-label="Ask AI about this"
-    title="Ask AI about this"
-    @click="ask"
-  >
-    <Sparkles />
-    <template v-if="!iconOnly">{{ label }}</template>
-  </Button>
+  <template v-if="assistantAvailable">
+    <IconButton
+      v-if="iconOnly"
+      label="Ask AI about this"
+      :variant="variant"
+      :size="props.size === 'sm' ? 'icon-sm' : 'icon'"
+      :class="props.class"
+      @click="ask"
+    >
+      <Sparkles class="size-3.5" />
+    </IconButton>
+    <Button
+      v-else
+      :variant="variant"
+      :size="props.size"
+      :class="cn('px-3.5', props.class)"
+      aria-label="Ask AI about this"
+      title="Ask AI about this"
+      @click="ask"
+    >
+      <Sparkles class="size-3.5" />{{ label }}
+    </Button>
+  </template>
 </template>
