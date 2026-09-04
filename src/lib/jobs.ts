@@ -55,6 +55,15 @@ export interface JobOutputResponse {
   endpoint_url: string | null
 }
 
+/** One input of the plan, with the node the plan expected to read it from. */
+export interface JobPlacementInput {
+  destination_key: string
+  bytes: number
+  /** Null when the input already sits on the node that runs the work. */
+  source_node_id: string | null
+  transfer_ms: number
+}
+
 export interface JobPlacementResponse {
   executor_kind?: string
   estimated_transfer_bytes: number
@@ -63,6 +72,20 @@ export interface JobPlacementResponse {
   rejected: number
   omitted: number
   stored_at_ms: number
+  // Served by newer nodes only; the figure falls back to the text form.
+  target_node_id?: string
+  scheduler_node_id?: string
+  inputs?: JobPlacementInput[]
+}
+
+export interface JobExecutionResponse {
+  execution_id: string
+  executor_node_id: string
+  // JobState::name() in practice, kept open for states the backend adds.
+  state: string
+  started_at_ms: number | null
+  observed_at_ms: number | null
+  canonical: boolean
 }
 
 export interface JobFamilyResponse {
@@ -75,7 +98,12 @@ export interface JobFamilyResponse {
   conflict_count: number
   logical_state: LogicalJobState
   canonical_execution_id?: string
-  executions: number
+  // A node serves either the count here or the list, with the count moved to
+  // `execution_count`; `executions_list` is the third shape seen in the wild.
+  executions: number | JobExecutionResponse[]
+  execution_count?: number
+  executions_list?: JobExecutionResponse[]
+  started_at_ms?: number | null
   duplicate_successes: number
   outputs: JobOutputResponse[]
   revision: number
@@ -613,6 +641,19 @@ export function placementVerdict(placement?: PlacementLike | null): PlacementVer
     explanation:
       'At least one input had no usable copy on the chosen node, so the plan expected to move those bytes to it before the run.',
   }
+}
+
+/** The executions a node served, whichever of the two field names it used. */
+export function familyExecutions(family: JobFamilyResponse): JobExecutionResponse[] {
+  if (Array.isArray(family.executions_list)) return family.executions_list
+  if (Array.isArray(family.executions)) return family.executions
+  return []
+}
+
+export function executionCount(family: JobFamilyResponse): number {
+  if (typeof family.execution_count === 'number') return family.execution_count
+  if (typeof family.executions === 'number') return family.executions
+  return familyExecutions(family).length
 }
 
 export const JOB_STATE_ORDER: JobState[] = [
