@@ -192,7 +192,7 @@ const resourceSummary = computed(() => {
   const r = task.value?.resources
   if (!r) return ''
   const parts: string[] = []
-  if (r.cpu_cores != null) parts.push(`${r.cpu_cores} cores`)
+  if (r.cpu_cores != null) parts.push(`${r.cpu_cores} core${r.cpu_cores === 1 ? '' : 's'}`)
   if (r.ram_gb != null) parts.push(`${gbLabel(r.ram_gb)} RAM`)
   if (r.disk_gb != null) parts.push(`${gbLabel(r.disk_gb)} disk`)
   if (r.preemptible) parts.push('preemptible')
