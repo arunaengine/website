@@ -347,6 +347,13 @@ function commitNew() {
   if (name.includes('/')) return
   extraDirs.value = new Set([...extraDirs.value, `${pending.dir === '/' ? '' : pending.dir}/${name}`])
 }
+// The card toolbar opens the same row; scaffold the folder so it has a host.
+function newOutputFile(dir: string) {
+  const path = normPath(dir)
+  extraDirs.value = new Set([...extraDirs.value, path])
+  startNew(path, 'file')
+}
+defineExpose({ newOutputFile })
 
 // ── Output destination, edited in place ──────────────────────────────────────
 const destEditing = ref<number | null>(null)

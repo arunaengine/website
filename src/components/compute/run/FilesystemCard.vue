@@ -2,7 +2,7 @@
 // What the run sees at run time: staged inputs, the script and the paths that
 // are captured afterwards. The tree is the default; the table edits the same
 // rows in grids.
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import OptionToggle from '@/components/ui/OptionToggle.vue'
@@ -51,6 +51,12 @@ const {
   aiPaths,
 } = injectCustomRun()
 
+const tree = ref<InstanceType<typeof ContainerFsTree> | null>(null)
+// The toolbar names a new file under out/, the same way the folder menu does.
+function addOutputFile() {
+  tree.value?.newOutputFile(`${activeWorkdir.value}/out`)
+}
+
 const complete = computed(
   () => outputRows.value.length > 0 && outputsValid.value && inputsValid.value,
 )
@@ -91,12 +97,13 @@ const checkLabel = computed(() => {
         <Button data-tutorial="run-add-input" variant="outline" size="sm" @click="openInputDialog()">
           <ListPlus class="size-3.5" /> Add input
         </Button>
-        <Button id="run-add-output" variant="outline" size="sm" @click="addOutputRow">
+        <Button id="run-add-output" variant="outline" size="sm" @click="addOutputFile">
           <Plus class="size-3.5" /> Add output
         </Button>
       </div>
       <div id="run-tree">
         <ContainerFsTree
+          ref="tree"
           :inputs="inputs"
           :outputs="treeOutputs"
           :script="hasScript ? { path: scriptPath, label: scriptUrl } : null"
