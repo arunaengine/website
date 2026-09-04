@@ -27,11 +27,15 @@ import type { StreamProviderOptions } from '@/lib/assistant/chat'
 import {
   assistantChatScopeKey,
   createAssistantChatStore,
+  decodeChatState,
+  encodeChatState,
   newAssistantChat,
   type AssistantChatRecord,
   type AssistantChatScope,
   type AssistantChatState,
 } from '@/lib/assistant/chatHistory'
+import { chatsConflicted, chatsUnsupported, readChats, saveChats } from '@/lib/api'
+import { chatsDiffer, mergeChats } from '@/lib/assistant/chatSync'
 import { clearLiveJobs, setWatchedJobs } from '@/lib/assistant/jobLive'
 import { searchKind, type SearchKind } from '@/lib/assistant/webSearch'
 import { watchPoller } from '@/lib/assistant/watchPoll'
@@ -48,6 +52,8 @@ import { assistantAvailable as available, assistantOpen as open, assistantPageOp
 
 const PROVIDER_KEY = 'aruna.assistant.provider'
 const MODEL_KEY = 'aruna.assistant.model'
+/** Saves to the node are batched, so a streaming answer writes once. */
+const REMOTE_SAVE_DELAY_MS = 3_000
 const APPROVE_KEY = 'aruna.assistant.approve'
 const SEARCH_KEY = 'aruna.assistant.search'
 const EFFORT_KEY = 'aruna.assistant.effort'
@@ -132,6 +138,12 @@ let history: ModelMessage[] = []
 let chatState: AssistantChatState = { activeChatId: '', chats: [] }
 let chatStore: ReturnType<typeof createAssistantChatStore> | null = null
 let chatScopeKey = ''
+// What the node last confirmed for this scope. `null` means it does not keep
+// chats, so everything stays in this browser.
+let remoteRevision: number | null = 0
+let remoteScopeKey = ''
+let remoteSaveTimer: ReturnType<typeof setTimeout> | null = null
+let remoteSaving = false
 let counter = 0
 let session: { token: string; expiresAt: number; epoch: number } | null = null
 let sessionInFlight: { epoch: number; owner: TurnContext | null; promise: Promise<string> } | null = null
@@ -272,6 +284,7 @@ function persistChatState() {
   chatState = chatStore.save(chatState)
   activeChatId.value = chatState.activeChatId
   updateChatList()
+  queueRemoteSave()
 }
 
 function persistCurrentChat() {
@@ -895,6 +908,76 @@ function resetConversation() {
   toolsNote.value = null
 }
 
+// ── Chats on the node ──────────────────────────────────────────────────────
+
+function stopRemoteSync() {
+  if (remoteSaveTimer !== null) clearTimeout(remoteSaveTimer)
+  remoteSaveTimer = null
+  remoteScopeKey = ''
+  remoteRevision = 0
+}
+
+/** Reads what the node holds and folds it into what this browser holds. */
+async function loadRemoteChats(scopeKey: string) {
+  try {
+    const stored = await readChats(client())
+    if (chatScopeKey !== scopeKey || !chatStore) return
+    remoteScopeKey = scopeKey
+    remoteRevision = stored.revision
+    const remote = stored.payload ? decodeChatState(stored.payload) : null
+    if (remote) {
+      const merged = mergeChats(chatState, remote)
+      if (chatsDiffer(merged, chatState)) {
+        applyChatState(chatStore.save(merged))
+      }
+      if (chatsDiffer(merged, remote)) queueRemoteSave()
+    } else if (chatState.chats.some((chat) => chat.messages.length)) {
+      queueRemoteSave()
+    }
+  } catch (cause) {
+    if (chatScopeKey !== scopeKey) return
+    // A node without the route keeps every chat local; anything else is worth
+    // one more try on the next save.
+    remoteRevision = chatsUnsupported(cause) ? null : remoteRevision
+  }
+}
+
+function queueRemoteSave() {
+  if (remoteRevision === null || !chatScopeKey || remoteScopeKey !== chatScopeKey) return
+  if (remoteSaveTimer !== null) return
+  remoteSaveTimer = setTimeout(() => {
+    remoteSaveTimer = null
+    void pushRemoteChats()
+  }, REMOTE_SAVE_DELAY_MS)
+}
+
+async function pushRemoteChats(retry = true) {
+  const scopeKey = chatScopeKey
+  if (remoteSaving || remoteRevision === null || !scopeKey || remoteScopeKey !== scopeKey) return
+  const payload = encodeChatState(chatState)
+  if (!payload) return
+  remoteSaving = true
+  try {
+    const stored = await saveChats({ payload, revision: remoteRevision }, client())
+    if (chatScopeKey === scopeKey) remoteRevision = stored.revision
+  } catch (cause) {
+    if (chatScopeKey !== scopeKey) return
+    if (chatsUnsupported(cause)) {
+      remoteRevision = null
+      return
+    }
+    // Another browser saved first: take its chats, fold ours in, save once more.
+    if (chatsConflicted(cause) && retry) {
+      remoteSaving = false
+      await loadRemoteChats(scopeKey)
+      if (chatScopeKey === scopeKey) await pushRemoteChats(false)
+      return
+    }
+  } finally {
+    remoteSaving = false
+  }
+}
+
 function syncChatScope() {
   const scope = currentChatScope()
   const nextKey = scope ? assistantChatScopeKey(scope) : ''
@@ -906,6 +989,7 @@ function syncChatScope() {
   chatScopeKey = ''
   chatStore = null
   historyReady.value = false
+  stopRemoteSync()
   stopWatchers()
   clearChatState()
   if (!scope) return
@@ -916,6 +1000,7 @@ function syncChatScope() {
   historyReady.value = true
   applyChatState(nextStore.load())
   startWatchers(scope)
+  void loadRemoteChats(nextStore.key)
 }
 
 function syncEpoch() {

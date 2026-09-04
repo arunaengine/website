@@ -1,8 +1,9 @@
 import type { ModelMessage } from 'ai'
 import type { ChatMessage, ToolCallView } from './types'
 
-// Transcripts are local to this browser. Provider credentials are deliberately
-// not part of a persisted chat record or its scope.
+// Transcripts are kept in this browser and, where the node serves the route,
+// saved to it as well so they follow the user. Provider credentials are
+// deliberately not part of a persisted chat record or its scope.
 export const ASSISTANT_CHAT_STORAGE_KEY = 'aruna.assistant.chat-history.v1'
 export const MAX_ASSISTANT_CHATS = 20
 export const MAX_ASSISTANT_MESSAGES = 120
@@ -255,6 +256,22 @@ function boundedState(state: AssistantChatState): { state: AssistantChatState; r
     raw = serialize({ version: 1, state: next })
   }
   return { state: next, raw }
+}
+
+/** The state as text, the same shape the browser keeps and the node stores. */
+export function encodeChatState(state: AssistantChatState): string | null {
+  return boundedState(state).raw
+}
+
+/** Reads that text back; anything unreadable counts as no chats at all. */
+export function decodeChatState(raw: string): AssistantChatState {
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    if (!record(parsed) || parsed.version !== 1 || !record(parsed.state)) return emptyState()
+    return normalizeState(parsed.state)
+  } catch {
+    return emptyState()
+  }
 }
 
 export function createAssistantChatStore(scope: AssistantChatScope, storage = browserStorage()) {

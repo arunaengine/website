@@ -778,6 +778,7 @@ export const docsTopics: DocsTopic[] = [
         paragraphs: [
           'The in-portal assistant runs on a provider you configure: Claude, OpenAI, an OpenAI-compatible or local endpoint, or a ChatGPT subscription.',
           'API keys stay in this browser tab and are never sent to Aruna; only a ChatGPT sign-in is kept by the [node](concept:glossary#node).',
+          'The conversations themselves are kept by the node you are signed in to, so the same chats are there in another browser or on another machine. They stay on that node and are not replicated to the realm. A node that does not keep them leaves every chat in this browser, as before.',
         ],
       },
       {
