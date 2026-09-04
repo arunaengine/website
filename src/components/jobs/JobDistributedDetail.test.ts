@@ -49,6 +49,12 @@ const NodeLabelStub = defineComponent({
   setup: (props) => () => h('span', props.nodeId),
 })
 const RouterLinkStub = defineComponent((_, { slots }) => () => h('a', slots.default?.()))
+const PaginationStub = defineComponent({
+  props: { page: Number, pageCount: Number, hasNext: Boolean },
+  emits: ['update:page'],
+  setup: (props, { emit }) => () =>
+    h('button', { onClick: () => emit('update:page', (props.page ?? 1) + 1) }, 'Next page'),
+})
 const icons = new Proxy({}, { get: () => PassThroughStub })
 const moduleDefault = (component: Component) => ({ __esModule: true, default: component })
 
@@ -142,6 +148,18 @@ const renderer = createRenderer<HostNode, HostNode>({
 
 function content(node: HostNode): string {
   return `${node.text}${node.children.map(content).join('')}`
+}
+
+function findAll(node: HostNode, match: (node: HostNode) => boolean): HostNode[] {
+  const hits = node.children.flatMap((child) => findAll(child, match))
+  return match(node) ? [node, ...hits] : hits
+}
+
+async function press(root: HostNode, text: string) {
+  const target = findAll(root, (node) => node.tag === 'button' && content(node).includes(text))[0]
+  if (!target) throw new Error(`No button named ${text}`)
+  await (target.props.onClick as ((event?: unknown) => unknown) | undefined)?.()
+  await nextTick()
 }
 
 async function mount(component: Component, props: Record<string, unknown>) {
@@ -307,9 +325,12 @@ describe('distributed job detail components', () => {
   }
   const figureModules = {
     vue: VueRuntime,
-    'vue-router': { RouterLink: RouterLinkStub },
     '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
+    '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+    '@/components/ui/DocsLink.vue': moduleDefault(PassThroughStub),
     '@/components/ui/NodeLabel.vue': moduleDefault(NodeLabelStub),
+    '@/components/ui/Pagination.vue': moduleDefault(PaginationStub),
+    '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => id }) },
     '@/lib/jobs': Jobs,
     '@/lib/utils': Utils,
   }
@@ -320,7 +341,9 @@ describe('distributed job detail components', () => {
       vue: VueRuntime,
       '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
       '@/components/ui/CopyButton.vue': moduleDefault(PassThroughStub),
+      '@/components/ui/DocsLink.vue': moduleDefault(PassThroughStub),
       '@/components/ui/NodeLabel.vue': moduleDefault(NodeLabelStub),
+      '@/components/ui/Notice.vue': moduleDefault(PassThroughStub),
       '@/components/jobs/JobStateBadge.vue': moduleDefault(JobStateBadgeStub),
       '@/lib/jobs': Jobs,
       '@/lib/utils': Utils,
@@ -372,7 +395,7 @@ describe('distributed job detail components', () => {
     mounted.app.unmount()
   })
 
-  it('draws every input as staying when none moved', async () => {
+  it('says nothing moved when every input was there', async () => {
     const local = placementInputs.map((input) => ({ ...input, source_node_id: null, transfer_ms: 0 }))
     const mounted = await mount(figure(), {
       placement: { ...family.placement!, target_node_id: 'node-giessen', inputs: local },
@@ -381,10 +404,11 @@ describe('distributed job detail components', () => {
 
     expect(mounted.errors).toEqual([])
     expect(text).toContain('Compute went to the data')
-    expect(text).toContain('All 3 inputs were already on the node that ran the work. Nothing moved.')
-    expect(text).toContain('in/reads.fq.gz')
-    expect(text).toContain('node-giessen')
-    expect(text).not.toContain('moved 300 MB')
+    expect(text).toContain('All 3 inputs were already on node-giessen. Nothing moved.')
+    expect(text).toContain('1.5 GB stayed')
+    // Hundreds of inputs must not land on the page unasked.
+    expect(text).not.toContain('in/reads.fq.gz')
+    expect(text).toContain('Show movements (3)')
     mounted.app.unmount()
   })
 
@@ -396,10 +420,8 @@ describe('distributed job detail components', () => {
 
     expect(mounted.errors).toEqual([])
     expect(text).toContain('Mixed: 1 of 3 moved')
-    expect(text).toContain('1 of 3 inputs (300 MB, about 4s) was copied to the node that ran the work.')
-    expect(text).toContain('moved 300 MB · ~4s')
-    expect(text).toContain('node-bielefeld')
-    expect(text).toContain('stays')
+    expect(text).toContain('1 of 3 inputs (300 MB, about 4s) was copied to node-giessen; 1.2 GB stayed.')
+    expect(text).toContain('300 MB moved · ~4s')
     mounted.app.unmount()
   })
 
@@ -416,8 +438,59 @@ describe('distributed job detail components', () => {
 
     expect(mounted.errors).toEqual([])
     expect(text).toContain('Data moved to the compute')
-    expect(text).toContain('All 3 inputs (1.5 GB, about 12s) were copied to the node that ran the work.')
-    expect(text).toContain('moved 1.2 GB · ~4s')
+    expect(text).toContain('All 3 inputs (1.5 GB, about 12s) were copied to node-bielefeld.')
+    expect(text).toContain('0 B stayed')
+    mounted.app.unmount()
+  })
+
+  it('pages the movements a reader asks for', async () => {
+    const many = Array.from({ length: 12 }, (_, i) => ({
+      destination_key: `in/file-${i}.txt`,
+      bytes: 1024,
+      source_node_id: i === 0 ? 'node-bielefeld' : null,
+      transfer_ms: i === 0 ? 2000 : 0,
+    }))
+    const mounted = await mount(figure(), {
+      placement: { ...family.placement!, target_node_id: 'node-giessen', inputs: many },
+    })
+
+    await press(mounted.root, 'Show movements (12)')
+    let text = content(mounted.root)
+
+    expect(mounted.errors).toEqual([])
+    expect(text).toContain('in/file-0.txt')
+    expect(text).toContain('in/file-7.txt')
+    expect(text).not.toContain('in/file-8.txt')
+    expect(text).toContain('1–8 of 12')
+
+    await press(mounted.root, 'Next page')
+    text = content(mounted.root)
+
+    expect(text).toContain('in/file-8.txt')
+    expect(text).not.toContain('in/file-0.txt')
+    expect(text).toContain('9–12 of 12')
+    mounted.app.unmount()
+  })
+
+  it('shows the candidates only when asked', async () => {
+    const candidates = [
+      { node_id: 'node-giessen', executor_kind: 'docker', verdict: 'selected' as const },
+      { node_id: 'node-bielefeld', executor_kind: 'docker', verdict: 'ranked' as const, rank: 1 },
+      { node_id: 'node-edge', verdict: 'rejected' as const, reason: 'no executor' },
+    ]
+    const mounted = await mount(figure(), {
+      placement: { ...family.placement!, target_node_id: 'node-giessen', candidates },
+    })
+
+    expect(content(mounted.root)).not.toContain('no executor')
+    await press(mounted.root, 'Show candidates (3)')
+    const text = content(mounted.root)
+
+    expect(mounted.errors).toEqual([])
+    expect(text).toContain('selected')
+    expect(text).toContain('ranked 1')
+    expect(text).toContain('no executor')
+    expect(text).toContain('1–3 of 3')
     mounted.app.unmount()
   })
 
@@ -493,11 +566,46 @@ describe('distributed job detail components', () => {
     expect(mounted.errors).toEqual([])
     expect(text).toContain('node-giessen')
     expect(text).toContain('node-bielefeld')
-    expect(text).toContain('canonical')
-    expect(text).toContain('still running')
+    expect(text).toContain('the result')
+    expect(text).toContain('replaced, still in progress')
     expect(text).toContain('not recorded')
     expect(text).toContain('1 duplicate success')
     expect(text).toContain(Utils.truncateMiddle('01EXECUTIONCANONICAL'))
+    // The word never reaches the reader, only the role does.
+    expect(text).not.toContain('canonical')
+    mounted.app.unmount()
+  })
+
+  it('names a catch-up instead of hiding the quiet execution', async () => {
+    const listed: JobFamilyResponse = {
+      ...family,
+      executions: [
+        {
+          execution_id: '01EXECUTIONQUIET',
+          executor_node_id: 'node-bielefeld',
+          state: 'indeterminate',
+          started_at_ms: 1755500000000,
+          observed_at_ms: 1755500060000,
+          canonical: false,
+        },
+        {
+          execution_id: '01EXECUTIONLATER',
+          executor_node_id: 'node-giessen',
+          state: 'succeeded',
+          started_at_ms: 1755500100000,
+          observed_at_ms: 1755500200000,
+          canonical: true,
+        },
+      ],
+    }
+
+    const mounted = await mount(executionsTable(), { family: listed })
+    const text = content(mounted.root)
+
+    expect(mounted.errors).toEqual([])
+    expect(text).toContain('An earlier execution went quiet and a later one supplied the result')
+    expect(text).toContain('replaced, silent for')
+    expect(text).toContain('the result')
     mounted.app.unmount()
   })
 
@@ -507,6 +615,7 @@ describe('distributed job detail components', () => {
 
     expect(mounted.errors).toEqual([])
     expect(text).toContain('1 execution recorded')
+    expect(text).toContain('Result execution')
     expect(text).toContain('canonical-execution')
     mounted.app.unmount()
   })

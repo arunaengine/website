@@ -54,9 +54,9 @@ function outputUrl(output: JobOutputResponse): string {
 
     <div data-tutorial="job-outputs" class="space-y-2">
       <div>
-        <h4 class="text-xs font-medium text-foreground">Canonical outputs</h4>
+        <h4 class="text-xs font-medium text-foreground">Result outputs</h4>
         <p class="text-[11px] text-muted-foreground">
-          Outputs of the canonical execution, each named by its exact version.
+          Outputs of the execution that supplied the result, each named by its exact version.
         </p>
       </div>
       <div v-if="family.outputs.length" class="overflow-x-auto rounded-md border border-border">
@@ -112,7 +112,7 @@ function outputUrl(output: JobOutputResponse): string {
           </tbody>
         </table>
       </div>
-      <p v-else class="text-xs text-muted-foreground">No canonical outputs have been recorded.</p>
+      <p v-else class="text-xs text-muted-foreground">No result outputs have been recorded.</p>
     </div>
   </section>
 </template>

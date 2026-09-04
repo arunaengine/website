@@ -64,6 +64,16 @@ export interface JobPlacementInput {
   transfer_ms: number
 }
 
+/** One target the planning round looked at, with what it decided about it. */
+export interface JobPlacementCandidate {
+  node_id: string
+  executor_kind?: string
+  verdict: 'selected' | 'ranked' | 'rejected'
+  // Rank of a ranked alternative, 1 being the closest runner-up.
+  rank?: number
+  reason?: string
+}
+
 export interface JobPlacementResponse {
   executor_kind?: string
   estimated_transfer_bytes: number
@@ -76,6 +86,7 @@ export interface JobPlacementResponse {
   target_node_id?: string
   scheduler_node_id?: string
   inputs?: JobPlacementInput[]
+  candidates?: JobPlacementCandidate[]
 }
 
 export interface JobExecutionResponse {
