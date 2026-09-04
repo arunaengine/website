@@ -418,6 +418,8 @@ interface OutRow {
   path: string
   size?: number
   link: ResolvedLink
+  /** True once the run wrote the file; a declared-only row is still a promise. */
+  captured: boolean
 }
 
 // A captured file opens in the portal's own file dialog, the same surface the
@@ -445,31 +447,45 @@ async function openPreview(row: OutRow) {
 function objectName(key: string): string {
   return key.split('/').filter(Boolean).pop() || key
 }
-const declaredOutputs = computed<OutRow[]>(() =>
-  (task.value?.outputs ?? []).map((o) => ({ url: o.url, path: o.path, link: resolveUrl(o.url) })),
-)
-const capturedOutputs = computed<OutRow[]>(() =>
-  (task.value?.logs ?? [])
-    .flatMap((l) => l.outputs ?? [])
-    .map((o) => ({ url: o.url, path: o.path, size: Number(o.size_bytes), link: resolveUrl(o.url) })),
-)
+/** Where a row lands, without the version, so a declared and a captured row meet. */
+function destination(link: ResolvedLink, url: string): string {
+  return link.kind === 's3' ? `${link.bucketId}/${link.objectKey}` : url
+}
 
-// A run may capture hundreds of files, so both lists page.
+// One table: every declared output is a row from the start, and the file the
+// run captured for it upgrades that row in place with its size and exact
+// version. A captured file nothing declared is appended.
+const outputRows = computed<OutRow[]>(() => {
+  const rows: OutRow[] = (task.value?.outputs ?? []).map((o) => ({
+    url: o.url,
+    path: o.path,
+    link: resolveUrl(o.url),
+    captured: false,
+  }))
+  for (const o of (task.value?.logs ?? []).flatMap((l) => l.outputs ?? [])) {
+    const link = resolveUrl(o.url)
+    const written: OutRow = { url: o.url, path: o.path, size: Number(o.size_bytes), link, captured: true }
+    const at = rows.findIndex((row) =>
+      !row.captured && (row.path === o.path || destination(row.link, row.url) === destination(link, o.url)))
+    if (at >= 0) rows[at] = written
+    else rows.push(written)
+  }
+  return rows
+})
+const capturedCount = computed(() => outputRows.value.filter((row) => row.captured).length)
+
+// A run may capture hundreds of files, so the table pages.
 const OUTPUT_PAGE = 8
-const declaredPage = ref(1)
-const capturedPage = ref(1)
-const declaredShown = computed(() => pageSlice(declaredOutputs.value, declaredPage.value))
-const capturedShown = computed(() => pageSlice(capturedOutputs.value, capturedPage.value))
-function pageSlice(rows: OutRow[], page: number): OutRow[] {
-  return rows.slice((page - 1) * OUTPUT_PAGE, page * OUTPUT_PAGE)
-}
-function pageTotal(rows: OutRow[]): number {
-  return Math.max(1, Math.ceil(rows.length / OUTPUT_PAGE))
-}
-function pageRange(rows: OutRow[], page: number): string {
-  const first = (page - 1) * OUTPUT_PAGE + 1
-  return `${first}–${Math.min(page * OUTPUT_PAGE, rows.length)} of ${rows.length} output${rows.length === 1 ? '' : 's'}`
-}
+const outputPage = ref(1)
+const outputsShown = computed(() =>
+  outputRows.value.slice((outputPage.value - 1) * OUTPUT_PAGE, outputPage.value * OUTPUT_PAGE))
+const outputPages = computed(() => Math.max(1, Math.ceil(outputRows.value.length / OUTPUT_PAGE)))
+const outputRange = computed(() => {
+  const total = outputRows.value.length
+  const first = (outputPage.value - 1) * OUTPUT_PAGE + 1
+  const span = total > OUTPUT_PAGE ? `${first}–${Math.min(outputPage.value * OUTPUT_PAGE, total)} of ` : ''
+  return `${span}${total} output${total === 1 ? '' : 's'}, ${capturedCount.value} captured`
+})
 
 // ── Run dataset (targeted lookup at runs/{taskId}) ───────────────────────────
 async function findRunCrate() {
@@ -727,66 +743,25 @@ async function confirmDelete() {
         <section data-tutorial="run-artifacts" class="space-y-3">
           <h3 class="font-display text-sm font-semibold text-aruna-navy">Outputs</h3>
 
-          <div v-if="declaredOutputs.length" class="space-y-1.5">
-            <div class="text-[11px] font-medium text-foreground">Declared</div>
+          <div v-if="outputRows.length" class="space-y-1.5">
             <div class="overflow-x-auto rounded-md border border-border">
-              <table class="w-full min-w-[36rem] text-left text-[11px]">
-                <thead class="bg-muted/50 text-muted-foreground">
-                  <tr>
-                    <th scope="col" class="px-3 py-2 font-medium">Path in the container</th>
-                    <th scope="col" class="px-3 py-2 font-medium">Destination</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-border">
-                  <tr v-for="(row, i) in declaredShown" :key="'d' + row.url + i">
-                    <td class="px-3 py-2 font-mono text-muted-foreground">{{ row.path }}</td>
-                    <td class="px-3 py-2">
-                      <RouterLink v-if="row.link.kind === 's3'" class="break-all font-mono text-primary hover:underline" :to="{ name: 'bucket', params: { bucketId: row.link.bucketId }, query: row.link.prefix ? { prefix: row.link.prefix } : {} }">{{ row.url }}</RouterLink>
-                      <span v-else-if="row.link.kind === 'drs'" class="inline-flex items-center gap-1">
-                        <a class="font-mono text-primary hover:underline" :href="row.link.object" target="_blank" rel="noopener noreferrer">{{ truncateMiddle(row.url, 24, 12) }}</a>
-                        <Tooltip label="Download this output">
-                          <a class="text-muted-foreground hover:text-foreground" :href="row.link.download" target="_blank" rel="noopener noreferrer" aria-label="Download this output"><Download class="h-3.5 w-3.5" /></a>
-                        </Tooltip>
-                      </span>
-                      <ExternalLink v-else :href="row.url" :label="row.url" class="break-all font-mono text-muted-foreground hover:text-primary" />
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div v-if="declaredOutputs.length > OUTPUT_PAGE" class="flex flex-wrap items-center justify-between gap-2">
-              <span class="text-[11px] text-muted-foreground">{{ pageRange(declaredOutputs, declaredPage) }}</span>
-              <Pagination
-                :page="declaredPage"
-                :page-count="pageTotal(declaredOutputs)"
-                :has-next="declaredPage < pageTotal(declaredOutputs)"
-                @update:page="(page: number) => (declaredPage = page)"
-              />
-            </div>
-          </div>
-
-          <div v-if="capturedOutputs.length" class="space-y-1.5">
-            <div class="text-[11px] font-medium text-foreground">Captured</div>
-            <div class="overflow-x-auto rounded-md border border-border">
-              <table class="w-full min-w-[44rem] text-left text-[11px]">
+              <table class="w-full min-w-[48rem] text-left text-[11px]">
                 <thead class="bg-muted/50 text-muted-foreground">
                   <tr>
                     <th scope="col" class="px-3 py-2 font-medium">File</th>
                     <th scope="col" class="px-3 py-2 font-medium">Path in the container</th>
-                    <th scope="col" class="px-3 py-2 text-right font-medium">Size</th>
                     <th scope="col" class="px-3 py-2 font-medium">Destination</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">Size</th>
+                    <th scope="col" class="px-3 py-2 font-medium">Status</th>
                     <th scope="col" class="px-3 py-2"><span class="sr-only">Actions</span></th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-border">
-                  <tr v-for="(row, i) in capturedShown" :key="'c' + row.url + i">
+                  <tr v-for="(row, i) in outputsShown" :key="row.url + i">
                     <td class="max-w-64 break-all px-3 py-2 font-mono text-foreground">
-                      {{ row.link.kind === 's3' ? objectName(row.link.objectKey) : objectName(row.path) }}
+                      {{ objectName(row.link.kind === 's3' ? row.link.objectKey : row.path) }}
                     </td>
                     <td class="px-3 py-2 font-mono text-muted-foreground">{{ row.path }}</td>
-                    <td class="whitespace-nowrap px-3 py-2 text-right text-foreground">
-                      {{ row.size !== undefined && !Number.isNaN(row.size) ? formatBytes(row.size) : '' }}
-                    </td>
                     <td class="px-3 py-2">
                       <RouterLink v-if="row.link.kind === 's3'" class="break-all font-mono text-primary hover:underline" :to="{ name: 'bucket', params: { bucketId: row.link.bucketId }, query: row.link.prefix ? { prefix: row.link.prefix } : {} }">{{ row.url }}</RouterLink>
                       <span v-else-if="row.link.kind === 'drs'" class="inline-flex items-center gap-1">
@@ -797,9 +772,15 @@ async function confirmDelete() {
                       </span>
                       <ExternalLink v-else :href="row.url" :label="row.url" class="break-all font-mono text-muted-foreground hover:text-primary" />
                     </td>
+                    <td class="whitespace-nowrap px-3 py-2 text-right text-foreground">
+                      {{ row.size !== undefined && !Number.isNaN(row.size) ? formatBytes(row.size) : '' }}
+                    </td>
+                    <td class="px-3 py-2">
+                      <Badge size="sm" :variant="row.captured ? 'success' : 'secondary'">{{ row.captured ? 'Captured' : 'Declared' }}</Badge>
+                    </td>
                     <td class="px-3 py-2 text-right">
                       <Button
-                        v-if="row.link.kind === 's3'"
+                        v-if="row.captured && row.link.kind === 's3'"
                         variant="ghost"
                         size="sm"
                         class="h-6 px-1.5"
@@ -815,18 +796,18 @@ async function confirmDelete() {
             </div>
             <div class="flex flex-wrap items-center justify-between gap-2">
               <span class="text-[11px] text-muted-foreground">
-                {{ pageRange(capturedOutputs, capturedPage) }} · all in the run dataset
+                {{ outputRange }}<template v-if="capturedCount"> · captured files are in the run dataset</template>
               </span>
               <Pagination
-                v-if="capturedOutputs.length > OUTPUT_PAGE"
-                :page="capturedPage"
-                :page-count="pageTotal(capturedOutputs)"
-                :has-next="capturedPage < pageTotal(capturedOutputs)"
-                @update:page="(page: number) => (capturedPage = page)"
+                v-if="outputRows.length > OUTPUT_PAGE"
+                :page="outputPage"
+                :page-count="outputPages"
+                :has-next="outputPage < outputPages"
+                @update:page="(page: number) => (outputPage = page)"
               />
             </div>
           </div>
-          <p v-if="!declaredOutputs.length && !capturedOutputs.length" class="text-xs text-muted-foreground">No files captured for this run.</p>
+          <p v-else class="text-xs text-muted-foreground">No files captured for this run.</p>
 
           <div class="flex flex-wrap items-center gap-2 text-xs">
             <span class="text-muted-foreground">Run dataset:</span>

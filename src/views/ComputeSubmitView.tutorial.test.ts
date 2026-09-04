@@ -121,7 +121,10 @@ describe('compute tutorial walkthrough', () => {
     await runTheDraft()
     await advance(RUN_STAGE_MS * 4)
 
-    await click(previewButtons(anchor(mounted.root, 'run-artifacts'))[0])
+    const plot = previewButtons(anchor(mounted.root, 'run-artifacts'))
+      .find((node) => node.props['aria-label'] === 'Preview plot.png')
+    if (!plot) throw new Error('No preview button for plot.png')
+    await click(plot)
 
     expect(content(mounted.root)).toContain(`preview ${RESULT_BUCKET}/runs/plot.png`)
   })
