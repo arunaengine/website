@@ -537,7 +537,7 @@ describe('distributed job detail components', () => {
   it('lists every execution with its result', async () => {
     const listed: JobFamilyResponse = {
       ...family,
-      executions: [
+      execution_list: [
         {
           execution_id: '01EXECUTIONCANONICAL',
           executor_node_id: 'node-giessen',
@@ -555,7 +555,7 @@ describe('distributed job detail components', () => {
           canonical: false,
         },
       ],
-      execution_count: 2,
+      executions: 2,
       duplicate_successes: 1,
       responder_node_id: 'node-giessen',
     }
@@ -579,7 +579,7 @@ describe('distributed job detail components', () => {
   it('names a catch-up instead of hiding the quiet execution', async () => {
     const listed: JobFamilyResponse = {
       ...family,
-      executions: [
+      execution_list: [
         {
           execution_id: '01EXECUTIONQUIET',
           executor_node_id: 'node-bielefeld',

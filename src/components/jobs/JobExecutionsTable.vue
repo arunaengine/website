@@ -8,19 +8,13 @@ import DocsLink from '@/components/ui/DocsLink.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
 import Notice from '@/components/ui/Notice.vue'
 import JobStateBadge from '@/components/jobs/JobStateBadge.vue'
-import {
-  executionCount,
-  familyExecutions,
-  type JobExecutionResponse,
-  type JobFamilyResponse,
-  type JobState,
-} from '@/lib/jobs'
+import type { JobExecutionResponse, JobFamilyResponse, JobState } from '@/lib/jobs'
 import { formatDuration, truncateMiddle } from '@/lib/utils'
 
 const props = defineProps<{ family: JobFamilyResponse }>()
 
-const executions = computed(() => familyExecutions(props.family))
-const count = computed(() => executionCount(props.family))
+const executions = computed(() => props.family.execution_list ?? [])
+const count = computed(() => props.family.executions)
 const decided = computed(() => executions.value.some((execution) => execution.canonical))
 // A later execution supplied the result while an earlier one was still open.
 const caughtUp = computed(

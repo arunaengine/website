@@ -82,10 +82,12 @@ export interface JobPlacementResponse {
   rejected: number
   omitted: number
   stored_at_ms: number
-  // Served by newer nodes only; the figure falls back to the text form.
-  target_node_id?: string
-  scheduler_node_id?: string
+  // Every node holding the family fills these; an older node omits them and
+  // the figure falls back to the plan totals.
+  target_node_id?: string | null
+  scheduler_node_id?: string | null
   inputs?: JobPlacementInput[]
+  // Not served yet; the candidate table stays hidden until it is.
   candidates?: JobPlacementCandidate[]
 }
 
@@ -109,11 +111,9 @@ export interface JobFamilyResponse {
   conflict_count: number
   logical_state: LogicalJobState
   canonical_execution_id?: string
-  // A node serves either the count here or the list, with the count moved to
-  // `execution_count`; `executions_list` is the third shape seen in the wild.
-  executions: number | JobExecutionResponse[]
-  execution_count?: number
-  executions_list?: JobExecutionResponse[]
+  executions: number
+  // Omitted by an older node, which then serves the count only.
+  execution_list?: JobExecutionResponse[]
   started_at_ms?: number | null
   duplicate_successes: number
   outputs: JobOutputResponse[]
@@ -652,19 +652,6 @@ export function placementVerdict(placement?: PlacementLike | null): PlacementVer
     explanation:
       'At least one input had no usable copy on the chosen node, so the plan expected to move those bytes to it before the run.',
   }
-}
-
-/** The executions a node served, whichever of the two field names it used. */
-export function familyExecutions(family: JobFamilyResponse): JobExecutionResponse[] {
-  if (Array.isArray(family.executions_list)) return family.executions_list
-  if (Array.isArray(family.executions)) return family.executions
-  return []
-}
-
-export function executionCount(family: JobFamilyResponse): number {
-  if (typeof family.execution_count === 'number') return family.execution_count
-  if (typeof family.executions === 'number') return family.executions
-  return familyExecutions(family).length
 }
 
 export const JOB_STATE_ORDER: JobState[] = [
