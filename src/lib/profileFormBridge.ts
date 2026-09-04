@@ -135,25 +135,38 @@ export function createProfileFormBridge(builder: ProfileBuilder, hooks: ProfileF
     group?: string
     visibility?: string
   }): string | null {
+    // Every field that can be applied is; a group or visibility that cannot be
+    // is refused only when nothing else was asked for, and stays in the problems.
+    const refused: string[] = []
+    let applied = false
     if (input.group !== undefined) {
       const wanted = input.group.trim().toLowerCase()
       const match = builder.groupOptions.find(
         (option) => option.value === input.group || option.label.toLowerCase() === wanted,
       )
-      if (!match) return `No group named "${input.group}". The user is a member of: ${builder.groupOptions.map((option) => option.label).join(', ') || 'none'}.`
-      builder.groupId = match.value
+      if (match) {
+        builder.groupId = match.value
+        applied = true
+      } else {
+        const groups = builder.groupOptions.map((option) => option.label).join(', ')
+        refused.push(`No group named "${input.group}"; the user is a member of ${groups || 'no group yet'}.`)
+      }
     }
     if (input.visibility !== undefined) {
-      if (input.visibility !== 'public' && input.visibility !== 'group') {
-        return 'Visibility is "public" or "group".'
+      if (input.visibility === 'public' || input.visibility === 'group') {
+        builder.isPublic = input.visibility === 'public'
+        applied = true
+      } else {
+        refused.push('Visibility is "public" or "group".')
       }
-      builder.isPublic = input.visibility === 'public'
     }
-    if (input.name !== undefined) builder.name = input.name
-    if (input.description !== undefined) builder.description = input.description
-    if (input.version !== undefined) builder.version = input.version
-    if (input.license !== undefined) builder.license = input.license
-    return null
+    for (const field of ['name', 'description', 'version', 'license'] as const) {
+      if (input[field] !== undefined) {
+        builder[field] = input[field]
+        applied = true
+      }
+    }
+    return refused.length && !applied ? refused.join(' ') : null
   }
 
   function addEntity(input: { type: string; label?: string }): string | null {

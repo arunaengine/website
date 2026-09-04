@@ -39,6 +39,12 @@ describe('createProfileFormBridge', () => {
     expect(bridge.setBasics({ visibility: 'secret' })).toBe('Visibility is "public" or "group".')
   })
 
+  it('applies the fields it can when the group does not match', () => {
+    // A wrong group must not cost the name; the problems list still asks for one.
+    expect(bridge.setBasics({ name: 'RNA-seq runs', group: 'Other lab' })).toBeNull()
+    expect(bridge.summary().name).toBe('RNA-seq runs')
+  })
+
   it('adds an entity rule and a property rule on it', () => {
     expect(bridge.addEntity({ type: 'Person' })).toBeNull()
     expect(bridge.addProperty({ entity: 'Person', name: 'ORCID', obligation: 'SHOULD', kind: 'url' })).toBeNull()
