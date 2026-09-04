@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import '@/assets/landing-graph.css'
 import LandingNav from '@/components/landing/LandingNav.vue'
 import Hero from '@/components/landing/Hero.vue'
 import FeatureGrid from '@/components/landing/FeatureGrid.vue'
+import RunAnywhereSection from '@/components/landing/RunAnywhereSection.vue'
+import ComputeSection from '@/components/landing/ComputeSection.vue'
 import ArchitectureSection from '@/components/landing/ArchitectureSection.vue'
 import CallToAction from '@/components/landing/CallToAction.vue'
 import LandingFooter from '@/components/landing/LandingFooter.vue'
@@ -13,6 +16,8 @@ import LandingFooter from '@/components/landing/LandingFooter.vue'
     <main>
       <Hero />
       <FeatureGrid />
+      <RunAnywhereSection />
+      <ComputeSection />
       <ArchitectureSection />
       <CallToAction />
     </main>

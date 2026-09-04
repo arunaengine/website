@@ -1,0 +1,136 @@
+/* One look for every node graph on the landing page: blue is structure, aqua
+   is activity, sky is a result. The components only add layout and timing. */
+.fed {
+  --aqua: #57c5de;
+  --sky: #2da8e5;
+  --structure: hsl(var(--primary));
+  isolation: isolate;
+}
+
+/* Links: a soft glow line under a crisp one; the glow only shows in use. */
+.fed .link-glow {
+  fill: none;
+  stroke: var(--aqua);
+  stroke-opacity: 0;
+  stroke-width: 7;
+  stroke-linecap: round;
+  filter: blur(3px);
+}
+.fed .link {
+  fill: none;
+  stroke: var(--structure);
+  stroke-opacity: 0.4;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+}
+
+/* Node cards: a blue-tinted frame, a bloom behind them while they work. */
+.fed .landing-node {
+  border-color: hsl(var(--primary) / 0.28);
+  background:
+    linear-gradient(180deg, hsl(var(--primary) / 0.08), transparent 55%),
+    hsl(var(--card));
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+}
+.fed .landing-node::before {
+  content: '';
+  position: absolute;
+  inset: -26px;
+  border-radius: 30px;
+  background: radial-gradient(ellipse at center, rgba(87, 197, 222, 0.3), rgba(87, 197, 222, 0) 68%);
+  filter: blur(14px);
+  opacity: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+.fed .node-dot {
+  position: relative;
+  background: hsl(var(--primary) / 0.7);
+}
+.fed .node-dot::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 1.5px solid var(--aqua);
+  opacity: 0;
+  transform: scale(0.6);
+}
+.fed .st-running,
+.fed .st-done {
+  opacity: 0;
+  transition: none;
+}
+
+/* Packets: a bright core, a bloom, a tail, a label above. */
+.fed .pt,
+.fed .tail {
+  position: absolute;
+  top: 0;
+  left: 0;
+  offset-distance: 0%;
+  opacity: 0;
+  pointer-events: none;
+}
+.fed .pt {
+  width: 12px;
+  height: 12px;
+  offset-rotate: 0deg;
+  will-change: offset-distance;
+}
+.fed .pt::before {
+  content: '';
+  position: absolute;
+  inset: -12px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(87, 197, 222, 0.5), rgba(87, 197, 222, 0) 70%);
+}
+.fed .pt::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow:
+    0 0 0 2px var(--aqua),
+    0 0 14px 4px rgba(87, 197, 222, 0.7);
+}
+.fed .pt b {
+  position: absolute;
+  left: 50%;
+  top: -20px;
+  transform: translateX(-50%);
+  font: 600 10px/1 ui-monospace, 'JetBrains Mono', monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--aqua);
+}
+.fed .tail {
+  width: 90px;
+  height: 3px;
+  border-radius: 3px;
+  offset-rotate: auto;
+  offset-anchor: 100% 50%;
+  background: linear-gradient(90deg, rgba(87, 197, 222, 0), rgba(87, 197, 222, 0.85));
+  filter: blur(0.6px);
+}
+.fed .pt-result::after {
+  box-shadow:
+    0 0 0 2px var(--sky),
+    0 0 14px 4px rgba(45, 168, 229, 0.7);
+}
+.fed .pt-result::before {
+  background: radial-gradient(circle, rgba(45, 168, 229, 0.45), rgba(45, 168, 229, 0) 70%);
+}
+.fed .pt-result b {
+  color: var(--sky);
+}
+.fed .tail.pt-result {
+  background: linear-gradient(90deg, rgba(45, 168, 229, 0), rgba(45, 168, 229, 0.8));
+}
+.fed.no-offset .pt,
+.fed.no-offset .tail {
+  display: none;
+}
+

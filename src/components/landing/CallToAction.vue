@@ -21,11 +21,11 @@ import { RouterLink } from 'vue-router'
             <h2
               class="mt-4 font-display text-3xl font-semibold tracking-tight sm:text-4xl"
             >
-              Run a node. Join a realm. Keep your data where it is.
+              Build the federation, not the integration project.
             </h2>
             <p class="mt-4 max-w-xl text-sm text-white/75 md:text-base">
-              A single binary plus your own OIDC provider. That is the whole
-              deployment.
+              Connect sovereign nodes for data, metadata and compute in one
+              deployable system. A single binary plus your own OIDC provider.
             </p>
           </div>
           <div class="flex flex-wrap gap-3 lg:justify-end">
