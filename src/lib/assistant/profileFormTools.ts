@@ -167,7 +167,8 @@ export function profileFormTools(bridge: ProfileFormBridge, gate: ApprovalGate):
         'Adds one property rule to an entity of the profile: which field a dataset must carry, how strongly '
         + '(MUST, SHOULD or MAY) and what kind of value it holds (text, longtext, date, url, email, integer, '
         + 'number, boolean, keyword-list, enum or entity). For kind "entity" pass target_type, the type the '
-        + 'reference points at.',
+        + 'reference points at: search_profile_terms names the types a term allows, so creator points at '
+        + 'Person, not at Thing.',
       inputSchema: schema<PropertyInput>({
         entity: STRING,
         name: STRING,
