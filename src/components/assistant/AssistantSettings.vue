@@ -1,15 +1,15 @@
 <script setup lang="ts">
 // The provider, model and approval choices, in one popover shared by the
 // composer cogwheel and the model pill in the chat header.
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
 import Popover from '@/components/ui/Popover.vue'
 import Select from '@/components/ui/Select.vue'
 import ModelCombobox from '@/components/assistant/ModelCombobox.vue'
 import { useAssistantChat } from '@/composables/useAssistantChat'
-import { effortLabel, isValidModelId, normalizeModelId } from '@/lib/assistant/modelOptions'
-import { Save, Settings } from '@lucide/vue'
+import { effortLabel } from '@/lib/assistant/modelOptions'
+import { Settings } from '@lucide/vue'
 
 const props = withDefaults(defineProps<{
   side?: 'top' | 'bottom'
@@ -42,10 +42,6 @@ const writeChoices = [
   { value: 'auto', label: 'Run writes automatically' },
 ]
 
-// The id typed into the model field; Save applies it once it is valid and new.
-const modelDraft = ref(model.value)
-const canSave = computed(() =>
-  isValidModelId(modelDraft.value) && normalizeModelId(modelDraft.value) !== normalizeModelId(model.value))
 </script>
 
 <template>
@@ -76,10 +72,9 @@ const canSave = computed(() =>
             aria-label="Model"
             required
             @update:model-value="selectModel"
-            @update:draft="(value: string) => (modelDraft = value)"
           />
           <p class="mt-1 text-[11px] text-muted-foreground">
-            Pick an id or type one, then press Enter or Save. Changing the model starts a new chat.
+            Pick an id, or type one and press Enter. Changing the model starts a new chat.
           </p>
           <p v-if="modelsError" class="mt-1 text-[11px] text-muted-foreground">{{ modelsError }}</p>
         </div>
@@ -108,14 +103,11 @@ const canSave = computed(() =>
               : 'Writes run without asking; the chat says what ran.' }}
           </p>
         </div>
-        <div class="flex items-center justify-end gap-2">
+        <div class="flex items-center justify-end">
           <Button variant="outline" size="sm" as-child>
             <RouterLink :to="{ name: 'settings', query: { tab: 'assistant' } }">
               <Settings class="size-3.5 shrink-0" aria-hidden="true" /> Assistant settings
             </RouterLink>
-          </Button>
-          <Button size="sm" :disabled="!canSave" @click="selectModel(normalizeModelId(modelDraft))">
-            <Save class="size-3.5 shrink-0" aria-hidden="true" /> Save
           </Button>
         </div>
       </div>

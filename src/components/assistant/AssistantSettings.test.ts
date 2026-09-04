@@ -128,18 +128,6 @@ describe('AssistantSettings', () => {
     expect(selectModel).toHaveBeenCalledWith('gpt-4.1')
   })
 
-  it('saves a typed id from the footer button once it differs', async () => {
-    const { root } = await mountApp(AssistantSettings)
-    expect(button(root, 'Save').props.disabled).toBe(true)
-
-    await typeValue(combobox(root), ' gpt-4.1 ')
-    expect(button(root, 'Save').props.disabled).toBe(false)
-
-    await click(button(root, 'Save'))
-
-    expect(selectModel).toHaveBeenCalledWith('gpt-4.1')
-  })
-
   it('offers the provider list only when a second provider is ready', async () => {
     chat.providers.value = [openai, { ...openai, provider_id: 'browser-2', label: 'Local' }]
     const { root } = await mountApp(AssistantSettings)
@@ -155,7 +143,9 @@ describe('AssistantSettings', () => {
 
     expect(content(root)).toContain('Enter the key again in settings to list models.')
     await typeValue(combobox(root), 'gpt-5.6-luna')
-    await click(button(root, 'Save'))
+    ;(combobox(root).props.onChange as (event: unknown) => void)({ target: { value: 'gpt-5.6-luna' } })
+    await flush()
+
     expect(selectModel).toHaveBeenCalledWith('gpt-5.6-luna')
   })
 
