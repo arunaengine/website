@@ -177,6 +177,12 @@ async function press(root: HostNode, text: string) {
   await nextTick()
 }
 
+const FileDialogStub = defineComponent({
+  props: { open: Boolean, bucket: String, objectKey: String, versionId: String, name: String },
+  setup: (props) => () =>
+    h('div', { 'data-file-dialog': `${props.bucket}/${props.objectKey}@${props.versionId ?? ''}` }, props.name),
+})
+
 async function mount(component: Component, props: Record<string, unknown>) {
   const root = hostNode('root')
   const app: App<HostNode> = renderer.createApp(component, props)
@@ -283,8 +289,10 @@ function taskPanel(getTask: unknown, getJob: unknown): Component {
       }),
     },
     '@/composables/useHiddenTasks': { useHiddenTasks: () => ({ hide: vi.fn() }) },
-    '@/composables/useS3': { useS3: () => ({ endpoint: ref(null) }) },
-    '@/components/preview/PreviewBody.vue': moduleDefault(PassThroughStub),
+    '@/composables/useS3': {
+      useS3: () => ({ endpoint: ref(null), hasActiveKey: ref(true), ensureSession: async () => {} }),
+    },
+    '@/components/data/FileDetailsDialog.vue': moduleDefault(FileDialogStub),
     '@/lib/assistant/objectLinks': ObjectLinks,
     '@/lib/chunk-recovery': { asyncChunkError: () => undefined },
     '@/lib/quickRuntimes': { detectQuickRun: () => false },
@@ -963,6 +971,40 @@ describe('distributed job detail components', () => {
       expect(text, `state ${task.state}`).toContain(expected)
       mounted.app.unmount()
     }
+    wake.mockRestore()
+    followSpy.mockRestore()
+  })
+
+  it('lists a captured output by its name and previews its exact version', async () => {
+    // The captured URL carries ?versionId=; the key is what stands before it.
+    const wake = vi.spyOn(Poll, 'onWake').mockImplementation(() => () => {})
+    const followSpy = vi.spyOn(Poll, 'follow').mockImplementation(() => () => {})
+    const url = 's3://reports/results/demo/chart.png?versionId=01VERSION'
+    const getTask = vi.fn(async () => ({
+      id: 'run',
+      state: 'COMPLETE',
+      executors: [{ image: 'alpine', command: ['sh'] }],
+      inputs: [],
+      outputs: [{ url: 's3://reports/results/demo/chart.png', path: '/work/chart.png' }],
+      logs: [{ logs: [{ exit_code: 0 }], outputs: [{ url, path: '/work/chart.png', size_bytes: '13' }] }],
+      tags: {},
+    }))
+    const getJob = vi.fn(async () => ({ family: null }))
+    const mounted = await mount(taskPanel(getTask, getJob), { taskId: 'run', open: true })
+    const text = content(mounted.root).replace(/\s+/g, ' ')
+
+    expect(text).toContain('/work/chart.png')
+    expect(findAll(mounted.root, (node) => node.tag === 'td' && content(node).trim() === 'chart.png')).toHaveLength(1)
+    await press(mounted.root, 'Preview')
+    // The dialog is an async component, so it lands a few ticks later.
+    for (let tick = 0; tick < 4; tick += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      await nextTick()
+    }
+    const [dialog] = findAll(mounted.root, (node) => 'data-file-dialog' in node.props)
+
+    expect(dialog?.props['data-file-dialog']).toBe('reports/results/demo/chart.png@01VERSION')
+    mounted.app.unmount()
     wake.mockRestore()
     followSpy.mockRestore()
   })

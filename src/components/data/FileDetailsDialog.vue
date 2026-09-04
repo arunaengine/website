@@ -50,6 +50,8 @@ const props = defineProps<{
   browseHref?: string
   /** Set when it opens from the assistant, which floats above the modal layer. */
   raised?: boolean
+  /** The exact version to show first, as a run's captured output names one. */
+  versionId?: string | null
 }>()
 const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
@@ -93,9 +95,9 @@ async function loadHead() {
 }
 
 watch(
-  () => [props.open, props.bucket, props.objectKey, props.revision],
+  () => [props.open, props.bucket, props.objectKey, props.revision, props.versionId],
   () => {
-    pinnedVersion.value = null
+    pinnedVersion.value = props.versionId ?? null
     if (props.open) void loadHead()
     else head.value = null
   },

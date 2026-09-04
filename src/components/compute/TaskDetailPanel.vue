@@ -386,18 +386,23 @@ const stages = computed(() => {
 
 // ── Output links ─────────────────────────────────────────────────────────────
 type ResolvedLink =
-  | { kind: 's3'; bucketId: string; prefix: string; objectKey: string }
+  | { kind: 's3'; bucketId: string; prefix: string; objectKey: string; versionId?: string }
   | { kind: 'drs'; object: string; download: string }
   | { kind: 'plain' }
 
 function resolveUrl(url: string): ResolvedLink {
   const parsed = parseS3Url(url, s3.endpoint.value)
   if (parsed) {
+    // A captured output names its exact version as `?versionId=`; the key is
+    // what stands before it, the version travels beside it.
+    const query = parsed.key.indexOf('?')
+    const objectKey = query >= 0 ? parsed.key.slice(0, query) : parsed.key
+    const versionId = query >= 0 ? new URLSearchParams(parsed.key.slice(query + 1)).get('versionId') : null
     // Slash-less parent prefix, matching DataManagerView.navigateTo (which
     // appends its own trailing '/'); a trailing slash here would list the
     // bucket at "prefix//", an always-empty folder view.
-    const prefix = parsed.key.includes('/') ? parsed.key.slice(0, parsed.key.lastIndexOf('/')) : ''
-    return { kind: 's3', bucketId: parsed.bucket, prefix, objectKey: parsed.key }
+    const prefix = objectKey.includes('/') ? objectKey.slice(0, objectKey.lastIndexOf('/')) : ''
+    return { kind: 's3', bucketId: parsed.bucket, prefix, objectKey, ...(versionId ? { versionId } : {}) }
   }
   // Only node-resolvable id forms (w3id URL / content-hash ARN) get a DRS href;
   // `drs://` URIs are accepted for TES input but the node's DRS route rejects
@@ -423,7 +428,17 @@ const FileDetailsDialog = defineAsyncComponent({
 })
 const previewing = ref<OutRow | null>(null)
 const previewTab = ref('preview')
-function openPreview(row: OutRow) {
+// The run page opens no S3 session of its own, so the first preview asks for
+// one on the run's group before the dialog reads the object.
+async function openPreview(row: OutRow) {
+  const groupId = groupTagId.value
+  if (groupId && !s3.hasActiveKey.value) {
+    try {
+      await s3.ensureSession(groupId)
+    } catch {
+      // The dialog reports the missing session itself and offers a retry.
+    }
+  }
   previewing.value = row
   previewTab.value = 'preview'
 }
@@ -882,6 +897,7 @@ async function confirmDelete() {
     :bucket="previewing.link.bucketId"
     :object-key="previewing.link.objectKey"
     :name="objectName(previewing.link.objectKey)"
+    :version-id="previewing.link.versionId ?? null"
     :size="previewing.size !== undefined && !Number.isNaN(previewing.size) ? previewing.size : undefined"
     :group-id="groupTagId ?? null"
     :browse-href="objectHref({ bucket: previewing.link.bucketId, key: previewing.link.objectKey })"
