@@ -59,8 +59,9 @@ const { publishProfileArtifacts } = useProfilePublish()
 // leaving means; without one the page owns an empty builder of its own.
 const hostedBuilder = inject(PROFILE_BUILDER, null)
 const builder = hostedBuilder ?? useProfileBuilder()
-// The assistant may read and fill this form while the page is open.
-provideProfileFormBridge(createProfileFormBridge(builder))
+// The assistant may read and fill this form while the page is open; a rule it
+// adds moves the wizard to the Rules step so the change is in view.
+provideProfileFormBridge(createProfileFormBridge(builder, { showRules: () => goStep(2) }))
 
 // Public profiles upload their three artifacts to the group's S3 profiles
 // bucket at create time, so publishing needs an active S3 key.

@@ -98,6 +98,14 @@ interface RemovePropertyInput {
   name: string
 }
 
+interface TermInput {
+  query: string
+  kind?: string
+}
+
+/** How many terms a lookup answers with; the ranking puts exact names first. */
+const MAX_TERMS = 8
+
 async function guarded(
   gate: ApprovalGate,
   name: string,
@@ -186,6 +194,35 @@ export function profileFormTools(bridge: ProfileFormBridge, gate: ApprovalGate):
       inputSchema: schema<EntityInput>({ type: STRING }, ['type']),
       execute: (input, { toolCallId }) =>
         guarded(gate, 'remove_profile_entity', input, toolCallId, () => bridge.removeEntity(input.type), bridge),
+    }),
+
+    search_profile_terms: tool({
+      description:
+        'Finds the schema.org and Dublin Core terms that fit a property or an entity type, so a rule uses a '
+        + 'known term instead of a made-up one. Pass a few words such as "instrument" or "organism", and kind '
+        + '"property" or "class". A term outside these two vocabularies, such as an EDAM or OBI term, is '
+        + 'something to look up with web_search and pass as its full URI.',
+      inputSchema: schema<TermInput>({
+        query: STRING,
+        kind: { type: 'string', enum: ['property', 'class'] },
+      }, ['query']),
+      execute: async (input) => {
+        const query = input.query.trim()
+        if (!query) return { error: 'Pass a few words naming the term to look for.' }
+        const { loadVocabulary, searchVocabTerms, vocabKind } = await import('@/lib/profiles/vocabulary')
+        const vocabulary = await loadVocabulary()
+        const terms = input.kind === 'class' ? vocabulary.classes : vocabulary.properties
+        return {
+          terms: searchVocabTerms(terms, query, MAX_TERMS).map((term) => ({
+            uri: term.uri,
+            name: term.name,
+            label: term.label,
+            description: term.description.slice(0, 200),
+            source: term.source,
+            ...(input.kind === 'class' ? {} : { kind: vocabKind(term) ?? 'text', targets: term.targets ?? [] }),
+          })),
+        }
+      },
     }),
 
     undo_profile_change: tool({

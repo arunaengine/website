@@ -2,7 +2,7 @@
 // a single-step undo. Nothing here creates the profile; Create stays the
 // user's click.
 import { entityTypeLabel } from '@/lib/profiles/entityTypes'
-import { normalizeTypeUri, sameSchemaOrgType, SCHEMA_ORG } from '@/lib/profiles/uri'
+import { isAbsoluteUri, normalizeTypeUri, sameSchemaOrgType, SCHEMA_ORG } from '@/lib/profiles/uri'
 import { PROFILE_VALUE_KIND_LABELS } from '@/lib/profiles/labels'
 import type { ProfileValueKind } from '@/lib/profiles/types'
 import type {
@@ -31,6 +31,15 @@ interface Snapshot {
   entities: string
 }
 
+/** The last path segment or fragment of a term URI: `creator` for schema:creator. */
+function localName(uri: string): string {
+  return uri.split(/[#/]/).filter(Boolean).pop() ?? ''
+}
+
+function names(entities: DraftEntityRule[]): string {
+  return entities.map((entity) => trimmed(entity.label) || entityTypeLabel(normalizeTypeUri(entity.type))).join(', ') || 'nothing yet'
+}
+
 function entityView(entity: DraftEntityRule): ProfileEntityView {
   return {
     type: normalizeTypeUri(entity.type),
@@ -46,8 +55,23 @@ function entityView(entity: DraftEntityRule): ProfileEntityView {
   }
 }
 
-export function createProfileFormBridge(builder: ProfileBuilder): ProfileFormBridge {
+/** What the page does around a change: show the step a new rule lands on. */
+export interface ProfileFormHooks {
+  showRules?: () => void
+}
+
+export function createProfileFormBridge(builder: ProfileBuilder, hooks: ProfileFormHooks = {}): ProfileFormBridge {
   let saved: Snapshot | null = null
+
+  /** A property named by its value name, its id, its label or its full term URI. */
+  function findProperty(entity: DraftEntityRule, wanted: string): number {
+    const needle = wanted.trim().toLowerCase()
+    const local = localName(wanted).toLowerCase()
+    return entity.properties.findIndex((property) =>
+      [property.valueName, property.id, property.label, property.propertyUri]
+        .map((value) => trimmed(value).toLowerCase())
+        .some((value) => value && (value === needle || value === local)))
+  }
 
   /** An entity named by its type, its label or its class name. */
   function findEntity(wanted: string): DraftEntityRule | null {
@@ -136,6 +160,7 @@ export function createProfileFormBridge(builder: ProfileBuilder): ProfileFormBri
     const uri = normalizeTypeUri(input.type)
     if (!uri) return 'An entity rule needs a type, such as Person or https://schema.org/Person.'
     builder.addEntityRuleForType(uri, input.label)
+    hooks.showRules?.()
     return null
   }
 
@@ -149,10 +174,14 @@ export function createProfileFormBridge(builder: ProfileBuilder): ProfileFormBri
     target_type?: string
   }): string | null {
     const entity = findEntity(input.entity)
-    if (!entity) return `The profile has no rule for "${input.entity}"; add one first.`
-    const valueName = propertyName(input.name)
+    if (!entity) {
+      return `The profile has no rule for "${input.entity}"; it rules on ${names(builder.entities)}. Add one first.`
+    }
+    // A full term URI names the property and keeps the term; a short name mints one.
+    const term = isAbsoluteUri(input.name.trim()) ? input.name.trim() : ''
+    const valueName = propertyName(term ? localName(term) : input.name)
     if (!valueName) return 'A property rule needs a name, such as "sampleId".'
-    if (entity.properties.some((property) => trimmed(property.valueName) === valueName)) {
+    if (findProperty(entity, valueName) >= 0) {
       return `"${valueName}" is already a rule of ${trimmed(entity.label) || input.entity}.`
     }
     const obligation = (input.obligation ?? 'MAY').toUpperCase()
@@ -170,20 +199,24 @@ export function createProfileFormBridge(builder: ProfileBuilder): ProfileFormBri
       valueName,
       label: input.label ?? input.name,
       description: input.description ?? '',
-      propertyUri: kind === 'entity' ? '' : `${SCHEMA_ORG}${valueName}`,
+      propertyUri: term || (kind === 'entity' ? '' : `${SCHEMA_ORG}${valueName}`),
       kind,
       entityTypes: targets,
       obligation: obligation as (typeof OBLIGATIONS)[number],
     }))
+    builder.selectedEntityIndex = builder.entities.indexOf(entity)
+    hooks.showRules?.()
     return null
   }
 
   function removeProperty(input: { entity: string; name: string }): string | null {
     const entity = findEntity(input.entity)
-    if (!entity) return `The profile has no rule for "${input.entity}".`
-    const wanted = propertyName(input.name)
-    const index = entity.properties.findIndex((property) => trimmed(property.valueName) === wanted)
-    if (index < 0) return `"${input.name}" is not a rule of ${trimmed(entity.label) || input.entity}.`
+    if (!entity) return `The profile has no rule for "${input.entity}"; it rules on ${names(builder.entities)}.`
+    const index = findProperty(entity, input.name)
+    if (index < 0) {
+      const held = entity.properties.map((property) => trimmed(property.valueName)).join(', ') || 'nothing yet'
+      return `"${input.name}" is not a rule of ${trimmed(entity.label) || input.entity}, which has: ${held}.`
+    }
     if (entity.properties[index].lock) return `"${input.name}" comes from RO-Crate itself and stays.`
     builder.removeProperty(entity, index)
     return null
@@ -191,7 +224,7 @@ export function createProfileFormBridge(builder: ProfileBuilder): ProfileFormBri
 
   function removeEntity(type: string): string | null {
     const entity = findEntity(type)
-    if (!entity) return `The profile has no rule for "${type}".`
+    if (!entity) return `The profile has no rule for "${type}"; it rules on ${names(builder.entities)}.`
     if (entity.lock) return `The rule for ${type} comes from RO-Crate itself and stays.`
     builder.removeEntity(builder.entities.indexOf(entity))
     return null

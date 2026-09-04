@@ -61,10 +61,18 @@ export async function runTurn(options: TurnOptions): Promise<TurnResult> {
   })
 
   let failure: string | undefined
+  // Text the model writes after a tool step is its own block; a blank line keeps
+  // it from running into the sentence before the call.
+  let written = false
   try {
     for await (const part of result.stream) {
-      if (part.type === 'text-delta') options.onText(part.text)
-      else if (part.type === 'tool-call') {
+      if (part.type === 'text-start') {
+        if (written) options.onText('\n\n')
+        written = false
+      } else if (part.type === 'text-delta') {
+        if (part.text) written = true
+        options.onText(part.text)
+      } else if (part.type === 'tool-call') {
         options.onToolCall({ id: part.toolCallId, name: part.toolName, input: part.input })
       } else if (part.type === 'tool-result') {
         options.onToolResult({ id: part.toolCallId, output: part.output })

@@ -74,15 +74,14 @@ describe('ToolCallDrawer', () => {
     expect(text).not.toContain('waiting')
     expect(text).toContain('1 running')
     expect(text).toContain('1 failed')
-    expect(text).toContain('Run this tool?')
+    expect(cards(root)).toBe(1)
   })
 
-  it('stays folded while a call waits for an answer', async () => {
+  it('keeps a waiting call in view as its own card while the stack stays folded', async () => {
     const { root } = await drawer([call('a', 'done'), call('b', 'approval')])
 
-    expect(cards(root)).toBe(0)
+    expect(cards(root)).toBe(1)
     expect(stackRow(root).props['aria-expanded']).toBe(false)
-    expect(content(root)).toContain('Run this tool?')
   })
 
   it('opens and closes on the row alone', async () => {
@@ -96,35 +95,35 @@ describe('ToolCallDrawer', () => {
     expect(cards(root)).toBe(0)
   })
 
-  it('says in plain words what an approved write is doing', async () => {
+  it('pins a write as a card of its own above the fold', async () => {
     const write: ToolCallView = {
       id: 'w', name: 'create_dataset', input: { name: 'Water quality 2024' }, state: 'running',
     }
     const { root } = await drawer([write, call('a', 'done')])
 
-    expect(content(root)).toContain('Creating dataset "Water quality 2024"')
-    expect(content(root)).not.toContain('Run this tool?')
-    expect(cards(root)).toBe(0)
+    expect(content(root)).toContain('1 tool call')
+    expect(cards(root)).toBe(1)
   })
 
   it('drops the stack row when it would hide nothing', async () => {
-    // One write shows its own summary row; a "1 tool call" row above it repeats it.
     const { root } = await drawer([{ id: 'w', name: 'create_dataset', input: {}, state: 'running' }])
 
     expect(content(root)).not.toContain('tool call')
-    expect(content(root)).toContain('Creating dataset')
+    expect(cards(root)).toBe(1)
   })
 
-  it('answers the approval from the row above the fold', async () => {
-    const decisions: boolean[] = []
-    const { root } = await mountApp(ToolCallDrawer, {
-      props: {
-        calls: [call('b', 'approval')],
-        onDecide: (approved: boolean) => decisions.push(approved),
-      },
-    })
+  it('folds a long run of applied changes and keeps a failed one in view', async () => {
+    // Four settled writes fold into one row; the failed fifth stays pinned.
+    const writes: ToolCallView[] = ['p', 'q', 'r', 's'].map((id) => ({
+      id, name: 'add_profile_entity', input: { type: id === 'p' ? 'Person' : 'File' }, state: 'done',
+    }))
+    const failed: ToolCallView = { id: 'x', name: 'add_profile_property', input: { name: 'x' }, state: 'error' }
+    const { root } = await drawer([...writes, failed])
 
-    await click(button(root, 'Approve'))
-    expect(decisions).toEqual([true])
+    expect(content(root)).toContain('4 changes, starting with adding profile entity Person')
+    expect(cards(root)).toBe(1)
+
+    await click(element(root, (node) => node.tag === 'button' && String(node.props['aria-label'] ?? '').length === 0))
+    expect(cards(root)).toBe(5)
   })
 })

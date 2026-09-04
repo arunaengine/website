@@ -100,6 +100,9 @@ const PROFILE_AUTHORING = [
   + 'let the user correct them before anything is written into the form.',
   'MUST is for what a dataset is useless without; SHOULD for what a careful author supplies; MAY for the rest. '
   + 'Do not make everything MUST.',
+  'Name every rule by a known term: search_profile_terms finds the schema.org or Dublin Core term for a '
+  + 'property or a type, and a term of another vocabulary is looked up with web_search and passed as its full '
+  + 'URI. Mint a custom name only when no term fits, and say so.',
   'Fill the open builder with the profile tools once the user agrees, one change at a time, and say what each '
   + 'one did. The user presses Create; you never do.',
 ]

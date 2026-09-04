@@ -25,7 +25,7 @@ const VERBS: Record<string, string> = {
 }
 
 /** The fields worth naming, most telling first. A name or title is quoted. */
-const LABELS = ['name', 'title', 'path', 'key', 'id', 'document_id', 'job_id', 'field']
+const LABELS = ['name', 'title', 'path', 'key', 'id', 'document_id', 'job_id', 'field', 'type']
 const QUOTED = new Set(['name', 'title'])
 
 function record(value: unknown): Record<string, unknown> {
@@ -71,6 +71,10 @@ export function callSummary(name: string, input: unknown): string {
     : ''
   const bucket = text(fields.bucket)
   const removing = verb === 'Deleting' || verb === 'Removing'
-  const where = bucket ? ` ${removing ? 'from' : 'in'} bucket ${bucket}` : ''
+  // A rule lands on an entity of the profile; an object lives in a bucket.
+  const entity = text(fields.entity)
+  const where = bucket
+    ? ` ${removing ? 'from' : 'in'} bucket ${bucket}`
+    : entity && picked?.key !== 'entity' ? ` ${removing ? 'from' : 'on'} ${entity}` : ''
   return `${verb}${subject ? ` ${subject}` : ''}${detail}${where}`
 }

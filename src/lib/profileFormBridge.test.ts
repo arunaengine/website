@@ -57,6 +57,16 @@ describe('createProfileFormBridge', () => {
     expect(bridge.addProperty({ entity: 'Person', name: 'boss', kind: 'entity' })).toContain('target_type')
   })
 
+  it('takes a full term uri as the property and finds it again by any name', () => {
+    bridge.addEntity({ type: 'Person' })
+
+    expect(bridge.addProperty({ entity: 'Person', name: 'http://schema.org/affiliation', kind: 'entity', target_type: 'Organization' })).toBeNull()
+    const person = bridge.summary().entities.find((entity) => entity.label === 'Person')
+    expect(person?.properties.map((property) => property.name)).toEqual(['name', 'affiliation'])
+    expect(bridge.removeProperty({ entity: 'Person', name: 'http://schema.org/affiliation' })).toBeNull()
+    expect(bridge.removeProperty({ entity: 'Person', name: 'affiliation' })).toContain('which has: name')
+  })
+
   it('keeps the baseline and undoes the last change', () => {
     const root = bridge.summary().entities.find((entity) => entity.locked)
     expect(bridge.removeEntity(root?.type ?? '')).toContain('stays')

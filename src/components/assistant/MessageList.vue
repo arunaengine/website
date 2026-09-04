@@ -126,7 +126,7 @@ onUnmounted(() => listening?.removeEventListener('scroll', measure))
           v-if="!messages.length && props.size !== 'full'"
           class="text-xs text-muted-foreground"
         >
-          Ask about your data, or let the assistant fill in the dataset you have open.
+          Ask about your data, or let the assistant work on what you have open.
         </p>
 
         <div v-for="message in messages" :key="message.id" class="min-w-0">

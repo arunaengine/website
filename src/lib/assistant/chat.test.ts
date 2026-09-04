@@ -74,6 +74,30 @@ describe('runTurn', () => {
     expect(result.messages.length).toBeGreaterThan(0)
   })
 
+  it('keeps a blank line between text the model writes in separate blocks', async () => {
+    const sink = handlers()
+    const model = new MockLanguageModelV4({
+      doStream: {
+        stream: simulateReadableStream({
+          chunks: [
+            { type: 'stream-start' as const, warnings: [] },
+            { type: 'text-start' as const, id: '1' },
+            { type: 'text-delta' as const, id: '1', delta: 'Added the rule.' },
+            { type: 'text-end' as const, id: '1' },
+            { type: 'text-start' as const, id: '2' },
+            { type: 'text-delta' as const, id: '2', delta: 'Next, the licence.' },
+            { type: 'text-end' as const, id: '2' },
+            { type: 'finish' as const, finishReason: { unified: 'stop' as const, raw: undefined }, usage: USAGE },
+          ],
+        }),
+      },
+    })
+
+    await runTurn(options(model, {}, sink))
+
+    expect(sink.text.join('')).toBe('Added the rule.\n\nNext, the licence.')
+  })
+
   it('runs a tool call and feeds its result back for a second step', async () => {
     const sink = handlers()
     const execute = vi.fn(async () => ({ buckets: ['a'] }))

@@ -4,12 +4,11 @@
 // their own so an approval and what followed it stay in view.
 import { computed, ref } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
-import Button from '@/components/ui/Button.vue'
 import FoldRow from '@/components/assistant/FoldRow.vue'
 import ToolCallCard from '@/components/assistant/ToolCallCard.vue'
 import { callSummary, isWriteAction } from '@/lib/assistant/callSummary'
 import type { ToolCallView } from '@/lib/assistant/types'
-import { Check, Wrench, X } from '@lucide/vue'
+import { Wrench } from '@lucide/vue'
 
 const props = withDefaults(defineProps<{
   calls: ToolCallView[]
@@ -17,9 +16,18 @@ const props = withDefaults(defineProps<{
 }>(), { deleteCallId: undefined })
 const emit = defineEmits<{ (e: 'decide', approved: boolean): void }>()
 
+/** Settled writes past this many fold into one row of their own. */
+const MAX_PINNED = 3
+
 // The writes and anything still waiting for an answer, shown above the fold.
 const actions = computed(() =>
   props.calls.filter((call) => call.state === 'approval' || isWriteAction(call.name)))
+// A long run of applied changes folds too; a change still running, failed or
+// waiting stays in view whatever the count.
+const settled = computed(() =>
+  actions.value.filter((call) => call.state === 'done' || call.state === 'denied'))
+const changes = computed(() => (settled.value.length > MAX_PINNED ? settled.value : []))
+const pinned = computed(() => actions.value.filter((call) => !changes.value.includes(call)))
 // The rest fold into one row, which only earns its place while it hides a call.
 const folded = computed(() => props.calls.filter((call) => !actions.value.includes(call)))
 
@@ -32,10 +40,12 @@ const counts = computed(() => {
   return tally
 })
 const open = ref(false)
+const changesOpen = ref(false)
 
-function summary(call: ToolCallView): string {
-  return callSummary(call.name, call.input)
-}
+const changesLabel = computed(() => {
+  const first = callSummary(changes.value[0].name, changes.value[0].input)
+  return `${changes.value.length} changes, starting with ${first.charAt(0).toLowerCase()}${first.slice(1)}`
+})
 </script>
 
 <template>
@@ -54,31 +64,34 @@ function summary(call: ToolCallView): string {
     </FoldRow>
 
     <template v-if="!open">
-      <div
-        v-for="call in actions"
-        :key="call.id"
-        class="rounded-md border border-border bg-muted/20 px-2.5 py-1.5 text-[11px]"
+      <FoldRow
+        v-if="changes.length"
+        :open="changesOpen"
+        :label="changesLabel"
+        @toggle="changesOpen = !changesOpen"
       >
-        <div class="flex items-center gap-2">
-          <Wrench class="size-3.5 shrink-0 text-muted-foreground" />
-          <span class="min-w-0 flex-1 break-words text-foreground">{{ summary(call) }}</span>
-          <Badge v-if="call.state === 'running'" size="sm" variant="secondary">running</Badge>
-          <Badge v-else-if="call.state === 'error'" size="sm" variant="destructive">failed</Badge>
-        </div>
-        <div v-if="call.state === 'approval'" class="mt-1.5 flex flex-wrap items-center gap-2">
-          <span class="text-muted-foreground">
-            {{ deleteCallId === call.id ? 'Remove this entity from the draft?' : 'Run this tool?' }}
-          </span>
-          <Button size="sm" @click="emit('decide', true)">
-            <Check class="size-3.5 shrink-0" aria-hidden="true" /> Approve
-          </Button>
-          <Button variant="ghost" size="sm" @click="emit('decide', false)">
-            <X class="size-3.5 shrink-0" aria-hidden="true" /> Abort
-          </Button>
-        </div>
-        <p v-else-if="call.state === 'denied'" class="mt-1 text-muted-foreground">Aborted, nothing ran.</p>
-        <p v-else-if="call.error" class="mt-1 break-words text-destructive">{{ call.error }}</p>
+        <template #icon>
+          <Wrench class="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+        </template>
+      </FoldRow>
+      <div v-if="changes.length && changesOpen" class="space-y-1.5">
+        <ToolCallCard
+          v-for="call in changes"
+          :key="call.id"
+          :call="call"
+          :awaiting-delete="deleteCallId === call.id"
+          collapsed
+          @decide="(approved) => emit('decide', approved)"
+        />
       </div>
+      <ToolCallCard
+        v-for="call in pinned"
+        :key="call.id"
+        :call="call"
+        :awaiting-delete="deleteCallId === call.id"
+        collapsed
+        @decide="(approved) => emit('decide', approved)"
+      />
     </template>
 
     <div v-if="open" class="space-y-1.5">

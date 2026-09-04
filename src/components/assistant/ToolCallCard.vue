@@ -5,6 +5,7 @@
 import { computed, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import { callSummary } from '@/lib/assistant/callSummary'
 import type { ToolCallView } from '@/lib/assistant/types'
 import { Check, ChevronRight, Wrench, X } from '@lucide/vue'
 
@@ -31,6 +32,8 @@ function preview(value: unknown): string {
   return text.length > 2000 ? `${text.slice(0, 2000)}…` : text
 }
 
+// The row reads as what the call does; the tool's own name waits inside.
+const title = computed(() => callSummary(props.call.name, props.call.input))
 const input = computed(() => preview(props.call.input))
 const output = computed(() => preview(props.call.output))
 const hasBody = computed(() =>
@@ -50,10 +53,14 @@ const hasBody = computed(() =>
     >
       <ChevronRight :class="['h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', open && hasBody && 'rotate-90', !hasBody && 'invisible']" />
       <Wrench class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-      <span class="min-w-0 truncate font-mono font-medium text-foreground">{{ call.name }}</span>
+      <span
+        class="min-w-0 truncate font-medium text-foreground"
+        :class="title === call.name ? 'font-mono' : ''"
+      >{{ title }}</span>
       <Badge size="sm" :variant="STATE_VARIANT[call.state]" class="ml-auto uppercase">{{ call.state }}</Badge>
     </button>
     <div v-if="open && hasBody" class="space-y-1.5 px-2.5 py-2">
+      <p v-if="title !== call.name" class="font-mono text-[10px] text-muted-foreground">{{ call.name }}</p>
       <pre v-if="input && input !== '{}'" class="scrollbar-thin max-h-32 overflow-auto font-mono text-[10px] text-muted-foreground">{{ input }}</pre>
       <div v-if="call.state === 'approval'" class="flex flex-wrap items-center gap-2">
         <span class="text-muted-foreground">

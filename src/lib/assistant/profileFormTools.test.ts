@@ -46,6 +46,7 @@ describe('profile form tools', () => {
       'read_profile_form',
       'remove_profile_entity',
       'remove_profile_property',
+      'search_profile_terms',
       'set_profile_basics',
       'undo_profile_change',
     ])
@@ -82,6 +83,14 @@ describe('profile form tools', () => {
     const form = bridge({ addEntity: vi.fn(() => 'An entity rule needs a type.') })
     expect(await call(profileFormTools(form, gate()), 'add_profile_entity', { type: ' ' }))
       .toEqual({ error: 'An entity rule needs a type.' })
+  })
+
+  it('finds a known term for a rule and names its value kind', async () => {
+    const output = await call(profileFormTools(bridge(), gate(false)), 'search_profile_terms', { query: 'date published' }) as {
+      terms: Array<{ uri: string; kind?: string }>
+    }
+
+    expect(output.terms[0]).toMatchObject({ uri: 'http://schema.org/datePublished', kind: 'date' })
   })
 
   it('undoes once and says when there is nothing left', async () => {
