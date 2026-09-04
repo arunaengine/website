@@ -3,7 +3,7 @@
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
-import { injectQuickRun } from '@/composables/useQuickRun'
+import { injectCustomRun } from '@/composables/useCustomRun'
 import { VERIFICATION_LABEL } from '@/lib/quickDependencies'
 import { Plus, X } from '@lucide/vue'
 
@@ -15,7 +15,7 @@ const {
   dependencyVerification,
   addDependency,
   removeDependency,
-} = injectQuickRun()
+} = injectCustomRun()
 </script>
 
 <template>

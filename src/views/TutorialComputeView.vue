@@ -22,7 +22,9 @@ import {
   INPUT_OBJECTS,
   RESULT_BUCKET,
   TUTORIAL_GROUP,
+  TUTORIAL_NODE_ID,
 } from '@/lib/tutorial/fixtures/data'
+import type { RealmNodeDisplay } from '@/composables/useRealmNodes'
 import { TUTORIAL_TASK_ID, runStageLabel } from '@/lib/tutorial/fixtures/run'
 import { tutorialApi } from '@/lib/tutorial/services/tutorialApi'
 import { tutorialJobClient } from '@/lib/tutorial/services/tutorialJobClient'
@@ -47,6 +49,27 @@ const { currentUser } = useAruna()
 const { realm } = useRealm()
 const { getTask } = useTes()
 const { markTutorialDone } = useOnboarding()
+
+// One made-up node, so placement has something to match against.
+const TUTORIAL_NODES: RealmNodeDisplay[] = [
+  {
+    nodeId: TUTORIAL_NODE_ID,
+    kind: 'server',
+    info: {
+      labels: { region: 'practice' },
+      executors: [{ kind: 'docker', file_staging: true, direct_s3: false }],
+      urls: {},
+      utilization: { storage_bytes_used: 0, heartbeat_at_ms: 0 },
+      updated_at_ms: 0,
+    },
+    label: 'Practice node',
+    s3Url: null,
+    apiBase: null,
+    reachable: true,
+    isLocal: false,
+    executorKinds: ['docker'],
+  },
+]
 
 const s3 = tutorialS3(currentUser.value?.id ?? 'tutorial-user')
 provide(S3_SOURCE, s3)
@@ -73,7 +96,8 @@ const store = createCustomRun({
   runTarget: useRunTarget(),
   s3,
   myGroups: groups,
-  executorKinds: computed(() => ['docker']),
+  currentUser,
+  nodes: computed(() => TUTORIAL_NODES),
   getTask,
   dataView: ref('tree'),
   realmName: computed(() => realm.value.shortName),
@@ -85,16 +109,20 @@ function seedDraft() {
   store.name.value = 'merge-station-readings'
   store.description.value = 'Merge two stations of survey readings into one summary.'
   store.groupId.value = TUTORIAL_GROUP.id
+  store.useCustomImage()
   store.inputs.value = INPUT_OBJECTS.map((object) => ({
     kind: 'file' as const,
     url: `s3://${INPUT_BUCKET}/${object.key}`,
     path: `/inputs/${object.name}`,
     name: object.name,
   }))
-  store.executors.value = [{ image: 'python:3.12-slim', command: ['python', '/inputs/merge.py'] }]
+  store.image.value = 'python:3.12-slim'
+  store.commandLine.value = 'python /inputs/merge.py'
+  store.markTouched('image')
+  store.markTouched('command')
   store.outputRows.value = [
-    { path: '/outputs/summary.json', bucket: RESULT_BUCKET, key: 'runs/summary.json' },
-    { path: '/outputs/plot.png', bucket: RESULT_BUCKET, key: 'runs/plot.png' },
+    { path: '/outputs/summary.json', bucket: RESULT_BUCKET, key: 'runs/summary.json', keyTouched: true },
+    { path: '/outputs/plot.png', bucket: RESULT_BUCKET, key: 'runs/plot.png', keyTouched: true },
   ]
   store.cpuCores.value = 2
   store.ramGb.value = 4

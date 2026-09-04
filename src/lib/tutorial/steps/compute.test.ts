@@ -44,7 +44,7 @@ describe('compute tutorial steps', () => {
   })
 
   it('stops at no scratch storage step', () => {
-    // A run makes no bucket of its own, so the wizard has nothing to show here.
+    // A run makes no bucket of its own, so the page has nothing to show here.
     expect(computeTutorialSteps).toHaveLength(15)
     const targets = computeTutorialSteps.map((step) => step.target)
     expect(computeTutorialSteps.map((step) => step.id)).not.toContain('workspace')
@@ -73,7 +73,7 @@ describe('compute tutorial steps', () => {
     expect(missing).toEqual([])
   })
 
-  it('lets the reader step back through the wizard', async () => {
+  it('lets the reader step back through the form', async () => {
     for (let step = 0; step < 4; step++) {
       nextTutorialStep()
       await settle()
@@ -86,7 +86,8 @@ describe('compute tutorial steps', () => {
     await settle()
 
     expect(tutorialStep.value?.id).toBe('filesystem')
-    expect(mounted.router.currentRoute.value.fullPath).toBe('/app/tutorial/compute?step=1')
+    // The run form is one page, so stepping back never changes the route.
+    expect(mounted.router.currentRoute.value.fullPath).toBe('/app/tutorial/compute')
     expect(anchors(mounted.root)).toContain('run-filesystem')
   })
 })

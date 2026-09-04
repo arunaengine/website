@@ -35,24 +35,26 @@ const NewRunMenu = compileClientComponent(new URL('./NewRunMenu.vue', import.met
 describe('new run menu', () => {
   beforeEach(() => push.mockClear())
 
-  it('shows both run modes and routes to each wizard', async () => {
+  it('opens the run page on the template that was picked', async () => {
     const mounted = await mountApp(NewRunMenu)
 
     expect(content(mounted.root)).toContain('New run')
-    expect(content(mounted.root)).toContain('Quick run')
-    expect(content(mounted.root)).toContain('Custom run')
+    const entries = ['Python script', 'JavaScript script', 'Bash script', 'Blank run']
+    for (const entry of entries) expect(content(mounted.root)).toContain(entry)
     expect(
       nodes(mounted.root).filter(
-        (node) =>
-          node.tag === 'button' &&
-          (content(node).trim().startsWith('Quick run') || content(node).trim().startsWith('Custom run')),
+        (node) => node.tag === 'button' && entries.some((entry) => content(node).trim().startsWith(entry)),
       ),
-    ).toHaveLength(2)
+    ).toHaveLength(4)
 
-    await click(button(mounted.root, 'Quick run'))
-    expect(push).toHaveBeenLastCalledWith({ name: 'compute-quick' })
+    await click(button(mounted.root, 'Python script'))
+    expect(push).toHaveBeenLastCalledWith({ name: 'compute-new', query: { template: 'python' } })
 
-    await click(button(mounted.root, 'Custom run'))
+    await click(button(mounted.root, 'Bash script'))
+    expect(push).toHaveBeenLastCalledWith({ name: 'compute-new', query: { template: 'bash' } })
+
+    // A blank run carries no template, so the page opens on a custom image.
+    await click(button(mounted.root, 'Blank run'))
     expect(push).toHaveBeenLastCalledWith({ name: 'compute-new' })
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()

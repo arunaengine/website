@@ -11,7 +11,7 @@ import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import Notice from '@/components/ui/Notice.vue'
 import ObjectBrowserPanel from '@/components/data/ObjectBrowserPanel.vue'
-import { injectQuickRun } from '@/composables/useQuickRun'
+import { injectCustomRun } from '@/composables/useCustomRun'
 import { FolderOpen } from '@lucide/vue'
 
 const {
@@ -22,7 +22,7 @@ const {
   editorHasCustomContent,
   onScriptPick,
   applyScriptPick,
-} = injectQuickRun()
+} = injectCustomRun()
 </script>
 
 <template>

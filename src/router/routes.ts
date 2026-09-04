@@ -166,7 +166,8 @@ export function portalRoutes(): RouteRecordRaw[] {
         // Compute: runs and durable system jobs in one surface
         // (each half is feature-gated in-view)
         { path: 'compute', name: 'compute', component: () => import('@/views/ComputeView.vue') },
-        { path: 'compute/quick', name: 'compute-quick', component: () => import('@/views/ComputeQuickRunView.vue') },
+        // The quick run wizard is gone; its link opens the Python template.
+        { path: 'compute/quick', redirect: { name: 'compute-new', query: { template: 'python' } } },
         { path: 'compute/new', name: 'compute-new', component: () => import('@/views/ComputeSubmitView.vue') },
         { path: 'compute/jobs', redirect: { name: 'compute', query: { tab: 'jobs' } } },
         {

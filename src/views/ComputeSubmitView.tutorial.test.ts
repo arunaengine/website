@@ -1,4 +1,4 @@
-// The compute tutorial end to end: the real wizard, the real submit path and
+// The compute tutorial end to end: the real run page, the real submit path and
 // the real run detail, with the simulated run walking its stages on the clock.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { button, click, content, element, flush, nodes, typeValue, type HostNode } from '@/test/clientRender'
@@ -45,23 +45,12 @@ describe('compute tutorial walkthrough', () => {
     expect(content(anchor(mounted.root, 'run-group'))).toContain('Group')
   })
 
-  it('walks the wizard with its own Continue and Run buttons', async () => {
-    // The card's Next reaches the group stop, whose own Continue moves on.
-    nextTutorialStep()
-    await settle()
-    await click(button(mounted.root, 'Continue'))
-    await settle()
+  it('reads the whole run on one page and starts it there', async () => {
+    // Every section is on the page at once, so the tutorial never changes route.
+    expect(content(anchor(mounted.root, 'run-executor'))).toContain('Command line')
+    expect(content(anchor(mounted.root, 'run-resources'))).toContain('CPU cores')
 
-    expect(mounted.router.currentRoute.value.fullPath).toBe('/app/tutorial/compute?step=1')
-    // Reaching the workload step is what the group stop was waiting for.
-    expect(tutorialStep.value?.id).toBe('filesystem')
-    expect(content(anchor(mounted.root, 'run-executor'))).toContain('Executor')
-
-    await click(button(mounted.root, 'Continue'))
-    await settle()
-
-    expect(mounted.router.currentRoute.value.fullPath).toBe('/app/tutorial/compute?step=2')
-    const review = content(anchor(mounted.root, 'run-review'))
+    const review = await showRequest()
     expect(review).toContain('station-a.csv')
     expect(review).toContain('"cpu_cores": 2')
     expect(review).toContain('python:3.12-slim')
@@ -140,16 +129,12 @@ describe('compute tutorial walkthrough', () => {
   it('puts the draft back when the reader starts again', async () => {
     const nameField = element(mounted.root, (node) => node.props.placeholder === 'align-and-count')
     await typeValue(nameField, 'my own attempt')
-    await mounted.router.push('/app/tutorial/compute?step=2')
-    await settle()
-    expect(content(anchor(mounted.root, 'run-review'))).toContain('my own attempt')
+    expect(await showRequest()).toContain('my own attempt')
 
     restartTutorial()
     await settle()
 
     expect(tutorialStep.value?.id).toBe('basics')
-    await mounted.router.push('/app/tutorial/compute?step=2')
-    await settle()
     const review = content(anchor(mounted.root, 'run-review'))
     expect(review).toContain('merge-station-readings')
     expect(review).not.toContain('my own attempt')
@@ -166,10 +151,10 @@ describe('compute tutorial walkthrough', () => {
   it('keeps the run detail reachable after a step back and forward', async () => {
     await runTheDraft()
 
-    // The reader can reread the review without losing the run.
-    await mounted.router.push('/app/tutorial/compute?step=2')
+    // The reader can go back to the form without losing the run.
+    await mounted.router.push('/app/tutorial/compute')
     await settle()
-    expect(content(anchor(mounted.root, 'run-review'))).toContain('station-a.csv')
+    expect(content(anchor(mounted.root, 'run-executor'))).toContain('Command line')
 
     await mounted.router.push('/app/tutorial/compute?stage=run')
     await settle()
@@ -189,12 +174,15 @@ function previewButtons(root: HostNode): HostNode[] {
   )
 }
 
-/** Drives the seeded draft through the wizard and starts it. */
+/** Starts the seeded draft from the page's own Run button. */
 async function runTheDraft() {
-  await click(button(mounted.root, 'Continue'))
-  await settle()
-  await click(button(mounted.root, 'Continue'))
-  await settle()
   await click(button(mounted.root, 'Run'))
   await settle()
+}
+
+/** Opens the request dialog and answers with the body it shows. */
+async function showRequest(): Promise<string> {
+  await click(button(mounted.root, 'Show request'))
+  await settle()
+  return content(anchor(mounted.root, 'run-review'))
 }

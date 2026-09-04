@@ -16,10 +16,11 @@ import * as S3 from '@/composables/useS3'
 import * as Tes from '@/composables/useTes'
 import * as ChunkRecovery from '@/lib/chunk-recovery'
 import * as NativeSubmit from '@/lib/nativeSubmit'
-import * as PlacementPolicies from '@/lib/placementPolicies'
 import * as QuickRuntimes from '@/lib/quickRuntimes'
 import * as RunTargetLib from '@/lib/runTarget'
 import * as Shellwords from '@/lib/shellwords'
+import * as BucketName from '@/lib/bucketName'
+import * as RunPaths from '@/lib/runPaths'
 import * as TesLib from '@/lib/tes'
 import * as Utils from '@/lib/utils'
 import * as Workspaces from '@/lib/workspaces'
@@ -61,10 +62,6 @@ const NoticeStub = defineComponent({
 const PageHeaderStub = defineComponent({
   props: { title: String, description: String },
   setup: (props, { slots }) => () => h('header', [h('h1', props.title), h('p', props.description), slots.actions?.()]),
-})
-const WizardStepsStub = defineComponent({
-  props: { steps: { type: Array, default: () => [] }, current: Number },
-  setup: (props) => () => h('nav', (props.steps as string[]).map((step) => h('span', step))),
 })
 const TaskJsonPreviewStub = defineComponent({
   props: { title: String, task: { type: Object, required: true } },
@@ -165,17 +162,13 @@ const ui = {
   '@/components/ui/RefreshButton.vue': moduleDefault(refreshButton()),
   '@/components/ui/Tooltip.vue': moduleDefault(PassThroughStub),
   '@/components/ui/ExternalLink.vue': moduleDefault(GenericStub),
+  '@/components/ui/DocsLink.vue': moduleDefault(GenericStub),
+  '@/components/ui/IconButton.vue': moduleDefault(ButtonStub),
+  '@/components/ui/OptionToggle.vue': moduleDefault(FilterChipsStub),
   '@/components/dashboard/PageHeader.vue': moduleDefault(PageHeaderStub),
-  '@/components/onboarding/WizardSteps.vue': moduleDefault(WizardStepsStub),
 }
 
-const ExecutorStepsEditor = compileClientComponent(url('components/compute/ExecutorStepsEditor.vue'), {
-  vue: VueRuntime,
-  '@lucide/vue': icons,
-  ...ui,
-  '@/lib/shellwords': Shellwords,
-})
-const stepModules = {
+const cardModules = {
   vue: VueRuntime,
   'vue-router': RouterRuntime,
   '@lucide/vue': icons,
@@ -184,29 +177,27 @@ const stepModules = {
   '@/lib/tes': TesLib,
   '@/lib/jobs': JobsLib,
   '@/lib/utils': Utils,
-  '@/components/compute/ExecutorStepsEditor.vue': moduleDefault(ExecutorStepsEditor),
+  '@/lib/runPaths': RunPaths,
+  '@/lib/quickRuntimes': QuickRuntimes,
+  '@/lib/shellwords': Shellwords,
+  '@/lib/bucketName': BucketName,
+  '@/lib/chunk-recovery': ChunkRecovery,
   '@/components/compute/ContainerFsTree.vue': moduleDefault(GenericStub),
   '@/components/compute/TesInputsEditor.vue': moduleDefault(GenericStub),
   '@/components/compute/TaskJsonPreview.vue': moduleDefault(TaskJsonPreviewStub),
-  '@/components/compute/RunPlacementSection.vue': moduleDefault(GenericStub),
+  '@/components/compute/ScriptEditor.vue': moduleDefault(GenericStub),
 }
-const ContainerFilesystem = compileClientComponent(url('components/compute/custom/ContainerFilesystem.vue'), stepModules)
-const AdvancedPlacement = compileClientComponent(url('components/compute/custom/AdvancedPlacement.vue'), stepModules)
-const BasicsStep = compileClientComponent(url('components/compute/custom/BasicsStep.vue'), {
-  ...stepModules,
+const runPart = (path: string) => moduleDefault(compileClientComponent(url(path), cardModules))
+const withParts = {
+  ...cardModules,
+  '@/components/compute/run/RunSection.vue': runPart('components/compute/run/RunSection.vue'),
+  '@/components/compute/run/RunTile.vue': runPart('components/compute/run/RunTile.vue'),
+  '@/components/compute/run/AiMark.vue': runPart('components/compute/run/AiMark.vue'),
+  '@/components/compute/run/PathChips.vue': runPart('components/compute/run/PathChips.vue'),
+  '@/components/compute/run/DependenciesTab.vue': moduleDefault(GenericStub),
   '@/components/groups/GroupSelect.vue': moduleDefault(SelectStub),
-})
-const WorkloadStep = compileClientComponent(url('components/compute/custom/WorkloadStep.vue'), {
-  ...stepModules,
-  '@/components/compute/custom/ContainerFilesystem.vue': moduleDefault(ContainerFilesystem),
-  '@/components/compute/custom/AdvancedPlacement.vue': moduleDefault(AdvancedPlacement),
-})
-const ReviewStep = compileClientComponent(url('components/compute/custom/ReviewStep.vue'), stepModules)
-const WizardNavBar = compileClientComponent(url('components/compute/WizardNavBar.vue'), {
-  vue: VueRuntime,
-  '@lucide/vue': icons,
-  ...ui,
-})
+}
+const card = (path: string) => moduleDefault(compileClientComponent(url(path), withParts))
 const ComputeGates = compileClientComponent(url('components/compute/ComputeGates.vue'), {
   vue: VueRuntime,
   '@lucide/vue': icons,
@@ -238,24 +229,40 @@ const TesDataRefDialog = compileClientComponent(url('components/compute/TesDataR
   '@/lib/tes': TesLib,
   '@/lib/utils': Utils,
 })
+const RequestDialog = compileClientComponent(url('components/compute/run/RequestDialog.vue'), {
+  vue: VueRuntime,
+  ...ui,
+  '@/components/ui/Dialog.vue': moduleDefault(DialogStub),
+  '@/components/ui/DialogContent.vue': moduleDefault(PassThroughStub),
+  '@/components/ui/DialogTitle.vue': moduleDefault(PassThroughStub),
+  '@/components/compute/TaskJsonPreview.vue': moduleDefault(TaskJsonPreviewStub),
+  '@/composables/useCustomRun': CustomRun,
+})
 const ComputeSubmitView = compileClientComponent(url('views/ComputeSubmitView.vue'), {
   vue: VueRuntime,
   'vue-router': RouterRuntime,
   '@lucide/vue': icons,
   ...ui,
-  '@/components/compute/custom/BasicsStep.vue': moduleDefault(BasicsStep),
-  '@/components/compute/custom/WorkloadStep.vue': moduleDefault(WorkloadStep),
-  '@/components/compute/custom/ReviewStep.vue': moduleDefault(ReviewStep),
+  '@/components/compute/run/RunBasics.vue': card('components/compute/run/RunBasics.vue'),
+  '@/components/compute/run/ExecutorCard.vue': card('components/compute/run/ExecutorCard.vue'),
+  '@/components/compute/run/ScriptCard.vue': card('components/compute/run/ScriptCard.vue'),
+  '@/components/compute/run/FilesystemCard.vue': card('components/compute/run/FilesystemCard.vue'),
+  '@/components/compute/run/ResourcesCard.vue': card('components/compute/run/ResourcesCard.vue'),
+  '@/components/compute/run/PlacementCard.vue': card('components/compute/run/PlacementCard.vue'),
+  '@/components/compute/run/RunFooter.vue': card('components/compute/run/RunFooter.vue'),
+  '@/components/compute/run/RequestDialog.vue': moduleDefault(RequestDialog),
+  '@/components/compute/run/ScriptPickerDialog.vue': moduleDefault(GenericStub),
   '@/components/compute/TesDataRefDialog.vue': moduleDefault(TesDataRefDialog),
   '@/components/compute/ComputeGates.vue': moduleDefault(ComputeGates),
   '@/components/compute/RerunPrefillNote.vue': moduleDefault(RerunPrefillNote),
-  '@/components/compute/WizardNavBar.vue': moduleDefault(WizardNavBar),
+  '@/components/data/CreateCredentialDialog.vue': moduleDefault(GenericStub),
+  '@/components/assistant/AskAiButton.vue': moduleDefault(GenericStub),
   '@/composables/useCustomRun': CustomRun,
   '@/composables/useTes': Tes,
   '@/composables/useAruna': arunaModule,
   '@/composables/useComputeDataView': { useComputeDataView: () => ref('tree') },
   '@/composables/useS3': S3,
-  '@/composables/useRealmNodes': { useRealmNodes: () => ({ executorKinds: ref(['docker']) }) },
+  '@/composables/useRealmNodes': { useRealmNodes: () => ({ nodes: ref([]) }) },
   '@/composables/useRealm': { useRealm: () => ({ realm: ref({ shortName: 'Test realm' }) }) },
   '@/composables/useRunTarget': runTargetModule,
   '@/lib/tes': TesLib,
@@ -264,7 +271,6 @@ const ComputeSubmitView = compileClientComponent(url('views/ComputeSubmitView.vu
   '@/lib/nativeSubmit': NativeSubmit,
   '@/lib/runTarget': RunTargetLib,
   '@/lib/jobs': JobsLib,
-  '@/lib/placementPolicies': PlacementPolicies,
 })
 const TaskDetailPanel = compileClientComponent(url('components/compute/TaskDetailPanel.vue'), {
   vue: VueRuntime,

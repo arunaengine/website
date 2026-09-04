@@ -6,7 +6,7 @@ import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
 import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
 import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
 import type { ButtonVariants } from '@/components/ui/button'
-import { ChevronDown, ListPlus, Play, Zap } from '@lucide/vue'
+import { Braces, ChevronDown, FileCode2, FileTerminal, ListPlus, Play } from '@lucide/vue'
 
 defineProps<{
   size?: ButtonVariants['size']
@@ -15,12 +15,15 @@ defineProps<{
 
 const router = useRouter()
 
-function goQuick() {
-  void router.push({ name: 'compute-quick' })
-}
+const TEMPLATES = [
+  { template: 'python', icon: FileCode2, label: 'Python script', hint: 'uv runs it; packages come from PyPI.' },
+  { template: 'javascript', icon: Braces, label: 'JavaScript script', hint: 'Deno runs it; packages come from npm.' },
+  { template: 'bash', icon: FileTerminal, label: 'Bash script', hint: 'Plain shell, no extra tooling.' },
+  { template: '', icon: ListPlus, label: 'Blank run', hint: 'Bring your own container image and command.' },
+]
 
-function goNew() {
-  void router.push({ name: 'compute-new' })
+function open(template: string) {
+  void router.push({ name: 'compute-new', ...(template ? { query: { template } } : {}) })
 }
 </script>
 
@@ -32,18 +35,16 @@ function goNew() {
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end" class="w-80 p-1.5">
-      <DropdownMenuItem class="cursor-pointer items-start gap-2.5 rounded-md px-2.5 py-2.5" @click="goQuick">
-        <Zap class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+      <DropdownMenuItem
+        v-for="entry in TEMPLATES"
+        :key="entry.label"
+        class="cursor-pointer items-start gap-2.5 rounded-md px-2.5 py-2.5"
+        @click="open(entry.template)"
+      >
+        <component :is="entry.icon" class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
         <span class="min-w-0">
-          <span class="block text-sm font-medium text-foreground">Quick run</span>
-          <span class="block text-xs leading-relaxed text-muted-foreground">Write a short script; the portal stages it and builds the run for you.</span>
-        </span>
-      </DropdownMenuItem>
-      <DropdownMenuItem class="cursor-pointer items-start gap-2.5 rounded-md px-2.5 py-2.5" @click="goNew">
-        <ListPlus class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-        <span class="min-w-0">
-          <span class="block text-sm font-medium text-foreground">Custom run</span>
-          <span class="block text-xs leading-relaxed text-muted-foreground">Bring your own container image, command and resources.</span>
+          <span class="block text-sm font-medium text-foreground">{{ entry.label }}</span>
+          <span class="block text-xs leading-relaxed text-muted-foreground">{{ entry.hint }}</span>
         </span>
       </DropdownMenuItem>
     </DropdownMenuContent>

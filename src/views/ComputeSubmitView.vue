@@ -1,16 +1,25 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+// The one run page: every part of a run on one form, with the footer at its
+// end. No steps and no review page; the request is a dialog away.
+import { computed, nextTick, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
-import WizardSteps from '@/components/onboarding/WizardSteps.vue'
+import Notice from '@/components/ui/Notice.vue'
+import AskAiButton from '@/components/assistant/AskAiButton.vue'
 import ComputeGates from '@/components/compute/ComputeGates.vue'
 import RerunPrefillNote from '@/components/compute/RerunPrefillNote.vue'
-import WizardNavBar from '@/components/compute/WizardNavBar.vue'
 import TesDataRefDialog from '@/components/compute/TesDataRefDialog.vue'
-import BasicsStep from '@/components/compute/custom/BasicsStep.vue'
-import WorkloadStep from '@/components/compute/custom/WorkloadStep.vue'
-import ReviewStep from '@/components/compute/custom/ReviewStep.vue'
+import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
+import RunBasics from '@/components/compute/run/RunBasics.vue'
+import ExecutorCard from '@/components/compute/run/ExecutorCard.vue'
+import ScriptCard from '@/components/compute/run/ScriptCard.vue'
+import FilesystemCard from '@/components/compute/run/FilesystemCard.vue'
+import ResourcesCard from '@/components/compute/run/ResourcesCard.vue'
+import PlacementCard from '@/components/compute/run/PlacementCard.vue'
+import RunFooter from '@/components/compute/run/RunFooter.vue'
+import RequestDialog from '@/components/compute/run/RequestDialog.vue'
+import ScriptPickerDialog from '@/components/compute/run/ScriptPickerDialog.vue'
 import { useTes, isTesUnsupported } from '@/composables/useTes'
 import { useAruna } from '@/composables/useAruna'
 import { useComputeDataView } from '@/composables/useComputeDataView'
@@ -19,163 +28,167 @@ import { useRealm } from '@/composables/useRealm'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useRunTarget } from '@/composables/useRunTarget'
 import { useS3 } from '@/composables/useS3'
-import { isNativeBlocked, tesFormToExecutionRequest } from '@/lib/nativeSubmit'
-import {
-  isNativeSubmitUnsupported,
-  isSubmitRetryable,
-  submitErrorMessage,
-  submitJob,
-} from '@/lib/jobs'
-import { createOperationId } from '@/lib/placementPolicies'
+import { defaultPlacement, isNativeBlocked, tesFormToExecutionRequest } from '@/lib/nativeSubmit'
+import { submitJob } from '@/lib/jobs'
+import type { TesTask } from '@/lib/tes'
 import { errorMessage } from '@/lib/utils'
 import { ArrowLeft } from '@lucide/vue'
 
 const router = useRouter()
-const route = useRoute()
 const { tesEnabled, busy, createTask, getTask } = useTes()
-const { apiBaseUrl, authToken, myGroups } = useAruna()
+const { currentUser, myGroups } = useAruna()
 const { realm } = useRealm()
-const { executorKinds } = useRealmNodes()
+const { nodes } = useRealmNodes()
 // Desktop only: this computer can run the container itself.
 const runTarget = useRunTarget()
 const s3 = useS3()
 const dataView = useComputeDataView()
 
+const store = useCustomRun({
+  runTarget,
+  s3,
+  myGroups,
+  currentUser,
+  nodes,
+  getTask,
+  dataView,
+  realmName: computed(() => realm.value.shortName),
+})
 const {
   groupId,
   task,
-  placement,
-  executorConstraint,
-  executorsValid,
-  outputsValid,
-  cpuCoresValid,
-  ramGbValid,
-  diskGbValid,
-  nativeInvalid,
-  useNative,
-  targetProblems,
+  hasScript,
+  language,
+  reuseSelectedScript,
+  stagedScript,
+  stagingBucket,
+  normalizedScriptKey,
+  dependencyConfig,
+  dependencyConfigKey,
+  problems,
+  inputDialogOpen,
+  inputMountDefault,
+  credentialDialogOpen,
+  addInputEntry,
   rerunSource,
   rerunNotes,
   rerunError,
   rerunLoading,
   dismissRerun,
-  inputDialogOpen,
-  inputMountDefault,
-  addInputEntry,
-} = useCustomRun({
-  runTarget,
-  s3,
-  myGroups,
-  executorKinds,
-  getTask,
-  dataView,
-  realmName: computed(() => realm.value.shortName),
-})
+} = store
 
-const WIZARD_STEPS = ['Basics', 'Workload', 'Review & run']
-// The step lives in ?step=N so browser back/forward walks the wizard instead
-// of leaving it.
-const step = computed(() => {
-  const raw = Number(route.query.step)
-  return Number.isInteger(raw) && raw > 0 && raw < WIZARD_STEPS.length ? raw : 0
-})
-function goStep(target: number) {
-  void router.push({ query: { ...route.query, step: target > 0 ? String(target) : undefined } })
-}
-
-const canContinue = computed(() => {
-  switch (step.value) {
-    case 0:
-      return groupId.value.length > 0
-    case 1:
-      return (
-        groupId.value.length > 0 &&
-        executorsValid.value &&
-        outputsValid.value &&
-        cpuCoresValid.value &&
-        ramGbValid.value &&
-        diskGbValid.value
-      )
-    default:
-      return groupId.value.length > 0
-  }
-})
-
-function next() {
-  if (canContinue.value && step.value < WIZARD_STEPS.length - 1) goStep(step.value + 1)
-}
-// The first step's Back leaves the wizard, and the button says so.
-function back() {
-  if (step.value > 0) goStep(step.value - 1)
-  else void router.push({ name: 'compute' })
-}
-
-// ── Submit ───────────────────────────────────────────────────────────────────
+const resourcesCard = ref<InstanceType<typeof ResourcesCard> | null>(null)
+const placementCard = ref<InstanceType<typeof PlacementCard> | null>(null)
+const requestOpen = ref(false)
+const submitting = ref(false)
 const submitError = ref<string | null>(null)
-// Held across retries: a 503 may already have committed the submission, so the
-// same key is what makes the retry a replay instead of a duplicate.
-const idempotencyKey = ref('')
-const submitRetryable = ref(false)
 
-async function submitNative() {
+const endpoint = computed(() => (runTarget.local.value ? 'POST /jobs/' : 'POST /ga4gh/tes/v1/tasks'))
+const sentTo = computed(() =>
+  runTarget.local.value
+    ? 'sent to this computer, which runs the container itself'
+    : 'sent to the node you are signed in to; the planner picks the executing node',
+)
+
+/** Scrolls to a problem and puts the caret in the field that carries it. */
+function jumpTo(section: string, field: string) {
+  if (section === 'section-resources') resourcesCard.value?.open()
+  if (section === 'section-placement') placementCard.value?.open()
+  const page = globalThis.document
+  page?.getElementById(section)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  void nextTick(() => {
+    const target = page?.getElementById(field)
+    if (!target) return
+    const focusable =
+      target.matches('input, select, textarea, button, [tabindex]')
+        ? target
+        : target.querySelector<HTMLElement>('input, select, textarea, button, [tabindex]')
+    focusable?.focus()
+  })
+}
+
+/**
+ * Sends the run to this computer as a native job, which is the only surface
+ * that accepts a local target. Answers false when the realm is the target.
+ */
+async function submitLocally(draft: TesTask): Promise<boolean> {
+  const client = runTarget.localClient.value
+  if (!client) return false
   const mapping = tesFormToExecutionRequest({
     groupId: groupId.value,
-    task: task.value,
-    executorConstraint: executorConstraint.value,
-    placement: placement.value,
-    idempotencyKey: idempotencyKey.value,
+    task: draft,
+    placement: defaultPlacement(),
   })
   if (isNativeBlocked(mapping)) {
     submitError.value = mapping.blocked
-    return
+    return true
   }
-  const local = runTarget.localClient.value
-  const created = await submitJob(
-    local ? { ...mapping.request, target: 'local' } : mapping.request,
-    local ?? { baseUrl: apiBaseUrl.value, token: authToken.value },
-  )
-  void router.push(
-    local
-      ? { name: 'run', params: { jobId: created.job_id } }
-      : { name: 'job', params: { jobId: created.job_id } },
-  )
+  const created = await submitJob({ ...mapping.request, target: 'local' }, client)
+  void router.push({ name: 'run', params: { jobId: created.job_id } })
+  return true
 }
 
-async function submit() {
+async function run() {
+  if (problems.value.length) {
+    jumpTo(problems.value[0].section, problems.value[0].field)
+    return
+  }
   submitError.value = null
-  submitRetryable.value = false
-  if (!idempotencyKey.value) idempotencyKey.value = createOperationId()
+  submitting.value = true
   try {
-    if (useNative.value) {
-      await submitNative()
-      return
+    let draft = task.value
+    const [scriptUpload, dependencyUpload] = await Promise.all([
+      hasScript.value && !reuseSelectedScript.value
+        ? s3.putTextObject(
+            stagingBucket.value.trim(),
+            normalizedScriptKey.value,
+            stagedScript.value,
+            language.value.contentType,
+          )
+        : Promise.resolve(null),
+      dependencyConfig.value
+        ? s3.putTextObject(
+            stagingBucket.value.trim(),
+            dependencyConfigKey.value,
+            dependencyConfig.value,
+            'application/json',
+          )
+        : Promise.resolve(null),
+    ])
+    if (runTarget.local.value) {
+      const sourceNodeId = s3.nodeIdFor()
+      if (!sourceNodeId) throw new Error('The realm node for staged inputs is not available.')
+      const localInputs = [...(draft.inputs ?? [])]
+      if (scriptUpload?.versionId && localInputs[0]) {
+        localInputs[0] = { ...localInputs[0], source_node_id: sourceNodeId, version_id: scriptUpload.versionId }
+      }
+      if (dependencyUpload?.versionId && localInputs[1]) {
+        localInputs[1] = { ...localInputs[1], source_node_id: sourceNodeId, version_id: dependencyUpload.versionId }
+      }
+      if (localInputs.some((input) => !input.source_node_id || !input.version_id)) {
+        throw new Error('Realm data inputs need an exact version for a local run.')
+      }
+      draft = { ...draft, inputs: localInputs }
     }
-    const created = await createTask(task.value)
+    if (await submitLocally(draft)) return
+    const created = await createTask(draft)
     void router.push({ name: 'task', params: { taskId: created.id } })
   } catch (err) {
-    if (useNative.value) {
-      submitRetryable.value = isSubmitRetryable(err)
-      submitError.value = isNativeSubmitUnsupported(err)
-        ? 'This node does not serve the native jobs API, so these advanced options cannot be used here.'
-        : submitErrorMessage(err)
-      return
-    }
     submitError.value = isTesUnsupported(err)
       ? `This node does not accept runs. ${errorMessage(err)}`
       : errorMessage(err)
+  } finally {
+    submitting.value = false
   }
 }
 </script>
 
 <template>
   <div>
-    <PageHeader
-      eyebrow="Compute"
-      title="Custom run"
-      description="Describe a container run: image, command, data and resources."
-    >
+    <PageHeader eyebrow="Compute" title="New run">
       <template #actions>
-        <Button variant="outline" size="sm" as-child>
+        <AskAiButton size="default" prompt="Help me set up this run." />
+        <Button variant="outline" size="default" as-child>
           <RouterLink :to="{ name: 'compute' }"><ArrowLeft class="h-4 w-4" /> Back to Compute</RouterLink>
         </Button>
       </template>
@@ -188,7 +201,7 @@ async function submit() {
       sign-in-description="Starting a run is an authenticated operation."
       redirect-to="/app/compute/new"
     >
-      <div class="container space-y-6 py-8">
+      <div class="container max-w-5xl space-y-4 py-8">
         <RerunPrefillNote
           :loading="rerunLoading"
           :error="rerunError"
@@ -197,32 +210,28 @@ async function submit() {
           @dismiss="dismissRerun"
         />
 
-        <WizardSteps :steps="WIZARD_STEPS" :current="step" />
+        <RunBasics />
+        <ExecutorCard />
+        <ScriptCard v-if="hasScript" />
+        <FilesystemCard />
+        <ResourcesCard ref="resourcesCard" />
+        <PlacementCard ref="placementCard" />
 
-        <section class="surface space-y-5 p-6">
-          <BasicsStep v-if="step === 0" />
-          <WorkloadStep v-else-if="step === 1" />
-          <ReviewStep
-            v-else
-            :submit-error="submitError"
-            :submit-retryable="submitRetryable"
-          />
-        </section>
+        <Notice v-if="submitError" tone="error">{{ submitError }}</Notice>
 
-        <WizardNavBar
-          :first="step === 0"
-          :last="step === WIZARD_STEPS.length - 1"
-          :can-continue="canContinue"
-          :can-run="!busy && !!groupId && executorsValid && outputsValid && cpuCoresValid && ramGbValid && diskGbValid && !nativeInvalid && !targetProblems.length"
-          @back="back"
-          @next="next"
-          @run="submit"
+        <RunFooter
+          :running="submitting || busy"
+          @run="run"
+          @cancel="router.push({ name: 'compute' })"
+          @show-request="requestOpen = true"
+          @jump="jumpTo"
         />
       </div>
     </ComputeGates>
 
-    <!-- Input picker for the filesystem tree's per-folder add-input action;
-         the Table view's TesInputsEditor keeps its own dialog. -->
+    <RequestDialog v-model:open="requestOpen" :endpoint="endpoint" :sent-to="sentTo" />
     <TesDataRefDialog v-model:open="inputDialogOpen" mode="input" :mount-default="inputMountDefault" @add="addInputEntry" />
+    <CreateCredentialDialog v-model:open="credentialDialogOpen" />
+    <ScriptPickerDialog />
   </div>
 </template>

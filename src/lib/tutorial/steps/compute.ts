@@ -1,11 +1,9 @@
 // The compute tutorial, stop by stop. Every stop names a real control by its
-// `data-tutorial` id on the route that mounts it; the wizard steps live in the
-// query, exactly as the real Custom run wizard keeps them.
+// `data-tutorial` id on the route that mounts it. The run form is one page, so
+// every form stop shares its route.
 import type { TutorialStep } from '../session'
 
 export const TUTORIAL_COMPUTE_ROUTE = '/app/tutorial/compute'
-const WIZARD_WORKLOAD = `${TUTORIAL_COMPUTE_ROUTE}?step=1`
-const WIZARD_REVIEW = `${TUTORIAL_COMPUTE_ROUTE}?step=2`
 export const TUTORIAL_RUN_ROUTE = `${TUTORIAL_COMPUTE_ROUTE}?stage=run`
 
 /** The step that opens the input picker for the reader. */
@@ -30,7 +28,7 @@ export const computeTutorialSteps: TutorialStep[] = [
   },
   {
     id: 'filesystem',
-    route: WIZARD_WORKLOAD,
+    route: TUTORIAL_COMPUTE_ROUTE,
     target: 'run-filesystem',
     title: 'The container filesystem',
     advanceOn: 'next',
@@ -38,7 +36,7 @@ export const computeTutorialSteps: TutorialStep[] = [
   },
   {
     id: 'add-input',
-    route: WIZARD_WORKLOAD,
+    route: TUTORIAL_COMPUTE_ROUTE,
     target: 'run-add-input',
     title: 'Stage your data',
     advanceOn: 'next',
@@ -46,7 +44,7 @@ export const computeTutorialSteps: TutorialStep[] = [
   },
   {
     id: 'picker',
-    route: WIZARD_WORKLOAD,
+    route: TUTORIAL_COMPUTE_ROUTE,
     target: 'input-picker',
     title: 'Files, folders, whole datasets',
     advanceOn: 'next',
@@ -54,7 +52,7 @@ export const computeTutorialSteps: TutorialStep[] = [
   },
   {
     id: 'mount',
-    route: WIZARD_WORKLOAD,
+    route: TUTORIAL_COMPUTE_ROUTE,
     target: 'input-mount',
     title: 'Where it lands',
     advanceOn: 'next',
@@ -62,7 +60,7 @@ export const computeTutorialSteps: TutorialStep[] = [
   },
   {
     id: 'executor',
-    route: WIZARD_WORKLOAD,
+    route: TUTORIAL_COMPUTE_ROUTE,
     target: 'run-executor',
     title: 'Image and command',
     advanceOn: 'next',
@@ -70,7 +68,7 @@ export const computeTutorialSteps: TutorialStep[] = [
   },
   {
     id: 'resources',
-    route: WIZARD_WORKLOAD,
+    route: TUTORIAL_COMPUTE_ROUTE,
     target: 'run-resources',
     title: 'Resources',
     advanceOn: 'next',
@@ -78,23 +76,23 @@ export const computeTutorialSteps: TutorialStep[] = [
   },
   {
     id: 'placement',
-    route: WIZARD_WORKLOAD,
+    route: TUTORIAL_COMPUTE_ROUTE,
     target: 'run-placement',
     title: 'Execution options',
-    advanceOn: 'action',
-    body: 'Input mode decides whether the run reads a snapshot, follows the current version, or pins one exactly. These options travel on the native jobs API. Continue to the review.',
+    advanceOn: 'next',
+    body: 'Placement decides which nodes the run may land on: a pinned node, an executor kind, and label constraints the nodes advertise. The tile says how many nodes still match.',
   },
   {
     id: 'review',
-    route: WIZARD_REVIEW,
-    target: 'run-review',
+    route: TUTORIAL_COMPUTE_ROUTE,
+    target: 'run-request',
     title: 'Read the request',
     advanceOn: 'next',
-    body: 'The request is shown verbatim: what is sent is what you see. Check the inputs, the captures and the placement before starting it.',
+    body: 'Show request opens the exact body that is sent, verbatim. Check the inputs, the captures and the placement before starting the run.',
   },
   {
     id: 'submit',
-    route: WIZARD_REVIEW,
+    route: TUTORIAL_COMPUTE_ROUTE,
     target: 'run-submit',
     title: 'Start the run',
     advanceOn: 'action',
