@@ -45,6 +45,7 @@ import {
   type TesState,
   type TesTask,
 } from '@/lib/tes'
+import { objectHref } from '@/lib/assistant/objectLinks'
 import { asyncChunkError } from '@/lib/chunk-recovery'
 import { errorMessage, formatBytes, formatDuration, relativeTime, truncateMiddle } from '@/lib/utils'
 import { Ban, Download, Eye, ExternalLink as ExternalLinkIcon, FileText, RotateCcw, Trash2 } from '@lucide/vue'
@@ -414,15 +415,17 @@ interface OutRow {
   link: ResolvedLink
 }
 
-// One captured file previewed in place, through the same viewer stack the Data
-// view uses; the viewers themselves stay in their own chunks.
-const PreviewBody = defineAsyncComponent({
-  loader: () => import('@/components/preview/PreviewBody.vue'),
+// A captured file opens in the portal's own file dialog, the same surface the
+// data browser and the assistant use; it loads only once one is asked for.
+const FileDetailsDialog = defineAsyncComponent({
+  loader: () => import('@/components/data/FileDetailsDialog.vue'),
   onError: asyncChunkError,
 })
-const previewing = ref<string | null>(null)
-function togglePreview(row: OutRow) {
-  previewing.value = previewing.value === row.url ? null : row.url
+const previewing = ref<OutRow | null>(null)
+const previewTab = ref('preview')
+function openPreview(row: OutRow) {
+  previewing.value = row
+  previewTab.value = 'preview'
 }
 function objectName(key: string): string {
   return key.split('/').filter(Boolean).pop() || key
@@ -468,8 +471,10 @@ async function findRunCrate() {
   }
 }
 
-const { busy: crateBusy, refresh: onFindCrate } = useRefresh(findRunCrate)
-const spinning = computed(() => crateBusy.value || runCrateLoading.value)
+// One refresh for the panel: the run itself and the dataset it writes.
+const { busy: refreshing, refresh: onRefresh } = useRefresh(async () => {
+  await Promise.all([poll(), findRunCrate()])
+})
 
 // The summary already prints the failure message, so a failed run lists only
 // the system log lines that add something.
@@ -590,7 +595,10 @@ async function confirmDelete() {
           :tags="task.tags"
           :description="task.description"
         />
-        <AskAiButton :prompt="askPrompt" :subject="`run ${taskId}`" icon-only class="shrink-0" />
+        <div class="flex shrink-0 items-center gap-2">
+          <RefreshButton :busy="refreshing" size="xs" sr-label="Refresh this run" @click="onRefresh" />
+          <AskAiButton :prompt="askPrompt" :subject="`run ${taskId}`" icon-only />
+        </div>
       </div>
       <Skeleton v-else-if="loadState === 'loading'" class="h-6 w-2/3" />
     </template>
@@ -706,17 +714,30 @@ async function confirmDelete() {
 
           <div v-if="declaredOutputs.length" class="space-y-1.5">
             <div class="text-[11px] font-medium text-foreground">Declared</div>
-            <div v-for="(row, i) in declaredShown" :key="'d' + row.url + i" class="flex flex-wrap items-center gap-2 text-[11px]">
-              <span class="font-mono text-muted-foreground">{{ row.path }}</span>
-              <span class="text-muted-foreground">to</span>
-              <RouterLink v-if="row.link.kind === 's3'" class="font-mono text-primary hover:underline" :to="{ name: 'bucket', params: { bucketId: row.link.bucketId }, query: row.link.prefix ? { prefix: row.link.prefix } : {} }">{{ row.url }}</RouterLink>
-              <template v-else-if="row.link.kind === 'drs'">
-                <a class="inline-flex items-center gap-1 font-mono text-primary hover:underline" :href="row.link.object" target="_blank" rel="noopener noreferrer">{{ truncateMiddle(row.url, 24, 12) }} <ExternalLinkIcon class="h-3 w-3" /></a>
-                <Tooltip label="Download this output">
-                  <a class="text-muted-foreground hover:text-foreground" :href="row.link.download" target="_blank" rel="noopener noreferrer" aria-label="Download this output" title="Download this output"><Download class="h-3.5 w-3.5" /></a>
-                </Tooltip>
-              </template>
-              <ExternalLink v-else :href="row.url" :label="row.url" class="font-mono text-muted-foreground hover:text-primary" />
+            <div class="overflow-x-auto rounded-md border border-border">
+              <table class="w-full min-w-[36rem] text-left text-[11px]">
+                <thead class="bg-muted/50 text-muted-foreground">
+                  <tr>
+                    <th scope="col" class="px-3 py-2 font-medium">Path in the container</th>
+                    <th scope="col" class="px-3 py-2 font-medium">Destination</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-border">
+                  <tr v-for="(row, i) in declaredShown" :key="'d' + row.url + i">
+                    <td class="px-3 py-2 font-mono text-muted-foreground">{{ row.path }}</td>
+                    <td class="px-3 py-2">
+                      <RouterLink v-if="row.link.kind === 's3'" class="break-all font-mono text-primary hover:underline" :to="{ name: 'bucket', params: { bucketId: row.link.bucketId }, query: row.link.prefix ? { prefix: row.link.prefix } : {} }">{{ row.url }}</RouterLink>
+                      <span v-else-if="row.link.kind === 'drs'" class="inline-flex items-center gap-1">
+                        <a class="font-mono text-primary hover:underline" :href="row.link.object" target="_blank" rel="noopener noreferrer">{{ truncateMiddle(row.url, 24, 12) }}</a>
+                        <Tooltip label="Download this output">
+                          <a class="text-muted-foreground hover:text-foreground" :href="row.link.download" target="_blank" rel="noopener noreferrer" aria-label="Download this output"><Download class="h-3.5 w-3.5" /></a>
+                        </Tooltip>
+                      </span>
+                      <ExternalLink v-else :href="row.url" :label="row.url" class="break-all font-mono text-muted-foreground hover:text-primary" />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
             <div v-if="declaredOutputs.length > OUTPUT_PAGE" class="flex flex-wrap items-center justify-between gap-2">
               <span class="text-[11px] text-muted-foreground">{{ pageRange(declaredOutputs, declaredPage) }}</span>
@@ -731,38 +752,51 @@ async function confirmDelete() {
 
           <div v-if="capturedOutputs.length" class="space-y-1.5">
             <div class="text-[11px] font-medium text-foreground">Captured</div>
-            <div v-for="(row, i) in capturedShown" :key="'c' + row.url + i" class="space-y-1.5">
-              <div class="flex flex-wrap items-center gap-2 text-[11px]">
-                <Button
-                  v-if="row.link.kind === 's3'"
-                  variant="ghost"
-                  size="sm"
-                  class="h-6 px-1.5"
-                  :aria-label="`Preview ${objectName(row.link.objectKey)}`"
-                  @click="togglePreview(row)"
-                >
-                  <Eye class="h-3.5 w-3.5" /> {{ previewing === row.url ? 'Hide' : 'Preview' }}
-                </Button>
-                <span class="font-mono text-muted-foreground">{{ row.path }}</span>
-                <span v-if="row.size !== undefined && !Number.isNaN(row.size)" class="text-muted-foreground">{{ formatBytes(row.size) }}</span>
-                <span class="text-muted-foreground">to</span>
-                <RouterLink v-if="row.link.kind === 's3'" class="font-mono text-primary hover:underline" :to="{ name: 'bucket', params: { bucketId: row.link.bucketId }, query: row.link.prefix ? { prefix: row.link.prefix } : {} }">{{ row.url }}</RouterLink>
-                <template v-else-if="row.link.kind === 'drs'">
-                  <a class="inline-flex items-center gap-1 font-mono text-primary hover:underline" :href="row.link.object" target="_blank" rel="noopener noreferrer">{{ truncateMiddle(row.url, 24, 12) }} <ExternalLinkIcon class="h-3 w-3" /></a>
-                  <Tooltip label="Download this output">
-                    <a class="text-muted-foreground hover:text-foreground" :href="row.link.download" target="_blank" rel="noopener noreferrer" aria-label="Download this output" title="Download this output"><Download class="h-3.5 w-3.5" /></a>
-                  </Tooltip>
-                </template>
-                <ExternalLink v-else :href="row.url" :label="row.url" class="font-mono text-muted-foreground hover:text-primary" />
-              </div>
-              <PreviewBody
-                v-if="previewing === row.url && row.link.kind === 's3'"
-                active
-                :bucket="row.link.bucketId"
-                :object-key="row.link.objectKey"
-                :name="objectName(row.link.objectKey)"
-                :size="row.size !== undefined && !Number.isNaN(row.size) ? row.size : undefined"
-              />
+            <div class="overflow-x-auto rounded-md border border-border">
+              <table class="w-full min-w-[44rem] text-left text-[11px]">
+                <thead class="bg-muted/50 text-muted-foreground">
+                  <tr>
+                    <th scope="col" class="px-3 py-2 font-medium">File</th>
+                    <th scope="col" class="px-3 py-2 font-medium">Path in the container</th>
+                    <th scope="col" class="px-3 py-2 text-right font-medium">Size</th>
+                    <th scope="col" class="px-3 py-2 font-medium">Destination</th>
+                    <th scope="col" class="px-3 py-2"><span class="sr-only">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-border">
+                  <tr v-for="(row, i) in capturedShown" :key="'c' + row.url + i">
+                    <td class="max-w-64 break-all px-3 py-2 font-mono text-foreground">
+                      {{ row.link.kind === 's3' ? objectName(row.link.objectKey) : objectName(row.path) }}
+                    </td>
+                    <td class="px-3 py-2 font-mono text-muted-foreground">{{ row.path }}</td>
+                    <td class="whitespace-nowrap px-3 py-2 text-right text-foreground">
+                      {{ row.size !== undefined && !Number.isNaN(row.size) ? formatBytes(row.size) : '' }}
+                    </td>
+                    <td class="px-3 py-2">
+                      <RouterLink v-if="row.link.kind === 's3'" class="break-all font-mono text-primary hover:underline" :to="{ name: 'bucket', params: { bucketId: row.link.bucketId }, query: row.link.prefix ? { prefix: row.link.prefix } : {} }">{{ row.url }}</RouterLink>
+                      <span v-else-if="row.link.kind === 'drs'" class="inline-flex items-center gap-1">
+                        <a class="font-mono text-primary hover:underline" :href="row.link.object" target="_blank" rel="noopener noreferrer">{{ truncateMiddle(row.url, 24, 12) }}</a>
+                        <Tooltip label="Download this output">
+                          <a class="text-muted-foreground hover:text-foreground" :href="row.link.download" target="_blank" rel="noopener noreferrer" aria-label="Download this output"><Download class="h-3.5 w-3.5" /></a>
+                        </Tooltip>
+                      </span>
+                      <ExternalLink v-else :href="row.url" :label="row.url" class="break-all font-mono text-muted-foreground hover:text-primary" />
+                    </td>
+                    <td class="px-3 py-2 text-right">
+                      <Button
+                        v-if="row.link.kind === 's3'"
+                        variant="ghost"
+                        size="sm"
+                        class="h-6 px-1.5"
+                        :aria-label="`Preview ${objectName(row.link.objectKey)}`"
+                        @click="openPreview(row)"
+                      >
+                        <Eye class="h-3.5 w-3.5" /> Preview
+                      </Button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
             <div class="flex flex-wrap items-center justify-between gap-2">
               <span class="text-[11px] text-muted-foreground">
@@ -784,10 +818,7 @@ async function confirmDelete() {
             <RouterLink v-if="runCrate" class="inline-flex items-center gap-1.5 text-primary hover:underline" :to="{ name: 'dataset', params: { id: runCrate.document_id } }">
               <FileText class="h-3.5 w-3.5" /> Open
             </RouterLink>
-            <template v-else>
-              <span class="text-muted-foreground">written once the run completes</span>
-              <RefreshButton :busy="spinning" label="Check again" @click="onFindCrate" />
-            </template>
+            <span v-else class="text-muted-foreground">written once the run completes</span>
           </div>
         </section>
 
@@ -843,5 +874,18 @@ async function confirmDelete() {
     :streams="logStreams"
     :name="headerTitle"
     @update:open="(value: boolean) => (logOpen = value)"
+  />
+  <FileDetailsDialog
+    v-if="previewing && previewing.link.kind === 's3'"
+    :open="true"
+    :tab="previewTab"
+    :bucket="previewing.link.bucketId"
+    :object-key="previewing.link.objectKey"
+    :name="objectName(previewing.link.objectKey)"
+    :size="previewing.size !== undefined && !Number.isNaN(previewing.size) ? previewing.size : undefined"
+    :group-id="groupTagId ?? null"
+    :browse-href="objectHref({ bucket: previewing.link.bucketId, key: previewing.link.objectKey })"
+    @update:open="(value: boolean) => { if (!value) previewing = null }"
+    @update:tab="(value: string) => (previewTab = value)"
   />
 </template>

@@ -11,6 +11,7 @@ import * as Poll from '@/lib/poll'
 import * as CustomRun from '@/composables/useCustomRun'
 import * as JobsComposable from '@/composables/useJobs'
 import * as ObjectPreview from '@/composables/useObjectPreview'
+import * as ObjectLinks from '@/lib/assistant/objectLinks'
 import * as RefreshComposable from '@/composables/useRefresh'
 import * as S3 from '@/composables/useS3'
 import * as Tes from '@/composables/useTes'
@@ -104,6 +105,11 @@ const PreviewStub = defineComponent({
   props: { bucket: String, objectKey: String, name: String },
   setup: (props) => () => h('section', `preview ${props.bucket}/${props.objectKey}`),
 })
+// The run panel opens the portal's file dialog, so the stub stands in for it.
+const FileDialogStub = defineComponent({
+  props: { open: Boolean, bucket: String, objectKey: String, tab: String },
+  setup: (props) => () => (props.open ? h('section', `preview ${props.bucket}/${props.objectKey}`) : null),
+})
 const RouterLinkStub = defineComponent((_, { attrs, slots }) => () => h('a', attrs, slots.default?.()))
 const icons = new Proxy({}, { get: () => GenericStub })
 
@@ -181,6 +187,7 @@ const cardModules = {
   '@/lib/quickRuntimes': QuickRuntimes,
   '@/lib/shellwords': Shellwords,
   '@/lib/bucketName': BucketName,
+  '@/lib/assistant/objectLinks': ObjectLinks,
   '@/lib/chunk-recovery': ChunkRecovery,
   '@/components/compute/ContainerFsTree.vue': moduleDefault(GenericStub),
   '@/components/compute/TesInputsEditor.vue': moduleDefault(GenericStub),
@@ -300,6 +307,7 @@ const TaskDetailPanel = compileClientComponent(url('components/compute/TaskDetai
   '@/components/assistant/AskAiButton.vue': moduleDefault(GenericStub),
   '@/components/onboarding/ClaimWatchStep.vue': moduleDefault(StagesStub),
   '@/components/preview/PreviewBody.vue': moduleDefault(PreviewStub),
+  '@/components/data/FileDetailsDialog.vue': moduleDefault(FileDialogStub),
   '@/composables/useTes': Tes,
   '@/composables/useJobs': JobsComposable,
   '@/composables/useAruna': arunaModule,
@@ -309,6 +317,7 @@ const TaskDetailPanel = compileClientComponent(url('components/compute/TaskDetai
   '@/composables/useRefresh': RefreshComposable,
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => id }) },
   '@/components/ui/NodeLabel.vue': moduleDefault(GenericStub),
+  '@/lib/assistant/objectLinks': ObjectLinks,
   '@/lib/chunk-recovery': ChunkRecovery,
   '@/lib/poll': Poll,
   '@/lib/quickRuntimes': QuickRuntimes,

@@ -9,6 +9,7 @@ import { useRefresh } from '@/composables/useRefresh'
 import { refreshButton } from '@/test/clientRender'
 import { ApiError } from '@/lib/api'
 import * as Jobs from '@/lib/jobs'
+import * as ObjectLinks from '@/lib/assistant/objectLinks'
 import * as Poll from '@/lib/poll'
 import * as Tes from '@/lib/tes'
 import * as Utils from '@/lib/utils'
@@ -284,6 +285,7 @@ function taskPanel(getTask: unknown, getJob: unknown): Component {
     '@/composables/useHiddenTasks': { useHiddenTasks: () => ({ hide: vi.fn() }) },
     '@/composables/useS3': { useS3: () => ({ endpoint: ref(null) }) },
     '@/components/preview/PreviewBody.vue': moduleDefault(PassThroughStub),
+    '@/lib/assistant/objectLinks': ObjectLinks,
     '@/lib/chunk-recovery': { asyncChunkError: () => undefined },
     '@/lib/quickRuntimes': { detectQuickRun: () => false },
     '@/lib/jobs': Jobs,

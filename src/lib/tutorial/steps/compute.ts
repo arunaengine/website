@@ -120,7 +120,7 @@ export const computeTutorialSteps: TutorialStep[] = [
     target: 'run-artifacts',
     title: 'What the run produced',
     advanceOn: 'next',
-    body: 'Captured files are listed with their size and destination. Preview opens an image, a table or a text file right here; anything else is offered as a download.',
+    body: 'Captured files are listed with their size and destination. Preview opens the file in the same file view the data browser uses, with its versions and its copies.',
   },
   {
     id: 'details',
