@@ -6,10 +6,10 @@ import { Hash, FileJson2, Database, Layers } from '@lucide/vue'
 
 <template>
   <section id="architecture" class="section bg-muted/30">
-    <div class="container max-w-6xl">
+    <div class="container max-w-5xl">
       <div class="mx-auto max-w-2xl text-center">
         <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">Architecture</div>
-        <h2 class="mt-3 font-display text-3xl font-semibold tracking-tight text-aruna-navy sm:text-4xl">
+        <h2 class="mt-3 text-balance font-display text-3xl font-semibold tracking-tight text-aruna-navy sm:text-4xl">
           How a realm is put together.
         </h2>
         <p class="mt-3 text-sm text-muted-foreground">
@@ -20,7 +20,7 @@ import { Hash, FileJson2, Database, Layers } from '@lucide/vue'
       <div class="mt-12 grid gap-10 lg:grid-cols-[1fr_1.3fr]">
         <dl class="flex flex-col gap-6">
           <div class="flex gap-4">
-            <div class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <div class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <Hash class="h-5 w-5" />
             </div>
             <div>
@@ -35,7 +35,7 @@ import { Hash, FileJson2, Database, Layers } from '@lucide/vue'
             </div>
           </div>
           <div class="flex gap-4">
-            <div class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <div class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <FileJson2 class="h-5 w-5" />
             </div>
             <div>
@@ -50,7 +50,7 @@ import { Hash, FileJson2, Database, Layers } from '@lucide/vue'
             </div>
           </div>
           <div class="flex gap-4">
-            <div class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <div class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <Database class="h-5 w-5" />
             </div>
             <div>
@@ -65,7 +65,7 @@ import { Hash, FileJson2, Database, Layers } from '@lucide/vue'
             </div>
           </div>
           <div class="flex gap-4">
-            <div class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <div class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <Layers class="h-5 w-5" />
             </div>
             <div>

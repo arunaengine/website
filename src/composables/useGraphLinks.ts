@@ -7,6 +7,7 @@ import { boxIn, linkPath, segment, type Box } from '@/lib/landing/graphLinks'
 const SVG = 'http://www.w3.org/2000/svg'
 /** How far outside a card its links begin, so a packet's bloom clears the edge. */
 const LINK_GAP = 14
+const PACKET_GAP = 2
 
 function offsetPathsWork(): boolean {
   return typeof CSS !== 'undefined' && typeof CSS.supports === 'function'
@@ -29,30 +30,35 @@ export function useGraphLinks(root: Ref<HTMLElement | null>, links: string[]) {
     for (const node of graph.querySelectorAll<HTMLElement>('[data-node]')) {
       boxes.set(node.dataset.node ?? '', boxIn(node.getBoundingClientRect(), rootRect))
     }
-    const between = (a: string, b: string) => {
+    const between = (a: string, b: string, gap = LINK_GAP) => {
       const from = boxes.get(a)
       const to = boxes.get(b)
-      return from && to ? segment(from, to, LINK_GAP) : null
+      return from && to ? segment(from, to, gap) : null
     }
     svg.setAttribute('viewBox', `0 0 ${graph.clientWidth} ${graph.clientHeight}`)
-    svg.replaceChildren()
     for (const pair of links) {
       const [a, b] = pair.split('-')
       const link = between(a, b)
       if (!link) continue
       // A soft glow line sits under the crisp one; the CSS lights it in use.
+      // The lines are kept across redraws, so their animations stay in step
+      // with the packets instead of restarting on every resize.
       for (const kind of ['link-glow', 'link']) {
-        const line = document.createElementNS(SVG, 'line')
+        let line = svg.querySelector<SVGLineElement>(`.${kind}-${pair}`)
+        if (!line) {
+          line = document.createElementNS(SVG, 'line')
+          line.setAttribute('class', `${kind} ${kind}-${pair}`)
+          svg.append(line)
+        }
         line.setAttribute('x1', String(link.from.x))
         line.setAttribute('y1', String(link.from.y))
         line.setAttribute('x2', String(link.to.x))
         line.setAttribute('y2', String(link.to.y))
-        line.setAttribute('class', `${kind} ${kind}-${pair}`)
-        svg.append(line)
       }
     }
+    // A packet runs up to the card edge, so it slips under the card on arrival.
     for (const packet of graph.querySelectorAll<HTMLElement>('[data-from][data-to]')) {
-      const link = between(packet.dataset.from ?? '', packet.dataset.to ?? '')
+      const link = between(packet.dataset.from ?? '', packet.dataset.to ?? '', PACKET_GAP)
       if (link) packet.style.offsetPath = linkPath(link)
     }
   }

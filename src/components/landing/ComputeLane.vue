@@ -15,7 +15,7 @@ useGraphLinks(root, ['data-compute'])
 <template>
   <div
     ref="root"
-    :class="['fed lane relative grid grid-cols-[1fr_72px_1fr] items-center', `lane-${props.direction}`]"
+    :class="['fed lane relative grid grid-cols-[1fr_64px_1fr] items-stretch max-sm:grid-cols-1 max-sm:grid-rows-[auto_56px_auto]', `lane-${props.direction}`]"
     role="img"
     :aria-label="props.direction === 'to-data'
       ? 'A compute job travels from the Kubernetes cluster to the research institute, runs next to the dataset, and the result is stored there.'
@@ -53,6 +53,9 @@ useGraphLinks(root, ['data-compute'])
   .lane .pt-back b { animation: lane-lbl-back var(--cycle) linear infinite; }
   .lane :deep(.link-data-compute) { animation: lane-link var(--cycle) linear infinite; }
   .lane :deep(.link-glow-data-compute) { animation: lane-glow var(--cycle) linear infinite; }
+  /* Nothing travels back in the to-data lane, so its link lights only once. */
+  .lane-to-data :deep(.link-data-compute) { animation-name: lane-link-once; }
+  .lane-to-data :deep(.link-glow-data-compute) { animation-name: lane-glow-once; }
   .lane-to-data :deep(.node-data)::before,
   .lane-to-compute :deep(.node-compute)::before { animation: lane-bloom var(--cycle) linear infinite; }
   .lane-to-data :deep(.node-data .node-dot),
@@ -64,17 +67,19 @@ useGraphLinks(root, ['data-compute'])
   .lane-to-data :deep(.node-data .st-done) { animation: lane-done var(--cycle) linear infinite; }
   .lane-to-compute :deep(.node-data .st-done) { animation: lane-done-back var(--cycle) linear infinite; }
 }
-/* The packet takes a third of the cycle; the run and its result take the rest. */
-@keyframes lane-go { 0% { offset-distance: 0%; opacity: 0; } 3% { opacity: 1; } 30% { opacity: 1; } 33% { offset-distance: 100%; opacity: 0; } 100% { offset-distance: 100%; opacity: 0; } }
-@keyframes lane-back { 0%, 60% { offset-distance: 0%; opacity: 0; } 63% { opacity: 1; } 87% { opacity: 1; } 90% { offset-distance: 100%; opacity: 0; } 100% { offset-distance: 100%; opacity: 0; } }
-@keyframes lane-lbl { 0%, 4% { opacity: 0; } 7%, 27% { opacity: 1; } 30%, 100% { opacity: 0; } }
-@keyframes lane-lbl-back { 0%, 64% { opacity: 0; } 67%, 84% { opacity: 1; } 87%, 100% { opacity: 0; } }
-@keyframes lane-link { 0%, 33% { stroke: #57c5de; stroke-opacity: 0.95; } 38%, 58% { stroke: hsl(var(--primary)); stroke-opacity: 0.4; } 62%, 90% { stroke: #2da8e5; stroke-opacity: 0.95; } 95%, 100% { stroke: hsl(var(--primary)); stroke-opacity: 0.4; } }
-@keyframes lane-glow { 0%, 33% { stroke: #57c5de; stroke-opacity: 0.3; } 38%, 58% { stroke-opacity: 0; } 62%, 90% { stroke: #2da8e5; stroke-opacity: 0.3; } 95%, 100% { stroke-opacity: 0; } }
-@keyframes lane-bloom { 0%, 32% { opacity: 0; } 36%, 58% { opacity: 1; } 66%, 100% { opacity: 0; } }
-@keyframes lane-dot { 0%, 32% { background: hsl(var(--primary) / 0.7); } 35%, 60% { background: #57c5de; box-shadow: 0 0 10px rgba(87, 197, 222, 0.8); } 66%, 100% { background: hsl(var(--primary) / 0.7); box-shadow: none; } }
-@keyframes lane-ring { 0%, 32% { opacity: 0; transform: scale(0.6); } 34% { opacity: 0.9; transform: scale(0.8); } 44% { opacity: 0; transform: scale(2.6); } 100% { opacity: 0; transform: scale(2.6); } }
-@keyframes lane-running { 0%, 34% { opacity: 0; transform: translateY(4px); } 37%, 57% { opacity: 1; transform: none; } 60%, 100% { opacity: 0; transform: translateY(-4px); } }
-@keyframes lane-done { 0%, 60% { opacity: 0; transform: translateY(4px); } 63%, 94% { opacity: 1; transform: none; } 97%, 100% { opacity: 0; transform: translateY(-4px); } }
-@keyframes lane-done-back { 0%, 89% { opacity: 0; transform: translateY(4px); } 92%, 99% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+/* The packet crosses in 14 % of the cycle; the run and its result take the rest. */
+@keyframes lane-go { 0% { offset-distance: 0%; opacity: 0; } 2% { opacity: 1; } 13% { opacity: 1; } 14% { offset-distance: 100%; opacity: 0; } 100% { offset-distance: 100%; opacity: 0; } }
+@keyframes lane-back { 0%, 60% { offset-distance: 0%; opacity: 0; } 62% { opacity: 1; } 73% { opacity: 1; } 74% { offset-distance: 100%; opacity: 0; } 100% { offset-distance: 100%; opacity: 0; } }
+@keyframes lane-lbl { 0%, 2% { opacity: 0; } 4%, 9% { opacity: 1; } 11%, 100% { opacity: 0; } }
+@keyframes lane-lbl-back { 0%, 62% { opacity: 0; } 64%, 69% { opacity: 1; } 71%, 100% { opacity: 0; } }
+@keyframes lane-link { 0%, 14% { stroke: #57c5de; stroke-opacity: 0.95; } 18%, 58% { stroke: hsl(var(--primary)); stroke-opacity: 0.4; } 60%, 74% { stroke: #2da8e5; stroke-opacity: 0.95; } 78%, 100% { stroke: hsl(var(--primary)); stroke-opacity: 0.4; } }
+@keyframes lane-glow { 0%, 14% { stroke: #57c5de; stroke-opacity: 0.3; } 18%, 58% { stroke-opacity: 0; } 60%, 74% { stroke: #2da8e5; stroke-opacity: 0.3; } 78%, 100% { stroke-opacity: 0; } }
+@keyframes lane-link-once { 0%, 14% { stroke: #57c5de; stroke-opacity: 0.95; } 18%, 100% { stroke: hsl(var(--primary)); stroke-opacity: 0.4; } }
+@keyframes lane-glow-once { 0%, 14% { stroke: #57c5de; stroke-opacity: 0.3; } 18%, 100% { stroke-opacity: 0; } }
+@keyframes lane-bloom { 0%, 14% { opacity: 0; } 17%, 56% { opacity: 1; } 62%, 100% { opacity: 0; } }
+@keyframes lane-dot { 0%, 14% { background: hsl(var(--primary) / 0.7); } 16%, 58% { background: #57c5de; box-shadow: 0 0 10px rgba(87, 197, 222, 0.8); } 62%, 100% { background: hsl(var(--primary) / 0.7); box-shadow: none; } }
+@keyframes lane-ring { 0%, 14% { opacity: 0; transform: scale(0.6); } 16% { opacity: 0.9; transform: scale(0.8); } 22% { opacity: 0; transform: scale(2.2); } 100% { opacity: 0; transform: scale(2.2); } }
+@keyframes lane-running { 0%, 15% { opacity: 0; transform: translateY(4px); } 17%, 56% { opacity: 1; transform: none; } 59%, 100% { opacity: 0; transform: translateY(-4px); } }
+@keyframes lane-done { 0%, 59% { opacity: 0; transform: translateY(4px); } 61%, 95% { opacity: 1; transform: none; } 98%, 100% { opacity: 0; transform: translateY(-4px); } }
+@keyframes lane-done-back { 0%, 74% { opacity: 0; transform: translateY(4px); } 76%, 97% { opacity: 1; transform: none; } 100% { opacity: 0; } }
 </style>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import Badge from "@/components/ui/Badge.vue";
 import Button from "@/components/ui/Button.vue";
 import { ArrowRight, BookOpen } from "@lucide/vue";
 import { computed } from "vue";
@@ -49,7 +50,7 @@ const wordmark = computed(() =>
       </p>
 
       <h1
-        class="mt-12 font-display text-3xl font-semibold leading-[1.12] tracking-tight text-aruna-navy sm:text-4xl md:text-[42px]"
+        class="mt-12 text-balance font-display text-3xl font-semibold leading-[1.12] tracking-tight text-aruna-navy sm:text-4xl md:text-[42px]"
       >
         Federated data. <span class="text-gradient">Sovereign control.</span>
       </h1>
@@ -83,11 +84,7 @@ const wordmark = computed(() =>
         <div
           class="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/5 px-3 py-1 text-[11px] font-medium text-muted-foreground"
         >
-          <span
-            class="rounded-full bg-primary/10 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-primary"
-          >
-            Upcoming
-          </span>
+          <Badge size="sm" class="uppercase tracking-wide">Upcoming</Badge>
           Realm federation
         </div>
       </div>

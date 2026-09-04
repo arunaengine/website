@@ -15,11 +15,11 @@ import { RouterLink } from 'vue-router'
         />
         <div class="relative grid items-end gap-8 lg:grid-cols-[1.35fr_1fr]">
           <div>
-            <div class="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-wider text-white/80">
+            <div class="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/80">
               Get started
             </div>
             <h2
-              class="mt-4 font-display text-3xl font-semibold tracking-tight sm:text-4xl"
+              class="mt-4 text-balance font-display text-3xl font-semibold tracking-tight sm:text-4xl"
             >
               Build the federation, not the integration project.
             </h2>

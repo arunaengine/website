@@ -26,7 +26,7 @@ const packets = [
     aria-label="Three independent Aruna nodes, a local machine, a research institute and a Kubernetes cluster, connected as peers. A compute job moves toward the dataset and runs there, then data moves toward compute and the result returns."
   >
     <svg data-links class="absolute inset-0 block h-full w-full overflow-visible" aria-hidden="true" />
-    <LandingNode id="local" label="Local machine" tag="Local" meta="portal open" class="node-local" />
+    <LandingNode id="local" label="Local machine" tag="Local" meta="portal open" states class="node-local" />
     <LandingNode id="institute" label="Research institute" tag="Institute" meta="Coral Reef Survey 2026" states class="node-institute" />
     <LandingNode id="k8s" label="Kubernetes cluster" tag="K8s" meta="executors ready" states class="node-k8s" />
     <template v-for="packet in packets" :key="packet.kind">
@@ -39,9 +39,11 @@ const packets = [
 <style scoped>
 .graph { --cycle: 16s; }
 .graph :deep(.landing-node) { position: absolute; width: 46%; max-width: 280px; }
-.graph :deep(.node-local) { left: 0; top: 0; }
+/* A triangle: the local machine on the left, the two remote nodes stacked on
+   the right, so every link is long enough for a packet, its tail and label. */
+.graph :deep(.node-local) { left: 0; top: 50%; transform: translateY(-50%); }
 .graph :deep(.node-institute) { right: 0; top: 0; }
-.graph :deep(.node-k8s) { left: 50%; bottom: 0; transform: translateX(-50%); }
+.graph :deep(.node-k8s) { right: 0; bottom: 0; }
 /* At rest the compute-to-data path is lit, with the job on its way. */
 .graph .pt-job { opacity: 1; offset-distance: 55%; }
 .graph :deep(.link-k8s-institute) { stroke: var(--aqua); stroke-opacity: 0.95; }
@@ -71,16 +73,17 @@ const packets = [
   .graph :deep(.node-institute .st-running) { animation: run-inst var(--cycle) linear infinite; }
   .graph :deep(.node-institute .st-done) { animation: done-inst var(--cycle) linear infinite; }
   .graph :deep(.node-k8s .st-running) { animation: run-k8s var(--cycle) linear infinite; }
+  .graph :deep(.node-local .st-done) { animation: done-local var(--cycle) linear infinite; }
 }
 /* Cycle: job 0-19, run at the institute 20-30, result 30-46, data 52-70, run at k8s 71-80, result 80-96. */
 @keyframes pt-job { 0% { offset-distance: 0%; opacity: 0; } 1.5% { opacity: 1; } 17.5% { opacity: 1; } 19% { offset-distance: 100%; opacity: 0; } 100% { offset-distance: 100%; opacity: 0; } }
 @keyframes pt-res1 { 0%, 30% { offset-distance: 0%; opacity: 0; } 31.5% { opacity: 1; } 44.5% { opacity: 1; } 46% { offset-distance: 100%; opacity: 0; } 100% { offset-distance: 100%; opacity: 0; } }
 @keyframes pt-data { 0%, 52% { offset-distance: 0%; opacity: 0; } 53.5% { opacity: 1; } 68.5% { opacity: 1; } 70% { offset-distance: 100%; opacity: 0; } 100% { offset-distance: 100%; opacity: 0; } }
 @keyframes pt-res2 { 0%, 80% { offset-distance: 0%; opacity: 0; } 81.5% { opacity: 1; } 94.5% { opacity: 1; } 96% { offset-distance: 100%; opacity: 0; } 100% { offset-distance: 100%; opacity: 0; } }
-@keyframes lbl-job { 0%, 2% { opacity: 0; } 3.5%, 15% { opacity: 1; } 17.5%, 100% { opacity: 0; } }
-@keyframes lbl-res1 { 0%, 32% { opacity: 0; } 33.5%, 43% { opacity: 1; } 45.5%, 100% { opacity: 0; } }
-@keyframes lbl-data { 0%, 54% { opacity: 0; } 55.5%, 67% { opacity: 1; } 69.5%, 100% { opacity: 0; } }
-@keyframes lbl-res2 { 0%, 82% { opacity: 0; } 83.5%, 93% { opacity: 1; } 95.5%, 100% { opacity: 0; } }
+@keyframes lbl-job { 0%, 2% { opacity: 0; } 3.5%, 12% { opacity: 1; } 14.5%, 100% { opacity: 0; } }
+@keyframes lbl-res1 { 0%, 32% { opacity: 0; } 33.5%, 40% { opacity: 1; } 42%, 100% { opacity: 0; } }
+@keyframes lbl-data { 0%, 54% { opacity: 0; } 55.5%, 64% { opacity: 1; } 66.5%, 100% { opacity: 0; } }
+@keyframes lbl-res2 { 0%, 82% { opacity: 0; } 83.5%, 90% { opacity: 1; } 92.5%, 100% { opacity: 0; } }
 @keyframes link-a { 0%, 20% { stroke: #57c5de; stroke-opacity: 0.95; } 26%, 50% { stroke: hsl(var(--primary)); stroke-opacity: 0.4; } 53%, 71% { stroke: #57c5de; stroke-opacity: 0.95; } 77%, 100% { stroke: hsl(var(--primary)); stroke-opacity: 0.4; } }
 @keyframes glow-a { 0%, 20% { stroke: #57c5de; stroke-opacity: 0.3; } 26%, 50% { stroke-opacity: 0; } 53%, 71% { stroke: #57c5de; stroke-opacity: 0.3; } 77%, 100% { stroke-opacity: 0; } }
 @keyframes link-b { 0%, 28% { stroke: hsl(var(--primary)); stroke-opacity: 0.4; } 31%, 46% { stroke: #2da8e5; stroke-opacity: 0.95; } 52%, 100% { stroke: hsl(var(--primary)); stroke-opacity: 0.4; } }
@@ -90,17 +93,18 @@ const packets = [
 @keyframes bloom-inst { 0%, 17% { opacity: 0; } 20%, 32% { opacity: 1; } 40%, 100% { opacity: 0; } }
 @keyframes bloom-k8s { 0%, 68% { opacity: 0; } 71%, 82% { opacity: 1; } 90%, 100% { opacity: 0; } }
 @keyframes dot-inst { 0%, 18% { background: hsl(var(--primary) / 0.7); } 20%, 32% { background: #57c5de; box-shadow: 0 0 10px rgba(87, 197, 222, 0.8); } 40%, 100% { background: hsl(var(--primary) / 0.7); box-shadow: none; } }
-@keyframes ring-inst { 0%, 18% { opacity: 0; transform: scale(0.6); } 20% { opacity: 0.9; transform: scale(0.8); } 30% { opacity: 0; transform: scale(2.6); } 100% { opacity: 0; transform: scale(2.6); } }
+@keyframes ring-inst { 0%, 18% { opacity: 0; transform: scale(0.6); } 20% { opacity: 0.9; transform: scale(0.8); } 25% { opacity: 0; transform: scale(2.2); } 100% { opacity: 0; transform: scale(2.2); } }
 @keyframes dot-k8s { 0%, 69% { background: hsl(var(--primary) / 0.7); } 71%, 82% { background: #57c5de; box-shadow: 0 0 10px rgba(87, 197, 222, 0.8); } 90%, 100% { background: hsl(var(--primary) / 0.7); box-shadow: none; } }
-@keyframes ring-k8s { 0%, 69% { opacity: 0; transform: scale(0.6); } 71% { opacity: 0.9; transform: scale(0.8); } 81% { opacity: 0; transform: scale(2.6); } 100% { opacity: 0; transform: scale(2.6); } }
+@keyframes ring-k8s { 0%, 69% { opacity: 0; transform: scale(0.6); } 71% { opacity: 0.9; transform: scale(0.8); } 76% { opacity: 0; transform: scale(2.2); } 100% { opacity: 0; transform: scale(2.2); } }
 @keyframes run-inst { 0%, 19% { opacity: 0; transform: translateY(4px); } 21%, 29% { opacity: 1; transform: none; } 31%, 100% { opacity: 0; transform: translateY(-4px); } }
 @keyframes done-inst { 0%, 30% { opacity: 0; transform: translateY(4px); } 32%, 50% { opacity: 1; transform: none; } 52%, 100% { opacity: 0; transform: translateY(-4px); } }
 @keyframes run-k8s { 0%, 70% { opacity: 0; transform: translateY(4px); } 72%, 79% { opacity: 1; transform: none; } 81%, 100% { opacity: 0; transform: translateY(-4px); } }
+@keyframes done-local { 0%, 5% { opacity: 1; transform: none; } 7%, 45% { opacity: 0; transform: translateY(4px); } 47%, 58% { opacity: 1; transform: none; } 60%, 96% { opacity: 0; transform: translateY(4px); } 97%, 100% { opacity: 1; transform: none; } }
 
 @media (max-width: 639px) {
   .graph :deep(.landing-node) { width: 72%; max-width: none; }
-  .graph :deep(.node-local) { left: 0; top: 0; }
+  .graph :deep(.node-local) { left: 0; top: 0; transform: none; }
   .graph :deep(.node-institute) { right: 0; top: 33%; }
-  .graph :deep(.node-k8s) { left: 0; bottom: 0; transform: none; }
+  .graph :deep(.node-k8s) { left: 0; bottom: 0; }
 }
 </style>

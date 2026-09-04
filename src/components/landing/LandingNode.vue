@@ -26,10 +26,10 @@ const props = defineProps<{
       <span class="min-w-0 whitespace-nowrap text-[13px] font-medium leading-tight text-foreground">{{ props.label }}</span>
       <span class="node-dot ml-auto h-2 w-2 shrink-0 rounded-full" aria-hidden="true" />
     </div>
-    <div class="mt-2 flex flex-wrap items-center gap-2">
+    <div class="mt-2 flex items-center gap-2">
       <Badge size="sm" class="uppercase tracking-wide">{{ props.tag }}</Badge>
-      <span class="hash text-[11px] text-muted-foreground">{{ props.meta }}</span>
     </div>
+    <div class="hash mt-1 text-[11px] text-muted-foreground">{{ props.meta }}</div>
     <div v-if="$slots.default || props.states" class="relative mt-2 flex min-h-[22px] items-center">
       <slot />
       <template v-if="props.states">

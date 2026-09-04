@@ -20,7 +20,7 @@ const nodes = [
     <div class="container max-w-5xl">
       <div class="mx-auto max-w-2xl text-center">
         <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">Run anywhere</div>
-        <h2 class="mt-3 font-display text-3xl font-semibold tracking-tight text-aruna-navy sm:text-4xl">
+        <h2 class="mt-3 text-balance font-display text-3xl font-semibold tracking-tight text-aruna-navy sm:text-4xl">
           One system, not a fleet of services.
         </h2>
         <p class="mt-3 text-sm text-muted-foreground">
@@ -30,7 +30,7 @@ const nodes = [
       <div class="mt-12 grid gap-4 sm:grid-cols-3">
         <Card v-for="node in nodes" :key="node.title" class="flex flex-col gap-3 p-5">
           <div class="flex items-center justify-between">
-            <div class="flex h-9 w-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <component :is="node.icon" class="h-4 w-4" aria-hidden="true" />
             </div>
             <Badge size="sm" class="uppercase tracking-wide">{{ node.tag }}</Badge>

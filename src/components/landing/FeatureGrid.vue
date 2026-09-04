@@ -9,6 +9,8 @@ import {
   Share2,
 } from '@lucide/vue'
 import type { FunctionalComponent } from 'vue'
+import Badge from '@/components/ui/Badge.vue'
+import Card from '@/components/ui/Card.vue'
 
 interface Feature {
   title: string
@@ -73,7 +75,7 @@ const features: Feature[] = [
         <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
           What's inside
         </div>
-        <h2 class="mt-3 font-display text-3xl font-semibold tracking-tight text-aruna-navy sm:text-4xl">
+        <h2 class="mt-3 text-balance font-display text-3xl font-semibold tracking-tight text-aruna-navy sm:text-4xl">
           One binary, the whole node.
         </h2>
         <p class="mt-3 text-sm text-muted-foreground">
@@ -83,30 +85,25 @@ const features: Feature[] = [
       </div>
 
       <div class="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <div
+        <Card
           v-for="f in features"
           :key="f.title"
-          class="surface flex h-full flex-col gap-3 p-5"
-          :class="f.upcoming ? 'border-primary/30 bg-primary/[0.03]' : ''"
+          class="flex h-full flex-col gap-3 p-5"
+          :class="f.upcoming ? 'border-primary/30 bg-primary/[0.03] lg:col-span-3 lg:flex-row lg:items-center lg:gap-5' : ''"
         >
-          <div class="flex items-start justify-between">
-            <div :class="['grid h-9 w-9 place-items-center rounded-lg', f.tone]">
-              <component :is="f.icon" class="h-4 w-4" />
-            </div>
-            <span
-              v-if="f.upcoming"
-              class="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary"
-            >
-              Upcoming
-            </span>
+          <div :class="['grid h-9 w-9 shrink-0 place-items-center rounded-lg', f.tone]">
+            <component :is="f.icon" class="h-4 w-4" />
           </div>
-          <h3 class="font-display text-base font-semibold text-aruna-navy">
-            {{ f.title }}
-          </h3>
-          <p class="text-sm leading-relaxed text-muted-foreground">
-            {{ f.desc }}
-          </p>
-        </div>
+          <div class="flex flex-col gap-3" :class="f.upcoming ? 'lg:gap-1' : ''">
+            <h3 class="font-display text-base font-semibold text-aruna-navy">
+              {{ f.title }}
+            </h3>
+            <p class="text-sm leading-relaxed text-muted-foreground">
+              {{ f.desc }}
+            </p>
+          </div>
+          <Badge v-if="f.upcoming" size="sm" class="uppercase tracking-wide lg:ml-auto lg:self-start">Upcoming</Badge>
+        </Card>
       </div>
     </div>
   </section>

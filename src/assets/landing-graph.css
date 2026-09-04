@@ -4,7 +4,14 @@
   --aqua: #57c5de;
   --sky: #2da8e5;
   --structure: hsl(var(--primary));
+  /* Label ink darkens on the light theme; the glows keep the brand colours. */
+  --aqua-ink: #177f98;
+  --sky-ink: #1b6fb0;
   isolation: isolate;
+}
+.dark .fed {
+  --aqua-ink: var(--aqua);
+  --sky-ink: var(--sky);
 }
 
 /* Links: a soft glow line under a crisp one; the glow only shows in use. */
@@ -32,15 +39,18 @@
   background:
     linear-gradient(180deg, hsl(var(--primary) / 0.08), transparent 55%),
     hsl(var(--card));
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+.dark .fed .landing-node {
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
 }
 .fed .landing-node::before {
   content: '';
   position: absolute;
-  inset: -26px;
+  inset: -18px;
   border-radius: 30px;
   background: radial-gradient(ellipse at center, rgba(87, 197, 222, 0.3), rgba(87, 197, 222, 0) 68%);
-  filter: blur(14px);
+  filter: blur(10px);
   opacity: 0;
   pointer-events: none;
   z-index: -1;
@@ -110,7 +120,7 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
   white-space: nowrap;
-  color: var(--aqua);
+  color: var(--aqua-ink);
 }
 .fed .tail {
   width: 90px;
@@ -130,7 +140,7 @@
   background: radial-gradient(circle, rgba(45, 168, 229, 0.45), rgba(45, 168, 229, 0) 70%);
 }
 .fed .pt-result b {
-  color: var(--sky);
+  color: var(--sky-ink);
 }
 .fed .tail.pt-result {
   background: linear-gradient(90deg, rgba(45, 168, 229, 0), rgba(45, 168, 229, 0.8));
