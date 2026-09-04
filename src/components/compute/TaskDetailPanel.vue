@@ -627,7 +627,7 @@ async function confirmDelete() {
           :description="task.description"
         />
         <div class="flex shrink-0 items-center gap-2">
-          <RefreshButton :busy="refreshing" size="xs" sr-label="Refresh this run" @click="onRefresh" />
+          <RefreshButton :busy="refreshing" sr-label="Refresh this run" @click="onRefresh" />
           <AskAiButton :prompt="askPrompt" :subject="`run ${taskId}`" icon-only />
         </div>
       </div>
