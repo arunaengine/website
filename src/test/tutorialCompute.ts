@@ -273,7 +273,11 @@ const TaskDetailPanel = compileClientComponent(url('components/compute/TaskDetai
   ...ui,
   '@/components/ui/DetailDialog.vue': moduleDefault(DetailDialogStub),
   '@/components/ui/DialogTitle.vue': moduleDefault(PassThroughStub),
-  '@/components/jobs/JobFamilySection.vue': moduleDefault(GenericStub),
+  '@/components/ui/DetailList.vue': moduleDefault(
+    compileClientComponent(url('components/ui/DetailList.vue'), { vue: VueRuntime }),
+  ),
+  '@/components/jobs/JobPlacementFigure.vue': moduleDefault(GenericStub),
+  '@/components/jobs/JobExecutionsTable.vue': moduleDefault(GenericStub),
   '@/components/compute/TaskHeader.vue': moduleDefault(TaskHeaderStub),
   '@/components/assistant/AskAiButton.vue': moduleDefault(GenericStub),
   '@/components/onboarding/ClaimWatchStep.vue': moduleDefault(StagesStub),

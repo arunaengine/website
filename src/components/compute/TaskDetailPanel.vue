@@ -12,7 +12,9 @@ import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
-import JobFamilySection from '@/components/jobs/JobFamilySection.vue'
+import DetailList, { type Detail } from '@/components/ui/DetailList.vue'
+import JobExecutionsTable from '@/components/jobs/JobExecutionsTable.vue'
+import JobPlacementFigure from '@/components/jobs/JobPlacementFigure.vue'
 import TaskHeader from '@/components/compute/TaskHeader.vue'
 import AskAiButton from '@/components/assistant/AskAiButton.vue'
 import ClaimWatchStep, { type WatchStage } from '@/components/onboarding/ClaimWatchStep.vue'
@@ -44,7 +46,8 @@ import { asyncChunkError } from '@/lib/chunk-recovery'
 import { errorMessage, formatBytes, formatDuration, relativeTime, truncateMiddle } from '@/lib/utils'
 import { Ban, Download, Eye, ExternalLink as ExternalLinkIcon, FileText, RotateCcw, Trash2 } from '@lucide/vue'
 
-const NODE_LABEL_TAG = `${TES_LABEL_TAG_PREFIX}aruna-engine.org/node`
+const NODE_LABEL_KEY = 'aruna-engine.org/node'
+const NODE_LABEL_TAG = `${TES_LABEL_TAG_PREFIX}${NODE_LABEL_KEY}`
 
 const props = defineProps<{ taskId: string; open: boolean }>()
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void; (e: 'canceled'): void; (e: 'hidden'): void }>()
@@ -182,6 +185,47 @@ const resourceSummary = computed(() => {
   if (r.disk_gb != null) parts.push(`${r.disk_gb} GB disk`)
   if (r.preemptible) parts.push('preemptible')
   return parts.join(' · ')
+})
+
+const constraintSummary = computed(() =>
+  Object.entries(tesPlacementTags(task.value?.tags).labelConstraints)
+    .map(([key, value]) => (key === NODE_LABEL_KEY ? `node ${displayName(value)}` : `${key}=${value}`))
+    .join(' · '),
+)
+
+const familySummary = computed(() => {
+  const family = nativeFamily.value
+  if (!family) return ''
+  const aliases = `${family.alias_count} alias${family.alias_count === 1 ? '' : 'es'}`
+  return `${aliases} · revision ${family.revision} · ${truncateMiddle(family.projection_digest, 6, 4)}`
+})
+
+const requestDetails = computed<Detail[]>(() => {
+  const items: Detail[] = [
+    {
+      key: 'created',
+      label: 'Created',
+      value: task.value?.creation_time ? relativeTime(task.value.creation_time) : 'not recorded',
+    },
+    { key: 'group', label: 'Group', value: groupTagLabel.value ?? 'not recorded' },
+  ]
+  const image = task.value?.executors?.[0]?.image
+  if (resourceSummary.value) items.push({ key: 'resources', label: 'Resources', value: resourceSummary.value })
+  if (image) items.push({ key: 'image', label: 'Image', value: image, mono: true })
+  if (constraintSummary.value) items.push({ key: 'constraints', label: 'Constraints', value: constraintSummary.value })
+  if (familySummary.value) items.push({ key: 'family', label: 'Family', value: familySummary.value })
+  if (task.value?.volumes?.length) {
+    items.push({ key: 'volumes', label: 'Volumes', value: task.value.volumes.join(' · '), mono: true })
+  }
+  if (otherTags.value.length) {
+    items.push({
+      key: 'tags',
+      label: 'Tags',
+      value: otherTags.value.map(([key, value]) => `${key}=${value}`).join(' · '),
+      mono: true,
+    })
+  }
+  return items
 })
 
 // Latest attempt's executor logs, aligned by index with task.executors.
@@ -513,57 +557,68 @@ async function confirmDelete() {
         </Notice>
         <p v-if="lastPollError" class="text-[11px] text-muted-foreground">Refresh failed, retrying.</p>
 
-        <!-- Progress leads while the run is active, output once it ended -->
-        <div class="flex flex-col gap-8">
-          <section data-tutorial="run-executors" class="space-y-3" :class="{ 'order-1': active }">
-            <h3 class="font-display text-sm font-semibold text-aruna-navy">Output</h3>
-            <p v-if="!task.logs?.length && !nativeResult" class="text-xs text-muted-foreground">Nothing captured yet.</p>
-            <div v-for="(executor, i) in task.executors" :key="i" class="surface space-y-3 p-4">
-              <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0 space-y-0.5">
-                  <div class="font-mono text-[11px] text-foreground">{{ executor.image }}</div>
-                  <div class="whitespace-pre-wrap break-all font-mono text-[11px] text-muted-foreground">{{ executor.command.join(' ') }}</div>
-                </div>
-                <Badge
-                  v-if="executorExit(i) !== undefined"
-                  :variant="executorExit(i) === 0 ? 'success' : 'destructive'"
-                  class="shrink-0"
-                >
-                  exit {{ executorExit(i) }}
-                </Badge>
-              </div>
-              <div v-if="executorLog(i)?.start_time || executorLog(i)?.end_time" class="text-[11px] text-muted-foreground">
-                <span v-if="executorLog(i)!.start_time">started {{ relativeTime(executorLog(i)!.start_time!) }}</span>
-                <span v-if="executorLog(i)!.end_time"> · ended {{ relativeTime(executorLog(i)!.end_time!) }}</span>
-              </div>
-              <template v-if="executorStdout(i) || executorStderr(i)">
-                <div v-if="executorStdout(i)">
-                  <div class="text-[10px] uppercase tracking-wider text-muted-foreground">{{ executorStderr(i) ? 'stdout' : 'output' }}</div>
-                  <pre class="mt-1 max-h-64 overflow-y-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-3 font-mono text-[11px] leading-relaxed">{{ executorStdout(i) }}</pre>
-                </div>
-                <div v-if="executorStderr(i)">
-                  <div class="text-[10px] uppercase tracking-wider text-muted-foreground">stderr</div>
-                  <pre class="mt-1 max-h-64 overflow-y-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-3 font-mono text-[11px] leading-relaxed">{{ executorStderr(i) }}</pre>
-                </div>
-              </template>
-              <p v-else-if="executorLog(i) || nativeResult" class="text-[11px] text-muted-foreground">No output captured.</p>
-            </div>
-            <div v-if="systemLogLines.length">
-              <Button v-if="!failed" variant="ghost" size="sm" @click="systemLogsOpen = !systemLogsOpen">
-                {{ systemLogsOpen ? 'Hide' : 'Show' }} system logs ({{ systemLogLines.length }})
-              </Button>
-              <template v-if="showSystemLogs">
-                <div v-if="failed" class="text-[10px] uppercase tracking-wider text-muted-foreground">system logs</div>
-                <pre class="mt-1 max-h-48 overflow-y-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-3 font-mono text-[11px] leading-relaxed">{{ systemLogLines.join('\n') }}</pre>
-              </template>
-            </div>
-          </section>
+        <section class="space-y-3">
+          <h3 class="font-display text-sm font-semibold text-aruna-navy">Progress</h3>
+          <ClaimWatchStep :stages="stages" />
+        </section>
 
-          <section class="space-y-3">
-            <h3 class="font-display text-sm font-semibold text-aruna-navy">Progress</h3>
-            <ClaimWatchStep :stages="stages" />
-          </section>
-        </div>
+        <section class="space-y-3">
+          <h3 class="font-display text-sm font-semibold text-aruna-navy">Placement</h3>
+          <JobPlacementFigure v-if="nativeFamily" :placement="nativeFamily.placement" />
+          <p v-else-if="nativeDetailUnavailable" class="text-xs text-muted-foreground">
+            Distributed execution detail could not be loaded.
+          </p>
+          <p v-else class="text-xs text-muted-foreground">No placement record for this run yet.</p>
+        </section>
+
+        <section v-if="nativeFamily" class="space-y-3">
+          <h3 class="font-display text-sm font-semibold text-aruna-navy">Executions</h3>
+          <JobExecutionsTable :family="nativeFamily" />
+        </section>
+
+        <section data-tutorial="run-executors" class="space-y-3">
+          <h3 class="font-display text-sm font-semibold text-aruna-navy">Output</h3>
+          <p v-if="!task.logs?.length && !nativeResult" class="text-xs text-muted-foreground">Nothing captured yet.</p>
+          <div v-for="(executor, i) in task.executors" :key="i" class="surface space-y-3 p-4">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0 space-y-0.5">
+                <div class="font-mono text-[11px] text-foreground">{{ executor.image }}</div>
+                <div class="whitespace-pre-wrap break-all font-mono text-[11px] text-muted-foreground">{{ executor.command.join(' ') }}</div>
+              </div>
+              <Badge
+                v-if="executorExit(i) !== undefined"
+                :variant="executorExit(i) === 0 ? 'success' : 'destructive'"
+                class="shrink-0"
+              >
+                exit {{ executorExit(i) }}
+              </Badge>
+            </div>
+            <div v-if="executorLog(i)?.start_time || executorLog(i)?.end_time" class="text-[11px] text-muted-foreground">
+              <span v-if="executorLog(i)!.start_time">started {{ relativeTime(executorLog(i)!.start_time!) }}</span>
+              <span v-if="executorLog(i)!.end_time"> · ended {{ relativeTime(executorLog(i)!.end_time!) }}</span>
+            </div>
+            <template v-if="executorStdout(i) || executorStderr(i)">
+              <div v-if="executorStdout(i)">
+                <div class="text-[10px] uppercase tracking-wider text-muted-foreground">{{ executorStderr(i) ? 'stdout' : 'output' }}</div>
+                <pre class="mt-1 max-h-64 overflow-y-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-3 font-mono text-[11px] leading-relaxed">{{ executorStdout(i) }}</pre>
+              </div>
+              <div v-if="executorStderr(i)">
+                <div class="text-[10px] uppercase tracking-wider text-muted-foreground">stderr</div>
+                <pre class="mt-1 max-h-64 overflow-y-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-3 font-mono text-[11px] leading-relaxed">{{ executorStderr(i) }}</pre>
+              </div>
+            </template>
+            <p v-else-if="executorLog(i) || nativeResult" class="text-[11px] text-muted-foreground">No output captured.</p>
+          </div>
+          <div v-if="systemLogLines.length">
+            <Button v-if="!failed" variant="ghost" size="sm" @click="systemLogsOpen = !systemLogsOpen">
+              {{ systemLogsOpen ? 'Hide' : 'Show' }} system logs ({{ systemLogLines.length }})
+            </Button>
+            <template v-if="showSystemLogs">
+              <div v-if="failed" class="text-[10px] uppercase tracking-wider text-muted-foreground">system logs</div>
+              <pre class="mt-1 max-h-48 overflow-y-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-3 font-mono text-[11px] leading-relaxed">{{ systemLogLines.join('\n') }}</pre>
+            </template>
+          </div>
+        </section>
 
         <!-- Outputs and the run dataset -->
         <section data-tutorial="run-artifacts" class="space-y-3">
@@ -635,50 +690,10 @@ async function confirmDelete() {
           </div>
         </section>
 
-        <!-- Placement and family, folded until asked -->
-        <details v-if="nativeFamily" class="group space-y-3">
-          <summary class="cursor-pointer list-none font-display text-sm font-semibold text-aruna-navy">
-            <span class="group-open:hidden">Show placement and distributed execution</span>
-            <span class="hidden group-open:inline">Placement and distributed execution</span>
-          </summary>
-          <JobFamilySection :family="nativeFamily" />
-        </details>
-        <p v-else-if="nativeDetailUnavailable" class="text-xs text-muted-foreground">
-          Distributed execution detail could not be loaded.
-        </p>
-
-        <!-- Request details, folded until asked -->
-        <details data-tutorial="run-details" class="group space-y-3">
-          <summary class="cursor-pointer list-none font-display text-sm font-semibold text-aruna-navy">
-            <span class="group-open:hidden">Show request details</span>
-            <span class="hidden group-open:inline">Request details</span>
-          </summary>
-          <dl class="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-xs">
-            <dt class="text-muted-foreground">Created</dt>
-            <dd class="text-foreground">{{ task.creation_time ? relativeTime(task.creation_time) : '-' }}</dd>
-            <dt class="text-muted-foreground">Group</dt>
-            <dd class="text-foreground">
-              <span v-if="groupTagLabel" :class="groupTagId && !myGroups.find((g) => g.id === groupTagId) ? 'font-mono' : ''">{{ groupTagLabel }}</span>
-              <span v-else class="text-muted-foreground">-</span>
-            </dd>
-            <template v-if="resourceSummary">
-              <dt class="text-muted-foreground">Resources</dt>
-              <dd class="text-foreground">{{ resourceSummary }}</dd>
-            </template>
-            <template v-if="task.volumes?.length">
-              <dt class="text-muted-foreground">Volumes</dt>
-              <dd class="space-y-0.5 font-mono text-[11px] text-foreground">
-                <div v-for="v in task.volumes" :key="v">{{ v }}</div>
-              </dd>
-            </template>
-            <template v-if="otherTags.length">
-              <dt class="text-muted-foreground">Tags</dt>
-              <dd class="flex flex-wrap items-center gap-1.5">
-                <Badge v-for="[k, v] in otherTags" :key="k" variant="outline" class="font-mono">{{ k }}={{ v }}</Badge>
-              </dd>
-            </template>
-          </dl>
-        </details>
+        <section data-tutorial="run-details" class="space-y-3">
+          <h3 class="font-display text-sm font-semibold text-aruna-navy">Request</h3>
+          <DetailList :items="requestDetails" />
+        </section>
       </div>
     </div>
 

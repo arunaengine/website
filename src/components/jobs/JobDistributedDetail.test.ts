@@ -42,7 +42,8 @@ const JobStateBadgeStub = defineComponent({
   props: { state: String },
   setup: (props) => () => h('span', props.state),
 })
-const JobFamilyStub = defineComponent(() => () => h('section', 'native family detail'))
+const PlacementFigureStub = defineComponent(() => () => h('div', 'placement figure'))
+const ExecutionsTableStub = defineComponent(() => () => h('div', 'executions table'))
 const NodeLabelStub = defineComponent({
   props: { nodeId: String },
   setup: (props) => () => h('span', props.nodeId),
@@ -220,7 +221,11 @@ function taskPanel(getTask: unknown, getJob: unknown): Component {
     '@/components/ui/ExternalLink.vue': moduleDefault(PassThroughStub),
     '@/components/ui/Tooltip.vue': moduleDefault(PassThroughStub),
     '@/components/ui/NodeLabel.vue': moduleDefault(NodeLabelStub),
-    '@/components/jobs/JobFamilySection.vue': moduleDefault(JobFamilyStub),
+    '@/components/ui/DetailList.vue': moduleDefault(
+      compileClientComponent(new URL('../ui/DetailList.vue', import.meta.url), { vue: VueRuntime }),
+    ),
+    '@/components/jobs/JobPlacementFigure.vue': moduleDefault(PlacementFigureStub),
+    '@/components/jobs/JobExecutionsTable.vue': moduleDefault(ExecutionsTableStub),
     '@/components/compute/TaskHeader.vue': moduleDefault(PassThroughStub),
     '@/components/assistant/AskAiButton.vue': moduleDefault(PassThroughStub),
     '@/components/compute/TaskStateBadge.vue': moduleDefault(JobStateBadgeStub),
@@ -266,7 +271,9 @@ function jobPanel(job: JobStatusResponse): Component {
     '@/components/ui/CopyButton.vue': moduleDefault(PassThroughStub),
     '@/components/jobs/JobArtifactButton.vue': moduleDefault(PassThroughStub),
     '@/components/jobs/JobAuditTrail.vue': moduleDefault(PassThroughStub),
-    '@/components/jobs/JobFamilySection.vue': moduleDefault(JobFamilyStub),
+    '@/components/jobs/JobFamilySection.vue': moduleDefault(
+      defineComponent(() => () => h('section', 'native family detail')),
+    ),
     '@/components/jobs/JobReportPanel.vue': moduleDefault(PassThroughStub),
     '@/components/jobs/JobStateBadge.vue': moduleDefault(JobStateBadgeStub),
     '@/composables/useJobs': {
@@ -293,9 +300,36 @@ describe('distributed job detail components', () => {
     '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
     '@/components/ui/CopyButton.vue': moduleDefault(PassThroughStub),
     '@/components/jobs/JobStateBadge.vue': moduleDefault(JobStateBadgeStub),
+    '@/components/jobs/JobPlacementFigure.vue': moduleDefault(PlacementFigureStub),
+    '@/components/jobs/JobExecutionsTable.vue': moduleDefault(ExecutionsTableStub),
     '@/lib/jobs': Jobs,
     '@/lib/utils': Utils,
   }
+  const figureModules = {
+    vue: VueRuntime,
+    'vue-router': { RouterLink: RouterLinkStub },
+    '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
+    '@/components/ui/NodeLabel.vue': moduleDefault(NodeLabelStub),
+    '@/lib/jobs': Jobs,
+    '@/lib/utils': Utils,
+  }
+  const figure = () =>
+    compileClientComponent(new URL('./JobPlacementFigure.vue', import.meta.url), figureModules)
+  const executionsTable = () =>
+    compileClientComponent(new URL('./JobExecutionsTable.vue', import.meta.url), {
+      vue: VueRuntime,
+      '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
+      '@/components/ui/CopyButton.vue': moduleDefault(PassThroughStub),
+      '@/components/ui/NodeLabel.vue': moduleDefault(NodeLabelStub),
+      '@/components/jobs/JobStateBadge.vue': moduleDefault(JobStateBadgeStub),
+      '@/lib/jobs': Jobs,
+      '@/lib/utils': Utils,
+    })
+  const placementInputs = [
+    { destination_key: 'in/reads.fq.gz', bytes: 1288490188, source_node_id: null, transfer_ms: 0 },
+    { destination_key: 'in/reference.fa', bytes: 314572800, source_node_id: 'node-bielefeld', transfer_ms: 4000 },
+    { destination_key: 'in/config.yaml', bytes: 2048, source_node_id: null, transfer_ms: 0 },
+  ]
 
   it('states no workspace detail, whatever the node reports', async () => {
     // A node may still serve a mode and a bucket; a run owns neither any more.
@@ -325,21 +359,65 @@ describe('distributed job detail components', () => {
   })
 
   it('labels planner transfer values as plan-time estimates', async () => {
-    const JobFamilySection = compileClientComponent(
-      new URL('./JobFamilySection.vue', import.meta.url),
-      familyModules,
-    )
-
-    const mounted = await mount(JobFamilySection, { family })
+    // Without the per-input record the plan totals are all the figure has.
+    const mounted = await mount(figure(), { placement: family.placement })
     const text = content(mounted.root)
 
     expect(mounted.errors).toEqual([])
-    expect(text).toContain('Placement')
     expect(text).toContain('Estimated at planning time')
-    expect(text).toContain('Data-to-compute')
-    expect(text).toContain('At least one input had no usable copy on the chosen node')
+    expect(text).toContain('Data moved to the compute')
     expect(text).toContain('4 MB')
     expect(text).toContain('340 ms')
+    expect(text).not.toContain('stays')
+    mounted.app.unmount()
+  })
+
+  it('draws every input as staying when none moved', async () => {
+    const local = placementInputs.map((input) => ({ ...input, source_node_id: null, transfer_ms: 0 }))
+    const mounted = await mount(figure(), {
+      placement: { ...family.placement!, target_node_id: 'node-giessen', inputs: local },
+    })
+    const text = content(mounted.root)
+
+    expect(mounted.errors).toEqual([])
+    expect(text).toContain('Compute went to the data')
+    expect(text).toContain('All 3 inputs were already on the node that ran the work. Nothing moved.')
+    expect(text).toContain('in/reads.fq.gz')
+    expect(text).toContain('node-giessen')
+    expect(text).not.toContain('moved 300 MB')
+    mounted.app.unmount()
+  })
+
+  it('counts the moved inputs of a mixed plan', async () => {
+    const mounted = await mount(figure(), {
+      placement: { ...family.placement!, target_node_id: 'node-giessen', inputs: placementInputs },
+    })
+    const text = content(mounted.root)
+
+    expect(mounted.errors).toEqual([])
+    expect(text).toContain('Mixed: 1 of 3 moved')
+    expect(text).toContain('1 of 3 inputs (300 MB, about 4s) was copied to the node that ran the work.')
+    expect(text).toContain('moved 300 MB · ~4s')
+    expect(text).toContain('node-bielefeld')
+    expect(text).toContain('stays')
+    mounted.app.unmount()
+  })
+
+  it('sums the transfer when every input moved', async () => {
+    const moved = placementInputs.map((input) => ({
+      ...input,
+      source_node_id: 'node-giessen',
+      transfer_ms: 4000,
+    }))
+    const mounted = await mount(figure(), {
+      placement: { ...family.placement!, target_node_id: 'node-bielefeld', inputs: moved },
+    })
+    const text = content(mounted.root)
+
+    expect(mounted.errors).toEqual([])
+    expect(text).toContain('Data moved to the compute')
+    expect(text).toContain('All 3 inputs (1.5 GB, about 12s) were copied to the node that ran the work.')
+    expect(text).toContain('moved 1.2 GB · ~4s')
     mounted.app.unmount()
   })
 
@@ -361,37 +439,75 @@ describe('distributed job detail components', () => {
   })
 
   it('reports compute-to-data when the plan moved no bytes', async () => {
-    const JobFamilySection = compileClientComponent(
-      new URL('./JobFamilySection.vue', import.meta.url),
-      familyModules,
-    )
-    const local: JobFamilyResponse = {
-      ...family,
+    const mounted = await mount(figure(), {
       placement: { ...family.placement!, estimated_transfer_bytes: 0, estimated_transfer_ms: 0 },
-    }
-
-    const mounted = await mount(JobFamilySection, { family: local })
+    })
     const text = content(mounted.root)
 
     expect(mounted.errors).toEqual([])
-    expect(text).toContain('Compute-to-data')
-    expect(text).toContain('the plan expected to move no bytes')
+    expect(text).toContain('Compute went to the data')
+    expect(text).toContain('the plan moved no bytes')
     mounted.app.unmount()
   })
 
   it('says no local plan exists rather than claiming none was made', async () => {
-    const JobFamilySection = compileClientComponent(
-      new URL('./JobFamilySection.vue', import.meta.url),
-      familyModules,
-    )
-    const { placement: _placement, ...unplanned } = family
-
-    const mounted = await mount(JobFamilySection, { family: unplanned })
+    const mounted = await mount(figure(), { placement: undefined })
     const text = content(mounted.root)
 
     expect(mounted.errors).toEqual([])
     expect(text).toContain('Not placed')
     expect(text).toContain('No local placement record for this family')
+    expect(text).toContain('No executor was selected in a plan this node stored')
+    mounted.app.unmount()
+  })
+
+  it('lists every execution with its result', async () => {
+    const listed: JobFamilyResponse = {
+      ...family,
+      executions: [
+        {
+          execution_id: '01EXECUTIONCANONICAL',
+          executor_node_id: 'node-giessen',
+          state: 'succeeded',
+          started_at_ms: 1755500000000,
+          observed_at_ms: 1755500100000,
+          canonical: true,
+        },
+        {
+          execution_id: '01EXECUTIONDUPLICATE',
+          executor_node_id: 'node-bielefeld',
+          state: 'running',
+          started_at_ms: 1755500010000,
+          observed_at_ms: null,
+          canonical: false,
+        },
+      ],
+      execution_count: 2,
+      duplicate_successes: 1,
+      responder_node_id: 'node-giessen',
+    }
+
+    const mounted = await mount(executionsTable(), { family: listed })
+    const text = content(mounted.root)
+
+    expect(mounted.errors).toEqual([])
+    expect(text).toContain('node-giessen')
+    expect(text).toContain('node-bielefeld')
+    expect(text).toContain('canonical')
+    expect(text).toContain('still running')
+    expect(text).toContain('not recorded')
+    expect(text).toContain('1 duplicate success')
+    expect(text).toContain(Utils.truncateMiddle('01EXECUTIONCANONICAL'))
+    mounted.app.unmount()
+  })
+
+  it('keeps the count line when a node serves no list', async () => {
+    const mounted = await mount(executionsTable(), { family })
+    const text = content(mounted.root)
+
+    expect(mounted.errors).toEqual([])
+    expect(text).toContain('1 execution recorded')
+    expect(text).toContain('canonical-execution')
     mounted.app.unmount()
   })
 
@@ -679,7 +795,8 @@ describe('distributed job detail components', () => {
     mounted.app.unmount()
   })
 
-  it('leads with progress only while the run is active', async () => {
+  it('keeps one section order whatever the state', async () => {
+    // No section folds and none moves: the run reads the same way throughout.
     const running = vi.fn(async () => ({
       id: 'live-run',
       state: 'RUNNING',
@@ -688,26 +805,27 @@ describe('distributed job detail components', () => {
       outputs: [],
       logs: [],
       tags: {},
+      resources: { cpu_cores: 2 },
     }))
     const done = vi.fn(async () => ({ ...(await running()), state: 'COMPLETE' }))
-    const getJob = vi.fn(async () => ({ family: null }))
+    const getJob = vi.fn(async () => ({ family }))
     const wake = vi.spyOn(Poll, 'onWake').mockImplementation(() => () => {})
     const followSpy = vi.spyOn(Poll, 'follow').mockImplementation(() => () => {})
-    const find = (node: HostNode): HostNode | null =>
-      node.props['data-tutorial'] === 'run-executors'
-        ? node
-        : node.children.map(find).find((match) => match !== null) ?? null
-    const output = (root: HostNode) => find(root)!
 
-    const live = await mount(taskPanel(running, getJob), { taskId: 'live-run', open: true })
-    expect(String(output(live.root).props.class)).toContain('order-1')
-    live.app.unmount()
-    const ended = await mount(taskPanel(done, getJob), { taskId: 'live-run', open: true })
-    expect(String(output(ended.root).props.class)).not.toContain('order-1')
-    expect(ended.errors).toEqual([])
+    for (const getTask of [running, done]) {
+      const mounted = await mount(taskPanel(getTask, getJob), { taskId: 'live-run', open: true })
+      const text = content(mounted.root)
+
+      expect(mounted.errors).toEqual([])
+      expect(text.indexOf('Progress')).toBeLessThan(text.indexOf('Placement'))
+      expect(text.indexOf('Placement')).toBeLessThan(text.indexOf('Executions'))
+      expect(text.indexOf('Executions')).toBeLessThan(text.indexOf('Output'))
+      expect(text.indexOf('Outputs')).toBeLessThan(text.indexOf('Request'))
+      expect(text).toContain('2 cores')
+      mounted.app.unmount()
+    }
     wake.mockRestore()
     followSpy.mockRestore()
-    ended.app.unmount()
   })
 
   it('refreshes the native job with every poll', async () => {

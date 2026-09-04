@@ -1,30 +1,13 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import JobStateBadge from '@/components/jobs/JobStateBadge.vue'
-import { placementVerdict, type JobFamilyResponse, type JobOutputResponse } from '@/lib/jobs'
-import { formatBytes, formatDuration, truncateMiddle } from '@/lib/utils'
+import JobExecutionsTable from '@/components/jobs/JobExecutionsTable.vue'
+import JobPlacementFigure from '@/components/jobs/JobPlacementFigure.vue'
+import type { JobFamilyResponse, JobOutputResponse } from '@/lib/jobs'
+import { formatBytes, truncateMiddle } from '@/lib/utils'
 
-const props = defineProps<{ family: JobFamilyResponse }>()
-
-const verdict = computed(() => placementVerdict(props.family.placement))
-const verdictVariant = computed(() =>
-  verdict.value.verdict === 'compute-to-data'
-    ? 'success'
-    : verdict.value.verdict === 'data-to-compute'
-      ? 'sky'
-      : 'outline',
-)
-
-function formatEstimatedTime(ms: number): string {
-  return ms < 1000 ? `${ms} ms` : formatDuration(ms)
-}
-
-function storedAt(ms: number): string {
-  return new Date(ms).toLocaleString()
-}
+defineProps<{ family: JobFamilyResponse }>()
 
 // The exact version on its owning endpoint when that endpoint is known, and
 // the bucket-relative URI otherwise. Never a version-less URL: that would
@@ -48,15 +31,6 @@ function outputUrl(output: JobOutputResponse): string {
         </Badge>
       </div>
       <dl class="grid grid-cols-[9rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-xs">
-        <dt class="text-muted-foreground">Canonical execution</dt>
-        <dd v-if="family.canonical_execution_id" class="break-all font-mono text-[11px] text-foreground">
-          {{ family.canonical_execution_id }}
-        </dd>
-        <dd v-else class="text-muted-foreground">Not selected yet</dd>
-        <dt class="text-muted-foreground">Executions</dt>
-        <dd class="text-foreground">{{ family.executions }}</dd>
-        <dt class="text-muted-foreground">Duplicate successes</dt>
-        <dd class="text-foreground">{{ family.duplicate_successes }}</dd>
         <dt class="text-muted-foreground">Known aliases</dt>
         <dd class="text-foreground">{{ family.alias_count }}</dd>
         <dt class="text-muted-foreground">Known family conflicts</dt>
@@ -66,6 +40,16 @@ function outputUrl(output: JobOutputResponse): string {
         Projection revision {{ family.revision }} · digest
         <span class="font-mono" :title="family.projection_digest">{{ truncateMiddle(family.projection_digest) }}</span>
       </p>
+    </div>
+
+    <div class="space-y-2">
+      <h4 class="text-xs font-medium text-foreground">Placement</h4>
+      <JobPlacementFigure :placement="family.placement" />
+    </div>
+
+    <div class="space-y-2">
+      <h4 class="text-xs font-medium text-foreground">Executions</h4>
+      <JobExecutionsTable :family="family" />
     </div>
 
     <div data-tutorial="job-outputs" class="space-y-2">
@@ -129,84 +113,6 @@ function outputUrl(output: JobOutputResponse): string {
         </table>
       </div>
       <p v-else class="text-xs text-muted-foreground">No canonical outputs have been recorded.</p>
-    </div>
-
-    <div class="surface space-y-3 p-3">
-      <div class="flex flex-wrap items-start justify-between gap-2">
-        <h4 class="text-xs font-medium text-foreground">Placement</h4>
-        <Badge :variant="verdictVariant">{{ verdict.label }}</Badge>
-      </div>
-      <p class="text-[11px] text-muted-foreground">
-        {{ verdict.explanation }}
-        <RouterLink
-          :to="{ name: 'docs', params: { topic: 'data-to-compute' } }"
-          class="font-medium text-primary hover:underline"
-        >Learn more</RouterLink>
-      </p>
-
-      <template v-if="family.placement">
-        <dl class="grid grid-cols-[10rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-xs">
-          <dt class="text-muted-foreground">Executor kind</dt>
-          <dd class="text-foreground">{{ family.placement.executor_kind || 'No executor selected' }}</dd>
-          <dt class="text-muted-foreground">Estimated transfer</dt>
-          <dd class="text-foreground">
-            {{ formatBytes(family.placement.estimated_transfer_bytes) }} ·
-            {{ formatEstimatedTime(family.placement.estimated_transfer_ms) }}
-          </dd>
-          <dt class="text-muted-foreground">Ranked alternatives</dt>
-          <dd
-            class="text-foreground"
-            title="Other targets the round would have accepted. One round keeps at most 8 ranked alternatives."
-          >{{ family.placement.alternatives }}</dd>
-          <dt class="text-muted-foreground">Rejected candidates</dt>
-          <dd
-            class="text-foreground"
-            title="Targets the round refused, with the reason recorded. One round keeps at most 32 rejection explanations."
-          >{{ family.placement.rejected }}</dd>
-          <dt class="text-muted-foreground">Omitted rejections</dt>
-          <dd
-            class="text-foreground"
-            title="Rejections dropped by that audit bound. A non-zero count means the recorded rejections are incomplete, not that the remaining targets agreed."
-          >{{ family.placement.omitted }}</dd>
-          <dt class="text-muted-foreground">Plan stored</dt>
-          <dd class="text-foreground" :title="new Date(family.placement.stored_at_ms).toISOString()">
-            {{ storedAt(family.placement.stored_at_ms) }}
-          </dd>
-        </dl>
-        <p class="text-[11px] text-muted-foreground">Estimated at planning time, not measured.</p>
-      </template>
-      <p v-else class="text-xs text-muted-foreground">
-        No local placement record for this family; the planning node keeps it.
-      </p>
-    </div>
-
-    <div class="space-y-1.5">
-      <div class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Responder-local caveats">
-        <Badge
-          v-if="family.partial"
-          variant="outline"
-          size="sm"
-          class="text-muted-foreground"
-          title="This responder could not reduce every family record."
-        >
-          Partial responder view
-        </Badge>
-        <Badge
-          v-if="family.locally_exhausted"
-          variant="outline"
-          size="sm"
-          class="text-muted-foreground"
-          title="Known executions are terminal here and no local retry is armed. This does not establish a permanent failure."
-        >
-          Locally exhausted
-        </Badge>
-        <span v-if="family.responder_node_id" class="text-[11px] text-muted-foreground">
-          answered by node
-          <span class="font-mono" :title="family.responder_node_id">
-            {{ truncateMiddle(family.responder_node_id) }}
-          </span>
-        </span>
-      </div>
     </div>
   </section>
 </template>
