@@ -140,11 +140,6 @@ function text(value: string | number): string {
 function baseNameOf(path: string): string {
   return normalizedOutputKey(path).split('/').filter(Boolean).pop() ?? ''
 }
-function dirOf(path: string): string {
-  const trimmed = path.trim().replace(/\/+$/, '')
-  return trimmed.slice(0, trimmed.lastIndexOf('/') + 1)
-}
-
 function createStore(deps: CustomRunDeps) {
   const { runTarget, s3, myGroups, currentUser, nodes, getTask, dataView, realmName } = deps
   const router = useRouter()

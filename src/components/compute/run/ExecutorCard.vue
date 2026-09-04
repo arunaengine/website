@@ -23,6 +23,7 @@ const {
   envRows,
   workdir,
   workdirValid,
+  workdirNotice,
   setWorkdir,
   imageValid,
   commandValid,
@@ -194,7 +195,7 @@ function addInputFor(path: string) {
           @update:model-value="(value) => setWorkdir(String(value))"
         />
         <p class="mt-1 text-[11px]" :class="workdirValid ? 'text-muted-foreground' : 'text-destructive'">
-          {{ workdirValid ? 'Inputs and outputs are placed under it.' : 'Needs an absolute directory other than /.' }}
+          {{ workdirValid ? workdirNotice ?? 'Inputs and outputs are placed under it.' : 'Needs an absolute directory other than /.' }}
         </p>
       </div>
 

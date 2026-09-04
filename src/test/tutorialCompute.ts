@@ -367,7 +367,6 @@ export async function mountTutorialCompute(path = '/app/tutorial/compute'): Prom
       { path: '/app/tutorial/compute', name: 'tutorial-compute', component: TutorialComputeView as Component },
       { path: '/app/compute', name: 'compute', component: RouteStub },
       { path: '/app/compute/new', name: 'compute-new', component: RouteStub },
-      { path: '/app/compute/quick', name: 'compute-quick', component: RouteStub },
       { path: '/app/compute/:taskId', name: 'task', component: RouteStub },
       { path: '/app/jobs/:jobId', name: 'job', component: RouteStub },
       { path: '/app/runs/:jobId', name: 'run', component: RouteStub },
