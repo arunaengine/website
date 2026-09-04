@@ -33,6 +33,7 @@ import {
   type AssistantChatState,
 } from '@/lib/assistant/chatHistory'
 import { clearLiveJobs, setWatchedJobs } from '@/lib/assistant/jobLive'
+import { searchKind, type SearchKind } from '@/lib/assistant/webSearch'
 import { watchPoller } from '@/lib/assistant/watchPoll'
 import {
   createWatchRegistry,
@@ -48,6 +49,7 @@ import { assistantAvailable as available, assistantOpen as open, assistantPageOp
 const PROVIDER_KEY = 'aruna.assistant.provider'
 const MODEL_KEY = 'aruna.assistant.model'
 const APPROVE_KEY = 'aruna.assistant.approve'
+const SEARCH_KEY = 'aruna.assistant.search'
 const EFFORT_KEY = 'aruna.assistant.effort'
 const SESSION_MARGIN_MS = 60_000
 // What the chat says when the node serves no MCP endpoint.
@@ -123,6 +125,7 @@ const unreadChats = ref<Record<string, number>>({})
 const providerId = ref(readStored(PROVIDER_KEY))
 const modelId = ref(readStored(MODEL_KEY))
 const approveWrites = ref(readStored(APPROVE_KEY) !== 'off')
+const webSearch = ref(readStored(SEARCH_KEY) !== 'off')
 const storedEffort = ref<string>(readEffort())
 
 let history: ModelMessage[] = []
@@ -560,19 +563,21 @@ async function renderToolSet(turn: TurnContext): Promise<ToolSet> {
   })
 }
 
-async function toolSet(turn: TurnContext): Promise<ToolSet> {
+async function toolSet(turn: TurnContext, search: SearchKind): Promise<ToolSet> {
   const { bridge } = useAssistantEditor()
   const { bridge: runForm } = useAssistantRunForm()
   const { editorTools } = await import('@/lib/assistant/editorTools')
   const { runFormTools } = await import('@/lib/assistant/runFormTools')
   const { watchTools } = await import('@/lib/assistant/watchTools')
   const { mergeTools } = await import('@/lib/assistant/tools')
+  const { searchTools } = await import('@/lib/assistant/webSearch')
   const gate = approvalGate(turn)
   const local = mergeTools(
     await renderToolSet(turn),
     watchTools({ watch: (input) => addWatch(turn.chatId, input) }),
     bridge.value ? editorTools(bridge.value, gate) : {},
     runForm.value ? runFormTools(runForm.value, gate) : {},
+    await searchTools(search),
   )
   try {
     const remote = await nodeToolSet(turn, gate)
@@ -774,14 +779,17 @@ async function runChatTurn(chatId: string, prompt: string, context: PromptContex
       import('@/lib/assistant/prompt'),
     ])
     if (!isCurrentTurn(turn)) return
-    const tools = await toolSet(turn)
-    if (!isCurrentTurn(turn)) return
     const direct = providers.direct(selectedProvider.provider_id)
+    const openAiResponses = (direct?.kind === 'openai_compatible' && direct.protocol === 'responses')
+      || selectedProvider.kind === 'chatgpt'
+    const search = webSearch.value
+      ? searchKind({ kind: direct?.kind ?? selectedProvider.kind, responses: openAiResponses })
+      : 'none'
+    const tools = await toolSet(turn, search)
+    if (!isCurrentTurn(turn)) return
     const languageModel = direct
       ? buildBrowserModel({ ...direct, model: modelName })
       : buildModel(selectedProvider, modelName, modelContext)
-    const openAiResponses = (direct?.kind === 'openai_compatible' && direct.protocol === 'responses')
-      || selectedProvider.kind === 'chatgpt'
     // No offered effort means the model does not reason; sending one would fault.
     const req = effortOptions.value.length
       ? turnRequest(direct?.kind ?? selectedProvider.kind, openAiResponses, reasoningEffort.value)
@@ -980,6 +988,11 @@ export function useAssistantChat() {
     storeValue(APPROVE_KEY, value ? 'on' : 'off')
   }
 
+  function setWebSearch(value: boolean) {
+    webSearch.value = value
+    storeValue(SEARCH_KEY, value ? 'on' : 'off')
+  }
+
   function setReasoningEffort(value: string) {
     if (!effortOptions.value.includes(value)) return
     storedEffort.value = value
@@ -1127,11 +1140,13 @@ export function useAssistantChat() {
     loadModels,
     available,
     approveWrites,
+    webSearch,
     reasoningEffort,
     effortOptions,
     selectProvider,
     selectModel,
     setApproveWrites,
+    setWebSearch,
     setReasoningEffort,
     openPanel,
     showPanel,

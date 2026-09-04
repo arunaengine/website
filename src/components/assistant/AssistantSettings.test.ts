@@ -18,6 +18,7 @@ import { effortLabel, isValidModelId, normalizeModelId } from '@/lib/assistant/m
 const selectModel = vi.fn()
 const selectProvider = vi.fn()
 const setApproveWrites = vi.fn()
+const setWebSearch = vi.fn()
 const setReasoningEffort = vi.fn()
 
 const openai: AssistantProvider = {
@@ -37,11 +38,13 @@ const chat = {
   modelChoices: ref([{ id: 'gpt-5.6-sol' }, { id: 'gpt-5.5' }, { id: 'gpt-4.1' }]),
   modelsError: ref<string | null>(null),
   approveWrites: ref(true),
+  webSearch: ref(true),
   reasoningEffort: ref('medium'),
   effortOptions: ref<string[]>(['minimal', 'low', 'medium', 'high']),
   selectProvider,
   selectModel,
   setApproveWrites,
+  setWebSearch,
   setReasoningEffort,
 }
 
@@ -154,6 +157,15 @@ describe('AssistantSettings', () => {
     const link = element(root, (node) => node.tag === 'a')
 
     expect(JSON.parse(String(link.props['data-to']))).toEqual({ name: 'settings', query: { tab: 'assistant' } })
+  })
+
+  it('turns the provider web search off', async () => {
+    const { root } = await mountApp(AssistantSettings)
+
+    expect(content(root)).toContain('Search the web')
+    await click(button(root, 'No web search'))
+
+    expect(setWebSearch).toHaveBeenCalledWith(false)
   })
 
   it('names both write modes and picks the automatic one', async () => {

@@ -23,11 +23,13 @@ const {
   modelChoices,
   modelsError,
   approveWrites,
+  webSearch,
   reasoningEffort,
   effortOptions,
   selectProvider,
   selectModel,
   setApproveWrites,
+  setWebSearch,
   setReasoningEffort,
 } = useAssistantChat()
 
@@ -36,6 +38,11 @@ const providerOptions = computed(() =>
 
 const effortChoices = computed(() =>
   effortOptions.value.map((value) => ({ value, label: effortLabel(value) })))
+
+const searchChoices = [
+  { value: 'on', label: 'Search the web' },
+  { value: 'off', label: 'No web search' },
+]
 
 const writeChoices = [
   { value: 'ask', label: 'Approve every write' },
@@ -87,6 +94,19 @@ const writeChoices = [
             aria-label="Reasoning"
             @update:model-value="setReasoningEffort"
           />
+        </div>
+        <div>
+          <p class="text-xs font-medium text-foreground">Web</p>
+          <Select
+            :model-value="webSearch ? 'on' : 'off'"
+            :options="searchChoices"
+            class="mt-1 h-8 text-xs"
+            aria-label="Web search"
+            @update:model-value="(value: string) => setWebSearch(value === 'on')"
+          />
+          <p class="mt-1 text-[11px] text-muted-foreground">
+            The provider runs the search; a provider without one keeps working unchanged.
+          </p>
         </div>
         <div>
           <p class="text-xs font-medium text-foreground">Writes</p>
