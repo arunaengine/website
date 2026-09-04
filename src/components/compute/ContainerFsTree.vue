@@ -4,6 +4,7 @@ import Badge from '@/components/ui/Badge.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
+import Select from '@/components/ui/Select.vue'
 import DropdownMenu from '@/components/ui/DropdownMenu.vue'
 import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
 import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
@@ -12,9 +13,11 @@ import { validContainerDir, validContainerFilePath, type TesDataRefEntry } from 
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
+  Check,
   ChevronRight,
   EllipsisVertical,
   FileCode2,
+  FilePlus2,
   FileText,
   Folder,
   FolderPlus,
@@ -31,8 +34,10 @@ import {
 
 export interface FsOutputEntry {
   containerPath: string
-  /** Display-only destination (s3://bucket/key); edited via the details slot. */
+  /** s3://bucket/key, shown inline and edited in place. */
   destination: string
+  bucket: string
+  key: string
 }
 
 const props = defineProps<{
@@ -41,15 +46,22 @@ const props = defineProps<{
   script?: { path: string; label?: string } | null
   workspace?: string | null
   disabled?: boolean
+  /** Buckets a destination may point at; free text without a listing. */
+  bucketOptions?: { value: string; label: string }[]
 }>()
 
 const emit = defineEmits<{
   (e: 'update-input-path', index: number, path: string): void
   (e: 'remove-input', index: number): void
   (e: 'update-output-path', index: number, path: string): void
+  (e: 'update-output-destination', index: number, bucket: string, key: string): void
   (e: 'remove-output', index: number): void
   (e: 'add-output', containerDir: string): void
+  (e: 'add-output-file', containerDir: string, fileName: string): void
   (e: 'add-input', containerDir: string): void
+  (e: 'use-as-script', index: number): void
+  (e: 'update-script-path', path: string): void
+  (e: 'unmark-script'): void
 }>()
 
 type MarkerKind = 'script' | 'in' | 'out' | 'ws'
@@ -209,7 +221,10 @@ function markerFor(row: Row): Marker | null {
 // when editing started is never the same object at render time; match on the
 // identity it carries instead.
 function sameMarker(a: Marker | null | undefined, b: Marker | null | undefined): boolean {
-  return !!a && !!b && a.kind === b.kind && a.index !== undefined && a.index === b.index
+  if (!a || !b || a.kind !== b.kind) return false
+  // A run carries one script, so its marker needs no index to be identified.
+  if (a.kind === 'script') return true
+  return a.index !== undefined && a.index === b.index
 }
 // The script path and the workspace mount are owned by the host form; a folder
 // above the script must not be renamed either, the executor command points at
@@ -235,10 +250,17 @@ function startEditMarker(marker: Marker) {
 }
 
 function applyMarkerPath(marker: Marker, value: string) {
+  if (marker.kind === 'script') {
+    emit('update-script-path', value)
+    return
+  }
   if (marker.index === undefined) return
   const next = marker.dir ? ensureDir(value) : value
   if (marker.kind === 'in') emit('update-input-path', marker.index, next)
   else if (marker.kind === 'out') emit('update-output-path', marker.index, next)
+}
+function scriptMarkerOf(row: Row): Marker | null {
+  return row.markers.find((marker) => marker.kind === 'script') ?? null
 }
 
 function mapRawPath(raw: string, oldPath: string, newPath: string): string | null {
@@ -300,34 +322,58 @@ function removeExtraDir(path: string) {
   extraDirs.value = next
 }
 
-// ── New folder ───────────────────────────────────────────────────────────────
-const creatingIn = ref<string | null>(null)
-const newFolderName = ref('')
-function startNewFolder(dir: string) {
-  creatingIn.value = dir
-  newFolderName.value = ''
+// ── New folder or output file, named in an inline row ────────────────────────
+const creating = ref<{ dir: string; kind: 'folder' | 'file' } | null>(null)
+const newName = ref('')
+function startNew(dir: string, kind: 'folder' | 'file') {
+  creating.value = { dir, kind }
+  newName.value = ''
   const next = new Set(collapsed.value)
   next.delete(dir)
   collapsed.value = next
 }
-function commitNewFolder() {
-  const dir = creatingIn.value
-  const name = newFolderName.value.trim()
-  creatingIn.value = null
-  if (!dir || !name || name.includes('/') || name === '.' || name === '..') return
-  extraDirs.value = new Set([...extraDirs.value, `${dir === '/' ? '' : dir}/${name}`])
+function commitNew() {
+  const pending = creating.value
+  const name = newName.value.trim()
+  creating.value = null
+  if (!pending || !name || name === '.' || name === '..') return
+  if (pending.kind === 'file') {
+    emit('add-output-file', dirValue(pending.dir), name)
+    return
+  }
+  if (name.includes('/')) return
+  extraDirs.value = new Set([...extraDirs.value, `${pending.dir === '/' ? '' : pending.dir}/${name}`])
 }
 
+// ── Output destination, edited in place ──────────────────────────────────────
+const destEditing = ref<number | null>(null)
+const destDraft = ref({ bucket: '', key: '' })
+function outMarkerOf(row: Row): Marker | null {
+  return row.markers.find((marker) => marker.kind === 'out' && marker.index !== undefined) ?? null
+}
+// A staged file can become the run's script, which is the only way back for an
+// object that was added as an input by mistake.
+function scriptCandidateOf(row: Row): Marker | null {
+  return row.markers.find((marker) => marker.kind === 'in' && !marker.dir && marker.index !== undefined) ?? null
+}
+function startDest(index: number) {
+  const entry = props.outputs[index]
+  if (props.disabled || !entry) return
+  destDraft.value = { bucket: entry.bucket, key: entry.key }
+  destEditing.value = index
+}
+function commitDest() {
+  const index = destEditing.value
+  destEditing.value = null
+  if (index === null) return
+  emit('update-output-destination', index, destDraft.value.bucket.trim(), destDraft.value.key.trim())
+}
+
+function dirValue(path: string): string {
+  return path === '/' ? '/' : `${path}/`
+}
 function dirValueOf(row: Row): string {
-  return row.path === '/' ? '/' : `${row.path}/`
-}
-
-// ── Output destination details (rendered by the host through the slot) ──────
-// Always inline below the captured row, mirroring the Table view.
-function outIndicesFor(row: Row): number[] {
-  return row.markers
-    .filter((marker) => marker.kind === 'out' && marker.index !== undefined)
-    .map((marker) => marker.index!)
+  return dirValue(row.path)
 }
 
 // ── Row menus ────────────────────────────────────────────────────────────────
@@ -340,7 +386,12 @@ function isRemovableExtraDir(row: Row): boolean {
   return row.extra && !row.hasChildren && !row.markers.length
 }
 function hasRowMenu(row: Row): boolean {
-  return canRename(row) || indexMarkersOf(row).length > 0 || isRemovableExtraDir(row)
+  return (
+    canRename(row) ||
+    indexMarkersOf(row).length > 0 ||
+    isRemovableExtraDir(row) ||
+    scriptMarkerOf(row) !== null
+  )
 }
 function secondaryOf(row: Row): Marker | null {
   return row.markers.find((marker) => marker.secondary) ?? null
@@ -392,7 +443,7 @@ const MARKER_VARIANT: Record<MarkerKind, 'secondary' | 'sky' | 'warn' | 'outline
             @blur="commitEdit"
           />
         </template>
-        <template v-else-if="editing && editing.marker && sameMarker(markerFor(row), editing.marker)">
+        <template v-else-if="editing && editing.marker && sameMarker(markerFor(row) ?? scriptMarkerOf(row), editing.marker)">
           <Input
             v-model="editing.value"
             class="h-6 min-w-0 flex-1 font-mono text-xs"
@@ -416,8 +467,51 @@ const MARKER_VARIANT: Record<MarkerKind, 'secondary' | 'sky' | 'warn' | 'outline
             <ArrowUpFromLine v-else-if="marker.kind === 'out'" class="h-2.5 w-2.5" />
             {{ MARKER_LABEL[marker.kind] }}<template v-if="marker.files"> · {{ marker.files.length }}</template>
           </Badge>
+          <template v-if="outMarkerOf(row)">
+            <span
+              v-if="destEditing === outMarkerOf(row)!.index"
+              class="flex min-w-0 flex-1 items-center gap-1"
+              @focusout="(e: FocusEvent) => { if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) commitDest() }"
+            >
+              <span class="shrink-0 text-[10px] text-muted-foreground">s3://</span>
+              <Select
+                v-if="bucketOptions?.length"
+                v-model="destDraft.bucket"
+                :options="bucketOptions"
+                class="h-6 w-28 shrink-0 text-xs"
+                aria-label="Destination bucket"
+              />
+              <Input
+                v-else
+                v-model="destDraft.bucket"
+                class="h-6 w-28 shrink-0 font-mono text-xs"
+                aria-label="Destination bucket"
+              />
+              <span class="shrink-0 text-muted-foreground">/</span>
+              <Input
+                v-model="destDraft.key"
+                class="h-6 min-w-0 flex-1 font-mono text-xs"
+                aria-label="Destination key"
+                autofocus
+                @keydown.enter.prevent="commitDest"
+                @keydown.esc.prevent="destEditing = null"
+              />
+              <Button variant="ghost" size="icon-sm" class="h-5 w-5" aria-label="Done" @click="commitDest">
+                <Check class="size-3" />
+              </Button>
+            </span>
+            <button
+              v-else
+              type="button"
+              class="min-w-0 flex-1 truncate text-left font-mono text-[10px] text-muted-foreground hover:underline"
+              :title="`Change the destination of ${row.name}`"
+              @click="startDest(outMarkerOf(row)!.index!)"
+            >
+              {{ outputs[outMarkerOf(row)!.index!]?.destination }}
+            </button>
+          </template>
           <span
-            v-for="marker in [secondaryOf(row)].filter((m): m is Marker => m !== null)"
+            v-for="marker in outMarkerOf(row) ? [] : [secondaryOf(row)].filter((m): m is Marker => m !== null)"
             :key="marker.kind"
             class="hidden min-w-0 flex-1 truncate text-[10px] text-muted-foreground sm:inline"
             :class="marker.kind === 'ws' ? 'italic' : 'font-mono'"
@@ -435,8 +529,11 @@ const MARKER_VARIANT: Record<MarkerKind, 'secondary' | 'sky' | 'warn' | 'outline
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" class="min-w-[11rem]" @close-auto-focus="(e: Event) => e.preventDefault()">
-                  <DropdownMenuItem class="text-xs" @select="startNewFolder(row.path)">
+                  <DropdownMenuItem class="text-xs" @select="startNew(row.path, 'folder')">
                     <FolderPlus class="size-3.5 text-muted-foreground" /> New folder
+                  </DropdownMenuItem>
+                  <DropdownMenuItem class="text-xs" @select="startNew(row.path, 'file')">
+                    <FilePlus2 class="size-3.5 text-muted-foreground" /> New output file
                   </DropdownMenuItem>
                   <DropdownMenuItem class="text-xs" @select="emit('add-input', dirValueOf(row))">
                     <ArrowDownToLine class="size-3.5 text-muted-foreground" /> Add input here
@@ -446,7 +543,7 @@ const MARKER_VARIANT: Record<MarkerKind, 'secondary' | 'sky' | 'warn' | 'outline
                     class="text-xs"
                     @select="emit('add-output', dirValueOf(row))"
                   >
-                    <ArrowUpFromLine class="size-3.5 text-muted-foreground" /> Capture as output
+                    <ArrowUpFromLine class="size-3.5 text-muted-foreground" /> Capture whole folder
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -460,6 +557,28 @@ const MARKER_VARIANT: Record<MarkerKind, 'secondary' | 'sky' | 'warn' | 'outline
                   <DropdownMenuItem v-if="canRename(row)" class="text-xs" @select="startEdit(row)">
                     <Pencil class="size-3.5 text-muted-foreground" /> {{ markerFor(row) ? 'Edit path' : 'Rename or move' }}
                   </DropdownMenuItem>
+                  <DropdownMenuItem
+                    v-if="outMarkerOf(row)"
+                    class="text-xs"
+                    @select="startDest(outMarkerOf(row)!.index!)"
+                  >
+                    <Pencil class="size-3.5 text-muted-foreground" /> Change destination
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    v-if="scriptCandidateOf(row)"
+                    class="text-xs"
+                    @select="emit('use-as-script', scriptCandidateOf(row)!.index!)"
+                  >
+                    <FileCode2 class="size-3.5 text-muted-foreground" /> Use as script
+                  </DropdownMenuItem>
+                  <template v-if="scriptMarkerOf(row)">
+                    <DropdownMenuItem class="text-xs" @select="startEditMarker(scriptMarkerOf(row)!)">
+                      <Pencil class="size-3.5 text-muted-foreground" /> Change mount path
+                    </DropdownMenuItem>
+                    <DropdownMenuItem class="text-xs" @select="emit('unmark-script')">
+                      <X class="size-3.5 text-muted-foreground" /> Unmark as script
+                    </DropdownMenuItem>
+                  </template>
                   <DropdownMenuItem
                     v-for="(marker, i) in indexMarkersOf(row)"
                     :key="`rm${i}`"
@@ -482,23 +601,22 @@ const MARKER_VARIANT: Record<MarkerKind, 'secondary' | 'sky' | 'warn' | 'outline
         </template>
       </div>
 
-      <!-- Host-rendered destination editors, inline below every capture. -->
-      <div v-for="index in outIndicesFor(row)" :key="`out-${index}`" class="py-1 pr-1" :style="indent(row.depth + 1)">
-        <slot name="output-details" :index="index" />
-      </div>
-
-      <!-- New-folder input row. -->
-      <div v-if="creatingIn === row.path" class="flex items-center gap-1.5 py-0.5" :style="indent(row.depth + 1)">
-        <Folder class="h-3.5 w-3.5 shrink-0 text-primary/70" />
+      <!-- Inline name row for a new folder or a new output file. -->
+      <div v-if="creating?.dir === row.path" class="flex items-center gap-1.5 py-0.5" :style="indent(row.depth + 1)">
+        <component
+          :is="creating.kind === 'folder' ? Folder : FileText"
+          class="h-3.5 w-3.5 shrink-0"
+          :class="creating.kind === 'folder' ? 'text-primary/70' : 'text-muted-foreground'"
+        />
         <Input
-          v-model="newFolderName"
+          v-model="newName"
           class="h-6 w-44 font-mono text-xs"
-          placeholder="folder-name"
-          aria-label="New folder name"
+          :placeholder="creating.kind === 'folder' ? 'folder-name' : 'file-name.txt'"
+          :aria-label="creating.kind === 'folder' ? 'New folder name' : 'New output file name'"
           autofocus
-          @keydown.enter.prevent="commitNewFolder"
-          @keydown.esc.prevent="creatingIn = null"
-          @blur="commitNewFolder"
+          @keydown.enter.prevent="commitNew"
+          @keydown.esc.prevent="creating = null"
+          @blur="commitNew"
         />
       </div>
 
