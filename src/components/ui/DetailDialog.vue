@@ -26,7 +26,7 @@ const classes = computed(() => cn(
       <div class="flex shrink-0 items-start justify-between gap-3 border-b border-border px-6 py-4">
         <div class="min-w-0 flex-1"><slot name="header" /></div>
         <DialogClose
-          class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md opacity-70 ring-offset-background transition-opacity hover:bg-accent hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring"
+          class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-input bg-background text-foreground shadow-sm ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           aria-label="Close"
         >
           <X class="h-4 w-4" />
