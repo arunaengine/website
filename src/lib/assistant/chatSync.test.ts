@@ -27,12 +27,18 @@ describe('mergeChats', () => {
     expect(merged.chats).toHaveLength(2)
   })
 
-  it('keeps the open chat open, and falls back when it is gone', () => {
-    const local = state([chat('a', 10)], 'a')
-    expect(mergeChats(local, state([chat('b', 20)])).activeChatId).toBe('a')
+  it('keeps an open chat with words in it, and falls back when it is gone', () => {
+    const written = { ...chat('a', 10), messages: [{ id: 'm', role: 'user' as const, text: 'hi', calls: [], at: 10 }] }
+    expect(mergeChats(state([written], 'a'), state([chat('b', 20)])).activeChatId).toBe('a')
 
     const missing = { activeChatId: 'gone', chats: [] }
     expect(mergeChats(missing, state([chat('b', 20)])).activeChatId).toBe('b')
+  })
+
+  it('opens the chat the node holds instead of a fresh empty one', () => {
+    // A new browser starts on an empty chat; the restored conversation wins.
+    const remote = { ...chat('b', 20), messages: [{ id: 'm', role: 'user' as const, text: 'hi', calls: [], at: 20 }] }
+    expect(mergeChats(state([chat('a', 30)], 'a'), state([remote])).activeChatId).toBe('b')
   })
 })
 

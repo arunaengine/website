@@ -22,9 +22,13 @@ export function mergeChats(
   const chats = [...byId.values()]
     .sort((first, second) => second.updatedAt - first.updatedAt)
     .slice(0, MAX_ASSISTANT_CHATS)
-  const activeChatId = chats.some((chat) => chat.id === local.activeChatId)
-    ? local.activeChatId
-    : chats[0]?.id ?? local.activeChatId
+  // A fresh browser opens on an empty chat; once the node's chats arrive, the
+  // one written to last is the one to show, not the empty placeholder.
+  const active = chats.find((chat) => chat.id === local.activeChatId)
+  const placeholder = !active || (!active.messages.length && !active.history.length)
+  const activeChatId = placeholder
+    ? chats.find((chat) => chat.messages.length)?.id ?? active?.id ?? chats[0]?.id ?? local.activeChatId
+    : local.activeChatId
   return { activeChatId, chats }
 }
 
