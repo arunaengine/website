@@ -321,6 +321,8 @@ const ComputeSubmitView = compileClientComponent(new URL('./ComputeSubmitView.vu
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ nodes: realmNodes }) },
   '@/composables/useRealm': { useRealm: () => ({ realm: ref({ shortName: 'Realm' }) }) },
   '@/composables/useRunTarget': { useRunTarget: () => runTarget },
+  '@/composables/useAssistantRunForm': { provideRunFormBridge: () => {} },
+  '@/lib/runFormBridge': { createRunFormBridge: () => ({}) },
   '@/lib/tes': Tes,
   '@/lib/utils': Utils,
   '@/lib/workspaces': Workspaces,

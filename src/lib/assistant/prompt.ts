@@ -11,6 +11,15 @@ export interface DraftContext {
   types: string[]
 }
 
+/** The run form the run page has open, if any. */
+export interface RunFormContext {
+  name: string
+  executor: string
+  inputs: number
+  outputs: number
+  problems: number
+}
+
 /** What the open view is showing: short details only, ids, paths and counts. */
 export interface PageContext {
   kind: string
@@ -41,6 +50,8 @@ export interface PromptContext {
   route: string
   page?: PageContext | null
   draft?: DraftContext | null
+  /** Set while the run page is open, so the run tools have their subject. */
+  runForm?: RunFormContext | null
   /** Realm profiles as id and name, when the portal already has them. */
   profiles?: Array<{ id: string; name: string }>
   /** Realm totals the portal already holds, so counts need no tool call. */
@@ -147,6 +158,16 @@ function draftLines(draft: DraftContext): string[] {
   return lines
 }
 
+function runFormLines(form: RunFormContext): string[] {
+  const lines = [
+    `A run form is open: "${form.name || 'unnamed'}" on ${form.executor}, `
+    + `${form.inputs} input${form.inputs === 1 ? '' : 's'} and ${form.outputs} output${form.outputs === 1 ? '' : 's'}.`,
+  ]
+  if (form.problems) lines.push(`It still needs ${form.problems} thing${form.problems === 1 ? '' : 's'}.`)
+  lines.push('Read it with read_run_form and change it with the run form tools; the user presses Run, you never do.')
+  return lines
+}
+
 export function systemPrompt(context: PromptContext): string {
   const lines = [
     'You are the Aruna assistant inside the Aruna data portal. Answer concisely and format clearly: '
@@ -164,6 +185,7 @@ export function systemPrompt(context: PromptContext): string {
   if (context.identity) lines.push(identityLine(context.identity))
   if (context.page) lines.push(pageLine(context.page))
   if (context.draft) lines.push(...draftLines(context.draft))
+  if (context.runForm) lines.push(...runFormLines(context.runForm))
   if (context.profiles?.length) {
     lines.push(`Realm profiles: ${context.profiles.map((profile) => `${profile.id} (${profile.name})`).join(', ')}.`)
   }

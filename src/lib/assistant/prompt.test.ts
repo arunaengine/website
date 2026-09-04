@@ -20,6 +20,29 @@ describe('systemPrompt', () => {
     )
   })
 
+  it('names the open run form and who presses Run', () => {
+    const prompt = systemPrompt({
+      route: '/app/compute/new',
+      runForm: {
+        name: 'align-and-count',
+        executor: 'the python-uv runtime',
+        inputs: 3,
+        outputs: 1,
+        problems: 2,
+      },
+    })
+
+    expect(prompt).toContain(
+      'A run form is open: "align-and-count" on the python-uv runtime, 3 inputs and 1 output.',
+    )
+    expect(prompt).toContain('It still needs 2 things.')
+    expect(prompt).toContain('the user presses Run, you never do')
+  })
+
+  it('leaves the run form out when no run page is open', () => {
+    expect(systemPrompt({ route: '/app/compute' })).not.toContain('A run form is open')
+  })
+
   it('leaves the page out when the view registered none', () => {
     const prompt = systemPrompt({ route: '/app/assistant' })
 

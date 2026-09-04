@@ -173,6 +173,17 @@ function createStore(deps: CustomRunDeps) {
   function hasAi(field: string): boolean {
     return aiMarks.value.has(field)
   }
+  // Container paths the assistant added; the tree marks those rows.
+  const aiPaths = ref<Set<string>>(new Set())
+  function markAiPath(path: string) {
+    aiPaths.value = new Set(aiPaths.value).add(path)
+  }
+  function clearAiPath(path: string) {
+    if (!aiPaths.value.has(path)) return
+    const next = new Set(aiPaths.value)
+    next.delete(path)
+    aiPaths.value = next
+  }
 
   // ── Executor ───────────────────────────────────────────────────────────────
   const executorMode = ref<ExecutorMode>('custom')
@@ -447,6 +458,7 @@ function createStore(deps: CustomRunDeps) {
   function setOutputDestination(index: number, bucket: string, key: string) {
     const row = outputRows.value[index]
     if (!row) return
+    clearAiPath(row.path)
     row.bucket = bucket
     setOutputKey(row, key)
     onOutputKeyBlur(row)
@@ -467,13 +479,17 @@ function createStore(deps: CustomRunDeps) {
     inputs.value = inputs.value.filter((_, i) => i !== index)
   }
   function onTreeInputPath(index: number, path: string) {
+    const previous = inputs.value[index]
+    if (previous) clearAiPath(previous.kind === 'folder' ? previous.basePath : previous.path)
     inputs.value = inputs.value.map((entry, i) =>
       i === index ? (entry.kind === 'folder' ? { ...entry, basePath: path } : { ...entry, path }) : entry,
     )
   }
   function onTreeOutputPath(index: number, path: string) {
     const row = outputRows.value[index]
-    if (row) setOutputPath(row, path)
+    if (!row) return
+    clearAiPath(row.path)
+    setOutputPath(row, path)
   }
   function onTreeAddOutput(containerDir: string) {
     addCapture(containerDir)
@@ -1159,6 +1175,9 @@ function createStore(deps: CustomRunDeps) {
     markAi,
     clearAi,
     hasAi,
+    aiPaths,
+    markAiPath,
+    clearAiPath,
     executorMode,
     runtimeId,
     runtime,

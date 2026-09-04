@@ -77,6 +77,7 @@ const ChatComposer = compileClientComponent(new URL('./ChatComposer.vue', import
   '@/composables/useRealm': { useRealm: () => ({ realmId: ref('r-1') }) },
   '@/composables/useGroupSelection': { activeGroupId: ref('') },
   '@/composables/useAssistantChat': { useAssistantChat: () => chat },
+  '@/composables/useAssistantRunForm': { useAssistantRunForm: () => ({ bridge: { value: null } }) },
   '@/composables/useAssistantEditor': { useAssistantEditor: () => ({ bridge: ref(null) }) },
   '@/composables/usePageContext': { usePageContext: () => ({ currentPage: () => page }) },
 })

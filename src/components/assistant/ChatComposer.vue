@@ -13,6 +13,7 @@ import { useRealm } from '@/composables/useRealm'
 import { activeGroupId } from '@/composables/useGroupSelection'
 import { useAssistantChat } from '@/composables/useAssistantChat'
 import { useAssistantEditor } from '@/composables/useAssistantEditor'
+import { useAssistantRunForm } from '@/composables/useAssistantRunForm'
 import { usePageContext } from '@/composables/usePageContext'
 import { SendHorizontal, Settings2 } from '@lucide/vue'
 
@@ -25,6 +26,7 @@ const route = useRoute()
 const { currentUser, profiles, myGroups, discoverableGroups, realmInfo, usageInfo } = useAruna()
 const { realmId } = useRealm()
 const { bridge } = useAssistantEditor()
+const { bridge: runForm } = useAssistantRunForm()
 const { currentPage } = usePageContext()
 const {
   busy,
@@ -81,6 +83,19 @@ function identity() {
   }
 }
 
+// What the open run page is showing, so the run tools have their subject.
+function runFormContext() {
+  const form = runForm.value?.summary()
+  if (!form) return null
+  return {
+    name: form.name,
+    executor: form.executor.runtime ? `the ${form.executor.runtime} runtime` : form.executor.image || 'a custom image',
+    inputs: form.inputs.length,
+    outputs: form.outputs.length,
+    problems: form.problems.length,
+  }
+}
+
 function submit() {
   if (!canSend.value) return
   const text = draft.value
@@ -89,6 +104,7 @@ function submit() {
     route: route.fullPath,
     page: currentPage(),
     draft: bridge.value?.summary() ?? null,
+    runForm: runFormContext(),
     profiles: profiles.value.map((profile) => ({ id: profile.id, name: profile.name })),
     realm: realmSummary(),
     identity: identity(),

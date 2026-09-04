@@ -48,6 +48,7 @@ const {
   useInputAsScript,
   unmarkScript,
   setScriptPath,
+  aiPaths,
 } = injectCustomRun()
 
 const complete = computed(
@@ -101,6 +102,7 @@ const checkLabel = computed(() => {
           :script="hasScript ? { path: scriptPath, label: scriptUrl } : null"
           :workspace="activeWorkdir"
           :bucket-options="bucketOptions"
+          :ai-paths="[...aiPaths]"
           @update-input-path="onTreeInputPath"
           @remove-input="removeInputEntry"
           @update-output-path="onTreeOutputPath"

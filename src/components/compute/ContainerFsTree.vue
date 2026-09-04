@@ -5,6 +5,7 @@ import Notice from '@/components/ui/Notice.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
+import AiMark from '@/components/compute/run/AiMark.vue'
 import DropdownMenu from '@/components/ui/DropdownMenu.vue'
 import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
 import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
@@ -48,6 +49,8 @@ const props = defineProps<{
   disabled?: boolean
   /** Buckets a destination may point at; free text without a listing. */
   bucketOptions?: { value: string; label: string }[]
+  /** Container paths the assistant added; those rows carry an AI mark. */
+  aiPaths?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -456,6 +459,7 @@ const MARKER_VARIANT: Record<MarkerKind, 'secondary' | 'sky' | 'warn' | 'outline
         </template>
         <template v-else>
           <span class="truncate font-mono text-foreground">{{ row.name }}{{ row.isDir && row.path !== '/' ? '/' : '' }}</span>
+          <AiMark v-if="aiPaths?.some((path) => normPath(path) === row.path)" />
           <Badge
             v-for="(marker, i) in row.markers"
             :key="i"

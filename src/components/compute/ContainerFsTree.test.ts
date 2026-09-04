@@ -50,6 +50,7 @@ const ContainerFsTree = compileClientComponent(new URL('./ContainerFsTree.vue', 
   '@/components/ui/DropdownMenuContent.vue': moduleDefault(PassThrough),
   '@/components/ui/DropdownMenuItem.vue': moduleDefault(MenuItemStub),
   '@/components/ui/DropdownMenuTrigger.vue': moduleDefault(PassThrough),
+  '@/components/compute/run/AiMark.vue': moduleDefault(EmptyStub),
   '@/lib/tes': Tes,
 })
 

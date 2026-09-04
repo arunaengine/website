@@ -16,6 +16,7 @@ import {
 import { loadRoCrate } from './aruna/crates'
 import { useAssistantProviders } from './useAssistantProviders'
 import { useAssistantEditor } from './useAssistantEditor'
+import { useAssistantRunForm } from './useAssistantRunForm'
 import type { McpConnection } from '@/lib/assistant/mcpClient'
 import type { PromptContext } from '@/lib/assistant/prompt'
 import type { ArtifactRef, LoadedArtifact } from '@/lib/assistant/renderTools'
@@ -445,10 +446,16 @@ async function renderToolSet(turn: TurnContext): Promise<ToolSet> {
 
 async function toolSet(turn: TurnContext): Promise<ToolSet> {
   const { bridge } = useAssistantEditor()
+  const { bridge: runForm } = useAssistantRunForm()
   const { editorTools } = await import('@/lib/assistant/editorTools')
+  const { runFormTools } = await import('@/lib/assistant/runFormTools')
   const { mergeTools } = await import('@/lib/assistant/tools')
   const gate = approvalGate(turn)
-  const local = mergeTools(await renderToolSet(turn), bridge.value ? editorTools(bridge.value, gate) : {})
+  const local = mergeTools(
+    await renderToolSet(turn),
+    bridge.value ? editorTools(bridge.value, gate) : {},
+    runForm.value ? runFormTools(runForm.value, gate) : {},
+  )
   try {
     const remote = await nodeToolSet(turn, gate)
     if (isCurrentTurn(turn) && realmInfo.value?.interfaces.mcp?.url) toolsNote.value = null

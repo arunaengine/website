@@ -186,6 +186,7 @@ const cardModules = {
   '@/components/compute/TesInputsEditor.vue': moduleDefault(GenericStub),
   '@/components/compute/TaskJsonPreview.vue': moduleDefault(TaskJsonPreviewStub),
   '@/components/compute/ScriptEditor.vue': moduleDefault(GenericStub),
+  '@/components/compute/run/AiMark.vue': moduleDefault(GenericStub),
 }
 const runPart = (path: string) => moduleDefault(compileClientComponent(url(path), cardModules))
 const withParts = {
@@ -265,6 +266,8 @@ const ComputeSubmitView = compileClientComponent(url('views/ComputeSubmitView.vu
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ nodes: ref([]) }) },
   '@/composables/useRealm': { useRealm: () => ({ realm: ref({ shortName: 'Test realm' }) }) },
   '@/composables/useRunTarget': runTargetModule,
+  '@/composables/useAssistantRunForm': { provideRunFormBridge: () => {} },
+  '@/lib/runFormBridge': { createRunFormBridge: () => ({}) },
   '@/lib/tes': TesLib,
   '@/lib/utils': Utils,
   '@/lib/workspaces': Workspaces,

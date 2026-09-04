@@ -28,6 +28,8 @@ import { useRealm } from '@/composables/useRealm'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useRunTarget } from '@/composables/useRunTarget'
 import { useS3 } from '@/composables/useS3'
+import { provideRunFormBridge } from '@/composables/useAssistantRunForm'
+import { createRunFormBridge } from '@/lib/runFormBridge'
 import { defaultPlacement, isNativeBlocked, tesFormToExecutionRequest } from '@/lib/nativeSubmit'
 import { submitJob } from '@/lib/jobs'
 import type { TesTask } from '@/lib/tes'
@@ -76,6 +78,9 @@ const {
   rerunLoading,
   dismissRerun,
 } = store
+
+// The assistant may read and change this form while the page is open.
+provideRunFormBridge(createRunFormBridge(store))
 
 const resourcesCard = ref<InstanceType<typeof ResourcesCard> | null>(null)
 const placementCard = ref<InstanceType<typeof PlacementCard> | null>(null)
