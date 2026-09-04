@@ -53,8 +53,9 @@ export interface LoadedArtifact {
 }
 
 export interface RenderHost {
-  /** Keeps the card beside the tool call so the message can draw it. */
-  keep: (toolCallId: string, view: RenderView) => void
+  /** Keeps the card beside the tool call so the message can draw it; answers
+   *  true when it updated a card the conversation already shows. */
+  keep: (toolCallId: string, view: RenderView) => boolean | void
   /** Fetches a stored dataset's RO-Crate by document id. */
   loadCrate: (documentId: string) => Promise<unknown>
   /** Fetches one stored object for a card; bytes never reach the model. */
@@ -301,7 +302,9 @@ export function renderTools(host: RenderHost): ToolSet {
       description:
         'Shows a job card in the conversation: its state, when it ran, the node that ran it and links to the '
         + 'files it wrote. Use it for every job submission and every job status answer instead of writing the '
-        + 'status as text. Pass the job id and the fields get_job returned.',
+        + 'status as text. Pass the job id and the fields get_job returned, including kind, so the card links to '
+        + 'the right page. Calling it again with the same job id updates that card in place, so a run has one '
+        + 'card from submission to result; the card also follows a watched job on its own.',
       inputSchema: schema<JobInput>({
         job_id: STRING,
         state: STRING,
@@ -347,8 +350,8 @@ export function renderTools(host: RenderHost): ToolSet {
           ...(text(input.error) ? { error: text(input.error) } : {}),
           outputs,
         }
-        host.keep(toolCallId, view)
-        return { shown: true, state, outputs: outputs.length }
+        const updated = host.keep(toolCallId, view) === true
+        return { shown: true, updated, state, outputs: outputs.length }
       },
     }),
 

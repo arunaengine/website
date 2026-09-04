@@ -147,9 +147,10 @@ describe('systemPrompt', () => {
     const prompt = systemPrompt({ route: '/app/assistant' })
 
     expect(prompt).toContain(
-      'Answer every job submission and every job status with show_job, passing the job id and the fields '
-      + 'get_job returned; never write a job state out as text or JSON.',
+      'Answer every job submission and every job status with show_job, passing the job id, the kind and the '
+      + 'fields get_job returned; never write a job state out as text or JSON.',
     )
+    expect(prompt).toContain('One run has one card')
     expect(prompt).toContain('a job with show_job')
     expect(prompt).toContain('A card carries the facts, so keep the words beside it short.')
   })

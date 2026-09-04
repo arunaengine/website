@@ -2,12 +2,14 @@
 // A job the assistant asked to show: what state it is in, when it ran, and
 // which stored files it wrote.
 import { computed } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, type RouteLocationRaw } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import Notice from '@/components/ui/Notice.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import ObjectLink from '@/components/assistant/ObjectLink.vue'
 import type { JobView } from '@/lib/assistant/types'
+import { jobWatched, liveJob } from '@/lib/assistant/jobLive'
 import { stateVariant } from '@/lib/stateBadge'
 import { formatBytes, relativeTime, truncateMiddle } from '@/lib/utils'
 import { Cpu } from '@lucide/vue'
@@ -15,17 +17,33 @@ import { Cpu } from '@lucide/vue'
 const props = defineProps<{ view: JobView }>()
 
 const OUTPUT_CAP = 6
+const TERMINAL = new Set(['succeeded', 'failed', 'cancelled'])
+
+// A watcher's last poll wins over the facts the card was drawn with, so the
+// card follows the run without the model taking another turn.
+const live = computed(() => liveJob(props.view.jobId))
+const state = computed(() => live.value?.state || props.view.state)
+const kind = computed(() => live.value?.kind || props.view.jobKind)
+const attemptCount = computed(() => live.value?.attempts ?? props.view.attempts)
+const failure = computed(() => live.value?.error || props.view.error)
+const finishedAt = computed(() => live.value?.finishedAt || props.view.finishedAt)
+const following = computed(() => jobWatched(props.view.jobId) && !TERMINAL.has(state.value))
+
+// A run opens on the run page; every other job kind is a system job.
+const target = computed<RouteLocationRaw>(() => (kind.value === 'execution'
+  ? { name: 'task', params: { taskId: props.view.jobId } }
+  : { name: 'job', params: { jobId: props.view.jobId } }))
 
 const stateLabel = computed(() => {
-  const state = props.view.state.trim()
-  return state ? state.charAt(0).toUpperCase() + state.slice(1) : 'Unknown'
+  const value = state.value.trim()
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : 'Unknown'
 })
 
 const shortJob = computed(() => truncateMiddle(props.view.jobId, 8, 5))
 const shortNode = computed(() => truncateMiddle(props.view.nodeId ?? '', 8, 5))
 // One attempt is the normal case and says nothing; more is worth naming.
 const attempts = computed(() => {
-  const value = props.view.attempts
+  const value = attemptCount.value
   return value !== undefined && value > 1 ? `${value} attempts` : ''
 })
 
@@ -33,7 +51,7 @@ const timings = computed(() =>
   [
     { label: 'Submitted', at: props.view.submittedAt },
     { label: 'Started', at: props.view.startedAt },
-    { label: 'Finished', at: props.view.finishedAt },
+    { label: 'Finished', at: finishedAt.value },
   ].flatMap((entry) => (entry.at ? [{ ...entry, at: entry.at, ago: relativeTime(entry.at) }] : [])),
 )
 
@@ -45,12 +63,13 @@ const outputs = computed(() => props.view.outputs.slice(0, OUTPUT_CAP))
     <div class="flex items-center gap-2 border-b border-border/60 px-2.5 py-1.5">
       <Cpu class="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
       <RouterLink
-        :to="{ name: 'job', params: { jobId: view.jobId } }"
+        :to="target"
         class="min-w-0 flex-1 truncate font-medium text-foreground hover:text-primary hover:underline"
         :title="`Open ${view.jobId}`"
       >{{ view.title }}</RouterLink>
-      <Badge v-if="view.jobKind" size="sm" variant="secondary">{{ view.jobKind }}</Badge>
-      <Badge size="sm" :variant="stateVariant(view.state)">{{ stateLabel }}</Badge>
+      <Badge v-if="kind" size="sm" variant="secondary">{{ kind }}</Badge>
+      <Spinner v-if="following" label="Following this job" class="shrink-0 text-primary" />
+      <Badge size="sm" :variant="stateVariant(state)">{{ stateLabel }}</Badge>
     </div>
     <div class="space-y-2 px-3 py-2.5">
       <dl class="space-y-0.5">
@@ -58,7 +77,7 @@ const outputs = computed(() => props.view.outputs.slice(0, OUTPUT_CAP))
           <dt class="w-16 shrink-0 text-muted-foreground">Job id</dt>
           <dd class="flex min-w-0 items-center gap-1">
             <RouterLink
-              :to="{ name: 'job', params: { jobId: view.jobId } }"
+              :to="target"
               class="hash truncate text-primary hover:underline"
               :title="view.jobId"
             >{{ shortJob }}</RouterLink>
@@ -74,6 +93,7 @@ const outputs = computed(() => props.view.outputs.slice(0, OUTPUT_CAP))
         </div>
       </dl>
 
+      <p v-if="following" class="text-muted-foreground">Following this job; this card updates on its own.</p>
       <p v-if="attempts" class="text-muted-foreground">{{ attempts }}</p>
 
       <ul v-if="timings.length" class="space-y-0.5">
@@ -83,7 +103,7 @@ const outputs = computed(() => props.view.outputs.slice(0, OUTPUT_CAP))
         </li>
       </ul>
 
-      <Notice v-if="view.error" tone="error">{{ view.error }}</Notice>
+      <Notice v-if="failure" tone="error">{{ failure }}</Notice>
 
       <div v-if="view.outputs.length">
         <p class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">

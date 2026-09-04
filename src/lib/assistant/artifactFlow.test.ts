@@ -84,7 +84,9 @@ describe('a chart from a script run', () => {
     const tools = mergeTools(
       nodeTools(descriptors(), source, { enabled: () => true, ask }),
       renderTools({
-        keep: (id, view) => kept.push([id, view]),
+        keep: (id, view) => {
+          kept.push([id, view])
+        },
         loadCrate: vi.fn(),
         loadArtifact,
       }),

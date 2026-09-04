@@ -1,8 +1,9 @@
 import { createSSRApp, h } from 'vue'
 import { renderToString } from 'vue/server-renderer'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import JobCard from './JobCard.vue'
+import { clearLiveJobs, noteJob, setWatchedJobs } from '@/lib/assistant/jobLive'
 import type { JobView } from '@/lib/assistant/types'
 
 const Stub = { render: () => null }
@@ -13,6 +14,7 @@ async function render(view: JobView): Promise<string> {
     routes: [
       { path: '/app/buckets/:bucketId', name: 'bucket', component: Stub },
       { path: '/app/jobs/:jobId', name: 'job', component: Stub },
+      { path: '/app/compute/:taskId', name: 'task', component: Stub },
       { path: '/:rest(.*)', component: Stub },
     ],
   })
@@ -38,6 +40,8 @@ const succeeded: JobView = {
   outputs: [{ bucket: 'lorem', key: 'results/gc_analysis_rerun.json', size: 82 }],
 }
 
+afterEach(() => clearLiveJobs())
+
 describe('JobCard', () => {
   it('shows the state and links every output into the data browser', async () => {
     const markup = await render(succeeded)
@@ -49,14 +53,42 @@ describe('JobCard', () => {
     expect(markup).toContain('1 output')
   })
 
-  it('shortens both ids, keeps them whole, and links the job page', async () => {
+  it('shortens both ids, keeps them whole, and links the run page', async () => {
     const markup = await render(succeeded)
 
     expect(markup).toContain('01M1NXNB…3D870')
     expect(markup).toContain('b59346e5…740a2')
     expect(markup).toContain(`title="${NODE}"`)
-    expect(markup).toContain('href="/app/jobs/01M1NXNBTN00030969DSD3D870"')
+    expect(markup).toContain('href="/app/compute/01M1NXNBTN00030969DSD3D870"')
     expect(markup).not.toContain(`>${NODE}<`)
+  })
+
+  it('links a system job to the jobs page', async () => {
+    const markup = await render({ ...succeeded, jobKind: 'import_rocrate' })
+
+    expect(markup).toContain('href="/app/jobs/01M1NXNBTN00030969DSD3D870"')
+  })
+
+  it('spins while a watcher follows the job', async () => {
+    // A card drawn at submission must show the state the watcher last polled.
+    setWatchedJobs([succeeded.jobId])
+    noteJob(succeeded.jobId, { state: 'running', kind: 'execution', attempts: 2 })
+    const markup = await render({ ...succeeded, state: 'queued' })
+
+    expect(markup).toContain('Running')
+    expect(markup).toContain('Following this job')
+    expect(markup).toContain('2 attempts')
+    expect(markup).not.toContain('Queued')
+  })
+
+  it('stops spinning once the watched job settles', async () => {
+    setWatchedJobs([succeeded.jobId])
+    noteJob(succeeded.jobId, { state: 'failed', kind: 'execution', error: 'exit code 2' })
+    const markup = await render({ ...succeeded, state: 'running' })
+
+    expect(markup).toContain('Failed')
+    expect(markup).toContain('exit code 2')
+    expect(markup).not.toContain('Following this job')
   })
 
   it('names repeated attempts and stays quiet about the first', async () => {

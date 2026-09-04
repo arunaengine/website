@@ -6,7 +6,9 @@ import { runTool } from '@/test/aiTool'
 function harness(crate: unknown = null, artifact: Partial<LoadedArtifact> = {}) {
   const kept: Array<[string, RenderView]> = []
   const host: RenderHost = {
-    keep: (id, view) => kept.push([id, view]),
+    keep: (id, view) => {
+      kept.push([id, view])
+    },
     loadCrate: vi.fn(async () => crate),
     loadArtifact: vi.fn(async (ref: ArtifactRef): Promise<LoadedArtifact> => ({
       url: 'blob:aruna/object',
@@ -129,7 +131,7 @@ describe('show_job', () => {
       outputs: [{ bucket: 'lorem', key: 'results/gc.json', size: 82 }, { bucket: 'lorem', key: '' }],
     }, 'call-3')
 
-    expect(output).toEqual({ shown: true, state: 'succeeded', outputs: 1 })
+    expect(output).toEqual({ shown: true, updated: false, state: 'succeeded', outputs: 1 })
     expect(kept[0]).toEqual(['call-3', {
       kind: 'job',
       title: 'gc analysis',

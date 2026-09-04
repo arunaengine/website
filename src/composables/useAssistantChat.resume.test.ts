@@ -28,9 +28,15 @@ vi.mock('./useAssistantProviders', () => ({
   }),
 }))
 
+interface TurnCall {
+  messages: unknown[]
+  tools: ToolSet
+  onToolCall?: (call: { id: string; name: string; input: unknown }) => void
+}
+
 const turns = vi.hoisted(() => ({
   calls: [] as Array<{ messages: unknown[]; tools: ToolSet }>,
-  onTurn: null as null | ((call: { messages: unknown[]; tools: ToolSet }) => Promise<void> | void),
+  onTurn: null as null | ((call: TurnCall) => Promise<void> | void),
 }))
 
 vi.mock('@/lib/assistant/chat', () => ({
@@ -109,6 +115,25 @@ async function watch(tools: ToolSet, jobId: string, callId: string) {
     messages: [],
     context: undefined,
   })
+}
+
+/** Draws a job card the way the model would: the call lands, then it runs. */
+async function showJob(turn: TurnCall, jobId: string, state: string, callId: string) {
+  const entry = turn.tools.show_job
+  if (!entry?.execute) throw new Error('No show_job tool')
+  turn.onToolCall?.({ id: callId, name: 'show_job', input: {} })
+  return entry.execute({ job_id: jobId, state, kind: 'execution', title: 'read counts' } as never, {
+    toolCallId: callId,
+    messages: [],
+    context: undefined,
+  })
+}
+
+function jobCards(messages: unknown, jobId: string) {
+  const list = messages as Array<{ calls: Array<{ view?: { kind: string; jobId?: string; state?: string } }> }>
+  return list
+    .flatMap((message) => message.calls)
+    .flatMap((call) => (call.view?.kind === 'job' && call.view.jobId === jobId ? [call.view] : []))
 }
 
 describe('a watcher resuming its own chat', () => {
@@ -194,6 +219,25 @@ describe('a watcher resuming its own chat', () => {
     const text = transcript(chat.chats.value, 'c-a')
     expect(text).toContain('never mind')
     expect(text.lastIndexOf('Background update')).toBeGreaterThan(text.indexOf('never mind'))
+  })
+
+  it('keeps one card for a job however often it is drawn', async () => {
+    const chat = useAssistantChat()
+    chat.selectChat('c-a')
+    jobs.state = 'running'
+    let second: unknown
+    turns.onTurn = async (turn) => {
+      await showJob(turn, '04JOB', 'queued', 's-1')
+      second = await showJob(turn, '04JOB', 'running', 's-2')
+      turns.onTurn = null
+    }
+
+    await chat.send('start the counts', { route: '/compute' })
+
+    const cards = jobCards(chat.messages.value, '04JOB')
+    expect(cards).toHaveLength(1)
+    expect(cards[0].state).toBe('running')
+    expect(second).toMatchObject({ updated: true })
   })
 
   it('stops watching once the job settled', async () => {

@@ -21,7 +21,7 @@ import type { McpConnection } from '@/lib/assistant/mcpClient'
 import type { PromptContext } from '@/lib/assistant/prompt'
 import type { ArtifactRef, LoadedArtifact } from '@/lib/assistant/renderTools'
 import { ARTIFACT_TEXT_CAP } from '@/lib/assistant/types'
-import type { ApprovalGate, ApprovalRequest, ChatMessage, ToolCallView } from '@/lib/assistant/types'
+import type { ApprovalGate, ApprovalRequest, ChatMessage, JobView, ToolCallView } from '@/lib/assistant/types'
 import { clampEffort, modelSuggestions, reasoningEffortOptions } from '@/lib/assistant/modelOptions'
 import type { StreamProviderOptions } from '@/lib/assistant/chat'
 import {
@@ -32,6 +32,7 @@ import {
   type AssistantChatScope,
   type AssistantChatState,
 } from '@/lib/assistant/chatHistory'
+import { clearLiveJobs, setWatchedJobs } from '@/lib/assistant/jobLive'
 import { watchPoller } from '@/lib/assistant/watchPoll'
 import {
   createWatchRegistry,
@@ -332,6 +333,20 @@ function patchCall(chatId: string, messageId: string, id: string, patch: Partial
   message.calls = message.calls.map((call) => (call.id === id ? { ...call, ...patch } : call))
 }
 
+// One card per job: a later show_job updates the card already in the chat
+// rather than adding a second one below it.
+function updateJobCard(chatId: string, view: JobView): boolean {
+  for (const message of messagesOf(chatId)) {
+    const index = message.calls.findIndex((call) => call.view?.kind === 'job' && call.view.jobId === view.jobId)
+    if (index < 0) continue
+    const current = message.calls[index].view as JobView
+    const merged: JobView = { ...current, ...view, outputs: view.outputs.length ? view.outputs : current.outputs }
+    message.calls = message.calls.map((call, at) => (at === index ? { ...call, view: merged } : call))
+    return true
+  }
+  return false
+}
+
 function settleApproval(entry: ApprovalEntry, approved: boolean) {
   if (entry.settled) return
   entry.settled = true
@@ -535,7 +550,10 @@ async function renderToolSet(turn: TurnContext): Promise<ToolSet> {
   const { renderTools } = await import('@/lib/assistant/renderTools')
   return renderTools({
     keep: (id, view) => {
-      if (isCurrentTurn(turn)) patchCall(turn.chatId, turn.messageId, id, { view })
+      if (!isCurrentTurn(turn)) return false
+      if (view.kind === 'job' && updateJobCard(turn.chatId, view)) return true
+      patchCall(turn.chatId, turn.messageId, id, { view })
+      return false
     },
     loadCrate: loadRoCrate,
     loadArtifact,
@@ -597,7 +615,9 @@ function discardTurn(turn: TurnContext | null) {
 // ── Background watchers ────────────────────────────────────────────────────
 
 function saveWatchState() {
-  watchStore?.save({ watches: watchRegistry?.list() ?? [], unread: unreadChats.value })
+  const watches = watchRegistry?.list() ?? []
+  watchStore?.save({ watches, unread: unreadChats.value })
+  setWatchedJobs(watches.filter((watch) => watch.kind === 'job').map((watch) => watch.target))
 }
 
 function applyUnread(next: Record<string, number>) {
@@ -670,6 +690,7 @@ function stopWatchers() {
   watchStore = null
   resumeQueue.length = 0
   applyUnread({})
+  clearLiveJobs()
 }
 
 /** A watcher's update, appended to its chat so the assistant answers it there. */

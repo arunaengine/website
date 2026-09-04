@@ -97,8 +97,10 @@ const COMPUTE = [
   + 'ready, running and cancelling are still in flight, and indeterminate proves nothing.',
   'Hand a run that will take a while to watch_progress with its job id instead of polling in a loop: it answers '
   + 'at once, and this chat continues on its own when the run settles, even while it is closed.',
-  'Answer every job submission and every job status with show_job, passing the job id and the fields get_job '
-  + 'returned; never write a job state out as text or JSON.',
+  'Answer every job submission and every job status with show_job, passing the job id, the kind and the fields '
+  + 'get_job returned; never write a job state out as text or JSON.',
+  'One run has one card: show_job with a job id already shown updates that card, and a watched job updates it '
+  + 'without any call, so answer a background update in a sentence rather than drawing the job again.',
   'A failed job\'s error and log tails are the evidence: report them instead of guessing what went wrong.',
   'A script has no network unless dependencies are declared, and it writes only into its workspace bucket.',
   'Set a quota or a resource limit to a round whole number in the unit a person uses (2 GiB, 8 GiB, 500 GB) and '
