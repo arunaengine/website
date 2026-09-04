@@ -2,15 +2,21 @@ import { defineComponent, h } from 'vue'
 import * as VueRuntime from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { button, click, compileClientComponent, content, mountApp, moduleDefault } from '@/test/clientRender'
+import * as Utils from '@/lib/utils'
 
 const ButtonStub = defineComponent({
   inheritAttrs: false,
   setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()),
 })
 
-const toggle = compileClientComponent(new URL('./DashboardScopeToggle.vue', import.meta.url), {
+const OptionToggle = compileClientComponent(new URL('../ui/OptionToggle.vue', import.meta.url), {
   vue: VueRuntime,
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+  '@/lib/utils': Utils,
+})
+const toggle = compileClientComponent(new URL('./DashboardScopeToggle.vue', import.meta.url), {
+  vue: VueRuntime,
+  '@/components/ui/OptionToggle.vue': moduleDefault(OptionToggle),
 })
 
 describe('dashboard scope toggle', () => {
