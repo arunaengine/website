@@ -123,7 +123,7 @@ describe('versioned in-portal Docs', () => {
   it('defines glossary terms', async () => {
     // The wiki's long tail: one linkable section per term.
     const html = await renderTopic('glossary')
-    for (const term of ['role', 'run-family', 'canonical-execution', 'delete-marker', 'quota', 'mcp']) {
+    for (const term of ['role', 'run-family', 'result-execution', 'delete-marker', 'quota', 'mcp']) {
       expect(html).toContain(`id="${term}"`)
     }
   })

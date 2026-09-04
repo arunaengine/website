@@ -639,7 +639,7 @@ export const docsTopics: DocsTopic[] = [
         title: 'Follow the run',
         icon: 'Activity',
         paragraphs: [
-          'The run page tracks Queued, Initializing, Running, and Finished, with the distributed record underneath: several nodes may plan the same [family](concept:glossary#run-family), and duplicate successes reconcile to one [canonical execution](concept:glossary#canonical-execution).',
+          'The run page tracks Queued, Initializing, Running, and Finished, with the distributed record underneath: several nodes may plan the same [family](concept:glossary#run-family), and duplicate successes reconcile to one [result execution](concept:glossary#result-execution).',
           'On completion Aruna writes a Process Run [dataset](concept:datasets) with action, tool, inputs, outputs, status, and group. Open it from the run detail, or filter the [Datasets](page:datasets) view by Process Run.',
         ],
         image: {
@@ -981,7 +981,7 @@ export const docsTopics: DocsTopic[] = [
         title: 'What the reference check covers',
         icon: 'Search',
         bullets: [
-          'Before a delete, the node asks every reachable [node](concept:realm-nodes-groups#nodes-and-the-realm) of the realm which datasets reference the target, under each identifier form the content is known by: its canonical content w3id and the legacy S3 and path-style addresses of the same bytes.',
+          'Before a delete, the node asks every reachable [node](concept:realm-nodes-groups#nodes-and-the-realm) of the realm which datasets reference the target, under each identifier form the content is known by: its main content w3id and the legacy S3 and path-style addresses of the same bytes.',
           'A form no node can resolve is reported as not queried. A reference recorded only under that form stays invisible to the check.',
           'Index current means a node has finished indexing what it holds. A pending, mixed, or failed index can miss a reference that already exists.',
           'A node that does not answer, a truncated page, or a partial realm view leaves the coverage incomplete. The dialog says so, and an empty result is then not proof that no dataset references the target.',

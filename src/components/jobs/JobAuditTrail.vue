@@ -111,7 +111,7 @@ function recordDetails(record: JobAuditRecord): string[] {
         ...details,
         `job ${truncateMiddle(record.job_id)}`,
         `spec ${truncateMiddle(record.spec_digest)}`,
-        record.canonical_alias ? 'canonical alias' : 'alternate alias',
+        record.canonical_alias ? 'main alias' : 'alternate alias',
       ]
     case 'budget':
       return [...details, `maximum launches ${record.sequence}`, `spec ${truncateMiddle(record.spec_digest)}`]

@@ -320,7 +320,7 @@ export const glossaryTopic: DocsTopic = {
       ],
     },
     {
-      title: 'Canonical execution',
+      title: 'Result execution',
       icon: 'BadgeCheck',
       paragraphs: [
         'The single execution a [run family](concept:glossary#run-family) reconciles its duplicate successes to. Outputs and provenance point at it.',

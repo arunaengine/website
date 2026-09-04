@@ -120,7 +120,7 @@ const checkLabel = computed(() => {
         Each input needs an absolute container path, unique across all staged files.
       </p>
       <p v-if="outputRows.length && !outputsValid" class="text-[11px] text-destructive">
-        Each capture needs a bucket and a canonical key; a folder capture (path ending in /) needs a key ending in /.
+        Each capture needs a bucket and a key; a folder capture (path ending in /) needs a key ending in /.
       </p>
     </section>
 
@@ -188,7 +188,7 @@ const checkLabel = computed(() => {
             <Button variant="outline" size="sm" @click="addOutputRow"><Plus class="size-3.5" /> Add output</Button>
           </div>
           <p v-if="outputRows.length && !outputsValid" class="text-[11px] text-destructive">
-            Each capture needs a bucket and a canonical key; a folder capture (path ending in /) needs a key ending in /.
+            Each capture needs a bucket and a key; a folder capture (path ending in /) needs a key ending in /.
           </p>
         </div>
       </div>
