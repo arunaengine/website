@@ -3,7 +3,10 @@ import { renderTools, type ArtifactRef, type LoadedArtifact, type RenderHost } f
 import type { RenderView } from './types'
 import { runTool } from '@/test/aiTool'
 
-function harness(crate: unknown = null, artifact: Partial<LoadedArtifact> = {}) {
+const REPORT = '<h2>Per base sequence quality</h2>'
+  + `<img alt="Per base quality graph" src="data:image/png;base64,${'A'.repeat(4000)}">`
+
+function harness(crate: unknown = null, artifact: Partial<LoadedArtifact> = {}, html = REPORT) {
   const kept: Array<[string, RenderView]> = []
   const host: RenderHost = {
     keep: (id, view) => {
@@ -17,6 +20,7 @@ function harness(crate: unknown = null, artifact: Partial<LoadedArtifact> = {}) 
       name: ref.filename ?? ref.key,
       ...artifact,
     })),
+    loadHtml: vi.fn(async () => html),
   }
   return { tools: renderTools(host), kept, host }
 }
@@ -110,6 +114,7 @@ describe('show_crate', () => {
       keep: vi.fn(),
       loadCrate: async () => { throw new Error('gone') },
       loadArtifact: host.loadArtifact,
+      loadHtml: host.loadHtml,
     })
     expect(await runTool(failing.show_crate, { document_id: 'doc-x' })).toEqual({ error: 'gone' })
     expect(await runTool(tools.show_crate, {})).toMatchObject({ error: expect.any(String) })
@@ -308,6 +313,7 @@ describe('show_artifact', () => {
       keep: vi.fn(),
       loadCrate: vi.fn(),
       loadArtifact: async () => { throw new Error('no S3 session') },
+      loadHtml: async () => { throw new Error('no S3 session') },
     })
     expect(await runTool(failing.show_artifact, { bucket: 'work', key: 'a.png' })).toEqual({ error: 'no S3 session' })
   })
@@ -462,5 +468,45 @@ describe('show_diff', () => {
     expect(await runTool(tools.show_diff, { title: 'x', before: '', after: '' }))
       .toMatchObject({ error: expect.any(String) })
     expect(kept).toEqual([])
+  })
+})
+
+describe('show_html_figure', () => {
+  it('shows the figure a report holds and names it', async () => {
+    const { tools, kept } = harness()
+
+    const output = await runTool(tools.show_html_figure, {
+      bucket: 'lorem',
+      key: 'reports/SRR1_fastqc.html',
+      figure: 'per base sequence quality',
+    })
+
+    expect(output).toEqual({ shown: true, figure: 'Per base sequence quality', of: 1 })
+    expect(kept[0][1]).toMatchObject({
+      kind: 'artifact',
+      title: 'Per base sequence quality',
+      artifact: { previewKind: 'image', contentType: 'image/png' },
+    })
+  })
+
+  it('lists what the report holds when nothing matches', async () => {
+    const { tools, kept } = harness(null, {}, REPORT + '<h2>Per sequence GC content</h2>'
+      + `<img src="data:image/png;base64,${'B'.repeat(3000)}">`)
+
+    const output = await runTool(tools.show_html_figure, {
+      bucket: 'lorem',
+      key: 'reports/SRR1_fastqc.html',
+      figure: 'adapter content',
+    })
+
+    expect(output).toMatchObject({ figures: ['Per base sequence quality', 'Per sequence GC content'] })
+    expect(kept).toEqual([])
+  })
+
+  it('says so when the report carries no figures', async () => {
+    const { tools } = harness(null, {}, '<h2>Summary</h2><p>Nothing to plot.</p>')
+
+    expect(await runTool(tools.show_html_figure, { bucket: 'lorem', key: 'r.html' }))
+      .toEqual({ error: 'That report carries no figures of its own.' })
   })
 })

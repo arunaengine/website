@@ -21,6 +21,7 @@ export const RENDER_TOOL_NAMES = [
   'show_stats',
   'show_crate',
   'show_artifact',
+  'show_html_figure',
   'show_job',
   'show_object',
   'show_tree',
@@ -60,6 +61,8 @@ export interface RenderHost {
   loadCrate: (documentId: string) => Promise<unknown>
   /** Fetches one stored object for a card; bytes never reach the model. */
   loadArtifact: (ref: ArtifactRef) => Promise<LoadedArtifact>
+  /** Reads one stored HTML file as text, so a figure inside it can be shown. */
+  loadHtml: (ref: ArtifactRef) => Promise<string>
 }
 
 interface TableInput {
@@ -121,6 +124,16 @@ interface ArtifactInput {
   filename?: string
   size?: number
   job_id?: string
+  caption?: string
+}
+
+interface FigureInput {
+  bucket: string
+  key: string
+  figure?: string
+  version_id?: string
+  node_id?: string
+  endpoint_url?: string
   caption?: string
 }
 
@@ -516,6 +529,69 @@ export function renderTools(host: RenderHost): ToolSet {
           afterLabel: text(input.after_label) || 'After',
         })
         return { shown: true, changed: before !== after }
+      },
+    }),
+
+    show_html_figure: tool({
+      description:
+        'Shows one figure out of a stored HTML report, such as the per base sequence quality plot of a FastQC '
+        + 'report. Pass the bucket, the key and the name of the figure or its section. Only images the file '
+        + 'itself carries are read. Never paste a report\'s markup into an answer: show the figure the user '
+        + 'asked for, and call this without a figure name to learn which figures the report holds.',
+      inputSchema: schema<FigureInput>({
+        bucket: STRING,
+        key: STRING,
+        figure: STRING,
+        version_id: STRING,
+        node_id: STRING,
+        endpoint_url: STRING,
+        caption: STRING,
+      }, ['bucket', 'key']),
+      execute: async (input, { toolCallId }) => {
+        const bucket = text(input.bucket)
+        const key = text(input.key)
+        if (!bucket || !key) return { error: 'A figure needs the bucket and key of the report.' }
+        const versionId = text(input.version_id)
+        try {
+          const source = await host.loadHtml({
+            bucket,
+            key,
+            versionId: versionId || undefined,
+            nodeId: text(input.node_id) || undefined,
+            endpointUrl: text(input.endpoint_url) || undefined,
+            contentType: 'text/html',
+          })
+          const { figureName, htmlFigures, pickFigure } = await import('./htmlFigures')
+          const figures = htmlFigures(source)
+          if (!figures.length) return { error: 'That report carries no figures of its own.' }
+          const names = figures.map(figureName)
+          const wanted = text(input.figure)
+          const picked = wanted ? pickFigure(figures, wanted) : figures.length === 1 ? figures[0] : null
+          if (!picked) {
+            return wanted
+              ? { error: `No figure matches "${wanted}".`, figures: names }
+              : { error: 'Name the figure to show.', figures: names }
+          }
+          const name = figureName(picked)
+          host.keep(toolCallId, {
+            kind: 'artifact',
+            title: name,
+            caption: text(input.caption) || undefined,
+            artifact: {
+              url: picked.url,
+              contentType: picked.contentType,
+              previewKind: 'image',
+              name,
+              size: picked.bytes,
+              bucket,
+              key,
+              versionId: versionId || undefined,
+            },
+          })
+          return { shown: true, figure: name, of: names.length }
+        } catch (cause) {
+          return { error: errorMessage(cause) }
+        }
       },
     }),
 

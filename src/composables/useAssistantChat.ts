@@ -548,6 +548,27 @@ export async function loadArtifact(ref: ArtifactRef): Promise<LoadedArtifact> {
   }
 }
 
+/**
+ * Reads one stored HTML file as text, for the figures it carries inline. It is
+ * read whole rather than capped like an artifact card's text, because a report
+ * keeps its plots near the end; the markup never reaches the model.
+ */
+export async function loadHtml(ref: ArtifactRef): Promise<string> {
+  const [{ useS3 }, { MAX_PREVIEW_HTML }] = await Promise.all([
+    import('./useS3'),
+    import('@/lib/htmlDocument'),
+  ])
+  const s3 = useS3()
+  if (!s3.hasActiveKey.value) {
+    const { activeGroupId } = await import('./useGroupSelection')
+    if (activeGroupId.value) await s3.ensureSession(activeGroupId.value)
+  }
+  const nodeId = artifactNode(s3.resolveObjectUrl, ref)
+  const blob = await s3.getObjectBlob(ref.bucket, ref.key, nodeId, ref.versionId)
+  if (blob.size > ARTIFACT_CAP) throw new Error('That file is too large to read here.')
+  return (await blob.text()).slice(0, MAX_PREVIEW_HTML)
+}
+
 // The cards a render tool asks for stay on the call; the model only hears "shown".
 async function renderToolSet(turn: TurnContext): Promise<ToolSet> {
   const { renderTools } = await import('@/lib/assistant/renderTools')
@@ -560,6 +581,7 @@ async function renderToolSet(turn: TurnContext): Promise<ToolSet> {
     },
     loadCrate: loadRoCrate,
     loadArtifact,
+    loadHtml,
   })
 }
 

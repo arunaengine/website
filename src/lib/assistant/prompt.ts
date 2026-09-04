@@ -114,6 +114,10 @@ const ARTIFACTS = [
   'Show an image, a PDF or any other file with show_artifact, passing the bucket, key and version the output '
   + 'names; show data read with read_object as show_table or show_chart.',
   'The user sees the file itself, so never paste file bytes into an answer.',
+  'An HTML report is never written out as markup: show the asked-for plot with show_html_figure, which lists the '
+  + 'figures the report holds when none is named, and show the whole report with show_artifact when the user '
+  + 'wants to read it. Where the numbers behind a plot are available, drawing them with show_chart is better '
+  + 'still.',
   'Answer a write, a copy or a lookup of one stored object with show_object, passing the bucket, the key and the '
   + 'facts you have (size, content type, version, last modified); never list those facts as bullets in the text.',
   'Name a stored result by its bucket and key, as bucket/results/report.json or s3://bucket/results/report.json, '

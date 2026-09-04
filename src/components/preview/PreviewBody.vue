@@ -2,7 +2,7 @@
 // The preview itself: origin line, download, and the viewer for the object's
 // kind. Both the standalone preview dialog and the file details view mount it,
 // so an object is previewed the same way wherever it is opened.
-import { defineAsyncComponent, watch } from 'vue'
+import { computed, defineAsyncComponent, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { asyncChunkError } from '@/lib/chunk-recovery'
 import Button from '@/components/ui/Button.vue'
@@ -42,6 +42,7 @@ const props = defineProps<{
 // Viewer deps (CodeMirror, markdown-it, papaparse, native players) stay in
 // dynamic chunks fetched only when their kind is shown.
 const TextPreview = defineAsyncComponent({ loader: () => import('./TextPreview.vue'), onError: asyncChunkError })
+const HtmlPreview = defineAsyncComponent({ loader: () => import('./HtmlPreview.vue'), onError: asyncChunkError })
 const MarkdownPreview = defineAsyncComponent({ loader: () => import('./MarkdownPreview.vue'), onError: asyncChunkError })
 const CsvPreview = defineAsyncComponent(() => import('./CsvPreview.vue'))
 const ImagePreview = defineAsyncComponent(() => import('./ImagePreview.vue'))
@@ -51,6 +52,11 @@ const DownloadCard = defineAsyncComponent(() => import('./DownloadCard.vue'))
 
 const s3 = useS3()
 const preview = useObjectPreview()
+
+// An HTML file reads as a page, not as markup; the viewer keeps the source one
+// click away.
+const isHtml = computed(() =>
+  /\.x?html?$/i.test(props.name) || (props.contentType ?? '').toLowerCase().startsWith('text/html'))
 
 function reload() {
   if (!props.objectKey) return
@@ -168,8 +174,13 @@ async function download() {
     />
 
     <template v-else-if="preview.status.value === 'ready'">
+      <HtmlPreview
+        v-if="preview.kind.value === 'text' && isHtml && preview.text.value !== null"
+        :text="preview.text.value"
+        :name="props.name"
+      />
       <TextPreview
-        v-if="preview.kind.value === 'text' && preview.text.value !== null"
+        v-else-if="preview.kind.value === 'text' && preview.text.value !== null"
         :text="preview.text.value"
         :language="preview.language.value"
       />

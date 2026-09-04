@@ -20,6 +20,7 @@ const TEXT_KINDS = new Set(['text', 'markdown', 'table'])
 // The viewer dependencies stay in their own chunks, fetched only for the kind
 // a card actually shows.
 const TextPreview = defineAsyncComponent(() => import('@/components/preview/TextPreview.vue'))
+const HtmlPreview = defineAsyncComponent(() => import('@/components/preview/HtmlPreview.vue'))
 const MarkdownPreview = defineAsyncComponent(() => import('@/components/preview/MarkdownPreview.vue'))
 const CsvPreview = defineAsyncComponent(() => import('@/components/preview/CsvPreview.vue'))
 
@@ -27,6 +28,11 @@ const classified = computed(() => classifyObject({ key: props.artifact.name || p
 // An artifact above the byte cap was never fetched, so it stays a download row.
 const kind = computed(() => (props.artifact.previewKind === 'download' ? 'download' : classified.value.kind))
 const isText = computed(() => TEXT_KINDS.has(kind.value))
+// An HTML report is shown as the page it is, never as its markup.
+const isHtml = computed(() =>
+  isText.value
+  && (/\.x?html?$/i.test(props.artifact.name || props.artifact.key)
+    || props.artifact.contentType.toLowerCase().startsWith('text/html')))
 const delimiter = computed(() => (props.artifact.key.toLowerCase().endsWith('.tsv') ? '\t' : ','))
 
 const fetched = ref<string | null>(null)
@@ -103,6 +109,7 @@ watch(
       <template v-else-if="isText">
         <Spinner v-if="loading" label="Reading the file…" show-label />
         <Notice v-else-if="failed" tone="error">{{ failed }}</Notice>
+        <HtmlPreview v-else-if="text !== null && isHtml" :text="text" :name="artifact.name" />
         <CsvPreview v-else-if="text !== null && kind === 'table'" :text="text" :delimiter="delimiter" />
         <MarkdownPreview v-else-if="text !== null && kind === 'markdown'" :text="text" />
         <TextPreview v-else-if="text !== null" :text="text" :language="classified.language" />

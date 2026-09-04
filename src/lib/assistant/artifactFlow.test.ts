@@ -89,6 +89,7 @@ describe('a chart from a script run', () => {
         },
         loadCrate: vi.fn(),
         loadArtifact,
+        loadHtml: vi.fn(async () => ''),
       }),
     )
 
