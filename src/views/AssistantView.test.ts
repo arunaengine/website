@@ -35,6 +35,7 @@ const chat = {
   loadModels,
   hidePanel,
   openPanel: vi.fn(),
+  showPanel: vi.fn(),
   newChat,
   renameChat,
   selectLatestChat,
@@ -84,10 +85,14 @@ const AssistantView = compileClientComponent(new URL('./AssistantView.vue', impo
   '@/components/ui/DialogTitle.vue': moduleDefault(PassthroughStub),
   '@/components/assistant/AssistantHistory.vue': moduleDefault(HistoryStub),
   '@/components/assistant/AssistantSettings.vue': moduleDefault(SettingsStub),
+  '@/components/ui/DocsLink.vue': moduleDefault(PassthroughStub),
   '@/components/assistant/ChatComposer.vue': moduleDefault(ComposerStub),
   '@/components/assistant/MessageList.vue': moduleDefault(MessageListStub),
   '@/composables/useAssistantChat': { useAssistantChat: () => chat },
   '@/composables/useAssistantEditor': { useAssistantEditor: () => ({ bridge: ref(null) }) },
+  '@/composables/useAssistantObject': { provideLeaveHandler: vi.fn() },
+  '@/composables/assistantState': { assistantPageOpen: ref(false) },
+  '@/components/assistant/AssistantFileDialog.vue': moduleDefault(PassthroughStub),
   '@/composables/useAruna': { useAruna: () => ({ currentUser: ref({ id: 'u-1' }) }) },
   '@/composables/aruna/state': {
     readStored: (key: string) => stored.get(key) ?? '',
@@ -122,7 +127,8 @@ describe('AssistantView', () => {
     // The page owns the viewport height; only the message list may scroll.
     const { root } = await mountApp(AssistantView)
 
-    expect(String(root.children[0].props.class)).toContain('h-full')
+    expect(String(root.children[0].props.class)).toContain('100dvh')
+    expect(String(element(root, (node) => node.tag === 'header').props.class)).toContain('sticky')
     expect(has(root, 'data-history')).toBe(false)
     expect(has(root, 'data-composer')).toBe(true)
     expect(has(root, 'data-empty')).toBe(false)
@@ -141,7 +147,7 @@ describe('AssistantView', () => {
   })
 
   it('shows the conversation once a turn exists', async () => {
-    chat.messages.value = [{ id: 'm-1', role: 'user', text: 'hi', calls: [] }]
+    chat.messages.value = [{ id: 'm-1', role: 'user', text: 'hi', calls: [], at: Date.now() }]
     const { root } = await mountApp(AssistantView)
 
     expect(has(root, 'data-messages')).toBe(true)

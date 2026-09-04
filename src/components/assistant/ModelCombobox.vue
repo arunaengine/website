@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // A model id field: free text, with every id the provider is known to offer
-// listed underneath. Any non-empty id is a valid choice.
-import { computed, ref } from 'vue'
+// listed on request. Typing only fills a draft; the id reaches the parent when
+// it is picked, entered, or the field is left with a changed valid id.
+import { computed, ref, watch } from 'vue'
 import { PopoverAnchor, PopoverContent, PopoverPortal, PopoverRoot } from 'radix-vue'
 import Input from '@/components/ui/Input.vue'
 import type { AssistantModel } from '@/lib/api'
@@ -17,13 +18,23 @@ const props = defineProps<{
   /** An empty id is reported as invalid; leave unset where no model is fine. */
   required?: boolean
 }>()
-const emit = defineEmits<{ (e: 'update:modelValue', value: string): void }>()
+const emit = defineEmits<{
+  (e: 'update:modelValue', value: string): void
+  /** The text in the field, so the parent can offer to save it. */
+  (e: 'update:draft', value: string): void
+}>()
 
 const open = ref(false)
 const active = ref(-1)
 // Only text typed since the field was opened narrows the list; the selected id
 // sitting in the field is not a search, or it would hide every other model.
 const query = ref<string | null>(null)
+const draft = ref(props.modelValue)
+
+watch(() => props.modelValue, (value) => {
+  draft.value = value
+})
+watch(draft, (value) => emit('update:draft', value))
 
 const shown = computed(() => {
   const needle = (query.value ?? '').trim().toLowerCase()
@@ -32,7 +43,9 @@ const shown = computed(() => {
     `${model.id} ${model.display_name ?? ''}`.toLowerCase().includes(needle))
 })
 const listOpen = computed(() => open.value && shown.value.length > 0)
-const invalid = computed(() => props.required && !isValidModelId(props.modelValue))
+const invalid = computed(() => props.required && !isValidModelId(draft.value))
+const changed = computed(() =>
+  isValidModelId(draft.value) && normalizeModelId(draft.value) !== normalizeModelId(props.modelValue))
 
 function close() {
   open.value = false
@@ -40,22 +53,42 @@ function close() {
   query.value = null
 }
 
+function apply(value: string) {
+  const id = normalizeModelId(value)
+  draft.value = id
+  if (id && id !== normalizeModelId(props.modelValue)) emit('update:modelValue', id)
+}
+
 function choose(index: number) {
   const model = shown.value[index]
   if (!model) return
-  emit('update:modelValue', model.id)
+  apply(model.id)
   close()
 }
 
 function onInput(value: string | number) {
   const text = String(value)
-  emit('update:modelValue', text)
+  draft.value = text
   query.value = text
   open.value = true
   active.value = -1
 }
 
 function onKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    draft.value = props.modelValue
+    close()
+    return
+  }
+  if (event.key === 'Enter') {
+    event.preventDefault()
+    if (open.value && active.value >= 0) choose(active.value)
+    else {
+      apply(draft.value)
+      close()
+    }
+    return
+  }
   if (!shown.value.length) return
   if (event.key === 'ArrowDown') {
     event.preventDefault()
@@ -65,22 +98,18 @@ function onKeydown(event: KeyboardEvent) {
     event.preventDefault()
     open.value = true
     active.value = (active.value - 1 + shown.value.length) % shown.value.length
-  } else if (event.key === 'Enter' && open.value && active.value >= 0) {
-    event.preventDefault()
-    choose(active.value)
-  } else if (event.key === 'Escape') {
-    close()
   }
 }
 
+// The list stays closed until it is asked for: a click, a key, or typing.
 function onFocus() {
-  open.value = true
   query.value = null
 }
 
 function onBlur() {
   close()
-  emit('update:modelValue', normalizeModelId(props.modelValue))
+  if (changed.value) apply(draft.value)
+  else draft.value = normalizeModelId(props.modelValue)
 }
 </script>
 
@@ -89,7 +118,7 @@ function onBlur() {
     <PopoverRoot :open="listOpen">
       <PopoverAnchor as="div" class="h-full">
         <Input
-          :model-value="modelValue"
+          :model-value="draft"
           :placeholder="placeholder ?? 'Model id'"
           :aria-label="ariaLabel ?? 'Model'"
           :invalid="invalid ? 'error' : undefined"
@@ -101,6 +130,7 @@ function onBlur() {
           spellcheck="false"
           @update:model-value="onInput"
           @focus="onFocus"
+          @click="open = true"
           @blur="onBlur"
           @keydown="onKeydown"
         />

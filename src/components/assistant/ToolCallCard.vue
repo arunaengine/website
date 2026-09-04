@@ -6,7 +6,7 @@ import { computed, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import type { ToolCallView } from '@/lib/assistant/types'
-import { ChevronRight, Wrench } from '@lucide/vue'
+import { Check, ChevronRight, Wrench, X } from '@lucide/vue'
 
 const props = defineProps<{ call: ToolCallView; awaitingDelete?: boolean; collapsed?: boolean }>()
 const emit = defineEmits<{ (e: 'decide', approved: boolean): void }>()
@@ -59,8 +59,12 @@ const hasBody = computed(() =>
         <span class="text-muted-foreground">
           {{ awaitingDelete ? 'Remove this entity from the draft?' : 'Run this tool?' }}
         </span>
-        <Button size="sm" @click="emit('decide', true)">Approve</Button>
-        <Button variant="ghost" size="sm" @click="emit('decide', false)">Abort</Button>
+        <Button size="sm" @click="emit('decide', true)">
+          <Check class="size-3.5 shrink-0" aria-hidden="true" /> Approve
+        </Button>
+        <Button variant="ghost" size="sm" @click="emit('decide', false)">
+          <X class="size-3.5 shrink-0" aria-hidden="true" /> Abort
+        </Button>
       </div>
       <p v-else-if="call.state === 'denied'" class="text-muted-foreground">Aborted, nothing ran.</p>
       <p v-else-if="call.error" class="break-words text-destructive">{{ call.error }}</p>

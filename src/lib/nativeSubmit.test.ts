@@ -263,4 +263,18 @@ describe('task to execution request', () => {
     ])
     expect(droppedNativeFields(task())).toEqual([])
   })
+
+  it('carries the run name and description the form collected', () => {
+    const request = mapped(form({ task: task({ name: ' Nightly counts ', description: ' Counts reads. ' }) }))
+
+    expect(request.name).toBe('Nightly counts')
+    expect(request.description).toBe('Counts reads.')
+  })
+
+  it('sends no name or description when the form has none', () => {
+    const request = mapped(form({ task: task({ name: '   ' }) }))
+
+    expect(request.name).toBeUndefined()
+    expect(request.description).toBeUndefined()
+  })
 })

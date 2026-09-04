@@ -98,12 +98,17 @@ function isModelMessage(value: unknown): value is ModelMessage {
   return record(value) && typeof value.role === 'string' && MODEL_ROLES.has(value.role) && 'content' in value
 }
 
-// A blob URL dies with the tab, so a restored artifact card would draw nothing:
-// the call keeps its record in the drawer instead.
-function staleArtifact(view: Record<string, unknown>): boolean {
-  if (view.kind !== 'artifact') return false
-  const url = (view.artifact as { url?: unknown } | undefined)?.url
-  return typeof url !== 'string' || url.startsWith('blob:')
+// A blob URL dies with the tab. A card that carries its text still draws from
+// that text, with the dead URL dropped; anything else keeps only its record.
+function restoredView(view: Record<string, unknown>): ToolCallView['view'] | null {
+  if (view.kind !== 'artifact') return view as ToolCallView['view']
+  const artifact = record(view.artifact) ? view.artifact : null
+  const url = artifact?.url
+  if (typeof url === 'string' && !url.startsWith('blob:')) return view as ToolCallView['view']
+  if (!artifact || typeof artifact.text !== 'string' || !artifact.text) return null
+  // Only the head of the text is worth a storage slot; the card holds the rest.
+  const text = artifact.text.slice(0, MAX_TEXT_LENGTH)
+  return { ...view, artifact: { ...artifact, url: '', text } } as ToolCallView['view']
 }
 
 function normalizeCall(value: unknown): ToolCallView | null {
@@ -114,13 +119,15 @@ function normalizeCall(value: unknown): ToolCallView | null {
   const call: ToolCallView = { id, name, input: value.input, state: value.state as ToolCallView['state'] }
   if ('output' in value) call.output = value.output
   if (typeof value.error === 'string') call.error = value.error.slice(0, MAX_TEXT_LENGTH)
-  if (record(value.view) && typeof value.view.kind === 'string' && !staleArtifact(value.view)) {
-    call.view = value.view as ToolCallView['view']
+  if (record(value.view) && typeof value.view.kind === 'string') {
+    const view = restoredView(value.view)
+    if (view) call.view = view
   }
   return call
 }
 
-function normalizeMessage(value: unknown): ChatMessage | null {
+// `fallback` dates a message stored before messages carried their own time.
+function normalizeMessage(value: unknown, fallback: number): ChatMessage | null {
   if (!record(value) || (value.role !== 'user' && value.role !== 'assistant')) return null
   const id = boundedString(value.id, '', 200)
   if (!id) return null
@@ -132,7 +139,9 @@ function normalizeMessage(value: unknown): ChatMessage | null {
     role: value.role,
     text: typeof value.text === 'string' ? value.text.slice(0, MAX_TEXT_LENGTH) : '',
     calls,
+    at: numberValue(value.at, fallback),
   }
+  if (value.background === true) message.background = true
   if (typeof value.error === 'string') message.error = value.error.slice(0, MAX_TEXT_LENGTH)
   return message
 }
@@ -148,8 +157,12 @@ function normalizeChat(value: unknown, now = Date.now()): AssistantChatRecord | 
   if (!record(value)) return null
   const id = boundedString(value.id, '', 200)
   if (!id) return null
+  const createdAt = numberValue(value.createdAt, now)
   const messages = Array.isArray(value.messages)
-    ? value.messages.slice(-MAX_ASSISTANT_MESSAGES).map(normalizeMessage).filter((message): message is ChatMessage => Boolean(message))
+    ? value.messages
+      .slice(-MAX_ASSISTANT_MESSAGES)
+      .map((message) => normalizeMessage(message, createdAt))
+      .filter((message): message is ChatMessage => Boolean(message))
     : []
   const history = Array.isArray(value.history)
     ? trimHistory(value.history.slice(-MAX_ASSISTANT_HISTORY_MESSAGES * 2).filter(isModelMessage))
@@ -157,7 +170,7 @@ function normalizeChat(value: unknown, now = Date.now()): AssistantChatRecord | 
   return {
     id,
     title: boundedString(value.title, 'New chat', MAX_TITLE_LENGTH),
-    createdAt: numberValue(value.createdAt, now),
+    createdAt,
     updatedAt: numberValue(value.updatedAt, now),
     messages,
     history,

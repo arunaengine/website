@@ -5,6 +5,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
+import AssistantFileDialog from '@/components/assistant/AssistantFileDialog.vue'
 import ChatComposer from '@/components/assistant/ChatComposer.vue'
 import MessageList from '@/components/assistant/MessageList.vue'
 import { useAssistantChat } from '@/composables/useAssistantChat'
@@ -34,13 +35,17 @@ function openFullView() {
 </script>
 
 <template>
+  <!-- Above the modal layer, and clickable again while a modal has switched
+       body pointer events off; the marker keeps a click here from dismissing
+       the dialog underneath. -->
   <div
     v-if="open"
-    class="fixed inset-x-2 bottom-20 z-50 flex h-[min(32rem,calc(100dvh-9.5rem))] flex-col overflow-hidden rounded-lg border border-border bg-card shadow-lg md:inset-x-auto md:bottom-6 md:right-6 md:h-[min(32rem,calc(100dvh-6rem))] md:w-96"
+    data-assistant-layer
+    class="pointer-events-auto fixed inset-x-2 bottom-20 z-[var(--z-assistant)] flex h-[min(32rem,calc(100dvh-9.5rem))] flex-col overflow-hidden rounded-lg border border-border bg-card shadow-lg md:inset-x-auto md:bottom-6 md:right-6 md:h-[min(32rem,calc(100dvh-6rem))] md:w-96"
     role="dialog"
     aria-label="Aruna assistant"
   >
-    <header class="border-b border-border bg-muted/40 px-3 py-2">
+    <header class="shrink-0 border-b border-border bg-muted/40 px-3 py-2">
       <div class="flex items-center gap-2">
         <MessageSquare class="h-4 w-4 shrink-0 text-primary" />
         <span class="text-xs font-semibold text-foreground">Assistant</span>
@@ -65,8 +70,10 @@ function openFullView() {
       @decide="(approved) => pending?.decide(approved)"
     />
 
-    <div class="border-t border-border px-2 py-2">
+    <div class="border-t border-border px-3 py-2">
       <ChatComposer />
     </div>
+
+    <AssistantFileDialog raised />
   </div>
 </template>

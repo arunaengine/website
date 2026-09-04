@@ -143,12 +143,50 @@ describe('systemPrompt', () => {
     expect(prompt).toContain('A script has no network unless dependencies are declared')
   })
 
+  it('tells the model to answer job questions with the job card', () => {
+    const prompt = systemPrompt({ route: '/app/assistant' })
+
+    expect(prompt).toContain(
+      'Answer every job submission and every job status with show_job, passing the job id and the fields '
+      + 'get_job returned; never write a job state out as text or JSON.',
+    )
+    expect(prompt).toContain('a job with show_job')
+    expect(prompt).toContain('A card carries the facts, so keep the words beside it short.')
+  })
+
+  it('names the tree, timeline, code and diff cards', () => {
+    const prompt = systemPrompt({ route: '/app/assistant' })
+
+    expect(prompt).toContain('Show a bucket or folder listing with show_tree')
+    expect(prompt).toContain('show_timeline')
+    expect(prompt).toContain('show_code')
+    expect(prompt).toContain('show_diff')
+  })
+
+  it('tells the model to keep quotas and sizes round', () => {
+    const prompt = systemPrompt({ route: '/app/assistant' })
+
+    expect(prompt).toContain(
+      'Set a quota or a resource limit to a round whole number in the unit a person uses (2 GiB, 8 GiB, 500 GB) '
+      + 'and convert that to its exact byte value; never set an odd derived byte count.',
+    )
+    expect(prompt).toContain(
+      'Report a quota or a size as a rounded value with at most one decimal place and a unit, '
+      + 'never a long decimal expansion.',
+    )
+  })
+
   it('tells the model to show what a job produced', () => {
     const prompt = systemPrompt({ route: '/app/assistant' })
 
     expect(prompt).toContain('After a job succeeds, call list_job_outputs and show what it produced.')
     expect(prompt).toContain('Show an image, a PDF or any other file with show_artifact')
     expect(prompt).toContain('never paste file bytes into an answer')
+    expect(prompt).toContain(
+      'Name a stored result by its bucket and key, as bucket/results/report.json or '
+      + 's3://bucket/results/report.json, so the portal can link it; a file name on its own only links once the '
+      + 'bucket is clear from the message.',
+    )
   })
 
   it('states the realm totals when they are known', () => {

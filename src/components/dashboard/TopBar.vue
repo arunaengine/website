@@ -20,7 +20,7 @@ import { useTheme } from '@/composables/useTheme'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
-import { assistantAvailable } from '@/composables/assistantState'
+import { assistantAvailable, assistantUnread } from '@/composables/assistantState'
 import { statusTone } from '@/components/nodes/node-display'
 
 // 'desktop' is the Aruna Desktop chrome: no realm switcher and no dataset
@@ -104,12 +104,16 @@ async function handleSignOut() {
         data-tour="top-assistant"
         variant="ghost"
         size="icon"
-        class="shrink-0"
-        aria-label="Open the assistant"
+        class="relative shrink-0"
+        :aria-label="assistantUnread ? `Open the assistant, ${assistantUnread} background ${assistantUnread === 1 ? 'update' : 'updates'}` : 'Open the assistant'"
         title="Assistant"
         @click="openAssistant"
       >
         <MessageSquare class="h-4 w-4" />
+        <span
+          v-if="assistantUnread"
+          class="absolute right-1.5 top-1.5 size-2 rounded-full bg-primary ring-2 ring-background"
+        />
       </Button>
 
       <Button

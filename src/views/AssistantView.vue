@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // The assistant on a page of its own: a chat list that folds away beside one
 // full-height chat column whose message list is the only scroller on the page.
-import { computed, onMounted, onScopeDispose, ref } from 'vue'
+import { computed, onMounted, onScopeDispose, onUnmounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
@@ -9,15 +9,19 @@ import Input from '@/components/ui/Input.vue'
 import Sheet from '@/components/ui/Sheet.vue'
 import SheetContent from '@/components/ui/SheetContent.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
+import AssistantFileDialog from '@/components/assistant/AssistantFileDialog.vue'
 import AssistantHistory from '@/components/assistant/AssistantHistory.vue'
 import AssistantSettings from '@/components/assistant/AssistantSettings.vue'
 import ChatComposer from '@/components/assistant/ChatComposer.vue'
+import DocsLink from '@/components/ui/DocsLink.vue'
 import MessageList from '@/components/assistant/MessageList.vue'
-import { useAssistantChat } from '@/composables/useAssistantChat'
+import { ensureKnownBuckets, useAssistantChat } from '@/composables/useAssistantChat'
 import { useAssistantEditor } from '@/composables/useAssistantEditor'
 import { useAruna } from '@/composables/useAruna'
+import { assistantPageOpen } from '@/composables/assistantState'
+import { provideLeaveHandler } from '@/composables/useAssistantObject'
 import { readStored, storeValue } from '@/composables/aruna/state'
-import { MessageSquare, Minimize2, PanelLeft, Plus, Sparkles } from '@lucide/vue'
+import { MessageSquare, Minimize2, PanelLeft, Pencil, Plus, Settings, Sparkles } from '@lucide/vue'
 
 const SIDEBAR_KEY = 'aruna.assistant.sidebar'
 
@@ -37,7 +41,7 @@ const {
   model,
   loadModels,
   hidePanel,
-  openPanel,
+  showPanel,
   newChat,
   renameChat,
   selectLatestChat,
@@ -78,7 +82,12 @@ const prompts = computed(() => [
 onMounted(() => {
   selectLatestChat()
   hidePanel()
+  assistantPageOpen.value = true
   if (currentUser.value) ensureProviders()
+  ensureKnownBuckets()
+})
+onUnmounted(() => {
+  assistantPageOpen.value = false
 })
 
 function toggleSidebar() {
@@ -110,16 +119,19 @@ function useSuggestion(prompt: string) {
   draft.value = prompt
 }
 
+// A link that really navigates leaves this page, so the chat comes along.
+provideLeaveHandler(() => showPanel())
+
 // Back to wherever the chat was opened from, with the panel showing it.
 function continueInPanel() {
-  openPanel()
+  showPanel()
   if (window.history.length > 1) router.back()
   else void router.push({ name: 'dashboard' })
 }
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 overflow-hidden">
+  <div class="flex h-[calc(100dvh-8.5rem)] min-h-0 overflow-hidden md:h-[calc(100dvh-3.5rem)]">
     <aside
       v-if="railOpen"
       aria-label="Chat list"
@@ -174,7 +186,7 @@ function continueInPanel() {
     </Sheet>
 
     <div class="flex min-w-0 flex-1 flex-col">
-      <header class="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3">
+      <header class="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b border-border bg-background px-3">
         <Button
           v-if="!railOpen"
           variant="ghost"
@@ -213,10 +225,13 @@ function continueInPanel() {
           <button
             v-else
             type="button"
-            class="min-w-0 truncate rounded px-1 text-sm font-medium text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            class="flex min-w-0 items-center gap-1.5 rounded px-1 text-sm font-medium text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             :title="`Rename ${chatName}`"
             @click="beginRename"
-          >{{ chatName }}</button>
+          >
+            <Pencil class="size-3.5 shrink-0" aria-hidden="true" />
+            <span class="truncate">{{ chatName }}</span>
+          </button>
         </div>
         <AssistantSettings side="bottom" align="end">
           <button
@@ -248,7 +263,9 @@ function continueInPanel() {
         >
           <template #icon><MessageSquare class="h-6 w-6" /></template>
           <Button variant="outline" size="sm" as-child>
-            <RouterLink :to="{ name: 'settings', query: { tab: 'assistant' } }">Open the assistant settings</RouterLink>
+            <RouterLink :to="{ name: 'settings', query: { tab: 'assistant' } }">
+              <Settings class="size-3.5 shrink-0" aria-hidden="true" /> Open the assistant settings
+            </RouterLink>
           </Button>
         </EmptyState>
       </div>
@@ -276,18 +293,28 @@ function continueInPanel() {
               v-for="prompt in prompts"
               :key="prompt"
               type="button"
-              class="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-sm hover:border-primary/40 hover:text-foreground"
+              class="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-sm hover:border-primary/40 hover:text-foreground"
               @click="useSuggestion(prompt)"
-            >{{ prompt }}</button>
+            >
+              <Sparkles class="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+              {{ prompt }}
+            </button>
           </div>
+          <DocsLink
+            topic="assistant"
+            section="What the assistant can show you"
+            label="What the assistant can do"
+          />
         </div>
 
         <div class="shrink-0 pb-4 pt-2">
-          <div class="mx-auto w-full max-w-[52rem] px-2 sm:px-4">
+          <div class="chat-column">
             <ChatComposer size="full" />
           </div>
         </div>
       </template>
     </div>
+
+    <AssistantFileDialog />
   </div>
 </template>

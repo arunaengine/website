@@ -114,6 +114,93 @@ describe('show_crate', () => {
   })
 })
 
+describe('show_job', () => {
+  it('keeps the job card and answers without repeating the status', async () => {
+    const { tools, kept } = harness()
+    const output = await runTool(tools.show_job, {
+      job_id: 'job-1',
+      state: 'succeeded',
+      title: 'gc analysis',
+      kind: 'execution',
+      submitted_at: '2026-09-04T10:00:00Z',
+      finished_at: '2026-09-04T10:02:00Z',
+      node_id: 'node-2',
+      attempts: 1,
+      outputs: [{ bucket: 'lorem', key: 'results/gc.json', size: 82 }, { bucket: 'lorem', key: '' }],
+    }, 'call-3')
+
+    expect(output).toEqual({ shown: true, state: 'succeeded', outputs: 1 })
+    expect(kept[0]).toEqual(['call-3', {
+      kind: 'job',
+      title: 'gc analysis',
+      jobId: 'job-1',
+      state: 'succeeded',
+      jobKind: 'execution',
+      submittedAt: '2026-09-04T10:00:00Z',
+      finishedAt: '2026-09-04T10:02:00Z',
+      nodeId: 'node-2',
+      attempts: 1,
+      outputs: [{ bucket: 'lorem', key: 'results/gc.json', size: 82 }],
+    }])
+  })
+
+  it('names a job that came without a title and keeps its failure', async () => {
+    const { tools, kept } = harness()
+    await runTool(tools.show_job, { job_id: 'job-9', state: 'failed', error: 'exit code 1' })
+
+    expect(kept[0][1]).toEqual({
+      kind: 'job',
+      title: 'Job job-9',
+      jobId: 'job-9',
+      state: 'failed',
+      error: 'exit code 1',
+      outputs: [],
+    })
+  })
+
+  it('refuses a job card without a state', async () => {
+    const { tools, kept } = harness()
+    expect(await runTool(tools.show_job, { job_id: 'job-1', state: ' ' })).toMatchObject({
+      error: expect.stringContaining('get_job'),
+    })
+    expect(kept).toEqual([])
+  })
+})
+
+describe('show_object', () => {
+  it('keeps the object card with only the facts it was given', async () => {
+    const { tools, kept } = harness()
+    const output = await runTool(tools.show_object, {
+      bucket: 'test',
+      key: 'notes/hello.txt',
+      caption: 'Created',
+      size: 24,
+      content_type: 'text/plain; charset=utf-8',
+      version_id: '01M1NXGE23RMY4RFBRBYTQDWDS',
+      last_modified: ' ',
+    }, 'call-3')
+
+    expect(output).toEqual({ shown: true })
+    expect(kept).toEqual([['call-3', {
+      kind: 'object',
+      bucket: 'test',
+      key: 'notes/hello.txt',
+      caption: 'Created',
+      contentType: 'text/plain; charset=utf-8',
+      versionId: '01M1NXGE23RMY4RFBRBYTQDWDS',
+      size: 24,
+    }]])
+  })
+
+  it('refuses an object card without a key', async () => {
+    const { tools, kept } = harness()
+    expect(await runTool(tools.show_object, { bucket: 'test', key: ' ' })).toMatchObject({
+      error: expect.any(String),
+    })
+    expect(kept).toEqual([])
+  })
+})
+
 describe('show_artifact', () => {
   it('shows a png as an image card and answers without its bytes', async () => {
     const { tools, kept, host } = harness(null, {
@@ -221,5 +308,157 @@ describe('show_artifact', () => {
       loadArtifact: async () => { throw new Error('no S3 session') },
     })
     expect(await runTool(failing.show_artifact, { bucket: 'work', key: 'a.png' })).toEqual({ error: 'no S3 session' })
+  })
+})
+
+describe('show_tree', () => {
+  it('keeps the entries and the bucket the files link through', async () => {
+    const { tools, kept } = harness()
+    const output = await runTool(tools.show_tree, {
+      title: 'Raw reads',
+      bucket: 'lorem',
+      entries: [
+        { path: 'reads/', kind: 'folder' },
+        { path: '/reads/a.fastq', kind: 'file', size: 900 },
+        { path: '  ', kind: 'file' },
+      ],
+    }, 'call-9')
+
+    expect(output).toEqual({ shown: true, entries: 2, truncated: false })
+    expect(kept).toEqual([['call-9', {
+      kind: 'tree',
+      title: 'Raw reads',
+      bucket: 'lorem',
+      entries: [{ path: 'reads', kind: 'folder' }, { path: 'reads/a.fastq', kind: 'file', size: 900 }],
+    }]])
+  })
+
+  it('caps a huge listing and says how much it left out', async () => {
+    const { tools, kept } = harness()
+    const entries = Array.from({ length: 620 }, (_, index) => ({ path: `p/${index}.txt`, kind: 'file' }))
+    const output = await runTool(tools.show_tree, { title: 'All', entries })
+
+    expect(output).toEqual({ shown: true, entries: 500, truncated: true })
+    expect(kept[0][1]).toMatchObject({ dropped: 120 })
+  })
+
+  it('refuses a tree without a usable path', async () => {
+    const { tools, kept } = harness()
+    expect(await runTool(tools.show_tree, { title: 'x', entries: [{ path: '/', kind: 'file' }] }))
+      .toMatchObject({ error: expect.any(String) })
+    expect(kept).toEqual([])
+  })
+})
+
+describe('show_timeline', () => {
+  it('orders events and takes a time as ISO or milliseconds', async () => {
+    const { tools, kept } = harness()
+    const output = await runTool(tools.show_timeline, {
+      title: 'Job history',
+      events: [
+        { at: '2026-09-04T10:05:00Z', label: 'Finished', state: 'succeeded' },
+        { at: 1_756_982_700_000, label: 'Started', detail: 'on node-2' },
+        { at: 'whenever', label: 'Dropped' },
+      ],
+    }, 'call-4')
+
+    expect(output).toEqual({ shown: true, events: 2, truncated: false })
+    expect(kept[0][1]).toEqual({
+      kind: 'timeline',
+      title: 'Job history',
+      events: [
+        { at: '2025-09-04T10:45:00.000Z', label: 'Started', detail: 'on node-2' },
+        { at: '2026-09-04T10:05:00.000Z', label: 'Finished', state: 'succeeded' },
+      ],
+    })
+  })
+
+  it('caps a long history', async () => {
+    const { tools, kept } = harness()
+    const events = Array.from({ length: 260 }, (_, index) => ({ at: 1_000 + index, label: `Step ${index}` }))
+    const output = await runTool(tools.show_timeline, { title: 'Sync', events })
+
+    expect(output).toEqual({ shown: true, events: 200, truncated: true })
+    expect((kept[0][1] as { events: unknown[] }).events).toHaveLength(200)
+  })
+
+  it('refuses a timeline whose events carry no usable time', async () => {
+    const { tools, kept } = harness()
+    expect(await runTool(tools.show_timeline, { title: 'x', events: [{ at: 'soon', label: 'a' }] }))
+      .toMatchObject({ error: expect.any(String) })
+    expect(kept).toEqual([])
+  })
+})
+
+describe('show_code', () => {
+  it('keeps the block and lowercases the language', async () => {
+    const { tools, kept } = harness()
+    const output = await runTool(tools.show_code, {
+      title: 'GC script',
+      language: 'Python',
+      code: 'print(1)\n',
+      caption: 'Writes gc.json',
+    }, 'call-5')
+
+    expect(output).toEqual({ shown: true, truncated: false })
+    expect(kept).toEqual([['call-5', {
+      kind: 'code',
+      title: 'GC script',
+      language: 'python',
+      code: 'print(1)\n',
+      caption: 'Writes gc.json',
+    }]])
+  })
+
+  it('cuts an oversized block and says so', async () => {
+    const { tools, kept } = harness()
+    const output = await runTool(tools.show_code, { title: 'x', language: 'text', code: 'a'.repeat(24_000) })
+
+    expect(output).toEqual({ shown: true, truncated: true })
+    expect((kept[0][1] as { code: string }).code).toHaveLength(20_000)
+  })
+
+  it('refuses an empty block', async () => {
+    const { tools, kept } = harness()
+    expect(await runTool(tools.show_code, { title: 'x', language: 'python', code: '   ' }))
+      .toMatchObject({ error: expect.any(String) })
+    expect(kept).toEqual([])
+  })
+})
+
+describe('show_diff', () => {
+  it('keeps both texts with a label for each side', async () => {
+    const { tools, kept } = harness()
+    const output = await runTool(tools.show_diff, {
+      title: 'Config change',
+      before: 'a\nb',
+      after: 'a\nc',
+      after_label: 'Version 2',
+    }, 'call-6')
+
+    expect(output).toEqual({ shown: true, changed: true })
+    expect(kept).toEqual([['call-6', {
+      kind: 'diff',
+      title: 'Config change',
+      before: 'a\nb',
+      after: 'a\nc',
+      beforeLabel: 'Before',
+      afterLabel: 'Version 2',
+    }]])
+  })
+
+  it('compares only the first lines of a long text', async () => {
+    const { tools, kept } = harness()
+    const before = Array.from({ length: 400 }, (_, index) => `line ${index}`).join('\n')
+    await runTool(tools.show_diff, { title: 'x', before, after: 'line 0' })
+
+    expect((kept[0][1] as { before: string }).before.split('\n')).toHaveLength(300)
+  })
+
+  it('refuses a comparison with nothing on either side', async () => {
+    const { tools, kept } = harness()
+    expect(await runTool(tools.show_diff, { title: 'x', before: '', after: '' }))
+      .toMatchObject({ error: expect.any(String) })
+    expect(kept).toEqual([])
   })
 })

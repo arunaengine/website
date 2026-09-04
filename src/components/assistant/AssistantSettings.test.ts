@@ -7,12 +7,13 @@ import {
   compileClientComponent,
   content,
   element,
+  flush,
   moduleDefault,
   mountApp,
   typeValue,
 } from '@/test/clientRender'
 import type { AssistantProvider } from '@/lib/api'
-import { effortLabel } from '@/lib/assistant/modelOptions'
+import { effortLabel, isValidModelId, normalizeModelId } from '@/lib/assistant/modelOptions'
 
 const selectModel = vi.fn()
 const selectProvider = vi.fn()
@@ -58,27 +59,24 @@ const SelectStub = defineComponent({
       (option) => h('button', { onClick: () => emit('update:modelValue', option.value) }, option.label),
     )),
 })
-const SwitchStub = defineComponent({
-  props: { checked: Boolean },
-  emits: ['update:checked'],
-  setup: (props, { emit }) => () =>
-    h('button', {
-      role: 'switch',
-      'aria-checked': String(props.checked),
-      onClick: () => emit('update:checked', !props.checked),
-    }),
-})
+// Typing reports a draft; a change event stands in for a pick or Enter.
 const ComboboxStub = defineComponent({
-  props: { modelValue: { type: String, default: '' }, ariaLabel: String, suggestions: { type: Array, default: () => [] } },
-  emits: ['update:modelValue'],
+  props: {
+    modelValue: { type: String, default: '' },
+    ariaLabel: String,
+    suggestions: { type: Array, default: () => [] },
+  },
+  emits: ['update:modelValue', 'update:draft'],
   setup: (props, { emit }) => () =>
     h('input', {
       'aria-label': props.ariaLabel,
       value: props.modelValue,
       'data-suggestions': (props.suggestions as Array<{ id: string }>).map((model) => model.id).join(','),
-      onInput: (event: { target: { value: unknown } }) => emit('update:modelValue', String(event.target.value ?? '')),
+      onInput: (event: { target: { value: unknown } }) => emit('update:draft', String(event.target.value ?? '')),
+      onChange: (event: { target: { value: unknown } }) => emit('update:modelValue', String(event.target.value ?? '')),
     }),
 })
+const icons = new Proxy({}, { get: () => defineComponent(() => () => h('i')) })
 const RouterLinkStub = defineComponent({
   props: { to: { type: [String, Object], default: '' } },
   setup: (props, { slots }) => () => h('a', { 'data-to': JSON.stringify(props.to) }, slots.default?.()),
@@ -90,10 +88,10 @@ const AssistantSettings = compileClientComponent(new URL('./AssistantSettings.vu
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Popover.vue': moduleDefault(PopoverStub),
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
-  '@/components/ui/Switch.vue': moduleDefault(SwitchStub),
   '@/components/assistant/ModelCombobox.vue': moduleDefault(ComboboxStub),
   '@/composables/useAssistantChat': { useAssistantChat: () => chat },
-  '@/lib/assistant/modelOptions': { effortLabel },
+  '@/lib/assistant/modelOptions': { effortLabel, isValidModelId, normalizeModelId },
+  '@lucide/vue': icons,
 })
 
 function combobox(root: Parameters<typeof content>[0]) {
@@ -118,9 +116,26 @@ describe('AssistantSettings', () => {
     expect(combobox(root).props['data-suggestions']).toBe('gpt-5.6-sol,gpt-5.5,gpt-4.1')
   })
 
-  it('sets the model the picker chose', async () => {
+  it('sets the model the picker committed', async () => {
+    // The field applies an id on an explicit act, never on a keystroke.
     const { root } = await mountApp(AssistantSettings)
     await typeValue(combobox(root), 'gpt-4.1')
+    expect(selectModel).not.toHaveBeenCalled()
+
+    ;(combobox(root).props.onChange as (event: unknown) => void)({ target: { value: 'gpt-4.1' } })
+    await flush()
+
+    expect(selectModel).toHaveBeenCalledWith('gpt-4.1')
+  })
+
+  it('saves a typed id from the footer button once it differs', async () => {
+    const { root } = await mountApp(AssistantSettings)
+    expect(button(root, 'Save').props.disabled).toBe(true)
+
+    await typeValue(combobox(root), ' gpt-4.1 ')
+    expect(button(root, 'Save').props.disabled).toBe(false)
+
+    await click(button(root, 'Save'))
 
     expect(selectModel).toHaveBeenCalledWith('gpt-4.1')
   })
@@ -140,6 +155,7 @@ describe('AssistantSettings', () => {
 
     expect(content(root)).toContain('Enter the key again in settings to list models.')
     await typeValue(combobox(root), 'gpt-5.6-luna')
+    await click(button(root, 'Save'))
     expect(selectModel).toHaveBeenCalledWith('gpt-5.6-luna')
   })
 
@@ -150,9 +166,11 @@ describe('AssistantSettings', () => {
     expect(JSON.parse(String(link.props['data-to']))).toEqual({ name: 'settings', query: { tab: 'assistant' } })
   })
 
-  it('toggles the write approval', async () => {
+  it('names both write modes and picks the automatic one', async () => {
     const { root } = await mountApp(AssistantSettings)
-    await click(element(root, (node) => node.props.role === 'switch'))
+
+    expect(content(root)).toContain('Approve every write')
+    await click(button(root, 'Run writes automatically'))
 
     expect(setApproveWrites).toHaveBeenCalledWith(false)
   })

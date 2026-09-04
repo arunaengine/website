@@ -744,7 +744,7 @@ export const docsTopics: DocsTopic[] = [
     slug: 'assistant',
     kind: 'Guide',
     title: 'Turn on the assistant',
-    summary: 'Wire your own AI provider into the portal and connect an outside MCP client to this node.',
+    summary: 'Wire your own AI provider into the portal, see what the assistant can show you, and connect an outside MCP client to this node.',
     tour: [
       {
         route: '/app/settings?tab=assistant',
@@ -807,6 +807,43 @@ export const docsTopics: DocsTopic[] = [
           alt: 'Assistant chat answering a datasets question with three MCP tool calls and a result table',
           caption: 'A turn that answered by calling the node’s own MCP tools and rendering the result.',
         },
+      },
+      {
+        title: 'What the assistant can show you',
+        icon: 'Gauge',
+        paragraphs: [
+          'Answers are drawn as cards instead of long text. The assistant picks the card that fits the question, and the card carries the facts, so the words beside it stay short. Cards belong to the chat, so they are still there when you come back to it.',
+          'show_table draws a sortable table. It is used for anything with columns, such as the objects in a [bucket](concept:data-and-deletion#buckets-hold-the-bytes) or the jobs of a group. Click a column heading to sort by it and again to reverse it, and copy the whole table as CSV from the card header. When the rows are about stored files, every file name is a link.',
+          'show_chart draws a bar, line or pie chart, and show_stats shows a row of labelled numbers. The assistant reaches for them when the answer is counts, sizes or shares, such as storage per group. Both are pictures of numbers a tool returned, so there is nothing to edit in them.',
+          'show_timeline lists dated steps in order: a job from submission to result, a version history, or the steps of a sync. Each entry keeps its exact time, so hovering one tells you when it happened.',
+          'show_code shows a script, a query or a configuration with highlighting instead of a plain block in the text, and show_diff puts two texts side by side line by line, such as two versions of one file. Both are read-only, and the text can be copied straight out of the card.',
+        ],
+      },
+      {
+        title: 'Files, jobs and datasets in an answer',
+        icon: 'Files',
+        paragraphs: [
+          'show_tree draws a bucket or folder listing as a tree: folders nest, sizes sit on the right, and every file is a link. Opening one shows the file over the conversation, so the chat stays where it is, and the file view offers "Open in the data browser" for when you do want to go there.',
+          'show_object answers a write, a copy or a lookup of one stored file. It names where the file lives, how big it is, its content type, its version and the [node](concept:glossary#node) holding it. The path is a link, and the version and node ids copy in one click.',
+          'show_artifact shows the file itself: an image, or the text of a JSON, CSV, Markdown or plain text file. The bytes are read in your browser and never sent to the model, and a file the browser cannot render becomes a download row instead.',
+          'show_job shows a submitted or polled job: its state, its attempts, when it was submitted, started and finished, and the files it wrote. The job id opens the full job page, and each output is a file link.',
+          'show_crate shows a [dataset](concept:datasets) as its RO-Crate: the root entity, the parts below it, and the [profile](concept:profiles-conformance) it declares. It is used once a dataset has been read or drafted, and it shows the same structure the dataset pages do.',
+        ],
+      },
+      {
+        title: 'What it can do on your node',
+        icon: 'Wrench',
+        paragraphs: [
+          'Besides drawing cards, the assistant acts through the tools your node serves over [MCP](concept:glossary#mcp). It reads that list with the first message of a chat, so a tool the node adds later needs no portal update. Reading happens on its own; every write asks you first, and a call you deny is not retried.',
+        ],
+        bullets: [
+          'Data: list and search buckets, prefixes and objects, read one object, and write or copy one when you allow it.',
+          'Datasets: search datasets, read one, check it against a profile, and query the realm with SPARQL.',
+          'Compute: submit a script or a job, follow its state, and list the files it wrote.',
+          'Groups: who you are, the groups you belong to, their members and their usage.',
+          'Realm: the nodes of the realm, what they serve, and how they are doing.',
+          'While the dataset editor or the run form is open, the assistant can also fill in the draft in front of you; only you save it.',
+        ],
       },
       {
         title: 'Connect an MCP client',

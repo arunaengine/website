@@ -20,6 +20,7 @@ import { useAssistantRunForm } from './useAssistantRunForm'
 import type { McpConnection } from '@/lib/assistant/mcpClient'
 import type { PromptContext } from '@/lib/assistant/prompt'
 import type { ArtifactRef, LoadedArtifact } from '@/lib/assistant/renderTools'
+import { ARTIFACT_TEXT_CAP } from '@/lib/assistant/types'
 import type { ApprovalGate, ApprovalRequest, ChatMessage, ToolCallView } from '@/lib/assistant/types'
 import { clampEffort, modelSuggestions, reasoningEffortOptions } from '@/lib/assistant/modelOptions'
 import type { StreamProviderOptions } from '@/lib/assistant/chat'
@@ -31,17 +32,35 @@ import {
   type AssistantChatScope,
   type AssistantChatState,
 } from '@/lib/assistant/chatHistory'
+import { watchPoller } from '@/lib/assistant/watchPoll'
+import {
+  createWatchRegistry,
+  createWatchStore,
+  type WatchKind,
+  type WatchRegistry,
+  type WatchResult,
+} from '@/lib/assistant/watchers'
+import { until } from '@vueuse/core'
 import { errorMessage } from '@/lib/utils'
-import { assistantAvailable as available, assistantOpen as open } from './assistantState'
+import { assistantAvailable as available, assistantOpen as open, assistantPageOpen, assistantUnread } from './assistantState'
 
 const PROVIDER_KEY = 'aruna.assistant.provider'
 const MODEL_KEY = 'aruna.assistant.model'
 const APPROVE_KEY = 'aruna.assistant.approve'
 const EFFORT_KEY = 'aruna.assistant.effort'
 const SESSION_MARGIN_MS = 60_000
+// What the chat says when the node serves no MCP endpoint.
+const NO_MCP_NOTE = 'This node serves no MCP endpoint, so only the open editor can be used.'
 // The same ceiling the object preview applies before bytes enter the tab.
 const ARTIFACT_CAP = 25 * 1024 * 1024
 const MAX_ARTIFACT_URLS = 24
+// One heartbeat drives both the watchers and the queued resumes; each watcher
+// keeps its own backoff, so this only decides how soon a due one is noticed.
+const WATCH_TICK_MS = 5_000
+// Told to the model after a background update; the transcript shows the update alone.
+const RESUME_NOTE = 'Answer this update in this chat: read the current state with the tools, show it with a '
+  + 'card, and carry on with whatever was waiting on it. If the portal stopped watching before the work '
+  + 'settled, say so and offer to check again.'
 
 // Any string level the active model advertises; validated against its list.
 export type ReasoningEffort = string
@@ -98,6 +117,8 @@ const pending = ref<PendingApproval | null>(null)
 const chats = ref<AssistantChatRecord[]>([])
 const activeChatId = ref('')
 const historyReady = ref(false)
+// Background updates that landed in a chat the user has not opened since.
+const unreadChats = ref<Record<string, number>>({})
 const providerId = ref(readStored(PROVIDER_KEY))
 const modelId = ref(readStored(MODEL_KEY))
 const approveWrites = ref(readStored(APPROVE_KEY) !== 'off')
@@ -113,12 +134,23 @@ let sessionInFlight: { epoch: number; owner: TurnContext | null; promise: Promis
 let connection: McpConnection | null = null
 let connectionToken = ''
 let connectionUrl = ''
+let watchStore: ReturnType<typeof createWatchStore> | null = null
+let watchRegistry: WatchRegistry | null = null
+let watchTimer: ReturnType<typeof setInterval> | null = null
+// Updates waiting for the turn slot; a resume never races the running turn.
+const resumeQueue: Array<{ chatId: string; text: string }> = []
+let lastContext: PromptContext | null = null
 
 interface TurnContext {
   generation: number
+  chatId: string
+  /** The model id this turn runs on, recorded on any run it submits. */
+  model: string
   userMessageId: string
   messageId: string
   controller: AbortController
+  /** Set on a watcher resume: the text to re-queue if the turn is cut short. */
+  resumeText?: string
 }
 
 interface ApprovalEntry {
@@ -178,6 +210,37 @@ function activeChat(): AssistantChatRecord | null {
   return chatState.chats.find((chat) => chat.id === activeChatId.value) ?? null
 }
 
+// A persist replaces every chat record, so a turn holds a chat id and looks the
+// record up again. The panel's refs stay the live view of the active chat, and
+// a write lands in both, so the two never drift apart.
+function chatById(id: string): AssistantChatRecord | null {
+  return chatState.chats.find((chat) => chat.id === id) ?? null
+}
+
+function isActiveChat(chatId: string): boolean {
+  return chatId === activeChatId.value
+}
+
+function messagesOf(chatId: string): ChatMessage[] {
+  return isActiveChat(chatId) ? messages.value : chatById(chatId)?.messages ?? []
+}
+
+function setMessagesOf(chatId: string, next: ChatMessage[]) {
+  const chat = chatById(chatId)
+  if (chat) chat.messages = next
+  if (isActiveChat(chatId)) messages.value = next
+}
+
+function historyOf(chatId: string): ModelMessage[] {
+  return isActiveChat(chatId) ? history : chatById(chatId)?.history ?? []
+}
+
+function setHistoryOf(chatId: string, next: ModelMessage[]) {
+  const chat = chatById(chatId)
+  if (chat) chat.history = next
+  if (isActiveChat(chatId)) history = next
+}
+
 function applyChatState(next: AssistantChatState) {
   chatState = next
   activeChatId.value = next.activeChatId
@@ -216,6 +279,18 @@ function persistCurrentChat() {
   persistChatState()
 }
 
+function persistChat(chatId: string) {
+  if (!chatStore || !chatScopeKey) return
+  if (isActiveChat(chatId)) {
+    persistCurrentChat()
+    return
+  }
+  const chat = chatById(chatId)
+  if (!chat) return
+  chat.updatedAt = Date.now()
+  persistChatState()
+}
+
 function chatTitle(prompt: string): string {
   const compact = prompt.replace(/\s+/g, ' ').trim()
   return compact.slice(0, 80) || 'New chat'
@@ -242,12 +317,17 @@ function isCurrentTurn(turn: TurnContext): boolean {
   return activeTurn === turn && turn.generation === turnGeneration && !turn.controller.signal.aborted
 }
 
+/** True while the turn's own chat is the one on screen; panel state follows it. */
+function isShownTurn(turn: TurnContext): boolean {
+  return isCurrentTurn(turn) && isActiveChat(turn.chatId)
+}
+
 function abortError(): DOMException {
   return new DOMException('The assistant session changed.', 'AbortError')
 }
 
-function patchCall(messageId: string, id: string, patch: Partial<ToolCallView>) {
-  const message = messages.value.find((entry) => entry.id === messageId)
+function patchCall(chatId: string, messageId: string, id: string, patch: Partial<ToolCallView>) {
+  const message = messagesOf(chatId).find((entry) => entry.id === messageId)
   if (!message) return
   message.calls = message.calls.map((call) => (call.id === id ? { ...call, ...patch } : call))
 }
@@ -259,7 +339,7 @@ function settleApproval(entry: ApprovalEntry, approved: boolean) {
     activeApproval = null
     pending.value = null
   }
-  patchCall(entry.turn.messageId, entry.request.id, { state: approved ? 'running' : 'denied' })
+  patchCall(entry.turn.chatId, entry.turn.messageId, entry.request.id, { state: approved ? 'running' : 'denied' })
   entry.resolve(approved)
 }
 
@@ -276,7 +356,7 @@ function pumpApprovals() {
     return
   }
   activeApproval = entry
-  patchCall(entry.turn.messageId, entry.request.id, { state: 'approval' })
+  patchCall(entry.turn.chatId, entry.turn.messageId, entry.request.id, { state: 'approval' })
   pending.value = {
     request: entry.request,
     always: entry.always,
@@ -301,7 +381,8 @@ function approvalGate(turn: TurnContext): ApprovalGate {
     enabled: () => approveWrites.value,
     ask: (request, always) => new Promise<boolean>((resolve) => {
       const entry: ApprovalEntry = { request, always, turn, resolve, settled: false }
-      if (!isCurrentTurn(turn)) {
+      // Nobody is there to answer a watcher's turn, so it never asks.
+      if (!isCurrentTurn(turn) || turn.resumeText !== undefined) {
         settleApproval(entry, false)
         return
       }
@@ -352,7 +433,7 @@ async function closeConnection(): Promise<void> {
 async function nodeToolSet(turn: TurnContext, gate: ApprovalGate): Promise<ToolSet> {
   const url = realmInfo.value?.interfaces.mcp?.url
   if (!url) {
-    if (isCurrentTurn(turn)) toolsNote.value = 'This node serves no MCP endpoint, so only the open editor can be used.'
+    if (isShownTurn(turn)) toolsNote.value = NO_MCP_NOTE
     if (isCurrentTurn(turn)) await closeConnection()
     return {}
   }
@@ -375,11 +456,13 @@ async function nodeToolSet(turn: TurnContext, gate: ApprovalGate): Promise<ToolS
     connectionUrl = url
   }
   const { nodeTools } = await import('@/lib/assistant/tools')
+  const { withRunProvenance } = await import('@/lib/assistant/runProvenance')
   const source = connection
   if (!source) throw abortError()
   const descriptors = await source.listTools()
   if (!isCurrentTurn(turn)) throw abortError()
-  return nodeTools(descriptors, source, gate)
+  const tagged = withRunProvenance(source, { model: turn.model, chatId: turn.chatId })
+  return nodeTools(descriptors, tagged, gate)
 }
 
 /** The node serving the bucket: the given id, else the endpoint the output names. */
@@ -393,6 +476,7 @@ function artifactNode(
 }
 
 const INLINE_KINDS = new Set(['image', 'text', 'markdown', 'table'])
+const TEXT_KINDS = new Set(['text', 'markdown', 'table'])
 
 /**
  * Fetches one stored object for an artifact card: a blob URL for bytes small
@@ -400,7 +484,7 @@ const INLINE_KINDS = new Set(['image', 'text', 'markdown', 'table'])
  * stay in the browser; only the content type and kind go back to the model.
  */
 export async function loadArtifact(ref: ArtifactRef): Promise<LoadedArtifact> {
-  const [{ useS3 }, { classifyObject }] = await Promise.all([
+  const [{ useS3 }, { classifyObject, prettyJson }] = await Promise.all([
     import('./useS3'),
     import('./useObjectPreview'),
   ])
@@ -429,7 +513,21 @@ export async function loadArtifact(ref: ArtifactRef): Promise<LoadedArtifact> {
   }
   const url = URL.createObjectURL(blob)
   trackArtifact(url)
-  return { url, contentType: ref.contentType || blob.type || contentType, kind: classified.kind, name, size: blob.size }
+  // The card reads the text from here: a blob URL cannot be fetched back under
+  // the node's connect-src policy, and the bytes are already in the tab. JSON is
+  // formatted first and capped after, the way the file dialog shows it.
+  const raw = TEXT_KINDS.has(classified.kind) ? await blob.text() : undefined
+  const body = raw === undefined
+    ? undefined
+    : (classified.language === 'json' ? prettyJson(raw) : raw).slice(0, ARTIFACT_TEXT_CAP)
+  return {
+    url,
+    contentType: ref.contentType || blob.type || contentType,
+    kind: classified.kind,
+    name,
+    size: blob.size,
+    text: body,
+  }
 }
 
 // The cards a render tool asks for stay on the call; the model only hears "shown".
@@ -437,7 +535,7 @@ async function renderToolSet(turn: TurnContext): Promise<ToolSet> {
   const { renderTools } = await import('@/lib/assistant/renderTools')
   return renderTools({
     keep: (id, view) => {
-      if (isCurrentTurn(turn)) patchCall(turn.messageId, id, { view })
+      if (isCurrentTurn(turn)) patchCall(turn.chatId, turn.messageId, id, { view })
     },
     loadCrate: loadRoCrate,
     loadArtifact,
@@ -449,22 +547,22 @@ async function toolSet(turn: TurnContext): Promise<ToolSet> {
   const { bridge: runForm } = useAssistantRunForm()
   const { editorTools } = await import('@/lib/assistant/editorTools')
   const { runFormTools } = await import('@/lib/assistant/runFormTools')
+  const { watchTools } = await import('@/lib/assistant/watchTools')
   const { mergeTools } = await import('@/lib/assistant/tools')
   const gate = approvalGate(turn)
   const local = mergeTools(
     await renderToolSet(turn),
+    watchTools({ watch: (input) => addWatch(turn.chatId, input) }),
     bridge.value ? editorTools(bridge.value, gate) : {},
     runForm.value ? runFormTools(runForm.value, gate) : {},
   )
   try {
     const remote = await nodeToolSet(turn, gate)
-    if (isCurrentTurn(turn) && realmInfo.value?.interfaces.mcp?.url) toolsNote.value = null
+    if (isShownTurn(turn) && realmInfo.value?.interfaces.mcp?.url) toolsNote.value = null
     return mergeTools(remote, local)
   } catch (cause) {
-    if (isCurrentTurn(turn)) {
-      toolsNote.value = `The node tools are unavailable: ${errorMessage(cause)}`
-      await closeConnection()
-    }
+    if (isShownTurn(turn)) toolsNote.value = `The node tools are unavailable: ${errorMessage(cause)}`
+    if (isCurrentTurn(turn)) await closeConnection()
     return local
   }
 }
@@ -477,13 +575,248 @@ function abortTurn(): TurnContext | null {
   if (turn && sessionInFlight?.owner === turn) sessionInFlight = null
   drainApprovals()
   if (turn) busy.value = false
+  // A watcher's update outlives the turn that was answering it.
+  if (turn?.resumeText !== undefined) {
+    resumeQueue.unshift({ chatId: turn.chatId, text: turn.resumeText })
+    armWatchTimer()
+  }
   return turn
+}
+
+/** Aborts the turn on screen; a watcher's turn keeps running in its own chat. */
+function abortShownTurn() {
+  if (activeTurn && activeTurn.resumeText === undefined) discardTurn(abortTurn())
 }
 
 function discardTurn(turn: TurnContext | null) {
   if (!turn) return
-  messages.value = messages.value.filter((message) =>
-    message.id !== turn.userMessageId && message.id !== turn.messageId)
+  setMessagesOf(turn.chatId, messagesOf(turn.chatId).filter((message) =>
+    message.id !== turn.userMessageId && message.id !== turn.messageId))
+}
+
+// ── Background watchers ────────────────────────────────────────────────────
+
+function saveWatchState() {
+  watchStore?.save({ watches: watchRegistry?.list() ?? [], unread: unreadChats.value })
+}
+
+function applyUnread(next: Record<string, number>) {
+  unreadChats.value = next
+  assistantUnread.value = Object.values(next).reduce((total, value) => total + value, 0)
+}
+
+function markUnread(chatId: string) {
+  if (isActiveChat(chatId) && (open.value || assistantPageOpen.value)) return
+  applyUnread({ ...unreadChats.value, [chatId]: Math.min(99, (unreadChats.value[chatId] ?? 0) + 1) })
+  saveWatchState()
+}
+
+function markChatRead(chatId: string) {
+  if (!unreadChats.value[chatId]) return
+  const next = { ...unreadChats.value }
+  delete next[chatId]
+  applyUnread(next)
+  saveWatchState()
+}
+
+function stopWatchTimer() {
+  if (watchTimer === null) return
+  clearInterval(watchTimer)
+  watchTimer = null
+}
+
+async function tickWatches() {
+  const registry = watchRegistry
+  if (!registry) {
+    stopWatchTimer()
+    return
+  }
+  await registry.tick()
+  pumpResumes()
+  if (!registry.list().length && !resumeQueue.length) stopWatchTimer()
+}
+
+function armWatchTimer() {
+  if (watchTimer !== null || typeof setInterval !== 'function') return
+  if (!watchRegistry?.list().length && !resumeQueue.length) return
+  watchTimer = setInterval(() => void tickWatches(), WATCH_TICK_MS)
+}
+
+function addWatch(chatId: string, input: { kind: WatchKind; target: string; label: string }): WatchResult {
+  if (!watchRegistry) return { ok: false, message: 'The portal cannot watch background work right now.' }
+  const result = watchRegistry.add({ chatId, ...input })
+  armWatchTimer()
+  return result
+}
+
+function startWatchers(scope: AssistantChatScope) {
+  const store = createWatchStore(scope)
+  const payload = store.load()
+  watchStore = store
+  applyUnread(payload.unread)
+  watchRegistry = createWatchRegistry({
+    poll: watchPoller(client),
+    resume: resumeChat,
+    hasChat: (chatId) => chatState.chats.some((chat) => chat.id === chatId),
+    load: () => payload.watches,
+    save: () => saveWatchState(),
+  })
+  armWatchTimer()
+}
+
+function stopWatchers() {
+  stopWatchTimer()
+  watchRegistry = null
+  watchStore = null
+  resumeQueue.length = 0
+  applyUnread({})
+}
+
+/** A watcher's update, appended to its chat so the assistant answers it there. */
+function resumeChat(chatId: string, text: string) {
+  if (!chatById(chatId)) return
+  resumeQueue.push({ chatId, text })
+  armWatchTimer()
+  pumpResumes()
+}
+
+// The page the update arrives on is not the page the chat was opened from, so
+// only the durable part of the last context is carried over.
+function resumeContext(): PromptContext {
+  return { route: lastContext?.route ?? '/', identity: lastContext?.identity ?? null }
+}
+
+function pumpResumes() {
+  if (busy.value || activeTurn || !resumeQueue.length) return
+  const next = resumeQueue.shift()
+  if (!next) return
+  if (!chatById(next.chatId)) {
+    pumpResumes()
+    return
+  }
+  markUnread(next.chatId)
+  if (!provider.value || !model.value || !chatStore || !historyReady.value) {
+    // No model can answer right now, so the update waits in the transcript.
+    setMessagesOf(next.chatId, [
+      ...messagesOf(next.chatId),
+      { id: nextId(), role: 'user', text: next.text, calls: [], at: Date.now(), background: true },
+    ])
+    persistChat(next.chatId)
+    return
+  }
+  void runChatTurn(next.chatId, next.text, resumeContext(), next.text)
+}
+
+// One turn against one chat, not always the one on screen: a watcher resumes
+// its own chat. One turn runs at a time, so a resume waits for the slot, and
+// `resumeText` marks a turn the person typing may set aside.
+async function runChatTurn(chatId: string, prompt: string, context: PromptContext, resumeText?: string) {
+  const selectedProvider = provider.value
+  const modelName = model.value
+  const chat = chatById(chatId)
+  if (!chat || !selectedProvider || !modelName || !chatStore || !historyReady.value) return
+  if (isActiveChat(chatId)) error.value = null
+  // A watcher's turn holds the turn slot but leaves the composer usable; the
+  // person typing takes the slot back through send().
+  if (resumeText === undefined) busy.value = true
+  const messageId = nextId()
+  const assistantMessageId = nextId()
+  const turn: TurnContext = {
+    generation: ++turnGeneration,
+    chatId,
+    model: modelName,
+    userMessageId: messageId,
+    messageId: assistantMessageId,
+    controller: new AbortController(),
+    ...(resumeText === undefined ? {} : { resumeText }),
+  }
+  activeTurn = turn
+  const startedAt = Date.now()
+  setMessagesOf(chatId, [
+    ...messagesOf(chatId),
+    { id: messageId, role: 'user', text: prompt, calls: [], at: startedAt, ...(resumeText === undefined ? {} : { background: true as const }) },
+    { id: assistantMessageId, role: 'assistant', text: '', calls: [], at: startedAt },
+  ])
+  if (resumeText === undefined && chat.title === 'New chat') chat.title = chatTitle(prompt)
+  updateChatList()
+  const turnMessages: ModelMessage[] = [
+    ...historyOf(chatId),
+    { role: 'user', content: resumeText === undefined ? prompt : `${prompt} ${RESUME_NOTE}` },
+  ]
+  const modelContext = { apiBaseUrl: apiBaseUrl.value, token: authToken.value }
+  const answer = () => messagesOf(chatId).find((entry) => entry.id === assistantMessageId)
+  try {
+    const [{ runTurn }, { buildModel }, { buildBrowserModel }, { systemPrompt }] = await Promise.all([
+      import('@/lib/assistant/chat'),
+      import('@/lib/assistant/models'),
+      import('@/lib/assistant/browserModels'),
+      import('@/lib/assistant/prompt'),
+    ])
+    if (!isCurrentTurn(turn)) return
+    const tools = await toolSet(turn)
+    if (!isCurrentTurn(turn)) return
+    const direct = providers.direct(selectedProvider.provider_id)
+    const languageModel = direct
+      ? buildBrowserModel({ ...direct, model: modelName })
+      : buildModel(selectedProvider, modelName, modelContext)
+    const openAiResponses = (direct?.kind === 'openai_compatible' && direct.protocol === 'responses')
+      || selectedProvider.kind === 'chatgpt'
+    // No offered effort means the model does not reason; sending one would fault.
+    const req = effortOptions.value.length
+      ? turnRequest(direct?.kind ?? selectedProvider.kind, openAiResponses, reasoningEffort.value)
+      : {}
+    const result = await runTurn({
+      model: languageModel,
+      system: systemPrompt(context),
+      messages: turnMessages,
+      tools,
+      abortSignal: turn.controller.signal,
+      providerOptions: req.providerOptions,
+      maxOutputTokens: req.maxOutputTokens,
+      onText: (delta) => {
+        if (!isCurrentTurn(turn)) return
+        const message = answer()
+        if (message) message.text += delta
+      },
+      onToolCall: (call) => {
+        if (!isCurrentTurn(turn)) return
+        const message = answer()
+        if (!message) return
+        message.calls = [...message.calls, { ...call, state: 'running' }]
+      },
+      onToolResult: ({ id, output }) => {
+        if (!isCurrentTurn(turn)) return
+        const denied = answer()?.calls.find((call) => call.id === id)?.state === 'denied'
+        if (denied) patchCall(chatId, assistantMessageId, id, { output })
+        else patchCall(chatId, assistantMessageId, id, { state: 'done', output })
+      },
+      onToolError: ({ id, message: toolError }) => {
+        if (isCurrentTurn(turn)) patchCall(chatId, assistantMessageId, id, { state: 'error', error: toolError })
+      },
+    })
+    if (!isCurrentTurn(turn)) return
+    if (result.error && !turn.controller.signal.aborted) {
+      if (isShownTurn(turn)) error.value = result.error
+      const message = answer()
+      if (message) message.error = result.error
+    } else if (!result.error) {
+      setHistoryOf(chatId, [...turnMessages, ...result.messages])
+    }
+  } catch (cause) {
+    if (isCurrentTurn(turn) && !turn.controller.signal.aborted) {
+      const failure = errorMessage(cause)
+      if (isShownTurn(turn)) error.value = failure
+      const message = answer()
+      if (message) message.error = failure
+    }
+  } finally {
+    if (activeTurn === turn) {
+      activeTurn = null
+      busy.value = false
+      persistChat(chatId)
+      pumpResumes()
+    }
+  }
 }
 
 function resetAssistantSession() {
@@ -491,6 +824,11 @@ function resetAssistantSession() {
   session = null
   sessionInFlight = null
   void closeConnection()
+  watchRegistry?.clear()
+  stopWatchTimer()
+  resumeQueue.length = 0
+  applyUnread({})
+  saveWatchState()
   resetConversation()
   draft.value = ''
   providerId.value = ''
@@ -517,6 +855,7 @@ function syncChatScope() {
   chatScopeKey = ''
   chatStore = null
   historyReady.value = false
+  stopWatchers()
   clearChatState()
   if (!scope) return
 
@@ -525,6 +864,7 @@ function syncChatScope() {
   chatScopeKey = nextStore.key
   historyReady.value = true
   applyChatState(nextStore.load())
+  startWatchers(scope)
 }
 
 function syncEpoch() {
@@ -540,32 +880,52 @@ watch(
   { flush: 'sync', immediate: true },
 )
 
-export function useAssistantChat() {
-  const providers = useAssistantProviders()
+// The provider and model selection is module state, like the conversation, so
+// a watcher's resume can run a turn without the panel being mounted.
+const providers = useAssistantProviders()
+const ready = computed(() => providers.ready.value)
+const provider = computed<AssistantProvider | null>(() =>
+  ready.value.find((entry) => entry.provider_id === providerId.value) ?? ready.value[0] ?? null)
+const model = computed(() => (provider.value ? providerModelId(provider.value, modelId.value) : ''))
+// What the provider offers now, ahead of the ids stored when it was added.
+const modelChoices = computed(() => (provider.value
+  ? modelSuggestions(provider.value, providers.listedModels.value[provider.value.provider_id] ?? [])
+  : []))
+const modelsError = computed(() =>
+  (provider.value ? providers.modelErrors.value[provider.value.provider_id] ?? null : null))
+// The active model object, whether it came from the fetched list or storage.
+const selectedModel = computed<AssistantModel | null>(() => {
+  const current = provider.value
+  if (!current) return null
+  const id = model.value
+  const listed = providers.listedModels.value[current.provider_id] ?? []
+  return listed.find((entry) => entry.id === id) ?? current.models.find((entry) => entry.id === id) ?? null
+})
+// The levels the active model offers, and the stored effort clamped to them.
+const effortOptions = computed(() =>
+  reasoningEffortOptions(provider.value?.kind ?? '', model.value, selectedModel.value?.reasoning_efforts))
+const reasoningEffort = computed(() => clampEffort(storedEffort.value, effortOptions.value))
 
-  const ready = computed(() => providers.ready.value)
-  const provider = computed<AssistantProvider | null>(() =>
-    ready.value.find((entry) => entry.provider_id === providerId.value) ?? ready.value[0] ?? null)
-  const model = computed(() => (provider.value ? providerModelId(provider.value, modelId.value) : ''))
-  // What the provider offers now, ahead of the ids stored when it was added.
-  const modelChoices = computed(() => (provider.value
-    ? modelSuggestions(provider.value, providers.listedModels.value[provider.value.provider_id] ?? [])
-    : []))
-  const modelsError = computed(() =>
-    (provider.value ? providers.modelErrors.value[provider.value.provider_id] ?? null : null))
-  // The active model object, whether it came from the fetched list or storage.
-  const selectedModel = computed<AssistantModel | null>(() => {
-    const current = provider.value
-    if (!current) return null
-    const id = model.value
-    const listed = providers.listedModels.value[current.provider_id] ?? []
-    return listed.find((entry) => entry.id === id) ?? current.models.find((entry) => entry.id === id) ?? null
+// Bucket names make a file name in an answer a link. Listing them needs an S3
+// session, and the group is restored after mount, so this waits a while for
+// one rather than reading it once and giving up.
+export function ensureKnownBuckets(): void {
+  void (async () => {
+    const [{ useS3 }, { useBuckets }, { activeGroupId }] = await Promise.all([
+      import('./useS3'),
+      import('./useBuckets'),
+      import('./useGroupSelection'),
+    ])
+    const groupId = await until(activeGroupId).toBeTruthy({ timeout: 30_000, throwOnTimeout: true })
+    const s3 = useS3()
+    if (!s3.hasActiveKey.value) await s3.ensureSession(groupId)
+    await useBuckets().ensure()
+  })().catch(() => {
+    // A realm that refuses the listing simply leaves those names unlinked.
   })
-  // The levels the active model offers, and the stored effort clamped to them.
-  const effortOptions = computed(() =>
-    reasoningEffortOptions(provider.value?.kind ?? '', model.value, selectedModel.value?.reasoning_efforts))
-  const reasoningEffort = computed(() => clampEffort(storedEffort.value, effortOptions.value))
+}
 
+export function useAssistantChat() {
   function loadModels() {
     if (provider.value) void providers.listModels(provider.value.provider_id)
   }
@@ -619,8 +979,9 @@ export function useAssistantChat() {
   function selectChat(id: string) {
     syncEpoch()
     if (!chatStore || !historyReady.value || !chatState.chats.some((chat) => chat.id === id)) return
+    markChatRead(id)
     if (activeChatId.value === id) return
-    discardTurn(abortTurn())
+    abortShownTurn()
     persistCurrentChat()
     chatState = { ...chatState, activeChatId: id }
     applyChatState(chatState)
@@ -639,7 +1000,10 @@ export function useAssistantChat() {
     syncEpoch()
     if (!chatStore || !historyReady.value || !chatState.chats.some((chat) => chat.id === id)) return
     const wasActive = activeChatId.value === id
-    if (wasActive) discardTurn(abortTurn())
+    if (activeTurn?.chatId === id) discardTurn(abortTurn())
+    // A deleted chat has nothing left to resume, so its watchers go with it.
+    watchRegistry?.dropChat(id)
+    markChatRead(id)
     const remaining = chatState.chats.filter((chat) => chat.id !== id)
     const replacement = remaining[0] ?? newAssistantChat()
     chatState = {
@@ -667,6 +1031,7 @@ export function useAssistantChat() {
     open.value = true
     selectLatestChat()
     void providers.load()
+    ensureKnownBuckets()
     if (realmInfo.value?.interfaces.mcp?.url) {
       void sessionToken().catch(() => {
         // A node that refuses the mint leaves the editor tools working.
@@ -681,6 +1046,12 @@ export function useAssistantChat() {
     draft.value = prompt.trim()
   }
 
+  /** Shows the panel on the chat already active, for a page handing the conversation over. */
+  function showPanel() {
+    syncEpoch()
+    open.value = true
+  }
+
   function hidePanel() {
     open.value = false
   }
@@ -688,109 +1059,21 @@ export function useAssistantChat() {
   function closePanel() {
     syncEpoch()
     open.value = false
-    discardTurn(abortTurn())
+    abortShownTurn()
     persistCurrentChat()
   }
 
   async function send(text: string, context: PromptContext) {
     const prompt = text.trim()
     syncEpoch()
-    const selectedProvider = provider.value
-    const selectedModel = model.value
-    if (!prompt || busy.value || !selectedProvider || !selectedModel || !chatStore || !historyReady.value) return
+    if (!prompt || !chatStore || !historyReady.value) return
+    // A watcher's turn steps aside for the person typing; its update requeues.
+    if (activeTurn?.resumeText !== undefined) discardTurn(abortTurn())
+    else if (busy.value) return
     const current = activeChat()
     if (!current) return
-    error.value = null
-    busy.value = true
-    const messageId = nextId()
-    const assistantMessageId = nextId()
-    const turn: TurnContext = {
-      generation: ++turnGeneration,
-      userMessageId: messageId,
-      messageId: assistantMessageId,
-      controller: new AbortController(),
-    }
-    activeTurn = turn
-    messages.value = [
-      ...messages.value,
-      { id: messageId, role: 'user', text: prompt, calls: [] },
-      { id: assistantMessageId, role: 'assistant', text: '', calls: [] },
-    ]
-    if (current.title === 'New chat') current.title = chatTitle(prompt)
-    updateChatList()
-    const turnMessages: ModelMessage[] = [...history, { role: 'user', content: prompt }]
-    const modelContext = { apiBaseUrl: apiBaseUrl.value, token: authToken.value }
-    try {
-      const [{ runTurn }, { buildModel }, { buildBrowserModel }, { systemPrompt }] = await Promise.all([
-        import('@/lib/assistant/chat'),
-        import('@/lib/assistant/models'),
-        import('@/lib/assistant/browserModels'),
-        import('@/lib/assistant/prompt'),
-      ])
-      if (!isCurrentTurn(turn)) return
-      const tools = await toolSet(turn)
-      if (!isCurrentTurn(turn)) return
-      const direct = providers.direct(selectedProvider.provider_id)
-      const languageModel = direct
-        ? buildBrowserModel({ ...direct, model: selectedModel })
-        : buildModel(selectedProvider, selectedModel, modelContext)
-      const openAiResponses = (direct?.kind === 'openai_compatible' && direct.protocol === 'responses')
-        || selectedProvider.kind === 'chatgpt'
-      // No offered effort means the model does not reason; sending one would fault.
-      const req = effortOptions.value.length
-        ? turnRequest(direct?.kind ?? selectedProvider.kind, openAiResponses, reasoningEffort.value)
-        : {}
-      const result = await runTurn({
-        model: languageModel,
-        system: systemPrompt(context),
-        messages: turnMessages,
-        tools,
-        abortSignal: turn.controller.signal,
-        providerOptions: req.providerOptions,
-        maxOutputTokens: req.maxOutputTokens,
-        onText: (delta) => {
-          if (!isCurrentTurn(turn)) return
-          const message = messages.value.find((entry) => entry.id === assistantMessageId)
-          if (message) message.text += delta
-        },
-        onToolCall: (call) => {
-          if (!isCurrentTurn(turn)) return
-          const message = messages.value.find((entry) => entry.id === assistantMessageId)
-          if (!message) return
-          message.calls = [...message.calls, { ...call, state: 'running' }]
-        },
-        onToolResult: ({ id, output }) => {
-          if (!isCurrentTurn(turn)) return
-          const message = messages.value.find((entry) => entry.id === assistantMessageId)
-          const denied = message?.calls.find((call) => call.id === id)?.state === 'denied'
-          if (denied) patchCall(assistantMessageId, id, { output })
-          else patchCall(assistantMessageId, id, { state: 'done', output })
-        },
-        onToolError: ({ id, message: toolError }) => {
-          if (isCurrentTurn(turn)) patchCall(assistantMessageId, id, { state: 'error', error: toolError })
-        },
-      })
-      if (!isCurrentTurn(turn)) return
-      if (result.error && !turn.controller.signal.aborted) {
-        error.value = result.error
-        const message = messages.value.find((entry) => entry.id === assistantMessageId)
-        if (message) message.error = result.error
-      } else if (!result.error) {
-        history = [...turnMessages, ...result.messages]
-      }
-    } catch (cause) {
-      if (isCurrentTurn(turn) && !turn.controller.signal.aborted) {
-        error.value = errorMessage(cause)
-        const message = messages.value.find((entry) => entry.id === assistantMessageId)
-        if (message) message.error = error.value
-      }
-    } finally {
-      if (activeTurn === turn) {
-        activeTurn = null
-        busy.value = false
-        persistCurrentChat()
-      }
-    }
+    lastContext = context
+    await runChatTurn(current.id, prompt, context)
   }
 
   return {
@@ -804,6 +1087,7 @@ export function useAssistantChat() {
     chats,
     activeChatId,
     historyReady,
+    unreadChats,
     provider,
     providers: ready,
     model,
@@ -819,6 +1103,7 @@ export function useAssistantChat() {
     setApproveWrites,
     setReasoningEffort,
     openPanel,
+    showPanel,
     openWith,
     hidePanel,
     closePanel,

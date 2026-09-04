@@ -198,6 +198,10 @@ export function tesFormToExecutionRequest(form: NativeSubmitForm): NativeMapping
     // Stated, not defaulted: a run must never get a bucket of its own.
     workspace: { mode: 'none' },
   }
+  const name = task.name?.trim()
+  if (name) request.name = name
+  const description = task.description?.trim()
+  if (description) request.description = description
   const cpu = task.resources?.cpu_cores
   if (cpu !== undefined && Number.isInteger(cpu) && cpu > 0) request.cpu_cores = cpu
   const ram = ramBytes(task.resources?.ram_gb)
@@ -214,6 +218,5 @@ export function droppedNativeFields(task: TesTask): string[] {
   const dropped: string[] = []
   if (task.resources?.disk_gb !== undefined) dropped.push('disk request')
   if (task.resources?.preemptible) dropped.push('preemptible flag')
-  if (task.description?.trim()) dropped.push('description')
   return dropped
 }

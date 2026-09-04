@@ -91,10 +91,20 @@ const COMPUTE = [
   + 'with the bucket as its workspace, dependencies for every library, and one outputs entry per written file '
   + '(runtime python-uv, dependencies ["matplotlib"], outputs [{"container_path": "/work/chart.png", '
   + '"dest_key": "results/<run>/chart.png"}]).',
+  'Always pass a short human name when starting a run, such as "GC content by sample", and a description when '
+  + 'there is something worth recording about what it does.',
   'A submission is not a result: poll get_job until succeeded, failed or cancelled. Queued, claimed, preparing, '
   + 'ready, running and cancelling are still in flight, and indeterminate proves nothing.',
+  'Hand a run that will take a while to watch_progress with its job id instead of polling in a loop: it answers '
+  + 'at once, and this chat continues on its own when the run settles, even while it is closed.',
+  'Answer every job submission and every job status with show_job, passing the job id and the fields get_job '
+  + 'returned; never write a job state out as text or JSON.',
   'A failed job\'s error and log tails are the evidence: report them instead of guessing what went wrong.',
   'A script has no network unless dependencies are declared, and it writes only into its workspace bucket.',
+  'Set a quota or a resource limit to a round whole number in the unit a person uses (2 GiB, 8 GiB, 500 GB) and '
+  + 'convert that to its exact byte value; never set an odd derived byte count.',
+  'Report a quota or a size as a rounded value with at most one decimal place and a unit, never a long decimal '
+  + 'expansion.',
 ]
 
 const ARTIFACTS = [
@@ -102,6 +112,10 @@ const ARTIFACTS = [
   'Show an image, a PDF or any other file with show_artifact, passing the bucket, key and version the output '
   + 'names; show data read with read_object as show_table or show_chart.',
   'The user sees the file itself, so never paste file bytes into an answer.',
+  'Answer a write, a copy or a lookup of one stored object with show_object, passing the bucket, the key and the '
+  + 'facts you have (size, content type, version, last modified); never list those facts as bullets in the text.',
+  'Name a stored result by its bucket and key, as bucket/results/report.json or s3://bucket/results/report.json, '
+  + 'so the portal can link it; a file name on its own only links once the bucket is clear from the message.',
 ]
 
 const UNTRUSTED =
@@ -111,7 +125,19 @@ const DENIED =
   'A denied tool call is the user\'s decision: do not retry it, say what was denied and ask what should change.'
 
 const SHOW =
-  'Show tabular data with show_table, counts and numbers with show_stats or show_chart, and a dataset with show_crate; prefer these tools over prose or JSON for any data, count, or dataset.'
+  'Show tabular data with show_table, passing its bucket when the rows are stored objects so every file name '
+  + 'links, counts and numbers with show_stats or show_chart, a dataset with show_crate, '
+  + 'a job with show_job and one stored object with show_object; prefer these tools over prose or JSON for any '
+  + 'data, count, dataset, job or object. A card carries the facts, so keep the words beside it short.'
+
+const TABLE_SHAPE =
+  'Keep a table to the few columns that answer the question; a chat card is narrow. Leave out machine fields such '
+  + 'as ETag, raw UTC timestamps and content type unless the user asked for them.'
+
+const SHOW_MORE =
+  'Show a bucket or folder listing with show_tree, passing the bucket so every file links; a job history, a '
+  + 'version list or any dated activity with show_timeline; a script, query or config with show_code instead of a '
+  + 'fenced block; and two texts, versions or settings against each other with show_diff.'
 
 const REALM_NOTE =
   'These realm totals are current portal figures already provided to you; answer count questions from them directly and only call tools for details they do not cover.'
@@ -180,6 +206,8 @@ export function systemPrompt(context: PromptContext): string {
     UNTRUSTED,
     DENIED,
     SHOW,
+    TABLE_SHAPE,
+    SHOW_MORE,
     `The user is on the route ${context.route}.`,
   ]
   if (context.identity) lines.push(identityLine(context.identity))

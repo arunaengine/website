@@ -53,7 +53,7 @@ describe('assistant chat history', () => {
       activeChatId: chat.id,
       chats: [{
         ...chat,
-        messages: [{ id: 'm1', role: 'user', text: 'Which datasets are public?', calls: [] }],
+        messages: [{ id: 'm1', role: 'user', text: 'Which datasets are public?', calls: [], at: 25 }],
         history: [{ role: 'user', content: 'Which datasets are public?' }],
       }],
     })
@@ -69,7 +69,7 @@ describe('assistant chat history', () => {
       const chat = newAssistantChat(`Chat ${index}`, index)
       return {
         ...chat,
-        messages: [{ id: `m-${index}`, role: 'assistant' as const, text: 'x'.repeat(8_000), calls: [] }],
+        messages: [{ id: `m-${index}`, role: 'assistant' as const, text: 'x'.repeat(8_000), calls: [], at: index }],
         history: [{ role: 'user' as const, content: 'x'.repeat(60_000) }],
       }
     })
@@ -98,6 +98,13 @@ describe('assistant chat history', () => {
         view: { kind: 'artifact', title: 'chart.png', artifact: { url: 'blob:aruna/chart' } },
       },
       { id: 'c2', name: 'show_table', input: {}, state: 'done', view: { kind: 'table', title: 'Buckets' } },
+      {
+        id: 'c3',
+        name: 'show_artifact',
+        input: {},
+        state: 'done',
+        view: { kind: 'artifact', title: 'notes.txt', artifact: { url: 'blob:aruna/notes', text: 'hello' } },
+      },
     ]
     backing.setItem(store.key, JSON.stringify({
       version: 1,
@@ -106,7 +113,59 @@ describe('assistant chat history', () => {
 
     const restored = store.load().chats[0]?.messages[0]?.calls ?? []
 
-    expect(restored.map((call) => call.view?.kind)).toEqual([undefined, 'table'])
+    expect(restored.map((call) => call.view?.kind)).toEqual([undefined, 'table', 'artifact'])
+    const kept = restored[2]?.view
+    expect(kept?.kind === 'artifact' && kept.artifact).toMatchObject({ url: '', text: 'hello' })
+  })
+
+  it('keeps the time of a message across a save and load', () => {
+    const store = createAssistantChatStore(scope('user-a'), backing)
+    const chat = newAssistantChat('Timing', 10)
+    store.save({
+      activeChatId: chat.id,
+      chats: [{
+        ...chat,
+        messages: [
+          { id: 'm1', role: 'user', text: 'hi', calls: [], at: 1_756_982_700_000 },
+          { id: 'm2', role: 'assistant', text: 'hello', calls: [], at: 1_756_982_701_000 },
+        ],
+      }],
+    })
+
+    const restored = createAssistantChatStore(scope('user-a'), backing).load().chats[0]?.messages ?? []
+    expect(restored.map((message) => message.at)).toEqual([1_756_982_700_000, 1_756_982_701_000])
+  })
+
+  it('keeps the background mark of a watcher update across a save and load', () => {
+    const store = createAssistantChatStore(scope('user-a'), backing)
+    const chat = newAssistantChat('Watched', 10)
+    store.save({
+      activeChatId: chat.id,
+      chats: [{
+        ...chat,
+        messages: [
+          { id: 'm1', role: 'user', text: 'watch it', calls: [], at: 1 },
+          { id: 'm2', role: 'user', text: 'Background update: the job finished.', calls: [], at: 2, background: true },
+        ],
+      }],
+    })
+
+    const restored = createAssistantChatStore(scope('user-a'), backing).load().chats[0]?.messages ?? []
+    expect(restored.map((message) => message.background)).toEqual([undefined, true])
+  })
+
+  it('dates a message stored before messages carried a time', () => {
+    const store = createAssistantChatStore(scope('user-a'), backing)
+    const chat = newAssistantChat('Old', 10)
+    backing.setItem(store.key, JSON.stringify({
+      version: 1,
+      state: {
+        activeChatId: chat.id,
+        chats: [{ ...chat, createdAt: 4_242, messages: [{ id: 'm1', role: 'user', text: 'hi', calls: [] }] }],
+      },
+    }))
+
+    expect(store.load().chats[0]?.messages[0]?.at).toBe(4_242)
   })
 
   it('ignores malformed persisted data', () => {

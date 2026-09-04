@@ -341,6 +341,10 @@ export interface WorkspaceRequest {
 
 export interface SubmitExecutionRequest {
   group_id: string
+  /** Short human name for the run, shown in the run list. */
+  name?: string
+  /** Longer note about what the run does; free text. */
+  description?: string
   image: string
   entrypoint?: string[]
   command: string[]

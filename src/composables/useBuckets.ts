@@ -1,6 +1,7 @@
 import { computed, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { isS3AuthError, s3ErrorMessage, useS3, type BucketEntry } from '@/composables/useS3'
+import { setKnownBuckets } from '@/lib/knownBuckets'
 import { createSwrCache } from '@/lib/swr'
 
 // Module singleton: the bucket list outlives the Data view, so switching tabs
@@ -16,6 +17,10 @@ const s3 = useS3()
 const FRESH_MS = 15_000
 
 const cache = createSwrCache<BucketEntry[]>([], FRESH_MS)
+
+// The assistant only links a bucket name it can prove exists, so every listing
+// publishes what it saw.
+watch(cache.data, (list) => setKnownBuckets(list.map((entry) => entry.name)))
 
 // Identity and target of the cached list. A new session epoch (token or API
 // base change), a different access key or a different endpoint all mean another

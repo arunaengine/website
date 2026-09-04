@@ -12,7 +12,7 @@ import { Check, Pencil, Trash2, X } from '@lucide/vue'
 
 const props = withDefaults(defineProps<{ readOnly?: boolean }>(), { readOnly: false })
 
-const { chats, activeChatId, historyReady, selectChat, deleteChat, renameChat } = useAssistantChat()
+const { chats, activeChatId, historyReady, unreadChats, selectChat, deleteChat, renameChat } = useAssistantChat()
 const editingId = ref<string | null>(null)
 const draftTitle = ref('')
 
@@ -85,8 +85,15 @@ function when(updatedAt: number): string {
             @click="selectChat(chat.id)"
             @dblclick="beginRename(chat.id, chat.title)"
           >
-            <span class="block truncate text-xs text-foreground" :class="activeChatId === chat.id ? 'font-medium' : ''">
-              {{ chat.title }}
+            <span class="flex min-w-0 items-center gap-1.5">
+              <span
+                v-if="unreadChats[chat.id]"
+                class="size-1.5 shrink-0 rounded-full bg-primary"
+                :title="`${unreadChats[chat.id]} background ${unreadChats[chat.id] === 1 ? 'update' : 'updates'}`"
+              />
+              <span class="truncate text-xs text-foreground" :class="activeChatId === chat.id ? 'font-medium' : ''">
+                {{ chat.title }}
+              </span>
             </span>
             <span class="mt-0.5 block truncate text-[11px] text-muted-foreground">
               {{ when(chat.updatedAt) }} · {{ chat.messages.length }} {{ chat.messages.length === 1 ? 'message' : 'messages' }}

@@ -1,21 +1,35 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import MarkdownIt from 'markdown-it'
+import { objectLinks } from '@/lib/assistant/objectLinks'
+import { usePageContext } from '@/composables/usePageContext'
+import { useAssistantObject } from '@/composables/useAssistantObject'
+import { ChevronDown, ChevronUp } from '@lucide/vue'
 
 const props = withDefaults(defineProps<{
   text: string
   size?: 'compact' | 'full'
-}>(), { size: 'compact' })
+  /** True when the message already shows a card, so long prose folds away. */
+  hasCard?: boolean
+}>(), { size: 'compact', hasCard: false })
+
+// Prose shorter than this stays open even beside a card.
+const FOLD_ABOVE_CHARS = 400
 
 // Keep provider output as a safe subset of Markdown. Raw HTML is escaped and
 // markdown-it rejects unsafe link protocols by default.
 const md = new MarkdownIt({ html: false, linkify: true, typographer: true })
+objectLinks(md)
 
 const renderLink = md.renderer.rules.link_open
   ?? ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options))
 md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
-  tokens[idx]?.attrSet('target', '_blank')
-  tokens[idx]?.attrSet('rel', 'noopener noreferrer')
+  const token = tokens[idx]
+  // A stored-object or bucket link stays inside the portal, so it is routed.
+  if (token && token.attrIndex('data-object') < 0 && token.attrIndex('data-bucket') < 0) {
+    token.attrSet('target', '_blank')
+    token.attrSet('rel', 'noopener noreferrer')
+  }
   return renderLink(tokens, idx, options, env, self)
 }
 
@@ -25,15 +39,17 @@ md.renderer.rules.fence = (tokens, idx, options, env, self) =>
   `<div class="assistant-code">${renderFence(tokens, idx, options, env, self)}`
   + '<button type="button" data-copy class="assistant-copy">Copy</button></div>'
 
-const html = computed(() => md.render(props.text))
+// The bucket the reader has open lets a bare file name in the answer link too.
+const { currentPage } = usePageContext()
+const html = computed(() => md.render(props.text, { bucket: currentPage()?.details.bucket ?? '' }))
+
+const { follow } = useAssistantObject()
+const expanded = ref(false)
+const foldable = computed(() => props.hasCard && props.text.length > FOLD_ABOVE_CHARS)
 
 // The copy control lives in rendered Markdown, so the block reads its code back
 // out of the DOM instead of holding a second copy of it.
-function onCopy(event: MouseEvent) {
-  const target = event.target
-  if (!(target instanceof HTMLElement)) return
-  const trigger = target.closest('button[data-copy]')
-  if (!(trigger instanceof HTMLElement)) return
+function copyCode(trigger: HTMLElement) {
   const code = trigger.parentElement?.querySelector('pre')?.textContent ?? ''
   const clipboard = navigator.clipboard
   if (!code || !clipboard) return
@@ -42,21 +58,56 @@ function onCopy(event: MouseEvent) {
     setTimeout(() => (trigger.textContent = 'Copy'), 1500)
   }).catch(() => undefined)
 }
+
+function onClick(event: MouseEvent) {
+  const target = event.target
+  if (!(target instanceof HTMLElement)) return
+  const trigger = target.closest('button[data-copy]')
+  if (trigger instanceof HTMLElement) {
+    copyCode(trigger)
+    return
+  }
+  const link = target.closest('a[data-bucket]')
+  const href = link?.getAttribute('href')
+  if (!link || !href) return
+  const bucket = link.getAttribute('data-bucket') ?? ''
+  const key = link.getAttribute('data-object') ?? ''
+  follow(event, href, key ? { bucket, key } : undefined)
+}
 </script>
 
 <template>
-  <!-- eslint-disable-next-line vue/no-v-html -- markdown-it output, raw HTML disabled -->
-  <div
-    class="assistant-markdown min-w-0 max-w-full break-words px-1 leading-relaxed text-foreground"
-    :class="size === 'full' ? 'text-sm' : 'text-xs'"
-    @click="onCopy"
-    v-html="html"
-  />
+  <div class="min-w-0" @click="onClick">
+    <!-- eslint-disable-next-line vue/no-v-html -- markdown-it output, raw HTML disabled -->
+    <div
+      class="assistant-markdown min-w-0 max-w-full break-words px-1 leading-relaxed text-foreground"
+      :class="[size === 'full' ? 'text-sm' : 'text-xs', foldable && !expanded ? 'assistant-fold' : '']"
+      v-html="html"
+    />
+    <button
+      v-if="foldable"
+      type="button"
+      class="mt-1 inline-flex items-center gap-1 px-1 text-xs font-medium text-primary hover:underline"
+      @click="expanded = !expanded"
+    >
+      <ChevronUp v-if="expanded" class="size-3.5 shrink-0" aria-hidden="true" />
+      <ChevronDown v-else class="size-3.5 shrink-0" aria-hidden="true" />
+      {{ expanded ? 'Show less' : 'Show more' }}
+    </button>
+  </div>
 </template>
 
 <style scoped>
 .assistant-markdown {
   overflow-wrap: anywhere;
+}
+
+/* Folded prose keeps the card above it in view; the fade marks the cut. */
+.assistant-fold {
+  max-height: 6rem;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent);
+  mask-image: linear-gradient(to bottom, black 60%, transparent);
 }
 
 .assistant-markdown :deep(p),

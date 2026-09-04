@@ -27,6 +27,7 @@ function record(id: string, title: string, messages: number): AssistantChatRecor
       role: 'user' as const,
       text: 'hi',
       calls: [],
+      at: 0,
     })),
     history: [],
   }
@@ -36,6 +37,7 @@ const chat = {
   chats: ref<AssistantChatRecord[]>([record('c-1', 'Bucket layout', 2), record('c-2', 'Crate profile', 1)]),
   activeChatId: ref('c-1'),
   historyReady: ref(true),
+  unreadChats: ref<Record<string, number>>({}),
   selectChat,
   deleteChat,
   renameChat,
@@ -104,6 +106,14 @@ describe('AssistantHistory', () => {
     await click(element(root, (node) => node.props['aria-label'] === 'Save chat name'))
 
     expect(renameChat).toHaveBeenCalledWith('c-1', 'Bucket layout')
+  })
+
+  it('marks a chat that a background update landed in', async () => {
+    chat.unreadChats.value = { 'c-2': 2 }
+    const { root } = await mountApp(AssistantHistory)
+
+    expect(element(root, (node) => node.props.title === '2 background updates')).toBeDefined()
+    chat.unreadChats.value = {}
   })
 
   it('hides the row controls while no provider may write', async () => {
