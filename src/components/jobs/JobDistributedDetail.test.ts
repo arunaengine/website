@@ -49,6 +49,20 @@ const NodeLabelStub = defineComponent({
   setup: (props) => () => h('span', props.nodeId),
 })
 const RouterLinkStub = defineComponent((_, { slots }) => () => h('a', slots.default?.()))
+const InputStub = defineComponent({
+  props: { modelValue: { type: String, default: '' } },
+  emits: ['update:modelValue'],
+  setup: (props, { attrs, emit }) => () =>
+    h('input', {
+      ...attrs,
+      value: props.modelValue,
+      onInput: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value),
+    }),
+})
+const CountedListStub = defineComponent({
+  props: { items: { type: Array, default: () => [] }, noun: String },
+  setup: (props) => () => h('span', `${(props.items as string[]).length} ${props.noun}`),
+})
 const PaginationStub = defineComponent({
   props: { page: Number, pageCount: Number, hasNext: Boolean },
   emits: ['update:page'],
@@ -242,8 +256,12 @@ function taskPanel(getTask: unknown, getJob: unknown): Component {
     '@/components/ui/DetailList.vue': moduleDefault(
       compileClientComponent(new URL('../ui/DetailList.vue', import.meta.url), { vue: VueRuntime }),
     ),
+    '@/components/ui/CountedList.vue': moduleDefault(CountedListStub),
+    '@/components/ui/DocsLink.vue': moduleDefault(PassThroughStub),
+    '@/components/ui/Pagination.vue': moduleDefault(PaginationStub),
     '@/components/jobs/JobPlacementFigure.vue': moduleDefault(PlacementFigureStub),
     '@/components/jobs/JobExecutionsTable.vue': moduleDefault(ExecutionsTableStub),
+    '@/components/compute/RunLogDialog.vue': moduleDefault(PassThroughStub),
     '@/components/compute/TaskHeader.vue': moduleDefault(PassThroughStub),
     '@/components/assistant/AskAiButton.vue': moduleDefault(PassThroughStub),
     '@/components/compute/TaskStateBadge.vue': moduleDefault(JobStateBadgeStub),
@@ -268,6 +286,7 @@ function taskPanel(getTask: unknown, getJob: unknown): Component {
     '@/components/preview/PreviewBody.vue': moduleDefault(PassThroughStub),
     '@/lib/chunk-recovery': { asyncChunkError: () => undefined },
     '@/lib/quickRuntimes': { detectQuickRun: () => false },
+    '@/lib/jobs': Jobs,
     '@/lib/poll': Poll,
     '@/lib/tes': Tes,
     '@/lib/utils': Utils,
@@ -901,6 +920,141 @@ describe('distributed job detail components', () => {
     expect(text).toContain('output')
     expect(text).not.toContain('no stderr captured')
     expect(text).toContain('Queued node node-2')
+    mounted.app.unmount()
+  })
+
+  it('words every run state for the reader', async () => {
+    const nodeTag = 'aruna-engine.org/label/aruna-engine.org/node'
+    const base = {
+      id: 'run',
+      executors: [{ image: 'alpine', command: ['sh'] }],
+      inputs: [],
+      outputs: [],
+      logs: [],
+      tags: {},
+    }
+    const started = new Date(Date.now() - 60000).toISOString()
+    const cases: Array<[Record<string, unknown>, Record<string, unknown>, string]> = [
+      [{ state: 'QUEUED', tags: { [nodeTag]: 'node-2' } }, {}, 'Waiting for a response from node-2'],
+      [{ state: 'QUEUED' }, {}, 'Queued, waiting for a node'],
+      [{ state: 'INITIALIZING' }, { progress: { current: 2, total: 5, unit: 'inputs' } }, 'Copying inputs · 2 / 5 inputs'],
+      [{ state: 'INITIALIZING' }, {}, 'Copying inputs'],
+      [{ state: 'RUNNING', logs: [{ start_time: started, logs: [], outputs: [] }] }, {}, 'Running for'],
+      [{ state: 'COMPLETE' }, {}, 'Completed'],
+      [{ state: 'CANCELED' }, {}, 'Cancelled'],
+      [
+        { state: 'EXECUTOR_ERROR', logs: [{ logs: [{ exit_code: 2, stderr: 'Traceback\nValueError: bad input' }], outputs: [] }] },
+        {},
+        'ValueError: bad input',
+      ],
+    ]
+    const wake = vi.spyOn(Poll, 'onWake').mockImplementation(() => () => {})
+    const followSpy = vi.spyOn(Poll, 'follow').mockImplementation(() => () => {})
+
+    for (const [task, job, expected] of cases) {
+      const getTask = vi.fn(async () => ({ ...base, ...task }))
+      const getJob = vi.fn(async () => ({ family: null, ...job }))
+      const mounted = await mount(taskPanel(getTask, getJob), { taskId: 'run', open: true })
+      const text = content(mounted.root).replace(/\s+/g, ' ')
+
+      expect(mounted.errors).toEqual([])
+      expect(text, `state ${task.state}`).toContain(expected)
+      mounted.app.unmount()
+    }
+    wake.mockRestore()
+    followSpy.mockRestore()
+  })
+
+  it('offers Run again only once the run ended', async () => {
+    const base = {
+      id: 'run',
+      executors: [{ image: 'alpine', command: ['sh'] }],
+      inputs: [],
+      outputs: [],
+      logs: [],
+      tags: {},
+    }
+    const getJob = vi.fn(async () => ({ family: null }))
+    const wake = vi.spyOn(Poll, 'onWake').mockImplementation(() => () => {})
+    const followSpy = vi.spyOn(Poll, 'follow').mockImplementation(() => () => {})
+
+    const running = await mount(taskPanel(vi.fn(async () => ({ ...base, state: 'RUNNING' })), getJob), {
+      taskId: 'run',
+      open: true,
+    })
+    expect(content(running.root)).not.toContain('Run again')
+    expect(content(running.root)).toContain('Cancel run')
+    running.app.unmount()
+
+    const done = await mount(taskPanel(vi.fn(async () => ({ ...base, state: 'COMPLETE' })), getJob), {
+      taskId: 'run',
+      open: true,
+    })
+    expect(content(done.root)).toContain('Run again')
+    expect(content(done.root)).not.toContain('Cancel run')
+    done.app.unmount()
+    wake.mockRestore()
+    followSpy.mockRestore()
+  })
+
+  it('previews the output tail and opens the full log', async () => {
+    const lines = Array.from({ length: 20 }, (_, i) => `line ${i + 1}`).join('\n')
+    const getTask = vi.fn(async () => ({
+      id: 'run',
+      state: 'COMPLETE',
+      executors: [{ image: 'alpine', command: ['sh'] }],
+      inputs: [],
+      outputs: [],
+      logs: [{ logs: [{ exit_code: 0, stdout: lines, stderr: 'warn one\nwarn two' }], outputs: [] }],
+      tags: {},
+    }))
+    const getJob = vi.fn(async () => ({ family: null }))
+
+    const mounted = await mount(taskPanel(getTask, getJob), { taskId: 'run', open: true })
+    const text = content(mounted.root)
+
+    expect(mounted.errors).toEqual([])
+    expect(text).toContain('line 20')
+    expect(text).toContain('line 13')
+    expect(text).not.toContain('line 12')
+    expect(text).toContain('stderr: 2 lines · last: warn two')
+    expect(text).toContain('Open full log')
+    mounted.app.unmount()
+  })
+
+  it('filters the full log and numbers its lines', async () => {
+    const RunLogDialog = compileClientComponent(new URL('../compute/RunLogDialog.vue', import.meta.url), {
+      vue: VueRuntime,
+      '@lucide/vue': icons,
+      '@/components/ui/DetailDialog.vue': moduleDefault(OpenPassThroughStub),
+      '@/components/ui/DialogTitle.vue': moduleDefault(PassThroughStub),
+      '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+      '@/components/ui/Input.vue': moduleDefault(InputStub),
+      '@/components/ui/Tabs.vue': moduleDefault(PassThroughStub),
+      '@/components/ui/TabsList.vue': moduleDefault(PassThroughStub),
+      '@/components/ui/TabsTrigger.vue': moduleDefault(PassThroughStub),
+    })
+    const streams = [
+      { key: 'stdout', label: 'stdout', text: '2026-09-04T14:03:19Z first line\n2026-09-04T14:03:20Z second line' },
+      { key: 'stderr', label: 'stderr', text: 'boom' },
+    ]
+
+    const mounted = await mount(RunLogDialog, { open: true, streams, name: 'align-and-count' })
+    let text = content(mounted.root).replace(/\s+/g, ' ')
+
+    expect(mounted.errors).toEqual([])
+    expect(text).toContain('stdout (2)')
+    expect(text).toContain('stderr (1)')
+    expect(text).toContain('2 of 2 lines shown')
+    expect(text).toContain('Hide timestamps')
+
+    const find = findAll(mounted.root, (node) => node.tag === 'input')[0]!
+    await (find.props.onInput as (event: unknown) => void)({ target: { value: 'second' } })
+    await nextTick()
+    text = content(mounted.root).replace(/\s+/g, ' ')
+
+    expect(text).toContain('1 of 2 lines shown')
+    expect(text).not.toContain('first line')
     mounted.app.unmount()
   })
 

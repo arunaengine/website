@@ -276,8 +276,17 @@ const TaskDetailPanel = compileClientComponent(url('components/compute/TaskDetai
   '@/components/ui/DetailList.vue': moduleDefault(
     compileClientComponent(url('components/ui/DetailList.vue'), { vue: VueRuntime }),
   ),
+  '@/components/ui/CountedList.vue': moduleDefault(
+    compileClientComponent(url('components/ui/CountedList.vue'), {
+      vue: VueRuntime,
+      '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+    }),
+  ),
+  '@/components/ui/DocsLink.vue': moduleDefault(GenericStub),
+  '@/components/ui/Pagination.vue': moduleDefault(GenericStub),
   '@/components/jobs/JobPlacementFigure.vue': moduleDefault(GenericStub),
   '@/components/jobs/JobExecutionsTable.vue': moduleDefault(GenericStub),
+  '@/components/compute/RunLogDialog.vue': moduleDefault(GenericStub),
   '@/components/compute/TaskHeader.vue': moduleDefault(TaskHeaderStub),
   '@/components/assistant/AskAiButton.vue': moduleDefault(GenericStub),
   '@/components/onboarding/ClaimWatchStep.vue': moduleDefault(StagesStub),
@@ -294,6 +303,7 @@ const TaskDetailPanel = compileClientComponent(url('components/compute/TaskDetai
   '@/lib/chunk-recovery': ChunkRecovery,
   '@/lib/poll': Poll,
   '@/lib/quickRuntimes': QuickRuntimes,
+  '@/lib/jobs': JobsLib,
   '@/lib/tes': TesLib,
   '@/lib/utils': Utils,
 })

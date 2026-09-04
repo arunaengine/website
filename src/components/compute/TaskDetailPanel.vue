@@ -13,8 +13,12 @@ import ExternalLink from '@/components/ui/ExternalLink.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
 import DetailList, { type Detail } from '@/components/ui/DetailList.vue'
+import CountedList from '@/components/ui/CountedList.vue'
+import Pagination from '@/components/ui/Pagination.vue'
+import DocsLink from '@/components/ui/DocsLink.vue'
 import JobExecutionsTable from '@/components/jobs/JobExecutionsTable.vue'
 import JobPlacementFigure from '@/components/jobs/JobPlacementFigure.vue'
+import RunLogDialog, { type LogStream } from '@/components/compute/RunLogDialog.vue'
 import TaskHeader from '@/components/compute/TaskHeader.vue'
 import AskAiButton from '@/components/assistant/AskAiButton.vue'
 import ClaimWatchStep, { type WatchStage } from '@/components/onboarding/ClaimWatchStep.vue'
@@ -26,7 +30,7 @@ import { useHiddenTasks } from '@/composables/useHiddenTasks'
 import { useS3 } from '@/composables/useS3'
 import { useRefresh } from '@/composables/useRefresh'
 import type { MetadataDocumentListItem } from '@/lib/api'
-import type { JobStatusResponse } from '@/lib/jobs'
+import { formatJobProgress, type JobStatusResponse } from '@/lib/jobs'
 import { detectQuickRun } from '@/lib/quickRuntimes'
 import { POLL_IDLE_MS, follow, onWake } from '@/lib/poll'
 import {
@@ -187,11 +191,16 @@ const resourceSummary = computed(() => {
   return parts.join(' · ')
 })
 
-const constraintSummary = computed(() =>
-  Object.entries(tesPlacementTags(task.value?.tags).labelConstraints)
-    .map(([key, value]) => (key === NODE_LABEL_KEY ? `node ${displayName(value)}` : `${key}=${value}`))
-    .join(' · '),
+const constraintList = computed(() =>
+  Object.entries(tesPlacementTags(task.value?.tags).labelConstraints).map(([key, value]) =>
+    key === NODE_LABEL_KEY ? `node ${displayName(value)}` : `${key}=${value}`,
+  ),
 )
+const tagList = computed(() => otherTags.value.map(([key, value]) => `${key}=${value}`))
+const volumeList = computed(() => task.value?.volumes ?? [])
+function countLabel(items: readonly string[], noun: string): string {
+  return items.length === 1 ? items[0]! : `${items.length} ${noun}${items.length === 1 ? '' : 's'}`
+}
 
 const familySummary = computed(() => {
   const family = nativeFamily.value
@@ -212,19 +221,14 @@ const requestDetails = computed<Detail[]>(() => {
   const image = task.value?.executors?.[0]?.image
   if (resourceSummary.value) items.push({ key: 'resources', label: 'Resources', value: resourceSummary.value })
   if (image) items.push({ key: 'image', label: 'Image', value: image, mono: true })
-  if (constraintSummary.value) items.push({ key: 'constraints', label: 'Constraints', value: constraintSummary.value })
+  if (constraintList.value.length) {
+    items.push({ key: 'constraints', label: 'Constraints', value: countLabel(constraintList.value, 'constraint') })
+  }
   if (familySummary.value) items.push({ key: 'family', label: 'Family', value: familySummary.value })
-  if (task.value?.volumes?.length) {
-    items.push({ key: 'volumes', label: 'Volumes', value: task.value.volumes.join(' · '), mono: true })
+  if (volumeList.value.length) {
+    items.push({ key: 'volumes', label: 'Volumes', value: countLabel(volumeList.value, 'volume') })
   }
-  if (otherTags.value.length) {
-    items.push({
-      key: 'tags',
-      label: 'Tags',
-      value: otherTags.value.map(([key, value]) => `${key}=${value}`).join(' · '),
-      mono: true,
-    })
-  }
+  if (tagList.value.length) items.push({ key: 'tags', label: 'Tags', value: countLabel(tagList.value, 'tag') })
   return items
 })
 
@@ -285,6 +289,13 @@ const failureMessage = computed(() => {
   return exitCode.value === undefined ? 'The script failed.' : `The script exited with code ${exitCode.value}`
 })
 
+// The node reports how far the input copy got; without a total there is
+// nothing to say beyond the state itself.
+const copyProgress = computed(() => {
+  const progress = nativeJob.value?.progress
+  return progress && progress.total != null ? formatJobProgress(progress) : ''
+})
+
 interface Summary {
   tone: 'error' | 'warning' | 'info' | 'success'
   headline: string
@@ -296,9 +307,14 @@ const summary = computed<Summary | null>(() => {
   const where = executorKind.value ? ` on ${executorKind.value}` : ''
   switch (state) {
     case 'QUEUED':
-      return { tone: 'info', headline: nodeConstraint.value ? 'Queued for the chosen node' : 'Queued, waiting for a node' }
+      return {
+        tone: 'info',
+        headline: nodeConstraint.value
+          ? `Waiting for a response from ${displayName(nodeConstraint.value)}`
+          : 'Queued, waiting for a node',
+      }
     case 'INITIALIZING':
-      return { tone: 'info', headline: `Preparing the run${where}` }
+      return { tone: 'info', headline: copyProgress.value ? `Copying inputs · ${copyProgress.value}` : 'Copying inputs' }
     case 'RUNNING':
       return { tone: 'info', headline: duration ? `Running for ${duration}${where}` : `Running${where}` }
     case 'PAUSED':
@@ -421,6 +437,23 @@ const capturedOutputs = computed<OutRow[]>(() =>
     .map((o) => ({ url: o.url, path: o.path, size: Number(o.size_bytes), link: resolveUrl(o.url) })),
 )
 
+// A run may capture hundreds of files, so both lists page.
+const OUTPUT_PAGE = 8
+const declaredPage = ref(1)
+const capturedPage = ref(1)
+const declaredShown = computed(() => pageSlice(declaredOutputs.value, declaredPage.value))
+const capturedShown = computed(() => pageSlice(capturedOutputs.value, capturedPage.value))
+function pageSlice(rows: OutRow[], page: number): OutRow[] {
+  return rows.slice((page - 1) * OUTPUT_PAGE, page * OUTPUT_PAGE)
+}
+function pageTotal(rows: OutRow[]): number {
+  return Math.max(1, Math.ceil(rows.length / OUTPUT_PAGE))
+}
+function pageRange(rows: OutRow[], page: number): string {
+  const first = (page - 1) * OUTPUT_PAGE + 1
+  return `${first}–${Math.min(page * OUTPUT_PAGE, rows.length)} of ${rows.length} output${rows.length === 1 ? '' : 's'}`
+}
+
 // ── Run dataset (targeted lookup at runs/{taskId}) ───────────────────────────
 async function findRunCrate() {
   if (runCrateLoading.value) return
@@ -439,8 +472,6 @@ async function findRunCrate() {
 const { busy: crateBusy, refresh: onFindCrate } = useRefresh(findRunCrate)
 const spinning = computed(() => crateBusy.value || runCrateLoading.value)
 
-const systemLogsOpen = ref(false)
-const showSystemLogs = computed(() => systemLogsOpen.value || failed.value)
 // The summary already prints the failure message, so a failed run lists only
 // the system log lines that add something.
 const systemLogLines = computed(() => {
@@ -448,6 +479,43 @@ const systemLogLines = computed(() => {
   if (!failed.value) return lines
   const message = failureMessage.value.trim()
   return lines.filter((line) => line.trim() !== message)
+})
+
+// The last error line next to the failure message, unless it says the same.
+const stderrTail = computed(() => {
+  const lines = executorStderr(0).split('\n').filter((line) => line.trim())
+  const last = lines[lines.length - 1]?.trim() ?? ''
+  return last && last !== failureMessage.value.trim() ? last : ''
+})
+
+const PREVIEW_LINES = 8
+function tail(text: string): string[] {
+  return text.split('\n').slice(-PREVIEW_LINES)
+}
+function hidden(text: string): number {
+  return Math.max(0, text.split('\n').length - PREVIEW_LINES)
+}
+// One line for the error stream: how much there is, and the last thing it said.
+function stderrSummary(i: number): string {
+  const lines = executorStderr(i).split('\n').filter((line) => line.trim())
+  if (!lines.length) return ''
+  return `${lines.length} line${lines.length === 1 ? '' : 's'} · last: ${lines[lines.length - 1]}`
+}
+
+const logOpen = ref(false)
+const logIndex = ref(0)
+function openLog(i: number) {
+  logIndex.value = i
+  logOpen.value = true
+}
+const logStreams = computed<LogStream[]>(() => {
+  const i = logIndex.value
+  const streams: LogStream[] = [{ key: 'stdout', label: 'stdout', text: executorStdout(i) }]
+  if (executorStderr(i)) streams.push({ key: 'stderr', label: 'stderr', text: executorStderr(i) })
+  if (systemLogLines.value.length) {
+    streams.push({ key: 'system', label: 'system', text: systemLogLines.value.join('\n') })
+  }
+  return streams
 })
 
 // ── Cancel (two-step inline confirm) ─────────────────────────────────────────
@@ -554,6 +622,13 @@ async function confirmDelete() {
             </Badge>
             <span v-if="nodeConstraint" class="inline-flex items-center gap-1">node <NodeLabel :node-id="nodeConstraint" size="sm" /></span>
           </div>
+          <p v-if="failed && stderrTail" class="truncate font-mono text-[11px]" :title="executorStderr(0)">
+            stderr: {{ stderrTail }}
+          </p>
+          <p v-if="task.state === 'QUEUED'" class="flex flex-wrap items-center gap-2 text-[11px]">
+            One node answers and runs it; another steps in after a while without a response.
+            <DocsLink topic="compute-run" section="Follow the run" />
+          </p>
         </Notice>
         <p v-if="lastPollError" class="text-[11px] text-muted-foreground">Refresh failed, retrying.</p>
 
@@ -599,24 +674,26 @@ async function confirmDelete() {
             </div>
             <template v-if="executorStdout(i) || executorStderr(i)">
               <div v-if="executorStdout(i)">
-                <div class="text-[10px] uppercase tracking-wider text-muted-foreground">{{ executorStderr(i) ? 'stdout' : 'output' }}</div>
-                <pre class="mt-1 max-h-64 overflow-y-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-3 font-mono text-[11px] leading-relaxed">{{ executorStdout(i) }}</pre>
+                <div class="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  {{ executorStderr(i) ? 'stdout' : 'output' }}<span v-if="hidden(executorStdout(i))"> · last {{ tail(executorStdout(i)).length }} lines</span>
+                </div>
+                <div class="relative mt-1">
+                  <pre class="overflow-x-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-3 font-mono text-[11px] leading-relaxed">{{ tail(executorStdout(i)).join('\n') }}</pre>
+                  <div
+                    v-if="hidden(executorStdout(i))"
+                    aria-hidden="true"
+                    class="pointer-events-none absolute inset-x-0 top-0 h-8 rounded-t bg-gradient-to-b from-background to-transparent"
+                  />
+                </div>
               </div>
-              <div v-if="executorStderr(i)">
-                <div class="text-[10px] uppercase tracking-wider text-muted-foreground">stderr</div>
-                <pre class="mt-1 max-h-64 overflow-y-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-3 font-mono text-[11px] leading-relaxed">{{ executorStderr(i) }}</pre>
-              </div>
+              <p v-if="stderrSummary(i)" class="truncate font-mono text-[11px] text-destructive" :title="executorStderr(i)">
+                stderr: {{ stderrSummary(i) }}
+              </p>
             </template>
             <p v-else-if="executorLog(i) || nativeResult" class="text-[11px] text-muted-foreground">No output captured.</p>
-          </div>
-          <div v-if="systemLogLines.length">
-            <Button v-if="!failed" variant="ghost" size="sm" @click="systemLogsOpen = !systemLogsOpen">
-              {{ systemLogsOpen ? 'Hide' : 'Show' }} system logs ({{ systemLogLines.length }})
+            <Button variant="outline" size="sm" @click="openLog(i)">
+              <FileText class="h-3.5 w-3.5" /> Open full log
             </Button>
-            <template v-if="showSystemLogs">
-              <div v-if="failed" class="text-[10px] uppercase tracking-wider text-muted-foreground">system logs</div>
-              <pre class="mt-1 max-h-48 overflow-y-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-3 font-mono text-[11px] leading-relaxed">{{ systemLogLines.join('\n') }}</pre>
-            </template>
           </div>
         </section>
 
@@ -626,7 +703,7 @@ async function confirmDelete() {
 
           <div v-if="declaredOutputs.length" class="space-y-1.5">
             <div class="text-[11px] font-medium text-foreground">Declared</div>
-            <div v-for="(row, i) in declaredOutputs" :key="'d' + i" class="flex flex-wrap items-center gap-2 text-[11px]">
+            <div v-for="(row, i) in declaredShown" :key="'d' + row.url + i" class="flex flex-wrap items-center gap-2 text-[11px]">
               <span class="font-mono text-muted-foreground">{{ row.path }}</span>
               <span class="text-muted-foreground">to</span>
               <RouterLink v-if="row.link.kind === 's3'" class="font-mono text-primary hover:underline" :to="{ name: 'bucket', params: { bucketId: row.link.bucketId }, query: row.link.prefix ? { prefix: row.link.prefix } : {} }">{{ row.url }}</RouterLink>
@@ -638,11 +715,20 @@ async function confirmDelete() {
               </template>
               <ExternalLink v-else :href="row.url" :label="row.url" class="font-mono text-muted-foreground hover:text-primary" />
             </div>
+            <div v-if="declaredOutputs.length > OUTPUT_PAGE" class="flex flex-wrap items-center justify-between gap-2">
+              <span class="text-[11px] text-muted-foreground">{{ pageRange(declaredOutputs, declaredPage) }}</span>
+              <Pagination
+                :page="declaredPage"
+                :page-count="pageTotal(declaredOutputs)"
+                :has-next="declaredPage < pageTotal(declaredOutputs)"
+                @update:page="(page: number) => (declaredPage = page)"
+              />
+            </div>
           </div>
 
           <div v-if="capturedOutputs.length" class="space-y-1.5">
             <div class="text-[11px] font-medium text-foreground">Captured</div>
-            <div v-for="(row, i) in capturedOutputs" :key="'c' + i" class="space-y-1.5">
+            <div v-for="(row, i) in capturedShown" :key="'c' + row.url + i" class="space-y-1.5">
               <div class="flex flex-wrap items-center gap-2 text-[11px]">
                 <Button
                   v-if="row.link.kind === 's3'"
@@ -675,6 +761,18 @@ async function confirmDelete() {
                 :size="row.size !== undefined && !Number.isNaN(row.size) ? row.size : undefined"
               />
             </div>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <span class="text-[11px] text-muted-foreground">
+                {{ pageRange(capturedOutputs, capturedPage) }} · all in the run dataset
+              </span>
+              <Pagination
+                v-if="capturedOutputs.length > OUTPUT_PAGE"
+                :page="capturedPage"
+                :page-count="pageTotal(capturedOutputs)"
+                :has-next="capturedPage < pageTotal(capturedOutputs)"
+                @update:page="(page: number) => (capturedPage = page)"
+              />
+            </div>
           </div>
           <p v-if="!declaredOutputs.length && !capturedOutputs.length" class="text-xs text-muted-foreground">No files captured for this run.</p>
 
@@ -692,7 +790,11 @@ async function confirmDelete() {
 
         <section data-tutorial="run-details" class="space-y-3">
           <h3 class="font-display text-sm font-semibold text-aruna-navy">Request</h3>
-          <DetailList :items="requestDetails" />
+          <DetailList :items="requestDetails">
+            <template #constraints><CountedList :items="constraintList" noun="constraint" /></template>
+            <template #volumes><CountedList :items="volumeList" noun="volume" mono /></template>
+            <template #tags><CountedList :items="tagList" noun="tag" mono /></template>
+          </DetailList>
         </section>
       </div>
     </div>
@@ -700,7 +802,7 @@ async function confirmDelete() {
     <template v-if="task" #footer>
       <div class="space-y-2">
         <div class="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" title="Starts a new run prefilled from this one" @click="rerun"><RotateCcw class="h-3.5 w-3.5" /> Run again</Button>
+          <Button v-if="!active" variant="outline" size="sm" title="Starts a new run prefilled from this one" @click="rerun"><RotateCcw class="h-3.5 w-3.5" /> Run again</Button>
           <template v-if="canCancel">
             <template v-if="!confirmingCancel">
               <Button variant="outline" size="sm" class="text-destructive hover:text-destructive" :disabled="busy" @click="requestCancel"><Ban class="h-3.5 w-3.5" /> Cancel run</Button>
@@ -732,4 +834,11 @@ async function confirmDelete() {
       </div>
     </template>
   </DetailDialog>
+  <RunLogDialog
+    v-if="task"
+    :open="logOpen"
+    :streams="logStreams"
+    :name="headerTitle"
+    @update:open="(value: boolean) => (logOpen = value)"
+  />
 </template>
