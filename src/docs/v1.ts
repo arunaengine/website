@@ -576,56 +576,63 @@ export const docsTopics: DocsTopic[] = [
       },
     ],
   },
+  // The three screenshots below still show the old two-step wizards; they need
+  // to be retaken against the one run page.
   {
     slug: 'compute-run',
     kind: 'Guide',
     title: 'Start and follow a compute run',
-    summary: 'Run a script next to your data with Quick run and read the states it reports.',
+    summary: 'Describe a run on one page, start it next to your data, and read the states it reports.',
     tutorial: 'compute',
     sections: [
       {
-        title: 'Choose a starting point',
+        title: 'Start from a template',
         icon: 'Play',
         paragraphs: [
-          'Quick run stages a short Python, JavaScript, or Bash script for you. Custom run takes your own image, command, and resources. Both run under a [group](concept:realm-nodes-groups#groups-own-your-work) and record provenance identically.',
+          'New run offers a Python, JavaScript or Bash script, or a blank run for your own container image. A template only prefills the image, the command and the working directory; every field stays editable, and a blank run can still add a script.',
         ],
         image: {
           src: '/docs/v1/compute-new-run.jpg',
-          alt: 'Compute view with the New run menu showing Quick run and Custom run',
-          caption: 'New run: a quick script or a fully described container.',
+          alt: 'Compute view with the New run menu listing the script templates and a blank run',
+          caption: 'New run: a script template, or your own container.',
         },
       },
       {
-        title: 'Script and data',
+        title: 'One page, six sections',
         icon: 'SquareTerminal',
         paragraphs: [
+          'Run, Executor, Script, Container filesystem, Resources and Placement sit on one page. Each card carries a check at the right end of its header: a green tick when it is complete, an orange mark with what is missing while it is not.',
           'A run creates no bucket of its own. It reads each input from the bucket that holds it, at the version current when the run was accepted, and writes every output into the bucket and key the run names.',
         ],
         steps: [
-          'Pick the runtime; the working directory defaults to /work.',
-          'Select the owning group.',
-          'Write the script, or load a staged one.',
-          'Add input mounts [bucket](concept:data-and-deletion#buckets-hold-the-bytes) [objects](concept:glossary#object); the tree shows the filesystem as the script will see it.',
-          'Add output declares files worth keeping; stdout and stderr are always captured.',
+          'Name the run and pick the owning [group](concept:realm-nodes-groups#groups-own-your-work).',
+          'Choose a script runtime or a custom image, and edit the command line.',
+          'Write the script; the paths it names are listed as chips under the editor.',
+          'Add inputs and captures in the container filesystem; a folder\u2019s + menu adds them in place.',
+          'stdout and stderr are always captured, whatever else the run keeps.',
         ],
         image: {
           src: '/docs/v1/quick-run-script.jpg',
-          alt: 'Quick run script step with the editor and the container data tree',
-          caption: 'The script step: code left, the container filesystem with staged inputs right.',
+          alt: 'The run page with the script editor and the container filesystem',
+          caption: 'The script and the filesystem it works on, side by side.',
         },
       },
       {
-        title: 'Review and run',
+        title: 'Resources, placement and the request',
         icon: 'Rocket',
+        paragraphs: [
+          'Resources and Placement show their decision as tiles; Edit turns the values into fields in place. Placement counts the nodes that still match the pinned node, the executor kind and the label constraints the nodes advertise.',
+        ],
         steps: [
-          'Read the review: [placement](concept:data-to-compute), the container manifest, and the exact request.',
-          'Leave the node on Any node unless the run must sit on a specific [node](concept:glossary#node).',
+          'Leave the node unpinned unless the run must sit on a specific [node](concept:glossary#node).',
+          'Show request opens the exact body that is sent, verbatim.',
+          'The line at the end of the form either lists what is still needed or says the run is ready.',
           'Run once. [Accepted](concept:states-and-retry) means durable; Preparing means scheduling is still converging.',
         ],
         image: {
           src: '/docs/v1/quick-run-review.jpg',
-          alt: 'Quick run review step with placement, container manifest, and the run request',
-          caption: 'Review before launch: the request is shown verbatim.',
+          alt: 'The end of the run page with the readiness line, Show request and Run',
+          caption: 'The request is shown verbatim before anything is sent.',
         },
       },
       {

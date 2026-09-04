@@ -355,7 +355,7 @@ onUnmounted(() => {
 <template>
   <div class="space-y-4">
     <p class="text-xs text-muted-foreground">
-      Runs are the work <span class="font-medium text-foreground">you start</span> on this node; begin with Quick run, or describe a custom run.
+      Runs are the work <span class="font-medium text-foreground">you start</span> on this node; begin with a script template, or describe your own container.
     </p>
 
     <ListSkeleton v-if="!painted" header :rows="5" label="Loading runs" />

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// The compute tutorial: the real Custom run wizard and the real run detail,
+// The compute tutorial: the real run page and the real run detail,
 // driven by a seeded draft and answered from fixtures. Nothing reaches a node
 // while the session runs, and leaving the route ends it.
 import { computed, onUnmounted, provide, ref, watch } from 'vue'
@@ -90,7 +90,7 @@ const groups = computed<Group[]>(() => [
   },
 ])
 
-// The wizard's own store, seeded with a draft worth reading, then provided so
+// The run page's own store, seeded with a draft worth reading, then provided so
 // ComputeSubmitView adopts it instead of building an empty one.
 const store = createCustomRun({
   runTarget: useRunTarget(),

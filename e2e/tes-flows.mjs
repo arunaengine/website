@@ -88,25 +88,24 @@ try {
     )
 
     await page.getByRole('button', { name: /New run/ }).first().click()
-    await page.getByText('Custom run', { exact: true }).first().click()
+    await page.getByText('Blank run', { exact: true }).first().click()
     await page.waitForURL(/\/app\/compute\/new/)
     await page.waitForTimeout(800)
 
-    // Basics: name the run, describe it, and pick its owning group.
+    // One page: run details, executor, filesystem, resources and placement.
     await page.getByPlaceholder('align-and-count').fill('TES resource e2e')
-    await page.locator('textarea').first().fill('Exercises the three-step run wizard.')
+    await page.getByRole('textbox', { name: 'Description' }).fill('Exercises the one run page.')
     await page.locator('[role="combobox"], button[aria-haspopup="listbox"]').first().click()
     await page.waitForTimeout(300)
     await page.getByRole('option').first().click()
-    await page.getByRole('button', { name: /^Continue$/ }).click()
 
-    // Workload: one command line, one output capture, a workspace, and resources.
-    await page.getByRole('button', { name: 'Table', exact: true }).click()
     await page.getByPlaceholder('ubuntu:22.04').fill('alpine:3.20')
     const commandLine = page.getByRole('textbox', { name: 'Command line' })
-    await commandLine.fill('sh -c "echo hello > /outputs/result.txt"')
-    await page.getByRole('textbox', { name: 'Container path to capture' }).fill('/outputs/result.txt')
+    await commandLine.fill('sh -c "echo hello > /work/out/result.txt"')
 
+    await page.getByRole('button', { name: 'Table', exact: true }).click()
+    await page.getByRole('button', { name: /^Add output$/ }).first().click()
+    await page.getByRole('textbox', { name: 'Container path to capture' }).fill('/work/out/result.txt')
     const outputBucket = page.locator('[aria-label="Destination bucket"]').first()
     if ((await outputBucket.evaluate((element) => element.tagName)) === 'INPUT') {
       await outputBucket.fill('e2e-results')
@@ -115,28 +114,27 @@ try {
       await page.getByRole('option').first().click()
     }
     await page.getByRole('textbox', { name: 'Destination key' }).fill('tes-e2e/result.txt')
-    await page.getByRole('button', { name: /^Temporary workspace/ }).click()
 
-    await page.getByText('CPU cores', { exact: true }).locator('..').locator('input').fill('4')
-    await page.getByText('RAM (GB)', { exact: true }).locator('..').locator('input').fill('8.5')
-    await page.getByText('Disk (GB)', { exact: true }).locator('..').locator('input').fill('20.25')
+    await page.getByRole('button', { name: 'Edit resources' }).click()
+    await page.getByRole('textbox', { name: 'CPU cores' }).fill('4')
+    await page.getByRole('textbox', { name: 'RAM in GB' }).fill('8.5')
+    await page.getByRole('textbox', { name: 'Disk in GB' }).fill('20.25')
 
-    step(
-      'single executor command-line editor shown',
-      (await page.getByText('A run has exactly one executor.').count()) === 1,
-    )
-    await page.getByRole('button', { name: /^Continue$/ }).click()
+    const footer = (await page.textContent('body')) || ''
+    step('footer reports the run as ready', footer.includes('Ready'))
 
-    // Review replaces the Workload DOM and shows the exact pruned request JSON.
+    // The request behind the form, shown verbatim in its own dialog.
+    await page.getByRole('button', { name: /^Show request$/ }).click()
     await page.getByText('Run request', { exact: true }).waitFor()
-    const reviewJson = (await page.locator('pre').filter({ hasText: '"resources"' }).textContent()) || ''
-    step('Workload form replaced by Review', (await commandLine.count()) === 0)
+    const requestJson = (await page.locator('pre').filter({ hasText: '"resources"' }).textContent()) || ''
     step(
-      'Review JSON carries CPU, RAM, and Disk values',
-      reviewJson.includes('"cpu_cores": 4') &&
-        reviewJson.includes('"ram_gb": 8.5') &&
-        reviewJson.includes('"disk_gb": 20.25'),
+      'request JSON carries CPU, RAM, and Disk values',
+      requestJson.includes('"cpu_cores": 4') &&
+        requestJson.includes('"ram_gb": 8.5') &&
+        requestJson.includes('"disk_gb": 20.25'),
     )
+    await page.keyboard.press('Escape')
+    step('the form is still there behind the request', (await commandLine.count()) === 1)
 
     await page.getByRole('button', { name: /^Run$/ }).click()
     await page.waitForURL(/\/app\/compute\/[^/]+$/, { timeout: 20000 })

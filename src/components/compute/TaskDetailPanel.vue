@@ -31,7 +31,6 @@ import { useS3 } from '@/composables/useS3'
 import { useRefresh } from '@/composables/useRefresh'
 import type { MetadataDocumentListItem } from '@/lib/api'
 import { formatJobProgress, type JobStatusResponse } from '@/lib/jobs'
-import { detectQuickRun } from '@/lib/quickRuntimes'
 import { POLL_IDLE_MS, follow, onWake } from '@/lib/poll'
 import {
   TES_GROUP_TAG,
@@ -543,12 +542,11 @@ const active = computed(() => !!task.value && !isTerminalTesState(task.value.sta
 const canCancel = active
 
 // ── Re-run ───────────────────────────────────────────────────────────────────
-// Quick runs reopen the quick-run wizard, anything else the custom-run wizard;
-// both read ?rerun=<taskId> and prefill from the FULL run record.
+// The run page reads ?rerun=<taskId> and prefills from the FULL run record; the
+// template it lands on comes from the run itself.
 function rerun() {
   if (!task.value) return
-  const target = detectQuickRun(task.value) ? 'compute-quick' : 'compute-new'
-  void router.push({ name: target, query: { rerun: props.taskId } })
+  void router.push({ name: 'compute-new', query: { rerun: props.taskId } })
 }
 
 // ── Delete (client-side hide; TES has no delete endpoint yet) ────────────────
