@@ -62,7 +62,7 @@ const {
       <div class="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
         <Badge variant="secondary">{{ relativeTime(doc.updatedAt) }}</Badge>
         <Badge v-if="projectCrate" variant="outline" size="sm" class="gap-1 uppercase"><Layers class="h-3 w-3" /> Project dataset</Badge>
-        <AskAiButton :prompt="askPrompt" icon-only />
+        <AskAiButton :prompt="askPrompt" :subject="`dataset ${doc.ulid}`" icon-only />
       </div>
     </div>
 

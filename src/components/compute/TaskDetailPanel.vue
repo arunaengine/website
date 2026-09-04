@@ -590,7 +590,7 @@ async function confirmDelete() {
           :tags="task.tags"
           :description="task.description"
         />
-        <AskAiButton :prompt="askPrompt" icon-only class="shrink-0" />
+        <AskAiButton :prompt="askPrompt" :subject="`run ${taskId}`" icon-only class="shrink-0" />
       </div>
       <Skeleton v-else-if="loadState === 'loading'" class="h-6 w-2/3" />
     </template>

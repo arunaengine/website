@@ -63,7 +63,20 @@ describe('AskAiButton', () => {
     await click(button(mounted.root, 'Ask AI'))
     await flush()
 
-    expect(openWith).toHaveBeenCalledWith('Explain run r1')
+    expect(openWith).toHaveBeenCalledWith('Explain run r1', undefined)
+    mounted.app.unmount()
+  })
+
+  it('hands the subject over so an unrelated question starts a chat', async () => {
+    assistantAvailable.value = true
+    const mounted = await mountApp(AskAiButton, {
+      props: { prompt: 'Explain run r1', subject: 'run r1' },
+    })
+
+    await click(button(mounted.root, 'Ask AI'))
+    await flush()
+
+    expect(openWith).toHaveBeenCalledWith('Explain run r1', 'run r1')
     mounted.app.unmount()
   })
 
@@ -83,7 +96,7 @@ describe('AskAiButton', () => {
     await click(control)
     await flush()
 
-    expect(openWith).toHaveBeenCalledWith('Explain run r1')
+    expect(openWith).toHaveBeenCalledWith('Explain run r1', undefined)
     mounted.app.unmount()
   })
 

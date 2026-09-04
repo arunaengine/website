@@ -192,7 +192,7 @@ async function run() {
   <div>
     <PageHeader eyebrow="Compute" title="New run">
       <template #actions>
-        <AskAiButton size="default" prompt="Help me set up this run." />
+        <AskAiButton size="default" prompt="Help me set up this run." subject="the run form" />
         <Button variant="outline" size="default" as-child>
           <RouterLink :to="{ name: 'compute' }"><ArrowLeft class="h-4 w-4" /> Back to Compute</RouterLink>
         </Button>

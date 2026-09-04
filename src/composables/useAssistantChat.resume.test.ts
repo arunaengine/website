@@ -240,6 +240,21 @@ describe('a watcher resuming its own chat', () => {
     expect(second).toMatchObject({ updated: true })
   })
 
+  it('opens a chat for another subject and keeps the one it is about', () => {
+    const chat = useAssistantChat()
+    chat.selectChat('c-a')
+    const started = chat.activeChatId.value
+
+    chat.openWith('Explain this run', 'run 04JOB')
+    const opened: string = chat.activeChatId.value
+    expect(opened).not.toBe(started)
+    expect(chat.draft.value).toBe('Explain this run')
+
+    chat.openWith('And what did it write?', 'run 04JOB')
+
+    expect(chat.activeChatId.value).toBe(opened)
+  })
+
   it('stops watching once the job settled', async () => {
     const chat = useAssistantChat()
     const before = turns.calls.length

@@ -21,6 +21,8 @@ export interface AssistantChatScope {
 export interface AssistantChatRecord {
   id: string
   title: string
+  /** What the chat is about, as the Ask AI button named it; a different one starts a new chat. */
+  subject?: string
   createdAt: number
   updatedAt: number
   messages: ChatMessage[]
@@ -167,9 +169,11 @@ function normalizeChat(value: unknown, now = Date.now()): AssistantChatRecord | 
   const history = Array.isArray(value.history)
     ? trimHistory(value.history.slice(-MAX_ASSISTANT_HISTORY_MESSAGES * 2).filter(isModelMessage))
     : []
+  const subject = boundedString(value.subject, '', MAX_TITLE_LENGTH)
   return {
     id,
     title: boundedString(value.title, 'New chat', MAX_TITLE_LENGTH),
+    ...(subject ? { subject } : {}),
     createdAt,
     updatedAt: numberValue(value.updatedAt, now),
     messages,

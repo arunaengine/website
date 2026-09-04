@@ -12,6 +12,8 @@ import { cn } from '@/lib/utils'
 const props = withDefaults(
   defineProps<{
     prompt: string
+    /** What the question is about; a different one opens a new chat. */
+    subject?: string
     label?: string
     iconOnly?: boolean
     size?: 'sm' | 'default'
@@ -19,6 +21,7 @@ const props = withDefaults(
     class?: string
   }>(),
   {
+    subject: undefined,
     label: 'Ask AI',
     iconOnly: false,
     size: 'sm',
@@ -29,7 +32,8 @@ const props = withDefaults(
 
 // Lazy so the chat module stays out of every host view's chunk.
 function ask() {
-  void import('@/composables/useAssistantChat').then(({ useAssistantChat }) => useAssistantChat().openWith(props.prompt))
+  void import('@/composables/useAssistantChat')
+    .then(({ useAssistantChat }) => useAssistantChat().openWith(props.prompt, props.subject))
 }
 </script>
 

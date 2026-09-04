@@ -314,7 +314,7 @@ async function leave() {
           <div class="truncate font-mono text-[10px] text-muted-foreground">{{ group.group_id }}</div>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-          <AskAiButton :prompt="askPrompt" />
+          <AskAiButton :prompt="askPrompt" :subject="`group ${groupId}`" />
           <Button v-if="isMember" variant="outline" size="sm" :disabled="saving" @click="leave">
             <LogOut class="h-3.5 w-3.5" /> Leave group
           </Button>
