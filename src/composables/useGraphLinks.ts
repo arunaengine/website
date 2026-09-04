@@ -5,6 +5,8 @@ import { onBeforeUnmount, onMounted, type Ref } from 'vue'
 import { boxIn, linkPath, segment, type Box } from '@/lib/landing/graphLinks'
 
 const SVG = 'http://www.w3.org/2000/svg'
+/** How far outside a card its links begin, so a packet's bloom clears the edge. */
+const LINK_GAP = 14
 
 function offsetPathsWork(): boolean {
   return typeof CSS !== 'undefined' && typeof CSS.supports === 'function'
@@ -30,7 +32,7 @@ export function useGraphLinks(root: Ref<HTMLElement | null>, links: string[]) {
     const between = (a: string, b: string) => {
       const from = boxes.get(a)
       const to = boxes.get(b)
-      return from && to ? segment(from, to) : null
+      return from && to ? segment(from, to, LINK_GAP) : null
     }
     svg.setAttribute('viewBox', `0 0 ${graph.clientWidth} ${graph.clientHeight}`)
     svg.replaceChildren()

@@ -24,8 +24,10 @@
   stroke-linecap: round;
 }
 
-/* Node cards: a blue-tinted frame, a bloom behind them while they work. */
+/* Node cards sit above the links and packets, so a packet enters a node and
+   disappears behind it instead of crossing the card. */
 .fed .landing-node {
+  z-index: 2;
   border-color: hsl(var(--primary) / 0.28);
   background:
     linear-gradient(180deg, hsl(var(--primary) / 0.08), transparent 55%),
@@ -42,6 +44,9 @@
   opacity: 0;
   pointer-events: none;
   z-index: -1;
+}
+.fed svg[data-links] {
+  z-index: 0;
 }
 .fed .node-dot {
   position: relative;
@@ -68,6 +73,7 @@
   position: absolute;
   top: 0;
   left: 0;
+  z-index: 1;
   offset-distance: 0%;
   opacity: 0;
   pointer-events: none;
