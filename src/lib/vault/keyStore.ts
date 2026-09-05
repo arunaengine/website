@@ -9,6 +9,7 @@ export interface VaultKeyStore {
   load(scope: string): Promise<CryptoKey | null>
   save(scope: string, key: CryptoKey): Promise<void>
   remove(scope: string): Promise<void>
+  clear(): Promise<void>
 }
 
 function settled<T>(request: IDBRequest<T>): Promise<T> {
@@ -48,6 +49,9 @@ export function browserKeyStore(): VaultKeyStore | null {
     },
     async remove(scope) {
       await withStore('readwrite', (store) => store.delete(scope))
+    },
+    async clear() {
+      await withStore('readwrite', (store) => store.clear())
     },
   }
 }

@@ -75,6 +75,12 @@ function forgetKey(scope: string) {
   })
 }
 
+function forgetKeys() {
+  void keyStore?.clear().catch(() => {
+    // Same as above: nothing was kept where nothing can be written.
+  })
+}
+
 async function rememberedKey(scope: string): Promise<CryptoKey | null> {
   try {
     return (await keyStore?.load(scope)) ?? null
@@ -312,13 +318,13 @@ async function saveProviders(next: BrowserProvider[]): Promise<void> {
   providers.value = merged
 }
 
-// A token or node change forgets the remembered key; a realm or user change
-// only starts over with what the node holds for the new scope.
+// A token or node change forgets every remembered key, whether or not this
+// tab loaded the vault; a realm or user change only starts over with what the
+// node holds for the new scope.
 watch(sessionEpoch, () => {
-  const scope = scopeKey
   scopeKey = ''
   clearLocal()
-  forgetKey(scope)
+  forgetKeys()
 }, { flush: 'sync' })
 watch(currentScope, (scope) => {
   if (scope === scopeKey) return

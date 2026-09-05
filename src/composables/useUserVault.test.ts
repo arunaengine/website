@@ -53,6 +53,9 @@ vi.mock('@/lib/vault/keyStore', () => ({
     remove: async (scope: string) => {
       remembered.delete(scope)
     },
+    clear: async () => {
+      remembered.clear()
+    },
   }),
 }))
 vi.mock('@/lib/vault/crypto', async (importOriginal) => {
@@ -75,7 +78,7 @@ const local = validateBrowserProvider({
 })
 
 /** A fresh portal start: new module state against the same node and browser store. */
-async function boot() {
+async function boot(options: { load?: boolean } = {}) {
   vi.resetModules()
   const state = await import('@/composables/aruna/state')
   state.apiBaseUrl.value = 'https://node.test/api/v1'
@@ -83,7 +86,7 @@ async function boot() {
   state.userInfo.value = { user: { user_id: 'u-1' }, realm: { realm_id: 'r-1' } } as never
   const { useUserVault } = await import('./useUserVault')
   const vault = useUserVault()
-  await vault.load()
+  if (options.load !== false) await vault.load()
   return { vault, state }
 }
 
@@ -254,6 +257,17 @@ describe('useUserVault', () => {
     expect(vault.state.value).toBe('absent')
     expect(vault.loaded.value).toBe(false)
     expect(remembered.size).toBe(0)
+  })
+
+  it('a session change forgets every key, even in a tab that never loaded', async () => {
+    const { vault, state } = await boot({ load: false })
+    remembered.set('another scope', {} as CryptoKey)
+
+    state.sessionEpoch.value += 1
+    await Promise.resolve()
+
+    expect(remembered.size).toBe(0)
+    expect(vault.loaded.value).toBe(false)
   })
 
   it('refuses to save while locked', async () => {
