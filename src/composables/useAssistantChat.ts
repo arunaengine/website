@@ -1106,7 +1106,8 @@ async function pullChat(head: AssistantChatHead): Promise<void> {
     markNew(sync, chatTurns(before))
     return
   }
-  const after = known && sync.revision ? sync.nextSeq - 1 : undefined
+  // A head this browser knows without any turn is read in full, not after -1.
+  const after = known && sync.revision && sync.nextSeq > 0 ? sync.nextSeq - 1 : undefined
   let pulled: ChatTurn[] = []
   if (after === undefined || head.next_seq > sync.nextSeq) {
     let turns

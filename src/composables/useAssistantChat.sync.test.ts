@@ -115,6 +115,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
     },
     readTurns: async (id: string, after?: number) => {
       node.log.push(`GET turns ${id} after ${after ?? '-'}`)
+      if (after !== undefined && after < 0) throw node.fail(400, 'after must not be negative')
       const chat = liveChat(id)
       const turns: AssistantChatTurn[] = [...chat.turns]
         .filter(([seq]) => seq > (after ?? -1))
@@ -392,6 +393,19 @@ describe('reloading', () => {
 
     expect(node.log).toEqual(['GET chats', `PUT turn ${id}/2 rev ${revision}`])
     expect(nodeTexts(id).slice(-2)).toEqual(['sent before', 'sent before answered'])
+  })
+
+  it('reads a chat in full whose head it knows but whose turns it never had', async () => {
+    // A cursor at next_seq 0 must not ask the node for the turns after -1.
+    await login((scope) => {
+      seedNode('n-9', 'Headed', [payload('u1', 'first')])
+      const held = { ...newAssistantChat('Headed'), id: 'n-9', updatedAt: 5, remote: { revision: 1, nextSeq: 0, tailKey: '' } }
+      createAssistantChatStore(scope).save({ activeChatId: held.id, chats: [held] })
+    })
+    await settle()
+
+    expect(node.log).toContain('GET turns n-9 after -')
+    expect(texts('n-9')).toEqual(['first', 'first answered'])
   })
 })
 
