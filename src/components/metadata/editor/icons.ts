@@ -11,11 +11,15 @@ const BY_TYPE: Record<string, typeof User> = {
   Dataset: FolderTree,
 }
 
-export function entityIcon(entity: DraftEntity | undefined, isRoot = false) {
+export function typeIcon(types: string[], isRoot = false) {
   if (isRoot) return Package
-  for (const type of entity?.types ?? []) {
+  for (const type of types) {
     const icon = BY_TYPE[typeLabel(type)]
     if (icon) return icon
   }
   return Tag
+}
+
+export function entityIcon(entity: DraftEntity | undefined, isRoot = false) {
+  return typeIcon(entity?.types ?? [], isRoot)
 }

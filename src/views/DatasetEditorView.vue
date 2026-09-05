@@ -48,7 +48,7 @@ import {
 import { FileJson2, FolderTree } from '@lucide/vue'
 
 // The graph carries Vue Flow and dagre; only the Graph tab pays for them.
-const EditorGraph = defineAsyncComponent(() => import('@/components/metadata/editor/EditorGraph.vue'))
+const CrateGraph = defineAsyncComponent(() => import('@/components/metadata/CrateGraph.vue'))
 
 const route = useRoute()
 const router = useRouter()
@@ -540,9 +540,10 @@ async function save() {
             />
             <PidWithdraw v-if="mode === 'edit'" :document-id="documentId" />
           </template>
-          <EditorGraph
+          <CrateGraph
             v-else
-            :draft="draft"
+            :source="draft"
+            mode="edit"
             :vocab="vocab"
             :selected="selected"
             @select="(id) => (selected = id)"

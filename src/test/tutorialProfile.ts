@@ -301,7 +301,7 @@ const DatasetEditorView = compileClientComponent(url('views/DatasetEditorView.vu
   '@/components/metadata/editor/EntityEditor.vue': moduleDefault(EntityEditor),
   '@/components/metadata/editor/IssueDrawer.vue': moduleDefault(IssueDrawer),
   '@/components/metadata/editor/NodeCheckPanel.vue': moduleDefault(NodeCheckPanel),
-  '@/components/metadata/editor/EditorGraph.vue': moduleDefault(GenericStub),
+  '@/components/metadata/CrateGraph.vue': moduleDefault(GenericStub),
   '@/components/metadata/PidWithdraw.vue': moduleDefault(GenericStub),
   '@/composables/useAruna': Aruna,
   '@/composables/useGroupSelection': GroupSelection,

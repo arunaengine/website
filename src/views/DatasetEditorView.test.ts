@@ -264,7 +264,7 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
   '@/components/metadata/editor/DatasetLocationDialog.vue': moduleDefault(LocationStub),
   '@/components/metadata/editor/EntityBrowser.vue': moduleDefault(BrowserStub),
   '@/components/metadata/editor/EntityEditor.vue': moduleDefault(EditorStub),
-  '@/components/metadata/editor/EditorGraph.vue': moduleDefault(GraphStub),
+  '@/components/metadata/CrateGraph.vue': moduleDefault(GraphStub),
   '@/components/metadata/editor/IssueDrawer.vue': moduleDefault(DrawerStub),
   '@/components/metadata/editor/NodeCheckPanel.vue': moduleDefault(NodeCheckStub),
   '@/components/metadata/PidWithdraw.vue': moduleDefault(WithdrawStub),
