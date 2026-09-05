@@ -41,6 +41,8 @@ export interface PutAssistantChatRequest {
 
 export interface PutAssistantTurnRequest {
   payload: string
+  /** The head revision the portal holds; a write since is refused with 409. */
+  revision?: number
 }
 
 const PATH = '/access/users/me/assistant/chats'
@@ -94,7 +96,7 @@ export function readTurns(
   return apiRequest<ReadAssistantTurnsResponse>(`${chatPath(id)}/turns`, { query: { after }, signal }, client)
 }
 
-/** Appends the turn at `next_seq` or rewrites the one before it; answers with the head. */
+/** Appends the turn at `next_seq` or rewrites the one before it; answers with the head after the write. */
 export function putTurn(
   id: string,
   seq: number,

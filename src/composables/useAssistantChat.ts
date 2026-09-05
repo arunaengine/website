@@ -1151,7 +1151,8 @@ async function pushChat(chat: AssistantChatRecord, sync: ChatSync, retry: boolea
         continue
       }
       const changes = sync.changes
-      const head = await putTurn(chat.id, seq, { payload: encodeTurn(turns[index]) }, client())
+      const request = { payload: encodeTurn(turns[index]), ...(sync.revision ? { revision: sync.revision } : {}) }
+      const head = await putTurn(chat.id, seq, request, client())
       if (chatScopeKey !== scopeKey) return
       trackHead(sync, head)
       sync.seqs.set(turnKey(turns[index]), seq)

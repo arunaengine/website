@@ -3,7 +3,14 @@
 // happens on a stale seq, a stale revision, and a deleted chat.
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
-import type { AssistantChatHead, AssistantChatTurn, AssistantProvider, PutAssistantChatRequest, UserInfoResponse } from '@/lib/api'
+import type {
+  AssistantChatHead,
+  AssistantChatTurn,
+  AssistantProvider,
+  PutAssistantChatRequest,
+  PutAssistantTurnRequest,
+  UserInfoResponse,
+} from '@/lib/api'
 
 const provider: AssistantProvider = {
   provider_id: 'p-1',
@@ -115,11 +122,12 @@ vi.mock('@/lib/api', async (importOriginal) => {
         .map(([seq, payload]) => ({ seq, payload, updated_at: node.now() }))
       return { turns }
     },
-    putTurn: async (id: string, seq: number, request: { payload: string }) => {
-      node.log.push(`PUT turn ${id}/${seq}`)
+    putTurn: async (id: string, seq: number, request: PutAssistantTurnRequest) => {
+      node.log.push(`PUT turn ${id}/${seq} rev ${request.revision ?? '-'}`)
       const chat = liveChat(id)
       const next = chat.head.next_seq
       if (seq !== next && seq !== next - 1) throw node.fail(409, `the next seq is ${next}`)
+      if (request.revision !== undefined && request.revision !== chat.head.revision) throw node.fail(409, 'stale revision')
       chat.turns.set(seq, request.payload)
       chat.head = { ...chat.head, next_seq: Math.max(next, seq + 1), revision: chat.head.revision + 1, updated_at: node.now() }
       return chat.head
@@ -224,7 +232,13 @@ describe('pushing', () => {
     await chat.send('second question', { route: '/' })
     await settle()
 
-    expect(node.log).toEqual(['GET chats', `PUT chat ${id} rev - first question`, `PUT turn ${id}/0`, `PUT turn ${id}/1`])
+    // Every turn write carries the revision the browser holds at that moment.
+    expect(node.log).toEqual([
+      'GET chats',
+      `PUT chat ${id} rev - first question`,
+      `PUT turn ${id}/0 rev 1`,
+      `PUT turn ${id}/1 rev 2`,
+    ])
     expect(nodeTexts(id)).toEqual(['first question', 'first question answered', 'second question', 'second question answered'])
     expect(node.chats.get(id)?.head.next_seq).toBe(2)
   })
@@ -236,7 +250,7 @@ describe('pushing', () => {
     await chat.send('third question', { route: '/' })
     await settle()
 
-    expect(node.log).toEqual([`PUT turn ${id}/2`])
+    expect(node.log).toEqual([`PUT turn ${id}/2 rev 3`])
     expect(nodeTexts(id)).toHaveLength(6)
   })
 
@@ -288,9 +302,9 @@ describe('logging in', () => {
     expect(texts('n-1')).toEqual(['one', 'one answered', 'two', 'two answered', 'late', 'late answered'])
     expect(chat.chats.value.find((entry) => entry.id === 'n-1')?.title).toBe('From the node')
     expect(node.log).toContain('GET turns n-1 after -')
-    expect(node.log).toContain('PUT turn n-1/2')
+    expect(node.log).toContain('PUT turn n-1/2 rev 3')
     expect(nodeTexts('n-1').slice(-2)).toEqual(['late', 'late answered'])
-    expect(node.log.indexOf('PUT chat l-1 rev - Only here')).toBeLessThan(node.log.indexOf('PUT turn l-1/0'))
+    expect(node.log.indexOf('PUT chat l-1 rev - Only here')).toBeLessThan(node.log.indexOf('PUT turn l-1/0 rev 1'))
     expect(nodeTexts('l-1')).toEqual(['mine', 'mine answered'])
   })
 
@@ -320,8 +334,7 @@ describe('conflicts', () => {
     await login(() => seedNode('n-3', 'Shared', [payload('u1', 'one')]))
     await settle()
     chat.selectChat('n-3')
-    // Another browser appended two turns since this one read the chat. (One
-    // alone would be taken for this browser's own tail and written over.)
+    // Another browser appended two turns since this one read the chat.
     const held = node.chats.get('n-3')!
     held.turns.set(1, payload('x1', 'theirs'))
     held.turns.set(2, payload('x2', 'more'))
@@ -331,7 +344,7 @@ describe('conflicts', () => {
     await chat.send('ours', { route: '/' })
     await settle()
 
-    expect(node.log).toEqual(['PUT turn n-3/1', 'GET chats', 'GET turns n-3 after 0', 'PUT turn n-3/3'])
+    expect(node.log).toEqual(['PUT turn n-3/1 rev 2', 'GET chats', 'GET turns n-3 after 0', 'PUT turn n-3/3 rev 4'])
     expect(texts('n-3')).toEqual([
       'one', 'one answered', 'theirs', 'theirs answered', 'more', 'more answered', 'ours', 'ours answered',
     ])
@@ -359,5 +372,23 @@ describe('conflicts', () => {
 
     expect(chat.chats.value.some((entry) => entry.id === 'n-3')).toBe(false)
     expect(chat.activeChatId.value).not.toBe('n-3')
+  })
+
+  it('never writes over one turn another browser appended a moment earlier', async () => {
+    // The seq alone would pass as a tail rewrite; the stale revision refuses it.
+    await login(() => seedNode('n-4', 'Shared', [payload('u1', 'one')]))
+    await settle()
+    chat.selectChat('n-4')
+    const held = node.chats.get('n-4')!
+    held.turns.set(1, payload('x1', 'theirs'))
+    held.head = { ...held.head, next_seq: 2, revision: held.head.revision + 1 }
+    node.log.length = 0
+
+    await chat.send('ours', { route: '/' })
+    await settle()
+
+    expect(node.log).toEqual(['PUT turn n-4/1 rev 2', 'GET chats', 'GET turns n-4 after 0', 'PUT turn n-4/2 rev 3'])
+    expect(nodeTexts('n-4')).toEqual(['one', 'one answered', 'theirs', 'theirs answered', 'ours', 'ours answered'])
+    expect(texts('n-4')).toEqual(nodeTexts('n-4'))
   })
 })
