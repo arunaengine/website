@@ -52,7 +52,17 @@ import {
   turnKey,
   type ChatTurn,
 } from '@/lib/assistant/chatTurns'
-import { markTurns, newChatSync, resetSync, trackHead, turnSeqs, type ChatSync } from '@/lib/assistant/chatSync'
+import {
+  cursorOf,
+  markNew,
+  markTurns,
+  newChatSync,
+  resetSync,
+  restoreCursor,
+  trackHead,
+  turnSeqs,
+  type ChatSync,
+} from '@/lib/assistant/chatSync'
 import { clearLiveJobs, setWatchedJobs } from '@/lib/assistant/jobLive'
 import { searchKind, type SearchKind } from '@/lib/assistant/webSearch'
 import { watchPoller } from '@/lib/assistant/watchPoll'
@@ -968,6 +978,19 @@ function markHead(chatId: string) {
   syncOf(chatId).headDirty = true
 }
 
+/** Puts what the node confirmed into the live record; the next save keeps it. */
+function recordCursor(chatId: string, sync: ChatSync) {
+  const chat = chatById(chatId)
+  if (chat) chat.remote = cursorOf(sync)
+}
+
+/** Starts a chat over as one the node does not hold. */
+function startOver(chat: AssistantChatRecord) {
+  const sync = syncOf(chat.id)
+  resetSync(sync, chatTurns(chat))
+  recordCursor(chat.id, sync)
+}
+
 /** Drops the chat from the node as well, where the node held it. */
 function forgetChat(id: string) {
   const sync = chatSyncs.get(id)
@@ -1015,8 +1038,14 @@ function chatFromHead(head: AssistantChatHead): AssistantChatRecord {
 async function pullChat(head: AssistantChatHead): Promise<void> {
   const scopeKey = chatScopeKey
   const sync = syncOf(head.id)
-  const known = Boolean(chatById(head.id))
-  if (known && sync.revision === head.revision && sync.nextSeq === head.next_seq) return
+  const before = chatById(head.id)
+  const known = Boolean(before)
+  if (before?.remote) restoreCursor(sync, chatTurns(before), before.remote)
+  if (before && sync.revision === head.revision && sync.nextSeq === head.next_seq) {
+    // Nothing moved on the node; only what this browser added since is unsent.
+    markNew(sync, chatTurns(before))
+    return
+  }
   const after = known && sync.revision ? sync.nextSeq - 1 : undefined
   let pulled: ChatTurn[] = []
   if (after === undefined || head.next_seq > sync.nextSeq) {
@@ -1050,6 +1079,8 @@ async function pullChat(head: AssistantChatHead): Promise<void> {
   }
   chat.updatedAt = Math.max(chat.updatedAt, Date.parse(head.updated_at))
   trackHead(sync, head)
+  if (pulled.length) sync.tailKey = turnKey(pulled[pulled.length - 1])
+  chat.remote = cursorOf(sync)
   sync.dirtyTurns = new Set(merged.unsent.map((_, index) => head.next_seq + index))
   if (!local) chatState = { ...chatState, chats: [...chatState.chats, chat] }
 }
@@ -1068,7 +1099,7 @@ async function syncChats(scopeKey: string) {
   await Promise.all(heads.map((head) => pullChat(head)))
   if (chatScopeKey !== scopeKey || !chatStore) return
   const held = new Set(heads.map((head) => head.id))
-  for (const chat of chatState.chats) if (!held.has(chat.id)) resetSync(syncOf(chat.id), chatTurns(chat))
+  for (const chat of chatState.chats) if (!held.has(chat.id)) startOver(chat)
   // A fresh browser opens on an empty chat; once the node's chats are in, the
   // one written to last is the one to show, not the empty placeholder.
   const current = activeChat()
@@ -1105,6 +1136,9 @@ async function pushRemoteChats() {
     }
   } finally {
     remoteSaving = false
+    // The cursors the writes moved are kept for the next reload.
+    saveChatState()
+    updateChatList()
     if (pushPending) {
       pushPending = false
       queueRemoteSave()
@@ -1140,6 +1174,7 @@ async function pushChat(chat: AssistantChatRecord, sync: ChatSync, retry: boolea
         chat = again
       } else {
         trackHead(sync, head)
+        recordCursor(chat.id, sync)
       }
     }
     const turns = chatTurns(chat)
@@ -1156,6 +1191,8 @@ async function pushChat(chat: AssistantChatRecord, sync: ChatSync, retry: boolea
       if (chatScopeKey !== scopeKey) return
       trackHead(sync, head)
       sync.seqs.set(turnKey(turns[index]), seq)
+      sync.tailKey = turnKey(turns[index])
+      recordCursor(chat.id, sync)
       // A turn marked again while the write was out is written once more.
       if (sync.changes === changes) sync.dirtyTurns.delete(seq)
     }
@@ -1167,7 +1204,7 @@ async function pushChat(chat: AssistantChatRecord, sync: ChatSync, retry: boolea
     }
     // Anything but these waits for the next queued save.
     if (!(cause instanceof ApiError)) return
-    if (cause.status === 404) resetSync(sync, chatTurns(chat))
+    if (cause.status === 404) startOver(chat)
     else if (cause.status === 409) await pullConflict(chat.id)
     else if (cause.status === 413) {
       sync.headDirty = false
@@ -1193,7 +1230,7 @@ async function pullConflict(chatId: string) {
   const chat = chatById(chatId)
   if (!chat) return
   if (head) await pullChat(head)
-  else resetSync(syncOf(chatId), chatTurns(chat))
+  else startOver(chat)
   if (chatScopeKey === scopeKey) refreshChats()
 }
 

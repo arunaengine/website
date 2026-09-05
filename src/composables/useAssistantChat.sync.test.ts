@@ -329,6 +329,67 @@ describe('logging in', () => {
   })
 })
 
+/** The same user again, as after a page load: the local store is kept, the node too. */
+async function reload() {
+  authToken.value = ''
+  await settle(0)
+  authToken.value = 'token'
+  await settle(0)
+}
+
+describe('reloading', () => {
+  it('reads no turns for a chat whose head did not move, and only the new ones for one that did', async () => {
+    const scope = await login()
+    const id: string = chat.activeChatId.value
+    await chat.send('before the reload', { route: '/' })
+    await settle()
+    const tailKey = chat.messages.value[0].id
+    const held = node.chats.get(id)!
+    expect(createAssistantChatStore(scope).load().chats[0]?.remote).toEqual({ revision: 2, nextSeq: 1, tailKey })
+    expect(held.turns.get(0)).not.toContain('remote')
+    node.log.length = 0
+
+    await reload()
+    await settle()
+
+    expect(node.log).toEqual(['GET chats'])
+    expect(texts(id)).toEqual(['before the reload', 'before the reload answered'])
+
+    held.turns.set(1, payload('x1', 'theirs'))
+    held.head = { ...held.head, next_seq: 2, revision: held.head.revision + 1 }
+    node.log.length = 0
+
+    await reload()
+    await settle()
+
+    expect(node.log).toEqual(['GET chats', `GET turns ${id} after 0`])
+    expect(texts(id)).toEqual(['before the reload', 'before the reload answered', 'theirs', 'theirs answered'])
+  })
+
+  it('pushes a turn added before the reload without reading the chat again', async () => {
+    const id: string = chat.activeChatId.value
+    await chat.send('sent before', { route: '/' })
+    await settle()
+    // A turn saved in this browser but never pushed, as when the tab closed in time.
+    const held = node.chats.get(id)!
+    held.turns.delete(2)
+    held.head = { ...held.head, next_seq: 2 }
+    const store = createAssistantChatStore({ apiBaseUrl: 'https://node.test', realmId: 'r-1', userId: `u-${users}` })
+    const state = store.load()
+    const record = state.chats.find((entry) => entry.id === id)!
+    const revision = held.head.revision
+    record.remote = { revision, nextSeq: 2, tailKey: record.messages[2].id }
+    store.save(state)
+    node.log.length = 0
+
+    await reload()
+    await settle()
+
+    expect(node.log).toEqual(['GET chats', `PUT turn ${id}/2 rev ${revision}`])
+    expect(nodeTexts(id).slice(-2)).toEqual(['sent before', 'sent before answered'])
+  })
+})
+
 describe('conflicts', () => {
   it('keeps the node turns on a stale seq and re-appends its own after them', async () => {
     await login(() => seedNode('n-3', 'Shared', [payload('u1', 'one')]))
