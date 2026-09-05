@@ -39,11 +39,25 @@ export interface TurnResult {
   error?: string
 }
 
+/** The reason inside a provider's error body, in the OpenAI or the Anthropic shape. */
+function providerReason(body: string | undefined): string {
+  if (!body) return ''
+  try {
+    const parsed: unknown = JSON.parse(body)
+    const outer = parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {}
+    const inner = outer.error && typeof outer.error === 'object' ? (outer.error as Record<string, unknown>) : outer
+    return typeof inner.message === 'string' ? inner.message.slice(0, 300) : ''
+  } catch {
+    return ''
+  }
+}
+
 /** A provider failure the way the panel shows it: the HTTP code, then why. */
 export function providerErrorMessage(error: unknown): string {
   if (APICallError.isInstance(error)) {
     const status = error.statusCode ? `${error.statusCode}: ` : ''
-    return `${status}${error.message}`
+    const reason = providerReason(error.responseBody)
+    return reason && reason !== error.message ? `${status}${error.message}: ${reason}` : `${status}${error.message}`
   }
   return errorMessage(error)
 }

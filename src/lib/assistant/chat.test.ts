@@ -196,4 +196,22 @@ describe('providerErrorMessage', () => {
   it('falls back to the plain message without a code', () => {
     expect(providerErrorMessage(new Error('offline'))).toBe('offline')
   })
+
+  it('adds the reason the provider put in the body', () => {
+    const failed = (responseBody: string) => new APICallError({
+      message: 'Bad Request',
+      statusCode: 400,
+      url: 'https://node',
+      requestBodyValues: {},
+      responseBody,
+    })
+
+    expect(providerErrorMessage(failed('{"error":{"message":"max_tokens is too large","type":"invalid_request_error"}}')))
+      .toBe('400: Bad Request: max_tokens is too large')
+    expect(providerErrorMessage(failed('{"type":"error","message":"credit balance is too low"}')))
+      .toBe('400: Bad Request: credit balance is too low')
+    expect(providerErrorMessage(failed(JSON.stringify({ error: { message: 'x'.repeat(400) } }))))
+      .toBe(`400: Bad Request: ${'x'.repeat(300)}`)
+    expect(providerErrorMessage(failed('<html>Bad Gateway</html>'))).toBe('400: Bad Request')
+  })
 })
