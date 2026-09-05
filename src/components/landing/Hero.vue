@@ -56,8 +56,9 @@ const wordmark = computed(() =>
       </h1>
 
       <p class="mx-auto mt-5 max-w-xl text-base text-muted-foreground">
-        Each organization runs its own node, from a laptop to Kubernetes. Nodes
-        share data, metadata and compute. Nobody gives up control.
+        Aruna is a federated, decentralized data management platform. It
+        orchestrates data and compute to make efficient use of available
+        resources.
       </p>
 
       <div class="mt-9 flex flex-wrap justify-center gap-3">
