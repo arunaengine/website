@@ -1106,10 +1106,14 @@ async function pullChat(head: AssistantChatHead): Promise<void> {
     markNew(sync, chatTurns(before))
     return
   }
+  // The revision moved while next_seq did not: another browser rewrote the tail turn.
+  const rewritten = known && sync.revision > 0 && sync.nextSeq === head.next_seq && head.next_seq > 0
   // A head this browser knows without any turn is read in full, not after -1.
-  const after = known && sync.revision && sync.nextSeq > 0 ? sync.nextSeq - 1 : undefined
+  const after = rewritten
+    ? (head.next_seq > 1 ? head.next_seq - 2 : undefined)
+    : (known && sync.revision && sync.nextSeq > 0 ? sync.nextSeq - 1 : undefined)
   let pulled: ChatTurn[] = []
-  if (after === undefined || head.next_seq > sync.nextSeq) {
+  if (after === undefined || head.next_seq > sync.nextSeq || rewritten) {
     let turns
     try {
       ({ turns } = await readTurns(head.id, after, client()))
@@ -1129,7 +1133,15 @@ async function pullChat(head: AssistantChatHead): Promise<void> {
   const local = chatById(head.id)
   if (known && !local) return
   const chat = local ?? chatFromHead(head)
-  const merged = mergeTurns(chatTurns(chat), pulled, (key) => sync.seqs.has(key))
+  let turns = chatTurns(chat)
+  if (rewritten && pulled.length) {
+    // The node's tail replaces whatever this browser held at that seq, by key.
+    const tail = turnKey(pulled[pulled.length - 1])
+    const replaced = [...sync.seqs].filter(([key, seq]) => seq === head.next_seq - 1 && key !== tail).map(([key]) => key)
+    for (const key of replaced) sync.seqs.delete(key)
+    turns = turns.filter((turn) => !replaced.includes(turnKey(turn)))
+  }
+  const merged = mergeTurns(turns, pulled, (key) => sync.seqs.has(key))
   const joined = joinTurns(merged.turns)
   chat.messages = joined.messages
   chat.history = joined.history

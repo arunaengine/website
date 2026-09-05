@@ -454,6 +454,26 @@ describe('conflicts', () => {
     expect(chat.activeChatId.value).not.toBe('n-3')
   })
 
+  it('takes a tail turn another browser rewrote in place', async () => {
+    // A background update finishing the streamed tail moves the revision, not next_seq.
+    await login(() => seedNode('n-6', 'Rewritten', [payload('u1', 'one'), payload('u2', 'two')]))
+    await settle()
+    chat.selectChat('n-6')
+    const held = node.chats.get('n-6')!
+    held.turns.set(1, payload('u2', 'two, finished'))
+    held.head = { ...held.head, revision: held.head.revision + 1 }
+    node.log.length = 0
+
+    await chat.send('ours', { route: '/' })
+    await settle()
+
+    expect(node.log).toEqual(['PUT turn n-6/2 rev 3', 'GET chats', 'GET turns n-6 after 0', 'PUT turn n-6/2 rev 4'])
+    expect(texts('n-6')).toEqual([
+      'one', 'one answered', 'two, finished', 'two, finished answered', 'ours', 'ours answered',
+    ])
+    expect(nodeTexts('n-6')).toEqual(texts('n-6'))
+  })
+
   it('never writes over one turn another browser appended a moment earlier', async () => {
     // The seq alone would pass as a tail rewrite; the stale revision refuses it.
     await login(() => seedNode('n-4', 'Shared', [payload('u1', 'one')]))
