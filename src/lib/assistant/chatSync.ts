@@ -15,6 +15,8 @@ export interface ChatSync {
   seqs: Map<string, number>
   /** How often turns were marked; a write that started earlier keeps the mark. */
   changes: number
+  /** A turn the node refused as too large; it is not written again until it changes. */
+  refused?: { seq: number; bytes: number }
 }
 
 export function newChatSync(): ChatSync {

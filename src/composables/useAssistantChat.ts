@@ -1233,6 +1233,7 @@ async function pushChat(chat: AssistantChatRecord, sync: ChatSync, retry: boolea
   const scopeKey = chatScopeKey
   // An empty chat never reaches the node; its head goes with its first turn.
   if (!sync.revision && !sync.dirtyTurns.size) return
+  let writing: { seq: number; bytes: number } | null = null
   try {
     if (!sync.revision || sync.headDirty) {
       const fresh = !sync.revision
@@ -1261,8 +1262,14 @@ async function pushChat(chat: AssistantChatRecord, sync: ChatSync, retry: boolea
       }
       const changes = sync.changes
       const request = { payload: encodeTurn(turns[index]), ...(sync.revision ? { revision: sync.revision } : {}) }
+      if (sync.refused?.seq === seq && sync.refused.bytes === request.payload.length) {
+        sync.dirtyTurns.delete(seq)
+        continue
+      }
+      writing = { seq, bytes: request.payload.length }
       const head = await putTurn(chat.id, seq, request, client())
       if (chatScopeKey !== scopeKey) return
+      if (sync.refused?.seq === seq) delete sync.refused
       trackHead(sync, head)
       sync.seqs.set(turnKey(turns[index]), seq)
       sync.tailKey = turnKey(turns[index])
@@ -1283,6 +1290,9 @@ async function pushChat(chat: AssistantChatRecord, sync: ChatSync, retry: boolea
     else if (cause.status === 413) {
       sync.headDirty = false
       sync.dirtyTurns.clear()
+      if (writing) sync.refused = writing
+      // Said once; the turn is tried again only once it changes.
+      if (isActiveChat(chat.id)) error.value = `The node did not keep the last turn: ${cause.message}`
       return
     } else return
     const again = chatById(chat.id)

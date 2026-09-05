@@ -57,6 +57,7 @@ const node = vi.hoisted(() => ({
   chats: new Map<string, NodeChat>(),
   log: [] as string[],
   listStatus: 200,
+  maxTurnChars: Infinity,
   fail: (status: number, message: string): Error => new Error(`${status} ${message}`),
   now: () => new Date().toISOString(),
 }))
@@ -127,6 +128,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
       node.log.push(`PUT turn ${id}/${seq} rev ${request.revision ?? '-'}`)
       const chat = liveChat(id)
       const next = chat.head.next_seq
+      if (request.payload.length > node.maxTurnChars) throw node.fail(413, 'the turn is larger than the node keeps')
       if (seq !== next && seq !== next - 1) throw node.fail(409, `the next seq is ${next}`)
       if (request.revision !== undefined && request.revision !== chat.head.revision) throw node.fail(409, 'stale revision')
       chat.turns.set(seq, request.payload)
@@ -274,6 +276,26 @@ describe('pushing', () => {
     await settle()
     expect(node.log.at(-1)).toBe(`DELETE chat ${id}`)
     expect(node.chats.get(id)?.deleted).toBe(true)
+  })
+
+  it('says once that the node refused a turn and leaves it alone until it changes', async () => {
+    await login()
+    node.maxTurnChars = 10
+    try {
+      await chat.send('far too long for this node', { route: '/' })
+      await settle()
+
+      expect(chat.error.value).toContain('larger than the node keeps')
+      expect(node.log.filter((line) => line.startsWith('PUT turn'))).toHaveLength(1)
+
+      // The next save writes the head again but leaves the refused turn alone.
+      chat.renameChat(chat.activeChatId.value, 'Renamed')
+      await settle()
+      expect(node.log.filter((line) => line.startsWith('PUT turn'))).toHaveLength(1)
+      expect(node.log.filter((line) => line.startsWith('PUT chat'))).toHaveLength(2)
+    } finally {
+      node.maxTurnChars = Infinity
+    }
   })
 
   it('never creates an empty chat on the node', async () => {
