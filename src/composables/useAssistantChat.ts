@@ -745,12 +745,14 @@ function stopWatchTimer() {
   watchLead.release()
 }
 
-// A tab that just took the lead reads the watches the last leader left in the
-// store, so a job that leader already answered is not answered again.
+/** Takes in the watches other tabs put in the store; a job the last leader answered is gone from it. */
+function reloadWatches() {
+  if (watchStore && watchRegistry) watchRegistry.reload(watchStore.load().watches)
+}
+
 async function claimWatchLead(): Promise<boolean> {
-  const led = watchLead.leading()
   if (!(await watchLead.claim())) return false
-  if (!led && watchStore && watchRegistry) watchRegistry = buildRegistry(watchStore.load().watches)
+  reloadWatches()
   return true
 }
 
@@ -772,6 +774,8 @@ function armWatchTimer() {
 
 function addWatch(chatId: string, input: { kind: WatchKind; target: string; label: string }): WatchResult {
   if (!watchRegistry) return { ok: false, message: 'The portal cannot watch background work right now.' }
+  // A tab that does not lead adds to what the store holds rather than over it.
+  if (!watchLead.leading()) reloadWatches()
   const result = watchRegistry.add({ chatId, ...input })
   armWatchTimer()
   return result
@@ -808,6 +812,7 @@ function stopWatchers() {
 /** Polls every watch now; the timer stays as the fallback for a dropped stream. */
 async function pollWatchesNow() {
   if (!watchRegistry || !watchLead.leading()) return
+  reloadWatches()
   await watchRegistry.tick(true)
   pumpResumes()
 }

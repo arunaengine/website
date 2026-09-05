@@ -80,7 +80,7 @@ vi.stubGlobal('window', {
 
 const { createAssistantChatStore, newAssistantChat } = await import('@/lib/assistant/chatHistory')
 const { apiBaseUrl, authToken, userInfo } = await import('./aruna/state')
-const { WATCH_FIRST_DELAY_MS } = await import('@/lib/assistant/watchers')
+const { WATCH_DEADLINE_MS, WATCH_FIRST_DELAY_MS, createWatchStore, watchId } = await import('@/lib/assistant/watchers')
 const { useNotifications } = await import('./useNotifications')
 
 const scope = { apiBaseUrl: 'https://node.test', realmId: 'r-1', userId: 'u-1' }
@@ -282,24 +282,24 @@ describe('a watcher resuming its own chat', () => {
   })
 })
 
+/** Starts a watch on `jobId` from chat c-a, the way the model would. */
+async function startWatch(jobId: string, callId: string) {
+  const chat = useAssistantChat()
+  chat.selectChat('c-a')
+  jobs.state = 'running'
+  turns.onTurn = async ({ tools }) => {
+    await watch(tools, jobId, callId)
+    turns.onTurn = null
+  }
+  await chat.send(`watch ${jobId}`, { route: '/compute' })
+  return chat
+}
+
+function polls(jobId: string) {
+  return jobs.polled.filter((id) => id === jobId).length
+}
+
 describe('a change the node reports', () => {
-  /** Starts a watch on `jobId` from chat c-a, the way the model would. */
-  async function startWatch(jobId: string, callId: string) {
-    const chat = useAssistantChat()
-    chat.selectChat('c-a')
-    jobs.state = 'running'
-    turns.onTurn = async ({ tools }) => {
-      await watch(tools, jobId, callId)
-      turns.onTurn = null
-    }
-    await chat.send(`watch ${jobId}`, { route: '/compute' })
-    return chat
-  }
-
-  function polls(jobId: string) {
-    return jobs.polled.filter((id) => id === jobId).length
-  }
-
   it('polls the watched job before the timer would', async () => {
     const chat = await startWatch('05JOB', 't-5')
     jobs.state = 'succeeded'
@@ -327,5 +327,55 @@ describe('a change the node reports', () => {
     lead.value = true
     await settle()
     expect(polls('06JOB')).toBeGreaterThan(0)
+  })
+})
+
+describe('watches shared between tabs', () => {
+  const store = () => createWatchStore(scope)
+
+  /** A watch on chat c-a as another tab would have written it to the store. */
+  function theirs(jobId: string) {
+    const at = Date.now()
+    return {
+      id: watchId('c-a', 'job', jobId),
+      chatId: 'c-a',
+      kind: 'job' as const,
+      target: jobId,
+      label: 'theirs',
+      createdAt: at,
+      deadlineAt: at + WATCH_DEADLINE_MS,
+      nextPollAt: at,
+      attempts: 0,
+      errors: 0,
+    }
+  }
+
+  it('polls a watch another tab put in the store', async () => {
+    await startWatch('10JOB', 't-10')
+    const held = store().load()
+    store().save({ ...held, watches: [...held.watches, theirs('11JOB')] })
+    jobs.state = 'succeeded'
+
+    await settle()
+
+    expect(polls('10JOB')).toBeGreaterThan(0)
+    expect(polls('11JOB')).toBeGreaterThan(0)
+  })
+
+  it('adds beside the leader\'s watches when this tab does not lead', async () => {
+    store().save({ ...store().load(), watches: [theirs('12JOB')] })
+    lead.value = false
+
+    await startWatch('13JOB', 't-13')
+
+    expect(store().load().watches.map((entry) => entry.target)).toEqual(['12JOB', '13JOB'])
+
+    // The leading tab answered its own watch meanwhile; the follower's is left for it to poll.
+    store().save({ ...store().load(), watches: store().load().watches.filter((entry) => entry.target === '13JOB') })
+    lead.value = true
+    jobs.state = 'succeeded'
+    await settle()
+    expect(polls('12JOB')).toBe(0)
+    expect(polls('13JOB')).toBeGreaterThan(0)
   })
 })

@@ -178,6 +178,30 @@ describe('watch registry', () => {
     expect(registry.list()[0].nextPollAt).toBeGreaterThan(clock.value)
   })
 
+  it('takes in what another tab added and lets go what it dropped', async () => {
+    const polled: string[] = []
+    const { registry, clock } = harness({
+      poll: async (entry) => {
+        polled.push(entry.target)
+        return { state: 'pending' }
+      },
+    })
+    registry.add({ chatId: 'chat-a', kind: 'job', target: '01JOB', label: 'run' })
+    const mine = registry.list()[0]
+    const theirs = watch({ id: 'chat-b|job|02JOB', chatId: 'chat-b', target: '02JOB', nextPollAt: clock.value })
+
+    registry.reload([mine, theirs])
+    expect(registry.list().map((entry) => entry.target)).toEqual(['01JOB', '02JOB'])
+    // A known id keeps its own record, so its schedule is not reset by the store copy.
+    expect(registry.list()[0]).toBe(mine)
+
+    registry.reload([theirs])
+    expect(registry.list().map((entry) => entry.target)).toEqual(['02JOB'])
+
+    await registry.tick(true)
+    expect(polled).toEqual(['02JOB'])
+  })
+
   it('backs off while the work is still in flight', async () => {
     const { registry, clock } = harness({ poll: async () => ({ state: 'pending' }) as WatchPoll })
     registry.add({ chatId: 'chat-a', kind: 'job', target: '01JOB', label: 'run' })

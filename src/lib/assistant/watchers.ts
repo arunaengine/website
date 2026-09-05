@@ -237,6 +237,8 @@ export interface WatchRegistry {
   add(input: { chatId: string; kind: WatchKind; target: string; label: string }): WatchResult
   dropChat(chatId: string): void
   clear(): void
+  /** Takes in the store as another tab left it: new ids are added, dropped ids go, running polls stay. */
+  reload(stored: AssistantWatch[]): void
   /** Polls what is due; `force` polls every watch now, as after a change the node reported. */
   tick(force?: boolean): Promise<void>
 }
@@ -248,6 +250,8 @@ export function createWatchRegistry(options: WatchRegistryOptions): WatchRegistr
 
   function finish(watch: AssistantWatch, message: string) {
     watches = watches.filter((entry) => entry.id !== watch.id)
+    // Saved at once, so a reload during a slow sibling poll cannot bring it back.
+    options.save(watches)
     options.resume(watch.chatId, message)
   }
 
@@ -324,6 +328,15 @@ export function createWatchRegistry(options: WatchRegistryOptions): WatchRegistr
       if (!watches.length) return
       watches = []
       options.save(watches)
+    },
+
+    reload(stored) {
+      const known = new Map(watches.map((watch) => [watch.id, watch]))
+      const next = stored.map((entry) => known.get(entry.id) ?? entry)
+      for (const watch of watches) {
+        if (running.has(watch.id) && !next.some((entry) => entry.id === watch.id)) next.push(watch)
+      }
+      watches = next.slice(0, MAX_ASSISTANT_WATCHES)
     },
 
     async tick(force = false) {
