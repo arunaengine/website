@@ -26,7 +26,11 @@ function browserLocks(): WatchLocks | null {
   return navigator.locks ?? null
 }
 
-export function watchLeadership(locks: WatchLocks | null = browserLocks()): WatchLeadership {
+/** `name` scopes the lock: tabs on another node or user must not share it. */
+export function watchLeadership(
+  locks: WatchLocks | null = browserLocks(),
+  name: string = WATCH_LOCK_NAME,
+): WatchLeadership {
   if (!locks) return { leading: () => true, claim: () => Promise.resolve(true), release: () => {} }
   let held: (() => void) | null = null
   let claiming: Promise<boolean> | null = null
@@ -38,7 +42,7 @@ export function watchLeadership(locks: WatchLocks | null = browserLocks()): Watc
       if (held) return Promise.resolve(true)
       claiming ??= new Promise<boolean>((resolve) => {
         // The browser keeps the lock with this tab until the callback's promise settles.
-        locks.request(WATCH_LOCK_NAME, { ifAvailable: true }, (lock) => {
+        locks.request(name, { ifAvailable: true }, (lock) => {
           if (!lock) {
             resolve(false)
             return Promise.resolve()

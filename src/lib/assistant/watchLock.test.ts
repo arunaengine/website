@@ -1,22 +1,22 @@
 import { describe, expect, it, vi } from 'vitest'
 import { WATCH_LOCK_NAME, watchLeadership, type WatchLocks } from './watchLock'
 
-// Behaves like navigator.locks with ifAvailable: a held lock answers null at
+// Behaves like navigator.locks with ifAvailable: a held name answers null at
 // once, and it is free again only after the holder's callback promise settles.
 function fakeLocks() {
-  let holder: Promise<void> | null = null
+  const holders = new Map<string, Promise<void>>()
   const requests: string[] = []
   const locks: WatchLocks = {
     async request(name, _options, callback) {
       requests.push(name)
-      if (holder) return callback(null)
+      if (holders.has(name)) return callback(null)
       const run = callback({ name })
-      holder = run
+      holders.set(name, run)
       await run
-      holder = null
+      holders.delete(name)
     },
   }
-  return { locks, requests, held: () => holder !== null }
+  return { locks, requests, held: () => holders.size > 0 }
 }
 
 describe('watchLeadership', () => {
@@ -60,6 +60,16 @@ describe('watchLeadership', () => {
     expect(await claim).toBe(false)
     expect(lead.leading()).toBe(false)
     await expect(holder).resolves.toBeUndefined()
+  })
+
+  it('keeps tabs of different scopes apart', async () => {
+    const fake = fakeLocks()
+    const here = watchLeadership(fake.locks, `${WATCH_LOCK_NAME}:node-a|user-1`)
+    const elsewhere = watchLeadership(fake.locks, `${WATCH_LOCK_NAME}:node-b|user-1`)
+
+    expect(await here.claim()).toBe(true)
+    expect(await elsewhere.claim()).toBe(true)
+    expect(fake.requests).toEqual([`${WATCH_LOCK_NAME}:node-a|user-1`, `${WATCH_LOCK_NAME}:node-b|user-1`])
   })
 
   it('asks once while it holds the lock', async () => {

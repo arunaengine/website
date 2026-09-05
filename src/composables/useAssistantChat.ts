@@ -66,7 +66,7 @@ import {
 } from '@/lib/assistant/chatSync'
 import { clearLiveJobs, setWatchedJobs } from '@/lib/assistant/jobLive'
 import { searchKind, type SearchKind } from '@/lib/assistant/webSearch'
-import { watchLeadership } from '@/lib/assistant/watchLock'
+import { WATCH_LOCK_NAME, watchLeadership, type WatchLeadership } from '@/lib/assistant/watchLock'
 import { watchPoller } from '@/lib/assistant/watchPoll'
 import {
   createWatchRegistry,
@@ -186,7 +186,8 @@ let watchRegistry: WatchRegistry | null = null
 let watchTimer: ReturnType<typeof setInterval> | null = null
 let revisionTimer: ReturnType<typeof setTimeout> | null = null
 // Only the tab holding the lock polls; the others keep their timer and retry.
-const watchLead = watchLeadership()
+// The lock is scoped in startWatchers, so tabs on another node or user keep their own.
+let watchLead: WatchLeadership = watchLeadership()
 // Updates waiting for the turn slot; a resume never races the running turn.
 const resumeQueue: Array<{ chatId: string; text: string }> = []
 let lastContext: PromptContext | null = null
@@ -795,6 +796,8 @@ function startWatchers(scope: AssistantChatScope) {
   const store = createWatchStore(scope)
   const payload = store.load()
   watchStore = store
+  watchLead.release()
+  watchLead = watchLeadership(undefined, `${WATCH_LOCK_NAME}:${assistantChatScopeKey(scope)}`)
   applyUnread(payload.unread)
   watchRegistry = buildRegistry(payload.watches)
   armWatchTimer()
@@ -802,6 +805,7 @@ function startWatchers(scope: AssistantChatScope) {
 
 function stopWatchers() {
   stopWatchTimer()
+  watchLead.release()
   watchRegistry = null
   watchStore = null
   resumeQueue.length = 0

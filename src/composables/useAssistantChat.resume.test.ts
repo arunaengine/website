@@ -60,9 +60,13 @@ vi.mock('@/lib/jobs', () => ({
 }))
 
 // Whether this tab leads the watchers; without Web Locks every tab would.
-const lead = vi.hoisted(() => ({ value: true }))
+const lead = vi.hoisted(() => ({ value: true, names: [] as Array<string | undefined> }))
 vi.mock('@/lib/assistant/watchLock', () => ({
-  watchLeadership: () => ({ leading: () => lead.value, claim: async () => lead.value, release: () => {} }),
+  WATCH_LOCK_NAME: 'aruna.assistant.watch',
+  watchLeadership: (_locks: unknown, name?: string) => {
+    lead.names.push(name)
+    return { leading: () => lead.value, claim: async () => lead.value, release: () => {} }
+  },
 }))
 
 const stored = new Map<string, string>()
@@ -332,6 +336,10 @@ describe('a change the node reports', () => {
 
 describe('watches shared between tabs', () => {
   const store = () => createWatchStore(scope)
+
+  it('locks the lead per node and user', () => {
+    expect(lead.names.at(-1)).toBe('aruna.assistant.watch:https%3A%2F%2Fnode.test|r-1|u-1')
+  })
 
   /** A watch on chat c-a as another tab would have written it to the store. */
   function theirs(jobId: string) {
