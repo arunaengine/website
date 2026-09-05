@@ -287,9 +287,10 @@ async function reset(): Promise<void> {
   payload = null
   masterKey = null
   providers.value = []
-  remoteRevision.value = 0
   state.value = 'absent'
   forgetKey(scope)
+  // The node keeps counting revisions past the delete; the next create needs the one it holds.
+  await settle(scope, await readVault(client()))
 }
 
 async function saveProviders(next: BrowserProvider[]): Promise<void> {

@@ -22,9 +22,10 @@ const saveVault = vi.fn(async (request: { payload: string; revision?: number }) 
   node.revision += 1
   return { payload: node.payload, revision: node.revision, updated_at: '2026-09-06T00:00:00Z' }
 })
+// A delete leaves a tombstone: the revision keeps counting, as on the node.
 const deleteVault = vi.fn(async () => {
+  if (node.payload !== null) node.revision += 1
   node.payload = null
-  node.revision = 0
 })
 
 // The remembered key, as the browser's IndexedDB would keep it.
@@ -219,6 +220,20 @@ describe('useUserVault', () => {
     expect(node.payload).toBeNull()
     expect(remembered.size).toBe(0)
     expect(vault.providers.value).toEqual([])
+  })
+
+  it('creates the keys again after a reset in the same tab', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', false)
+    await vault.saveProviders([work])
+
+    await vault.reset()
+    expect(vault.remoteRevision.value).toBe(node.revision)
+    await vault.create('new horse', false)
+
+    expect(vault.state.value).toBe('unlocked')
+    expect(saveVault.mock.calls.at(-1)?.[0].revision).toBe(3)
+    expect(await nodeProviders('new horse')).toEqual([])
   })
 
   it('reports a node without the route', async () => {
