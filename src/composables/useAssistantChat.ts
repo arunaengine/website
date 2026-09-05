@@ -322,12 +322,13 @@ function clearChatState() {
   toolsNote.value = null
 }
 
-/** Writes the chats to this browser; one the bounded store let go leaves the node too. */
+/** Writes the chats to this browser; one the bounded store let go is only forgotten here. */
 function saveChatState() {
   if (!chatStore) return
   const before = chatState.chats.map((chat) => chat.id)
   chatState = chatStore.save(chatState)
-  for (const id of before) if (!chatById(id)) forgetChat(id)
+  // The node keeps a chat this browser has no room for; only deleteChat removes it there.
+  for (const id of before) if (!chatById(id)) chatSyncs.delete(id)
   activeChatId.value = chatState.activeChatId
 }
 
