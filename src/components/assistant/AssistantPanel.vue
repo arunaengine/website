@@ -14,7 +14,8 @@ import { Maximize2, MessageSquare, Plus, X } from '@lucide/vue'
 const router = useRouter()
 const {
   open,
-  busy,
+  working,
+  workingLabel,
   messages,
   pending,
   hidePanel,
@@ -65,7 +66,8 @@ function openFullView() {
 
     <MessageList
       :messages="messages"
-      :busy="busy"
+      :working="working"
+      :working-label="workingLabel"
       :delete-call-id="deleteCallId"
       @decide="(approved) => pending?.decide(approved)"
     />

@@ -29,7 +29,8 @@ const router = useRouter()
 const { currentUser } = useAruna()
 const { bridge } = useAssistantEditor()
 const {
-  busy,
+  working,
+  workingLabel,
   draft,
   messages,
   pending,
@@ -289,7 +290,8 @@ function continueInPanel() {
           v-if="messages.length"
           size="full"
           :messages="messages"
-          :busy="busy"
+          :working="working"
+          :working-label="workingLabel"
           :delete-call-id="deleteCallId"
           @decide="(approved) => pending?.decide(approved)"
         />

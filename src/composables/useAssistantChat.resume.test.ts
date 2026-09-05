@@ -210,6 +210,9 @@ describe('a watcher resuming its own chat', () => {
     jobs.state = 'succeeded'
     await settle()
     expect(chat.busy.value).toBe(false)
+    // The person sees the background turn at work in the chat on screen.
+    expect(chat.working.value).toBe(true)
+    expect(chat.workingLabel.value).toBe('Thinking…')
 
     turns.onTurn = null
     await chat.send('never mind, what else is queued?', { route: '/compute' })

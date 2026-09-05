@@ -209,6 +209,15 @@ interface ApprovalEntry {
 
 let turnGeneration = 0
 let activeTurn: TurnContext | null = null
+// The turn under way as the panel sees it: which chat, and which answer it writes.
+const runningTurn = ref<{ chatId: string; messageId: string } | null>(null)
+/** True while a turn writes into the chat on screen, the person's or a watcher's. */
+const working = computed(() => runningTurn.value?.chatId === activeChatId.value)
+const workingLabel = computed(() => {
+  const answer = messages.value.find((message) => message.id === runningTurn.value?.messageId)
+  const call = answer?.calls.filter((entry) => entry.state === 'running').at(-1)
+  return call ? `Running ${call.name}…` : 'Thinking…'
+})
 let activeApproval: ApprovalEntry | null = null
 const approvalQueue: ApprovalEntry[] = []
 let assistantEpoch = sessionEpoch.value
@@ -671,6 +680,7 @@ function abortTurn(): TurnContext | null {
   const turn = activeTurn
   turnGeneration += 1
   activeTurn = null
+  runningTurn.value = null
   turn?.controller.abort()
   if (turn && sessionInFlight?.owner === turn) sessionInFlight = null
   drainApprovals()
@@ -847,6 +857,7 @@ async function runChatTurn(chatId: string, prompt: string, context: PromptContex
     ...(resumeText === undefined ? {} : { resumeText }),
   }
   activeTurn = turn
+  runningTurn.value = { chatId, messageId: assistantMessageId }
   const startedAt = Date.now()
   setMessagesOf(chatId, [
     ...messagesOf(chatId),
@@ -934,6 +945,7 @@ async function runChatTurn(chatId: string, prompt: string, context: PromptContex
   } finally {
     if (activeTurn === turn) {
       activeTurn = null
+      runningTurn.value = null
       busy.value = false
       persistChat(chatId)
       pumpResumes()
@@ -1492,6 +1504,8 @@ export function useAssistantChat() {
   return {
     open,
     busy,
+    working,
+    workingLabel,
     draft,
     messages,
     error,

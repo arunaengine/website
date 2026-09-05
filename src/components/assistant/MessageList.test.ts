@@ -80,14 +80,14 @@ function jumps(node: HostNode): Array<{ top: number }> {
 async function turn(call: ToolCallView) {
   const calls = ref<ToolCallView[]>([call])
   const Host = defineComponent(() => () =>
-    h(MessageList, { messages: [{ id: 'm-1', role: 'assistant', text: '', calls: calls.value }], busy: false }))
+    h(MessageList, { messages: [{ id: 'm-1', role: 'assistant', text: '', calls: calls.value }], working: false }))
   const { root } = await mountApp(Host)
   return { root, calls }
 }
 
 describe('MessageList', () => {
   it('offers the way back only after the reader scrolled up', async () => {
-    const { root } = await mountApp(MessageList, { props: { messages, busy: false } })
+    const { root } = await mountApp(MessageList, { props: { messages, working: false } })
     expect(endButton(root)).toBeUndefined()
 
     await scrollTo(scroller(root), 0)
@@ -98,7 +98,7 @@ describe('MessageList', () => {
   })
 
   it('jumps to the newest turn when the button is used', async () => {
-    const { root } = await mountApp(MessageList, { props: { messages, busy: false } })
+    const { root } = await mountApp(MessageList, { props: { messages, working: false } })
     const jumps: Array<{ top: number }> = []
     Object.assign(scroller(root), { scrollTo: (options: { top: number }) => jumps.push(options) })
 
@@ -152,7 +152,7 @@ describe('MessageList', () => {
           { id: 'm-1', role: 'user', text: 'Hello', calls: [], at },
           { id: 'm-2', role: 'assistant', text: 'Hi', calls: [], at },
         ],
-        busy: false,
+        working: false,
       },
     })
     const times = nodes(root).filter((node) => node.tag === 'time')
@@ -170,7 +170,7 @@ describe('MessageList', () => {
           { id: 'm-1', role: 'user', text: 'Hello', calls: [], at: 1_756_000_000_000 },
           { id: 'm-2', role: 'user', text, calls: [], at: 1_756_000_000_000, background: true },
         ],
-        busy: false,
+        working: false,
       },
     })
     const bubbles = nodes(root).filter((node) => String(node.props.class ?? '').includes('rounded-br-sm'))
@@ -188,8 +188,34 @@ describe('MessageList', () => {
     expect(nodes(root).filter((node) => node.tag === 'p' && content(node).trim() === text)).toHaveLength(1)
   })
 
+  it('shows what the turn is doing under the answer being written', async () => {
+    const { root } = await mountApp(MessageList, {
+      props: {
+        messages: [
+          { id: 'm-1', role: 'user', text: 'Hello', calls: [], at: 1_756_000_000_000 },
+          { id: 'm-2', role: 'assistant', text: '', calls: [{ id: 'c-1', name: 'get_job', input: {}, state: 'running' }], at: 1_756_000_000_000 },
+        ],
+        working: true,
+        workingLabel: 'Running get_job…',
+      },
+    })
+    const spinners = nodes(root).filter((node) => node.props.label === 'Running get_job…')
+    const answer = element(root, (node) => String(node.props.class ?? '').includes('space-y-1.5'))
+
+    expect(spinners).toHaveLength(1)
+    expect(nodes(answer)).toContain(spinners[0])
+  })
+
+  it('shows the indicator at the end while no answer exists yet', async () => {
+    const { root } = await mountApp(MessageList, {
+      props: { messages: [messages[0]], working: true, workingLabel: 'Thinking…' },
+    })
+
+    expect(nodes(root).filter((node) => node.props.label === 'Thinking…')).toHaveLength(1)
+  })
+
   it('drops its scroll listener when it goes away', async () => {
-    const { app, root } = await mountApp(MessageList, { props: { messages, busy: false } })
+    const { app, root } = await mountApp(MessageList, { props: { messages, working: false } })
     const node = scroller(root)
     expect(node.listeners.get('scroll')?.size).toBe(1)
 

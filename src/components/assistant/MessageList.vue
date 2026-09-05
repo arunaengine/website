@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // The conversation: what was asked, what the model wrote, the tool calls it
 // made along the way, and the cards a render tool asked to show.
-import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import ArtifactCard from '@/components/assistant/cards/ArtifactCard.vue'
 import JobCard from '@/components/assistant/cards/JobCard.vue'
 import ChartCard from '@/components/assistant/cards/ChartCard.vue'
@@ -27,11 +27,13 @@ const END_GAP = 160
 
 const props = withDefaults(defineProps<{
   messages: ChatMessage[]
-  busy: boolean
+  /** True while a turn writes into this chat, the person's or a watcher's. */
+  working: boolean
+  workingLabel?: string
   deleteCallId?: string
   /** `full` is the page: larger type, wider bubbles, settled tool calls folded. */
   size?: 'compact' | 'full'
-}>(), { deleteCallId: undefined, size: 'compact' })
+}>(), { workingLabel: 'Working…', deleteCallId: undefined, size: 'compact' })
 const emit = defineEmits<{ (e: 'decide', approved: boolean): void }>()
 
 const scroller = ref<HTMLElement | null>(null)
@@ -44,6 +46,12 @@ function toggleUpdate(id: string) {
   if (!next.delete(id)) next.add(id)
   unfolded.value = next
 }
+
+// The answer under way is the newest message, so the indicator sits under it.
+const writing = computed(() => {
+  const last = props.messages.at(-1)
+  return props.working && last?.role === 'assistant' ? last.id : ''
+})
 
 function shownCards(message: ChatMessage) {
   return message.calls.filter((call) => call.view)
@@ -189,10 +197,11 @@ onUnmounted(() => listening?.removeEventListener('scroll', measure))
               :has-card="shownCards(message).length > 0"
             />
             <Notice v-if="message.error" tone="error">{{ message.error }}</Notice>
+            <Spinner v-if="message.id === writing" :label="workingLabel" show-label />
           </div>
         </div>
 
-        <Spinner v-if="busy" label="Working…" show-label />
+        <Spinner v-if="working && !writing" :label="workingLabel" show-label />
       </div>
     </div>
 
