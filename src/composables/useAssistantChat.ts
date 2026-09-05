@@ -1516,6 +1516,7 @@ export function useAssistantChat() {
     historyReady,
     unreadChats,
     provider,
+    providerId,
     providers: ready,
     model,
     modelChoices,

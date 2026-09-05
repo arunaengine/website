@@ -1,5 +1,5 @@
 import * as VueRuntime from 'vue'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   button,
@@ -18,7 +18,7 @@ import * as BrowserProviders from '@/lib/assistant/browserProviders'
 import type { BrowserProvider } from '@/lib/assistant/browserProviders'
 import * as ProviderKinds from './providerKinds'
 
-const create = vi.fn(async (provider: Record<string, unknown>) => ({
+const create = vi.fn(async (provider: Record<string, unknown>, _storage?: string) => ({
   provider_id: provider.id,
   kind: provider.kind,
   label: provider.label,
@@ -26,7 +26,7 @@ const create = vi.fn(async (provider: Record<string, unknown>) => ({
   default_model: provider.model,
   status: 'ready',
 }))
-const update = vi.fn(async (id: string, provider: Record<string, unknown>) => ({
+const update = vi.fn(async (id: string, provider: Record<string, unknown>, _storage?: string) => ({
   provider_id: id,
   kind: provider.kind,
   label: provider.label,
@@ -37,6 +37,8 @@ const update = vi.fn(async (id: string, provider: Record<string, unknown>) => ({
 const check = vi.fn(async (_provider: Record<string, unknown>) => ({ ok: true, message: 'ok' }))
 const models = vi.fn(async (_provider: Record<string, unknown>) => [{ id: 'm-1' }])
 const direct = vi.fn((_id: string): BrowserProvider | null => null)
+const storageOf = vi.fn((_id: string): 'session' | 'node' | null => null)
+const vaultState = ref<'absent' | 'locked' | 'unlocked' | 'unsupported'>('absent')
 
 const ButtonStub = defineComponent({
   inheritAttrs: false,
@@ -75,6 +77,15 @@ const ComboboxStub = defineComponent({
 })
 const IconStub = defineComponent(() => () => h('i'))
 const LoginStub = defineComponent(() => () => h('div', { 'data-login': '' }, 'Sign in with Codex'))
+const GateStub = defineComponent(() => () => h('div', { 'data-gate': '' }))
+const ToggleStub = defineComponent({
+  props: { modelValue: String, options: { type: Array, default: () => [] } },
+  emits: ['update:modelValue'],
+  setup: (props, { emit }) => () =>
+    h('div', (props.options as Array<{ value: string; label: string }>).map(
+      (option) => h('button', { onClick: () => emit('update:modelValue', option.value) }, option.label),
+    )),
+})
 const icons = new Proxy({}, { get: () => IconStub })
 
 const ProviderForm = compileClientComponent(new URL('./ProviderForm.vue', import.meta.url), {
@@ -83,17 +94,20 @@ const ProviderForm = compileClientComponent(new URL('./ProviderForm.vue', import
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Notice.vue': moduleDefault(NoticeStub),
+  '@/components/ui/OptionToggle.vue': moduleDefault(ToggleStub),
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/components/ui/Spinner.vue': moduleDefault(SpinnerStub),
   '@/components/assistant/ModelCombobox.vue': moduleDefault(ComboboxStub),
   './ChatGptLogin.vue': moduleDefault(LoginStub),
   './ProviderIcon.vue': moduleDefault(IconStub),
+  './VaultGate.vue': moduleDefault(GateStub),
   './providerKinds': ProviderKinds,
   '@/lib/assistant/modelOptions': ModelOptions,
   '@/lib/assistant/browserProviders': BrowserProviders,
   '@/composables/useAssistantProviders': {
-    useAssistantProviders: () => ({ create, update, check, models, direct }),
+    useAssistantProviders: () => ({ create, update, check, models, direct, storageOf }),
   },
+  '@/composables/useUserVault': { useUserVault: () => ({ state: vaultState }) },
   '@/lib/utils': { errorMessage },
 })
 
@@ -142,6 +156,8 @@ beforeEach(() => {
   direct.mockClear()
   check.mockResolvedValue({ ok: true, message: 'ok' })
   direct.mockReturnValue(null)
+  storageOf.mockReturnValue(null)
+  vaultState.value = 'absent'
 })
 
 describe('ProviderForm', () => {
@@ -158,6 +174,39 @@ describe('ProviderForm', () => {
 
     await click(button(root, 'Save provider'))
     expect(create).toHaveBeenCalledOnce()
+    expect(create.mock.calls[0][1]).toBe('session')
+  })
+
+  it('keeps a new key on the node once keys exist there', async () => {
+    vaultState.value = 'unlocked'
+    const { root } = await addClaude()
+    await click(button(root, 'Test connection'))
+    await click(button(root, 'Save provider'))
+
+    expect(create.mock.calls[0][1]).toBe('node')
+    expect(() => element(root, (node) => node.props['data-gate'] !== undefined)).toThrow()
+  })
+
+  it('waits for the passphrase before a key can go to the node', async () => {
+    const { root } = await addClaude()
+    await click(button(root, 'On this node, sealed with my passphrase'))
+    await click(button(root, 'Test connection'))
+
+    expect(element(root, (node) => node.props['data-gate'] !== undefined)).toBeDefined()
+    expect(button(root, 'Save provider').props.disabled).toBe(true)
+
+    vaultState.value = 'unlocked'
+    await click(button(root, 'Test connection'))
+    expect(button(root, 'Save provider').props.disabled).toBe(false)
+    await click(button(root, 'Save provider'))
+    expect(create.mock.calls[0][1]).toBe('node')
+  })
+
+  it('offers no storage choice when the node cannot keep keys', async () => {
+    vaultState.value = 'unsupported'
+    const { root } = await addClaude()
+
+    expect(() => button(root, 'This browser session')).toThrow()
   })
 
   it('keeps Save disabled when the provider refuses the credentials', async () => {

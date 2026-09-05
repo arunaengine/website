@@ -36,11 +36,14 @@ const aruna = {
   usageInfo: ref<{ metadata_documents?: number; objects?: number; buckets?: number; stored_bytes?: number } | null>(null),
 }
 
+const vaultState = ref<'absent' | 'locked' | 'unlocked' | 'unsupported'>('absent')
+
 const chat = {
   busy: ref(false),
   draft: ref(''),
   toolsNote: ref<string | null>(null),
   provider: ref<AssistantProvider | null>(openai),
+  providerId: ref('browser-1'),
   model: ref('gpt-5.6-sol'),
   historyReady: ref(true),
   loadModels,
@@ -53,6 +56,12 @@ const ButtonStub = defineComponent({
 })
 const NoticeStub = defineComponent((_, { slots }) => () => h('div', { 'data-notice': '' }, slots.default?.()))
 const SettingsStub = defineComponent((_, { slots }) => () => h('div', { 'data-settings': '' }, slots.default?.()))
+const Passthrough = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
+const DialogStub = defineComponent({
+  props: { open: Boolean },
+  setup: (props, { slots }) => () => (props.open ? h('div', { 'data-dialog': '' }, slots.default?.()) : null),
+})
+const UnlockStub = defineComponent(() => () => h('div', { 'data-unlock': '' }))
 const TextareaStub = defineComponent({
   props: { modelValue: { type: String, default: '' } },
   emits: ['update:modelValue'],
@@ -70,9 +79,16 @@ const ChatComposer = compileClientComponent(new URL('./ChatComposer.vue', import
   'vue-router': { useRoute: () => ({ fullPath: '/app/assistant' }) },
   '@lucide/vue': icons,
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+  '@/components/ui/Dialog.vue': moduleDefault(DialogStub),
+  '@/components/ui/DialogContent.vue': moduleDefault(Passthrough),
+  '@/components/ui/DialogDescription.vue': moduleDefault(Passthrough),
+  '@/components/ui/DialogHeader.vue': moduleDefault(Passthrough),
+  '@/components/ui/DialogTitle.vue': moduleDefault(Passthrough),
   '@/components/ui/Notice.vue': moduleDefault(NoticeStub),
   '@/components/ui/Textarea.vue': moduleDefault(TextareaStub),
   '@/components/assistant/AssistantSettings.vue': moduleDefault(SettingsStub),
+  '@/components/settings/VaultUnlockForm.vue': moduleDefault(UnlockStub),
+  '@/composables/useUserVault': { useUserVault: () => ({ state: vaultState }) },
   '@/composables/useAruna': { useAruna: () => aruna },
   '@/composables/useRealm': { useRealm: () => ({ realmId: ref('r-1') }) },
   '@/composables/useGroupSelection': { activeGroupId: ref('') },
@@ -93,6 +109,9 @@ beforeEach(() => {
   chat.draft.value = ''
   chat.toolsNote.value = null
   chat.busy.value = false
+  chat.provider.value = openai
+  chat.providerId.value = 'browser-1'
+  vaultState.value = 'absent'
   aruna.currentUser.value = null
   aruna.profiles.value = []
   aruna.myGroups.value = []
@@ -151,6 +170,35 @@ describe('ChatComposer', () => {
       objects: 40,
       buckets: 6,
     })
+  })
+
+  it('offers to unlock when the chosen keys are sealed on the node', async () => {
+    vaultState.value = 'locked'
+    chat.provider.value = null
+    const { root } = await mountApp(ChatComposer)
+
+    expect(content(root)).toContain('Your provider keys are locked.')
+    await click(control(root, 'Send'))
+    expect(send).not.toHaveBeenCalled()
+
+    await click(element(root, (node) => node.tag === 'button' && content(node).trim() === 'Unlock'))
+    expect(element(root, (node) => node.props['data-unlock'] !== undefined)).toBeDefined()
+  })
+
+  it('stays quiet while a session key answers', async () => {
+    vaultState.value = 'locked'
+    const { root } = await mountApp(ChatComposer)
+
+    expect(content(root)).not.toContain('provider keys are locked')
+  })
+
+  it('points at the locked keys when another provider stands in', async () => {
+    // The stored choice names a sealed key; a node sign-in answers meanwhile.
+    vaultState.value = 'locked'
+    chat.providerId.value = 'browser-sealed'
+    const { root } = await mountApp(ChatComposer)
+
+    expect(content(root)).toContain('Your provider keys are locked.')
   })
 
   it('explains the tool state and the send keys on the page', async () => {

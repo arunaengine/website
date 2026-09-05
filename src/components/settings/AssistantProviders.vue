@@ -1,6 +1,7 @@
 <script setup lang="ts">
-// Every configured provider in one list: the browser-held keys of this tab and
-// the sign-ins the node keeps. Adding and editing happen in one dialog.
+// Every configured provider in one list: the keys of this browser session, the
+// keys sealed on the node, and the sign-ins the node keeps. Adding and editing
+// happen in one dialog; a key can be moved between the session and the node.
 import { computed, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
@@ -20,24 +21,30 @@ import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import ProviderForm from './ProviderForm.vue'
 import ProviderIcon from './ProviderIcon.vue'
+import VaultGate from './VaultGate.vue'
+import VaultSettings from './VaultSettings.vue'
 import { providerChoice, providerKind, providerStatus } from './providerKinds'
 import { useAruna } from '@/composables/useAruna'
 import { useAssistantChat } from '@/composables/useAssistantChat'
-import { useAssistantProviders } from '@/composables/useAssistantProviders'
+import { useAssistantProviders, type ProviderStorage } from '@/composables/useAssistantProviders'
+import { useUserVault } from '@/composables/useUserVault'
 import { apiBaseUrl, authToken } from '@/composables/aruna/state'
 import { testAssistantProvider, type AssistantProvider } from '@/lib/api'
 import { toneVariant } from '@/lib/stateBadge'
 import { errorMessage } from '@/lib/utils'
-import { Check, MoreHorizontal, Pencil, Plug2, Plus, Star, Trash2 } from '@lucide/vue'
+import { Check, HardDrive, MoreHorizontal, Pencil, Plug2, Plus, Star, Trash2 } from '@lucide/vue'
 
 const { currentUser, sessionEpoch } = useAruna()
-const { providers, loading, error, load, remove, check, direct } = useAssistantProviders()
+const { providers, loading, error, load, remove, check, direct, storageOf, move } = useAssistantProviders()
 const { provider: activeProvider, selectProvider } = useAssistantChat()
+const { state: vaultState } = useUserVault()
 
 const dialogOpen = ref(false)
 const editingId = ref('')
 const removingId = ref('')
+const movingId = ref('')
 const removeError = ref<string | null>(null)
+const moveError = ref<string | null>(null)
 const testingId = ref('')
 const results = ref<Record<string, { ok: boolean; message: string }>>({})
 
@@ -45,7 +52,10 @@ const editingProvider = computed(() =>
   providers.value.find((provider) => provider.provider_id === editingId.value) ?? null)
 const removingProvider = computed(() =>
   providers.value.find((provider) => provider.provider_id === removingId.value) ?? null)
+const movingProvider = computed(() =>
+  providers.value.find((provider) => provider.provider_id === movingId.value) ?? null)
 const defaultId = computed(() => activeProvider.value?.provider_id ?? '')
+const nodeKeeps = computed(() => vaultState.value !== 'unsupported')
 
 watch(currentUser, (user) => {
   if (user) void load()
@@ -57,6 +67,7 @@ function closeAll() {
   dialogOpen.value = false
   editingId.value = ''
   removingId.value = ''
+  movingId.value = ''
   results.value = {}
 }
 
@@ -88,7 +99,31 @@ function kindTitle(provider: AssistantProvider): string {
 }
 
 function where(provider: AssistantProvider): string {
-  return direct(provider.provider_id) ? 'This tab' : 'Node'
+  const storage = storageOf(provider.provider_id)
+  if (storage === 'session') return 'This browser session'
+  return storage === 'node' ? 'Sealed on this node' : 'Node'
+}
+
+async function moveTo(providerId: string, storage: ProviderStorage) {
+  moveError.value = null
+  try {
+    await move(providerId, storage)
+  } catch (cause) {
+    moveError.value = errorMessage(cause)
+  }
+}
+
+// Moving a key to the node needs the keys there unlocked; the gate asks for
+// the passphrase first, or for a new one when there is none yet.
+function moveToNode(provider: AssistantProvider) {
+  if (vaultState.value === 'unlocked') void moveTo(provider.provider_id, 'node')
+  else movingId.value = provider.provider_id
+}
+
+async function finishMove() {
+  const providerId = movingId.value
+  movingId.value = ''
+  await moveTo(providerId, 'node')
 }
 
 // The assistant's provider choice is the default; switching it starts a new chat.
@@ -129,7 +164,9 @@ async function confirmRemove() {
       <div class="min-w-0">
         <h3 class="font-display text-sm font-semibold text-aruna-navy">Providers</h3>
         <p class="text-xs text-muted-foreground">
-          API keys stay in this browser tab and are never sent to Aruna; a ChatGPT sign-in is kept by the node.
+          {{ nodeKeeps
+            ? 'API keys stay in this browser session, or on this node sealed with your passphrase. A ChatGPT sign-in is kept by the node.'
+            : 'API keys stay in this browser tab and are never sent to Aruna; a ChatGPT sign-in is kept by the node.' }}
         </p>
       </div>
       <div class="flex shrink-0 items-center gap-2">
@@ -144,6 +181,8 @@ async function confirmRemove() {
     <template v-else>
       <Notice v-if="error" tone="error" class="mx-5 mt-4">{{ error }}</Notice>
       <Notice v-if="removeError" tone="error" class="mx-5 mt-4">{{ removeError }}</Notice>
+      <Notice v-if="moveError" tone="error" class="mx-5 mt-4">{{ moveError }}</Notice>
+      <VaultSettings />
 
       <EmptyState
         v-if="!providers.length"
@@ -188,6 +227,18 @@ async function confirmRemove() {
                 <DropdownMenuItem v-if="direct(provider.provider_id)" @click="edit(provider)">
                   <Pencil class="size-3.5" /> Edit
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  v-if="nodeKeeps && storageOf(provider.provider_id) === 'session'"
+                  @click="moveToNode(provider)"
+                >
+                  <HardDrive class="size-3.5" /> Move to this node
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  v-if="storageOf(provider.provider_id) === 'node'"
+                  @click="moveTo(provider.provider_id, 'session')"
+                >
+                  <HardDrive class="size-3.5" /> Move to this browser session
+                </DropdownMenuItem>
                 <DropdownMenuItem :disabled="Boolean(testingId)" @click="test(provider)">
                   <Plug2 class="size-3.5" /> Test connection
                 </DropdownMenuItem>
@@ -231,13 +282,25 @@ async function confirmRemove() {
         <DialogHeader>
           <DialogTitle>Remove {{ removingProvider?.label }}?</DialogTitle>
           <DialogDescription>
-            The assistant stops using it. A browser key is dropped from this tab; a node sign-in is revoked.
+            The assistant stops using it. A key is removed from where it is kept; a node sign-in is revoked.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <Button variant="outline" size="sm" @click="removingId = ''">Cancel</Button>
           <Button variant="destructive" size="sm" @click="confirmRemove">Remove</Button>
         </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog :open="Boolean(movingProvider)" @update:open="(open: boolean) => { if (!open) movingId = '' }">
+      <DialogContent class="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Move {{ movingProvider?.label }} to this node</DialogTitle>
+          <DialogDescription>
+            The key is sealed with your passphrase before it reaches the node, and follows you to other browsers.
+          </DialogDescription>
+        </DialogHeader>
+        <VaultGate @done="finishMove" />
       </DialogContent>
     </Dialog>
   </section>

@@ -18,6 +18,8 @@ import * as ProviderKinds from './providerKinds'
 
 const load = vi.fn(async () => {})
 const remove = vi.fn(async (_id: string) => {})
+const move = vi.fn(async (_id: string, _storage: string) => {})
+const vaultState = ref<'absent' | 'locked' | 'unlocked' | 'unsupported'>('absent')
 const check = vi.fn(async (_provider: BrowserProvider) => ({ ok: true, message: 'The provider answered.' }))
 const selectProvider = vi.fn()
 const testAssistantProvider = vi.fn(async () => ({ ok: true, message: 'node ok' }))
@@ -73,6 +75,11 @@ const FormStub = defineComponent({
     h('div', { 'data-form': '' }, [h('button', { onClick: () => emit('done') }, 'Save provider')]),
 })
 const RefreshStub = defineComponent(() => () => h('button', { 'aria-label': 'Refresh providers' }))
+const GateStub = defineComponent({
+  emits: ['done'],
+  setup: (_, { emit }) => () => h('div', { 'data-gate': '' }, [h('button', { onClick: () => emit('done') }, 'Passphrase set')]),
+})
+const VaultStub = defineComponent(() => () => h('div', { 'data-vault': '' }))
 const SpinnerStub = defineComponent(() => () => h('span', { 'data-spinner': '' }))
 const IconStub = defineComponent(() => () => h('i'))
 const icons = new Proxy({}, { get: () => IconStub })
@@ -98,6 +105,8 @@ const AssistantProviders = compileClientComponent(new URL('./AssistantProviders.
   '@/components/ui/Spinner.vue': moduleDefault(SpinnerStub),
   './ProviderForm.vue': moduleDefault(FormStub),
   './ProviderIcon.vue': moduleDefault(IconStub),
+  './VaultGate.vue': moduleDefault(GateStub),
+  './VaultSettings.vue': moduleDefault(VaultStub),
   './providerKinds': ProviderKinds,
   '@/composables/useAruna': { useAruna: () => ({ currentUser, sessionEpoch: ref(1) }) },
   '@/composables/useAssistantChat': {
@@ -110,10 +119,13 @@ const AssistantProviders = compileClientComponent(new URL('./AssistantProviders.
       error: ref(null),
       load,
       remove,
+      move,
       check,
       direct: (id: string) => (id === 'p-1' ? local : id === 'p-3' ? keyless : null),
+      storageOf: (id: string) => (id === 'p-1' ? 'session' : id === 'p-3' ? 'node' : null),
     }),
   },
+  '@/composables/useUserVault': { useUserVault: () => ({ state: vaultState }) },
   '@/composables/aruna/state': { apiBaseUrl: ref('https://node.test'), authToken: ref('t') },
   '@/lib/api': { testAssistantProvider },
   '@/lib/stateBadge': StateBadge,
@@ -127,6 +139,8 @@ function menuItem(root: Parameters<typeof content>[0], label: string) {
 beforeEach(() => {
   load.mockClear()
   remove.mockClear()
+  move.mockClear()
+  vaultState.value = 'absent'
   check.mockClear()
   selectProvider.mockClear()
   testAssistantProvider.mockClear()
@@ -147,9 +161,47 @@ describe('AssistantProviders', () => {
     expect(text).toContain('Pending login')
     expect(text).toContain('Needs key')
     expect(text).toContain('Default')
-    // The row shows where the credential is kept, browser tab or node.
-    expect(text).toContain('This tab')
+    // The row shows where the credential is kept: this session, sealed on the node, or the node's own.
+    expect(text).toContain('This browser session')
+    expect(text).toContain('Sealed on this node')
     expect(text).toContain('Node')
+  })
+
+  it('moves a session key to the node once the passphrase exists', async () => {
+    vaultState.value = 'unlocked'
+    const { root } = await mountApp(AssistantProviders)
+    await click(menuItem(root, 'Move to this node'))
+
+    expect(move).toHaveBeenCalledWith('p-1', 'node')
+  })
+
+  it('asks for the passphrase before the first key goes to the node', async () => {
+    const { root } = await mountApp(AssistantProviders)
+    await click(menuItem(root, 'Move to this node'))
+
+    expect(move).not.toHaveBeenCalled()
+    expect(content(root)).toContain('Move Work to this node')
+    await click(button(root, 'Passphrase set'))
+
+    expect(move).toHaveBeenCalledWith('p-1', 'node')
+    expect(() => element(root, (node) => node.props['data-gate'] !== undefined)).toThrow()
+  })
+
+  it('offers no node storage when the node cannot keep keys', async () => {
+    vaultState.value = 'unsupported'
+    const { root } = await mountApp(AssistantProviders)
+
+    expect(() => menuItem(root, 'Move to this node')).toThrow()
+    expect(content(root)).toContain('never sent to Aruna')
+  })
+
+  it('moves a sealed key back into this browser session', async () => {
+    providers.value = [browserProvider, nodeProvider, staleProvider]
+    vaultState.value = 'unlocked'
+    const { root } = await mountApp(AssistantProviders)
+    await click(menuItem(root, 'Move to this browser session'))
+
+    expect(move).toHaveBeenCalledWith('p-3', 'session')
   })
 
   it('opens the add dialog from the primary button', async () => {

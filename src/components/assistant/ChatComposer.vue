@@ -5,9 +5,15 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
+import Dialog from '@/components/ui/Dialog.vue'
+import DialogContent from '@/components/ui/DialogContent.vue'
+import DialogDescription from '@/components/ui/DialogDescription.vue'
+import DialogHeader from '@/components/ui/DialogHeader.vue'
+import DialogTitle from '@/components/ui/DialogTitle.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Textarea from '@/components/ui/Textarea.vue'
 import AssistantSettings from '@/components/assistant/AssistantSettings.vue'
+import VaultUnlockForm from '@/components/settings/VaultUnlockForm.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealm } from '@/composables/useRealm'
 import { activeGroupId } from '@/composables/useGroupSelection'
@@ -16,6 +22,7 @@ import { useAssistantEditor } from '@/composables/useAssistantEditor'
 import { useAssistantProfileForm } from '@/composables/useAssistantProfileForm'
 import { useAssistantRunForm } from '@/composables/useAssistantRunForm'
 import { usePageContext } from '@/composables/usePageContext'
+import { useUserVault } from '@/composables/useUserVault'
 import { SendHorizontal, Settings2 } from '@lucide/vue'
 
 /** About eight rows; the card scrolls inside itself beyond that. */
@@ -35,13 +42,21 @@ const {
   draft,
   toolsNote,
   provider,
+  providerId,
   model,
   historyReady,
   loadModels,
   send,
 } = useAssistantChat()
+const { state: vaultState } = useUserVault()
 
 const box = ref<{ $el: HTMLTextAreaElement } | null>(null)
+const unlockOpen = ref(false)
+// The chosen provider is one sealed on the node when nothing is ready, or when
+// the choice names a provider the ready list does not hold.
+const keysLocked = computed(() =>
+  vaultState.value === 'locked'
+  && (!provider.value || (providerId.value !== '' && providerId.value !== provider.value.provider_id)))
 const canSend = computed(() =>
   historyReady.value && !busy.value && Boolean(provider.value) && Boolean(model.value) && Boolean(draft.value.trim()))
 
@@ -137,6 +152,10 @@ function onKeydown(event: KeyboardEvent) {
 <template>
   <div class="space-y-2">
     <Notice v-if="toolsNote" tone="info">{{ toolsNote }}</Notice>
+    <Notice v-if="keysLocked" tone="warning" class="flex items-center justify-between gap-3">
+      <span>Your provider keys are locked.</span>
+      <Button variant="outline" size="sm" @click="unlockOpen = true">Unlock</Button>
+    </Notice>
     <div class="rounded-2xl border border-border bg-card shadow-sm focus-within:border-ring">
       <Textarea
         ref="box"
@@ -168,5 +187,14 @@ function onKeydown(event: KeyboardEvent) {
     <p v-if="props.size === 'full'" class="px-1 text-[11px] text-muted-foreground">
       Enter sends, Shift+Enter starts a new line.
     </p>
+    <Dialog :open="unlockOpen" @update:open="(open: boolean) => (unlockOpen = open)">
+      <DialogContent class="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Unlock your provider keys</DialogTitle>
+          <DialogDescription>The keys on this node open with the passphrase you chose in settings.</DialogDescription>
+        </DialogHeader>
+        <VaultUnlockForm @done="unlockOpen = false" />
+      </DialogContent>
+    </Dialog>
   </div>
 </template>

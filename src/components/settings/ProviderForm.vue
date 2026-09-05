@@ -1,18 +1,22 @@
 <script setup lang="ts">
 // Add or edit one provider in two steps: pick the kind, then fill only what
-// that kind needs. Browser credentials stay in this tab's session store and a
-// candidate is tested before it can be saved.
+// that kind needs. A browser key stays in this browser session or goes to the
+// node sealed with the user's passphrase; a candidate is tested before it can
+// be saved.
 import { computed, reactive, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
+import OptionToggle from '@/components/ui/OptionToggle.vue'
 import Select from '@/components/ui/Select.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import ModelCombobox from '@/components/assistant/ModelCombobox.vue'
 import ChatGptLogin from './ChatGptLogin.vue'
 import ProviderIcon from './ProviderIcon.vue'
+import VaultGate from './VaultGate.vue'
 import { OPENAI_ROOT, PROVIDER_KINDS, providerChoice, providerKind, type ProviderChoice } from './providerKinds'
-import { useAssistantProviders } from '@/composables/useAssistantProviders'
+import { useAssistantProviders, type ProviderStorage } from '@/composables/useAssistantProviders'
+import { useUserVault } from '@/composables/useUserVault'
 import type { AssistantModel, AssistantProvider } from '@/lib/api'
 import {
   validateBrowserProvider,
@@ -26,9 +30,21 @@ import { ArrowLeft, ChevronRight, Plus, X } from '@lucide/vue'
 const props = defineProps<{ provider?: AssistantProvider | null }>()
 const emit = defineEmits<{ (e: 'done'): void; (e: 'cancel'): void }>()
 
-const { create, update, check, models: fetchModels, direct } = useAssistantProviders()
+const { create, update, check, models: fetchModels, direct, storageOf } = useAssistantProviders()
+const { state: vaultState } = useUserVault()
 const existing = props.provider ? direct(props.provider.provider_id) : null
 const existingCompatible = existing?.kind === 'openai_compatible' ? existing : null
+// Once keys exist on the node, a new key goes there too unless the user says otherwise.
+const existingStorage = props.provider ? storageOf(props.provider.provider_id) : null
+const storage = ref<ProviderStorage>(
+  existingStorage ?? (vaultState.value === 'locked' || vaultState.value === 'unlocked' ? 'node' : 'session'),
+)
+const storageOptions = [
+  { value: 'session', label: 'This browser session' },
+  { value: 'node', label: 'On this node, sealed with my passphrase' },
+] satisfies Array<{ value: ProviderStorage; label: string }>
+const storageChoice = computed(() => vaultState.value !== 'unsupported')
+const storageReady = computed(() => storage.value === 'session' || vaultState.value === 'unlocked')
 
 const editing = computed(() => Boolean(props.provider))
 const choice = ref<ProviderChoice | ''>(props.provider ? providerChoice(props.provider, existing) : '')
@@ -129,7 +145,8 @@ const testedForCurrent = computed(() => {
   if (!testedFingerprint.value) return false
   return testedFingerprint.value === fingerprint(candidate())
 })
-const canSave = computed(() => testedForCurrent.value && Boolean(defaultModel.value.trim()) && !busy.value)
+const canSave = computed(() =>
+  testedForCurrent.value && storageReady.value && Boolean(defaultModel.value.trim()) && !busy.value)
 
 function pick(next: ProviderChoice) {
   choice.value = next
@@ -216,8 +233,8 @@ async function save() {
   failure.value = null
   try {
     const value = candidate()
-    if (existing) await update(value.id, value)
-    else await create(value)
+    if (existing) await update(value.id, value, storage.value)
+    else await create(value, storage.value)
     emit('done')
   } catch (cause) {
     failure.value = errorMessage(cause)
@@ -283,7 +300,7 @@ async function save() {
             class="mt-1.5"
             type="password"
             :placeholder="editing
-              ? 'Stored in this tab; type to replace'
+              ? 'Saved; type to replace'
               : kind.keyRequired ? 'Paste the key' : 'Optional for local endpoints'"
           />
         </div>
@@ -341,11 +358,29 @@ async function save() {
         </div>
       </div>
 
+      <div v-if="storageChoice" class="space-y-2">
+        <label class="text-xs font-medium text-foreground">Keep the key</label>
+        <div>
+          <OptionToggle
+            :model-value="storage"
+            :options="storageOptions"
+            aria-label="Where the key is kept"
+            @update:model-value="(value) => (storage = value as ProviderStorage)"
+          />
+        </div>
+        <p class="text-xs text-muted-foreground">
+          {{ storage === 'node'
+            ? 'The key is sealed with your passphrase before it reaches the node, and follows you to other browsers.'
+            : 'The key is gone when you sign out or close the browser, and never reaches the node.' }}
+        </p>
+        <VaultGate v-if="storage === 'node' && !storageReady" />
+      </div>
+
       <div class="flex flex-wrap items-center gap-2">
         <Button variant="outline" :disabled="!canTest || busy" @click="test">Test connection</Button>
         <Spinner v-if="busy" label="Testing the provider" />
         <p v-else-if="!testedForCurrent" class="text-xs text-muted-foreground">
-          The key stays in this tab. Save opens once the test passes.
+          Save opens once the test passes.
         </p>
       </div>
 

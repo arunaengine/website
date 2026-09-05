@@ -7,6 +7,7 @@
 export const VAULT_VERSION = 1 as const
 export const VAULT_KDF_NAME = 'pbkdf2-sha256' as const
 export const VAULT_KDF_ITERATIONS = 600_000
+export const MIN_PASSPHRASE_LENGTH = 8
 /** Bound to every AES-GCM operation of this payload version. */
 const ADDITIONAL_DATA = new TextEncoder().encode('aruna user vault v1')
 const SALT_BYTES = 16
