@@ -21,7 +21,7 @@ import { useAuth } from '@/composables/useAuth'
 import { useHiddenTasks } from '@/composables/useHiddenTasks'
 import { useRefresh } from '@/composables/useRefresh'
 import { useFirstPaint } from '@/composables/useFirstPaint'
-import { errorMessage, formatDuration, relativeTime, truncateMiddle } from '@/lib/utils'
+import { errorMessage, formatDuration, formatResourceGb, relativeTime, truncateMiddle } from '@/lib/utils'
 import { follow, onWake } from '@/lib/poll'
 import {
   TES_GROUP_TAG,
@@ -178,8 +178,8 @@ function taskResources(task: TesTask): string {
   if (!r) return ''
   const parts: string[] = []
   if (r.cpu_cores != null) parts.push(`${r.cpu_cores} cpu`)
-  if (r.ram_gb != null) parts.push(`${r.ram_gb} GB RAM`)
-  if (r.disk_gb != null) parts.push(`${r.disk_gb} GB disk`)
+  if (r.ram_gb != null) parts.push(`${formatResourceGb(r.ram_gb)} RAM`)
+  if (r.disk_gb != null) parts.push(`${formatResourceGb(r.disk_gb)} disk`)
   return parts.join(' · ')
 }
 

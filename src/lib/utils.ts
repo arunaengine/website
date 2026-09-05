@@ -13,6 +13,15 @@ export function formatBytes(bytes: number, decimals = 1): string {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(decimals))} ${sizes[i]}`
 }
 
+// A limit set in GiB reaches the portal as a GB fraction (2 GiB is
+// 2.147483648 GB); it reads back in the unit it was set in.
+export function formatResourceGb(gb: number): string {
+  if (Math.abs(gb - Math.round(gb)) < 1e-6) return `${Math.round(gb)} GB`
+  const gib = (gb * 1e9) / 1024 ** 3
+  if (Math.abs(gib - Math.round(gib)) < 1e-6) return `${Math.round(gib)} GiB`
+  return `${gb.toFixed(1)} GB`
+}
+
 export function formatNumber(n: number): string {
   return new Intl.NumberFormat('en-US').format(n)
 }
