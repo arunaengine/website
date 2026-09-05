@@ -239,7 +239,10 @@ describe('providerErrorMessage', () => {
     expect(providerErrorMessage(failed('{"type":"error","message":"credit balance is too low"}')))
       .toBe('400: Bad Request: credit balance is too low')
     expect(providerErrorMessage(failed(JSON.stringify({ error: { message: 'x'.repeat(400) } }))))
-      .toBe(`400: Bad Request: ${'x'.repeat(300)}`)
+      .toBe(`400: Bad Request: ${'x'.repeat(200)}`)
+    // The stored reason ends at the first line, so an echoed header never lands in the chat.
+    expect(providerErrorMessage(failed(JSON.stringify({ error: { message: 'no key\nAuthorization: Bearer sk-1' } }))))
+      .toBe('400: Bad Request: no key')
     expect(providerErrorMessage(failed('<html>Bad Gateway</html>'))).toBe('400: Bad Request')
   })
 })

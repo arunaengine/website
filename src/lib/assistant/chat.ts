@@ -42,14 +42,18 @@ export interface TurnResult {
   error?: string
 }
 
-/** The reason inside a provider's error body, in the OpenAI or the Anthropic shape. */
+/** How much of a provider's reason is kept; the message is stored with the turn on the node. */
+const MAX_REASON_CHARS = 200
+
+// The reason inside a provider's error body, in the OpenAI or the Anthropic
+// shape. Only its first line, so an echoed request header is never stored.
 function providerReason(body: string | undefined): string {
   if (!body) return ''
   try {
     const parsed: unknown = JSON.parse(body)
     const outer = parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {}
     const inner = outer.error && typeof outer.error === 'object' ? (outer.error as Record<string, unknown>) : outer
-    return typeof inner.message === 'string' ? inner.message.slice(0, 300) : ''
+    return typeof inner.message === 'string' ? (inner.message.split(/\r?\n/)[0] ?? '').slice(0, MAX_REASON_CHARS) : ''
   } catch {
     return ''
   }
