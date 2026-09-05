@@ -2,7 +2,7 @@
 // surfaces are imported lazily, so the shell never pulls them in for a chat
 // that watches nothing.
 import type { ApiClientOptions } from '@/lib/api'
-import { noteJob } from './jobLive'
+import { jobFacts, noteJob } from './jobLive'
 import { jobOutcome, syncOutcome, type AssistantWatch, type WatchPoll } from './watchers'
 
 export function watchPoller(client: () => ApiClientOptions) {
@@ -11,13 +11,7 @@ export function watchPoller(client: () => ApiClientOptions) {
       const { getJob } = await import('@/lib/jobs')
       const job = await getJob(watch.target, client())
       // The card reads this, so a run stays current without a model turn.
-      noteJob(watch.target, {
-        state: job.state,
-        kind: job.kind,
-        attempts: job.attempts,
-        finishedAt: job.finished_at,
-        error: job.error?.message,
-      })
+      noteJob(watch.target, jobFacts(job))
       return jobOutcome(watch, job.state)
     }
     const { getSyncRelationship } = await import('@/composables/aruna/sync')

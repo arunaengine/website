@@ -1,10 +1,18 @@
-import { createSSRApp, h } from 'vue'
+import * as VueRuntime from 'vue'
+import { createSSRApp, defineComponent, h, ref } from 'vue'
 import { renderToString } from 'vue/server-renderer'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import JobCard from './JobCard.vue'
+import * as JobLive from '@/lib/assistant/jobLive'
 import { clearLiveJobs, noteJob, setWatchedJobs } from '@/lib/assistant/jobLive'
 import type { JobView } from '@/lib/assistant/types'
+import * as StateBadge from '@/lib/stateBadge'
+import * as Utils from '@/lib/utils'
+import { compileClientComponent, content, flush, moduleDefault, mountApp } from '@/test/clientRender'
+
+const jobs = vi.hoisted(() => ({ getJob: vi.fn() }))
+vi.mock('@/lib/jobs', () => jobs)
 
 const Stub = { render: () => null }
 
@@ -40,7 +48,35 @@ const succeeded: JobView = {
   outputs: [{ bucket: 'lorem', key: 'results/gc_analysis_rerun.json', size: 82 }],
 }
 
-afterEach(() => clearLiveJobs())
+afterEach(() => {
+  clearLiveJobs()
+  jobs.getJob.mockReset()
+})
+
+// The card mounted in the client renderer, so its mount hook runs.
+const Passthrough = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
+const LinkStub = defineComponent({ setup: (_, { slots }) => () => h('a', {}, slots.default?.()) })
+const ClientCard = compileClientComponent(new URL('./JobCard.vue', import.meta.url), {
+  vue: VueRuntime,
+  'vue-router': { RouterLink: LinkStub },
+  '@lucide/vue': new Proxy({}, { get: () => defineComponent(() => () => h('i')) }),
+  '@/components/ui/Badge.vue': moduleDefault(Passthrough),
+  '@/components/ui/CopyButton.vue': moduleDefault(Passthrough),
+  '@/components/ui/Notice.vue': moduleDefault(Passthrough),
+  '@/components/ui/Spinner.vue': moduleDefault(Passthrough),
+  '@/components/assistant/ObjectLink.vue': moduleDefault(LinkStub),
+  '@/composables/aruna/state': { apiBaseUrl: ref('https://node.test'), authToken: ref('token') },
+  '@/lib/assistant/jobLive': JobLive,
+  '@/lib/jobs': jobs,
+  '@/lib/stateBadge': StateBadge,
+  '@/lib/utils': Utils,
+})
+
+async function mount(view: JobView): Promise<string> {
+  const { root } = await mountApp(ClientCard, { props: { view } })
+  await flush()
+  return content(root)
+}
 
 describe('JobCard', () => {
   it('shows the state and links every output into the data browser', async () => {
@@ -89,6 +125,43 @@ describe('JobCard', () => {
     expect(markup).toContain('Failed')
     expect(markup).toContain('exit code 2')
     expect(markup).not.toContain('Following this job')
+  })
+
+  it('keeps the polled facts after the watch ended', async () => {
+    // The watch is gone once the job settled; what it last read must stay.
+    noteJob(succeeded.jobId, { state: 'succeeded', kind: 'execution' })
+    setWatchedJobs([])
+    const markup = await render({ ...succeeded, state: 'running' })
+
+    expect(markup).toContain('Succeeded')
+    expect(markup).not.toContain('Following this job')
+  })
+
+  it('reads the job once when a stale card mounts', async () => {
+    jobs.getJob.mockResolvedValue({ state: 'succeeded', kind: 'execution', attempts: 1 })
+
+    const text = await mount({ ...succeeded, state: 'running' })
+
+    expect(jobs.getJob).toHaveBeenCalledTimes(1)
+    expect(jobs.getJob).toHaveBeenCalledWith(succeeded.jobId, { baseUrl: 'https://node.test', token: 'token' })
+    expect(text).toContain('Succeeded')
+    expect(text).not.toContain('Running')
+  })
+
+  it('leaves a settled or already polled card alone', async () => {
+    await mount(succeeded)
+    noteJob('job-live', { state: 'running' })
+    await mount({ ...succeeded, jobId: 'job-live', state: 'queued' })
+
+    expect(jobs.getJob).not.toHaveBeenCalled()
+  })
+
+  it('keeps the stored facts when the read fails', async () => {
+    jobs.getJob.mockRejectedValue(new Error('offline'))
+
+    const text = await mount({ ...succeeded, state: 'running' })
+
+    expect(text).toContain('Running')
   })
 
   it('names repeated attempts and stays quiet about the first', async () => {

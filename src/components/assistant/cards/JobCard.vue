@@ -1,15 +1,17 @@
 <script setup lang="ts">
 // A job the assistant asked to show: what state it is in, when it ran, and
 // which stored files it wrote.
-import { computed } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { RouterLink, type RouteLocationRaw } from 'vue-router'
+import { apiBaseUrl, authToken } from '@/composables/aruna/state'
 import Badge from '@/components/ui/Badge.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import ObjectLink from '@/components/assistant/ObjectLink.vue'
 import type { JobView } from '@/lib/assistant/types'
-import { jobWatched, liveJob } from '@/lib/assistant/jobLive'
+import { jobFacts, jobWatched, liveJob, noteJob } from '@/lib/assistant/jobLive'
+import { getJob } from '@/lib/jobs'
 import { stateVariant } from '@/lib/stateBadge'
 import { formatBytes, relativeTime, truncateMiddle } from '@/lib/utils'
 import { Cpu } from '@lucide/vue'
@@ -56,6 +58,20 @@ const timings = computed(() =>
 )
 
 const outputs = computed(() => props.view.outputs.slice(0, OUTPUT_CAP))
+
+// A card restored after a reload, or read back from the node, holds the facts
+// from submission; one read brings it up to date. Polling is the watcher's job.
+async function readJob() {
+  const jobId = props.view.jobId
+  if (!jobId || liveJob(jobId) || TERMINAL.has(props.view.state)) return
+  try {
+    noteJob(jobId, jobFacts(await getJob(jobId, { baseUrl: apiBaseUrl.value, token: authToken.value })))
+  } catch {
+    // The stored facts stay on the card; the watcher or the next reload tries again.
+  }
+}
+onMounted(readJob)
+watch(() => props.view.jobId, readJob)
 </script>
 
 <template>

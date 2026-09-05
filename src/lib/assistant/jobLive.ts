@@ -1,7 +1,8 @@
-// What a background watcher last saw of a job, so a job card in the
+// What a watcher or a card last read of a job, so a job card in the
 // conversation stays current between model turns. Nothing here is persisted:
-// a reload leaves the cards on the facts the transcript holds.
+// after a reload a card reads its job once and the watcher polls on from there.
 import { reactive } from 'vue'
+import type { JobStatusResponse } from '@/lib/jobs'
 
 export interface JobLive {
   state: string
@@ -21,6 +22,17 @@ export function liveJob(jobId: string): JobLive | undefined {
 
 export function noteJob(jobId: string, facts: JobLive): void {
   if (jobId) seen.set(jobId, facts)
+}
+
+/** The facts a card shows, picked out of a job status. */
+export function jobFacts(job: JobStatusResponse): JobLive {
+  return {
+    state: job.state,
+    kind: job.kind,
+    attempts: job.attempts,
+    finishedAt: job.finished_at,
+    error: job.error?.message,
+  }
 }
 
 /** True while a watcher follows this job, which is what the card's spinner means. */
