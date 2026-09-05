@@ -1,18 +1,20 @@
-// The dataset editor's graph view reads this model: one node per entity plus a
+// Every crate graph in the portal reads this model: one node per entity plus a
 // ghost node for every reference leaving the crate, and one edge per reference
-// value. Building it is pure, so the view only has to draw what it answers.
+// value. Building it is pure, so the views only have to draw what it answers.
 
 import dagre from 'dagre'
+import { formatContentSize, isDataEntity, isLeafFile } from '@/lib/dataEntities'
 import { isAbsoluteUri } from '@/lib/profiles/uri'
 import {
   displayName,
-  entityGroup,
-  findEntity,
-  partIds,
+  fromRoCrate,
   propertyTerm,
+  rootId,
   typeLabel,
   type CrateDraft,
+  type DraftEntity,
 } from './editor'
+import { partsOf } from './orphans'
 import type { VocabIndex } from '@/lib/profiles/vocabulary'
 
 export type GraphNodeKind = 'root' | 'file' | 'dataset' | 'contextual' | 'external'
@@ -22,6 +24,8 @@ export interface GraphNode {
   kind: GraphNodeKind
   badge: string
   label: string
+  /** One muted line under the name: size and format, parts, type or host. */
+  facts: string
   types: string[]
 }
 
@@ -44,10 +48,15 @@ export interface Placed<T> {
   y: number
 }
 
-export const NODE_WIDTH = 200
-export const NODE_HEIGHT = 76
+export const NODE_WIDTH = 220
+export const NODE_HEIGHT = 64
 
-const BADGES: Readonly<Record<GraphNodeKind, string>> = {
+/** Above this many nodes a graph starts with contextual entities hidden. */
+export const CONTEXT_LIMIT = 40
+/** Above this many nodes a graph shows a minimap. */
+export const MINIMAP_LIMIT = 30
+
+export const BADGES: Readonly<Record<GraphNodeKind, string>> = {
   root: 'Root',
   file: 'File',
   dataset: 'Dataset',
@@ -55,25 +64,61 @@ const BADGES: Readonly<Record<GraphNodeKind, string>> = {
   external: 'External',
 }
 
-function kindOf(draft: CrateDraft, entityId: string, parts: Set<string>): GraphNodeKind {
-  const entity = findEntity(draft, entityId)
-  if (!entity) return 'external'
-  const group = entityGroup(draft, entity, parts)
-  if (group === 'root') return 'root'
-  if (group !== 'data') return 'contextual'
-  return entity.types.map(typeLabel).includes('File') ? 'file' : 'dataset'
+function isDraft(source: unknown): source is CrateDraft {
+  return Boolean(source) && Array.isArray((source as CrateDraft).entities)
+}
+
+/** The editor's draft as it is; the RO-Crate JSON a page loaded, parsed. */
+export function toDraft(source: unknown): CrateDraft {
+  return isDraft(source) ? source : fromRoCrate(source)
+}
+
+function kindOf(draft: CrateDraft, entity: DraftEntity): GraphNodeKind {
+  if (entity.id === rootId(draft)) return 'root'
+  if (isLeafFile(entity.types)) return 'file'
+  return isDataEntity(entity.types) ? 'dataset' : 'contextual'
+}
+
+function hostOf(id: string): string {
+  try {
+    return new URL(id).host
+  } catch {
+    return ''
+  }
+}
+
+function count(n: number, one: string, many = `${one}s`): string {
+  return `${n} ${n === 1 ? one : many}`
+}
+
+function factsOf(kind: GraphNodeKind, entity: DraftEntity): string {
+  const first = (property: string) => entity.properties[property]?.[0]?.value.trim() ?? ''
+  switch (kind) {
+    case 'root':
+    case 'dataset':
+      return count(partsOf(entity).length, 'part')
+    case 'file': {
+      const size = first('contentSize')
+      return [size ? formatContentSize(size) : '', first('encodingFormat')].filter(Boolean).join(' · ')
+    }
+    case 'contextual':
+      return entity.types.map(typeLabel).join(', ')
+    case 'external':
+      return hostOf(entity.id)
+  }
 }
 
 /** Every entity and every reference between them, ghost targets included. */
-export function crateGraph(draft: CrateDraft, vocab: VocabIndex | null = null): CrateGraphModel {
-  const parts = partIds(draft)
+export function crateGraph(source: unknown, vocab: VocabIndex | null = null): CrateGraphModel {
+  const draft = toDraft(source)
   const nodes: GraphNode[] = draft.entities.map((entity) => {
-    const kind = kindOf(draft, entity.id, parts)
+    const kind = kindOf(draft, entity)
     return {
       id: entity.id,
       kind,
       badge: BADGES[kind],
       label: displayName(entity),
+      facts: factsOf(kind, entity),
       types: entity.types.map(typeLabel),
     }
   })
@@ -91,6 +136,7 @@ export function crateGraph(draft: CrateDraft, vocab: VocabIndex | null = null): 
             kind: 'external',
             badge: BADGES.external,
             label: target,
+            facts: hostOf(target) || 'Not in this crate',
             types: isAbsoluteUri(target) ? ['URL'] : [],
           })
         }
@@ -105,6 +151,20 @@ export function crateGraph(draft: CrateDraft, vocab: VocabIndex | null = null): 
     }
   }
   return { nodes, edges }
+}
+
+/** The root and its data only; what a large crate shows first. */
+export function dataOnly(model: CrateGraphModel): CrateGraphModel {
+  const nodes = model.nodes.filter((node) => node.kind !== 'contextual' && node.kind !== 'external')
+  const kept = new Set(nodes.map((node) => node.id))
+  return { nodes, edges: model.edges.filter((edge) => kept.has(edge.source) && kept.has(edge.target)) }
+}
+
+/** What the graph shows, for its accessible name. */
+export function describeGraph(model: CrateGraphModel): string {
+  const root = model.nodes.find((node) => node.kind === 'root')
+  const entities = count(model.nodes.length, 'entity', 'entities')
+  return `${root?.label || 'Crate'}: ${entities}, ${count(model.edges.length, 'reference')}`
 }
 
 /** A layered top-down layout; the root ends up above what it points at. */

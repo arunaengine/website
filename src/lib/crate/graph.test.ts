@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import * as Editor from '@/lib/crate/editor'
 import { addFilePart, linkReference } from '@/lib/crate/references'
-import { crateGraph, layoutGraph, NODE_HEIGHT } from '@/lib/crate/graph'
+import {
+  crateGraph,
+  dataOnly,
+  describeGraph,
+  layoutGraph,
+  NODE_HEIGHT,
+  toDraft,
+} from '@/lib/crate/graph'
 
-// The graph tab draws exactly what this model answers, so the model is what
-// the tests pin down; mounting Vue Flow needs a DOM this suite does not have.
+// Every graph view draws exactly what this model answers, so the model is
+// what the tests pin down.
 function seeded(): Editor.CrateDraft {
   const named = Editor.updateValue(Editor.newDraft(), './', 'name', 0, 'Example dataset')
   const person = Editor.addEntity(named, { type: 'Person', name: 'Ada Lovelace' })
@@ -12,11 +19,20 @@ function seeded(): Editor.CrateDraft {
     kind: 'reference',
     value: person.entity.id,
   })
-  const withFile = addFilePart(authored, { id: 's3://bucket/reads.csv', name: 'reads.csv' })
+  const withFile = addFilePart(authored, {
+    id: 's3://bucket/reads.csv',
+    name: 'reads.csv',
+    contentSize: '2048',
+    encodingFormat: 'text/csv',
+  })
   return Editor.addValue(withFile, '#ada-lovelace', 'affiliation', {
     kind: 'reference',
     value: 'https://ror.org/03yrm5c26',
   })
+}
+
+function nodeById(source: unknown, id: string) {
+  return crateGraph(source).nodes.find((node) => node.id === id)
 }
 
 describe('crateGraph', () => {
@@ -31,11 +47,55 @@ describe('crateGraph', () => {
     expect(nodes.find((node) => node.id === '#ada-lovelace')?.types).toEqual(['Person'])
   })
 
+  it('reads the crate JSON a page loaded for viewing', () => {
+    // The same picture whether the crate comes from the editor or the node.
+    const crate = Editor.toRoCrate(seeded())
+    const fromJson = crateGraph(crate)
+    const fromDraft = crateGraph(seeded())
+
+    expect(toDraft(crate).entities.map((entity) => entity.id)).toEqual(seeded().entities.map((entity) => entity.id))
+    expect(fromJson.nodes).toEqual(fromDraft.nodes)
+    expect(fromJson.edges).toEqual(fromDraft.edges)
+  })
+
+  it('tells files and datasets apart by type, wherever they hang', () => {
+    // A media file inside a sub-dataset is not in the root's hasPart.
+    const crate = {
+      '@graph': [
+        { '@id': 'ro-crate-metadata.json', '@type': 'CreativeWork', about: { '@id': './' } },
+        { '@id': './', '@type': 'Dataset', name: 'Nested', hasPart: { '@id': 'images/' } },
+        { '@id': 'images/', '@type': 'Dataset', hasPart: [{ '@id': 'images/a.png' }, { '@id': 'images/b.png' }] },
+        { '@id': 'images/a.png', '@type': 'ImageObject', contentSize: '1024' },
+        { '@id': 'images/b.png', '@type': ['File', 'ImageObject'] },
+      ],
+    }
+
+    expect(nodeById(crate, 'images/')).toMatchObject({ kind: 'dataset', facts: '2 parts' })
+    expect(nodeById(crate, 'images/a.png')).toMatchObject({ kind: 'file', facts: '1 KB' })
+    expect(nodeById(crate, 'images/b.png')).toMatchObject({ kind: 'file', facts: '' })
+    expect(nodeById(crate, './')).toMatchObject({ kind: 'root', facts: '1 part' })
+  })
+
+  it('puts one line of facts under every node', () => {
+    const draft = seeded()
+
+    expect(nodeById(draft, './')?.facts).toBe('1 part')
+    expect(nodeById(draft, 's3://bucket/reads.csv')?.facts).toBe('2 KB · text/csv')
+    expect(nodeById(draft, '#ada-lovelace')?.facts).toBe('Person')
+    expect(nodeById(draft, 'https://ror.org/03yrm5c26')?.facts).toBe('ror.org')
+  })
+
   it('gives a reference leaving the crate a ghost node', () => {
     const { nodes } = crateGraph(seeded())
     const ghost = nodes.find((node) => node.id === 'https://ror.org/03yrm5c26')
 
     expect(ghost).toMatchObject({ kind: 'external', badge: 'External', types: ['URL'] })
+  })
+
+  it('says when a dangling reference is no URL', () => {
+    const draft = Editor.addValue(seeded(), './', 'publisher', { kind: 'reference', value: '#gone' })
+
+    expect(nodeById(draft, '#gone')).toMatchObject({ kind: 'external', facts: 'Not in this crate', types: [] })
   })
 
   it('labels each edge with the property it stands for', () => {
@@ -69,6 +129,22 @@ describe('crateGraph', () => {
     const draft = Editor.addValue(seeded(), './', 'publisher', { kind: 'reference', value: '' })
 
     expect(crateGraph(draft).edges.some((edge) => edge.property === 'publisher')).toBe(false)
+  })
+})
+
+describe('dataOnly', () => {
+  it('keeps the root and its data with the edges between them', () => {
+    const model = dataOnly(crateGraph(seeded()))
+
+    expect(model.nodes.map((node) => node.id)).toEqual(['./', 's3://bucket/reads.csv'])
+    expect(model.edges.map((edge) => edge.property)).toEqual(['hasPart'])
+  })
+})
+
+describe('describeGraph', () => {
+  it('names the crate and counts what is drawn', () => {
+    expect(describeGraph(crateGraph(seeded()))).toBe('Example dataset: 4 entities, 3 references')
+    expect(describeGraph(dataOnly(crateGraph(seeded())))).toBe('Example dataset: 2 entities, 1 reference')
   })
 })
 
