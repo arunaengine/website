@@ -16,6 +16,7 @@ import RunProvenancePanel from '@/components/metadata/RunProvenancePanel.vue'
 import DatasetActions from '@/components/metadata/view/DatasetActions.vue'
 import DatasetDetailSkeleton from '@/components/metadata/view/DatasetDetailSkeleton.vue'
 import DatasetFiles from '@/components/metadata/view/DatasetFiles.vue'
+import DatasetGraph from '@/components/metadata/view/DatasetGraph.vue'
 import DatasetHeader from '@/components/metadata/view/DatasetHeader.vue'
 import DatasetRelated from '@/components/metadata/view/DatasetRelated.vue'
 import PreviewPane from '@/components/preview/PreviewPane.vue'
@@ -26,6 +27,9 @@ import DialogTitle from '@/components/ui/DialogTitle.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
+import Tabs from '@/components/ui/Tabs.vue'
+import TabsList from '@/components/ui/TabsList.vue'
+import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import DataEntityDialog from '@/components/metadata/DataEntityDialog.vue'
 import { ref } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
@@ -93,6 +97,7 @@ providePageContext(() => {
   }
 })
 
+const tab = ref<'overview' | 'graph'>('overview')
 const showCrateExport = ref(false)
 const showDelete = ref(false)
 const deleteError = ref<string | null>(null)
@@ -130,6 +135,12 @@ function openPreview(target: { bucket: string; key: string; name: string; size?:
 function openInfo(entityId: string) {
   infoEntityId.value = entityId
   infoOpen.value = true
+}
+
+// A jump lands on an overview section, so the overview has to be showing.
+function jumpTo(entityId: string) {
+  tab.value = 'overview'
+  jumpEntity(entityId)
 }
 </script>
 
@@ -171,63 +182,74 @@ function openInfo(entityId: string) {
       <template v-else-if="docState === 'found'">
         <DatasetHeader v-if="current" :doc="current" :state="state" />
 
-        <PersistentIdSection
-          v-if="fetchedSummary"
-          :document-id="detailId"
-          :is-public="fetchedSummary.public"
-        />
+        <Tabs :model-value="tab" @update:model-value="(value: string) => (tab = value === 'graph' ? 'graph' : 'overview')">
+          <TabsList aria-label="Dataset views">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="graph">Graph</TabsTrigger>
+          </TabsList>
+        </Tabs>
 
-        <DetailsSection
-          :fields="presentation.fields"
-          :loading="loadingCrate"
-          :preparing="Boolean(cratePending[detailId])"
-          :not-ready="crateNotReady"
-          :error="crateError"
-          @retry="fetchCrate(detailId)"
-          @jump="jumpEntity"
-        />
+        <DatasetGraph v-if="tab === 'graph'" :state="state" @open="openInfo" />
 
-        <PeopleSection
-          :people="presentation.people"
-          :organizations="presentation.organizations"
-          :highlight-id="highlightId"
-          @jump="jumpEntity"
-        />
+        <template v-if="tab === 'overview'">
+          <PersistentIdSection
+            v-if="fetchedSummary"
+            :document-id="detailId"
+            :is-public="fetchedSummary.public"
+          />
 
-        <ContextSection
-          :entities="presentation.entities"
-          :comments="presentation.comments"
-          :highlight-id="highlightId"
-          @jump="jumpEntity"
-        />
+          <DetailsSection
+            :fields="presentation.fields"
+            :loading="loadingCrate"
+            :preparing="Boolean(cratePending[detailId])"
+            :not-ready="crateNotReady"
+            :error="crateError"
+            @retry="fetchCrate(detailId)"
+            @jump="jumpEntity"
+          />
 
-        <SubcratesSection
-          v-if="subcrateIris.size"
-          :crate="currentCrate"
-          :document-id="detailId"
-          :can-write="Boolean(current) && canWrite"
-        />
+          <PeopleSection
+            :people="presentation.people"
+            :organizations="presentation.organizations"
+            :highlight-id="highlightId"
+            @jump="jumpEntity"
+          />
 
-        <RunProvenancePanel v-if="runProvenance" :run="runProvenance" />
+          <ContextSection
+            :entities="presentation.entities"
+            :comments="presentation.comments"
+            :highlight-id="highlightId"
+            @jump="jumpEntity"
+          />
 
-        <DatasetFiles v-else :state="state" @preview="openPreview" @info="openInfo" />
+          <SubcratesSection
+            v-if="subcrateIris.size"
+            :crate="currentCrate"
+            :document-id="detailId"
+            :can-write="Boolean(current) && canWrite"
+          />
 
-        <DatasetRelated :state="state" />
+          <RunProvenancePanel v-if="runProvenance" :run="runProvenance" />
 
-        <section class="surface overflow-hidden">
-          <div class="flex items-center gap-2 border-b border-border px-5 py-3.5 text-sm font-medium text-foreground">
-            <Code2 class="h-4 w-4 text-primary" /> Advanced
-          </div>
-          <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
-            <div>
-              <h3 class="text-sm font-medium text-foreground">Query this dataset</h3>
-              <p class="mt-1 text-xs text-muted-foreground">Open the SPARQL workbench with this exact dataset scope fixed.</p>
+          <DatasetFiles v-else :state="state" @preview="openPreview" @info="openInfo" />
+
+          <DatasetRelated :state="state" />
+
+          <section class="surface overflow-hidden">
+            <div class="flex items-center gap-2 border-b border-border px-5 py-3.5 text-sm font-medium text-foreground">
+              <Code2 class="h-4 w-4 text-primary" /> Advanced
             </div>
-            <Button variant="outline" size="sm" as-child>
-              <RouterLink :to="{ name: 'datasets', query: { expert: '1', document: detailId } }"><Code2 class="h-3.5 w-3.5" /> Query this dataset</RouterLink>
-            </Button>
-          </div>
-        </section>
+            <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+              <div>
+                <h3 class="text-sm font-medium text-foreground">Query this dataset</h3>
+                <p class="mt-1 text-xs text-muted-foreground">Open the SPARQL workbench with this exact dataset scope fixed.</p>
+              </div>
+              <Button variant="outline" size="sm" as-child>
+                <RouterLink :to="{ name: 'datasets', query: { expert: '1', document: detailId } }"><Code2 class="h-3.5 w-3.5" /> Query this dataset</RouterLink>
+              </Button>
+            </div>
+          </section>
+        </template>
 
         <CrateImportExport
           ref="crateSection"
@@ -290,7 +312,7 @@ function openInfo(entityId: string) {
       :crate="fullCrates[detailId] ?? current?.roCrate"
       :entity-id="infoEntityId"
       :profile="currentProfile"
-      @jump="jumpEntity"
+      @jump="jumpTo"
     />
 
     <CrateTransferDialog v-model:open="showCrateExport" mode="export" :document-id="detailId" :document-path="currentPath" />
