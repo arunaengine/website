@@ -247,6 +247,10 @@ function lock() {
 async function create(passphrase: string, withRecovery: boolean): Promise<string | null> {
   const scope = requireScope()
   if (state.value === 'unsupported') throw new Error('This node cannot keep provider keys.')
+  // Creating over a vault that could not be read would replace it.
+  if (!loaded.value || error.value) {
+    throw new Error('The provider keys on this node could not be read yet. Reload the page and try again.')
+  }
   if (payload) throw new Error('Your provider keys are already set up.')
   const run = generation
   const created = await createVault(passphrase, withRecovery)

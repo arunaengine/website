@@ -270,6 +270,17 @@ describe('useUserVault', () => {
     expect(vault.loaded.value).toBe(false)
   })
 
+  it('refuses to create before the node answered, or after it failed to', async () => {
+    const { vault } = await boot({ load: false })
+    await expect(vault.create('x', false)).rejects.toThrow('could not be read yet')
+
+    readVault.mockRejectedValueOnce(new Error('offline'))
+    const failed = await boot()
+    expect(failed.vault.error.value).toBe('offline')
+    await expect(failed.vault.create('x', false)).rejects.toThrow('could not be read yet')
+    expect(saveVault).not.toHaveBeenCalled()
+  })
+
   it('refuses to save while locked', async () => {
     const { vault } = await boot()
     await vault.create('correct horse', false)
