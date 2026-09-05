@@ -1,5 +1,8 @@
 // What the chat panel renders and what the tool layer hands back to the model.
 import type { PreviewKind } from '@/composables/useObjectPreview'
+import type { MessageSource } from '@/lib/assistant/citations'
+
+export type { MessageSource }
 
 /** What a denied tool call answers the model, as NovaCrate words it. */
 export const DENIAL_MESSAGE = 'The user has denied this operation'
@@ -153,6 +156,8 @@ export interface ChatMessage {
   background?: true
   /** Set when the provider or the loop itself failed, e.g. "429 rate limited". */
   error?: string
+  /** The web pages a search-backed answer drew on, with their titles. */
+  sources?: MessageSource[]
 }
 
 export interface ApprovalRequest {

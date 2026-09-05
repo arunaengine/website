@@ -154,6 +154,32 @@ describe('assistant chat history', () => {
     expect(restored.map((message) => message.background)).toEqual([undefined, true])
   })
 
+  it('keeps the pages an answer cited across a save and load', () => {
+    const store = createAssistantChatStore(scope('user-a'), backing)
+    const chat = newAssistantChat('Cited', 10)
+    store.save({
+      activeChatId: chat.id,
+      chats: [{
+        ...chat,
+        messages: [
+          { id: 'm1', role: 'user', text: 'where?', calls: [], at: 1 },
+          {
+            id: 'm2',
+            role: 'assistant',
+            text: 'Here.',
+            calls: [],
+            at: 2,
+            sources: [{ url: 'https://example.test/a', title: 'Example page' }, { url: 'https://example.test/b' }],
+          },
+        ],
+      }],
+    })
+
+    const restored = createAssistantChatStore(scope('user-a'), backing).load().chats[0]?.messages ?? []
+    expect(restored[0]?.sources).toBeUndefined()
+    expect(restored[1]?.sources).toEqual([{ url: 'https://example.test/a', title: 'Example page' }, { url: 'https://example.test/b' }])
+  })
+
   it('dates a message stored before messages carried a time', () => {
     const store = createAssistantChatStore(scope('user-a'), backing)
     const chat = newAssistantChat('Old', 10)

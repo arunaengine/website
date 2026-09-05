@@ -926,6 +926,12 @@ async function runChatTurn(chatId: string, prompt: string, context: PromptContex
       onToolError: ({ id, message: toolError }) => {
         if (isCurrentTurn(turn)) patchCall(chatId, assistantMessageId, id, { state: 'error', error: toolError })
       },
+      onSource: (source) => {
+        if (!isCurrentTurn(turn)) return
+        const message = answer()
+        if (!message || message.sources?.some((known) => known.url === source.url)) return
+        message.sources = [...(message.sources ?? []), source]
+      },
     })
     if (!isCurrentTurn(turn)) return
     if (result.error && !turn.controller.signal.aborted) {

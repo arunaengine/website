@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, useId } from 'vue'
 import MarkdownIt from 'markdown-it'
+import { citations, type MessageSource } from '@/lib/assistant/citations'
 import { objectLinks } from '@/lib/assistant/objectLinks'
 import { usePageContext } from '@/composables/usePageContext'
 import { useAssistantObject } from '@/composables/useAssistantObject'
@@ -11,7 +12,12 @@ const props = withDefaults(defineProps<{
   size?: 'compact' | 'full'
   /** True when the message already shows a card, so long prose folds away. */
   hasCard?: boolean
-}>(), { size: 'compact', hasCard: false })
+  /** The web pages the answer drew on, for the titles in its reference list. */
+  sources?: MessageSource[]
+}>(), { size: 'compact', hasCard: false, sources: undefined })
+
+// Reference anchors are element ids, so every rendered message gets its own prefix.
+const refId = `ref-${useId()}`
 
 // Prose shorter than this stays open even beside a card.
 const FOLD_ABOVE_CHARS = 400
@@ -20,6 +26,7 @@ const FOLD_ABOVE_CHARS = 400
 // markdown-it rejects unsafe link protocols by default.
 const md = new MarkdownIt({ html: false, linkify: true, typographer: true })
 objectLinks(md)
+citations(md)
 
 const renderLink = md.renderer.rules.link_open
   ?? ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options))
@@ -41,7 +48,11 @@ md.renderer.rules.fence = (tokens, idx, options, env, self) =>
 
 // The bucket the reader has open lets a bare file name in the answer link too.
 const { currentPage } = usePageContext()
-const html = computed(() => md.render(props.text, { bucket: currentPage()?.details.bucket ?? '' }))
+const html = computed(() => md.render(props.text, {
+  bucket: currentPage()?.details.bucket ?? '',
+  refId,
+  sources: props.sources,
+}))
 
 const { follow } = useAssistantObject()
 const expanded = ref(false)
@@ -65,6 +76,14 @@ function onClick(event: MouseEvent) {
   const trigger = target.closest('button[data-copy]')
   if (trigger instanceof HTMLElement) {
     copyCode(trigger)
+    return
+  }
+  // A citation mark scrolls to its reference; the page address stays as it is.
+  const cite = target.closest('a[data-cite]')
+  if (cite instanceof HTMLElement) {
+    event.preventDefault()
+    const id = cite.getAttribute('href')?.slice(1) ?? ''
+    document.getElementById(id)?.scrollIntoView({ block: 'nearest' })
     return
   }
   const link = target.closest('a[data-bucket]')
@@ -163,6 +182,39 @@ function onClick(event: MouseEvent) {
   color: hsl(var(--primary));
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+.assistant-markdown :deep(.assistant-cite) {
+  margin-left: 0.1em;
+  font-size: 0.75em;
+  line-height: 1;
+}
+
+.assistant-markdown :deep(.assistant-cite a) {
+  text-decoration: none;
+}
+
+.assistant-markdown :deep(.assistant-references) {
+  margin-top: 0.9em;
+  border-top: 1px solid hsl(var(--border));
+  padding-top: 0.5em;
+  font-size: 0.85em;
+  color: hsl(var(--muted-foreground));
+}
+
+.assistant-markdown :deep(.assistant-references p) {
+  margin: 0 0 0.25em;
+  font-weight: 600;
+}
+
+.assistant-markdown :deep(.assistant-references ol) {
+  margin: 0;
+  list-style: none;
+  padding-left: 0;
+}
+
+.assistant-markdown :deep(.assistant-references li + li) {
+  margin-top: 0.15em;
 }
 
 .assistant-markdown :deep(code) {

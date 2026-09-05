@@ -8,6 +8,7 @@ import {
   type ModelMessage,
   type ToolSet,
 } from 'ai'
+import type { MessageSource } from '@/lib/assistant/citations'
 import { errorMessage } from '@/lib/utils'
 
 export type StreamProviderOptions = Parameters<typeof streamText>[0]['providerOptions']
@@ -20,6 +21,8 @@ export interface TurnHandlers {
   onToolCall: (call: { id: string; name: string; input: unknown }) => void
   onToolResult: (result: { id: string; output: unknown }) => void
   onToolError: (failure: { id: string; message: string }) => void
+  /** A web page the provider's search drew on. */
+  onSource?: (source: MessageSource) => void
 }
 
 export interface TurnOptions extends TurnHandlers {
@@ -92,6 +95,8 @@ export async function runTurn(options: TurnOptions): Promise<TurnResult> {
         options.onToolResult({ id: part.toolCallId, output: part.output })
       } else if (part.type === 'tool-error') {
         options.onToolError({ id: part.toolCallId, message: providerErrorMessage(part.error) })
+      } else if (part.type === 'source') {
+        if (part.sourceType === 'url') options.onSource?.({ url: part.url, ...(part.title ? { title: part.title } : {}) })
       } else if (part.type === 'error') {
         failure ??= providerErrorMessage(part.error)
       }

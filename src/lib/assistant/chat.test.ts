@@ -46,6 +46,7 @@ function handlers() {
     calls: [] as Array<{ id: string; name: string; input: unknown }>,
     results: [] as Array<{ id: string; output: unknown }>,
     errors: [] as Array<{ id: string; message: string }>,
+    sources: [] as Array<{ url: string; title?: string }>,
   }
 }
 
@@ -59,6 +60,7 @@ function options(model: MockLanguageModelV4, tools: ToolSet, sink: ReturnType<ty
     onToolCall: (call: { id: string; name: string; input: unknown }) => sink.calls.push(call),
     onToolResult: (result: { id: string; output: unknown }) => sink.results.push(result),
     onToolError: (failure: { id: string; message: string }) => sink.errors.push(failure),
+    onSource: (source: { url: string; title?: string }) => sink.sources.push(source),
   }
 }
 
@@ -72,6 +74,32 @@ describe('runTurn', () => {
     expect(sink.text).toEqual(['hi there'])
     expect(result.error).toBeUndefined()
     expect(result.messages.length).toBeGreaterThan(0)
+  })
+
+  it('hands the web pages a search drew on to the caller', async () => {
+    const sink = handlers()
+    const model = new MockLanguageModelV4({
+      doStream: {
+        stream: simulateReadableStream({
+          chunks: [
+            { type: 'stream-start' as const, warnings: [] },
+            { type: 'source' as const, sourceType: 'url' as const, id: 's-1', url: 'https://example.test/a', title: 'Example page' },
+            { type: 'source' as const, sourceType: 'url' as const, id: 's-2', url: 'https://example.test/b' },
+            { type: 'text-start' as const, id: '1' },
+            { type: 'text-delta' as const, id: '1', delta: 'See the page.' },
+            { type: 'text-end' as const, id: '1' },
+            { type: 'finish' as const, finishReason: { unified: 'stop' as const, raw: undefined }, usage: USAGE },
+          ],
+        }),
+      },
+    })
+
+    await runTurn(options(model, {}, sink))
+
+    expect(sink.sources).toEqual([
+      { url: 'https://example.test/a', title: 'Example page' },
+      { url: 'https://example.test/b' },
+    ])
   })
 
   it('keeps a blank line between text the model writes in separate blocks', async () => {

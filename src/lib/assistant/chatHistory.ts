@@ -12,6 +12,8 @@ export const MAX_ASSISTANT_STORAGE_CHARS = 900_000
 
 const MAX_TITLE_LENGTH = 80
 const MAX_TEXT_LENGTH = 8_000
+/** Web pages kept per answer; a search rarely cites more. */
+const MAX_SOURCES = 50
 
 export interface AssistantChatScope {
   apiBaseUrl: string
@@ -156,6 +158,15 @@ export function normalizeMessage(value: unknown, fallback: number): ChatMessage 
   }
   if (value.background === true) message.background = true
   if (typeof value.error === 'string') message.error = value.error.slice(0, MAX_TEXT_LENGTH)
+  if (Array.isArray(value.sources)) {
+    const sources = value.sources.slice(0, MAX_SOURCES).flatMap((source) => {
+      if (!record(source)) return []
+      const url = boundedString(source.url, '', 2_000)
+      const title = boundedString(source.title, '', 300)
+      return url ? [{ url, ...(title ? { title } : {}) }] : []
+    })
+    if (sources.length) message.sources = sources
+  }
   return message
 }
 

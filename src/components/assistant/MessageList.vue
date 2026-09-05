@@ -193,6 +193,7 @@ onUnmounted(() => listening?.removeEventListener('scroll', measure))
             <AssistantMarkdown
               v-if="message.text"
               :text="message.text"
+              :sources="message.sources"
               :size="props.size"
               :has-card="shownCards(message).length > 0"
             />
