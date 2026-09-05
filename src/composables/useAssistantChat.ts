@@ -70,7 +70,7 @@ import { assistantAvailable as available, assistantOpen as open, assistantPageOp
 const PROVIDER_KEY = 'aruna.assistant.provider'
 const MODEL_KEY = 'aruna.assistant.model'
 /** Saves to the node are batched, so a streaming answer writes once. */
-const REMOTE_SAVE_DELAY_MS = 3_000
+export const REMOTE_SAVE_DELAY_MS = 3_000
 const APPROVE_KEY = 'aruna.assistant.approve'
 const SEARCH_KEY = 'aruna.assistant.search'
 const EFFORT_KEY = 'aruna.assistant.effort'
