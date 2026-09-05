@@ -76,8 +76,9 @@ describe('vault crypto', () => {
     expect(code).toMatch(/^([0-9A-HJKMNP-TV-Z]{4}-){12}[0-9A-HJKMNP-TV-Z]{4}$/)
     const key = await unlockWithRecovery(payload, code.toLowerCase().replace(/-/g, ' '))
     expect(await openData(key, payload)).toEqual({ providers: [] })
-    await expect(unlockWithRecovery(payload, code.slice(0, -1) + (code.endsWith('A') ? 'B' : 'A')))
-      .rejects.toThrow('The recovery code is wrong.')
+    // The last character holds one used bit and four of padding, so a full character is flipped.
+    const flipped = code.slice(0, 5) + (code[5] === 'A' ? 'B' : 'A') + code.slice(6)
+    await expect(unlockWithRecovery(payload, flipped)).rejects.toThrow('The recovery code is wrong.')
     await expect(unlockWithRecovery(payload, 'short')).rejects.toThrow('The recovery code is wrong.')
   })
 
