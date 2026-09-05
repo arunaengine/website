@@ -65,10 +65,12 @@ import {
 } from '@/lib/assistant/chatSync'
 import { clearLiveJobs, setWatchedJobs } from '@/lib/assistant/jobLive'
 import { searchKind, type SearchKind } from '@/lib/assistant/webSearch'
+import { watchLeadership } from '@/lib/assistant/watchLock'
 import { watchPoller } from '@/lib/assistant/watchPoll'
 import {
   createWatchRegistry,
   createWatchStore,
+  type AssistantWatch,
   type WatchKind,
   type WatchRegistry,
   type WatchResult,
@@ -179,6 +181,8 @@ let connectionUrl = ''
 let watchStore: ReturnType<typeof createWatchStore> | null = null
 let watchRegistry: WatchRegistry | null = null
 let watchTimer: ReturnType<typeof setInterval> | null = null
+// Only the tab holding the lock polls; the others keep their timer and retry.
+const watchLead = watchLeadership()
 // Updates waiting for the turn slot; a resume never races the running turn.
 const resumeQueue: Array<{ chatId: string; text: string }> = []
 let lastContext: PromptContext | null = null
@@ -721,17 +725,26 @@ function stopWatchTimer() {
   if (watchTimer === null) return
   clearInterval(watchTimer)
   watchTimer = null
+  watchLead.release()
+}
+
+// A tab that just took the lead reads the watches the last leader left in the
+// store, so a job that leader already answered is not answered again.
+async function claimWatchLead(): Promise<boolean> {
+  const led = watchLead.leading()
+  if (!(await watchLead.claim())) return false
+  if (!led && watchStore && watchRegistry) watchRegistry = buildRegistry(watchStore.load().watches)
+  return true
 }
 
 async function tickWatches() {
-  const registry = watchRegistry
-  if (!registry) {
+  if (!watchRegistry) {
     stopWatchTimer()
     return
   }
-  await registry.tick()
+  if (await claimWatchLead()) await watchRegistry?.tick()
   pumpResumes()
-  if (!registry.list().length && !resumeQueue.length) stopWatchTimer()
+  if (!watchRegistry?.list().length && !resumeQueue.length) stopWatchTimer()
 }
 
 function armWatchTimer() {
@@ -747,18 +760,22 @@ function addWatch(chatId: string, input: { kind: WatchKind; target: string; labe
   return result
 }
 
+function buildRegistry(watches: AssistantWatch[]): WatchRegistry {
+  return createWatchRegistry({
+    poll: watchPoller(client),
+    resume: resumeChat,
+    hasChat: (chatId) => chatState.chats.some((chat) => chat.id === chatId),
+    load: () => watches,
+    save: () => saveWatchState(),
+  })
+}
+
 function startWatchers(scope: AssistantChatScope) {
   const store = createWatchStore(scope)
   const payload = store.load()
   watchStore = store
   applyUnread(payload.unread)
-  watchRegistry = createWatchRegistry({
-    poll: watchPoller(client),
-    resume: resumeChat,
-    hasChat: (chatId) => chatState.chats.some((chat) => chat.id === chatId),
-    load: () => payload.watches,
-    save: () => saveWatchState(),
-  })
+  watchRegistry = buildRegistry(payload.watches)
   armWatchTimer()
 }
 
