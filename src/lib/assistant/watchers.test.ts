@@ -75,8 +75,12 @@ function harness(options: Partial<WatchRegistryOptions> = {}): Harness {
 
 describe('watchDelay', () => {
   it('grows from the first delay up to the cap', () => {
+    // A finished job is seen within 15 s, however long the watch has run.
+    expect(WATCH_FIRST_DELAY_MS).toBe(5_000)
+    expect(WATCH_MAX_DELAY_MS).toBe(15_000)
     expect(watchDelay(0)).toBe(WATCH_FIRST_DELAY_MS)
     expect(watchDelay(1)).toBeGreaterThan(WATCH_FIRST_DELAY_MS)
+    expect(watchDelay(3)).toBe(WATCH_MAX_DELAY_MS)
     expect(watchDelay(50)).toBe(WATCH_MAX_DELAY_MS)
   })
 })

@@ -8,7 +8,7 @@ export const MAX_ASSISTANT_WATCHES = 8
 /** A watcher stops on its own after this long, whatever the work is doing. */
 export const WATCH_DEADLINE_MS = 2 * 60 * 60 * 1000
 export const WATCH_FIRST_DELAY_MS = 5_000
-export const WATCH_MAX_DELAY_MS = 60_000
+export const WATCH_MAX_DELAY_MS = 15_000
 export const MAX_WATCH_ERRORS = 5
 
 const WATCH_GROWTH = 1.6
