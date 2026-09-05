@@ -97,7 +97,7 @@ function numberValue(value: unknown, fallback: number): number {
 const TOOL_STATES = new Set<ToolCallView['state']>(['approval', 'running', 'done', 'error', 'denied'])
 const MODEL_ROLES = new Set(['system', 'user', 'assistant', 'tool'])
 
-function isModelMessage(value: unknown): value is ModelMessage {
+export function isModelMessage(value: unknown): value is ModelMessage {
   return record(value) && typeof value.role === 'string' && MODEL_ROLES.has(value.role) && 'content' in value
 }
 
@@ -130,7 +130,7 @@ function normalizeCall(value: unknown): ToolCallView | null {
 }
 
 // `fallback` dates a message stored before messages carried their own time.
-function normalizeMessage(value: unknown, fallback: number): ChatMessage | null {
+export function normalizeMessage(value: unknown, fallback: number): ChatMessage | null {
   if (!record(value) || (value.role !== 'user' && value.role !== 'assistant')) return null
   const id = boundedString(value.id, '', 200)
   if (!id) return null
