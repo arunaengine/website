@@ -36,7 +36,7 @@ import { BookOpen } from '@lucide/vue'
         </h4>
         <ul class="mt-3 space-y-2 text-sm text-foreground/80">
           <li>
-            <a href="https://github.com/ArunaStorage" class="inline-flex items-center gap-1 hover:text-foreground" target="_blank" rel="noopener">
+            <a href="https://github.com/arunaengine/aruna" class="inline-flex items-center gap-1 hover:text-foreground" target="_blank" rel="noopener">
               <GithubIcon class="h-3 w-3" /> Aruna engine (Rust)
             </a>
           </li>
@@ -54,7 +54,7 @@ import { BookOpen } from '@lucide/vue'
         </div>
         <div class="flex items-center gap-3">
           <a
-            href="https://github.com/ArunaStorage"
+            href="https://github.com/arunaengine/aruna"
             target="_blank"
             rel="noopener"
             aria-label="Aruna on GitHub"

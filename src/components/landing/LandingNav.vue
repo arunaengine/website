@@ -46,7 +46,7 @@ async function onSignIn() {
       <div class="flex items-center gap-2">
         <Button variant="ghost" size="sm" as-child>
           <a
-            href="https://github.com/ArunaStorage"
+            href="https://github.com/arunaengine/aruna"
             target="_blank"
             rel="noopener"
             aria-label="GitHub"
