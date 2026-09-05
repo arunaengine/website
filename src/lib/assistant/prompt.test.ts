@@ -81,6 +81,14 @@ describe('systemPrompt', () => {
     expect(prompt).toContain('never dump raw JSON')
   })
 
+  it('keeps emojis and dashes out of every answer', () => {
+    const prompt = systemPrompt({ route: '/app/assistant' })
+
+    expect(prompt).toContain(
+      'Never use emojis, em dashes or en dashes; write plain sentences with commas, colons or full stops.',
+    )
+  })
+
   it('tells the model a denial is final', () => {
     const prompt = systemPrompt({ route: '/app/assistant' })
 

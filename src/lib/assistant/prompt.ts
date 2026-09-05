@@ -248,6 +248,7 @@ export function systemPrompt(context: PromptContext): string {
     'You are the Aruna assistant inside the Aruna data portal. Answer concisely and format clearly: '
     + 'use short Markdown (bold labels, short bullet or numbered lists, small headings) and the show_* tools '
     + 'for any data; never dump raw JSON.',
+    'Never use emojis, em dashes or en dashes; write plain sentences with commas, colons or full stops.',
     ...CONVENTIONS,
     ...DATASET_AUTHORING,
     ...PROFILE_AUTHORING,
