@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { markTurns, newChatSync, resetSync, trackHead, turnSeqs } from './chatSync'
+import { cursorOf, markNew, markTurns, newChatSync, resetSync, restoreCursor, trackHead, turnSeqs } from './chatSync'
 import type { ChatTurn } from './chatTurns'
 
 function turn(id: string): ChatTurn {
@@ -57,6 +57,48 @@ describe('markTurns', () => {
     markTurns(sync, [])
 
     expect(sync.dirtyTurns.size).toBe(0)
+  })
+})
+
+describe('markNew', () => {
+  it('leaves the tail alone and marks only what comes after next_seq', () => {
+    const sync = synced('u1', 'u2')
+
+    markNew(sync, turns('u1', 'u2', 'u3'))
+
+    expect([...sync.dirtyTurns]).toEqual([2])
+    markNew(sync, turns('u1', 'u2'))
+    expect([...sync.dirtyTurns]).toEqual([2])
+  })
+})
+
+describe('restoreCursor', () => {
+  it('places the local turns from the tail key and counts on from next_seq', () => {
+    // The browser let u1 go before the reload; u2 and u3 are on the node, u4 is not.
+    const sync = newChatSync()
+
+    restoreCursor(sync, turns('u2', 'u3', 'u4'), { revision: 9, nextSeq: 3, tailKey: 'u3' })
+
+    expect(cursorOf(sync)).toEqual({ revision: 9, nextSeq: 3, tailKey: 'u3' })
+    expect(turnSeqs(sync, turns('u2', 'u3', 'u4'))).toEqual([1, 2, 3])
+  })
+
+  it('leaves the sync empty when the tail turn is gone, so the chat is read in full', () => {
+    const sync = newChatSync()
+
+    restoreCursor(sync, turns('u5'), { revision: 9, nextSeq: 3, tailKey: 'u3' })
+
+    expect(sync.revision).toBe(0)
+    expect(sync.seqs.size).toBe(0)
+  })
+
+  it('takes a cursor for a chat the node holds without turns', () => {
+    const sync = newChatSync()
+
+    restoreCursor(sync, turns('u1'), { revision: 1, nextSeq: 0, tailKey: '' })
+
+    expect(sync.revision).toBe(1)
+    expect(turnSeqs(sync, turns('u1'))).toEqual([0])
   })
 })
 

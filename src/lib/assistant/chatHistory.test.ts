@@ -168,6 +168,17 @@ describe('assistant chat history', () => {
     expect(store.load().chats[0]?.messages[0]?.at).toBe(4_242)
   })
 
+  it('keeps the node cursor of a chat and drops a broken one', () => {
+    const store = createAssistantChatStore(scope('user-a'), backing)
+    const synced = { ...newAssistantChat('Synced', 10), remote: { revision: 7, nextSeq: 3, tailKey: 'm-9' } }
+    const broken = { ...newAssistantChat('Broken', 20), remote: { revision: 'seven' } }
+    store.save({ activeChatId: synced.id, chats: [synced, broken as unknown as typeof synced] })
+
+    const restored = createAssistantChatStore(scope('user-a'), backing).load().chats
+    expect(restored.find((chat) => chat.id === synced.id)?.remote).toEqual({ revision: 7, nextSeq: 3, tailKey: 'm-9' })
+    expect(restored.find((chat) => chat.id === broken.id)).not.toHaveProperty('remote')
+  })
+
   it('ignores malformed persisted data', () => {
     const store = createAssistantChatStore(scope('user-a'), backing)
     backing.values.set(store.key, '{not json')

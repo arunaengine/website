@@ -19,6 +19,14 @@ export interface AssistantChatScope {
   userId: string
 }
 
+/** What the node last confirmed for a chat, so a reload reads on from there. */
+export interface AssistantChatCursor {
+  revision: number
+  nextSeq: number
+  /** The key of the turn at `nextSeq - 1`, which places the local turns. */
+  tailKey: string
+}
+
 export interface AssistantChatRecord {
   id: string
   title: string
@@ -28,6 +36,8 @@ export interface AssistantChatRecord {
   updatedAt: number
   messages: ChatMessage[]
   history: ModelMessage[]
+  /** Kept in this browser only; never part of what goes to the node. */
+  remote?: AssistantChatCursor
 }
 
 export interface AssistantChatState {
@@ -156,10 +166,17 @@ function trimHistory(history: ModelMessage[]): ModelMessage[] {
   return history.slice(start)
 }
 
+function normalizeCursor(value: unknown): AssistantChatCursor | null {
+  if (!record(value) || typeof value.revision !== 'number' || typeof value.nextSeq !== 'number') return null
+  if (typeof value.tailKey !== 'string' || value.revision < 0 || value.nextSeq < 0) return null
+  return { revision: value.revision, nextSeq: value.nextSeq, tailKey: value.tailKey }
+}
+
 function normalizeChat(value: unknown, now = Date.now()): AssistantChatRecord | null {
   if (!record(value)) return null
   const id = boundedString(value.id, '', 200)
   if (!id) return null
+  const remote = normalizeCursor(value.remote)
   const createdAt = numberValue(value.createdAt, now)
   const messages = Array.isArray(value.messages)
     ? value.messages
@@ -179,6 +196,7 @@ function normalizeChat(value: unknown, now = Date.now()): AssistantChatRecord | 
     updatedAt: numberValue(value.updatedAt, now),
     messages,
     history,
+    ...(remote ? { remote } : {}),
   }
 }
 
