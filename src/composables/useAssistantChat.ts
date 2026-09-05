@@ -216,7 +216,7 @@ const working = computed(() => runningTurn.value?.chatId === activeChatId.value)
 const workingLabel = computed(() => {
   const answer = messages.value.find((message) => message.id === runningTurn.value?.messageId)
   const call = answer?.calls.filter((entry) => entry.state === 'running').at(-1)
-  return call ? `Running ${call.name}…` : 'Thinking…'
+  return call ? `Running ${call.name}` : 'Thinking'
 })
 let activeApproval: ApprovalEntry | null = null
 const approvalQueue: ApprovalEntry[] = []

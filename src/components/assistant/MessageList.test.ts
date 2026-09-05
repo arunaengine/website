@@ -32,8 +32,8 @@ const stubs = [
   '@/components/assistant/cards/TreeCard.vue',
   '@/components/assistant/AssistantMarkdown.vue',
   '@/components/assistant/ToolCallDrawer.vue',
+  '@/components/assistant/WorkingDots.vue',
   '@/components/ui/Notice.vue',
-  '@/components/ui/Spinner.vue',
 ]
 
 const modules = { '@/lib/utils': { relativeTime } }
@@ -196,10 +196,10 @@ describe('MessageList', () => {
           { id: 'm-2', role: 'assistant', text: '', calls: [{ id: 'c-1', name: 'get_job', input: {}, state: 'running' }], at: 1_756_000_000_000 },
         ],
         working: true,
-        workingLabel: 'Running get_job…',
+        workingLabel: 'Running get_job',
       },
     })
-    const spinners = nodes(root).filter((node) => node.props.label === 'Running get_job…')
+    const spinners = nodes(root).filter((node) => node.props.label === 'Running get_job')
     const answer = element(root, (node) => String(node.props.class ?? '').includes('space-y-1.5'))
 
     expect(spinners).toHaveLength(1)
@@ -208,10 +208,10 @@ describe('MessageList', () => {
 
   it('shows the indicator at the end while no answer exists yet', async () => {
     const { root } = await mountApp(MessageList, {
-      props: { messages: [messages[0]], working: true, workingLabel: 'Thinking…' },
+      props: { messages: [messages[0]], working: true, workingLabel: 'Thinking' },
     })
 
-    expect(nodes(root).filter((node) => node.props.label === 'Thinking…')).toHaveLength(1)
+    expect(nodes(root).filter((node) => node.props.label === 'Thinking')).toHaveLength(1)
   })
 
   it('drops its scroll listener when it goes away', async () => {

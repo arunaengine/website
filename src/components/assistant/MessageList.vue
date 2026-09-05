@@ -16,8 +16,8 @@ import TreeCard from '@/components/assistant/cards/TreeCard.vue'
 import AssistantMarkdown from '@/components/assistant/AssistantMarkdown.vue'
 import FoldRow from '@/components/assistant/FoldRow.vue'
 import ToolCallDrawer from '@/components/assistant/ToolCallDrawer.vue'
+import WorkingDots from '@/components/assistant/WorkingDots.vue'
 import Notice from '@/components/ui/Notice.vue'
-import Spinner from '@/components/ui/Spinner.vue'
 import type { ChatMessage } from '@/lib/assistant/types'
 import { relativeTime } from '@/lib/utils'
 import { ArrowDown, Radar, Sparkles } from '@lucide/vue'
@@ -33,7 +33,7 @@ const props = withDefaults(defineProps<{
   deleteCallId?: string
   /** `full` is the page: larger type, wider bubbles, settled tool calls folded. */
   size?: 'compact' | 'full'
-}>(), { workingLabel: 'Working…', deleteCallId: undefined, size: 'compact' })
+}>(), { workingLabel: 'Working', deleteCallId: undefined, size: 'compact' })
 const emit = defineEmits<{ (e: 'decide', approved: boolean): void }>()
 
 const scroller = ref<HTMLElement | null>(null)
@@ -197,11 +197,11 @@ onUnmounted(() => listening?.removeEventListener('scroll', measure))
               :has-card="shownCards(message).length > 0"
             />
             <Notice v-if="message.error" tone="error">{{ message.error }}</Notice>
-            <Spinner v-if="message.id === writing" :label="workingLabel" show-label />
+            <WorkingDots v-if="message.id === writing" :label="workingLabel" />
           </div>
         </div>
 
-        <Spinner v-if="working && !writing" :label="workingLabel" show-label />
+        <WorkingDots v-if="working && !writing" :label="workingLabel" />
       </div>
     </div>
 
