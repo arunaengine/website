@@ -196,9 +196,14 @@ function payload(userId: string, text: string): string {
   })
 }
 
+// The chat list carries the model history, whose union type is too deep for
+// the checker to walk here; only ids, titles and visible text matter.
+function chatList(): Array<{ id: string; title: string; messages: Array<{ text: string }> }> {
+  return chat.chats.value as ReturnType<typeof chatList>
+}
+
 function texts(id: string): string[] {
-  const list = chat.chats.value as Array<{ id: string; messages: Array<{ text: string }> }>
-  return (list.find((entry) => entry.id === id)?.messages ?? []).map((message) => message.text)
+  return (chatList().find((entry) => entry.id === id)?.messages ?? []).map((message) => message.text)
 }
 
 function nodeTexts(id: string): string[] {
@@ -300,7 +305,7 @@ describe('logging in', () => {
     await settle()
 
     expect(texts('n-1')).toEqual(['one', 'one answered', 'two', 'two answered', 'late', 'late answered'])
-    expect(chat.chats.value.find((entry) => entry.id === 'n-1')?.title).toBe('From the node')
+    expect(chatList().find((entry) => entry.id === 'n-1')?.title).toBe('From the node')
     expect(node.log).toContain('GET turns n-1 after -')
     expect(node.log).toContain('PUT turn n-1/2 rev 3')
     expect(nodeTexts('n-1').slice(-2)).toEqual(['late', 'late answered'])
@@ -431,7 +436,7 @@ describe('conflicts', () => {
     await chat.send('into the void', { route: '/' })
     await settle()
 
-    expect(chat.chats.value.some((entry) => entry.id === 'n-3')).toBe(false)
+    expect(chatList().some((entry) => entry.id === 'n-3')).toBe(false)
     expect(chat.activeChatId.value).not.toBe('n-3')
   })
 
