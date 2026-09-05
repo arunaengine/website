@@ -28,15 +28,31 @@ import type { StreamProviderOptions } from '@/lib/assistant/chat'
 import {
   assistantChatScopeKey,
   createAssistantChatStore,
-  decodeChatState,
-  encodeChatState,
   newAssistantChat,
   type AssistantChatRecord,
   type AssistantChatScope,
   type AssistantChatState,
 } from '@/lib/assistant/chatHistory'
-import { chatsConflicted, chatsUnsupported, readChats, saveChats } from '@/lib/api'
-import { chatsDiffer, mergeChats } from '@/lib/assistant/chatSync'
+import {
+  ApiError,
+  chatGone,
+  deleteChat as deleteChatOnNode,
+  listChats,
+  putChat,
+  putTurn,
+  readTurns,
+  type AssistantChatHead,
+} from '@/lib/api'
+import {
+  decodeTurn,
+  encodeTurn,
+  joinTurns,
+  mergeTurns,
+  splitTurns,
+  turnKey,
+  type ChatTurn,
+} from '@/lib/assistant/chatTurns'
+import { markTurns, newChatSync, resetSync, trackHead, turnSeqs, type ChatSync } from '@/lib/assistant/chatSync'
 import { clearLiveJobs, setWatchedJobs } from '@/lib/assistant/jobLive'
 import { searchKind, type SearchKind } from '@/lib/assistant/webSearch'
 import { watchPoller } from '@/lib/assistant/watchPoll'
@@ -139,12 +155,11 @@ let history: ModelMessage[] = []
 let chatState: AssistantChatState = { activeChatId: '', chats: [] }
 let chatStore: ReturnType<typeof createAssistantChatStore> | null = null
 let chatScopeKey = ''
-// What the node last confirmed for this scope. `null` means it does not keep
-// chats, so everything stays in this browser.
-let remoteRevision: number | null = 0
+// Set once the node answered for this scope; empty while chats stay in this browser.
 let remoteScopeKey = ''
 let remoteSaveTimer: ReturnType<typeof setTimeout> | null = null
 let remoteSaving = false
+let pushPending = false
 let counter = 0
 let session: { token: string; expiresAt: number; epoch: number } | null = null
 let sessionInFlight: { epoch: number; owner: TurnContext | null; promise: Promise<string> } | null = null
@@ -280,10 +295,18 @@ function clearChatState() {
   toolsNote.value = null
 }
 
+/** Writes the chats to this browser; one the bounded store let go leaves the node too. */
+function saveChatState() {
+  if (!chatStore) return
+  const before = chatState.chats.map((chat) => chat.id)
+  chatState = chatStore.save(chatState)
+  for (const id of before) if (!chatById(id)) forgetChat(id)
+  activeChatId.value = chatState.activeChatId
+}
+
 function persistChatState() {
   if (!chatStore || !chatScopeKey) return
-  chatState = chatStore.save(chatState)
-  activeChatId.value = chatState.activeChatId
+  saveChatState()
   updateChatList()
   queueRemoteSave()
 }
@@ -297,15 +320,16 @@ function persistCurrentChat() {
   persistChatState()
 }
 
+/** Saves a chat whose transcript grew, so its new turns reach the node. */
 function persistChat(chatId: string) {
-  if (!chatStore || !chatScopeKey) return
-  if (isActiveChat(chatId)) {
-    persistCurrentChat()
-    return
-  }
   const chat = chatById(chatId)
-  if (!chat) return
+  if (!chatStore || !chatScopeKey || !chat) return
+  if (isActiveChat(chatId)) {
+    chat.messages = messages.value
+    chat.history = history
+  }
   chat.updatedAt = Date.now()
+  markTurns(syncOf(chat.id), chatTurns(chat))
   persistChatState()
 }
 
@@ -802,7 +826,10 @@ async function runChatTurn(chatId: string, prompt: string, context: PromptContex
     { id: messageId, role: 'user', text: prompt, calls: [], at: startedAt, ...(resumeText === undefined ? {} : { background: true as const }) },
     { id: assistantMessageId, role: 'assistant', text: '', calls: [], at: startedAt },
   ])
-  if (resumeText === undefined && chat.title === 'New chat') chat.title = chatTitle(prompt)
+  if (resumeText === undefined && chat.title === 'New chat') {
+    chat.title = chatTitle(prompt)
+    markHead(chatId)
+  }
   updateChatList()
   const turnMessages: ModelMessage[] = [
     ...historyOf(chatId),
@@ -914,72 +941,259 @@ function resetConversation() {
 
 // ── Chats on the node ──────────────────────────────────────────────────────
 
+const chatSyncs = new Map<string, ChatSync>()
+
+function syncOf(chatId: string): ChatSync {
+  let sync = chatSyncs.get(chatId)
+  if (!sync) {
+    sync = newChatSync()
+    chatSyncs.set(chatId, sync)
+  }
+  return sync
+}
+
 function stopRemoteSync() {
   if (remoteSaveTimer !== null) clearTimeout(remoteSaveTimer)
   remoteSaveTimer = null
   remoteScopeKey = ''
-  remoteRevision = 0
+  pushPending = false
+  chatSyncs.clear()
 }
 
-/** Reads what the node holds and folds it into what this browser holds. */
-async function loadRemoteChats(scopeKey: string) {
-  try {
-    const stored = await readChats(client())
-    if (chatScopeKey !== scopeKey || !chatStore) return
-    remoteScopeKey = scopeKey
-    remoteRevision = stored.revision
-    const remote = stored.payload ? decodeChatState(stored.payload) : null
-    if (remote) {
-      const merged = mergeChats(chatState, remote)
-      if (chatsDiffer(merged, chatState)) {
-        applyChatState(chatStore.save(merged))
-      }
-      if (chatsDiffer(merged, remote)) queueRemoteSave()
-    } else if (chatState.chats.some((chat) => chat.messages.length)) {
-      queueRemoteSave()
-    }
-  } catch (cause) {
-    if (chatScopeKey !== scopeKey) return
-    // A node without the route keeps every chat local; anything else is worth
-    // one more try on the next save.
-    remoteRevision = chatsUnsupported(cause) ? null : remoteRevision
+function chatTurns(chat: AssistantChatRecord): ChatTurn[] {
+  return splitTurns(chat.messages, chat.history)
+}
+
+function markHead(chatId: string) {
+  syncOf(chatId).headDirty = true
+}
+
+/** Drops the chat from the node as well, where the node held it. */
+function forgetChat(id: string) {
+  const sync = chatSyncs.get(id)
+  chatSyncs.delete(id)
+  if (!sync?.revision) return
+  void deleteChatOnNode(id, client()).catch(() => {
+    // The delete is idempotent; a copy left behind comes back on the next login.
+  })
+}
+
+function removeChat(id: string) {
+  if (!chatStore || !chatById(id)) return
+  const wasActive = activeChatId.value === id
+  if (activeTurn?.chatId === id) discardTurn(abortTurn())
+  // A deleted chat has nothing left to resume, so its watchers go with it.
+  watchRegistry?.dropChat(id)
+  markChatRead(id)
+  chatSyncs.delete(id)
+  const remaining = chatState.chats.filter((chat) => chat.id !== id)
+  const replacement = remaining[0] ?? newAssistantChat()
+  chatState = {
+    activeChatId: wasActive ? replacement.id : activeChatId.value,
+    chats: remaining.length ? remaining : [replacement],
   }
+  applyChatState(chatState)
+  if (wasActive) persistCurrentChat()
+  else persistChatState()
+}
+
+/** Shows the chat list and the active chat again after the node changed them. */
+function refreshChats() {
+  if (!chatStore) return
+  saveChatState()
+  const current = activeChat()
+  messages.value = current?.messages ?? []
+  history = current?.history ?? []
+  updateChatList()
+}
+
+function chatFromHead(head: AssistantChatHead): AssistantChatRecord {
+  return { ...newAssistantChat(head.title, Date.parse(head.created_at)), id: head.id }
+}
+
+/** Folds one chat the node holds into this browser: its turns after the local cursor, and its title. */
+async function pullChat(head: AssistantChatHead): Promise<void> {
+  const scopeKey = chatScopeKey
+  const sync = syncOf(head.id)
+  const known = Boolean(chatById(head.id))
+  if (known && sync.revision === head.revision && sync.nextSeq === head.next_seq) return
+  const after = known && sync.revision ? sync.nextSeq - 1 : undefined
+  let pulled: ChatTurn[] = []
+  if (after === undefined || head.next_seq > sync.nextSeq) {
+    let turns
+    try {
+      ({ turns } = await readTurns(head.id, after, client()))
+    } catch (cause) {
+      if (chatScopeKey === scopeKey && chatGone(cause)) removeChat(head.id)
+      return
+    }
+    if (chatScopeKey !== scopeKey) return
+    pulled = turns.flatMap((turn) => {
+      const decoded = decodeTurn(turn.payload, Date.parse(turn.updated_at))
+      if (decoded) sync.seqs.set(turnKey(decoded), turn.seq)
+      return decoded ? [decoded] : []
+    })
+  }
+  // The records are replaced on every save, so the chat is looked up again
+  // after the read; one deleted meanwhile stays deleted.
+  const local = chatById(head.id)
+  if (known && !local) return
+  const chat = local ?? chatFromHead(head)
+  const merged = mergeTurns(chatTurns(chat), pulled, (key) => sync.seqs.has(key))
+  const joined = joinTurns(merged.turns)
+  chat.messages = joined.messages
+  chat.history = joined.history
+  if (!sync.headDirty) {
+    chat.title = head.title
+    if (head.subject) chat.subject = head.subject
+    else delete chat.subject
+  }
+  chat.updatedAt = Math.max(chat.updatedAt, Date.parse(head.updated_at))
+  trackHead(sync, head)
+  sync.dirtyTurns = new Set(merged.unsent.map((_, index) => head.next_seq + index))
+  if (!local) chatState = { ...chatState, chats: [...chatState.chats, chat] }
+}
+
+/** Reads what the node holds, folds it in, and marks what only this browser holds. */
+async function syncChats(scopeKey: string) {
+  let heads: AssistantChatHead[]
+  try {
+    ({ chats: heads } = await listChats(client()))
+  } catch {
+    // A node without the routes keeps every chat local; so does one that did
+    // not answer, until the next login.
+    return
+  }
+  if (chatScopeKey !== scopeKey || !chatStore) return
+  await Promise.all(heads.map((head) => pullChat(head)))
+  if (chatScopeKey !== scopeKey || !chatStore) return
+  const held = new Set(heads.map((head) => head.id))
+  for (const chat of chatState.chats) if (!held.has(chat.id)) resetSync(syncOf(chat.id), chatTurns(chat))
+  // A fresh browser opens on an empty chat; once the node's chats are in, the
+  // one written to last is the one to show, not the empty placeholder.
+  const current = activeChat()
+  if (!current || (!current.messages.length && !current.history.length)) {
+    const shown = [...chatState.chats].filter((chat) => chat.messages.length).sort((a, b) => b.updatedAt - a.updatedAt)[0]
+    if (shown) chatState = { ...chatState, activeChatId: shown.id }
+  }
+  remoteScopeKey = scopeKey
+  refreshChats()
+  queueRemoteSave()
 }
 
 function queueRemoteSave() {
-  if (remoteRevision === null || !chatScopeKey || remoteScopeKey !== chatScopeKey) return
-  if (remoteSaveTimer !== null) return
+  if (!chatScopeKey || remoteScopeKey !== chatScopeKey || remoteSaveTimer !== null) return
   remoteSaveTimer = setTimeout(() => {
     remoteSaveTimer = null
     void pushRemoteChats()
   }, REMOTE_SAVE_DELAY_MS)
 }
 
-async function pushRemoteChats(retry = true) {
+async function pushRemoteChats() {
   const scopeKey = chatScopeKey
-  if (remoteSaving || remoteRevision === null || !scopeKey || remoteScopeKey !== scopeKey) return
-  const payload = encodeChatState(chatState)
-  if (!payload) return
+  if (!scopeKey || remoteScopeKey !== scopeKey) return
+  if (remoteSaving) {
+    pushPending = true
+    return
+  }
   remoteSaving = true
   try {
-    const stored = await saveChats({ payload, revision: remoteRevision }, client())
-    if (chatScopeKey === scopeKey) remoteRevision = stored.revision
-  } catch (cause) {
-    if (chatScopeKey !== scopeKey) return
-    if (chatsUnsupported(cause)) {
-      remoteRevision = null
-      return
-    }
-    // Another browser saved first: take its chats, fold ours in, save once more.
-    if (chatsConflicted(cause) && retry) {
-      remoteSaving = false
-      await loadRemoteChats(scopeKey)
-      if (chatScopeKey === scopeKey) await pushRemoteChats(false)
-      return
+    for (const [id, sync] of [...chatSyncs]) {
+      if (chatScopeKey !== scopeKey) return
+      const chat = chatById(id)
+      if (chat && (sync.headDirty || sync.dirtyTurns.size)) await pushChat(chat, sync, true)
     }
   } finally {
     remoteSaving = false
+    if (pushPending) {
+      pushPending = false
+      queueRemoteSave()
+    }
   }
+}
+
+function headOf(chat: AssistantChatRecord, sync: ChatSync) {
+  return {
+    title: chat.title,
+    ...(chat.subject ? { subject: chat.subject } : {}),
+    ...(sync.revision ? { revision: sync.revision } : {}),
+  }
+}
+
+/** The head first when it is new or changed, then the unsent turns in seq order. */
+async function pushChat(chat: AssistantChatRecord, sync: ChatSync, retry: boolean): Promise<void> {
+  const scopeKey = chatScopeKey
+  // An empty chat never reaches the node; its head goes with its first turn.
+  if (!sync.revision && !sync.dirtyTurns.size) return
+  try {
+    if (!sync.revision || sync.headDirty) {
+      const fresh = !sync.revision
+      const head = await putChat(chat.id, headOf(chat, sync), client())
+      if (chatScopeKey !== scopeKey) return
+      sync.headDirty = false
+      if (fresh && head.next_seq > 0) {
+        // The node already held turns for a chat this browser took for new.
+        await pullChat(head)
+        refreshChats()
+        const again = chatById(chat.id)
+        if (!again || chatScopeKey !== scopeKey) return
+        chat = again
+      } else {
+        trackHead(sync, head)
+      }
+    }
+    const turns = chatTurns(chat)
+    const seqs = turnSeqs(sync, turns)
+    for (const seq of [...sync.dirtyTurns].sort((a, b) => a - b)) {
+      const index = seqs.indexOf(seq)
+      if (index < 0) {
+        sync.dirtyTurns.delete(seq)
+        continue
+      }
+      const changes = sync.changes
+      const head = await putTurn(chat.id, seq, { payload: encodeTurn(turns[index]) }, client())
+      if (chatScopeKey !== scopeKey) return
+      trackHead(sync, head)
+      sync.seqs.set(turnKey(turns[index]), seq)
+      // A turn marked again while the write was out is written once more.
+      if (sync.changes === changes) sync.dirtyTurns.delete(seq)
+    }
+  } catch (cause) {
+    if (chatScopeKey !== scopeKey) return
+    if (chatGone(cause)) {
+      removeChat(chat.id)
+      return
+    }
+    // Anything but these waits for the next queued save.
+    if (!(cause instanceof ApiError)) return
+    if (cause.status === 404) resetSync(sync, chatTurns(chat))
+    else if (cause.status === 409) await pullConflict(chat.id)
+    else if (cause.status === 413) {
+      sync.headDirty = false
+      sync.dirtyTurns.clear()
+      return
+    } else return
+    const again = chatById(chat.id)
+    if (retry && again) await pushChat(again, sync, false)
+  }
+}
+
+/** After a 409: the node's turns and revision, with this browser's unsent turns after them. */
+async function pullConflict(chatId: string) {
+  const scopeKey = chatScopeKey
+  let heads: AssistantChatHead[]
+  try {
+    ({ chats: heads } = await listChats(client()))
+  } catch {
+    return
+  }
+  if (chatScopeKey !== scopeKey) return
+  const head = heads.find((entry) => entry.id === chatId)
+  const chat = chatById(chatId)
+  if (!chat) return
+  if (head) await pullChat(head)
+  else resetSync(syncOf(chatId), chatTurns(chat))
+  if (chatScopeKey === scopeKey) refreshChats()
 }
 
 function syncChatScope() {
@@ -1004,7 +1218,7 @@ function syncChatScope() {
   historyReady.value = true
   applyChatState(nextStore.load())
   startWatchers(scope)
-  void loadRemoteChats(nextStore.key)
+  void syncChats(nextStore.key)
 }
 
 function syncEpoch() {
@@ -1143,32 +1357,20 @@ export function useAssistantChat() {
 
   function deleteChat(id: string) {
     syncEpoch()
-    if (!chatStore || !historyReady.value || !chatState.chats.some((chat) => chat.id === id)) return
-    const wasActive = activeChatId.value === id
-    if (activeTurn?.chatId === id) discardTurn(abortTurn())
-    // A deleted chat has nothing left to resume, so its watchers go with it.
-    watchRegistry?.dropChat(id)
-    markChatRead(id)
-    const remaining = chatState.chats.filter((chat) => chat.id !== id)
-    const replacement = remaining[0] ?? newAssistantChat()
-    chatState = {
-      activeChatId: wasActive ? replacement.id : activeChatId.value,
-      chats: remaining.length ? remaining : [replacement],
-    }
-    applyChatState(chatState)
-    if (wasActive) persistCurrentChat()
-    else persistChatState()
+    if (!chatStore || !historyReady.value || !chatById(id)) return
+    forgetChat(id)
+    removeChat(id)
   }
 
   function renameChat(id: string, title: string) {
     syncEpoch()
     if (!chatStore || !historyReady.value) return
-    const chat = chatState.chats.find((entry) => entry.id === id)
+    const chat = chatById(id)
     if (!chat) return
     chat.title = title.trim().slice(0, 80) || 'New chat'
     chat.updatedAt = Date.now()
-    chatState = chatStore.save(chatState)
-    updateChatList()
+    markHead(id)
+    persistChatState()
   }
 
   function openPanel() {
@@ -1196,6 +1398,7 @@ export function useAssistantChat() {
     const chat = activeChat()
     if (chat && topic && chat.subject !== topic) {
       chat.subject = topic
+      markHead(chat.id)
       persistChatState()
     }
     draft.value = prompt.trim()

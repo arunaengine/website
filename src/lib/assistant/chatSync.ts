@@ -1,40 +1,52 @@
-// Keeping the chats on the node. The portal is the only reader of the payload:
-// it stores its whole chat state as text, and merges what the node holds with
-// what this browser holds, newest write per chat winning.
-import type { AssistantChatRecord, AssistantChatState } from './chatHistory'
-import { MAX_ASSISTANT_CHATS } from './chatHistory'
+// What this browser knows about one chat on the node: the head it last saw,
+// which local turn sits at which seq, and what still has to be pushed.
+import { turnKey, type ChatTurn } from './chatTurns'
 
-/**
- * One list of chats out of two. A chat both sides know is taken from the side
- * that wrote it last, so a browser that has been offline cannot undo newer
- * work, and neither side loses a chat the other never saw.
- */
-export function mergeChats(
-  local: AssistantChatState,
-  remote: AssistantChatState,
-): AssistantChatState {
-  const byId = new Map<string, AssistantChatRecord>()
-  for (const chat of remote.chats) byId.set(chat.id, chat)
-  for (const chat of local.chats) {
-    const held = byId.get(chat.id)
-    if (!held || chat.updatedAt >= held.updatedAt) byId.set(chat.id, chat)
-  }
-  const chats = [...byId.values()]
-    .sort((first, second) => second.updatedAt - first.updatedAt)
-    .slice(0, MAX_ASSISTANT_CHATS)
-  // A fresh browser opens on an empty chat; once the node's chats arrive, the
-  // one written to last is the one to show, not the empty placeholder.
-  const active = chats.find((chat) => chat.id === local.activeChatId)
-  const placeholder = !active || (!active.messages.length && !active.history.length)
-  const activeChatId = placeholder
-    ? chats.find((chat) => chat.messages.length)?.id ?? active?.id ?? chats[0]?.id ?? local.activeChatId
-    : local.activeChatId
-  return { activeChatId, chats }
+export interface ChatSync {
+  /** 0 until the node holds the chat. */
+  revision: number
+  nextSeq: number
+  headDirty: boolean
+  dirtyTurns: Set<number>
+  /** The seq of every turn the node holds, by the turn's key. */
+  seqs: Map<string, number>
+  /** How often turns were marked; a write that started earlier keeps the mark. */
+  changes: number
 }
 
-/** True when the two states differ in what a save would store. */
-export function chatsDiffer(first: AssistantChatState, second: AssistantChatState): boolean {
-  if (first.chats.length !== second.chats.length) return true
-  const held = new Map(second.chats.map((chat) => [chat.id, chat.updatedAt]))
-  return first.chats.some((chat) => held.get(chat.id) !== chat.updatedAt)
+export function newChatSync(): ChatSync {
+  return { revision: 0, nextSeq: 0, headDirty: false, dirtyTurns: new Set(), seqs: new Map(), changes: 0 }
+}
+
+export function trackHead(sync: ChatSync, head: { revision: number; next_seq: number }) {
+  sync.revision = head.revision
+  sync.nextSeq = head.next_seq
+}
+
+/** The seq of each local turn: known ones as the node has them, the rest counted on from next_seq. */
+export function turnSeqs(sync: ChatSync, turns: ChatTurn[]): number[] {
+  let last = -1
+  turns.forEach((turn, index) => {
+    if (sync.seqs.has(turnKey(turn))) last = index
+  })
+  return turns.map((turn, index) =>
+    (index > last ? sync.nextSeq + index - last - 1 : sync.seqs.get(turnKey(turn)) ?? -1))
+}
+
+/** Marks the tail turn and every turn after the node's next_seq as unsent. */
+export function markTurns(sync: ChatSync, turns: ChatTurn[]) {
+  sync.changes += 1
+  const seqs = turnSeqs(sync, turns)
+  if (!seqs.length) return
+  const tail = seqs[seqs.length - 1]
+  for (const seq of seqs) if (seq >= Math.min(tail, sync.nextSeq)) sync.dirtyTurns.add(seq)
+}
+
+/** Starts the chat over as one the node does not hold. */
+export function resetSync(sync: ChatSync, turns: ChatTurn[]) {
+  sync.revision = 0
+  sync.nextSeq = 0
+  sync.seqs.clear()
+  sync.dirtyTurns.clear()
+  markTurns(sync, turns)
 }

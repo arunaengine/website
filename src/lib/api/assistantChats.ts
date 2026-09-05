@@ -116,33 +116,3 @@ export function deleteChat(
 ): Promise<void> {
   return apiRequest<void>(chatPath(id), { method: 'DELETE', signal }, client)
 }
-
-export interface AssistantChatsResponse {
-  payload: string | null
-  revision: number
-  updated_at: string | null
-}
-
-export interface SaveAssistantChatsRequest {
-  payload: string
-  revision?: number
-}
-
-export function readChats(
-  client: ApiClientOptions = {},
-  signal?: AbortSignal,
-): Promise<AssistantChatsResponse> {
-  return apiRequest<AssistantChatsResponse>(PATH, { signal }, client)
-}
-
-export function saveChats(
-  request: SaveAssistantChatsRequest,
-  client: ApiClientOptions = {},
-  signal?: AbortSignal,
-): Promise<AssistantChatsResponse> {
-  return apiRequest<AssistantChatsResponse>(
-    PATH,
-    { method: 'PUT', body: JSON.stringify(request), signal },
-    client,
-  )
-}
