@@ -1,12 +1,16 @@
 <script setup lang="ts">
 // A dataset the assistant asked to show: the root's name and description,
 // what it contains and who is described in it, with a link to the page.
-import { computed } from 'vue'
+import { computed, defineAsyncComponent, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
+import Button from '@/components/ui/Button.vue'
 import { presentCrate } from '@/lib/cratePresenter'
 import { crateGraph, crateRootId, dataEntitiesOf, stringProp, typesOf } from '@/lib/dataEntities'
-import { Package } from '@lucide/vue'
+import { Package, Waypoints } from '@lucide/vue'
+
+// The graph carries Vue Flow and dagre; only a card that shows it pays.
+const CrateGraph = defineAsyncComponent(() => import('@/components/metadata/CrateGraph.vue'))
 
 const props = defineProps<{ title: string; crate: unknown; documentId?: string }>()
 
@@ -24,6 +28,10 @@ const parts = computed(() => dataEntitiesOf(props.crate))
 const presentation = computed(() => presentCrate(props.crate))
 const people = computed(() => [...presentation.value.people, ...presentation.value.organizations])
 const entities = computed(() => presentation.value.entities)
+
+// A card that only carries the dataset's id has nothing to draw.
+const hasGraph = computed(() => crateGraph(props.crate).length > 0)
+const graphShown = ref(false)
 </script>
 
 <template>
@@ -60,6 +68,13 @@ const entities = computed(() => presentation.value.entities)
             <span class="text-[10px] text-muted-foreground/80">{{ entity.types[0] }}</span>
           </span>
         </div>
+      </div>
+
+      <div v-if="hasGraph">
+        <Button variant="outline" size="sm" class="h-7 text-[11px]" :aria-pressed="graphShown" @click="graphShown = !graphShown">
+          <Waypoints class="size-3.5" /> {{ graphShown ? 'Hide graph' : 'Show graph' }}
+        </Button>
+        <CrateGraph v-if="graphShown" :source="crate" mode="view" height="16rem" class="mt-2" />
       </div>
 
       <RouterLink

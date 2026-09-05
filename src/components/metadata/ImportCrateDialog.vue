@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { AlertTriangle, FileJson, FileJson2, Upload } from '@lucide/vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
@@ -17,6 +17,8 @@ import { analyzeCrateJson, type CrateImportPreview } from '@/lib/crateImport'
 import { fromRoCrate, type CrateDraft } from '@/lib/crate/editor'
 import { slugify } from '@/lib/profiles/emit'
 import { errorMessage } from '@/lib/utils'
+
+const CrateGraph = defineAsyncComponent(() => import('@/components/metadata/CrateGraph.vue'))
 
 const props = defineProps<{
   open: boolean
@@ -161,6 +163,10 @@ watch(
                 <code class="break-all font-mono">{{ unrecognizedImportProfiles.join(', ') }}</code>. The reference stays in the draft, but the backend may reject it until the Profile is registered.
               </span>
             </Notice>
+            <div class="space-y-1.5">
+              <p class="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Graph</p>
+              <CrateGraph :source="importPreview.crate" mode="view" height="18rem" />
+            </div>
           </template>
         </div>
 

@@ -2,7 +2,7 @@
 // RO-Crate zip transfer: upload-and-import an archive, or package a document
 // into one. Both are durable jobs, so progress and the per-entry report come
 // from the shared job machinery (useJobDetail) rather than a private poller.
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
@@ -50,6 +50,8 @@ import { Download, FileArchive, FolderPlus, FolderTree, Upload } from '@lucide/v
 
 type TransferRow = ArchiveReportRow<Partial<ImportReportDetail & ExportReportDetail>>
 
+const CrateGraph = defineAsyncComponent(() => import('@/components/metadata/CrateGraph.vue'))
+
 const props = defineProps<{
   open: boolean
   mode: 'import' | 'export'
@@ -59,13 +61,26 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
 
-const { apiBaseUrl, authToken, groups } = useAruna()
+const { apiBaseUrl, authToken, groups, fullCrates, loadRoCrate } = useAruna()
 const { bumpDashboard } = useNotifications()
 function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
 }
 
 const isImport = computed(() => props.mode === 'import')
+
+// Export shows what it packages; an archive has no crate to show before it
+// is unpacked.
+const exportCrate = computed(() => (props.documentId ? fullCrates.value[props.documentId] : undefined))
+watch(
+  () => [props.open, props.documentId] as const,
+  ([open, documentId]) => {
+    if (open && !isImport.value && documentId && !exportCrate.value) {
+      void loadRoCrate(documentId).catch(() => undefined)
+    }
+  },
+  { immediate: true },
+)
 
 const file = ref<File | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -539,6 +554,10 @@ function rowTarget(row: TransferRow): string {
           Data entities that cannot be resolved (external URLs, denied, missing or unreachable objects) are listed in the
           report instead of being packed.
         </p>
+        <div v-if="!isImport && !activeJobId && exportCrate" class="space-y-1.5">
+          <p class="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Graph</p>
+          <CrateGraph :source="exportCrate" mode="view" height="18rem" />
+        </div>
 
         <section v-if="activeJobId" class="space-y-3">
           <div class="flex flex-wrap items-center gap-2">
