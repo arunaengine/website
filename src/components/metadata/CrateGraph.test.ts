@@ -176,6 +176,31 @@ describe('CrateGraph in view mode', () => {
     onDblclick()
     expect(open).toHaveBeenCalledWith('s3://bucket/reads.csv')
   })
+
+  it('selects a node on focus and opens it with Enter or Space', async () => {
+    const select = vi.fn()
+    const open = vi.fn()
+    const { root } = await mountApp(CrateGraph, {
+      props: { source: seeded(), mode: 'view', onSelect: select, onOpen: open },
+    })
+    const stop = { preventDefault: vi.fn(), stopPropagation: vi.fn() }
+    const file = element(card(root, 'reads.csv'), (node) => node.props.tabindex === 0)
+
+    // One handler per key modifier: each sees the event and answers its key.
+    const press = (key: string) => {
+      for (const handler of file.props.onKeydown as Array<(event: unknown) => void>) handler({ key, ...stop })
+    }
+
+    ;(file.props.onFocus as () => void)()
+    expect(select).toHaveBeenCalledWith('s3://bucket/reads.csv')
+
+    press('Enter')
+    press(' ')
+    press('a')
+    expect(open).toHaveBeenCalledTimes(2)
+    expect(open).toHaveBeenCalledWith('s3://bucket/reads.csv')
+    expect(stop.preventDefault).toHaveBeenCalledTimes(2)
+  })
 })
 
 describe('CrateGraph in edit mode', () => {

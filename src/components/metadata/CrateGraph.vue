@@ -164,6 +164,7 @@ function link(key: string) {
         :nodes="nodes"
         :edges="edges"
         :nodes-connectable="mode === 'edit'"
+        :nodes-focusable="mode === 'edit'"
         :zoom-on-double-click="false"
         :min-zoom="0.1"
         :max-zoom="1.5"
@@ -178,8 +179,12 @@ function link(key: string) {
         <MiniMap v-if="shown.nodes.length > MINIMAP_LIMIT" pannable zoomable />
         <template #node-crate="{ data }">
           <div
-            class="surface flex h-16 w-[220px] items-center gap-2.5 px-3 text-left transition-opacity"
+            class="surface flex h-16 w-[220px] items-center gap-2.5 px-3 text-left transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             :class="nodeClass(data)"
+            :tabindex="mode === 'view' ? 0 : undefined"
+            @focus="focus = data.id; emit('select', data.id)"
+            @keydown.enter.prevent.stop="emit('open', data.id)"
+            @keydown.space.prevent.stop="emit('open', data.id)"
           >
             <Handle v-if="mode === 'edit'" type="target" :position="Position.Top" />
             <component
