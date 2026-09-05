@@ -30,6 +30,8 @@ export function watchLeadership(locks: WatchLocks | null = browserLocks()): Watc
   if (!locks) return { leading: () => true, claim: () => Promise.resolve(true), release: () => {} }
   let held: (() => void) | null = null
   let claiming: Promise<boolean> | null = null
+  // A release asked for while the claim is out is applied once the lock arrives.
+  let releasePending = false
   return {
     leading: () => held !== null,
     claim() {
@@ -46,6 +48,12 @@ export function watchLeadership(locks: WatchLocks | null = browserLocks()): Watc
               held = null
               done()
             }
+            if (releasePending) {
+              releasePending = false
+              held()
+              resolve(false)
+              return
+            }
             resolve(true)
           })
         }).catch(() => resolve(false))
@@ -54,6 +62,9 @@ export function watchLeadership(locks: WatchLocks | null = browserLocks()): Watc
       })
       return claiming
     },
-    release: () => held?.(),
+    release() {
+      if (held) held()
+      else if (claiming) releasePending = true
+    },
   }
 }

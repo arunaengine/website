@@ -39,6 +39,29 @@ describe('watchLeadership', () => {
     expect(second.leading()).toBe(true)
   })
 
+  it('gives a lock back that was released while the claim was out', async () => {
+    // A scope change during the request must not leave the tab holding the lock.
+    let grant: ((lock: object | null) => Promise<void>) | null = null
+    let holder: Promise<void> | null = null
+    const locks: WatchLocks = {
+      request: (_name, _options, callback) => new Promise<void>((resolve) => {
+        grant = (lock) => {
+          holder = callback(lock)
+          return holder.then(resolve)
+        }
+      }),
+    }
+    const lead = watchLeadership(locks)
+    const claim = lead.claim()
+    lead.release()
+
+    await grant!({ name: 'lock' })
+
+    expect(await claim).toBe(false)
+    expect(lead.leading()).toBe(false)
+    await expect(holder).resolves.toBeUndefined()
+  })
+
   it('asks once while it holds the lock', async () => {
     const fake = fakeLocks()
     const lead = watchLeadership(fake.locks)
