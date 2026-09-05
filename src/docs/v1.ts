@@ -756,7 +756,7 @@ export const docsTopics: DocsTopic[] = [
         route: '/app/settings?tab=assistant',
         anchor: 'assistant-providers',
         title: 'Providers',
-        body: 'API keys stay in this browser tab and are never sent to Aruna; only a ChatGPT sign-in is kept by the node.',
+        body: 'API keys stay in this browser session by default. A key can also be kept on this node, sealed with a passphrase only you know; a ChatGPT sign-in is kept by the node.',
       },
       {
         route: '/app/settings?tab=assistant',
@@ -777,7 +777,7 @@ export const docsTopics: DocsTopic[] = [
         icon: 'Bot',
         paragraphs: [
           'The in-portal assistant runs on a provider you configure: Claude, OpenAI, an OpenAI-compatible or local endpoint, or a ChatGPT subscription.',
-          'API keys stay in this browser tab and are never sent to Aruna; only a ChatGPT sign-in is kept by the [node](concept:glossary#node).',
+          'API keys stay in this browser session by default and are gone when you sign out. When you add or edit a provider you can keep its key on this [node](concept:glossary#node) instead, sealed with a passphrase only you know: the node stores ciphertext it cannot read, and the key follows you to other browsers. A recovery code, created with the passphrase and shown once, opens the keys if you forget the passphrase. Reset in the provider settings deletes every sealed key from the node; a ChatGPT sign-in is kept by the node on its own.',
           'The conversations themselves are kept by the node you are signed in to, so the same chats are there in another browser or on another machine. They stay on that node and are not replicated to the realm. A node that does not keep them leaves every chat in this browser, as before.',
         ],
       },
@@ -793,7 +793,7 @@ export const docsTopics: DocsTopic[] = [
         image: {
           src: '/docs/v1/assistant-add.jpg',
           alt: 'Add provider dialog with Claude, OpenAI, OpenAI-compatible, and ChatGPT options',
-          caption: 'Four provider kinds: a browser-held key, or a ChatGPT sign-in the node keeps.',
+          caption: 'Four provider kinds: a key kept in the browser or sealed on the node, or a ChatGPT sign-in the node keeps.',
         },
       },
       {
