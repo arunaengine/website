@@ -15,11 +15,14 @@ import LandingFooter from '@/components/landing/LandingFooter.vue'
     <LandingNav />
     <main>
       <Hero />
-      <FeatureGrid />
-      <RunAnywhereSection />
-      <ComputeSection />
-      <ArchitectureSection />
-      <CallToAction />
+      <div class="relative isolate">
+        <div aria-hidden="true" class="wash-landing pointer-events-none absolute inset-0 -z-10" />
+        <FeatureGrid />
+        <RunAnywhereSection />
+        <ComputeSection />
+        <ArchitectureSection />
+        <CallToAction />
+      </div>
     </main>
     <LandingFooter />
   </div>

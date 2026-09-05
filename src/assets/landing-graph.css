@@ -31,18 +31,21 @@
   stroke-linecap: round;
 }
 
-/* Node cards sit above the links and packets, so a packet enters a node and
-   disappears behind it instead of crossing the card. */
-.fed .landing-node {
-  z-index: 2;
+/* The node card look, shared by the graphs and the run-anywhere cards. */
+.landing-node {
   border-color: hsl(var(--primary) / 0.28);
   background:
     linear-gradient(180deg, hsl(var(--primary) / 0.08), transparent 55%),
     hsl(var(--card));
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
 }
-.dark .fed .landing-node {
+.dark .landing-node {
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+}
+/* Node cards sit above the links and packets, so a packet enters a node and
+   disappears behind it instead of crossing the card. */
+.fed .landing-node {
+  z-index: 2;
 }
 .fed .landing-node::before {
   content: '';

@@ -5,7 +5,7 @@ import { RouterLink } from 'vue-router'
 </script>
 
 <template>
-  <section class="section bg-background">
+  <section class="section">
     <div class="container max-w-5xl">
       <div
         class="relative overflow-hidden rounded-xl border border-white/10 bg-aruna-navy px-8 py-12 text-white shadow-sm sm:px-14"

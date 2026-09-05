@@ -69,7 +69,7 @@ const features: Feature[] = [
 </script>
 
 <template>
-  <section id="capabilities" class="section bg-background">
+  <section id="capabilities" class="section">
     <div class="container max-w-5xl">
       <div class="mx-auto max-w-2xl text-center">
         <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">

@@ -5,7 +5,7 @@ import { Hash, FileJson2, Database, Layers } from '@lucide/vue'
 </script>
 
 <template>
-  <section id="architecture" class="section bg-muted/30">
+  <section id="architecture" class="section">
     <div class="container max-w-5xl">
       <div class="mx-auto max-w-2xl text-center">
         <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">Architecture</div>
@@ -87,6 +87,7 @@ import { Hash, FileJson2, Database, Layers } from '@lucide/vue'
               aria-hidden="true"
               class="grid-faint pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_at_50%_50%,black_30%,transparent_72%)]"
             />
+            <div aria-hidden="true" class="wash-primary pointer-events-none absolute inset-0" />
             <FederationGraph />
           </Card>
           <p class="mt-3 text-xs text-muted-foreground">
