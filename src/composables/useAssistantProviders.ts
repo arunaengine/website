@@ -1,5 +1,6 @@
-// Browser providers are session-scoped direct connections. Node-managed
-// provider summaries are merged with the local direct providers.
+// Browser providers are direct connections whose key lives in this browser
+// session or, when the user chose so, sealed on the node. Node-managed
+// provider summaries are merged with both lists.
 import { computed, ref, watch } from 'vue'
 import {
   apiErrorMessage,
@@ -18,6 +19,10 @@ import {
 import { errorMessage } from '@/lib/utils'
 import { apiBaseUrl, authToken, sessionEpoch, userInfo } from './aruna/state'
 import { assistantAvailable } from './assistantState'
+import { useUserVault } from './useUserVault'
+
+/** Where a browser provider's key is kept. */
+export type ProviderStorage = 'session' | 'node'
 
 export interface BrowserProviderTestResponse {
   ok: boolean
@@ -27,6 +32,7 @@ export interface BrowserProviderTestResponse {
 const KEY_GONE = 'Enter the key again in settings to list models.'
 
 const browserStore = createBrowserProviderStore()
+const vault = useUserVault()
 const nodeProviders = ref<AssistantProvider[]>([])
 const providers = ref<AssistantProvider[]>([])
 const loading = ref(false)
@@ -62,16 +68,48 @@ function directSummary(provider: BrowserProvider): AssistantProvider {
   }
 }
 
+/** The keys on the node are listed only while they are unlocked. */
+function sealed(): BrowserProvider[] {
+  return vault.state.value === 'unlocked' ? vault.providers.value : []
+}
+
 function rebuild() {
   providers.value = [
     ...browserStore.state.providers.map(directSummary),
+    ...sealed().map(directSummary),
     ...nodeProviders.value,
   ]
   assistantAvailable.value = authenticated() && providers.value.some((provider) => provider.status === 'ready')
 }
 
 function direct(providerId: string): BrowserProvider | null {
-  return browserStore.state.providers.find((provider) => provider.id === providerId) ?? null
+  return browserStore.state.providers.find((provider) => provider.id === providerId)
+    ?? sealed().find((provider) => provider.id === providerId)
+    ?? null
+}
+
+function storageOf(providerId: string): ProviderStorage | null {
+  if (browserStore.state.providers.some((provider) => provider.id === providerId)) return 'session'
+  return sealed().some((provider) => provider.id === providerId) ? 'node' : null
+}
+
+function upsert(list: BrowserProvider[], next: BrowserProvider): BrowserProvider[] {
+  return list.some((entry) => entry.id === next.id)
+    ? list.map((entry) => (entry.id === next.id ? next : entry))
+    : [...list, next]
+}
+
+// The node is written first in both directions, so a failed save leaves the
+// provider where it was instead of in both places.
+async function place(validated: BrowserProvider, storage: ProviderStorage, previous: ProviderStorage | null) {
+  if (storage === 'node') {
+    await vault.saveProviders(upsert(vault.providers.value, validated))
+    if (previous === 'session') browserStore.remove(validated.id)
+  } else {
+    if (previous === 'node') await vault.saveProviders(vault.providers.value.filter((entry) => entry.id !== validated.id))
+    browserStore.upsert(validated)
+  }
+  rebuild()
 }
 
 function identityKey(): string {
@@ -89,6 +127,7 @@ function currentNodeContext(epoch: number, generation: number, identity: string)
 async function revalidate(epoch: number, generation: number, identity: string): Promise<void> {
   loading.value = true
   error.value = null
+  void vault.load()
   try {
     const response = await listAssistantProviders(client())
     if (!currentNodeContext(epoch, generation, identity)) return
@@ -132,6 +171,7 @@ function resetBrowserSession() {
 // change only invalidates node Codex summaries and in-flight loads.
 watch(sessionEpoch, resetBrowserSession, { flush: 'sync' })
 watch(() => userInfo.value?.user.user_id ?? '', resetNodeCache)
+watch([vault.state, vault.providers], rebuild)
 
 export function useAssistantProviders() {
   /** Revalidates the node-managed provider summaries once per concurrent wave. */
@@ -158,25 +198,40 @@ export function useAssistantProviders() {
     void load()
   }
 
-  async function create(provider: BrowserProvider): Promise<AssistantProvider> {
+  async function create(provider: BrowserProvider, storage: ProviderStorage = 'session'): Promise<AssistantProvider> {
     const validated = validateBrowserProvider(provider)
-    browserStore.upsert(validated)
-    rebuild()
+    await place(validated, storage, null)
     return directSummary(validated)
   }
 
-  async function update(providerId: string, provider: BrowserProvider): Promise<AssistantProvider> {
-    const current = direct(providerId)
-    if (!current) throw new Error('Only browser-owned providers can be edited here.')
+  /** Saves the edit; a different `storage` moves the provider there as well. */
+  async function update(
+    providerId: string,
+    provider: BrowserProvider,
+    storage?: ProviderStorage,
+  ): Promise<AssistantProvider> {
+    const previous = storageOf(providerId)
+    if (!previous) throw new Error('Only browser-owned providers can be edited here.')
     const validated = validateBrowserProvider({ ...provider, id: providerId })
-    browserStore.upsert(validated)
-    rebuild()
+    await place(validated, storage ?? previous, previous)
     return directSummary(validated)
+  }
+
+  async function move(providerId: string, storage: ProviderStorage): Promise<void> {
+    const current = direct(providerId)
+    if (!current) return
+    await update(providerId, current, storage)
   }
 
   async function remove(providerId: string): Promise<void> {
-    if (direct(providerId)) {
+    const storage = storageOf(providerId)
+    if (storage === 'session') {
       browserStore.remove(providerId)
+      rebuild()
+      return
+    }
+    if (storage === 'node') {
+      await vault.saveProviders(vault.providers.value.filter((entry) => entry.id !== providerId))
       rebuild()
       return
     }
@@ -274,6 +329,7 @@ export function useAssistantProviders() {
     ensureLoaded,
     create,
     update,
+    move,
     remove,
     check,
     models,
@@ -281,5 +337,6 @@ export function useAssistantProviders() {
     modelErrors,
     listModels,
     direct,
+    storageOf,
   }
 }
