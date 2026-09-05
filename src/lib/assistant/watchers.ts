@@ -237,7 +237,8 @@ export interface WatchRegistry {
   add(input: { chatId: string; kind: WatchKind; target: string; label: string }): WatchResult
   dropChat(chatId: string): void
   clear(): void
-  tick(): Promise<void>
+  /** Polls what is due; `force` polls every watch now, as after a change the node reported. */
+  tick(force?: boolean): Promise<void>
 }
 
 export function createWatchRegistry(options: WatchRegistryOptions): WatchRegistry {
@@ -325,11 +326,11 @@ export function createWatchRegistry(options: WatchRegistryOptions): WatchRegistr
       options.save(watches)
     },
 
-    async tick() {
+    async tick(force = false) {
       const gone = watches.filter((watch) => !options.hasChat(watch.chatId))
       if (gone.length) watches = watches.filter((watch) => options.hasChat(watch.chatId))
       const at = now()
-      const due = watches.filter((watch) => !running.has(watch.id) && watch.nextPollAt <= at)
+      const due = watches.filter((watch) => !running.has(watch.id) && (force || watch.nextPollAt <= at))
       if (!due.length && !gone.length) return
       for (const watch of due.filter((entry) => at >= entry.deadlineAt)) finish(watch, deadlineText(watch))
       await Promise.all(due.filter((watch) => watches.includes(watch)).map(poll))

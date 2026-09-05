@@ -299,7 +299,7 @@ function restartStream() {
   void connectStream(streamGeneration)
 }
 
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   // Sign-in/out lifecycle: re-probe availability for a fresh identity, clear
   // state when signed out, and use the backend SSE wake stream while signed in.
   watch(

@@ -51,8 +51,19 @@ vi.mock('@/lib/assistant/models', () => ({ buildModel: () => ({ id: 'm-1' }) }))
 vi.mock('@/lib/assistant/browserModels', () => ({ buildBrowserModel: () => ({ id: 'm-1' }) }))
 vi.mock('@/lib/assistant/prompt', () => ({ systemPrompt: () => 'system' }))
 
-const jobs = vi.hoisted(() => ({ state: 'running' }))
-vi.mock('@/lib/jobs', () => ({ getJob: async () => ({ state: jobs.state }) }))
+const jobs = vi.hoisted(() => ({ state: 'running', polled: [] as string[] }))
+vi.mock('@/lib/jobs', () => ({
+  getJob: async (id: string) => {
+    jobs.polled.push(id)
+    return { state: jobs.state }
+  },
+}))
+
+// Whether this tab leads the watchers; without Web Locks every tab would.
+const lead = vi.hoisted(() => ({ value: true }))
+vi.mock('@/lib/assistant/watchLock', () => ({
+  watchLeadership: () => ({ leading: () => lead.value, claim: async () => lead.value, release: () => {} }),
+}))
 
 const stored = new Map<string, string>()
 vi.stubGlobal('window', {
@@ -70,6 +81,7 @@ vi.stubGlobal('window', {
 const { createAssistantChatStore, newAssistantChat } = await import('@/lib/assistant/chatHistory')
 const { apiBaseUrl, authToken, userInfo } = await import('./aruna/state')
 const { WATCH_FIRST_DELAY_MS } = await import('@/lib/assistant/watchers')
+const { useNotifications } = await import('./useNotifications')
 
 const scope = { apiBaseUrl: 'https://node.test', realmId: 'r-1', userId: 'u-1' }
 
@@ -80,9 +92,10 @@ function seed() {
   apiBaseUrl.value = scope.apiBaseUrl
   authToken.value = 'token'
   userInfo.value = {
-    user: { user_id: scope.userId },
+    user: { user_id: scope.userId, name: 'Ada', attributes: {} },
     realm: { realm_id: scope.realmId, roles: [] },
     groups: [],
+    preferences: {},
   } as unknown as UserInfoResponse
 }
 
@@ -266,5 +279,53 @@ describe('a watcher resuming its own chat', () => {
 
     expect(turns.calls).toHaveLength(before)
     expect(chat.busy.value).toBe(false)
+  })
+})
+
+describe('a change the node reports', () => {
+  /** Starts a watch on `jobId` from chat c-a, the way the model would. */
+  async function startWatch(jobId: string, callId: string) {
+    const chat = useAssistantChat()
+    chat.selectChat('c-a')
+    jobs.state = 'running'
+    turns.onTurn = async ({ tools }) => {
+      await watch(tools, jobId, callId)
+      turns.onTurn = null
+    }
+    await chat.send(`watch ${jobId}`, { route: '/compute' })
+    return chat
+  }
+
+  function polls(jobId: string) {
+    return jobs.polled.filter((id) => id === jobId).length
+  }
+
+  it('polls the watched job before the timer would', async () => {
+    const chat = await startWatch('05JOB', 't-5')
+    jobs.state = 'succeeded'
+    const before = turns.calls.length
+
+    // A burst of frames is one poll round, well inside the first 5 s delay.
+    useNotifications().dashboardRevision.value++
+    useNotifications().dashboardRevision.value++
+    await vi.advanceTimersByTimeAsync(WATCH_FIRST_DELAY_MS / 2)
+
+    expect(polls('05JOB')).toBe(1)
+    expect(turns.calls.length).toBe(before + 1)
+    expect(transcript(chat.chats.value, 'c-a')).toContain('05JOB')
+  })
+
+  it('leaves the polling to the tab that leads', async () => {
+    await startWatch('06JOB', 't-6')
+    jobs.state = 'succeeded'
+    lead.value = false
+
+    useNotifications().dashboardRevision.value++
+    await vi.advanceTimersByTimeAsync(WATCH_FIRST_DELAY_MS / 2)
+
+    expect(polls('06JOB')).toBe(0)
+    lead.value = true
+    await settle()
+    expect(polls('06JOB')).toBeGreaterThan(0)
   })
 })

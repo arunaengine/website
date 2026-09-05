@@ -15,6 +15,7 @@ import {
 } from './aruna/state'
 import { loadRoCrate } from './aruna/crates'
 import { useAssistantProviders } from './useAssistantProviders'
+import { useNotifications } from './useNotifications'
 import { useAssistantEditor } from './useAssistantEditor'
 import { useAssistantProfileForm } from './useAssistantProfileForm'
 import { useAssistantRunForm } from './useAssistantRunForm'
@@ -95,6 +96,8 @@ const MAX_ARTIFACT_URLS = 24
 // One heartbeat drives both the watchers and the queued resumes; each watcher
 // keeps its own backoff, so this only decides how soon a due one is noticed.
 const WATCH_TICK_MS = 5_000
+/** A burst of change frames from the node makes one poll round. */
+const REVISION_DEBOUNCE_MS = 300
 // Told to the model after a background update; the transcript shows the update alone.
 const RESUME_NOTE = 'Answer this update in this chat: read the current state with the tools, show it with a '
   + 'card, and carry on with whatever was waiting on it. If the portal stopped watching before the work '
@@ -181,6 +184,7 @@ let connectionUrl = ''
 let watchStore: ReturnType<typeof createWatchStore> | null = null
 let watchRegistry: WatchRegistry | null = null
 let watchTimer: ReturnType<typeof setInterval> | null = null
+let revisionTimer: ReturnType<typeof setTimeout> | null = null
 // Only the tab holding the lock polls; the others keep their timer and retry.
 const watchLead = watchLeadership()
 // Updates waiting for the turn slot; a resume never races the running turn.
@@ -732,6 +736,8 @@ function markChatRead(chatId: string) {
 }
 
 function stopWatchTimer() {
+  if (revisionTimer !== null) clearTimeout(revisionTimer)
+  revisionTimer = null
   if (watchTimer === null) return
   clearInterval(watchTimer)
   watchTimer = null
@@ -797,6 +803,25 @@ function stopWatchers() {
   applyUnread({})
   clearLiveJobs()
 }
+
+/** Polls every watch now; the timer stays as the fallback for a dropped stream. */
+async function pollWatchesNow() {
+  if (!watchRegistry || !watchLead.leading()) return
+  await watchRegistry.tick(true)
+  pumpResumes()
+}
+
+// The node reports every job state change over the notification stream, so
+// the leading tab polls right away instead of at the next timer tick.
+const notifications = useNotifications()
+watch(notifications.dashboardRevision, () => {
+  if (!notifications.available.value || !watchLead.leading() || !watchRegistry?.list().length) return
+  if (revisionTimer !== null) clearTimeout(revisionTimer)
+  revisionTimer = setTimeout(() => {
+    revisionTimer = null
+    void pollWatchesNow()
+  }, REVISION_DEBOUNCE_MS)
+})
 
 /** A watcher's update, appended to its chat so the assistant answers it there. */
 function resumeChat(chatId: string, text: string) {

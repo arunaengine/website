@@ -159,6 +159,25 @@ describe('watch registry', () => {
     expect(registry.list()).toEqual([])
   })
 
+  it('polls every watch at once when forced', async () => {
+    // A change the node reported must not wait for the next due time.
+    const polled: string[] = []
+    const { registry, clock } = harness({
+      poll: async (entry) => {
+        polled.push(entry.target)
+        return { state: 'pending' }
+      },
+    })
+    registry.add({ chatId: 'chat-a', kind: 'job', target: '01JOB', label: 'run' })
+    await registry.tick()
+    expect(polled).toEqual([])
+
+    await registry.tick(true)
+
+    expect(polled).toEqual(['01JOB'])
+    expect(registry.list()[0].nextPollAt).toBeGreaterThan(clock.value)
+  })
+
   it('backs off while the work is still in flight', async () => {
     const { registry, clock } = harness({ poll: async () => ({ state: 'pending' }) as WatchPoll })
     registry.add({ chatId: 'chat-a', kind: 'job', target: '01JOB', label: 'run' })
