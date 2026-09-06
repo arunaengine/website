@@ -189,32 +189,55 @@ describe('loadArtifact', () => {
 })
 
 describe('turnRequest', () => {
-  it('carries store:false and the effort on the openai responses branch', () => {
-    expect(turnRequest('chatgpt', true, 'high')).toEqual({
+  it('carries store:false and the effort for chatgpt', () => {
+    expect(turnRequest({ kind: 'chatgpt', responses: true, effort: 'high', search: false })).toEqual({
       providerOptions: { openai: { store: false, reasoningEffort: 'high' } },
     })
   })
 
   it('sends the effort alone for openai chat completions', () => {
-    expect(turnRequest('openai', false, 'high')).toEqual({
+    expect(turnRequest({ kind: 'openai', responses: false, effort: 'high', search: false })).toEqual({
       providerOptions: { openai: { reasoningEffort: 'high' } },
     })
   })
 
   it('maps anthropic effort to a thinking budget under the output cap', () => {
-    expect(turnRequest('anthropic', false, 'high')).toEqual({
+    expect(turnRequest({ kind: 'anthropic', responses: false, effort: 'high', search: true })).toEqual({
       providerOptions: { anthropic: { thinking: { type: 'enabled', budgetTokens: 12000 } } },
       maxOutputTokens: 20000,
     })
   })
 
   it('sends no thinking for anthropic off', () => {
-    expect(turnRequest('anthropic', false, 'off')).toEqual({})
+    expect(turnRequest({ kind: 'anthropic', responses: false, effort: 'off', search: false })).toEqual({})
   })
 
   it('passes a reasoning effort for openrouter', () => {
-    expect(turnRequest('openrouter', false, 'medium')).toEqual({
+    expect(turnRequest({ kind: 'openrouter', responses: false, effort: 'medium', search: false })).toEqual({
       providerOptions: { openrouter: { reasoning: { effort: 'medium' } } },
     })
+  })
+
+  it('sends a compatible Responses endpoint nothing it did not ask for', () => {
+    // store:false makes the SDK add an include field, which an endpoint such
+    // as vLLM behind LiteLLM rejects; it goes only beside the search or reasoning.
+    const compatible = { kind: 'openai_compatible', responses: true }
+
+    expect(turnRequest({ ...compatible, effort: null, search: false })).toEqual({})
+    expect(turnRequest({ ...compatible, effort: null, search: true })).toEqual({
+      providerOptions: { openai: { store: false } },
+    })
+    expect(turnRequest({ ...compatible, effort: 'low', search: false })).toEqual({
+      providerOptions: { openai: { store: false, reasoningEffort: 'low' } },
+    })
+  })
+
+  it('keys a compatible chat completions effort by the adapter name', () => {
+    const compatible = { kind: 'openai_compatible', responses: false, search: false }
+
+    expect(turnRequest({ ...compatible, effort: 'medium' })).toEqual({
+      providerOptions: { 'openai-compatible': { reasoningEffort: 'medium' } },
+    })
+    expect(turnRequest({ ...compatible, effort: null })).toEqual({})
   })
 })

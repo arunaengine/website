@@ -13,14 +13,37 @@ export interface SearchSupport {
   kind: string
   /** True when the model speaks the OpenAI Responses API. */
   responses: boolean
+  /** What the model entry reports for a compatible endpoint; unset is unknown. */
+  webSearch?: boolean
+  /** The provider's own choice, which wins over the report. */
+  choice?: 'on' | 'off'
 }
 
 // The ChatGPT subscription surface is left out: its proxy accepts only the
 // Responses paths Codex uses, and a rejected tool would fail the whole turn.
+// A compatible endpoint gets the tool unless its model or provider says no;
+// an unknown model tries once, and a refusal is remembered on the model.
 export function searchKind(support: SearchSupport): SearchKind {
   if (support.kind === 'anthropic') return 'anthropic'
-  if (support.kind === 'chatgpt') return 'none'
-  return support.responses ? 'openai' : 'none'
+  if (support.kind === 'chatgpt' || !support.responses) return 'none'
+  if (support.kind !== 'openai_compatible') return 'openai'
+  if (support.choice) return support.choice === 'on' ? 'openai' : 'none'
+  return support.webSearch === false ? 'none' : 'openai'
+}
+
+/** Which extras a 400 from the endpoint refused, read from its reason. */
+export interface RefusedExtras {
+  search: boolean
+  reasoning: boolean
+}
+
+// A refusal of `include` lists the allowed values, which name reasoning too,
+// so reasoning counts as refused only when the search extras are not.
+export function refusedExtras(error: string | undefined): RefusedExtras | null {
+  if (!error || !/^400\b/.test(error)) return null
+  const search = /\binclude\b|web_search/i.test(error)
+  const reasoning = !search && /reasoning/i.test(error)
+  return search || reasoning ? { search, reasoning } : null
 }
 
 export async function searchTools(kind: SearchKind): Promise<ToolSet> {

@@ -25,7 +25,7 @@ import type { ArtifactRef, LoadedArtifact } from '@/lib/assistant/renderTools'
 import { ARTIFACT_TEXT_CAP } from '@/lib/assistant/types'
 import type { ApprovalGate, ApprovalRequest, ChatMessage, JobView, ToolCallView } from '@/lib/assistant/types'
 import { clampEffort, modelSuggestions, reasoningEffortOptions } from '@/lib/assistant/modelOptions'
-import type { StreamProviderOptions } from '@/lib/assistant/chat'
+import type { StreamProviderOptions, TurnHandlers } from '@/lib/assistant/chat'
 import {
   assistantChatScopeKey,
   createAssistantChatStore,
@@ -65,7 +65,7 @@ import {
   type ChatSync,
 } from '@/lib/assistant/chatSync'
 import { clearLiveJobs, setWatchedJobs } from '@/lib/assistant/jobLive'
-import { searchKind, type SearchKind } from '@/lib/assistant/webSearch'
+import { refusedExtras, searchKind, type SearchKind } from '@/lib/assistant/webSearch'
 import { WATCH_LOCK_NAME, watchLeadership, type WatchLeadership } from '@/lib/assistant/watchLock'
 import { watchPoller } from '@/lib/assistant/watchPoll'
 import {
@@ -90,6 +90,9 @@ const EFFORT_KEY = 'aruna.assistant.effort'
 const SESSION_MARGIN_MS = 60_000
 // What the chat says when the node serves no MCP endpoint.
 const NO_MCP_NOTE = 'This node serves no MCP endpoint, so only the open editor can be used.'
+// Said once after a compatible endpoint refused an extra and the turn ran again without it.
+const NO_SEARCH_NOTE = 'Web search is not available for this model.'
+const NO_REASONING_NOTE = 'Reasoning options are not available for this model.'
 // The same ceiling the object preview applies before bytes enter the tab.
 const ARTIFACT_CAP = 25 * 1024 * 1024
 const MAX_ARTIFACT_URLS = 24
@@ -119,23 +122,40 @@ export interface TurnRequest {
   maxOutputTokens?: number
 }
 
-// How one turn carries its reasoning effort: OpenAI responses and chatgpt add
-// store:false, openai chat sends it alone, anthropic maps it to a thinking
-// budget under the output cap, openrouter keys it by the provider name.
-export function turnRequest(kind: string, openAiResponses: boolean, effort: string): TurnRequest {
-  if (openAiResponses) return { providerOptions: { openai: { store: false, reasoningEffort: effort } } }
-  if (kind === 'openai') return { providerOptions: { openai: { reasoningEffort: effort } } }
+export interface TurnSupport {
+  /** The provider kind, as the record or the browser provider names it. */
+  kind: string
+  /** True when the model speaks the OpenAI Responses API. */
+  responses: boolean
+  /** The chosen effort, or null when the model lists no reasoning levels. */
+  effort: string | null
+  /** True when the turn carries the OpenAI web search tool. */
+  search: boolean
+}
+
+// How one turn carries its extras: chatgpt always adds store:false, openai
+// chat sends the effort alone, anthropic maps it to a thinking budget under
+// the output cap, openrouter keys it by name. A compatible Responses endpoint
+// gets store:false only beside the search or a reasoning field, and a chat
+// completions one gets the effort under the name its adapter was made with.
+export function turnRequest(support: TurnSupport): TurnRequest {
+  const { kind, responses, effort, search } = support
+  const reasoning = effort && effort !== 'off' ? effort : null
+  if (kind === 'chatgpt') return { providerOptions: { openai: { store: false, ...(effort ? { reasoningEffort: effort } : {}) } } }
+  if (kind === 'openai') return effort ? { providerOptions: { openai: { reasoningEffort: effort } } } : {}
   if (kind === 'anthropic') {
-    if (effort === 'off') return {}
-    const budget = THINK_BUDGET[effort] ?? THINK_BUDGET.medium
+    if (!reasoning) return {}
+    const budget = THINK_BUDGET[reasoning] ?? THINK_BUDGET.medium
     return {
       providerOptions: { anthropic: { thinking: { type: 'enabled', budgetTokens: budget } } },
       maxOutputTokens: budget + 8000,
     }
   }
-  if (kind === 'openrouter' || kind === 'openai_compatible') {
-    if (effort === 'off') return {}
-    return { providerOptions: { [kind]: { reasoning: { effort } } } }
+  if (kind === 'openrouter') return reasoning ? { providerOptions: { openrouter: { reasoning: { effort: reasoning } } } } : {}
+  if (kind === 'openai_compatible') {
+    if (!responses) return reasoning ? { providerOptions: { 'openai-compatible': { reasoningEffort: reasoning } } } : {}
+    if (!search && !reasoning) return {}
+    return { providerOptions: { openai: { store: false, ...(reasoning ? { reasoningEffort: reasoning } : {}) } } }
   }
   return {}
 }
@@ -926,29 +946,41 @@ async function runChatTurn(chatId: string, prompt: string, context: PromptContex
     ])
     if (!isCurrentTurn(turn)) return
     const direct = providers.direct(selectedProvider.provider_id)
+    const kind = direct?.kind ?? selectedProvider.kind
     const openAiResponses = (direct?.kind === 'openai_compatible' && direct.protocol === 'responses')
       || selectedProvider.kind === 'chatgpt'
-    const search = webSearch.value
-      ? searchKind({ kind: direct?.kind ?? selectedProvider.kind, responses: openAiResponses })
-      : 'none'
-    const tools = await toolSet(turn, search)
-    if (!isCurrentTurn(turn)) return
     const languageModel = direct
       ? buildBrowserModel({ ...direct, model: modelName })
       : buildModel(selectedProvider, modelName, modelContext)
     // No offered effort means the model does not reason; sending one would fault.
-    const req = effortOptions.value.length
-      ? turnRequest(direct?.kind ?? selectedProvider.kind, openAiResponses, reasoningEffort.value)
-      : {}
-    const result = await runTurn({
-      model: languageModel,
-      system: systemPrompt(context),
-      messages: turnMessages,
-      tools,
-      abortSignal: turn.controller.signal,
-      providerOptions: req.providerOptions,
-      maxOutputTokens: req.maxOutputTokens,
-      onText: (delta) => {
+    const extras = {
+      search: webSearch.value
+        ? searchKind({
+            kind,
+            responses: openAiResponses,
+            webSearch: selectedModel.value?.web_search,
+            choice: direct?.kind === 'openai_compatible' ? direct.webSearch : undefined,
+          })
+        : 'none' as SearchKind,
+      effort: effortOptions.value.length ? reasoningEffort.value : null,
+    }
+    const attempt = async () => {
+      const tools = await toolSet(turn, extras.search)
+      if (!isCurrentTurn(turn)) return null
+      const req = turnRequest({ kind, responses: openAiResponses, effort: extras.effort, search: extras.search === 'openai' })
+      return runTurn({
+        model: languageModel,
+        system: systemPrompt(context),
+        messages: turnMessages,
+        tools,
+        abortSignal: turn.controller.signal,
+        providerOptions: req.providerOptions,
+        maxOutputTokens: req.maxOutputTokens,
+        ...handlers,
+      })
+    }
+    const handlers = {
+      onText: (delta: string) => {
         if (!isCurrentTurn(turn)) return
         const message = answer()
         if (message) message.text += delta
@@ -974,7 +1006,30 @@ async function runChatTurn(chatId: string, prompt: string, context: PromptContex
         if (!message || message.sources?.some((known) => known.url === source.url)) return
         message.sources = [...(message.sources ?? []), source]
       },
-    })
+    } satisfies TurnHandlers
+    let result = await attempt()
+    if (!result) return
+    const refused = direct?.kind === 'openai_compatible' ? refusedExtras(result.error) : null
+    const retry = refused && ((refused.search && extras.search === 'openai') || (refused.reasoning && extras.effort))
+    if (retry && !turn.controller.signal.aborted) {
+      // The endpoint refused an extra it does not know: once more without it,
+      // and remembered on the model so the next turn does not ask again.
+      if (refused.search) extras.search = 'none'
+      else extras.effort = null
+      void providers.learnModel(
+        selectedProvider.provider_id,
+        modelName,
+        refused.search ? { web_search: false } : { reasoning_efforts: [] },
+      )
+      const message = answer()
+      if (message) {
+        message.text = ''
+        message.calls = []
+      }
+      result = await attempt()
+      if (!result) return
+      if (isShownTurn(turn)) toolsNote.value = refused.search ? NO_SEARCH_NOTE : NO_REASONING_NOTE
+    }
     if (!isCurrentTurn(turn)) return
     if (result.error && !turn.controller.signal.aborted) {
       if (isShownTurn(turn)) error.value = result.error
@@ -1385,13 +1440,15 @@ const modelChoices = computed(() => (provider.value
   : []))
 const modelsError = computed(() =>
   (provider.value ? providers.modelErrors.value[provider.value.provider_id] ?? null : null))
-// The active model object, whether it came from the fetched list or storage.
+// The active model object: the fetched entry, with what the stored record
+// learned about the model on top of it.
 const selectedModel = computed<AssistantModel | null>(() => {
   const current = provider.value
   if (!current) return null
   const id = model.value
-  const listed = providers.listedModels.value[current.provider_id] ?? []
-  return listed.find((entry) => entry.id === id) ?? current.models.find((entry) => entry.id === id) ?? null
+  const listed = (providers.listedModels.value[current.provider_id] ?? []).find((entry) => entry.id === id)
+  const stored = current.models.find((entry) => entry.id === id)
+  return listed || stored ? { ...listed, ...stored, id } : null
 })
 // The levels the active model offers, and the stored effort clamped to them.
 const effortOptions = computed(() =>

@@ -223,6 +223,17 @@ export function useAssistantProviders() {
     await update(providerId, current, storage)
   }
 
+  /** Remembers what a model refused on the stored record, so the next turn skips it. */
+  async function learnModel(providerId: string, modelId: string, patch: Partial<AssistantModel>): Promise<void> {
+    const current = direct(providerId)
+    if (!current) return
+    const known = current.models ?? []
+    const models = known.some((entry) => entry.id === modelId)
+      ? known.map((entry) => (entry.id === modelId ? { ...entry, ...patch } : entry))
+      : [...known, { id: modelId, ...patch }]
+    await update(providerId, { ...current, models })
+  }
+
   async function remove(providerId: string): Promise<void> {
     const storage = storageOf(providerId)
     if (storage === 'session') {
@@ -330,6 +341,7 @@ export function useAssistantProviders() {
     create,
     update,
     move,
+    learnModel,
     remove,
     check,
     models,
