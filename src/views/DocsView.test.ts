@@ -64,6 +64,7 @@ describe('versioned in-portal Docs', () => {
       'first-dataset',
       'build-a-profile',
       'compute-run',
+      'notebooks',
       'storage-backend',
       'cli-access-key',
       'assistant',

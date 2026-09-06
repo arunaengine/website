@@ -658,6 +658,53 @@ export const docsTopics: DocsTopic[] = [
     ],
   },
   {
+    slug: 'notebooks',
+    kind: 'Guide',
+    title: 'Work in a notebook',
+    summary: 'Run code cell by cell in a live session, next to the bucket the notebook works in.',
+    sections: [
+      {
+        title: 'What a notebook is here',
+        icon: 'NotebookPen',
+        paragraphs: [
+          'A notebook is a plain .ipynb file in one of your buckets. Jupyter opens the same file, and the portal adds only what it needs under its own metadata key.',
+          'While you work, one session job runs on a node of the realm. Cells go to that session over a live connection, and the outputs come back the same way. The cells themselves never become run records.',
+        ],
+        bullets: [
+          'New notebook in a bucket starts one; the file is written on the first save.',
+          'A stored .ipynb file opens in the notebook page.',
+        ],
+      },
+      {
+        title: 'The session bar',
+        icon: 'Play',
+        paragraphs: [
+          'The bar on top holds everything the session needs: the runtime, the dependency list, the bucket the notebook works in, where it may run, and what it needs from the node.',
+          'Start begins the session. End stops it. A session also ends by itself after it sits idle for a while; the realm sets that timeout and a session may pick a shorter one.',
+        ],
+        bullets: [
+          'Dependencies are stored beside the notebook and installed when the session starts.',
+          'Changing the runtime or the dependencies applies to the next session.',
+          'The [group](concept:realm-nodes-groups#groups-own-your-work) that owns the session pays for it, like any other run.',
+        ],
+      },
+      {
+        title: 'Cells and files',
+        icon: 'SquareTerminal',
+        paragraphs: [
+          'Code cells run in the kernel. Text cells hold Markdown. A pipeline cell runs one ordinary job instead, so a heavy step keeps its own image, its own resources and its own record.',
+          'The panel on the left shows the bucket the notebook works in, and the scratch folder inside the running container. Results belong in the bucket: scratch is gone when the session ends.',
+        ],
+        bullets: [
+          'Run runs one cell, Run to here runs everything above it as well.',
+          'Add more copies stored files into the bucket, so nothing is copied into the container.',
+          'Save writes the file; the portal also saves at most every five minutes after a change.',
+          'Unsaved edits stay in this browser until they are saved.',
+        ],
+      },
+    ],
+  },
+  {
     slug: 'storage-backend',
     kind: 'Guide',
     title: 'Configure a storage backend',
