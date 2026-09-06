@@ -19,6 +19,7 @@ import { useNotifications } from './useNotifications'
 import { useAssistantEditor } from './useAssistantEditor'
 import { useAssistantProfileForm } from './useAssistantProfileForm'
 import { useAssistantRunForm } from './useAssistantRunForm'
+import { useAssistantNotebook } from './useAssistantNotebook'
 import type { McpConnection } from '@/lib/assistant/mcpClient'
 import type { PromptContext } from '@/lib/assistant/prompt'
 import type { ArtifactRef, LoadedArtifact } from '@/lib/assistant/renderTools'
@@ -683,9 +684,11 @@ async function toolSet(turn: TurnContext, search: SearchKind): Promise<ToolSet> 
   const { bridge } = useAssistantEditor()
   const { bridge: runForm } = useAssistantRunForm()
   const { bridge: profileForm } = useAssistantProfileForm()
+  const { bridge: notebook } = useAssistantNotebook()
   const { editorTools } = await import('@/lib/assistant/editorTools')
   const { runFormTools } = await import('@/lib/assistant/runFormTools')
   const { profileFormTools } = await import('@/lib/assistant/profileFormTools')
+  const { notebookTools } = await import('@/lib/assistant/notebookTools')
   const { watchTools } = await import('@/lib/assistant/watchTools')
   const { mergeTools } = await import('@/lib/assistant/tools')
   const { searchTools } = await import('@/lib/assistant/webSearch')
@@ -696,6 +699,7 @@ async function toolSet(turn: TurnContext, search: SearchKind): Promise<ToolSet> 
     bridge.value ? editorTools(bridge.value, gate) : {},
     runForm.value ? runFormTools(runForm.value, gate) : {},
     profileForm.value ? profileFormTools(profileForm.value, gate) : {},
+    notebook.value ? notebookTools(notebook.value, gate) : {},
     await searchTools(search),
   )
   try {
