@@ -109,6 +109,23 @@ describe('createNotebook', () => {
     expect(notebook.cells.value[0].source).toBe('')
   })
 
+  it('records an edit against the notebook that is open, not the route', async () => {
+    // Opening another notebook changes the route before the read happens.
+    s3.getObjectText.mockRejectedValue({ name: 'NoSuchKey' })
+    s3.putTextObject.mockResolvedValue({ versionId: 'v1' })
+    const key = ref('notebooks/a.ipynb')
+    const notebook = store(ref('lab-data'), key)
+    await notebook.load()
+
+    key.value = 'notebooks/b.ipynb'
+    notebook.setSource(notebook.cells.value[0].id, 'print(1)')
+    notebook.flushCopy()
+    await notebook.save()
+
+    expect(readWorkingCopy('lab-data', 'notebooks/b.ipynb')).toBeNull()
+    expect(s3.putTextObject.mock.calls[0][1]).toBe('notebooks/a.ipynb')
+  })
+
   it('restores the unsaved copy when it differs from the stored file', async () => {
     const stored = emptyNotebook({
       version: 1,

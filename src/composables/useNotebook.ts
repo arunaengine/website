@@ -62,10 +62,10 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
   const meta = computed<NotebookAruna | null>(() => notebook.value?.metadata.aruna ?? null)
   const dirty = computed(() => changedAt.value !== null)
 
-  // A running cell changes the document on every output line, so the copy in
-  // this browser is written on a trailing timer rather than on every change.
-  // The edit carries the notebook it belongs to: when the timer fires, the page
-  // may already show another one.
+  // A running cell changes the document on every output line, so the copy is
+  // written on a trailing timer. Every edit carries where its document came
+  // from: the page may show another notebook by the time the timer fires.
+  let loadedFrom = { bucket: '', key: '' }
   let pending: { bucket: string; key: string; doc: Notebook; changedAt: number } | null = null
   const copy = trailing(() => {
     if (!pending) return
@@ -86,7 +86,7 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
     if (!doc) return
     changeCount += 1
     changedAt.value = Date.now()
-    pending = { bucket: bucket.value, key: key.value, doc, changedAt: changedAt.value }
+    pending = { ...loadedFrom, doc, changedAt: changedAt.value }
     copy.schedule()
   }
 
@@ -107,6 +107,8 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
         isNew.value = true
       }
       notebook.value = text === null ? emptyNotebook({ version: 1, workspace_bucket: bucket.value, ...seed() }) : parseNotebook(text)
+      // Everything this document does later happens where it was read from.
+      loadedFrom = { bucket: bucket.value, key: key.value }
       lastSavedMs.value = Date.now()
       changedAt.value = null
       const unsaved = readWorkingCopy(bucket.value, key.value)
@@ -129,14 +131,15 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
 
   async function save(): Promise<boolean> {
     const doc = notebook.value
-    if (!doc || saving.value) return false
+    if (!doc || saving.value || !loadedFrom.key) return false
+    const target = loadedFrom
     saving.value = true
     saveError.value = null
     // What was written is the document as it stood when the save started.
     const sent = serializeNotebook(doc)
     const changedBefore = changeCount
     try {
-      await s3.putTextObject(bucket.value, key.value, sent, NOTEBOOK_CONTENT_TYPE)
+      await s3.putTextObject(target.bucket, target.key, sent, NOTEBOOK_CONTENT_TYPE)
       lastSavedMs.value = Date.now()
       isNew.value = false
       restoredCopy.value = false
@@ -144,7 +147,7 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
       if (changeCount === changedBefore) {
         changedAt.value = null
         dropPending()
-        clearWorkingCopy(bucket.value, key.value)
+        clearWorkingCopy(target.bucket, target.key)
       }
       return true
     } catch (error) {
@@ -163,7 +166,7 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
 
   function discardCopy(): void {
     dropPending()
-    clearWorkingCopy(bucket.value, key.value)
+    clearWorkingCopy(loadedFrom.bucket, loadedFrom.key)
     restoredCopy.value = false
     void load()
   }
