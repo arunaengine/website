@@ -133,7 +133,7 @@ function answered(prompt: string, ...entries: ReturnType<typeof call>[]): ChatTu
     history: [
       { role: 'user', content: prompt },
       { role: 'assistant', content: entries.map((entry) => entry.request) },
-      { role: 'tool', content: entries.map((entry) => entry.result) },
+      { role: 'tool', content: entries.map((entry) => entry.result) } as ModelMessage,
       { role: 'assistant', content: 'done' },
     ],
   }

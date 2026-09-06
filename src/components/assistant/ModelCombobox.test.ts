@@ -13,6 +13,7 @@ import {
   typeValue,
   type HostNode,
 } from '@/test/clientRender'
+import type { AssistantModel } from '@/lib/api'
 import { isValidModelId, normalizeModelId } from '@/lib/assistant/modelOptions'
 import { cn } from '@/lib/utils'
 
@@ -72,7 +73,7 @@ const ModelCombobox = compileClientComponent(new URL('./ModelCombobox.vue', impo
 
 async function open(
   modelValue: string,
-  suggestions = CHAT_MODELS.map((id) => ({ id })),
+  suggestions: AssistantModel[] = CHAT_MODELS.map((id) => ({ id })),
   extra: Record<string, unknown> = {},
 ) {
   const applied: string[] = []
