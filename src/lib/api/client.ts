@@ -1,5 +1,5 @@
 import { portalConfig } from '../config'
-import { RATE_LIMITED_STATUS, fetchWithRetry } from '../fetch'
+import { RATE_LIMITED_STATUS, fetchWithRetry, retryAfterMs } from '../fetch'
 import { apiInterceptor, passesThrough } from '../tutorial/interceptor'
 import { errorMessage } from '../utils'
 
@@ -14,6 +14,8 @@ export class ApiError extends Error {
     public code?: string,
     /** Parsed structured backend error body. */
     public details?: Record<string, unknown>,
+    /** What Retry-After asked for, when the refusal carried one. */
+    public retryAfter?: number,
   ) {
     super(message)
     this.name = 'ApiError'
@@ -136,11 +138,13 @@ export async function apiRequest<T>(
     }
     // A 429 has already survived the one retry fetchWithRetry allows, so tell
     // the user to wait rather than repeating the limiter's terse wording.
+    let retryAfter: number | undefined
     if (response.status === RATE_LIMITED_STATUS) {
       message = rateLimitMessage(response)
       code = code ?? 'rate_limited'
+      retryAfter = retryAfterMs(response) ?? undefined
     }
-    throw new ApiError(response.status, message, code, details)
+    throw new ApiError(response.status, message, code, details, retryAfter)
   }
 
   if (response.status === 204 || response.status === 205) return undefined as T

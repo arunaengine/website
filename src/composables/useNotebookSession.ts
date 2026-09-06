@@ -7,7 +7,7 @@ import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useS3 } from '@/composables/useS3'
 import type { NotebookStore } from '@/composables/useNotebook'
 import { getJob, submitErrorMessage, submitJob, type JobStatusResponse } from '@/lib/jobs'
-import { ApiError, type ApiClientOptions } from '@/lib/api'
+import { ApiError, isRateLimited, type ApiClientOptions } from '@/lib/api'
 import {
   endSession,
   getSessionState,
@@ -30,6 +30,8 @@ import { errorMessage } from '@/lib/utils'
 /** Attempts to learn which node runs the job, before the stream can open. */
 const NODE_LOOKUP_TRIES = 20
 const NODE_LOOKUP_DELAY_MS = 1_500
+/** Wait before resending a cell the node rate limited, without a Retry-After. */
+const RATE_LIMIT_WAIT_MS = 2_000
 
 function executorNode(job: JobStatusResponse): string {
   const executions = job.family?.execution_list ?? []
@@ -37,8 +39,9 @@ function executorNode(job: JobStatusResponse): string {
   return canonical?.executor_node_id ?? ''
 }
 
-/** The submit, plus the dependency file the portal writes before it. */
-export interface SessionStartDraft extends SessionSubmitDraft {
+/** The submit, plus the dependency file the portal writes before it. The
+ * idempotency key is the store's, so a retry keeps the same one. */
+export interface SessionStartDraft extends Omit<SessionSubmitDraft, 'idempotencyKey'> {
   dependencyText?: string
 }
 
@@ -65,6 +68,8 @@ export function createNotebookSession(notebook: NotebookStore) {
   // Stopped work must not keep polling for a node after the page is gone.
   let disposed = false
   let seenEventId = 0
+  // Kept until a submit lands, so a retry after a 503 is the same request.
+  let pendingKey = ''
   // A busy cell sends many events; the resume point is written on a timer.
   const keepResumePoint = trailing(() => {
     if (jobId.value && seenEventId) writeResumePoint(jobId.value, seenEventId)
@@ -269,11 +274,14 @@ export function createNotebookSession(notebook: NotebookStore) {
           'text/plain',
         )
       }
+      pendingKey ||= crypto.randomUUID()
       const request = sessionSubmitRequest({
         ...draft,
+        idempotencyKey: pendingKey,
         ...(idlePickMs.value ? { idleAfterMs: idlePickMs.value } : {}),
       })
       const created = await submitJob(request, homeClient.value)
+      pendingKey = ''
       jobId.value = created.job_id
       nodeId.value = ''
       state.value = null
@@ -318,28 +326,50 @@ export function createNotebookSession(notebook: NotebookStore) {
     }
   }
 
-  /** Sends one cell to the kernel; its outputs arrive on the stream. */
-  async function runCell(cellId: string, code: string): Promise<boolean> {
-    if (!jobId.value || !live.value) return false
+  function setCellState(cellId: string, cell: SessionCell | undefined) {
+    const next = { ...cellStates.value }
+    if (cell) next[cellId] = cell
+    else delete next[cellId]
+    cellStates.value = next
+  }
+
+  /** Sends one cell; answers the reason it was refused, or null. */
+  async function sendCell(cellId: string, code: string): Promise<unknown | null> {
+    if (!jobId.value || !live.value) return new Error('The session is not running.')
+    const before = cellStates.value[cellId]
+    if (before?.state === 'queued' || before?.state === 'running') {
+      return new Error('That cell is already running.')
+    }
     notebook.clearOutputs(cellId)
-    cellStates.value = { ...cellStates.value, [cellId]: { cell_id: cellId, state: 'queued' } }
+    setCellState(cellId, { cell_id: cellId, state: 'queued' })
     try {
       await runSessionCell(jobId.value, { cell_id: cellId, code }, client.value)
-      return true
+      return null
     } catch (cause) {
-      const next = { ...cellStates.value }
-      delete next[cellId]
-      cellStates.value = next
-      error.value = errorMessage(cause)
-      return false
+      setCellState(cellId, before)
+      return cause
     }
+  }
+
+  /** Sends one cell to the kernel; its outputs arrive on the stream. */
+  async function runCell(cellId: string, code: string): Promise<boolean> {
+    const cause = await sendCell(cellId, code)
+    if (cause) error.value = errorMessage(cause)
+    return cause === null
   }
 
   /** Sends the cells in order; the node keeps the queue. */
   async function runCells(cells: { id: string; source: string }[]): Promise<void> {
-    for (const cell of cells) {
-      const sent = await runCell(cell.id, cell.source)
-      if (!sent) return
+    for (const [index, cell] of cells.entries()) {
+      let cause = await sendCell(cell.id, cell.source)
+      if (cause && isRateLimited(cause)) {
+        const wait = cause instanceof ApiError ? (cause.retryAfter ?? RATE_LIMIT_WAIT_MS) : RATE_LIMIT_WAIT_MS
+        await new Promise((resolve) => setTimeout(resolve, wait))
+        cause = await sendCell(cell.id, cell.source)
+      }
+      if (!cause) continue
+      error.value = `The run stopped at cell ${index + 1}: ${errorMessage(cause)}`
+      return
     }
   }
 

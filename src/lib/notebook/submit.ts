@@ -81,7 +81,9 @@ export function sessionSubmitRequest(draft: SessionSubmitDraft): SubmitExecution
 }
 
 /** What the session submit still needs, in plain words. */
-export function sessionProblems(draft: SessionSubmitDraft): string[] {
+export function sessionProblems(
+  draft: Pick<SessionSubmitDraft, 'groupId' | 'workspaceBucket' | 'runtime'>,
+): string[] {
   const problems: string[] = []
   if (!draft.groupId.trim()) problems.push('Pick the group that owns the session.')
   if (!draft.workspaceBucket.trim()) problems.push('Pick the bucket the notebook works in.')

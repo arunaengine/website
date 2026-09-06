@@ -15,6 +15,7 @@ import { useRealmNodes } from '@/composables/useRealmNodes'
 import { SESSION_RUNTIMES, dependencyKind } from '@/lib/notebook/runtimes'
 import { dependencyKey } from '@/lib/notebook/document'
 import { sessionProblems } from '@/lib/notebook/submit'
+import { DEFAULT_SESSION_IDLE_AFTER_MS } from '@/lib/computeAdmin'
 import { CircleStop, Play, Settings2 } from '@lucide/vue'
 
 const { notebook, session } = injectNotebook()
@@ -40,13 +41,18 @@ const kindOptions = computed(() => [
     .sort((a, b) => a.localeCompare(b))
     .map((kind) => ({ value: kind, label: kind })),
 ])
-// The realm sets the idle timeout; a session may pick a shorter one.
-const idleOptions = [
-  { value: '', label: 'Realm default' },
+// The realm sets the idle timeout; a session may pick a shorter one, so the
+// realm's own value is not offered twice.
+const IDLE_PICKS = [
   { value: '300000', label: '5 minutes' },
   { value: '900000', label: '15 minutes' },
   { value: '1800000', label: '30 minutes' },
 ]
+const realmIdleMs = computed(() => session.state.value?.idle_after_ms ?? DEFAULT_SESSION_IDLE_AFTER_MS)
+const idleOptions = computed(() => [
+  { value: '', label: 'Realm default' },
+  ...IDLE_PICKS.filter((option) => Number(option.value) !== realmIdleMs.value),
+])
 
 const stateLabel = computed(() => {
   if (session.starting.value) return 'Starting'
@@ -73,10 +79,8 @@ const idleLeft = computed(() => {
 const problems = computed(() =>
   sessionProblems({
     groupId: meta.value?.group_id ?? '',
-    name: notebook.name.value,
     runtime: meta.value?.runtime ?? '',
     workspaceBucket: meta.value?.workspace_bucket ?? '',
-    idempotencyKey: '',
   }),
 )
 
@@ -122,7 +126,6 @@ function start() {
       : {}),
     resources: current.resources,
     placement: current.placement,
-    idempotencyKey: `${current.workspace_bucket}/${notebook.key.value}/${Date.now()}`,
   })
 }
 </script>
@@ -180,6 +183,7 @@ function start() {
           :model-value="session.idlePickMs.value ? String(session.idlePickMs.value) : ''"
           :options="idleOptions"
           aria-label="Idle timeout"
+          :disabled="session.running.value"
           @update:model-value="session.idlePickMs.value = $event ? Number($event) : null"
         />
       </label>

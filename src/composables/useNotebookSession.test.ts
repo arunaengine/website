@@ -202,7 +202,6 @@ describe('createNotebookSession', () => {
       name: 'counts',
       runtime: 'python-notebook',
       workspaceBucket: 'lab-data',
-      idempotencyKey: 'once',
     })
 
     const request = jobs.submitJob.mock.calls[0][0]
@@ -229,7 +228,6 @@ describe('createNotebookSession', () => {
       name: 'counts',
       runtime: 'python-notebook',
       workspaceBucket: 'lab-data',
-      idempotencyKey: 'once',
       dependencyKey: 'notebooks/counts.requirements.txt',
       dependencyKind: 'requirements',
       dependencyText: 'pandas>=2\n',
@@ -257,7 +255,6 @@ describe('createNotebookSession', () => {
       name: 'counts',
       runtime: 'python-notebook',
       workspaceBucket: 'lab-data',
-      idempotencyKey: 'once',
       dependencyKey: 'notebooks/counts.requirements.txt',
       dependencyKind: 'requirements',
       dependencyText: 'pandas>=2',
@@ -278,7 +275,6 @@ describe('createNotebookSession', () => {
       name: 'counts',
       runtime: 'python-notebook',
       workspaceBucket: 'lab-data',
-      idempotencyKey: 'once',
     })
 
     expect(store.jobId.value).toBe('')
@@ -314,6 +310,125 @@ describe('createNotebookSession', () => {
     expect(await store.runCell(cell.id, 'print(1)')).toBe(true)
     expect(cell.outputs).toHaveLength(0)
     expect(store.cellStates.value[cell.id].state).toBe('queued')
+    scope.stop()
+  })
+
+  it('waits and resends a cell the node rate limited', async () => {
+    const { notebook, session: store, scope } = await setup()
+    notebook.patchMeta({ job_id: '01JOB', executor_node_id: 'node-a' })
+    session.getSessionState.mockResolvedValue(state())
+    await store.attachSaved()
+    const cell = notebook.cells.value[0]
+    session.runSessionCell
+      .mockRejectedValueOnce(new ApiError(429, 'Too many requests.', 'rate_limited', {}, 0))
+      .mockResolvedValueOnce({ cell_id: cell.id, position: 0 })
+
+    await store.runCells([{ id: cell.id, source: 'print(1)' }])
+
+    expect(session.runSessionCell).toHaveBeenCalledTimes(2)
+    expect(store.error.value).toBeNull()
+    scope.stop()
+  })
+
+  it('stops the run at the cell that failed', async () => {
+    const { notebook, session: store, scope } = await setup()
+    notebook.patchMeta({ job_id: '01JOB', executor_node_id: 'node-a' })
+    session.getSessionState.mockResolvedValue(state())
+    await store.attachSaved()
+    const first = notebook.cells.value[0]
+    const second = notebook.addCell('code', undefined, 'print(2)')
+    const third = notebook.addCell('code', undefined, 'print(3)')
+    session.runSessionCell
+      .mockResolvedValueOnce({ cell_id: first.id, position: 0 })
+      .mockRejectedValueOnce(new ApiError(409, 'session_ended', 'session_ended'))
+
+    await store.runCells(
+      [first, second, third].map((cell) => ({ id: cell.id, source: cell.source })),
+    )
+
+    expect(session.runSessionCell).toHaveBeenCalledTimes(2)
+    expect(store.error.value).toContain('stopped at cell 2')
+    scope.stop()
+  })
+
+  it('sends the cells in the order it was given', async () => {
+    const { notebook, session: store, scope } = await setup()
+    notebook.patchMeta({ job_id: '01JOB', executor_node_id: 'node-a' })
+    session.getSessionState.mockResolvedValue(state())
+    await store.attachSaved()
+    const first = notebook.cells.value[0]
+    const second = notebook.addCell('code', undefined, 'print(2)')
+    session.runSessionCell.mockResolvedValue({ cell_id: 'x', position: 0 })
+
+    await store.runCells([
+      { id: first.id, source: 'print(1)' },
+      { id: second.id, source: 'print(2)' },
+    ])
+
+    expect(session.runSessionCell.mock.calls.map((call) => call[1].cell_id)).toEqual([
+      first.id,
+      second.id,
+    ])
+    scope.stop()
+  })
+
+  it('refuses a cell that is already running', async () => {
+    const { notebook, session: store, scope } = await setup()
+    notebook.patchMeta({ job_id: '01JOB', executor_node_id: 'node-a' })
+    session.getSessionState.mockResolvedValue(state({ cells: [{ cell_id: 'c1', state: 'running' }] }))
+    await store.attachSaved()
+    const cell = notebook.cells.value[0]
+    session.getSessionState.mockClear()
+    store.cellStates.value = { [cell.id]: { cell_id: cell.id, state: 'running' } }
+
+    expect(await store.runCell(cell.id, 'print(1)')).toBe(false)
+    expect(session.runSessionCell).not.toHaveBeenCalled()
+    expect(store.error.value).toContain('already running')
+    scope.stop()
+  })
+
+  it('ends and interrupts through the executing node', async () => {
+    const { notebook, session: store, scope } = await setup()
+    notebook.patchMeta({ job_id: '01JOB', executor_node_id: 'node-a' })
+    session.getSessionState.mockResolvedValue(state())
+    await store.attachSaved()
+    session.interruptSession.mockResolvedValue(undefined)
+    session.endSession.mockResolvedValue({ job_id: '01JOB', state: 'succeeded' })
+
+    await store.interrupt()
+    await store.end()
+
+    expect(session.interruptSession).toHaveBeenCalledWith('01JOB', {
+      baseUrl: 'https://node-a.example/api/v1',
+      token: 'bearer-token',
+    })
+    expect(store.ended.value).toBe(true)
+    expect(store.live.value).toBe(false)
+    scope.stop()
+  })
+
+  it('reuses the idempotency key after a refused submit', async () => {
+    const { session: store, scope } = await setup()
+    jobs.submitJob.mockRejectedValueOnce(new ApiError(503, 'job_placement_unavailable'))
+    jobs.submitJob.mockResolvedValueOnce({ job_id: '01NEW' })
+    jobs.getJob.mockResolvedValue({
+      state: 'running',
+      family: { execution_list: [{ executor_node_id: 'node-a', canonical: true }] },
+    })
+    session.getSessionState.mockResolvedValue(state({ job_id: '01NEW' }))
+    const draft = {
+      groupId: 'group-1',
+      name: 'counts',
+      runtime: 'python-notebook',
+      workspaceBucket: 'lab-data',
+    }
+
+    await store.start(draft)
+    await store.start(draft)
+
+    const [first, second] = jobs.submitJob.mock.calls.map((call) => call[0].idempotency_key)
+    expect(first).toBeTruthy()
+    expect(second).toBe(first)
     scope.stop()
   })
 

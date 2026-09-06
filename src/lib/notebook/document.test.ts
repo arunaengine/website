@@ -149,4 +149,8 @@ describe('sessionSubmitRequest', () => {
     ])
     expect(sessionProblems(draft)).toEqual([])
   })
+
+  it('keeps one idempotency key for the whole request', () => {
+    expect(sessionSubmitRequest(draft).idempotency_key).toBe('session-1')
+  })
 })
