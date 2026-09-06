@@ -3,10 +3,12 @@
 // Earlier turns never change once written; only the tail is rewritten.
 import type { ModelMessage } from 'ai'
 import { isModelMessage, normalizeMessage } from './chatHistory'
-import type { ChatMessage, ToolCallView } from './types'
+import type { ChatMessage, RenderView, ToolCallView } from './types'
 
 /** The node refuses a turn payload above this many bytes. */
-export const MAX_TURN_BYTES = 64 * 1024
+export const MAX_TURN_BYTES = 256 * 1024
+/** A stored tool result is never cut shorter than this many characters. */
+export const MAX_RESULT_CHARS = 4_000
 
 const CUT_TEXT_LENGTH = 2_000
 const DROPPED_NOTE = 'This tool output was left out of the stored chat.'
@@ -96,22 +98,89 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value))
 }
 
-function dropResult(history: ModelMessage[], callId: string): ModelMessage[] {
+type ToolResultPart = { type: 'tool-result'; toolCallId: string; toolName: string; output: Record<string, unknown> }
+
+function isToolResult(part: unknown): part is ToolResultPart {
+  return isRecord(part) && part.type === 'tool-result' && typeof part.toolCallId === 'string' && isRecord(part.output)
+}
+
+/** The result as the text the model read; a json result is written out. */
+function resultText(output: Record<string, unknown>): string {
+  return typeof output.value === 'string' ? output.value : JSON.stringify(output.value) ?? ''
+}
+
+function mapResults(history: ModelMessage[], patch: (part: ToolResultPart) => ToolResultPart): ModelMessage[] {
   return history.map((entry) => {
     if (entry.role !== 'tool' || !Array.isArray(entry.content)) return entry
-    const content = entry.content.map((part) =>
-      (part.type === 'tool-result' && part.toolCallId === callId
-        ? { ...part, output: { type: 'text' as const, value: DROPPED_NOTE } }
-        : part))
+    const content = entry.content.map((part) => (isToolResult(part) ? patch(part) : part))
     return { ...entry, content } as ModelMessage
   })
 }
 
-function patchCalls(
-  messages: ChatMessage[],
-  callId: string,
-  patch: (call: ToolCallView) => ToolCallView,
-): ChatMessage[] {
+function textResult(part: ToolResultPart, value: string): ToolResultPart {
+  const type = String(part.output.type).startsWith('error') ? 'error-text' : 'text'
+  return { ...part, output: { type, value } }
+}
+
+// A text result that is JSON is written without whitespace, and every line
+// loses its trailing blanks; nothing is cut here.
+function minifyResult(part: ToolResultPart): ToolResultPart {
+  if (typeof part.output.value !== 'string') return part
+  const trimmed = part.output.value.replace(/[ \t]+$/gm, '').trimEnd()
+  try {
+    return textResult(part, JSON.stringify(JSON.parse(trimmed)))
+  } catch {
+    return trimmed === part.output.value ? part : textResult(part, trimmed)
+  }
+}
+
+function cutNote(length: number): string {
+  return `[cut, ${length.toLocaleString('en-US')} characters]`
+}
+
+function cutResult(part: ToolResultPart): ToolResultPart {
+  const text = resultText(part.output)
+  if (text.length <= MAX_RESULT_CHARS) return part
+  return textResult(part, `${text.slice(0, MAX_RESULT_CHARS)} ${cutNote(text.length)}`)
+}
+
+function* results(history: ModelMessage[]): Generator<ToolResultPart> {
+  for (const entry of history) {
+    if (entry.role !== 'tool' || !Array.isArray(entry.content)) continue
+    for (const part of entry.content) if (isToolResult(part)) yield part
+  }
+}
+
+/** The result ids, largest first; the show_* card tools answer with a few words. */
+function resultsBySize(history: ModelMessage[]): string[] {
+  const sizes: Array<[string, number]> = []
+  for (const part of results(history)) {
+    if (!part.toolName.startsWith('show_')) sizes.push([part.toolCallId, resultText(part.output).length])
+  }
+  return sizes.sort((a, b) => b[1] - a[1]).map(([id]) => id)
+}
+
+function patchResult(history: ModelMessage[], callId: string, patch: (part: ToolResultPart) => ToolResultPart) {
+  return mapResults(history, (part) => (part.toolCallId === callId ? patch(part) : part))
+}
+
+// A stored card is a reference: the bytes and the tab's blob URL stay out,
+// and a restored card reads the object again.
+function storedView(view: RenderView): RenderView {
+  if (view.kind !== 'artifact') return view
+  const { text: _text, ...artifact } = view.artifact
+  return { ...view, artifact: { ...artifact, url: artifact.url.startsWith('blob:') ? '' : artifact.url } }
+}
+
+/** The history holds each result once, so the calls store none. */
+function storedMessages(messages: ChatMessage[]): ChatMessage[] {
+  return messages.map((message) => ({
+    ...message,
+    calls: message.calls.map(({ output: _output, view, ...call }) => (view ? { ...call, view: storedView(view) } : call)),
+  }))
+}
+
+function patchCall(messages: ChatMessage[], callId: string, patch: (call: ToolCallView) => ToolCallView): ChatMessage[] {
   return messages.map((message) => ({
     ...message,
     calls: message.calls.map((call) => (call.id === callId ? patch(call) : call)),
@@ -119,27 +188,26 @@ function patchCalls(
 }
 
 /**
- * The turn as JSON text under the node's per-turn cap. When it is too large,
- * the oldest tool outputs go first, then the oldest cards and inputs, then
- * the model history, then the texts are cut; the chat itself is left as is.
+ * The turn as JSON text under the node's per-turn cap. Tool results are kept
+ * once, in the history, and only minified while the turn fits. Over the cap
+ * the largest results are cut to a floor, then dropped, then the inputs, the
+ * history and the texts go; the cards always stay. The live chat is left as is.
  */
 export function encodeTurn(turn: ChatTurn, cap = MAX_TURN_BYTES): string {
-  let current: ChatTurn = { messages: turn.messages, history: turn.history }
+  let current: ChatTurn = { messages: storedMessages(turn.messages), history: mapResults(turn.history, minifyResult) }
   let payload = payloadOf(current)
   if (byteLength(payload) <= cap) return payload
+  const resultIds = resultsBySize(current.history)
   const callIds = current.messages.flatMap((message) => message.calls.map((call) => call.id))
   const steps: Array<() => void> = [
-    ...callIds.map((id) => () => {
-      current = {
-        messages: patchCalls(current.messages, id, ({ output: _output, ...call }) => call),
-        history: dropResult(current.history, id),
-      }
+    ...resultIds.map((id) => () => {
+      current = { ...current, history: patchResult(current.history, id, cutResult) }
+    }),
+    ...resultIds.map((id) => () => {
+      current = { ...current, history: patchResult(current.history, id, (part) => textResult(part, DROPPED_NOTE)) }
     }),
     ...callIds.map((id) => () => {
-      current = {
-        ...current,
-        messages: patchCalls(current.messages, id, ({ view: _view, ...call }) => ({ ...call, input: undefined })),
-      }
+      current = { ...current, messages: patchCall(current.messages, id, (call) => ({ ...call, input: undefined })) }
     }),
     () => {
       current = { ...current, history: [] }
@@ -154,7 +222,19 @@ export function encodeTurn(turn: ChatTurn, cap = MAX_TURN_BYTES): string {
     () => {
       current = {
         history: [],
-        messages: current.messages.map(({ id, role, at }) => ({ id, role, text: '', calls: [], at })),
+        messages: current.messages.map(({ id, role, at, calls }) => ({
+          id,
+          role,
+          text: '',
+          at,
+          calls: calls.map(({ id: callId, name, state, view }) => ({
+            id: callId,
+            name,
+            input: undefined,
+            state,
+            ...(view ? { view } : {}),
+          })),
+        })),
       }
     },
   ]
@@ -166,17 +246,29 @@ export function encodeTurn(turn: ChatTurn, cap = MAX_TURN_BYTES): string {
   return payload
 }
 
+/** What each call answered, read from the one copy the history keeps. */
+function resultsOf(history: ModelMessage[]): Map<string, unknown> {
+  const answers = new Map<string, unknown>()
+  for (const part of results(history)) answers.set(part.toolCallId, part.output.value)
+  return answers
+}
+
 /** Reads a turn payload back; anything unreadable counts as no turn. */
 export function decodeTurn(payload: string, at = Date.now()): ChatTurn | null {
   try {
     const parsed = JSON.parse(payload) as unknown
     if (!isRecord(parsed) || !Array.isArray(parsed.messages) || !Array.isArray(parsed.history)) return null
-    return {
-      messages: parsed.messages
-        .map((message) => normalizeMessage(message, at))
-        .filter((message): message is ChatMessage => Boolean(message)),
-      history: parsed.history.filter(isModelMessage),
-    }
+    const history = parsed.history.filter(isModelMessage)
+    const results = resultsOf(history)
+    const messages = parsed.messages
+      .map((message) => normalizeMessage(message, at))
+      .filter((message): message is ChatMessage => Boolean(message))
+      .map((message) => ({
+        ...message,
+        calls: message.calls.map((call) =>
+          (call.output === undefined && results.has(call.id) ? { ...call, output: results.get(call.id) } : call)),
+      }))
+    return { messages, history }
   } catch {
     return null
   }
