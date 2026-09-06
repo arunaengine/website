@@ -90,6 +90,38 @@ export function clearWorkingCopy(bucket: string, key: string): void {
   }
 }
 
+// ── Resume point ─────────────────────────────────────────────────────────────
+// The last event id this browser saw for one session job, so a reload picks the
+// stream up where it left off instead of at the state the node reports now.
+
+const RESUME_PREFIX = 'aruna.notebook.resume.'
+
+export function readResumePoint(jobId: string): number {
+  try {
+    const raw = store()?.getItem(`${RESUME_PREFIX}${jobId}`)
+    const id = Number(raw)
+    return Number.isSafeInteger(id) && id > 0 ? id : 0
+  } catch {
+    return 0
+  }
+}
+
+export function writeResumePoint(jobId: string, eventId: number): void {
+  try {
+    store()?.setItem(`${RESUME_PREFIX}${jobId}`, String(eventId))
+  } catch {
+    // Without it a reload resumes at the state the node reports.
+  }
+}
+
+export function clearResumePoint(jobId: string): void {
+  try {
+    store()?.removeItem(`${RESUME_PREFIX}${jobId}`)
+  } catch {
+    // Nothing to do; a stale point only replays events the node still holds.
+  }
+}
+
 /** True when a changed notebook is due for its automatic save. */
 export function autosaveDue(changedAtMs: number | null, lastSavedMs: number, nowMs: number): boolean {
   if (!changedAtMs) return false

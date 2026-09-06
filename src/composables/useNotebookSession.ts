@@ -22,6 +22,8 @@ import {
   type SessionStream,
 } from '@/lib/notebook/session'
 import { sessionSubmitRequest, type SessionSubmitDraft } from '@/lib/notebook/submit'
+import { clearResumePoint, readResumePoint, writeResumePoint } from '@/lib/notebook/document'
+import { trailing } from '@/lib/throttle'
 import { errorMessage } from '@/lib/utils'
 
 /** Attempts to learn which node runs the job, before the stream can open. */
@@ -53,6 +55,13 @@ export function createNotebookSession(notebook: NotebookStore) {
   const idlePickMs = ref<number | null>(null)
 
   let stream: SessionStream | null = null
+  // Stopped work must not keep polling for a node after the page is gone.
+  let disposed = false
+  let seenEventId = 0
+  // A busy cell sends many events; the resume point is written on a timer.
+  const keepResumePoint = trailing(() => {
+    if (jobId.value && seenEventId) writeResumePoint(jobId.value, seenEventId)
+  }, 1_000)
 
   const homeClient = computed<ApiClientOptions>(() => ({
     baseUrl: apiBaseUrl.value,
@@ -75,6 +84,10 @@ export function createNotebookSession(notebook: NotebookStore) {
   }
 
   function applyEvent(event: SessionEvent) {
+    if (event.id > seenEventId) {
+      seenEventId = event.id
+      keepResumePoint.schedule()
+    }
     if (event.type === 'session') {
       state.value = { cells: state.value?.cells ?? [], ...event.data }
       return
@@ -111,6 +124,7 @@ export function createNotebookSession(notebook: NotebookStore) {
     }
     // ended
     notice.value = `The session ended (${event.data.reason}).`
+    clearResumePoint(jobId.value)
     if (state.value) state.value = { ...state.value, state: 'ended', ended: event.data }
     kernel.value = 'dead'
     closeStream()
@@ -122,7 +136,8 @@ export function createNotebookSession(notebook: NotebookStore) {
     stream = openSessionStream({
       jobId: jobId.value,
       client: () => client.value,
-      lastEventId: state.value?.last_event_id,
+      // What this browser saw wins; the node's figure is the fallback.
+      lastEventId: readResumePoint(jobId.value) || state.value?.last_event_id,
       onEvent: applyEvent,
       onOpen: () => {
         streamOpen.value = true
@@ -157,6 +172,7 @@ export function createNotebookSession(notebook: NotebookStore) {
   /** Drops the session for good, so the bar offers Start again. */
   function forget(reason?: string) {
     detach()
+
     notebook.patchMeta({ job_id: undefined, executor_node_id: undefined })
     if (reason) error.value = reason
   }
@@ -214,7 +230,7 @@ export function createNotebookSession(notebook: NotebookStore) {
   }
 
   async function findNode(): Promise<void> {
-    for (let attempt = 0; attempt < NODE_LOOKUP_TRIES; attempt += 1) {
+    for (let attempt = 0; attempt < NODE_LOOKUP_TRIES && !disposed; attempt += 1) {
       const job = await getJob(jobId.value, homeClient.value)
       const found = executorNode(job)
       if (found) {
@@ -227,6 +243,7 @@ export function createNotebookSession(notebook: NotebookStore) {
       }
       await new Promise((resolve) => setTimeout(resolve, NODE_LOOKUP_DELAY_MS))
     }
+    if (disposed) return
     throw new Error('No node reported that it runs this session yet.')
   }
 
@@ -251,7 +268,10 @@ export function createNotebookSession(notebook: NotebookStore) {
       await refresh()
       openStream()
     } catch (cause) {
-      error.value = submitErrorMessage(cause)
+      const message = submitErrorMessage(cause)
+      // A job that was admitted but cannot be followed must not block Start.
+      if (jobId.value) forget()
+      error.value = message
     } finally {
       starting.value = false
     }
@@ -263,6 +283,7 @@ export function createNotebookSession(notebook: NotebookStore) {
     try {
       await endSession(jobId.value, client.value)
       closeStream()
+      clearResumePoint(jobId.value)
       if (state.value) state.value = { ...state.value, state: 'ended', ended: { reason: 'ended' } }
       kernel.value = 'dead'
     } catch (cause) {
@@ -308,13 +329,20 @@ export function createNotebookSession(notebook: NotebookStore) {
 
   function detach(): void {
     closeStream()
+    keepResumePoint.cancel()
+    if (jobId.value) clearResumePoint(jobId.value)
+    seenEventId = 0
     jobId.value = ''
     nodeId.value = ''
     state.value = null
     cellStates.value = {}
   }
 
-  onScopeDispose(closeStream)
+  onScopeDispose(() => {
+    disposed = true
+    keepResumePoint.flush()
+    closeStream()
+  })
 
   return {
     jobId,
