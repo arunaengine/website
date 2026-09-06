@@ -50,6 +50,9 @@ export interface AnthropicBrowserProvider extends BrowserProviderBase {
   apiKey: string
 }
 
+/** The web search choice for a provider; unset follows what the model reports. */
+export type WebSearchChoice = 'on' | 'off'
+
 export interface OpenAICompatibleBrowserProvider extends BrowserProviderBase {
   kind: 'openai_compatible'
   /** Kept exactly as entered; the model adapter owns no URL rewriting. */
@@ -57,6 +60,7 @@ export interface OpenAICompatibleBrowserProvider extends BrowserProviderBase {
   protocol: OpenAICompatibleProtocol
   apiKey?: string
   headers?: Record<string, string>
+  webSearch?: WebSearchChoice
 }
 
 export type BrowserProvider =
@@ -157,8 +161,18 @@ function modelSuggestions(value: unknown, path: string, selected: string): Assis
       invalid(`${path}[${index}].display_name`)
     }
     const normalizedDisplayName = typeof displayName === 'string' ? displayName.trim() : ''
+    const efforts = input.reasoning_efforts
+    if (efforts !== undefined && !(Array.isArray(efforts) && efforts.every((entry) => typeof entry === 'string'))) {
+      invalid(`${path}[${index}].reasoning_efforts`)
+    }
+    if (input.web_search !== undefined && typeof input.web_search !== 'boolean') invalid(`${path}[${index}].web_search`)
     seen.add(id)
-    output.push({ id, ...(normalizedDisplayName ? { display_name: normalizedDisplayName } : {}) })
+    output.push({
+      id,
+      ...(normalizedDisplayName ? { display_name: normalizedDisplayName } : {}),
+      ...(Array.isArray(efforts) ? { reasoning_efforts: [...efforts] as string[] } : {}),
+      ...(typeof input.web_search === 'boolean' ? { web_search: input.web_search } : {}),
+    })
   })
   if (!seen.has(selected)) output.push({ id: selected })
   return output
@@ -189,6 +203,8 @@ export function validateBrowserProvider(value: unknown, path = 'provider'): Brow
       const customHeaders = headers(input.headers, `${path}.headers`)
       const baseUrl = apiRoot(input.baseUrl, `${path}.baseUrl`)
       if (isOfficialOpenAiRoot(baseUrl) && !apiKey) invalid(`${path}.apiKey`)
+      const webSearch = input.webSearch
+      if (webSearch !== undefined && webSearch !== 'on' && webSearch !== 'off') invalid(`${path}.webSearch`)
       return {
         ...common,
         kind: 'openai_compatible',
@@ -196,6 +212,7 @@ export function validateBrowserProvider(value: unknown, path = 'provider'): Brow
         protocol,
         ...(apiKey ? { apiKey } : {}),
         ...(customHeaders ? { headers: customHeaders } : {}),
+        ...(webSearch ? { webSearch } : {}),
       }
     }
     default:

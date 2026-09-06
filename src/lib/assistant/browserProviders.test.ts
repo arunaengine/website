@@ -125,6 +125,23 @@ describe('browser provider contract', () => {
       { id: 'typed-model' },
     ])
   })
+
+  it('keeps what a model reports and the web search choice', () => {
+    const provider = validateBrowserProvider({
+      kind: 'openai_compatible',
+      id: 'id', label: 'label', model: 'qwen', protocol: 'responses', baseUrl: 'https://litellm.test/v1',
+      models: [{ id: 'qwen', web_search: false, reasoning_efforts: [] }, { id: 'gpt-5', reasoning_efforts: ['low'] }],
+      webSearch: 'off',
+    })
+
+    expect(provider.models).toEqual([{ id: 'qwen', web_search: false, reasoning_efforts: [] }, { id: 'gpt-5', reasoning_efforts: ['low'] }])
+    expect(provider.kind === 'openai_compatible' && provider.webSearch).toBe('off')
+    expect(() => validateBrowserProvider({
+      kind: 'openai_compatible',
+      id: 'id', label: 'label', model: 'qwen', protocol: 'responses', baseUrl: 'https://litellm.test/v1',
+      webSearch: 'maybe',
+    })).toThrow('provider.webSearch')
+  })
 })
 
 describe('browser provider session store', () => {

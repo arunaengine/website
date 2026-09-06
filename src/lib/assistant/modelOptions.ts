@@ -67,12 +67,17 @@ export function familyEfforts(kind: string, id: string): string[] {
 }
 
 // Kinds whose effort catalog is authoritative: listing nothing means the model
-// does not reason. An opaque or unset provider instead gets the guess set.
-const AUTHORITATIVE_KINDS = new Set(['chatgpt', 'openai', 'anthropic', 'openrouter'])
+// does not reason. An unset provider kind instead gets the guess set.
+const AUTHORITATIVE_KINDS = new Set(['chatgpt', 'openai', 'anthropic', 'openrouter', 'openai_compatible'])
 
-/** The levels to offer: what the model lists, else its family, else the default. */
+/**
+ * The levels to offer: what the model lists, else its family, else the default.
+ * A compatible endpoint rejects a reasoning field it does not know, so there
+ * an explicit empty list means none, and an unknown model gets none either.
+ */
 export function reasoningEffortOptions(kind: string, id: string, listed?: readonly string[]): string[] {
   if (listed?.length) return [...listed]
+  if (kind === 'openai_compatible' && listed) return []
   const family = familyEfforts(kind, id)
   if (family.length) return family
   return AUTHORITATIVE_KINDS.has(kind) ? [] : [...DEFAULT_REASONING_EFFORTS]

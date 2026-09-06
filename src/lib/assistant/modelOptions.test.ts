@@ -51,7 +51,17 @@ describe('reasoning efforts', () => {
     // endpoint gets the guess set.
     expect(reasoningEffortOptions('anthropic', 'claude-3-5-haiku')).toEqual([])
     expect(reasoningEffortOptions('openai', 'gpt-4o')).toEqual([])
-    expect(reasoningEffortOptions('openai_compatible', 'mystery-1')).toEqual(['minimal', 'low', 'medium', 'high'])
+    expect(reasoningEffortOptions('', 'mystery-1')).toEqual(['minimal', 'low', 'medium', 'high'])
+  })
+
+  it('offers a compatible endpoint only what its model lists', () => {
+    // An unknown compatible endpoint rejects a reasoning field it does not
+    // take, so nothing is guessed; an explicit empty list means none.
+    expect(reasoningEffortOptions('openai_compatible', 'jlu/qwen3.8-27b')).toEqual([])
+    expect(reasoningEffortOptions('openai_compatible', 'jlu/qwen3.8-27b', [])).toEqual([])
+    expect(reasoningEffortOptions('openai_compatible', 'jlu/qwen3.8-27b', ['low', 'high'])).toEqual(['low', 'high'])
+    expect(reasoningEffortOptions('openai_compatible', 'gpt-5.6-sol')).toEqual(['low', 'medium', 'high'])
+    expect(reasoningEffortOptions('openai_compatible', 'gpt-5.6-sol', [])).toEqual([])
   })
 
   it('offers nothing extra for a non-reasoning family', () => {

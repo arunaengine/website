@@ -166,6 +166,7 @@ function onBlur() {
                 <span v-if="model.display_name && model.display_name !== model.id" class="truncate text-muted-foreground">
                   {{ model.display_name }}
                 </span>
+                <span v-if="model.web_search" class="ml-auto shrink-0 text-[10px] text-muted-foreground">web search</span>
               </button>
             </li>
           </ul>

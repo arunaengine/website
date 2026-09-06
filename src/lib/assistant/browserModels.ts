@@ -31,13 +31,63 @@ const NON_TEXT_MODEL_TERMS = [
   'babbage',
 ]
 
-function modelsUrl(baseUrl: string): string {
-  return `${baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`}models`
+function endpointUrl(baseUrl: string, path: string): string {
+  return `${baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`}${path}`
 }
 
 function textModel(id: string): boolean {
   const lower = id.toLowerCase()
   return !NON_TEXT_MODEL_TERMS.some((term) => lower.includes(term))
+}
+
+/** The levels a model reported as reasoning gets; the Responses API takes these three. */
+const REPORTED_EFFORTS: readonly string[] = ['low', 'medium', 'high']
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value))
+}
+
+/**
+ * What LiteLLM knows about its models, from `GET /model/info` beside the
+ * listing; any endpoint without that route leaves the list as it is.
+ */
+async function modelInfo(
+  baseUrl: string,
+  headers: Headers,
+  fetcher: typeof globalThis.fetch,
+): Promise<Map<string, Partial<AssistantModel>>> {
+  const flags = new Map<string, Partial<AssistantModel>>()
+  try {
+    const response = await fetcher(endpointUrl(baseUrl, 'model/info'), { headers })
+    if (!response.ok) return flags
+    const payload = await response.json() as unknown
+    const entries = isRecord(payload) && Array.isArray(payload.data) ? payload.data : []
+    for (const entry of entries) {
+      if (!isRecord(entry) || typeof entry.model_name !== 'string' || !isRecord(entry.model_info)) continue
+      const info = entry.model_info
+      const patch: Partial<AssistantModel> = {}
+      if (typeof info.supports_web_search === 'boolean') patch.web_search = info.supports_web_search
+      if (typeof info.supports_reasoning === 'boolean') {
+        patch.reasoning_efforts = info.supports_reasoning ? [...REPORTED_EFFORTS] : []
+      }
+      flags.set(entry.model_name, patch)
+    }
+  } catch {
+    // The route is LiteLLM's own; a plain endpoint answers with nothing.
+  }
+  return flags
+}
+
+/** The listed models with the reported flags; a reported model missing from the list joins it. */
+function withModelInfo(models: AssistantModel[], flags: Map<string, Partial<AssistantModel>>): AssistantModel[] {
+  if (!flags.size) return models
+  const merged = models.map((model) => {
+    const { reasoning_efforts: efforts, ...rest } = flags.get(model.id) ?? {}
+    return { ...model, ...rest, ...(model.reasoning_efforts?.length || !efforts ? {} : { reasoning_efforts: efforts }) }
+  })
+  const listed = new Set(models.map((model) => model.id))
+  for (const [id, patch] of flags) if (!listed.has(id) && textModel(id)) merged.push({ id, ...patch })
+  return merged
 }
 
 /** Fetches a provider's model list without sending an Aruna bearer. */
@@ -55,10 +105,18 @@ export async function fetchBrowserProviderModels(
   if (provider.kind === 'openai_compatible' && provider.apiKey) {
     headers.set('Authorization', `Bearer ${provider.apiKey}`)
   }
-  const response = await fetcher(
-    provider.kind === 'anthropic' ? 'https://api.anthropic.com/v1/models' : modelsUrl(provider.baseUrl),
-    { headers },
-  )
+  if (provider.kind === 'openai_compatible') {
+    const [models, flags] = await Promise.all([
+      listModels(endpointUrl(provider.baseUrl, 'models'), headers, fetcher),
+      modelInfo(provider.baseUrl, headers, fetcher),
+    ])
+    return withModelInfo(models, flags)
+  }
+  return listModels('https://api.anthropic.com/v1/models', headers, fetcher)
+}
+
+async function listModels(url: string, headers: Headers, fetcher: typeof globalThis.fetch): Promise<AssistantModel[]> {
+  const response = await fetcher(url, { headers })
   if (response.status === 404 || response.status === 405) return []
   if (!response.ok) throw new Error(`Provider model listing failed (${response.status}).`)
   const payload = await response.json() as unknown

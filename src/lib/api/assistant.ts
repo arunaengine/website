@@ -18,6 +18,8 @@ export interface AssistantModel {
   display_name?: string | null
   /** Reasoning levels this model accepts; empty leaves the client its fallback. */
   reasoning_efforts?: string[]
+  /** Whether the provider runs a web search for this model; unset is unknown. */
+  web_search?: boolean
 }
 
 /** What the node serves for a provider; it never contains a secret. */

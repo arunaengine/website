@@ -146,4 +146,44 @@ describe('fetchBrowserProviderModels', () => {
 
     expect(await fetchBrowserProviderModels(OPENAI, empty)).toEqual([])
   })
+
+  it('takes web search and reasoning flags from a LiteLLM model info answer', async () => {
+    // The listing and the info route share the base URL and key; a model the
+    // info names alone is added, and one already reasoning keeps its levels.
+    const calls: FetchCall[] = []
+    const answers: Record<string, unknown> = {
+      'https://litellm.test/v1/models': { data: [{ id: 'jlu/qwen', created: 1 }, { id: 'gpt-5.6-sol', created: 2 }] },
+      'https://litellm.test/v1/model/info': {
+        data: [
+          { model_name: 'jlu/qwen', model_info: { supports_web_search: false, supports_reasoning: false } },
+          { model_name: 'gpt-5.6-sol', model_info: { supports_web_search: true, supports_reasoning: true } },
+          { model_name: 'claude-sonnet', model_info: { supports_web_search: true } },
+        ],
+      },
+    }
+    const fetcher = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ input, init })
+      return new Response(JSON.stringify(answers[String(input)]), { status: 200 })
+    }) as typeof globalThis.fetch
+
+    const models = await fetchBrowserProviderModels(
+      { ...OPENAI, baseUrl: 'https://litellm.test/v1', apiKey: 'sk-lite' },
+      fetcher,
+    )
+
+    expect(models).toEqual([
+      { id: 'gpt-5.6-sol', web_search: true, reasoning_efforts: ['low', 'medium', 'high'] },
+      { id: 'jlu/qwen', web_search: false, reasoning_efforts: [] },
+      { id: 'claude-sonnet', web_search: true },
+    ])
+    expect(calls.map((call) => new Headers(call.init?.headers).get('authorization'))).toEqual(['Bearer sk-lite', 'Bearer sk-lite'])
+  })
+
+  it('ignores an endpoint that has no model info route', async () => {
+    const fetcher = (async (input: RequestInfo | URL) => (String(input).endsWith('/models')
+      ? new Response(JSON.stringify({ data: [{ id: 'qwen' }] }), { status: 200 })
+      : new Response('not found', { status: 404 }))) as typeof globalThis.fetch
+
+    expect(await fetchBrowserProviderModels({ ...OPENAI, baseUrl: 'https://vllm.test/v1' }, fetcher)).toEqual([{ id: 'qwen' }])
+  })
 })

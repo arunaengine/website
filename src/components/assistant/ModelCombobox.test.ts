@@ -105,6 +105,12 @@ describe('ModelCombobox', () => {
     expect(options(root)).toEqual(CHAT_MODELS)
   })
 
+  it('marks a model whose provider runs a web search', async () => {
+    const { root } = await open('gpt-5.6-sol', [{ id: 'gpt-5.6-sol', web_search: true }, { id: 'jlu/qwen' }])
+
+    expect(options(root)).toEqual(['gpt-5.6-solweb search', 'jlu/qwen'])
+  })
+
   it('narrows only on text the person typed', async () => {
     const { root, field } = await open('gpt-5.6-sol')
     await typeValue(field, 'mini')
