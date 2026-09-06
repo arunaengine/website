@@ -318,7 +318,7 @@ function continueInPanel() {
           </div>
           <DocsLink
             topic="assistant"
-            section="What the assistant can show you"
+            section="What the assistant can do"
             label="What the assistant can do"
           />
         </div>
