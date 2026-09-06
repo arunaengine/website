@@ -1,7 +1,7 @@
-// Pure parser for the [label](target) links in docs copy. Targets:
-// concept:<slug>[#<section>] and page:<routeName> become router locations,
-// api:reference targets the in-portal API reference, https:// stays external;
-// unknown targets degrade to the plain label, never a broken link.
+// Pure parser for the [label](target) links and `code` spans in docs copy.
+// Targets: concept:<slug>[#<section>] and page:<routeName> become router
+// locations, api:reference targets the in-portal API reference, https://
+// stays external; unknown targets degrade to the plain label, never a broken link.
 import { docsTopicBySlug, sectionId } from './v1'
 
 export interface InlineText {
@@ -18,7 +18,11 @@ export interface InlineExternalLink {
   href: string
 }
 
-export type InlineSegment = InlineText | InlineRouteLink | InlineExternalLink
+export interface InlineCode {
+  code: string
+}
+
+export type InlineSegment = InlineText | InlineRouteLink | InlineExternalLink | InlineCode
 
 /** Portal route names docs copy may target; anything else falls back to text. */
 const pageRoutes = new Set([
@@ -34,7 +38,7 @@ const pageRoutes = new Set([
   'admin',
 ])
 
-const linkPattern = /\[([^\]]+)\]\(([^()\s]+)\)/g
+const linkPattern = /\[([^\]]+)\]\(([^()\s]+)\)|`([^`]+)`/g
 
 function resolveTarget(label: string, target: string): InlineSegment {
   if (target.startsWith('concept:')) {
@@ -69,7 +73,7 @@ export function parseInline(text: string): InlineSegment[] {
   for (const match of text.matchAll(linkPattern)) {
     const index = match.index ?? 0
     if (index > cursor) push({ text: text.slice(cursor, index) })
-    push(resolveTarget(match[1], match[2]))
+    push(match[3] !== undefined ? { code: match[3] } : resolveTarget(match[1], match[2]))
     cursor = index + match[0].length
   }
   if (cursor < text.length) push({ text: text.slice(cursor) })

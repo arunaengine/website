@@ -8,6 +8,15 @@ describe('docs inline links', () => {
     ])
   })
 
+  it('marks a tool name in backticks as code', () => {
+    expect(parseInline('call `show_table` for rows, then [Data](page:buckets)')).toEqual([
+      { text: 'call ' },
+      { code: 'show_table' },
+      { text: ' for rows, then ' },
+      { label: 'Data', to: { name: 'buckets' } },
+    ])
+  })
+
   it('keeps bare brackets', () => {
     // Bracketed text without a (target) is not a link.
     expect(parseInline('use [brackets] freely')).toEqual([{ text: 'use [brackets] freely' }])

@@ -5,7 +5,12 @@ import { docsTopicBySlug } from './v1'
 function topicText(slug: string): string {
   const topic = docsTopicBySlug(slug)
   return (topic?.sections ?? [])
-    .flatMap((section) => [...(section.paragraphs ?? []), ...(section.bullets ?? []), ...(section.steps ?? [])])
+    .flatMap((section) => [
+      ...(section.paragraphs ?? []),
+      ...(section.bullets ?? []),
+      ...(section.steps ?? []),
+      ...(section.table?.rows ?? []).flat(),
+    ])
     .join('\n')
 }
 

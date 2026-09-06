@@ -13,6 +13,12 @@ export type DocsImage = { alt: string; caption?: string } & (
   | { figure: DocsFigure; src?: never }
 )
 
+/** A small reference table; cells take the same inline links and `code` spans as copy. */
+export interface DocsTable {
+  columns: string[]
+  rows: string[][]
+}
+
 export interface DocsSection {
   title: string
   /** Lucide icon name rendered beside the heading; DocsView maps it. */
@@ -20,6 +26,7 @@ export interface DocsSection {
   paragraphs?: string[]
   bullets?: string[]
   steps?: string[]
+  table?: DocsTable
   image?: DocsImage
 }
 
@@ -833,42 +840,163 @@ export const docsTopics: DocsTopic[] = [
         },
       },
       {
-        title: 'What the assistant can show you',
-        icon: 'Gauge',
-        paragraphs: [
-          'Answers are drawn as cards instead of long text. The assistant picks the card that fits the question, and the card carries the facts, so the words beside it stay short. Cards belong to the chat, so they are still there when you come back to it.',
-          'show_table draws a sortable table. It is used for anything with columns, such as the objects in a [bucket](concept:data-and-deletion#buckets-hold-the-bytes) or the jobs of a group. Click a column heading to sort by it and again to reverse it, and copy the whole table as CSV from the card header. When the rows are about stored files, every file name is a link.',
-          'show_chart draws a bar, line or pie chart, and show_stats shows a row of labelled numbers. The assistant reaches for them when the answer is counts, sizes or shares, such as storage per group. Both are pictures of numbers a tool returned, so there is nothing to edit in them.',
-          'show_timeline lists dated steps in order: a job from submission to result, a version history, or the steps of a sync. Each entry keeps its exact time, so hovering one tells you when it happened.',
-          'show_code shows a script, a query or a configuration with highlighting instead of a plain block in the text, and show_diff puts two texts side by side line by line, such as two versions of one file. Both are read-only, and the text can be copied straight out of the card.',
-        ],
-      },
-      {
-        title: 'Files, jobs and datasets in an answer',
-        icon: 'Files',
-        paragraphs: [
-          'show_tree draws a bucket or folder listing as a tree: folders nest, sizes sit on the right, and every file is a link. Opening one shows the file over the conversation, so the chat stays where it is, and the file view offers "Open in the data browser" for when you do want to go there.',
-          'show_object answers a write, a copy or a lookup of one stored file. It names where the file lives, how big it is, its content type, its version and the [node](concept:glossary#node) holding it. The path is a link, and the version and node ids copy in one click.',
-          'show_artifact shows the file itself: an image, or the text of a JSON, CSV, Markdown or plain text file. The bytes are read in your browser and never sent to the model, and a file the browser cannot render becomes a download row instead.',
-          'show_html_figure pulls one figure out of a stored HTML report, such as the per base sequence quality plot of a FastQC report, and shows that plot on its own. Only images the report carries inside it are read, and the report itself opens as a page in the file view.',
-          'show_job shows a submitted or polled job: its state, its attempts, when it was submitted, started and finished, and the files it wrote. A run opens on its run page and every other job on the system job page, and each output is a file link. One job keeps one card: while the portal follows the job in the background the card spins and updates itself, rather than a second card arriving.',
-          'show_crate shows a [dataset](concept:datasets) as its RO-Crate: the root entity, the parts below it, and the [profile](concept:profiles-conformance) it declares. It is used once a dataset has been read or drafted, and it shows the same structure the dataset pages do.',
-        ],
-      },
-      {
-        title: 'What it can do on your node',
+        title: 'What the assistant can do',
         icon: 'Wrench',
         paragraphs: [
-          'Besides drawing cards, the assistant acts through the tools your node serves over [MCP](concept:glossary#mcp). It reads that list with the first message of a chat, so a tool the node adds later needs no portal update. Reading happens on its own; every write asks you first, and a call you deny is not retried.',
+          'The assistant acts through tools. Most of them are served by your node over [MCP](concept:glossary#mcp); it reads that list with the first message of a chat, so a tool the node adds later needs no portal update. The rest run in your browser: the cards, the web search, the background watch, and the tools that fill in a form you have open. Reading happens on its own; every write asks you first, and a call you deny is not retried.',
+          'The tables below list every tool with one example of what to ask. The tool name is what you see in the chat when a call is folded under an answer.',
         ],
-        bullets: [
-          'Data: list and search buckets, prefixes and objects, read one object, and write or copy one when you allow it.',
-          'Datasets: search datasets, read one, check it against a profile, and query the realm with SPARQL.',
-          'Compute: submit a script or a job, follow its state, and list the files it wrote.',
-          'Groups: who you are, the groups you belong to, their members and their usage.',
-          'Realm: the nodes of the realm, what they serve, and how they are doing.',
-          'While the dataset editor or the run form is open, the assistant can also fill in the draft in front of you; only you save it.',
+      },
+      {
+        title: 'Find and read data',
+        icon: 'Database',
+        table: {
+          columns: ['What it does', 'Tool', 'Ask for example'],
+          rows: [
+            ['Lists the buckets on this node you may read, with their owning group', '`list_buckets`', 'Which buckets can I read here?'],
+            ['Lists the objects in one bucket, narrowed by a key prefix and paged', '`list_objects`', 'What is under results/ in the reef bucket?'],
+            ['Reads a bounded text window of one object, walking a large file by offset', '`read_object`', 'Read the first lines of samples.csv in the reef bucket.'],
+            ['Describes one object without reading it: size, type, version and the node holding it', '`stat_object`', 'How big is run-1/report.html, and which node holds it?'],
+            ['Counts objects and bytes per day, week or month over a bucket or prefix', '`aggregate_objects`', 'How many files were written per week in the survey bucket?'],
+            ['Writes up to 1 MiB of text to one object as a new version; asks you first', '`write_object`', 'Save these notes as notes/today.md in the reef bucket.'],
+            ['Searches documents, buckets, groups and users by name in one call', '`search`', 'Find anything called coral.'],
+          ],
+        },
+      },
+      {
+        title: 'Your groups and the realm',
+        icon: 'Users',
+        table: {
+          columns: ['What it does', 'Tool', 'Ask for example'],
+          rows: [
+            ['Says who you are: your id, your realm roles and every group you belong to', '`whoami`', 'Which groups am I in?'],
+            ['Lists the groups you belong to with your roles, so a group id is at hand', '`list_groups`', 'List my groups with their ids.'],
+            ['Reads one group by id: its name and its roles', '`get_group`', 'What is the group with this id called?'],
+            ['Lists the members of a group you belong to, with their roles', '`list_group_members`', 'Who is in the reef survey group?'],
+            ['Reads a group\'s storage usage, its dataset counts and its quota status', '`get_group_usage`', 'How much storage does my group use?'],
+            ['Counts your datasets, profiles and process runs, in total and per group', '`count_datasets`', 'How many datasets do I have?'],
+            ['Describes the realm: its nodes, endpoints, replication and quota settings', '`get_realm_info`', 'Which nodes are in this realm?'],
+            ['Describes this node: api version, capabilities and service status', '`get_node_info`', 'Is this node healthy?'],
+          ],
+        },
+      },
+      {
+        title: 'Run and watch compute',
+        icon: 'Play',
+        paragraphs: [
+          'The first seven tools run on the node. The rest work on the run form while that page is open in front of you; the assistant fills it in, and only you submit it.',
         ],
+        table: {
+          columns: ['What it does', 'Tool', 'Ask for example'],
+          rows: [
+            ['Lists the quick-run runtimes with their images and starter templates', '`list_runtimes`', 'Which runtimes can I run a script in?'],
+            ['Stages a Python, Deno or Bash script into a bucket and submits it as a job', '`run_script`', 'Run this Python script against the reef bucket.'],
+            ['Submits a full job: image, command, environment, resources, inputs, outputs and workspace', '`submit_job`', 'Run the fastqc image on reads.fastq and capture /out.'],
+            ['Reads one of your jobs: state, attempts, timestamps, progress, result and the log tails', '`get_job`', 'What happened to my last job?'],
+            ['Lists the files one job wrote, each with its exact version', '`list_job_outputs`', 'Which files did the last run write?'],
+            ['Lists your jobs on this node, newest first, filtered by group or state', '`list_jobs`', 'Show my failed jobs.'],
+            ['Asks to cancel one of your jobs', '`cancel_job`', 'Cancel the running counts job.'],
+            ['Reads the open run form: name, group, executor, script, inputs, outputs and placement', '`read_run_form`', 'What is in this run so far?'],
+            ['Sets the run name, its description or its owning group', '`set_run_field`', 'Call this run Reef counts.'],
+            ['Sets what runs: the python-uv, deno or bash runtime, or a custom image with its command', '`set_run_executor`', 'Use the python-uv runtime.'],
+            ['Replaces the text of the script the run executes', '`set_run_script`', 'Write a script that counts the reads per sample.'],
+            ['Stages a stored object as an input of the run', '`add_run_input`', 'Take reads.fastq from the reef bucket as input.'],
+            ['Captures a container path after the run, as one file or a whole folder', '`capture_run_output`', 'Keep everything the run writes to /out.'],
+            ['Sets what the node must offer the run, such as cores and memory', '`set_run_resources`', 'Give it four cores and 8 GB.'],
+            ['Sets where the run may execute: the realm, this computer, a pinned node or an executor', '`set_run_placement`', 'Run it on this computer.'],
+            ['Puts the run form back as it was before the last change a tool applied', '`undo_run_change`', 'Undo that.'],
+          ],
+        },
+      },
+      {
+        title: 'Show results as cards',
+        icon: 'Gauge',
+        paragraphs: [
+          'Answers are drawn as cards instead of long text. The assistant picks the card that fits the question, and the card carries the facts, so the words beside it stay short. Cards belong to the chat: they are still there when you come back to it, and a file card reads its file again when the chat is reopened.',
+        ],
+        table: {
+          columns: ['What it shows', 'Tool', 'Ask for example'],
+          rows: [
+            ['A sortable table; click a heading to sort, and copy the whole table as CSV from its header', '`show_table`', 'Show the objects of the reef bucket as a table.'],
+            ['A bar, line or pie chart of numbers a tool returned', '`show_chart`', 'Chart the storage per group.'],
+            ['A row of labelled numbers', '`show_stats`', 'Give me the key numbers of this run.'],
+            ['Dated steps in order: a job from submission to result, a version history, or a sync', '`show_timeline`', 'Show the timeline of my last job.'],
+            ['A script, query or configuration, highlighted and read-only, with a copy button', '`show_code`', 'Show the script that job ran.'],
+            ['Two texts side by side, line by line, such as two versions of one file', '`show_diff`', 'Compare the two versions of config.yaml.'],
+            ['A bucket or folder listing as a tree, with every file a link', '`show_tree`', 'Draw the survey bucket as a tree.'],
+            ['One stored object as a card: where it lives, its size, type, version and node', '`show_object`', 'Where does report.html live?'],
+            ['The file itself: an image, or the text of a JSON, CSV, Markdown or plain text file; a download row for anything else. The bytes are read in your browser and never sent to the model', '`show_artifact`', 'Show the plot the run produced.'],
+            ['One figure out of a stored HTML report, such as a FastQC plot', '`show_html_figure`', 'Show the per base quality plot from the FastQC report.'],
+            ['A job card with its state, attempts, times and outputs; it keeps updating while the job is followed', '`show_job`', 'Show the state of my running job.'],
+            ['A dataset as its RO-Crate: the root, the parts below it and the profile it declares', '`show_crate`', 'Show the coral dataset as a crate.'],
+          ],
+        },
+      },
+      {
+        title: 'Datasets and profiles',
+        icon: 'FileJson',
+        paragraphs: [
+          'The first nine tools read and write metadata on the node. The rest work on the draft while the [dataset editor](concept:datasets) or the profile builder is open; the assistant edits what is in front of you, and only you save it.',
+        ],
+        table: {
+          columns: ['What it does', 'Tool', 'Ask for example'],
+          rows: [
+            ['Lists the profiles you may read', '`list_profiles`', 'Which profiles exist in this realm?'],
+            ['Reads one profile with every SHACL rule it carries', '`get_profile`', 'What does the survey profile require?'],
+            ['Searches dataset metadata by text, by declared profile and by group', '`search_datasets`', 'Find datasets about coral bleaching.'],
+            ['Reads one dataset\'s RO-Crate', '`get_dataset`', 'Open the reef survey dataset.'],
+            ['Checks a crate against the structural and profile rules without storing it', '`validate_dataset`', 'Does this crate pass the survey profile?'],
+            ['Creates a dataset from an RO-Crate; asks you first', '`create_dataset`', 'Create a dataset for these files in my group.'],
+            ['Replaces a dataset\'s whole crate, or changes its visibility; asks you first', '`replace_dataset`', 'Make the reef dataset public.'],
+            ['Runs a read-only SPARQL SELECT or ASK query over the metadata you can see', '`sparql_query`', 'Which datasets name Jane Doe as author?'],
+            ['Finds the documents that reference an IRI, such as every dataset conforming to a profile', '`find_references`', 'Which datasets conform to the survey profile?'],
+            ['Reads one entity of the open draft', '`read_entity`', 'What does the root entity say?'],
+            ['Changes one entity of the draft: sets or appends properties', '`edit_entity`', 'Set the licence to CC BY 4.0.'],
+            ['Adds an entity to the draft, or answers the one that already has that type', '`create_entity`', 'Add the university as an organization.'],
+            ['Renames an entity and every reference to it', '`rename_entity`', 'Rename #person-1 to #jane-doe.'],
+            ['Removes an entity with every reference to it; asks you first', '`delete_entity`', 'Remove the second author from the draft.'],
+            ['Summarises the draft: name, profile, entity counts and the types present', '`crate_summary`', 'Summarise what is in my draft.'],
+            ['Lists the data entities the draft points at', '`list_parts`', 'Which files does the draft include?'],
+            ['Runs the same check the Save button runs', '`validate`', 'Check my draft before I save.'],
+            ['Declares a profile on the draft and seeds the rows it requires', '`apply_profile`', 'Apply the survey profile to this draft.'],
+            ['Adds a Person from an ORCID identifier', '`import_person_orcid`', 'Add the author with ORCID 0000-0002-1825-0097.'],
+            ['Adds an Organization from a ROR identifier', '`import_organization_ror`', 'Add the university from its ROR id.'],
+            ['Reads the open profile: name, licence, group and every entity rule', '`read_profile_form`', 'What does this profile require so far?'],
+            ['Sets the profile\'s name, description, version, licence, group or visibility', '`set_profile_basics`', 'Name this profile Reef Survey 2026.'],
+            ['Adds a rule for an entity type the profile describes', '`add_profile_entity`', 'Require a Person for every dataset.'],
+            ['Adds one property rule to an entity of the profile', '`add_profile_property`', 'Require a licence on the root.'],
+            ['Removes one property rule; a rule the RO-Crate baseline owns stays', '`remove_profile_property`', 'Drop the keywords rule.'],
+            ['Removes an entity rule; a rule the RO-Crate baseline owns stays', '`remove_profile_entity`', 'Remove the Organization rule.'],
+            ['Finds the schema.org and Dublin Core terms that fit a property or an entity type', '`search_profile_terms`', 'Which term fits a sampling date?'],
+            ['Puts the profile form back as it was before the last change', '`undo_profile_change`', 'Undo that.'],
+          ],
+        },
+      },
+      {
+        title: 'Web search',
+        icon: 'Globe',
+        paragraphs: [
+          'The provider runs the search itself, so the portal sends no request of its own. Claude and the OpenAI Responses API offer it; a compatible endpoint gets it when its model reports the capability or the provider settings say on, and an endpoint that refuses it is remembered, with a note in the chat. Turn it on or off under Web in the chat settings. The pages an answer drew on are listed under it.',
+        ],
+        table: {
+          columns: ['What it does', 'Tool', 'Ask for example'],
+          rows: [
+            ['Searches the web through the provider and cites the pages the answer drew on', '`web_search`', 'What is the latest FastQC release?'],
+          ],
+        },
+      },
+      {
+        title: 'Background updates',
+        icon: 'Clock',
+        paragraphs: [
+          'A watch keeps going while the chat is closed and while you work elsewhere. When the job or the sync settles, the update lands in that chat as a folded row and the assistant carries on from it; the assistant button in the top bar shows a dot while an update is unread.',
+        ],
+        table: {
+          columns: ['What it does', 'Tool', 'Ask for example'],
+          rows: [
+            ['Follows a running job or a bucket sync in the background and continues the chat on its own once it settles', '`watch_progress`', 'Watch this job and tell me when it is done.'],
+          ],
+        },
       },
       {
         title: 'Connect an MCP client',

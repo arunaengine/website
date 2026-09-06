@@ -103,6 +103,8 @@ const DocsInline = defineComponent({
             { key: index, href: segment.href, target: '_blank', rel: 'noopener noreferrer', class: inlineLinkClass },
             segment.label,
           )
+        if ('code' in segment)
+          return h('code', { key: index, class: 'rounded bg-muted px-1 py-0.5 font-mono text-[0.85em] text-foreground' }, segment.code)
         return segment.text
       })
   },
@@ -352,6 +354,28 @@ function glossaryLink(anchor: string) {
                     <span class="min-w-0"><DocsInline :text="step" /></span>
                   </li>
                 </ol>
+                <div v-if="section.table" class="mt-3 min-w-0 overflow-x-auto rounded-md border border-border">
+                  <table class="w-full min-w-max text-sm">
+                    <thead class="bg-muted/20 text-[11px] uppercase tracking-wider text-muted-foreground">
+                      <tr>
+                        <th v-for="column in section.table.columns" :key="column" class="px-3 py-2 text-left font-semibold">
+                          {{ column }}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(row, rowIndex) in section.table.rows" :key="rowIndex" class="border-t border-border align-top">
+                        <td
+                          v-for="(cell, cellIndex) in row"
+                          :key="cellIndex"
+                          class="px-3 py-2 text-xs leading-relaxed text-foreground/85"
+                        >
+                          <DocsInline :text="cell" />
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
                 <figure v-if="section.image" class="mt-4">
                   <component
                     :is="docsFigures[section.image.figure]"
