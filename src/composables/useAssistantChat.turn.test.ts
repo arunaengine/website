@@ -189,7 +189,11 @@ describe('changing the model or provider', () => {
     expect(stored.get('aruna.assistant.model')).toBe('gpt-5.6-sol')
     const marker = chat.messages.value.at(-1)
     expect(marker).toMatchObject({ role: 'user', marker: true, text: 'Model changed to gpt-5.6-sol' })
-    expect(chat.chats.value.find((entry) => entry.id === chat.activeChatId.value)?.messages.at(-1)?.marker).toBe(true)
+    // Read through the narrow shape this assertion needs: a chat record also
+    // holds the provider's own message type, which is too deep to instantiate.
+    const chats = chat.chats.value as unknown as { id: string; messages: { marker?: boolean }[] }[]
+    const active = chats.find((entry) => entry.id === chat.activeChatId.value)
+    expect(active?.messages.at(-1)?.marker).toBe(true)
 
     await chat.send('again', { route: '/' })
     expect(state.built.at(-1)).toBe('gpt-5.6-sol')
