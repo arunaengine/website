@@ -16,6 +16,7 @@ import {
   parseNotebook,
   serializeNotebook,
   type CellAruna,
+  type CellInputRef,
   type CellKind,
   type Notebook,
   type NotebookAruna,
@@ -216,6 +217,22 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
     markChanged()
   }
 
+  /** The cell the page acts on: staged files are recorded on it. */
+  const activeCellId = ref('')
+
+  function selectCell(id: string): void {
+    activeCellId.value = id
+  }
+
+  /** Records the files that were staged for one cell. */
+  function noteCellInputs(id: string, inputs: CellInputRef[]): void {
+    const cell = cellById(id)
+    if (!cell || !inputs.length) return
+    const known = cell.metadata.aruna?.inputs ?? []
+    cell.metadata.aruna = { ...cell.metadata.aruna, inputs: [...known, ...inputs] }
+    markChanged()
+  }
+
   /** Records what the session reported about one run of a cell. */
   function noteCellRun(
     id: string,
@@ -253,6 +270,9 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
     markChanged,
     patchMeta,
     cellById,
+    activeCellId,
+    selectCell,
+    noteCellInputs,
     addCell,
     removeCell,
     moveCell,

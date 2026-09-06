@@ -52,7 +52,11 @@ function run() {
 </script>
 
 <template>
-  <div class="surface overflow-hidden" :class="busy ? 'border-primary/50' : ''">
+  <div
+    class="surface overflow-hidden"
+    :class="[busy ? 'border-primary/50' : '', notebook.activeCellId.value === cell.id ? 'ring-1 ring-ring' : '']"
+    @click="notebook.selectCell(cell.id)"
+  >
     <div class="flex items-center gap-2 border-b border-border bg-muted/40 px-2.5 py-1.5">
       <code v-if="cell.cell_type === 'code'" class="font-mono text-[11px] text-muted-foreground">{{ counter }}</code>
       <Badge v-else variant="outline" size="sm">{{ pipeline ? 'Pipeline' : cell.cell_type }}</Badge>

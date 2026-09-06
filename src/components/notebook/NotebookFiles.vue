@@ -8,15 +8,20 @@ import Notice from '@/components/ui/Notice.vue'
 import OptionToggle from '@/components/ui/OptionToggle.vue'
 import ObjectBrowserPanel from '@/components/data/ObjectBrowserPanel.vue'
 import TesDataRefDialog from '@/components/compute/TesDataRefDialog.vue'
+import AddDataDialog from '@/components/data/AddDataDialog.vue'
+import ScratchFileDialog from '@/components/notebook/ScratchFileDialog.vue'
 import { injectNotebook } from '@/composables/notebookContext'
 import { addSessionInputs, listScratch, type ScratchEntry } from '@/lib/notebook/session'
 import { NOTEBOOK_DATA_PREFIX } from '@/lib/notebook/document'
 import { parseS3Url, type TesDataRefEntry } from '@/lib/tes'
 import { errorMessage, formatBytes } from '@/lib/utils'
-import { FolderTree, Plus, RefreshCw } from '@lucide/vue'
+import { CloudDownload, FolderTree, Plus, RefreshCw } from '@lucide/vue'
 
 const { notebook, session } = injectNotebook()
 
+const importOpen = ref(false)
+const scratchFile = ref('')
+const scratchOpen = ref(false)
 const tab = ref('bucket')
 const tabs = [
   { value: 'bucket', label: 'Bucket' },
@@ -46,9 +51,14 @@ watch([() => session.live.value, tab, scratchPath], () => {
   if (tab.value === 'scratch') void loadScratch()
 })
 
-function openFolder(entry: ScratchEntry) {
-  if (entry.kind !== 'dir') return
-  scratchPath.value = scratchPath.value ? `${scratchPath.value}/${entry.name}` : entry.name
+function openEntry(entry: ScratchEntry) {
+  const path = scratchPath.value ? `${scratchPath.value}/${entry.name}` : entry.name
+  if (entry.kind === 'dir') {
+    scratchPath.value = path
+    return
+  }
+  scratchFile.value = path
+  scratchOpen.value = true
 }
 
 function up() {
@@ -77,8 +87,20 @@ async function stage(entry: TesDataRefEntry) {
   try {
     const result = await addSessionInputs(session.jobId.value, items, session.client.value)
     const staged = result.staged.length
+    const cellId = notebook.activeCellId.value
+    if (cellId && staged) {
+      notebook.noteCellInputs(
+        cellId,
+        result.staged.map((file) => ({
+          dest_key: file.dest_key,
+          source_node_id: file.source_node_id,
+          version_id: file.version_id,
+          blake3: file.blake3,
+        })),
+      )
+    }
     stageNote.value = staged
-      ? `${staged} of ${items.length} files are now in ${bucket.value}.`
+      ? `${staged} of ${items.length} files are now in ${bucket.value}.${cellId ? '' : ' Select a cell first to record them on it.'}`
       : 'The copy was started; the files appear in the bucket when they land.'
   } catch (cause) {
     stageNote.value = errorMessage(cause)
@@ -101,6 +123,9 @@ async function stage(entry: TesDataRefEntry) {
         @click="addOpen = true"
       >
         <Plus class="size-3.5" /> Add more
+      </Button>
+      <Button v-if="bucket" variant="outline" size="sm" @click="importOpen = true">
+        <CloudDownload class="size-3.5" /> Import
       </Button>
     </div>
 
@@ -129,7 +154,7 @@ async function stage(entry: TesDataRefEntry) {
           <button
             type="button"
             class="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs hover:bg-muted"
-            @click="openFolder(entry)"
+            @click="openEntry(entry)"
           >
             <span class="min-w-0 flex-1 truncate font-mono">{{ entry.name }}{{ entry.kind === 'dir' ? '/' : '' }}</span>
             <span v-if="entry.kind === 'file'" class="shrink-0 text-[11px] text-muted-foreground">
@@ -144,5 +169,20 @@ async function stage(entry: TesDataRefEntry) {
     </div>
 
     <TesDataRefDialog v-model:open="addOpen" mode="input" @add="stage" />
+
+    <!-- The data manager's own import, pointed at the notebook's data folder. -->
+    <AddDataDialog
+      v-model:open="importOpen"
+      :bucket="bucket"
+      :prefix="NOTEBOOK_DATA_PREFIX"
+      :group-id="notebook.meta.value?.group_id ?? null"
+    />
+
+    <ScratchFileDialog
+      v-model:open="scratchOpen"
+      :job-id="session.jobId.value"
+      :path="scratchFile"
+      :client="session.client.value"
+    />
   </aside>
 </template>
