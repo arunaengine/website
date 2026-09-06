@@ -14,6 +14,7 @@ import { jobFacts, jobWatched, liveJob, noteJob } from '@/lib/assistant/jobLive'
 import { getJob } from '@/lib/jobs'
 import { stateVariant } from '@/lib/stateBadge'
 import { formatBytes, relativeTime, truncateMiddle } from '@/lib/utils'
+import { useNow } from '@/composables/useNow'
 import { Cpu } from '@lucide/vue'
 
 const props = defineProps<{ view: JobView }>()
@@ -49,13 +50,16 @@ const attempts = computed(() => {
   return value !== undefined && value > 1 ? `${value} attempts` : ''
 })
 
-const timings = computed(() =>
-  [
+// The clock is read so the labels move on while the card stays on screen.
+const now = useNow()
+const timings = computed(() => {
+  void now.value
+  return [
     { label: 'Submitted', at: props.view.submittedAt },
     { label: 'Started', at: props.view.startedAt },
     { label: 'Finished', at: finishedAt.value },
-  ].flatMap((entry) => (entry.at ? [{ ...entry, at: entry.at, ago: relativeTime(entry.at) }] : [])),
-)
+  ].flatMap((entry) => (entry.at ? [{ ...entry, at: entry.at, ago: relativeTime(entry.at) }] : []))
+})
 
 const outputs = computed(() => props.view.outputs.slice(0, OUTPUT_CAP))
 

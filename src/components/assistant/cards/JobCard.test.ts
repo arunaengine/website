@@ -9,6 +9,7 @@ import { clearLiveJobs, noteJob, setWatchedJobs } from '@/lib/assistant/jobLive'
 import type { JobView } from '@/lib/assistant/types'
 import * as StateBadge from '@/lib/stateBadge'
 import * as Utils from '@/lib/utils'
+import * as UseNow from '@/composables/useNow'
 import { compileClientComponent, content, flush, moduleDefault, mountApp } from '@/test/clientRender'
 
 const jobs = vi.hoisted(() => ({ getJob: vi.fn() }))
@@ -66,6 +67,7 @@ const ClientCard = compileClientComponent(new URL('./JobCard.vue', import.meta.u
   '@/components/ui/Spinner.vue': moduleDefault(Passthrough),
   '@/components/assistant/ObjectLink.vue': moduleDefault(LinkStub),
   '@/composables/aruna/state': { apiBaseUrl: ref('https://node.test'), authToken: ref('token') },
+  '@/composables/useNow': UseNow,
   '@/lib/assistant/jobLive': JobLive,
   '@/lib/jobs': jobs,
   '@/lib/stateBadge': StateBadge,
