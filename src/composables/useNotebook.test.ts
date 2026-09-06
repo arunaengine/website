@@ -12,8 +12,8 @@ const { readWorkingCopy } = await import('@/lib/notebook/document')
 
 const seed = () => ({ runtime: 'python-notebook', group_id: 'group-1' })
 
-function store() {
-  return createNotebook(ref('lab-data'), ref('notebooks/counts.ipynb'), seed)
+function store(bucket = ref('lab-data'), key = ref('notebooks/counts.ipynb')) {
+  return createNotebook(bucket, key, seed)
 }
 
 beforeEach(() => {
@@ -91,6 +91,22 @@ describe('createNotebook', () => {
     expect(notebook.dirty.value).toBe(true)
     notebook.flushCopy()
     expect(readWorkingCopy('lab-data', 'notebooks/counts.ipynb')?.text).toContain('print(3)')
+  })
+
+  it('writes an unsaved edit under the notebook it belongs to', async () => {
+    // The page may already show another notebook when the timer fires.
+    s3.getObjectText.mockRejectedValue({ name: 'NoSuchKey' })
+    const key = ref('notebooks/a.ipynb')
+    const notebook = store(ref('lab-data'), key)
+    await notebook.load()
+    notebook.setSource(notebook.cells.value[0].id, 'print(1)')
+
+    key.value = 'notebooks/b.ipynb'
+    await notebook.load()
+
+    expect(readWorkingCopy('lab-data', 'notebooks/a.ipynb')?.text).toContain('print(1)')
+    expect(readWorkingCopy('lab-data', 'notebooks/b.ipynb')).toBeNull()
+    expect(notebook.cells.value[0].source).toBe('')
   })
 
   it('restores the unsaved copy when it differs from the stored file', async () => {

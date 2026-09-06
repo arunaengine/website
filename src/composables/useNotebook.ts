@@ -2,7 +2,7 @@
 // this browser, and the cell edits the view makes. The session lives next door
 // in useNotebookSession.
 import { computed, onScopeDispose, ref, type Ref } from 'vue'
-import { useS3 } from '@/composables/useS3'
+import { isS3AuthError, useS3 } from '@/composables/useS3'
 import {
   autosaveDue,
   clearWorkingCopy,
@@ -46,6 +46,8 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
   const notebook = ref<Notebook | null>(null)
   const loading = ref(false)
   const loadError = ref<string | null>(null)
+  /** The read was refused, so another group may still open this notebook. */
+  const loadDenied = ref(false)
   const saving = ref(false)
   const saveError = ref<string | null>(null)
   /** When the last edit happened; null once everything is saved. */
@@ -62,26 +64,38 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
 
   // A running cell changes the document on every output line, so the copy in
   // this browser is written on a trailing timer rather than on every change.
+  // The edit carries the notebook it belongs to: when the timer fires, the page
+  // may already show another one.
+  let pending: { bucket: string; key: string; doc: Notebook; changedAt: number } | null = null
   const copy = trailing(() => {
-    const doc = notebook.value
-    if (!doc || changedAt.value === null) return
-    writeWorkingCopy(bucket.value, key.value, serializeNotebook(doc), changedAt.value)
+    if (!pending) return
+    writeWorkingCopy(pending.bucket, pending.key, serializeNotebook(pending.doc), pending.changedAt)
+    pending = null
   }, 1_000)
+  function dropPending() {
+    copy.cancel()
+    pending = null
+  }
   onScopeDispose(() => copy.flush())
 
   // Counted, not timed: two edits in the same millisecond must still differ.
   let changeCount = 0
 
   function markChanged() {
-    if (!notebook.value) return
+    const doc = notebook.value
+    if (!doc) return
     changeCount += 1
     changedAt.value = Date.now()
+    pending = { bucket: bucket.value, key: key.value, doc, changedAt: changedAt.value }
     copy.schedule()
   }
 
   async function load(): Promise<void> {
+    // The notebook shown before this one keeps its own unsaved edit.
+    copy.flush()
     loading.value = true
     loadError.value = null
+    loadDenied.value = false
     restoredCopy.value = false
     try {
       let text: string | null = null
@@ -107,6 +121,7 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
       }
     } catch (error) {
       loadError.value = errorMessage(error)
+      loadDenied.value = isS3AuthError(error)
     } finally {
       loading.value = false
     }
@@ -128,7 +143,7 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
       // An edit made during the save keeps the notebook unsaved.
       if (changeCount === changedBefore) {
         changedAt.value = null
-        copy.cancel()
+        dropPending()
         clearWorkingCopy(bucket.value, key.value)
       }
       return true
@@ -147,7 +162,7 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
   }
 
   function discardCopy(): void {
-    copy.cancel()
+    dropPending()
     clearWorkingCopy(bucket.value, key.value)
     restoredCopy.value = false
     void load()
@@ -181,6 +196,7 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
     if (!doc) return
     doc.cells = doc.cells.filter((cell) => cell.id !== id)
     if (!doc.cells.length) doc.cells.push(newCell('code'))
+    if (activeCellId.value === id) activeCellId.value = ''
     markChanged()
   }
 
@@ -254,6 +270,7 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
     meta,
     loading,
     loadError,
+    loadDenied,
     saving,
     saveError,
     dirty,
