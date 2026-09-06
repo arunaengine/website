@@ -162,6 +162,27 @@ describe('MessageList', () => {
     for (const node of times) expect(String(node.props.title ?? '')).toBe(new Date(at).toLocaleString())
   })
 
+  it('names the model that wrote an answer', async () => {
+    const { root } = await mountApp(MessageList, {
+      props: {
+        messages: [
+          { id: 'm-1', role: 'user', text: 'Hello', calls: [], at: 1_756_000_000_000 },
+          {
+            id: 'm-2',
+            role: 'assistant',
+            text: 'Hi',
+            calls: [],
+            at: 1_756_000_000_000,
+            model: { providerId: 'p-1', providerLabel: 'OpenAI', model: 'gpt-5.6-sol' },
+          },
+        ],
+        working: false,
+      },
+    })
+
+    expect(content(root)).toContain('gpt-5.6-sol via OpenAI')
+  })
+
   it('folds a background update like a tool call, not as a bubble', async () => {
     const text = 'Background update: the job 01JOB (read counts) reached the state succeeded.'
     const { root } = await mountApp(MessageList, {

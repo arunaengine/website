@@ -170,6 +170,9 @@ onUnmounted(() => listening?.removeEventListener('scroll', measure))
               <time v-if="message.at" class="font-normal text-muted-foreground/70" :title="exact(message.at)">
                 {{ ago(message.at) }}
               </time>
+              <span v-if="message.model" class="truncate font-normal text-muted-foreground/70">
+                {{ message.model.model }} via {{ message.model.providerLabel }}
+              </span>
             </p>
             <template v-for="call in shownCards(message)" :key="call.id">
               <TableCard v-if="call.view?.kind === 'table'" v-bind="call.view" />

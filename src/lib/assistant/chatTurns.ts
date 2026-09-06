@@ -222,11 +222,12 @@ export function encodeTurn(turn: ChatTurn, cap = MAX_TURN_BYTES): string {
     () => {
       current = {
         history: [],
-        messages: current.messages.map(({ id, role, at, calls }) => ({
+        messages: current.messages.map(({ id, role, at, calls, model }) => ({
           id,
           role,
           text: '',
           at,
+          ...(model ? { model } : {}),
           calls: calls.map(({ id: callId, name, state, view }) => ({
             id: callId,
             name,

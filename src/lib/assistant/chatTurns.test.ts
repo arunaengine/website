@@ -241,6 +241,15 @@ describe('encodeTurn', () => {
     expect(decoded?.messages[1].calls[0].output).toBe(`${'r'.repeat(4_000)} [cut, 15,372 characters]`)
   })
 
+  it('keeps which model answered through every step', () => {
+    const model = { providerId: 'p-1', providerLabel: 'OpenAI', model: 'gpt-5.6-sol' }
+    const entry = answered('u1', call('c1', 'read_object', big))
+    entry.messages[1].model = model
+
+    expect(decodeTurn(encodeTurn(entry))?.messages[1].model).toEqual(model)
+    expect(decodeTurn(encodeTurn(entry, 600))?.messages[1].model).toEqual(model)
+  })
+
   it('keeps the cards through every trim step', () => {
     const entry = answered('u1', call('c1', 'show_artifact', 'shown', plot), call('c2', 'read_object', big))
 

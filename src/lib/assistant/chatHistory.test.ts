@@ -131,6 +131,27 @@ describe('assistant chat history', () => {
     expect(kept?.kind === 'artifact' && kept.artifact).toMatchObject({ url: '', text: 'hello' })
   })
 
+  it('keeps which model wrote an answer', () => {
+    const store = createAssistantChatStore(scope('user-a'), backing)
+    const chat = newAssistantChat()
+    const model = { providerId: 'p-1', providerLabel: 'OpenAI', model: 'gpt-5.6-sol' }
+    store.save({
+      activeChatId: chat.id,
+      chats: [{
+        ...chat,
+        messages: [
+          { id: 'm1', role: 'user', text: 'Hi', calls: [], at: 5 },
+          { id: 'm2', role: 'assistant', text: 'Hello', calls: [], at: 6, model },
+          { id: 'm3', role: 'assistant', text: 'Again', calls: [], at: 7, model: { providerId: '', model: 'x' } as never },
+        ],
+      }],
+    })
+
+    const restored = store.load().chats[0]?.messages ?? []
+
+    expect(restored.map((message) => message.model)).toEqual([undefined, model, undefined])
+  })
+
   it('keeps the time of a message across a save and load', () => {
     const store = createAssistantChatStore(scope('user-a'), backing)
     const chat = newAssistantChat('Timing', 10)

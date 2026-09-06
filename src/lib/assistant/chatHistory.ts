@@ -158,6 +158,12 @@ export function normalizeMessage(value: unknown, fallback: number): ChatMessage 
   }
   if (value.background === true) message.background = true
   if (typeof value.error === 'string') message.error = value.error.slice(0, MAX_TEXT_LENGTH)
+  if (record(value.model)) {
+    const providerId = boundedString(value.model.providerId, '', 200)
+    const providerLabel = boundedString(value.model.providerLabel, '', 200)
+    const model = boundedString(value.model.model, '', 200)
+    if (providerId && model) message.model = { providerId, providerLabel, model }
+  }
   if (Array.isArray(value.sources)) {
     const sources = value.sources.slice(0, MAX_SOURCES).flatMap((source) => {
       if (!record(source)) return []

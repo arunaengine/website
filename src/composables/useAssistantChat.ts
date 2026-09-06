@@ -897,7 +897,14 @@ async function runChatTurn(chatId: string, prompt: string, context: PromptContex
   setMessagesOf(chatId, [
     ...messagesOf(chatId),
     { id: messageId, role: 'user', text: prompt, calls: [], at: startedAt, ...(resumeText === undefined ? {} : { background: true as const }) },
-    { id: assistantMessageId, role: 'assistant', text: '', calls: [], at: startedAt },
+    {
+      id: assistantMessageId,
+      role: 'assistant',
+      text: '',
+      calls: [],
+      at: startedAt,
+      model: { providerId: selectedProvider.provider_id, providerLabel: selectedProvider.label, model: modelName },
+    },
   ])
   if (resumeText === undefined && chat.title === 'New chat') {
     chat.title = chatTitle(prompt)

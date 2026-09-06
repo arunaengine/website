@@ -145,6 +145,13 @@ export interface ToolCallView {
   view?: RenderView
 }
 
+/** Which model wrote an answer, as the picker named it at the time. */
+export interface MessageModel {
+  providerId: string
+  providerLabel: string
+  model: string
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
@@ -152,6 +159,8 @@ export interface ChatMessage {
   calls: ToolCallView[]
   /** When the message was created, in epoch milliseconds. */
   at: number
+  /** Set on an answer when the turn starts; the chat header shows the current choice. */
+  model?: MessageModel
   /** Set on an update the portal added for a watcher; not the person's words. */
   background?: true
   /** Set when the provider or the loop itself failed, e.g. "429 rate limited". */
