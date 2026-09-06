@@ -48,6 +48,7 @@ const {
   renameChat,
   selectLatestChat,
   ensureProviders,
+  retry,
 } = useAssistantChat()
 
 const sidebarOpen = ref(readStored(SIDEBAR_KEY) === 'open')
@@ -294,6 +295,7 @@ function continueInPanel() {
           :working-label="workingLabel"
           :delete-call-id="deleteCallId"
           @decide="(approved) => pending?.decide(approved)"
+          @retry="retry"
         />
         <div v-else class="flex min-h-0 flex-1 flex-col items-center justify-center gap-5 px-4 text-center">
           <div class="space-y-2">

@@ -22,6 +22,7 @@ const {
   closePanel,
   newChat,
   selectLatestChat,
+  retry,
 } = useAssistantChat()
 
 const deleteCallId = computed(() =>
@@ -70,6 +71,7 @@ function openFullView() {
       :working-label="workingLabel"
       :delete-call-id="deleteCallId"
       @decide="(approved) => pending?.decide(approved)"
+          @retry="retry"
     />
 
     <div class="border-t border-border px-3 py-2">

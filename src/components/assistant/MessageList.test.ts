@@ -46,6 +46,7 @@ const MessageList = compileClientComponent(new URL('./MessageList.vue', import.m
   vue: VueRuntime,
   '@lucide/vue': icons,
   '@/components/assistant/FoldRow.vue': moduleDefault(FoldRow),
+  '@/components/ui/Button.vue': moduleDefault(defineComponent({ setup: (_, { slots, attrs }) => () => h('button', attrs, slots.default?.()) })),
   ...Object.fromEntries(stubs.map((path) => [path, moduleDefault(PassthroughStub)])),
   ...modules,
 })
@@ -260,4 +261,17 @@ describe('MessageList', () => {
     app.unmount()
     expect(node.listeners.get('scroll')?.size).toBe(0)
   })
+})
+
+it('offers a retry on a failed answer', async () => {
+  const seen: string[] = []
+  const messages: ChatMessage[] = [
+    { id: 'u-1', role: 'user', text: 'run it', calls: [], at: 1 },
+    { id: 'a-1', role: 'assistant', text: '', calls: [], at: 2, error: '500: boom' },
+  ]
+  const Host = defineComponent(() => () =>
+    h(MessageList, { messages, working: false, onRetry: (id: string) => seen.push(id) }))
+  const { root } = await mountApp(Host)
+  await click(button(root, 'Retry'))
+  expect(seen).toEqual(['a-1'])
 })

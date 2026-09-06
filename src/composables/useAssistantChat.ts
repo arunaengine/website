@@ -1697,6 +1697,21 @@ export function useAssistantChat() {
     persistCurrentChat()
   }
 
+  /** Runs a failed turn again with the same prompt, in place of the failed answer. */
+  async function retry(messageId: string) {
+    const current = activeChat()
+    if (!current || busy.value || activeTurn || !chatStore || !historyReady.value) return
+    const list = messagesOf(current.id)
+    const index = list.findIndex((entry) => entry.id === messageId)
+    const failed = list[index]
+    const asked = index > 0 ? list[index - 1] : undefined
+    if (!failed?.error || asked?.role !== 'user') return
+    setMessagesOf(current.id, [...list.slice(0, index - 1), ...list.slice(index + 1)])
+    persistChat(current.id)
+    const context = lastContext ?? resumeContext()
+    await runChatTurn(current.id, asked.text, context, asked.background ? asked.text : undefined)
+  }
+
   async function send(text: string, context: PromptContext) {
     const prompt = text.trim()
     syncEpoch()
@@ -1756,6 +1771,7 @@ export function useAssistantChat() {
     deleteChat,
     renameChat,
     send,
+    retry,
     ensureProviders: providers.ensureLoaded,
   }
 }

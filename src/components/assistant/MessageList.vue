@@ -18,6 +18,7 @@ import FoldRow from '@/components/assistant/FoldRow.vue'
 import ToolCallDrawer from '@/components/assistant/ToolCallDrawer.vue'
 import WorkingDots from '@/components/assistant/WorkingDots.vue'
 import Notice from '@/components/ui/Notice.vue'
+import Button from '@/components/ui/Button.vue'
 import type { ChatMessage } from '@/lib/assistant/types'
 import { relativeTime } from '@/lib/utils'
 import { ArrowDown, Radar, Sparkles } from '@lucide/vue'
@@ -34,7 +35,7 @@ const props = withDefaults(defineProps<{
   /** `full` is the page: larger type, wider bubbles, settled tool calls folded. */
   size?: 'compact' | 'full'
 }>(), { workingLabel: 'Working', deleteCallId: undefined, size: 'compact' })
-const emit = defineEmits<{ (e: 'decide', approved: boolean): void }>()
+const emit = defineEmits<{ (e: 'decide', approved: boolean): void; (e: 'retry', messageId: string): void }>()
 
 const scroller = ref<HTMLElement | null>(null)
 const atEnd = ref(true)
@@ -206,7 +207,18 @@ onUnmounted(() => listening?.removeEventListener('scroll', measure))
               :size="props.size"
               :has-card="shownCards(message).length > 0"
             />
-            <Notice v-if="message.error" tone="error">{{ message.error }}</Notice>
+            <div v-if="message.error" class="flex items-start gap-2">
+              <Notice tone="error" class="min-w-0 flex-1">{{ message.error }}</Notice>
+              <Button
+                v-if="message.role === 'assistant' && !props.working"
+                variant="outline"
+                size="sm"
+                class="shrink-0"
+                @click="emit('retry', message.id)"
+              >
+                Retry
+              </Button>
+            </div>
             <WorkingDots v-if="message.id === writing" :label="workingLabel" />
           </div>
         </div>

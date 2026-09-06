@@ -388,3 +388,24 @@ describe('watches shared between tabs', () => {
     expect(polls('13JOB')).toBeGreaterThan(0)
   })
 })
+
+describe('retrying a failed turn', () => {
+  it('runs the same prompt again in place of the failed answer', async () => {
+    const chat = useAssistantChat()
+    chat.selectChat('c-a')
+    chat.newChat()
+    turns.onTurn = () => {
+      throw new Error('500: boom')
+    }
+    await chat.send('count the reads', { route: '/compute' })
+    turns.onTurn = null
+    const failed = chat.messages.value.find((message) => message.role === 'assistant')
+    expect(failed?.error).toContain('500')
+    const before = turns.calls.length
+    await chat.retry(failed!.id)
+    expect(turns.calls.length).toBe(before + 1)
+    expect(chat.messages.value.filter((message) => message.error)).toHaveLength(0)
+    expect(chat.messages.value.map((message) => message.role)).toEqual(['user', 'assistant'])
+    expect(chat.messages.value[0]?.text).toBe('count the reads')
+  })
+})
