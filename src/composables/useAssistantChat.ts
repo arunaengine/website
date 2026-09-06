@@ -78,7 +78,14 @@ import {
 } from '@/lib/assistant/watchers'
 import { until } from '@vueuse/core'
 import { errorMessage } from '@/lib/utils'
-import { assistantAvailable as available, assistantOpen as open, assistantPageOpen, assistantUnread } from './assistantState'
+import {
+  assistantAvailable as available,
+  assistantOpen as open,
+  assistantPageOpen,
+  assistantRemovedProvider,
+  assistantUnread,
+  assistantWarning,
+} from './assistantState'
 
 const PROVIDER_KEY = 'aruna.assistant.provider'
 const MODEL_KEY = 'aruna.assistant.model'
@@ -1431,9 +1438,50 @@ watch(
 // a watcher's resume can run a turn without the panel being mounted.
 const providers = useAssistantProviders()
 const ready = computed(() => providers.ready.value)
+// A change on a chat with history waits here until it is confirmed, and a
+// removed provider leaves the selection empty until one is picked.
+const switching = ref<{ providerId: string; modelId: string } | null>(null)
+const removed = ref<{ id: string; label: string } | null>(null)
 const provider = computed<AssistantProvider | null>(() =>
-  ready.value.find((entry) => entry.provider_id === providerId.value) ?? ready.value[0] ?? null)
+  ready.value.find((entry) => entry.provider_id === providerId.value) ?? (removed.value ? null : ready.value[0] ?? null))
 const model = computed(() => (provider.value ? providerModelId(provider.value, modelId.value) : ''))
+
+/** What the pending change would do, for the notice above the composer. */
+const switchNotice = computed(() => {
+  const next = switching.value
+  if (!next) return null
+  const target = (next.providerId ? ready.value.find((entry) => entry.provider_id === next.providerId) : null) ?? provider.value
+  if (!target) return null
+  return {
+    providerId: target.provider_id,
+    providerLabel: target.label,
+    model: providerModelId(target, next.modelId),
+    messages: messages.value.length,
+    kiloChars: Math.max(1, Math.round(JSON.stringify(history).length / 1000)),
+  }
+})
+
+watch(assistantRemovedProvider, (gone) => {
+  if (!gone || (provider.value?.provider_id !== gone.id && providerId.value !== gone.id)) return
+  providerId.value = ''
+  modelId.value = ''
+  storeValue(PROVIDER_KEY, '')
+  storeValue(MODEL_KEY, '')
+  switching.value = null
+  removed.value = gone
+}, { flush: 'sync' })
+
+const warning = computed(() => {
+  if (removed.value) return `The provider ${removed.value.label} was removed. Pick a provider to continue.`
+  if (providers.providers.value.length && !ready.value.length) return 'No provider is ready.'
+  return ''
+})
+watch(warning, (value) => {
+  assistantWarning.value = value
+}, { immediate: true, flush: 'sync' })
+watch(activeChatId, () => {
+  switching.value = null
+})
 // What the provider offers now, ahead of the ids stored when it was added.
 const modelChoices = computed(() => (provider.value
   ? modelSuggestions(provider.value, providers.listedModels.value[provider.value.provider_id] ?? [])
@@ -1479,28 +1527,61 @@ export function useAssistantChat() {
     if (provider.value) void providers.listModels(provider.value.provider_id)
   }
 
+  function applySelection(nextProvider: string, nextModel: string) {
+    providerId.value = nextProvider
+    modelId.value = nextModel
+    storeValue(PROVIDER_KEY, nextProvider)
+    storeValue(MODEL_KEY, nextModel)
+    removed.value = null
+    switching.value = null
+  }
+
+  // A row for the reader alone, saying which model answers from here on.
+  function noteModelChange() {
+    const current = activeChat()
+    if (!current || !model.value) return
+    setMessagesOf(current.id, [
+      ...messagesOf(current.id),
+      { id: nextId(), role: 'user', text: `Model changed to ${model.value}`, calls: [], at: Date.now(), marker: true },
+    ])
+    persistChat(current.id)
+  }
+
+  // A change on a chat with history is confirmed first, because the new model
+  // reads the whole chat again; after a removal there is nothing to keep.
   function selectProvider(id: string) {
     syncEpoch()
-    if (providerId.value === id) return
-    discardTurn(abortTurn())
-    persistCurrentChat()
-    startFreshChat()
-    providerId.value = id
-    storeValue(PROVIDER_KEY, id)
-    modelId.value = ''
-    storeValue(MODEL_KEY, '')
+    if (providerId.value === id && !removed.value) return
+    const asked = messages.value.length > 0
+    if (asked && !removed.value) {
+      switching.value = { providerId: id, modelId: '' }
+      return
+    }
+    applySelection(id, '')
+    if (asked) noteModelChange()
   }
 
   // Any id goes: a fine-tune or a model newer than the fetched list.
   function selectModel(id: string) {
     syncEpoch()
     const next = id.trim()
-    if (modelId.value === next) return
-    discardTurn(abortTurn())
-    persistCurrentChat()
-    startFreshChat()
-    modelId.value = next
-    storeValue(MODEL_KEY, modelId.value)
+    if (!next || next === model.value) return
+    if (messages.value.length) {
+      switching.value = { providerId: providerId.value, modelId: next }
+      return
+    }
+    applySelection(providerId.value, next)
+  }
+
+  function confirmSwitch() {
+    const next = switching.value
+    if (!next) return
+    applySelection(next.providerId, next.modelId)
+    noteModelChange()
+  }
+
+  function keepCurrent() {
+    switching.value = null
   }
 
   function setApproveWrites(value: boolean) {
@@ -1657,6 +1738,10 @@ export function useAssistantChat() {
     effortOptions,
     selectProvider,
     selectModel,
+    switchNotice,
+    confirmSwitch,
+    keepCurrent,
+    removed,
     setApproveWrites,
     setWebSearch,
     setReasoningEffort,

@@ -183,6 +183,23 @@ describe('MessageList', () => {
     expect(content(root)).toContain('gpt-5.6-sol via OpenAI')
   })
 
+  it('shows a model change as a small centred row, not a bubble', async () => {
+    const { root } = await mountApp(MessageList, {
+      props: {
+        messages: [
+          { id: 'm-1', role: 'user', text: 'Hello', calls: [], at: 1_756_000_000_000 },
+          { id: 'm-2', role: 'user', text: 'Model changed to gpt-5.5', calls: [], at: 1_756_000_000_000, marker: true },
+        ],
+        working: false,
+      },
+    })
+    const bubbles = nodes(root).filter((node) => String(node.props.class ?? '').includes('rounded-br-sm'))
+    const row = element(root, (node) => node.tag === 'span' && content(node).trim() === 'Model changed to gpt-5.5')
+
+    expect(bubbles).toHaveLength(1)
+    expect(String(row.props.class)).toContain('rounded-full')
+  })
+
   it('folds a background update like a tool call, not as a bubble', async () => {
     const text = 'Background update: the job 01JOB (read counts) reached the state succeeded.'
     const { root } = await mountApp(MessageList, {

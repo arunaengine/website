@@ -47,6 +47,10 @@ const {
   historyReady,
   loadModels,
   send,
+  removed,
+  switchNotice,
+  confirmSwitch,
+  keepCurrent,
 } = useAssistantChat()
 const { state: vaultState } = useUserVault()
 
@@ -155,6 +159,23 @@ function onKeydown(event: KeyboardEvent) {
     <Notice v-if="keysLocked" tone="warning" class="flex items-center justify-between gap-3">
       <span>Your provider keys are locked.</span>
       <Button variant="outline" size="sm" @click="unlockOpen = true">Unlock</Button>
+    </Notice>
+    <Notice v-if="removed" tone="warning" class="flex items-center justify-between gap-3">
+      <span>The provider {{ removed.label }} was removed. Pick a provider to continue.</span>
+      <AssistantSettings>
+        <Button variant="outline" size="sm" @click="loadModels">Pick a provider</Button>
+      </AssistantSettings>
+    </Notice>
+    <Notice v-if="switchNotice" tone="info" class="flex flex-wrap items-center justify-between gap-3">
+      <span>
+        Switching to {{ switchNotice.model }}: the new model reads the whole chat again
+        ({{ switchNotice.messages }} {{ switchNotice.messages === 1 ? 'message' : 'messages' }},
+        about {{ switchNotice.kiloChars }} thousand characters)
+      </span>
+      <span class="flex shrink-0 gap-2">
+        <Button size="sm" @click="confirmSwitch">Switch</Button>
+        <Button variant="outline" size="sm" @click="keepCurrent">Keep current</Button>
+      </span>
     </Notice>
     <div class="rounded-2xl border border-border bg-card shadow-sm focus-within:border-ring">
       <Textarea

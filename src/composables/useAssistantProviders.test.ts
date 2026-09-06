@@ -10,6 +10,7 @@ vi.mock('@/lib/api', async (importOriginal) => ({
 }))
 
 const { useAssistantProviders } = await import('./useAssistantProviders')
+const { assistantRemovedProvider } = await import('./assistantState')
 
 const openai = {
   id: 'browser-1',
@@ -90,5 +91,25 @@ describe('assistant model listing', () => {
 
     expect(await providers.listModels('chatgpt-2')).toEqual([])
     expect(providers.modelErrors.value['chatgpt-2']).toContain('HTTP 401')
+  })
+})
+
+
+describe('removing a provider', () => {
+  it('announces the provider before the list changes', async () => {
+    const providers = useAssistantProviders()
+    await providers.create({ ...openai, id: 'browser-gone', label: 'Gone' })
+    const seen: Array<{ id: string; label: string } | null> = []
+    const stop = (await import('vue')).watch(assistantRemovedProvider, (gone) => {
+      seen.push(gone)
+      // The chat looks the provider up while it is still listed.
+      expect(providers.providers.value.some((entry) => entry.provider_id === 'browser-gone')).toBe(true)
+    }, { flush: 'sync' })
+
+    await providers.remove('browser-gone')
+    stop()
+
+    expect(seen).toEqual([{ id: 'browser-gone', label: 'Gone' }])
+    expect(providers.providers.value.some((entry) => entry.provider_id === 'browser-gone')).toBe(false)
   })
 })

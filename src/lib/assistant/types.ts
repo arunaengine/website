@@ -163,6 +163,8 @@ export interface ChatMessage {
   model?: MessageModel
   /** Set on an update the portal added for a watcher; not the person's words. */
   background?: true
+  /** Set on a row the portal wrote for the reader only, such as a model change; never sent to the model. */
+  marker?: true
   /** Set when the provider or the loop itself failed, e.g. "429 rate limited". */
   error?: string
   /** The web pages a search-backed answer drew on, with their titles. */

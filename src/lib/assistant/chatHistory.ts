@@ -157,6 +157,7 @@ export function normalizeMessage(value: unknown, fallback: number): ChatMessage 
     at: numberValue(value.at, fallback),
   }
   if (value.background === true) message.background = true
+  if (value.marker === true) message.marker = true
   if (typeof value.error === 'string') message.error = value.error.slice(0, MAX_TEXT_LENGTH)
   if (record(value.model)) {
     const providerId = boundedString(value.model.providerId, '', 200)

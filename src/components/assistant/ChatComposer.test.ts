@@ -14,6 +14,8 @@ import type { AssistantProvider } from '@/lib/api'
 
 const loadModels = vi.fn()
 const send = vi.fn()
+const confirmSwitch = vi.fn()
+const keepCurrent = vi.fn()
 
 const openai: AssistantProvider = {
   provider_id: 'browser-1',
@@ -48,6 +50,10 @@ const chat = {
   historyReady: ref(true),
   loadModels,
   send,
+  removed: ref<{ id: string; label: string } | null>(null),
+  switchNotice: ref<{ providerId: string; providerLabel: string; model: string; messages: number; kiloChars: number } | null>(null),
+  confirmSwitch,
+  keepCurrent,
 }
 
 const ButtonStub = defineComponent({
@@ -111,6 +117,10 @@ beforeEach(() => {
   chat.busy.value = false
   chat.provider.value = openai
   chat.providerId.value = 'browser-1'
+  chat.removed.value = null
+  chat.switchNotice.value = null
+  confirmSwitch.mockClear()
+  keepCurrent.mockClear()
   vaultState.value = 'absent'
   aruna.currentUser.value = null
   aruna.profiles.value = []
@@ -199,6 +209,30 @@ describe('ChatComposer', () => {
     const { root } = await mountApp(ChatComposer)
 
     expect(content(root)).toContain('Your provider keys are locked.')
+  })
+
+  it('asks before a model change and offers to keep the current one', async () => {
+    chat.switchNotice.value = { providerId: 'browser-1', providerLabel: 'OpenAI', model: 'gpt-5.5', messages: 4, kiloChars: 12 }
+    const { root } = await mountApp(ChatComposer)
+
+    expect(content(root)).toContain('Switching to gpt-5.5: the new model reads the whole chat again (4 messages, about 12 thousand characters)')
+    await click(element(root, (node) => node.tag === 'button' && content(node).trim() === 'Switch'))
+    await click(element(root, (node) => node.tag === 'button' && content(node).trim() === 'Keep current'))
+
+    expect(confirmSwitch).toHaveBeenCalledOnce()
+    expect(keepCurrent).toHaveBeenCalledOnce()
+  })
+
+  it('says which provider was removed and offers the picker', async () => {
+    chat.provider.value = null
+    chat.providerId.value = ''
+    chat.removed.value = { id: 'browser-1', label: 'OpenAI' }
+    const { root } = await mountApp(ChatComposer)
+
+    expect(content(root)).toContain('The provider OpenAI was removed. Pick a provider to continue.')
+    await click(element(root, (node) => node.tag === 'button' && content(node).trim() === 'Pick a provider'))
+    expect(loadModels).toHaveBeenCalled()
+    expect(control(root, 'Send').props.disabled).toBe(true)
   })
 
   it('explains the tool state and the send keys on the page', async () => {

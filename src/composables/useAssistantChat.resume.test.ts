@@ -19,6 +19,7 @@ const provider: AssistantProvider = {
 vi.mock('./useAssistantProviders', () => ({
   useAssistantProviders: () => ({
     ready: ref([provider]),
+    providers: ref([provider]),
     listedModels: ref({}),
     modelErrors: ref({}),
     direct: () => undefined,

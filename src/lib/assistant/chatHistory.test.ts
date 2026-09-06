@@ -143,13 +143,15 @@ describe('assistant chat history', () => {
           { id: 'm1', role: 'user', text: 'Hi', calls: [], at: 5 },
           { id: 'm2', role: 'assistant', text: 'Hello', calls: [], at: 6, model },
           { id: 'm3', role: 'assistant', text: 'Again', calls: [], at: 7, model: { providerId: '', model: 'x' } as never },
+          { id: 'm4', role: 'user', text: 'Model changed to x', calls: [], at: 8, marker: true },
         ],
       }],
     })
 
     const restored = store.load().chats[0]?.messages ?? []
 
-    expect(restored.map((message) => message.model)).toEqual([undefined, model, undefined])
+    expect(restored.map((message) => message.model)).toEqual([undefined, model, undefined, undefined])
+    expect(restored.map((message) => message.marker)).toEqual([undefined, undefined, undefined, true])
   })
 
   it('keeps the time of a message across a save and load', () => {

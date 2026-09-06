@@ -22,6 +22,7 @@ vi.mock('./useAssistantProviders', async () => {
   return {
     useAssistantProviders: () => ({
       ready,
+      providers: ready,
       listedModels: ref({}),
       modelErrors: ref({}),
       direct: (id: string) => (state.provider?.id === id ? state.provider : null),
@@ -67,6 +68,7 @@ vi.stubGlobal('window', {
 })
 
 const { apiBaseUrl, authToken, userInfo } = await import('./aruna/state')
+const { assistantRemovedProvider, assistantWarning } = await import('./assistantState')
 const { useAssistantChat } = await import('./useAssistantChat')
 
 function compatible(models: AssistantModel[], webSearch?: 'on' | 'off'): void {
@@ -164,5 +166,74 @@ describe('a turn against a compatible Responses provider', () => {
     expect(state.calls[0].model).toEqual({ id: 'gpt-5.6-sol' })
     expect(stored.get('aruna.assistant.model')).toBe('gpt-5.6-sol')
     expect(chat.messages.value.at(-1)?.model).toEqual({ providerId: 'p-lite', providerLabel: 'LiteLLM', model: 'gpt-5.6-sol' })
+  })
+})
+
+describe('changing the model or provider', () => {
+  it('asks first on a chat with history, then marks the change in the transcript', async () => {
+    compatible([{ id: 'jlu/qwen3.8-27b', web_search: false }, { id: 'gpt-5.6-sol', web_search: false }])
+    const chat = useAssistantChat()
+    chat.newChat()
+    chat.selectModel('jlu/qwen3.8-27b')
+    await chat.send('hello', { route: '/' })
+
+    chat.selectModel('gpt-5.6-sol')
+
+    expect(chat.model.value).toBe('jlu/qwen3.8-27b')
+    expect(chat.switchNotice.value).toMatchObject({ model: 'gpt-5.6-sol', providerLabel: 'LiteLLM', messages: 2, kiloChars: 1 })
+
+    chat.confirmSwitch()
+
+    expect(chat.model.value).toBe('gpt-5.6-sol')
+    expect(chat.switchNotice.value).toBeNull()
+    expect(stored.get('aruna.assistant.model')).toBe('gpt-5.6-sol')
+    const marker = chat.messages.value.at(-1)
+    expect(marker).toMatchObject({ role: 'user', marker: true, text: 'Model changed to gpt-5.6-sol' })
+    expect(chat.chats.value.find((entry) => entry.id === chat.activeChatId.value)?.messages.at(-1)?.marker).toBe(true)
+
+    await chat.send('again', { route: '/' })
+    expect(state.built.at(-1)).toBe('gpt-5.6-sol')
+  })
+
+  it('keeps the current model when the change is declined', async () => {
+    compatible([{ id: 'jlu/qwen3.8-27b', web_search: false }, { id: 'gpt-5.6-sol', web_search: false }])
+    const chat = useAssistantChat()
+    chat.newChat()
+    chat.selectModel('jlu/qwen3.8-27b')
+    await chat.send('hello', { route: '/' })
+
+    chat.selectModel('gpt-5.6-sol')
+    chat.keepCurrent()
+
+    expect(chat.switchNotice.value).toBeNull()
+    expect(chat.model.value).toBe('jlu/qwen3.8-27b')
+    expect(chat.messages.value.some((message) => message.marker)).toBe(false)
+  })
+
+  it('leaves the selection empty when the chosen provider is removed', async () => {
+    compatible([{ id: 'jlu/qwen3.8-27b', web_search: false }])
+    const chat = useAssistantChat()
+    chat.newChat()
+    chat.selectProvider('p-lite')
+    expect(stored.get('aruna.assistant.provider')).toBe('p-lite')
+
+    // The removal is announced while the provider is still listed, then the list changes.
+    assistantRemovedProvider.value = { id: 'p-lite', label: 'LiteLLM' }
+    if (state.ready) state.ready.value = []
+
+    expect(chat.provider.value).toBeNull()
+    expect(chat.removed.value).toEqual({ id: 'p-lite', label: 'LiteLLM' })
+    expect(stored.get('aruna.assistant.provider')).toBeFalsy()
+    expect(stored.get('aruna.assistant.model')).toBeFalsy()
+    expect(assistantWarning.value).toBe('The provider LiteLLM was removed. Pick a provider to continue.')
+
+    compatible([{ id: 'gpt-5.6-sol', web_search: false }])
+    expect(chat.provider.value).toBeNull()
+
+    chat.selectProvider('p-lite')
+
+    expect(chat.removed.value).toBeNull()
+    expect(chat.provider.value?.provider_id).toBe('p-lite')
+    expect(assistantWarning.value).toBe('')
   })
 })

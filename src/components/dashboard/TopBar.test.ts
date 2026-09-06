@@ -14,6 +14,7 @@ const nodeState = ref('running')
 const watchNode = vi.fn()
 const stopNode = vi.fn()
 const assistantAvailable = ref(false)
+const assistantWarning = ref('')
 const openAssistant = vi.fn()
 const ensureProviders = vi.fn()
 
@@ -76,7 +77,7 @@ const TopBar = compileClientComponent(new URL('./TopBar.vue', import.meta.url), 
       ensureProviders,
     }),
   },
-  '@/composables/assistantState': { assistantAvailable },
+  '@/composables/assistantState': { assistantAvailable, assistantUnread: ref(0), assistantWarning },
   '@/lib/utils': Utils,
 })
 
@@ -86,6 +87,7 @@ beforeEach(() => {
   watchNode.mockClear()
   currentUser.value = { id: 'u1', name: 'Test User', email: 'me@example.org' }
   assistantAvailable.value = false
+  assistantWarning.value = ''
   openAssistant.mockClear()
 })
 
@@ -128,6 +130,19 @@ describe('portal chrome', () => {
     const mounted = await mountApp(TopBar)
     await click(launcher(mounted.root))
 
+    expect(openAssistant).toHaveBeenCalledOnce()
+    mounted.app.unmount()
+  })
+
+  it('shows the assistant with a warning when no provider can answer', async () => {
+    assistantWarning.value = 'No provider is ready.'
+    const mounted = await mountApp(TopBar)
+    const launcher = element(mounted.root, (node) => String(node.props['aria-label'] ?? '').startsWith('Open the assistant'))
+    const dot = element(mounted.root, (node) => node.props['aria-label'] === 'No provider is ready.')
+
+    expect(launcher.props.title).toBe('No provider is ready.')
+    expect(dot).toBeTruthy()
+    await click(launcher)
     expect(openAssistant).toHaveBeenCalledOnce()
     mounted.app.unmount()
   })

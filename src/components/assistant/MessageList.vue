@@ -153,6 +153,12 @@ onUnmounted(() => listening?.removeEventListener('scroll', measure))
               class="whitespace-pre-wrap break-words rounded-md border border-border bg-muted/10 px-2.5 py-1.5 text-[11px] text-muted-foreground"
             >{{ message.text }}</p>
           </div>
+          <!-- A row the portal wrote for the reader, such as a model change. -->
+          <div v-else-if="message.marker" class="flex justify-center">
+            <span class="rounded-full border border-border bg-muted/30 px-2.5 py-0.5 text-[10px] text-muted-foreground">
+              {{ message.text }}
+            </span>
+          </div>
           <div v-else-if="message.role === 'user'" class="flex flex-col items-end gap-0.5">
             <div
               class="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-sm bg-primary/10 px-3.5 py-2 leading-relaxed text-foreground"

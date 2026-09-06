@@ -18,7 +18,7 @@ import {
 } from '@/lib/assistant/browserProviders'
 import { errorMessage } from '@/lib/utils'
 import { apiBaseUrl, authToken, sessionEpoch, userInfo } from './aruna/state'
-import { assistantAvailable } from './assistantState'
+import { assistantAvailable, assistantRemovedProvider } from './assistantState'
 import { useUserVault } from './useUserVault'
 
 /** Where a browser provider's key is kept. */
@@ -234,14 +234,23 @@ export function useAssistantProviders() {
     await update(providerId, { ...current, models })
   }
 
+  // The chat hears about a removal before the list changes, so a selection
+  // that named the provider is dropped instead of falling back to the next.
+  function announceRemoval(providerId: string) {
+    const gone = providers.value.find((provider) => provider.provider_id === providerId)
+    if (gone) assistantRemovedProvider.value = { id: gone.provider_id, label: gone.label }
+  }
+
   async function remove(providerId: string): Promise<void> {
     const storage = storageOf(providerId)
     if (storage === 'session') {
+      announceRemoval(providerId)
       browserStore.remove(providerId)
       rebuild()
       return
     }
     if (storage === 'node') {
+      announceRemoval(providerId)
       await vault.saveProviders(vault.providers.value.filter((entry) => entry.id !== providerId))
       rebuild()
       return
@@ -249,6 +258,7 @@ export function useAssistantProviders() {
     const nodeProvider = nodeProviders.value.find((provider) => provider.provider_id === providerId)
     if (!nodeProvider) return
     await deleteAssistantProvider(providerId, client())
+    announceRemoval(providerId)
     nodeProviders.value = nodeProviders.value.filter((provider) => provider.provider_id !== providerId)
     rebuild()
   }

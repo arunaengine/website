@@ -28,10 +28,15 @@ const {
   effortOptions,
   selectProvider,
   selectModel,
+  switchNotice,
   setApproveWrites,
   setWebSearch,
   setReasoningEffort,
 } = useAssistantChat()
+
+// While a change waits for its confirmation, the fields show what was picked.
+const shownProvider = computed(() => switchNotice.value?.providerId ?? provider.value?.provider_id ?? '')
+const shownModel = computed(() => switchNotice.value?.model ?? model.value)
 
 const providerOptions = computed(() =>
   providers.value.map((entry) => ({ value: entry.provider_id, label: entry.label })))
@@ -58,12 +63,12 @@ const writeChoices = [
       <div class="space-y-3">
         <div>
           <p class="text-xs font-medium text-foreground">Provider</p>
-          <p v-if="providers.length < 2" class="mt-1 truncate text-xs text-muted-foreground">
+          <p v-if="providers.length < 2 && provider" class="mt-1 truncate text-xs text-muted-foreground">
             {{ provider?.label ?? 'No provider is ready' }}
           </p>
           <Select
             v-else
-            :model-value="provider?.provider_id ?? ''"
+            :model-value="shownProvider"
             :options="providerOptions"
             class="mt-1 h-8 text-xs"
             aria-label="Provider"
@@ -73,7 +78,7 @@ const writeChoices = [
         <div>
           <p class="text-xs font-medium text-foreground">Model</p>
           <ModelCombobox
-            :model-value="model"
+            :model-value="shownModel"
             :suggestions="modelChoices"
             class="mt-1 h-8"
             aria-label="Model"
@@ -81,7 +86,7 @@ const writeChoices = [
             @update:model-value="selectModel"
           />
           <p class="mt-1 text-[11px] text-muted-foreground">
-            Pick an id, or type one and press Enter. Changing the model starts a new chat.
+            Pick an id, or type one and press Enter. A change applies to the next turn; a chat with history asks first.
           </p>
           <p v-if="modelsError" class="mt-1 text-[11px] text-muted-foreground">{{ modelsError }}</p>
         </div>

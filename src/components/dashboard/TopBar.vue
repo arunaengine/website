@@ -20,7 +20,7 @@ import { useTheme } from '@/composables/useTheme'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
-import { assistantAvailable, assistantUnread } from '@/composables/assistantState'
+import { assistantAvailable, assistantUnread, assistantWarning } from '@/composables/assistantState'
 import { statusTone } from '@/components/nodes/node-display'
 
 // 'desktop' is the Aruna Desktop chrome: no realm switcher and no dataset
@@ -98,20 +98,28 @@ async function handleSignOut() {
 
       <SearchOverlay />
 
-      <!-- Only offered once a provider is configured and ready. -->
+      <!-- Offered once a provider is configured; a warning dot says none can answer. -->
       <Button
-        v-if="assistantAvailable"
+        v-if="assistantAvailable || assistantWarning"
         data-tour="top-assistant"
         variant="ghost"
         size="icon"
         class="relative shrink-0"
-        :aria-label="assistantUnread ? `Open the assistant, ${assistantUnread} background ${assistantUnread === 1 ? 'update' : 'updates'}` : 'Open the assistant'"
-        title="Assistant"
+        :aria-label="assistantWarning
+          ? `Open the assistant. ${assistantWarning}`
+          : assistantUnread ? `Open the assistant, ${assistantUnread} background ${assistantUnread === 1 ? 'update' : 'updates'}` : 'Open the assistant'"
+        :title="assistantWarning || 'Assistant'"
         @click="openAssistant"
       >
         <MessageSquare class="h-4 w-4" />
+        <StatusDot
+          v-if="assistantWarning"
+          tone="attention"
+          :label="assistantWarning"
+          class="absolute right-1.5 top-1.5 size-2 ring-2 ring-background"
+        />
         <span
-          v-if="assistantUnread"
+          v-else-if="assistantUnread"
           class="absolute right-1.5 top-1.5 size-2 rounded-full bg-primary ring-2 ring-background"
         />
       </Button>

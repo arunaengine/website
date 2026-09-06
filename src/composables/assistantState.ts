@@ -8,3 +8,8 @@ export const assistantAvailable = ref(false)
 export const assistantPageOpen = ref(false)
 // Background updates waiting in chats the user has not opened since.
 export const assistantUnread = ref(0)
+// Why the assistant cannot answer right now, shown by the top bar; empty when it can.
+export const assistantWarning = ref('')
+// The provider being removed, announced before the list changes so the chat
+// can drop a selection that named it.
+export const assistantRemovedProvider = ref<{ id: string; label: string } | null>(null)

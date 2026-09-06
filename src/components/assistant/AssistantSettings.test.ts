@@ -43,6 +43,7 @@ const chat = {
   effortOptions: ref<string[]>(['minimal', 'low', 'medium', 'high']),
   selectProvider,
   selectModel,
+  switchNotice: ref(null),
   setApproveWrites,
   setWebSearch,
   setReasoningEffort,
