@@ -217,25 +217,27 @@ describe('openSessionStream', () => {
   })
 
   it('stops for good once it is closed', async () => {
-    const opened = deferred()
-    const fetchImpl = vi.fn(async () => {
-      opened.settle()
-      return streamResponse([], true)
-    }) as unknown as typeof fetch
-    const stream = openSessionStream({
-      jobId: '01JOB',
-      client,
-      onEvent: () => {},
-      fetchImpl,
-      retryDelayMs: () => 0,
-    })
-    await opened.promise
-    stream.close()
-    const calls = () => (fetchImpl as unknown as { mock: { calls: unknown[] } }).mock.calls.length
-    const before = calls()
-    // Give the loop every chance to reconnect; a closed stream never does.
-    for (let step = 0; step < 50; step += 1) await Promise.resolve()
-    expect(calls()).toBe(before)
+    vi.useFakeTimers()
+    try {
+      // A connection that ends at once makes the loop want to reconnect.
+      const fetchImpl = vi.fn(async () => streamResponse([], false))
+      const stream = openSessionStream({
+        jobId: '01JOB',
+        client,
+        onEvent: () => {},
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+        retryDelayMs: () => 1_000,
+      })
+      await vi.advanceTimersByTimeAsync(1)
+      const before = fetchImpl.mock.calls.length
+      expect(before).toBe(1)
+
+      stream.close()
+      await vi.runAllTimersAsync()
+      expect(fetchImpl.mock.calls.length).toBe(before)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 
