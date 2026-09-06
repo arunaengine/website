@@ -7,15 +7,18 @@ import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import JobCard from '@/components/assistant/cards/JobCard.vue'
+import TesDataRefDialog from '@/components/compute/TesDataRefDialog.vue'
 import { injectNotebook } from '@/composables/notebookContext'
 import { useAruna } from '@/composables/useAruna'
 import { submitErrorMessage, submitJob } from '@/lib/jobs'
 import {
+  defaultInputPath,
   defaultOutputKey,
   pipelineDraftFrom,
   pipelineRequest,
   pipelineSource,
 } from '@/lib/notebook/pipeline'
+import { parseS3Url, type TesDataRefEntry } from '@/lib/tes'
 import type { NotebookCell } from '@/lib/notebook/nbformat'
 import type { JobView } from '@/lib/assistant/types'
 import { Plus, Send, X } from '@lucide/vue'
@@ -57,6 +60,31 @@ const jobView = computed<JobView>(() => ({
   jobKind: 'execution',
   outputs: [],
 }))
+
+const inputsOpen = ref(false)
+
+/** A picked object, or every file of a picked folder, becomes an input row. */
+function addInput(entry: TesDataRefEntry) {
+  if (entry.kind === 'file') {
+    const parsed = parseS3Url(entry.url)
+    if (!parsed) return
+    draft.value.inputs.push({
+      bucket: parsed.bucket,
+      key: parsed.key,
+      path: defaultInputPath(entry.name),
+      name: entry.name,
+    })
+    return
+  }
+  for (const file of entry.files) {
+    draft.value.inputs.push({
+      bucket: entry.bucket,
+      key: file.key,
+      path: defaultInputPath(`${entry.name}/${file.name}`),
+      name: file.name,
+    })
+  }
+}
 
 function addOutput() {
   draft.value.outputs.push({ path: '/work/out/result.txt', key: defaultOutputKey('result.txt') })
@@ -108,6 +136,25 @@ async function submit() {
 
     <div class="space-y-2">
       <div class="flex items-center gap-2">
+        <span class="text-xs font-medium text-foreground">Files to read</span>
+        <Button variant="outline" size="sm" @click="inputsOpen = true"><Plus class="size-3.5" /> Add</Button>
+      </div>
+      <p v-if="!draft.inputs.length" class="text-[11px] text-muted-foreground">
+        No files staged. A picked object is read into the container at the path beside it.
+      </p>
+      <div v-for="(row, index) in draft.inputs" :key="`${row.bucket}/${row.key}/${index}`" class="flex items-center gap-2">
+        <span class="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground" :title="`s3://${row.bucket}/${row.key}`">
+          {{ row.key }}
+        </span>
+        <Input v-model="row.path" class="font-mono text-xs" aria-label="Path in the container" />
+        <Button variant="ghost" size="icon-sm" aria-label="Remove this file" @click="draft.inputs.splice(index, 1)">
+          <X class="size-3" />
+        </Button>
+      </div>
+    </div>
+
+    <div class="space-y-2">
+      <div class="flex items-center gap-2">
         <span class="text-xs font-medium text-foreground">Files to keep</span>
         <Button variant="outline" size="sm" @click="addOutput"><Plus class="size-3.5" /> Add</Button>
       </div>
@@ -134,5 +181,7 @@ async function submit() {
     </div>
 
     <JobCard v-if="jobId" :view="jobView" />
+
+    <TesDataRefDialog v-model:open="inputsOpen" mode="input" @add="addInput" />
   </div>
 </template>

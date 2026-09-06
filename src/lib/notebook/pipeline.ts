@@ -15,12 +15,21 @@ export interface PipelineOutputRow {
   key: string
 }
 
+/** One stored file the step reads, mounted at a path in the container. */
+export interface PipelineInputRow {
+  bucket: string
+  key: string
+  path: string
+  name: string
+}
+
 export interface PipelineDraft {
   name: string
   image: string
   command: string
   cpuCores: string
   ramGb: string
+  inputs: PipelineInputRow[]
   outputs: PipelineOutputRow[]
 }
 
@@ -31,12 +40,17 @@ export interface PipelineContext {
 }
 
 export function emptyPipelineDraft(): PipelineDraft {
-  return { name: '', image: '', command: '', cpuCores: '1', ramGb: '2', outputs: [] }
+  return { name: '', image: '', command: '', cpuCores: '1', ramGb: '2', inputs: [], outputs: [] }
 }
 
 export function defaultOutputKey(path: string): string {
   const file = path.split('/').filter(Boolean).pop() ?? 'result'
   return `${NOTEBOOK_DATA_PREFIX}${file}`
+}
+
+/** Where a picked object is mounted inside the container. */
+export function defaultInputPath(name: string): string {
+  return `/work/in/${name}`
 }
 
 export type PipelineMapping = { request: SubmitExecutionRequest } | { blocked: string }
@@ -51,7 +65,14 @@ export function pipelineRequest(draft: PipelineDraft, context: PipelineContext):
     groupId: context.groupId,
     idempotencyKey: context.idempotencyKey,
     executor: runExecutor({ image: draft.image, command: tokens.argv, env: [], workdir: '/work' }),
-    inputs: [],
+    inputs: draft.inputs
+      .filter((row) => row.bucket.trim() && row.key.trim() && row.path.trim())
+      .map((row) => ({
+        name: row.name || row.key.split('/').filter(Boolean).pop() || 'input',
+        url: `s3://${row.bucket.trim()}/${row.key.trim()}`,
+        path: row.path.trim(),
+        type: 'FILE' as const,
+      })),
     outputs: draft.outputs
       .filter((row) => row.path.trim() && row.key.trim() && bucket)
       .map((row) => captureOutput(row.path.trim(), bucket, row.key.trim())),
@@ -77,14 +98,20 @@ export function pipelineDraftFrom(source: string): PipelineDraft {
   } catch {
     return draft
   }
-  draft.name = request.name ?? ''
-  draft.image = request.image ?? ''
-  draft.command = quoteCommand(request.command ?? [])
+  draft.name = typeof request.name === 'string' ? request.name : ''
+  draft.image = typeof request.image === 'string' ? request.image : ''
+  draft.command = quoteCommand(Array.isArray(request.command) ? request.command.map((arg) => String(arg ?? '')) : [])
   draft.cpuCores = request.cpu_cores === undefined ? '' : String(request.cpu_cores)
   draft.ramGb = request.ram_bytes === undefined ? '' : String(request.ram_bytes / 1_000_000_000)
-  draft.outputs = (request.outputs ?? []).map((output) => ({
-    path: output.container_path,
-    key: output.dest_key,
+  draft.inputs = (Array.isArray(request.inputs) ? request.inputs : []).map((input) => ({
+    bucket: String(input?.bucket ?? ''),
+    key: String(input?.key ?? ''),
+    path: String(input?.container_path ?? `/inputs/${input?.dest_key ?? ''}`),
+    name: String(input?.dest_key ?? '').split('/').filter(Boolean).pop() ?? '',
+  }))
+  draft.outputs = (Array.isArray(request.outputs) ? request.outputs : []).map((output) => ({
+    path: String(output?.container_path ?? ''),
+    key: String(output?.dest_key ?? ''),
   }))
   return draft
 }
