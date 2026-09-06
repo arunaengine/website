@@ -1,7 +1,7 @@
 // The open notebook: the document in the workspace bucket, the unsaved copy in
 // this browser, and the cell edits the view makes. The session lives next door
 // in useNotebookSession.
-import { computed, ref, type Ref } from 'vue'
+import { computed, onScopeDispose, ref, type Ref } from 'vue'
 import { useS3 } from '@/composables/useS3'
 import {
   autosaveDue,
@@ -21,6 +21,7 @@ import {
   type NotebookCell,
   type NotebookOutput,
 } from '@/lib/notebook/nbformat'
+import { trailing } from '@/lib/throttle'
 import { errorMessage } from '@/lib/utils'
 
 export const NOTEBOOK_CONTENT_TYPE = 'application/x-ipynb+json'
@@ -57,11 +58,23 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
   const meta = computed<NotebookAruna | null>(() => notebook.value?.metadata.aruna ?? null)
   const dirty = computed(() => changedAt.value !== null)
 
-  function markChanged() {
+  // A running cell changes the document on every output line, so the copy in
+  // this browser is written on a trailing timer rather than on every change.
+  const copy = trailing(() => {
     const doc = notebook.value
-    if (!doc) return
-    changedAt.value = Date.now()
+    if (!doc || changedAt.value === null) return
     writeWorkingCopy(bucket.value, key.value, serializeNotebook(doc), changedAt.value)
+  }, 1_000)
+  onScopeDispose(() => copy.flush())
+
+  // Counted, not timed: two edits in the same millisecond must still differ.
+  let changeCount = 0
+
+  function markChanged() {
+    if (!notebook.value) return
+    changeCount += 1
+    changedAt.value = Date.now()
+    copy.schedule()
   }
 
   async function load(): Promise<void> {
@@ -80,12 +93,12 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
       notebook.value = text === null ? emptyNotebook({ version: 1, workspace_bucket: bucket.value, ...seed() }) : parseNotebook(text)
       lastSavedMs.value = Date.now()
       changedAt.value = null
-      const copy = readWorkingCopy(bucket.value, key.value)
-      if (copy && copy.text !== (text ?? '')) {
+      const unsaved = readWorkingCopy(bucket.value, key.value)
+      if (unsaved && unsaved.text !== (text ?? '')) {
         try {
-          notebook.value = parseNotebook(copy.text)
+          notebook.value = parseNotebook(unsaved.text)
           restoredCopy.value = true
-          changedAt.value = copy.changed_at_ms || Date.now()
+          changedAt.value = unsaved.changed_at_ms || Date.now()
         } catch {
           clearWorkingCopy(bucket.value, key.value)
         }
@@ -102,13 +115,20 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
     if (!doc || saving.value) return false
     saving.value = true
     saveError.value = null
+    // What was written is the document as it stood when the save started.
+    const sent = serializeNotebook(doc)
+    const changedBefore = changeCount
     try {
-      await s3.putTextObject(bucket.value, key.value, serializeNotebook(doc), NOTEBOOK_CONTENT_TYPE)
+      await s3.putTextObject(bucket.value, key.value, sent, NOTEBOOK_CONTENT_TYPE)
       lastSavedMs.value = Date.now()
-      changedAt.value = null
       isNew.value = false
       restoredCopy.value = false
-      clearWorkingCopy(bucket.value, key.value)
+      // An edit made during the save keeps the notebook unsaved.
+      if (changeCount === changedBefore) {
+        changedAt.value = null
+        copy.cancel()
+        clearWorkingCopy(bucket.value, key.value)
+      }
       return true
     } catch (error) {
       saveError.value = errorMessage(error)
@@ -125,6 +145,7 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
   }
 
   function discardCopy(): void {
+    copy.cancel()
     clearWorkingCopy(bucket.value, key.value)
     restoredCopy.value = false
     void load()
@@ -224,6 +245,8 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
     load,
     save,
     autosave,
+    /** Writes a pending working copy now, before leaving the page. */
+    flushCopy: () => copy.flush(),
     discardCopy,
     markChanged,
     patchMeta,

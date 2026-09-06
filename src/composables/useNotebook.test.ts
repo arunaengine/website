@@ -72,12 +72,37 @@ describe('createNotebook', () => {
     await notebook.load()
     notebook.setSource(notebook.cells.value[0].id, 'print(2)')
     expect(notebook.dirty.value).toBe(true)
+    // The copy is written on a trailing timer, not on every keystroke.
+    expect(readWorkingCopy('lab-data', 'notebooks/counts.ipynb')).toBeNull()
+    notebook.flushCopy()
     expect(readWorkingCopy('lab-data', 'notebooks/counts.ipynb')?.text).toContain('print(2)')
 
     await notebook.save()
     expect(s3.putTextObject).toHaveBeenCalledOnce()
     expect(notebook.dirty.value).toBe(false)
     expect(readWorkingCopy('lab-data', 'notebooks/counts.ipynb')).toBeNull()
+  })
+
+  it('keeps a notebook edited during a save unsaved', async () => {
+    s3.getObjectText.mockRejectedValue({ name: 'NoSuchKey' })
+    let release = () => {}
+    s3.putTextObject.mockImplementation(
+      () => new Promise((resolve) => {
+        release = () => resolve({ versionId: 'v1' })
+      }),
+    )
+    const notebook = store()
+    await notebook.load()
+    const cell = notebook.cells.value[0]
+    notebook.setSource(cell.id, 'print(2)')
+    const saved = notebook.save()
+    notebook.setSource(cell.id, 'print(3)')
+    release()
+    await saved
+
+    expect(notebook.dirty.value).toBe(true)
+    notebook.flushCopy()
+    expect(readWorkingCopy('lab-data', 'notebooks/counts.ipynb')?.text).toContain('print(3)')
   })
 
   it('restores the unsaved copy when it differs from the stored file', async () => {
