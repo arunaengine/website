@@ -7,6 +7,7 @@ import {
   compileClientComponent,
   content,
   element,
+  flush,
   moduleDefault,
   mountApp,
   typeValue,
@@ -119,6 +120,13 @@ function modelField(root: Parameters<typeof content>[0]) {
   return element(root, (node) => node.props['aria-label'] === 'Default model')
 }
 
+/** Picks where the key is kept through the radio group. */
+async function pickStorage(root: Parameters<typeof content>[0], value: 'session' | 'node') {
+  const radio = element(root, (node) => node.tag === 'input' && node.props.type === 'radio' && node.props.value === value)
+  ;(radio.props.onChange as () => void)()
+  await flush()
+}
+
 const stored: AssistantProvider = {
   provider_id: 'p-1',
   kind: 'anthropic',
@@ -161,27 +169,28 @@ beforeEach(() => {
 })
 
 describe('ProviderForm', () => {
-  it('keeps Save disabled until the connection test passes', async () => {
-    const { root } = await addClaude()
+  it('tests the connection first and adds the provider when it answers', async () => {
+    const { root } = await mountApp(ProviderForm)
+    await click(button(root, 'Claude'))
+    expect(button(root, 'Add provider').props.disabled).toBe(true)
 
-    expect(button(root, 'Save provider').props.disabled).toBe(true)
+    await typeValue(field(root, 'Work account'), 'Work')
+    await typeValue(field(root, 'Paste the key'), 'sk-1')
+    await typeValue(modelField(root), 'claude-sonnet')
+    expect(button(root, 'Add provider').props.disabled).toBe(false)
 
-    await click(button(root, 'Test connection'))
+    await click(button(root, 'Add provider'))
 
-    expect(create).not.toHaveBeenCalled()
     expect(check).toHaveBeenCalledWith(expect.objectContaining({ kind: 'anthropic', label: 'Work', model: 'claude-sonnet', apiKey: 'sk-1' }))
-    expect(button(root, 'Save provider').props.disabled).toBe(false)
-
-    await click(button(root, 'Save provider'))
     expect(create).toHaveBeenCalledOnce()
     expect(create.mock.calls[0][1]).toBe('session')
+    expect(check.mock.invocationCallOrder[0]).toBeLessThan(create.mock.invocationCallOrder[0])
   })
 
   it('keeps a new key on the node once keys exist there', async () => {
     vaultState.value = 'unlocked'
     const { root } = await addClaude()
-    await click(button(root, 'Test connection'))
-    await click(button(root, 'Save provider'))
+    await click(button(root, 'Add provider'))
 
     expect(create.mock.calls[0][1]).toBe('node')
     expect(() => element(root, (node) => node.props['data-gate'] !== undefined)).toThrow()
@@ -189,16 +198,15 @@ describe('ProviderForm', () => {
 
   it('waits for the passphrase before a key can go to the node', async () => {
     const { root } = await addClaude()
-    await click(button(root, 'On this node, sealed with my passphrase'))
-    await click(button(root, 'Test connection'))
+    await pickStorage(root, 'node')
 
     expect(element(root, (node) => node.props['data-gate'] !== undefined)).toBeDefined()
-    expect(button(root, 'Save provider').props.disabled).toBe(true)
+    expect(button(root, 'Add provider').props.disabled).toBe(true)
 
     vaultState.value = 'unlocked'
-    await click(button(root, 'Test connection'))
-    expect(button(root, 'Save provider').props.disabled).toBe(false)
-    await click(button(root, 'Save provider'))
+    await flush()
+    expect(button(root, 'Add provider').props.disabled).toBe(false)
+    await click(button(root, 'Add provider'))
     expect(create.mock.calls[0][1]).toBe('node')
   })
 
@@ -206,27 +214,30 @@ describe('ProviderForm', () => {
     vaultState.value = 'unsupported'
     const { root } = await addClaude()
 
-    expect(() => button(root, 'This browser session')).toThrow()
+    expect(() => element(root, (node) => node.tag === 'input' && node.props.type === 'radio')).toThrow()
   })
 
-  it('keeps Save disabled when the provider refuses the credentials', async () => {
+  it('keeps the form with the reason when the provider refuses the key', async () => {
     check.mockResolvedValueOnce({ ok: false, message: 'bad key' })
     const { root } = await addClaude()
-    await click(button(root, 'Test connection'))
+    await click(button(root, 'Add provider'))
 
     expect(content(root)).toContain('bad key')
     expect(create).not.toHaveBeenCalled()
-    expect(button(root, 'Save provider').props.disabled).toBe(true)
+    expect(field(root, 'Paste the key').props.value).toBe('sk-1')
+    expect(button(root, 'Add provider').props.disabled).toBe(false)
   })
 
-  it('keeps testing and model discovery side effect free until save', async () => {
+  it('keeps a test and model discovery side effect free until the provider is added', async () => {
     const { root } = await addClaude()
-    await click(button(root, 'Test connection'))
+    await click(button(root, 'Test only'))
+    expect(content(root)).toContain('The provider answered.')
     await click(button(root, 'Fetch models'))
 
+    expect(check).toHaveBeenCalledOnce()
     expect(create).not.toHaveBeenCalled()
     expect(models).toHaveBeenCalledWith(expect.objectContaining({ kind: 'anthropic', apiKey: 'sk-1' }))
-    await click(button(root, 'Save provider'))
+    await click(button(root, 'Add provider'))
     expect(create).toHaveBeenCalledOnce()
     expect(create.mock.calls[0][0]).toEqual(expect.objectContaining({ models: [{ id: 'm-1' }] }))
   })
@@ -235,8 +246,7 @@ describe('ProviderForm', () => {
     // The browser keeps the key locally, so an untouched field must not clear it.
     direct.mockReturnValue({ kind: 'anthropic', id: 'p-1', label: 'Work', model: 'm-1', apiKey: 'stored-key' })
     const { root } = await mountApp(ProviderForm, { props: { provider: stored } })
-    await click(button(root, 'Test connection'))
-    await click(button(root, 'Save provider'))
+    await click(button(root, 'Save'))
 
     expect(create).not.toHaveBeenCalled()
     expect(update.mock.calls[0][0]).toBe('p-1')
@@ -251,8 +261,7 @@ describe('ProviderForm', () => {
     expect(model.props['data-suggestions']).toBe('m-1')
 
     await typeValue(model, '  my-fine-tune ')
-    await click(button(root, 'Test connection'))
-    await click(button(root, 'Save provider'))
+    await click(button(root, 'Save'))
 
     expect(update.mock.calls.at(-1)?.[1]).toEqual(expect.objectContaining({ model: 'my-fine-tune' }))
   })
@@ -276,7 +285,19 @@ describe('ProviderForm', () => {
     await click(button(root, 'ChatGPT subscription'))
 
     expect(content(root)).toContain('Sign in with Codex')
-    expect(() => button(root, 'Save provider')).toThrow()
+    expect(() => button(root, 'Add provider')).toThrow()
+  })
+
+  it('stores the web search choice of a compatible endpoint', async () => {
+    const { root } = await mountApp(ProviderForm)
+    await click(button(root, 'OpenAI-compatible or local'))
+    await typeValue(field(root, 'Work account'), 'Proxy')
+    await typeValue(field(root, 'http://localhost:11434/v1'), 'https://litellm.test/v1')
+    await typeValue(modelField(root), 'jlu/qwen')
+    await click(element(root, (node) => node.tag === 'button' && content(node).trim() === 'Off'))
+    await click(button(root, 'Add provider'))
+
+    expect(create.mock.calls[0][0]).toEqual(expect.objectContaining({ kind: 'openai_compatible', webSearch: 'off' }))
   })
 
   it('fills the model picker from the OpenAI listing', async () => {
@@ -319,7 +340,7 @@ describe('ProviderForm', () => {
     await typeValue(field(root, 'Work account'), 'Team')
     await typeValue(field(root, 'Paste the key'), 'sk-2')
     await typeValue(modelField(root), 'gpt-5')
-    await click(button(root, 'Test connection'))
+    await click(button(root, 'Test only'))
 
     expect(check).toHaveBeenCalledWith(expect.objectContaining({
       kind: 'openai_compatible',

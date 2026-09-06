@@ -1,13 +1,11 @@
 <script setup lang="ts">
 // Add or edit one provider in two steps: pick the kind, then fill only what
 // that kind needs. A browser key stays in this browser session or goes to the
-// node sealed with the user's passphrase; a candidate is tested before it can
-// be saved.
+// node sealed with the user's passphrase; saving tests the connection first.
 import { computed, reactive, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
-import OptionToggle from '@/components/ui/OptionToggle.vue'
 import Select from '@/components/ui/Select.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import ModelCombobox from '@/components/assistant/ModelCombobox.vue'
@@ -22,6 +20,7 @@ import {
   validateBrowserProvider,
   type BrowserProvider,
   type OpenAICompatibleProtocol,
+  type WebSearchChoice,
 } from '@/lib/assistant/browserProviders'
 import { OPENAI_MODELS, modelSuggestions, normalizeModelId } from '@/lib/assistant/modelOptions'
 import { errorMessage } from '@/lib/utils'
@@ -40,9 +39,17 @@ const storage = ref<ProviderStorage>(
   existingStorage ?? (vaultState.value === 'locked' || vaultState.value === 'unlocked' ? 'node' : 'session'),
 )
 const storageOptions = [
-  { value: 'session', label: 'This browser session' },
-  { value: 'node', label: 'On this node, sealed with my passphrase' },
-] satisfies Array<{ value: ProviderStorage; label: string }>
+  {
+    value: 'session',
+    label: 'This browser session',
+    help: 'The key is gone when you sign out or close the browser, and never reaches the node.',
+  },
+  {
+    value: 'node',
+    label: 'On this node, sealed with my passphrase',
+    help: 'The key is sealed with your passphrase before it reaches the node, and follows you to other browsers.',
+  },
+] satisfies Array<{ value: ProviderStorage; label: string; help: string }>
 const storageChoice = computed(() => vaultState.value !== 'unsupported')
 const storageReady = computed(() => storage.value === 'session' || vaultState.value === 'unlocked')
 
@@ -54,6 +61,7 @@ const label = ref(props.provider?.label ?? '')
 const apiKey = ref('')
 const baseUrl = ref(existingCompatible?.baseUrl ?? '')
 const protocol = ref<OpenAICompatibleProtocol>(existingCompatible?.protocol ?? 'responses')
+const webSearch = ref<WebSearchChoice | ''>(existingCompatible?.webSearch ?? '')
 const headers = reactive<Array<{ name: string; value: string }>>(
   Object.entries(existingCompatible?.headers ?? {}).map(([name, value]) => ({ name, value })),
 )
@@ -61,8 +69,7 @@ const headersOpen = ref(false)
 const models = ref<AssistantModel[]>(props.provider?.models ?? existing?.models ?? [])
 const defaultModel = ref(existing?.model ?? props.provider?.default_model ?? '')
 const providerId = ref(props.provider?.provider_id ?? '')
-const testedFingerprint = ref('')
-const busy = ref(false)
+const busy = ref<'test' | 'save' | 'models' | null>(null)
 const message = ref<string | null>(null)
 const failure = ref<string | null>(null)
 const MODEL_LISTING_PLACEHOLDER = '__model_listing__'
@@ -71,6 +78,12 @@ const protocolOptions = [
   { value: 'responses', label: 'Responses' },
   { value: 'chat_completions', label: 'Chat Completions' },
 ] satisfies Array<{ value: OpenAICompatibleProtocol; label: string }>
+// What the endpoint reports per model decides by default; a choice here wins over it.
+const searchChoices = [
+  { value: '', label: 'As the model reports' },
+  { value: 'on', label: 'On' },
+  { value: 'off', label: 'Off' },
+] satisfies Array<{ value: WebSearchChoice | ''; label: string }>
 // Fetched ids are suggestions; any id typed by hand is accepted as well.
 const suggestions = computed(() => modelSuggestions(
   { kind: choice.value === 'anthropic' ? 'anthropic' : 'openai_compatible', models: models.value },
@@ -132,21 +145,11 @@ function candidate(modelOverride = defaultModel.value, listing = false): Browser
     protocol: choice.value === 'openai' ? 'responses' : protocol.value,
     ...(key ? { apiKey: key } : {}),
     ...(customHeaders ? { headers: customHeaders } : {}),
+    ...(webSearch.value ? { webSearch: webSearch.value } : {}),
   }
 }
 
-// The discovered suggestion list is not part of what the connection test
-// covers, so fetching models must not silently disable Save again.
-function fingerprint(provider: BrowserProvider): string {
-  return JSON.stringify({ ...provider, models: undefined })
-}
-
-const testedForCurrent = computed(() => {
-  if (!testedFingerprint.value) return false
-  return testedFingerprint.value === fingerprint(candidate())
-})
-const canSave = computed(() =>
-  testedForCurrent.value && storageReady.value && Boolean(defaultModel.value.trim()) && !busy.value)
+const canSave = computed(() => canTest.value && storageReady.value && !busy.value)
 
 function pick(next: ProviderChoice) {
   choice.value = next
@@ -154,40 +157,40 @@ function pick(next: ProviderChoice) {
   defaultModel.value = ''
   models.value = []
   headers.splice(0, headers.length)
-  testedFingerprint.value = ''
   message.value = null
   failure.value = null
   baseUrl.value = ''
   protocol.value = 'responses'
+  webSearch.value = ''
 }
 
 function back() {
   choice.value = ''
-  testedFingerprint.value = ''
   message.value = null
   failure.value = null
 }
 
-async function test() {
-  if (!canTest.value) return
-  busy.value = true
-  message.value = null
-  failure.value = null
-  const value = candidate()
+/** The connection check alone; true when the provider accepted the candidate. */
+async function checked(value: BrowserProvider): Promise<boolean> {
   try {
     const result = await check(value)
-    if (result.ok) {
-      testedFingerprint.value = fingerprint(value)
-      message.value = result.message || 'The provider answered.'
-    } else {
-      testedFingerprint.value = ''
-      failure.value = result.message || 'The provider refused the credentials.'
-    }
+    if (result.ok) return true
+    failure.value = result.message || 'The provider refused the credentials.'
   } catch (cause) {
-    testedFingerprint.value = ''
     failure.value = errorMessage(cause)
+  }
+  return false
+}
+
+async function test() {
+  if (!canTest.value || busy.value) return
+  busy.value = 'test'
+  message.value = null
+  failure.value = null
+  try {
+    if (await checked(candidate())) message.value = 'The provider answered.'
   } finally {
-    busy.value = false
+    busy.value = null
   }
 }
 
@@ -205,8 +208,8 @@ function offerKnown(): boolean {
 }
 
 async function loadModels() {
-  if (!canFetchModels.value) return
-  busy.value = true
+  if (!canFetchModels.value || busy.value) return
+  busy.value = 'models'
   failure.value = null
   message.value = null
   try {
@@ -223,23 +226,26 @@ async function loadModels() {
     const reason = errorMessage(cause)
     failure.value = offerKnown() ? `${reason} The known OpenAI models are offered instead.` : reason
   } finally {
-    busy.value = false
+    busy.value = null
   }
 }
 
+// The connection is tested first; a refusal keeps the form open with the reason.
 async function save() {
-  if (!testedForCurrent.value) return
-  busy.value = true
+  if (!canSave.value) return
+  busy.value = 'save'
   failure.value = null
+  message.value = null
   try {
     const value = candidate()
+    if (!(await checked(value))) return
     if (existing) await update(value.id, value, storage.value)
     else await create(value, storage.value)
     emit('done')
   } catch (cause) {
     failure.value = errorMessage(cause)
   } finally {
-    busy.value = false
+    busy.value = null
   }
 }
 </script>
@@ -288,14 +294,15 @@ async function save() {
     </template>
 
     <template v-else>
-      <div class="grid gap-3 sm:grid-cols-2">
+      <div class="space-y-4">
         <div>
-          <label class="text-xs font-medium text-foreground">Display name</label>
-          <Input v-model="label" class="mt-1.5" placeholder="Work account" />
+          <label class="text-xs font-medium text-foreground" for="provider-label">Display name</label>
+          <Input id="provider-label" v-model="label" class="mt-1.5" placeholder="Work account" />
         </div>
         <div>
-          <label class="text-xs font-medium text-foreground">{{ keyLabel }}</label>
+          <label class="text-xs font-medium text-foreground" for="provider-key">{{ keyLabel }}</label>
           <Input
+            id="provider-key"
             v-model="apiKey"
             class="mt-1.5"
             type="password"
@@ -305,8 +312,8 @@ async function save() {
           />
         </div>
         <div v-if="kind.needsBaseUrl">
-          <label class="text-xs font-medium text-foreground">API root</label>
-          <Input v-model="baseUrl" class="mt-1.5" placeholder="http://localhost:11434/v1" />
+          <label class="text-xs font-medium text-foreground" for="provider-root">API root</label>
+          <Input id="provider-root" v-model="baseUrl" class="mt-1.5" placeholder="http://localhost:11434/v1" />
         </div>
         <div v-if="kind.needsBaseUrl">
           <label class="text-xs font-medium text-foreground">Protocol</label>
@@ -318,7 +325,7 @@ async function save() {
             @update:model-value="(value) => (protocol = value as OpenAICompatibleProtocol)"
           />
         </div>
-        <div class="sm:col-span-2">
+        <div>
           <label class="text-xs font-medium text-foreground">Default model</label>
           <div class="mt-1.5 flex items-center gap-2">
             <ModelCombobox
@@ -329,67 +336,82 @@ async function save() {
               required
               placeholder="Enter a model id"
             />
-            <Button variant="outline" :disabled="!canFetchModels || busy" @click="loadModels">Fetch models</Button>
+            <Button variant="outline" :disabled="!canFetchModels || Boolean(busy)" @click="loadModels">Fetch models</Button>
           </div>
         </div>
-      </div>
+        <div v-if="kind.needsBaseUrl">
+          <label class="text-xs font-medium text-foreground">Web search</label>
+          <Select
+            :model-value="webSearch"
+            :options="searchChoices"
+            class="mt-1.5"
+            aria-label="Web search"
+            @update:model-value="(value) => (webSearch = value as WebSearchChoice | '')"
+          />
+          <p class="mt-1.5 text-xs text-muted-foreground">
+            Whether the endpoint runs a web search for the model. Leave it to the model unless you know better.
+          </p>
+        </div>
 
-      <div v-if="kind.needsBaseUrl">
-        <button
-          type="button"
-          class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-          :aria-expanded="headersOpen"
-          @click="headersOpen = !headersOpen"
-        >
-          <ChevronRight :class="['size-3.5 transition-transform', headersOpen && 'rotate-90']" />
-          Custom headers
-        </button>
-        <div v-if="headersOpen" class="mt-2 space-y-2">
-          <div v-for="(header, index) in headers" :key="index" class="flex items-center gap-2">
-            <Input v-model="header.name" class="w-48" placeholder="Header" />
-            <Input v-model="header.value" class="flex-1" placeholder="Value" type="password" />
-            <Button variant="ghost" size="icon-sm" aria-label="Remove header" @click="headers.splice(index, 1)">
-              <X class="size-3.5" />
+        <div v-if="kind.needsBaseUrl">
+          <button
+            type="button"
+            class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+            :aria-expanded="headersOpen"
+            @click="headersOpen = !headersOpen"
+          >
+            <ChevronRight :class="['size-3.5 transition-transform', headersOpen && 'rotate-90']" />
+            Custom headers
+          </button>
+          <div v-if="headersOpen" class="mt-2 space-y-2">
+            <div v-for="(header, index) in headers" :key="index" class="flex items-center gap-2">
+              <Input v-model="header.name" class="w-48" placeholder="Header" />
+              <Input v-model="header.value" class="flex-1" placeholder="Value" type="password" />
+              <Button variant="ghost" size="icon-sm" aria-label="Remove header" @click="headers.splice(index, 1)">
+                <X class="size-3.5" />
+              </Button>
+            </div>
+            <Button variant="outline" size="sm" @click="headers.push({ name: '', value: '' })">
+              <Plus class="size-3.5" /> Add a header
             </Button>
           </div>
-          <Button variant="outline" size="sm" @click="headers.push({ name: '', value: '' })">
-            <Plus class="size-3.5" /> Add a header
-          </Button>
         </div>
+
+        <fieldset v-if="storageChoice" class="space-y-2">
+          <legend class="text-xs font-medium text-foreground">Keep the key</legend>
+          <label
+            v-for="option in storageOptions"
+            :key="option.value"
+            class="flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 transition-colors"
+            :class="storage === option.value ? 'border-primary/60 bg-primary/5' : 'border-border hover:bg-muted/30'"
+          >
+            <input
+              type="radio"
+              name="provider-key-storage"
+              :value="option.value"
+              :checked="storage === option.value"
+              class="mt-1 accent-primary"
+              @change="storage = option.value"
+            >
+            <span class="min-w-0">
+              <span class="block text-sm text-foreground">{{ option.label }}</span>
+              <span class="mt-0.5 block text-xs text-muted-foreground">{{ option.help }}</span>
+            </span>
+          </label>
+          <VaultGate v-if="storage === 'node' && !storageReady" />
+        </fieldset>
+
+        <Notice v-if="failure" tone="error">{{ failure }}</Notice>
+        <Notice v-else-if="message" tone="success">{{ message }}</Notice>
       </div>
 
-      <div v-if="storageChoice" class="space-y-2">
-        <label class="text-xs font-medium text-foreground">Keep the key</label>
-        <div>
-          <OptionToggle
-            :model-value="storage"
-            :options="storageOptions"
-            aria-label="Where the key is kept"
-            @update:model-value="(value) => (storage = value as ProviderStorage)"
-          />
-        </div>
-        <p class="text-xs text-muted-foreground">
-          {{ storage === 'node'
-            ? 'The key is sealed with your passphrase before it reaches the node, and follows you to other browsers.'
-            : 'The key is gone when you sign out or close the browser, and never reaches the node.' }}
-        </p>
-        <VaultGate v-if="storage === 'node' && !storageReady" />
-      </div>
-
-      <div class="flex flex-wrap items-center gap-2">
-        <Button variant="outline" :disabled="!canTest || busy" @click="test">Test connection</Button>
-        <Spinner v-if="busy" label="Testing the provider" />
-        <p v-else-if="!testedForCurrent" class="text-xs text-muted-foreground">
-          Save opens once the test passes.
-        </p>
-      </div>
-
-      <Notice v-if="failure" tone="error">{{ failure }}</Notice>
-      <Notice v-else-if="message" tone="success">{{ message }}</Notice>
-
-      <div class="flex items-center justify-end gap-2 border-t border-border pt-3">
+      <div class="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-3">
+        <Spinner v-if="busy === 'test'" label="Testing the connection" show-label class="mr-auto" />
         <Button variant="ghost" size="sm" @click="emit('cancel')">Cancel</Button>
-        <Button size="sm" :disabled="!canSave" @click="save">{{ busy ? 'Saving…' : 'Save provider' }}</Button>
+        <Button variant="outline" size="sm" :disabled="!canTest || Boolean(busy)" @click="test">Test only</Button>
+        <Button size="sm" :disabled="!canSave" @click="save">
+          {{ busy === 'save' ? 'Testing and saving…' : editing ? 'Save' : 'Add provider' }}
+        </Button>
       </div>
     </template>
   </div>
