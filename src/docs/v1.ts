@@ -759,6 +759,12 @@ export const docsTopics: DocsTopic[] = [
         body: 'API keys stay in this browser session by default. A key can also be kept on this node, sealed with a passphrase only you know; a ChatGPT sign-in is kept by the node.',
       },
       {
+        route: '/app/settings?tab=keys',
+        anchor: 'settings-keys',
+        title: 'Provider keys',
+        body: 'The passphrase that seals provider keys on this node lives here: create it, unlock the keys once per browser, change it, lock, or reset.',
+      },
+      {
         route: '/app/settings?tab=assistant',
         anchor: 'assistant-mcp',
         title: 'Connect an MCP client',
@@ -777,7 +783,7 @@ export const docsTopics: DocsTopic[] = [
         icon: 'Bot',
         paragraphs: [
           'The in-portal assistant runs on a provider you configure: Claude, OpenAI, an OpenAI-compatible or local endpoint, or a ChatGPT subscription.',
-          'API keys stay in this browser session by default and are gone when you sign out. When you add or edit a provider you can keep its key on this [node](concept:glossary#node) instead, sealed with a passphrase only you know: the node stores ciphertext it cannot read, and the key follows you to other browsers. A recovery code, created with the passphrase and shown once, opens the keys if you forget the passphrase. Reset in the provider settings deletes every sealed key from the node; a ChatGPT sign-in is kept by the node on its own.',
+          'An API key stays in this browser session by default. You can also keep it on this [node](concept:glossary#node), sealed with a passphrase only you know; the section below says how that works and what the node can see.',
           'The conversations themselves are kept by the node you are signed in to, so the same chats are there in another browser or on another machine. They stay on that node and are not replicated to the realm. A node that does not keep them leaves every chat in this browser, as before.',
         ],
       },
@@ -786,15 +792,32 @@ export const docsTopics: DocsTopic[] = [
         icon: 'CirclePlus',
         steps: [
           'Open [Settings](page:settings), then the Assistant tab.',
-          'Choose Add provider.',
-          'Sign in to ChatGPT, or paste a key for a local or compatible model endpoint.',
-          'Wait for the provider to show Ready.',
+          'Choose Add provider and pick the kind: Claude, OpenAI, an OpenAI-compatible endpoint, or a ChatGPT sign-in.',
+          'Give it a name, paste the key, and pick the default model. Fetch models lists what the key can reach.',
+          'Choose where the key is kept: this browser session, or on this node sealed with your passphrase.',
+          'Choose Add provider. The connection is tested first; a refusal shows its reason and keeps the form open.',
         ],
         image: {
           src: '/docs/v1/assistant-add.jpg',
           alt: 'Add provider dialog with Claude, OpenAI, OpenAI-compatible, and ChatGPT options',
           caption: 'Four provider kinds: a key kept in the browser or sealed on the node, or a ChatGPT sign-in the node keeps.',
         },
+      },
+      {
+        title: 'Where your provider keys are kept',
+        icon: 'KeyRound',
+        paragraphs: [
+          'By default a key lives in this browser session only. It is gone when you sign out or close the browser, and it never reaches the node.',
+          'You can keep a key on this node instead. It is sealed in your browser with a passphrase only you know, so the node stores what it cannot read. The key follows you to other browsers: you unlock the keys once per browser with the passphrase, and they stay unlocked there until you lock them or sign out.',
+          'When you choose the passphrase, a recovery code is shown once. Keep it somewhere safe: it opens the keys if you forget the passphrase, and it lets you set a new one. Changing the passphrase seals the keys again with the new one; the recovery code stays valid.',
+          'Lock puts the keys away in this browser until you enter the passphrase again. Reset deletes every sealed key from the node, in every browser, and the recovery code stops working; keys in this browser session and a ChatGPT sign-in are kept.',
+          'What the node can see: never a key you keep in the browser or sealed on the node. The assistant talks to such a provider straight from your browser. A ChatGPT sign-in is different: the node holds that sign-in and proxies every turn, so it sees those requests while it proxies them.',
+        ],
+        steps: [
+          'Open [Settings](page:settings), then Provider keys, and choose a passphrase. Save the recovery code.',
+          'Add a provider, or edit one, and pick "On this node, sealed with my passphrase" under Keep the key.',
+          'In another browser, unlock the keys once under Provider keys, or from the notice in the chat.',
+        ],
       },
       {
         title: 'Use it everywhere',
