@@ -391,6 +391,26 @@ describe('createNotebookSession', () => {
     scope.stop()
   })
 
+  it('leaves the job of an earlier session alone when a submit fails', async () => {
+    const { notebook, session: store, scope } = await setup()
+    notebook.patchMeta({ job_id: '01OLD', executor_node_id: 'node-a' })
+    session.getSessionState.mockResolvedValue(state({ job_id: '01OLD', state: 'ended', ended: { reason: 'ended' } }))
+    await store.attachSaved()
+    jobs.submitJob.mockRejectedValue(new ApiError(503, 'job_placement_unavailable'))
+
+    await store.start({
+      groupId: 'group-1',
+      name: 'counts',
+      runtime: 'python-notebook',
+      workspaceBucket: 'lab-data',
+    })
+
+    expect(session.endSession).not.toHaveBeenCalled()
+    expect(jobs.cancelJob).not.toHaveBeenCalled()
+    expect(notebook.meta.value?.job_id).toBe('01OLD')
+    scope.stop()
+  })
+
   it('clears the outputs of a cell it sends', async () => {
     const { notebook, session: store, scope } = await setup()
     notebook.patchMeta({ job_id: '01JOB', executor_node_id: 'node-a' })

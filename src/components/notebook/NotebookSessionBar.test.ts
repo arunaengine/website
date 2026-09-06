@@ -182,7 +182,7 @@ describe('the session bar', () => {
     expect(labels).toEqual(['Realm default', '5 minutes', '15 minutes'])
   })
 
-  it('hides the value the compute config reports the compute config reports', async () => {
+  it('hides the value the compute config reports', async () => {
     realmIdleMs = 300_000
     const root = await render()
     await click(button(root, 'Session'))

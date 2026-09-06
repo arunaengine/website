@@ -272,6 +272,8 @@ export function createNotebookSession(notebook: NotebookStore) {
     starting.value = true
     error.value = null
     notice.value = null
+    // Set once this attempt admitted a job; a job from before is not ours.
+    let submitted = ''
     try {
       // The session stages this file from the bucket, so it must exist first.
       if (draft.dependencyKey && draft.dependencyKind && draft.dependencyText?.trim()) {
@@ -289,6 +291,7 @@ export function createNotebookSession(notebook: NotebookStore) {
         ...(idlePickMs.value ? { idleAfterMs: idlePickMs.value } : {}),
       })
       const created = await submitJob(request, homeClient.value)
+      submitted = created.job_id
       pendingKey = ''
       // The new job counts its events from one again.
       keepResumePoint.cancel()
@@ -306,8 +309,8 @@ export function createNotebookSession(notebook: NotebookStore) {
       const message = submitErrorMessage(cause)
       // A job that was admitted but cannot be followed must not block Start,
       // and must not keep a quota slot either.
-      if (jobId.value) {
-        await stopUnfollowed()
+      if (submitted) {
+        await stopUnfollowed(submitted)
         forget()
       }
       error.value = message
@@ -317,15 +320,15 @@ export function createNotebookSession(notebook: NotebookStore) {
   }
 
   /** Best effort: end the session, and cancel the job when that fails. */
-  async function stopUnfollowed(): Promise<void> {
+  async function stopUnfollowed(id: string): Promise<void> {
     try {
-      await endSession(jobId.value, client.value)
+      await endSession(id, client.value)
       return
     } catch {
       // The node may not serve the session routes for this job at all.
     }
     try {
-      await cancelJob(jobId.value, homeClient.value)
+      await cancelJob(id, homeClient.value)
     } catch {
       // Nothing else to try; the walltime ends it.
     }
