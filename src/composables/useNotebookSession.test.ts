@@ -17,6 +17,7 @@ vi.mock('@/composables/useRealmNodes', () => ({
 const jobs = vi.hoisted(() => ({
   getJob: vi.fn(),
   submitJob: vi.fn(),
+  cancelJob: vi.fn(),
   submitErrorMessage: (error: unknown) => String((error as Error)?.message ?? error),
 }))
 vi.mock('@/lib/jobs', () => jobs)
@@ -43,6 +44,8 @@ vi.mock('@/lib/notebook/session', async (importOriginal) => {
 
 const { createNotebook } = await import('./useNotebook')
 const { createNotebookSession } = await import('./useNotebookSession')
+const { memoryStorage } = await import('@/test/storage')
+const { readResumePoint, writeResumePoint } = await import('@/lib/notebook/document')
 
 function state(overrides: Record<string, unknown> = {}) {
   return {
@@ -74,15 +77,17 @@ async function setup() {
 }
 
 beforeEach(() => {
-  vi.stubGlobal('localStorage', undefined)
+  vi.stubGlobal('localStorage', memoryStorage())
   for (const mock of [
     s3.getObjectText,
     s3.putTextObject,
     jobs.getJob,
     jobs.submitJob,
+    jobs.cancelJob,
     session.getSessionState,
     session.runSessionCell,
     session.endSession,
+    session.interruptSession,
     session.openSessionStream,
   ]) {
     mock.mockReset()
@@ -295,6 +300,94 @@ describe('createNotebookSession', () => {
     expect(notebook.meta.value?.job_id).toBeUndefined()
     expect(store.error.value).toContain('no longer running')
     expect(session.openSessionStream).not.toHaveBeenCalled()
+    scope.stop()
+  })
+
+  it('does not follow a session that already ended', async () => {
+    const { notebook, session: store, scope } = await setup()
+    notebook.patchMeta({ job_id: '01JOB', executor_node_id: 'node-a' })
+    session.getSessionState.mockResolvedValue(state({ state: 'ended', ended: { reason: 'idle' } }))
+
+    await store.attachSaved()
+
+    expect(store.ended.value).toBe(true)
+    expect(session.openSessionStream).not.toHaveBeenCalled()
+    scope.stop()
+  })
+
+  it('resumes at the event this browser last saw', async () => {
+    const { notebook, session: store, scope } = await setup()
+    writeResumePoint('01JOB', 31)
+    notebook.patchMeta({ job_id: '01JOB', executor_node_id: 'node-a' })
+    session.getSessionState.mockResolvedValue(state({ last_event_id: 7 }))
+
+    await store.attachSaved()
+
+    expect(session.openSessionStream.mock.calls[0][0].lastEventId).toBe(31)
+    scope.stop()
+  })
+
+  it('counts the events of a new session from the start', async () => {
+    const { notebook, session: store, scope } = await setup()
+    notebook.patchMeta({ job_id: '01JOB', executor_node_id: 'node-a' })
+    session.getSessionState.mockResolvedValue(state())
+    await store.attachSaved()
+    session.stream.emit({ id: 44, type: 'kernel', data: { state: 'idle' } })
+    session.endSession.mockResolvedValue({ job_id: '01JOB', state: 'succeeded' })
+    await store.end()
+
+    jobs.submitJob.mockResolvedValue({ job_id: '01NEW' })
+    jobs.getJob.mockResolvedValue({
+      state: 'running',
+      family: { execution_list: [{ executor_node_id: 'node-a', canonical: true }] },
+    })
+    session.getSessionState.mockResolvedValue(state({ job_id: '01NEW' }))
+    await store.start({
+      groupId: 'group-1',
+      name: 'counts',
+      runtime: 'python-notebook',
+      workspaceBucket: 'lab-data',
+    })
+    session.stream.emit({ id: 2, type: 'kernel', data: { state: 'busy' } })
+    // Disposing the scope writes the pending resume point.
+    scope.stop()
+
+    // Without the reset the new session's small ids would never be recorded.
+    expect(readResumePoint('01NEW')).toBe(2)
+  })
+
+  it('follows one hop when a node names another', async () => {
+    const { notebook, session: store, scope } = await setup()
+    notebook.patchMeta({ job_id: '01JOB', executor_node_id: 'node-a' })
+    session.getSessionState.mockRejectedValue(
+      new ApiError(409, 'session_not_here', 'session_not_here', { executor_node_id: 'node-b' }),
+    )
+
+    await store.attachSaved()
+
+    // node-b answers with node-b again; the client must not chase it.
+    expect(session.getSessionState).toHaveBeenCalledTimes(2)
+    expect(store.error.value).toContain('session_not_here')
+    scope.stop()
+  })
+
+  it('ends a submitted session it cannot follow', async () => {
+    const { session: store, scope } = await setup()
+    jobs.submitJob.mockResolvedValue({ job_id: '01NEW' })
+    jobs.getJob.mockResolvedValue({ state: 'failed', family: { execution_list: [] } })
+    session.endSession.mockRejectedValue(new ApiError(404, 'not found'))
+    jobs.cancelJob.mockResolvedValue({ job_id: '01NEW', state: 'cancelled' })
+
+    await store.start({
+      groupId: 'group-1',
+      name: 'counts',
+      runtime: 'python-notebook',
+      workspaceBucket: 'lab-data',
+    })
+
+    expect(session.endSession).toHaveBeenCalledWith('01NEW', expect.anything())
+    expect(jobs.cancelJob).toHaveBeenCalledWith('01NEW', { baseUrl: '/api/v1', token: 'bearer-token' })
+    expect(store.jobId.value).toBe('')
     scope.stop()
   })
 

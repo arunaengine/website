@@ -2,14 +2,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   AUTOSAVE_INTERVAL_MS,
   autosaveDue,
+  clearResumePoint,
   clearWorkingCopy,
   dependencyKey,
   isNotebookKey,
   notebookKey,
   notebookName,
   notebookSlug,
+  readResumePoint,
   readWorkingCopy,
   workingCopyKey,
+  writeResumePoint,
   writeWorkingCopy,
 } from './document'
 import { sessionSubmitRequest, sessionProblems } from './submit'
@@ -71,6 +74,45 @@ describe('working copy', () => {
     })
     expect(() => writeWorkingCopy('b', 'k', 'x', 1)).not.toThrow()
     expect(readWorkingCopy('b', 'k')).toBeNull()
+  })
+})
+
+describe('resume point', () => {
+  it('keeps the last event id per session job', () => {
+    vi.stubGlobal('localStorage', memoryStorage())
+    expect(readResumePoint('01JOB')).toBe(0)
+    writeResumePoint('01JOB', 42)
+    writeResumePoint('01OTHER', 7)
+    expect(readResumePoint('01JOB')).toBe(42)
+    expect(readResumePoint('01OTHER')).toBe(7)
+    clearResumePoint('01JOB')
+    expect(readResumePoint('01JOB')).toBe(0)
+    expect(readResumePoint('01OTHER')).toBe(7)
+  })
+
+  it('answers zero for anything that is not a positive id', () => {
+    vi.stubGlobal('localStorage', memoryStorage())
+    localStorage.setItem('aruna.notebook.resume.01JOB', 'later')
+    expect(readResumePoint('01JOB')).toBe(0)
+    writeResumePoint('01JOB', 0)
+    expect(readResumePoint('01JOB')).toBe(0)
+  })
+
+  it('survives a store that refuses to work', () => {
+    vi.stubGlobal('localStorage', {
+      getItem: () => {
+        throw new Error('blocked')
+      },
+      setItem: () => {
+        throw new Error('blocked')
+      },
+      removeItem: () => {
+        throw new Error('blocked')
+      },
+    })
+    expect(() => writeResumePoint('01JOB', 3)).not.toThrow()
+    expect(() => clearResumePoint('01JOB')).not.toThrow()
+    expect(readResumePoint('01JOB')).toBe(0)
   })
 })
 

@@ -6,7 +6,7 @@ import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useS3 } from '@/composables/useS3'
 import type { NotebookStore } from '@/composables/useNotebook'
-import { getJob, submitErrorMessage, submitJob, type JobStatusResponse } from '@/lib/jobs'
+import { cancelJob, getJob, submitErrorMessage, submitJob, type JobStatusResponse } from '@/lib/jobs'
 import { ApiError, isRateLimited, type ApiClientOptions } from '@/lib/api'
 import {
   endSession,
@@ -72,7 +72,10 @@ export function createNotebookSession(notebook: NotebookStore) {
   let pendingKey = ''
   // A busy cell sends many events; the resume point is written on a timer.
   const keepResumePoint = trailing(() => {
-    if (jobId.value && seenEventId) writeResumePoint(jobId.value, seenEventId)
+    if (!jobId.value || !seenEventId) return
+    // The copy must hold the outputs the resume point says were seen.
+    notebook.flushCopy()
+    writeResumePoint(jobId.value, seenEventId)
   }, 1_000)
 
   const homeClient = computed<ApiClientOptions>(() => ({
@@ -136,6 +139,7 @@ export function createNotebookSession(notebook: NotebookStore) {
     }
     // ended
     notice.value = `The session ended (${event.data.reason}).`
+    keepResumePoint.cancel()
     clearResumePoint(jobId.value)
     if (state.value) state.value = { ...state.value, state: 'ended', ended: event.data }
     kernel.value = 'dead'
@@ -168,9 +172,12 @@ export function createNotebookSession(notebook: NotebookStore) {
     }
     const elsewhere = sessionNotHere(cause)
     if (elsewhere) {
-      nodeId.value = elsewhere
-      notebook.patchMeta({ executor_node_id: elsewhere })
-      openStream()
+      // The stream's own loop reconnects through the client getter, with its
+      // backoff; reopening here would spin when the node is not in the list.
+      if (elsewhere !== nodeId.value) {
+        nodeId.value = elsewhere
+        notebook.patchMeta({ executor_node_id: elsewhere })
+      }
       return
     }
     if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) {
@@ -189,8 +196,8 @@ export function createNotebookSession(notebook: NotebookStore) {
     if (reason) error.value = reason
   }
 
-  /** Reads the session state again, following the node that answers for it. */
-  async function refresh(): Promise<boolean> {
+  /** Reads the state again, following the node that answers for it once. */
+  async function refresh(followed = false): Promise<boolean> {
     if (!jobId.value) return false
     try {
       const next = await getSessionState(jobId.value, client.value)
@@ -203,10 +210,10 @@ export function createNotebookSession(notebook: NotebookStore) {
       return true
     } catch (cause) {
       const elsewhere = sessionNotHere(cause)
-      if (elsewhere && elsewhere !== nodeId.value) {
+      if (elsewhere && !followed && elsewhere !== nodeId.value) {
         nodeId.value = elsewhere
         notebook.patchMeta({ executor_node_id: elsewhere })
-        return refresh()
+        return refresh(true)
       }
       if (sessionAbsent(cause)) {
         forget('That session is no longer running.')
@@ -233,7 +240,8 @@ export function createNotebookSession(notebook: NotebookStore) {
     error.value = null
     try {
       if (!nodeId.value) await findNode()
-      if (await refresh()) openStream()
+      // A session that already ended has nothing left to stream.
+      if ((await refresh()) && !ended.value) openStream()
     } catch (cause) {
       error.value = errorMessage(cause)
     } finally {
@@ -282,6 +290,9 @@ export function createNotebookSession(notebook: NotebookStore) {
       })
       const created = await submitJob(request, homeClient.value)
       pendingKey = ''
+      // The new job counts its events from one again.
+      keepResumePoint.cancel()
+      seenEventId = 0
       jobId.value = created.job_id
       nodeId.value = ''
       state.value = null
@@ -293,11 +304,30 @@ export function createNotebookSession(notebook: NotebookStore) {
       openStream()
     } catch (cause) {
       const message = submitErrorMessage(cause)
-      // A job that was admitted but cannot be followed must not block Start.
-      if (jobId.value) forget()
+      // A job that was admitted but cannot be followed must not block Start,
+      // and must not keep a quota slot either.
+      if (jobId.value) {
+        await stopUnfollowed()
+        forget()
+      }
       error.value = message
     } finally {
       starting.value = false
+    }
+  }
+
+  /** Best effort: end the session, and cancel the job when that fails. */
+  async function stopUnfollowed(): Promise<void> {
+    try {
+      await endSession(jobId.value, client.value)
+      return
+    } catch {
+      // The node may not serve the session routes for this job at all.
+    }
+    try {
+      await cancelJob(jobId.value, homeClient.value)
+    } catch {
+      // Nothing else to try; the walltime ends it.
     }
   }
 
@@ -307,6 +337,7 @@ export function createNotebookSession(notebook: NotebookStore) {
     try {
       await endSession(jobId.value, client.value)
       closeStream()
+      keepResumePoint.cancel()
       clearResumePoint(jobId.value)
       if (state.value) state.value = { ...state.value, state: 'ended', ended: { reason: 'ended' } }
       kernel.value = 'dead'
