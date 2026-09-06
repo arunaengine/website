@@ -84,6 +84,9 @@ const problems = computed(() =>
   }),
 )
 
+// Null while the runtime is one this portal does not know.
+const dependencies = computed(() => dependencyKind(meta.value?.runtime ?? ''))
+
 const resources = computed(() => meta.value?.resources ?? {})
 const ramGb = computed({
   get: () => (resources.value.ram_bytes ? String(resources.value.ram_bytes / 1_000_000_000) : ''),
@@ -111,17 +114,17 @@ function setPlacement(patch: { node?: string; executor_kind?: string }) {
 function start() {
   const current = meta.value
   if (!current) return
-  const dependencies = current.dependencies?.text.trim() ? current.dependencies : undefined
+  const declared = current.dependencies?.text.trim() ? current.dependencies : undefined
   void session.start({
     groupId: current.group_id,
     name: notebook.name.value,
     runtime: current.runtime,
     workspaceBucket: current.workspace_bucket,
-    ...(dependencies
+    ...(declared
       ? {
-          dependencyKey: dependencyKey(notebook.name.value, dependencies.kind),
-          dependencyKind: dependencies.kind,
-          dependencyText: dependencies.text,
+          dependencyKey: dependencyKey(notebook.name.value, declared.kind),
+          dependencyKind: declared.kind,
+          dependencyText: declared.text,
         }
       : {}),
     resources: current.resources,
@@ -149,7 +152,9 @@ function start() {
         :disabled="session.running.value"
         @update:model-value="notebook.patchMeta({ runtime: $event })"
       />
-      <Button variant="outline" size="sm" @click="dependenciesOpen = true">Dependencies</Button>
+      <Button variant="outline" size="sm" :disabled="!dependencies" @click="dependenciesOpen = true">
+        Dependencies
+      </Button>
       <Button variant="outline" size="sm" :aria-expanded="settingsOpen" @click="settingsOpen = !settingsOpen">
         <Settings2 class="size-3.5" /> Session
       </Button>
@@ -224,10 +229,11 @@ function start() {
     <Notice v-if="session.notice.value" tone="warning">{{ session.notice.value }}</Notice>
 
     <NotebookDependencies
+      v-if="dependencies"
       v-model:open="dependenciesOpen"
-      :kind="dependencyKind(meta?.runtime ?? '')"
+      :kind="dependencies"
       :text="meta?.dependencies?.text ?? ''"
-      @save="notebook.patchMeta({ dependencies: { kind: dependencyKind(meta?.runtime ?? ''), text: $event } })"
+      @save="notebook.patchMeta({ dependencies: { kind: dependencies, text: $event } })"
     />
   </div>
 </template>

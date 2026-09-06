@@ -5,7 +5,7 @@ import { placementTags } from '@/lib/tes'
 import { TES_NETWORK_TAG } from '@/lib/quickRuntimes'
 import type { ExecutionInputRequest, SubmitExecutionRequest } from '@/lib/jobs'
 import type { NotebookPlacement, NotebookResources } from './nbformat'
-import { dependencyFileName } from './runtimes'
+import { dependencyFileName, sessionRuntimeById } from './runtimes'
 
 /** Marks the job as the session behind one notebook. */
 export const SESSION_TAG = 'aruna-engine.org/session'
@@ -88,5 +88,6 @@ export function sessionProblems(
   if (!draft.groupId.trim()) problems.push('Pick the group that owns the session.')
   if (!draft.workspaceBucket.trim()) problems.push('Pick the bucket the notebook works in.')
   if (!draft.runtime.trim()) problems.push('Pick a runtime.')
+  else if (!sessionRuntimeById(draft.runtime)) problems.push('Pick a runtime this portal knows.')
   return problems
 }

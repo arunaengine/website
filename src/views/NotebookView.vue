@@ -46,6 +46,8 @@ const autosaveTimer = ref<ReturnType<typeof setInterval> | null>(null)
 
 async function open() {
   if (!bucket.value || !key.value) return
+  // A different notebook must never keep the stream of the one before it.
+  session.detach()
   const asked = typeof route.query.group === 'string' ? route.query.group : (myGroups.value[0]?.id ?? '')
   if (asked) await s3.ensureSession(asked).catch(() => {})
   await notebook.load()
@@ -63,6 +65,15 @@ onUnmounted(() => {
   if (autosaveTimer.value) clearInterval(autosaveTimer.value)
 })
 watch([bucket, key, currentUser], () => void open())
+// Groups can load after the page did; without one the first read is refused.
+watch(myGroups, () => {
+  if (notebook.loadError.value || !notebook.notebook.value) void open()
+})
+
+// The key holds slashes, so every segment is encoded on its own.
+const redirectTo = computed(
+  () => `/app/notebooks/${encodeURIComponent(bucket.value)}/${key.value.split('/').map(encodeURIComponent).join('/')}`,
+)
 
 const codeCells = computed(() => notebook.cells.value.filter((cell) => cell.cell_type === 'code'))
 
@@ -83,9 +94,7 @@ function runToHere(cellId: string) {
 }
 
 function addPipelineCell() {
-  const cell = notebook.addCell('raw')
-  cell.metadata.aruna = { kind: 'pipeline' }
-  notebook.markChanged()
+  notebook.addCell('raw', undefined, '', { kind: 'pipeline' })
 }
 
 const savedLabel = computed(() => {
@@ -113,7 +122,7 @@ const savedLabel = computed(() => {
       disabled-description="Set features.tes to true in portal-config.json for this deployment; notebooks run on the same compute as every other run."
       sign-in-title="Sign in to open a notebook"
       sign-in-description="A notebook reads and writes stored data."
-      :redirect-to="`/app/notebooks/${bucket}/${key}`"
+      :redirect-to="redirectTo"
     >
       <div class="container max-w-[110rem] space-y-3 py-6">
         <NotebookSessionBar />

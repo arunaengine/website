@@ -1,6 +1,6 @@
 // Picks how one nbformat output is shown. Richer types win over plain text,
 // the way a notebook viewer picks a representation.
-import type { NotebookOutput } from './nbformat'
+import { multilineText, type NotebookOutput } from './nbformat'
 
 export type OutputRender =
   | { kind: 'stream'; name: string; text: string }
@@ -23,32 +23,25 @@ const MIME_ORDER = [
   'text/plain',
 ]
 
-/** nbformat values are a string or a list of lines. */
-function value(raw: unknown): string {
-  if (typeof raw === 'string') return raw
-  if (Array.isArray(raw)) return raw.map((line) => (typeof line === 'string' ? line : '')).join('')
-  return ''
-}
-
 function fromData(data: Record<string, unknown>): OutputRender {
   const mime = MIME_ORDER.find((candidate) => data[candidate] !== undefined)
   if (!mime) {
     const first = Object.keys(data)[0]
-    return { kind: 'text', text: first ? value(data[first]) : '' }
+    return { kind: 'text', text: first ? multilineText(data[first]) : '' }
   }
-  if (mime === 'text/html') return { kind: 'html', text: value(data[mime]) }
-  if (mime === 'image/svg+xml') return { kind: 'svg', text: value(data[mime]) }
+  if (mime === 'text/html') return { kind: 'html', text: multilineText(data[mime]) }
+  if (mime === 'image/svg+xml') return { kind: 'svg', text: multilineText(data[mime]) }
   if (mime === 'image/png' || mime === 'image/jpeg') {
     // Binary mimes arrive base64 encoded, as nbformat stores them.
-    return { kind: 'image', mime, dataUrl: `data:${mime};base64,${value(data[mime]).replace(/\s+/g, '')}` }
+    return { kind: 'image', mime, dataUrl: `data:${mime};base64,${multilineText(data[mime]).replace(/\s+/g, '')}` }
   }
-  if (mime === 'text/markdown') return { kind: 'markdown', text: value(data[mime]) }
+  if (mime === 'text/markdown') return { kind: 'markdown', text: multilineText(data[mime]) }
   if (mime === 'application/json') {
     const raw = data[mime]
-    const text = typeof raw === 'string' || Array.isArray(raw) ? value(raw) : JSON.stringify(raw, null, 2)
+    const text = typeof raw === 'string' || Array.isArray(raw) ? multilineText(raw) : JSON.stringify(raw, null, 2)
     return { kind: 'json', text }
   }
-  return { kind: 'text', text: value(data[mime]) }
+  return { kind: 'text', text: multilineText(data[mime]) }
 }
 
 export function renderOutput(output: NotebookOutput): OutputRender {

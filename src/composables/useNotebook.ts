@@ -15,6 +15,7 @@ import {
   newCell,
   parseNotebook,
   serializeNotebook,
+  type CellAruna,
   type CellKind,
   type Notebook,
   type NotebookAruna,
@@ -162,9 +163,10 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
     return notebook.value?.cells.find((cell) => cell.id === id)
   }
 
-  function addCell(kind: CellKind, index?: number, source = ''): NotebookCell {
+  function addCell(kind: CellKind, index?: number, source = '', aruna?: CellAruna): NotebookCell {
     const doc = notebook.value
     const cell = newCell(kind, source)
+    if (aruna) cell.metadata.aruna = aruna
     if (doc) {
       const at = index === undefined ? doc.cells.length : Math.max(0, Math.min(index, doc.cells.length))
       doc.cells.splice(at, 0, cell)

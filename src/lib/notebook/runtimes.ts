@@ -28,13 +28,16 @@ export const SESSION_RUNTIMES: SessionRuntime[] = [
   },
 ]
 
-export function sessionRuntimeById(id: string): SessionRuntime {
-  return SESSION_RUNTIMES.find((runtime) => runtime.id === id) ?? SESSION_RUNTIMES[0]
+/** Undefined for an id this portal does not know; callers say so. */
+export function sessionRuntimeById(id: string): SessionRuntime | undefined {
+  return SESSION_RUNTIMES.find((runtime) => runtime.id === id)
 }
 
-/** Which dependency file the runtime reads. */
-export function dependencyKind(runtimeId: string): 'requirements' | 'deno' {
-  return sessionRuntimeById(runtimeId).lang === 'deno' ? 'deno' : 'requirements'
+/** Which dependency file the runtime reads; null when it is unknown. */
+export function dependencyKind(runtimeId: string): 'requirements' | 'deno' | null {
+  const runtime = sessionRuntimeById(runtimeId)
+  if (!runtime) return null
+  return runtime.lang === 'deno' ? 'deno' : 'requirements'
 }
 
 /** File name the dependency list is staged under inside the container. */

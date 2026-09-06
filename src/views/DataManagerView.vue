@@ -27,7 +27,7 @@ import { providePageContext } from '@/composables/usePageContext'
 import { useStaging } from '@/composables/useStaging'
 import { useS3, s3ErrorMessage } from '@/composables/useS3'
 import { folderNameProblem } from '@/lib/bucketName'
-import { notebookKey, notebookSlug } from '@/lib/notebook/document'
+import { NOTEBOOK_PREFIX, notebookKey, notebookSlug } from '@/lib/notebook/document'
 import { featureEnabled } from '@/lib/config'
 import { isDesktop } from '@/lib/desktop'
 import type { BucketSearchHit } from '@/lib/api'
@@ -169,7 +169,7 @@ const newNotebookName = ref('')
 const notebookTarget = computed(() => notebookKey(notebookSlug(newNotebookName.value)))
 
 function openNewNotebook() {
-  if (!canWriteCurrentPrefix.value) return
+  if (!s3.canWrite(bucket.value, NOTEBOOK_PREFIX, remoteNodeId.value)) return
   newNotebookName.value = ''
   newNotebookOpen.value = true
 }

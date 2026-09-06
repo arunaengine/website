@@ -83,6 +83,8 @@ export interface Notebook {
 }
 
 /** Cell ids are 1 to 64 characters of [A-Za-z0-9_-], the session id too. */
+export const CELL_ID = /^[A-Za-z0-9_-]{1,64}$/
+
 export function newCellId(): string {
   return crypto.randomUUID().replaceAll('-', '').slice(0, 12)
 }
@@ -102,7 +104,7 @@ export function emptyNotebook(aruna: NotebookAruna): Notebook {
 
 // nbformat writes a multiline string either as one string or as a list of
 // lines; both are read here so a file written by Jupyter opens unchanged.
-function readSource(value: unknown): string {
+export function multilineText(value: unknown): string {
   if (typeof value === 'string') return value
   if (Array.isArray(value)) return value.map((line) => (typeof line === 'string' ? line : '')).join('')
   return ''
@@ -116,7 +118,7 @@ function readOutput(value: unknown): NotebookOutput | null {
     return {
       output_type: 'stream',
       name: typeof record.name === 'string' ? record.name : 'stdout',
-      text: readSource(record.text),
+      text: multilineText(record.text),
     }
   }
   if (type === 'display_data' || type === 'execute_result') {
@@ -160,9 +162,10 @@ function readCell(value: unknown): NotebookCell | null {
       })
     : []
   return {
-    id: typeof record.id === 'string' && record.id ? record.id : newCellId(),
+    // An id a session would refuse is replaced rather than carried along.
+    id: typeof record.id === 'string' && CELL_ID.test(record.id) ? record.id : newCellId(),
     cell_type: kind,
-    source: readSource(record.source),
+    source: multilineText(record.source),
     outputs,
     execution_count: typeof record.execution_count === 'number' ? record.execution_count : null,
     metadata,

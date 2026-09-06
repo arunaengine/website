@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // One cell: code in the shared editor, markdown as it reads, and a pipeline
 // cell as its own small run form. The toolbar runs it and moves it.
-import { computed, defineAsyncComponent, ref } from 'vue'
+import { computed, defineAsyncComponent, h, ref } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import IconButton from '@/components/ui/IconButton.vue'
@@ -16,6 +16,10 @@ import { ArrowDown, ArrowUp, Ban, Pencil, Play, Trash2 } from '@lucide/vue'
 
 const ScriptEditor = defineAsyncComponent({
   loader: () => import('@/components/compute/ScriptEditor.vue'),
+  loadingComponent: {
+    render: () =>
+      h('div', { class: 'grid h-24 place-items-center bg-field text-xs text-muted-foreground' }, 'Loading editor…'),
+  },
   onError: asyncChunkError,
 })
 
@@ -25,7 +29,7 @@ const emit = defineEmits<{ (e: 'run-to-here'): void }>()
 const { notebook, session } = injectNotebook()
 
 const pipeline = computed(() => isPipelineCell(props.cell))
-const highlight = computed(() => sessionRuntimeById(notebook.meta.value?.runtime ?? '').highlight)
+const highlight = computed(() => sessionRuntimeById(notebook.meta.value?.runtime ?? '')?.highlight ?? 'text')
 const runState = computed(() => session.cellStates.value[props.cell.id]?.state ?? null)
 const busy = computed(() => runState.value === 'queued' || runState.value === 'running')
 const stateLabel = computed(() => {
@@ -88,16 +92,11 @@ function run() {
     <NotebookPipelineCell v-if="pipeline" :cell="cell" />
 
     <div v-else-if="cell.cell_type === 'code'" class="min-w-0">
-      <Suspense>
-        <ScriptEditor
-          :model-value="cell.source"
-          :language="highlight"
-          @update:model-value="notebook.setSource(cell.id, $event)"
-        />
-        <template #fallback>
-          <div class="grid h-24 place-items-center bg-field text-xs text-muted-foreground">Loading editor…</div>
-        </template>
-      </Suspense>
+      <ScriptEditor
+        :model-value="cell.source"
+        :language="highlight"
+        @update:model-value="notebook.setSource(cell.id, $event)"
+      />
     </div>
 
     <div v-else class="min-w-0">

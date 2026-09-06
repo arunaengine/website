@@ -15,7 +15,7 @@ export function notebookKey(name: string): string {
 /** The name inside the key, used for the file names beside the notebook. */
 export function notebookName(key: string): string {
   const base = key.split('/').filter(Boolean).pop() ?? key
-  return base.endsWith(NOTEBOOK_SUFFIX) ? base.slice(0, -NOTEBOOK_SUFFIX.length) : base
+  return isNotebookKey(base) ? base.slice(0, -NOTEBOOK_SUFFIX.length) : base
 }
 
 export function isNotebookKey(key: string): boolean {

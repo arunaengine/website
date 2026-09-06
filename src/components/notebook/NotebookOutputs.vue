@@ -35,6 +35,7 @@ function svgUrl(text: string): string {
 
       <HtmlPreview v-else-if="output.kind === 'html'" :text="output.text" :name="name" />
 
+      <!-- Plots are drawn for a white canvas; a transparent one would vanish in the dark theme. -->
       <img
         v-else-if="output.kind === 'image'"
         :src="output.dataUrl"
