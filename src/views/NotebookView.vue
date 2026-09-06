@@ -67,7 +67,7 @@ onUnmounted(() => {
 watch([bucket, key, currentUser], () => void open())
 // Groups can load after the page did; without one the first read is refused.
 watch(myGroups, () => {
-  if (notebook.loadError.value || !notebook.notebook.value) void open()
+  if (notebook.loadDenied.value && !notebook.loading.value) void open()
 })
 
 // The key holds slashes, so every segment is encoded on its own.

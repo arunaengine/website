@@ -91,6 +91,8 @@ function fakeContext(overrides: { state?: Record<string, unknown> | null; runnin
   }
 }
 
+let realmIdleMs: number | undefined = 1_800_000
+
 let compiled: Component | null = null
 
 function sessionBar(): Component {
@@ -106,6 +108,11 @@ function sessionBar(): Component {
     '@/composables/notebookContext': { injectNotebook: () => context },
     '@/composables/useAruna': { useAruna: () => ({ myGroups: ref([{ id: 'group-1', name: 'Lab' }]) }) },
     '@/composables/useNow': { useNow: () => ref(1_000) },
+    '@/composables/useComputeAdmin': {
+      useComputeAdmin: () => ({
+        getComputeConfig: async () => ({ session_idle_after_ms: realmIdleMs }),
+      }),
+    },
     '@/composables/useRealmNodes': {
       useRealmNodes: () => ({
         nodes: ref([{ nodeId: 'node-a', label: 'Node A', executorKinds: ['docker'] }]),
@@ -165,11 +172,24 @@ describe('the session bar', () => {
   })
 
   it('locks the idle pick while a session runs and hides the realm default', async () => {
-    const root = await render({ state: { state: 'ready', idle_after_ms: 1_800_000 }, running: true })
+    realmIdleMs = 1_800_000
+    // The session picked a shorter timeout; the realm value is what counts.
+    const root = await render({ state: { state: 'ready', idle_after_ms: 300_000 }, running: true })
     await click(button(root, 'Session'))
     const idle = select(root, 'Idle timeout')
     expect(idle.props.disabled).toBe(true)
     const labels = (idle.props.options as { label: string }[]).map((option) => option.label)
     expect(labels).toEqual(['Realm default', '5 minutes', '15 minutes'])
+  })
+
+  it('hides the value the compute config reports the compute config reports', async () => {
+    realmIdleMs = 300_000
+    const root = await render()
+    await click(button(root, 'Session'))
+    const labels = (select(root, 'Idle timeout').props.options as { label: string }[]).map(
+      (option) => option.label,
+    )
+    expect(labels).toEqual(['Realm default', '15 minutes', '30 minutes'])
+    realmIdleMs = 1_800_000
   })
 })

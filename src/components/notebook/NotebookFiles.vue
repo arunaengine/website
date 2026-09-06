@@ -11,6 +11,7 @@ import TesDataRefDialog from '@/components/compute/TesDataRefDialog.vue'
 import AddDataDialog from '@/components/data/AddDataDialog.vue'
 import ScratchFileDialog from '@/components/notebook/ScratchFileDialog.vue'
 import { injectNotebook } from '@/composables/notebookContext'
+import { useS3 } from '@/composables/useS3'
 import { addSessionInputs, listScratch, type ScratchEntry } from '@/lib/notebook/session'
 import { NOTEBOOK_DATA_PREFIX } from '@/lib/notebook/document'
 import { parseS3Url, type TesDataRefEntry } from '@/lib/tes'
@@ -18,8 +19,12 @@ import { errorMessage, formatBytes } from '@/lib/utils'
 import { CloudDownload, FolderTree, Plus, RefreshCw } from '@lucide/vue'
 
 const { notebook, session } = injectNotebook()
+const s3 = useS3()
 
 const importOpen = ref(false)
+// Remounts the browser after an import, which has no reload of its own.
+const panelRevision = ref(0)
+const dataKeys = ref<ReadonlySet<string>>(new Set())
 const scratchFile = ref('')
 const scratchOpen = ref(false)
 const tab = ref('bucket')
@@ -35,6 +40,22 @@ const staging = ref(false)
 const stageNote = ref<string | null>(null)
 
 const bucket = computed(() => notebook.meta.value?.workspace_bucket ?? '')
+
+/** Keys under data/, so the import warns before it overwrites one. */
+async function loadDataKeys() {
+  if (!bucket.value) return
+  try {
+    const page = await s3.listObjects(bucket.value, NOTEBOOK_DATA_PREFIX)
+    dataKeys.value = new Set(page.objects.map((object) => object.key))
+  } catch {
+    dataKeys.value = new Set()
+  }
+}
+
+function onImported() {
+  panelRevision.value += 1
+  void loadDataKeys()
+}
 
 async function loadScratch() {
   if (!session.jobId.value || !session.live.value) return
@@ -124,7 +145,7 @@ async function stage(entry: TesDataRefEntry) {
       >
         <Plus class="size-3.5" /> Add more
       </Button>
-      <Button v-if="bucket" variant="outline" size="sm" @click="importOpen = true">
+      <Button v-if="bucket" variant="outline" size="sm" @click="importOpen = true; loadDataKeys()">
         <CloudDownload class="size-3.5" /> Import
       </Button>
     </div>
@@ -132,7 +153,7 @@ async function stage(entry: TesDataRefEntry) {
     <Notice v-if="stageNote" tone="info">{{ stageNote }}</Notice>
 
     <div v-if="tab === 'bucket'" class="min-h-0 flex-1 overflow-auto">
-      <ObjectBrowserPanel v-if="bucket" :bucket="bucket" />
+      <ObjectBrowserPanel v-if="bucket" :key="panelRevision" :bucket="bucket" />
       <p v-else class="text-xs text-muted-foreground">This notebook has no workspace bucket yet.</p>
     </div>
 
@@ -176,6 +197,8 @@ async function stage(entry: TesDataRefEntry) {
       :bucket="bucket"
       :prefix="NOTEBOOK_DATA_PREFIX"
       :group-id="notebook.meta.value?.group_id ?? null"
+      :existing-keys="dataKeys"
+      @staged="onImported"
     />
 
     <ScratchFileDialog

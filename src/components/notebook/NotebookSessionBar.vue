@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // What the session runs on, and its state: runtime, dependencies, the bucket
 // the notebook works in, where it may run, what it needs, and Start or End.
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
@@ -16,10 +16,12 @@ import { SESSION_RUNTIMES, dependencyKind } from '@/lib/notebook/runtimes'
 import { dependencyKey } from '@/lib/notebook/document'
 import { sessionProblems } from '@/lib/notebook/submit'
 import { DEFAULT_SESSION_IDLE_AFTER_MS } from '@/lib/computeAdmin'
+import { useComputeAdmin } from '@/composables/useComputeAdmin'
 import { CircleStop, Play, Settings2 } from '@lucide/vue'
 
 const { notebook, session } = injectNotebook()
 const { myGroups } = useAruna()
+const { getComputeConfig } = useComputeAdmin()
 const { nodes, displayName } = useRealmNodes()
 const now = useNow(1_000)
 
@@ -48,7 +50,17 @@ const IDLE_PICKS = [
   { value: '900000', label: '15 minutes' },
   { value: '1800000', label: '30 minutes' },
 ]
-const realmIdleMs = computed(() => session.state.value?.idle_after_ms ?? DEFAULT_SESSION_IDLE_AFTER_MS)
+// The realm's own value, not this session's: a session that picked five
+// minutes must not hide the five minute option afterwards.
+const realmIdleMs = ref(DEFAULT_SESSION_IDLE_AFTER_MS)
+onMounted(async () => {
+  try {
+    const config = await getComputeConfig()
+    realmIdleMs.value = config.session_idle_after_ms ?? DEFAULT_SESSION_IDLE_AFTER_MS
+  } catch {
+    // Reading the realm config is an admin call; the constant stands otherwise.
+  }
+})
 const idleOptions = computed(() => [
   { value: '', label: 'Realm default' },
   ...IDLE_PICKS.filter((option) => Number(option.value) !== realmIdleMs.value),
