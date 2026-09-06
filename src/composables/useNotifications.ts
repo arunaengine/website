@@ -12,6 +12,7 @@ import {
 } from '@/lib/api'
 import { useAruna } from '@/composables/useAruna'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
+import { readSseFrames, type SseFrame } from '@/lib/sse'
 import { errorMessage } from '@/lib/utils'
 
 const STREAM_RETRY_MS = 3_000
@@ -220,38 +221,12 @@ function applyStateEvent(data: string) {
   }
 }
 
-function applyStreamFrame(frame: string) {
-  let event = 'message'
-  const data: string[] = []
-  for (const line of frame.split(/\r?\n/)) {
-    if (!line || line.startsWith(':')) continue
-    const separator = line.indexOf(':')
-    const field = separator === -1 ? line : line.slice(0, separator)
-    let value = separator === -1 ? '' : line.slice(separator + 1)
-    if (value.startsWith(' ')) value = value.slice(1)
-    if (field === 'event') event = value
-    if (field === 'data') data.push(value)
-  }
-  if (!data.length) return
-  if (event === 'state') applyStateEvent(data.join('\n'))
+function applyStreamFrame(frame: SseFrame) {
+  if (frame.event === 'state') applyStateEvent(frame.data)
 }
 
-async function readStream(response: Response) {
-  const reader = response.body?.getReader()
-  if (!reader) throw new Error('Notification stream has no response body.')
-  const decoder = new TextDecoder()
-  let buffer = ''
-  while (true) {
-    const { done, value } = await reader.read()
-    buffer += decoder.decode(value, { stream: !done })
-    const frames = buffer.split(/\r?\n\r?\n/)
-    buffer = frames.pop() ?? ''
-    for (const frame of frames) applyStreamFrame(frame)
-    if (done) {
-      if (buffer.trim()) applyStreamFrame(buffer)
-      return
-    }
-  }
+function readStream(response: Response) {
+  return readSseFrames(response.body, applyStreamFrame)
 }
 
 function stopStream() {

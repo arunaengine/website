@@ -1,15 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/lib/api'
-import {
-  openSessionStream,
-  parseSseFrame,
-  sessionAbsent,
-  sessionEventFrom,
-  sessionNotHere,
-  type SessionEvent,
-} from './session'
+import { openSessionStream, sessionAbsent, sessionEventFrom, sessionNotHere, type SessionEvent } from './session'
 
-const client = { baseUrl: 'https://node-a.example/api/v1', token: 'bearer-token' }
+const client = () => ({ baseUrl: 'https://node-a.example/api/v1', token: 'bearer-token' })
 
 beforeEach(() => {
   vi.stubGlobal('window', { location: { origin: 'https://portal.example' } })
@@ -19,8 +12,17 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-/** A response whose body hands out the given chunks, then ends. */
-function streamResponse(chunks: string[], hold = false): Response {
+/** A promise the test resolves when the stream reached the point it waits for. */
+function deferred<T = void>() {
+  let settle: (value: T) => void = () => {}
+  const promise = new Promise<T>((resolve) => {
+    settle = resolve
+  })
+  return { promise, settle }
+}
+
+/** A response whose body hands out the given chunks, then ends or stays open. */
+function streamResponse(chunks: string[], hold: boolean): Response {
   const encoder = new TextEncoder()
   let index = 0
   const body = {
@@ -40,46 +42,41 @@ function frame(id: number, event: string, data: unknown): string {
   return `id: ${id}\nevent: ${event}\ndata: ${JSON.stringify(data)}\n\n`
 }
 
-async function collect(chunks: string[][], options: Record<string, unknown> = {}) {
+interface Attempt {
+  url: URL
+  headers: Headers
+}
+
+/**
+ * Runs the stream over the given connections and waits until `until` many
+ * events arrived, so no test waits on the clock.
+ */
+async function collect(connections: string[][], until: number, options: Record<string, unknown> = {}) {
   const events: SessionEvent[] = []
-  const urls: URL[] = []
-  const headers: Headers[] = []
+  const attempts: Attempt[] = []
+  const enough = deferred()
   let call = 0
   const fetchImpl = vi.fn(async (url: URL, init: RequestInit) => {
-    urls.push(url)
-    headers.push(init.headers as Headers)
-    const chunk = chunks[Math.min(call, chunks.length - 1)]
+    attempts.push({ url, headers: init.headers as Headers })
+    const chunks = connections[Math.min(call, connections.length - 1)]
     call += 1
-    return streamResponse(chunk, call >= chunks.length)
+    return streamResponse(chunks, call >= connections.length)
   }) as unknown as typeof fetch
   const stream = openSessionStream({
     jobId: '01JOB',
     client,
-    onEvent: (event) => events.push(event),
+    onEvent: (event) => {
+      events.push(event)
+      if (events.length >= until) enough.settle()
+    },
     fetchImpl,
     retryDelayMs: () => 0,
     ...options,
   })
-  // Let the reader drain what the mocked body holds.
-  for (let step = 0; step < 20; step += 1) await Promise.resolve()
-  await new Promise((resolve) => setTimeout(resolve, 5))
+  await enough.promise
   stream.close()
-  return { events, urls, headers, stream }
+  return { events, attempts, stream }
 }
-
-describe('parseSseFrame', () => {
-  it('reads id, event and joined data lines', () => {
-    expect(parseSseFrame('id: 7\nevent: cell\ndata: {"a":1}\ndata: ')).toEqual({
-      id: '7',
-      event: 'cell',
-      data: '{"a":1}\n',
-    })
-  })
-
-  it('ignores a keep-alive comment', () => {
-    expect(parseSseFrame(': keep-alive')).toBeNull()
-  })
-})
 
 describe('sessionEventFrom', () => {
   it('refuses an unknown event name and broken data', () => {
@@ -90,84 +87,141 @@ describe('sessionEventFrom', () => {
 
 describe('openSessionStream', () => {
   it('sends the bearer and reads the contract events', async () => {
-    const { events, headers } = await collect([
+    const { events, attempts } = await collect(
       [
-        frame(1, 'session', { job_id: '01JOB', state: 'ready', last_event_id: 1 }),
-        frame(2, 'kernel', { state: 'busy' }),
-        frame(3, 'cell', { cell_id: 'c1', state: 'running' }),
-        frame(4, 'output', {
-          cell_id: 'c1',
-          seq: 1,
-          output: { output_type: 'stream', name: 'stdout', text: 'hi\n' },
-        }),
-        frame(5, 'ended', { reason: 'idle' }),
+        [
+          frame(1, 'session', { job_id: '01JOB', state: 'ready', last_event_id: 1 }),
+          frame(2, 'kernel', { state: 'busy' }),
+          frame(3, 'cell', { cell_id: 'c1', state: 'running' }),
+          frame(4, 'output', {
+            cell_id: 'c1',
+            seq: 1,
+            output: { output_type: 'stream', name: 'stdout', text: 'hi\n' },
+          }),
+          frame(5, 'ended', { reason: 'idle' }),
+        ],
       ],
-    ])
-    expect(headers[0].get('Authorization')).toBe('Bearer bearer-token')
-    expect(headers[0].get('Accept')).toBe('text/event-stream')
+      5,
+    )
+    expect(attempts[0].headers.get('Authorization')).toBe('Bearer bearer-token')
+    expect(attempts[0].headers.get('Accept')).toBe('text/event-stream')
     expect(events.map((event) => event.type)).toEqual(['session', 'kernel', 'cell', 'output', 'ended'])
     expect(events[3]).toMatchObject({ id: 4, type: 'output', data: { cell_id: 'c1', seq: 1 } })
   })
 
   it('reassembles an event split across chunks', async () => {
-    const { events } = await collect([['id: 1\nevent: kernel\nda', 'ta: {"state":"idle"}\n\n']])
+    const { events } = await collect([['id: 1\nevent: kernel\nda', 'ta: {"state":"idle"}\n\n']], 1)
     expect(events).toEqual([{ id: 1, type: 'kernel', data: { state: 'idle' } }])
   })
 
-  it('resumes after the last event id it saw', async () => {
-    const { urls, headers } = await collect([
-      [frame(9, 'kernel', { state: 'idle' })],
-      [frame(10, 'kernel', { state: 'busy' })],
-    ])
-    expect(headers[0].has('Last-Event-ID')).toBe(false)
-    expect(headers[1].get('Last-Event-ID')).toBe('9')
-    expect(urls[1].searchParams.get('after')).toBe('9')
+  it('resumes with the after parameter and never a header', async () => {
+    // A cross-origin node would refuse a Last-Event-ID header at the preflight.
+    const { attempts } = await collect(
+      [[frame(9, 'kernel', { state: 'idle' })], [frame(10, 'kernel', { state: 'busy' })]],
+      2,
+    )
+    expect(attempts[0].url.searchParams.has('after')).toBe(false)
+    expect(attempts[1].url.searchParams.get('after')).toBe('9')
+    for (const attempt of attempts) expect(attempt.headers.has('Last-Event-ID')).toBe(false)
   })
 
   it('starts from a resume point the caller kept', async () => {
-    const { headers, urls } = await collect([[frame(42, 'kernel', { state: 'idle' })]], {
-      lastEventId: 41,
-    })
-    expect(headers[0].get('Last-Event-ID')).toBe('41')
-    expect(urls[0].searchParams.get('after')).toBe('41')
+    const { attempts } = await collect([[frame(42, 'kernel', { state: 'idle' })]], 1, { lastEventId: 41 })
+    expect(attempts[0].url.searchParams.get('after')).toBe('41')
   })
 
   it('reports a gap so the caller re-fetches the state', async () => {
-    const { events } = await collect([[frame(1, 'gap', { from: 2, to: 40 })]])
+    const { events } = await collect([[frame(1, 'gap', { from: 2, to: 40 })]], 1)
     expect(events).toEqual([{ id: 1, type: 'gap', data: { from: 2, to: 40 } }])
   })
 
   it('ignores keep-alive comments between events', async () => {
-    const { events } = await collect([[': keep-alive\n\n', frame(1, 'kernel', { state: 'idle' })]])
+    const { events } = await collect([[': keep-alive\n\n', frame(1, 'kernel', { state: 'idle' })]], 1)
     expect(events).toHaveLength(1)
   })
 
   it('reconnects after a failed connection', async () => {
     const errors: unknown[] = []
+    const events: SessionEvent[] = []
+    const arrived = deferred()
     let call = 0
     const fetchImpl = vi.fn(async () => {
       call += 1
       if (call === 1) throw new Error('connection lost')
       return streamResponse([frame(1, 'kernel', { state: 'idle' })], true)
     }) as unknown as typeof fetch
-    const events: SessionEvent[] = []
     const stream = openSessionStream({
       jobId: '01JOB',
       client,
-      onEvent: (event) => events.push(event),
+      onEvent: (event) => {
+        events.push(event)
+        arrived.settle()
+      },
       onError: (error) => errors.push(error),
       fetchImpl,
       retryDelayMs: () => 0,
     })
-    await new Promise((resolve) => setTimeout(resolve, 10))
+    await arrived.promise
     stream.close()
     expect(errors).toHaveLength(1)
     expect(events).toHaveLength(1)
     expect(stream.lastEventId()).toBe(1)
   })
 
+  it('hands a refusal to the caller with its code', async () => {
+    const refused = deferred<unknown>()
+    const fetchImpl = vi.fn(async () => ({
+      ok: false,
+      status: 409,
+      statusText: 'Conflict',
+      json: async () => ({ code: 'session_not_here', error: 'elsewhere', executor_node_id: 'node-b' }),
+    })) as unknown as typeof fetch
+    const stream = openSessionStream({
+      jobId: '01JOB',
+      client,
+      onEvent: () => {},
+      onError: (error) => refused.settle(error),
+      fetchImpl,
+      retryDelayMs: () => 0,
+    })
+    const error = await refused.promise
+    stream.close()
+    expect(sessionNotHere(error)).toBe('node-b')
+  })
+
+  it('reads a fresh client on every attempt', async () => {
+    const arrived = deferred()
+    const tokens: (string | null)[] = []
+    let token = 'first'
+    let call = 0
+    const fetchImpl = vi.fn(async (_url: URL, init: RequestInit) => {
+      tokens.push((init.headers as Headers).get('Authorization'))
+      call += 1
+      if (call === 1) throw new Error('connection lost')
+      arrived.settle()
+      return streamResponse([], true)
+    }) as unknown as typeof fetch
+    const stream = openSessionStream({
+      jobId: '01JOB',
+      client: () => ({ baseUrl: 'https://node-a.example/api/v1', token }),
+      onEvent: () => {},
+      onError: () => {
+        token = 'second'
+      },
+      fetchImpl,
+      retryDelayMs: () => 0,
+    })
+    await arrived.promise
+    stream.close()
+    expect(tokens).toEqual(['Bearer first', 'Bearer second'])
+  })
+
   it('stops for good once it is closed', async () => {
-    const fetchImpl = vi.fn(async () => streamResponse([], false)) as unknown as typeof fetch
+    const opened = deferred()
+    const fetchImpl = vi.fn(async () => {
+      opened.settle()
+      return streamResponse([], true)
+    }) as unknown as typeof fetch
     const stream = openSessionStream({
       jobId: '01JOB',
       client,
@@ -175,11 +229,13 @@ describe('openSessionStream', () => {
       fetchImpl,
       retryDelayMs: () => 0,
     })
-    await new Promise((resolve) => setTimeout(resolve, 5))
+    await opened.promise
     stream.close()
-    const calls = (fetchImpl as unknown as { mock: { calls: unknown[] } }).mock.calls.length
-    await new Promise((resolve) => setTimeout(resolve, 10))
-    expect((fetchImpl as unknown as { mock: { calls: unknown[] } }).mock.calls.length).toBe(calls)
+    const calls = () => (fetchImpl as unknown as { mock: { calls: unknown[] } }).mock.calls.length
+    const before = calls()
+    // Give the loop every chance to reconnect; a closed stream never does.
+    for (let step = 0; step < 50; step += 1) await Promise.resolve()
+    expect(calls()).toBe(before)
   })
 })
 

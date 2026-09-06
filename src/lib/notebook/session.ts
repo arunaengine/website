@@ -3,6 +3,7 @@
 // caller passes the client it resolved from the realm node list.
 import { ApiError, apiRequest, apiUrl, type ApiClientOptions } from '@/lib/api'
 import type { JobStatusResponse } from '@/lib/jobs'
+import { readSseFrames, type SseFrame } from '@/lib/sse'
 import type { NotebookOutput } from './nbformat'
 
 export type SessionRunState = 'starting' | 'ready' | 'busy' | 'ended'
@@ -145,33 +146,9 @@ export function sessionAbsent(error: unknown): boolean {
 }
 
 // ── Event stream ─────────────────────────────────────────────────────────────
-// A fetch reader, not EventSource: the stream needs the bearer header, and the
-// resume header. Reconnects on its own until the caller closes it.
-
-interface SseFrame {
-  id?: string
-  event: string
-  data: string
-}
-
-/** Parses one SSE frame; comment-only keep-alive frames answer null. */
-export function parseSseFrame(frame: string): SseFrame | null {
-  let event = 'message'
-  let id: string | undefined
-  const data: string[] = []
-  for (const line of frame.split(/\r?\n/)) {
-    if (!line || line.startsWith(':')) continue
-    const separator = line.indexOf(':')
-    const field = separator === -1 ? line : line.slice(0, separator)
-    let value = separator === -1 ? '' : line.slice(separator + 1)
-    if (value.startsWith(' ')) value = value.slice(1)
-    if (field === 'event') event = value
-    if (field === 'id') id = value
-    if (field === 'data') data.push(value)
-  }
-  if (!data.length) return null
-  return { id, event, data: data.join('\n') }
-}
+// A fetch reader, not EventSource: the stream needs the bearer header. The
+// resume point travels as a query parameter, because the executing node is a
+// different origin and a Last-Event-ID header would not survive the preflight.
 
 const EVENT_TYPES = new Set(['session', 'cell', 'output', 'kernel', 'credential', 'gap', 'ended'])
 
@@ -194,7 +171,8 @@ export function sessionEventFrom(frame: SseFrame): SessionEvent | null {
 
 export interface SessionStreamOptions {
   jobId: string
-  client: ApiClientOptions
+  /** Read again on every attempt, so a refreshed token and a new node are used. */
+  client: () => ApiClientOptions
   /** Resume point; the first connect asks for everything after it. */
   lastEventId?: number
   onEvent: (event: SessionEvent) => void
@@ -231,28 +209,24 @@ export function openSessionStream(options: SessionStreamOptions): SessionStream 
     controller = null
   }
 
-  async function readBody(response: Response, touch: () => void) {
-    const reader = response.body?.getReader()
-    if (!reader) throw new Error('The session stream carries no body.')
-    const decoder = new TextDecoder()
-    let buffer = ''
-    while (true) {
-      const { done, value } = await reader.read()
-      // Any byte proves the connection lives, a keep-alive comment included.
-      touch()
-      buffer += decoder.decode(value, { stream: !done })
-      const frames = buffer.split(/\r?\n\r?\n/)
-      buffer = frames.pop() ?? ''
-      for (const raw of frames) {
-        const frame = parseSseFrame(raw)
-        if (!frame) continue
-        const event = sessionEventFrom(frame)
-        if (!event) continue
-        if (event.id) lastEventId = event.id
-        options.onEvent(event)
-      }
-      if (done) return
+  function applyFrame(frame: SseFrame) {
+    const event = sessionEventFrom(frame)
+    if (!event) return
+    if (event.id) lastEventId = event.id
+    options.onEvent(event)
+  }
+
+  // A refusal carries the code and the body the caller needs to react to it.
+  async function refusal(response: Response): Promise<ApiError> {
+    let body: Record<string, unknown> = {}
+    try {
+      body = (await response.json()) as Record<string, unknown>
+    } catch {
+      // Not every refusal carries a JSON body.
     }
+    const message = typeof body.error === 'string' ? body.error : `${response.status} ${response.statusText}`
+    const code = typeof body.code === 'string' ? body.code : undefined
+    return new ApiError(response.status, message, code, body)
   }
 
   /** One attempt; answers true when the stream was open before it ended. */
@@ -266,19 +240,20 @@ export function openSessionStream(options: SessionStreamOptions): SessionStream 
       watchdog = setTimeout(() => active.abort(), idleTimeoutMs)
     }
     try {
+      const client = options.client()
       const headers = new Headers({ Accept: 'text/event-stream' })
-      if (options.client.token) headers.set('Authorization', `Bearer ${options.client.token}`)
-      if (lastEventId) headers.set('Last-Event-ID', String(lastEventId))
+      if (client.token) headers.set('Authorization', `Bearer ${client.token}`)
       const url = apiUrl(
         sessionPath(options.jobId, '/events'),
         lastEventId ? { after: lastEventId } : {},
-        options.client,
+        client,
       )
       const response = await run(url, { headers, cache: 'no-store', signal: active.signal })
-      if (!response.ok) throw new ApiError(response.status, `${response.status} ${response.statusText}`)
+      if (!response.ok) throw await refusal(response)
       opened = true
       options.onOpen?.()
-      await readBody(response, touch)
+      // Any byte proves the connection lives, a keep-alive comment included.
+      await readSseFrames(response.body, applyFrame, touch)
     } catch (cause) {
       if (!closed) options.onError?.(cause)
     } finally {

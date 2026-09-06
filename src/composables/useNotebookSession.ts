@@ -6,7 +6,7 @@ import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import type { NotebookStore } from '@/composables/useNotebook'
 import { getJob, submitErrorMessage, submitJob, type JobStatusResponse } from '@/lib/jobs'
-import type { ApiClientOptions } from '@/lib/api'
+import { ApiError, type ApiClientOptions } from '@/lib/api'
 import {
   endSession,
   getSessionState,
@@ -121,18 +121,44 @@ export function createNotebookSession(notebook: NotebookStore) {
     if (!jobId.value) return
     stream = openSessionStream({
       jobId: jobId.value,
-      client: client.value,
+      client: () => client.value,
       lastEventId: state.value?.last_event_id,
       onEvent: applyEvent,
       onOpen: () => {
         streamOpen.value = true
         error.value = null
       },
-      onError: (cause) => {
-        streamOpen.value = false
-        error.value = `The session stream stopped: ${errorMessage(cause)}`
-      },
+      onError: onStreamError,
     })
+  }
+
+  /** What a broken connection means: gone, moved, refused, or worth retrying. */
+  function onStreamError(cause: unknown) {
+    streamOpen.value = false
+    if (sessionAbsent(cause)) {
+      forget('That session is no longer running.')
+      return
+    }
+    const elsewhere = sessionNotHere(cause)
+    if (elsewhere) {
+      nodeId.value = elsewhere
+      notebook.patchMeta({ executor_node_id: elsewhere })
+      openStream()
+      return
+    }
+    if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) {
+      closeStream()
+      error.value = 'This session refused the connection. Sign in again and reopen the notebook.'
+      return
+    }
+    error.value = `The session stream stopped: ${errorMessage(cause)}`
+  }
+
+  /** Drops the session for good, so the bar offers Start again. */
+  function forget(reason?: string) {
+    detach()
+    notebook.patchMeta({ job_id: undefined, executor_node_id: undefined })
+    if (reason) error.value = reason
   }
 
   /** Reads the session state again, following the node that answers for it. */
@@ -155,8 +181,7 @@ export function createNotebookSession(notebook: NotebookStore) {
         return refresh()
       }
       if (sessionAbsent(cause)) {
-        state.value = null
-        error.value = 'That session is no longer running.'
+        forget('That session is no longer running.')
         return false
       }
       error.value = errorMessage(cause)
