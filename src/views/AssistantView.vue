@@ -153,7 +153,17 @@ function continueInPanel() {
       aria-label="Chat list"
       class="hidden w-72 max-w-[80vw] shrink-0 flex-col border-r border-border bg-muted/20 md:flex"
     >
-      <div class="flex h-12 shrink-0 items-center justify-end border-b border-border px-2">
+      <div class="flex h-12 shrink-0 items-center justify-end gap-1 border-b border-border px-2">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Start a new chat"
+          title="Start a new chat"
+          :disabled="!available || !historyReady"
+          @click="startChat"
+        >
+          <Plus class="size-4" />
+        </Button>
         <Button
           variant="ghost"
           size="icon-sm"
