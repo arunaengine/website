@@ -177,3 +177,50 @@ describe('object browser selection', () => {
     expect(trigger.props.disabled).toBe(true)
   })
 })
+
+describe('notebooks in the bucket', () => {
+  const notebookObject = {
+    key: 'notebooks/counts.ipynb',
+    name: 'counts.ipynb',
+    size: 1024,
+    lastModified: new Date('2026-02-01T00:00:00Z'),
+  }
+
+  it('opens a stored notebook in the notebook page', async () => {
+    push.mockClear()
+    openDetails.mockClear()
+    const root = await render({ objects: ref([notebookObject]) })
+    const row = element(root, (node) => node.tag === 'tr' && content(node).includes('counts.ipynb'))
+
+    await bubbleClick(row)
+
+    expect(push).toHaveBeenCalledWith({
+      name: 'notebook',
+      params: { bucketId: 'reef', key: 'notebooks/counts.ipynb' },
+      query: { group: 'g-1' },
+    })
+    expect(openDetails).not.toHaveBeenCalled()
+  })
+
+  it('keeps opening every other file in its details', async () => {
+    push.mockClear()
+    openDetails.mockClear()
+    const root = await render()
+    const row = element(root, (node) => node.tag === 'tr' && content(node).includes('reads.fastq'))
+
+    await bubbleClick(row)
+
+    expect(openDetails).toHaveBeenCalled()
+    expect(push).not.toHaveBeenCalled()
+  })
+
+  it('offers a new notebook only while the session may write notebooks/', async () => {
+    resetS3Access()
+    const root = await render()
+    expect(button(root, 'New notebook').props.disabled).toBe(false)
+
+    s3Access.canWrite = (_bucket: string, key: string) => key !== 'notebooks/'
+    const refused = await render()
+    expect(button(refused, 'New notebook').props.disabled).toBe(true)
+  })
+})

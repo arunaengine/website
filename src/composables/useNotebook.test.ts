@@ -3,24 +3,12 @@ import { ref } from 'vue'
 
 const s3 = vi.hoisted(() => ({ getObjectText: vi.fn(), putTextObject: vi.fn() }))
 vi.mock('@/composables/useS3', () => ({ useS3: () => s3 }))
+import { memoryStorage } from '@/test/storage'
 
 const { createNotebook } = await import('./useNotebook')
 const { emptyNotebook, serializeNotebook } = await import('@/lib/notebook/nbformat')
 const { readWorkingCopy } = await import('@/lib/notebook/document')
 
-function memoryStorage(): Storage {
-  const entries = new Map<string, string>()
-  return {
-    get length() {
-      return entries.size
-    },
-    clear: () => entries.clear(),
-    getItem: (key: string) => entries.get(key) ?? null,
-    key: (index: number) => [...entries.keys()][index] ?? null,
-    removeItem: (key: string) => void entries.delete(key),
-    setItem: (key: string, value: string) => void entries.set(key, value),
-  }
-}
 
 const seed = () => ({ runtime: 'python-notebook', group_id: 'group-1' })
 
