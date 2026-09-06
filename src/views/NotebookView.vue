@@ -46,9 +46,13 @@ const autosaveTimer = ref<ReturnType<typeof setInterval> | null>(null)
 
 async function open() {
   if (!bucket.value || !key.value) return
-  await s3.ensureSession(notebook.meta.value?.group_id || myGroups.value[0]?.id || '').catch(() => {})
+  const asked = typeof route.query.group === 'string' ? route.query.group : (myGroups.value[0]?.id ?? '')
+  if (asked) await s3.ensureSession(asked).catch(() => {})
   await notebook.load()
-  if (notebook.meta.value?.job_id) void session.attach()
+  // The stored notebook may belong to another group than the link named.
+  const owner = notebook.meta.value?.group_id
+  if (owner && owner !== asked) await s3.ensureSession(owner).catch(() => {})
+  await session.attachSaved()
 }
 
 onMounted(() => {

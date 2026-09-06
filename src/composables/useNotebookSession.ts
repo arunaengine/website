@@ -164,7 +164,16 @@ export function createNotebookSession(notebook: NotebookStore) {
     }
   }
 
-  /** Reattaches to the session the notebook names, after a reload. */
+  /** Picks up the session the notebook names, once the document is read. */
+  async function attachSaved(): Promise<void> {
+    const meta = notebook.meta.value
+    if (!meta?.job_id) return
+    jobId.value = meta.job_id
+    nodeId.value = meta.executor_node_id ?? ''
+    await attach()
+  }
+
+  /** Reattaches to the session, after a reload or a node change. */
   async function attach(): Promise<void> {
     if (!jobId.value || attaching.value) return
     attaching.value = true
@@ -172,6 +181,8 @@ export function createNotebookSession(notebook: NotebookStore) {
     try {
       if (!nodeId.value) await findNode()
       if (await refresh()) openStream()
+    } catch (cause) {
+      error.value = errorMessage(cause)
     } finally {
       attaching.value = false
     }
@@ -298,6 +309,7 @@ export function createNotebookSession(notebook: NotebookStore) {
     ended,
     running,
     attach,
+    attachSaved,
     refresh,
     start,
     end,
