@@ -7,6 +7,7 @@ import { vi } from 'vitest'
 import * as DeletionRequest from '@/lib/deletion/request'
 import * as StateBadge from '@/lib/stateBadge'
 import * as DropEntries from '@/lib/upload/dropEntries'
+import * as NotebookDocument from '@/lib/notebook/document'
 import * as Utils from '@/lib/utils'
 import { compileClientComponent, moduleDefault } from '@/test/clientRender'
 
@@ -60,6 +61,7 @@ export function objectBrowser(): Component {
       '@/lib/deletion/request': DeletionRequest,
       '@/lib/stateBadge': StateBadge,
       '@/lib/upload/dropEntries': DropEntries,
+      '@/lib/notebook/document': NotebookDocument,
       '@/lib/utils': Utils,
       '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
       '@/components/ui/Button.vue': moduleDefault(ButtonStub),

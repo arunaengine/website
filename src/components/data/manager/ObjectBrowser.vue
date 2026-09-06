@@ -25,6 +25,7 @@ import { featureEnabled } from '@/lib/config'
 import { collectDropFiles } from '@/lib/upload/dropEntries'
 import { stateVariant } from '@/lib/stateBadge'
 import { selectionNoun } from '@/lib/deletion/request'
+import { isNotebookKey } from '@/lib/notebook/document'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
@@ -37,6 +38,7 @@ import {
   KeyRound,
   Link2,
   MoreHorizontal,
+  NotebookPen,
   Plus,
   Settings,
   Trash2,
@@ -47,6 +49,7 @@ const props = defineProps<{ manager: DataManager }>()
 const emit = defineEmits<{
   (e: 'add-data'): void
   (e: 'new-folder'): void
+  (e: 'new-notebook'): void
   (e: 'sync-to-node'): void
 }>()
 
@@ -141,6 +144,19 @@ watch(
   },
   { immediate: true },
 )
+
+// A notebook opens in the notebook page; every other object opens its details.
+function openObject(object: ObjectEntry) {
+  if (isNotebookKey(object.key) && !remoteNodeId.value) {
+    void router.push({
+      name: 'notebook',
+      params: { bucketId: bucket.value, key: object.key },
+      query: { group: activeGroupId.value },
+    })
+    return
+  }
+  openDetails(object)
+}
 
 function openBucketSettings() {
   void router.push(storageLink.value)
@@ -323,6 +339,7 @@ async function onDrop(event: DragEvent) {
           </Popover>
           <!-- The Add data pipeline always targets the connected node. -->
           <Button v-if="!remoteBlocked" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix" :title="writeRestrictionMessage ?? 'Create a folder'" @click="emit('new-folder')"><FolderPlus class="h-4 w-4" /> New folder</Button>
+          <Button v-if="!remoteNodeId" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix" :title="writeRestrictionMessage ?? 'Start a notebook in this bucket'" @click="emit('new-notebook')"><NotebookPen class="h-4 w-4" /> New notebook</Button>
           <Button v-if="!remoteNodeId" data-tour="bucket-add-data" size="sm" :disabled="!canWriteCurrentPrefix" :title="writeRestrictionMessage ?? 'Add data'" @click="emit('add-data')"><Plus class="h-4 w-4" /> Add data</Button>
         </div>
       </div>
@@ -457,7 +474,7 @@ async function onDrop(event: DragEvent) {
               v-for="object in objects"
               :key="object.key"
               class="cursor-pointer border-t border-border hover:bg-muted/30"
-              @click="openDetails(object)"
+              @click="openObject(object)"
             >
               <td class="w-10 px-4 py-2.5" @click.stop>
                 <input
