@@ -22,11 +22,16 @@ export interface GroupQuotaBody {
   quota: ComputeQuotaBody
 }
 
+/** Realm default for how long a notebook session may sit idle. */
+export const DEFAULT_SESSION_IDLE_AFTER_MS = 1_800_000
+
 export interface ComputeConfigBody {
   links: LocationLinkBody[]
   pessimistic_bandwidth_bytes_per_sec: number
   availability_stale_after_ms: number
   witness_base_delay_ms: number
+  /** Absent from a node that does not serve notebook sessions yet. */
+  session_idle_after_ms?: number
   default_group_quota: ComputeQuotaBody
   group_quotas: GroupQuotaBody[]
 }
@@ -115,6 +120,7 @@ export interface ComputeConfigDraft {
   pessimistic_bandwidth: ByteInputDraft
   availability_stale_after_ms: NumericDraftValue
   witness_base_delay_ms: NumericDraftValue
+  session_idle_after_ms: NumericDraftValue
   default_group_quota: ComputeQuotaDraft
   group_quotas: GroupQuotaDraft[]
 }
@@ -258,6 +264,7 @@ export function computeConfigDraftFromBody(config: ComputeConfigBody): ComputeCo
     pessimistic_bandwidth: seedByteInput(config.pessimistic_bandwidth_bytes_per_sec),
     availability_stale_after_ms: String(config.availability_stale_after_ms),
     witness_base_delay_ms: String(config.witness_base_delay_ms),
+    session_idle_after_ms: String(config.session_idle_after_ms ?? DEFAULT_SESSION_IDLE_AFTER_MS),
     default_group_quota: quotaDraftFromBody(config.default_group_quota),
     group_quotas: config.group_quotas.map((entry) => ({
       group_id: entry.group_id,
@@ -332,6 +339,10 @@ export function validateComputeConfigDraft(draft: ComputeConfigDraft): string[] 
   if (!Number.isSafeInteger(witnessDelay) || witnessDelay <= 0) {
     problems.push('Witness base delay must be greater than zero milliseconds.')
   }
+  const sessionIdle = Number(text(draft.session_idle_after_ms))
+  if (!Number.isSafeInteger(sessionIdle) || sessionIdle <= 0) {
+    problems.push('Session idle timeout must be greater than zero milliseconds.')
+  }
   problems.push(...quotaProblems(draft.default_group_quota, 'Realm default'))
   if (draft.group_quotas.length > MAX_GROUP_QUOTAS) {
     problems.push(`A realm can configure at most ${MAX_GROUP_QUOTAS} group quota overrides.`)
@@ -359,6 +370,7 @@ export function computeConfigBodyFromDraft(draft: ComputeConfigDraft): ComputeCo
     pessimistic_bandwidth_bytes_per_sec: byteInputValue(draft.pessimistic_bandwidth) as number,
     availability_stale_after_ms: Number(text(draft.availability_stale_after_ms)),
     witness_base_delay_ms: Number(text(draft.witness_base_delay_ms)),
+    session_idle_after_ms: Number(text(draft.session_idle_after_ms)),
     default_group_quota: serializeQuotaDraft(draft.default_group_quota),
     group_quotas: draft.group_quotas.map((entry) => ({
       group_id: entry.group_id.trim(),

@@ -349,6 +349,13 @@ watch(
                     <Input v-model="draft.witness_base_delay_ms" type="number" min="1" step="1" class="mt-1" />
                     <p class="mt-1 text-[11px] text-muted-foreground">Must be greater than zero.</p>
                   </div>
+                  <div>
+                    <label class="text-xs font-medium text-foreground">Session idle timeout (ms)</label>
+                    <Input v-model="draft.session_idle_after_ms" type="number" min="1" step="1" class="mt-1" />
+                    <p class="mt-1 text-[11px] text-muted-foreground">
+                      How long a notebook session may sit idle before the node ends it. A session may pick a shorter one.
+                    </p>
+                  </div>
                 </div>
               </div>
             </section>
