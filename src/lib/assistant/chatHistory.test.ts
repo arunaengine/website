@@ -85,17 +85,28 @@ describe('assistant chat history', () => {
     expect(parsed.state?.activeChatId).toBe(parsed.state?.chats[0]?.id)
   })
 
-  it('drops a restored artifact card whose bytes are gone', () => {
-    // A blob URL belongs to the tab that made it; a chart card keeps a table one.
+  it('keeps a restored artifact card without its dead blob URL', () => {
+    // A blob URL belongs to the tab that made it; the record stays so the
+    // card can read the object again.
     const store = createAssistantChatStore(scope('user-a'), backing)
     const chat = newAssistantChat()
+    const record = {
+      bucket: 'work',
+      key: 'out/chart.png',
+      versionId: 'v1',
+      name: 'chart.png',
+      contentType: 'image/png',
+      previewKind: 'image',
+      size: 4096,
+      jobId: 'job-1',
+    }
     const calls = [
       {
         id: 'c1',
         name: 'show_artifact',
         input: {},
         state: 'done',
-        view: { kind: 'artifact', title: 'chart.png', artifact: { url: 'blob:aruna/chart' } },
+        view: { kind: 'artifact', title: 'chart.png', artifact: { url: 'blob:aruna/chart', ...record } },
       },
       { id: 'c2', name: 'show_table', input: {}, state: 'done', view: { kind: 'table', title: 'Buckets' } },
       {
@@ -113,7 +124,9 @@ describe('assistant chat history', () => {
 
     const restored = store.load().chats[0]?.messages[0]?.calls ?? []
 
-    expect(restored.map((call) => call.view?.kind)).toEqual([undefined, 'table', 'artifact'])
+    expect(restored.map((call) => call.view?.kind)).toEqual(['artifact', 'table', 'artifact'])
+    const chart = restored[0]?.view
+    expect(chart?.kind === 'artifact' && chart.artifact).toEqual({ url: '', ...record })
     const kept = restored[2]?.view
     expect(kept?.kind === 'artifact' && kept.artifact).toMatchObject({ url: '', text: 'hello' })
   })

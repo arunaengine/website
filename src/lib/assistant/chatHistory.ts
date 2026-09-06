@@ -113,17 +113,17 @@ export function isModelMessage(value: unknown): value is ModelMessage {
   return record(value) && typeof value.role === 'string' && MODEL_ROLES.has(value.role) && 'content' in value
 }
 
-// A blob URL dies with the tab. A card that carries its text still draws from
-// that text, with the dead URL dropped; anything else keeps only its record.
+// A blob URL dies with the tab. The card keeps its record and its text, if
+// any, and reads the object again when it has neither the URL nor the text.
 function restoredView(view: Record<string, unknown>): ToolCallView['view'] | null {
   if (view.kind !== 'artifact') return view as ToolCallView['view']
   const artifact = record(view.artifact) ? view.artifact : null
-  const url = artifact?.url
+  if (!artifact) return null
+  const url = artifact.url
   if (typeof url === 'string' && !url.startsWith('blob:')) return view as ToolCallView['view']
-  if (!artifact || typeof artifact.text !== 'string' || !artifact.text) return null
   // Only the head of the text is worth a storage slot; the card holds the rest.
-  const text = artifact.text.slice(0, MAX_TEXT_LENGTH)
-  return { ...view, artifact: { ...artifact, url: '', text } } as ToolCallView['view']
+  const text = typeof artifact.text === 'string' ? { text: artifact.text.slice(0, MAX_TEXT_LENGTH) } : {}
+  return { ...view, artifact: { ...artifact, url: '', ...text } } as ToolCallView['view']
 }
 
 function normalizeCall(value: unknown): ToolCallView | null {

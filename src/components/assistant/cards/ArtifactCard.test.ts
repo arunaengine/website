@@ -40,9 +40,12 @@ const ImagePreview = compileClientComponent(
   { vue: VueRuntime },
 )
 
+const loadArtifact = vi.fn()
+
 const ArtifactCard = compileClientComponent(new URL('./ArtifactCard.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': icons,
+  '@/composables/useAssistantChat': { loadArtifact },
   '@/components/preview/ImagePreview.vue': moduleDefault(ImagePreview),
   '@/components/preview/TextPreview.vue': moduleDefault(TextStub),
   '@/components/preview/MarkdownPreview.vue': moduleDefault(TextStub),
@@ -83,6 +86,8 @@ function tag(root: HostNode, name: string): HostNode | undefined {
 }
 
 afterEach(() => {
+  loadArtifact.mockReset()
+  vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
 
@@ -146,8 +151,52 @@ describe('ArtifactCard', () => {
     }))
 
     expect(fetchMock).not.toHaveBeenCalled()
+    expect(loadArtifact).not.toHaveBeenCalled()
     expect(content(root)).toContain('still here')
-    expect(content(root)).not.toContain('Reading the file')
+    expect(content(root)).not.toContain('Loading the file')
+  })
+
+  it('reads the object again for a restored image', async () => {
+    // A stored card keeps the record only; the bytes are read once on mount.
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    loadArtifact.mockResolvedValue({
+      url: 'blob:aruna/restored',
+      contentType: 'image/png',
+      kind: 'image',
+      name: 'chart.png',
+      size: 4096,
+    })
+
+    const { app, root } = await card(artifact({ url: '', versionId: 'v-2' }))
+    await flush()
+
+    expect(loadArtifact).toHaveBeenCalledOnce()
+    expect(loadArtifact).toHaveBeenCalledWith({
+      bucket: 'work',
+      key: 'results/run-1/chart.png',
+      versionId: 'v-2',
+      contentType: 'image/png',
+      filename: 'chart.png',
+      size: 4096,
+    })
+    expect(element(root, (node) => node.tag === 'img').props.src).toBe('blob:aruna/restored')
+
+    app.unmount()
+    expect(revoke).toHaveBeenCalledWith('blob:aruna/restored')
+  })
+
+  it('falls back to the file link when the object cannot be read', async () => {
+    loadArtifact.mockRejectedValue(new Error('The object could not be fetched (HTTP 403).'))
+
+    const { root } = await card(artifact({ url: '' }))
+    await flush()
+    const open = nodes(root).filter((node) => node.props.title === 'Open the file viewer')
+
+    expect(tag(root, 'img')).toBeUndefined()
+    expect(content(root)).toContain('The object could not be fetched (HTTP 403).')
+    expect(open).toHaveLength(2)
+    expect(open[1].props['data-object']).toBe('work/results/run-1/chart.png')
+    expect(nodes(root).some((node) => node.tag === 'a' && node.props.download)).toBe(false)
   })
 
   it('reads a json output and shows its text', async () => {
@@ -211,13 +260,13 @@ describe('ArtifactCard', () => {
       name: 'notes.txt',
       key: 'out/notes.txt',
     }))
-    expect(content(root)).toContain('Reading the file')
+    expect(content(root)).toContain('Loading the file')
 
     release()
     await flush()
 
     expect(content(root)).toContain('The object could not be fetched (HTTP 403).')
-    expect(content(root)).not.toContain('Reading the file')
+    expect(content(root)).not.toContain('Loading the file')
   })
 
   it('shows the caption the assistant wrote', async () => {

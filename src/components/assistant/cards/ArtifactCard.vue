@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // A stored object the assistant asked to show: the image itself, the text it
 // holds, or a download row for bytes the browser cannot render.
-import { computed, defineAsyncComponent, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, ref, watch } from 'vue'
 import BucketLink from '@/components/assistant/BucketLink.vue'
 import ImagePreview from '@/components/preview/ImagePreview.vue'
 import ObjectLink from '@/components/assistant/ObjectLink.vue'
@@ -11,6 +11,7 @@ import { classifyObject } from '@/composables/useObjectPreview'
 import { errorMessage, formatBytes, truncateMiddle } from '@/lib/utils'
 import { ARTIFACT_TEXT_CAP } from '@/lib/assistant/types'
 import type { ArtifactView } from '@/lib/assistant/types'
+import type { LoadedArtifact } from '@/lib/assistant/renderTools'
 import { Download, Eye, FileBox } from '@lucide/vue'
 
 const props = defineProps<{ title: string; caption?: string; artifact: ArtifactView }>()
@@ -24,9 +25,18 @@ const HtmlPreview = defineAsyncComponent(() => import('@/components/preview/Html
 const MarkdownPreview = defineAsyncComponent(() => import('@/components/preview/MarkdownPreview.vue'))
 const CsvPreview = defineAsyncComponent(() => import('@/components/preview/CsvPreview.vue'))
 
+// A restored card holds the object's record but not its bytes; they are read
+// again here and shown from `loaded`.
+const loaded = ref<LoadedArtifact | null>(null)
+const fetched = ref<string | null>(null)
+const loading = ref(false)
+const failed = ref<string | null>(null)
+let readId = 0
+
 const classified = computed(() => classifyObject({ key: props.artifact.name || props.artifact.key, contentType: props.artifact.contentType }))
 // An artifact above the byte cap was never fetched, so it stays a download row.
-const kind = computed(() => (props.artifact.previewKind === 'download' ? 'download' : classified.value.kind))
+const kind = computed(() =>
+  loaded.value?.kind ?? (props.artifact.previewKind === 'download' ? 'download' : classified.value.kind))
 const isText = computed(() => TEXT_KINDS.has(kind.value))
 // An HTML report is shown as the page it is, never as its markup.
 const isHtml = computed(() =>
@@ -34,22 +44,28 @@ const isHtml = computed(() =>
   && (/\.x?html?$/i.test(props.artifact.name || props.artifact.key)
     || props.artifact.contentType.toLowerCase().startsWith('text/html')))
 const delimiter = computed(() => (props.artifact.key.toLowerCase().endsWith('.tsv') ? '\t' : ','))
-
-const fetched = ref<string | null>(null)
-const loading = ref(false)
-const failed = ref<string | null>(null)
-let readId = 0
+const url = computed(() => loaded.value?.url ?? props.artifact.url)
+const size = computed(() => loaded.value?.size ?? props.artifact.size)
+const contentType = computed(() => loaded.value?.contentType ?? props.artifact.contentType)
+const isDownload = computed(() => kind.value !== 'image' && !isText.value)
 
 // The bytes normally arrive with the card; a card without them reads the URL.
-const text = computed(() => (isText.value ? props.artifact.text ?? fetched.value : null))
+const text = computed(() => (isText.value ? props.artifact.text ?? loaded.value?.text ?? fetched.value : null))
+// A stored card that has neither its URL nor its text reads the object again.
+const needsObject = computed(() =>
+  !props.artifact.url && props.artifact.previewKind !== 'download' && !(isText.value && props.artifact.text !== undefined))
 
-async function readText(url: string) {
+function release(target: LoadedArtifact | null) {
+  if (target?.url.startsWith('blob:')) URL.revokeObjectURL(target.url)
+}
+
+async function readText(target: string) {
   const id = ++readId
   loading.value = true
   failed.value = null
   fetched.value = null
   try {
-    const response = await fetch(url)
+    const response = await fetch(target)
     if (!response.ok) throw new Error(`This file could not be read (HTTP ${response.status}).`)
     const body = await response.text()
     if (id !== readId) return
@@ -61,20 +77,52 @@ async function readText(url: string) {
   }
 }
 
-watch(
-  () => [props.artifact.url, props.artifact.text, isText.value] as const,
-  () => {
-    if (isText.value && props.artifact.text === undefined && props.artifact.url) {
-      void readText(props.artifact.url)
+// The same read path and byte cap as the show_artifact tool.
+async function readObject() {
+  const id = ++readId
+  loading.value = true
+  failed.value = null
+  try {
+    const { loadArtifact } = await import('@/composables/useAssistantChat')
+    const result = await loadArtifact({
+      bucket: props.artifact.bucket,
+      key: props.artifact.key,
+      versionId: props.artifact.versionId,
+      contentType: props.artifact.contentType || undefined,
+      filename: props.artifact.name || undefined,
+      size: props.artifact.size,
+    })
+    if (id !== readId) {
+      release(result)
       return
     }
+    loaded.value = result
+  } catch (cause) {
+    if (id === readId) failed.value = errorMessage(cause)
+  } finally {
+    if (id === readId) loading.value = false
+  }
+}
+
+watch(
+  () => [props.artifact.url, props.artifact.text, props.artifact.previewKind] as const,
+  () => {
     ++readId
+    release(loaded.value)
+    loaded.value = null
     fetched.value = null
     failed.value = null
     loading.value = false
+    if (needsObject.value) void readObject()
+    else if (isText.value && props.artifact.text === undefined && props.artifact.url) void readText(props.artifact.url)
   },
   { immediate: true },
 )
+
+onBeforeUnmount(() => {
+  ++readId
+  release(loaded.value)
+})
 </script>
 
 <template>
@@ -104,30 +152,45 @@ watch(
     <div class="space-y-2 px-3 py-2.5">
       <p v-if="caption" class="leading-relaxed text-foreground/85">{{ caption }}</p>
 
-      <ImagePreview v-if="kind === 'image'" :url="artifact.url" :name="artifact.name" />
+      <Spinner v-if="loading" label="Loading the file…" show-label />
 
-      <template v-else-if="isText">
-        <Spinner v-if="loading" label="Reading the file…" show-label />
-        <Notice v-else-if="failed" tone="error">{{ failed }}</Notice>
-        <HtmlPreview v-else-if="text !== null && isHtml" :text="text" :name="artifact.name" />
+      <ImagePreview v-else-if="kind === 'image' && !failed" :url="url" :name="artifact.name" />
+
+      <template v-else-if="isText && !failed">
+        <HtmlPreview v-if="text !== null && isHtml" :text="text" :name="artifact.name" />
         <CsvPreview v-else-if="text !== null && kind === 'table'" :text="text" :delimiter="delimiter" />
         <MarkdownPreview v-else-if="text !== null && kind === 'markdown'" :text="text" />
         <TextPreview v-else-if="text !== null" :text="text" :language="classified.language" />
       </template>
 
-      <div v-else class="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/20 px-3 py-2">
-        <span class="min-w-0 flex-1 truncate font-medium text-foreground">{{ artifact.name }}</span>
-        <span v-if="artifact.size !== undefined" class="font-mono text-[11px] text-muted-foreground">
-          {{ formatBytes(artifact.size) }}
-        </span>
-        <a
-          :href="artifact.url"
-          :download="artifact.name"
-          class="inline-flex items-center gap-1 font-medium text-primary hover:underline"
-        >
-          <Download class="h-3.5 w-3.5" aria-hidden="true" /> Download
-        </a>
-      </div>
+      <template v-else>
+        <Notice v-if="failed" tone="error">{{ failed }}</Notice>
+        <div class="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/20 px-3 py-2">
+          <span class="min-w-0 flex-1 truncate font-medium text-foreground">{{ artifact.name }}</span>
+          <span v-if="size !== undefined" class="font-mono text-[11px] text-muted-foreground">
+            {{ formatBytes(size) }}
+          </span>
+          <a
+            v-if="url && isDownload"
+            :href="url"
+            :download="artifact.name"
+            class="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+          >
+            <Download class="h-3.5 w-3.5" aria-hidden="true" /> Download
+          </a>
+          <ObjectLink
+            v-else
+            :bucket="artifact.bucket"
+            :object-key="artifact.key"
+            :name="artifact.name"
+            :size="size"
+            class="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+            title="Open the file viewer"
+          >
+            <Eye class="h-3.5 w-3.5" aria-hidden="true" /> Open
+          </ObjectLink>
+        </div>
+      </template>
 
       <p class="flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-[10px] text-muted-foreground">
         <span class="break-all">
@@ -145,8 +208,8 @@ watch(
         </span>
         <span v-if="artifact.versionId">version {{ truncateMiddle(artifact.versionId) }}</span>
         <span v-if="artifact.jobId">job {{ artifact.jobId }}</span>
-        <span v-if="artifact.size !== undefined">{{ formatBytes(artifact.size) }}</span>
-        <span>{{ artifact.contentType }}</span>
+        <span v-if="size !== undefined">{{ formatBytes(size) }}</span>
+        <span>{{ contentType }}</span>
       </p>
     </div>
   </div>
