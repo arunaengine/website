@@ -3,6 +3,7 @@
 // that kind needs. A browser key stays in this browser session or goes to the
 // node sealed with the user's passphrase; saving tests the connection first.
 import { computed, reactive, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
@@ -11,7 +12,6 @@ import Spinner from '@/components/ui/Spinner.vue'
 import ModelCombobox from '@/components/assistant/ModelCombobox.vue'
 import ChatGptLogin from './ChatGptLogin.vue'
 import ProviderIcon from './ProviderIcon.vue'
-import VaultGate from './VaultGate.vue'
 import { OPENAI_ROOT, PROVIDER_KINDS, providerChoice, providerKind, type ProviderChoice } from './providerKinds'
 import { useAssistantProviders, type ProviderStorage } from '@/composables/useAssistantProviders'
 import { useUserVault } from '@/composables/useUserVault'
@@ -51,7 +51,12 @@ const storageOptions = [
   },
 ] satisfies Array<{ value: ProviderStorage; label: string; help: string }>
 const storageChoice = computed(() => vaultState.value !== 'unsupported')
-const storageReady = computed(() => storage.value === 'session' || vaultState.value === 'unlocked')
+// Keys go to the node only while they are unlocked there; the keys tab creates or unlocks them.
+const nodeReady = computed(() => vaultState.value === 'unlocked')
+const storageReady = computed(() => storage.value === 'session' || nodeReady.value)
+const nodeNote = computed(() => (vaultState.value === 'locked'
+  ? 'Your keys on this node are locked.'
+  : 'There is no passphrase for keys on this node yet.'))
 
 const editing = computed(() => Boolean(props.provider))
 const choice = ref<ProviderChoice | ''>(props.provider ? providerChoice(props.provider, existing) : '')
@@ -390,15 +395,21 @@ async function save() {
               name="provider-key-storage"
               :value="option.value"
               :checked="storage === option.value"
+              :disabled="option.value === 'node' && !nodeReady"
               class="mt-1 accent-primary"
               @change="storage = option.value"
             >
             <span class="min-w-0">
               <span class="block text-sm text-foreground">{{ option.label }}</span>
               <span class="mt-0.5 block text-xs text-muted-foreground">{{ option.help }}</span>
+              <span v-if="option.value === 'node' && !nodeReady" class="mt-1 block text-xs text-muted-foreground">
+                {{ nodeNote }}
+                <RouterLink :to="{ name: 'settings', query: { tab: 'keys' } }" class="text-primary hover:underline">
+                  Open Settings, Provider keys
+                </RouterLink>
+              </span>
             </span>
           </label>
-          <VaultGate v-if="storage === 'node' && !storageReady" />
         </fieldset>
 
         <Notice v-if="failure" tone="error">{{ failure }}</Notice>

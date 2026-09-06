@@ -101,6 +101,7 @@ export function navEntries(options: NavOptions): NavEntry[] {
 export const SETTINGS_TAB_ANCHORS: Record<string, string> = {
   access: 'settings-access',
   assistant: 'settings-assistant',
+  keys: 'settings-keys',
 }
 
 /** Stable in-app tour anchor for a sidebar entry, derived from its label. */

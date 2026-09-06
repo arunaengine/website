@@ -14,6 +14,7 @@ import DevicesPanel from '@/components/onboarding/DevicesPanel.vue'
 import SessionsPanel from '@/components/settings/SessionsPanel.vue'
 import S3SessionsPanel from '@/components/settings/S3SessionsPanel.vue'
 import AssistantProviders from '@/components/settings/AssistantProviders.vue'
+import VaultSettings from '@/components/settings/VaultSettings.vue'
 import McpConnect from '@/components/settings/McpConnect.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import { isAssignableProfile, PROFILE_SCOPE_REASON } from '@/lib/profiles/assignable'
@@ -73,6 +74,7 @@ const settingsTabs = [
   { id: 'groups', label: 'Groups' },
   { id: 'access', label: 'Access & connection' },
   { id: 'assistant', label: 'Assistant' },
+  { id: 'keys', label: 'Provider keys' },
   { id: 'appearance', label: 'Appearance' },
 ] as const
 // Links and bookmarks still carry the ids of the tabs merged into `access`.
@@ -526,6 +528,10 @@ async function revoke(accessKeyId: string) {
       <TabsContent value="assistant" class="container mt-0 min-w-0 space-y-5 py-6">
         <AssistantProviders />
         <McpConnect />
+      </TabsContent>
+
+      <TabsContent value="keys" class="container mt-0 min-w-0 space-y-5 py-6">
+        <VaultSettings />
       </TabsContent>
 
       <TabsContent value="appearance" class="container mt-0 min-w-0 space-y-5 py-6">

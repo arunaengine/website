@@ -3,6 +3,7 @@
 // keys sealed on the node, and the sign-ins the node keeps. Adding and editing
 // happen in one dialog; a key can be moved between the session and the node.
 import { computed, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Dialog from '@/components/ui/Dialog.vue'
@@ -22,7 +23,6 @@ import Spinner from '@/components/ui/Spinner.vue'
 import ProviderForm from './ProviderForm.vue'
 import ProviderIcon from './ProviderIcon.vue'
 import VaultGate from './VaultGate.vue'
-import VaultSettings from './VaultSettings.vue'
 import { providerChoice, providerKind, providerStatus } from './providerKinds'
 import { useAruna } from '@/composables/useAruna'
 import { useAssistantChat } from '@/composables/useAssistantChat'
@@ -167,6 +167,11 @@ async function confirmRemove() {
           {{ nodeKeeps
             ? 'API keys stay in this browser session, or on this node sealed with your passphrase. A ChatGPT sign-in is kept by the node.'
             : 'API keys stay in this browser tab and are never sent to Aruna; a ChatGPT sign-in is kept by the node.' }}
+          <RouterLink
+            v-if="nodeKeeps"
+            :to="{ name: 'settings', query: { tab: 'keys' } }"
+            class="text-primary hover:underline"
+          >Manage the passphrase under Provider keys.</RouterLink>
         </p>
       </div>
       <div class="flex shrink-0 items-center gap-2">
@@ -182,7 +187,6 @@ async function confirmRemove() {
       <Notice v-if="error" tone="error" class="mx-5 mt-4">{{ error }}</Notice>
       <Notice v-if="removeError" tone="error" class="mx-5 mt-4">{{ removeError }}</Notice>
       <Notice v-if="moveError" tone="error" class="mx-5 mt-4">{{ moveError }}</Notice>
-      <VaultSettings />
 
       <EmptyState
         v-if="!providers.length"

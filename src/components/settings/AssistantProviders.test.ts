@@ -83,6 +83,10 @@ const VaultStub = defineComponent(() => () => h('div', { 'data-vault': '' }))
 const SpinnerStub = defineComponent(() => () => h('span', { 'data-spinner': '' }))
 const IconStub = defineComponent(() => () => h('i'))
 const icons = new Proxy({}, { get: () => IconStub })
+const LinkStub = defineComponent({
+  props: { to: { type: Object, default: () => ({}) } },
+  setup: (props, { slots }) => () => h('a', { 'data-to': JSON.stringify(props.to) }, slots.default?.()),
+})
 
 const AssistantProviders = compileClientComponent(new URL('./AssistantProviders.vue', import.meta.url), {
   vue: VueRuntime,
@@ -106,7 +110,7 @@ const AssistantProviders = compileClientComponent(new URL('./AssistantProviders.
   './ProviderForm.vue': moduleDefault(FormStub),
   './ProviderIcon.vue': moduleDefault(IconStub),
   './VaultGate.vue': moduleDefault(GateStub),
-  './VaultSettings.vue': moduleDefault(VaultStub),
+  'vue-router': { RouterLink: LinkStub },
   './providerKinds': ProviderKinds,
   '@/composables/useAruna': { useAruna: () => ({ currentUser, sessionEpoch: ref(1) }) },
   '@/composables/useAssistantChat': {

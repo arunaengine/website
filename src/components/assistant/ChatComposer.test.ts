@@ -79,10 +79,14 @@ const TextareaStub = defineComponent({
     }),
 })
 const icons = new Proxy({}, { get: () => defineComponent(() => () => h('i')) })
+const LinkStub = defineComponent({
+  props: { to: { type: Object, default: () => ({}) } },
+  setup: (props, { slots }) => () => h('a', { 'data-to': JSON.stringify(props.to) }, slots.default?.()),
+})
 
 const ChatComposer = compileClientComponent(new URL('./ChatComposer.vue', import.meta.url), {
   vue: VueRuntime,
-  'vue-router': { useRoute: () => ({ fullPath: '/app/assistant' }) },
+  'vue-router': { useRoute: () => ({ fullPath: '/app/assistant' }), RouterLink: LinkStub },
   '@lucide/vue': icons,
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Dialog.vue': moduleDefault(DialogStub),

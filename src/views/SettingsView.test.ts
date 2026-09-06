@@ -100,7 +100,7 @@ describe('SettingsView responsive geometry', () => {
   })
 
   it('offers every settings section as a shareable tab', () => {
-    const tabIds = ['profile', 'groups', 'access', 'assistant', 'appearance']
+    const tabIds = ['profile', 'groups', 'access', 'assistant', 'keys', 'appearance']
     const tabList = source.match(/const settingsTabs = \[([\s\S]*?)\] as const/)?.[1] ?? ''
     const declaredIds = Array.from(tabList.matchAll(/\{ id: '([^']+)'/g), (match) => match[1])
     const panelIds = collectElements(root, (node) => node.tag === 'TabsContent')
@@ -137,6 +137,16 @@ describe('SettingsView responsive geometry', () => {
     expect(panel).toBeDefined()
     expect(collectElements(panel!, (node) => node.tag === 'AssistantProviders')).toHaveLength(1)
     expect(collectElements(panel!, (node) => node.tag === 'McpConnect')).toHaveLength(1)
+  })
+
+  it('keeps the provider keys on their own tab', () => {
+    // The provider form and the composer link here with ?tab=keys.
+    const panel = collectElements(root, (node) => node.tag === 'TabsContent')
+      .find((node) => staticAttribute(node, 'value') === 'keys')
+
+    expect(panel).toBeDefined()
+    expect(collectElements(panel!, (node) => node.tag === 'VaultSettings')).toHaveLength(1)
+    expect(collectElements(root, (node) => node.tag === 'AssistantProviders')).toHaveLength(1)
   })
 
   it('keeps the watched resources page reachable from the settings header', () => {
@@ -231,7 +241,7 @@ const SettingsView = compileClientComponent(new URL('./SettingsView.vue', import
   'vue-router': RouterRuntime,
   '@lucide/vue': icons,
   '@/lib/api': { apiOrigin: () => 'https://node.example' },
-  '@/components/layout/nav': { SETTINGS_TAB_ANCHORS: { access: 'settings-access', assistant: 'settings-assistant' } },
+  '@/components/layout/nav': { SETTINGS_TAB_ANCHORS: { access: 'settings-access', assistant: 'settings-assistant', keys: 'settings-keys' } },
   '@/lib/utils': Utils,
   '@/composables/useRouteTab': RouteTab,
   '@/composables/useAruna': { useAruna: () => aruna },
@@ -263,6 +273,7 @@ const SettingsView = compileClientComponent(new URL('./SettingsView.vue', import
   '@/components/settings/SessionsPanel.vue': moduleDefault(labelled('Sessions panel')),
   '@/components/settings/S3SessionsPanel.vue': moduleDefault(Empty),
   '@/components/settings/AssistantProviders.vue': moduleDefault(Empty),
+  '@/components/settings/VaultSettings.vue': moduleDefault(Empty),
   '@/components/settings/McpConnect.vue': moduleDefault(Empty),
 })
 

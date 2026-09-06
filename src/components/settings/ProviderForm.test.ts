@@ -88,9 +88,14 @@ const ToggleStub = defineComponent({
     )),
 })
 const icons = new Proxy({}, { get: () => IconStub })
+const LinkStub = defineComponent({
+  props: { to: { type: Object, default: () => ({}) } },
+  setup: (props, { slots }) => () => h('a', { 'data-to': JSON.stringify(props.to) }, slots.default?.()),
+})
 
 const ProviderForm = compileClientComponent(new URL('./ProviderForm.vue', import.meta.url), {
   vue: VueRuntime,
+  'vue-router': { RouterLink: LinkStub },
   '@lucide/vue': icons,
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
@@ -196,18 +201,30 @@ describe('ProviderForm', () => {
     expect(() => element(root, (node) => node.props['data-gate'] !== undefined)).toThrow()
   })
 
-  it('waits for the passphrase before a key can go to the node', async () => {
+  it('points at the keys tab until the keys on the node are unlocked', async () => {
+    // The form embeds no passphrase step; the node choice waits for the keys tab.
+    vaultState.value = 'locked'
     const { root } = await addClaude()
-    await pickStorage(root, 'node')
+    const node = element(root, (n) => n.tag === 'input' && n.props.type === 'radio' && n.props.value === 'node')
 
-    expect(element(root, (node) => node.props['data-gate'] !== undefined)).toBeDefined()
-    expect(button(root, 'Add provider').props.disabled).toBe(true)
+    expect(node.props.disabled).toBe(true)
+    expect(content(root)).toContain('Your keys on this node are locked.')
+    expect(element(root, (n) => n.tag === 'a').props['data-to']).toContain('"tab":"keys"')
+    expect(() => element(root, (n) => n.props['data-gate'] !== undefined)).toThrow()
 
     vaultState.value = 'unlocked'
     await flush()
-    expect(button(root, 'Add provider').props.disabled).toBe(false)
+    expect(node.props.disabled).toBe(false)
+    await pickStorage(root, 'node')
     await click(button(root, 'Add provider'))
     expect(create.mock.calls[0][1]).toBe('node')
+  })
+
+  it('names the missing passphrase for a node without keys', async () => {
+    const { root } = await addClaude()
+
+    expect(content(root)).toContain('There is no passphrase for keys on this node yet.')
+    expect(element(root, (n) => n.tag === 'input' && n.props.type === 'radio' && n.props.value === 'node').props.disabled).toBe(true)
   })
 
   it('offers no storage choice when the node cannot keep keys', async () => {

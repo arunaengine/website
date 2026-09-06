@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// The passphrase that seals provider keys on this node: unlock the keys here,
-// change the passphrase, lock them again, or reset and start over.
+// The passphrase that seals provider keys on this node: create it, unlock the
+// keys here, change the passphrase, lock them again, or reset and start over.
 import { computed, ref } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
@@ -12,6 +12,7 @@ import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
+import VaultCreateForm from './VaultCreateForm.vue'
 import VaultUnlockForm from './VaultUnlockForm.vue'
 import { useUserVault } from '@/composables/useUserVault'
 import { MIN_PASSPHRASE_LENGTH } from '@/lib/vault/crypto'
@@ -28,7 +29,6 @@ const repeat = ref('')
 const busy = ref(false)
 const failure = ref<string | null>(null)
 
-const shown = computed(() => state.value === 'locked' || state.value === 'unlocked' || Boolean(error.value))
 const canChange = computed(() =>
   current.value.trim().length > 0
   && next.value.length >= MIN_PASSPHRASE_LENGTH
@@ -79,29 +79,47 @@ async function confirmReset() {
 </script>
 
 <template>
-  <div v-if="shown" class="border-b border-border px-5 py-4">
-    <Notice v-if="error" tone="error">The provider keys on this node could not be read: {{ error }}</Notice>
-    <template v-else-if="state === 'locked'">
-      <p class="text-sm font-medium text-foreground">Provider keys on this node</p>
-      <p class="mt-0.5 text-xs text-muted-foreground">
-        They are sealed with your passphrase. Unlock them to use and edit them in this browser.
+  <section data-tour="vault-settings" class="surface overflow-hidden">
+    <header class="border-b border-border px-5 py-4">
+      <h3 class="font-display text-sm font-semibold text-aruna-navy">Provider keys on this node</h3>
+      <p class="text-xs text-muted-foreground">
+        A provider key kept on this node is sealed with a passphrase only you know. The node stores what it
+        cannot read, and the key follows you to other browsers.
       </p>
-      <VaultUnlockForm class="mt-3" />
-    </template>
-    <div v-else class="flex flex-wrap items-center gap-3">
-      <div class="min-w-0 flex-1">
-        <div class="flex items-center gap-2">
-          <span class="text-sm font-medium text-foreground">Provider keys on this node</span>
-          <Badge size="sm" variant="success">Unlocked</Badge>
-        </div>
-        <p class="mt-0.5 text-xs text-muted-foreground">
-          They stay unlocked in this browser until you lock them or sign out.
+    </header>
+    <div class="px-5 py-4">
+      <Notice v-if="error" tone="error">The provider keys on this node could not be read: {{ error }}</Notice>
+      <p v-else-if="state === 'unsupported'" class="text-xs text-muted-foreground">
+        This node cannot keep provider keys. Keys stay in this browser session.
+      </p>
+      <template v-else-if="state === 'absent'">
+        <p class="text-xs text-muted-foreground">
+          Choose a passphrase to start. A recovery code is shown once; it opens the keys if you forget the passphrase.
         </p>
-      </div>
-      <div class="flex shrink-0 flex-wrap items-center gap-2">
-        <Button variant="outline" size="sm" @click="openChange">Change passphrase</Button>
-        <Button variant="outline" size="sm" @click="lock">Lock</Button>
-        <Button variant="ghost" size="sm" class="text-destructive" @click="openReset">Reset</Button>
+        <VaultCreateForm class="mt-3" />
+      </template>
+      <template v-else-if="state === 'locked'">
+        <p class="text-sm font-medium text-foreground">Locked</p>
+        <p class="mt-0.5 text-xs text-muted-foreground">
+          They are sealed with your passphrase. Unlock them to use and edit them in this browser.
+        </p>
+        <VaultUnlockForm class="mt-3" />
+      </template>
+      <div v-else class="flex flex-wrap items-center gap-3">
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-medium text-foreground">Keys on this node</span>
+            <Badge size="sm" variant="success">Unlocked</Badge>
+          </div>
+          <p class="mt-0.5 text-xs text-muted-foreground">
+            They stay unlocked in this browser until you lock them or sign out.
+          </p>
+        </div>
+        <div class="flex shrink-0 flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" @click="openChange">Change passphrase</Button>
+          <Button variant="outline" size="sm" @click="lock">Lock</Button>
+          <Button variant="ghost" size="sm" class="text-destructive" @click="openReset">Reset</Button>
+        </div>
       </div>
     </div>
 
@@ -176,5 +194,5 @@ async function confirmReset() {
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  </div>
+  </section>
 </template>

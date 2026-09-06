@@ -40,6 +40,7 @@ const InputStub = defineComponent({
     }),
 })
 const UnlockStub = defineComponent(() => () => h('div', { 'data-unlock': '' }))
+const CreateStub = defineComponent(() => () => h('div', { 'data-create': '' }))
 
 const VaultSettings = compileClientComponent(new URL('./VaultSettings.vue', import.meta.url), {
   vue: VueRuntime,
@@ -54,6 +55,7 @@ const VaultSettings = compileClientComponent(new URL('./VaultSettings.vue', impo
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Notice.vue': moduleDefault(Passthrough),
   './VaultUnlockForm.vue': moduleDefault(UnlockStub),
+  './VaultCreateForm.vue': moduleDefault(CreateStub),
   '@/composables/useUserVault': { useUserVault: () => ({ state, error, lock, changePassphrase, reset }) },
   '@/lib/vault/crypto': { MIN_PASSPHRASE_LENGTH: 8 },
   '@/lib/utils': { errorMessage },
@@ -76,11 +78,20 @@ beforeEach(() => {
 })
 
 describe('VaultSettings', () => {
-  it('shows nothing for a user who never set up keys on the node', async () => {
+  it('offers to choose a passphrase for a user who has no keys on the node', async () => {
     state.value = 'absent'
     const { root } = await mountApp(VaultSettings)
 
-    expect(content(root).trim()).toBe('')
+    expect(content(root)).toContain('Choose a passphrase to start.')
+    expect(element(root, (node) => node.props['data-create'] !== undefined)).toBeDefined()
+    expect(() => button(root, 'Lock')).toThrow()
+  })
+
+  it('says when the node cannot keep keys', async () => {
+    state.value = 'unsupported'
+    const { root } = await mountApp(VaultSettings)
+
+    expect(content(root)).toContain('This node cannot keep provider keys.')
   })
 
   it('asks for the passphrase while the keys are locked', async () => {

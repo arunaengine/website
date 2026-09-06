@@ -3,7 +3,7 @@
 // Send. Enter sends, Shift+Enter breaks the line, and the turn's context
 // (route, open draft, realm profiles) is gathered here.
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
@@ -157,7 +157,12 @@ function onKeydown(event: KeyboardEvent) {
   <div class="space-y-2">
     <Notice v-if="toolsNote" tone="info">{{ toolsNote }}</Notice>
     <Notice v-if="keysLocked" tone="warning" class="flex items-center justify-between gap-3">
-      <span>Your provider keys are locked.</span>
+      <span>
+        Your provider keys are locked.
+        <RouterLink :to="{ name: 'settings', query: { tab: 'keys' } }" class="text-primary hover:underline">
+          Manage them under Provider keys.
+        </RouterLink>
+      </span>
       <Button variant="outline" size="sm" @click="unlockOpen = true">Unlock</Button>
     </Notice>
     <Notice v-if="removed" tone="warning" class="flex items-center justify-between gap-3">
