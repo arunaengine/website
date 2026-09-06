@@ -4,6 +4,7 @@
 import { computed, onScopeDispose, ref } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
+import { useS3 } from '@/composables/useS3'
 import type { NotebookStore } from '@/composables/useNotebook'
 import { getJob, submitErrorMessage, submitJob, type JobStatusResponse } from '@/lib/jobs'
 import { ApiError, type ApiClientOptions } from '@/lib/api'
@@ -36,8 +37,14 @@ function executorNode(job: JobStatusResponse): string {
   return canonical?.executor_node_id ?? ''
 }
 
+/** The submit, plus the dependency file the portal writes before it. */
+export interface SessionStartDraft extends SessionSubmitDraft {
+  dependencyText?: string
+}
+
 export function createNotebookSession(notebook: NotebookStore) {
   const { apiBaseUrl, authToken } = useAruna()
+  const s3 = useS3()
   const { nodeById } = useRealmNodes()
 
   const jobId = ref(notebook.meta.value?.job_id ?? '')
@@ -247,12 +254,21 @@ export function createNotebookSession(notebook: NotebookStore) {
     throw new Error('No node reported that it runs this session yet.')
   }
 
-  async function start(draft: SessionSubmitDraft): Promise<void> {
+  async function start(draft: SessionStartDraft): Promise<void> {
     if (starting.value || running.value) return
     starting.value = true
     error.value = null
     notice.value = null
     try {
+      // The session stages this file from the bucket, so it must exist first.
+      if (draft.dependencyKey && draft.dependencyKind && draft.dependencyText?.trim()) {
+        await s3.putTextObject(
+          draft.workspaceBucket,
+          draft.dependencyKey,
+          draft.dependencyText,
+          'text/plain',
+        )
+      }
       const request = sessionSubmitRequest({
         ...draft,
         ...(idlePickMs.value ? { idleAfterMs: idlePickMs.value } : {}),

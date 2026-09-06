@@ -117,6 +117,7 @@ function start() {
       ? {
           dependencyKey: dependencyKey(notebook.name.value, dependencies.kind),
           dependencyKind: dependencies.kind,
+          dependencyText: dependencies.text,
         }
       : {}),
     resources: current.resources,

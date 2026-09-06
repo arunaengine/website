@@ -134,19 +134,6 @@ describe('createNotebookSession', () => {
     scope.stop()
   })
 
-  it('reports a session that is gone', async () => {
-    const { notebook, session: store, scope } = await setup()
-    notebook.patchMeta({ job_id: '01JOB', executor_node_id: 'node-a' })
-    session.getSessionState.mockRejectedValue(new ApiError(404, 'not found'))
-
-    await store.attachSaved()
-
-    expect(store.live.value).toBe(false)
-    expect(store.error.value).toContain('no longer running')
-    expect(session.openSessionStream).not.toHaveBeenCalled()
-    scope.stop()
-  })
-
   it('writes stream events into the notebook', async () => {
     const { notebook, session: store, scope } = await setup()
     notebook.patchMeta({ job_id: '01JOB', executor_node_id: 'node-a' })
@@ -224,6 +211,94 @@ describe('createNotebookSession', () => {
     expect(notebook.meta.value?.job_id).toBe('01NEW')
     expect(notebook.meta.value?.executor_node_id).toBe('node-a')
     expect(store.live.value).toBe(true)
+    scope.stop()
+  })
+
+  it('writes the dependency file before it submits', async () => {
+    const { session: store, scope } = await setup()
+    s3.putTextObject.mockResolvedValue({ versionId: 'v1' })
+    jobs.submitJob.mockResolvedValue({ job_id: '01NEW' })
+    jobs.getJob.mockResolvedValue({
+      state: 'running',
+      family: { execution_list: [{ executor_node_id: 'node-a', canonical: true }] },
+    })
+    session.getSessionState.mockResolvedValue(state({ job_id: '01NEW' }))
+
+    await store.start({
+      groupId: 'group-1',
+      name: 'counts',
+      runtime: 'python-notebook',
+      workspaceBucket: 'lab-data',
+      idempotencyKey: 'once',
+      dependencyKey: 'notebooks/counts.requirements.txt',
+      dependencyKind: 'requirements',
+      dependencyText: 'pandas>=2\n',
+    })
+
+    expect(s3.putTextObject).toHaveBeenCalledWith(
+      'lab-data',
+      'notebooks/counts.requirements.txt',
+      'pandas>=2\n',
+      'text/plain',
+    )
+    // The file has to exist before the node stages it.
+    expect(s3.putTextObject.mock.invocationCallOrder[0]).toBeLessThan(
+      jobs.submitJob.mock.invocationCallOrder[0],
+    )
+    scope.stop()
+  })
+
+  it('reports a dependency file it could not write', async () => {
+    const { session: store, scope } = await setup()
+    s3.putTextObject.mockRejectedValue(new Error('bucket is full'))
+
+    await store.start({
+      groupId: 'group-1',
+      name: 'counts',
+      runtime: 'python-notebook',
+      workspaceBucket: 'lab-data',
+      idempotencyKey: 'once',
+      dependencyKey: 'notebooks/counts.requirements.txt',
+      dependencyKind: 'requirements',
+      dependencyText: 'pandas>=2',
+    })
+
+    expect(jobs.submitJob).not.toHaveBeenCalled()
+    expect(store.error.value).toContain('bucket is full')
+    scope.stop()
+  })
+
+  it('forgets a job it submitted but cannot follow', async () => {
+    const { notebook, session: store, scope } = await setup()
+    jobs.submitJob.mockResolvedValue({ job_id: '01NEW' })
+    jobs.getJob.mockResolvedValue({ state: 'failed', family: { execution_list: [] } })
+
+    await store.start({
+      groupId: 'group-1',
+      name: 'counts',
+      runtime: 'python-notebook',
+      workspaceBucket: 'lab-data',
+      idempotencyKey: 'once',
+    })
+
+    expect(store.jobId.value).toBe('')
+    expect(notebook.meta.value?.job_id).toBeUndefined()
+    expect(store.error.value).toContain('finished before it started a kernel')
+    scope.stop()
+  })
+
+  it('forgets a session that is gone on reload', async () => {
+    const { notebook, session: store, scope } = await setup()
+    notebook.patchMeta({ job_id: '01JOB', executor_node_id: 'node-a' })
+    session.getSessionState.mockRejectedValue(new ApiError(404, 'not found'))
+
+    await store.attachSaved()
+
+    expect(store.jobId.value).toBe('')
+    expect(store.live.value).toBe(false)
+    expect(notebook.meta.value?.job_id).toBeUndefined()
+    expect(store.error.value).toContain('no longer running')
+    expect(session.openSessionStream).not.toHaveBeenCalled()
     scope.stop()
   })
 
