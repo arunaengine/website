@@ -8,11 +8,11 @@ import Input from '@/components/ui/Input.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { useAssistantChat } from '@/composables/useAssistantChat'
 import { relativeTime } from '@/lib/utils'
-import { Check, Pencil, Trash2, X } from '@lucide/vue'
+import { Check, Pencil, Plus, Trash2, X } from '@lucide/vue'
 
 const props = withDefaults(defineProps<{ readOnly?: boolean }>(), { readOnly: false })
 
-const { chats, activeChatId, historyReady, unreadChats, selectChat, deleteChat, renameChat } = useAssistantChat()
+const { chats, activeChatId, historyReady, unreadChats, selectChat, deleteChat, renameChat, newChat } = useAssistantChat()
 const editingId = ref<string | null>(null)
 const draftTitle = ref('')
 
@@ -42,8 +42,13 @@ function when(updatedAt: number): string {
   <section aria-label="Assistant chats" class="flex min-h-0 flex-col overflow-hidden">
     <div class="flex shrink-0 items-center justify-between gap-2 px-3 py-2">
       <span class="text-xs font-medium text-muted-foreground">Chats</span>
-      <span v-if="historyReady" class="text-[11px] tabular-nums text-muted-foreground">{{ chats.length }}</span>
-      <Spinner v-else />
+      <span class="flex items-center gap-1">
+        <span v-if="historyReady" class="text-[11px] tabular-nums text-muted-foreground">{{ chats.length }}</span>
+        <Spinner v-else />
+        <Button variant="ghost" size="icon" class="size-6" aria-label="New chat" title="New chat" @click="newChat()">
+          <Plus class="size-3.5" />
+        </Button>
+      </span>
     </div>
 
     <EmptyState
