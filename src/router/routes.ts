@@ -169,6 +169,12 @@ export function portalRoutes(): RouteRecordRaw[] {
         // The quick run wizard is gone; its link opens the Python template.
         { path: 'compute/quick', redirect: { name: 'compute-new', query: { template: 'python' } } },
         { path: 'compute/new', name: 'compute-new', component: () => import('@/views/ComputeSubmitView.vue') },
+        // One notebook, named by the bucket it works in and its object key.
+        {
+          path: 'notebooks/:bucketId/:key(.*)',
+          name: 'notebook',
+          component: () => import('@/views/NotebookView.vue'),
+        },
         { path: 'compute/jobs', redirect: { name: 'compute', query: { tab: 'jobs' } } },
         {
           path: 'compute/jobs/:jobId',
