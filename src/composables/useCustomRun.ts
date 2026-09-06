@@ -17,13 +17,10 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   TES_EXECUTOR_TAG,
   TES_GROUP_TAG,
-  TES_IDEMPOTENCY_TAG,
   captureContainerPath,
   captureOutput,
   expandDataRefEntry,
   parseS3Url,
-  placementTags,
-  pruneTesTask,
   tesPlacementTags,
   validContainerDir,
   validContainerFilePath,
@@ -34,10 +31,10 @@ import {
   type TesResources,
   type TesTask,
 } from '@/lib/tes'
+import { buildRunTask, runExecutor, runResources } from '@/lib/runTask'
 import {
   RUNTIMES,
   SCRIPT_LANGUAGES,
-  TES_NETWORK_TAG,
   detectQuickRun,
   languageById,
   runtimeById,
@@ -770,17 +767,14 @@ function createStore(deps: CustomRunDeps) {
 
   // ── Derived task ───────────────────────────────────────────────────────────
   const commandTokens = computed(() => tokenizeCommand(commandLine.value))
-  const executors = computed<TesExecutor[]>(() => {
-    const env: Record<string, string> = {}
-    for (const row of envRows.value) if (row.key.trim()) env[row.key.trim()] = row.value
-    const executor: TesExecutor = {
-      image: image.value.trim(),
+  const executors = computed<TesExecutor[]>(() => [
+    runExecutor({
+      image: image.value,
       command: commandTokens.value.error ? [] : commandTokens.value.argv,
+      env: envRows.value,
       workdir: activeWorkdir.value,
-    }
-    if (Object.keys(env).length) executor.env = env
-    return [executor]
-  })
+    }),
+  ])
 
   const scriptInput = computed<TesInput | null>(() =>
     hasScript.value
@@ -812,21 +806,17 @@ function createStore(deps: CustomRunDeps) {
       .filter((row) => row.bucket.trim() && normalizedOutputKey(row.key) && row.path.trim())
       .map((row) => captureOutput(row.path, row.bucket, normalizedOutputKey(row.key))),
   )
-  const resources = computed<TesResources>(() => {
-    const r: TesResources = {}
-    const cpu = Number(text(cpuCores.value))
-    if (text(cpuCores.value) && !Number.isNaN(cpu)) r.cpu_cores = cpu
-    const ram = Number(text(ramGb.value))
-    if (text(ramGb.value) && !Number.isNaN(ram)) r.ram_gb = ram
-    const disk = Number(text(diskGb.value))
-    if (text(diskGb.value) && !Number.isNaN(disk)) r.disk_gb = disk
-    return r
-  })
+  const resources = computed<TesResources>(() =>
+    runResources({ cpuCores: cpuCores.value, ramGb: ramGb.value, diskGb: diskGb.value }),
+  )
 
   const task = computed<TesTask>(() =>
-    pruneTesTask({
+    buildRunTask({
       name: name.value,
       description: description.value,
+      groupId: groupId.value,
+      idempotencyKey: runId.value,
+      executor: executors.value[0],
       inputs: [
         ...(scriptInput.value ? [scriptInput.value] : []),
         ...(dependencyInput.value ? [dependencyInput.value] : []),
@@ -834,14 +824,9 @@ function createStore(deps: CustomRunDeps) {
       ],
       outputs: outputs.value,
       resources: resources.value,
-      executors: executors.value,
-      tags: {
-        [TES_GROUP_TAG]: groupId.value,
-        [TES_IDEMPOTENCY_TAG]: runId.value,
-        ...(executorConstraint.value.trim() ? { [TES_EXECUTOR_TAG]: executorConstraint.value.trim() } : {}),
-        ...(dependencies.value.length ? { [TES_NETWORK_TAG]: 'open' } : {}),
-        ...(runTarget.local.value ? {} : placementTags(placementLabels.value)),
-      },
+      executorConstraint: executorConstraint.value,
+      networkOpen: dependencies.value.length > 0,
+      placementLabels: runTarget.local.value ? {} : placementLabels.value,
     }),
   )
 
