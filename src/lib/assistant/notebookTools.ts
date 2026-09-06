@@ -49,9 +49,10 @@ export function notebookTools(bridge: NotebookBridge, gate: ApprovalGate): ToolS
     toolCallId: string,
     input: Record<string, unknown>,
     apply: () => Promise<string | null> | (string | null),
+    always = false,
   ) {
-    if (gate.enabled()) {
-      const approved = await gate.ask({ id: toolCallId, name, input }, false)
+    if (always || gate.enabled()) {
+      const approved = await gate.ask({ id: toolCallId, name, input }, always)
       if (!approved) return denied()
     }
     const refusal = await apply()
@@ -81,8 +82,10 @@ export function notebookTools(bridge: NotebookBridge, gate: ApprovalGate): ToolS
     run_notebook_cell: tool({
       description: 'Runs one cell in the running session. Its outputs arrive on the notebook page.',
       inputSchema: schema<{ cell_id: string }>({ cell_id: STRING }, ['cell_id']),
+      // Running a cell executes code with the session's own credential, so it
+      // always asks, whatever the approval toggle says.
       execute: (input, { toolCallId }) =>
-        write('run_notebook_cell', toolCallId, input, () => bridge.runCell(input.cell_id)),
+        write('run_notebook_cell', toolCallId, input, () => bridge.runCell(input.cell_id), true),
     }),
 
     read_notebook_outputs: tool({
