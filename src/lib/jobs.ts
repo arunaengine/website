@@ -371,6 +371,13 @@ export interface SubmitExecutionRequest {
    * by that device's API; absent means the realm, as it always did.
    */
   target?: 'realm' | 'local'
+  /**
+   * Session runtime catalog id. Required by a session job, which then leaves
+   * image, entrypoint and command empty for the node to fill.
+   */
+  runtime?: string
+  /** A shorter idle timeout for a session; the node clamps it to the realm's. */
+  session_idle_after_ms?: number
 }
 
 export interface SubmitJobResponse {
