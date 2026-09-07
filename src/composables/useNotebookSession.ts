@@ -61,6 +61,9 @@ export function createNotebookSession(notebook: NotebookStore) {
   const error = ref<string | null>(null)
   const notice = ref<string | null>(null)
   const streamOpen = ref(false)
+  watch(state, (next) => {
+    kernel.value = next?.state === 'ready' ? 'idle' : next?.state === 'ended' ? 'dead' : next?.state ?? 'starting'
+  }, { flush: 'sync' })
   /** A shorter idle timeout than the realm's, picked in the session bar. */
   const idlePickMs = ref<number | null>(null)
 

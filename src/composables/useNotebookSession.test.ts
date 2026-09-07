@@ -114,6 +114,17 @@ afterEach(() => {
 })
 
 describe('createNotebookSession', () => {
+  it.each([
+    ['ready', 'idle'], ['busy', 'busy'], ['starting', 'starting'], ['ended', 'dead'],
+  ])('restores kernel state when attaching to a %s session', async (phase, kernel) => {
+    const { notebook, session: store, scope } = await setup()
+    notebook.patchMeta({ job_id: '01JOB', executor_node_id: 'node-a' })
+    session.getSessionState.mockResolvedValue(state({ state: phase }))
+    await store.attachSaved()
+    expect(store.kernel.value).toBe(kernel)
+    scope.stop()
+  })
+
   it('stops Run all when another session attaches during submission', async () => {
     const { notebook, session: store, scope } = await setup()
     notebook.patchMeta({ job_id: '01JOB', executor_node_id: 'node-a' })
