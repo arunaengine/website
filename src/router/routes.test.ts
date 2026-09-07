@@ -83,6 +83,8 @@ describe('web routes', () => {
       ['groups/:id', 'group'],
       ['users/:id', 'user'],
       ['jobs/:jobId', 'job'],
+      ['notebooks', 'notebooks'],
+      ['notebooks/:bucketId/:key(.*)', 'notebook'],
       ['compute/:taskId', 'task'],
     ]
 

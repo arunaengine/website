@@ -27,7 +27,6 @@ import { providePageContext } from '@/composables/usePageContext'
 import { useStaging } from '@/composables/useStaging'
 import { useS3, s3ErrorMessage } from '@/composables/useS3'
 import { folderNameProblem } from '@/lib/bucketName'
-import { NOTEBOOK_PREFIX, notebookKey, notebookSlug } from '@/lib/notebook/document'
 import { featureEnabled } from '@/lib/config'
 import { isDesktop } from '@/lib/desktop'
 import type { BucketSearchHit } from '@/lib/api'
@@ -163,26 +162,6 @@ const newFolderError = ref<string | null>(null)
 // An empty name is invalid too, but says nothing until a person types.
 const newFolderProblem = computed(() => folderNameProblem(newFolderName.value.trim()))
 const newFolderInvalid = computed(() => Boolean(newFolderProblem.value))
-
-const newNotebookOpen = ref(false)
-const newNotebookName = ref('')
-const notebookTarget = computed(() => notebookKey(notebookSlug(newNotebookName.value)))
-
-function openNewNotebook() {
-  if (!s3.canWrite(bucket.value, NOTEBOOK_PREFIX, remoteNodeId.value)) return
-  newNotebookName.value = ''
-  newNotebookOpen.value = true
-}
-
-// The notebook page creates the file itself, so this only opens it.
-function createNotebook() {
-  newNotebookOpen.value = false
-  void router.push({
-    name: 'notebook',
-    params: { bucketId: bucket.value, key: notebookTarget.value },
-    query: { group: activeGroupId.value },
-  })
-}
 
 function openNewFolder() {
   if (!canWriteCurrentPrefix.value) return
@@ -322,7 +301,6 @@ async function createFolder() {
           :manager="manager"
           @add-data="addDataOpen = true"
           @new-folder="openNewFolder"
-          @new-notebook="openNewNotebook"
           @sync-to-node="openSyncDialog"
         >
           <UploadPanel :manager="manager" />
@@ -378,28 +356,6 @@ async function createFolder() {
       @close="closeDelete"
       @completed="onDeleted"
     />
-
-    <Dialog :open="newNotebookOpen" @update:open="(v: boolean) => (newNotebookOpen = v)">
-      <DialogContent class="max-w-md">
-        <DialogHeader>
-          <DialogTitle>New notebook</DialogTitle>
-          <DialogDescription>
-            Opens <span class="font-mono text-xs">{{ notebookTarget }}</span> in
-            <span class="font-mono text-xs">{{ bucket }}</span>. The file is written on the first save.
-          </DialogDescription>
-        </DialogHeader>
-        <Input
-          v-model="newNotebookName"
-          placeholder="first-look"
-          class="font-mono text-xs"
-          @keyup.enter="createNotebook"
-        />
-        <DialogFooter>
-          <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
-          <Button :disabled="!newNotebookName.trim()" @click="createNotebook">Open</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
 
     <Dialog :open="newFolderOpen" @update:open="(v: boolean) => (newFolderOpen = v)">
       <DialogContent class="max-w-md">

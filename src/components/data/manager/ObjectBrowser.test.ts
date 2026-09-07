@@ -186,7 +186,7 @@ describe('notebooks in the bucket', () => {
     lastModified: new Date('2026-02-01T00:00:00Z'),
   }
 
-  it('opens a stored notebook in the notebook page', async () => {
+  it('opens notebook details from the Data list', async () => {
     push.mockClear()
     openDetails.mockClear()
     const root = await render({ objects: ref([notebookObject]) })
@@ -194,12 +194,8 @@ describe('notebooks in the bucket', () => {
 
     await bubbleClick(row)
 
-    expect(push).toHaveBeenCalledWith({
-      name: 'notebook',
-      params: { bucketId: 'reef', key: 'notebooks/counts.ipynb' },
-      query: { group: 'g-1' },
-    })
-    expect(openDetails).not.toHaveBeenCalled()
+    expect(push).not.toHaveBeenCalled()
+    expect(openDetails).toHaveBeenCalledWith(notebookObject)
   })
 
   it('keeps opening every other file in its details', async () => {
@@ -214,13 +210,8 @@ describe('notebooks in the bucket', () => {
     expect(push).not.toHaveBeenCalled()
   })
 
-  it('offers a new notebook only while the session may write notebooks/', async () => {
-    resetS3Access()
+  it('keeps notebook creation out of the Data toolbar', async () => {
     const root = await render()
-    expect(button(root, 'New notebook').props.disabled).toBe(false)
-
-    s3Access.canWrite = (_bucket: string, key: string) => key !== 'notebooks/'
-    const refused = await render()
-    expect(button(refused, 'New notebook').props.disabled).toBe(true)
+    expect(content(root)).not.toContain('New notebook')
   })
 })

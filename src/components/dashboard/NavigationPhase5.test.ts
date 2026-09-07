@@ -92,6 +92,7 @@ describe('Phase 5 navigation parity', () => {
       '/app/datasets',
       '/app/profiles',
       '/app/compute',
+      '/app/notebooks',
       '/app/groups',
       '/app/status',
       '/app/settings',

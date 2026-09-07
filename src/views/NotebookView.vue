@@ -103,12 +103,12 @@ const savedLabel = computed(() => {
 
 <template>
   <div>
-    <PageHeader eyebrow="Compute" :title="notebook.name.value || 'Notebook'">
+    <PageHeader eyebrow="Notebooks" :title="notebook.name.value || 'Notebook'">
       <template #actions>
         <AskAiButton size="default" prompt="Help me with this notebook." subject="the notebook" />
         <Button variant="outline" size="default" as-child>
-          <RouterLink :to="{ name: 'bucket', params: { bucketId: bucket } }">
-            <ArrowLeft class="h-4 w-4" /> Back to the bucket
+          <RouterLink :to="{ name: 'notebooks' }">
+            <ArrowLeft class="h-4 w-4" /> Back to notebooks
           </RouterLink>
         </Button>
       </template>

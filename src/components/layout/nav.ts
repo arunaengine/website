@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   ListChecks,
   MessageSquare,
+  NotebookPen,
   Play,
   RefreshCw,
   Settings,
@@ -74,6 +75,7 @@ export function navEntries(options: NavOptions): NavEntry[] {
     { to: '/app/datasets', icon: FileJson2, label: 'Datasets', match: ['/app/datasets'], primary: true },
     { to: '/app/profiles', icon: ListChecks, label: 'Profiles' },
     ...(computeEnabled() ? [{ to: '/app/compute', icon: Workflow, label: 'Compute', primary: true }] : []),
+    ...(featureEnabled('tes') ? [{ to: '/app/notebooks', icon: NotebookPen, label: 'Notebooks' }] : []),
     ...(options.assistant ? [{ to: '/app/assistant', icon: MessageSquare, label: 'Assistant' }] : []),
     navSeparator,
     ...(options.desktop

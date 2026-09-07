@@ -21,11 +21,13 @@ import PreviewBody from '@/components/preview/PreviewBody.vue'
 import { useS3, s3ErrorMessage } from '@/composables/useS3'
 import { useAssistantObject } from '@/composables/useAssistantObject'
 import type { DeleteRequest } from '@/lib/deletion/request'
+import { featureEnabled } from '@/lib/config'
+import { isNotebookKey } from '@/lib/notebook/document'
 import { stateVariant } from '@/lib/stateBadge'
 import { formatBytes, relativeTime, truncateMiddle } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { Eye, ListTree } from '@lucide/vue'
+import { Eye, ListTree, NotebookPen } from '@lucide/vue'
 
 const props = defineProps<{
   open: boolean
@@ -177,6 +179,14 @@ const details = computed(() => [
         Showing version <span class="hash">{{ truncateMiddle(pinnedVersion, 8, 6) }}</span>.
         <button type="button" class="underline" @click="pinnedVersion = null">Show the current version</button>
       </p>
+      <div v-if="!remote && !pinnedVersion && props.groupId && isNotebookKey(props.objectKey) && featureEnabled('tes')">
+        <Button variant="outline" size="sm" as-child>
+          <RouterLink
+            :to="{ name: 'notebook', params: { bucketId: props.bucket, key: props.objectKey }, query: { group: props.groupId } }"
+            @click="leave"
+          ><NotebookPen class="h-4 w-4" /> Open notebook</RouterLink>
+        </Button>
+      </div>
       <PreviewBody
         class="flex-1"
         :active="props.open"

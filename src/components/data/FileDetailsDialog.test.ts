@@ -3,6 +3,7 @@ import * as VueRuntime from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import * as assistantObject from '@/composables/useAssistantObject'
 import * as StateBadge from '@/lib/stateBadge'
+import * as NotebookDocument from '@/lib/notebook/document'
 import * as Utils from '@/lib/utils'
 import {
   button,
@@ -10,6 +11,7 @@ import {
   compileClientComponent,
   content,
   flush,
+  element,
   mountApp,
   moduleDefault,
 } from '@/test/clientRender'
@@ -70,13 +72,16 @@ const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.
     s3ErrorMessage: (error: unknown) => String(error),
   },
   '@/composables/useAssistantObject': assistantObject,
+  '@/lib/config': { featureEnabled: () => true },
+  '@/lib/notebook/document': NotebookDocument,
   '@/lib/stateBadge': StateBadge,
   '@/lib/utils': Utils,
 })
 
-async function mount(tab: string) {
+async function mount(tab: string, overrides: Record<string, unknown> = {}) {
   headObject.mockResolvedValue({ contentType: 'text/plain', versionId: '01J000000000000000000HEAD' })
   const tabs: string[] = []
+  const closed: boolean[] = []
   const host = defineComponent({
     setup: () => () =>
       h(dialog, {
@@ -87,12 +92,14 @@ async function mount(tab: string) {
         name: 'reads.fastq',
         nodeId: null,
         groupId: 'g-1',
+        ...overrides,
         'onUpdate:tab': (value: string) => tabs.push(value),
+        'onUpdate:open': (value: boolean) => closed.push(value),
       }),
   })
   const { root } = await mountApp(host)
   await flush()
-  return { root, tabs }
+  return { root, tabs, closed }
 }
 
 async function render(tab: string) {
@@ -156,5 +163,29 @@ describe('file details preview mode', () => {
     expect(text).toContain('General')
     expect(text).toContain('Versions')
     expect(text).not.toContain('preview')
+  })
+})
+
+describe('notebook preview entry', () => {
+  it('opens the notebook in its bucket and group', async () => {
+    const { root, closed } = await mount('preview', { objectKey: 'notebooks/counts.IPYNB' })
+    const link = element(root, (node) => node.tag === 'a' && content(node).includes('Open notebook'))
+    expect(link.props.to).toEqual({
+      name: 'notebook',
+      params: { bucketId: 'reef-survey', key: 'notebooks/counts.IPYNB' },
+      query: { group: 'g-1' },
+    })
+    await click(link)
+    expect(closed).toEqual([])
+  })
+
+  it.each([
+    { objectKey: 'reads.fastq' },
+    { objectKey: 'counts.ipynb', nodeId: 'remote-node' },
+    { objectKey: 'counts.ipynb', versionId: 'older-version' },
+    { objectKey: 'counts.ipynb', groupId: null },
+  ])('does not open unsupported or ambiguous notebook targets: %j', async (overrides) => {
+    const { root } = await mount('preview', overrides)
+    expect(content(root)).not.toContain('Open notebook')
   })
 })

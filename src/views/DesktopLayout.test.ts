@@ -153,6 +153,7 @@ describe('desktop shell', () => {
       '/app/datasets',
       '/app/profiles',
       '/app/compute',
+      '/app/notebooks',
       '/app/sync',
       '/app/runs',
       '/app/device',
