@@ -75,7 +75,7 @@ export async function findCandidates(
     }
   }
   const query = `SELECT DISTINCT ?g WHERE { GRAPH ?g { ?s a <${vocabTypeUri(type)}> } } LIMIT ${GRAPH_LIMIT}`
-  const result = await runSparql(query, 'distributed')
+  const result = await runSparql(query, 'distributed-best-effort')
   partial ||= !result.complete
   const documentIds = [...new Set(result.rows.map(graphDocumentId))]
     .filter((id): id is string => Boolean(id) && id !== registry && id !== options.excludeDocumentId)

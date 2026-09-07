@@ -90,7 +90,7 @@ describe('findCandidates', () => {
     expect(runSparql.mock.calls[0][0]).toBe(
       'SELECT DISTINCT ?g WHERE { GRAPH ?g { ?s a <http://schema.org/Person> } } LIMIT 20',
     )
-    expect(runSparql.mock.calls[0][1]).toBe('distributed')
+    expect(runSparql.mock.calls[0][1]).toBe('distributed-best-effort')
     expect(loadRoCrate.mock.calls.map((call) => call[0])).toEqual([REGISTRY, OTHER])
     expect(result.partial).toBe(false)
     expect(result.candidates.map((candidate) => [candidate.entity.id, candidate.source.title, candidate.source.registry])).toEqual([
