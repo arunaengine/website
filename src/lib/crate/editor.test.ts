@@ -5,6 +5,7 @@ import {
   addValue,
   autoId,
   changeKind,
+  customPropertyKey,
   displayName,
   findEntity,
   fromRoCrate,
@@ -139,6 +140,21 @@ describe('crate draft', () => {
 
     expect(toRoCrate(draft)).toEqual(crate)
     expect(displayName(draft.entities[1])).toBe('Ada Lovelace')
+  })
+
+  it('keeps a custom property through the crate without a context change', () => {
+    const key = customPropertyKey(vocab, 'sampleCount')
+    expect(key).toBe('https://w3id.org/aruna/terms/sampleCount')
+    expect(customPropertyKey(vocab, 'ex:device')).toBe('ex:device')
+    expect(customPropertyKey(vocab, 'https://example.org/t')).toBe('https://example.org/t')
+    expect(customPropertyKey(vocab, 'sample count')).toBe('')
+    expect(customPropertyKey(vocab, 'familyName')).toBe('')
+
+    const crate = toRoCrate(addValue(seeded(), './', key, { kind: 'text', value: '12' }))
+    const root = (crate['@graph'] as Array<Record<string, unknown>>).find((node) => node['@id'] === './')
+    expect(root?.[key]).toBe('12')
+    expect(crate['@context']).toBe('https://w3id.org/ro/crate/1.2/context')
+    expect(fromRoCrate(crate).entities[0].properties[key]).toEqual([{ kind: 'text', value: '12' }])
   })
 
   it('keeps unknown properties and types verbatim', () => {

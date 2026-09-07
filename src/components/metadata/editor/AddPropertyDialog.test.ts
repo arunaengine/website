@@ -144,6 +144,27 @@ describe('AddPropertyDialog', () => {
     mounted.app.unmount()
   })
 
+  it('mints a plain name as a custom property under the node namespace', async () => {
+    const picked: Array<{ key: string; kind: string }> = []
+    const mounted = await mount(dataset, picked)
+    await typeValue(search(mounted.root), 'sampleCount')
+
+    expect(content(mounted.root)).toContain('Use custom term')
+    await click(row(mounted.root, 'Use custom term'))
+
+    expect(picked).toEqual([{ key: 'https://w3id.org/aruna/terms/sampleCount', kind: 'text' }])
+    mounted.app.unmount()
+  })
+
+  it('keeps a known vocabulary name out of the custom option', async () => {
+    const mounted = await mount(dataset)
+    await typeValue(search(mounted.root), 'familyName')
+
+    expect(content(mounted.root)).toContain('Family name')
+    expect(content(mounted.root)).not.toContain('Use custom term')
+    mounted.app.unmount()
+  })
+
   it('asks which kind of value a mixed range takes', async () => {
     const picked: Array<{ key: string; kind: string }> = []
     const mounted = await mount(dataset, picked)

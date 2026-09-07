@@ -883,3 +883,16 @@ export function issueCountsBySeverity(issues: LiveIssue[]): Record<IssueSeverity
 export function propertyKey(term: VocabTerm): string {
   return term.uri.startsWith(SCHEMA_ORG) ? term.name : term.uri
 }
+
+/** Namespace the node uses for crate terms outside the bundled vocabulary. */
+export const ARUNA_TERMS = 'https://w3id.org/aruna/terms/'
+const CURIE = /^[A-Za-z][\w-]*:[\w-]+$/
+const SIMPLE_NAME = /^[A-Za-z][A-Za-z0-9_-]*$/
+
+// A plain name that no context defines is dropped by JSON-LD expansion on the
+// node, so it is minted as an absolute IRI under the node's own namespace.
+export function customPropertyKey(vocab: VocabIndex | null, text: string): string {
+  if (isAbsoluteUri(text) || CURIE.test(text)) return text
+  if (!SIMPLE_NAME.test(text) || vocab?.propertyNamed(text)) return ''
+  return `${ARUNA_TERMS}${text}`
+}

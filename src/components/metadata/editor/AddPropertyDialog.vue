@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import CommandDialog from '@/components/ui/CommandDialog.vue'
 import {
+  customPropertyKey,
   propertyKey,
   propertyTerm,
   typeLabel,
@@ -13,7 +14,6 @@ import {
   type DraftValueKind,
 } from '@/lib/crate/editor'
 import { draftKind } from '@/lib/crate/profileSeed'
-import { isAbsoluteUri } from '@/lib/profiles/uri'
 import type { ProfilePropertyRule } from '@/lib/profiles/types'
 import type { VocabIndex, VocabTerm } from '@/lib/profiles/vocabulary'
 
@@ -31,7 +31,6 @@ const emit = defineEmits<{
 }>()
 
 const LIMIT = 25
-const CURIE = /^[A-Za-z][\w-]*:[\w-]+$/
 // What a dataset author reaches for first; everything else stays alphabetical.
 const COMMON = [
   'name',
@@ -116,7 +115,7 @@ const all = computed(() => {
 })
 
 // Anything the bundled vocabulary does not know can still be written down.
-const custom = computed(() => (CURIE.test(text.value) || isAbsoluteUri(text.value) ? text.value : ''))
+const custom = computed(() => customPropertyKey(props.vocab, text.value))
 
 function choose(key: string) {
   const kinds = valueKindsFor(props.vocab, key)
