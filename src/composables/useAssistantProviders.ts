@@ -73,6 +73,14 @@ function sealed(): BrowserProvider[] {
   return vault.state.value === 'unlocked' ? vault.providers.value : []
 }
 
+function clearModels(providerId: string) {
+  const { [providerId]: _models, ...remaining } = listedModels.value
+  const { [providerId]: _error, ...errors } = modelErrors.value
+  listedModels.value = remaining
+  modelErrors.value = errors
+  modelLoads.delete(providerId)
+}
+
 function rebuild() {
   providers.value = [
     ...browserStore.state.providers.map(directSummary),
@@ -109,6 +117,7 @@ async function place(validated: BrowserProvider, storage: ProviderStorage, previ
     if (previous === 'node') await vault.saveProviders(vault.providers.value.filter((entry) => entry.id !== validated.id))
     browserStore.upsert(validated)
   }
+  clearModels(validated.id)
   rebuild()
 }
 
@@ -326,15 +335,17 @@ export function useAssistantProviders() {
     if (running) return running
     const load = fetchModels(providerId)
       .then((listed) => {
+        if (modelLoads.get(providerId) !== load) return []
         listedModels.value = { ...listedModels.value, [providerId]: listed }
         return listed
       })
       .catch((cause: unknown) => {
+        if (modelLoads.get(providerId) !== load) return []
         const message = `The model list could not be read: ${apiErrorMessage(cause)}`
         modelErrors.value = { ...modelErrors.value, [providerId]: message }
         return []
       })
-      .finally(() => modelLoads.delete(providerId))
+      .finally(() => { if (modelLoads.get(providerId) === load) modelLoads.delete(providerId) })
     modelLoads.set(providerId, load)
     return load
   }

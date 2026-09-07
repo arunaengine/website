@@ -1449,6 +1449,14 @@ const removed = ref<{ id: string; label: string } | null>(null)
 const provider = computed<AssistantProvider | null>(() =>
   ready.value.find((entry) => entry.provider_id === providerId.value) ?? (removed.value ? null : ready.value[0] ?? null))
 const model = computed(() => (provider.value ? providerModelId(provider.value, modelId.value) : ''))
+watch(provider, (next, previous) => {
+  if (!next) return
+  void providers.listModels(next.provider_id)
+  if (next.provider_id !== previous?.provider_id || !next.default_model || next.default_model === previous.default_model) return
+  modelId.value = next.default_model
+  storeValue(MODEL_KEY, next.default_model)
+  switching.value = null
+})
 
 /** What the pending change would do, for the notice above the composer. */
 const switchNotice = computed(() => {

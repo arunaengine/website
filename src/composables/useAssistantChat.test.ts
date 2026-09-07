@@ -241,3 +241,28 @@ describe('turnRequest', () => {
     expect(turnRequest({ ...compatible, effort: null })).toEqual({})
   })
 })
+
+
+describe('provider configuration changes', () => {
+  it('updates the assistant model after the configured default changes', async () => {
+    seed()
+    const { useAssistantProviders } = await import('./useAssistantProviders')
+    const { nextTick } = await import('vue')
+    const providers = useAssistantProviders()
+    const direct = { id: 'model-refresh', kind: 'openai_compatible' as const, protocol: 'responses' as const, label: 'Model refresh', model: 'old-model', baseUrl: 'https://model.example/v1', apiKey: 'test-key' }
+    vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ data: [{ id: 'new-model' }] }), { status: 200 }))
+    await providers.create(direct)
+    const chat = useAssistantChat()
+    chat.selectProvider(direct.id)
+    chat.confirmSwitch()
+    chat.selectModel('old-model')
+    chat.confirmSwitch()
+    expect(chat.model.value).toBe('old-model')
+    await providers.update(direct.id, { ...direct, model: 'new-model' })
+    await nextTick()
+    expect(chat.model.value).toBe('new-model')
+    expect(chat.modelChoices.value.map(model => model.id)).toContain('new-model')
+    expect(stored.get('aruna.assistant.model')).toBe('new-model')
+    await providers.remove(direct.id)
+  })
+})

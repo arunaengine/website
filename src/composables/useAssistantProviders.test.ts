@@ -36,6 +36,34 @@ beforeEach(() => {
 })
 
 describe('assistant model listing', () => {
+  it('refreshes cached models after provider configuration changes', async () => {
+    const providers = useAssistantProviders()
+    await providers.create({ ...openai, id: 'edited-provider' })
+    await providers.listModels('edited-provider')
+    vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ data: [{ id: 'new-model' }] }), { status: 200 }))
+    await providers.update('edited-provider', { ...openai, id: 'edited-provider', model: 'new-model', baseUrl: 'https://new-provider.example/v1' })
+    expect(providers.listedModels.value['edited-provider']).toBeUndefined()
+    expect((await providers.listModels('edited-provider')).map(model => model.id)).toContain('new-model')
+  })
+
+  it('ignores a model listing from before a provider edit', async () => {
+    const providers = useAssistantProviders()
+    await providers.create({ ...openai, id: 'changing-provider' })
+    let finish = (_response: Response) => {}
+    let started = () => {}
+    const entered = new Promise<void>(resolve => { started = resolve })
+    vi.stubGlobal('fetch', (url: RequestInfo | URL) => { if (!String(url).endsWith('/models')) return Promise.resolve(new Response('{}', { status: 404 })); started(); return new Promise<Response>(resolve => { finish = resolve }) })
+    const old = providers.listModels('changing-provider')
+    await entered
+    await providers.update('changing-provider', { ...openai, id: 'changing-provider', model: 'new-model' })
+    vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ data: [{ id: 'new-model' }] }), { status: 200 }))
+    await providers.listModels('changing-provider')
+    finish(new Response(JSON.stringify({ data: [{ id: 'old-model' }] }), { status: 200 }))
+    await old
+    expect(providers.listedModels.value['changing-provider'].map(model => model.id)).toEqual(['new-model'])
+  })
+
+
   it('lists what a stored key can reach, not only the id it was saved with', async () => {
     // A provider saved without fetching models carries a single stored id.
     const providers = useAssistantProviders()
