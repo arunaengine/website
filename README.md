@@ -79,13 +79,13 @@ This command creates:
 
 - `aruna-portal-dist.tar.gz`: static portal files at archive root, including `index.html`, `assets/`, `brand/`, and `portal-manifest.json`
 - `aruna-portal-dist.tar.gz.sha256`: SHA-256 checksum for the tarball
-- `portal-manifest.json`: release metadata, including the tarball SHA-256, consumed by Aruna `/api/v1/info.portal`
+- `portal-manifest.json`: release metadata, including the tarball SHA-256, exposed through Aruna `/api/v1/system/info` in the `portal` field
 
 The standalone release manifest contains the portal name, package version, source git commit/ref, build time, source repository reference, and `artifact_sha256`. The copy inside the tarball omits `artifact_sha256` because the tarball checksum cannot be embedded inside the archive without making the checksum self-referential.
 
 ## GitHub Actions
 
-Pull requests and pushes to the portal branches run `.github/workflows/portal-ci.yml`, which installs the committed npm lockfile with `npm ci` and runs `npm run build`.
+Pull requests and pushes to the branches listed in `.github/workflows/portal-ci.yml` install the committed npm lockfile with `npm ci`, then run `npm test` and `npm run build`.
 
 Publish release assets with `.github/workflows/portal-release.yml`:
 
