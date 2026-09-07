@@ -156,6 +156,7 @@ describe('server profile validation preview', () => {
     expect(preview.unavailable.value).toBe(false)
     expect(preview.running.value).toBe(false)
     expect(preview.error.value).toBe('Validator unavailable.')
+    expect(preview.result.value).toBeNull()
 
     preview.previewNow(CRATE)
     expect(fetch).toHaveBeenCalledTimes(2)

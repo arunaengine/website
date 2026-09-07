@@ -88,6 +88,8 @@ export function useProfilePreview(options: UseProfilePreviewOptions) {
           result.value = null
           return
         }
+        // An older verdict must not stand in for the check that just failed.
+        result.value = null
         error.value = errorMessage(cause)
       })
   }
