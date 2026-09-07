@@ -176,6 +176,7 @@ function groupName(entityId: string): string {
       </section>
     </div>
 
+    <slot />
     <Notice v-if="submitError" tone="error">{{ submitError }}</Notice>
     <div class="flex flex-wrap items-center justify-end gap-3">
       <p v-if="blocked && !saving" class="min-w-0 text-xs text-muted-foreground">{{ blocked }}</p>

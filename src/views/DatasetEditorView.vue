@@ -3,6 +3,7 @@ import { computed, defineAsyncComponent, onMounted, ref, shallowRef, watch } fro
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
+import Notice from '@/components/ui/Notice.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
@@ -18,11 +19,14 @@ import { useGroupSelection } from '@/composables/useGroupSelection'
 import { usePathPrefixes } from '@/composables/usePathPrefixes'
 import { usePathTaken } from '@/composables/usePathTaken'
 import { useProfilePreview } from '@/composables/useProfilePreview'
+import { getGroup } from '@/composables/aruna/groups'
+import { grantPublicRead } from '@/composables/usePublicRead'
+import { isGroupAdmin } from '@/lib/groupAdmin'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { provideEditorBridge } from '@/composables/useAssistantEditor'
 import { isDesktop } from '@/lib/desktop'
 import { previewDeviceDraft, requireDevice } from '@/lib/deviceApi'
-import { apiErrorMessage } from '@/lib/api'
+import { apiErrorMessage, type RestrictedFile } from '@/lib/api'
 import { errorMessage } from '@/lib/utils'
 import { slugify } from '@/lib/profiles/emit'
 import { isAssignableProfile } from '@/lib/profiles/assignable'
@@ -221,6 +225,7 @@ const deviceStatus = desktop ? useDeviceStatus() : null
 const preview = useProfilePreview({
   client: () => ({ baseUrl: apiBaseUrl.value, token: authToken.value ?? undefined }),
   groupId: () => draft.value.groupId,
+  isPublic: () => draft.value.visibility === 'public',
   ...(desktop
     ? {
         request: (rocrate: unknown, signal: AbortSignal) =>
@@ -388,9 +393,53 @@ function discard() {
     : { name: 'datasets' })
 }
 
+// Files a public dataset would list without everyone being able to read them.
+const restrictedFiles = ref<RestrictedFile[]>([])
+const canGrantPublic = ref(false)
+const grantBusy = ref(false)
+const grantError = ref<string | null>(null)
+const grantUnresolved = ref<RestrictedFile[]>([])
+
+function fileLabel(file: RestrictedFile): string {
+  return file.bucket && file.key ? `${file.bucket}/${file.key}` : file.entity_id
+}
+
+// Only a group administrator may add the public role; anyone else is pointed
+// at the group's roles.
+async function checkGrantAccess() {
+  const groupId = draft.value.groupId
+  const userId = currentUser.value?.id
+  canGrantPublic.value = false
+  if (!groupId || !userId) return
+  try {
+    const detail = await getGroup(groupId)
+    if (groupId === draft.value.groupId) canGrantPublic.value = isGroupAdmin(detail, userId)
+  } catch {
+    // The roles link stays available.
+  }
+}
+
+async function makePublic() {
+  const groupId = draft.value.groupId
+  if (!groupId || grantBusy.value) return
+  grantBusy.value = true
+  grantError.value = null
+  try {
+    const result = await grantPublicRead(groupId, `Public read: ${locationPath.value}`, restrictedFiles.value)
+    grantUnresolved.value = result.unresolved
+    restrictedFiles.value = result.unresolved
+    if (!result.unresolved.length) await save()
+  } catch (error) {
+    grantError.value = errorMessage(error)
+  } finally {
+    grantBusy.value = false
+  }
+}
+
 // The node validates the crate before every write; a rejected verdict stops
-// here and the panel shows what it found.
-async function save() {
+// here and the panel shows what it found. A public draft with files not
+// everyone can read pauses for a choice unless it is saved anyway.
+async function save(anyway = false) {
   if (!canSave.value || saving.value || submitting.value) return
   submitting.value = true
   submitError.value = null
@@ -403,6 +452,15 @@ async function save() {
   }
   if (!verified || !submitting.value) return
   const isPublic = draft.value.visibility === 'public'
+  const restricted = isPublic ? preview.result.value?.restricted_files ?? [] : []
+  if (restricted.length && !anyway) {
+    restrictedFiles.value = restricted
+    grantError.value = null
+    submitting.value = false
+    void checkGrantAccess()
+    return
+  }
+  restrictedFiles.value = []
   try {
     if (mode.value === 'edit') {
       await replaceMetadataRoCrate(documentId.value, { rocrate: crate.value, public: isPublic })
@@ -535,9 +593,39 @@ async function save() {
               :busy-label="mode === 'edit' ? 'Saving' : 'Creating'"
               @preview="preview.previewNow(crate)"
               @retry-profile="retryProfileRules"
-              @save="save"
+              @save="save()"
               @jump="open"
-            />
+            >
+              <Notice v-if="restrictedFiles.length" tone="warning" title="Not everyone can read these files">
+                <p>The dataset is public, but these files are not publicly readable. Readers will see them listed and cannot download them.</p>
+                <ul class="mt-1 list-disc space-y-0.5 pl-4 font-mono text-[11px]">
+                  <li v-for="file in restrictedFiles" :key="file.entity_id" class="break-all">{{ fileLabel(file) }}</li>
+                </ul>
+                <p v-if="grantUnresolved.length" class="mt-1">
+                  These files have no bucket and key the portal can grant access on. Change their access from the group's roles.
+                </p>
+                <p v-else-if="!canGrantPublic" class="mt-1">
+                  A group administrator can add a public role with read access to these files under the group's roles.
+                </p>
+                <p v-if="grantError" class="mt-1 text-destructive">{{ grantError }}</p>
+                <span class="mt-2 flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" @click="restrictedFiles = []">Back</Button>
+                  <Button
+                    v-if="canGrantPublic && !grantUnresolved.length"
+                    variant="outline"
+                    size="sm"
+                    :disabled="grantBusy"
+                    @click="makePublic"
+                  >
+                    {{ grantBusy ? 'Granting access' : 'Make the data public' }}
+                  </Button>
+                  <Button v-else-if="draft.groupId" variant="outline" size="sm" as-child>
+                    <RouterLink :to="{ name: 'group', params: { id: draft.groupId }, query: { tab: 'roles' } }">Open the group's roles</RouterLink>
+                  </Button>
+                  <Button size="sm" @click="save(true)">Save anyway</Button>
+                </span>
+              </Notice>
+            </NodeCheckPanel>
             <PidWithdraw v-if="mode === 'edit'" :document-id="documentId" />
           </template>
           <CrateGraph

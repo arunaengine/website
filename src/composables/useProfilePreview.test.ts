@@ -84,6 +84,15 @@ describe('server profile validation preview', () => {
     expect(preview.result.value?.accepted).toBe(true)
   })
 
+  it('tells the node when the draft is public', async () => {
+    scope = effectScope()
+    const preview = scope.run(() => useProfilePreview({ client: () => CLIENT, isPublic: () => true }))!
+
+    preview.previewNow(CRATE)
+    const [, init] = vi.mocked(fetch).mock.calls[0] as [URL, RequestInit]
+    expect(JSON.parse(String(init.body))).toEqual({ rocrate: CRATE, public: true })
+  })
+
   it('keeps the newest verdict when an older request settles last', async () => {
     const preview = setupPreview()
 

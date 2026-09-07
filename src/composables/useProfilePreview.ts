@@ -20,6 +20,8 @@ export interface UseProfilePreviewOptions {
   request?: (rocrate: unknown, signal: AbortSignal) => Promise<ProfileValidationPreviewResponse>
   /** Owning group of the draft, so a group-scoped profile can be resolved. */
   groupId?: () => string | undefined
+  /** A public draft also asks which of its files are not readable by everyone. */
+  isPublic?: () => boolean
 }
 
 export function useProfilePreview(options: UseProfilePreviewOptions) {
@@ -60,7 +62,13 @@ export function useProfilePreview(options: UseProfilePreviewOptions) {
     // leaving `running` stuck.
     const request = options.request
       ? Promise.resolve().then(() => options.request!(rocrate, controller.signal))
-      : previewProfileValidation(rocrate, options.client(), controller.signal, options.groupId?.())
+      : previewProfileValidation(
+          rocrate,
+          options.client(),
+          controller.signal,
+          options.groupId?.(),
+          options.isPublic?.() ?? false,
+        )
     return request
       .then((response) => {
         if (current !== generation || disposed) return

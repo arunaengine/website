@@ -41,6 +41,16 @@ describe('profile validation preview', () => {
     expect(bodies[1]).not.toHaveProperty('group_id')
   })
 
+  it('asks which files of a public draft are not readable by everyone', async () => {
+    const bodies = stubFetch({ status: 200, payload: ACCEPTED })
+
+    await previewProfileValidation({ '@graph': [] }, CLIENT, undefined, 'group-1', true)
+    await previewProfileValidation({ '@graph': [] }, CLIENT, undefined, undefined, false)
+
+    expect(bodies[0]).toMatchObject({ group_id: 'group-1', public: true })
+    expect(bodies[1]).toEqual({ rocrate: { '@graph': [] } })
+  })
+
   it('keeps a refusal of the draft itself', async () => {
     const bodies = stubFetch({ status: 400, payload: { message: 'profile_not_registered' } })
 

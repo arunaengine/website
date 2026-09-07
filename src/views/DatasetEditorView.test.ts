@@ -21,6 +21,7 @@ import * as Emit from '@/lib/profiles/emit'
 import * as Assignable from '@/lib/profiles/assignable'
 import { PROCESS_RUN_CRATE_PROFILE } from '@/lib/profiles/builtinProfiles'
 import * as Utils from '@/lib/utils'
+import * as GroupAdmin from '@/lib/groupAdmin'
 
 const route = reactive<{ name: string; params: Record<string, string>; query: Record<string, string> }>({
   name: 'dataset-new',
@@ -29,7 +30,7 @@ const route = reactive<{ name: string; params: Record<string, string>; query: Re
 })
 const groups = ref([{ id: 'group-1', name: 'Research group' }])
 const profiles = ref<Array<Record<string, unknown>>>([])
-const currentUser = ref<{ preferredProfileId?: string } | null>(null)
+const currentUser = ref<{ id?: string; preferredProfileId?: string } | null>(null)
 const saving = ref(false)
 const apiBaseUrl = ref('https://api.example.test')
 const authToken = ref('token')
@@ -37,6 +38,8 @@ const createMetadata = vi.fn()
 const getMetadataItem = vi.fn()
 const fetchRoCrateRaw = vi.fn()
 const replaceMetadataRoCrate = vi.fn()
+const getGroup = vi.fn()
+const grantPublicRead = vi.fn()
 const loadProfileCrate = vi.fn(async () => ({}))
 const routerPush = vi.fn(async () => undefined)
 
@@ -157,6 +160,7 @@ const LocationStub = defineComponent({
           onInput: (event: { target: { value: string } }) => emit('slug', event.target.value),
         }),
         h('button', { onClick: () => emit('folder', 'other') }, 'Pick other folder'),
+        h('button', { onClick: () => emit('update', { ...props.draft, visibility: 'public' }) }, 'Make public'),
         ...(props.groupOptions as Array<{ value: string; label: string }>).map((option) =>
           h('button', {
             onClick: () => emit('update', { ...props.draft, groupId: option.value }),
@@ -238,13 +242,18 @@ const NodeCheckStub = defineComponent({
     blocked: { type: String, default: '' },
   },
   emits: ['save', 'retry-profile'],
-  setup: (props, { emit }) => () => h('div', [
+  setup: (props, { emit, slots }) => () => h('div', [
     h('p', `Checking ${props.profileName || 'no profile'}${props.profileLoading ? ', loading its rules' : ''}`),
     h('p', `Rules ${props.profileError || 'fine'}`),
     h('p', `Blocked ${props.blocked || 'not'}`),
+    slots.default?.(),
     h('button', { onClick: () => emit('retry-profile') }, 'Retry profile rules'),
     h('button', { disabled: !props.canSave, onClick: () => emit('save') }, props.actionLabel),
   ]),
+})
+const NoticeStub = defineComponent({
+  props: { title: { type: String, default: '' } },
+  setup: (props, { slots }) => () => h('div', [props.title, slots.default?.()]),
 })
 
 const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vue', import.meta.url), {
@@ -257,6 +266,7 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
   '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
   '@/components/dashboard/PageHeader.vue': moduleDefault(PageHeaderStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+  '@/components/ui/Notice.vue': moduleDefault(NoticeStub),
   '@/components/ui/Skeleton.vue': moduleDefault(EmptyStub),
   '@/components/ui/ErrorPanel.vue': moduleDefault(EmptyStub),
   '@/components/groups/CreateGroupDialog.vue': moduleDefault(EmptyStub),
@@ -317,6 +327,9 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
       verify,
     }),
   },
+  '@/composables/aruna/groups': { getGroup },
+  '@/composables/usePublicRead': { grantPublicRead },
+  '@/lib/groupAdmin': GroupAdmin,
   '@/composables/useDeviceStatus': { useDeviceStatus: () => ({ deviceClient: ref(null) }) },
   '@/composables/useAssistantEditor': { provideEditorBridge: vi.fn() },
   '@/lib/desktop': { isDesktop: () => false },
@@ -331,6 +344,22 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
   '@/lib/crate/issues': Issues,
   '@/lib/crate/paths': Paths,
 })
+
+// An accepted verdict that still names two files not everyone can read.
+function restrictedVerdict(): Api.ProfileValidationPreviewResponse {
+  return {
+    accepted: true,
+    state: 'valid',
+    evaluator: 'craqle',
+    findings: [],
+    completeness: 'complete',
+    structural_violations: [],
+    restricted_files: [
+      { entity_id: 'raw/reads.fastq', bucket: 'bucket-a', key: 'raw/reads.fastq' },
+      { entity_id: '#notes' },
+    ],
+  }
+}
 
 async function name(root: Parameters<typeof content>[0], value = 'Draft') {
   await typeValue(element(root, (node) => node.props['aria-label'] === 'Dataset name'), value)
@@ -364,6 +393,8 @@ beforeEach(() => {
   })
   fetchRoCrateRaw.mockReset().mockResolvedValue(Editor.toRoCrate(seeded(Editor.newDraft())))
   verify.mockReset().mockResolvedValue(true)
+  getGroup.mockReset().mockResolvedValue({ group_id: 'group-1', realm_id: 'realm-1', display_name: 'Research group', roles: [] })
+  grantPublicRead.mockReset().mockResolvedValue({ granted: [], unresolved: [] })
   loadProfileCrate.mockReset().mockResolvedValue({})
   route.query = {}
   previewDebounced.mockClear()
@@ -698,6 +729,59 @@ describe('DatasetEditorView', () => {
     expect(verify).toHaveBeenCalledTimes(1)
     expect(createMetadata).not.toHaveBeenCalled()
     expect(routerPush).not.toHaveBeenCalled()
+    mounted.app.unmount()
+  })
+
+  it('pauses a public draft whose files are not readable by everyone', async () => {
+    previewResult.value = restrictedVerdict()
+    const mounted = await mountApp(DatasetEditorView)
+    await openLocation(mounted.root)
+    await click(button(mounted.root, 'Make public'))
+    await click(button(mounted.root, 'Seed dataset'))
+    await click(button(mounted.root, 'Create dataset'))
+    await flush()
+
+    expect(verify).toHaveBeenCalledTimes(1)
+    expect(createMetadata).not.toHaveBeenCalled()
+    const text = content(mounted.root)
+    expect(text).toContain('Not everyone can read these files')
+    expect(text).toContain('bucket-a/raw/reads.fastq')
+    expect(text).toContain('#notes')
+    expect(text).toContain("Open the group's roles")
+    expect(text).not.toContain('Make the data public')
+
+    await click(button(mounted.root, 'Save anyway'))
+    await flush()
+    expect(createMetadata).toHaveBeenCalledTimes(1)
+    expect(createMetadata.mock.calls[0][0]).toMatchObject({ public: true })
+    mounted.app.unmount()
+  })
+
+  it('lets a group administrator make the listed files public before saving', async () => {
+    previewResult.value = restrictedVerdict()
+    currentUser.value = { id: 'user-1' }
+    getGroup.mockResolvedValue({
+      group_id: 'group-1',
+      realm_id: 'realm-1',
+      display_name: 'Research group',
+      roles: [{ role_id: 'r', name: 'admin', permissions: { '/realm-1/g/group-1/admin/**': 'write' }, assigned_users: ['user-1'] }],
+    })
+    grantPublicRead.mockImplementation(async () => {
+      previewResult.value = { ...restrictedVerdict(), restricted_files: [] }
+      return { granted: restrictedVerdict().restricted_files, unresolved: [] }
+    })
+    const mounted = await mountApp(DatasetEditorView)
+    await openLocation(mounted.root)
+    await click(button(mounted.root, 'Make public'))
+    await click(button(mounted.root, 'Seed dataset'))
+    await click(button(mounted.root, 'Create dataset'))
+    await flush()
+
+    await click(button(mounted.root, 'Make the data public'))
+    await flush()
+    expect(grantPublicRead).toHaveBeenCalledWith('group-1', expect.stringContaining('Public read: '), restrictedVerdict().restricted_files)
+    expect(createMetadata).toHaveBeenCalledTimes(1)
+    expect(createMetadata.mock.calls[0][0]).toMatchObject({ public: true })
     mounted.app.unmount()
   })
 

@@ -44,6 +44,13 @@ export interface RoCrateStructuralViolation {
   entity_id?: string | null
 }
 
+// A data entity of a public draft whose object is not readable by everyone.
+export interface RestrictedFile {
+  entity_id: string
+  bucket?: string
+  key?: string
+}
+
 export interface ProfileValidationPreviewResponse {
   // The verdict POST /metadata or PUT /metadata/{id}/rocrate would enforce.
   accepted: boolean
@@ -55,6 +62,8 @@ export interface ProfileValidationPreviewResponse {
   findings: ProfileValidationFinding[]
   completeness: ProfileValidationCompleteness
   structural_violations: RoCrateStructuralViolation[]
+  // Only answered for a public draft; absent or empty when every file is readable.
+  restricted_files?: RestrictedFile[]
 }
 
 // A node that predates group-scoped profiles refuses the extra field instead of
@@ -68,14 +77,16 @@ function unknownFieldRefusal(cause: unknown): boolean {
  * POST /metadata/profile/validation/preview: advisory validation of a draft
  * crate before it is saved. Rate limited like revalidate; 404/405 means the
  * node does not serve the preview at all. `groupId` names the owning group so
- * the node can resolve a group-scoped profile; it is retried once without the
- * field when the node does not know it yet.
+ * the node can resolve a group-scoped profile; `isPublic` asks which files a
+ * public draft would expose without being readable. Both are retried once
+ * without the fields when the node does not know them yet.
  */
 export async function previewProfileValidation(
   rocrate: unknown,
   client: ApiClientOptions = {},
   signal?: AbortSignal,
   groupId?: string,
+  isPublic = false,
 ): Promise<ProfileValidationPreviewResponse> {
   const post = (body: Record<string, unknown>) =>
     apiRequest<ProfileValidationPreviewResponse>(
@@ -83,9 +94,9 @@ export async function previewProfileValidation(
       { method: 'POST', body: JSON.stringify(body), signal },
       client,
     )
-  if (!groupId) return post({ rocrate })
+  if (!groupId && !isPublic) return post({ rocrate })
   try {
-    return await post({ rocrate, group_id: groupId })
+    return await post({ rocrate, ...(groupId ? { group_id: groupId } : {}), ...(isPublic ? { public: true } : {}) })
   } catch (cause) {
     if (!unknownFieldRefusal(cause)) throw cause
     return post({ rocrate })
