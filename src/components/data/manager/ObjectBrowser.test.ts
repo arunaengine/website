@@ -240,9 +240,12 @@ describe('notebooks in the bucket', () => {
     expect(await marked(false)).toBe(false)
   })
 
-  it('offers notebook creation wherever the data view stands', async () => {
-    const root = await render()
-    expect(button(root, 'New notebook')).toBeTruthy()
+  it.each([false, true])('offers notebook creation only in Notebooks: notebooks=%s', async (notebooks) => {
+    const manager = fakeManager({ openDetails, router: { push } })
+    const { root, app } = await mountApp(defineComponent({ setup: () => () => h(browser, { manager, notebooks }) }))
+    if (notebooks) expect(button(root, 'New notebook')).toBeTruthy()
+    else expect(() => button(root, 'New notebook')).toThrow()
+    app.unmount()
   })
 })
 

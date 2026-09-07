@@ -8,6 +8,9 @@ import type { NotebookAruna, NotebookPlacement, NotebookResources } from './nbfo
 import { dependencyKey } from './document'
 import { dependencyFileName, dependencyKind, sessionRuntimeById } from './runtimes'
 
+export const DEFAULT_KERNEL_CPU = 2
+export const DEFAULT_KERNEL_RAM = 4_000_000_000
+
 /** Marks the job as the session behind one notebook. */
 export const SESSION_TAG = 'aruna-engine.org/session'
 export const SESSION_TAG_VALUE = 'notebook'
@@ -67,9 +70,9 @@ export function sessionSubmitRequest(draft: SessionSubmitDraft): SubmitExecution
   }
   const name = draft.name.trim()
   if (name) request.name = name
-  const cpu = draft.resources?.cpu_cores
+  const cpu = draft.resources?.cpu_cores ?? DEFAULT_KERNEL_CPU
   if (cpu !== undefined && Number.isInteger(cpu) && cpu > 0) request.cpu_cores = cpu
-  const ram = draft.resources?.ram_bytes
+  const ram = draft.resources?.ram_bytes ?? DEFAULT_KERNEL_RAM
   if (ram !== undefined && Number.isFinite(ram) && ram > 0) request.ram_bytes = Math.floor(ram)
   const kind = draft.placement?.executor_kind?.trim()
   if (kind) request.executor_constraint = kind

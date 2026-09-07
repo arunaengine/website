@@ -149,6 +149,11 @@ describe('sessionSubmitRequest', () => {
     expect(request.inputs).toEqual([])
   })
 
+  it('defaults kernel budgets and preserves explicit overrides', () => {
+    expect(sessionSubmitRequest(draft)).toMatchObject({ cpu_cores: 2, ram_bytes: 4_000_000_000 })
+    expect(sessionSubmitRequest({ ...draft, resources: { cpu_cores: 8, ram_bytes: 16_000_000_000 } })).toMatchObject({ cpu_cores: 8, ram_bytes: 16_000_000_000 })
+  })
+
   it('stages the dependency list and opens the network', () => {
     const request = sessionSubmitRequest({
       ...draft,

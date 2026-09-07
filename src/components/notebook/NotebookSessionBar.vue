@@ -20,7 +20,7 @@ import { useNow } from '@/composables/useNow'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { SESSION_RUNTIMES, dependencyFileName, dependencyKind } from '@/lib/notebook/runtimes'
 import type { NotebookDependencies as DependencySpec } from '@/lib/notebook/nbformat'
-import { sessionProblems, sessionStartDraft } from '@/lib/notebook/submit'
+import { DEFAULT_KERNEL_CPU, DEFAULT_KERNEL_RAM, sessionProblems, sessionStartDraft } from '@/lib/notebook/submit'
 import { toneVariant, type StateTone } from '@/lib/stateBadge'
 import { DEFAULT_SESSION_IDLE_AFTER_MS } from '@/lib/computeAdmin'
 import { useComputeAdmin } from '@/composables/useComputeAdmin'
@@ -117,7 +117,7 @@ const dependencies = computed(() => {
   return kind === 'requirements' && meta.value?.dependencies?.kind === 'conda' ? 'conda' : kind
 })
 
-const resources = computed(() => meta.value?.resources ?? {})
+const resources = computed(() => ({ ...meta.value?.resources, cpu_cores: meta.value?.resources?.cpu_cores ?? DEFAULT_KERNEL_CPU, ram_bytes: meta.value?.resources?.ram_bytes ?? DEFAULT_KERNEL_RAM }))
 const ramGb = computed({
   get: () => (resources.value.ram_bytes ? String(resources.value.ram_bytes / 1_000_000_000) : ''),
   set: (value: string) => {
