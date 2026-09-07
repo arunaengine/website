@@ -182,12 +182,12 @@ async function saveDependencies(value: DependencySpec, restart: boolean) {
 <template>
   <div class="min-w-0 space-y-2">
     <div class="flex flex-wrap items-center gap-2">
-      <Button v-if="!session.running.value" variant="ghost" size="sm" :disabled="runBusy || Boolean(problems.length) || notebook.loading.value || !meta" @click="start()">Start kernel</Button>
       <Button size="sm" :disabled="runBusy || Boolean(problems.length) || notebook.loading.value || !meta" @click="runNotebook">
         <Play class="size-3.5" /> {{ pendingRun || session.starting.value ? 'Starting…' : session.kernel.value === 'busy' ? 'Running…' : 'Run notebook' }}
       </Button>
+      <div class="inline-flex items-stretch">
       <Popover>
-        <Button size="sm" variant="outline" aria-label="Kernel">
+        <Button size="sm" variant="outline" class="rounded-r-none" aria-label="Kernel">
           Kernel
           <span class="flex items-center gap-1.5 text-xs text-muted-foreground" aria-label="Kernel status">
             <span class="h-2 w-2 rounded-full" :class="session.live.value ? (session.kernel.value === 'busy' ? 'bg-amber-500' : 'bg-emerald-500') : session.running.value || session.starting.value ? 'bg-amber-500' : 'bg-muted-foreground'" />
@@ -197,6 +197,9 @@ async function saveDependencies(value: DependencySpec, restart: boolean) {
         </Button>
         <template #content>
           <div class="max-h-[70vh] space-y-3 overflow-y-auto">
+            <Notice v-if="problems.length" tone="warning" :lines="problems">This session cannot start yet.</Notice>
+            <Notice v-if="session.error.value" tone="error">{{ session.error.value }}</Notice>
+            <Notice v-if="session.notice.value" :tone="session.ended.value ? 'info' : 'warning'">{{ session.notice.value }}</Notice>
               <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
                 <Badge :variant="stateVariant">{{ stateLabel }}</Badge>
                 <Badge v-if="session.live.value" variant="outline" size="sm">Kernel {{ session.kernel.value }}</Badge>
@@ -220,6 +223,7 @@ async function saveDependencies(value: DependencySpec, restart: boolean) {
                 <Button variant="outline" size="sm" :aria-expanded="settingsOpen" @click="settingsOpen = !settingsOpen">
                   <Settings2 class="size-3.5" /> Resources and placement
                 </Button>
+                <Button v-if="!session.running.value" variant="outline" size="sm" :disabled="runBusy || Boolean(problems.length) || notebook.loading.value || !meta" @click="start()"><Play class="size-3.5" /> Start kernel</Button>
                 <Button v-if="session.running.value" variant="outline" size="sm" :disabled="!session.live.value || session.ending.value || session.restarting.value" title="Start a fresh kernel with the saved dependencies; variables are cleared." @click="start(true)">
                   <RotateCcw class="size-3.5" /> Restart kernel
                 </Button>
@@ -278,11 +282,9 @@ async function saveDependencies(value: DependencySpec, restart: boolean) {
           </div>
         </template>
       </Popover>
+      <Button variant="outline" size="icon-sm" class="h-8 rounded-l-none border-l-0" aria-label="Start kernel" :title="session.running.value ? 'Kernel is already running' : 'Start kernel'" :disabled="session.running.value || runBusy || Boolean(problems.length) || notebook.loading.value || !meta" @click="start()"><Play class="size-3.5" /></Button>
+      </div>
     </div>
-
-    <Notice v-if="problems.length" tone="warning" :lines="problems">This session cannot start yet.</Notice>
-    <Notice v-if="session.error.value" tone="error">{{ session.error.value }}</Notice>
-    <Notice v-if="session.notice.value" tone="warning">{{ session.notice.value }}</Notice>
 
     <NotebookDependencies
       v-if="dependencies"

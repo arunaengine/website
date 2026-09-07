@@ -2,16 +2,18 @@ import * as VueRuntime from 'vue'
 import { defineComponent, h, ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as Runtimes from '@/lib/notebook/runtimes'
-import { newCell } from '@/lib/notebook/nbformat'
+import { newCell, type CellKind } from '@/lib/notebook/nbformat'
 import { button, click, compileClientComponent, element, flush, moduleDefault, mountApp } from '@/test/clientRender'
 
 async function render() {
   const cells = ref(['a', 'b', 'c'].map((id) => ({ ...newCell('code', id), id })))
   const activeCellId = ref('a')
+  const ended = ref(false)
   const moveCell = vi.fn()
-  const addCell = vi.fn(() => ({ ...newCell('code'), id: 'new-cell' }))
+  const addCell = vi.fn((kind: CellKind = 'code', index?: number) => { const cell = { ...newCell(kind), id: 'new-cell' }; cells.value.splice(index ?? cells.value.length, 0, cell); return cell })
+  const addAttachment = vi.fn()
   const notebook = {
-    cells, activeCellId, moveCell, addCell,
+    cells, activeCellId, moveCell, addCell, addAttachment,
     selectCell: (id: string) => { activeCellId.value = id },
     name: ref('analysis'), meta: ref({ runtime: 'python-notebook', group_id: 'group', workspace_bucket: 'lab' }),
     scope: ref('account'), generation: ref(1),
@@ -43,7 +45,7 @@ async function render() {
     '@/composables/notebookContext': { provideNotebook: vi.fn() },
     '@/composables/useNotebook': { createNotebook: () => notebook },
     '@/composables/useNotebookSession': { createNotebookSession: () => ({
-      detach: vi.fn(), attachSaved: vi.fn(), live: ref(true), ended: ref(false), jobId: ref('job'), runCells: vi.fn(),
+      detach: vi.fn(), attachSaved: vi.fn(), live: ref(true), ended, jobId: ref('job'), runCells: vi.fn(),
     }) },
     '@/composables/useAssistantNotebook': { provideNotebookBridge: vi.fn() },
     '@/lib/notebook/bridge': { createNotebookBridge: vi.fn() },
@@ -54,13 +56,14 @@ async function render() {
     '@/lib/notebook/runtimes': Runtimes,
     '@/lib/utils': { relativeTime: () => 'now' },
   }
-  for (const path of ['dashboard/PageHeader', 'ui/Notice', 'ui/Spinner', 'assistant/AskAiButton', 'compute/ComputeGates', 'notebook/NotebookFiles', 'notebook/NotebookSessionBar', 'jobs/JobReportPanel']) {
+  for (const path of ['ui/DialogContent', 'ui/DialogHeader', 'ui/DialogTitle', 'ui/DialogDescription', 'dashboard/PageHeader', 'ui/Notice', 'ui/Spinner', 'assistant/AskAiButton', 'compute/ComputeGates', 'notebook/NotebookFiles', 'notebook/NotebookCapture', 'notebook/NotebookSessionBar', 'jobs/JobReportPanel']) {
     modules[`@/components/${path}.vue`] = moduleDefault(Slotted)
   }
+  modules['@/components/ui/Dialog.vue'] = moduleDefault(defineComponent({ props: ['open'], setup: (props, { slots }) => () => props.open ? h('dialog', {}, slots.default?.()) : null }))
   vi.stubGlobal('document', { getElementById: () => null, addEventListener: vi.fn(), removeEventListener: vi.fn() })
   const component = compileClientComponent(new URL('./NotebookView.vue', import.meta.url), modules)
   const { root, app } = await mountApp(component)
-  return { root, app, moveCell, addCell, activeCellId }
+  return { root, app, moveCell, addCell, activeCellId, ended, cells, addAttachment }
 }
 
 afterEach(() => vi.unstubAllGlobals())
@@ -78,6 +81,33 @@ describe('notebook workspace controls', () => {
     const { root, app, addCell } = await render()
     await click(button(root, 'Add below b'))
     expect(addCell).toHaveBeenCalledWith('code', 2)
+    app.unmount()
+  })
+
+  it('opens the completed report only in its modal', async () => {
+    const { root, app, ended } = await render()
+    expect(() => element(root, (node) => node.tag === 'dialog')).toThrow()
+    ended.value = true
+    await flush()
+    await click(element(root, (node) => node.props.label === 'Session report'))
+    expect(element(root, (node) => node.tag === 'dialog')).toBeTruthy()
+    app.unmount()
+  })
+
+  it.each([false, true])('drops PNG into a Markdown cell or creates one: existing=%s', async (existing) => {
+    vi.stubGlobal('FileReader', class {
+      result = 'data:image/png;base64,AA=='
+      onload?: () => void
+      readAsDataURL() { this.onload?.() }
+    })
+    const { root, app, cells, addCell, addAttachment } = await render()
+    if (existing) cells.value[1].cell_type = 'markdown'
+    const destination = element(root, (node) => node.props.id === 'notebook-cell-b')
+    ;(destination.props.onDrop as (event: unknown) => void)({ dataTransfer: { files: [{ name: 'plot.png', type: 'image/png' }] }, preventDefault: vi.fn(), stopPropagation: vi.fn() })
+    await flush()
+    expect(addAttachment).toHaveBeenCalledWith(existing ? 'b' : 'new-cell', 'plot.png', 'AA==')
+    if (existing) expect(addCell).not.toHaveBeenCalled()
+    else expect(addCell).toHaveBeenCalledWith('markdown', 2)
     app.unmount()
   })
 
@@ -106,7 +136,7 @@ describe('notebook workspace controls', () => {
     const drag = button(root, `Drag ${id}`)
     ;(drag.props.onDragstart as (event: unknown) => void)({ dataTransfer: { setData: vi.fn() } })
     const destination = element(root, (node) => node.props.id === `notebook-cell-${target}`)
-    const event = { currentTarget: { getBoundingClientRect: () => ({ top: 0, height: 100 }) }, clientY: y, preventDefault: vi.fn() }
+    const event = { currentTarget: { getBoundingClientRect: () => ({ top: 0, height: 100 }) }, clientY: y, preventDefault: vi.fn(), stopPropagation: vi.fn() }
     ;(destination.props.onDragover as (event: unknown) => void)(event)
     await flush()
     ;(destination.props.onDrop as (event: unknown) => void)(event)
@@ -117,7 +147,7 @@ describe('notebook workspace controls', () => {
   it('ignores drops that did not begin on a notebook cell', async () => {
     const { root, app, moveCell } = await render()
     const destination = element(root, (node) => node.props.id === 'notebook-cell-a')
-    ;(destination.props.onDrop as (event: unknown) => void)({ preventDefault: vi.fn() })
+    ;(destination.props.onDrop as (event: unknown) => void)({ preventDefault: vi.fn(), stopPropagation: vi.fn() })
     expect(moveCell).not.toHaveBeenCalled()
     app.unmount()
   })

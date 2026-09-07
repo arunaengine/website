@@ -6,10 +6,11 @@ const s3 = vi.hoisted(() => ({
   referenceForContext: (nodeId: string, groupId: string) => ({ nodeId, groupId, accessKeyId: 'temporary' }),
 }))
 vi.mock('@/composables/useS3', () => ({ useS3: () => s3, isS3AuthError: () => false }))
+const metadata = vi.hoisted(() => ({ create: vi.fn() }))
 const apiBaseUrl = ref('/api/v1')
 const currentUser = ref({ id: 'user-a' })
 const nodeInfo = ref({ node: { realm_id: 'realm-a', peer_id: 'node-a' } })
-vi.mock('@/composables/useAruna', () => ({ useAruna: () => ({ apiBaseUrl, currentUser, nodeInfo }) }))
+vi.mock('@/composables/useAruna', () => ({ useAruna: () => ({ apiBaseUrl, currentUser, nodeInfo, createMetadata: metadata.create }) }))
 import { memoryStorage } from '@/test/storage'
 
 const { createNotebook } = await import('./useNotebook')
@@ -31,6 +32,7 @@ beforeEach(() => {
   vi.stubGlobal('localStorage', memoryStorage())
   s3.getObjectText.mockReset()
   s3.putTextObject.mockReset()
+  metadata.create.mockReset().mockResolvedValue({ document_id: 'snapshot-dataset' })
 })
 
 afterEach(() => {
@@ -295,6 +297,61 @@ describe('createNotebook', () => {
     notebook.setCellType(cell.id, 'code')
     expect(cell.metadata.aruna).toEqual({ job_id: 'retained-job' })
     expect(notebook.dirty.value).toBe(true)
+  })
+
+  it('embeds PNG attachments without replacing existing images', async () => {
+    s3.getObjectText.mockRejectedValue({ name: 'NoSuchKey' })
+    const notebook = store()
+    await notebook.load()
+    const cell = notebook.addCell('markdown', undefined, '# Images')
+    notebook.addAttachment(cell.id, 'plot.png', 'first')
+    notebook.addAttachment(cell.id, 'plot.png', 'second')
+    expect(cell.attachments?.['plot.png']).toEqual({ 'image/png': 'first' })
+    expect(Object.values(cell.attachments!)).toContainEqual({ 'image/png': 'second' })
+    expect(cell.source).toContain('attachment:plot.png')
+    expect(notebook.dirty.value).toBe(true)
+  })
+
+  it.each([false, true])('captures fixed notebook bytes and refuses a changed document: changed=%s', async (changed) => {
+    s3.getObjectText.mockRejectedValue({ name: 'NoSuchKey' })
+    const notebook = store()
+    await notebook.load()
+    const cell = notebook.cells.value[0]
+    notebook.setSource(cell.id, 'print(42)')
+    notebook.appendOutput(cell.id, { output_type: 'stream', name: 'stdout', text: '42' })
+    let upload = () => {}
+    let release = () => {}
+    const entered = new Promise<void>((resolve) => { upload = resolve })
+    s3.putTextObject.mockImplementation(async () => { upload(); await new Promise<void>((resolve) => { release = resolve }); return { versionId: 'frozen-version' } })
+    const result = notebook.capture()
+    const outcome = result.then((id) => id, (error: Error) => error.message)
+    await entered
+    if (changed) currentUser.value = { id: 'other-user' }
+    else notebook.setSource(cell.id, 'newer draft')
+    release()
+    if (changed) {
+      expect(await outcome).toContain('changed during capture')
+      expect(metadata.create).not.toHaveBeenCalled()
+    } else {
+      expect(await outcome).toBe('snapshot-dataset')
+      expect(s3.putTextObject.mock.calls[0][2]).toContain('print(42)')
+      expect(s3.putTextObject.mock.calls[0][2]).not.toContain('newer draft')
+      expect(cell.source).toBe('newer draft')
+      const input = metadata.create.mock.calls[0][0]
+      expect(input).toMatchObject({ group_id: 'group-1', public: false })
+      const file = input.rocrate['@graph'].find((entity: Record<string, unknown>) => entity['@type'] === 'File')
+      expect(file.contentUrl).toContain('?versionId=frozen-version')
+      expect(file['@id']).toMatch(/^https:\/\/w3id.org\/aruna\/data\/[0-9a-f]{64}$/)
+    }
+  })
+
+  it('does not create a run-crate without a pinned snapshot version', async () => {
+    s3.getObjectText.mockRejectedValue({ name: 'NoSuchKey' })
+    s3.putTextObject.mockResolvedValue({ versionId: null })
+    const notebook = store()
+    await notebook.load()
+    await expect(notebook.capture()).rejects.toThrow('without a version')
+    expect(metadata.create).not.toHaveBeenCalled()
   })
 
   it('records what a cell run reported', async () => {

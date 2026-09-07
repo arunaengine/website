@@ -26,6 +26,9 @@ import {
   type NotebookCellType,
   type NotebookOutput,
 } from '@/lib/notebook/nbformat'
+import { blake3 } from 'hash-wasm'
+import { contentIdentityFromBlake3 } from '@/lib/contentIdentity'
+import { snapshotCrate } from '@/lib/notebook/capture'
 import { trailing } from '@/lib/throttle'
 import { errorMessage } from '@/lib/utils'
 
@@ -46,7 +49,7 @@ function missingObject(error: unknown): boolean {
 
 export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () => NotebookSeed) {
   const s3 = useS3()
-  const { apiBaseUrl, currentUser, nodeInfo } = useAruna()
+  const { apiBaseUrl, currentUser, nodeInfo, createMetadata } = useAruna()
   const scope = computed(() => JSON.stringify([
     apiBaseUrl.value, currentUser.value?.id, nodeInfo.value?.node.realm_id, nodeInfo.value?.node.peer_id,
   ]))
@@ -250,6 +253,49 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
     markChanged()
   }
 
+  function addAttachment(id: string, name: string, data: string): void {
+    const cell = cellById(id)
+    if (!cell || cell.cell_type !== 'markdown') return
+    let attachment = name
+    while (cell.attachments?.[attachment]) attachment = `${crypto.randomUUID()}-${name}`
+    cell.attachments = { ...cell.attachments, [attachment]: { 'image/png': data } }
+    cell.source += `${cell.source ? '\n\n' : ''}![${name.replace(/[\[\]\\]/g, '\\$&')}](attachment:${encodeURIComponent(attachment)})`
+    markChanged()
+  }
+
+  async function capture(): Promise<string> {
+    if (!notebook.value || !loadedFrom || !currentUser.value) throw new Error('Load a notebook before capturing it.')
+    const target = loadedFrom
+    const request = generation.value
+    const current = () => request === generation.value && loadedFrom === target
+    const text = serializeNotebook(notebook.value)
+    const title = name.value
+    const author = currentUser.value.id
+    const id = crypto.randomUUID()
+    const snapshotKey = `notebooks/captures/${id}.ipynb`
+    const started = new Date().toISOString()
+    const hash = await blake3(text)
+    if (!current()) throw new Error('The notebook changed before capture.')
+    let reference = s3.referenceForContext(target.nodeId, target.groupId)
+    if (!reference) {
+      await s3.activateContext(target.nodeId, target.groupId)
+      if (!current()) throw new Error('The notebook changed before capture.')
+      reference = s3.referenceForContext(target.nodeId, target.groupId)
+    }
+    if (!reference) throw new Error('The notebook storage session is unavailable.')
+    const saved = await s3.putTextObject(target.bucket, snapshotKey, text, NOTEBOOK_CONTENT_TYPE, target.nodeId, reference)
+    if (!current()) throw new Error('The notebook changed during capture.')
+    if (!saved.versionId) throw new Error('The snapshot was stored without a version; its run-crate was not created.')
+    const identity = contentIdentityFromBlake3(hash)
+    if (identity.status !== 'resolved') throw new Error('The snapshot content identity is unavailable.')
+    const result = await createMetadata({
+      group_id: target.groupId, path: `captures/notebooks/${id}`, public: false,
+      rocrate: snapshotCrate({ id, name: title, author, started, finished: new Date().toISOString(), contentId: identity.id, contentUrl: `s3://${target.bucket}/${snapshotKey}?versionId=${encodeURIComponent(saved.versionId)}`, bytes: new TextEncoder().encode(text).byteLength }),
+    })
+    if (!current()) throw new Error('The notebook changed after capture.')
+    return result.document_id
+  }
+
   function removeCell(id: string): void {
     const doc = notebook.value
     if (!doc) return
@@ -354,6 +400,8 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
     addCell,
     removeCell,
     setCellType,
+    addAttachment,
+    capture,
     moveCell,
     setSource,
     clearOutputs,

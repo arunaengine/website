@@ -1,10 +1,11 @@
 import { defineComponent, h, ref } from 'vue'
 import * as VueRuntime from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import { button, click, compileClientComponent, content, flush, moduleDefault, mountApp } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, element, flush, moduleDefault, mountApp } from '@/test/clientRender'
 
 async function render() {
   const generation = ref(1)
+  const collapsed = ref(false)
   const activeCellId = ref('first')
   const noteCellInputs = vi.fn()
   const addSessionInputs = vi.fn()
@@ -25,16 +26,25 @@ async function render() {
     '@/lib/tes': { parseS3Url: () => ({ bucket: 'source', key: 'input.txt' }) },
     '@/lib/utils': { errorMessage: (cause: Error) => cause.message, formatBytes: String },
   }
-  for (const path of ['ui/Button', 'ui/Notice', 'data/ObjectBrowserPanel', 'data/AddDataDialog']) {
+  for (const path of ['ui/IconButton', 'ui/Button', 'ui/Notice', 'data/ObjectBrowserPanel', 'data/AddDataDialog']) {
     modules[`@/components/${path}.vue`] = moduleDefault(stub)
   }
   modules['@/components/compute/TesDataRefDialog.vue'] = moduleDefault(picker)
   const component = compileClientComponent(new URL('./NotebookFiles.vue', import.meta.url), modules)
-  const { root, app } = await mountApp(component)
+  const { root, app } = await mountApp(defineComponent({ setup: () => () => h(component, { collapsed: collapsed.value, onToggle: () => { collapsed.value = !collapsed.value } }) }))
   return { root, app, generation, activeCellId, noteCellInputs, addSessionInputs }
 }
 
 describe('notebook input provenance', () => {
+  it('collapses and expands from the file pane header', async () => {
+    const { root, app } = await render()
+    await click(element(root, (node) => node.props.label === 'Collapse files'))
+    expect(() => button(root, 'Add files')).toThrow()
+    await click(element(root, (node) => node.props.label === 'Expand files'))
+    expect(button(root, 'Add files')).toBeTruthy()
+    app.unmount()
+  })
+
   it.each([false, true])('binds a staged input to the originating cell and document: changed=%s', async (changed) => {
     const { root, app, generation, activeCellId, noteCellInputs, addSessionInputs } = await render()
     let finish = (_result: unknown) => {}

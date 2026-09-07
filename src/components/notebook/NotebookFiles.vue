@@ -2,6 +2,7 @@
 // Files stored beside the notebook; imports and picked objects go into data/.
 import { computed, onScopeDispose, ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
+import IconButton from '@/components/ui/IconButton.vue'
 import Notice from '@/components/ui/Notice.vue'
 import ObjectBrowserPanel from '@/components/data/ObjectBrowserPanel.vue'
 import TesDataRefDialog from '@/components/compute/TesDataRefDialog.vue'
@@ -12,7 +13,10 @@ import { addSessionInputs } from '@/lib/notebook/session'
 import { NOTEBOOK_DATA_PREFIX } from '@/lib/notebook/document'
 import { parseS3Url, type TesDataRefEntry } from '@/lib/tes'
 import { errorMessage } from '@/lib/utils'
-import { CloudDownload, Plus } from '@lucide/vue'
+import { CloudDownload, PanelLeft, Plus } from '@lucide/vue'
+
+defineProps<{ collapsed?: boolean }>()
+const emit = defineEmits<{ (event: 'toggle'): void }>()
 
 const { notebook, session } = injectNotebook()
 const s3 = useS3()
@@ -111,12 +115,12 @@ async function stage(entry: TesDataRefEntry) {
 </script>
 
 <template>
-  <aside class="min-w-0 space-y-3 rounded-lg border border-border bg-card p-3">
+  <aside class="min-w-0 space-y-3 rounded-lg border border-border bg-card" :class="collapsed ? 'p-1' : 'p-3'">
     <div class="flex flex-wrap items-center gap-2">
-      <span class="text-sm font-semibold">Files</span>
-      <span class="flex-1" />
+      <span v-if="!collapsed" class="text-sm font-semibold">Files</span>
+      <span v-if="!collapsed" class="flex-1" />
       <Button
-        v-if="session.live.value"
+        v-if="!collapsed && session.live.value"
         variant="outline"
         size="sm"
         :disabled="staging"
@@ -124,17 +128,20 @@ async function stage(entry: TesDataRefEntry) {
       >
         <Plus class="size-3.5" /> Add files
       </Button>
-      <Button v-if="bucket" variant="outline" size="sm" @click="importOpen = true; loadDataKeys()">
+      <Button v-if="!collapsed && bucket" variant="outline" size="sm" @click="importOpen = true; loadDataKeys()">
         <CloudDownload class="size-3.5" /> Import
       </Button>
+      <IconButton :label="collapsed ? 'Expand files' : 'Collapse files'" :aria-expanded="!collapsed" @click="emit('toggle')"><PanelLeft class="size-4" /></IconButton>
     </div>
 
-    <Notice v-if="stageNote" tone="info">{{ stageNote }}</Notice>
+    <template v-if="!collapsed">
+      <Notice v-if="stageNote" tone="info">{{ stageNote }}</Notice>
 
-    <div class="min-w-0 overflow-auto">
-      <ObjectBrowserPanel v-if="bucket" :key="panelRevision" :bucket="bucket" :group-id="notebook.meta.value?.group_id" />
-      <p v-else class="text-xs text-muted-foreground">This notebook has no workspace bucket yet.</p>
-    </div>
+      <div class="min-w-0 overflow-auto">
+        <ObjectBrowserPanel v-if="bucket" :key="panelRevision" :bucket="bucket" :group-id="notebook.meta.value?.group_id" />
+        <p v-else class="text-xs text-muted-foreground">This notebook has no workspace bucket yet.</p>
+      </div>
+    </template>
 
     <TesDataRefDialog v-model:open="addOpen" mode="input" @add="stage" />
 

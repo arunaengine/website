@@ -176,8 +176,18 @@ describe('the session bar', () => {
     const root = await render()
     ;(context.notebook.meta as { value: NotebookAruna }).value.runtime = ''
     await flush()
+    await openOptions(root)
     expect(element(root, (node) => node.tag === 'aside').props.lines).toEqual(['Pick a runtime.'])
     expect(button(root, 'Run notebook').props.disabled).toBe(true)
+  })
+
+  it('keeps the ended-session notice inside the Kernel menu', async () => {
+    const root = await render()
+    ;(context.session.notice as { value: string }).value = 'The session ended (idle).'
+    await flush()
+    expect(content(root)).not.toContain('The session ended (idle).')
+    await openOptions(root)
+    expect(content(root)).toContain('The session ended (idle).')
   })
 
   it('starts a session with the notebook settings', async () => {
