@@ -71,10 +71,12 @@ export function previewDeviceDraft(
   rocrate: unknown,
   client: DeviceClient,
   signal?: AbortSignal,
+  groupId?: string,
+  isPublic = false,
 ): Promise<ProfileValidationPreviewResponse> {
   return request<ProfileValidationPreviewResponse>('/device/drafts/preview', client, {
     method: 'POST',
-    body: JSON.stringify({ rocrate }),
+    body: JSON.stringify({ rocrate, ...(groupId ? { group_id: groupId } : {}), ...(isPublic ? { public: true } : {}) }),
     signal,
   })
 }

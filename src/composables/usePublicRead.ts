@@ -1,19 +1,22 @@
 import type { GroupPermissionLevel, RestrictedFile } from '@/lib/api'
 import { createGroupRole, getGroup } from './aruna/groups'
+import { isGroupAdmin } from '@/lib/groupAdmin'
+import { assertCurrentSession, refreshContext } from './aruna/state'
 
 export interface PublicReadGrant {
   granted: RestrictedFile[]
   /** Files without a permission path, or whose path a role would read as a pattern. */
   unresolved: RestrictedFile[]
+  failed: boolean
 }
 
 // Role paths are glob patterns on the node; a literal path holding one of these
 // would widen or miss the grant.
-const GLOB_CHARACTERS = /[*?[\]{}]/
+const GLOB_CHARACTERS = /[\\*?[\]{}]/
 
 // There is no role update API, so a repeated grant gets its own numbered role.
-async function freeRoleName(groupId: string, roleName: string): Promise<string> {
-  const taken = new Set((await getGroup(groupId)).roles.map((role) => role.name))
+function freeRoleName(names: string[], roleName: string): string {
+  const taken = new Set(names)
   if (!taken.has(roleName)) return roleName
   for (let index = 2; ; index++) {
     const candidate = `${roleName} (${index})`
@@ -21,25 +24,48 @@ async function freeRoleName(groupId: string, roleName: string): Promise<string> 
   }
 }
 
-/** Grants everyone READ on exactly the listed files through one public group role. */
+/** Grants everyone READ in each owning group the caller administers. */
 export async function grantPublicRead(
-  groupId: string,
   roleName: string,
   files: RestrictedFile[],
+  userId: string,
 ): Promise<PublicReadGrant> {
-  const permissions: Record<string, GroupPermissionLevel> = {}
+  const epoch = refreshContext().epoch
+  const groups = new Map<string, RestrictedFile[]>()
   const granted: RestrictedFile[] = []
   const unresolved: RestrictedFile[] = []
+  let failed = false
   for (const file of files) {
-    if (!file.permission_path || GLOB_CHARACTERS.test(file.permission_path)) {
+    if (!file.group_id || !file.permission_path || GLOB_CHARACTERS.test(file.permission_path)) {
       unresolved.push(file)
       continue
     }
-    permissions[file.permission_path] = 'read'
-    granted.push(file)
+    const entries = groups.get(file.group_id) ?? []
+    entries.push(file)
+    groups.set(file.group_id, entries)
   }
-  if (granted.length) {
-    await createGroupRole(groupId, { name: await freeRoleName(groupId, roleName), permissions, public: true })
+  for (const [groupId, entries] of groups) {
+    try {
+      assertCurrentSession(epoch)
+      const detail = await getGroup(groupId)
+      assertCurrentSession(epoch)
+      const prefix = `/${detail.realm_id}/g/${groupId}/data/`
+      if (!isGroupAdmin(detail, userId) || entries.some((file) => !file.permission_path!.startsWith(prefix))) {
+        unresolved.push(...entries)
+        continue
+      }
+      const permissions: Record<string, GroupPermissionLevel> = Object.fromEntries(
+        entries.map((file) => [file.permission_path!, 'read']),
+      )
+      await createGroupRole(groupId, {
+        name: freeRoleName(detail.roles.map((role) => role.name), roleName), permissions, public: true,
+      })
+      granted.push(...entries)
+    } catch {
+      unresolved.push(...entries)
+      failed = true
+    }
   }
-  return { granted, unresolved }
+  assertCurrentSession(epoch)
+  return { granted, unresolved, failed }
 }

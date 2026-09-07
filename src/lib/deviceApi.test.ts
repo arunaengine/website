@@ -12,6 +12,7 @@ import {
   readEntry,
   readFolder,
   readTransfer,
+  previewDeviceDraft,
   requireDevice,
 } from './deviceApi'
 
@@ -190,6 +191,21 @@ describe('device client', () => {
 })
 
 describe('bind request wire shape', () => {
+  it('sends the group and publication intent to the device preview', async () => {
+    const request = vi.spyOn(await import('./api'), 'apiRequest').mockResolvedValue({})
+    const client = { baseUrl: 'http://127.0.0.1:9000/api/v1', token: 'owner-token' }
+    try {
+      await previewDeviceDraft({ '@graph': [] }, client, undefined, 'group-1', true)
+      expect(request.mock.calls[0][0]).toBe('/device/drafts/preview')
+      expect(JSON.parse(String(request.mock.calls[0][1]?.body))).toEqual({
+        rocrate: { '@graph': [] }, group_id: 'group-1', public: true,
+      })
+      expect(request.mock.calls[0][2]).toEqual(client)
+    } finally {
+      request.mockRestore()
+    }
+  })
+
   it('flattens the remote binding', async () => {
     // The node deserializes a flat body with deny_unknown_fields: a nested
     // `remote` object is answered with 422 before the handler runs.

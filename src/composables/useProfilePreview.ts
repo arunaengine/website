@@ -57,18 +57,21 @@ export function useProfilePreview(options: UseProfilePreviewOptions) {
     running.value = true
     error.value = null
     rejection.value = null
-    // The injected request is deferred so a synchronous throw (no device
-    // client) lands in `catch` and is rendered as a failed check instead of
-    // leaving `running` stuck.
-    const request = options.request
-      ? Promise.resolve().then(() => options.request!(rocrate, controller.signal))
-      : previewProfileValidation(
+    // Capture request context now; setup failures still use the request error path.
+    let request: Promise<ProfileValidationPreviewResponse>
+    try {
+      request = options.request
+        ? options.request(rocrate, controller.signal)
+        : previewProfileValidation(
           rocrate,
           options.client(),
           controller.signal,
           options.groupId?.(),
           options.isPublic?.() ?? false,
-        )
+          )
+    } catch (cause) {
+      request = Promise.reject(cause)
+    }
     return request
       .then((response) => {
         if (current !== generation || disposed) return

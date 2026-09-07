@@ -49,6 +49,7 @@ export interface RoCrateStructuralViolation {
 // the caller may read the object; bucket and key are for display.
 export interface RestrictedFile {
   entity_id: string
+  group_id?: string
   permission_path?: string
   bucket?: string
   key?: string
@@ -65,8 +66,9 @@ export interface ProfileValidationPreviewResponse {
   findings: ProfileValidationFinding[]
   completeness: ProfileValidationCompleteness
   structural_violations: RoCrateStructuralViolation[]
-  // Only answered for a public draft; absent or empty when every file is readable.
+  // An empty list is conclusive only when restricted_files_complete is true.
   restricted_files?: RestrictedFile[]
+  restricted_files_complete?: boolean
 }
 
 // A node that predates a request field refuses it (deny_unknown_fields answers

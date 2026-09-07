@@ -354,9 +354,11 @@ function restrictedVerdict(): Api.ProfileValidationPreviewResponse {
     findings: [],
     completeness: 'complete',
     structural_violations: [],
+    restricted_files_complete: true,
     restricted_files: [
       {
         entity_id: 'raw/reads.fastq',
+        group_id: 'group-1',
         permission_path: '/realm-1/g/group-1/data/node-1/bucket-a/raw/reads.fastq',
         bucket: 'bucket-a',
         key: 'raw/reads.fastq',
@@ -752,7 +754,7 @@ describe('DatasetEditorView', () => {
     expect(text).toContain('Not everyone can read these files')
     expect(text).toContain('bucket-a/raw/reads.fastq')
     expect(text).toContain('#notes')
-    expect(text).toContain("Open the group's roles")
+    expect(text).toContain('Research group roles')
     expect(text).not.toContain('Make the data public')
 
     await click(button(mounted.root, 'Save anyway'))
@@ -784,9 +786,36 @@ describe('DatasetEditorView', () => {
 
     await click(button(mounted.root, 'Make the data public'))
     await flush()
-    expect(grantPublicRead).toHaveBeenCalledWith('group-1', expect.stringContaining('Public read: '), restrictedVerdict().restricted_files)
+    expect(grantPublicRead).toHaveBeenCalledWith(expect.stringContaining('Public read: '), restrictedVerdict().restricted_files, 'user-1')
     expect(createMetadata).toHaveBeenCalledTimes(1)
     expect(createMetadata.mock.calls[0][0]).toMatchObject({ public: true })
+    mounted.app.unmount()
+  })
+
+  it('requires an explicit choice when public-file coverage is incomplete', async () => {
+    previewResult.value = { ...restrictedVerdict(), restricted_files: [], restricted_files_complete: false }
+    const mounted = await mountApp(DatasetEditorView)
+    await openLocation(mounted.root)
+    await click(button(mounted.root, 'Make public'))
+    await click(button(mounted.root, 'Seed dataset'))
+    await click(button(mounted.root, 'Create dataset'))
+    expect(createMetadata).not.toHaveBeenCalled()
+    expect(content(mounted.root)).toContain('Some file access could not be checked')
+    expect(content(mounted.root)).not.toContain('Make the data public')
+    await click(button(mounted.root, 'Save anyway'))
+    expect(createMetadata).toHaveBeenCalledTimes(1)
+    mounted.app.unmount()
+  })
+
+  it('does not silently publish after the preview failed', async () => {
+    previewResult.value = null
+    const mounted = await mountApp(DatasetEditorView)
+    await openLocation(mounted.root)
+    await click(button(mounted.root, 'Make public'))
+    await click(button(mounted.root, 'Seed dataset'))
+    await click(button(mounted.root, 'Create dataset'))
+    expect(createMetadata).not.toHaveBeenCalled()
+    expect(content(mounted.root)).toContain('Some file access could not be checked')
     mounted.app.unmount()
   })
 
@@ -803,6 +832,37 @@ describe('DatasetEditorView', () => {
     verdict.resolve(true)
     await flush()
     expect(createMetadata).toHaveBeenCalledTimes(1)
+    mounted.app.unmount()
+  })
+
+  it('does not save a draft changed while its public check was in flight', async () => {
+    const pending = deferred<boolean>()
+    verify.mockReturnValue(pending.promise)
+    previewResult.value = { ...restrictedVerdict(), restricted_files: [] }
+    const mounted = await mountApp(DatasetEditorView)
+    await openLocation(mounted.root)
+    await click(button(mounted.root, 'Make public'))
+    await click(button(mounted.root, 'Seed dataset'))
+    await click(button(mounted.root, 'Create dataset'))
+    await typeValue(element(mounted.root, (node) => node.props['aria-label'] === 'Dataset name'), 'Changed draft')
+    pending.resolve(true)
+    await flush()
+    expect(createMetadata).not.toHaveBeenCalled()
+    expect(routerPush).not.toHaveBeenCalled()
+    mounted.app.unmount()
+  })
+
+  it('cancels a save if its location changes during validation', async () => {
+    const pending = deferred<boolean>()
+    verify.mockReturnValue(pending.promise)
+    const mounted = await mountApp(DatasetEditorView)
+    await click(button(mounted.root, 'Seed dataset'))
+    await click(button(mounted.root, 'Create dataset'))
+    await openLocation(mounted.root)
+    await click(button(mounted.root, 'Pick other folder'))
+    pending.resolve(true)
+    await flush()
+    expect(createMetadata).not.toHaveBeenCalled()
     mounted.app.unmount()
   })
 

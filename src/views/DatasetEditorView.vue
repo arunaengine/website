@@ -229,7 +229,7 @@ const preview = useProfilePreview({
   ...(desktop
     ? {
         request: (rocrate: unknown, signal: AbortSignal) =>
-          previewDeviceDraft(rocrate, requireDevice(deviceStatus?.deviceClient.value, 'draft validation'), signal),
+          previewDeviceDraft(rocrate, requireDevice(deviceStatus?.deviceClient.value, 'draft validation'), signal, draft.value.groupId, draft.value.visibility === 'public'),
       }
     : {}),
 })
@@ -395,10 +395,21 @@ function discard() {
 
 // Files a public dataset would list without everyone being able to read them.
 const restrictedFiles = ref<RestrictedFile[]>([])
+const publicUnchecked = ref(false)
 const canGrantPublic = ref(false)
 const grantBusy = ref(false)
 const grantError = ref<string | null>(null)
 const grantUnresolved = ref<RestrictedFile[]>([])
+const owningGroups = computed(() => [...new Set(restrictedFiles.value.flatMap((file) => file.group_id ? [file.group_id] : []))])
+let publicationGeneration = 0
+watch([crate, () => draft.value.visibility, () => draft.value.groupId, () => draft.value.path, apiBaseUrl, authToken], () => {
+  publicationGeneration += 1
+  restrictedFiles.value = []
+  publicUnchecked.value = false
+  grantUnresolved.value = []
+  canGrantPublic.value = false
+  grantError.value = null
+})
 
 function fileLabel(file: RestrictedFile): string {
   return file.bucket && file.key ? `${file.bucket}/${file.key}` : file.entity_id
@@ -407,30 +418,37 @@ function fileLabel(file: RestrictedFile): string {
 // Only a group administrator may add the public role; anyone else is pointed
 // at the group's roles.
 async function checkGrantAccess() {
-  const groupId = draft.value.groupId
   const userId = currentUser.value?.id
+  const generation = publicationGeneration
+  const groupIds = owningGroups.value
   canGrantPublic.value = false
-  if (!groupId || !userId) return
-  try {
-    const detail = await getGroup(groupId)
-    if (groupId === draft.value.groupId) canGrantPublic.value = isGroupAdmin(detail, userId)
-  } catch {
-    // The roles link stays available.
-  }
+  if (!userId) return
+  const allowed = await Promise.all(groupIds.map(async (groupId) => {
+    try { return isGroupAdmin(await getGroup(groupId), userId) } catch { return false }
+  }))
+  if (generation === publicationGeneration && userId === currentUser.value?.id) canGrantPublic.value = allowed.some(Boolean)
 }
 
 async function makePublic() {
-  const groupId = draft.value.groupId
-  if (!groupId || grantBusy.value) return
+  const userId = currentUser.value?.id
+  const generation = publicationGeneration
+  if (!userId || grantBusy.value) return
   grantBusy.value = true
   grantError.value = null
   try {
-    const result = await grantPublicRead(groupId, `Public read: ${locationPath.value}`, restrictedFiles.value)
+    if (!await preview.verify(crate.value) || generation !== publicationGeneration) return
+    if (!preview.result.value) {
+      grantError.value = 'File access could not be checked. Try again before granting access.'
+      return
+    }
+    const result = await grantPublicRead(`Public read: ${locationPath.value}`, preview.result.value.restricted_files ?? [], userId)
+    if (generation !== publicationGeneration) return
     grantUnresolved.value = result.unresolved
     restrictedFiles.value = result.unresolved
+    if (result.failed) grantError.value = 'Some access changes could not be completed. Check the remaining groups’ roles.'
     if (!result.unresolved.length) await save()
   } catch (error) {
-    grantError.value = errorMessage(error)
+    if (generation === publicationGeneration) grantError.value = errorMessage(error)
   } finally {
     grantBusy.value = false
   }
@@ -441,37 +459,52 @@ async function makePublic() {
 // everyone can read pauses for a choice unless it is saved anyway.
 async function save(anyway = false) {
   if (!canSave.value || saving.value || submitting.value) return
+  const generation = publicationGeneration
+  const source = crate.value
+  const targetId = documentId.value
+  const sourceMode = mode.value
+  const isPublic = draft.value.visibility === 'public'
+  const groupId = draft.value.groupId ?? ''
+  const path = draft.value.path?.trim() ?? ''
   submitting.value = true
   submitError.value = null
   saveIssues.value = []
   let verified = false
   try {
-    verified = await preview.verify(crate.value)
+    verified = await preview.verify(source)
   } finally {
     if (!verified) submitting.value = false
   }
+  if (generation !== publicationGeneration || source !== crate.value || sourceMode !== mode.value || targetId !== documentId.value
+    || groupId !== (draft.value.groupId ?? '') || path !== (draft.value.path?.trim() ?? '')) {
+    submitting.value = false
+    return
+  }
   if (!verified || !submitting.value) return
-  const isPublic = draft.value.visibility === 'public'
   const restricted = isPublic ? preview.result.value?.restricted_files ?? [] : []
-  if (restricted.length && !anyway) {
+  const unchecked = isPublic && preview.result.value?.restricted_files_complete !== true
+  if ((restricted.length || unchecked) && !anyway) {
     restrictedFiles.value = restricted
+    publicUnchecked.value = unchecked
+    grantUnresolved.value = []
     grantError.value = null
     submitting.value = false
     void checkGrantAccess()
     return
   }
   restrictedFiles.value = []
+  publicUnchecked.value = false
   try {
-    if (mode.value === 'edit') {
-      await replaceMetadataRoCrate(documentId.value, { rocrate: crate.value, public: isPublic })
-      await router.push({ name: 'dataset', params: { id: documentId.value } })
+    if (sourceMode === 'edit') {
+      await replaceMetadataRoCrate(targetId, { rocrate: source, public: isPublic })
+      await router.push({ name: 'dataset', params: { id: targetId } })
       return
     }
     const result = await createMetadata({
-      group_id: draft.value.groupId ?? '',
-      path: draft.value.path?.trim() ?? '',
+      group_id: groupId,
+      path,
       public: isPublic,
-      rocrate: crate.value,
+      rocrate: source,
     })
     await router.push({ name: 'dataset', params: { id: result.document_id } })
   } catch (error) {
@@ -596,20 +629,21 @@ async function save(anyway = false) {
               @save="save()"
               @jump="open"
             >
-              <Notice v-if="restrictedFiles.length" tone="warning" title="Not everyone can read these files">
-                <p>The dataset is public, but these files are not publicly readable. Readers will see them listed and cannot download them.</p>
+              <Notice v-if="restrictedFiles.length || publicUnchecked" tone="warning" :title="restrictedFiles.length ? 'Not everyone can read these files' : 'Some file access could not be checked'">
+                <p v-if="restrictedFiles.length">The dataset is public, but these files are not publicly readable. Readers will see them listed and cannot download them.</p>
+                <p v-if="publicUnchecked">Some files could not be checked. Retry the check, or save anyway knowing that readers may not be able to download all files.</p>
                 <ul class="mt-1 list-disc space-y-0.5 pl-4 font-mono text-[11px]">
                   <li v-for="file in restrictedFiles" :key="file.entity_id" class="break-all">{{ fileLabel(file) }}</li>
                 </ul>
                 <p v-if="grantUnresolved.length" class="mt-1">
-                  These files have no permission path the portal can grant access on. Change their access from the group's roles.
+                  Access could not be granted for these files. An administrator of each owning group can change their roles.
                 </p>
                 <p v-else-if="!canGrantPublic" class="mt-1">
                   A group administrator can add a public role with read access to these files under the group's roles.
                 </p>
                 <p v-if="grantError" class="mt-1 text-destructive">{{ grantError }}</p>
                 <span class="mt-2 flex flex-wrap gap-2">
-                  <Button variant="outline" size="sm" @click="restrictedFiles = []">Back</Button>
+                  <Button variant="outline" size="sm" :disabled="grantBusy" @click="restrictedFiles = []; publicUnchecked = false">Back</Button>
                   <Button
                     v-if="canGrantPublic && !grantUnresolved.length"
                     variant="outline"
@@ -619,10 +653,10 @@ async function save(anyway = false) {
                   >
                     {{ grantBusy ? 'Granting access' : 'Make the data public' }}
                   </Button>
-                  <Button v-else-if="draft.groupId" variant="outline" size="sm" as-child>
-                    <RouterLink :to="{ name: 'group', params: { id: draft.groupId }, query: { tab: 'roles' } }">Open the group's roles</RouterLink>
+                  <Button v-for="groupId in !canGrantPublic || grantUnresolved.length ? owningGroups : []" :key="groupId" variant="outline" size="sm" as-child>
+                    <RouterLink :to="{ name: 'group', params: { id: groupId }, query: { tab: 'roles' } }">{{ groups.find((group) => group.id === groupId)?.name ?? 'Owning group' }} roles</RouterLink>
                   </Button>
-                  <Button size="sm" @click="save(true)">Save anyway</Button>
+                  <Button size="sm" :disabled="grantBusy" @click="save(true)">Save anyway</Button>
                 </span>
               </Notice>
             </NodeCheckPanel>
