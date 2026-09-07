@@ -3,7 +3,7 @@ import { documentIdFromIri, isDocumentId } from '@/lib/graphIri'
 import { subcrateLinksOf, type SubcrateLink } from '@/lib/subcrates'
 
 export interface ExportPreflight {
-  /** Linked datasets the caller may not read; the archive leaves them out. */
+  /** Linked datasets the caller may not read; their references remain external. */
   restricted: SubcrateLink[]
   /** Linked crates outside this realm's catalog, which cannot be checked here. */
   unchecked: SubcrateLink[]
@@ -16,8 +16,7 @@ export function linkedDocumentId(link: SubcrateLink): string | null {
   return documentIdFromIri(link.iri)
 }
 
-// A 403 or 404 on a linked document means the export will report it as denied
-// or missing instead of packing it; the person deserves to know before starting.
+// Check access to linked datasets without implying that export bundles them.
 export async function preflightExport(
   crate: unknown,
   getDocument: (documentId: string) => Promise<unknown>,

@@ -576,13 +576,13 @@ function rowTarget(row: TransferRow): string {
         <Notice
           v-if="!isImport && !activeJobId && preflight?.restricted.length"
           tone="warning"
-          title="Linked datasets you cannot read are left out"
+          title="Some linked datasets are not accessible"
           :lines="preflight.restricted.map((link) => link.name)"
         >
-          The archive will not contain these linked datasets; the report lists them as denied or missing.
+          The archive keeps these dataset references. Linked datasets and their files are not bundled recursively.
         </Notice>
         <p v-if="!isImport && !activeJobId && preflight?.failed" class="text-[11px] text-muted-foreground">
-          Not every linked dataset could be checked; the report shows what was left out.
+          Not every linked dataset could be checked. Their references remain in the metadata.
         </p>
         <div v-if="!isImport && !activeJobId && exportCrate" class="space-y-1.5">
           <p class="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Graph</p>
