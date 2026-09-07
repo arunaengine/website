@@ -37,13 +37,15 @@ const props = defineProps<
 >()
 const emits = defineEmits<{ (e: 'update:modelValue', v: string): void }>()
 const forwarded = useForwardPropsEmits(props, emits)
-// radix-vue refuses an empty item value, so callers that use '' for "nothing
+// radix-vue refuses an empty item value, so callers that offer '' as "nothing
 // selected" get a private stand-in that is translated back on every update.
+// Without such an option '' stays as it is, which is what shows the placeholder.
 const emptyValue = '\u0000empty'
-const itemValue = (value: string) => (value === '' ? emptyValue : value)
+const hasEmptyOption = computed(() => props.options.some((option) => option.value === ''))
+const itemValue = (value: string) => (value === '' && hasEmptyOption.value ? emptyValue : value)
 const rootProps = computed(() => ({
   ...forwarded.value,
-  modelValue: props.modelValue === '' ? emptyValue : props.modelValue,
+  modelValue: props.modelValue === '' && hasEmptyOption.value ? emptyValue : props.modelValue,
   'onUpdate:modelValue': (value: string) => emits('update:modelValue', value === emptyValue ? '' : value),
 }))
 const triggerClasses = computed(() =>

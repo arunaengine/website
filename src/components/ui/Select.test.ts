@@ -67,6 +67,15 @@ describe('Select', () => {
     expect(updates).toEqual(['', 'p1'])
   })
 
+  it('leaves an empty model value alone when no option is empty, so the placeholder shows', async () => {
+    const { root, errors } = await mountApp(Select, {
+      props: { options: [{ value: 'p1', label: 'Profile one' }], modelValue: '', placeholder: 'Pick a profile' },
+    })
+    expect(errors).toEqual([])
+
+    expect(element(root, (node) => node.props.role === 'root').props.modelValue).toBe('')
+  })
+
   it('shows the empty option as selected for an empty model value', async () => {
     const { root, errors } = await mountApp(Select, { props: { options, modelValue: '' } })
     expect(errors).toEqual([])
