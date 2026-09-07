@@ -51,6 +51,16 @@ describe('profile validation preview', () => {
     expect(bodies[1]).toEqual({ rocrate: { '@graph': [] } })
   })
 
+  it('drops only the public field when a node refuses it with 422', async () => {
+    const bodies = stubFetch({ status: 422, payload: { message: 'unknown field `public`' } })
+
+    await previewProfileValidation({ '@graph': [] }, CLIENT, undefined, 'group-1', true)
+
+    expect(bodies).toHaveLength(2)
+    expect(bodies[0]).toMatchObject({ group_id: 'group-1', public: true })
+    expect(bodies[1]).toEqual({ rocrate: { '@graph': [] }, group_id: 'group-1' })
+  })
+
   it('keeps a refusal of the draft itself', async () => {
     const bodies = stubFetch({ status: 400, payload: { message: 'profile_not_registered' } })
 

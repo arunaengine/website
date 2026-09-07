@@ -66,11 +66,12 @@ export interface ProfileValidationPreviewResponse {
   restricted_files?: RestrictedFile[]
 }
 
-// A node that predates group-scoped profiles refuses the extra field instead of
-// ignoring it; that answer means "not supported yet", not "bad draft".
+// A node that predates a request field refuses it (deny_unknown_fields answers
+// 422, older nodes 400) instead of ignoring it; that means "not supported yet",
+// not "bad draft".
 function unknownFieldRefusal(cause: unknown): boolean {
-  if (!(cause instanceof ApiError) || cause.status !== 400) return false
-  return /unknown|unexpected|unsupported/i.test(cause.message) && /group_id|field/i.test(cause.message)
+  if (!(cause instanceof ApiError) || (cause.status !== 400 && cause.status !== 422)) return false
+  return /unknown|unexpected|unsupported/i.test(cause.message) && /group_id|public|field/i.test(cause.message)
 }
 
 /**
@@ -94,12 +95,16 @@ export async function previewProfileValidation(
       { method: 'POST', body: JSON.stringify(body), signal },
       client,
     )
-  if (!groupId && !isPublic) return post({ rocrate })
-  try {
-    return await post({ rocrate, ...(groupId ? { group_id: groupId } : {}), ...(isPublic ? { public: true } : {}) })
-  } catch (cause) {
-    if (!unknownFieldRefusal(cause)) throw cause
-    return post({ rocrate })
+  // Newest field first: each refusal drops one more field, `public` before `group_id`.
+  const bodies: Array<Record<string, unknown>> = [{ rocrate }]
+  if (groupId) bodies.unshift({ rocrate, group_id: groupId })
+  if (isPublic) bodies.unshift({ ...bodies[0], public: true })
+  for (let index = 0; ; index++) {
+    try {
+      return await post(bodies[index])
+    } catch (cause) {
+      if (index === bodies.length - 1 || !unknownFieldRefusal(cause)) throw cause
+    }
   }
 }
 
