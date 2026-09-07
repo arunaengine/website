@@ -10,7 +10,7 @@ import JobCard from '@/components/assistant/cards/JobCard.vue'
 import TesDataRefDialog from '@/components/compute/TesDataRefDialog.vue'
 import { injectNotebook } from '@/composables/notebookContext'
 import { useAruna } from '@/composables/useAruna'
-import { submitErrorMessage, submitJob } from '@/lib/jobs'
+import { getJob, submitErrorMessage, submitJob } from '@/lib/jobs'
 import {
   defaultInputPath,
   defaultOutputKey,
@@ -18,6 +18,8 @@ import {
   pipelineRequest,
   pipelineSource,
 } from '@/lib/notebook/pipeline'
+import { follow, POLL_ACTIVE_MS } from '@/lib/poll'
+import { jobFacts, liveJob, noteJob } from '@/lib/assistant/jobLive'
 import { parseS3Url, type TesDataRefEntry } from '@/lib/tes'
 import type { NotebookCell } from '@/lib/notebook/nbformat'
 import type { JobView } from '@/lib/assistant/types'
@@ -31,6 +33,7 @@ const { apiBaseUrl, authToken } = useAruna()
 const draft = ref(pipelineDraftFrom(props.cell.source))
 const submitting = ref(false)
 const error = ref<string | null>(null)
+const statusError = ref<string | null>(null)
 const jobId = ref(props.cell.metadata.aruna?.job_id ?? '')
 const expanded = ref(!jobId.value)
 let pendingKey = ''
@@ -64,6 +67,20 @@ const jobView = computed<JobView>(() => ({
   jobKind: 'execution',
   outputs: [],
 }))
+
+onScopeDispose(follow(async () => {
+  const id = jobId.value
+  const request = notebook.generation.value
+  const active = () => !disposed && id === jobId.value && request === notebook.generation.value
+  try {
+    const job = await getJob(id, { baseUrl: apiBaseUrl.value, token: authToken.value })
+    if (!active()) return
+    statusError.value = null
+    noteJob(id, jobFacts(job))
+  } catch (cause) {
+    if (active()) statusError.value = submitErrorMessage(cause)
+  }
+}, () => POLL_ACTIVE_MS, () => !jobId.value || ['succeeded', 'failed', 'cancelled'].includes(liveJob(jobId.value)?.state ?? '')))
 
 const inputsOpen = ref(false)
 
@@ -194,6 +211,7 @@ async function submit() {
 
     <Notice v-if="blocked" tone="warning">{{ blocked }}</Notice>
     <Notice v-if="error" tone="error">{{ error }}</Notice>
+    <Notice v-if="statusError" tone="warning">Could not refresh this run: {{ statusError }}</Notice>
 
     <div class="flex flex-wrap items-center gap-2">
       <Button size="sm" :disabled="!ready || submitting" @click="submit">

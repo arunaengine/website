@@ -12,6 +12,9 @@ async function render() {
   const generation = ref(1)
   const noteCellRun = vi.fn()
   const submitJob = vi.fn()
+  const getJob = vi.fn()
+  const noteJob = vi.fn()
+  let poll = async () => {}
   const stub = defineComponent({ setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()) })
   const component = compileClientComponent(new URL('./NotebookPipelineCell.vue', import.meta.url), {
     vue: VueRuntime,
@@ -27,12 +30,14 @@ async function render() {
       setSource: (_id: string, source: string) => { cell.source = source },
     } }) },
     '@/composables/useAruna': { useAruna: () => ({ apiBaseUrl: ref('/api/v1'), authToken: ref('token') }) },
-    '@/lib/jobs': { submitJob, submitErrorMessage: (cause: Error) => cause.message },
+    '@/lib/jobs': { submitJob, getJob, submitErrorMessage: (cause: Error) => cause.message },
     '@/lib/notebook/pipeline': Pipeline,
     '@/lib/tes': Tes,
+    '@/lib/poll': { POLL_ACTIVE_MS: 3000, follow: (run: () => Promise<void>) => { poll = run; return () => {} } },
+    '@/lib/assistant/jobLive': { liveJob: () => undefined, noteJob, jobFacts: (job: unknown) => job },
   })
   const { root, app } = await mountApp(defineComponent({ setup: () => () => h(component, { cell }) }))
-  return { root, app, submitJob, noteCellRun, generation }
+  return { root, app, submitJob, noteCellRun, generation, getJob, noteJob, poll: () => poll() }
 }
 
 describe('pipeline runs', () => {
@@ -47,6 +52,21 @@ describe('pipeline runs', () => {
     expect(keys).toHaveLength(2)
     expect(keys[0]).toBeTruthy()
     expect(keys[1]).not.toBe(keys[0])
+    app.unmount()
+  })
+
+  it.each([false, true])('refreshes only the current notebook run: changed=%s', async (changed) => {
+    const { root, app, submitJob, getJob, noteJob, generation, poll } = await render()
+    submitJob.mockResolvedValue({ job_id: 'job-1' })
+    await click(button(root, 'Run this step'))
+    let finish = (_job: { state: string }) => {}
+    getJob.mockReturnValue(new Promise((resolve) => { finish = resolve }))
+    const reading = poll()
+    if (changed) generation.value += 1
+    finish({ state: 'succeeded' })
+    await reading
+    if (changed) expect(noteJob).not.toHaveBeenCalled()
+    else expect(noteJob).toHaveBeenCalledWith('job-1', { state: 'succeeded' })
     app.unmount()
   })
 
