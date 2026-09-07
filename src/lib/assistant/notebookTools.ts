@@ -28,9 +28,20 @@ export interface NotebookOutputSummary {
   outputs: { type: string; text: string }[]
 }
 
+export interface KernelPatch {
+  runtime?: string
+  dependencies?: string
+  dependency_kind?: 'requirements' | 'conda' | 'deno'
+  cpu_cores?: number
+  ram_gb?: number
+}
+
 /** The small API the notebook page lends the assistant while it is open. */
 export interface NotebookBridge {
   summary: () => NotebookSummary
+  startKernel: (restart: boolean) => Promise<string | null>
+  stopKernel: () => Promise<string | null>
+  setKernel: (patch: KernelPatch) => string | null
   editCell: (cellId: string, source: string) => string | null
   runCell: (cellId: string) => Promise<string | null>
   readOutputs: (cellId: string) => NotebookOutputSummary | string
@@ -77,6 +88,38 @@ export function notebookTools(bridge: NotebookBridge, gate: ApprovalGate): ToolS
       ),
       execute: (input, { toolCallId }) =>
         write('edit_notebook_cell', toolCallId, input, () => bridge.editCell(input.cell_id, input.source)),
+    }),
+
+    set_notebook_kernel: tool({
+      description:
+        'Changes what the kernel runs on: its runtime, its dependency list (the whole file, one '
+        + 'package per line for pip), and its CPU and RAM. The changes apply the next time the kernel starts.',
+      inputSchema: schema<KernelPatch>({
+        runtime: STRING,
+        dependencies: STRING,
+        dependency_kind: { type: 'string', enum: ['requirements', 'conda', 'deno'] },
+        cpu_cores: { type: 'number' },
+        ram_gb: { type: 'number' },
+      }),
+      execute: (input, { toolCallId }) =>
+        write('set_notebook_kernel', toolCallId, { ...input }, () => bridge.setKernel(input)),
+    }),
+
+    start_notebook_kernel: tool({
+      description:
+        'Starts the kernel of the open notebook, or restarts a running one with `restart`. A restart '
+        + 'installs the saved dependencies again and clears every variable.',
+      inputSchema: schema<{ restart?: boolean }>({ restart: { type: 'boolean' } }),
+      // Starting a session spends compute, so it always asks.
+      execute: (input, { toolCallId }) =>
+        write('start_notebook_kernel', toolCallId, input, () => bridge.startKernel(input.restart === true), true),
+    }),
+
+    stop_notebook_kernel: tool({
+      description: 'Ends the running session. Its variables are lost; the notebook and its files stay.',
+      inputSchema: schema<Record<string, never>>({}),
+      execute: (input, { toolCallId }) =>
+        write('stop_notebook_kernel', toolCallId, input, () => bridge.stopKernel(), true),
     }),
 
     run_notebook_cell: tool({

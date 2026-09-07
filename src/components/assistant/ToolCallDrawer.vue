@@ -16,17 +16,13 @@ const props = withDefaults(defineProps<{
 }>(), { deleteCallId: undefined })
 const emit = defineEmits<{ (e: 'decide', approved: boolean): void }>()
 
-/** Settled writes past this many fold into one row of their own. */
-const MAX_PINNED = 3
-
 // The writes and anything still waiting for an answer, shown above the fold.
 const actions = computed(() =>
   props.calls.filter((call) => call.state === 'approval' || isWriteAction(call.name)))
-// A long run of applied changes folds too; a change still running, failed or
-// waiting stays in view whatever the count.
-const settled = computed(() =>
+// Applied changes fold into one row; a change still running, failed or waiting
+// for an answer stays in view.
+const changes = computed(() =>
   actions.value.filter((call) => call.state === 'done' || call.state === 'denied'))
-const changes = computed(() => (settled.value.length > MAX_PINNED ? settled.value : []))
 const pinned = computed(() => actions.value.filter((call) => !changes.value.includes(call)))
 // The rest fold into one row, which only earns its place while it hides a call.
 const folded = computed(() => props.calls.filter((call) => !actions.value.includes(call)))
@@ -44,6 +40,7 @@ const changesOpen = ref(false)
 
 const changesLabel = computed(() => {
   const first = callSummary(changes.value[0].name, changes.value[0].input)
+  if (changes.value.length === 1) return first
   return `${changes.value.length} changes, starting with ${first.charAt(0).toLowerCase()}${first.slice(1)}`
 })
 </script>

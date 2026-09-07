@@ -15,6 +15,9 @@ function bridge(): NotebookBridge {
       session: { state: 'ready', kernel: 'idle', job_id: '01JOB' },
       cells: [{ cell_id: 'c1', kind: 'code', source: 'print(1)', outputs: 0 }],
     }),
+    startKernel: vi.fn(async () => null),
+    stopKernel: vi.fn(async () => null),
+    setKernel: vi.fn(() => null),
     editCell: vi.fn(() => null),
     runCell: vi.fn(async () => null),
     readOutputs: vi.fn(() => ({ cell_id: 'c1', outputs: [] })),
@@ -60,6 +63,31 @@ describe('notebookTools', () => {
     await call(notebookTools(api, value), 'edit_notebook_cell', { cell_id: 'c1', source: 'print(2)' })
     expect(asked).toEqual([])
     expect(api.editCell).toHaveBeenCalledWith('c1', 'print(2)')
+  })
+
+  it('starts and restarts the kernel, always asking first', async () => {
+    const api = bridge()
+    const { gate: value, asked } = gate(true, false)
+    const tools = notebookTools(api, value)
+    await call(tools, 'start_notebook_kernel', {})
+    await call(tools, 'start_notebook_kernel', { restart: true })
+    await call(tools, 'stop_notebook_kernel', {})
+    expect(asked).toEqual([
+      { name: 'start_notebook_kernel', always: true },
+      { name: 'start_notebook_kernel', always: true },
+      { name: 'stop_notebook_kernel', always: true },
+    ])
+    expect(api.startKernel).toHaveBeenNthCalledWith(1, false)
+    expect(api.startKernel).toHaveBeenNthCalledWith(2, true)
+    expect(api.stopKernel).toHaveBeenCalled()
+  })
+
+  it('changes the kernel settings through the write gate', async () => {
+    const api = bridge()
+    const { gate: value, asked } = gate(true, true)
+    await call(notebookTools(api, value), 'set_notebook_kernel', { dependencies: 'pandas>=2' })
+    expect(asked).toEqual([{ name: 'set_notebook_kernel', always: false }])
+    expect(api.setKernel).toHaveBeenCalledWith({ dependencies: 'pandas>=2' })
   })
 
   it('reads the notebook and the outputs of a cell without asking', async () => {

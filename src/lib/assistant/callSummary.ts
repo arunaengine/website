@@ -17,6 +17,8 @@ const VERBS: Record<string, string> = {
   replace: 'Replacing',
   run: 'Running',
   set: 'Setting',
+  start: 'Starting',
+  stop: 'Stopping',
   submit: 'Submitting',
   undo: 'Undoing',
   update: 'Updating',

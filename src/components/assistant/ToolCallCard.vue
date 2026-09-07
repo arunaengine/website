@@ -62,16 +62,20 @@ const hasBody = computed(() =>
     <div v-if="open && hasBody" class="space-y-1.5 px-2.5 py-2">
       <p v-if="title !== call.name" class="font-mono text-[10px] text-muted-foreground">{{ call.name }}</p>
       <pre v-if="input && input !== '{}'" class="scrollbar-thin max-h-32 overflow-auto font-mono text-[10px] text-muted-foreground">{{ input }}</pre>
-      <div v-if="call.state === 'approval'" class="flex flex-wrap items-center gap-2">
-        <span class="text-muted-foreground">
+      <!-- The question and its two answers stay one block, so the choice never
+           wraps apart in the narrow panel. -->
+      <div v-if="call.state === 'approval'" class="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2">
+        <p class="text-foreground">
           {{ awaitingDelete ? 'Remove this entity from the draft?' : 'Run this tool?' }}
-        </span>
-        <Button size="sm" @click="emit('decide', true)">
-          <Check class="size-3.5 shrink-0" aria-hidden="true" /> Approve
-        </Button>
-        <Button variant="ghost" size="sm" @click="emit('decide', false)">
-          <X class="size-3.5 shrink-0" aria-hidden="true" /> Abort
-        </Button>
+        </p>
+        <div class="flex items-center justify-end gap-2">
+          <Button variant="outline" size="sm" @click="emit('decide', false)">
+            <X class="size-3.5 shrink-0" aria-hidden="true" /> Abort
+          </Button>
+          <Button size="sm" @click="emit('decide', true)">
+            <Check class="size-3.5 shrink-0" aria-hidden="true" /> Approve
+          </Button>
+        </div>
       </div>
       <p v-else-if="call.state === 'denied'" class="text-muted-foreground">Aborted, nothing ran.</p>
       <p v-else-if="call.error" class="break-words text-destructive">{{ call.error }}</p>
