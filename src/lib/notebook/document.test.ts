@@ -50,16 +50,16 @@ describe('notebook keys', () => {
 describe('working copy', () => {
   it('keeps the text under a key of bucket and object', () => {
     vi.stubGlobal('localStorage', memoryStorage())
-    writeWorkingCopy('lab-data', 'notebooks/counts.ipynb', '{"cells":[]}', 100)
-    expect(workingCopyKey('lab-data', 'notebooks/counts.ipynb')).toBe(
-      'aruna.notebook.lab-data/notebooks/counts.ipynb',
+    writeWorkingCopy('scope-a', 'lab-data', 'notebooks/counts.ipynb', '{"cells":[]}', 100)
+    expect(workingCopyKey('scope-a', 'lab-data', 'notebooks/counts.ipynb')).toBe(
+      'aruna.notebook.["scope-a","lab-data","notebooks/counts.ipynb"]',
     )
-    expect(readWorkingCopy('lab-data', 'notebooks/counts.ipynb')).toEqual({
+    expect(readWorkingCopy('scope-a', 'lab-data', 'notebooks/counts.ipynb')).toEqual({
       text: '{"cells":[]}',
       changed_at_ms: 100,
     })
-    clearWorkingCopy('lab-data', 'notebooks/counts.ipynb')
-    expect(readWorkingCopy('lab-data', 'notebooks/counts.ipynb')).toBeNull()
+    clearWorkingCopy('scope-a', 'lab-data', 'notebooks/counts.ipynb')
+    expect(readWorkingCopy('scope-a', 'lab-data', 'notebooks/counts.ipynb')).toBeNull()
   })
 
   it('survives a store that refuses to write', () => {
@@ -72,8 +72,8 @@ describe('working copy', () => {
       },
       removeItem: () => {},
     })
-    expect(() => writeWorkingCopy('b', 'k', 'x', 1)).not.toThrow()
-    expect(readWorkingCopy('b', 'k')).toBeNull()
+    expect(() => writeWorkingCopy('scope-a', 'b', 'k', 'x', 1)).not.toThrow()
+    expect(readWorkingCopy('scope-a', 'b', 'k')).toBeNull()
   })
 })
 

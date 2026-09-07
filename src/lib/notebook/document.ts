@@ -49,8 +49,8 @@ export interface WorkingCopy {
   changed_at_ms: number
 }
 
-export function workingCopyKey(bucket: string, key: string): string {
-  return `${WORKING_COPY_PREFIX}${bucket}/${key}`
+export function workingCopyKey(scope: string, bucket: string, key: string): string {
+  return `${WORKING_COPY_PREFIX}${JSON.stringify([scope, bucket, key])}`
 }
 
 function store(): Storage | null {
@@ -61,9 +61,9 @@ function store(): Storage | null {
   }
 }
 
-export function readWorkingCopy(bucket: string, key: string): WorkingCopy | null {
+export function readWorkingCopy(scope: string, bucket: string, key: string): WorkingCopy | null {
   try {
-    const raw = store()?.getItem(workingCopyKey(bucket, key))
+    const raw = store()?.getItem(workingCopyKey(scope, bucket, key))
     if (!raw) return null
     const parsed = JSON.parse(raw) as WorkingCopy
     if (typeof parsed?.text !== 'string') return null
@@ -73,18 +73,18 @@ export function readWorkingCopy(bucket: string, key: string): WorkingCopy | null
   }
 }
 
-export function writeWorkingCopy(bucket: string, key: string, text: string, nowMs: number): void {
+export function writeWorkingCopy(scope: string, bucket: string, key: string, text: string, nowMs: number): void {
   try {
     const copy: WorkingCopy = { text, changed_at_ms: nowMs }
-    store()?.setItem(workingCopyKey(bucket, key), JSON.stringify(copy))
+    store()?.setItem(workingCopyKey(scope, bucket, key), JSON.stringify(copy))
   } catch {
     // A full or blocked store only costs the unsaved copy, never the notebook.
   }
 }
 
-export function clearWorkingCopy(bucket: string, key: string): void {
+export function clearWorkingCopy(scope: string, bucket: string, key: string): void {
   try {
-    store()?.removeItem(workingCopyKey(bucket, key))
+    store()?.removeItem(workingCopyKey(scope, bucket, key))
   } catch {
     // Nothing to do; the next save overwrites it.
   }

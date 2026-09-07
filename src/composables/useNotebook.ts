@@ -1,7 +1,8 @@
 // The open notebook: the document in the workspace bucket, the unsaved copy in
 // this browser, and the cell edits the view makes. The session lives next door
 // in useNotebookSession.
-import { computed, onScopeDispose, ref, type Ref } from 'vue'
+import { computed, onScopeDispose, ref, watch, type Ref } from 'vue'
+import { useAruna } from '@/composables/useAruna'
 import { isS3AuthError, useS3 } from '@/composables/useS3'
 import {
   autosaveDue,
@@ -43,6 +44,11 @@ function missingObject(error: unknown): boolean {
 
 export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () => NotebookSeed) {
   const s3 = useS3()
+  const { apiBaseUrl, currentUser, nodeInfo } = useAruna()
+  const scope = computed(() => JSON.stringify([
+    apiBaseUrl.value, currentUser.value?.id, nodeInfo.value?.node.realm_id, nodeInfo.value?.node.peer_id,
+  ]))
+  const generation = ref(0)
   const notebook = ref<Notebook | null>(null)
   const loading = ref(false)
   const loadError = ref<string | null>(null)
@@ -65,25 +71,36 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
   // A running cell changes the document on every output line, so the copy is
   // written on a trailing timer. Every edit carries where its document came
   // from: the page may show another notebook by the time the timer fires.
-  let loadedFrom = { bucket: '', key: '' }
-  let pending: { bucket: string; key: string; doc: Notebook; changedAt: number } | null = null
+  let loadedFrom: { scope: string; bucket: string; key: string; nodeId: string | null; groupId: string } | null = null
+  let pending: { scope: string; bucket: string; key: string; doc: Notebook; changedAt: number } | null = null
   const copy = trailing(() => {
     if (!pending) return
-    writeWorkingCopy(pending.bucket, pending.key, serializeNotebook(pending.doc), pending.changedAt)
+    writeWorkingCopy(pending.scope, pending.bucket, pending.key, serializeNotebook(pending.doc), pending.changedAt)
     pending = null
   }, 1_000)
   function dropPending() {
     copy.cancel()
     pending = null
   }
-  onScopeDispose(() => copy.flush())
+  function invalidate() {
+    copy.flush()
+    generation.value += 1
+    loadedFrom = null
+    notebook.value = null
+    changedAt.value = null
+    saving.value = false
+    loading.value = false
+    saveError.value = null
+  }
+  watch([scope, bucket, key], invalidate, { flush: 'sync' })
+  onScopeDispose(invalidate)
 
   // Counted, not timed: two edits in the same millisecond must still differ.
   let changeCount = 0
 
   function markChanged() {
     const doc = notebook.value
-    if (!doc) return
+    if (!doc || !loadedFrom) return
     changeCount += 1
     changedAt.value = Date.now()
     pending = { ...loadedFrom, doc, changedAt: changedAt.value }
@@ -91,56 +108,76 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
   }
 
   async function load(): Promise<void> {
-    // The notebook shown before this one keeps its own unsaved edit.
-    copy.flush()
+    invalidate()
+    const request = generation.value
+    const defaults = { version: 1 as const, workspace_bucket: bucket.value, ...seed() }
+    const target = {
+      scope: scope.value, bucket: bucket.value, key: key.value,
+      nodeId: nodeInfo.value?.node.peer_id ?? null, groupId: defaults.group_id,
+    }
     loading.value = true
     loadError.value = null
     loadDenied.value = false
     restoredCopy.value = false
     try {
+      await s3.activateContext(target.nodeId, target.groupId)
+      if (request !== generation.value) return
+      const reference = s3.referenceForContext(target.nodeId, target.groupId)
+      if (!reference) throw new Error('The notebook storage session is unavailable.')
       let text: string | null = null
+      let missing = false
       try {
-        text = await s3.getObjectText(bucket.value, key.value)
-        isNew.value = false
+        text = await s3.getObjectText(target.bucket, target.key, target.nodeId, undefined, reference)
       } catch (error) {
         if (!missingObject(error)) throw error
-        isNew.value = true
+        missing = true
       }
-      const defaults = { version: 1 as const, workspace_bucket: bucket.value, ...seed() }
+      if (request !== generation.value) return
+      isNew.value = missing
       notebook.value = text === null ? emptyNotebook(defaults) : parseNotebook(text, defaults)
       // Everything this document does later happens where it was read from.
-      loadedFrom = { bucket: bucket.value, key: key.value }
+      loadedFrom = target
       lastSavedMs.value = Date.now()
       changedAt.value = null
-      const unsaved = readWorkingCopy(bucket.value, key.value)
+      const unsaved = readWorkingCopy(target.scope, target.bucket, target.key)
       if (unsaved && unsaved.text !== (text ?? '')) {
         try {
           notebook.value = parseNotebook(unsaved.text)
           restoredCopy.value = true
           changedAt.value = unsaved.changed_at_ms || Date.now()
         } catch {
-          clearWorkingCopy(bucket.value, key.value)
+          clearWorkingCopy(target.scope, target.bucket, target.key)
         }
       }
     } catch (error) {
+      if (request !== generation.value) return
       loadError.value = errorMessage(error)
-      loadDenied.value = isS3AuthError(error)
+      loadDenied.value = isS3AuthError(error) || !target.groupId
     } finally {
-      loading.value = false
+      if (request === generation.value) loading.value = false
     }
   }
 
   async function save(): Promise<boolean> {
     const doc = notebook.value
-    if (!doc || saving.value || !loadedFrom.key) return false
+    if (!doc || saving.value || !loadedFrom) return false
     const target = loadedFrom
+    const request = generation.value
     saving.value = true
     saveError.value = null
     // What was written is the document as it stood when the save started.
     const sent = serializeNotebook(doc)
     const changedBefore = changeCount
     try {
-      await s3.putTextObject(target.bucket, target.key, sent, NOTEBOOK_CONTENT_TYPE)
+      let reference = s3.referenceForContext(target.nodeId, target.groupId)
+      if (!reference) {
+        await s3.activateContext(target.nodeId, target.groupId)
+        if (request !== generation.value) return false
+        reference = s3.referenceForContext(target.nodeId, target.groupId)
+      }
+      if (!reference) throw new Error('The notebook storage session is unavailable.')
+      await s3.putTextObject(target.bucket, target.key, sent, NOTEBOOK_CONTENT_TYPE, target.nodeId, reference)
+      if (request !== generation.value) return false
       lastSavedMs.value = Date.now()
       isNew.value = false
       restoredCopy.value = false
@@ -148,14 +185,15 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
       if (changeCount === changedBefore) {
         changedAt.value = null
         dropPending()
-        clearWorkingCopy(target.bucket, target.key)
+        clearWorkingCopy(target.scope, target.bucket, target.key)
       }
       return true
     } catch (error) {
+      if (request !== generation.value) return false
       saveError.value = errorMessage(error)
       return false
     } finally {
-      saving.value = false
+      if (request === generation.value) saving.value = false
     }
   }
 
@@ -166,8 +204,9 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
   }
 
   function discardCopy(): void {
+    if (!loadedFrom) return
     dropPending()
-    clearWorkingCopy(loadedFrom.bucket, loadedFrom.key)
+    clearWorkingCopy(loadedFrom.scope, loadedFrom.bucket, loadedFrom.key)
     restoredCopy.value = false
     void load()
   }
@@ -266,6 +305,8 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
   }
 
   return {
+    scope,
+    generation,
     bucket,
     key,
     name,

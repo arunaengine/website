@@ -77,8 +77,10 @@ export async function putTextObject(
   key: string,
   text: string,
   contentType: string,
+  nodeId?: string | null,
+  reference?: S3SessionReference,
 ): Promise<{ versionId: string | null }> {
-  const response = await client().send(
+  const response = await client(nodeId, reference).send(
     new PutObjectCommand({
       Bucket: bucket,
       Key: key,
@@ -577,9 +579,10 @@ export async function downloadUrl(
   nodeId?: string | null,
   versionId?: string,
   filename?: string,
+  reference?: S3SessionReference,
 ): Promise<string> {
   return getSignedUrl(
-    client(nodeId),
+    client(nodeId, reference),
     new GetObjectCommand({
       Bucket: bucket,
       Key: key,
@@ -601,8 +604,9 @@ async function fetchObject(
   key: string,
   nodeId?: string | null,
   versionId?: string,
+  reference?: S3SessionReference,
 ): Promise<Response> {
-  const url = await downloadUrl(bucket, key, nodeId, versionId)
+  const url = await downloadUrl(bucket, key, nodeId, versionId, undefined, reference)
   const response = await fetch(url)
   if (!response.ok) {
     throw Object.assign(new Error(`The object could not be fetched (HTTP ${response.status}).`), {
@@ -617,8 +621,9 @@ export async function getObjectText(
   key: string,
   nodeId?: string | null,
   versionId?: string,
+  reference?: S3SessionReference,
 ): Promise<string> {
-  return (await fetchObject(bucket, key, nodeId, versionId)).text()
+  return (await fetchObject(bucket, key, nodeId, versionId, reference)).text()
 }
 
 export async function getObjectBlob(

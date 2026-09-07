@@ -19,15 +19,13 @@ import { createNotebookSession } from '@/composables/useNotebookSession'
 import { provideNotebookBridge } from '@/composables/useAssistantNotebook'
 import { createNotebookBridge } from '@/lib/notebook/bridge'
 import { useAruna } from '@/composables/useAruna'
-import { useS3 } from '@/composables/useS3'
 import { useTes } from '@/composables/useTes'
 import { SESSION_RUNTIMES } from '@/lib/notebook/runtimes'
 import { relativeTime } from '@/lib/utils'
 import { ArrowLeft, Code2, FileText, Plus, Save, Workflow } from '@lucide/vue'
 
 const route = useRoute()
-const s3 = useS3()
-const { myGroups, currentUser } = useAruna()
+const { myGroups } = useAruna()
 const { tesEnabled } = useTes()
 
 const bucket = computed(() => String(route.params.bucketId ?? ''))
@@ -48,12 +46,10 @@ async function open() {
   if (!bucket.value || !key.value) return
   // A different notebook must never keep the stream of the one before it.
   session.detach()
-  const asked = typeof route.query.group === 'string' ? route.query.group : (myGroups.value[0]?.id ?? '')
-  if (asked) await s3.ensureSession(asked).catch(() => {})
-  await notebook.load()
-  // The stored notebook may belong to another group than the link named.
-  const owner = notebook.meta.value?.group_id
-  if (owner && owner !== asked) await s3.ensureSession(owner).catch(() => {})
+  const loading = notebook.load()
+  const request = notebook.generation.value
+  await loading
+  if (request !== notebook.generation.value || notebook.loadError.value) return
   await session.attachSaved()
 }
 
@@ -64,7 +60,7 @@ onMounted(() => {
 onUnmounted(() => {
   if (autosaveTimer.value) clearInterval(autosaveTimer.value)
 })
-watch([bucket, key, currentUser], () => void open())
+watch([bucket, key, notebook.scope], () => void open())
 // Groups can load after the page did; without one the first read is refused.
 watch(myGroups, () => {
   if (notebook.loadDenied.value && !notebook.loading.value) void open()

@@ -3,10 +3,17 @@ import { effectScope, ref } from 'vue'
 import { ApiError } from '@/lib/api'
 import type { SessionEvent } from '@/lib/notebook/session'
 
-const s3 = vi.hoisted(() => ({ getObjectText: vi.fn(), putTextObject: vi.fn() }))
+const s3 = vi.hoisted(() => ({
+  getObjectText: vi.fn(), putTextObject: vi.fn(), activateContext: vi.fn(),
+  referenceForContext: (nodeId: string, groupId: string) => ({ nodeId, groupId, accessKeyId: 'temporary' }),
+}))
 vi.mock('@/composables/useS3', () => ({ useS3: () => s3 }))
 vi.mock('@/composables/useAruna', () => ({
-  useAruna: () => ({ apiBaseUrl: { value: '/api/v1' }, authToken: { value: 'bearer-token' } }),
+  useAruna: () => ({
+    apiBaseUrl: { value: '/api/v1' }, authToken: { value: 'bearer-token' },
+    currentUser: { value: { id: 'user-a' } },
+    nodeInfo: { value: { node: { realm_id: 'realm-a', peer_id: 'node-a' } } },
+  }),
 }))
 vi.mock('@/composables/useRealmNodes', () => ({
   useRealmNodes: () => ({
