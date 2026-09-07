@@ -62,7 +62,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
 
-const { apiBaseUrl, authToken, groups, fullCrates, loadRoCrate, getMetadataItem } = useAruna()
+const { apiBaseUrl, authToken, groups, fullCrates, loadRoCrate, getMetadataDocument } = useAruna()
 const { bumpDashboard } = useNotifications()
 function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
@@ -84,15 +84,17 @@ watch(
 )
 
 // Linked datasets the archive will leave out, checked before the job starts.
+// The account and API base are part of the source so their answer never
+// outlives a sign-in or realm change.
 const preflight = ref<ExportPreflight | null>(null)
 let preflightToken = 0
 watch(
-  () => [props.open, isImport.value, exportCrate.value] as const,
+  () => [props.open, isImport.value, exportCrate.value, apiBaseUrl.value, authToken.value] as const,
   ([open, importing, crate]) => {
     preflight.value = null
     const token = ++preflightToken
     if (!open || importing || !crate) return
-    void preflightExport(crate, getMetadataItem).then((result) => {
+    void preflightExport(crate, getMetadataDocument).then((result) => {
       if (token === preflightToken) preflight.value = result
     })
   },

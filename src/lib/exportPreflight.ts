@@ -20,7 +20,7 @@ export function linkedDocumentId(link: SubcrateLink): string | null {
 // or missing instead of packing it; the person deserves to know before starting.
 export async function preflightExport(
   crate: unknown,
-  getItem: (documentId: string) => Promise<unknown>,
+  getDocument: (documentId: string) => Promise<unknown>,
 ): Promise<ExportPreflight> {
   const result: ExportPreflight = { restricted: [], unchecked: [], failed: false }
   await Promise.all(subcrateLinksOf(crate).map(async (link) => {
@@ -30,7 +30,7 @@ export async function preflightExport(
       return
     }
     try {
-      await getItem(documentId)
+      await getDocument(documentId)
     } catch (error) {
       if (error instanceof ApiError && (error.status === 403 || error.status === 404)) result.restricted.push(link)
       else result.failed = true
