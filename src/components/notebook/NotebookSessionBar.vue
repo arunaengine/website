@@ -1,9 +1,10 @@
 <script setup lang="ts">
 // What the session runs on, and its state: runtime, dependencies, the bucket
 // the notebook works in, where it may run, what it needs, and Start or End.
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import Popover from '@/components/ui/Popover.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Select from '@/components/ui/Select.vue'
@@ -17,7 +18,7 @@ import { dependencyKey } from '@/lib/notebook/document'
 import { sessionProblems } from '@/lib/notebook/submit'
 import { DEFAULT_SESSION_IDLE_AFTER_MS } from '@/lib/computeAdmin'
 import { useComputeAdmin } from '@/composables/useComputeAdmin'
-import { CircleStop, Play, RotateCcw, Settings2 } from '@lucide/vue'
+import { ChevronDown, CircleStop, Play, RotateCcw, Settings2 } from '@lucide/vue'
 
 const { notebook, session } = injectNotebook()
 const { getComputeConfig } = useComputeAdmin()
@@ -88,7 +89,7 @@ const idleLeft = computed(() => {
 })
 
 const problems = computed(() =>
-  sessionProblems({
+  notebook.loading.value || !meta.value ? [] : sessionProblems({
     groupId: meta.value?.group_id ?? '',
     runtime: meta.value?.runtime ?? '',
     workspaceBucket: meta.value?.workspace_bucket ?? '',
@@ -125,11 +126,11 @@ function setPlacement(patch: { node?: string; executor_kind?: string }) {
   notebook.patchMeta({ placement: { ...(meta.value?.placement ?? {}), ...patch } })
 }
 
-function start(restart = false) {
+async function start(restart = false) {
   const current = meta.value
   if (!current) return
   const declared = current.dependencies?.kind === dependencies.value && current.dependencies.text.trim() ? current.dependencies : undefined
-  void (restart ? session.restart : session.start)({
+  await (restart ? session.restart : session.start)({
     groupId: current.group_id,
     name: notebook.name.value,
     runtime: current.runtime,
@@ -145,6 +146,32 @@ function start(restart = false) {
     placement: current.placement,
   })
 }
+const pendingRun = ref(false)
+const runBusy = computed(() => pendingRun.value || session.starting.value || session.restarting.value || session.ending.value || session.kernel.value === 'busy' || Object.values(session.cellStates.value).some((cell) => cell.state === 'queued' || cell.state === 'running'))
+
+async function runNotebook() {
+  if (runBusy.value || problems.value.length || notebook.loading.value || !meta.value) return
+  if (!session.live.value) {
+    pendingRun.value = true
+    await start()
+    if (!session.running.value) pendingRun.value = false
+    return
+  }
+  notebook.selectCell('')
+  await session.runCells(notebook.cells.value.filter((cell) => cell.cell_type === 'code').map((cell) => ({ id: cell.id, source: cell.source })))
+}
+
+watch([session.live, session.starting], ([live, starting]) => {
+  if (live && !starting && pendingRun.value) {
+    pendingRun.value = false
+    void runNotebook()
+  }
+})
+watch(notebook.generation, () => { pendingRun.value = false })
+watch([session.ended, session.error], ([ended, error]) => {
+  if (ended || error) pendingRun.value = false
+})
+
 async function saveDependencies(value: DependencySpec, restart: boolean) {
   notebook.patchMeta({ dependencies: value })
   if (!await notebook.save()) return
@@ -153,87 +180,103 @@ async function saveDependencies(value: DependencySpec, restart: boolean) {
 </script>
 
 <template>
-  <div class="surface space-y-3 p-3">
-    <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-      <Badge :variant="stateVariant">{{ stateLabel }}</Badge>
-      <Badge v-if="session.live.value" variant="outline" size="sm">Kernel {{ session.kernel.value }}</Badge>
-      <span v-if="idleLeft" class="text-[11px] text-muted-foreground">Idle timeout: {{ idleLeft }}</span>
-      <span v-if="session.nodeId.value" class="text-[11px] text-muted-foreground">
-        on {{ displayName(session.nodeId.value) }}
+  <div class="min-w-0 space-y-2">
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="flex items-center gap-1.5 text-xs text-muted-foreground" aria-label="Kernel status">
+        <span class="h-2 w-2 rounded-full" :class="session.live.value ? (session.kernel.value === 'busy' ? 'bg-amber-500' : 'bg-emerald-500') : session.running.value || session.starting.value ? 'bg-amber-500' : 'bg-muted-foreground'" />
+        {{ notebook.loading.value ? 'Loading' : session.live.value ? (session.kernel.value === 'busy' ? 'Busy' : 'Idle') : session.running.value || session.starting.value ? stateLabel : 'Stopped' }}
       </span>
-    </div>
-    <div class="flex min-w-0 flex-wrap items-center gap-2">
-      <Select
-        :model-value="meta?.runtime ?? ''"
-        :options="runtimeOptions"
-        aria-label="Runtime"
-        class="w-48 max-w-full"
-        :disabled="session.running.value"
-        @update:model-value="notebook.patchMeta({ runtime: $event })"
-      />
-      <Button variant="outline" size="sm" :disabled="!dependencies" @click="dependenciesOpen = true">
-        Dependencies
+      <Button v-if="!session.running.value" variant="ghost" size="sm" :disabled="runBusy || Boolean(problems.length) || notebook.loading.value || !meta" @click="start()">Start kernel</Button>
+      <Button size="sm" :disabled="runBusy || Boolean(problems.length) || notebook.loading.value || !meta" @click="runNotebook">
+        <Play class="size-3.5" /> {{ pendingRun || session.starting.value ? 'Starting…' : session.kernel.value === 'busy' ? 'Running…' : 'Run notebook' }}
       </Button>
-      <Button variant="outline" size="sm" :aria-expanded="settingsOpen" @click="settingsOpen = !settingsOpen">
-        <Settings2 class="size-3.5" /> Kernel settings
-      </Button>
-      <Button v-if="session.running.value" variant="outline" size="sm" :disabled="!session.live.value || session.ending.value || session.restarting.value" title="Start a fresh kernel with the saved dependencies; variables are cleared." @click="start(true)">
-        <RotateCcw class="size-3.5" /> Restart kernel
-      </Button>
-      <Button v-if="session.running.value" variant="outline" size="sm" :disabled="session.ending.value || session.restarting.value" @click="session.end()">
-        <CircleStop class="size-3.5" /> Stop kernel
-      </Button>
-      <Button v-else size="sm" :disabled="Boolean(problems.length) || session.starting.value" @click="start()">
-        <Play class="size-3.5" /> {{ session.starting.value ? 'Starting…' : 'Start kernel' }}
-      </Button>
-    </div>
+      <Popover>
+        <Button size="sm" variant="outline" aria-label="Kernel">
+          Kernel <ChevronDown class="size-3.5" />
+        </Button>
+        <template #content>
+          <div class="max-h-[70vh] space-y-3 overflow-y-auto">
+              <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+                <Badge :variant="stateVariant">{{ stateLabel }}</Badge>
+                <Badge v-if="session.live.value" variant="outline" size="sm">Kernel {{ session.kernel.value }}</Badge>
+                <span v-if="idleLeft" class="text-[11px] text-muted-foreground">Idle timeout: {{ idleLeft }}</span>
+                <span v-if="session.nodeId.value" class="text-[11px] text-muted-foreground">
+                  on {{ displayName(session.nodeId.value) }}
+                </span>
+              </div>
+              <div class="flex min-w-0 flex-wrap items-center gap-2">
+                <Select
+                  :model-value="meta?.runtime ?? ''"
+                  :options="runtimeOptions"
+                  aria-label="Runtime"
+                  class="w-full"
+                  :disabled="session.running.value"
+                  @update:model-value="notebook.patchMeta({ runtime: $event })"
+                />
+                <Button variant="outline" size="sm" :disabled="!dependencies" @click="dependenciesOpen = true">
+                  Dependencies
+                </Button>
+                <Button variant="outline" size="sm" :aria-expanded="settingsOpen" @click="settingsOpen = !settingsOpen">
+                  <Settings2 class="size-3.5" /> Resources and placement
+                </Button>
+                <Button v-if="session.running.value" variant="outline" size="sm" :disabled="!session.live.value || session.ending.value || session.restarting.value" title="Start a fresh kernel with the saved dependencies; variables are cleared." @click="start(true)">
+                  <RotateCcw class="size-3.5" /> Restart kernel
+                </Button>
+                <Button v-if="session.running.value" variant="outline" size="sm" :disabled="session.ending.value || session.restarting.value" @click="session.end()">
+                  <CircleStop class="size-3.5" /> Stop kernel
+                </Button>
+              </div>
 
-    <div v-if="settingsOpen" class="grid gap-3 border-t border-border pt-3 sm:grid-cols-2 lg:grid-cols-3">
-      <label class="space-y-1">
-        <span class="text-xs font-medium text-foreground">Workspace bucket</span>
-        <Input :model-value="meta?.workspace_bucket ?? ''" disabled aria-label="Workspace bucket" />
-        <span class="text-[11px] text-muted-foreground">The notebook and its files live here.</span>
-      </label>
-      <label class="space-y-1">
-        <span class="text-xs font-medium text-foreground">Idle timeout</span>
-        <Select
-          :model-value="session.idlePickMs.value ? String(session.idlePickMs.value) : ''"
-          :options="idleOptions"
-          aria-label="Idle timeout"
-          :disabled="session.running.value"
-          @update:model-value="session.idlePickMs.value = $event ? Number($event) : null"
-        />
-      </label>
-      <label class="space-y-1">
-        <span class="text-xs font-medium text-foreground">Node</span>
-        <Select
-          :model-value="meta?.placement?.node ?? ''"
-          :options="nodeOptions"
-          aria-label="Node"
-          :disabled="session.running.value"
-          @update:model-value="setPlacement({ node: $event })"
-        />
-      </label>
-      <label class="space-y-1">
-        <span class="text-xs font-medium text-foreground">Executor</span>
-        <Select
-          :model-value="meta?.placement?.executor_kind ?? ''"
-          :options="kindOptions"
-          aria-label="Executor kind"
-          :disabled="session.running.value"
-          @update:model-value="setPlacement({ executor_kind: $event })"
-        />
-      </label>
-      <div class="grid grid-cols-2 gap-2">
-        <label class="space-y-1">
-          <span class="text-xs font-medium text-foreground">CPU cores</span>
-          <Input v-model="cpuCores" type="number" min="1" step="1" :disabled="session.running.value" />
-        </label>
-        <label class="space-y-1">
-          <span class="text-xs font-medium text-foreground">RAM in GB</span>
-          <Input v-model="ramGb" type="number" min="0" step="any" :disabled="session.running.value" />
-        </label>
-      </div>
+              <div v-if="settingsOpen" class="grid gap-3 border-t border-border pt-3 ">
+                <label class="space-y-1">
+                  <span class="text-xs font-medium text-foreground">Workspace bucket</span>
+                  <Input :model-value="meta?.workspace_bucket ?? ''" disabled aria-label="Workspace bucket" />
+                  <span class="text-[11px] text-muted-foreground">The notebook and its files live here.</span>
+                </label>
+                <label class="space-y-1">
+                  <span class="text-xs font-medium text-foreground">Idle timeout</span>
+                  <Select
+                    :model-value="session.idlePickMs.value ? String(session.idlePickMs.value) : ''"
+                    :options="idleOptions"
+                    aria-label="Idle timeout"
+                    :disabled="session.running.value"
+                    @update:model-value="session.idlePickMs.value = $event ? Number($event) : null"
+                  />
+                </label>
+                <label class="space-y-1">
+                  <span class="text-xs font-medium text-foreground">Node</span>
+                  <Select
+                    :model-value="meta?.placement?.node ?? ''"
+                    :options="nodeOptions"
+                    aria-label="Node"
+                    :disabled="session.running.value"
+                    @update:model-value="setPlacement({ node: $event })"
+                  />
+                </label>
+                <label class="space-y-1">
+                  <span class="text-xs font-medium text-foreground">Executor</span>
+                  <Select
+                    :model-value="meta?.placement?.executor_kind ?? ''"
+                    :options="kindOptions"
+                    aria-label="Executor kind"
+                    :disabled="session.running.value"
+                    @update:model-value="setPlacement({ executor_kind: $event })"
+                  />
+                </label>
+                <div class="grid grid-cols-2 gap-2">
+                  <label class="space-y-1">
+                    <span class="text-xs font-medium text-foreground">CPU cores</span>
+                    <Input v-model="cpuCores" type="number" min="1" step="1" :disabled="session.running.value" />
+                  </label>
+                  <label class="space-y-1">
+                    <span class="text-xs font-medium text-foreground">RAM in GB</span>
+                    <Input v-model="ramGb" type="number" min="0" step="any" :disabled="session.running.value" />
+                  </label>
+                </div>
+              </div>
+          </div>
+        </template>
+      </Popover>
     </div>
 
     <Notice v-if="problems.length" tone="warning" :lines="problems">This session cannot start yet.</Notice>

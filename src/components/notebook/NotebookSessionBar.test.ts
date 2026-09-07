@@ -6,7 +6,9 @@ import * as NotebookDocument from '@/lib/notebook/document'
 import * as NotebookRuntimes from '@/lib/notebook/runtimes'
 import * as NotebookSubmit from '@/lib/notebook/submit'
 import {
+  bubbleClick,
   button,
+  flush,
   click,
   compileClientComponent,
   content,
@@ -68,12 +70,17 @@ function fakeContext(overrides: { state?: Record<string, unknown> | null; runnin
     notebook: {
       name: computed(() => 'counts'),
       key: ref('notebooks/counts.ipynb'),
-      meta: computed(() => meta),
+      meta: ref<NotebookAruna | null>({ ...meta }),
       patchMeta: vi.fn(),
+      loading: ref(false), generation: ref(1),
+      cells: ref([{ id: 'code', cell_type: 'code', source: 'print(1)' }, { id: 'text', cell_type: 'markdown', source: '# Title' }]),
+      selectCell: vi.fn(),
     },
     session: {
       state,
       kernel: ref('idle'),
+      cellStates: ref({}),
+      runCells: vi.fn(),
       jobId: ref(overrides.running ? '01JOB' : ''),
       nodeId: ref(overrides.running ? 'node-a' : ''),
       starting: ref(false),
@@ -106,6 +113,10 @@ function sessionBar(): Component {
     '@/components/ui/Input.vue': moduleDefault(InputStub),
     '@/components/ui/Notice.vue': moduleDefault(Slotted('aside')),
     '@/components/ui/Select.vue': moduleDefault(SelectStub),
+    '@/components/ui/Popover.vue': moduleDefault(defineComponent({ setup: (_, { slots }) => {
+      const open = ref(false)
+      return () => h('div', [h('div', { onClick: () => { open.value = !open.value } }, slots.default?.()), open.value ? slots.content?.() : null])
+    } })),
     '@/components/notebook/NotebookDependencies.vue': moduleDefault(Slotted('div')),
     '@/composables/notebookContext': { injectNotebook: () => context },
     '@/composables/useAruna': { useAruna: () => ({ myGroups: ref([{ id: 'group-1', name: 'Lab' }]) }) },
@@ -140,17 +151,39 @@ function select(root: HostNode, label: string): HostNode {
   return element(root, (node) => node.tag === 'select' && node.props['aria-label'] === label)
 }
 
+async function openOptions(root: HostNode) {
+  await bubbleClick(element(root, (node) => node.props['aria-label'] === 'Kernel'))
+}
+
 describe('the session bar', () => {
   it('offers Start while no session runs', async () => {
     const root = await render()
-    expect(content(root)).toContain('No session')
-    expect(button(root, 'Start').props.disabled).toBe(false)
+    expect(content(root)).not.toContain('No session')
+    expect(() => select(root, 'Runtime')).toThrow()
+    expect(button(root, 'Run notebook').props.disabled).toBe(false)
+  })
+
+  it('does not show missing-settings warnings while the notebook loads', async () => {
+    const root = await render()
+    ;(context.notebook.loading as { value: boolean }).value = true
+    ;(context.notebook.meta as { value: unknown }).value = null
+    await flush()
+    expect(content(root)).not.toContain('cannot start yet')
+    expect(button(root, 'Run notebook').props.disabled).toBe(true)
+  })
+
+  it('shows a genuine missing-runtime warning after loading', async () => {
+    const root = await render()
+    ;(context.notebook.meta as { value: NotebookAruna }).value.runtime = ''
+    await flush()
+    expect(element(root, (node) => node.tag === 'aside').props.lines).toEqual(['Pick a runtime.'])
+    expect(button(root, 'Run notebook').props.disabled).toBe(true)
   })
 
   it('starts a session with the notebook settings', async () => {
     const root = await render()
     const { start } = context.session as { start: ReturnType<typeof vi.fn> }
-    await click(button(root, 'Start'))
+    await click(button(root, 'Run notebook'))
     expect(start).toHaveBeenCalledWith(
       expect.objectContaining({
         groupId: 'group-1',
@@ -161,25 +194,57 @@ describe('the session bar', () => {
     )
   })
 
+  it('runs code cells immediately when the kernel is ready', async () => {
+    const root = await render({ state: { state: 'ready' }, running: true })
+    await click(button(root, 'Run notebook'))
+    expect(context.session.start).not.toHaveBeenCalled()
+    expect(context.session.runCells).toHaveBeenCalledWith([{ id: 'code', source: 'print(1)' }])
+  })
+
+  it.each([false, true])('runs after startup only for the same notebook: changed=%s', async (changed) => {
+    const root = await render({ state: { state: 'starting' }, running: true })
+    await click(button(root, 'Run notebook'))
+    expect(context.session.runCells).not.toHaveBeenCalled()
+    if (changed) (context.notebook.generation as { value: number }).value += 1
+    await flush()
+    ;(context.session.state as { value: unknown }).value = { state: 'ready' }
+    await flush()
+    if (changed) expect(context.session.runCells).not.toHaveBeenCalled()
+    else expect(context.session.runCells).toHaveBeenCalledTimes(1)
+  })
+
+  it('cancels the queued run when startup fails', async () => {
+    const root = await render({ state: { state: 'starting' }, running: true })
+    await click(button(root, 'Run notebook'))
+    ;(context.session.error as { value: unknown }).value = 'Kernel failed'
+    await flush()
+    ;(context.session.state as { value: unknown }).value = { state: 'ready' }
+    await flush()
+    expect(context.session.runCells).not.toHaveBeenCalled()
+  })
+
   it('shows the idle countdown from the session state', async () => {
     const root = await render({ state: { state: 'ready', idle_deadline_ms: 301_000, idle_after_ms: 1_800_000 } })
+    await openOptions(root)
     expect(content(root)).toContain('Ready')
     expect(content(root)).toContain('5 min left')
   })
 
   it('offers restart and stop while a session runs', async () => {
     const root = await render({ state: { state: 'ready', idle_deadline_ms: 0 }, running: true })
+    await openOptions(root)
     expect(button(root, 'Stop kernel')).toBeTruthy()
     await click(button(root, 'Restart kernel'))
     expect(context.session.restart).toHaveBeenCalledWith(expect.objectContaining({ runtime: 'python-notebook' }))
-    expect(() => button(root, 'Start')).toThrow()
+    expect(button(root, 'Run notebook')).toBeTruthy()
   })
 
   it('locks the idle pick while a session runs and hides the realm default', async () => {
     realmIdleMs = 1_800_000
     // The session picked a shorter timeout; the realm value is what counts.
     const root = await render({ state: { state: 'ready', idle_after_ms: 300_000 }, running: true })
-    await click(button(root, 'Kernel settings'))
+    await openOptions(root)
+    await click(button(root, 'Resources and placement'))
     const idle = select(root, 'Idle timeout')
     expect(idle.props.disabled).toBe(true)
     const labels = (idle.props.options as { label: string }[]).map((option) => option.label)
@@ -189,7 +254,8 @@ describe('the session bar', () => {
   it('hides the value the compute config reports', async () => {
     realmIdleMs = 300_000
     const root = await render()
-    await click(button(root, 'Kernel settings'))
+    await openOptions(root)
+    await click(button(root, 'Resources and placement'))
     const labels = (select(root, 'Idle timeout').props.options as { label: string }[]).map(
       (option) => option.label,
     )
