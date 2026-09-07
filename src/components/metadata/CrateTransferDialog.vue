@@ -29,6 +29,7 @@ import { useBucketShortcuts } from '@/composables/useBucketShortcuts'
 import { useJobDetail } from '@/composables/useJobs'
 import { useNotifications } from '@/composables/useNotifications'
 import { useS3 } from '@/composables/useS3'
+import { preflightExport, type ExportPreflight } from '@/lib/exportPreflight'
 import { formatJobProgress, isTerminalJobState, jobProgressPercent } from '@/lib/jobs'
 import { errorMessage, formatBytes } from '@/lib/utils'
 import { isWorkspaceBucket } from '@/lib/workspaces'
@@ -61,7 +62,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
 
-const { apiBaseUrl, authToken, groups, fullCrates, loadRoCrate } = useAruna()
+const { apiBaseUrl, authToken, groups, fullCrates, loadRoCrate, getMetadataItem } = useAruna()
 const { bumpDashboard } = useNotifications()
 function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
@@ -78,6 +79,22 @@ watch(
     if (open && !isImport.value && documentId && !exportCrate.value) {
       void loadRoCrate(documentId).catch(() => undefined)
     }
+  },
+  { immediate: true },
+)
+
+// Linked datasets the archive will leave out, checked before the job starts.
+const preflight = ref<ExportPreflight | null>(null)
+let preflightToken = 0
+watch(
+  () => [props.open, isImport.value, exportCrate.value] as const,
+  ([open, importing, crate]) => {
+    preflight.value = null
+    const token = ++preflightToken
+    if (!open || importing || !crate) return
+    void preflightExport(crate, getMetadataItem).then((result) => {
+      if (token === preflightToken) preflight.value = result
+    })
   },
   { immediate: true },
 )
@@ -554,6 +571,17 @@ function rowTarget(row: TransferRow): string {
           Data entities that cannot be resolved (external URLs, denied, missing or unreachable objects) are listed in the
           report instead of being packed.
         </p>
+        <Notice
+          v-if="!isImport && !activeJobId && preflight?.restricted.length"
+          tone="warning"
+          title="Linked datasets you cannot read are left out"
+          :lines="preflight.restricted.map((link) => link.name)"
+        >
+          The archive will not contain these linked datasets; the report lists them as denied or missing.
+        </Notice>
+        <p v-if="!isImport && !activeJobId && preflight?.failed" class="text-[11px] text-muted-foreground">
+          Not every linked dataset could be checked; the report shows what was left out.
+        </p>
         <div v-if="!isImport && !activeJobId && exportCrate" class="space-y-1.5">
           <p class="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Graph</p>
           <CrateGraph :source="exportCrate" mode="view" height="18rem" />
@@ -579,6 +607,10 @@ function rowTarget(row: TransferRow): string {
           <DetailList v-if="importResult" :items="importDetails" />
 
           <DetailList v-if="exportResult" :items="exportDetails" />
+          <Notice v-if="exportResult && exportResult.omitted.denied > 0" tone="warning">
+            {{ exportResult.omitted.denied === 1 ? '1 entry was' : `${exportResult.omitted.denied} entries were` }}
+            left out because you may not read them; the report marks them as denied.
+          </Notice>
           <p v-if="exportResult?.artifact" class="text-[11px] text-muted-foreground">
             Archive {{ formatBytes(exportResult.artifact.size) }}
             <template v-if="downloadedName"> · saved as {{ downloadedName }}</template>
