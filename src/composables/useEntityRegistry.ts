@@ -113,6 +113,13 @@ export async function findCandidates(
   return { candidates, partial }
 }
 
+async function mergeInto(documentId: string, entities: DraftEntity[]): Promise<{ documentId: string }> {
+  // The whole-crate PUT has no precondition: two saves at once are last write wins.
+  const crate = await loadRoCrate(documentId, { force: true })
+  await replaceMetadataRoCrate(documentId, { rocrate: withEntities(crate, entities) })
+  return { documentId }
+}
+
 /** Adds `entity` and what it references to the group registry, creating it on first use. */
 export async function saveToRegistry(
   groupId: string,
@@ -120,25 +127,21 @@ export async function saveToRegistry(
   related: DraftEntity[],
 ): Promise<{ documentId: string }> {
   const entities = [entity, ...related]
-  for (let attempt = 0; ; attempt++) {
-    try {
-      const existing = await registryId(groupId)
-      if (!existing) {
-        const created = await createMetadata({
-          group_id: groupId,
-          path: REGISTRY_PATH,
-          public: false,
-          rocrate: withEntities(null, entities),
-        })
-        return { documentId: created.document_id }
-      }
-      const crate = await loadRoCrate(existing, { force: true })
-      await replaceMetadataRoCrate(existing, { rocrate: withEntities(crate, entities) })
-      return { documentId: existing }
-    } catch (error) {
-      // A concurrent save took the path or the revision: read again once.
-      if (attempt === 0 && error instanceof ApiError && (error.status === 409 || error.status === 412)) continue
-      throw error
-    }
+  const existing = await registryId(groupId)
+  if (existing) return mergeInto(existing, entities)
+  try {
+    const created = await createMetadata({
+      group_id: groupId,
+      path: REGISTRY_PATH,
+      public: false,
+      rocrate: withEntities(null, entities),
+    })
+    return { documentId: created.document_id }
+  } catch (error) {
+    // Another save created the registry first: merge into it instead.
+    if (!(error instanceof ApiError && error.status === 409)) throw error
+    const winner = await registryId(groupId)
+    if (!winner) throw error
+    return mergeInto(winner, entities)
   }
 }

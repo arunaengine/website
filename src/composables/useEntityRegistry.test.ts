@@ -149,29 +149,41 @@ describe('saveToRegistry', () => {
     expect(ids).toEqual(['ro-crate-metadata.json', './', ada.id, institute.id])
   })
 
-  it('merges into the current registry and retries once after a conflict', async () => {
+  it('merges into the current registry from a fresh copy', async () => {
     lookupMetadataPath.mockResolvedValue({ winner: { document_id: REGISTRY }, conflicts: [] })
-    loadRoCrate
-      .mockResolvedValueOnce(withEntities(null, [grace]))
-      .mockResolvedValueOnce(withEntities(null, [grace, institute]))
-    replaceMetadataRoCrate
-      .mockRejectedValueOnce(new ApiError(409, 'conflict'))
-      .mockResolvedValueOnce({ document_id: REGISTRY })
+    loadRoCrate.mockResolvedValue(withEntities(null, [grace, institute]))
+    replaceMetadataRoCrate.mockResolvedValue({ document_id: REGISTRY })
 
     const saved = await registry.saveToRegistry('group-1', ada, [])
 
     expect(saved).toEqual({ documentId: REGISTRY })
-    expect(loadRoCrate).toHaveBeenNthCalledWith(2, REGISTRY, { force: true })
-    const graph = replaceMetadataRoCrate.mock.calls[1][1].rocrate['@graph'] as Array<Record<string, unknown>>
+    expect(loadRoCrate).toHaveBeenCalledWith(REGISTRY, { force: true })
+    expect(createMetadata).not.toHaveBeenCalled()
+    const graph = replaceMetadataRoCrate.mock.calls[0][1].rocrate['@graph'] as Array<Record<string, unknown>>
     expect(graph.map((node) => node['@id'])).toEqual(['ro-crate-metadata.json', './', '#grace', institute.id, ada.id])
   })
 
-  it('reports a second conflict instead of looping', async () => {
+  it('merges into the registry another save created first', async () => {
+    lookupMetadataPath
+      .mockRejectedValueOnce(new ApiError(404, 'not found'))
+      .mockResolvedValueOnce({ winner: { document_id: REGISTRY }, conflicts: [] })
+    createMetadata.mockRejectedValue(new ApiError(409, 'path taken'))
+    loadRoCrate.mockResolvedValue(withEntities(null, [grace]))
+    replaceMetadataRoCrate.mockResolvedValue({ document_id: REGISTRY })
+
+    const saved = await registry.saveToRegistry('group-1', ada, [])
+
+    expect(saved).toEqual({ documentId: REGISTRY })
+    expect(createMetadata).toHaveBeenCalledTimes(1)
+    expect(replaceMetadataRoCrate).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports a failed replace without retrying it', async () => {
     lookupMetadataPath.mockResolvedValue({ winner: { document_id: REGISTRY }, conflicts: [] })
     loadRoCrate.mockResolvedValue(withEntities(null, []))
-    replaceMetadataRoCrate.mockRejectedValue(new ApiError(409, 'conflict'))
+    replaceMetadataRoCrate.mockRejectedValue(new ApiError(503, 'unavailable'))
 
     await expect(registry.saveToRegistry('group-1', ada, [])).rejects.toBeInstanceOf(ApiError)
-    expect(replaceMetadataRoCrate).toHaveBeenCalledTimes(2)
+    expect(replaceMetadataRoCrate).toHaveBeenCalledTimes(1)
   })
 })
