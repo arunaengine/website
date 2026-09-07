@@ -126,18 +126,28 @@ function control(root: HostNode, label: string): HostNode {
 }
 
 describe('EntityHeader', () => {
-  it('saves a contextual entity with what it references to the group registry', async () => {
+  it('saves only a reference to the entity in its saved dataset', async () => {
     saveToRegistry.mockResolvedValue({ documentId: 'reg' })
     const base = seeded()
     const org = Editor.addEntity(base, { type: 'Organization', name: 'Example Institute', id: '#institute' })
-    const draft = { ...Editor.addValue(org.draft, '#ada-lovelace', 'affiliation', { kind: 'reference', value: '#institute' }), groupId: 'group-1' }
+    const draft = { ...Editor.addValue(org.draft, '#ada-lovelace', 'affiliation', { kind: 'reference', value: '#institute' }), groupId: 'group-1', documentId: 'source-1' }
     const person = Editor.findEntity(draft, '#ada-lovelace')!
     const mounted = await mountApp(EntityHeader, { props: { draft, entity: person, vocab: null } })
 
     await click(button(mounted.root, 'Save to group registry'))
 
-    expect(saveToRegistry).toHaveBeenCalledWith('group-1', person, [Editor.findEntity(draft, '#institute')])
-    expect(content(mounted.root)).toContain('Ada Lovelace is saved in the group registry.')
+    expect(saveToRegistry).toHaveBeenCalledWith('group-1', { documentId: 'source-1', entityId: person.id })
+    expect(content(mounted.root)).toContain('Reference saved to the group registry')
+    mounted.app.unmount()
+  })
+
+  it('explains that a new source dataset must be saved first', async () => {
+    const draft = { ...seeded(), groupId: 'group-1' }
+    const mounted = await mountApp(EntityHeader, { props: {
+      draft, entity: Editor.findEntity(draft, '#ada-lovelace')!, vocab: null,
+    } })
+    expect(button(mounted.root, 'Save to group registry').props.disabled).toBe(true)
+    expect(content(mounted.root)).toContain('Save the dataset first')
     mounted.app.unmount()
   })
 

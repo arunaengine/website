@@ -130,6 +130,13 @@ export async function lookupMetadataPath(groupId: string, path: string): Promise
   return request<MetadataPathResponse>(`/metadata/groups/${encodeURIComponent(groupId)}/path`, { query: { path } })
 }
 
+export async function upsertContextualEntity(documentId: string, entity: Record<string, unknown>): Promise<void> {
+  await request(`/metadata/${encodeURIComponent(documentId)}/rocrate/entities/contextual`, {
+    method: 'POST', body: JSON.stringify(entity),
+  })
+  invalidateCrate(documentId)
+}
+
 export async function deleteMetadataDocument(documentId: string): Promise<void> {
   saving.value = true
   try {

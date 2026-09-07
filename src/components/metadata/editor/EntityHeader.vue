@@ -25,7 +25,6 @@ import {
 } from '@/lib/crate/editor'
 import { orphanedDataEntities } from '@/lib/crate/orphans'
 import { linkReference, rootParts } from '@/lib/crate/references'
-import { relatedEntities } from '@/lib/crate/registry'
 import { saveToRegistry } from '@/composables/useEntityRegistry'
 import { matchRorByName } from '@/lib/lookup/ror'
 import { errorMessage, truncateMiddle } from '@/lib/utils'
@@ -110,14 +109,20 @@ const registryNote = ref('')
 
 async function pinToRegistry() {
   const groupId = props.draft.groupId
-  if (!groupId || registryBusy.value) return
+  const documentId = props.draft.documentId
+  const entityId = props.entity.id
+  if (!groupId || !documentId || registryBusy.value) return
   registryBusy.value = true
   registryNote.value = ''
   try {
-    await saveToRegistry(groupId, props.entity, relatedEntities(props.draft, props.entity))
-    registryNote.value = `${displayName(props.entity)} is saved in the group registry.`
+    await saveToRegistry(groupId, { documentId, entityId })
+    if (props.draft.documentId === documentId && props.entity.id === entityId) {
+      registryNote.value = 'Reference saved to the group registry. Reuse reads the dataset’s current saved version.'
+    }
   } catch (error) {
-    registryNote.value = `Could not save to the group registry: ${errorMessage(error)}`
+    if (props.draft.documentId === documentId && props.entity.id === entityId) {
+      registryNote.value = `Could not save to the group registry: ${errorMessage(error)}`
+    }
   } finally {
     registryBusy.value = false
   }
@@ -244,7 +249,8 @@ function applyRor() {
         variant="ghost"
         size="sm"
         class="h-6 px-2 text-[11px] text-muted-foreground"
-        :disabled="registryBusy"
+        :disabled="registryBusy || !draft.documentId"
+        :title="draft.documentId ? 'Save a reference to the current saved dataset' : 'Save the dataset first to reuse this entity'"
         @click="pinToRegistry"
       >
         {{ registryBusy ? 'Saving to registry' : 'Save to group registry' }}
@@ -261,6 +267,9 @@ function applyRor() {
     </Notice>
     <Notice v-else-if="rorNote" tone="info">{{ rorNote }}</Notice>
     <Notice v-if="registryNote" tone="info">{{ registryNote }}</Notice>
+    <p v-if="group === 'contextual' && draft.groupId && !draft.documentId" class="text-[11px] text-muted-foreground">
+      Save the dataset first to add this entity to the group registry.
+    </p>
 
     <Notice v-if="stranded" tone="warning">
       Nothing in this dataset holds {{ displayName(entity) }}. The node refuses a file it cannot

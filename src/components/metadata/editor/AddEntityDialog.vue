@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
@@ -32,8 +32,10 @@ import {
   type DraftValue,
 } from '@/lib/crate/editor'
 import { linkReference } from '@/lib/crate/references'
-import { placeEntity } from '@/lib/crate/registry'
-import { findCandidates, saveToRegistry, type ReuseCandidate } from '@/composables/useEntityRegistry'
+import { copyEntity, entitiesOfType, referenceKey } from '@/lib/crate/registry'
+import { findCandidates, resolveReference, saveToRegistry, type ReuseCandidate } from '@/composables/useEntityRegistry'
+import { useAruna } from '@/composables/useAruna'
+import { isAbsoluteUri } from '@/lib/profiles/uri'
 import { defaultProperties, defaultRows } from '@/lib/crate/typeDefaults'
 import { fetchOrcidRecord, normalizeOrcidId } from '@/lib/lookup/orcid'
 import { fetchRorRecord, matchRorByName, normalizeRorId } from '@/lib/lookup/ror'
@@ -84,13 +86,17 @@ const candidateState = ref<'idle' | 'loading' | 'ready' | 'failed'>('idle')
 const candidatesPartial = ref(false)
 const picked = ref<ReuseCandidate | null>(null)
 const pinNote = ref('')
+const registryUnavailable = ref(false)
+const reuseBusy = ref(false)
+const { apiBaseUrl, authToken } = useAruna()
 let candidateToken = 0
 
-watch(type, (next) => {
+watch([type, () => props.draft.groupId, () => props.draft.documentId, apiBaseUrl, authToken], ([next]) => {
   candidates.value = []
   candidatesPartial.value = false
   picked.value = null
   pinNote.value = ''
+  registryUnavailable.value = false
   candidateState.value = next ? 'loading' : 'idle'
   const token = ++candidateToken
   if (!next) return
@@ -99,17 +105,19 @@ watch(type, (next) => {
       if (token !== candidateToken) return
       candidates.value = result.candidates
       candidatesPartial.value = result.partial
+      registryUnavailable.value = result.unavailable
       candidateState.value = 'ready'
     })
     .catch(() => {
       if (token === candidateToken) candidateState.value = 'failed'
     })
 })
+onScopeDispose(() => { candidateToken += 1 })
 
 const shownCandidates = computed(() => {
   const needle = name.value.trim().toLowerCase()
   return candidates.value
-    .filter((candidate) => !findEntity(props.draft, candidate.entity.id))
+    .filter((candidate) => !isAbsoluteUri(candidate.entity.id) || !findEntity(props.draft, candidate.entity.id))
     .filter((candidate) => !needle || displayName(candidate.entity).toLowerCase().includes(needle))
     .slice(0, 8)
 })
@@ -137,13 +145,14 @@ watch(identifier, (next) => {
 
 async function pin(candidate: ReuseCandidate) {
   const groupId = props.draft.groupId
+  const token = candidateToken
   if (!groupId) return
   pinNote.value = ''
   try {
-    await saveToRegistry(groupId, candidate.entity, candidate.related)
-    pinNote.value = `${displayName(candidate.entity)} is saved in the group registry.`
+    await saveToRegistry(groupId, candidate.reference)
+    if (token === candidateToken) pinNote.value = `Reference to ${displayName(candidate.entity)} saved in the group registry.`
   } catch (error) {
-    pinNote.value = `Could not save to the group registry: ${errorMessage(error)}`
+    if (token === candidateToken) pinNote.value = `Could not save to the group registry: ${errorMessage(error)}`
   }
 }
 
@@ -309,23 +318,30 @@ const reuse = computed(() => {
   return registryId.value && registryId.value !== match.id ? undefined : match
 })
 
-function create() {
-  if (!canCreate.value) return
+async function create() {
+  if (!canCreate.value || reuseBusy.value) return
   let base = props.draft
-  let entity = reuse.value
-  if (!entity && picked.value) {
-    let properties = { ...picked.value.entity.properties }
-    for (const relatedEntity of picked.value.related) {
-      const known = findSimilarEntity(base, relatedEntity.types[0] ?? 'Thing', displayName(relatedEntity))
-      if (known) {
-        properties = retarget(properties, relatedEntity.id, known.id)
-        continue
-      }
-      base = placeEntity(base, relatedEntity)
+  let entity = picked.value ? undefined : reuse.value
+  if (picked.value) {
+    const candidate = picked.value
+    const token = candidateToken
+    reuseBusy.value = true
+    try {
+      const current = await resolveReference(candidate.reference, candidate.source.registry)
+      if (token !== candidateToken || !props.open || picked.value !== candidate) return
+      if (!entitiesOfType([current.entity], type.value).length) throw new Error('The saved entity type changed. Search again.')
+      const source = name.value.trim() && name.value.trim() !== displayName(candidate.entity)
+        ? { ...current.entity, properties: { ...current.entity.properties, name: text(name.value.trim()) } }
+        : current.entity
+      const copied = copyEntity(props.draft, source, current.related)
+      base = copied.draft
+      entity = copied.entity
+    } catch (error) {
+      if (token === candidateToken) lookupError.value = `Could not reuse this entity: ${errorMessage(error)}`
+      return
+    } finally {
+      reuseBusy.value = false
     }
-    if (name.value.trim()) properties = { ...properties, name: text(name.value.trim()) }
-    base = placeEntity(base, { ...picked.value.entity, properties })
-    entity = findEntity(base, picked.value.entity.id)
   }
   if (!entity) {
     let properties: Record<string, DraftValue[]> = { ...defaultRows(props.vocab, type.value), ...extra.value }
@@ -395,18 +411,18 @@ function create() {
             <ul v-if="shownCandidates.length" class="mt-1 divide-y divide-border rounded-md border border-border">
               <li
                 v-for="candidate in shownCandidates"
-                :key="candidate.entity.id"
+                :key="referenceKey(candidate.reference)"
                 class="flex min-w-0 items-center gap-2 px-2 py-1.5 text-xs"
               >
                 <button
                   type="button"
                   class="min-w-0 flex-1 rounded-sm text-left hover:text-primary"
-                  :aria-pressed="picked?.entity.id === candidate.entity.id"
+                  :aria-pressed="picked ? referenceKey(picked.reference) === referenceKey(candidate.reference) : false"
                   @click="pick(candidate)"
                 >
                   <span class="block truncate font-medium text-foreground">{{ displayName(candidate.entity) }}</span>
                   <span class="block truncate text-[11px] text-muted-foreground">
-                    {{ candidate.source.registry ? 'Group registry' : candidate.source.title }}
+                    {{ candidate.source.title }}<template v-if="candidate.source.registry"> · Group registry</template>
                   </span>
                 </button>
                 <Button
@@ -415,6 +431,7 @@ function create() {
                   size="sm"
                   class="h-6 shrink-0 px-2 text-[11px] text-muted-foreground"
                   @click="pin(candidate)"
+                  title="Save a reference to this entity in its source dataset"
                 >
                   Save to registry
                 </Button>
@@ -427,9 +444,12 @@ function create() {
               Not every dataset could be searched.
             </p>
           </template>
+          <p v-if="registryUnavailable" class="mt-1 text-[11px] text-muted-foreground">
+            Some saved references are unavailable or no longer accessible.
+          </p>
           <Notice v-if="picked" tone="info" class="mt-2 break-words">
-            Copies {{ displayName(picked.entity) }} from
-            {{ picked.source.registry ? 'the group registry' : picked.source.title }}<template v-if="picked.related.length">
+            Loads the current saved {{ displayName(picked.entity) }} from
+            {{ picked.source.title }}<template v-if="picked.related.length">
               with {{ picked.related.map(displayName).join(', ') }}</template>.
             <button type="button" class="ml-1 underline" @click="unpick">Start from scratch instead</button>
           </Notice>
@@ -465,10 +485,10 @@ function create() {
                 </span>
               </Button>
             </div>
-            <Notice v-if="lookupError" tone="warning" class="break-words">{{ lookupError }}</Notice>
           </div>
           <Input v-else v-model="name" class="mt-1" aria-label="Name" autofocus @keydown.enter="create" />
-          <Notice v-if="reuse" tone="info" class="mt-2 break-words">
+          <Notice v-if="lookupError" tone="warning" class="break-words">{{ lookupError }}</Notice>
+          <Notice v-if="reuse && !picked" tone="info" class="mt-2 break-words">
             Matches {{ displayName(reuse) }} already in this dataset; it will be reused.
           </Notice>
         </div>
@@ -509,7 +529,7 @@ function create() {
 
       <DialogFooter class="min-w-0 border-t border-border px-4 py-3">
         <Button variant="outline" @click="type = ''">Back</Button>
-        <Button :disabled="!canCreate" @click="create">Create</Button>
+        <Button :disabled="!canCreate || reuseBusy" @click="create">{{ reuseBusy ? 'Loading saved entity' : 'Create' }}</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>
