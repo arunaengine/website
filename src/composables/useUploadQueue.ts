@@ -8,7 +8,7 @@ import {
 } from './useS3'
 import { uploadQueueItems as items, type UploadItemState, type UploadQueueItem } from './uploadQueueState'
 
-export type { UploadItemState, UploadQueueItem } from './uploadQueueState'
+export { UPLOAD_FINISHING_MESSAGE, type UploadItemState, type UploadQueueItem } from './uploadQueueState'
 
 export interface UploadTarget {
   bucket: string
@@ -117,6 +117,7 @@ async function run(item: UploadQueueItem): Promise<void> {
   item.state = 'uploading'
   item.pausedForSession = undefined
   item.progress = 0
+  item.finishing = undefined
   touch()
   try {
     const handle = s3.uploadObject(
@@ -125,6 +126,7 @@ async function run(item: UploadQueueItem): Promise<void> {
       file,
       (loaded, total) => {
         item.progress = total ? Math.round((loaded / total) * 100) : 0
+        if (total && loaded >= total) item.finishing = true
         touch()
       },
       item.nodeId,
@@ -141,6 +143,7 @@ async function run(item: UploadQueueItem): Promise<void> {
       item.state = 'done'
       item.error = undefined
       item.progress = 100
+      item.finishing = undefined
       files.delete(item.id) // free the blob; done items are not retryable
       lastCompleted.value = { bucket: item.bucket, key: item.key, nodeId: item.nodeId, at: Date.now() }
     }

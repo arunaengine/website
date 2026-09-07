@@ -3,7 +3,7 @@ import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Progress from '@/components/ui/Progress.vue'
 import Spinner from '@/components/ui/Spinner.vue'
-import { useUploadQueue, type UploadQueueItem } from '@/composables/useUploadQueue'
+import { UPLOAD_FINISHING_MESSAGE, useUploadQueue, type UploadQueueItem } from '@/composables/useUploadQueue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { AlertTriangle, ChevronDown, ChevronUp, UploadCloud, X } from '@lucide/vue'
@@ -128,6 +128,12 @@ function transferVariant(item: UploadQueueItem): BadgeVariant {
           :warn="101"
           :critical="101"
           class="h-1"
+        />
+        <Spinner
+          v-if="item.state === 'uploading' && item.finishing"
+          :label="UPLOAD_FINISHING_MESSAGE"
+          show-label
+          class="text-[10px]"
         />
         <p
           v-if="item.overwrite && item.state !== 'error' && item.state !== 'canceled'"

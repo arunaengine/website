@@ -10,6 +10,7 @@ import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Progress from '@/components/ui/Progress.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import Select from '@/components/ui/Select.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsList from '@/components/ui/TabsList.vue'
@@ -20,7 +21,7 @@ import UploadTab from '@/components/data/add/UploadTab.vue'
 import SubcratePickerDialog from '@/components/metadata/SubcratePickerDialog.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useS3, s3ErrorMessage, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
-import { useUploadQueue } from '@/composables/useUploadQueue'
+import { UPLOAD_FINISHING_MESSAGE, useUploadQueue } from '@/composables/useUploadQueue'
 import { externalContentReference, type ContentIdentityOptions } from '@/lib/contentIdentity'
 import { dataEntityIdentity, objectLocation } from '@/lib/crate/dataIdentity'
 import {
@@ -295,6 +296,12 @@ function addUrl() {
                 <span class="text-muted-foreground">{{ item.state }}</span>
               </div>
               <Progress v-if="item.state === 'uploading'" :value="item.progress" />
+              <Spinner
+                v-if="item.state === 'uploading' && item.finishing"
+                :label="UPLOAD_FINISHING_MESSAGE"
+                show-label
+                class="text-[11px]"
+              />
               <p v-if="item.error" class="text-[11px] text-destructive">{{ item.error }}</p>
             </li>
           </ul>

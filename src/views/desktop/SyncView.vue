@@ -12,6 +12,7 @@ import FilterChips from '@/components/ui/FilterChips.vue'
 import ListShell from '@/components/ui/ListShell.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Progress from '@/components/ui/Progress.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import RefusalNote from '@/components/ui/RefusalNote.vue'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
@@ -22,7 +23,7 @@ import { useDeviceSync } from '@/composables/useDeviceSync'
 import { useDeviceTransfers } from '@/composables/useDeviceTransfers'
 import { useRefresh } from '@/composables/useRefresh'
 import { useSyncedFolders } from '@/composables/useSyncedFolders'
-import { useUploadQueue } from '@/composables/useUploadQueue'
+import { UPLOAD_FINISHING_MESSAGE, useUploadQueue } from '@/composables/useUploadQueue'
 import type { SyncedFolder } from '@/lib/deviceApi'
 import { stateVariant } from '@/lib/stateBadge'
 import { itemChip, type SyncItem } from '@/lib/syncStates'
@@ -248,6 +249,7 @@ async function findOfflineDataset(): Promise<void> {
             <div class="min-w-0 flex-1">
               <p class="truncate text-foreground">{{ item.name }}</p>
               <p class="hash truncate">{{ item.bucket }}/{{ item.key }}</p>
+              <Spinner v-if="item.state === 'uploading' && item.finishing" :label="UPLOAD_FINISHING_MESSAGE" show-label />
               <p v-if="item.error" class="text-destructive">{{ item.error }}</p>
             </div>
             <Progress :value="item.progress" :label="`${item.name}: ${item.progress}%`" class="h-1.5 w-28" />

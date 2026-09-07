@@ -15,6 +15,7 @@ import Spinner from '@/components/ui/Spinner.vue'
 import Progress from '@/components/ui/Progress.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useBuilderBasket, type BuilderRow } from '@/composables/useBuilderBasket'
+import { UPLOAD_FINISHING_MESSAGE } from '@/composables/useUploadQueue'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
 import { formatBytes } from '@/lib/utils'
 import { stateVariant, toneVariant } from '@/lib/stateBadge'
@@ -202,6 +203,12 @@ function rowEditable(row: BuilderRow): boolean {
                     class="h-1.5 w-16"
                   />
                 </div>
+                <Spinner
+                  v-if="row.state === 'submitting' && row.finishing"
+                  :label="UPLOAD_FINISHING_MESSAGE"
+                  show-label
+                  class="mt-1 text-[10px]"
+                />
                 <p v-if="row.state === 'submitting' && row.phase" class="mt-1 text-[10px] text-muted-foreground">
                   {{ row.phase }}
                   <template v-if="row.progressTotal != null">

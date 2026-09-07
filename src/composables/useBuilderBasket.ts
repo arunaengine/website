@@ -30,6 +30,7 @@ export interface BuilderRow {
   blockedReason: string | null
   // Links an upload row to its useUploadQueue item for live progress.
   uploadId: number | null
+  finishing?: boolean
   jobId?: string
   phase?: StagingJobPhase
   progressCurrent?: number
@@ -432,6 +433,7 @@ export function useBuilderBasket(ctx: {
         const item = items.find((entry) => entry.id === row.uploadId)
         if (!item) continue
         row.progress = item.progress
+        row.finishing = item.state === 'uploading' && item.finishing === true
         if (item.state === 'done') row.state = 'done'
         else if (item.state === 'error') {
           row.state = 'error'

@@ -3,6 +3,8 @@ import type { S3SessionReference } from './s3/session'
 
 export type UploadItemState = 'queued' | 'uploading' | 'done' | 'error' | 'canceled'
 
+export const UPLOAD_FINISHING_MESSAGE = 'Finishing upload, this can take a while for large files'
+
 export interface UploadQueueItem {
   id: number
   bucket: string
@@ -11,6 +13,8 @@ export interface UploadQueueItem {
   size: number
   state: UploadItemState
   progress: number // 0-100
+  // Every byte is on the node and the multipart completion is still running.
+  finishing?: boolean
   error?: string
   quotaExceeded?: boolean
   // Group backing the temporary session at enqueue time. It remains fixed

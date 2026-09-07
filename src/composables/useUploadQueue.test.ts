@@ -161,6 +161,23 @@ describe('upload queue completion status', () => {
     return uploadObject.mock.calls[0]?.[6] as (attempt: number, error: unknown) => void
   }
 
+  it('marks the item as finishing once every byte is sent', async () => {
+    const { item, resolve } = start('finishing')
+    await vi.waitFor(() => expect(item.state).toBe('uploading'))
+    const progress = uploadObject.mock.calls[0]?.[3] as (loaded: number, total: number) => void
+
+    progress(5, 10)
+    expect(item).toMatchObject({ state: 'uploading', progress: 50 })
+    expect(item.finishing).toBeUndefined()
+
+    progress(10, 10)
+    expect(item).toMatchObject({ state: 'uploading', progress: 100, finishing: true })
+
+    resolve()
+    await vi.waitFor(() => expect(item.state).toBe('done'))
+    expect(item.finishing).toBeUndefined()
+  })
+
   it('names the completion attempt while the node finishes the object', async () => {
     const { item, resolve } = start('completing')
     await vi.waitFor(() => expect(item.state).toBe('uploading'))
