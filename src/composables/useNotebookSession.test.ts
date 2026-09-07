@@ -329,6 +329,51 @@ describe('createNotebookSession', () => {
     scope.stop()
   })
 
+  it('restarts with a new job only after ending the old kernel', async () => {
+    const { notebook, session: store, scope } = await setup()
+    notebook.patchMeta({ job_id: '01OLD', executor_node_id: 'node-a' })
+    session.getSessionState.mockResolvedValue(state({ job_id: '01OLD' }))
+    await store.attachSaved()
+    jobs.submitJob.mockResolvedValue({ job_id: '01NEW' })
+    jobs.getJob.mockResolvedValue({ state: 'running', family: { execution_list: [{ executor_node_id: 'node-a', canonical: true }] } })
+    session.getSessionState.mockResolvedValue(state({ job_id: '01NEW' }))
+    await store.restart({ groupId: 'group-1', name: 'counts', runtime: 'python-notebook', workspaceBucket: 'lab-data' })
+    expect(session.endSession).toHaveBeenCalledWith('01OLD', expect.anything())
+    expect(session.endSession.mock.invocationCallOrder[0]).toBeLessThan(jobs.submitJob.mock.invocationCallOrder[0]!)
+    expect(store.jobId.value).toBe('01NEW')
+    expect(store.restarting.value).toBe(false)
+    scope.stop()
+  })
+
+  it('does not start another kernel when stopping the old one fails', async () => {
+    const { notebook, session: store, scope } = await setup()
+    notebook.patchMeta({ job_id: '01OLD', executor_node_id: 'node-a' })
+    session.getSessionState.mockResolvedValue(state({ job_id: '01OLD' }))
+    await store.attachSaved()
+    session.endSession.mockRejectedValue(new Error('stop failed'))
+    await store.restart({ groupId: 'group-1', name: 'counts', runtime: 'python-notebook', workspaceBucket: 'lab-data' })
+    expect(jobs.submitJob).not.toHaveBeenCalled()
+    expect(store.jobId.value).toBe('01OLD')
+    expect(store.error.value).toBe('stop failed')
+    scope.stop()
+  })
+
+  it('does not finish a restart after the notebook identity changes', async () => {
+    const { notebook, session: store, scope } = await setup()
+    notebook.patchMeta({ job_id: '01OLD', executor_node_id: 'node-a' })
+    session.getSessionState.mockResolvedValue(state({ job_id: '01OLD' }))
+    await store.attachSaved()
+    let finish = () => {}
+    session.endSession.mockReturnValue(new Promise<void>((resolve) => { finish = resolve }))
+    const restarting = store.restart({ groupId: 'group-1', name: 'counts', runtime: 'python-notebook', workspaceBucket: 'lab-data' })
+    aruna.currentUser.value = { id: 'another-user' }
+    finish()
+    await restarting
+    expect(jobs.submitJob).not.toHaveBeenCalled()
+    expect(store.restarting.value).toBe(false)
+    scope.stop()
+  })
+
   it('writes the dependency file before it submits', async () => {
     const { session: store, scope } = await setup()
     s3.putTextObject.mockResolvedValue({ versionId: 'v1' })

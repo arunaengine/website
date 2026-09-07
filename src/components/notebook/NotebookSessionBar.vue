@@ -9,18 +9,17 @@ import Notice from '@/components/ui/Notice.vue'
 import Select from '@/components/ui/Select.vue'
 import NotebookDependencies from '@/components/notebook/NotebookDependencies.vue'
 import { injectNotebook } from '@/composables/notebookContext'
-import { useAruna } from '@/composables/useAruna'
 import { useNow } from '@/composables/useNow'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { SESSION_RUNTIMES, dependencyKind } from '@/lib/notebook/runtimes'
+import type { NotebookDependencies as DependencySpec } from '@/lib/notebook/nbformat'
 import { dependencyKey } from '@/lib/notebook/document'
 import { sessionProblems } from '@/lib/notebook/submit'
 import { DEFAULT_SESSION_IDLE_AFTER_MS } from '@/lib/computeAdmin'
 import { useComputeAdmin } from '@/composables/useComputeAdmin'
-import { CircleStop, Play, Settings2 } from '@lucide/vue'
+import { CircleStop, Play, RotateCcw, Settings2 } from '@lucide/vue'
 
 const { notebook, session } = injectNotebook()
-const { myGroups } = useAruna()
 const { getComputeConfig } = useComputeAdmin()
 const { nodes, displayName } = useRealmNodes()
 const now = useNow(1_000)
@@ -30,7 +29,6 @@ const dependenciesOpen = ref(false)
 
 const meta = computed(() => notebook.meta.value)
 const runtimeOptions = SESSION_RUNTIMES.map((runtime) => ({ value: runtime.id, label: runtime.label }))
-const groupOptions = computed(() => myGroups.value.map((group) => ({ value: group.id, label: group.name })))
 const nodeOptions = computed(() => [
   { value: '', label: 'Any node' },
   ...nodes.value
@@ -67,6 +65,7 @@ const idleOptions = computed(() => [
 ])
 
 const stateLabel = computed(() => {
+  if (session.restarting.value) return 'Restarting'
   if (session.starting.value) return 'Starting'
   const state = session.state.value?.state
   if (!state) return session.jobId.value ? 'Not attached' : 'No session'
@@ -97,7 +96,10 @@ const problems = computed(() =>
 )
 
 // Null while the runtime is one this portal does not know.
-const dependencies = computed(() => dependencyKind(meta.value?.runtime ?? ''))
+const dependencies = computed(() => {
+  const kind = dependencyKind(meta.value?.runtime ?? '')
+  return kind === 'requirements' && meta.value?.dependencies?.kind === 'conda' ? 'conda' : kind
+})
 
 const resources = computed(() => meta.value?.resources ?? {})
 const ramGb = computed({
@@ -123,11 +125,11 @@ function setPlacement(patch: { node?: string; executor_kind?: string }) {
   notebook.patchMeta({ placement: { ...(meta.value?.placement ?? {}), ...patch } })
 }
 
-function start() {
+function start(restart = false) {
   const current = meta.value
   if (!current) return
-  const declared = current.dependencies?.text.trim() ? current.dependencies : undefined
-  void session.start({
+  const declared = current.dependencies?.kind === dependencies.value && current.dependencies.text.trim() ? current.dependencies : undefined
+  void (restart ? session.restart : session.start)({
     groupId: current.group_id,
     name: notebook.name.value,
     runtime: current.runtime,
@@ -143,24 +145,29 @@ function start() {
     placement: current.placement,
   })
 }
+async function saveDependencies(value: DependencySpec, restart: boolean) {
+  notebook.patchMeta({ dependencies: value })
+  if (!await notebook.save()) return
+  if (restart) start(true)
+}
 </script>
 
 <template>
   <div class="surface space-y-3 p-3">
-    <div class="flex flex-wrap items-center gap-2">
+    <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
       <Badge :variant="stateVariant">{{ stateLabel }}</Badge>
       <Badge v-if="session.live.value" variant="outline" size="sm">Kernel {{ session.kernel.value }}</Badge>
       <span v-if="idleLeft" class="text-[11px] text-muted-foreground">Idle timeout: {{ idleLeft }}</span>
       <span v-if="session.nodeId.value" class="text-[11px] text-muted-foreground">
         on {{ displayName(session.nodeId.value) }}
       </span>
-      <span class="flex-1" />
-
+    </div>
+    <div class="flex min-w-0 flex-wrap items-center gap-2">
       <Select
         :model-value="meta?.runtime ?? ''"
         :options="runtimeOptions"
         aria-label="Runtime"
-        class="w-48"
+        class="w-48 max-w-full"
         :disabled="session.running.value"
         @update:model-value="notebook.patchMeta({ runtime: $event })"
       />
@@ -168,27 +175,20 @@ function start() {
         Dependencies
       </Button>
       <Button variant="outline" size="sm" :aria-expanded="settingsOpen" @click="settingsOpen = !settingsOpen">
-        <Settings2 class="size-3.5" /> Session
+        <Settings2 class="size-3.5" /> Kernel settings
       </Button>
-      <Button v-if="session.running.value" variant="outline" size="sm" :disabled="session.ending.value" @click="session.end()">
-        <CircleStop class="size-3.5" /> End
+      <Button v-if="session.running.value" variant="outline" size="sm" :disabled="!session.live.value || session.ending.value || session.restarting.value" title="Start a fresh kernel with the saved dependencies; variables are cleared." @click="start(true)">
+        <RotateCcw class="size-3.5" /> Restart kernel
       </Button>
-      <Button v-else size="sm" :disabled="Boolean(problems.length) || session.starting.value" @click="start">
-        <Play class="size-3.5" /> {{ session.starting.value ? 'Starting…' : 'Start' }}
+      <Button v-if="session.running.value" variant="outline" size="sm" :disabled="session.ending.value || session.restarting.value" @click="session.end()">
+        <CircleStop class="size-3.5" /> Stop kernel
+      </Button>
+      <Button v-else size="sm" :disabled="Boolean(problems.length) || session.starting.value" @click="start()">
+        <Play class="size-3.5" /> {{ session.starting.value ? 'Starting…' : 'Start kernel' }}
       </Button>
     </div>
 
     <div v-if="settingsOpen" class="grid gap-3 border-t border-border pt-3 sm:grid-cols-2 lg:grid-cols-3">
-      <label class="space-y-1">
-        <span class="text-xs font-medium text-foreground">Group</span>
-        <Select
-          :model-value="meta?.group_id ?? ''"
-          :options="groupOptions"
-          aria-label="Owning group"
-          :disabled="session.running.value"
-          @update:model-value="notebook.patchMeta({ group_id: $event })"
-        />
-      </label>
       <label class="space-y-1">
         <span class="text-xs font-medium text-foreground">Workspace bucket</span>
         <Input :model-value="meta?.workspace_bucket ?? ''" disabled aria-label="Workspace bucket" />
@@ -244,8 +244,9 @@ function start() {
       v-if="dependencies"
       v-model:open="dependenciesOpen"
       :kind="dependencies"
-      :text="meta?.dependencies?.text ?? ''"
-      @save="notebook.patchMeta({ dependencies: { kind: dependencies, text: $event } })"
+      :text="meta?.dependencies?.kind === dependencies ? meta.dependencies.text : ''"
+      :running="session.running.value"
+      @save="saveDependencies"
     />
   </div>
 </template>

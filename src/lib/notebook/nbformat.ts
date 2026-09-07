@@ -48,7 +48,7 @@ export interface NotebookCell {
 }
 
 export interface NotebookDependencies {
-  kind: 'requirements' | 'deno'
+  kind: 'requirements' | 'conda' | 'deno'
   text: string
 }
 

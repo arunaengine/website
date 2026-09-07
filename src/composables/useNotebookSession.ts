@@ -57,6 +57,7 @@ export function createNotebookSession(notebook: NotebookStore) {
   const cellStates = ref<Record<string, SessionCell>>({})
   const starting = ref(false)
   const ending = ref(false)
+  const restarting = ref(false)
   const attaching = ref(false)
   const error = ref<string | null>(null)
   const notice = ref<string | null>(null)
@@ -399,6 +400,21 @@ export function createNotebookSession(notebook: NotebookStore) {
     }
   }
 
+  async function restart(draft: SessionStartDraft): Promise<void> {
+    if (restarting.value || starting.value || ending.value || !running.value) return
+    const active = current()
+    const previous = jobId.value
+    restarting.value = true
+    error.value = null
+    try {
+      await end()
+      if (!active() || jobId.value !== previous || !ended.value) return
+      await start(draft)
+    } finally {
+      if (active()) restarting.value = false
+    }
+  }
+
   async function interrupt(): Promise<void> {
     if (!jobId.value) return
     runGeneration += 1
@@ -490,6 +506,7 @@ export function createNotebookSession(notebook: NotebookStore) {
     cellStates.value = {}
     starting.value = false
     ending.value = false
+    restarting.value = false
     attaching.value = false
     error.value = null
     notice.value = null
@@ -510,6 +527,7 @@ export function createNotebookSession(notebook: NotebookStore) {
     cellStates,
     starting,
     ending,
+    restarting,
     attaching,
     error,
     notice,
@@ -524,6 +542,7 @@ export function createNotebookSession(notebook: NotebookStore) {
     refresh,
     start,
     end,
+    restart,
     interrupt,
     runCell,
     runCells,

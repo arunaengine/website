@@ -15,7 +15,7 @@ export const SESSION_RUNTIMES: SessionRuntime[] = [
   {
     id: 'python-notebook',
     label: 'Python',
-    hint: 'ipykernel, packages from PyPI',
+    hint: 'IPython, Bash, and PyPI or Conda packages',
     lang: 'python',
     highlight: 'python',
   },
@@ -34,13 +34,13 @@ export function sessionRuntimeById(id: string): SessionRuntime | undefined {
 }
 
 /** Which dependency file the runtime reads; null when it is unknown. */
-export function dependencyKind(runtimeId: string): 'requirements' | 'deno' | null {
+export function dependencyKind(runtimeId: string): 'requirements' | 'conda' | 'deno' | null {
   const runtime = sessionRuntimeById(runtimeId)
   if (!runtime) return null
   return runtime.lang === 'deno' ? 'deno' : 'requirements'
 }
 
 /** File name the dependency list is staged under inside the container. */
-export function dependencyFileName(kind: 'requirements' | 'deno'): string {
-  return kind === 'deno' ? 'deno.json' : 'requirements.txt'
+export function dependencyFileName(kind: 'requirements' | 'conda' | 'deno'): string {
+  return kind === 'deno' ? 'deno.json' : kind === 'conda' ? 'environment.yml' : 'requirements.txt'
 }

@@ -158,6 +158,12 @@ describe('sessionSubmitRequest', () => {
     expect(request.tags['aruna-engine.org/network']).toBe('open')
   })
 
+  it('stages a shared Conda environment file', () => {
+    const request = sessionSubmitRequest({ ...draft, dependencyKey: 'notebooks/counts.environment.yml', dependencyKind: 'conda' })
+    expect(request.inputs).toEqual([{ bucket: 'lab-data', key: 'notebooks/counts.environment.yml', dest_key: 'environment.yml' }])
+    expect(request.tags['aruna-engine.org/network']).toBe('open')
+  })
+
   it('carries resources, placement and a shorter idle timeout', () => {
     const request = sessionSubmitRequest({
       ...draft,

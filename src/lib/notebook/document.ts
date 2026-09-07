@@ -23,7 +23,7 @@ export function isNotebookKey(key: string): boolean {
 }
 
 /** Key of the dependency list the session stages, beside the notebook. */
-export function dependencyKey(name: string, kind: 'requirements' | 'deno'): string {
+export function dependencyKey(name: string, kind: 'requirements' | 'conda' | 'deno'): string {
   return `${NOTEBOOK_PREFIX}${name}.${dependencyFileName(kind)}`
 }
 

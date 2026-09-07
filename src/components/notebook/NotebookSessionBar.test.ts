@@ -78,6 +78,7 @@ function fakeContext(overrides: { state?: Record<string, unknown> | null; runnin
       nodeId: ref(overrides.running ? 'node-a' : ''),
       starting: ref(false),
       ending: ref(false),
+      restarting: ref(false),
       error: ref(null),
       notice: ref(null),
       idlePickMs: ref(null),
@@ -86,6 +87,7 @@ function fakeContext(overrides: { state?: Record<string, unknown> | null; runnin
       running: computed(() => Boolean(overrides.running)),
       start: vi.fn(),
       end: vi.fn(),
+      restart: vi.fn(),
       interrupt: vi.fn(),
     },
   }
@@ -165,9 +167,11 @@ describe('the session bar', () => {
     expect(content(root)).toContain('5 min left')
   })
 
-  it('offers End instead of Start while a session runs', async () => {
+  it('offers restart and stop while a session runs', async () => {
     const root = await render({ state: { state: 'ready', idle_deadline_ms: 0 }, running: true })
-    expect(button(root, 'End')).toBeTruthy()
+    expect(button(root, 'Stop kernel')).toBeTruthy()
+    await click(button(root, 'Restart kernel'))
+    expect(context.session.restart).toHaveBeenCalledWith(expect.objectContaining({ runtime: 'python-notebook' }))
     expect(() => button(root, 'Start')).toThrow()
   })
 
@@ -175,7 +179,7 @@ describe('the session bar', () => {
     realmIdleMs = 1_800_000
     // The session picked a shorter timeout; the realm value is what counts.
     const root = await render({ state: { state: 'ready', idle_after_ms: 300_000 }, running: true })
-    await click(button(root, 'Session'))
+    await click(button(root, 'Kernel settings'))
     const idle = select(root, 'Idle timeout')
     expect(idle.props.disabled).toBe(true)
     const labels = (idle.props.options as { label: string }[]).map((option) => option.label)
@@ -185,7 +189,7 @@ describe('the session bar', () => {
   it('hides the value the compute config reports', async () => {
     realmIdleMs = 300_000
     const root = await render()
-    await click(button(root, 'Session'))
+    await click(button(root, 'Kernel settings'))
     const labels = (select(root, 'Idle timeout').props.options as { label: string }[]).map(
       (option) => option.label,
     )

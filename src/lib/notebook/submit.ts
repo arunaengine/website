@@ -21,7 +21,7 @@ export interface SessionSubmitDraft {
   workspaceBucket: string
   /** Key of the dependency list in the workspace bucket, empty when there is none. */
   dependencyKey?: string
-  dependencyKind?: 'requirements' | 'deno'
+  dependencyKind?: 'requirements' | 'conda' | 'deno'
   resources?: NotebookResources
   placement?: NotebookPlacement
   idempotencyKey: string
