@@ -2,7 +2,7 @@
 // A pipeline cell: an ordinary job, described in a small form and submitted the
 // way the run page submits one. Its outputs land in the workspace bucket, and
 // the job card follows it once it is on its way.
-import { computed, ref, watch } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
@@ -32,6 +32,9 @@ const draft = ref(pipelineDraftFrom(props.cell.source))
 const submitting = ref(false)
 const error = ref<string | null>(null)
 const jobId = ref(props.cell.metadata.aruna?.job_id ?? '')
+let pendingKey = ''
+let disposed = false
+onScopeDispose(() => { disposed = true })
 
 const context = computed(() => ({
   groupId: notebook.meta.value?.group_id ?? '',
@@ -93,16 +96,26 @@ function addOutput() {
 async function submit() {
   const built = mapping.value
   if ('blocked' in built || submitting.value) return
+  const request = notebook.generation.value
+  const cellId = props.cell.id
+  const active = () => !disposed && request === notebook.generation.value && props.cell.id === cellId
   submitting.value = true
   error.value = null
   try {
-    const created = await submitJob(built.request, { baseUrl: apiBaseUrl.value, token: authToken.value })
+    pendingKey ||= crypto.randomUUID()
+    const created = await submitJob(
+      { ...built.request, idempotency_key: pendingKey },
+      { baseUrl: apiBaseUrl.value, token: authToken.value },
+    )
+    if (!active()) return
+    pendingKey = ''
     jobId.value = created.job_id
-    notebook.noteCellRun(props.cell.id, { job_id: created.job_id })
+    notebook.noteCellRun(cellId, { job_id: created.job_id })
   } catch (cause) {
+    if (!active()) return
     error.value = submitErrorMessage(cause)
   } finally {
-    submitting.value = false
+    if (active()) submitting.value = false
   }
 }
 </script>
