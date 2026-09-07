@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref, useId } from 'vue'
+import { computed, ref, useId, watch } from 'vue'
 import MarkdownIt from 'markdown-it'
 import { citations, type MessageSource } from '@/lib/assistant/citations'
 import { objectLinks } from '@/lib/assistant/objectLinks'
+import { useTheme } from '@/composables/useTheme'
 import { usePageContext } from '@/composables/usePageContext'
 import { useAssistantObject } from '@/composables/useAssistantObject'
 import { ChevronDown, ChevronUp } from '@lucide/vue'
@@ -10,6 +11,7 @@ import { ChevronDown, ChevronUp } from '@lucide/vue'
 const props = withDefaults(defineProps<{
   text: string
   imageSources?: Record<string, string>
+  mermaid?: boolean
   size?: 'compact' | 'full'
   /** True when the message already shows a card, so long prose folds away. */
   hasCard?: boolean
@@ -19,6 +21,8 @@ const props = withDefaults(defineProps<{
 
 // Reference anchors are element ids, so every rendered message gets its own prefix.
 const refId = `ref-${useId()}`
+const { isDark } = useTheme()
+const diagrams = ref<Record<string, { url?: string; error?: string }>>({})
 
 // Prose shorter than this stays open even beside a card.
 const FOLD_ABOVE_CHARS = 400
@@ -53,9 +57,40 @@ md.renderer.rules.image = (tokens, idx, options, env, self) => {
 
 const renderFence = md.renderer.rules.fence
   ?? ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options))
-md.renderer.rules.fence = (tokens, idx, options, env, self) =>
-  `<div class="assistant-code">${renderFence(tokens, idx, options, env, self)}`
-  + '<button type="button" data-copy class="assistant-copy">Copy</button></div>'
+md.renderer.rules.fence = (tokens, idx, options, env, self) => {
+  const token = tokens[idx]!
+  const diagram = props.mermaid && token.info.trim() === 'mermaid' ? diagrams.value[token.content] : undefined
+  if (diagram?.url) return `<figure class="my-3 overflow-auto"><img src="${diagram.url}" alt="Mermaid diagram" /></figure>`
+  const error = diagram?.error ? `<p role="alert">${md.utils.escapeHtml(diagram.error)}</p>` : ''
+  return error + `<div class="assistant-code">${renderFence(tokens, idx, options, env, self)}`
+    + '<button type="button" data-copy class="assistant-copy">Copy</button></div>'
+}
+
+const diagramSources = computed(() => props.mermaid
+  ? [...new Set(md.parse(props.text, {}).filter((token) => token.type === 'fence' && token.info.trim() === 'mermaid').map((token) => token.content))]
+  : [])
+watch([diagramSources, isDark], async ([sources, dark], _previous, onCleanup) => {
+  let active = true
+  onCleanup(() => { active = false })
+  diagrams.value = {}
+  if (!sources.length) return
+  try {
+    const { default: mermaid } = await import('mermaid')
+    if (!active) return
+    mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', suppressErrorRendering: true, theme: dark ? 'dark' : 'default', fontFamily: 'system-ui, sans-serif', flowchart: { htmlLabels: false } })
+    for (const [index, source] of sources.entries()) {
+      try {
+        const { svg } = await mermaid.render(`${refId}-diagram-${index}`, source)
+        if (!active) return
+        diagrams.value[source] = { url: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}` }
+      } catch {
+        if (active) diagrams.value[source] = { error: 'Could not render this Mermaid diagram. Check its syntax below.' }
+      }
+    }
+  } catch {
+    if (active) diagrams.value = Object.fromEntries(sources.map((source) => [source, { error: 'The diagram renderer could not be loaded.' }]))
+  }
+}, { immediate: true })
 
 // The bucket the reader has open lets a bare file name in the answer link too.
 const { currentPage } = usePageContext()

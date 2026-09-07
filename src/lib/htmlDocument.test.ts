@@ -39,6 +39,15 @@ describe('safeHtmlDocument', () => {
     expect(result.html).toContain("default-src 'none'; img-src data:")
   })
 
+  it.each(['light', 'dark'] as const)('themes embedded tables in %s without enabling scripts', (theme) => {
+    const result = safeHtmlDocument('<table><tr><th>Result</th></tr><tr><td>42</td></tr></table><script>bad()</script>', theme)
+    expect(result.html).toContain(`color-scheme:${theme}`)
+    expect(result.html).toContain('border-collapse:collapse')
+    expect(result.html).toContain('<td>42</td>')
+    expect(result.html).not.toContain('<script>')
+    expect(result.html).toContain("default-src 'none'")
+  })
+
   it('cuts a file too large to render and says so', () => {
     const result = safeHtmlDocument(`<p>${'a'.repeat(MAX_PREVIEW_HTML)}</p>`)
 

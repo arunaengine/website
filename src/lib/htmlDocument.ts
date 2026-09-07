@@ -57,7 +57,7 @@ export interface SafeHtml {
 const POLICY = '<meta http-equiv="Content-Security-Policy" '
   + `content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:">`
 
-export function safeHtmlDocument(source: string): SafeHtml {
+export function safeHtmlDocument(source: string, theme?: 'light' | 'dark'): SafeHtml {
   const truncated = source.length > MAX_PREVIEW_HTML
   let removed = 0
   const count = () => {
@@ -96,8 +96,17 @@ export function safeHtmlDocument(source: string): SafeHtml {
     })
     return `<${tag}${kept.replace(/\s+/g, ' ').replace(/\s+>/, '>')}>`
   })
+  const style = theme ? `<style>
+    :root{color-scheme:${theme}}
+    body{margin:0;padding:12px;background:${theme === 'dark' ? '#202024' : '#ffffff'};color:${theme === 'dark' ? '#f1f3f8' : '#0f1322'};font:13px/1.55 system-ui,sans-serif}
+    table{border-collapse:collapse;min-width:100%;font-variant-numeric:tabular-nums}
+    th,td{padding:8px 12px;border-bottom:1px solid ${theme === 'dark' ? '#3e3e46' : '#e5e7ec'};text-align:left}
+    th{font-weight:600;background:${theme === 'dark' ? '#292930' : '#f1f3f8'}}
+    tr:last-child td{border-bottom:0}p{margin:0 0 8px}pre{white-space:pre-wrap}
+    img,svg{max-width:100%;height:auto}
+  </style>` : ''
   return {
-    html: `<!doctype html><html><head>${POLICY}</head><body>${body}</body></html>`,
+    html: `<!doctype html><html><head>${POLICY}${style}</head><body>${body}</body></html>`,
     removed,
     truncated,
   }

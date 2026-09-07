@@ -2,6 +2,7 @@
 // What one cell produced. Each output is shown in its richest form: a page
 // through the shared HTML preview, an image inline, everything else as text.
 import { computed } from 'vue'
+import { useTheme } from '@/composables/useTheme'
 import HtmlPreview from '@/components/preview/HtmlPreview.vue'
 import AssistantMarkdown from '@/components/assistant/AssistantMarkdown.vue'
 import { plainTraceback, renderOutput } from '@/lib/notebook/outputs'
@@ -9,6 +10,7 @@ import type { NotebookOutput } from '@/lib/notebook/nbformat'
 
 const props = defineProps<{ outputs: NotebookOutput[]; name: string }>()
 
+const { resolved } = useTheme()
 const rendered = computed(() => props.outputs.map((output) => renderOutput(output)))
 
 function svgUrl(text: string): string {
@@ -33,7 +35,7 @@ function svgUrl(text: string): string {
         >{{ plainTraceback(output.traceback) }}</pre>
       </div>
 
-      <HtmlPreview v-else-if="output.kind === 'html'" :text="output.text" :name="name" />
+      <HtmlPreview v-else-if="output.kind === 'html'" :text="output.text" :name="name" :theme="resolved" compact />
 
       <!-- Both images keep a white canvas: a plot with a transparent ground would vanish in the dark theme. -->
       <img
@@ -50,7 +52,7 @@ function svgUrl(text: string): string {
         class="max-w-full rounded-md border border-border bg-white"
       />
 
-      <AssistantMarkdown v-else-if="output.kind === 'markdown'" :text="output.text" size="full" />
+      <AssistantMarkdown v-else-if="output.kind === 'markdown'" :text="output.text" mermaid size="full" />
 
       <pre
         v-else
