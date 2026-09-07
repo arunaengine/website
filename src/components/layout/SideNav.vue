@@ -33,7 +33,7 @@ const showBackLink = computed(() => props.backLink ?? !desktop)
 const route = useRoute()
 
 function isActive(item: NavItem): boolean {
-  return navItemActive(item, route.path)
+  return navItemActive(item, route.path, route.query?.notebooks === '1')
 }
 
 const COLLAPSE_KEY = 'aruna.sidebarCollapsed'

@@ -30,7 +30,7 @@ const primaryNav = computed(() => items.value.filter((item) => item.primary))
 const moreNav = computed(() => items.value.filter((item) => !item.primary))
 
 function isActive(item: NavItem): boolean {
-  return navItemActive(item, route.path)
+  return navItemActive(item, route.path, route.query?.notebooks === '1')
 }
 
 const moreActive = computed(() => moreNav.value.some(isActive))

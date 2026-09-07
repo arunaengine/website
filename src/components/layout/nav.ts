@@ -112,7 +112,9 @@ export function navAnchor(label: string): string {
 }
 
 /** True while the route sits on the entry's own destination or below it. */
-export function navItemActive(item: NavItem, path: string): boolean {
+export function navItemActive(item: NavItem, path: string, notebooks = false): boolean {
+  // The notebooks flavour of the data view belongs to Notebooks, not to Data.
+  if (notebooks) return item.to === '/app/notebooks'
   if (item.exact) return path === item.to
   return (item.match ?? [item.to]).some((prefix) => path === prefix || path.startsWith(`${prefix}/`))
 }

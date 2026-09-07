@@ -217,6 +217,10 @@ async function saveDependencies(value: DependencySpec, restart: boolean) {
           </span>
         </div>
 
+        <Notice v-if="session.running.value" tone="info">
+          The kernel is running, so these settings are locked. Restart it to apply a change.
+        </Notice>
+
         <div class="grid gap-3 sm:grid-cols-2">
           <label class="space-y-1">
             <span class="text-xs font-medium text-foreground">Runtime</span>

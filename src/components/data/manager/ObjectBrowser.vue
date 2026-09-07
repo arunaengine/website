@@ -22,6 +22,7 @@ import {
 } from '@/composables/useS3'
 import { usePlacementPolicies } from '@/composables/usePlacementPolicies'
 import { featureEnabled } from '@/lib/config'
+import { isNotebookKey } from '@/lib/notebook/document'
 import { collectDropFiles } from '@/lib/upload/dropEntries'
 import { stateVariant } from '@/lib/stateBadge'
 import { selectionNoun } from '@/lib/deletion/request'
@@ -37,16 +38,18 @@ import {
   KeyRound,
   Link2,
   MoreHorizontal,
+  NotebookPen,
   Plus,
   Settings,
   Trash2,
   Undo2,
 } from '@lucide/vue'
 
-const props = defineProps<{ manager: DataManager }>()
+const props = defineProps<{ manager: DataManager; notebooks?: boolean }>()
 const emit = defineEmits<{
   (e: 'add-data'): void
   (e: 'new-folder'): void
+  (e: 'new-notebook'): void
   (e: 'sync-to-node'): void
 }>()
 
@@ -58,6 +61,7 @@ const {
   router,
   bucket,
   prefix,
+  selectedGroupId,
   s3Prefix,
   remoteNodeId,
   realmNodes,
@@ -117,6 +121,23 @@ const {
 const selectionSummary = computed(() =>
   selectionNoun(selectedObjectKeys.value.size, selectedPrefixes.value.size),
 )
+
+// With the notebooks flag a notebook row stands out and opens the notebook
+// itself; everything else keeps the ordinary file details.
+function isNotebook(object: ObjectEntry): boolean {
+  return Boolean(props.notebooks) && isNotebookKey(object.key)
+}
+function openObject(object: ObjectEntry) {
+  if (!isNotebook(object)) {
+    openDetails(object)
+    return
+  }
+  void router.push({
+    name: 'notebook',
+    params: { bucketId: bucket.value, key: object.key },
+    query: { group: selectedGroupId.value },
+  })
+}
 
 const showStorageButton = computed(() => Boolean(bucket.value))
 const bucketPolicyCount = ref(0)
@@ -323,6 +344,7 @@ async function onDrop(event: DragEvent) {
           </Popover>
           <!-- The Add data pipeline always targets the connected node. -->
           <Button v-if="!remoteBlocked" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix" :title="writeRestrictionMessage ?? 'Create a folder'" @click="emit('new-folder')"><FolderPlus class="h-4 w-4" /> New folder</Button>
+          <Button v-if="!remoteNodeId" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix" :title="writeRestrictionMessage ?? 'Create a notebook here'" @click="emit('new-notebook')"><NotebookPen class="h-4 w-4" /> New notebook</Button>
           <Button v-if="!remoteNodeId" data-tour="bucket-add-data" size="sm" :disabled="!canWriteCurrentPrefix" :title="writeRestrictionMessage ?? 'Add data'" @click="emit('add-data')"><Plus class="h-4 w-4" /> Add data</Button>
         </div>
       </div>
@@ -457,7 +479,8 @@ async function onDrop(event: DragEvent) {
               v-for="object in objects"
               :key="object.key"
               class="cursor-pointer border-t border-border hover:bg-muted/30"
-              @click="openDetails(object)"
+              :class="isNotebook(object) ? 'bg-primary/5' : ''"
+              @click="openObject(object)"
             >
               <td class="w-10 px-4 py-2.5" @click.stop>
                 <input
@@ -472,7 +495,9 @@ async function onDrop(event: DragEvent) {
               </td>
               <td class="px-4 py-2.5">
                 <span class="flex items-center gap-2">
-                  <ObjectIcon :name="object.name" class="h-4 w-4" /> <span class="truncate">{{ object.name }}</span>
+                  <ObjectIcon :name="object.name" class="h-4 w-4" />
+                  <span class="truncate" :class="isNotebook(object) ? 'font-medium text-primary' : ''">{{ object.name }}</span>
+                  <Badge v-if="isNotebook(object)" variant="royal" size="sm" class="shrink-0">Notebook</Badge>
                   <ArrowLeftRight
                     v-if="keyIsSynced(object.key)"
                     class="h-3 w-3 shrink-0 text-primary/40"

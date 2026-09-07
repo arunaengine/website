@@ -701,6 +701,10 @@ export function useDataManager() {
     { immediate: true },
   )
 
+  // The notebooks flavour of the data view keeps its flag while browsing.
+  const notebooksQuery = computed(() =>
+    route.name === 'notebooks' || route.query.notebooks === '1' ? { notebooks: '1' } : {})
+
   // The bucket-less route is the picker: it reopens the remembered bucket once
   // this group's list can confirm it, and forgets it when the list cannot.
   watch(
@@ -715,7 +719,7 @@ export function useDataManager() {
         bucketsLoaded: bucketsLoaded.value,
       })
       if (step.action === 'forget') writeLastBucket(scope, null)
-      else if (step.action === 'open') void router.replace(step.route)
+      else if (step.action === 'open') void router.replace({ ...step.route, query: { ...step.route.query, ...notebooksQuery.value } })
     },
     { immediate: true },
   )
@@ -734,6 +738,7 @@ export function useDataManager() {
       query: {
         ...(nodeId ? { node: nodeId } : {}),
         ...(groupId ? { group: groupId } : {}),
+        ...notebooksQuery.value,
       },
     })
   }
@@ -760,6 +765,7 @@ export function useDataManager() {
         ...(path ? { prefix: path } : {}),
         ...(remoteNodeId.value ? { node: remoteNodeId.value } : {}),
         ...(selectedGroupId.value ? { group: selectedGroupId.value } : {}),
+        ...notebooksQuery.value,
       },
     })
   }

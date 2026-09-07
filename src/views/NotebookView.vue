@@ -190,7 +190,7 @@ const savedLabel = computed(() => {
         <AskAiButton size="default" prompt="Help me with this notebook." subject="the notebook" />
         <Button variant="outline" size="default" as-child>
           <RouterLink :to="{ name: 'notebooks', query: { browse: '1' } }">
-            <ArrowLeft class="h-4 w-4" /> Browse notebooks
+            <ArrowLeft class="h-4 w-4" /> Change notebook
           </RouterLink>
         </Button>
       </template>

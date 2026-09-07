@@ -210,8 +210,39 @@ describe('notebooks in the bucket', () => {
     expect(push).not.toHaveBeenCalled()
   })
 
-  it('keeps notebook creation out of the Data toolbar', async () => {
+  it('opens the notebook itself while the notebooks flag is set', async () => {
+    push.mockClear()
+    openDetails.mockClear()
+    const manager = fakeManager({ openDetails, router: { push }, objects: ref([notebookObject, listedObject]) })
+    const host = defineComponent({ setup: () => () => h(browser, { manager, notebooks: true }) })
+    const { root } = await mountApp(host)
+
+    await bubbleClick(element(root, (node) => node.tag === 'tr' && content(node).includes('counts.ipynb')))
+    expect(push).toHaveBeenCalledWith({
+      name: 'notebook',
+      params: { bucketId: 'reef', key: 'notebooks/counts.ipynb' },
+      query: { group: 'g-1' },
+    })
+
+    // Everything else keeps its file details, flag or not.
+    await bubbleClick(element(root, (node) => node.tag === 'tr' && content(node).includes('reads.fastq')))
+    expect(openDetails).toHaveBeenCalledWith(listedObject)
+  })
+
+  it('marks notebook rows only while the flag is set', async () => {
+    const marked = async (notebooks: boolean) => {
+      const manager = fakeManager({ openDetails, router: { push }, objects: ref([notebookObject]) })
+      const host = defineComponent({ setup: () => () => h(browser, { manager, notebooks }) })
+      const { root } = await mountApp(host)
+      return content(root).includes('Notebook')
+    }
+    expect(await marked(true)).toBe(true)
+    expect(await marked(false)).toBe(false)
+  })
+
+  it('offers notebook creation wherever the data view stands', async () => {
     const root = await render()
-    expect(content(root)).not.toContain('New notebook')
+    expect(button(root, 'New notebook')).toBeTruthy()
   })
 })
+

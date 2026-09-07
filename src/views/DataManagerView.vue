@@ -21,6 +21,7 @@ import DeleteDialog from '@/components/data/DeleteDialog.vue'
 import FileDetailsDialog from '@/components/data/FileDetailsDialog.vue'
 import ObjectBrowser from '@/components/data/manager/ObjectBrowser.vue'
 import UploadPanel from '@/components/data/manager/UploadPanel.vue'
+import NewNotebookDialog from '@/components/notebook/NewNotebookDialog.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDataManager } from '@/composables/useDataManager'
 import { providePageContext } from '@/composables/usePageContext'
@@ -131,6 +132,9 @@ function onSyncChanged() {
 }
 
 const addDataOpen = ref(false)
+const newNotebookOpen = ref(false)
+// The notebooks entry is this same view with notebooks highlighted.
+const notebooksView = computed(() => route.name === 'notebooks' || route.query.notebooks === '1')
 // The Add data browser may open another node or group; the view takes its
 // own session back once the dialog closes.
 watch(addDataOpen, (open) => {
@@ -196,8 +200,10 @@ async function createFolder() {
 <template>
   <div>
     <PageHeader
-      :title="route.name === 'bucket' ? bucket : 'Data'"
-      description="Browse buckets and objects through the node's S3 interface, signed in your browser."
+      :title="notebooksView ? 'Notebooks' : route.name === 'bucket' ? bucket : 'Data'"
+      :description="notebooksView
+        ? 'Pick a notebook to open, or create one in the folder you are browsing.'
+        : `Browse buckets and objects through the node's S3 interface, signed in your browser.`"
     >
       <template #actions>
         <template v-if="currentUser && s3.connectedEndpoint.value">
@@ -299,8 +305,10 @@ async function createFolder() {
 
         <ObjectBrowser
           :manager="manager"
+          :notebooks="notebooksView"
           @add-data="addDataOpen = true"
           @new-folder="openNewFolder"
+          @new-notebook="newNotebookOpen = true"
           @sync-to-node="openSyncDialog"
         >
           <UploadPanel :manager="manager" />
@@ -317,6 +325,13 @@ async function createFolder() {
       :existing-references="references.entries.value"
       @staged="() => { void loadObjects(); void references.reload() }"
       @sync-created="onSyncChanged"
+    />
+
+    <NewNotebookDialog
+      v-model:open="newNotebookOpen"
+      :bucket="bucket"
+      :prefix="s3Prefix"
+      :group-id="activeGroupId ?? ''"
     />
 
     <StagingJobsPanel v-if="stagingJobsEnabled" v-model:open="stagingPanelOpen" />

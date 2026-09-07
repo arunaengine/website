@@ -133,6 +133,7 @@ export function fakeManager(overrides: Record<string, unknown> = {}) {
     referencedFrom: () => '',
     prefixReferenceSummary: () => '',
     activeGroupId: ref('g-1'),
+    selectedGroupId: ref('g-1'),
     folders,
     objects,
     nextToken: ref(undefined),
