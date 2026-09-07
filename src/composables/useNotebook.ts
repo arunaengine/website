@@ -106,7 +106,8 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
         if (!missingObject(error)) throw error
         isNew.value = true
       }
-      notebook.value = text === null ? emptyNotebook({ version: 1, workspace_bucket: bucket.value, ...seed() }) : parseNotebook(text)
+      const defaults = { version: 1 as const, workspace_bucket: bucket.value, ...seed() }
+      notebook.value = text === null ? emptyNotebook(defaults) : parseNotebook(text, defaults)
       // Everything this document does later happens where it was read from.
       loadedFrom = { bucket: bucket.value, key: key.value }
       lastSavedMs.value = Date.now()

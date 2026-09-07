@@ -44,6 +44,7 @@ export interface NotebookCell {
   outputs: NotebookOutput[]
   execution_count: number | null
   metadata: Record<string, unknown> & { aruna?: CellAruna }
+  attachments?: Record<string, Record<string, unknown>>
 }
 
 export interface NotebookDependencies {
@@ -169,32 +170,30 @@ function readCell(value: unknown): NotebookCell | null {
     outputs,
     execution_count: typeof record.execution_count === 'number' ? record.execution_count : null,
     metadata,
+    ...(record.attachments && typeof record.attachments === 'object' && !Array.isArray(record.attachments)
+      ? { attachments: record.attachments as Record<string, Record<string, unknown>> }
+      : {}),
   }
 }
 
-function readAruna(value: unknown): NotebookAruna {
+function readAruna(value: unknown, defaults: Partial<NotebookAruna>): NotebookAruna {
   const record = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>
   return {
+    ...record,
     version: 1,
-    runtime: typeof record.runtime === 'string' ? record.runtime : '',
-    workspace_bucket: typeof record.workspace_bucket === 'string' ? record.workspace_bucket : '',
-    group_id: typeof record.group_id === 'string' ? record.group_id : '',
-    ...(typeof record.job_id === 'string' ? { job_id: record.job_id } : {}),
-    ...(typeof record.executor_node_id === 'string' ? { executor_node_id: record.executor_node_id } : {}),
-    ...(record.dependencies && typeof record.dependencies === 'object'
-      ? { dependencies: record.dependencies as NotebookDependencies }
-      : {}),
-    ...(record.resources && typeof record.resources === 'object'
-      ? { resources: record.resources as NotebookResources }
-      : {}),
-    ...(record.placement && typeof record.placement === 'object'
-      ? { placement: record.placement as NotebookPlacement }
-      : {}),
+    runtime: typeof record.runtime === 'string' && record.runtime ? record.runtime : (defaults.runtime ?? ''),
+    workspace_bucket: typeof record.workspace_bucket === 'string' && record.workspace_bucket ? record.workspace_bucket : (defaults.workspace_bucket ?? ''),
+    group_id: typeof record.group_id === 'string' && record.group_id ? record.group_id : (defaults.group_id ?? ''),
+    job_id: typeof record.job_id === 'string' ? record.job_id : undefined,
+    executor_node_id: typeof record.executor_node_id === 'string' ? record.executor_node_id : undefined,
+    dependencies: record.dependencies && typeof record.dependencies === 'object' ? record.dependencies as NotebookDependencies : undefined,
+    resources: record.resources && typeof record.resources === 'object' ? record.resources as NotebookResources : undefined,
+    placement: record.placement && typeof record.placement === 'object' ? record.placement as NotebookPlacement : undefined,
   }
 }
 
 /** Reads a stored .ipynb file. Throws only when the text is not JSON. */
-export function parseNotebook(text: string): Notebook {
+export function parseNotebook(text: string, defaults: Partial<NotebookAruna> = {}): Notebook {
   const parsed = JSON.parse(text) as unknown
   if (!parsed || typeof parsed !== 'object') throw new Error('This file does not hold a notebook.')
   const record = parsed as Record<string, unknown>
@@ -208,7 +207,7 @@ export function parseNotebook(text: string): Notebook {
     : []
   return {
     cells: cells.length ? cells : [newCell('code')],
-    metadata: { ...metadata, aruna: readAruna(metadata.aruna) },
+    metadata: { ...metadata, aruna: readAruna(metadata.aruna, defaults) },
     nbformat: typeof record.nbformat === 'number' ? record.nbformat : NBFORMAT_MAJOR,
     nbformat_minor: typeof record.nbformat_minor === 'number' ? record.nbformat_minor : NBFORMAT_MINOR,
   }
@@ -220,6 +219,7 @@ function writeCell(cell: NotebookCell): Record<string, unknown> {
     cell_type: cell.cell_type,
     metadata: cell.metadata,
     source: cell.source,
+    ...(cell.attachments ? { attachments: cell.attachments } : {}),
   }
   if (cell.cell_type === 'code') {
     written.outputs = cell.outputs

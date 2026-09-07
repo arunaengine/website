@@ -67,6 +67,26 @@ describe('parseNotebook', () => {
 })
 
 describe('serializeNotebook', () => {
+  it('preserves cell attachments and unknown Aruna metadata', () => {
+    const attachments = { 'plot.png': { 'image/png': 'AA==' } }
+    const original = {
+      nbformat: 4,
+      nbformat_minor: 5,
+      metadata: { aruna: { ...aruna, extension: { keep: true } } },
+      cells: [{ id: 'c1', cell_type: 'markdown', source: '![plot](attachment:plot.png)', metadata: {}, attachments }],
+    }
+    const saved = JSON.parse(serializeNotebook(parseNotebook(JSON.stringify(original))))
+    expect(saved.cells[0].attachments).toEqual(attachments)
+    expect(saved.metadata.aruna.extension).toEqual({ keep: true })
+  })
+
+  it('fills only missing imported notebook context', () => {
+    const imported = parseNotebook(JSON.stringify({ nbformat: 4, cells: [], metadata: {} }), aruna)
+    expect(imported.metadata.aruna).toEqual(aruna)
+    const existing = parseNotebook(serializeNotebook(emptyNotebook(aruna)), { workspace_bucket: 'other' })
+    expect(existing.metadata.aruna.workspace_bucket).toBe('lab-data')
+  })
+
   it('writes a document that reads back the same', () => {
     const notebook = emptyNotebook(aruna)
     notebook.cells[0].source = 'print("hi")'

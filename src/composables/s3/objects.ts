@@ -604,7 +604,11 @@ async function fetchObject(
 ): Promise<Response> {
   const url = await downloadUrl(bucket, key, nodeId, versionId)
   const response = await fetch(url)
-  if (!response.ok) throw new Error(`The object could not be fetched (HTTP ${response.status}).`)
+  if (!response.ok) {
+    throw Object.assign(new Error(`The object could not be fetched (HTTP ${response.status}).`), {
+      $metadata: { httpStatusCode: response.status },
+    })
+  }
   return response
 }
 
