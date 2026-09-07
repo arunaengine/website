@@ -236,8 +236,10 @@ export function openSessionStream(options: SessionStreamOptions): SessionStream 
   }
 
   function applyFrame(frame: SseFrame) {
+    if (closed) return
     const event = sessionEventFrom(frame)
     if (!event) return
+    if (event.type === 'gap') lastEventId = 0
     if (event.id) lastEventId = event.id
     options.onEvent(event)
   }
@@ -275,7 +277,18 @@ export function openSessionStream(options: SessionStreamOptions): SessionStream 
         client,
       )
       const response = await run(url, { headers, cache: 'no-store', signal: active.signal })
+      if (closed) return false
       if (!response.ok) throw await refusal(response)
+      if (response.headers.get('Content-Type')?.includes('application/json')) {
+        const summary = await response.json() as SessionState
+        if (closed) return false
+        options.onEvent({ id: 0, type: 'session', data: summary })
+        if (summary.state === 'ended') stop()
+        return false
+      }
+      if (!response.headers.get('Content-Type')?.includes('text/event-stream')) {
+        throw new Error('The session endpoint did not return an event stream.')
+      }
       opened = true
       options.onOpen?.()
       // Any byte proves the connection lives, a keep-alive comment included.

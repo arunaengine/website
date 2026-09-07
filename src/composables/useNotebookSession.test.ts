@@ -8,12 +8,13 @@ const s3 = vi.hoisted(() => ({
   referenceForContext: (nodeId: string, groupId: string) => ({ nodeId, groupId, accessKeyId: 'temporary' }),
 }))
 vi.mock('@/composables/useS3', () => ({ useS3: () => s3 }))
+const aruna = {
+  apiBaseUrl: ref('/api/v1'), authToken: ref('bearer-token'),
+  currentUser: ref({ id: 'user-a' }),
+  nodeInfo: ref({ node: { realm_id: 'realm-a', peer_id: 'node-a' } }),
+}
 vi.mock('@/composables/useAruna', () => ({
-  useAruna: () => ({
-    apiBaseUrl: { value: '/api/v1' }, authToken: { value: 'bearer-token' },
-    currentUser: { value: { id: 'user-a' } },
-    nodeInfo: { value: { node: { realm_id: 'realm-a', peer_id: 'node-a' } } },
-  }),
+  useAruna: () => aruna,
 }))
 vi.mock('@/composables/useRealmNodes', () => ({
   useRealmNodes: () => ({
@@ -84,6 +85,9 @@ async function setup() {
 }
 
 beforeEach(() => {
+  aruna.apiBaseUrl.value = '/api/v1'
+  aruna.authToken.value = 'bearer-token'
+  aruna.currentUser.value = { id: 'user-a' }
   vi.stubGlobal('localStorage', memoryStorage())
   for (const mock of [
     s3.getObjectText,
@@ -110,6 +114,95 @@ afterEach(() => {
 })
 
 describe('createNotebookSession', () => {
+  it('stops Run all when another session attaches during submission', async () => {
+    const { notebook, session: store, scope } = await setup()
+    notebook.patchMeta({ job_id: '01JOB', executor_node_id: 'node-a' })
+    session.getSessionState.mockResolvedValue(state())
+    await store.attachSaved()
+    let finish = () => {}
+    session.runSessionCell.mockReturnValueOnce(new Promise<void>((resolve) => { finish = resolve }))
+    const running = store.runCells([{ id: 'c1', source: 'old first' }, { id: 'c2', source: 'old second' }])
+    notebook.patchMeta({ job_id: '01OTHER', executor_node_id: 'node-b' })
+    session.getSessionState.mockResolvedValue(state({ job_id: '01OTHER', executor_node_id: 'node-b' }))
+    await store.attachSaved()
+    finish()
+    await running
+    expect(session.runSessionCell).toHaveBeenCalledOnce()
+    expect(session.runSessionCell.mock.calls[0][0]).toBe('01JOB')
+    expect(store.jobId.value).toBe('01OTHER')
+    expect(store.error.value).toBeNull()
+    scope.stop()
+  })
+
+  it('ignores old session state and callbacks after detach', async () => {
+    const { notebook, session: store, scope } = await setup()
+    notebook.patchMeta({ job_id: '01JOB', executor_node_id: 'node-a' })
+    session.getSessionState.mockResolvedValue(state())
+    await store.attachSaved()
+    const oldEvent = session.stream.emit
+    let finish = (_value: ReturnType<typeof state>) => {}
+    session.getSessionState.mockReturnValueOnce(new Promise((resolve) => { finish = resolve }))
+    const refreshing = store.refresh()
+    notebook.patchMeta({ job_id: '01OTHER', executor_node_id: 'node-b' })
+    session.getSessionState.mockResolvedValue(state({ job_id: '01OTHER', executor_node_id: 'node-b' }))
+    await store.attachSaved()
+    finish(state())
+    await refreshing
+    oldEvent({ id: 50, type: 'ended', data: { reason: 'idle' } })
+    expect(store.state.value?.job_id).toBe('01OTHER')
+    expect(store.live.value).toBe(true)
+    expect(notebook.meta.value?.executor_node_id).toBe('node-b')
+    scope.stop()
+  })
+
+  it('does not submit after a dependency write outlives the document', async () => {
+    const { notebook, session: store, scope } = await setup()
+    let finish = () => {}
+    s3.putTextObject.mockReturnValueOnce(new Promise<void>((resolve) => { finish = resolve }))
+    const starting = store.start({
+      groupId: 'group-1', name: 'counts', runtime: 'python-notebook', workspaceBucket: 'lab-data',
+      dependencyKey: 'requirements.txt', dependencyKind: 'requirements', dependencyText: 'pandas',
+    })
+    await Promise.resolve()
+    notebook.key.value = 'notebooks/another.ipynb'
+    finish()
+    await starting
+    expect(jobs.submitJob).not.toHaveBeenCalled()
+    expect(store.starting.value).toBe(false)
+    scope.stop()
+  })
+
+  it('cancels a late admitted job using its original account', async () => {
+    const { notebook, session: store, scope } = await setup()
+    let finish = (_value: { job_id: string }) => {}
+    jobs.submitJob.mockReturnValueOnce(new Promise((resolve) => { finish = resolve }))
+    jobs.cancelJob.mockResolvedValue({ state: 'cancelled' })
+    const starting = store.start({ groupId: 'group-1', name: 'counts', runtime: 'python-notebook', workspaceBucket: 'lab-data' })
+    aruna.currentUser.value = { id: 'user-b' }
+    aruna.apiBaseUrl.value = 'https://another.example/api/v1'
+    aruna.authToken.value = 'new-token'
+    await notebook.load()
+    finish({ job_id: '01OLD' })
+    await starting
+    expect(jobs.cancelJob).toHaveBeenCalledWith('01OLD', { baseUrl: '/api/v1', token: 'bearer-token' })
+    expect(notebook.meta.value?.job_id).toBeUndefined()
+    expect(store.starting.value).toBe(false)
+    scope.stop()
+  })
+
+  it('persists lower event ids after a node restart gap', async () => {
+    const { notebook, session: store, scope } = await setup()
+    notebook.patchMeta({ job_id: '01JOB', executor_node_id: 'node-a' })
+    session.getSessionState.mockResolvedValue(state())
+    await store.attachSaved()
+    session.stream.emit({ id: 100, type: 'kernel', data: { state: 'idle' } })
+    session.stream.emit({ id: 0, type: 'gap', data: { from: 1, to: 2 } })
+    session.stream.emit({ id: 2, type: 'kernel', data: { state: 'idle' } })
+    store.detach()
+    expect(readResumePoint(notebook.scope.value, '01JOB')).toBe(2)
+    scope.stop()
+  })
+
   it('attaches to the session the notebook names', async () => {
     const { notebook, session: store, scope } = await setup()
     notebook.patchMeta({ job_id: '01JOB', executor_node_id: 'node-a' })
@@ -250,6 +343,8 @@ describe('createNotebookSession', () => {
       'notebooks/counts.requirements.txt',
       'pandas>=2\n',
       'text/plain',
+      'node-a',
+      { nodeId: 'node-a', groupId: 'group-1', accessKeyId: 'temporary' },
     )
     // The file has to exist before the node stages it.
     expect(s3.putTextObject.mock.invocationCallOrder[0]).toBeLessThan(
@@ -324,7 +419,7 @@ describe('createNotebookSession', () => {
 
   it('resumes at the event this browser last saw', async () => {
     const { notebook, session: store, scope } = await setup()
-    writeResumePoint('01JOB', 31)
+    writeResumePoint(JSON.stringify(['/api/v1', 'user-a', 'realm-a', 'node-a']), '01JOB', 31)
     notebook.patchMeta({ job_id: '01JOB', executor_node_id: 'node-a' })
     session.getSessionState.mockResolvedValue(state({ last_event_id: 7 }))
 
@@ -360,7 +455,7 @@ describe('createNotebookSession', () => {
     scope.stop()
 
     // Without the reset the new session's small ids would never be recorded.
-    expect(readResumePoint('01NEW')).toBe(2)
+    expect(readResumePoint(JSON.stringify(['/api/v1', 'user-a', 'realm-a', 'node-a']), '01NEW')).toBe(2)
   })
 
   it('follows one hop when a node names another', async () => {

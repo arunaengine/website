@@ -80,22 +80,22 @@ describe('working copy', () => {
 describe('resume point', () => {
   it('keeps the last event id per session job', () => {
     vi.stubGlobal('localStorage', memoryStorage())
-    expect(readResumePoint('01JOB')).toBe(0)
-    writeResumePoint('01JOB', 42)
-    writeResumePoint('01OTHER', 7)
-    expect(readResumePoint('01JOB')).toBe(42)
-    expect(readResumePoint('01OTHER')).toBe(7)
-    clearResumePoint('01JOB')
-    expect(readResumePoint('01JOB')).toBe(0)
-    expect(readResumePoint('01OTHER')).toBe(7)
+    expect(readResumePoint('scope-a', '01JOB')).toBe(0)
+    writeResumePoint('scope-a', '01JOB', 42)
+    writeResumePoint('scope-a', '01OTHER', 7)
+    expect(readResumePoint('scope-a', '01JOB')).toBe(42)
+    expect(readResumePoint('scope-a', '01OTHER')).toBe(7)
+    clearResumePoint('scope-a', '01JOB')
+    expect(readResumePoint('scope-a', '01JOB')).toBe(0)
+    expect(readResumePoint('scope-a', '01OTHER')).toBe(7)
   })
 
   it('answers zero for anything that is not a positive id', () => {
     vi.stubGlobal('localStorage', memoryStorage())
-    localStorage.setItem('aruna.notebook.resume.01JOB', 'later')
-    expect(readResumePoint('01JOB')).toBe(0)
-    writeResumePoint('01JOB', 0)
-    expect(readResumePoint('01JOB')).toBe(0)
+    localStorage.setItem('aruna.notebook.resume.["scope-a","01JOB"]', 'later')
+    expect(readResumePoint('scope-a', '01JOB')).toBe(0)
+    writeResumePoint('scope-a', '01JOB', 0)
+    expect(readResumePoint('scope-a', '01JOB')).toBe(0)
   })
 
   it('survives a store that refuses to work', () => {
@@ -110,9 +110,9 @@ describe('resume point', () => {
         throw new Error('blocked')
       },
     })
-    expect(() => writeResumePoint('01JOB', 3)).not.toThrow()
-    expect(() => clearResumePoint('01JOB')).not.toThrow()
-    expect(readResumePoint('01JOB')).toBe(0)
+    expect(() => writeResumePoint('scope-a', '01JOB', 3)).not.toThrow()
+    expect(() => clearResumePoint('scope-a', '01JOB')).not.toThrow()
+    expect(readResumePoint('scope-a', '01JOB')).toBe(0)
   })
 })
 

@@ -35,7 +35,7 @@ function streamResponse(chunks: string[], hold: boolean): Response {
       },
     }),
   }
-  return { ok: true, status: 200, statusText: 'OK', body } as unknown as Response
+  return { ok: true, status: 200, statusText: 'OK', headers: new Headers({ 'Content-Type': 'text/event-stream' }), body } as unknown as Response
 }
 
 function frame(id: number, event: string, data: unknown): string {
@@ -86,6 +86,32 @@ describe('sessionEventFrom', () => {
 })
 
 describe('openSessionStream', () => {
+  it('retries a starting JSON state without announcing an open stream', async () => {
+    const arrived = deferred()
+    const onOpen = vi.fn()
+    const events: SessionEvent[] = []
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(Response.json({ job_id: '01JOB', state: 'starting', cells: [] }))
+      .mockResolvedValueOnce(streamResponse([frame(1, 'kernel', { state: 'idle' })], true))
+    const stream = openSessionStream({
+      jobId: '01JOB', client, fetchImpl, retryDelayMs: () => 0, onOpen,
+      onEvent: (event) => { events.push(event); if (event.type === 'kernel') arrived.settle() },
+    })
+    await arrived.promise
+    stream.close()
+    expect(events[0]).toMatchObject({ type: 'session', data: { state: 'starting' } })
+    expect(onOpen).toHaveBeenCalledOnce()
+  })
+
+  it('resets a future resume point when a restarted node sends a gap', async () => {
+    const { attempts } = await collect(
+      [[frame(0, 'gap', { from: 0, to: 0 })], [frame(1, 'kernel', { state: 'idle' })]], 2,
+      { lastEventId: 100 },
+    )
+    expect(attempts[0].url.searchParams.get('after')).toBe('100')
+    expect(attempts[1].url.searchParams.has('after')).toBe(false)
+  })
+
   it('sends the bearer and reads the contract events', async () => {
     const { events, attempts } = await collect(
       [

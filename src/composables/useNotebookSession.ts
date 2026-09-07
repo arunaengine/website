@@ -1,7 +1,7 @@
 // The live session behind the open notebook: start, attach, the event stream,
 // and the cell runs. The browser talks to the node that runs the session, so
 // every call uses that node's API base.
-import { computed, onScopeDispose, ref } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useS3 } from '@/composables/useS3'
@@ -46,7 +46,7 @@ export interface SessionStartDraft extends Omit<SessionSubmitDraft, 'idempotency
 }
 
 export function createNotebookSession(notebook: NotebookStore) {
-  const { apiBaseUrl, authToken } = useAruna()
+  const { apiBaseUrl, authToken, nodeInfo } = useAruna()
   const s3 = useS3()
   const { nodeById } = useRealmNodes()
 
@@ -67,6 +67,8 @@ export function createNotebookSession(notebook: NotebookStore) {
   let stream: SessionStream | null = null
   // Stopped work must not keep polling for a node after the page is gone.
   let disposed = false
+  let generation = 0
+  let resumeScope = notebook.scope.value
   let seenEventId = 0
   // Kept until a submit lands, so a retry after a 503 is the same request.
   let pendingKey = ''
@@ -75,7 +77,7 @@ export function createNotebookSession(notebook: NotebookStore) {
     if (!jobId.value || !seenEventId) return
     // The copy must hold the outputs the resume point says were seen.
     notebook.flushCopy()
-    writeResumePoint(jobId.value, seenEventId)
+    writeResumePoint(resumeScope, jobId.value, seenEventId)
   }, 1_000)
 
   const homeClient = computed<ApiClientOptions>(() => ({
@@ -91,6 +93,12 @@ export function createNotebookSession(notebook: NotebookStore) {
   const live = computed(() => state.value?.state === 'ready' || state.value?.state === 'busy')
   const ended = computed(() => state.value?.state === 'ended')
   const running = computed(() => Boolean(jobId.value) && !ended.value)
+
+  function current() {
+    const request = generation
+    const document = notebook.generation.value
+    return () => !disposed && request === generation && document === notebook.generation.value
+  }
 
   function closeStream() {
     stream?.close()
@@ -133,6 +141,9 @@ export function createNotebookSession(notebook: NotebookStore) {
       return
     }
     if (event.type === 'gap') {
+      keepResumePoint.cancel()
+      seenEventId = 0
+      clearResumePoint(resumeScope, jobId.value)
       notice.value = 'Some output was dropped while this page was away; the cells that were running may be incomplete.'
       void refresh()
       return
@@ -140,7 +151,7 @@ export function createNotebookSession(notebook: NotebookStore) {
     // ended
     notice.value = `The session ended (${event.data.reason}).`
     keepResumePoint.cancel()
-    clearResumePoint(jobId.value)
+    clearResumePoint(resumeScope, jobId.value)
     if (state.value) state.value = { ...state.value, state: 'ended', ended: event.data }
     kernel.value = 'dead'
     closeStream()
@@ -149,17 +160,19 @@ export function createNotebookSession(notebook: NotebookStore) {
   function openStream() {
     closeStream()
     if (!jobId.value) return
+    const active = current()
     stream = openSessionStream({
       jobId: jobId.value,
       client: () => client.value,
       // What this browser saw wins; the node's figure is the fallback.
-      lastEventId: readResumePoint(jobId.value) || state.value?.last_event_id,
-      onEvent: applyEvent,
+      lastEventId: readResumePoint(resumeScope, jobId.value) || state.value?.last_event_id,
+      onEvent: (event) => { if (active()) applyEvent(event) },
       onOpen: () => {
+        if (!active()) return
         streamOpen.value = true
         error.value = null
       },
-      onError: onStreamError,
+      onError: (cause) => { if (active()) onStreamError(cause) },
     })
   }
 
@@ -199,8 +212,10 @@ export function createNotebookSession(notebook: NotebookStore) {
   /** Reads the state again, following the node that answers for it once. */
   async function refresh(followed = false): Promise<boolean> {
     if (!jobId.value) return false
+    const active = current()
     try {
       const next = await getSessionState(jobId.value, client.value)
+      if (!active()) return false
       state.value = next
       cellStates.value = Object.fromEntries(next.cells.map((cell) => [cell.cell_id, cell]))
       if (next.executor_node_id && next.executor_node_id !== nodeId.value) {
@@ -209,6 +224,7 @@ export function createNotebookSession(notebook: NotebookStore) {
       }
       return true
     } catch (cause) {
+      if (!active()) return false
       const elsewhere = sessionNotHere(cause)
       if (elsewhere && !followed && elsewhere !== nodeId.value) {
         nodeId.value = elsewhere
@@ -228,6 +244,7 @@ export function createNotebookSession(notebook: NotebookStore) {
   async function attachSaved(): Promise<void> {
     const meta = notebook.meta.value
     if (!meta?.job_id) return
+    detach()
     jobId.value = meta.job_id
     nodeId.value = meta.executor_node_id ?? ''
     await attach()
@@ -236,22 +253,29 @@ export function createNotebookSession(notebook: NotebookStore) {
   /** Reattaches to the session, after a reload or a node change. */
   async function attach(): Promise<void> {
     if (!jobId.value || attaching.value) return
+    const active = current()
     attaching.value = true
     error.value = null
     try {
       if (!nodeId.value) await findNode()
+      if (!active()) return
       // A session that already ended has nothing left to stream.
-      if ((await refresh()) && !ended.value) openStream()
+      if ((await refresh()) && active() && !ended.value) openStream()
     } catch (cause) {
+      if (!active()) return
       error.value = errorMessage(cause)
     } finally {
-      attaching.value = false
+      if (active()) attaching.value = false
     }
   }
 
   async function findNode(): Promise<void> {
-    for (let attempt = 0; attempt < NODE_LOOKUP_TRIES && !disposed; attempt += 1) {
-      const job = await getJob(jobId.value, homeClient.value)
+    const active = current()
+    const id = jobId.value
+    const origin = homeClient.value
+    for (let attempt = 0; attempt < NODE_LOOKUP_TRIES && active(); attempt += 1) {
+      const job = await getJob(id, origin)
+      if (!active()) return
       const found = executorNode(job)
       if (found) {
         nodeId.value = found
@@ -263,12 +287,15 @@ export function createNotebookSession(notebook: NotebookStore) {
       }
       await new Promise((resolve) => setTimeout(resolve, NODE_LOOKUP_DELAY_MS))
     }
-    if (disposed) return
+    if (!active()) return
     throw new Error('No node reported that it runs this session yet.')
   }
 
   async function start(draft: SessionStartDraft): Promise<void> {
     if (starting.value || running.value) return
+    const active = current()
+    const origin = homeClient.value
+    const storageNode = nodeInfo.value?.node.peer_id ?? null
     starting.value = true
     error.value = null
     notice.value = null
@@ -277,12 +304,19 @@ export function createNotebookSession(notebook: NotebookStore) {
     try {
       // The session stages this file from the bucket, so it must exist first.
       if (draft.dependencyKey && draft.dependencyKind && draft.dependencyText?.trim()) {
+        await s3.activateContext(storageNode, draft.groupId)
+        if (!active()) return
+        const reference = s3.referenceForContext(storageNode, draft.groupId)
+        if (!reference) throw new Error('The notebook storage session is unavailable.')
         await s3.putTextObject(
           draft.workspaceBucket,
           draft.dependencyKey,
           draft.dependencyText,
           'text/plain',
+          storageNode,
+          reference,
         )
+        if (!active()) return
       }
       pendingKey ||= crypto.randomUUID()
       const request = sessionSubmitRequest({
@@ -290,8 +324,12 @@ export function createNotebookSession(notebook: NotebookStore) {
         idempotencyKey: pendingKey,
         ...(idlePickMs.value ? { idleAfterMs: idlePickMs.value } : {}),
       })
-      const created = await submitJob(request, homeClient.value)
+      const created = await submitJob(request, origin)
       submitted = created.job_id
+      if (!active()) {
+        await cancelJob(submitted, origin).catch(() => {})
+        return
+      }
       pendingKey = ''
       // The new job counts its events from one again.
       keepResumePoint.cancel()
@@ -303,32 +341,34 @@ export function createNotebookSession(notebook: NotebookStore) {
       cellStates.value = {}
       notebook.patchMeta({ job_id: created.job_id })
       await findNode()
-      await refresh()
-      openStream()
+      if (!active()) return
+      if ((await refresh()) && active() && !ended.value) openStream()
     } catch (cause) {
+      if (!active()) return
       const message = submitErrorMessage(cause)
       // A job that was admitted but cannot be followed must not block Start,
       // and must not keep a quota slot either.
       if (submitted) {
-        await stopUnfollowed(submitted)
+        await stopUnfollowed(submitted, client.value, origin)
+        if (!active()) return
         forget()
       }
       error.value = message
     } finally {
-      starting.value = false
+      if (active()) starting.value = false
     }
   }
 
   /** Best effort: end the session, and cancel the job when that fails. */
-  async function stopUnfollowed(id: string): Promise<void> {
+  async function stopUnfollowed(id: string, executor: ApiClientOptions, origin: ApiClientOptions): Promise<void> {
     try {
-      await endSession(id, client.value)
+      await endSession(id, executor)
       return
     } catch {
       // The node may not serve the session routes for this job at all.
     }
     try {
-      await cancelJob(id, homeClient.value)
+      await cancelJob(id, origin)
     } catch {
       // Nothing else to try; the walltime ends it.
     }
@@ -336,26 +376,31 @@ export function createNotebookSession(notebook: NotebookStore) {
 
   async function end(): Promise<void> {
     if (!jobId.value || ending.value) return
+    const active = current()
     ending.value = true
     try {
       await endSession(jobId.value, client.value)
+      if (!active()) return
       closeStream()
       keepResumePoint.cancel()
-      clearResumePoint(jobId.value)
+      clearResumePoint(resumeScope, jobId.value)
       if (state.value) state.value = { ...state.value, state: 'ended', ended: { reason: 'ended' } }
       kernel.value = 'dead'
     } catch (cause) {
+      if (!active()) return
       error.value = errorMessage(cause)
     } finally {
-      ending.value = false
+      if (active()) ending.value = false
     }
   }
 
   async function interrupt(): Promise<void> {
     if (!jobId.value) return
+    const active = current()
     try {
       await interruptSession(jobId.value, client.value)
     } catch (cause) {
+      if (!active()) return
       error.value = errorMessage(cause)
     }
   }
@@ -370,6 +415,7 @@ export function createNotebookSession(notebook: NotebookStore) {
   /** Sends one cell; answers the reason it was refused, or null. */
   async function sendCell(cellId: string, code: string): Promise<unknown | null> {
     if (!jobId.value || !live.value) return new Error('The session is not running.')
+    const active = current()
     const before = cellStates.value[cellId]
     if (before?.state === 'queued' || before?.state === 'running') {
       return new Error('That cell is already running.')
@@ -380,6 +426,7 @@ export function createNotebookSession(notebook: NotebookStore) {
       await runSessionCell(jobId.value, { cell_id: cellId, code }, client.value)
       return null
     } catch (cause) {
+      if (!active()) return cause
       setCellState(cellId, before)
       return cause
     }
@@ -387,19 +434,26 @@ export function createNotebookSession(notebook: NotebookStore) {
 
   /** Sends one cell to the kernel; its outputs arrive on the stream. */
   async function runCell(cellId: string, code: string): Promise<boolean> {
+    const active = current()
     const cause = await sendCell(cellId, code)
+    if (!active()) return false
     if (cause) error.value = errorMessage(cause)
     return cause === null
   }
 
   /** Sends the cells in order; the node keeps the queue. */
   async function runCells(cells: { id: string; source: string }[]): Promise<void> {
+    const active = current()
     for (const [index, cell] of cells.entries()) {
+      if (!active()) return
       let cause = await sendCell(cell.id, cell.source)
+      if (!active()) return
       if (cause && isRateLimited(cause)) {
         const wait = cause instanceof ApiError ? (cause.retryAfter ?? RATE_LIMIT_WAIT_MS) : RATE_LIMIT_WAIT_MS
         await new Promise((resolve) => setTimeout(resolve, wait))
+        if (!active()) return
         cause = await sendCell(cell.id, cell.source)
+        if (!active()) return
       }
       if (!cause) continue
       error.value = `The run stopped at cell ${index + 1}: ${errorMessage(cause)}`
@@ -408,20 +462,28 @@ export function createNotebookSession(notebook: NotebookStore) {
   }
 
   function detach(): void {
+    keepResumePoint.flush()
+    generation += 1
     closeStream()
-    keepResumePoint.cancel()
-    if (jobId.value) clearResumePoint(jobId.value)
+    resumeScope = notebook.scope.value
+    pendingKey = ''
     seenEventId = 0
     jobId.value = ''
     nodeId.value = ''
     state.value = null
     cellStates.value = {}
+    starting.value = false
+    ending.value = false
+    attaching.value = false
+    error.value = null
+    notice.value = null
   }
+
+  watch(notebook.generation, detach, { flush: 'sync' })
 
   onScopeDispose(() => {
     disposed = true
-    keepResumePoint.flush()
-    closeStream()
+    detach()
   })
 
   return {
