@@ -141,9 +141,12 @@ async function download() {
         <span v-else>Referenced (external source)</span>
       </p>
       <span v-else />
-      <Button variant="outline" size="sm" class="shrink-0" @click="download">
-        <Download class="h-4 w-4" /> Download
-      </Button>
+      <div class="ml-auto flex flex-wrap items-center gap-2">
+        <slot name="actions" />
+        <Button variant="outline" size="sm" class="shrink-0" @click="download">
+          <Download class="h-4 w-4" /> Download
+        </Button>
+      </div>
     </div>
 
     <Spinner

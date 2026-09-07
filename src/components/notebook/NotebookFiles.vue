@@ -1,22 +1,18 @@
 <script setup lang="ts">
-// The files beside the notebook: the workspace bucket it reads and writes, and
-// the scratch folder inside the running container. "Add more" copies stored
-// objects into the workspace bucket, so nothing is copied into the container.
+// Files stored beside the notebook; imports and picked objects go into data/.
 import { computed, onScopeDispose, ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
-import OptionToggle from '@/components/ui/OptionToggle.vue'
 import ObjectBrowserPanel from '@/components/data/ObjectBrowserPanel.vue'
 import TesDataRefDialog from '@/components/compute/TesDataRefDialog.vue'
 import AddDataDialog from '@/components/data/AddDataDialog.vue'
-import ScratchFileDialog from '@/components/notebook/ScratchFileDialog.vue'
 import { injectNotebook } from '@/composables/notebookContext'
 import { useS3 } from '@/composables/useS3'
-import { addSessionInputs, listScratch, type ScratchEntry } from '@/lib/notebook/session'
+import { addSessionInputs } from '@/lib/notebook/session'
 import { NOTEBOOK_DATA_PREFIX } from '@/lib/notebook/document'
 import { parseS3Url, type TesDataRefEntry } from '@/lib/tes'
-import { errorMessage, formatBytes } from '@/lib/utils'
-import { CloudDownload, FolderTree, Plus, RefreshCw } from '@lucide/vue'
+import { errorMessage } from '@/lib/utils'
+import { CloudDownload, Plus } from '@lucide/vue'
 
 const { notebook, session } = injectNotebook()
 const s3 = useS3()
@@ -25,23 +21,12 @@ const importOpen = ref(false)
 // Remounts the browser after an import, which has no reload of its own.
 const panelRevision = ref(0)
 const dataKeys = ref<ReadonlySet<string>>(new Set())
-const scratchFile = ref('')
-const scratchOpen = ref(false)
-const tab = ref('bucket')
-const tabs = [
-  { value: 'bucket', label: 'Bucket' },
-  { value: 'scratch', label: 'Scratch' },
-]
 const addOpen = ref(false)
-const scratchPath = ref('')
-const scratch = ref<ScratchEntry[]>([])
-const scratchError = ref<string | null>(null)
 const staging = ref(false)
 const stageNote = ref<string | null>(null)
 
 const bucket = computed(() => notebook.meta.value?.workspace_bucket ?? '')
 let disposed = false
-let scratchRequest = 0
 onScopeDispose(() => { disposed = true })
 
 function current() {
@@ -51,11 +36,6 @@ function current() {
 }
 
 watch([notebook.generation, session.jobId], () => {
-  scratchRequest += 1
-  scratch.value = []
-  scratchPath.value = ''
-  scratchOpen.value = false
-  scratchError.value = null
   staging.value = false
   stageNote.value = null
   dataKeys.value = new Set()
@@ -80,39 +60,6 @@ async function loadDataKeys() {
 function onImported() {
   panelRevision.value += 1
   void loadDataKeys()
-}
-
-async function loadScratch() {
-  if (!session.jobId.value || !session.live.value) return
-  const active = current()
-  const request = ++scratchRequest
-  scratchError.value = null
-  try {
-    const listing = await listScratch(session.jobId.value, scratchPath.value, session.client.value)
-    if (!active() || request !== scratchRequest) return
-    scratch.value = listing.entries
-  } catch (cause) {
-    if (!active() || request !== scratchRequest) return
-    scratchError.value = errorMessage(cause)
-  }
-}
-
-watch([() => session.live.value, tab, scratchPath], () => {
-  if (tab.value === 'scratch') void loadScratch()
-})
-
-function openEntry(entry: ScratchEntry) {
-  const path = scratchPath.value ? `${scratchPath.value}/${entry.name}` : entry.name
-  if (entry.kind === 'dir') {
-    scratchPath.value = path
-    return
-  }
-  scratchFile.value = path
-  scratchOpen.value = true
-}
-
-function up() {
-  scratchPath.value = scratchPath.value.split('/').slice(0, -1).join('/')
 }
 
 /** Stages picked objects into the workspace bucket under data/. */
@@ -164,9 +111,9 @@ async function stage(entry: TesDataRefEntry) {
 </script>
 
 <template>
-  <aside class="flex min-h-0 flex-col gap-2">
-    <div class="flex items-center gap-2">
-      <OptionToggle v-model="tab" :options="tabs" aria-label="Files" />
+  <aside class="min-w-0 space-y-3 rounded-lg border border-border bg-card p-3">
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="text-sm font-semibold">Files</span>
       <span class="flex-1" />
       <Button
         v-if="session.live.value"
@@ -175,7 +122,7 @@ async function stage(entry: TesDataRefEntry) {
         :disabled="staging"
         @click="addOpen = true"
       >
-        <Plus class="size-3.5" /> Add more
+        <Plus class="size-3.5" /> Add files
       </Button>
       <Button v-if="bucket" variant="outline" size="sm" @click="importOpen = true; loadDataKeys()">
         <CloudDownload class="size-3.5" /> Import
@@ -184,41 +131,9 @@ async function stage(entry: TesDataRefEntry) {
 
     <Notice v-if="stageNote" tone="info">{{ stageNote }}</Notice>
 
-    <div v-if="tab === 'bucket'" class="min-h-0 flex-1 overflow-auto">
-      <ObjectBrowserPanel v-if="bucket" :key="panelRevision" :bucket="bucket" />
+    <div class="min-w-0 overflow-auto">
+      <ObjectBrowserPanel v-if="bucket" :key="panelRevision" :bucket="bucket" :group-id="notebook.meta.value?.group_id" />
       <p v-else class="text-xs text-muted-foreground">This notebook has no workspace bucket yet.</p>
-    </div>
-
-    <div v-else class="min-h-0 flex-1 space-y-2 overflow-auto">
-      <div class="flex items-center gap-2 text-[11px] text-muted-foreground">
-        <FolderTree class="size-3.5" />
-        <span class="truncate font-mono">{{ scratchPath || 'the working directory' }}</span>
-        <span class="flex-1" />
-        <Button v-if="scratchPath" variant="ghost" size="sm" @click="up">Up</Button>
-        <Button variant="ghost" size="icon-sm" aria-label="Read the folder again" @click="loadScratch">
-          <RefreshCw class="size-3.5" />
-        </Button>
-      </div>
-      <Notice v-if="!session.live.value" tone="info">The scratch folder exists while a session runs.</Notice>
-      <Notice v-else-if="scratchError" tone="error">{{ scratchError }}</Notice>
-      <p v-else-if="!scratch.length" class="text-xs text-muted-foreground">This folder is empty.</p>
-      <ul v-else class="space-y-1">
-        <li v-for="entry in scratch" :key="entry.name">
-          <button
-            type="button"
-            class="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs hover:bg-muted"
-            @click="openEntry(entry)"
-          >
-            <span class="min-w-0 flex-1 truncate font-mono">{{ entry.name }}{{ entry.kind === 'dir' ? '/' : '' }}</span>
-            <span v-if="entry.kind === 'file'" class="shrink-0 text-[11px] text-muted-foreground">
-              {{ formatBytes(entry.bytes) }}
-            </span>
-          </button>
-        </li>
-      </ul>
-      <p class="text-[11px] text-muted-foreground">
-        Scratch is the working directory of the container. Results belong in the bucket.
-      </p>
     </div>
 
     <TesDataRefDialog v-model:open="addOpen" mode="input" @add="stage" />
@@ -233,11 +148,5 @@ async function stage(entry: TesDataRefEntry) {
       @staged="onImported"
     />
 
-    <ScratchFileDialog
-      v-model:open="scratchOpen"
-      :job-id="session.jobId.value"
-      :path="scratchFile"
-      :client="session.client.value"
-    />
   </aside>
 </template>

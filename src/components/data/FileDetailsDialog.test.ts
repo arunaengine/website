@@ -66,7 +66,7 @@ const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.
   '@/components/data/ObjectVersionsPanel.vue': moduleDefault(Marker('version rows')),
   '@/components/storage/ObjectRulesEditor.vue': moduleDefault(Marker('edit rules for this file')),
   '@/components/storage/PolicyColumn.vue': moduleDefault(Marker('rules this file carries')),
-  '@/components/preview/PreviewBody.vue': moduleDefault(Marker('preview')),
+  '@/components/preview/PreviewBody.vue': moduleDefault(defineComponent({ setup: (_, { slots }) => () => h('section', [slots.actions?.(), 'preview']) })),
   '@/composables/useS3': {
     useS3: () => ({ headObject, hasActiveKey }),
     s3ErrorMessage: (error: unknown) => String(error),
@@ -167,8 +167,8 @@ describe('file details preview mode', () => {
 })
 
 describe('notebook preview entry', () => {
-  it('opens the notebook in its bucket and group', async () => {
-    const { root, closed } = await mount('preview', { objectKey: 'notebooks/counts.IPYNB' })
+  it.each(['preview', 'general'])('opens the notebook from %s in its bucket and group', async (tab) => {
+    const { root, closed } = await mount(tab, { objectKey: 'notebooks/counts.IPYNB' })
     const link = element(root, (node) => node.tag === 'a' && content(node).includes('Open notebook'))
     expect(link.props.to).toEqual({
       name: 'notebook',

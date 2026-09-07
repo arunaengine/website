@@ -36,6 +36,7 @@ const props = withDefaults(
   defineProps<{
     /** Controlled mode: browse exactly this bucket and hide the bucket sidebar. */
     bucket?: string
+    groupId?: string
     /** Folder the browser opens on; read once, later navigation owns the location. */
     prefix?: string
     /** Node hosting the browsed bucket; null = the connected node. */
@@ -73,10 +74,13 @@ const requiredNodeName = computed(() =>
   requiredNodeId.value ? realmNodes.displayName(requiredNodeId.value) : 'the selected node',
 )
 
-const selectedGroupId = ref(s3.activeContext.value?.groupId ?? '')
+const selectedGroupId = ref(props.groupId ?? s3.activeContext.value?.groupId ?? '')
 const { groupsLoading, hasGroups } = props.notebooksOnly
   ? useGroupContext(selectedGroupId)
   : useGroupSelection(selectedGroupId)
+watch(() => props.groupId, (groupId) => {
+  if (groupId !== undefined) selectedGroupId.value = groupId
+})
 const groupOptions = computed(() => {
   const options = myGroups.value.map((group) => ({ value: group.id, label: group.name }))
   if (selectedGroupId.value && !options.some((option) => option.value === selectedGroupId.value)) {
@@ -354,9 +358,9 @@ const isEmpty = computed(
 <template>
   <div class="min-w-0 space-y-3">
     <!-- Same context line as the Data view header: the group switches here. -->
-    <div v-if="currentUser && groupOptions.length" class="flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-      <span>{{ controlled ? 'Browsing as' : 'Showing buckets of' }}</span>
-      <DropdownMenu>
+    <div v-if="currentUser && groupOptions.length && (props.groupId === undefined || $slots.actions)" class="flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+      <span v-if="props.groupId === undefined">{{ controlled ? 'Browsing as' : 'Showing buckets of' }}</span>
+      <DropdownMenu v-if="props.groupId === undefined">
         <DropdownMenuTrigger as-child>
           <button
             type="button"
@@ -379,7 +383,7 @@ const isEmpty = computed(
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <span :title="requiredNodeId ?? undefined">on {{ requiredNodeName }}</span>
+      <span v-if="props.groupId === undefined" :title="requiredNodeId ?? undefined">on {{ requiredNodeName }}</span>
       <div class="ml-auto">
         <slot name="actions" :bucket="activeBucket" :group-id="selectedGroupId" :ready="canBrowse" />
       </div>

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import * as Pipeline from '@/lib/notebook/pipeline'
 import { newCell } from '@/lib/notebook/nbformat'
 import * as Tes from '@/lib/tes'
-import { button, click, compileClientComponent, moduleDefault, mountApp } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, moduleDefault, mountApp } from '@/test/clientRender'
 
 async function render() {
   const cell = newCell('raw', JSON.stringify({ image: 'alpine:3.20', command: ['true'], cpu_cores: 1, ram_bytes: 1_000_000_000 }))
@@ -40,7 +40,9 @@ describe('pipeline runs', () => {
     const { root, app, submitJob } = await render()
     submitJob.mockResolvedValue({ job_id: 'job-1' })
     await click(button(root, 'Run this step'))
-    await click(button(root, 'Run this step'))
+    expect(content(root)).not.toContain('CPU cores')
+    expect(button(root, 'Edit step')).toBeTruthy()
+    await click(button(root, 'Run again'))
     const keys = submitJob.mock.calls.map(([request]) => request.idempotency_key)
     expect(keys).toHaveLength(2)
     expect(keys[0]).toBeTruthy()

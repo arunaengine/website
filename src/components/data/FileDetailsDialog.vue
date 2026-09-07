@@ -77,6 +77,10 @@ const currentVersion = computed(() => pinnedVersion.value ?? head.value?.version
 // same header, and the tabs are one click away.
 const previewMode = computed(() => props.tab === 'preview')
 const detailsTab = computed(() => (previewMode.value ? 'general' : props.tab))
+const notebookLink = computed(() => !remote.value && !pinnedVersion.value && props.groupId &&
+  isNotebookKey(props.objectKey) && featureEnabled('tes')
+  ? { name: 'notebook', params: { bucketId: props.bucket, key: props.objectKey }, query: { group: props.groupId } }
+  : null)
 
 async function loadHead() {
   if (!props.objectKey || remote.value) return
@@ -155,13 +159,16 @@ const details = computed(() => [
             <span v-if="props.size !== undefined"> · {{ formatBytes(props.size) }}</span>
           </p>
         </div>
-        <div class="flex shrink-0 items-center gap-2">
+        <div class="flex flex-wrap items-center justify-end gap-2">
           <RouterLink
             v-if="props.browseHref"
             :to="props.browseHref"
             class="text-xs font-medium text-primary hover:underline"
             @click="openBrowser"
           >Open in the data browser</RouterLink>
+          <Button v-if="notebookLink && !previewMode" variant="outline" size="sm" as-child>
+            <RouterLink :to="notebookLink" @click="leave"><NotebookPen class="h-4 w-4" /> Open notebook</RouterLink>
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -179,14 +186,6 @@ const details = computed(() => [
         Showing version <span class="hash">{{ truncateMiddle(pinnedVersion, 8, 6) }}</span>.
         <button type="button" class="underline" @click="pinnedVersion = null">Show the current version</button>
       </p>
-      <div v-if="!remote && !pinnedVersion && props.groupId && isNotebookKey(props.objectKey) && featureEnabled('tes')">
-        <Button variant="outline" size="sm" as-child>
-          <RouterLink
-            :to="{ name: 'notebook', params: { bucketId: props.bucket, key: props.objectKey }, query: { group: props.groupId } }"
-            @click="leave"
-          ><NotebookPen class="h-4 w-4" /> Open notebook</RouterLink>
-        </Button>
-      </div>
       <PreviewBody
         class="flex-1"
         :active="props.open"
@@ -199,7 +198,13 @@ const details = computed(() => [
         :version-id="pinnedVersion"
         :referenced-from="props.referencedFrom"
         :probe-reference="props.probeReference"
-      />
+      >
+        <template #actions>
+          <Button v-if="notebookLink" variant="outline" size="sm" as-child>
+            <RouterLink :to="notebookLink" @click="leave"><NotebookPen class="h-4 w-4" /> Open notebook</RouterLink>
+          </Button>
+        </template>
+      </PreviewBody>
     </div>
 
     <Tabs

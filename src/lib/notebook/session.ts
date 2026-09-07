@@ -75,18 +75,6 @@ export interface SessionInputsResponse {
   pending: { dest_key: string; job_id: string }[]
 }
 
-export interface ScratchEntry {
-  name: string
-  kind: 'file' | 'dir'
-  bytes: number
-  modified_ms: number
-}
-
-export interface ScratchListing {
-  path: string
-  entries: ScratchEntry[]
-}
-
 function sessionPath(jobId: string, suffix = ''): string {
   return `/compute/jobs/${encodeURIComponent(jobId)}/session${suffix}`
 }
@@ -122,40 +110,6 @@ export function addSessionInputs(
     { method: 'POST', body: JSON.stringify({ items }) },
     client,
   )
-}
-
-export function listScratch(
-  jobId: string,
-  path: string,
-  client: ApiClientOptions,
-): Promise<ScratchListing> {
-  return apiRequest<ScratchListing>(sessionPath(jobId, '/scratch'), { query: { path } }, client)
-}
-
-export interface ScratchFile {
-  blob: Blob
-  contentType: string
-}
-
-/**
- * Reads one file from the container's working directory. The node caps it at
- * 8 MiB and answers 413 above that.
- */
-export async function readScratch(
-  jobId: string,
-  path: string,
-  client: ApiClientOptions,
-): Promise<ScratchFile> {
-  const headers = new Headers()
-  if (client.token) headers.set('Authorization', `Bearer ${client.token}`)
-  const response = await fetch(apiUrl(sessionPath(jobId, '/scratch/read'), { path }, client), { headers })
-  if (!response.ok) {
-    throw new ApiError(response.status, `${response.status} ${response.statusText}`)
-  }
-  return {
-    blob: await response.blob(),
-    contentType: response.headers.get('Content-Type') ?? 'application/octet-stream',
-  }
 }
 
 /** The node runs this session, or a 409 names the node that does. */

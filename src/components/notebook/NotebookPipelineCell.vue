@@ -32,6 +32,7 @@ const draft = ref(pipelineDraftFrom(props.cell.source))
 const submitting = ref(false)
 const error = ref<string | null>(null)
 const jobId = ref(props.cell.metadata.aruna?.job_id ?? '')
+const expanded = ref(!jobId.value)
 let pendingKey = ''
 let disposed = false
 onScopeDispose(() => { disposed = true })
@@ -110,6 +111,7 @@ async function submit() {
     if (!active()) return
     pendingKey = ''
     jobId.value = created.job_id
+    expanded.value = false
     notebook.noteCellRun(cellId, { job_id: created.job_id })
   } catch (cause) {
     if (!active()) return
@@ -122,6 +124,11 @@ async function submit() {
 
 <template>
   <div class="space-y-3 p-3">
+    <div v-if="!expanded" class="flex min-w-0 flex-wrap items-center gap-2">
+      <span class="min-w-0 flex-1 truncate text-sm font-medium">{{ draft.name || 'Pipeline step' }}</span>
+      <Button variant="outline" size="sm" @click="expanded = true">Edit step</Button>
+    </div>
+    <template v-if="expanded">
     <div class="grid gap-2 sm:grid-cols-2">
       <label class="space-y-1">
         <span class="text-xs font-medium text-foreground">Name</span>
@@ -183,12 +190,14 @@ async function submit() {
       </div>
     </div>
 
+    </template>
+
     <Notice v-if="blocked" tone="warning">{{ blocked }}</Notice>
     <Notice v-if="error" tone="error">{{ error }}</Notice>
 
-    <div class="flex items-center gap-2">
+    <div class="flex flex-wrap items-center gap-2">
       <Button size="sm" :disabled="!ready || submitting" @click="submit">
-        <Send class="size-3.5" /> {{ submitting ? 'Sending…' : 'Run this step' }}
+        <Send class="size-3.5" /> {{ submitting ? 'Sending…' : jobId ? 'Run again' : 'Run this step' }}
       </Button>
       <span class="text-[11px] text-muted-foreground">Runs as an ordinary job, not in the kernel.</span>
     </div>

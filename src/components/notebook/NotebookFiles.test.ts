@@ -20,12 +20,12 @@ async function render() {
       session: { jobId: ref('job-a'), live: ref(true), client: ref({ baseUrl: '/api/v1' }) },
     }) },
     '@/composables/useS3': { useS3: () => ({ listObjects: vi.fn() }) },
-    '@/lib/notebook/session': { addSessionInputs, listScratch: vi.fn() },
+    '@/lib/notebook/session': { addSessionInputs },
     '@/lib/notebook/document': { NOTEBOOK_DATA_PREFIX: 'data/' },
     '@/lib/tes': { parseS3Url: () => ({ bucket: 'source', key: 'input.txt' }) },
     '@/lib/utils': { errorMessage: (cause: Error) => cause.message, formatBytes: String },
   }
-  for (const path of ['ui/Button', 'ui/Notice', 'ui/OptionToggle', 'data/ObjectBrowserPanel', 'data/AddDataDialog', 'notebook/ScratchFileDialog']) {
+  for (const path of ['ui/Button', 'ui/Notice', 'data/ObjectBrowserPanel', 'data/AddDataDialog']) {
     modules[`@/components/${path}.vue`] = moduleDefault(stub)
   }
   modules['@/components/compute/TesDataRefDialog.vue'] = moduleDefault(picker)
