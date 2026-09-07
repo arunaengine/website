@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import ComputeGates from '@/components/compute/ComputeGates.vue'
 import ObjectBrowserPanel from '@/components/data/ObjectBrowserPanel.vue'
@@ -13,13 +13,23 @@ import DialogTitle from '@/components/ui/DialogTitle.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
+import { activeGroupId } from '@/composables/useGroupSelection'
+import { useNotebookLocation } from '@/composables/useNotebookLocation'
 import { useS3 } from '@/composables/useS3'
 import { featureEnabled } from '@/lib/config'
 import { NOTEBOOK_PREFIX, notebookKey, notebookSlug } from '@/lib/notebook/document'
 import { NotebookPen } from '@lucide/vue'
 
 const router = useRouter()
+const route = useRoute()
+const saved = useNotebookLocation()
+const initial = ref(saved.location.value)
+watch(saved.scope, () => { initial.value = saved.location.value })
 const s3 = useS3()
+watch([saved.scope, () => route.query.browse, () => s3.activeContext.value], () => {
+  if (route.query.browse === '1' || !saved.location.value?.key || s3.activeContext.value?.groupId !== activeGroupId.value) return
+  void router.replace({ name: 'notebook', params: { bucketId: saved.location.value.bucket, key: saved.location.value.key }, query: { group: activeGroupId.value } })
+}, { immediate: true })
 const enabled = featureEnabled('tes')
 const newNotebookOpen = ref(false)
 const newNotebookName = ref('')
@@ -70,7 +80,15 @@ function createNotebook() {
       redirect-to="/app/notebooks"
     >
       <div class="container py-4">
-        <ObjectBrowserPanel notebooks-only @select="openNotebook">
+        <ObjectBrowserPanel
+          :key="saved.scope.value"
+          notebooks-only
+          :initial-bucket="initial?.bucket"
+          :prefix="initial?.prefix"
+          :group-id="activeGroupId"
+          @navigate="saved.remember($event)"
+          @select="openNotebook"
+        >
           <template #actions="{ bucket: selectedBucket, groupId: selectedGroup, ready }">
             <Button
               size="sm"

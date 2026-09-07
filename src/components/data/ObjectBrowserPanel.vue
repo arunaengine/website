@@ -36,6 +36,7 @@ const props = withDefaults(
   defineProps<{
     /** Controlled mode: browse exactly this bucket and hide the bucket sidebar. */
     bucket?: string
+    initialBucket?: string
     groupId?: string
     /** Folder the browser opens on; read once, later navigation owns the location. */
     prefix?: string
@@ -63,7 +64,7 @@ const realmNodes = useRealmNodes()
 const { currentUser, myGroups } = useAruna()
 
 const controlled = computed(() => props.bucket !== undefined)
-const activeBucket = ref(props.bucket ?? '')
+const activeBucket = ref(props.bucket ?? props.initialBucket ?? '')
 const prefix = ref(props.prefix.replace(/^\/+|\/+$/g, ''))
 const s3Prefix = computed(() => (prefix.value ? `${prefix.value}/` : ''))
 

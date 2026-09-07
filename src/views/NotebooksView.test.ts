@@ -11,6 +11,9 @@ const context = ref<{ userId: string; nodeId: string; groupId: string; session: 
 const writable = ref(true)
 const listObjects = vi.fn()
 const push = vi.fn()
+const replace = vi.fn()
+const location = ref<{ bucket: string; prefix: string; key?: string } | null>(null)
+const route = { query: { browse: '1' } }
 const Slotted = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
 const Button = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
 const Input = defineComponent({
@@ -28,7 +31,7 @@ const Dialog = defineComponent({
 const groupSelection = () => ({ groupsLoading: ref(false), hasGroups: ref(true) })
 const modules: Record<string, unknown> = {
   vue: VueRuntime,
-  'vue-router': { useRouter: () => ({ push }) },
+  'vue-router': { useRouter: () => ({ push, replace }), useRoute: () => route },
   '@lucide/vue': new Proxy({}, { get: () => Slotted }),
   '@/components/dashboard/PageHeader.vue': moduleDefault(Slotted),
   '@/components/compute/ComputeGates.vue': moduleDefault(Slotted),
@@ -50,7 +53,8 @@ const modules: Record<string, unknown> = {
   '@/composables/useAruna': { useAruna: () => ({
     currentUser: ref({ id: 'user-1' }), myGroups: ref([{ id: 'group-1', name: 'Research' }]),
   }) },
-  '@/composables/useGroupSelection': { useGroupSelection: groupSelection, useGroupContext: groupSelection },
+  '@/composables/useGroupSelection': { useGroupSelection: groupSelection, useGroupContext: groupSelection, activeGroupId: ref('group-1') },
+  '@/composables/useNotebookLocation': { useNotebookLocation: () => ({ scope: ref('scope'), location, remember: vi.fn() }) },
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: () => 'Local node' }) },
   '@/composables/useStagingReferences': { useStagingReferences: () => ({
     prefixHasReferences: () => false, keyIsReferenced: () => false,
@@ -75,6 +79,9 @@ beforeEach(() => {
   context.value = { userId: 'user-1', nodeId: 'node-1', groupId: 'group-1', session: { accessKeyId: 'session-1' } }
   writable.value = true
   push.mockReset()
+  replace.mockReset()
+  location.value = null
+  route.query.browse = '1'
   listObjects.mockReset().mockResolvedValue({ folders: [], objects: [] })
 })
 
@@ -86,6 +93,21 @@ async function render() {
 }
 
 describe('notebook workspace', () => {
+  it('resumes the remembered notebook from the sidebar entry', async () => {
+    route.query.browse = ''
+    location.value = { bucket: 'reef', prefix: 'notebooks', key: 'notebooks/analysis.ipynb' }
+    const { app } = await mountApp(view)
+    expect(replace).toHaveBeenCalledWith({ name: 'notebook', params: { bucketId: 'reef', key: 'notebooks/analysis.ipynb' }, query: { group: 'group-1' } })
+    app.unmount()
+  })
+
+  it('keeps the notebook picker open when browsing was requested', async () => {
+    location.value = { bucket: 'reef', prefix: 'notebooks', key: 'notebooks/analysis.ipynb' }
+    const { app } = await mountApp(view)
+    expect(replace).not.toHaveBeenCalled()
+    app.unmount()
+  })
+
   it('keeps folders and notebooks while filtering ordinary files', async () => {
     listObjects.mockResolvedValue({
       folders: [{ prefix: 'notebooks/', name: 'notebooks' }],
