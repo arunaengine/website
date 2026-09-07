@@ -45,8 +45,11 @@ export interface RoCrateStructuralViolation {
 }
 
 // A data entity of a public draft whose object is not readable by everyone.
+// `permission_path` is the object's full permission path, present only when
+// the caller may read the object; bucket and key are for display.
 export interface RestrictedFile {
   entity_id: string
+  permission_path?: string
   bucket?: string
   key?: string
 }

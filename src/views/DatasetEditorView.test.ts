@@ -355,7 +355,12 @@ function restrictedVerdict(): Api.ProfileValidationPreviewResponse {
     completeness: 'complete',
     structural_violations: [],
     restricted_files: [
-      { entity_id: 'raw/reads.fastq', bucket: 'bucket-a', key: 'raw/reads.fastq' },
+      {
+        entity_id: 'raw/reads.fastq',
+        permission_path: '/realm-1/g/group-1/data/node-1/bucket-a/raw/reads.fastq',
+        bucket: 'bucket-a',
+        key: 'raw/reads.fastq',
+      },
       { entity_id: '#notes' },
     ],
   }

@@ -602,7 +602,7 @@ async function save(anyway = false) {
                   <li v-for="file in restrictedFiles" :key="file.entity_id" class="break-all">{{ fileLabel(file) }}</li>
                 </ul>
                 <p v-if="grantUnresolved.length" class="mt-1">
-                  These files have no bucket and key the portal can grant access on. Change their access from the group's roles.
+                  These files have no permission path the portal can grant access on. Change their access from the group's roles.
                 </p>
                 <p v-else-if="!canGrantPublic" class="mt-1">
                   A group administrator can add a public role with read access to these files under the group's roles.
