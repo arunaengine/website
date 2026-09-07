@@ -75,9 +75,17 @@ export async function findCandidates(
     }
   }
   const query = `SELECT DISTINCT ?g WHERE { GRAPH ?g { ?s a <${vocabTypeUri(type)}> } } LIMIT ${GRAPH_LIMIT}`
-  const result = await runSparql(query, 'distributed-best-effort')
-  partial ||= !result.complete
-  const documentIds = [...new Set(result.rows.map(graphDocumentId))]
+  let rows: Array<Record<string, string>> = []
+  try {
+    const result = await runSparql(query, 'distributed-best-effort')
+    rows = result.rows
+    partial ||= !result.complete
+  } catch (error) {
+    // The registry hits still stand; a failed search must not hide them.
+    if (!candidates.length) throw error
+    partial = true
+  }
+  const documentIds = [...new Set(rows.map(graphDocumentId))]
     .filter((id): id is string => Boolean(id) && id !== registry && id !== options.excludeDocumentId)
   if (documentIds.length > DOCUMENT_LIMIT) partial = true
   const loaded = await Promise.all(documentIds.slice(0, DOCUMENT_LIMIT).map(async (documentId) => {

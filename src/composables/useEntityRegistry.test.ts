@@ -122,6 +122,17 @@ describe('findCandidates', () => {
     await expect(registry.findCandidates('Person')).rejects.toThrow('offline')
     expect(lookupMetadataPath).not.toHaveBeenCalled()
   })
+
+  it('keeps the registry hits as a partial answer when the search fails', async () => {
+    lookupMetadataPath.mockResolvedValue({ winner: { document_id: REGISTRY }, conflicts: [] })
+    loadRoCrate.mockResolvedValue(withEntities(null, [grace]))
+    runSparql.mockRejectedValue(new Error('offline'))
+
+    const result = await registry.findCandidates('Person', { groupId: 'group-1' })
+
+    expect(result.partial).toBe(true)
+    expect(result.candidates.map((candidate) => candidate.entity.id)).toEqual(['#grace'])
+  })
 })
 
 describe('saveToRegistry', () => {
