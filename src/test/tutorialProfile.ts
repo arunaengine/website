@@ -14,6 +14,7 @@ import {
   type Mounted,
 } from '@/test/clientRender'
 import * as Utils from '@/lib/utils'
+import * as GroupAdmin from '@/lib/groupAdmin'
 import * as VueUse from '@vueuse/core'
 import * as Aruna from '@/composables/useAruna'
 import * as Catalog from '@/composables/aruna/catalog'
@@ -308,6 +309,9 @@ const DatasetEditorView = compileClientComponent(url('views/DatasetEditorView.vu
   '@/composables/usePathPrefixes': PathPrefixes,
   '@/composables/usePathTaken': PathTaken,
   '@/composables/useProfilePreview': ProfilePreview,
+  '@/composables/aruna/groups': { getGroup: vi.fn() },
+  '@/composables/usePublicRead': { grantPublicRead: vi.fn() },
+  '@/lib/groupAdmin': GroupAdmin,
   '@/composables/useDeviceStatus': { useDeviceStatus: () => ({ deviceClient: ref(null) }) },
   '@/composables/useAssistantEditor': { provideEditorBridge: () => {} },
   '@/lib/desktop': { isDesktop: () => false },

@@ -90,6 +90,7 @@ const AddFilesDialog = compileClientComponent(new URL('./AddFilesDialog.vue', im
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Notice.vue': moduleDefault(Passthrough),
   '@/components/ui/Progress.vue': moduleDefault(EmptyStub),
+  '@/components/ui/Spinner.vue': moduleDefault(EmptyStub),
   '@/components/ui/Select.vue': moduleDefault(EmptyStub),
   '@/components/ui/Tabs.vue': moduleDefault(Passthrough),
   '@/components/ui/TabsList.vue': moduleDefault(Passthrough),
