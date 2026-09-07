@@ -1,25 +1,27 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/lib/api/client'
-import { withEntities } from '@/lib/crate/registry'
+import { referenceNode, registryCrate, registryReferences } from '@/lib/crate/registry'
+import { newDraft, toRoCrate } from '@/lib/crate/editor'
 import type { DraftEntity } from '@/lib/crate/editor'
 
 const REGISTRY = '01JREG0000000000000000000A'
 const OTHER = '01J0THER00000000000000000A'
 const OWN = '01J0WN000000000000000000AB'
 const BROKEN = '01JBR0KEN0000000000000000A'
+const SAVED = '01J00000000000000000000004'
 
 const lookupMetadataPath = vi.fn()
-const loadRoCrate = vi.fn()
+const fetchRoCrateRaw = vi.fn()
 const getMetadataDocument = vi.fn()
 const createMetadata = vi.fn()
-const replaceMetadataRoCrate = vi.fn()
+const upsertContextualEntity = vi.fn()
 const runSparql = vi.fn()
 
 let registry: typeof import('./useEntityRegistry')
 
 beforeAll(async () => {
-  vi.doMock('./aruna/crates', () => ({ loadRoCrate }))
-  vi.doMock('./aruna/documents', () => ({ lookupMetadataPath, getMetadataDocument, createMetadata, replaceMetadataRoCrate }))
+  vi.doMock('./aruna/crates', () => ({ fetchRoCrateRaw }))
+  vi.doMock('./aruna/documents', () => ({ lookupMetadataPath, getMetadataDocument, createMetadata, upsertContextualEntity }))
   vi.doMock('./aruna/search', () => ({ runSparql }))
   registry = await import('./useEntityRegistry')
 })
@@ -50,10 +52,19 @@ const grace: DraftEntity = {
 }
 
 function dataset(title: string, entities: DraftEntity[]): unknown {
-  const crate = withEntities(null, entities) as { '@graph': Array<Record<string, unknown>> }
-  const root = crate['@graph'].find((node) => node['@id'] === './')!
-  root.name = title
-  return crate
+  const draft = newDraft()
+  return toRoCrate({ ...draft, entities: [
+    { ...draft.entities[0], properties: { ...draft.entities[0].properties, name: [{ kind: 'text', value: title }] } },
+    ...entities,
+  ] })
+}
+
+const adaReference = { documentId: OTHER, entityId: ada.id }
+const graceReference = { documentId: SAVED, entityId: grace.id }
+function sourceCrate(id: string): unknown {
+  if (id === OTHER) return dataset('Other dataset', [ada, institute])
+  if (id === SAVED) return dataset('Saved dataset', [grace])
+  throw new Error(`unexpected ${id}`)
 }
 
 function graphs(...ids: string[]) {
@@ -72,118 +83,140 @@ function graphs(...ids: string[]) {
 
 beforeEach(() => {
   vi.resetAllMocks()
+  fetchRoCrateRaw.mockImplementation(async (id: string) => sourceCrate(id))
+  getMetadataDocument.mockResolvedValue({ group_id: 'group-1', document_path: 'datasets/example' })
+  runSparql.mockResolvedValue(graphs())
 })
 
 describe('findCandidates', () => {
-  it('lists registry entries first, then other datasets, with what they reference', async () => {
+  it('resolves saved references first and retains their source graph', async () => {
     lookupMetadataPath.mockResolvedValue({ winner: { document_id: REGISTRY }, conflicts: [] })
-    loadRoCrate.mockImplementation(async (documentId: string) => {
-      if (documentId === REGISTRY) return withEntities(null, [grace])
-      if (documentId === OTHER) return dataset('Other dataset', [ada, institute])
-      throw new Error(`unexpected ${documentId}`)
-    })
-    getMetadataDocument.mockResolvedValue({ document_id: OTHER, group_id: 'group-2', document_path: 'datasets/other' })
+    fetchRoCrateRaw.mockImplementation(async (id: string) => id === REGISTRY ? registryCrate(graceReference) : sourceCrate(id))
     runSparql.mockResolvedValue(graphs(OTHER, OWN, REGISTRY))
-
     const result = await registry.findCandidates('Person', { groupId: 'group-1', excludeDocumentId: OWN })
-
-    expect(runSparql.mock.calls[0][0]).toBe(
+    expect(runSparql.mock.calls[0]).toEqual([
       'SELECT DISTINCT ?g WHERE { GRAPH ?g { ?s a <http://schema.org/Person> } } LIMIT 20',
-    )
-    expect(runSparql.mock.calls[0][1]).toBe('distributed-best-effort')
-    expect(loadRoCrate.mock.calls.map((call) => call[0])).toEqual([REGISTRY, OTHER])
+      'distributed-best-effort',
+    ])
     expect(result.partial).toBe(false)
-    expect(result.candidates.map((candidate) => [candidate.entity.id, candidate.source.title, candidate.source.registry])).toEqual([
-      ['#grace', 'Entity registry', true],
-      [ada.id, 'Other dataset', false],
+    expect(result.candidates.map((item) => [item.reference, item.source.title, item.source.registry])).toEqual([
+      [graceReference, 'Saved dataset', true], [adaReference, 'Other dataset', false],
     ])
     expect(result.candidates[1].related).toEqual([institute])
-    expect(result.candidates[1].source.groupId).toBe('group-2')
   })
 
-  it('degrades to a partial answer when a dataset or the registry cannot be read', async () => {
-    lookupMetadataPath.mockRejectedValue(new ApiError(503, 'unavailable'))
-    loadRoCrate.mockImplementation(async (documentId: string) => {
-      if (documentId === BROKEN) throw new ApiError(403, 'forbidden')
-      return dataset('Other dataset', [ada, institute])
+  it('combines references from concurrent first-created registry graphs', async () => {
+    lookupMetadataPath.mockResolvedValue({ winner: { document_id: REGISTRY }, conflicts: [BROKEN] })
+    fetchRoCrateRaw.mockImplementation(async (id: string) => {
+      if (id === REGISTRY) return registryCrate(adaReference)
+      if (id === BROKEN) return registryCrate(graceReference)
+      return sourceCrate(id)
     })
-    getMetadataDocument.mockResolvedValue({ document_id: OTHER, group_id: 'group-1', document_path: 'datasets/other' })
-    runSparql.mockResolvedValue({ ...graphs(OTHER, BROKEN), complete: false })
-
     const result = await registry.findCandidates('Person', { groupId: 'group-1' })
-
-    expect(result.partial).toBe(true)
-    expect(result.candidates.map((candidate) => candidate.entity.id)).toEqual([ada.id])
+    expect(result.candidates.map((item) => item.reference)).toEqual([adaReference, graceReference])
+    expect(result.partial).toBe(false)
   })
 
-  it('skips the registry lookup without a group and fails when the search fails', async () => {
-    runSparql.mockRejectedValue(new Error('offline'))
+  it('does not merge equal fragment ids from separate source graphs', async () => {
+    runSparql.mockResolvedValue(graphs(OTHER, SAVED))
+    fetchRoCrateRaw.mockImplementation(async (id: string) => dataset(id, [{ ...grace, properties: {
+      name: [{ kind: 'text', value: id === OTHER ? 'Alice' : 'Bob' }],
+    } }]))
+    const result = await registry.findCandidates('Person')
+    expect(result.candidates).toHaveLength(2)
+    expect(result.candidates.map((item) => item.reference.documentId)).toEqual([OTHER, SAVED])
+  })
 
+  it('excludes pointer nodes from other groups registry graphs in discovery', async () => {
+    runSparql.mockResolvedValue(graphs(OTHER))
+    fetchRoCrateRaw.mockResolvedValue(registryCrate(graceReference))
+    const result = await registry.findCandidates('CreativeWork')
+    expect(result.candidates).toEqual([])
+  })
+
+  it('reports saved sources that have become inaccessible', async () => {
+    lookupMetadataPath.mockResolvedValue({ winner: { document_id: REGISTRY }, conflicts: [] })
+    fetchRoCrateRaw.mockImplementation(async (id: string) => {
+      if (id === REGISTRY) return registryCrate(adaReference)
+      throw new ApiError(403, 'forbidden')
+    })
+    const result = await registry.findCandidates('Person', { groupId: 'group-1' })
+    expect(result).toEqual({ candidates: [], partial: true, unavailable: true })
+  })
+
+  it('keeps saved candidates as partial results if discovery fails', async () => {
+    lookupMetadataPath.mockResolvedValue({ winner: { document_id: REGISTRY }, conflicts: [] })
+    fetchRoCrateRaw.mockImplementation(async (id: string) => id === REGISTRY ? registryCrate(adaReference) : sourceCrate(id))
+    runSparql.mockRejectedValue(new Error('offline'))
+    const result = await registry.findCandidates('Person', { groupId: 'group-1' })
+    expect(result.partial).toBe(true)
+    expect(result.candidates[0].reference).toEqual(adaReference)
+  })
+
+  it('reports a failed discovery with no saved candidates', async () => {
+    runSparql.mockRejectedValue(new Error('offline'))
     await expect(registry.findCandidates('Person')).rejects.toThrow('offline')
     expect(lookupMetadataPath).not.toHaveBeenCalled()
-  })
-
-  it('keeps the registry hits as a partial answer when the search fails', async () => {
-    lookupMetadataPath.mockResolvedValue({ winner: { document_id: REGISTRY }, conflicts: [] })
-    loadRoCrate.mockResolvedValue(withEntities(null, [grace]))
-    runSparql.mockRejectedValue(new Error('offline'))
-
-    const result = await registry.findCandidates('Person', { groupId: 'group-1' })
-
-    expect(result.partial).toBe(true)
-    expect(result.candidates.map((candidate) => candidate.entity.id)).toEqual(['#grace'])
   })
 })
 
 describe('saveToRegistry', () => {
-  it('creates the registry document on first use', async () => {
+  it('creates a marked registry with its first reference already included', async () => {
     lookupMetadataPath.mockRejectedValue(new ApiError(404, 'not found'))
     createMetadata.mockResolvedValue({ document_id: REGISTRY })
-
-    const saved = await registry.saveToRegistry('group-1', ada, [institute])
-
-    expect(saved).toEqual({ documentId: REGISTRY })
+    expect(await registry.saveToRegistry('group-1', adaReference)).toEqual({ documentId: REGISTRY })
     const input = createMetadata.mock.calls[0][0]
     expect(input).toMatchObject({ group_id: 'group-1', path: 'entity-registry', public: false })
-    const ids = (input.rocrate['@graph'] as Array<Record<string, unknown>>).map((node) => node['@id'])
-    expect(ids).toEqual(['ro-crate-metadata.json', './', ada.id, institute.id])
+    expect(registryReferences(input.rocrate)).toEqual([adaReference])
+    expect(JSON.stringify(input.rocrate)).not.toContain('Ada Lovelace')
+    expect(upsertContextualEntity).not.toHaveBeenCalled()
   })
 
-  it('merges into the current registry from a fresh copy', async () => {
+  it('uses independent contextual upserts for concurrent saves', async () => {
     lookupMetadataPath.mockResolvedValue({ winner: { document_id: REGISTRY }, conflicts: [] })
-    loadRoCrate.mockResolvedValue(withEntities(null, [grace, institute]))
-    replaceMetadataRoCrate.mockResolvedValue({ document_id: REGISTRY })
-
-    const saved = await registry.saveToRegistry('group-1', ada, [])
-
-    expect(saved).toEqual({ documentId: REGISTRY })
-    expect(loadRoCrate).toHaveBeenCalledWith(REGISTRY, { force: true })
+    fetchRoCrateRaw.mockImplementation(async (id: string) => id === REGISTRY ? registryCrate(adaReference) : sourceCrate(id))
+    await Promise.all([
+      registry.saveToRegistry('group-1', adaReference), registry.saveToRegistry('group-1', graceReference),
+    ])
+    expect(upsertContextualEntity.mock.calls).toEqual([
+      [REGISTRY, referenceNode(adaReference)], [REGISTRY, referenceNode(graceReference)],
+    ])
     expect(createMetadata).not.toHaveBeenCalled()
-    const graph = replaceMetadataRoCrate.mock.calls[0][1].rocrate['@graph'] as Array<Record<string, unknown>>
-    expect(graph.map((node) => node['@id'])).toEqual(['ro-crate-metadata.json', './', '#grace', institute.id, ada.id])
   })
 
-  it('merges into the registry another save created first', async () => {
-    lookupMetadataPath
-      .mockRejectedValueOnce(new ApiError(404, 'not found'))
-      .mockResolvedValueOnce({ winner: { document_id: REGISTRY }, conflicts: [] })
-    createMetadata.mockRejectedValue(new ApiError(409, 'path taken'))
-    loadRoCrate.mockResolvedValue(withEntities(null, [grace]))
-    replaceMetadataRoCrate.mockResolvedValue({ document_id: REGISTRY })
-
-    const saved = await registry.saveToRegistry('group-1', ada, [])
-
-    expect(saved).toEqual({ documentId: REGISTRY })
-    expect(createMetadata).toHaveBeenCalledTimes(1)
-    expect(replaceMetadataRoCrate).toHaveBeenCalledTimes(1)
-  })
-
-  it('reports a failed replace without retrying it', async () => {
+  it('refuses to modify an ordinary dataset at the reserved registry path', async () => {
     lookupMetadataPath.mockResolvedValue({ winner: { document_id: REGISTRY }, conflicts: [] })
-    loadRoCrate.mockResolvedValue(withEntities(null, []))
-    replaceMetadataRoCrate.mockRejectedValue(new ApiError(503, 'unavailable'))
+    fetchRoCrateRaw.mockImplementation(async (id: string) => id === REGISTRY ? dataset('Research', [grace]) : sourceCrate(id))
+    await expect(registry.saveToRegistry('group-1', adaReference)).rejects.toThrow('already used by another dataset')
+    expect(upsertContextualEntity).not.toHaveBeenCalled()
+    expect(createMetadata).not.toHaveBeenCalled()
+  })
 
-    await expect(registry.saveToRegistry('group-1', ada, [])).rejects.toBeInstanceOf(ApiError)
-    expect(replaceMetadataRoCrate).toHaveBeenCalledTimes(1)
+  it('uses a marked conflict without modifying an unmarked winner', async () => {
+    lookupMetadataPath.mockResolvedValue({ winner: { document_id: REGISTRY }, conflicts: [BROKEN] })
+    fetchRoCrateRaw.mockImplementation(async (id: string) => {
+      if (id === REGISTRY) return dataset('Research', [grace])
+      if (id === BROKEN) return registryCrate(graceReference)
+      return sourceCrate(id)
+    })
+    await registry.saveToRegistry('group-1', adaReference)
+    expect(upsertContextualEntity).toHaveBeenCalledWith(BROKEN, referenceNode(adaReference))
+    expect(createMetadata).not.toHaveBeenCalled()
+  })
+
+  it('does not save descriptions that exist only in an unsaved draft', async () => {
+    await expect(registry.saveToRegistry('group-1', { ...adaReference, documentId: '' })).rejects.toThrow('Save the dataset first')
+    await expect(registry.saveToRegistry('group-1', { ...adaReference, entityId: '#new' })).rejects.toThrow('Save the dataset changes first')
+    expect(upsertContextualEntity).not.toHaveBeenCalled()
+    expect(createMetadata).not.toHaveBeenCalled()
+  })
+
+  it('does not replay an uncertain upsert failure', async () => {
+    lookupMetadataPath.mockResolvedValue({ winner: { document_id: REGISTRY }, conflicts: [] })
+    fetchRoCrateRaw.mockImplementation(async (id: string) => id === REGISTRY ? registryCrate(graceReference) : sourceCrate(id))
+    upsertContextualEntity.mockRejectedValue(new ApiError(503, 'unavailable'))
+    await expect(registry.saveToRegistry('group-1', adaReference)).rejects.toBeInstanceOf(ApiError)
+    expect(upsertContextualEntity).toHaveBeenCalledTimes(1)
+    expect(createMetadata).not.toHaveBeenCalled()
   })
 })
