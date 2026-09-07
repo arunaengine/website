@@ -6,6 +6,8 @@ import type { ToolSet } from 'ai'
 
 function bridge(): NotebookBridge {
   return {
+    scope: () => 'notebook-a/session-a',
+    addCell: vi.fn(() => null), removeCell: vi.fn(() => null), moveCell: vi.fn(() => null), setCellType: vi.fn(() => null), save: vi.fn(async () => null), capture: vi.fn(async () => 'captured-dataset'),
     summary: () => ({
       name: 'counts',
       bucket: 'lab-data',
@@ -41,6 +43,35 @@ function call(tools: ToolSet, name: string, input: Record<string, unknown>) {
 }
 
 describe('notebookTools', () => {
+  it.each(['start_notebook_kernel', 'stop_notebook_kernel', 'run_notebook_cell', 'remove_notebook_cell', 'capture_notebook'])('rejects a changed target after approval: %s', async (name) => {
+    const api = bridge()
+    let scope = 'A'
+    api.scope = () => scope
+    let approve = (_value: boolean) => {}
+    const gate: ApprovalGate = { enabled: () => true, ask: () => new Promise<boolean>(resolve => { approve = resolve }) }
+    const pending = call(notebookTools(api, gate), name, { cell_id: 'c1' })
+    scope = 'B'
+    approve(true)
+    expect(await pending).toMatchObject({ error: expect.stringContaining('changed while waiting') })
+    for (const action of [api.startKernel, api.stopKernel, api.runCell, api.removeCell, api.capture]) expect(action).not.toHaveBeenCalled()
+  })
+
+  it('offers cell construction, ordering, saving, and capture through the gate', async () => {
+    const api = bridge()
+    const { gate: value } = gate(true, true)
+    const tools = notebookTools(api, value)
+    await call(tools, 'add_notebook_cell', { kind: 'markdown', source: '# Plan', after_cell_id: 'c1' })
+    expect(api.addCell).toHaveBeenCalledWith('markdown', '# Plan', 'c1')
+    await call(tools, 'move_notebook_cell', { cell_id: 'c1', offset: 1 })
+    expect(api.moveCell).toHaveBeenCalledWith('c1', 1)
+    await call(tools, 'set_notebook_cell_type', { cell_id: 'c1', kind: 'code' })
+    expect(api.setCellType).toHaveBeenCalledWith('c1', 'code')
+    await call(tools, 'save_notebook', {})
+    expect(api.save).toHaveBeenCalledOnce()
+    expect(await call(tools, 'capture_notebook', {})).toMatchObject({ document_id: 'captured-dataset' })
+  })
+
+
   it('asks before running a cell even with the gate off', async () => {
     const api = bridge()
     const { gate: value, asked } = gate(true, false)

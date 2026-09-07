@@ -2,7 +2,7 @@
 import type { NotebookStore } from '@/composables/useNotebook'
 import type { NotebookSessionStore } from '@/composables/useNotebookSession'
 import type { NotebookBridge, NotebookSummary } from '@/lib/assistant/notebookTools'
-import { outputText } from './nbformat'
+import { cellType, outputText, type NotebookCellType } from './nbformat'
 import { declaredKind, sessionProblems, sessionStartDraft } from './submit'
 import { SESSION_RUNTIMES, sessionRuntimeById } from './runtimes'
 
@@ -55,8 +55,48 @@ export function createNotebookBridge(
     return session.running.value ? null : 'The session did not start.'
   }
 
+  function editable(cellId: string): string | null {
+    if (!notebook.cellById(cellId)) return `There is no cell ${cellId} in this notebook.`
+    const state = session.cellStates.value[cellId]?.state
+    return state === 'queued' || state === 'running' ? 'Wait for this cell to finish before editing it.' : null
+  }
+  function validType(kind: NotebookCellType): string | null {
+    if (!['code', 'markdown', 'bash', 'pipeline'].includes(kind)) return 'Choose Code, Markdown, Bash, or Pipeline.'
+    return kind === 'bash' && sessionRuntimeById(notebook.meta.value?.runtime ?? '')?.lang !== 'python' ? 'Bash cells need a Python kernel.' : null
+  }
+
   return {
     summary,
+    scope: () => JSON.stringify([notebook.scope.value, notebook.generation.value, session.jobId.value]),
+    addCell: (kind, source, after) => {
+      if (!notebook.meta.value) return 'The notebook is still loading.'
+      const invalid = validType(kind)
+      if (invalid) return invalid
+      const index = after === undefined ? undefined : notebook.cells.value.findIndex((cell) => cell.id === after)
+      if (index === -1) return `There is no cell ${after} in this notebook.`
+      const cell = notebook.addCell(kind === 'pipeline' ? 'raw' : kind === 'bash' ? 'code' : kind, index === undefined ? undefined : index + 1, kind === 'bash' ? `%%bash\n${source.replace(/^%%bash\r?\n?/, '')}` : source, kind === 'pipeline' ? { kind: 'pipeline' } : undefined)
+      notebook.selectCell(cell.id)
+      return null
+    },
+    removeCell: (id) => { const error = editable(id); if (error) return error; notebook.removeCell(id); return null },
+    moveCell: (id, offset) => {
+      const error = editable(id)
+      if (error) return error
+      const index = notebook.cells.value.findIndex((cell) => cell.id === id) + offset
+      if (!Number.isInteger(offset) || index < 0 || index >= notebook.cells.value.length) return 'The move would leave the notebook.'
+      notebook.moveCell(id, offset)
+      return null
+    },
+    setCellType: (id, kind) => {
+      const error = editable(id) ?? validType(kind)
+      if (error) return error
+      const cell = notebook.cellById(id)!
+      if (kind === 'pipeline' && cell.source.trim() && cellType(cell) !== 'pipeline') return 'Only an empty cell can become a Pipeline cell.'
+      notebook.setCellType(id, kind)
+      return null
+    },
+    save: async () => await notebook.save() ? (notebook.dirty.value ? 'Saved the earlier snapshot; newer edits still need saving.' : null) : notebook.saveError.value ?? 'The notebook could not be saved.',
+    capture: () => notebook.capture(),
     startKernel,
     stopKernel: async () => {
       if (!session.running.value) return 'No session is running.'
@@ -66,31 +106,25 @@ export function createNotebookBridge(
     setKernel: (patch) => {
       const meta = notebook.meta.value
       if (!meta) return 'The notebook is still loading.'
-      if (patch.runtime !== undefined) {
-        if (!sessionRuntimeById(patch.runtime)) {
-          return `Unknown runtime. This portal offers ${SESSION_RUNTIMES.map((runtime) => runtime.id).join(', ')}.`
-        }
-        notebook.patchMeta({ runtime: patch.runtime })
-      }
-      if (patch.dependencies !== undefined) {
-        const kind = patch.dependency_kind ?? declaredKind(notebook.meta.value ?? meta)
-        if (!kind) return 'This runtime takes no dependency list.'
-        notebook.patchMeta({ dependencies: { kind, text: patch.dependencies } })
-      }
-      if (patch.cpu_cores !== undefined || patch.ram_gb !== undefined) {
-        notebook.patchMeta({
-          resources: {
-            ...(notebook.meta.value?.resources ?? {}),
-            ...(patch.cpu_cores !== undefined ? { cpu_cores: patch.cpu_cores } : {}),
-            ...(patch.ram_gb !== undefined ? { ram_bytes: Math.floor(patch.ram_gb * 1_000_000_000) } : {}),
-          },
-        })
-      }
+      if (!Object.values(patch).some((value) => value !== undefined)) return null
+      const runtime = patch.runtime ?? meta.runtime
+      if (!sessionRuntimeById(runtime)) return `Unknown runtime. Choose ${SESSION_RUNTIMES.map((entry) => entry.id).join(', ')}.`
+      if (patch.cpu_cores !== undefined && (!Number.isInteger(patch.cpu_cores) || patch.cpu_cores < 1 || patch.cpu_cores > 4_294_967_295)) return 'CPU cores must be a positive whole number.'
+      if (patch.ram_gb !== undefined && (!Number.isFinite(patch.ram_gb) || Math.floor(patch.ram_gb * 1_000_000_000) < 1 || patch.ram_gb > 9_223_372_036)) return 'RAM must be positive and within the supported range.'
+      const kind = patch.dependency_kind ?? declaredKind({ ...meta, runtime })
+      if (patch.dependency_kind !== undefined && patch.dependencies === undefined) return 'Provide the dependency file text with its kind.'
+      if (patch.dependencies !== undefined && (runtime === 'deno-notebook' ? kind !== 'deno' : kind !== 'requirements' && kind !== 'conda')) return 'The dependency kind does not match this runtime.'
+      if (patch.runtime !== undefined && patch.dependencies === undefined && meta.dependencies?.text.trim() && (runtime === 'deno-notebook') !== (meta.dependencies.kind === 'deno')) return 'Replace the dependency list when changing between Python and Deno.'
+      notebook.patchMeta({
+        ...(patch.runtime !== undefined ? { runtime } : {}),
+        ...(patch.dependencies !== undefined && kind ? { dependencies: { kind, text: patch.dependencies } } : {}),
+        ...(patch.cpu_cores !== undefined || patch.ram_gb !== undefined ? { resources: { ...meta.resources, ...(patch.cpu_cores !== undefined ? { cpu_cores: patch.cpu_cores } : {}), ...(patch.ram_gb !== undefined ? { ram_bytes: Math.floor(patch.ram_gb * 1_000_000_000) } : {}) } } : {}),
+      })
       return null
     },
     editCell: (cellId, source) => {
-      const cell = notebook.cellById(cellId)
-      if (!cell) return `There is no cell ${cellId} in this notebook.`
+      const error = editable(cellId)
+      if (error) return error
       notebook.setSource(cellId, source)
       return null
     },
