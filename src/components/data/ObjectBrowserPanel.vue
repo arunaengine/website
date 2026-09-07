@@ -13,13 +13,12 @@ import Spinner from '@/components/ui/Spinner.vue'
 import ObjectBrowserSkeleton from '@/components/data/ObjectBrowserSkeleton.vue'
 import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import { useAruna } from '@/composables/useAruna'
-import { useGroupContext, useGroupSelection } from '@/composables/useGroupSelection'
+import { useGroupSelection } from '@/composables/useGroupSelection'
 import { useS3, s3ErrorMessage, isS3AuthError, isS3NetworkError, type BucketEntry, type FolderEntry, type ObjectEntry } from '@/composables/useS3'
 import { contextKey, shouldOpenContext } from '@/composables/s3/context'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useStagingReferences } from '@/composables/useStagingReferences'
 import { formatBytes, relativeTime } from '@/lib/utils'
-import { isNotebookKey } from '@/lib/notebook/document'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import { computed, ref, watch } from 'vue'
 import { Boxes, Check, ChevronsUpDown, KeyRound, Link2, ShieldAlert } from '@lucide/vue'
@@ -44,9 +43,10 @@ const props = withDefaults(
     nodeId?: string | null
     /** Checkbox multi-select of objects and folders (emits `add`). */
     selectable?: boolean
-    notebooksOnly?: boolean
+    /** Embedded in a host surface: the list drops its own frame. */
+    flush?: boolean
   }>(),
-  { bucket: undefined, prefix: '', nodeId: null, selectable: false, notebooksOnly: false },
+  { bucket: undefined, prefix: '', nodeId: null, selectable: false, flush: false },
 )
 
 const emit = defineEmits<{
@@ -76,9 +76,7 @@ const requiredNodeName = computed(() =>
 )
 
 const selectedGroupId = ref(props.groupId ?? s3.activeContext.value?.groupId ?? '')
-const { groupsLoading, hasGroups } = props.notebooksOnly
-  ? useGroupContext(selectedGroupId)
-  : useGroupSelection(selectedGroupId)
+const { groupsLoading, hasGroups } = useGroupSelection(selectedGroupId)
 watch(() => props.groupId, (groupId) => {
   if (groupId !== undefined) selectedGroupId.value = groupId
 })
@@ -169,9 +167,7 @@ const visibleBuckets = computed(() => buckets.value.filter((entry) => !isWorkspa
 
 const folders = ref<FolderEntry[]>([])
 const objects = ref<ObjectEntry[]>([])
-const visibleObjects = computed(() => props.notebooksOnly
-  ? objects.value.filter((object) => isNotebookKey(object.key))
-  : objects.value)
+const visibleObjects = computed(() => objects.value)
 const nextToken = ref<string | undefined>(undefined)
 const listLoading = ref(false)
 const listError = ref<string | null>(null)
@@ -386,7 +382,7 @@ const isEmpty = computed(
       </DropdownMenu>
       <span v-if="props.groupId === undefined" :title="requiredNodeId ?? undefined">on {{ requiredNodeName }}</span>
       <div class="ml-auto">
-        <slot name="actions" :bucket="activeBucket" :group-id="selectedGroupId" :ready="canBrowse" />
+        <slot name="actions" :bucket="activeBucket" :group-id="selectedGroupId" :prefix="s3Prefix" :ready="canBrowse" />
       </div>
     </div>
 
@@ -437,7 +433,7 @@ const isEmpty = computed(
       </aside>
 
       <div class="min-w-0">
-        <EmptyState v-if="!activeBucket" class="h-full" :title="notebooksOnly ? 'Select a bucket to browse or create notebooks.' : 'Select a bucket to browse its objects.'" />
+        <EmptyState v-if="!activeBucket" class="h-full" title="Select a bucket to browse its objects." />
         <template v-else>
           <div class="flex min-w-0 items-center gap-2 pb-2">
             <Breadcrumbs :bucket="activeBucket" :path="prefix" @navigate="navigateTo" />
@@ -445,15 +441,15 @@ const isEmpty = computed(
           </div>
           <!-- Fixed columns plus a truncating name keep the table inside narrow
                dialogs; Modified only appears once the container has room. -->
-          <div class="@container overflow-hidden rounded-md border border-border">
+          <div class="@container overflow-hidden" :class="flush ? '' : 'rounded-md border border-border'">
             <p v-if="listError" class="border-b border-border px-3 py-2 text-xs text-destructive">{{ listError }}</p>
-            <div tabindex="0" role="region" :aria-label="notebooksOnly ? 'Notebooks' : 'Objects'" class="overflow-y-auto" :class="notebooksOnly ? 'max-h-[60dvh]' : 'max-h-[260px]'">
+            <div tabindex="0" role="region" aria-label="Objects" class="max-h-[260px] overflow-y-auto">
               <table class="w-full table-fixed text-sm">
-                <thead class="bg-muted/50 text-[11px] uppercase tracking-wider text-muted-foreground">
+                <thead class="hidden bg-muted/50 text-[11px] uppercase tracking-wider text-muted-foreground @xs:table-header-group">
                   <tr>
                     <th v-if="selectable" class="w-10 px-3 py-1.5"></th>
                     <th scope="col" class="px-3 py-1.5 text-left font-semibold">Name</th>
-                    <th scope="col" class="w-24 px-3 py-1.5 text-right font-semibold">Size</th>
+                    <th scope="col" class="hidden w-24 px-3 py-1.5 text-right font-semibold @xs:table-cell">Size</th>
                     <th scope="col" class="hidden w-24 px-3 py-1.5 text-left font-semibold @sm:table-cell">Modified</th>
                   </tr>
                 </thead>
@@ -490,7 +486,7 @@ const isEmpty = computed(
                         </span>
                       </span>
                     </td>
-                    <td class="w-24 whitespace-nowrap px-3 py-2 text-right text-xs text-muted-foreground">-</td>
+                    <td class="hidden w-24 whitespace-nowrap px-3 py-2 text-right text-xs text-muted-foreground @xs:table-cell">-</td>
                     <td class="hidden w-24 whitespace-nowrap px-3 py-2 text-xs text-muted-foreground @sm:table-cell">-</td>
                   </tr>
                   <tr
@@ -524,11 +520,11 @@ const isEmpty = computed(
                         </span>
                       </span>
                     </td>
-                    <td class="w-24 whitespace-nowrap px-3 py-2 text-right font-mono text-xs text-muted-foreground">{{ object.size !== undefined ? formatBytes(object.size) : '-' }}</td>
+                    <td class="hidden w-24 whitespace-nowrap px-3 py-2 text-right font-mono text-xs text-muted-foreground @xs:table-cell">{{ object.size !== undefined ? formatBytes(object.size) : '-' }}</td>
                     <td class="hidden w-24 whitespace-nowrap px-3 py-2 text-xs text-muted-foreground @sm:table-cell">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '-' }}</td>
                   </tr>
                   <tr v-if="isEmpty">
-                    <td :colspan="selectable ? 4 : 3" class="px-3 py-6 text-center text-xs text-muted-foreground">{{ notebooksOnly ? (nextToken ? 'No notebooks on this page. Load more to keep looking.' : 'No notebooks in this folder.') : 'This prefix is empty.' }}</td>
+                    <td :colspan="selectable ? 4 : 3" class="px-3 py-6 text-center text-xs text-muted-foreground">This prefix is empty.</td>
                   </tr>
                 </tbody>
               </table>

@@ -26,8 +26,11 @@ afterEach(() => {
 describe('notebook keys', () => {
   it('names the file and its dependency list beside it', () => {
     expect(notebookKey('counts')).toBe('notebooks/counts.ipynb')
-    expect(dependencyKey('counts', 'requirements')).toBe('notebooks/counts.requirements.txt')
-    expect(dependencyKey('counts', 'deno')).toBe('notebooks/counts.deno.json')
+    expect(notebookKey('counts', 'runs/june/')).toBe('runs/june/counts.ipynb')
+    expect(notebookKey('counts', '')).toBe('counts.ipynb')
+    expect(dependencyKey('notebooks/counts.ipynb', 'requirements')).toBe('notebooks/counts.requirements.txt')
+    expect(dependencyKey('runs/june/counts.ipynb', 'requirements')).toBe('runs/june/counts.requirements.txt')
+    expect(dependencyKey('counts.ipynb', 'deno')).toBe('counts.deno.json')
   })
 
   it('reads the name back out of a key', () => {

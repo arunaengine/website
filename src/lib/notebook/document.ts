@@ -8,8 +8,16 @@ export const NOTEBOOK_SUFFIX = '.ipynb'
 export const NOTEBOOK_DATA_PREFIX = 'data/'
 export const AUTOSAVE_INTERVAL_MS = 300_000
 
-export function notebookKey(name: string): string {
-  return `${NOTEBOOK_PREFIX}${name}${NOTEBOOK_SUFFIX}`
+/** Folder part of a key, trailing slash included; empty at the bucket root. */
+export function keyFolder(key: string): string {
+  const cut = key.lastIndexOf('/')
+  return cut < 0 ? '' : key.slice(0, cut + 1)
+}
+
+/** A notebook may live in any folder; `notebooks/` is only the default. */
+export function notebookKey(name: string, folder: string = NOTEBOOK_PREFIX): string {
+  const clean = folder.replace(/^\/+|\/+$/g, '')
+  return `${clean ? `${clean}/` : ''}${name}${NOTEBOOK_SUFFIX}`
 }
 
 /** The name inside the key, used for the file names beside the notebook. */
@@ -23,8 +31,8 @@ export function isNotebookKey(key: string): boolean {
 }
 
 /** Key of the dependency list the session stages, beside the notebook. */
-export function dependencyKey(name: string, kind: 'requirements' | 'conda' | 'deno'): string {
-  return `${NOTEBOOK_PREFIX}${name}.${dependencyFileName(kind)}`
+export function dependencyKey(key: string, kind: 'requirements' | 'conda' | 'deno'): string {
+  return `${keyFolder(key)}${notebookName(key)}.${dependencyFileName(kind)}`
 }
 
 /** A file name that is safe as an object key segment. */

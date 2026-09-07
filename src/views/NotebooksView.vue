@@ -17,7 +17,7 @@ import { activeGroupId } from '@/composables/useGroupSelection'
 import { useNotebookLocation } from '@/composables/useNotebookLocation'
 import { useS3 } from '@/composables/useS3'
 import { featureEnabled } from '@/lib/config'
-import { NOTEBOOK_PREFIX, notebookKey, notebookSlug } from '@/lib/notebook/document'
+import { isNotebookKey, notebookKey, notebookSlug } from '@/lib/notebook/document'
 import { NotebookPen } from '@lucide/vue'
 
 const router = useRouter()
@@ -35,7 +35,9 @@ const newNotebookOpen = ref(false)
 const newNotebookName = ref('')
 const bucket = ref('')
 const groupId = ref('')
-const notebookTarget = computed(() => notebookKey(notebookSlug(newNotebookName.value)))
+// A notebook is created in the folder the browser is showing, not a fixed one.
+const folder = ref('')
+const notebookTarget = computed(() => notebookKey(notebookSlug(newNotebookName.value), folder.value))
 const canCreate = computed(() => Boolean(
   newNotebookName.value.trim() &&
   s3.activeContext.value?.groupId === groupId.value &&
@@ -44,17 +46,19 @@ const canCreate = computed(() => Boolean(
 
 watch(s3.activeContext, () => { newNotebookOpen.value = false })
 
-function openNewNotebook(selectedBucket: string, selectedGroup: string) {
-  if (!selectedBucket || !s3.canWrite(selectedBucket, NOTEBOOK_PREFIX)) return
+function openNewNotebook(selectedBucket: string, selectedGroup: string, selectedFolder: string) {
+  if (!selectedBucket || !s3.canWrite(selectedBucket, selectedFolder)) return
   bucket.value = selectedBucket
   groupId.value = selectedGroup
+  folder.value = selectedFolder
   newNotebookName.value = ''
   newNotebookOpen.value = true
 }
 
 function openNotebook(entry: { bucket: string; key: string }) {
   const context = s3.activeContext.value
-  if (!context) return
+  // The browser lists every object; only a notebook opens as one.
+  if (!context || !isNotebookKey(entry.key)) return
   void router.push({
     name: 'notebook',
     params: { bucketId: entry.bucket, key: entry.key },
@@ -82,18 +86,17 @@ function createNotebook() {
       <div class="container py-4">
         <ObjectBrowserPanel
           :key="saved.scope.value"
-          notebooks-only
           :initial-bucket="initial?.bucket"
           :prefix="initial?.prefix"
           :group-id="activeGroupId"
           @navigate="saved.remember($event)"
           @select="openNotebook"
         >
-          <template #actions="{ bucket: selectedBucket, groupId: selectedGroup, ready }">
+          <template #actions="{ bucket: selectedBucket, groupId: selectedGroup, prefix: selectedFolder, ready }">
             <Button
               size="sm"
-              :disabled="!ready || !selectedBucket || !s3.canWrite(selectedBucket, NOTEBOOK_PREFIX)"
-              @click="openNewNotebook(selectedBucket, selectedGroup)"
+              :disabled="!ready || !selectedBucket || !s3.canWrite(selectedBucket, selectedFolder)"
+              @click="openNewNotebook(selectedBucket, selectedGroup, selectedFolder)"
             ><NotebookPen class="h-4 w-4" /> New notebook</Button>
           </template>
         </ObjectBrowserPanel>

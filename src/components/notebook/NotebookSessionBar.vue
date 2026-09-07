@@ -137,7 +137,7 @@ async function start(restart = false) {
     workspaceBucket: current.workspace_bucket,
     ...(declared
       ? {
-          dependencyKey: dependencyKey(notebook.name.value, declared.kind),
+          dependencyKey: dependencyKey(notebook.key.value, declared.kind),
           dependencyKind: declared.kind,
           dependencyText: declared.text,
         }

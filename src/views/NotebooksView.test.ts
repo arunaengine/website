@@ -108,35 +108,47 @@ describe('notebook workspace', () => {
     app.unmount()
   })
 
-  it('keeps folders and notebooks while filtering ordinary files', async () => {
+  it('lists every object and opens only a notebook', async () => {
     listObjects.mockResolvedValue({
       folders: [{ prefix: 'notebooks/', name: 'notebooks' }],
       objects: [{ key: 'analysis.IPYNB', name: 'analysis.IPYNB' }, { key: 'reads.csv', name: 'reads.csv' }],
     })
     const root = await render()
     expect(content(root)).toContain('notebooks/')
-    expect(content(root)).not.toContain('reads.csv')
+    expect(content(root)).toContain('reads.csv')
+    await click(element(root, (node) => node.tag === 'tr' && content(node).includes('reads.csv')))
+    expect(push).not.toHaveBeenCalled()
     await click(element(root, (node) => node.tag === 'tr' && content(node).includes('analysis.IPYNB')))
     expect(push).toHaveBeenCalledWith({ name: 'notebook', params: { bucketId: 'reef', key: 'analysis.IPYNB' }, query: { group: 'group-1' } })
   })
 
-  it('keeps pagination available when a page contains no notebooks', async () => {
+  it('keeps pagination available across pages', async () => {
     listObjects.mockResolvedValueOnce({ folders: [], objects: [{ key: 'reads.csv', name: 'reads.csv' }], nextToken: 'next' })
       .mockResolvedValueOnce({ folders: [], objects: [{ key: 'later.ipynb', name: 'later.ipynb' }] })
     const root = await render()
-    expect(content(root)).toContain('No notebooks on this page')
+    expect(content(root)).toContain('reads.csv')
     await click(button(root, 'Load more'))
     expect(listObjects).toHaveBeenLastCalledWith('reef', '', 'next', null)
     expect(content(root)).toContain('later.ipynb')
   })
 
-  it('opens a named notebook in the selected writable bucket', async () => {
+  it('opens a named notebook in the browsed folder', async () => {
     const root = await render()
     await click(button(root, 'New notebook'))
     expect(button(root, 'Open').props.disabled).toBe(true)
     await typeValue(input(root, 'aria-label', 'Notebook name'), 'First look')
     await click(button(root, 'Open'))
-    expect(push).toHaveBeenCalledWith({ name: 'notebook', params: { bucketId: 'reef', key: 'notebooks/first-look.ipynb' }, query: { group: 'group-1' } })
+    expect(push).toHaveBeenCalledWith({ name: 'notebook', params: { bucketId: 'reef', key: 'first-look.ipynb' }, query: { group: 'group-1' } })
+  })
+
+  it('creates the notebook inside the folder the browser shows', async () => {
+    listObjects.mockResolvedValue({ folders: [{ prefix: 'runs/', name: 'runs' }], objects: [] })
+    const root = await render()
+    await click(element(root, (node) => node.tag === 'tr' && content(node).includes('runs/')))
+    await click(button(root, 'New notebook'))
+    await typeValue(input(root, 'aria-label', 'Notebook name'), 'First look')
+    await click(button(root, 'Open'))
+    expect(push).toHaveBeenCalledWith({ name: 'notebook', params: { bucketId: 'reef', key: 'runs/first-look.ipynb' }, query: { group: 'group-1' } })
   })
 
   it('blocks creation when write access is lost', async () => {
