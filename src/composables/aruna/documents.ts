@@ -5,6 +5,7 @@ import {
   type CreateMetadataResponse,
   type MetadataDocumentListItem,
   type MetadataDocumentSummary,
+  type MetadataPathResponse,
   type MetadataRoCrateResponse,
   type ReplaceMetadataRoCrateRequest,
 } from '@/lib/api'
@@ -122,6 +123,11 @@ export async function replaceMetadataRoCrate(
   } finally {
     saving.value = false
   }
+}
+
+/** The document stored under an exact path of a group; 404 when none is visible. */
+export async function lookupMetadataPath(groupId: string, path: string): Promise<MetadataPathResponse> {
+  return request<MetadataPathResponse>(`/metadata/groups/${encodeURIComponent(groupId)}/path`, { query: { path } })
 }
 
 export async function deleteMetadataDocument(documentId: string): Promise<void> {
