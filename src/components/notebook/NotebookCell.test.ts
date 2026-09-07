@@ -21,7 +21,7 @@ async function render(kind: Nbformat.CellKind, source: string, markdownLocked = 
     vue: { ...VueRuntime, defineAsyncComponent: () => Editor },
     '@lucide/vue': new Proxy({}, { get: () => Slotted }),
     '@/components/ui/Select.vue': moduleDefault(defineComponent({ props: ['modelValue', 'options'], emits: ['update:modelValue'], setup: (props, { emit }) => () => h('select', { value: props.modelValue, options: props.options, onChange: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value) }) })),
-    '@/components/ui/Badge.vue': moduleDefault(Slotted),
+    '@/components/ui/Spinner.vue': moduleDefault(Slotted),
     '@/components/ui/Button.vue': moduleDefault(Slotted),
     '@/components/ui/IconButton.vue': moduleDefault(Slotted),
     '@/components/assistant/AssistantMarkdown.vue': moduleDefault(defineComponent({ props: ['text', 'imageSources'], setup: (props) => () => h('article', { images: props.imageSources }, props.text) })),

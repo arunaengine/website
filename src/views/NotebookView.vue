@@ -203,7 +203,7 @@ const savedLabel = computed(() => {
       sign-in-description="A notebook reads and writes stored data."
       :redirect-to="redirectTo"
     >
-      <div class="container space-y-4 py-4">
+      <div class="container space-y-6 py-6">
         <Notice v-if="notebook.loadError.value" tone="error">{{ notebook.loadError.value }}</Notice>
         <Notice v-if="notebook.saveError.value" tone="error">{{ notebook.saveError.value }}</Notice>
         <Notice v-if="notebook.restoredCopy.value" tone="warning">
@@ -213,7 +213,7 @@ const savedLabel = computed(() => {
           </Button>
         </Notice>
 
-        <div class="grid items-start gap-5" :class="filesOpen ? 'xl:grid-cols-[18rem_minmax(0,1fr)]' : 'xl:grid-cols-[3rem_minmax(0,1fr)]'">
+        <div class="grid items-start gap-6" :class="filesOpen ? 'xl:grid-cols-[18rem_minmax(0,1fr)]' : 'xl:grid-cols-[3rem_minmax(0,1fr)]'">
           <NotebookFiles :collapsed="!filesOpen" class="max-h-[70vh] overflow-auto" @toggle="filesOpen = !filesOpen" />
 
           <div class="min-w-0 space-y-3">
@@ -226,7 +226,7 @@ const savedLabel = computed(() => {
               <IconButton v-if="session.ended.value && session.jobId.value" label="Session report" @click="reportOpen = true"><FileText class="size-3.5" /></IconButton>
               <IconButton :label="markdownLocked ? 'Unlock Markdown' : 'Lock Markdown'" :aria-pressed="markdownLocked" @click="markdownLocked = !markdownLocked"><component :is="markdownLocked ? Lock : Unlock" class="size-3.5" /></IconButton>
               <Button size="sm" :disabled="notebook.saving.value" @click="notebook.save()">
-                <Save class="size-3.5" /> Save
+                <Spinner v-if="notebook.saving.value" class="text-current" aria-hidden="true" /><Save v-else class="size-3.5" /> Save
               </Button>
             </div>
 

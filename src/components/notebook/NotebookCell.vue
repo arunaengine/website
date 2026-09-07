@@ -3,9 +3,9 @@
 // cell as its own small run form. The toolbar runs it and moves it.
 import { computed, defineAsyncComponent, h, nextTick, ref, watch } from 'vue'
 import Select from '@/components/ui/Select.vue'
-import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import IconButton from '@/components/ui/IconButton.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import AssistantMarkdown from '@/components/assistant/AssistantMarkdown.vue'
 import NotebookOutputs from '@/components/notebook/NotebookOutputs.vue'
 import NotebookPipelineCell from '@/components/notebook/NotebookPipelineCell.vue'
@@ -14,7 +14,7 @@ import { asyncChunkError } from '@/lib/chunk-recovery'
 import { cellType, type NotebookCell, type NotebookCellType } from '@/lib/notebook/nbformat'
 import { renderOutput } from '@/lib/notebook/outputs'
 import { sessionRuntimeById } from '@/lib/notebook/runtimes'
-import { ArrowDown, ArrowUp, Ban, GripVertical, Play, Plus, Trash2 } from '@lucide/vue'
+import { ArrowDown, ArrowUp, Ban, Check, ChevronsDown, CircleAlert, Clock, GripVertical, Play, Plus, Trash2 } from '@lucide/vue'
 
 const ScriptEditor = defineAsyncComponent({
   loader: () => import('@/components/compute/ScriptEditor.vue'),
@@ -59,6 +59,18 @@ const stateLabel = computed(() => {
   const state = runState.value
   if (!state) return ''
   return state.charAt(0).toUpperCase() + state.slice(1)
+})
+// One glyph per finished run state, in the portal's state colours; a running
+// cell shows the shared spinner instead.
+const RUN_MARKS = {
+  queued: { icon: Clock, tint: 'text-muted-foreground' },
+  done: { icon: Check, tint: 'text-emerald-600 dark:text-emerald-400' },
+  error: { icon: CircleAlert, tint: 'text-destructive' },
+  interrupted: { icon: Ban, tint: 'text-amber-600 dark:text-amber-400' },
+} as const
+const runMark = computed(() => {
+  const state = runState.value
+  return state && state in RUN_MARKS ? RUN_MARKS[state as keyof typeof RUN_MARKS] : null
 })
 const counter = computed(() => {
   if (props.cell.cell_type !== 'code') return ''
@@ -126,18 +138,25 @@ function run() {
       <IconButton label="Drag to reorder cell" draggable="true" class="cursor-grab active:cursor-grabbing" @dragstart.stop="emit('drag-cell', $event)">
         <GripVertical class="size-3.5" />
       </IconButton>
-      <Select :model-value="kind" :options="typeOptions" :disabled="busy || (markdownLocked && cell.cell_type === 'markdown')" aria-label="Cell type" class="h-6 w-auto rounded-full border-border bg-muted/40 px-2.5 py-0 text-[11px] font-medium shadow-none [&_svg]:hidden" @update:model-value="changeType" />
+      <Select :model-value="kind" :options="typeOptions" :disabled="busy || (markdownLocked && cell.cell_type === 'markdown')" aria-label="Cell type" class="h-6 w-auto gap-1 rounded-full border-border bg-muted/40 px-2.5 py-0 text-[11px] font-medium shadow-none [&_svg]:size-3" @update:model-value="changeType" />
       <code v-if="cell.cell_type === 'code'" class="font-mono text-[11px] text-muted-foreground">{{ counter }}</code>
-      <Badge v-if="stateLabel" :variant="runState === 'error' ? 'destructive' : 'outline'" size="sm">
-        {{ stateLabel }}
-      </Badge>
+      <Spinner v-if="runState === 'running'" :label="stateLabel" />
+      <component
+        :is="runMark.icon"
+        v-else-if="runMark"
+        class="size-3.5 shrink-0"
+        :class="runMark.tint"
+        role="img"
+        :aria-label="stateLabel"
+        :title="stateLabel"
+      />
       <span class="flex-1" />
       <template v-if="cell.cell_type === 'code'">
         <Button size="sm" variant="ghost" :disabled="!session.live.value || busy" @click="run">
           <Play class="size-3.5" /> Run
         </Button>
         <Button size="sm" variant="ghost" :disabled="!session.live.value" @click="emit('run-to-here')">
-          Run to here
+          <ChevronsDown class="size-3.5" /> Run to here
         </Button>
         <IconButton v-if="busy" label="Interrupt the kernel" @click="session.interrupt()">
           <Ban class="size-3.5" />

@@ -2,6 +2,7 @@ import { computed, defineComponent, h, ref, type Component } from 'vue'
 import * as VueRuntime from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import * as ComputeAdmin from '@/lib/computeAdmin'
+import * as StateBadge from '@/lib/stateBadge'
 import * as NotebookDocument from '@/lib/notebook/document'
 import * as NotebookRuntimes from '@/lib/notebook/runtimes'
 import * as NotebookSubmit from '@/lib/notebook/submit'
@@ -42,6 +43,11 @@ const SelectStub = defineComponent({
       value: props.modelValue,
       options: props.options,
     }),
+})
+const DialogStub = defineComponent({
+  inheritAttrs: false,
+  props: { open: Boolean },
+  setup: (props, { slots }) => () => (props.open ? h('div', slots.default?.()) : null),
 })
 const InputStub = defineComponent({
   inheritAttrs: false,
@@ -110,13 +116,17 @@ function sessionBar(): Component {
     '@lucide/vue': new Proxy({}, { get: () => IconStub }),
     '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
     '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+    '@/components/ui/Dialog.vue': moduleDefault(DialogStub),
+    '@/components/ui/DialogContent.vue': moduleDefault(Slotted('div')),
+    '@/components/ui/DialogDescription.vue': moduleDefault(Slotted('p')),
+    '@/components/ui/DialogFooter.vue': moduleDefault(Slotted('div')),
+    '@/components/ui/DialogHeader.vue': moduleDefault(Slotted('header')),
+    '@/components/ui/DialogTitle.vue': moduleDefault(Slotted('h2')),
     '@/components/ui/Input.vue': moduleDefault(InputStub),
     '@/components/ui/Notice.vue': moduleDefault(Slotted('aside')),
     '@/components/ui/Select.vue': moduleDefault(SelectStub),
-    '@/components/ui/Popover.vue': moduleDefault(defineComponent({ setup: (_, { slots }) => {
-      const open = ref(false)
-      return () => h('div', [h('div', { onClick: () => { open.value = !open.value } }, slots.default?.()), open.value ? slots.content?.() : null])
-    } })),
+    '@/components/ui/StatusDot.vue': moduleDefault(Slotted('span')),
+    '@/lib/stateBadge': StateBadge,
     '@/components/notebook/NotebookDependencies.vue': moduleDefault(Slotted('div')),
     '@/composables/notebookContext': { injectNotebook: () => context },
     '@/composables/useAruna': { useAruna: () => ({ myGroups: ref([{ id: 'group-1', name: 'Lab' }]) }) },
@@ -254,7 +264,6 @@ describe('the session bar', () => {
     // The session picked a shorter timeout; the realm value is what counts.
     const root = await render({ state: { state: 'ready', idle_after_ms: 300_000 }, running: true })
     await openOptions(root)
-    await click(button(root, 'Resources and placement'))
     const idle = select(root, 'Idle timeout')
     expect(idle.props.disabled).toBe(true)
     const labels = (idle.props.options as { label: string }[]).map((option) => option.label)
@@ -265,7 +274,6 @@ describe('the session bar', () => {
     realmIdleMs = 300_000
     const root = await render()
     await openOptions(root)
-    await click(button(root, 'Resources and placement'))
     const labels = (select(root, 'Idle timeout').props.options as { label: string }[]).map(
       (option) => option.label,
     )

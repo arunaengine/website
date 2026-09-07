@@ -1,7 +1,6 @@
 <script setup lang="ts">
 // Files stored beside the notebook; imports and picked objects go into data/.
 import { computed, onScopeDispose, ref, watch } from 'vue'
-import Button from '@/components/ui/Button.vue'
 import IconButton from '@/components/ui/IconButton.vue'
 import Notice from '@/components/ui/Notice.vue'
 import ObjectBrowserPanel from '@/components/data/ObjectBrowserPanel.vue'
@@ -115,33 +114,26 @@ async function stage(entry: TesDataRefEntry) {
 </script>
 
 <template>
-  <aside class="min-w-0 space-y-3 rounded-lg border border-border bg-card" :class="collapsed ? 'p-1' : 'p-3'">
-    <div class="flex flex-wrap items-center gap-2">
-      <span v-if="!collapsed" class="text-sm font-semibold">Files</span>
-      <span v-if="!collapsed" class="flex-1" />
-      <Button
-        v-if="!collapsed && session.live.value"
-        variant="outline"
-        size="sm"
-        :disabled="staging"
-        @click="addOpen = true"
-      >
-        <Plus class="size-3.5" /> Add files
-      </Button>
-      <Button v-if="!collapsed && bucket" variant="outline" size="sm" @click="importOpen = true; loadDataKeys()">
-        <CloudDownload class="size-3.5" /> Import
-      </Button>
+  <aside class="surface min-w-0 overflow-hidden">
+    <header class="flex h-12 items-center gap-1 border-b border-border" :class="collapsed ? 'px-2' : 'px-4'">
+      <h2 v-if="!collapsed" class="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">Files</h2>
+      <IconButton v-if="!collapsed && session.live.value" label="Add files" :disabled="staging" @click="addOpen = true">
+        <Plus class="size-4" />
+      </IconButton>
+      <IconButton v-if="!collapsed && bucket" label="Import into data/" @click="importOpen = true; loadDataKeys()">
+        <CloudDownload class="size-4" />
+      </IconButton>
       <IconButton :label="collapsed ? 'Expand files' : 'Collapse files'" :aria-expanded="!collapsed" @click="emit('toggle')"><PanelLeft class="size-4" /></IconButton>
-    </div>
+    </header>
 
-    <template v-if="!collapsed">
+    <div v-if="!collapsed" class="space-y-3 px-4 pb-4 pt-3">
       <Notice v-if="stageNote" tone="info">{{ stageNote }}</Notice>
 
       <div class="min-w-0 overflow-auto">
-        <ObjectBrowserPanel v-if="bucket" :key="panelRevision" :bucket="bucket" :group-id="notebook.meta.value?.group_id" />
+        <ObjectBrowserPanel v-if="bucket" :key="panelRevision" flush :bucket="bucket" :group-id="notebook.meta.value?.group_id" />
         <p v-else class="text-xs text-muted-foreground">This notebook has no workspace bucket yet.</p>
       </div>
-    </template>
+    </div>
 
     <TesDataRefDialog v-model:open="addOpen" mode="input" @add="stage" />
 

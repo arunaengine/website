@@ -4,28 +4,34 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
-import Popover from '@/components/ui/Popover.vue'
+import Dialog from '@/components/ui/Dialog.vue'
+import DialogContent from '@/components/ui/DialogContent.vue'
+import DialogDescription from '@/components/ui/DialogDescription.vue'
+import DialogFooter from '@/components/ui/DialogFooter.vue'
+import DialogHeader from '@/components/ui/DialogHeader.vue'
+import DialogTitle from '@/components/ui/DialogTitle.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Select from '@/components/ui/Select.vue'
+import StatusDot from '@/components/ui/StatusDot.vue'
 import NotebookDependencies from '@/components/notebook/NotebookDependencies.vue'
 import { injectNotebook } from '@/composables/notebookContext'
 import { useNow } from '@/composables/useNow'
 import { useRealmNodes } from '@/composables/useRealmNodes'
-import { SESSION_RUNTIMES, dependencyKind } from '@/lib/notebook/runtimes'
+import { SESSION_RUNTIMES, dependencyFileName, dependencyKind } from '@/lib/notebook/runtimes'
 import type { NotebookDependencies as DependencySpec } from '@/lib/notebook/nbformat'
-import { dependencyKey } from '@/lib/notebook/document'
-import { sessionProblems } from '@/lib/notebook/submit'
+import { sessionProblems, sessionStartDraft } from '@/lib/notebook/submit'
+import { toneVariant, type StateTone } from '@/lib/stateBadge'
 import { DEFAULT_SESSION_IDLE_AFTER_MS } from '@/lib/computeAdmin'
 import { useComputeAdmin } from '@/composables/useComputeAdmin'
-import { ChevronDown, CircleStop, Play, RotateCcw, Settings2 } from '@lucide/vue'
+import { ChevronDown, CircleStop, Play, RotateCcw } from '@lucide/vue'
 
 const { notebook, session } = injectNotebook()
 const { getComputeConfig } = useComputeAdmin()
 const { nodes, displayName } = useRealmNodes()
 const now = useNow(1_000)
 
-const settingsOpen = ref(false)
+const kernelOpen = ref(false)
 const dependenciesOpen = ref(false)
 
 const meta = computed(() => notebook.meta.value)
@@ -72,10 +78,19 @@ const stateLabel = computed(() => {
   if (!state) return session.jobId.value ? 'Not attached' : 'No session'
   return state.charAt(0).toUpperCase() + state.slice(1)
 })
-const stateVariant = computed(() => {
-  if (session.ended.value) return 'outline' as const
-  if (session.live.value) return 'success' as const
-  return 'warn' as const
+const stateVariant = computed(() =>
+  toneVariant(session.ended.value ? 'count' : session.live.value ? 'done' : 'attention'),
+)
+
+// The kernel light and its word, in the portal's shared state tones.
+const kernelLabel = computed(() => {
+  if (notebook.loading.value) return 'Loading'
+  if (session.live.value) return session.kernel.value === 'busy' ? 'Busy' : 'Idle'
+  return session.running.value || session.starting.value ? stateLabel.value : 'Stopped'
+})
+const kernelTone = computed<StateTone>(() => {
+  if (session.live.value) return session.kernel.value === 'busy' ? 'progress' : 'done'
+  return session.running.value || session.starting.value ? 'progress' : 'idle'
 })
 
 const idleLeft = computed(() => {
@@ -129,22 +144,9 @@ function setPlacement(patch: { node?: string; executor_kind?: string }) {
 async function start(restart = false) {
   const current = meta.value
   if (!current) return
-  const declared = current.dependencies?.kind === dependencies.value && current.dependencies.text.trim() ? current.dependencies : undefined
-  await (restart ? session.restart : session.start)({
-    groupId: current.group_id,
-    name: notebook.name.value,
-    runtime: current.runtime,
-    workspaceBucket: current.workspace_bucket,
-    ...(declared
-      ? {
-          dependencyKey: dependencyKey(notebook.key.value, declared.kind),
-          dependencyKind: declared.kind,
-          dependencyText: declared.text,
-        }
-      : {}),
-    resources: current.resources,
-    placement: current.placement,
-  })
+  await (restart ? session.restart : session.start)(
+    sessionStartDraft(current, notebook.key.value, notebook.name.value),
+  )
 }
 const pendingRun = ref(false)
 const runBusy = computed(() => pendingRun.value || session.starting.value || session.restarting.value || session.ending.value || session.kernel.value === 'busy' || Object.values(session.cellStates.value).some((cell) => cell.state === 'queued' || cell.state === 'running'))
@@ -185,106 +187,130 @@ async function saveDependencies(value: DependencySpec, restart: boolean) {
       <Button size="sm" :disabled="runBusy || Boolean(problems.length) || notebook.loading.value || !meta" @click="runNotebook">
         <Play class="size-3.5" /> {{ pendingRun || session.starting.value ? 'Starting…' : session.kernel.value === 'busy' ? 'Running…' : 'Run notebook' }}
       </Button>
-      <div class="inline-flex items-stretch">
-      <Popover>
-        <Button size="sm" variant="outline" class="rounded-r-none" aria-label="Kernel">
-          Kernel
-          <span class="flex items-center gap-1.5 text-xs text-muted-foreground" aria-label="Kernel status">
-            <span class="h-2 w-2 rounded-full" :class="session.live.value ? (session.kernel.value === 'busy' ? 'bg-amber-500' : 'bg-emerald-500') : session.running.value || session.starting.value ? 'bg-amber-500' : 'bg-muted-foreground'" />
-            {{ notebook.loading.value ? 'Loading' : session.live.value ? (session.kernel.value === 'busy' ? 'Busy' : 'Idle') : session.running.value || session.starting.value ? stateLabel : 'Stopped' }}
-          </span>
-          <ChevronDown class="size-3.5" />
-        </Button>
-        <template #content>
-          <div class="max-h-[70vh] space-y-3 overflow-y-auto">
-            <Notice v-if="problems.length" tone="warning" :lines="problems">This session cannot start yet.</Notice>
-            <Notice v-if="session.error.value" tone="error">{{ session.error.value }}</Notice>
-            <Notice v-if="session.notice.value" :tone="session.ended.value ? 'info' : 'warning'">{{ session.notice.value }}</Notice>
-              <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-                <Badge :variant="stateVariant">{{ stateLabel }}</Badge>
-                <Badge v-if="session.live.value" variant="outline" size="sm">Kernel {{ session.kernel.value }}</Badge>
-                <span v-if="idleLeft" class="text-[11px] text-muted-foreground">Idle timeout: {{ idleLeft }}</span>
-                <span v-if="session.nodeId.value" class="text-[11px] text-muted-foreground">
-                  on {{ displayName(session.nodeId.value) }}
-                </span>
-              </div>
-              <div class="flex min-w-0 flex-wrap items-center gap-2">
-                <Select
-                  :model-value="meta?.runtime ?? ''"
-                  :options="runtimeOptions"
-                  aria-label="Runtime"
-                  class="w-full"
-                  :disabled="session.running.value"
-                  @update:model-value="notebook.patchMeta({ runtime: $event })"
-                />
-                <Button variant="outline" size="sm" :disabled="!dependencies" @click="dependenciesOpen = true">
-                  Dependencies
-                </Button>
-                <Button variant="outline" size="sm" :aria-expanded="settingsOpen" @click="settingsOpen = !settingsOpen">
-                  <Settings2 class="size-3.5" /> Resources and placement
-                </Button>
-                <Button v-if="!session.running.value" variant="outline" size="sm" :disabled="runBusy || Boolean(problems.length) || notebook.loading.value || !meta" @click="start()"><Play class="size-3.5" /> Start kernel</Button>
-                <Button v-if="session.running.value" variant="outline" size="sm" :disabled="!session.live.value || session.ending.value || session.restarting.value" title="Start a fresh kernel with the saved dependencies; variables are cleared." @click="start(true)">
-                  <RotateCcw class="size-3.5" /> Restart kernel
-                </Button>
-                <Button v-if="session.running.value" variant="outline" size="sm" :disabled="session.ending.value || session.restarting.value" @click="session.end()">
-                  <CircleStop class="size-3.5" /> Stop kernel
-                </Button>
-              </div>
-
-              <div v-if="settingsOpen" class="grid gap-3 border-t border-border pt-3 ">
-                <label class="space-y-1">
-                  <span class="text-xs font-medium text-foreground">Workspace bucket</span>
-                  <Input :model-value="meta?.workspace_bucket ?? ''" disabled aria-label="Workspace bucket" />
-                  <span class="text-[11px] text-muted-foreground">The notebook and its files live here.</span>
-                </label>
-                <label class="space-y-1">
-                  <span class="text-xs font-medium text-foreground">Idle timeout</span>
-                  <Select
-                    :model-value="session.idlePickMs.value ? String(session.idlePickMs.value) : ''"
-                    :options="idleOptions"
-                    aria-label="Idle timeout"
-                    :disabled="session.running.value"
-                    @update:model-value="session.idlePickMs.value = $event ? Number($event) : null"
-                  />
-                </label>
-                <label class="space-y-1">
-                  <span class="text-xs font-medium text-foreground">Node</span>
-                  <Select
-                    :model-value="meta?.placement?.node ?? ''"
-                    :options="nodeOptions"
-                    aria-label="Node"
-                    :disabled="session.running.value"
-                    @update:model-value="setPlacement({ node: $event })"
-                  />
-                </label>
-                <label class="space-y-1">
-                  <span class="text-xs font-medium text-foreground">Executor</span>
-                  <Select
-                    :model-value="meta?.placement?.executor_kind ?? ''"
-                    :options="kindOptions"
-                    aria-label="Executor kind"
-                    :disabled="session.running.value"
-                    @update:model-value="setPlacement({ executor_kind: $event })"
-                  />
-                </label>
-                <div class="grid grid-cols-2 gap-2">
-                  <label class="space-y-1">
-                    <span class="text-xs font-medium text-foreground">CPU cores</span>
-                    <Input v-model="cpuCores" type="number" min="1" step="1" :disabled="session.running.value" />
-                  </label>
-                  <label class="space-y-1">
-                    <span class="text-xs font-medium text-foreground">RAM in GB</span>
-                    <Input v-model="ramGb" type="number" min="0" step="any" :disabled="session.running.value" />
-                  </label>
-                </div>
-              </div>
-          </div>
-        </template>
-      </Popover>
-      <Button variant="outline" size="icon-sm" class="h-8 rounded-l-none border-l-0" aria-label="Start kernel" :title="session.running.value ? 'Kernel is already running' : 'Start kernel'" :disabled="session.running.value || runBusy || Boolean(problems.length) || notebook.loading.value || !meta" @click="start()"><Play class="size-3.5" /></Button>
-      </div>
+      <Button size="sm" variant="outline" aria-label="Kernel" @click="kernelOpen = true">
+        Kernel
+        <span class="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <StatusDot :tone="kernelTone" :label="`Kernel ${kernelLabel}`" />
+          {{ kernelLabel }}
+        </span>
+        <ChevronDown class="size-3.5" />
+      </Button>
     </div>
+
+    <Dialog v-model:open="kernelOpen">
+      <DialogContent class="max-h-[85vh] max-w-lg overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Kernel</DialogTitle>
+          <DialogDescription>What this notebook runs on and where it may run. Changes apply the next time the kernel starts.</DialogDescription>
+        </DialogHeader>
+
+        <Notice v-if="problems.length" tone="warning" :lines="problems">This session cannot start yet.</Notice>
+        <Notice v-if="session.error.value" tone="error">{{ session.error.value }}</Notice>
+        <Notice v-if="session.notice.value" :tone="session.ended.value ? 'info' : 'warning'">{{ session.notice.value }}</Notice>
+
+        <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+          <Badge :variant="stateVariant">{{ stateLabel }}</Badge>
+          <Badge v-if="session.live.value" variant="outline" size="sm">Kernel {{ session.kernel.value }}</Badge>
+          <span v-if="idleLeft" class="text-[11px] text-muted-foreground">Idle timeout: {{ idleLeft }}</span>
+          <span v-if="session.nodeId.value" class="text-[11px] text-muted-foreground">
+            on {{ displayName(session.nodeId.value) }}
+          </span>
+        </div>
+
+        <div class="grid gap-3 sm:grid-cols-2">
+          <label class="space-y-1">
+            <span class="text-xs font-medium text-foreground">Runtime</span>
+            <Select
+              :model-value="meta?.runtime ?? ''"
+              :options="runtimeOptions"
+              aria-label="Runtime"
+              :disabled="session.running.value"
+              @update:model-value="notebook.patchMeta({ runtime: $event })"
+            />
+          </label>
+          <label class="space-y-1">
+            <span class="text-xs font-medium text-foreground">Idle timeout</span>
+            <Select
+              :model-value="session.idlePickMs.value ? String(session.idlePickMs.value) : ''"
+              :options="idleOptions"
+              placeholder="Realm default"
+              aria-label="Idle timeout"
+              :disabled="session.running.value"
+              @update:model-value="session.idlePickMs.value = $event ? Number($event) : null"
+            />
+          </label>
+          <label class="space-y-1">
+            <span class="text-xs font-medium text-foreground">Node</span>
+            <Select
+              :model-value="meta?.placement?.node ?? ''"
+              :options="nodeOptions"
+              placeholder="Any node"
+              aria-label="Node"
+              :disabled="session.running.value"
+              @update:model-value="setPlacement({ node: $event })"
+            />
+          </label>
+          <label class="space-y-1">
+            <span class="text-xs font-medium text-foreground">Executor</span>
+            <Select
+              :model-value="meta?.placement?.executor_kind ?? ''"
+              :options="kindOptions"
+              placeholder="Any executor"
+              aria-label="Executor kind"
+              :disabled="session.running.value"
+              @update:model-value="setPlacement({ executor_kind: $event })"
+            />
+          </label>
+          <label class="space-y-1">
+            <span class="text-xs font-medium text-foreground">CPU cores</span>
+            <Input v-model="cpuCores" type="number" min="1" step="1" :disabled="session.running.value" />
+          </label>
+          <label class="space-y-1">
+            <span class="text-xs font-medium text-foreground">RAM in GB</span>
+            <Input v-model="ramGb" type="number" min="0" step="any" :disabled="session.running.value" />
+          </label>
+          <label class="space-y-1 sm:col-span-2">
+            <span class="text-xs font-medium text-foreground">Workspace bucket</span>
+            <Input :model-value="meta?.workspace_bucket ?? ''" disabled aria-label="Workspace bucket" />
+            <span class="text-[11px] text-muted-foreground">The notebook and its files live here.</span>
+          </label>
+        </div>
+
+        <div v-if="dependencies" class="flex items-center justify-between gap-3 rounded-md border border-border/70 bg-muted/30 px-3 py-2">
+          <div class="min-w-0">
+            <p class="text-xs font-medium text-foreground">Dependencies</p>
+            <p class="text-[11px] text-muted-foreground">{{ dependencyFileName(dependencies) }} installs when the kernel starts.</p>
+          </div>
+          <Button variant="outline" size="sm" @click="kernelOpen = false; dependenciesOpen = true">Edit</Button>
+        </div>
+
+        <DialogFooter>
+          <Button
+            v-if="session.running.value"
+            variant="outline"
+            :disabled="session.ending.value || session.restarting.value"
+            @click="session.end()"
+          >
+            <CircleStop class="size-3.5" /> Stop kernel
+          </Button>
+          <Button
+            v-if="session.running.value"
+            :disabled="!session.live.value || session.ending.value || session.restarting.value"
+            title="Start a fresh kernel with the saved dependencies; variables are cleared."
+            @click="start(true)"
+          >
+            <RotateCcw class="size-3.5" /> Restart kernel
+          </Button>
+          <Button
+            v-else
+            :disabled="runBusy || Boolean(problems.length) || notebook.loading.value || !meta"
+            @click="start()"
+          >
+            <Play class="size-3.5" /> Start kernel
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
 
     <NotebookDependencies
       v-if="dependencies"

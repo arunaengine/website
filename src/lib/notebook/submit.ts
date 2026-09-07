@@ -4,8 +4,9 @@
 import { placementTags } from '@/lib/tes'
 import { TES_NETWORK_TAG } from '@/lib/quickRuntimes'
 import type { ExecutionInputRequest, SubmitExecutionRequest } from '@/lib/jobs'
-import type { NotebookPlacement, NotebookResources } from './nbformat'
-import { dependencyFileName, sessionRuntimeById } from './runtimes'
+import type { NotebookAruna, NotebookPlacement, NotebookResources } from './nbformat'
+import { dependencyKey } from './document'
+import { dependencyFileName, dependencyKind, sessionRuntimeById } from './runtimes'
 
 /** Marks the job as the session behind one notebook. */
 export const SESSION_TAG = 'aruna-engine.org/session'
@@ -90,4 +91,38 @@ export function sessionProblems(
   if (!draft.runtime.trim()) problems.push('Pick a runtime.')
   else if (!sessionRuntimeById(draft.runtime)) problems.push('Pick a runtime this portal knows.')
   return problems
+}
+
+/** The dependency list kind this runtime reads, honouring a stored conda file. */
+export function declaredKind(meta: NotebookAruna): 'requirements' | 'conda' | 'deno' | null {
+  const kind = dependencyKind(meta.runtime ?? '')
+  return kind === 'requirements' && meta.dependencies?.kind === 'conda' ? 'conda' : kind
+}
+
+/**
+ * Everything a start or restart sends, from the notebook's own settings. The
+ * toolbar and the assistant both start a session through this.
+ */
+export function sessionStartDraft(
+  meta: NotebookAruna,
+  key: string,
+  name: string,
+): Omit<SessionSubmitDraft, 'idempotencyKey'> & { dependencyText?: string } {
+  const kind = declaredKind(meta)
+  const declared = meta.dependencies?.kind === kind && meta.dependencies.text.trim() ? meta.dependencies : undefined
+  return {
+    groupId: meta.group_id,
+    name,
+    runtime: meta.runtime,
+    workspaceBucket: meta.workspace_bucket,
+    ...(declared
+      ? {
+          dependencyKey: dependencyKey(key, declared.kind),
+          dependencyKind: declared.kind,
+          dependencyText: declared.text,
+        }
+      : {}),
+    resources: meta.resources,
+    placement: meta.placement,
+  }
 }

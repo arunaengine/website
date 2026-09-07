@@ -39,9 +39,9 @@ describe('notebook input provenance', () => {
   it('collapses and expands from the file pane header', async () => {
     const { root, app } = await render()
     await click(element(root, (node) => node.props.label === 'Collapse files'))
-    expect(() => button(root, 'Add files')).toThrow()
+    expect(() => element(root, (node) => node.props.label === 'Add files')).toThrow()
     await click(element(root, (node) => node.props.label === 'Expand files'))
-    expect(button(root, 'Add files')).toBeTruthy()
+    expect(element(root, (node) => node.props.label === 'Add files')).toBeTruthy()
     app.unmount()
   })
 
