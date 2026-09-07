@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // One file from the container's working directory, read through the session and
 // shown the way the portal shows a stored file of the same kind.
-import { computed, ref, watch } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
@@ -39,39 +39,49 @@ function release() {
   error.value = null
 }
 
-async function load() {
+async function load(active: () => boolean) {
   release()
   loading.value = true
   try {
     const file = await readScratch(props.jobId, props.path, props.client)
+    if (!active()) return
     const type = file.contentType.split(';')[0].trim()
+    const body = type.startsWith('text/') || type === 'application/json' ? await file.blob.text() : ''
+    if (!active()) return
     if (type.startsWith('image/')) {
       kind.value = 'image'
       imageUrl.value = URL.createObjectURL(file.blob)
     } else if (type === 'text/html') {
       kind.value = 'html'
-      text.value = await file.blob.text()
+      text.value = body
     } else if (type.startsWith('text/') || type === 'application/json') {
       kind.value = 'text'
-      text.value = await file.blob.text()
+      text.value = body
     } else {
       kind.value = 'other'
     }
   } catch (cause) {
+    if (!active()) return
     error.value = errorMessage(cause)
   } finally {
-    loading.value = false
+    if (active()) loading.value = false
   }
 }
 
 watch(
-  () => [props.open, props.path] as const,
-  ([open]) => {
-    if (open && props.path && props.jobId) void load()
-    if (!open) release()
+  () => [props.open, props.path, props.jobId, props.client.baseUrl, props.client.token] as const,
+  ([open], _, onCleanup) => {
+    let active = true
+    onCleanup(() => { active = false })
+    if (open && props.path && props.jobId) void load(() => active)
+    else {
+      release()
+      loading.value = false
+    }
   },
   { immediate: true },
 )
+onScopeDispose(release)
 </script>
 
 <template>

@@ -68,6 +68,7 @@ export function createNotebookSession(notebook: NotebookStore) {
   // Stopped work must not keep polling for a node after the page is gone.
   let disposed = false
   let generation = 0
+  let runGeneration = 0
   let resumeScope = notebook.scope.value
   let seenEventId = 0
   // Kept until a submit lands, so a retry after a 503 is the same request.
@@ -376,6 +377,7 @@ export function createNotebookSession(notebook: NotebookStore) {
 
   async function end(): Promise<void> {
     if (!jobId.value || ending.value) return
+    runGeneration += 1
     const active = current()
     ending.value = true
     try {
@@ -396,6 +398,7 @@ export function createNotebookSession(notebook: NotebookStore) {
 
   async function interrupt(): Promise<void> {
     if (!jobId.value) return
+    runGeneration += 1
     const active = current()
     try {
       await interruptSession(jobId.value, client.value)
@@ -420,6 +423,9 @@ export function createNotebookSession(notebook: NotebookStore) {
     if (before?.state === 'queued' || before?.state === 'running') {
       return new Error('That cell is already running.')
     }
+    const cell = notebook.cellById(cellId)
+    const outputs = cell?.outputs ?? []
+    const count = cell?.execution_count ?? null
     notebook.clearOutputs(cellId)
     setCellState(cellId, { cell_id: cellId, state: 'queued' })
     try {
@@ -427,6 +433,11 @@ export function createNotebookSession(notebook: NotebookStore) {
       return null
     } catch (cause) {
       if (!active()) return cause
+      if (cause instanceof ApiError && cause.status < 500 && cell && !cell.outputs.length) {
+        cell.outputs = outputs
+        cell.execution_count = count
+        notebook.flushCopy()
+      }
       setCellState(cellId, before)
       return cause
     }
@@ -443,7 +454,9 @@ export function createNotebookSession(notebook: NotebookStore) {
 
   /** Sends the cells in order; the node keeps the queue. */
   async function runCells(cells: { id: string; source: string }[]): Promise<void> {
-    const active = current()
+    const documentActive = current()
+    const request = ++runGeneration
+    const active = () => documentActive() && request === runGeneration
     for (const [index, cell] of cells.entries()) {
       if (!active()) return
       let cause = await sendCell(cell.id, cell.source)

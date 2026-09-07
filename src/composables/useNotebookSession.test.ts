@@ -528,6 +528,37 @@ describe('createNotebookSession', () => {
     scope.stop()
   })
 
+  it('preserves saved output when a cell submission is refused', async () => {
+    const { notebook, session: store, scope } = await setup()
+    notebook.patchMeta({ job_id: '01JOB', executor_node_id: 'node-a' })
+    session.getSessionState.mockResolvedValue(state())
+    await store.attachSaved()
+    const cell = notebook.cells.value[0]
+    notebook.appendOutput(cell.id, { output_type: 'stream', name: 'stdout', text: 'previous result' })
+    cell.execution_count = 4
+    session.runSessionCell.mockRejectedValue(new ApiError(429, 'queue full'))
+
+    expect(await store.runCell(cell.id, 'print(1)')).toBe(false)
+    expect(cell.outputs).toEqual([{ output_type: 'stream', name: 'stdout', text: 'previous result' }])
+    expect(cell.execution_count).toBe(4)
+    scope.stop()
+  })
+
+  it.each(['interrupt', 'end'] as const)('stops remaining submissions on %s', async (action) => {
+    const { notebook, session: store, scope } = await setup()
+    notebook.patchMeta({ job_id: '01JOB', executor_node_id: 'node-a' })
+    session.getSessionState.mockResolvedValue(state())
+    await store.attachSaved()
+    let finish = () => {}
+    session.runSessionCell.mockReturnValue(new Promise<void>((resolve) => { finish = resolve }))
+    const running = store.runCells([{ id: 'first', source: '1' }, { id: 'second', source: '2' }])
+    await store[action]()
+    finish()
+    await running
+    expect(session.runSessionCell).toHaveBeenCalledTimes(1)
+    scope.stop()
+  })
+
   it('waits and resends a cell the node rate limited', async () => {
     const { notebook, session: store, scope } = await setup()
     notebook.patchMeta({ job_id: '01JOB', executor_node_id: 'node-a' })

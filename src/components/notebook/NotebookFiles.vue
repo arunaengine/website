@@ -2,7 +2,7 @@
 // The files beside the notebook: the workspace bucket it reads and writes, and
 // the scratch folder inside the running container. "Add more" copies stored
 // objects into the workspace bucket, so nothing is copied into the container.
-import { computed, ref, watch } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
 import OptionToggle from '@/components/ui/OptionToggle.vue'
@@ -40,14 +40,39 @@ const staging = ref(false)
 const stageNote = ref<string | null>(null)
 
 const bucket = computed(() => notebook.meta.value?.workspace_bucket ?? '')
+let disposed = false
+let scratchRequest = 0
+onScopeDispose(() => { disposed = true })
+
+function current() {
+  const generation = notebook.generation.value
+  const jobId = session.jobId.value
+  return () => !disposed && generation === notebook.generation.value && jobId === session.jobId.value
+}
+
+watch([notebook.generation, session.jobId], () => {
+  scratchRequest += 1
+  scratch.value = []
+  scratchPath.value = ''
+  scratchOpen.value = false
+  scratchError.value = null
+  staging.value = false
+  stageNote.value = null
+  dataKeys.value = new Set()
+  importOpen.value = false
+  addOpen.value = false
+}, { flush: 'sync' })
 
 /** Keys under data/, so the import warns before it overwrites one. */
 async function loadDataKeys() {
   if (!bucket.value) return
+  const active = current()
   try {
     const page = await s3.listObjects(bucket.value, NOTEBOOK_DATA_PREFIX)
+    if (!active()) return
     dataKeys.value = new Set(page.objects.map((object) => object.key))
   } catch {
+    if (!active()) return
     dataKeys.value = new Set()
   }
 }
@@ -59,11 +84,15 @@ function onImported() {
 
 async function loadScratch() {
   if (!session.jobId.value || !session.live.value) return
+  const active = current()
+  const request = ++scratchRequest
   scratchError.value = null
   try {
     const listing = await listScratch(session.jobId.value, scratchPath.value, session.client.value)
+    if (!active() || request !== scratchRequest) return
     scratch.value = listing.entries
   } catch (cause) {
+    if (!active() || request !== scratchRequest) return
     scratchError.value = errorMessage(cause)
   }
 }
@@ -89,6 +118,8 @@ function up() {
 /** Stages picked objects into the workspace bucket under data/. */
 async function stage(entry: TesDataRefEntry) {
   if (!session.jobId.value) return
+  const active = current()
+  const cellId = notebook.activeCellId.value
   const items =
     entry.kind === 'file'
       ? (() => {
@@ -107,8 +138,8 @@ async function stage(entry: TesDataRefEntry) {
   stageNote.value = null
   try {
     const result = await addSessionInputs(session.jobId.value, items, session.client.value)
+    if (!active()) return
     const staged = result.staged.length
-    const cellId = notebook.activeCellId.value
     if (cellId && staged) {
       notebook.noteCellInputs(
         cellId,
@@ -124,9 +155,10 @@ async function stage(entry: TesDataRefEntry) {
       ? `${staged} of ${items.length} files are now in ${bucket.value}.${cellId ? '' : ' Select a cell first to record them on it.'}`
       : 'The copy was started; the files appear in the bucket when they land.'
   } catch (cause) {
+    if (!active()) return
     stageNote.value = errorMessage(cause)
   } finally {
-    staging.value = false
+    if (active()) staging.value = false
   }
 }
 </script>
