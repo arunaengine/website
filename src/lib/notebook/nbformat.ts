@@ -6,6 +6,7 @@ export const NBFORMAT_MAJOR = 4
 export const NBFORMAT_MINOR = 5
 
 export type CellKind = 'code' | 'markdown' | 'raw'
+export type NotebookCellType = CellKind | 'bash' | 'pipeline'
 
 /** One nbformat output, in the shapes the session sends. */
 export type NotebookOutput =
@@ -253,4 +254,10 @@ export function outputText(output: NotebookOutput): string {
   if (typeof plain === 'string') return plain
   if (Array.isArray(plain)) return plain.join('')
   return ''
+}
+
+export function cellType(cell: NotebookCell): NotebookCellType {
+  if (isPipelineCell(cell)) return 'pipeline'
+  if (cell.cell_type === 'code' && /^%%bash(?:\r?\n|$)/.test(cell.source)) return 'bash'
+  return cell.cell_type
 }

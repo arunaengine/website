@@ -6,17 +6,21 @@ import * as Outputs from '@/lib/notebook/outputs'
 import * as Runtimes from '@/lib/notebook/runtimes'
 import { button, click, compileClientComponent, content, element, flush, moduleDefault, mountApp } from '@/test/clientRender'
 
-async function render(kind: Nbformat.CellKind, source: string) {
+async function render(kind: Nbformat.CellKind, source: string, markdownLocked = false) {
   const cell = reactive(Nbformat.newCell(kind, source))
   const activeCellId = ref(cell.id)
+  const lastSavedMs = ref(0)
+  const dirty = ref(false)
   const runCell = vi.fn()
   const setSource = vi.fn()
+  const setCellType = vi.fn()
   const drag = vi.fn()
   const Slotted = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
   const Editor = defineComponent({ props: ['modelValue', 'language'], setup: (props) => () => h('textarea', { value: props.modelValue, language: props.language }) })
   const component = compileClientComponent(new URL('./NotebookCell.vue', import.meta.url), {
     vue: { ...VueRuntime, defineAsyncComponent: () => Editor },
     '@lucide/vue': new Proxy({}, { get: () => Slotted }),
+    '@/components/ui/Select.vue': moduleDefault(defineComponent({ props: ['modelValue', 'options'], emits: ['update:modelValue'], setup: (props, { emit }) => () => h('select', { value: props.modelValue, options: props.options, onChange: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value) }) })),
     '@/components/ui/Badge.vue': moduleDefault(Slotted),
     '@/components/ui/Button.vue': moduleDefault(Slotted),
     '@/components/ui/IconButton.vue': moduleDefault(Slotted),
@@ -24,7 +28,7 @@ async function render(kind: Nbformat.CellKind, source: string) {
     '@/components/notebook/NotebookOutputs.vue': moduleDefault(Slotted),
     '@/components/notebook/NotebookPipelineCell.vue': moduleDefault(Slotted),
     '@/composables/notebookContext': { injectNotebook: () => ({
-      notebook: { activeCellId, meta: ref({ runtime: 'python-notebook' }), selectCell: vi.fn(), setSource },
+      notebook: { activeCellId, lastSavedMs, dirty, meta: ref({ runtime: 'python-notebook' }), selectCell: vi.fn(), setSource, setCellType },
       session: { cellStates: ref({}), live: ref(true), runCell },
     }) },
     '@/lib/chunk-recovery': { asyncChunkError: vi.fn() },
@@ -32,18 +36,33 @@ async function render(kind: Nbformat.CellKind, source: string) {
     '@/lib/notebook/runtimes': Runtimes,
     '@/lib/notebook/outputs': Outputs,
   })
-  const { root, app } = await mountApp(defineComponent({ setup: () => () => h(component, { cell, index: 0, onDragCell: drag }) }))
-  return { root, app, cell, activeCellId, runCell, drag }
+  const { root, app } = await mountApp(defineComponent({ setup: () => () => h(component, { cell, index: 0, markdownLocked, onDragCell: drag }) }))
+  return { root, app, cell, activeCellId, runCell, drag, lastSavedMs, dirty, setCellType }
 }
 
 describe('notebook cells', () => {
-  it('renders Markdown and offers an explicit edit/render cycle', async () => {
+  it('edits Markdown on focus and renders on blur', async () => {
     const { root, app } = await render('markdown', '# Heading')
     expect(content(element(root, (node) => node.tag === 'article'))).toBe('# Heading')
-    await click(button(root, 'Edit Markdown'))
+    ;(element(root, (node) => 'data-markdown-preview' in node.props).props.onFocus as (event: unknown) => void)({ target: null })
+    await flush()
+    ;(element(root, (node) => typeof node.props.onFocusout === 'function').props.onFocusout as (event: unknown) => void)({ target: { hasAttribute: () => true }, currentTarget: { contains: () => false }, relatedTarget: null })
+    await flush()
     expect(element(root, (node) => node.tag === 'textarea').props.value).toBe('# Heading')
-    await click(button(root, 'Render Markdown'))
+    ;(element(root, (node) => typeof node.props.onFocusout === 'function').props.onFocusout as (event: unknown) => void)({ currentTarget: { contains: () => false }, relatedTarget: null })
+    await flush()
     expect(element(root, (node) => node.tag === 'article')).toBeTruthy()
+    app.unmount()
+  })
+
+  it.each([false, true])('renders after saving unless newer edits remain: dirty=%s', async (newerEdits) => {
+    const { root, app, lastSavedMs, dirty } = await render('markdown', '# Saved')
+    ;(element(root, (node) => 'data-markdown-preview' in node.props).props.onFocus as (event: unknown) => void)({ target: null })
+    await flush()
+    dirty.value = newerEdits
+    lastSavedMs.value = 1
+    await flush()
+    expect(element(root, (node) => node.tag === (newerEdits ? 'textarea' : 'article'))).toBeTruthy()
     app.unmount()
   })
 
@@ -71,6 +90,41 @@ describe('notebook cells', () => {
     cell.attachments = { 'plot.png': { 'image/png': 'iVBORw0KGgo=' } }
     await flush()
     expect(element(root, (node) => node.tag === 'article').props.images).toEqual({ 'attachment:plot.png': 'data:image/png;base64,iVBORw0KGgo=' })
+    app.unmount()
+  })
+
+  it('resizes Markdown from its separate handle with a minimum height', async () => {
+    const { root, app } = await render('markdown', '# Resize')
+    await click(element(root, (node) => 'data-markdown-preview' in node.props))
+    const handle = element(root, (node) => node.props['aria-label'] === 'Resize Markdown cell')
+    const capture = vi.fn()
+    ;(handle.props.onPointerdown as (event: unknown) => void)({ button: 0, clientY: 100, pointerId: 1, currentTarget: { setPointerCapture: capture }, preventDefault: vi.fn() })
+    ;(handle.props.onPointermove as (event: unknown) => void)({ clientY: 180 })
+    await flush()
+    expect(element(root, (node) => node.tag === 'textarea').props.style).toEqual({ height: '192px' })
+    ;(handle.props.onPointermove as (event: unknown) => void)({ clientY: -100 })
+    await flush()
+    expect(element(root, (node) => node.tag === 'textarea').props.style).toEqual({ height: '80px' })
+    expect(capture).toHaveBeenCalledWith(1)
+    app.unmount()
+  })
+
+  it('keeps locked Markdown rendered when focused or clicked', async () => {
+    const { root, app } = await render('markdown', '# Showcase', true)
+    const preview = element(root, (node) => 'data-markdown-preview' in node.props)
+    ;(preview.props.onFocus as (event: unknown) => void)({ target: null })
+    await click(preview)
+    expect(content(element(root, (node) => node.tag === 'article'))).toBe('# Showcase')
+    expect(preview.props.tabindex).toBe(-1)
+    app.unmount()
+  })
+
+  it('changes a cell type from its header', async () => {
+    const { root, app, cell, setCellType } = await render('code', 'print(1)')
+    const select = element(root, (node) => node.tag === 'select')
+    ;(select.props.onChange as (event: unknown) => void)({ target: { value: 'markdown' } })
+    expect(setCellType).toHaveBeenCalledWith(cell.id, 'markdown')
+    expect(select.props.options).not.toContainEqual({ value: 'pipeline', label: 'Pipeline' })
     app.unmount()
   })
 

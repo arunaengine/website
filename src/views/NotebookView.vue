@@ -5,8 +5,8 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
-import Select from '@/components/ui/Select.vue'
 import Button from '@/components/ui/Button.vue'
+import IconButton from '@/components/ui/IconButton.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import AskAiButton from '@/components/assistant/AskAiButton.vue'
@@ -24,9 +24,9 @@ import { useAruna } from '@/composables/useAruna'
 import { useTes } from '@/composables/useTes'
 import { activeGroupId } from '@/composables/useGroupSelection'
 import { useNotebookLocation } from '@/composables/useNotebookLocation'
-import { SESSION_RUNTIMES, sessionRuntimeById } from '@/lib/notebook/runtimes'
+import { SESSION_RUNTIMES } from '@/lib/notebook/runtimes'
 import { relativeTime } from '@/lib/utils'
-import { ArrowLeft, FolderClosed, Plus, Save } from '@lucide/vue'
+import { ArrowLeft, FolderClosed, Lock, Unlock, Plus, Save } from '@lucide/vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -61,11 +61,17 @@ async function open() {
   await session.attachSaved()
 }
 
+function deselectCell(event: MouseEvent) {
+  if (!(event.target as Element | null)?.closest?.('.notebook-cell')) notebook.selectCell('')
+}
+
 onMounted(() => {
+  document.addEventListener('click', deselectCell, true)
   void open()
   autosaveTimer.value = setInterval(() => void notebook.autosave(), 30_000)
 })
 onUnmounted(() => {
+  document.removeEventListener('click', deselectCell, true)
   if (autosaveTimer.value) clearInterval(autosaveTimer.value)
 })
 watch([bucket, key, notebook.scope], () => void open())
@@ -82,13 +88,6 @@ const redirectTo = computed(
   () => `/app/notebooks/${encodeURIComponent(bucket.value)}/${key.value.split('/').map(encodeURIComponent).join('/')}`,
 )
 
-const codeCells = computed(() => notebook.cells.value.filter((cell) => cell.cell_type === 'code'))
-
-function runAll() {
-  notebook.selectCell('')
-  void session.runCells(codeCells.value.map((cell) => ({ id: cell.id, source: cell.source })))
-}
-
 function runToHere(cellId: string) {
   const cells = notebook.cells.value
   const index = cells.findIndex((cell) => cell.id === cellId)
@@ -102,21 +101,14 @@ function runToHere(cellId: string) {
 }
 
 const filesOpen = ref(true)
-const cellType = ref('code')
-const cellTypes = computed(() => [
-  { value: 'code', label: sessionRuntimeById(notebook.meta.value?.runtime ?? '')?.label || 'Code' },
-  ...(sessionRuntimeById(notebook.meta.value?.runtime ?? '')?.lang === 'python' ? [{ value: 'bash', label: 'Bash' }] : []),
-  { value: 'markdown', label: 'Markdown' },
-  { value: 'pipeline', label: 'Pipeline' },
-])
-
-async function addCell() {
-  const kind = cellType.value
-  const cell = notebook.addCell(kind === 'pipeline' ? 'raw' : kind === 'markdown' ? 'markdown' : 'code',
-    undefined, kind === 'bash' ? '%%bash\n' : '', kind === 'pipeline' ? { kind: 'pipeline' } : undefined)
+const markdownLocked = ref(false)
+async function addCell(index?: number) {
+  const cell = notebook.addCell('code', index)
   notebook.selectCell(cell.id)
   await nextTick()
-  document.getElementById(`notebook-cell-${cell.id}`)?.scrollIntoView({ block: 'nearest' })
+  const element = document.getElementById(`notebook-cell-${cell.id}`)
+  element?.scrollIntoView({ block: 'nearest' })
+  element?.querySelector<HTMLElement>('[data-markdown-preview]')?.focus()
 }
 
 const draggedCell = ref('')
@@ -171,9 +163,7 @@ const savedLabel = computed(() => {
       sign-in-description="A notebook reads and writes stored data."
       :redirect-to="redirectTo"
     >
-      <div class="mx-auto w-full max-w-[110rem] space-y-4 px-4 py-4 sm:px-6">
-        <NotebookSessionBar />
-
+      <div class="container space-y-4 py-4">
         <Notice v-if="notebook.loadError.value" tone="error">{{ notebook.loadError.value }}</Notice>
         <Notice v-if="notebook.saveError.value" tone="error">{{ notebook.saveError.value }}</Notice>
         <Notice v-if="notebook.restoredCopy.value" tone="warning">
@@ -187,15 +177,15 @@ const savedLabel = computed(() => {
           <NotebookFiles v-if="filesOpen" class="max-h-[70vh] overflow-auto" />
 
           <div class="min-w-0 space-y-3">
-            <div class="flex flex-wrap items-center gap-2">
-              <Button size="sm" variant="outline" :disabled="!session.live.value" @click="runAll">Run all</Button>
+            <div class="sticky top-14 z-10 flex flex-wrap items-center gap-2 bg-background/95 py-2 backdrop-blur">
+              <NotebookSessionBar />
               <Button size="sm" variant="outline" :aria-expanded="filesOpen" @click="filesOpen = !filesOpen">
                 <FolderClosed class="size-3.5" /> Files
               </Button>
-              <Select v-model="cellType" :options="cellTypes" aria-label="New cell type" class="w-36" />
-              <Button size="sm" variant="outline" @click="addCell"><Plus class="size-3.5" /> Add cell</Button>
+              <Button size="sm" variant="outline" @click="addCell()"><Plus class="size-3.5" /> Add cell</Button>
               <span class="flex-1" />
               <span class="text-[11px] text-muted-foreground">{{ savedLabel }}</span>
+              <IconButton :label="markdownLocked ? 'Unlock Markdown' : 'Lock Markdown'" :aria-pressed="markdownLocked" @click="markdownLocked = !markdownLocked"><component :is="markdownLocked ? Lock : Unlock" class="size-3.5" /></IconButton>
               <Button size="sm" :disabled="notebook.saving.value" @click="notebook.save()">
                 <Save class="size-3.5" /> Save
               </Button>
@@ -213,11 +203,9 @@ const savedLabel = computed(() => {
                 @dragover="dragOver($event, index)"
                 @drop.prevent="dropCell"
               >
-                <NotebookCellView :cell="cell" :index="index" @run-to-here="runToHere(cell.id)" @drag-cell="startDrag($event, cell.id)" />
+                <NotebookCellView :cell="cell" :index="index" :markdown-locked="markdownLocked" @run-to-here="runToHere(cell.id)" @drag-cell="startDrag($event, cell.id)" @add-below="addCell(index + 1)" />
               </div>
-              <div :class="dropIndex === notebook.cells.value.length ? 'border-t-4 border-primary' : ''" @dragover.prevent="draggedCell && (dropIndex = notebook.cells.value.length)" @drop.prevent="dropCell">
-                <Button variant="ghost" size="sm" @click="addCell"><Plus class="size-3.5" /> Add {{ cellTypes.find((type) => type.value === cellType)?.label }} cell</Button>
-              </div>
+              <div v-if="draggedCell" class="rounded-md border border-dashed border-border p-3 text-center text-xs text-muted-foreground" :class="dropIndex === notebook.cells.value.length ? 'border-primary bg-primary/5' : ''" @dragover.prevent="dropIndex = notebook.cells.value.length" @drop.prevent="dropCell">Drop cell here</div>
             </div>
           </div>
         </div>

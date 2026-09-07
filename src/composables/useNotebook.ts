@@ -12,6 +12,7 @@ import {
   writeWorkingCopy,
 } from '@/lib/notebook/document'
 import {
+  cellType,
   emptyNotebook,
   newCell,
   parseNotebook,
@@ -22,6 +23,7 @@ import {
   type Notebook,
   type NotebookAruna,
   type NotebookCell,
+  type NotebookCellType,
   type NotebookOutput,
 } from '@/lib/notebook/nbformat'
 import { trailing } from '@/lib/throttle'
@@ -234,6 +236,20 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
     return cell
   }
 
+  function setCellType(id: string, type: NotebookCellType): void {
+    const cell = cellById(id)
+    if (!cell || cellType(cell) === type) return
+    if (type === 'pipeline' && cell.source.trim() && cellType(cell) !== 'pipeline') return
+    const source = cellType(cell) === 'bash' ? cell.source.replace(/^%%bash\r?\n?/, '') : cell.source
+    cell.cell_type = type === 'pipeline' ? 'raw' : type === 'bash' ? 'code' : type
+    cell.source = type === 'bash' ? `%%bash\n${source}` : source
+    cell.outputs = []
+    cell.execution_count = null
+    if (type === 'pipeline') cell.metadata.aruna = { ...cell.metadata.aruna, kind: 'pipeline' }
+    else if (cell.metadata.aruna?.kind === 'pipeline') delete cell.metadata.aruna.kind
+    markChanged()
+  }
+
   function removeCell(id: string): void {
     const doc = notebook.value
     if (!doc) return
@@ -337,6 +353,7 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
     noteCellInputs,
     addCell,
     removeCell,
+    setCellType,
     moveCell,
     setSource,
     clearOutputs,

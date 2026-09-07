@@ -272,6 +272,31 @@ describe('createNotebook', () => {
     expect(notebook.cells.value[0].cell_type).toBe('code')
   })
 
+  it('converts cell types while preserving text and unrelated metadata', async () => {
+    s3.getObjectText.mockRejectedValue({ name: 'NoSuchKey' })
+    const notebook = store()
+    await notebook.load()
+    const cell = notebook.cells.value[0]
+    notebook.setSource(cell.id, 'echo hello')
+    cell.metadata = { custom: true, aruna: { job_id: 'retained-job' } }
+    notebook.appendOutput(cell.id, { output_type: 'stream', name: 'stdout', text: 'old' })
+    notebook.setCellType(cell.id, 'bash')
+    expect(cell.source).toBe('%%bash\necho hello')
+    expect(cell.outputs).toEqual([])
+    notebook.setCellType(cell.id, 'markdown')
+    expect(cell.cell_type).toBe('markdown')
+    expect(cell.source).toBe('echo hello')
+    expect(cell.metadata).toEqual({ custom: true, aruna: { job_id: 'retained-job' } })
+    notebook.setCellType(cell.id, 'pipeline')
+    expect(cell.cell_type).toBe('markdown')
+    notebook.setSource(cell.id, '')
+    notebook.setCellType(cell.id, 'pipeline')
+    expect(cell.metadata.aruna).toEqual({ job_id: 'retained-job', kind: 'pipeline' })
+    notebook.setCellType(cell.id, 'code')
+    expect(cell.metadata.aruna).toEqual({ job_id: 'retained-job' })
+    expect(notebook.dirty.value).toBe(true)
+  })
+
   it('records what a cell run reported', async () => {
     s3.getObjectText.mockRejectedValue({ name: 'NoSuchKey' })
     const notebook = store()

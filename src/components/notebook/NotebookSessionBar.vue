@@ -182,17 +182,18 @@ async function saveDependencies(value: DependencySpec, restart: boolean) {
 <template>
   <div class="min-w-0 space-y-2">
     <div class="flex flex-wrap items-center gap-2">
-      <span class="flex items-center gap-1.5 text-xs text-muted-foreground" aria-label="Kernel status">
-        <span class="h-2 w-2 rounded-full" :class="session.live.value ? (session.kernel.value === 'busy' ? 'bg-amber-500' : 'bg-emerald-500') : session.running.value || session.starting.value ? 'bg-amber-500' : 'bg-muted-foreground'" />
-        {{ notebook.loading.value ? 'Loading' : session.live.value ? (session.kernel.value === 'busy' ? 'Busy' : 'Idle') : session.running.value || session.starting.value ? stateLabel : 'Stopped' }}
-      </span>
       <Button v-if="!session.running.value" variant="ghost" size="sm" :disabled="runBusy || Boolean(problems.length) || notebook.loading.value || !meta" @click="start()">Start kernel</Button>
       <Button size="sm" :disabled="runBusy || Boolean(problems.length) || notebook.loading.value || !meta" @click="runNotebook">
         <Play class="size-3.5" /> {{ pendingRun || session.starting.value ? 'Starting…' : session.kernel.value === 'busy' ? 'Running…' : 'Run notebook' }}
       </Button>
       <Popover>
         <Button size="sm" variant="outline" aria-label="Kernel">
-          Kernel <ChevronDown class="size-3.5" />
+          Kernel
+          <span class="flex items-center gap-1.5 text-xs text-muted-foreground" aria-label="Kernel status">
+            <span class="h-2 w-2 rounded-full" :class="session.live.value ? (session.kernel.value === 'busy' ? 'bg-amber-500' : 'bg-emerald-500') : session.running.value || session.starting.value ? 'bg-amber-500' : 'bg-muted-foreground'" />
+            {{ notebook.loading.value ? 'Loading' : session.live.value ? (session.kernel.value === 'busy' ? 'Busy' : 'Idle') : session.running.value || session.starting.value ? stateLabel : 'Stopped' }}
+          </span>
+          <ChevronDown class="size-3.5" />
         </Button>
         <template #content>
           <div class="max-h-[70vh] space-y-3 overflow-y-auto">
