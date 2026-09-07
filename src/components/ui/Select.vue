@@ -37,6 +37,15 @@ const props = defineProps<
 >()
 const emits = defineEmits<{ (e: 'update:modelValue', v: string): void }>()
 const forwarded = useForwardPropsEmits(props, emits)
+// radix-vue refuses an empty item value, so callers that use '' for "nothing
+// selected" get a private stand-in that is translated back on every update.
+const emptyValue = '\u0000empty'
+const itemValue = (value: string) => (value === '' ? emptyValue : value)
+const rootProps = computed(() => ({
+  ...forwarded.value,
+  modelValue: props.modelValue === '' ? emptyValue : props.modelValue,
+  'onUpdate:modelValue': (value: string) => emits('update:modelValue', value === emptyValue ? '' : value),
+}))
 const triggerClasses = computed(() =>
   cn(
     'flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-field px-3 py-2 text-sm shadow-sm ring-offset-background data-[placeholder]:text-muted-foreground focus:outline-none focus:border-ring focus:ring-2 focus:ring-ring',
@@ -48,7 +57,7 @@ const triggerClasses = computed(() =>
 </script>
 
 <template>
-  <SelectRoot v-bind="forwarded">
+  <SelectRoot v-bind="rootProps">
     <SelectTrigger :class="triggerClasses" :aria-label="props.ariaLabel">
       <span class="flex min-w-0 items-center gap-1.5">
         <span v-if="props.label" class="shrink-0 text-muted-foreground">{{ props.label }}:</span>
@@ -66,7 +75,7 @@ const triggerClasses = computed(() =>
           <SelectItem
             v-for="o in options"
             :key="o.value"
-            :value="o.value"
+            :value="itemValue(o.value)"
             :title="o.label"
             class="relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-muted data-[state=checked]:bg-muted"
           >

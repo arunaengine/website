@@ -1,9 +1,10 @@
 // One in-memory client renderer for the SFC tests. Vitest runs this repository
 // in SSR mode with no DOM dependency, so a component under interaction is
 // compiled here and mounted against plain objects that behave like nodes.
-import { readFileSync } from 'node:fs'
+import { readFileSync, realpathSync, statSync } from 'node:fs'
 import { compile } from '@vue/compiler-dom'
-import { compileScript, parse } from '@vue/compiler-sfc'
+import { compileScript, parse, registerTS } from '@vue/compiler-sfc'
+import * as TypeScript from 'typescript'
 import { ModuleKind, ScriptTarget, transpileModule } from 'typescript'
 import * as VueRuntime from 'vue'
 import { createRenderer, defineComponent, h, nextTick, type App, type Component } from 'vue'
@@ -17,11 +18,19 @@ export function moduleDefault(component: Component) {
 
 // Vitest runs this repository in SSR mode and there is no DOM test dependency.
 // Compile only the three SFCs under test for the small in-memory client renderer.
+// Prop types imported from a package (radix-vue) resolve through TypeScript.
+registerTS(() => TypeScript)
+const typeFiles = {
+  fileExists: (path: string) => statSync(path, { throwIfNoEntry: false })?.isFile() ?? false,
+  readFile: (path: string) => readFileSync(path, 'utf8'),
+  realpath: realpathSync,
+}
+
 export function compileClientComponent(url: URL, modules: Record<string, unknown>): Component {
   const source = readFileSync(url, 'utf8')
   const { descriptor } = parse(source, { filename: url.pathname })
   if (!descriptor.template) throw new Error(`Missing template in ${url.pathname}`)
-  const script = compileScript(descriptor, { id: url.pathname, inlineTemplate: false })
+  const script = compileScript(descriptor, { id: url.pathname, inlineTemplate: false, fs: typeFiles })
   const scriptJavascript = transpileModule(script.content, {
     compilerOptions: { module: ModuleKind.CommonJS, target: ScriptTarget.ES2022 },
   }).outputText
