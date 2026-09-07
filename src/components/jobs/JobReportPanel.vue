@@ -14,9 +14,7 @@ import {
 } from '@/lib/jobs'
 import { errorMessage, truncateMiddle } from '@/lib/utils'
 
-// The frozen per-entry report of an RO-Crate import or export. Only those two
-// kinds keep one, so an absent report is the normal answer everywhere else and
-// is reported as "not kept" rather than as a failure.
+// RO-Crate transfers and notebook sessions keep a frozen per-entry report.
 const props = defineProps<{ jobId: string }>()
 
 const { getJobReport } = useJobs()
@@ -48,6 +46,10 @@ const CODE_LABELS: Record<string, string> = {
   unrewritten_reference: 'Unrewritten reference',
   signature_dropped: 'Signature dropped',
   unsupported_crate_version: 'Unsupported RO-Crate version',
+  input: 'Input',
+  read: 'Read',
+  write: 'Written',
+  ended: 'Ended',
 }
 const GOOD_CODES = new Set(['imported', 'included', 'external'])
 const BAD_CODES = new Set(['failed', 'denied', 'missing', 'unsupported', 'unsupported_crate_version'])
@@ -145,7 +147,7 @@ const summary = computed(() => {
     </div>
 
     <p v-else-if="panelState === 'absent'" class="text-xs text-muted-foreground">
-      No report is kept here. Only an RO-Crate import or export keeps one, and a kept report
+      No report is kept here. RO-Crate imports, exports and notebook sessions keep reports. A report
       disappears again once its retention window passes.
     </p>
 

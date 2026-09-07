@@ -448,8 +448,8 @@ export function submitErrorMessage(error: unknown): string {
 }
 
 // ── Frozen per-entry report ──────────────────────────────────────────────────
-// Only import_rocrate and export_rocrate jobs keep one; every other kind is a
-// plain 404. Rows are untyped on the wire (serde_json::Value), so the shared
+// RO-Crate transfers and notebook sessions keep one; other kinds return 404.
+// Rows are untyped on the wire (serde_json::Value), so the shared
 // envelope is typed and the detail is left open.
 
 export interface JobReportRow {

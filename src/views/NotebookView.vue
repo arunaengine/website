@@ -13,6 +13,7 @@ import ComputeGates from '@/components/compute/ComputeGates.vue'
 import NotebookCellView from '@/components/notebook/NotebookCell.vue'
 import NotebookFiles from '@/components/notebook/NotebookFiles.vue'
 import NotebookSessionBar from '@/components/notebook/NotebookSessionBar.vue'
+import JobReportPanel from '@/components/jobs/JobReportPanel.vue'
 import { provideNotebook } from '@/composables/notebookContext'
 import { createNotebook } from '@/composables/useNotebook'
 import { createNotebookSession } from '@/composables/useNotebookSession'
@@ -171,6 +172,7 @@ const savedLabel = computed(() => {
             </div>
           </div>
         </div>
+        <JobReportPanel v-if="session.ended.value && session.jobId.value" :job-id="session.jobId.value" />
       </div>
     </ComputeGates>
   </div>
