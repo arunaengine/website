@@ -332,6 +332,7 @@ const secretRows = computed<SecretRow[]>(() =>
     <PageHeader
       title="Node onboarding"
       description="Mint single-use secrets, generate the new node's configuration, and watch it join the realm."
+      :docs="{ topic: 'realm-nodes-groups', section: 'Nodes and the realm' }"
     >
       <template #actions>
         <Button variant="outline" size="sm" as-child>

@@ -429,7 +429,7 @@ async function save() {
 
 <template>
   <div>
-    <PageHeader eyebrow="Datasets" :title="title">
+    <PageHeader eyebrow="Datasets" :title="title" :docs="{ topic: 'first-dataset', section: 'Describe the dataset' }">
       <template #description>
         <span class="inline-flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
           <RouterLink

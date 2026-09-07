@@ -209,6 +209,7 @@ const pageDescription = computed(() =>
     <PageHeader
       :title="pageTitle"
       :description="pageDescription"
+      :docs="{ topic: 'portal-tour', section: 'Start at the dashboard' }"
     >
       <template #actions>
         <RefreshButton :busy="spinning" size="default" @click="onRefresh" />

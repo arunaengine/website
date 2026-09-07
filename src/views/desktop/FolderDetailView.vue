@@ -211,6 +211,7 @@ const details = computed(() => {
       eyebrow="This computer"
       :title="folder ? folderName(folder.root) : 'Folder'"
       :description="folder?.root"
+      :docs="{ topic: 'where-data-lives', section: 'Syncs' }"
     >
       <template #breadcrumbs>
         <Badge v-if="folder" variant="outline" size="sm" class="uppercase">{{

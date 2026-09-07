@@ -425,6 +425,7 @@ async function submit() {
       :description="isEditing
         ? 'Adjust the profile\'s rules and details; saving replaces the stored profile in place.'
         : 'Define which RO-Crate entities must, should, or may exist, and the property rules for each, step by step.'"
+      :docs="{ topic: 'build-a-profile', section: 'The root dataset shape' }"
     >
       <template #actions>
         <AskAiButton size="default" prompt="Help me build this profile." subject="the profile form" />

@@ -259,6 +259,7 @@ function continueInPanel() {
             <span class="truncate">{{ chatName }}</span>
           </button>
         </div>
+        <DocsLink topic="assistant" icon />
         <AssistantSettings side="bottom" align="end">
           <button
             type="button"

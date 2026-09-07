@@ -43,7 +43,7 @@ function setTab(next: string) {
 
 <template>
   <div>
-    <PageHeader :title="pageTitle" description="The runs you start on this node, and the system jobs it produces.">
+    <PageHeader :title="pageTitle" description="The runs you start on this node, and the system jobs it produces." :docs="{ topic: 'compute-run', section: 'Follow the run' }">
       <!-- One Run entry point; the menu explains the two ways to start one. -->
       <template v-if="tesEnabled && currentUser" #actions>
         <NewRunMenu size="sm" />

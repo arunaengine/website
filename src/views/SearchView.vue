@@ -61,6 +61,7 @@ const askPrompt = computed(() =>
     <PageHeader
       title="Datasets"
       description="Browse every visible RO-Crate by dataset purpose, search across supported resource kinds, or use the SPARQL workbench."
+      :docs="{ topic: 'datasets' }"
     >
       <template #breadcrumbs>
         <template v-if="groupFilter">

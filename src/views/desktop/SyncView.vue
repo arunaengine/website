@@ -147,6 +147,7 @@ async function findOfflineDataset(): Promise<void> {
       eyebrow="This computer"
       title="Sync"
       description="Folders and datasets this computer keeps in step with the realm."
+      :docs="{ topic: 'where-data-lives', section: 'Syncs' }"
     >
       <template #breadcrumbs>
         <Badge :variant="stateVariant(status.realmReachable ? 'reachable' : 'unreachable')">

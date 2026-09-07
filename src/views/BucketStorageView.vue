@@ -95,7 +95,7 @@ const browserLink = computed(() => ({
 
 <template>
   <div>
-    <PageHeader :title="`Settings for ${bucket}`">
+    <PageHeader :title="`Settings for ${bucket}`" :docs="{ topic: 'where-data-lives', section: 'Buckets' }">
       <template #description>
         What this bucket holds, where new uploads go, which rules apply, and what this node can see.
         <DocsLink icon topic="where-data-lives" class="ml-0.5" />

@@ -48,7 +48,7 @@ const askPrompt = computed(() =>
 
 <template>
   <div>
-    <PageHeader :title="user?.name ?? 'User profile'" description="Public profile resolved from this realm's user directory.">
+    <PageHeader :title="user?.name ?? 'User profile'" description="Public profile resolved from this realm's user directory." :docs="{ topic: 'portal-tour' }">
       <template #actions>
         <AskAiButton :prompt="askPrompt" :subject="`user ${userId}`" size="default" />
       </template>

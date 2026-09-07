@@ -159,6 +159,7 @@ onMounted(() => void reload())
       eyebrow="This computer"
       title="Your data on this computer"
       :description="`Signed in to ${realm.name}.`"
+      :docs="{ topic: 'where-data-lives', section: 'Syncs' }"
     >
       <template #breadcrumbs>
         <Badge :variant="nodeTone">{{ nodeLabel }}</Badge>

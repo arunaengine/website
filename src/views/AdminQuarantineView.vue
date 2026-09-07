@@ -242,6 +242,7 @@ async function runPrunePass() {
     <PageHeader
       title="Sync quarantine"
       description="Replicated sync events this node rejected, retained as evidence for review."
+      :docs="{ topic: 'where-data-lives', section: 'Syncs' }"
     >
       <template #actions>
         <Button variant="outline" size="sm" as-child>

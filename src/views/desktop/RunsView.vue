@@ -49,7 +49,7 @@ onMounted(() => {
 
 <template>
   <div>
-    <PageHeader eyebrow="This computer" :title="pageTitle" description="Work you started, wherever it is executing.">
+    <PageHeader eyebrow="This computer" :title="pageTitle" description="Work you started, wherever it is executing." :docs="{ topic: 'compute-run', section: 'Follow the run' }">
       <template #breadcrumbs>
         <Badge v-if="localHint" variant="outline" size="sm">{{ localHint }}</Badge>
       </template>

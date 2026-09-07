@@ -334,7 +334,7 @@ async function save() {
 
 <template>
   <div>
-    <PageHeader title="Realm administration" description="Realm-wide usage, quotas, compute, where records are placed and where data may be stored.">
+    <PageHeader title="Realm administration" description="Realm-wide usage, quotas, compute, where records are placed and where data may be stored." :docs="{ topic: 'data-to-compute', section: 'Placement policies and record placement' }">
       <template #actions>
         <RefreshButton :busy="refreshBusy" size="default" @click="onRefresh" />
       </template>

@@ -204,6 +204,7 @@ async function createFolder() {
       :description="notebooksView
         ? 'Pick a notebook to open, or create one in the folder you are browsing.'
         : `Browse buckets and objects through the node's S3 interface, signed in your browser.`"
+      :docs="{ topic: 'upload-data', section: 'Create a bucket and upload' }"
     >
       <template #actions>
         <template v-if="currentUser && s3.connectedEndpoint.value">

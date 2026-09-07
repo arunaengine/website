@@ -190,7 +190,7 @@ async function run() {
 
 <template>
   <div>
-    <PageHeader eyebrow="Compute" title="New run">
+    <PageHeader eyebrow="Compute" title="New run" :docs="{ topic: 'compute-run', section: 'One page, six sections' }">
       <template #actions>
         <AskAiButton size="default" prompt="Help me set up this run." subject="the run form" />
         <Button variant="outline" size="default" as-child>

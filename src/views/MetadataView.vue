@@ -149,6 +149,7 @@ function jumpTo(entityId: string) {
     <PageHeader
       :title="current ? current.title : fetchedSummary ? fetchedSummary.document_path : 'Dataset'"
       :description="current ? (runProvenance ? profileName : `${profileName} · ${current.ulid}`) : fetchedSummary ? fetchedSummary.document_id : 'Live RO-Crate dataset.'"
+      :docs="{ topic: 'datasets', section: 'The bundle is an RO-Crate' }"
     >
       <template #breadcrumbs>
         <template v-if="current?.realmId || fetchedSummary?.group_id">

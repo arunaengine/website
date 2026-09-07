@@ -185,7 +185,7 @@ const savedLabel = computed(() => {
 
 <template>
   <div>
-    <PageHeader eyebrow="Notebooks" :title="notebook.name.value || 'Notebook'">
+    <PageHeader eyebrow="Notebooks" :title="notebook.name.value || 'Notebook'" :docs="{ topic: 'notebooks', section: 'The session bar' }">
       <template #actions>
         <AskAiButton size="default" prompt="Help me with this notebook." subject="the notebook" />
         <Button variant="outline" size="default" as-child>

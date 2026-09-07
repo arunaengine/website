@@ -211,7 +211,7 @@ const sharedGroups = computed(() => {
 
 <template>
   <div>
-    <PageHeader title="Realm users" description="Read-only directory of every user registered in this realm.">
+    <PageHeader title="Realm users" description="Read-only directory of every user registered in this realm." :docs="{ topic: 'realm-nodes-groups' }">
       <template #actions>
         <Button variant="outline" size="sm" as-child>
           <RouterLink :to="{ name: 'admin' }">Admin</RouterLink>

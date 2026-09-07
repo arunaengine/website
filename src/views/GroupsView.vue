@@ -135,7 +135,7 @@ const shellState = computed<'loading' | 'empty' | 'ready'>(() => {
 
 <template>
   <div>
-    <PageHeader :title="pageTitle" :description="description">
+    <PageHeader :title="pageTitle" :description="description" :docs="{ topic: 'first-group', section: 'Groups own your work' }">
       <template #actions>
         <RefreshButton :busy="spinning" size="default" @click="onRefresh" />
         <Button data-tour="groups-create" :disabled="!currentUser" @click="createGroupOpen = true">

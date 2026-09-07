@@ -302,6 +302,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
     <PageHeader
       :title="route.name === 'profile' ? (selected?.name ?? selectedId) : 'Profiles'"
       description="Profiles are ordinary RO-Crate datasets stored under profiles/."
+      :docs="{ topic: 'profiles-conformance', section: 'Profiles define minimum requirements' }"
     >
       <template #actions>
         <DocsLink topic="build-a-profile" label="Learn how profiles work" />

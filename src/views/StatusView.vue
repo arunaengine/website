@@ -248,7 +248,7 @@ watch(
 
 <template>
   <div>
-    <PageHeader title="Status" description="Realm topology and this node's health, refreshed every minute.">
+    <PageHeader title="Status" description="Realm topology and this node's health, refreshed every minute." :docs="{ topic: 'realm-nodes-groups', section: 'Nodes and the realm' }">
       <template #actions>
         <span class="text-[11px] tabular-nums text-muted-foreground">Updated {{ lastUpdatedLabel }}</span>
         <RefreshButton :busy="spinning" @click="onRefresh" />

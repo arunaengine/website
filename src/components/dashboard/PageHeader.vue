@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DocsLink from '@/components/ui/DocsLink.vue'
 import RealmBadge from '@/components/ui/RealmBadge.vue'
 import { useRealm } from '@/composables/useRealm'
 import { cn } from '@/lib/utils'
@@ -11,6 +12,8 @@ withDefaults(
     description?: string
     eyebrow?: string
     class?: string
+    /** The manual page this surface belongs to. */
+    docs?: { topic: string; section?: string; label?: string }
   }>(),
   { eyebrow: 'Portal' },
 )
@@ -37,6 +40,7 @@ const { realm } = useRealm()
         <span>·</span>
         <RealmBadge :realm="realm" />
         <slot name="breadcrumbs" />
+        <DocsLink v-if="docs" :topic="docs.topic" :section="docs.section" :label="docs.label" class="ml-auto" />
       </div>
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div class="min-w-0">

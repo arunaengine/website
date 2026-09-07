@@ -59,6 +59,7 @@ function onEnrolled() {
       eyebrow="This computer"
       title="This device"
       description="The node Aruna Desktop runs on this computer: its state, its enrollment, and the settings only you control."
+      :docs="{ topic: 'realm-nodes-groups', section: 'Nodes and the realm' }"
     />
 
     <div class="container py-5">

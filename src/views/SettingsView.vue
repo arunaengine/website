@@ -248,7 +248,7 @@ async function revoke(accessKeyId: string) {
 
 <template>
   <div>
-    <PageHeader title="Settings" description="Your account, groups, access keys and this browser's connection to the realm.">
+    <PageHeader title="Settings" description="Your account, groups, access keys and this browser's connection to the realm." :docs="{ topic: 'storage-access' }">
       <template #actions>
         <RefreshButton :busy="refreshBusy" size="default" @click="onRefresh" />
         <Button v-if="watchesAvailable" variant="outline" size="default" as-child>
