@@ -28,6 +28,15 @@ describe('AssistantMarkdown', () => {
     expect(markup).toContain('assistant-markdown')
   })
 
+  it('resolves image attachments without accepting unsafe replacements', async () => {
+    const markup = await renderToString(createSSRApp({ render: () => h(AssistantMarkdown, {
+      text: '![plot](attachment:plot.png) ![bad](attachment:bad.png)',
+      imageSources: { 'attachment:plot.png': 'data:image/png;base64,iVBORw0KGgo=', 'attachment:bad.png': 'javascript:alert(1)' },
+    }) }))
+    expect(markup).toContain('src="data:image/png;base64,iVBORw0KGgo="')
+    expect(markup).not.toContain('src="javascript:')
+  })
+
   it('gives every fenced block a copy control', async () => {
     const markup = await render('```sh\nls -la\n```')
 

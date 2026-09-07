@@ -11,7 +11,8 @@ import {
   lineNumbers,
 } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
-import { bracketMatching, indentUnit } from '@codemirror/language'
+import { bracketMatching, indentUnit, StreamLanguage } from '@codemirror/language'
+import { shell } from '@codemirror/legacy-modes/mode/shell'
 import { python } from '@codemirror/lang-python'
 import { javascript } from '@codemirror/lang-javascript'
 import { EDITOR_FONT, highlightExtension } from '@/lib/codemirror'
@@ -19,7 +20,7 @@ import { useTheme } from '@/composables/useTheme'
 
 // Lazy-loaded on its own chunk: the quick-run wizard mounts it through
 // defineAsyncComponent so CodeMirror never enters the main bundle.
-export type ScriptLang = 'python' | 'javascript' | 'text'
+export type ScriptLang = 'python' | 'javascript' | 'shell' | 'text'
 
 const props = withDefaults(defineProps<{ modelValue: string; language: ScriptLang; disabled?: boolean }>(), {
   disabled: false,
@@ -34,6 +35,7 @@ const editableConf = new Compartment()
 const highlightConf = new Compartment()
 
 function langExtension(lang: ScriptLang): Extension {
+  if (lang === 'shell') return StreamLanguage.define(shell)
   if (lang === 'python') return python()
   if (lang === 'javascript') return javascript()
   return []

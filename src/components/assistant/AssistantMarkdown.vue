@@ -9,6 +9,7 @@ import { ChevronDown, ChevronUp } from '@lucide/vue'
 
 const props = withDefaults(defineProps<{
   text: string
+  imageSources?: Record<string, string>
   size?: 'compact' | 'full'
   /** True when the message already shows a card, so long prose folds away. */
   hasCard?: boolean
@@ -38,6 +39,16 @@ md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
     token.attrSet('rel', 'noopener noreferrer')
   }
   return renderLink(tokens, idx, options, env, self)
+}
+
+const renderImage = md.renderer.rules.image!
+md.renderer.rules.image = (tokens, idx, options, env, self) => {
+  const token = tokens[idx]!
+  const source = props.imageSources?.[token.attrGet('src') ?? '']
+  if (source && (md.validateLink(source) || source.startsWith('data:image/svg+xml;utf8,'))) {
+    token.attrSet('src', source)
+  }
+  return renderImage(tokens, idx, options, env, self)
 }
 
 const renderFence = md.renderer.rules.fence
