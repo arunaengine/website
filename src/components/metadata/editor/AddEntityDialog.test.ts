@@ -16,6 +16,8 @@ import {
 } from '@/test/clientRender'
 import * as Editor from '@/lib/crate/editor'
 import * as References from '@/lib/crate/references'
+import * as CrateRegistry from '@/lib/crate/registry'
+import type { ReuseCandidate } from '@/composables/useEntityRegistry'
 import * as TypeDefaults from '@/lib/crate/typeDefaults'
 import * as Uri from '@/lib/profiles/uri'
 import * as Orcid from '@/lib/lookup/orcid'
@@ -28,10 +30,16 @@ let vocab: VocabIndex
 beforeAll(async () => {
   vocab = await loadVocabIndex()
 })
+const findCandidates = vi.fn<(type: string, options: Record<string, unknown>) => Promise<{ candidates: ReuseCandidate[]; partial: boolean }>>()
+const saveToRegistry = vi.fn()
+
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.useRealTimers()
+  findCandidates.mockReset().mockResolvedValue({ candidates: [], partial: false })
+  saveToRegistry.mockReset()
 })
+findCandidates.mockResolvedValue({ candidates: [], partial: false })
 
 const Passthrough = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
@@ -110,7 +118,9 @@ const AddEntityDialog = compileClientComponent(new URL('./AddEntityDialog.vue', 
   './TypeBrowser.vue': moduleDefault(TypeBrowser),
   '@/lib/crate/editor': Editor,
   '@/lib/crate/references': References,
+  '@/lib/crate/registry': CrateRegistry,
   '@/lib/crate/typeDefaults': TypeDefaults,
+  '@/composables/useEntityRegistry': { findCandidates, saveToRegistry },
   '@/lib/lookup/orcid': Orcid,
   '@/lib/lookup/ror': Ror,
   '@/lib/utils': Utils,
@@ -164,7 +174,110 @@ function typeNames(root: HostNode): string[] {
     .map((node) => content(node).trim())
 }
 
+const institute: Editor.DraftEntity = {
+  id: 'https://ror.org/03yrm5c26',
+  types: ['Organization'],
+  properties: { name: [{ kind: 'text', value: 'Example Institute' }] },
+}
+const ada: Editor.DraftEntity = {
+  id: 'https://orcid.org/0000-0002-1825-0097',
+  types: ['Person'],
+  properties: {
+    name: [{ kind: 'text', value: 'Ada Lovelace' }],
+    affiliation: [{ kind: 'reference', value: institute.id }],
+  },
+}
+const grace: Editor.DraftEntity = {
+  id: '#grace',
+  types: ['Person'],
+  properties: { name: [{ kind: 'text', value: 'Grace Hopper' }] },
+}
+
+function candidate(entity: Editor.DraftEntity, related: Editor.DraftEntity[], registry: boolean): ReuseCandidate {
+  return {
+    entity,
+    related,
+    source: registry
+      ? { documentId: 'reg', title: 'Entity registry', groupId: 'group-1', registry: true }
+      : { documentId: 'doc-2', title: 'Other dataset', groupId: 'group-2', registry: false },
+  }
+}
+
 describe('AddEntityDialog', () => {
+  it('offers saved and found entities of the type and copies the pick with what it references', async () => {
+    findCandidates.mockResolvedValue({ candidates: [candidate(grace, [], true), candidate(ada, [institute], false)], partial: false })
+    const created: Created[] = []
+    const mounted = await mount({ draft: { ...draft, groupId: 'group-1', documentId: 'doc-1' } }, created)
+
+    await click(button(mounted.root, 'Person'))
+    await flush()
+    expect(findCandidates).toHaveBeenCalledWith('Person', { groupId: 'group-1', excludeDocumentId: 'doc-1' })
+    const text = content(mounted.root)
+    expect(text).toContain('Reuse an existing Person')
+    expect(text.indexOf('Grace Hopper')).toBeLessThan(text.indexOf('Ada Lovelace'))
+    expect(text).toContain('Group registry')
+    expect(text).toContain('Other dataset')
+
+    await click(button(mounted.root, 'Ada Lovelace'))
+    expect(field(mounted.root, 'Identifier').props.value).toBe(ada.id)
+    expect(content(mounted.root)).toContain('Copies Ada Lovelace from Other dataset with Example Institute')
+
+    await click(button(mounted.root, 'Create'))
+    expect(created[0].entity).toMatchObject({ id: ada.id, types: ['Person'] })
+    expect(created[0].entity.properties.affiliation).toEqual([{ kind: 'reference', value: institute.id }])
+    expect(Editor.findEntity(created[0].draft, institute.id)).toMatchObject({ types: ['Organization'] })
+    mounted.app.unmount()
+  })
+
+  it('says when existing datasets could not be searched and keeps the form usable', async () => {
+    findCandidates.mockRejectedValue(new Error('offline'))
+    const created: Created[] = []
+    const mounted = await mount({}, created)
+
+    await click(button(mounted.root, 'Place'))
+    await flush()
+    expect(content(mounted.root)).toContain('Could not search existing datasets.')
+
+    await typeValue(field(mounted.root, 'Name'), 'Giessen')
+    await click(button(mounted.root, 'Create'))
+    expect(created[0].entity.id).toBe('#giessen')
+    mounted.app.unmount()
+  })
+
+  it('drops a search answer that arrives for an earlier type', async () => {
+    let answerPerson!: (value: { candidates: ReuseCandidate[]; partial: boolean }) => void
+    findCandidates.mockImplementation((type) => (type === 'Person'
+      ? new Promise((resolve) => { answerPerson = resolve })
+      : Promise.resolve({ candidates: [], partial: false })))
+    const mounted = await mount()
+
+    await click(button(mounted.root, 'Person'))
+    await click(button(mounted.root, 'Back'))
+    await click(button(mounted.root, 'Place'))
+    await flush()
+    answerPerson({ candidates: [candidate(ada, [], false)], partial: false })
+    await flush()
+
+    expect(content(mounted.root)).not.toContain('Ada Lovelace')
+    expect(content(mounted.root)).toContain('No existing Place found.')
+    mounted.app.unmount()
+  })
+
+  it('saves a found entity to the group registry', async () => {
+    findCandidates.mockResolvedValue({ candidates: [candidate(ada, [institute], false)], partial: true })
+    saveToRegistry.mockResolvedValue({ documentId: 'reg' })
+    const mounted = await mount({ draft: { ...draft, groupId: 'group-1' } })
+
+    await click(button(mounted.root, 'Person'))
+    await flush()
+    expect(content(mounted.root)).toContain('Not every dataset could be searched.')
+    await click(button(mounted.root, 'Save to registry'))
+
+    expect(saveToRegistry).toHaveBeenCalledWith('group-1', ada, [institute])
+    expect(content(mounted.root)).toContain('Ada Lovelace is saved in the group registry.')
+    mounted.app.unmount()
+  })
+
   it('pins the common types above everything else', async () => {
     const mounted = await mount()
     const text = content(mounted.root)

@@ -17,6 +17,7 @@ import {
   addEntity,
   autoId,
   displayName,
+  findEntity,
   findSimilarEntity,
   idHint,
   linkProperties,
@@ -31,6 +32,8 @@ import {
   type DraftValue,
 } from '@/lib/crate/editor'
 import { linkReference } from '@/lib/crate/references'
+import { placeEntity } from '@/lib/crate/registry'
+import { findCandidates, saveToRegistry, type ReuseCandidate } from '@/composables/useEntityRegistry'
 import { defaultProperties, defaultRows } from '@/lib/crate/typeDefaults'
 import { fetchOrcidRecord, normalizeOrcidId } from '@/lib/lookup/orcid'
 import { fetchRorRecord, matchRorByName, normalizeRorId } from '@/lib/lookup/ror'
@@ -73,6 +76,76 @@ const related = ref<ContextEntity[]>([])
 const linkAs = ref('')
 // A ROR match belongs to the hit it was started for, and to no later one.
 let hitToken = 0
+
+// Entities of the picked type saved in the group registry or found in other
+// datasets; a pick copies one instead of typing it again.
+const candidates = ref<ReuseCandidate[]>([])
+const candidateState = ref<'idle' | 'loading' | 'ready' | 'failed'>('idle')
+const candidatesPartial = ref(false)
+const picked = ref<ReuseCandidate | null>(null)
+const pinNote = ref('')
+let candidateToken = 0
+
+watch(type, (next) => {
+  candidates.value = []
+  candidatesPartial.value = false
+  picked.value = null
+  pinNote.value = ''
+  candidateState.value = next ? 'loading' : 'idle'
+  const token = ++candidateToken
+  if (!next) return
+  findCandidates(next, { groupId: props.draft.groupId, excludeDocumentId: props.draft.documentId })
+    .then((result) => {
+      if (token !== candidateToken) return
+      candidates.value = result.candidates
+      candidatesPartial.value = result.partial
+      candidateState.value = 'ready'
+    })
+    .catch(() => {
+      if (token === candidateToken) candidateState.value = 'failed'
+    })
+})
+
+const shownCandidates = computed(() => {
+  const needle = name.value.trim().toLowerCase()
+  return candidates.value
+    .filter((candidate) => !findEntity(props.draft, candidate.entity.id))
+    .filter((candidate) => !needle || displayName(candidate.entity).toLowerCase().includes(needle))
+    .slice(0, 8)
+})
+
+function pick(candidate: ReuseCandidate) {
+  picked.value = candidate
+  name.value = displayName(candidate.entity)
+  identifier.value = candidate.entity.id
+  idTouched.value = true
+  extra.value = {}
+  related.value = []
+  hitToken += 1
+}
+
+function unpick() {
+  picked.value = null
+  idTouched.value = false
+  refreshId()
+}
+
+// An edited identifier no longer names the copied entity.
+watch(identifier, (next) => {
+  if (picked.value && next !== picked.value.entity.id) picked.value = null
+})
+
+async function pin(candidate: ReuseCandidate) {
+  const groupId = props.draft.groupId
+  if (!groupId) return
+  pinNote.value = ''
+  try {
+    await saveToRegistry(groupId, candidate.entity, candidate.related)
+    pinNote.value = `${displayName(candidate.entity)} is saved in the group registry.`
+  } catch (error) {
+    pinNote.value = `Could not save to the group registry: ${errorMessage(error)}`
+  }
+}
 
 const linkOptions = computed(() => {
   if (!props.offerLink || !type.value) return []
@@ -240,6 +313,20 @@ function create() {
   if (!canCreate.value) return
   let base = props.draft
   let entity = reuse.value
+  if (!entity && picked.value) {
+    let properties = { ...picked.value.entity.properties }
+    for (const relatedEntity of picked.value.related) {
+      const known = findSimilarEntity(base, relatedEntity.types[0] ?? 'Thing', displayName(relatedEntity))
+      if (known) {
+        properties = retarget(properties, relatedEntity.id, known.id)
+        continue
+      }
+      base = placeEntity(base, relatedEntity)
+    }
+    if (name.value.trim()) properties = { ...properties, name: text(name.value.trim()) }
+    base = placeEntity(base, { ...picked.value.entity, properties })
+    entity = findEntity(base, picked.value.entity.id)
+  }
   if (!entity) {
     let properties: Record<string, DraftValue[]> = { ...defaultRows(props.vocab, type.value), ...extra.value }
     for (const stub of related.value) {
@@ -298,6 +385,57 @@ function create() {
       </div>
 
       <div class="scrollbar-thin max-h-[60vh] min-w-0 space-y-4 overflow-y-auto p-4">
+        <div v-if="candidateState !== 'idle'" class="min-w-0">
+          <p class="text-xs font-medium text-foreground">Reuse an existing {{ typeLabel(type) }}</p>
+          <Spinner v-if="candidateState === 'loading'" label="Searching existing datasets" show-label class="mt-1" />
+          <p v-else-if="candidateState === 'failed'" class="mt-1 text-[11px] text-muted-foreground">
+            Could not search existing datasets.
+          </p>
+          <template v-else>
+            <ul v-if="shownCandidates.length" class="mt-1 divide-y divide-border rounded-md border border-border">
+              <li
+                v-for="candidate in shownCandidates"
+                :key="candidate.entity.id"
+                class="flex min-w-0 items-center gap-2 px-2 py-1.5 text-xs"
+              >
+                <button
+                  type="button"
+                  class="min-w-0 flex-1 rounded-sm text-left hover:text-primary"
+                  :aria-pressed="picked?.entity.id === candidate.entity.id"
+                  @click="pick(candidate)"
+                >
+                  <span class="block truncate font-medium text-foreground">{{ displayName(candidate.entity) }}</span>
+                  <span class="block truncate text-[11px] text-muted-foreground">
+                    {{ candidate.source.registry ? 'Group registry' : candidate.source.title }}
+                  </span>
+                </button>
+                <Button
+                  v-if="!candidate.source.registry && draft.groupId"
+                  variant="ghost"
+                  size="sm"
+                  class="h-6 shrink-0 px-2 text-[11px] text-muted-foreground"
+                  @click="pin(candidate)"
+                >
+                  Save to registry
+                </Button>
+              </li>
+            </ul>
+            <p v-else class="mt-1 text-[11px] text-muted-foreground">
+              {{ candidatesPartial ? 'Nothing found in the datasets that could be searched.' : `No existing ${typeLabel(type)} found.` }}
+            </p>
+            <p v-if="shownCandidates.length && candidatesPartial" class="mt-1 text-[11px] text-muted-foreground">
+              Not every dataset could be searched.
+            </p>
+          </template>
+          <Notice v-if="picked" tone="info" class="mt-2 break-words">
+            Copies {{ displayName(picked.entity) }} from
+            {{ picked.source.registry ? 'the group registry' : picked.source.title }}<template v-if="picked.related.length">
+              with {{ picked.related.map(displayName).join(', ') }}</template>.
+            <button type="button" class="ml-1 underline" @click="unpick">Start from scratch instead</button>
+          </Notice>
+          <Notice v-if="pinNote" tone="info" class="mt-2 break-words">{{ pinNote }}</Notice>
+        </div>
+
         <div class="min-w-0">
           <label class="text-xs font-medium text-foreground">Name</label>
           <div v-if="registry" class="mt-1 min-w-0 space-y-2">

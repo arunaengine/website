@@ -17,6 +17,7 @@ import {
 import * as Editor from '@/lib/crate/editor'
 import * as Orphans from '@/lib/crate/orphans'
 import * as References from '@/lib/crate/references'
+import * as Registry from '@/lib/crate/registry'
 import * as Utils from '@/lib/utils'
 import type { LookupHit } from '@/lib/lookup/types'
 
@@ -54,9 +55,11 @@ const InputStub = defineComponent({
 })
 
 const rorMatch = vi.fn<(name: string) => Promise<LookupHit | null>>(async () => null)
+const saveToRegistry = vi.fn()
 afterEach(() => {
   rorMatch.mockReset()
   rorMatch.mockResolvedValue(null)
+  saveToRegistry.mockReset()
 })
 
 const EntityHeader = compileClientComponent(new URL('./EntityHeader.vue', import.meta.url), {
@@ -73,6 +76,8 @@ const EntityHeader = compileClientComponent(new URL('./EntityHeader.vue', import
   '@/lib/crate/editor': Editor,
   '@/lib/crate/orphans': Orphans,
   '@/lib/crate/references': References,
+  '@/lib/crate/registry': Registry,
+  '@/composables/useEntityRegistry': { saveToRegistry },
   '@/lib/lookup/ror': { matchRorByName: rorMatch },
   '@/lib/utils': Utils,
 })
@@ -121,6 +126,31 @@ function control(root: HostNode, label: string): HostNode {
 }
 
 describe('EntityHeader', () => {
+  it('saves a contextual entity with what it references to the group registry', async () => {
+    saveToRegistry.mockResolvedValue({ documentId: 'reg' })
+    const base = seeded()
+    const org = Editor.addEntity(base, { type: 'Organization', name: 'Example Institute', id: '#institute' })
+    const draft = { ...Editor.addValue(org.draft, '#ada-lovelace', 'affiliation', { kind: 'reference', value: '#institute' }), groupId: 'group-1' }
+    const person = Editor.findEntity(draft, '#ada-lovelace')!
+    const mounted = await mountApp(EntityHeader, { props: { draft, entity: person, vocab: null } })
+
+    await click(button(mounted.root, 'Save to group registry'))
+
+    expect(saveToRegistry).toHaveBeenCalledWith('group-1', person, [Editor.findEntity(draft, '#institute')])
+    expect(content(mounted.root)).toContain('Ada Lovelace is saved in the group registry.')
+    mounted.app.unmount()
+  })
+
+  it('offers the registry only for contextual entities of a group draft', async () => {
+    const root = await mount('./')
+    expect(content(root.root)).not.toContain('Save to group registry')
+    root.app.unmount()
+
+    const person = await mount('#ada-lovelace')
+    expect(content(person.root)).not.toContain('Save to group registry')
+    person.app.unmount()
+  })
+
   it('offers the two ways out of a file the dataset cannot reach', async () => {
     const updates: Editor.CrateDraft[] = []
     const added = Editor.addEntity(seeded(), { type: 'File', id: 's3://bucket/stray.csv', name: 'stray.csv' })

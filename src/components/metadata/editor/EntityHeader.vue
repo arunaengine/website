@@ -25,8 +25,10 @@ import {
 } from '@/lib/crate/editor'
 import { orphanedDataEntities } from '@/lib/crate/orphans'
 import { linkReference, rootParts } from '@/lib/crate/references'
+import { relatedEntities } from '@/lib/crate/registry'
+import { saveToRegistry } from '@/composables/useEntityRegistry'
 import { matchRorByName } from '@/lib/lookup/ror'
-import { truncateMiddle } from '@/lib/utils'
+import { errorMessage, truncateMiddle } from '@/lib/utils'
 import type { LookupHit } from '@/lib/lookup/types'
 import type { VocabIndex } from '@/lib/profiles/vocabulary'
 import { Pencil, Plus, Trash2, X } from '@lucide/vue'
@@ -98,7 +100,28 @@ const needsRor = computed(() =>
 watch(() => props.entity.id, () => {
   rorHit.value = null
   rorNote.value = ''
+  registryNote.value = ''
 })
+
+// A contextual entity and what it references go to the group registry, so the
+// next dataset can pick it instead of typing it again.
+const registryBusy = ref(false)
+const registryNote = ref('')
+
+async function pinToRegistry() {
+  const groupId = props.draft.groupId
+  if (!groupId || registryBusy.value) return
+  registryBusy.value = true
+  registryNote.value = ''
+  try {
+    await saveToRegistry(groupId, props.entity, relatedEntities(props.draft, props.entity))
+    registryNote.value = `${displayName(props.entity)} is saved in the group registry.`
+  } catch (error) {
+    registryNote.value = `Could not save to the group registry: ${errorMessage(error)}`
+  } finally {
+    registryBusy.value = false
+  }
+}
 
 async function findRor() {
   rorBusy.value = true
@@ -216,6 +239,16 @@ function applyRor() {
       >
         {{ rorBusy ? 'Searching ROR' : 'Find ROR' }}
       </Button>
+      <Button
+        v-if="group === 'contextual' && draft.groupId"
+        variant="ghost"
+        size="sm"
+        class="h-6 px-2 text-[11px] text-muted-foreground"
+        :disabled="registryBusy"
+        @click="pinToRegistry"
+      >
+        {{ registryBusy ? 'Saving to registry' : 'Save to group registry' }}
+      </Button>
       <TypeDialog v-if="typeOpen" :open="typeOpen" :vocab="vocab" @update:open="(value) => (typeOpen = value)" @pick="addType" />
     </div>
 
@@ -227,6 +260,7 @@ function applyRor() {
       </span>
     </Notice>
     <Notice v-else-if="rorNote" tone="info">{{ rorNote }}</Notice>
+    <Notice v-if="registryNote" tone="info">{{ registryNote }}</Notice>
 
     <Notice v-if="stranded" tone="warning">
       Nothing in this dataset holds {{ displayName(entity) }}. The node refuses a file it cannot
