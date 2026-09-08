@@ -1,19 +1,15 @@
-import { ApiError } from '@/lib/api'
 import { displayName, findEntity, fromRoCrate, rootId, vocabTypeUri, type DraftEntity } from '@/lib/crate/editor'
 import {
   entitiesOfType,
   relatedEntities,
-  REGISTRY_PATH,
   isRegistry,
   referenceKey,
-  referenceNode,
-  registryCrate,
-  registryReferences,
   type EntityReference,
 } from '@/lib/crate/registry'
 import { documentIdFromIri, isDocumentId } from '@/lib/graphIri'
+import { listRecentMetadata } from './aruna/catalog'
 import { fetchRoCrateRaw } from './aruna/crates'
-import { createMetadata, getMetadataDocument, lookupMetadataPath, upsertContextualEntity } from './aruna/documents'
+import { getMetadataDocument } from './aruna/documents'
 import { runSparql } from './aruna/search'
 import { assertCurrentSession, refreshContext } from './aruna/state'
 
@@ -21,7 +17,6 @@ export interface ReuseSource {
   documentId: string
   title: string
   groupId: string
-  registry: boolean
 }
 
 export interface ReuseCandidate {
@@ -36,47 +31,21 @@ export interface ReuseSearch {
   candidates: ReuseCandidate[]
   /** Some datasets were not searched or could not be read, so more may exist. */
   partial: boolean
-  unavailable: boolean
 }
 
 const GRAPH_LIMIT = 20
 const DOCUMENT_LIMIT = 8
 
-async function registryCopies(groupId: string) {
-  let lookup
-  try {
-    lookup = await lookupMetadataPath(groupId, REGISTRY_PATH)
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 404) return { copies: [], occupied: false, partial: false }
-    throw error
-  }
-  const ids = [...new Set([lookup.winner.document_id, ...lookup.conflicts])]
-  const copies: Array<{ documentId: string; crate: unknown }> = []
-  let partial = false
-  for (let offset = 0; offset < ids.length; offset += DOCUMENT_LIMIT) {
-    const loaded = await Promise.all(ids.slice(offset, offset + DOCUMENT_LIMIT).map(async (documentId) => {
-      try {
-        const crate = await fetchRoCrateRaw(documentId)
-        return isRegistry(crate) ? { documentId, crate } : null
-      } catch {
-        partial = true
-        return null
-      }
-    }))
-    copies.push(...loaded.filter((copy): copy is { documentId: string; crate: unknown } => copy !== null))
-  }
-  return { copies, occupied: true, partial }
-}
-
-function candidatesOf(crate: unknown, type: string, source: ReuseSource): ReuseCandidate[] {
+function candidatesOf(crate: unknown, type: string | null, source: ReuseSource): ReuseCandidate[] {
   const draft = fromRoCrate(crate)
   const root = rootId(draft)
-  return entitiesOfType(draft.entities.filter((entity) => entity.id !== root), type)
+  const entities = draft.entities.filter((entity) => entity.id !== root)
+  return (type ? entitiesOfType(entities, type) : entities)
     .map((entity) => ({ reference: { documentId: source.documentId, entityId: entity.id }, entity, related: relatedEntities(draft, entity), source }))
 }
 
-export async function resolveReference(reference: EntityReference, registry = false): Promise<ReuseCandidate> {
-  if (!isDocumentId(reference.documentId) || !reference.entityId) throw new Error('Save the dataset first before saving an entity reference.')
+export async function resolveReference(reference: EntityReference): Promise<ReuseCandidate> {
+  if (!isDocumentId(reference.documentId) || !reference.entityId) throw new Error('This entity has no saved source dataset.')
   const epoch = refreshContext().epoch
   const [summary, crate] = await Promise.all([
     getMetadataDocument(reference.documentId), fetchRoCrateRaw(reference.documentId),
@@ -84,7 +53,7 @@ export async function resolveReference(reference: EntityReference, registry = fa
   assertCurrentSession(epoch)
   const draft = fromRoCrate(crate)
   const entity = findEntity(draft, reference.entityId)
-  if (!entity) throw new Error('This entity is not in the saved dataset. Save the dataset changes first.')
+  if (!entity) throw new Error('This entity is no longer in the saved source dataset.')
   return {
     reference,
     entity,
@@ -93,16 +62,44 @@ export async function resolveReference(reference: EntityReference, registry = fa
       documentId: reference.documentId,
       title: displayName(draft.entities.find((item) => item.id === rootId(draft))) || summary.document_path,
       groupId: summary.group_id,
-      registry,
     },
   }
+}
+
+/** Entities from the most recently updated readable datasets. */
+export async function findRecentCandidates(
+  options: { excludeDocumentId?: string } = {},
+): Promise<ReuseSearch> {
+  const epoch = refreshContext().epoch
+  const recent = await listRecentMetadata(DOCUMENT_LIMIT)
+  assertCurrentSession(epoch)
+  if (!recent) return { candidates: [], partial: false }
+  let partial = false
+  const loaded = await Promise.all(recent
+    .filter((document) => document.ulid !== options.excludeDocumentId)
+    .map(async (document) => {
+      try {
+        const crate = await fetchRoCrateRaw(document.ulid)
+        if (isRegistry(crate)) return []
+        return candidatesOf(crate, null, {
+          documentId: document.ulid,
+          title: document.title,
+          groupId: document.realmId,
+        })
+      } catch {
+        partial = true
+        return []
+      }
+    }))
+  assertCurrentSession(epoch)
+  return { candidates: loaded.flat(), partial }
 }
 
 function graphDocumentId(row: Record<string, string>): string | null {
   return documentIdFromIri(String(row.g ?? '').replace(/^<|>$/g, ''))
 }
 
-/** Entities of `type` from the group registry first, then from other readable datasets. */
+/** Entities of `type` from readable datasets. */
 export async function findCandidates(
   type: string,
   options: { groupId?: string; excludeDocumentId?: string } = {},
@@ -110,47 +107,12 @@ export async function findCandidates(
   const epoch = refreshContext().epoch
   const candidates: ReuseCandidate[] = []
   let partial = false
-  let unavailable = false
-  const registries = new Set<string>()
-  if (options.groupId) {
-    try {
-      const result = await registryCopies(options.groupId)
-      partial ||= result.partial
-      const references = new Map<string, EntityReference>()
-      for (const copy of result.copies) {
-        registries.add(copy.documentId)
-        for (const reference of registryReferences(copy.crate)) references.set(referenceKey(reference), reference)
-      }
-      const pending = [...references.values()].filter((reference) => reference.documentId !== options.excludeDocumentId)
-      for (let offset = 0; offset < pending.length; offset += DOCUMENT_LIMIT) {
-        const loaded = await Promise.all(pending.slice(offset, offset + DOCUMENT_LIMIT).map(async (reference) => {
-          try {
-            const candidate = await resolveReference(reference, true)
-            return entitiesOfType([candidate.entity], type).length ? candidate : null
-          } catch {
-            unavailable = true
-            return null
-          }
-        }))
-        candidates.push(...loaded.filter((candidate): candidate is ReuseCandidate => candidate !== null))
-      }
-    } catch {
-      partial = true
-    }
-  }
   const query = `SELECT DISTINCT ?g WHERE { GRAPH ?g { ?s a <${vocabTypeUri(type)}> } } LIMIT ${GRAPH_LIMIT}`
-  let rows: Array<Record<string, string>> = []
-  try {
-    const result = await runSparql(query, 'distributed-best-effort')
-    rows = result.rows
-    partial ||= !result.complete
-  } catch (error) {
-    // The registry hits still stand; a failed search must not hide them.
-    if (!candidates.length) throw error
-    partial = true
-  }
+  const result = await runSparql(query, 'distributed-best-effort')
+  const rows = result.rows
+  partial ||= !result.complete
   const documentIds = [...new Set(rows.map(graphDocumentId))]
-    .filter((id): id is string => Boolean(id) && !registries.has(id!) && id !== options.excludeDocumentId)
+    .filter((id): id is string => Boolean(id) && id !== options.excludeDocumentId)
   if (documentIds.length > DOCUMENT_LIMIT) partial = true
   const loaded = await Promise.all(documentIds.slice(0, DOCUMENT_LIMIT).map(async (documentId) => {
     try {
@@ -158,7 +120,7 @@ export async function findCandidates(
       if (isRegistry(crate)) return []
       const draft = fromRoCrate(crate)
       const title = displayName(draft.entities.find((entity) => entity.id === rootId(draft))) || summary.document_path
-      return candidatesOf(crate, type, { documentId, title, groupId: summary.group_id, registry: false })
+      return candidatesOf(crate, type, { documentId, title, groupId: summary.group_id })
     } catch {
       partial = true
       return []
@@ -171,35 +133,9 @@ export async function findCandidates(
     seen.add(key)
     candidates.push(candidate)
   }
-  // Registry entries lead, then the draft's own group; the sort is stable.
+  // The draft's own group leads; the sort is stable.
   const own = options.groupId
-  candidates.sort((a, b) =>
-    Number(b.source.registry) - Number(a.source.registry)
-    || Number(b.source.groupId === own) - Number(a.source.groupId === own))
+  candidates.sort((a, b) => Number(b.source.groupId === own) - Number(a.source.groupId === own))
   assertCurrentSession(epoch)
-  return { candidates, partial: partial || unavailable, unavailable }
-}
-
-/** Saves a reference to an entity in an existing dataset, never its description. */
-export async function saveToRegistry(
-  groupId: string,
-  reference: EntityReference,
-): Promise<{ documentId: string }> {
-  const epoch = refreshContext().epoch
-  await resolveReference(reference)
-  const result = await registryCopies(groupId)
-  assertCurrentSession(epoch)
-  const existing = result.copies[0]
-  if (existing) {
-    await upsertContextualEntity(existing.documentId, referenceNode(reference))
-    assertCurrentSession(epoch)
-    return { documentId: existing.documentId }
-  }
-  if (result.partial) throw new Error('The group registry could not be loaded. Try again.')
-  if (result.occupied) throw new Error('The entity-registry path is already used by another dataset.')
-  const created = await createMetadata({
-    group_id: groupId, path: REGISTRY_PATH, public: false, rocrate: registryCrate(reference),
-  })
-  assertCurrentSession(epoch)
-  return { documentId: created.document_id }
+  return { candidates, partial }
 }

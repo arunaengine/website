@@ -31,12 +31,6 @@ export interface MetadataRoCrateResponse {
 // POST /metadata (flattened): the registry summary without rocrate_summary.
 export type MetadataDocumentSummary = Omit<MetadataDocumentListItem, 'rocrate_summary'>
 
-// GET /metadata/groups/{group_id}/path: the visible document stored at an exact path.
-export interface MetadataPathResponse {
-  winner: MetadataDocumentSummary
-  conflicts: string[]
-}
-
 export interface ReplaceMetadataRoCrateRequest {
   rocrate: unknown
   // Omitted keeps the document's current visibility.

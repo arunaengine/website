@@ -3,23 +3,15 @@ import {
   autoId,
   displayName,
   findSimilarEntity,
-  newDraft,
   rootId,
-  toRoCrate,
   typeLabel,
   type CrateDraft,
   type DraftEntity,
 } from './editor'
-import { documentIdFromIri, graphIriFor } from '@/lib/graphIri'
 import { isAbsoluteUri } from '@/lib/profiles/uri'
 
-// Registry graphs contain references; source descriptions are loaded on reuse.
-export const REGISTRY_PATH = 'entity-registry'
-export const REGISTRY_NAME = 'Entity registry'
+// Internal registry datasets are not reusable source datasets.
 const REGISTRY_TYPE = 'https://w3id.org/aruna/terms/EntityRegistry'
-const ENTRY_TYPE = 'https://w3id.org/aruna/terms/EntityRegistryEntry'
-const SOURCE_GRAPH = 'https://w3id.org/aruna/terms/sourceGraph'
-const SOURCE_ENTITY = 'https://w3id.org/aruna/terms/sourceEntity'
 
 export interface EntityReference {
   documentId: string
@@ -30,27 +22,8 @@ export function referenceKey(reference: EntityReference): string {
   return JSON.stringify([reference.documentId, reference.entityId])
 }
 
-export function referenceNode(reference: EntityReference): Record<string, unknown> {
-  return {
-    '@id': `urn:aruna:entity-reference:${encodeURIComponent(referenceKey(reference))}`,
-    '@type': ['CreativeWork', ENTRY_TYPE],
-    [SOURCE_GRAPH]: graphIriFor(reference.documentId),
-    [SOURCE_ENTITY]: reference.entityId,
-  }
-}
-
 export function isRegistry(crate: unknown): boolean {
   return fromRoCrate(crate).entities[0]?.types.includes(REGISTRY_TYPE) === true
-}
-
-export function registryReferences(crate: unknown): EntityReference[] {
-  const draft = fromRoCrate(crate)
-  return draft.entities.flatMap((entity) => {
-    if (!entity.types.includes(ENTRY_TYPE)) return []
-    const documentId = documentIdFromIri(entity.properties[SOURCE_GRAPH]?.[0]?.value ?? '')
-    const entityId = entity.properties[SOURCE_ENTITY]?.[0]?.value
-    return documentId && entityId ? [{ documentId, entityId }] : []
-  })
 }
 
 /** Entities of `type` among `entities`, matched by type label. */
@@ -104,29 +77,4 @@ export function copyEntity(draft: CrateDraft, entity: DraftEntity, related: Draf
     })
   }
   return { draft: next, entity: next.entities.find((item) => item.id === ids.get(entity.id))! }
-}
-
-function registryDraft(): CrateDraft {
-  const draft = newDraft()
-  const root = draft.entities[0]
-  return {
-    ...draft,
-    entities: [{
-      ...root,
-      types: ['Dataset', REGISTRY_TYPE],
-      properties: {
-        ...root.properties,
-        name: [{ kind: 'text', value: REGISTRY_NAME }],
-        description: [{ kind: 'longtext', value: 'References to entities saved for reuse in this group.' }],
-        license: [],
-      },
-    }],
-  }
-}
-
-export function registryCrate(reference: EntityReference): Record<string, unknown> {
-  const crate = toRoCrate(registryDraft())
-  const graph = crate['@graph'] as unknown[]
-  graph.push(referenceNode(reference))
-  return crate
 }

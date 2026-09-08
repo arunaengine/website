@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { addEntity, addValue, fromRoCrate, newDraft, type DraftEntity } from './editor'
-import { copyEntity, entitiesOfType, isRegistry, placeEntity, referenceKey, referenceNode, registryCrate, registryReferences, relatedEntities } from './registry'
+import { addEntity, addValue, newDraft, type DraftEntity } from './editor'
+import { copyEntity, entitiesOfType, isRegistry, placeEntity, referenceKey, relatedEntities } from './registry'
 
 const reference = { documentId: '01J00000000000000000000001', entityId: '#author' }
 
@@ -18,30 +18,14 @@ const ada: DraftEntity = {
   },
 }
 
-describe('entity registry crate', () => {
-  it('stores only the source graph and entity reference', () => {
-    const crate = registryCrate(reference)
-    const graph = crate['@graph'] as Array<Record<string, unknown>>
-    const root = graph.find((node) => node['@id'] === './')
-
-    expect(root).toMatchObject({
-      name: 'Entity registry',
-    })
-    expect(typeof root?.datePublished).toBe('string')
-    expect(isRegistry(crate)).toBe(true)
-    expect(registryReferences(crate)).toEqual([reference])
-    expect(graph[2]).toEqual(referenceNode(reference))
-    expect(JSON.stringify(crate)).not.toContain('Ada Lovelace')
-    expect(JSON.stringify(crate)).not.toContain('affiliation')
-  })
-
+describe('entity reuse', () => {
   it('distinguishes identical fragment ids from different source graphs', () => {
     const other = { ...reference, documentId: '01J00000000000000000000002' }
     expect(referenceKey(reference)).not.toBe(referenceKey(other))
-    expect(referenceNode(reference)['@id']).not.toBe(referenceNode(other)['@id'])
-    const crate = registryCrate(reference)
-    ;(crate['@graph'] as unknown[]).push(referenceNode(other))
-    expect(registryReferences(crate)).toEqual([reference, other])
+  })
+
+  it('recognizes only the marker on an obsolete registry dataset', () => {
+    expect(isRegistry({ '@graph': [{ '@id': './', '@type': ['Dataset', 'https://w3id.org/aruna/terms/EntityRegistry'] }] })).toBe(true)
     expect(isRegistry({ '@graph': [{ '@id': './', '@type': 'Dataset', name: 'Entity registry' }] })).toBe(false)
   })
 
