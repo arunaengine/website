@@ -74,10 +74,13 @@ describe('page header docs links', () => {
     )
     expect(html).toContain('realm-nodes-groups')
     expect(html).toContain('#nodes-and-the-realm')
-    expect(html).toContain('Learn about nodes and the realm')
+    expect(html).toContain('Read the docs')
+    expect(html).not.toContain('Learn about')
+    expect(html).not.toContain('ml-auto')
+    expect(html).toContain('lucide-book-open')
 
     const bare = await renderToString(createSSRApp({ render: () => h(PageHeader, { title: 'Docs' }) }))
-    expect(bare).not.toContain('Learn about')
+    expect(bare).not.toContain('Read the docs')
 
     vi.doUnmock('vue-router')
     vi.doUnmock('@/composables/useRealm')

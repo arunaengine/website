@@ -19,7 +19,7 @@ import DatasetSearch from '@/components/datasets/DatasetSearch.vue'
 import SparqlWorkbench from '@/components/datasets/SparqlWorkbench.vue'
 import AskAiButton from '@/components/assistant/AskAiButton.vue'
 import { computed, ref } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
 import { useDatasetSearch } from '@/composables/useDatasetSearch'
 import { useSparqlWorkbench } from '@/composables/useSparqlWorkbench'
@@ -70,12 +70,6 @@ const askPrompt = computed(() =>
             Group: {{ groupNames.get(groupFilter) ?? truncateMiddle(groupFilter) }}
           </Badge>
         </template>
-        <span>·</span>
-        <span>What is this?</span>
-        <RouterLink
-          :to="{ name: 'docs', params: { topic: 'datasets' } }"
-          class="font-medium text-primary hover:underline"
-        >Learn more</RouterLink>
       </template>
       <template #actions>
         <AskAiButton :prompt="askPrompt" subject="dataset search" size="default" />

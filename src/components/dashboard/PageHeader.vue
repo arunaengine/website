@@ -40,7 +40,10 @@ const { realm } = useRealm()
         <span>·</span>
         <RealmBadge :realm="realm" />
         <slot name="breadcrumbs" />
-        <DocsLink v-if="docs" :topic="docs.topic" :section="docs.section" :label="docs.label" class="ml-auto" />
+        <template v-if="docs">
+          <span>·</span>
+          <DocsLink :topic="docs.topic" :section="docs.section" label="Read the docs" />
+        </template>
       </div>
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div class="min-w-0">

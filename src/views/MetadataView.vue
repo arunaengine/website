@@ -159,12 +159,6 @@ function jumpTo(entityId: string) {
             :title="current?.realmId || fetchedSummary?.group_id"
           >Group: {{ truncateMiddle(current?.realmId || fetchedSummary?.group_id || '') }}</Badge>
         </template>
-        <span>·</span>
-        <span>What is this?</span>
-        <RouterLink
-          :to="{ name: 'docs', params: { topic: 'datasets' } }"
-          class="font-medium text-primary hover:underline"
-        >Learn more</RouterLink>
       </template>
       <template #actions>
         <DatasetActions
