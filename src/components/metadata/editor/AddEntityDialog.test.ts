@@ -18,7 +18,7 @@ import {
 import * as Editor from '@/lib/crate/editor'
 import * as References from '@/lib/crate/references'
 import * as CrateRegistry from '@/lib/crate/registry'
-import type { ReuseCandidate } from '@/composables/useEntityRegistry'
+import type { ReuseCandidate, ReuseSearch } from '@/composables/useEntityRegistry'
 import * as TypeDefaults from '@/lib/crate/typeDefaults'
 import * as Uri from '@/lib/profiles/uri'
 import * as Orcid from '@/lib/lookup/orcid'
@@ -31,8 +31,8 @@ let vocab: VocabIndex
 beforeAll(async () => {
   vocab = await loadVocabIndex()
 })
-const findCandidates = vi.fn<(type: string, options: Record<string, unknown>) => Promise<{ candidates: ReuseCandidate[]; partial: boolean }>>()
-const findRecentCandidates = vi.fn<(_options: Record<string, unknown>) => Promise<{ candidates: ReuseCandidate[]; partial: boolean }>>()
+const findCandidates = vi.fn<(type: string, options: Record<string, unknown>) => Promise<ReuseSearch>>()
+const findRecentCandidates = vi.fn<(_options: Record<string, unknown>) => Promise<ReuseSearch>>()
 const resolveReference = vi.fn()
 const apiBaseUrl = VueRuntime.ref('http://realm.test')
 const authToken = VueRuntime.ref('token')
@@ -135,7 +135,7 @@ const AddEntityDialog = compileClientComponent(new URL('./AddEntityDialog.vue', 
   '@/lib/utils': Utils,
 })
 
-const draft = Editor.newDraft()
+const draft = { ...Editor.newDraft(), groupId: 'group-1' }
 type Created = { draft: Editor.CrateDraft; entity: Editor.DraftEntity }
 
 // An organization typed by hand: same name as the ORCID affiliation, other id.
@@ -210,11 +210,67 @@ function candidate(entity: Editor.DraftEntity, related: Editor.DraftEntity[], sa
     related,
     source: saved
       ? { documentId, title: 'Saved dataset', groupId: 'group-1' }
-      : { documentId, title: 'Other dataset', groupId: 'group-2' },
+      : { documentId, title: 'Other dataset', groupId: 'group-2', public: true },
   }
 }
 
 describe('AddEntityDialog', () => {
+  it('matches every saved type in both search steps', async () => {
+    const found = candidate({ ...ada, types: ['Person', 'Thing'] }, [], true)
+    findRecentCandidates.mockResolvedValue({ candidates: [found], partial: false })
+    findCandidates.mockResolvedValue({ candidates: [found], partial: false })
+    const mounted = await mount()
+    await flush()
+    await typeValue(field(mounted.root, 'Search entities and types'), 'Thing')
+    await click(button(mounted.root, 'Ada Lovelace'))
+    await typeValue(field(mounted.root, 'Name'), 'Thing')
+    expect(button(mounted.root, 'Ada Lovelace')).toBeDefined()
+    mounted.app.unmount()
+  })
+
+  it('loads further reusable entities with their public source label', async () => {
+    const next = vi.fn(async (): Promise<ReuseSearch> => ({ candidates: [candidate(ada, [], false)], partial: false }))
+    findRecentCandidates.mockResolvedValue({ candidates: [candidate(grace, [], true)], partial: false, loadMore: next })
+    const mounted = await mount()
+    await flush()
+    expect(content(mounted.root)).toContain('Grace Hopper')
+    await click(button(mounted.root, 'Load more entities'))
+    expect(next).toHaveBeenCalledOnce()
+    expect(content(mounted.root)).toContain('Ada Lovelace')
+    expect(content(mounted.root)).toContain('Public dataset')
+    mounted.app.unmount()
+  })
+
+  it('searches the group corpus when the query is absent from initial suggestions', async () => {
+    vi.useFakeTimers()
+    const mounted = await mount()
+    try {
+      findRecentCandidates.mockResolvedValue({ candidates: [candidate(grace, [], true)], partial: false })
+      await typeValue(field(mounted.root, 'Search entities and types'), 'Grace')
+      await vi.advanceTimersByTimeAsync(250)
+      await flush()
+      expect(findRecentCandidates).toHaveBeenLastCalledWith(expect.objectContaining({ groupId: 'group-1', query: 'Grace' }))
+      expect(content(mounted.root)).toContain('Grace Hopper')
+    } finally {
+      mounted.app.unmount()
+      vi.useRealTimers()
+    }
+  })
+
+  it('refuses a public supplement that became private before copying', async () => {
+    const found = candidate(ada, [], false)
+    findRecentCandidates.mockResolvedValue({ candidates: [found], partial: false })
+    resolveReference.mockResolvedValue({ ...found, source: { ...found.source, public: false } })
+    const created: Created[] = []
+    const mounted = await mount({}, created)
+    await flush()
+    await click(button(mounted.root, 'Ada Lovelace'))
+    await click(button(mounted.root, 'Create'))
+    expect(created).toEqual([])
+    expect(content(mounted.root)).toContain('The source dataset is no longer public.')
+    mounted.app.unmount()
+  })
+
   it('searches and selects a recent person before a type is picked', async () => {
     const found = candidate(ada, [institute], false)
     findRecentCandidates.mockResolvedValue({ candidates: [found], partial: false })
@@ -223,7 +279,7 @@ describe('AddEntityDialog', () => {
     const mounted = await mount({}, created)
     await flush()
 
-    expect(content(mounted.root)).toContain('From recent datasets')
+    expect(content(mounted.root)).toContain('From saved datasets')
     expect(content(mounted.root)).toContain('Ada Lovelace')
     await typeValue(field(mounted.root, 'Search entities and types'), 'lovelace')
     expect(content(mounted.root)).toContain('Ada Lovelace')
@@ -298,7 +354,7 @@ describe('AddEntityDialog', () => {
     const mounted = await mount()
     await flush()
 
-    expect(content(mounted.root)).toContain('Some recent datasets could not be read.')
+    expect(content(mounted.root)).toContain('Some datasets could not be searched.')
     mounted.app.unmount()
   })
 
@@ -358,7 +414,7 @@ describe('AddEntityDialog', () => {
 
     await click(button(mounted.root, 'Person'))
     await flush()
-    expect(findCandidates).toHaveBeenCalledWith('Person', { groupId: 'group-1', excludeDocumentId: 'doc-1' })
+    expect(findCandidates).toHaveBeenCalledWith('Person', expect.objectContaining({ groupId: 'group-1', excludeDocumentId: 'doc-1' }))
     const text = content(mounted.root)
     expect(text).toContain('Reuse an existing Person')
     expect(text.indexOf('Grace Hopper')).toBeLessThan(text.indexOf('Ada Lovelace'))

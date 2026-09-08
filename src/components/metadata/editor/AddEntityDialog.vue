@@ -33,7 +33,7 @@ import {
 } from '@/lib/crate/editor'
 import { linkReference } from '@/lib/crate/references'
 import { copyEntity, entitiesOfType, referenceKey } from '@/lib/crate/registry'
-import { findCandidates, findRecentCandidates, resolveReference, type ReuseCandidate } from '@/composables/useEntityRegistry'
+import { findCandidates, findRecentCandidates, resolveReference, type ReuseCandidate, type ReuseSearch } from '@/composables/useEntityRegistry'
 import { useAruna } from '@/composables/useAruna'
 import { isAbsoluteUri } from '@/lib/profiles/uri'
 import { isDataEntity } from '@/lib/dataEntities'
@@ -80,60 +80,119 @@ const linkAs = ref('')
 // A ROR match belongs to the hit it was started for, and to no later one.
 let hitToken = 0
 
-// Recent entities are shown before a type is picked. The selected type also
-// searches every readable dataset, and a pick copies one instead of retyping it.
+// Recency bounds suggestions; each query can continue through all group datasets.
 const recentCandidates = ref<ReuseCandidate[]>([])
 const candidates = ref<ReuseCandidate[]>([])
 const recentState = ref<'idle' | 'loading' | 'ready' | 'failed'>('idle')
 const candidateState = ref<'idle' | 'loading' | 'ready' | 'failed'>('idle')
 const candidatesPartial = ref(false)
 const recentPartial = ref(false)
+const recentMore = ref<ReuseSearch['loadMore']>()
+const candidateMore = ref<ReuseSearch['loadMore']>()
+const moreBusy = ref(false)
 const picked = ref<ReuseCandidate | null>(null)
 const reuseBusy = ref(false)
 const { apiBaseUrl, authToken } = useAruna()
 let candidateToken = 0
 let recentToken = 0
+let recentController: AbortController | undefined
+let candidateController: AbortController | undefined
+let recentTimer: ReturnType<typeof setTimeout> | undefined
+let candidateTimer: ReturnType<typeof setTimeout> | undefined
 
-watch([() => props.open, () => props.draft.documentId, apiBaseUrl, authToken], ([open]) => {
-  picked.value = null
-  recentCandidates.value = []
+function acceptsCandidate(candidate: ReuseCandidate): boolean {
+  return Boolean(candidateType(candidate))
+    && (!isAbsoluteUri(candidate.entity.id) || !findEntity(props.draft, candidate.entity.id))
+}
+
+watch([() => props.open, () => props.draft.groupId, () => props.draft.documentId, apiBaseUrl, authToken,
+  type, query, onlyMatching, () => props.range, () => props.excludeData, () => props.vocab], (values, previous) => {
+  recentController?.abort()
+  clearTimeout(recentTimer)
+  const scopeChanged = !previous || values.slice(0, 5).some((value, i) => value !== previous[i])
+  if (scopeChanged) { picked.value = null; recentCandidates.value = [] }
+  recentMore.value = undefined
   recentPartial.value = false
-  recentState.value = open ? 'loading' : 'idle'
+  moreBusy.value = false
   const token = ++recentToken
-  if (!open) return
-  findRecentCandidates({ excludeDocumentId: props.draft.documentId })
+  recentState.value = props.open && !type.value ? 'loading' : 'idle'
+  if (!props.open || type.value) return
+  const controller = recentController = new AbortController()
+  const load = () => findRecentCandidates({ groupId: props.draft.groupId, query: query.value,
+    excludeDocumentId: props.draft.documentId, accept: acceptsCandidate, signal: controller.signal })
     .then((result) => {
       if (token !== recentToken) return
       recentCandidates.value = result.candidates
       recentPartial.value = result.partial
+      recentMore.value = result.loadMore
       recentState.value = 'ready'
     })
-    .catch(() => {
-      if (token === recentToken) recentState.value = 'failed'
-    })
+    .catch(() => { if (token === recentToken) recentState.value = 'failed' })
+  if (query.value.trim()) recentTimer = setTimeout(() => { void load() }, 250)
+  else void load()
 }, { immediate: true })
 
-watch([type, () => props.draft.groupId, () => props.draft.documentId, apiBaseUrl, authToken], ([next]) => {
+watch([type, () => props.draft.groupId, () => props.draft.documentId, apiBaseUrl, authToken,
+  name, () => props.open, onlyMatching, () => props.range, () => props.excludeData, () => props.vocab], (values, previous) => {
+  candidateController?.abort()
+  clearTimeout(candidateTimer)
+  const next = type.value
   if (next && picked.value && !entitiesOfType([picked.value.entity], next).length) unpick()
-  candidates.value = []
+  if (!previous || values.slice(0, 5).some((value, i) => value !== previous[i])) candidates.value = []
+  candidateMore.value = undefined
   candidatesPartial.value = false
-  candidateState.value = next ? 'loading' : 'idle'
+  moreBusy.value = false
+  candidateState.value = next && props.open ? 'loading' : 'idle'
   const token = ++candidateToken
-  if (!next) return
-  findCandidates(next, { groupId: props.draft.groupId, excludeDocumentId: props.draft.documentId })
+  if (!next || !props.open) return
+  const controller = candidateController = new AbortController()
+  const load = () => findCandidates(next, { groupId: props.draft.groupId, query: name.value,
+    excludeDocumentId: props.draft.documentId, accept: acceptsCandidate, signal: controller.signal })
     .then((result) => {
       if (token !== candidateToken) return
       candidates.value = result.candidates
       candidatesPartial.value = result.partial
+      candidateMore.value = result.loadMore
       candidateState.value = 'ready'
     })
-    .catch(() => {
-      if (token === candidateToken) candidateState.value = 'failed'
-    })
+    .catch(() => { if (token === candidateToken) candidateState.value = 'failed' })
+  if (name.value.trim() && !picked.value) candidateTimer = setTimeout(() => { void load() }, 250)
+  else void load()
 })
+
+async function loadMore(typed: boolean) {
+  const token = typed ? candidateToken : recentToken
+  const next = typed ? candidateMore.value : recentMore.value
+  if (!next || moreBusy.value) return
+  moreBusy.value = true
+  try {
+    const result = await next()
+    if (token !== (typed ? candidateToken : recentToken)) return
+    if (typed) {
+      candidates.value.push(...result.candidates)
+      candidatesPartial.value ||= result.partial
+      candidateMore.value = result.loadMore
+    } else {
+      recentCandidates.value.push(...result.candidates)
+      recentPartial.value ||= result.partial
+      recentMore.value = result.loadMore
+    }
+  } catch {
+    if (token === (typed ? candidateToken : recentToken)) {
+      if (typed) candidatesPartial.value = true
+      else recentPartial.value = true
+    }
+  } finally {
+    if (token === (typed ? candidateToken : recentToken)) moreBusy.value = false
+  }
+}
 onScopeDispose(() => {
   candidateToken += 1
   recentToken += 1
+  recentController?.abort()
+  candidateController?.abort()
+  clearTimeout(recentTimer)
+  clearTimeout(candidateTimer)
 })
 
 const rangeTypes = computed(() => new Set((props.vocab?.classesInRange(props.range) ?? []).map((term) => term.uri)))
@@ -152,15 +211,15 @@ const shownRecent = computed(() => {
     .filter((candidate) => !isAbsoluteUri(candidate.entity.id) || !findEntity(props.draft, candidate.entity.id))
     .filter((candidate) => !needle || [displayName(candidate.entity), candidate.entity.id,
       ...(candidate.entity.properties.identifier ?? []).map((value) => value.value),
-      typeLabel(candidateType(candidate)), candidate.source.title]
+      ...candidate.entity.types.map(typeLabel), candidate.source.title]
       .some((value) => value.toLowerCase().includes(needle)))
-    .slice(0, 8)
+
 })
 
 const shownCandidates = computed(() => {
   const needle = name.value.trim().toLowerCase()
   const seen = new Set<string>()
-  return [...recentCandidates.value, ...candidates.value]
+  return candidates.value
     .filter((candidate) => !props.excludeData || !isDataEntity(candidate.entity.types))
     .filter((candidate) => entitiesOfType([candidate.entity], type.value).length)
     .filter((candidate) => {
@@ -170,8 +229,12 @@ const shownCandidates = computed(() => {
       return true
     })
     .filter((candidate) => !isAbsoluteUri(candidate.entity.id) || !findEntity(props.draft, candidate.entity.id))
-    .filter((candidate) => !needle || displayName(candidate.entity).toLowerCase().includes(needle))
-    .slice(0, 8)
+    .filter((candidate) => !needle || [displayName(candidate.entity), candidate.entity.id, candidate.source.title,
+      ...candidate.entity.types.map(typeLabel),
+      ...(candidate.entity.properties.identifier ?? []).map((value) => value.value)]
+      .some((value) => value.toLowerCase().includes(needle)))
+    .sort((a, b) => Number(b.source.groupId === props.draft.groupId) - Number(a.source.groupId === props.draft.groupId))
+
 })
 
 function pick(candidate: ReuseCandidate) {
@@ -369,6 +432,7 @@ async function create() {
     try {
       const current = await resolveReference(candidate.reference)
       if (token !== candidateToken || !props.open || picked.value !== candidate) return
+      if (current.source.groupId !== props.draft.groupId && !current.source.public) throw new Error('The source dataset is no longer public.')
       if (!candidateType(current) || !entitiesOfType([current.entity], type.value).length) throw new Error('The saved entity type changed. Search again.')
       const source = name.value.trim() && name.value.trim() !== displayName(candidate.entity)
         ? { ...current.entity, properties: { ...current.entity.properties, name: text(name.value.trim()) } }
@@ -417,16 +481,16 @@ async function create() {
       <div class="min-w-0 border-b border-border px-4 py-3 pr-10">
         <DialogTitle class="text-sm">Add an entity</DialogTitle>
         <DialogDescription class="mt-0.5 text-xs">
-          Reuse something from a recent dataset, or choose the kind of thing to add.
+          Reuse an entity from this group or a public dataset, or choose a type.
         </DialogDescription>
       </div>
-      <CommandPane v-model="query" placeholder="Search recent entities or types" aria-label="Search entities and types" :busy="recentState === 'loading'">
+      <CommandPane v-model="query" placeholder="Search saved entities or types" aria-label="Search entities and types" :busy="recentState === 'loading'">
         <div v-if="recentState === 'failed'" class="px-2.5 py-2 text-xs text-muted-foreground">
-          Could not load entities from recent datasets.
+          Could not search saved datasets.
         </div>
         <div v-else-if="shownRecent.length">
           <p class="px-2.5 pb-1 pt-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            From recent datasets
+            From saved datasets
           </p>
           <button
             v-for="candidate in shownRecent"
@@ -438,13 +502,14 @@ async function create() {
           >
             <span class="w-full truncate text-sm font-medium text-foreground">{{ displayName(candidate.entity) }}</span>
             <span class="w-full truncate text-[11px] text-muted-foreground">
-              {{ typeLabel(candidateType(candidate)) }} · {{ candidate.source.title }}
+              {{ typeLabel(candidateType(candidate)) }} · {{ candidate.source.groupId === draft.groupId ? 'This group' : 'Public dataset' }} · {{ candidate.source.title }}
             </span>
           </button>
         </div>
         <p v-if="recentPartial" class="px-2.5 py-1 text-[11px] text-muted-foreground">
-          Some recent datasets could not be read.
+          Some datasets could not be searched.
         </p>
+        <Button v-if="recentMore" variant="ghost" size="sm" :disabled="moreBusy || recentState === 'loading'" @click="loadMore(false)">{{ moreBusy ? 'Loading…' : 'Load more entities' }}</Button>
         <TypeBrowser
           v-model="type"
           v-model:only-matching="onlyMatching"
@@ -472,7 +537,7 @@ async function create() {
           <p v-else-if="candidateState === 'failed'" class="mt-1 text-[11px] text-muted-foreground">
             Could not search existing datasets.
           </p>
-          <template v-else>
+          <template v-if="candidateState !== 'failed'">
             <ul v-if="shownCandidates.length" class="mt-1 divide-y divide-border rounded-md border border-border">
               <li
                 v-for="candidate in shownCandidates"
@@ -487,18 +552,19 @@ async function create() {
                 >
                   <span class="block truncate font-medium text-foreground">{{ displayName(candidate.entity) }}</span>
                   <span class="block truncate text-[11px] text-muted-foreground">
-                    {{ candidate.source.title }}
+                    {{ candidate.source.groupId === draft.groupId ? 'This group' : 'Public dataset' }} · {{ candidate.source.title }}
                   </span>
                 </button>
               </li>
             </ul>
-            <p v-else class="mt-1 text-[11px] text-muted-foreground">
+            <p v-else-if="candidateState === 'ready'" class="mt-1 text-[11px] text-muted-foreground">
               {{ candidatesPartial ? 'Nothing found in the datasets that could be searched.' : `No existing ${typeLabel(type)} found.` }}
             </p>
             <p v-if="shownCandidates.length && candidatesPartial" class="mt-1 text-[11px] text-muted-foreground">
               Not every dataset could be searched.
             </p>
           </template>
+          <Button v-if="candidateMore" variant="ghost" size="sm" :disabled="moreBusy || candidateState === 'loading'" @click="loadMore(true)">{{ moreBusy ? 'Loading…' : 'Load more entities' }}</Button>
           <Notice v-if="picked" tone="info" class="mt-2 break-words">
             Loads the current saved {{ displayName(picked.entity) }} from
             {{ picked.source.title }}<template v-if="picked.related.length">
