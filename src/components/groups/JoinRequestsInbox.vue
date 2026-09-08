@@ -10,7 +10,7 @@ import { errorMessage, relativeTime } from '@/lib/utils'
 import type { ApiRole, JoinRequest } from '@/lib/api'
 
 const props = defineProps<{ groupId: string; roles: ApiRole[] }>()
-const emit = defineEmits<{ (e: 'changed'): void; (e: 'count', n: number): void }>()
+const emit = defineEmits<{ (e: 'changed'): void; (e: 'count', n: number | null): void }>()
 
 const { listGroupJoinRequests, decideJoinRequest, busy } = useJoinRequests()
 
@@ -35,6 +35,7 @@ async function reload() {
   const epoch = sessionEpoch.value
   const generation = ++loadGeneration
   loading.value = true
+  emit('count', null)
   loadError.value = null
   try {
     const loaded = await listGroupJoinRequests(groupId)

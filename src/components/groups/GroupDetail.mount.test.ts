@@ -3,7 +3,7 @@ import { defineComponent, h, inject, provide, ref } from 'vue'
 import * as RouterRuntime from 'vue-router'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { click, compileClientComponent, element, flush, moduleDefault, mountApp, nodes } from '@/test/clientRender'
+import { click, compileClientComponent, content, element, flush, moduleDefault, mountApp, nodes } from '@/test/clientRender'
 import * as RouteTab from '@/composables/useRouteTab'
 import * as Api from '@/lib/api'
 import * as GroupAdmin from '@/lib/groupAdmin'
@@ -33,6 +33,8 @@ const MEMBER_ROLE: Role = {
 }
 const group = ref({ display_name: 'Genomics lab', group_id: 'g1', realm_id: REALM, roles: [ADMIN_ROLE] })
 
+const joinRequestsEnabled = ref(false)
+const inboxCount = ref<number | null>(null)
 const Empty = defineComponent(() => () => null)
 const icons = new Proxy({}, { get: () => Empty })
 const Passthrough = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
@@ -57,6 +59,14 @@ const PanelStub = defineComponent({
   setup: (props, { slots }) => () => h('section', { 'data-panel': props.value }, slots.default?.()),
 })
 
+const InboxStub = defineComponent({
+  emits: ['count'],
+  setup(_, { emit }) {
+    VueRuntime.watch(inboxCount, (count) => emit('count', count), { immediate: true })
+    return () => h('div', { 'data-request-inbox': '' }, 'Pending request inbox')
+  },
+})
+
 const GroupDetail = compileClientComponent(new URL('./GroupDetail.vue', import.meta.url), {
   vue: VueRuntime,
   'vue-router': RouterRuntime,
@@ -67,7 +77,7 @@ const GroupDetail = compileClientComponent(new URL('./GroupDetail.vue', import.m
   '@/lib/utils': Utils,
   '@/lib/config': { featureEnabled: () => true },
   '@/composables/useRouteTab': RouteTab,
-  '@/composables/useJoinRequests': { useJoinRequests: () => ({ joinRequestsEnabled: ref(false) }) },
+  '@/composables/useJoinRequests': { useJoinRequests: () => ({ joinRequestsEnabled }) },
   '@/composables/useAruna': {
     useAruna: () => ({
       getGroup: vi.fn(async () => group.value),
@@ -97,7 +107,7 @@ const GroupDetail = compileClientComponent(new URL('./GroupDetail.vue', import.m
   '@/components/groups/GroupDetailSkeleton.vue': moduleDefault(Empty),
   '@/components/groups/GroupRoles.vue': moduleDefault(Empty),
   '@/components/groups/JoinRequestButton.vue': moduleDefault(Empty),
-  '@/components/groups/JoinRequestsInbox.vue': moduleDefault(Empty),
+  '@/components/groups/JoinRequestsInbox.vue': moduleDefault(InboxStub),
   '@/components/groups/RenameGroupDialog.vue': moduleDefault(Empty),
   '@/components/groups/UsageHistoryChart.vue': moduleDefault(Empty),
   '@/components/policies/PoliciesSection.vue': moduleDefault(Empty),
@@ -169,5 +179,40 @@ describe('Group rename control', () => {
 
     group.value = { display_name: 'Genomics lab', group_id: 'g1', realm_id: REALM, roles: [MEMBER_ROLE] }
     expect(renameButtons((await mount('/app/groups/g1')).root)).toHaveLength(0)
+  })
+})
+
+
+describe('Group access request box', () => {
+  beforeEach(() => {
+    group.value = { display_name: 'Genomics lab', group_id: 'g1', realm_id: REALM, roles: [ADMIN_ROLE] }
+    joinRequestsEnabled.value = true
+    inboxCount.value = null
+  })
+
+  it('shows the admin inbox above the tabs, including on the overview', async () => {
+    const mounted = await mount('/app/groups/g1')
+    const box = element(mounted.root, (node) => node.props['aria-label'] === 'Access requests')
+    const tabs = element(mounted.root, (node) => node.props['data-active'] !== undefined)
+    expect(nodes(tabs)).not.toContain(box)
+    expect(nodes(box).some((node) => node.props['data-request-inbox'] !== undefined)).toBe(true)
+    expect(nodes(mounted.root).indexOf(box)).toBeLessThan(nodes(mounted.root).indexOf(tabs))
+    expect(nodes(box).some((node) => node.props['aria-label'] === 'Pending access requests')).toBe(false)
+    inboxCount.value = 2
+    await flush()
+    expect(content(element(box, (node) => node.props['aria-label'] === 'Pending access requests'))).toBe('2')
+    await click(element(mounted.root, (node) => node.props['data-tab'] === 'roles'))
+    await settled(mounted.router, 'roles')
+    expect(nodes(mounted.root)).toContain(box)
+    expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('hides the request box from regular group members', async () => {
+    group.value = { display_name: 'Genomics lab', group_id: 'g1', realm_id: REALM, roles: [MEMBER_ROLE] }
+    const mounted = await mount('/app/groups/g1')
+    expect(nodes(mounted.root).some((node) => node.props['aria-label'] === 'Access requests')).toBe(false)
+    expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
   })
 })

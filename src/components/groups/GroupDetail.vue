@@ -55,7 +55,7 @@ const route = useRoute()
 let storageAnchorPending = false
 
 const DOC_LIMIT = 8
-const joinRequestCount = ref(0)
+const joinRequestCount = ref<number | null>(null)
 const renameOpen = ref(false)
 
 const group = ref<GroupDetailResponse | null>(null)
@@ -329,6 +329,25 @@ async function leave() {
         @renamed="reload"
       />
 
+      <section
+        v-if="canManage && joinRequestsEnabled"
+        aria-label="Access requests"
+        class="mx-5 my-4 overflow-hidden rounded-lg border border-primary/20 bg-primary/5"
+      >
+        <div class="flex items-center gap-2 px-5 pt-4">
+          <Inbox class="h-4 w-4 text-primary" />
+          <h2 class="font-display text-sm font-semibold text-aruna-navy">Access requests</h2>
+          <Badge v-if="joinRequestCount !== null" :variant="joinRequestCount > 0 ? 'warn' : 'outline'" size="count" aria-label="Pending access requests">{{ joinRequestCount }}</Badge>
+        </div>
+        <p class="px-5 pt-1 text-xs text-muted-foreground">Review requests to join this group. Approve a request to assign roles, or deny it with an optional reason.</p>
+        <JoinRequestsInbox
+          :group-id="group.group_id"
+          :roles="group.roles"
+          @changed="reload"
+          @count="joinRequestCount = $event"
+        />
+      </section>
+
       <Tabs v-model="tab">
         <div data-tour="group-tabs" class="border-b border-border px-5 py-2">
           <TabsList class="h-auto flex-wrap">
@@ -336,7 +355,6 @@ async function leave() {
             <TabsTrigger value="members" class="gap-1.5">
               <Users class="h-3.5 w-3.5" /> Members
               <Badge v-if="!membersHidden" variant="outline" size="count">{{ members.length }}</Badge>
-              <Badge v-if="joinRequestCount > 0" variant="warn" size="count" title="Pending join requests">{{ joinRequestCount }}</Badge>
             </TabsTrigger>
             <TabsTrigger value="roles" class="gap-1.5">
               <ShieldCheck class="h-3.5 w-3.5" /> Roles
@@ -500,7 +518,7 @@ async function leave() {
         </TabsContent>
 
         <TabsContent value="members" class="mt-0">
-          <div :class="canManage && joinRequestsEnabled ? 'border-b border-border' : ''">
+          <div>
             <div v-if="membersHidden" class="px-5 py-4 text-xs text-muted-foreground">
               The member list is only visible to group members.
             </div>
@@ -511,21 +529,6 @@ async function leave() {
               :roles="group.roles"
               :can-manage="canManage"
               @changed="reload"
-            />
-          </div>
-
-          <div v-if="canManage && joinRequestsEnabled">
-            <div class="flex items-center gap-2 px-5 pb-1 pt-4">
-              <Inbox class="h-3.5 w-3.5 text-primary" />
-              <h2 class="font-display text-sm font-semibold text-aruna-navy">Join requests</h2>
-              <Badge v-if="joinRequestCount > 0" variant="warn" size="count">{{ joinRequestCount }}</Badge>
-              <Badge v-else variant="outline" size="count">0</Badge>
-            </div>
-            <JoinRequestsInbox
-              :group-id="group.group_id"
-              :roles="group.roles"
-              @changed="reload"
-              @count="joinRequestCount = $event"
             />
           </div>
         </TabsContent>
