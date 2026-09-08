@@ -1,22 +1,22 @@
-import { displayName, findEntity, fromRoCrate, rootId, vocabTypeUri, type DraftEntity } from '@/lib/crate/editor'
+import { displayName, findEntity, fromRoCrate, rootId, typeLabel, type DraftEntity } from '@/lib/crate/editor'
 import {
   entitiesOfType,
   relatedEntities,
   isRegistry,
-  referenceKey,
   type EntityReference,
 } from '@/lib/crate/registry'
-import { documentIdFromIri, isDocumentId } from '@/lib/graphIri'
-import { listRecentMetadata } from './aruna/catalog'
+import { isDocumentId } from '@/lib/graphIri'
+import { CATALOG_PAGE_SIZE, listCatalogPage } from './aruna/catalog'
+import type { ListMetadataResponse, MetadataDocumentListItem } from '@/lib/api'
 import { fetchRoCrateRaw } from './aruna/crates'
 import { getMetadataDocument } from './aruna/documents'
-import { runSparql } from './aruna/search'
 import { assertCurrentSession, refreshContext } from './aruna/state'
 
 export interface ReuseSource {
   documentId: string
   title: string
   groupId: string
+  public?: boolean
 }
 
 export interface ReuseCandidate {
@@ -31,10 +31,18 @@ export interface ReuseSearch {
   candidates: ReuseCandidate[]
   /** Some datasets were not searched or could not be read, so more may exist. */
   partial: boolean
+  loadMore?: () => Promise<ReuseSearch>
 }
 
-const GRAPH_LIMIT = 20
-const DOCUMENT_LIMIT = 8
+interface SearchOptions {
+  groupId?: string
+  excludeDocumentId?: string
+  query?: string
+  accept?: (candidate: ReuseCandidate) => boolean
+  signal?: AbortSignal
+}
+
+const CANDIDATE_LIMIT = 20
 
 function candidatesOf(crate: unknown, type: string | null, source: ReuseSource): ReuseCandidate[] {
   const draft = fromRoCrate(crate)
@@ -62,80 +70,94 @@ export async function resolveReference(reference: EntityReference): Promise<Reus
       documentId: reference.documentId,
       title: displayName(draft.entities.find((item) => item.id === rootId(draft))) || summary.document_path,
       groupId: summary.group_id,
+      public: summary.public,
     },
   }
 }
 
-/** Entities from the most recently updated readable datasets. */
-export async function findRecentCandidates(
-  options: { excludeDocumentId?: string } = {},
-): Promise<ReuseSearch> {
-  const epoch = refreshContext().epoch
-  const recent = await listRecentMetadata(DOCUMENT_LIMIT)
-  assertCurrentSession(epoch)
-  if (!recent) return { candidates: [], partial: false }
-  let partial = false
-  const loaded = await Promise.all(recent
-    .filter((document) => document.ulid !== options.excludeDocumentId)
-    .map(async (document) => {
-      try {
-        const crate = await fetchRoCrateRaw(document.ulid)
-        if (isRegistry(crate)) return []
-        return candidatesOf(crate, null, {
-          documentId: document.ulid,
-          title: document.title,
-          groupId: document.realmId,
-        })
-      } catch {
-        partial = true
-        return []
-      }
-    }))
-  assertCurrentSession(epoch)
-  return { candidates: loaded.flat(), partial }
+/** Recent suggestions and searches share the entire paged group corpus. */
+export function findRecentCandidates(options: SearchOptions = {}): Promise<ReuseSearch> {
+  return searchCandidates(null, options)
 }
 
-function graphDocumentId(row: Record<string, string>): string | null {
-  return documentIdFromIri(String(row.g ?? '').replace(/^<|>$/g, ''))
+export function findCandidates(type: string, options: SearchOptions = {}): Promise<ReuseSearch> {
+  return searchCandidates(type, options)
 }
 
-/** Entities of `type` from readable datasets. */
-export async function findCandidates(
-  type: string,
-  options: { groupId?: string; excludeDocumentId?: string } = {},
-): Promise<ReuseSearch> {
+async function searchCandidates(type: string | null, options: SearchOptions): Promise<ReuseSearch> {
   const epoch = refreshContext().epoch
-  const candidates: ReuseCandidate[] = []
+  const needle = options.query?.trim().toLowerCase() ?? ''
+  let scope: 'group' | 'public' = options.groupId ? 'group' : 'public'
+  let offset = 0
+  let exhausted = false
+  let finished = false
   let partial = false
-  const query = `SELECT DISTINCT ?g WHERE { GRAPH ?g { ?s a <${vocabTypeUri(type)}> } } LIMIT ${GRAPH_LIMIT}`
-  const result = await runSparql(query, 'distributed-best-effort')
-  const rows = result.rows
-  partial ||= !result.complete
-  const documentIds = [...new Set(rows.map(graphDocumentId))]
-    .filter((id): id is string => Boolean(id) && id !== options.excludeDocumentId)
-  if (documentIds.length > DOCUMENT_LIMIT) partial = true
-  const loaded = await Promise.all(documentIds.slice(0, DOCUMENT_LIMIT).map(async (documentId) => {
-    try {
-      const [summary, crate] = await Promise.all([getMetadataDocument(documentId), fetchRoCrateRaw(documentId)])
-      if (isRegistry(crate)) return []
-      const draft = fromRoCrate(crate)
-      const title = displayName(draft.entities.find((entity) => entity.id === rootId(draft))) || summary.document_path
-      return candidatesOf(crate, type, { documentId, title, groupId: summary.group_id })
-    } catch {
-      partial = true
-      return []
-    }
-  }))
-  const seen = new Set(candidates.map((candidate) => referenceKey(candidate.reference)))
-  for (const candidate of loaded.flat()) {
-    const key = referenceKey(candidate.reference)
-    if (seen.has(key)) continue
-    seen.add(key)
-    candidates.push(candidate)
+  const documents: MetadataDocumentListItem[] = []
+  const pending: ReuseCandidate[] = []
+  const seen = new Set<string>()
+  function current() {
+    assertCurrentSession(epoch)
+    options.signal?.throwIfAborted()
   }
-  // The draft's own group leads; the sort is stable.
-  const own = options.groupId
-  candidates.sort((a, b) => Number(b.source.groupId === own) - Number(a.source.groupId === own))
-  assertCurrentSession(epoch)
-  return { candidates, partial }
+  async function loadMore(): Promise<ReuseSearch> {
+    const candidates: ReuseCandidate[] = []
+    while (candidates.length < CANDIDATE_LIMIT) {
+      current()
+      if (pending.length) {
+        candidates.push(pending.shift()!)
+        continue
+      }
+      if (documents.length) {
+        const document = documents.shift()!
+        if (seen.has(document.document_id) || document.document_id === options.excludeDocumentId
+          || document.document_path.startsWith('profiles/')) continue
+        if (scope === 'group' && document.group_id !== options.groupId) continue
+        if (scope === 'public' && (!document.public || document.group_id === options.groupId)) continue
+        seen.add(document.document_id)
+        try {
+          const crate = await fetchRoCrateRaw(document.document_id, options.signal)
+          current()
+          if (isRegistry(crate)) continue
+          const draft = fromRoCrate(crate)
+          const title = displayName(findEntity(draft, rootId(draft))) || document.document_path
+          const found = candidatesOf(crate, type, { documentId: document.document_id, title,
+            groupId: document.group_id, public: document.public })
+          pending.push(...found.filter((candidate) => (!options.accept || options.accept(candidate))
+            && (!needle || [displayName(candidate.entity), candidate.entity.id, title,
+              ...candidate.entity.types.map(typeLabel),
+              ...(candidate.entity.properties.identifier ?? []).map((value) => value.value)]
+              .some((value) => value.toLowerCase().includes(needle)))))
+        } catch {
+          current()
+          partial = true
+        }
+        continue
+      }
+      if (exhausted) {
+        if (scope === 'public') { finished = true; break }
+        scope = 'public'
+        offset = 0
+        exhausted = false
+      }
+      let page: ListMetadataResponse
+      try {
+        page = await listCatalogPage({ groupId: scope === 'group' ? options.groupId : undefined,
+          offset, limit: CATALOG_PAGE_SIZE, order: 'recent', signal: options.signal })
+      } catch (error) {
+        current()
+        if (!candidates.length) throw error
+        partial = true
+        return { candidates, partial, loadMore }
+      }
+      current()
+      documents.push(...page.documents)
+      exhausted = page.total_returned < page.limit
+      const next = page.offset + page.total_returned
+      if (!exhausted && next <= offset) throw new Error('Dataset discovery did not advance.')
+      offset = next
+    }
+    current()
+    return { candidates, partial, ...(finished ? {} : { loadMore }) }
+  }
+  return loadMore()
 }

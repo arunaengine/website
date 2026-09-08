@@ -38,11 +38,12 @@ export function resetRecentOrderProbe() {
 export async function listMetadataPage(
   query: Record<string, string | number>,
   context = refreshContext(),
+  signal?: AbortSignal,
 ): Promise<ListMetadataResponse> {
   const attempts = 3
   for (let attempt = 0; attempt < attempts; attempt++) {
     try {
-      return await apiRequest<ListMetadataResponse>('/metadata', { query }, context.client)
+      return await apiRequest<ListMetadataResponse>('/metadata', { query, ...(signal ? { signal } : {}) }, context.client)
     } catch (err) {
       const transient = err instanceof ApiError && err.status >= 500
       if (transient && attempt < attempts - 1) {
@@ -51,7 +52,7 @@ export async function listMetadataPage(
       }
       if (transient) {
         const { include: _summary, ...withoutSummary } = query
-        return apiRequest<ListMetadataResponse>('/metadata', { query: withoutSummary }, context.client)
+        return apiRequest<ListMetadataResponse>('/metadata', { query: withoutSummary, ...(signal ? { signal } : {}) }, context.client)
       }
       throw err
     }
@@ -126,6 +127,7 @@ export async function listCatalogPage(
     groupId?: string | null
     summary?: boolean
     order?: 'created' | 'recent'
+    signal?: AbortSignal
   } = {},
 ): Promise<ListMetadataResponse> {
   return listMetadataPage({
@@ -134,7 +136,7 @@ export async function listCatalogPage(
     ...(options.groupId ? { group_id: options.groupId } : {}),
     ...(options.summary ? { include: 'summary' } : {}),
     ...(options.order ? { order: options.order } : {}),
-  })
+  }, refreshContext(), options.signal)
 }
 
 // Whether a page can be a recency-ordered one. A node that does not know

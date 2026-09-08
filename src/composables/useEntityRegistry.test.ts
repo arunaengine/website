@@ -9,16 +9,14 @@ const SAVED = '01J00000000000000000000004'
 
 const fetchRoCrateRaw = vi.fn()
 const getMetadataDocument = vi.fn()
-const listRecentMetadata = vi.fn()
-const runSparql = vi.fn()
+const listCatalogPage = vi.fn()
 
 let registry: typeof import('./useEntityRegistry')
 
 beforeAll(async () => {
   vi.doMock('./aruna/crates', () => ({ fetchRoCrateRaw }))
-  vi.doMock('./aruna/catalog', () => ({ listRecentMetadata }))
+  vi.doMock('./aruna/catalog', () => ({ listCatalogPage, CATALOG_PAGE_SIZE: 2 }))
   vi.doMock('./aruna/documents', () => ({ getMetadataDocument }))
-  vi.doMock('./aruna/search', () => ({ runSparql }))
   registry = await import('./useEntityRegistry')
 })
 
@@ -26,7 +24,6 @@ afterAll(() => {
   vi.doUnmock('./aruna/crates')
   vi.doUnmock('./aruna/catalog')
   vi.doUnmock('./aruna/documents')
-  vi.doUnmock('./aruna/search')
 })
 
 const institute: DraftEntity = {
@@ -75,100 +72,103 @@ function sourceCrate(id: string): unknown {
   throw new Error(`unexpected ${id}`)
 }
 
-function graphs(...ids: string[]) {
-  return {
-    columns: ['g'],
-    rows: ids.map((id) => ({ g: `<https://w3id.org/aruna/${id}>` })),
-    complete: true,
-    nodesQueried: 1,
-    nodesFailed: 0,
-    failedPartitions: [],
-    tookMs: 1,
-    totalRows: ids.length,
-    mode: 'distributed',
-  }
+function metadata(document_id: string, group_id = 'group-1', isPublic = false) {
+  return { document_id, group_id, public: isPublic, document_path: `datasets/${document_id}` }
+}
+
+function documents(own: ReturnType<typeof metadata>[], publicDocuments: ReturnType<typeof metadata>[] = []) {
+  listCatalogPage.mockImplementation(async (options) => {
+    const source = options.groupId ? own : publicDocuments
+    const offset = options.offset ?? 0
+    const page = source.slice(offset, offset + 2)
+    return { documents: page, limit: 2, offset, total_returned: page.length }
+  })
 }
 
 beforeEach(() => {
   vi.resetAllMocks()
   fetchRoCrateRaw.mockImplementation(async (id: string) => sourceCrate(id))
   getMetadataDocument.mockResolvedValue({ group_id: 'group-1', document_path: 'datasets/example' })
-  listRecentMetadata.mockResolvedValue(null)
-  runSparql.mockResolvedValue(graphs())
+  documents([])
 })
 
-describe('findRecentCandidates', () => {
-  it('keeps recent dataset order and source references', async () => {
-    listRecentMetadata.mockResolvedValue([
-      { ulid: OTHER, title: 'Other dataset', realmId: 'group-2' },
-      { ulid: SAVED, title: 'Saved dataset', realmId: 'group-1' },
-    ])
-    const result = await registry.findRecentCandidates({ excludeDocumentId: OWN })
-
-    expect(listRecentMetadata).toHaveBeenCalledWith(8)
+describe('group entity discovery', () => {
+  it('prioritizes group datasets over more recent public sources', async () => {
+    documents([metadata(SAVED)], [metadata(OTHER, 'group-2', true)])
+    const result = await registry.findRecentCandidates({ groupId: 'group-1', excludeDocumentId: OWN })
     expect(result.candidates.map((item) => item.reference)).toEqual([
-      adaReference, { documentId: OTHER, entityId: institute.id }, graceReference,
+      graceReference, adaReference, { documentId: OTHER, entityId: institute.id },
     ])
-    expect(result.candidates[0].related).toEqual([institute])
+    expect(listCatalogPage.mock.calls[0][0]).toEqual(expect.objectContaining({ groupId: 'group-1', order: 'recent' }))
+    expect(result.candidates[1].related).toEqual([institute])
+    expect(result.candidates[1].source.public).toBe(true)
     expect(result.partial).toBe(false)
   })
 
-  it('excludes the current dataset and reports unreadable recent datasets', async () => {
-    listRecentMetadata.mockResolvedValue([
-      { ulid: OWN, title: 'Current dataset', realmId: 'group-1' },
-      { ulid: SAVED, title: 'Saved dataset', realmId: 'group-1' },
-    ])
-    fetchRoCrateRaw.mockRejectedValue(new Error('forbidden'))
-    const result = await registry.findRecentCandidates({ excludeDocumentId: OWN })
+  it('searches the entire group corpus beyond the first eight datasets', async () => {
+    const older = Array.from({ length: 12 }, (_, i) => metadata(`document-${i}`))
+    documents([...older, metadata(SAVED)])
+    fetchRoCrateRaw.mockImplementation(async (id) => id === SAVED ? sourceCrate(id) : dataset('Other work', []))
+    const result = await registry.findRecentCandidates({ groupId: 'group-1', query: 'grace' })
+    expect(result.candidates.map((item) => item.reference)).toEqual([graceReference])
+    expect(listCatalogPage.mock.calls.some(([options]) => options.groupId === 'group-1' && options.offset >= 8)).toBe(true)
+    expect(result.loadMore).toBeUndefined()
+  })
 
+  it('bounds initial entities and loads further matches without a document cap', async () => {
+    documents([metadata(SAVED)])
+    fetchRoCrateRaw.mockResolvedValue(dataset('Many people', Array.from({ length: 25 }, (_, i) => ({
+      ...grace, id: `#person-${i}`, properties: { name: [{ kind: 'text', value: `Person ${i}` }] },
+    }))))
+    const first = await registry.findCandidates('Person', { groupId: 'group-1' })
+    expect(first.candidates).toHaveLength(20)
+    const second = await first.loadMore!()
+    expect(second.candidates).toHaveLength(5)
+    expect(second.loadMore).toBeUndefined()
+    expect(new Set([...first.candidates, ...second.candidates].map((candidate) => candidate.reference.entityId)).size).toBe(25)
     expect(fetchRoCrateRaw).toHaveBeenCalledOnce()
-    expect(fetchRoCrateRaw).toHaveBeenCalledWith(SAVED)
+  })
+
+  it('never supplements with private datasets from another group', async () => {
+    documents([], [metadata(OTHER, 'group-2', false), metadata(SAVED, 'group-2', true)])
+    const result = await registry.findCandidates('Person', { groupId: 'group-1' })
+    expect(result.candidates.map((item) => item.reference)).toEqual([graceReference])
+    expect(fetchRoCrateRaw.mock.calls.some(([id]) => id === OTHER)).toBe(false)
+  })
+
+  it('excludes the current dataset and retains unreadable-source coverage', async () => {
+    documents([metadata(OWN), metadata(SAVED)])
+    fetchRoCrateRaw.mockRejectedValue(new Error('forbidden'))
+    const result = await registry.findRecentCandidates({ groupId: 'group-1', excludeDocumentId: OWN })
+    expect(fetchRoCrateRaw).toHaveBeenCalledOnce()
     expect(result).toEqual({ candidates: [], partial: true })
   })
 
-  it('does not offer entities from an obsolete registry dataset', async () => {
-    listRecentMetadata.mockResolvedValue([{ ulid: REGISTRY, title: 'Entity registry', realmId: 'group-1' }])
+  it('does not offer entities from obsolete registry documents', async () => {
+    documents([metadata(REGISTRY)])
     fetchRoCrateRaw.mockResolvedValue(legacyRegistry())
-    const result = await registry.findRecentCandidates()
+    const result = await registry.findRecentCandidates({ groupId: 'group-1' })
     expect(result.candidates).toEqual([])
   })
-})
 
-describe('findCandidates', () => {
-  it('finds typed entities and retains their source graph', async () => {
-    runSparql.mockResolvedValue(graphs(OTHER, OWN))
-    const result = await registry.findCandidates('Person', { groupId: 'group-1', excludeDocumentId: OWN })
-    expect(runSparql.mock.calls[0]).toEqual([
-      'SELECT DISTINCT ?g WHERE { GRAPH ?g { ?s a <http://schema.org/Person> } } LIMIT 20',
-      'distributed-best-effort',
-    ])
-    expect(result.partial).toBe(false)
-    expect(result.candidates.map((item) => [item.reference, item.source.title])).toEqual([
-      [adaReference, 'Other dataset'],
-    ])
-    expect(result.candidates[0].related).toEqual([institute])
-    expect(result.partial).toBe(false)
-  })
-
-  it('does not merge equal fragment ids from separate source graphs', async () => {
-    runSparql.mockResolvedValue(graphs(OTHER, SAVED))
-    fetchRoCrateRaw.mockImplementation(async (id: string) => dataset(id, [{ ...grace, properties: {
+  it('does not merge equal fragment ids from different source datasets', async () => {
+    documents([metadata(OTHER), metadata(SAVED)])
+    fetchRoCrateRaw.mockImplementation(async (id) => dataset(id, [{ ...grace, properties: {
       name: [{ kind: 'text', value: id === OTHER ? 'Alice' : 'Bob' }],
     } }]))
-    const result = await registry.findCandidates('Person')
-    expect(result.candidates).toHaveLength(2)
+    const result = await registry.findCandidates('Person', { groupId: 'group-1' })
     expect(result.candidates.map((item) => item.reference.documentId)).toEqual([OTHER, SAVED])
   })
 
-  it('excludes pointer nodes from other groups registry graphs in discovery', async () => {
-    runSparql.mockResolvedValue(graphs(OTHER))
-    fetchRoCrateRaw.mockResolvedValue(legacyRegistry())
-    const result = await registry.findCandidates('CreativeWork')
-    expect(result.candidates).toEqual([])
+  it('stops scanning a cancelled search', async () => {
+    const controller = new AbortController()
+    controller.abort()
+    await expect(registry.findRecentCandidates({ groupId: 'group-1', signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' })
+    expect(listCatalogPage).not.toHaveBeenCalled()
   })
 
   it('reports a failed discovery', async () => {
-    runSparql.mockRejectedValue(new Error('offline'))
-    await expect(registry.findCandidates('Person')).rejects.toThrow('offline')
+    listCatalogPage.mockRejectedValue(new Error('offline'))
+    await expect(registry.findCandidates('Person', { groupId: 'group-1' })).rejects.toThrow('offline')
   })
 })
