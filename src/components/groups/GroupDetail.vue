@@ -322,6 +322,14 @@ async function leave() {
           <JoinRequestButton v-if="group" :group-id="group.group_id" :group-name="group.display_name" />
         </div>
       </header>
+      <section
+        v-if="tab === 'stats' && canManage && joinRequestsEnabled && !joinRequestError && joinRequestCount !== null && joinRequestCount > 0"
+        aria-label="Group notifications"
+        class="border-b border-border px-5 py-4"
+      >
+        <h2 class="font-display text-sm font-semibold text-aruna-navy">Group notifications</h2>
+        <button type="button" class="mt-1 text-sm font-medium text-primary hover:underline" @click="tab = 'members'">There are open member requests</button>
+      </section>
       <div v-if="leaveError" class="border-b border-border px-5 py-2 text-xs text-destructive">{{ leaveError }}</div>
       <RenameGroupDialog
         v-model:open="renameOpen"
@@ -360,13 +368,6 @@ async function leave() {
         </div>
 
         <TabsContent value="stats" class="mt-0">
-          <section v-if="canManage && joinRequestsEnabled" aria-label="Group notifications" class="border-b border-border px-5 py-4">
-            <h2 class="font-display text-sm font-semibold text-aruna-navy">Group notifications</h2>
-            <button v-if="joinRequestError" type="button" class="mt-1 text-xs text-destructive hover:underline" @click="tab = 'members'">Member requests could not be checked.</button>
-            <p v-else-if="joinRequestCount === null" class="mt-1 text-xs text-muted-foreground">Checking member requests…</p>
-            <button v-else-if="joinRequestCount > 0" type="button" class="mt-1 text-sm font-medium text-primary hover:underline" @click="tab = 'members'">There are open member requests</button>
-            <p v-else class="mt-1 text-xs text-muted-foreground">No open member requests.</p>
-          </section>
       <div v-if="usage" class="border-b border-border">
         <div class="flex items-center gap-2 px-5 pb-1 pt-4">
           <FileJson2 class="h-3.5 w-3.5 text-primary" />

@@ -193,30 +193,40 @@ describe('Group notifications', () => {
     inboxError.value = null
   })
 
-  it('keeps approval controls in Members and links from the overview hint', async () => {
+  it('shows only pending notifications below the header and links to Members', async () => {
     const mounted = await mount('/app/groups/g1')
+    const notices = () => nodes(mounted.root).filter((node) => node.props['aria-label'] === 'Group notifications')
     const overview = element(mounted.root, (node) => node.props['data-panel'] === 'stats')
     const members = element(mounted.root, (node) => node.props['data-panel'] === 'members')
-    expect(content(overview)).toContain('Group notifications')
-    expect(content(overview)).toContain('Checking member requests')
+    expect(notices()).toHaveLength(0)
     expect(content(overview)).not.toContain('Pending request inbox')
     expect(content(members)).toContain('Pending request inbox')
     expect(members.props.class).toContain('hidden')
     inboxCount.value = 2
     await flush()
-    const hint = element(overview, (node) => node.tag === 'button' && content(node) === 'There are open member requests')
+    const notice = notices()[0]!
+    const header = element(mounted.root, (node) => node.tag === 'header')
+    const tabs = element(mounted.root, (node) => node.props['data-active'] !== undefined)
+    const all = nodes(mounted.root)
+    expect(all.indexOf(notice)).toBeGreaterThan(all.indexOf(header))
+    expect(all.indexOf(notice)).toBeLessThan(all.indexOf(tabs))
+    expect(nodes(overview)).not.toContain(notice)
+    const hint = element(notice, (node) => node.tag === 'button' && content(node) === 'There are open member requests')
     await click(hint)
     await settled(mounted.router, 'members')
     expect(mounted.router.currentRoute.value.query.tab).toBe('members')
     expect(members.props.class).not.toContain('hidden')
+    expect(notices()).toHaveLength(0)
+    await click(element(mounted.root, (node) => node.props['data-tab'] === 'stats'))
+    await settled(mounted.router, undefined)
+    expect(notices()).toHaveLength(1)
     inboxCount.value = 0
     await flush()
-    expect(content(overview)).toContain('No open member requests.')
+    expect(notices()).toHaveLength(0)
     inboxCount.value = null
     inboxError.value = 'Unavailable'
     await flush()
-    expect(content(overview)).toContain('Member requests could not be checked.')
-    expect(content(overview)).not.toContain('No open member requests.')
+    expect(notices()).toHaveLength(0)
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })
