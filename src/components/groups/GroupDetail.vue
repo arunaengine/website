@@ -314,19 +314,19 @@ async function leave() {
           </div>
           <div class="truncate font-mono text-[10px] text-muted-foreground">{{ group.group_id }}</div>
         </div>
-        <Button
-          v-if="tab === 'stats' && canManage && joinRequestsEnabled && !joinRequestError && joinRequestCount !== null && joinRequestCount > 0"
-          variant="outline"
-          size="sm"
-          class="mr-auto"
-          aria-label="You have unanswered join requests"
-          @click="tab = 'members'"
-        >
-          <Inbox class="h-3.5 w-3.5 shrink-0 text-primary" />
-          You have unanswered join requests
-        </Button>
         <div class="flex flex-wrap items-center gap-2">
           <AskAiButton :prompt="askPrompt" :subject="`group ${groupId}`" />
+          <Button
+            v-if="tab === 'stats' && canManage && joinRequestsEnabled && !joinRequestError && joinRequestCount !== null && joinRequestCount > 0"
+            variant="outline"
+            size="sm"
+            class="border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100 hover:text-amber-900 dark:border-amber-400/20 dark:bg-amber-500/15 dark:text-amber-200 dark:hover:bg-amber-500/25 dark:hover:text-amber-100"
+            aria-label="You have unanswered join requests"
+            @click="tab = 'members'"
+          >
+            <Inbox class="h-3.5 w-3.5 shrink-0" />
+            You have unanswered join requests
+          </Button>
           <Button v-if="isMember" variant="outline" size="sm" :disabled="saving" @click="leave">
             <LogOut class="h-3.5 w-3.5" /> Leave group
           </Button>

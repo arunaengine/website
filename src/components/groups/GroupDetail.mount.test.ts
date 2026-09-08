@@ -193,7 +193,7 @@ describe('Group notifications', () => {
     inboxError.value = null
   })
 
-  it('shows the pending request box beside the group name and links to Members', async () => {
+  it('shows the pending request box beside Leave group and links to Members', async () => {
     const mounted = await mount('/app/groups/g1')
     const notices = () => nodes(mounted.root).filter((node) => node.props['aria-label'] === 'You have unanswered join requests')
     const overview = element(mounted.root, (node) => node.props['data-panel'] === 'stats')
@@ -208,7 +208,9 @@ describe('Group notifications', () => {
     const header = element(mounted.root, (node) => node.tag === 'header')
     const tabs = element(mounted.root, (node) => node.props['data-active'] !== undefined)
     const all = nodes(mounted.root)
-    expect(notice.parent).toBe(header)
+    const leave = element(header, (node) => content(node).trim() === 'Leave group' && node.props.variant === 'outline')
+    expect(notice.parent).toBe(leave.parent)
+    expect(notice.parent?.children.indexOf(notice)).toBe((leave.parent?.children.indexOf(leave) ?? 0) - 1)
     expect(all.indexOf(notice)).toBeGreaterThan(all.indexOf(element(header, (node) => node.tag === 'h4')))
     expect(all.indexOf(notice)).toBeLessThan(all.indexOf(tabs))
     expect(notice.props.variant).toBe('outline')
