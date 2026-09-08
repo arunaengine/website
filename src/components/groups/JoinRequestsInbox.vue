@@ -48,7 +48,7 @@ async function reload() {
   }
 }
 
-watch([() => props.groupId, sessionEpoch], () => {
+watch([() => props.groupId, () => props.roles, sessionEpoch], () => {
   requests.value = []
   expandedId.value = ''
   decideError.value = null

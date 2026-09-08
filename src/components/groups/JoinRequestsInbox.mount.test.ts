@@ -5,6 +5,7 @@ import { button, click, compileClientComponent, content, flush, moduleDefault, m
 import * as Utils from '@/lib/utils'
 
 const groupId = ref('group-1')
+const roles = ref([{ role_id: 'user-role', name: 'user' }])
 const sessionEpoch = ref(1)
 const request = { request_id: 'request-1', group_id: 'group-1', user_id: 'member', user_name: 'Prospective Member', status: 'pending', created_at: '2026-09-08T00:00:00Z' }
 const listGroupJoinRequests = vi.fn(async (_group: string) => [request])
@@ -22,7 +23,7 @@ const Inbox = compileClientComponent(new URL('./JoinRequestsInbox.vue', import.m
   '@/components/ui/Badge.vue': moduleDefault(Passthrough),
   '@/components/ui/Input.vue': moduleDefault(Empty),
 })
-const Wrapper = defineComponent(() => () => h(Inbox, { groupId: groupId.value, roles: [{ role_id: 'user-role', name: 'user' }] }))
+const Wrapper = defineComponent(() => () => h(Inbox, { groupId: groupId.value, roles: roles.value }))
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -41,6 +42,21 @@ describe('membership approval inbox', () => {
     await click(button(mounted.root, 'Approve & assign roles'))
     expect(decideJoinRequest).toHaveBeenCalledWith('group-1', 'request-1', { approve: true, role_ids: ['user-role'] })
     expect(content(mounted.root)).toContain('No pending join requests.')
+    expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('reloads pending requests when the group detail refreshes', async () => {
+    listGroupJoinRequests.mockResolvedValueOnce([])
+    const mounted = await mountApp(Wrapper)
+    await listGroupJoinRequests.mock.results[0]!.value
+    await flush()
+    expect(content(mounted.root)).toContain('No pending join requests.')
+    roles.value = [...roles.value]
+    await flush()
+    await listGroupJoinRequests.mock.results[1]!.value
+    await flush()
+    expect(content(mounted.root)).toContain('Prospective Member')
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })
