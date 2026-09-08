@@ -37,6 +37,7 @@ import {
   ARCHIVE_FILE_ACCEPT,
   archiveMediaType,
   downloadArchiveArtifact,
+  displayArchiveRows,
   exportJobResult,
   fetchArchiveReport,
   importJobResult,
@@ -253,6 +254,7 @@ const exportDetails = computed<Detail[]>(() => {
 const artifactReady = computed(() => job.value?.state === 'succeeded' && Boolean(exportResult.value?.artifact))
 
 const rows = ref<TransferRow[]>([])
+const visibleRows = computed(() => displayArchiveRows(rows.value))
 const reportCursor = ref<string | null>(null)
 const reportPending = ref(false)
 const reportError = ref<string | null>(null)
@@ -625,7 +627,7 @@ function rowTarget(row: TransferRow): string {
           <div v-if="terminal" class="space-y-2">
             <div class="flex items-center gap-2">
               <h3 class="font-display text-sm font-semibold text-aruna-navy">Report</h3>
-              <span v-if="rows.length" class="text-[11px] text-muted-foreground">{{ rows.length }} rows</span>
+              <span v-if="visibleRows.length" class="text-[11px] text-muted-foreground">{{ visibleRows.length }} rows</span>
             </div>
             <div v-if="reportPending || reportError" class="flex items-center gap-2">
               <p class="text-xs" :class="reportError ? 'text-destructive' : 'text-muted-foreground'">
@@ -633,11 +635,11 @@ function rowTarget(row: TransferRow): string {
               </p>
               <Button variant="ghost" size="sm" :disabled="reportLoading" @click="retryReport">Retry</Button>
             </div>
-            <EmptyState v-else-if="!rows.length && !reportLoading" compact title="This transfer produced no report rows." />
-            <div v-else-if="rows.length" class="max-h-64 overflow-y-auto rounded-md border border-border">
+            <EmptyState v-else-if="!visibleRows.length && !reportLoading" compact title="No further report details." />
+            <div v-else-if="visibleRows.length" class="max-h-64 overflow-y-auto rounded-md border border-border">
               <table class="w-full text-[11px]">
                 <tbody>
-                  <tr v-for="row in rows" :key="row.entry_key" class="border-b border-border last:border-0 align-top">
+                  <tr v-for="row in visibleRows" :key="row.entry_key" class="border-b border-border last:border-0 align-top">
                     <td class="px-2 py-1.5">
                       <Badge :variant="codeVariant(row.code)" size="sm" class="uppercase">{{ row.code }}</Badge>
                     </td>

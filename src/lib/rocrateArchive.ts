@@ -115,6 +115,18 @@ export interface ArchiveReportRow<T> {
 export type ImportReportRow = ArchiveReportRow<ImportReportDetail>
 export type ExportReportRow = ArchiveReportRow<ExportReportDetail>
 
+export function displayArchiveRows(rows: ArchiveReportRow<Partial<ImportReportDetail & ExportReportDetail>>[]) {
+  return rows.flatMap((row) => {
+    if (row.code !== 'path_synthesized') return [row]
+    if (row.detail.zip_path && !row.detail.validation) return []
+    return [{
+      ...row,
+      code: 'Archive path',
+      message: row.detail.zip_path ? 'The archive path needs attention.' : 'No archive path was produced.',
+    }]
+  })
+}
+
 export interface ArchiveReportPage<T> {
   rows: ArchiveReportRow<T>[]
   // Opaque cursor; omitted on the last page. Bound to the frozen report digest.
