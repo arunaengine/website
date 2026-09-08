@@ -35,6 +35,7 @@ const group = ref({ display_name: 'Genomics lab', group_id: 'g1', realm_id: REAL
 
 const joinRequestsEnabled = ref(false)
 const inboxCount = ref<number | null>(null)
+const inboxError = ref<string | null>(null)
 const Empty = defineComponent(() => () => null)
 const icons = new Proxy({}, { get: () => Empty })
 const Passthrough = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
@@ -60,9 +61,10 @@ const PanelStub = defineComponent({
 })
 
 const InboxStub = defineComponent({
-  emits: ['count'],
+  emits: ['count', 'load-error'],
   setup(_, { emit }) {
     VueRuntime.watch(inboxCount, (count) => emit('count', count), { immediate: true })
+    VueRuntime.watch(inboxError, (error) => emit('load-error', error), { immediate: true })
     return () => h('div', { 'data-request-inbox': '' }, 'Pending request inbox')
   },
 })
@@ -183,27 +185,38 @@ describe('Group rename control', () => {
 })
 
 
-describe('Group access request box', () => {
+describe('Group notifications', () => {
   beforeEach(() => {
     group.value = { display_name: 'Genomics lab', group_id: 'g1', realm_id: REALM, roles: [ADMIN_ROLE] }
     joinRequestsEnabled.value = true
     inboxCount.value = null
+    inboxError.value = null
   })
 
-  it('shows the admin inbox above the tabs, including on the overview', async () => {
+  it('keeps approval controls in Members and links from the overview hint', async () => {
     const mounted = await mount('/app/groups/g1')
-    const box = element(mounted.root, (node) => node.props['aria-label'] === 'Access requests')
-    const tabs = element(mounted.root, (node) => node.props['data-active'] !== undefined)
-    expect(nodes(tabs)).not.toContain(box)
-    expect(nodes(box).some((node) => node.props['data-request-inbox'] !== undefined)).toBe(true)
-    expect(nodes(mounted.root).indexOf(box)).toBeLessThan(nodes(mounted.root).indexOf(tabs))
-    expect(nodes(box).some((node) => node.props['aria-label'] === 'Pending access requests')).toBe(false)
+    const overview = element(mounted.root, (node) => node.props['data-panel'] === 'stats')
+    const members = element(mounted.root, (node) => node.props['data-panel'] === 'members')
+    expect(content(overview)).toContain('Group notifications')
+    expect(content(overview)).toContain('Checking member requests')
+    expect(content(overview)).not.toContain('Pending request inbox')
+    expect(content(members)).toContain('Pending request inbox')
+    expect(members.props.class).toContain('hidden')
     inboxCount.value = 2
     await flush()
-    expect(content(element(box, (node) => node.props['aria-label'] === 'Pending access requests'))).toBe('2')
-    await click(element(mounted.root, (node) => node.props['data-tab'] === 'roles'))
-    await settled(mounted.router, 'roles')
-    expect(nodes(mounted.root)).toContain(box)
+    const hint = element(overview, (node) => node.tag === 'button' && content(node) === 'There are open member requests')
+    await click(hint)
+    await settled(mounted.router, 'members')
+    expect(mounted.router.currentRoute.value.query.tab).toBe('members')
+    expect(members.props.class).not.toContain('hidden')
+    inboxCount.value = 0
+    await flush()
+    expect(content(overview)).toContain('No open member requests.')
+    inboxCount.value = null
+    inboxError.value = 'Unavailable'
+    await flush()
+    expect(content(overview)).toContain('Member requests could not be checked.')
+    expect(content(overview)).not.toContain('No open member requests.')
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })
@@ -211,7 +224,7 @@ describe('Group access request box', () => {
   it('hides the request box from regular group members', async () => {
     group.value = { display_name: 'Genomics lab', group_id: 'g1', realm_id: REALM, roles: [MEMBER_ROLE] }
     const mounted = await mount('/app/groups/g1')
-    expect(nodes(mounted.root).some((node) => node.props['aria-label'] === 'Access requests')).toBe(false)
+    expect(nodes(mounted.root).some((node) => node.props['aria-label'] === 'Join requests' || node.props['aria-label'] === 'Group notifications')).toBe(false)
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })

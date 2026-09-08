@@ -10,6 +10,7 @@ export interface ApiNotification {
   created_at_ms: number
   read: boolean
   group_id?: string
+  request_id?: string
   member_user_id?: string
   actor_user_id?: string
   node_id?: string

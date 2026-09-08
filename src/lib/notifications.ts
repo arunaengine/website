@@ -46,6 +46,12 @@ export const NOTIFICATION_KINDS: Record<string, NotificationKindDescriptor> = {
     // Membership is gone, so the detail page would 403; link to the list.
     link: () => ({ name: 'groups' }),
   },
+  group_join_requested: {
+    icon: UserPlus,
+    title: (n, ctx) => `New member request for ${groupLabel(n, ctx)}`,
+    detail: () => 'Review the request in Members.',
+    link: (n) => (n.group_id ? { name: 'group', params: { id: n.group_id }, query: { tab: 'members' } } : { name: 'groups' }),
+  },
   group_member_added: {
     icon: Users,
     title: (n, ctx) => `New member in ${groupLabel(n, ctx)}`,

@@ -56,6 +56,7 @@ let storageAnchorPending = false
 
 const DOC_LIMIT = 8
 const joinRequestCount = ref<number | null>(null)
+const joinRequestError = ref<string | null>(null)
 const renameOpen = ref(false)
 
 const group = ref<GroupDetailResponse | null>(null)
@@ -329,25 +330,6 @@ async function leave() {
         @renamed="reload"
       />
 
-      <section
-        v-if="canManage && joinRequestsEnabled"
-        aria-label="Access requests"
-        class="mx-5 my-4 overflow-hidden rounded-lg border border-primary/20 bg-primary/5"
-      >
-        <div class="flex items-center gap-2 px-5 pt-4">
-          <Inbox class="h-4 w-4 text-primary" />
-          <h2 class="font-display text-sm font-semibold text-aruna-navy">Access requests</h2>
-          <Badge v-if="joinRequestCount !== null" :variant="joinRequestCount > 0 ? 'warn' : 'outline'" size="count" aria-label="Pending access requests">{{ joinRequestCount }}</Badge>
-        </div>
-        <p class="px-5 pt-1 text-xs text-muted-foreground">Review requests to join this group. Approve a request to assign roles, or deny it with an optional reason.</p>
-        <JoinRequestsInbox
-          :group-id="group.group_id"
-          :roles="group.roles"
-          @changed="reload"
-          @count="joinRequestCount = $event"
-        />
-      </section>
-
       <Tabs v-model="tab">
         <div data-tour="group-tabs" class="border-b border-border px-5 py-2">
           <TabsList class="h-auto flex-wrap">
@@ -378,6 +360,13 @@ async function leave() {
         </div>
 
         <TabsContent value="stats" class="mt-0">
+          <section v-if="canManage && joinRequestsEnabled" aria-label="Group notifications" class="border-b border-border px-5 py-4">
+            <h2 class="font-display text-sm font-semibold text-aruna-navy">Group notifications</h2>
+            <button v-if="joinRequestError" type="button" class="mt-1 text-xs text-destructive hover:underline" @click="tab = 'members'">Member requests could not be checked.</button>
+            <p v-else-if="joinRequestCount === null" class="mt-1 text-xs text-muted-foreground">Checking member requests…</p>
+            <button v-else-if="joinRequestCount > 0" type="button" class="mt-1 text-sm font-medium text-primary hover:underline" @click="tab = 'members'">There are open member requests</button>
+            <p v-else class="mt-1 text-xs text-muted-foreground">No open member requests.</p>
+          </section>
       <div v-if="usage" class="border-b border-border">
         <div class="flex items-center gap-2 px-5 pb-1 pt-4">
           <FileJson2 class="h-3.5 w-3.5 text-primary" />
@@ -517,7 +506,26 @@ async function leave() {
       </div>
         </TabsContent>
 
-        <TabsContent value="members" class="mt-0">
+        <TabsContent value="members" :force-mount="canManage && joinRequestsEnabled" :class="tab === 'members' ? 'mt-0' : 'mt-0 hidden'">
+      <section
+        v-if="canManage && joinRequestsEnabled"
+        aria-label="Join requests"
+        class="border-b border-border"
+      >
+        <div class="flex items-center gap-2 px-5 pt-4">
+          <Inbox class="h-4 w-4 text-primary" />
+          <h2 class="font-display text-sm font-semibold text-aruna-navy">Join requests</h2>
+          <Badge v-if="joinRequestCount !== null" :variant="joinRequestCount > 0 ? 'warn' : 'outline'" size="count" aria-label="Pending access requests">{{ joinRequestCount }}</Badge>
+        </div>
+        <p class="px-5 pt-1 text-xs text-muted-foreground">Review requests to join this group. Approve a request to assign roles, or deny it with an optional reason.</p>
+        <JoinRequestsInbox
+          :group-id="group.group_id"
+          :roles="group.roles"
+          @changed="reload"
+          @count="joinRequestCount = $event"
+          @load-error="joinRequestError = $event"
+        />
+      </section>
           <div>
             <div v-if="membersHidden" class="px-5 py-4 text-xs text-muted-foreground">
               The member list is only visible to group members.
