@@ -1,3 +1,4 @@
+import * as DataEntities from '@/lib/dataEntities'
 import * as VueRuntime from 'vue'
 import { defineComponent, h } from 'vue'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -31,7 +32,7 @@ beforeAll(async () => {
   vocab = await loadVocabIndex()
 })
 const findCandidates = vi.fn<(type: string, options: Record<string, unknown>) => Promise<{ candidates: ReuseCandidate[]; partial: boolean }>>()
-const saveToRegistry = vi.fn()
+const findRecentCandidates = vi.fn<(_options: Record<string, unknown>) => Promise<{ candidates: ReuseCandidate[]; partial: boolean }>>()
 const resolveReference = vi.fn()
 const apiBaseUrl = VueRuntime.ref('http://realm.test')
 const authToken = VueRuntime.ref('token')
@@ -40,7 +41,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
   vi.useRealTimers()
   findCandidates.mockReset().mockResolvedValue({ candidates: [], partial: false })
-  saveToRegistry.mockReset()
+  findRecentCandidates.mockReset().mockResolvedValue({ candidates: [], partial: false })
   resolveReference.mockReset()
 })
 findCandidates.mockResolvedValue({ candidates: [], partial: false })
@@ -76,6 +77,7 @@ const TypeBrowser = compileClientComponent(new URL('./TypeBrowser.vue', import.m
   vue: VueRuntime,
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/lib/crate/editor': Editor,
+  '@/lib/dataEntities': DataEntities,
   '@/lib/profiles/uri': Uri,
 })
 
@@ -121,10 +123,11 @@ const AddEntityDialog = compileClientComponent(new URL('./AddEntityDialog.vue', 
   '@/components/metadata/LookupBox.vue': moduleDefault(LookupBox),
   './TypeBrowser.vue': moduleDefault(TypeBrowser),
   '@/lib/crate/editor': Editor,
+  '@/lib/dataEntities': DataEntities,
   '@/lib/crate/references': References,
   '@/lib/crate/registry': CrateRegistry,
   '@/lib/crate/typeDefaults': TypeDefaults,
-  '@/composables/useEntityRegistry': { findCandidates, resolveReference, saveToRegistry },
+  '@/composables/useEntityRegistry': { findCandidates, findRecentCandidates, resolveReference },
   '@/composables/useAruna': { useAruna: () => ({ apiBaseUrl, authToken }) },
   '@/lib/profiles/uri': Uri,
   '@/lib/lookup/orcid': Orcid,
@@ -199,18 +202,154 @@ const grace: Editor.DraftEntity = {
   properties: { name: [{ kind: 'text', value: 'Grace Hopper' }] },
 }
 
-function candidate(entity: Editor.DraftEntity, related: Editor.DraftEntity[], registry: boolean): ReuseCandidate {
+function candidate(entity: Editor.DraftEntity, related: Editor.DraftEntity[], saved: boolean): ReuseCandidate {
+  const documentId = saved ? 'source-1' : 'doc-2'
   return {
-    reference: { documentId: registry ? 'source-1' : 'doc-2', entityId: entity.id },
+    reference: { documentId, entityId: entity.id },
     entity,
     related,
-    source: registry
-      ? { documentId: 'reg', title: 'Entity registry', groupId: 'group-1', registry: true }
-      : { documentId: 'doc-2', title: 'Other dataset', groupId: 'group-2', registry: false },
+    source: saved
+      ? { documentId, title: 'Saved dataset', groupId: 'group-1' }
+      : { documentId, title: 'Other dataset', groupId: 'group-2' },
   }
 }
 
 describe('AddEntityDialog', () => {
+  it('searches and selects a recent person before a type is picked', async () => {
+    const found = candidate(ada, [institute], false)
+    findRecentCandidates.mockResolvedValue({ candidates: [found], partial: false })
+    resolveReference.mockResolvedValue(found)
+    const created: Created[] = []
+    const mounted = await mount({}, created)
+    await flush()
+
+    expect(content(mounted.root)).toContain('From recent datasets')
+    expect(content(mounted.root)).toContain('Ada Lovelace')
+    await typeValue(field(mounted.root, 'Search entities and types'), 'lovelace')
+    expect(content(mounted.root)).toContain('Ada Lovelace')
+    await typeValue(field(mounted.root, 'Search entities and types'), '0000-0002-1825-0097')
+    expect(content(mounted.root)).toContain('Ada Lovelace')
+
+    await click(button(mounted.root, 'Ada Lovelace'))
+    expect(content(mounted.root)).toContain('Add a Person')
+    expect(field(mounted.root, 'Identifier').props.value).toBe(ada.id)
+    await click(button(mounted.root, 'Create'))
+
+    expect(resolveReference).toHaveBeenCalledWith(found.reference)
+    expect(created[0].entity.types).toContain('Person')
+    mounted.app.unmount()
+  })
+
+  it('filters recent suggestions by the accepted range and contextual scope', async () => {
+    const file: Editor.DraftEntity = {
+      id: 'data.csv',
+      types: ['https://schema.org/ImageObject', 'Thing'],
+      properties: { name: [{ kind: 'text', value: 'Results file' }] },
+    }
+    findRecentCandidates.mockResolvedValue({
+      candidates: [candidate(ada, [], false), candidate(institute, [], false), candidate(file, [], false)],
+      partial: false,
+    })
+    const mounted = await mount({
+      range: ['http://schema.org/Person'],
+      excludeData: true,
+    })
+    await flush()
+
+    const text = content(mounted.root)
+    expect(text).toContain('Ada Lovelace')
+    expect(text).not.toContain('Example Institute')
+    expect(text).not.toContain('Results file')
+    mounted.app.unmount()
+
+    const contextual = await mount({ excludeData: true })
+    await flush()
+    expect(content(contextual.root)).toContain('Example Institute')
+    expect(content(contextual.root)).not.toContain('Results file')
+    contextual.app.unmount()
+  })
+
+  it('keeps mixed search open when a type and recent entity both match', async () => {
+    findRecentCandidates.mockResolvedValue({ candidates: [candidate(ada, [], false)], partial: false })
+    const mounted = await mount()
+    await flush()
+
+    await typeValue(field(mounted.root, 'Search entities and types'), 'person')
+
+    expect(content(mounted.root)).toContain('Add an entity')
+    expect(content(mounted.root)).toContain('Ada Lovelace')
+    mounted.app.unmount()
+  })
+
+  it('searches an entity by an identifier property', async () => {
+    const person = { ...ada, id: '#ada', properties: {
+      ...ada.properties, identifier: [{ kind: 'url' as const, value: ada.id }],
+    } }
+    findRecentCandidates.mockResolvedValue({ candidates: [candidate(person, [], false)], partial: false })
+    const mounted = await mount()
+    await flush()
+    await typeValue(field(mounted.root, 'Search entities and types'), '0000-0002-1825-0097')
+    expect(content(mounted.root)).toContain('Ada Lovelace')
+    mounted.app.unmount()
+  })
+
+  it('shows when all recent sources were unreadable', async () => {
+    findRecentCandidates.mockResolvedValue({ candidates: [], partial: true })
+    const mounted = await mount()
+    await flush()
+
+    expect(content(mounted.root)).toContain('Some recent datasets could not be read.')
+    mounted.app.unmount()
+  })
+
+  it('keeps mixed data entities out of contextual type results', async () => {
+    const mixed: Editor.DraftEntity = {
+      id: '#mixed',
+      types: ['Person', 'File'],
+      properties: { name: [{ kind: 'text', value: 'Mixed entity' }] },
+    }
+    findCandidates.mockResolvedValue({ candidates: [candidate(mixed, [], false)], partial: false })
+    const mounted = await mount({ excludeData: true })
+
+    await click(button(mounted.root, 'Person'))
+    await flush()
+
+    expect(content(mounted.root)).not.toContain('Mixed entity')
+    mounted.app.unmount()
+  })
+
+  it('reauthorizes a recent pick before copying it', async () => {
+    const found = candidate(ada, [], false)
+    findRecentCandidates.mockResolvedValue({ candidates: [found], partial: false })
+    resolveReference.mockRejectedValue(new Error('The source dataset is unavailable'))
+    const created: Created[] = []
+    const mounted = await mount({}, created)
+    await flush()
+
+    await click(button(mounted.root, 'Ada Lovelace'))
+    await click(button(mounted.root, 'Create'))
+
+    expect(created).toEqual([])
+    expect(content(mounted.root)).toContain('Could not reuse this entity')
+    mounted.app.unmount()
+  })
+
+  it.each([['Organization'], ['Person', 'File']])('refuses a recent pick whose saved types changed to %s', async (...types) => {
+    const found = candidate(ada, [], false)
+    findRecentCandidates.mockResolvedValue({ candidates: [found], partial: false })
+    resolveReference.mockResolvedValue(candidate({ ...ada, types }, [], false))
+    const created: Created[] = []
+    const mounted = await mount({ excludeData: true }, created)
+    await flush()
+
+    await click(button(mounted.root, 'Ada Lovelace'))
+    await click(button(mounted.root, 'Create'))
+
+    expect(created).toEqual([])
+    expect(content(mounted.root)).toContain('The saved entity type changed')
+    mounted.app.unmount()
+  })
+
   it('offers saved and found entities of the type and copies the pick with what it references', async () => {
     resolveReference.mockResolvedValue(candidate(ada, [institute], false))
     findCandidates.mockResolvedValue({ candidates: [candidate(grace, [], true), candidate(ada, [institute], false)], partial: false })
@@ -223,7 +362,7 @@ describe('AddEntityDialog', () => {
     const text = content(mounted.root)
     expect(text).toContain('Reuse an existing Person')
     expect(text.indexOf('Grace Hopper')).toBeLessThan(text.indexOf('Ada Lovelace'))
-    expect(text).toContain('Group registry')
+    expect(text).toContain('Saved dataset')
     expect(text).toContain('Other dataset')
 
     await click(button(mounted.root, 'Ada Lovelace'))
@@ -231,7 +370,7 @@ describe('AddEntityDialog', () => {
     expect(content(mounted.root)).toContain('Loads the current saved Ada Lovelace from Other dataset with Example Institute')
 
     await click(button(mounted.root, 'Create'))
-    expect(resolveReference).toHaveBeenCalledWith(candidate(ada, [institute], false).reference, false)
+    expect(resolveReference).toHaveBeenCalledWith(candidate(ada, [institute], false).reference)
     expect(created[0].entity).toMatchObject({ id: ada.id, types: ['Person'] })
     expect(created[0].entity.properties.affiliation).toEqual([{ kind: 'reference', value: institute.id }])
     expect(Editor.findEntity(created[0].draft, institute.id)).toMatchObject({ types: ['Organization'] })
@@ -314,21 +453,6 @@ describe('AddEntityDialog', () => {
     mounted.app.unmount()
   })
 
-  it('saves a found entity to the group registry', async () => {
-    findCandidates.mockResolvedValue({ candidates: [candidate(ada, [institute], false)], partial: true })
-    saveToRegistry.mockResolvedValue({ documentId: 'reg' })
-    const mounted = await mount({ draft: { ...draft, groupId: 'group-1' } })
-
-    await click(button(mounted.root, 'Person'))
-    await flush()
-    expect(content(mounted.root)).toContain('Not every dataset could be searched.')
-    await click(button(mounted.root, 'Save to registry'))
-
-    expect(saveToRegistry).toHaveBeenCalledWith('group-1', candidate(ada, [institute], false).reference)
-    expect(content(mounted.root)).toContain('Reference to Ada Lovelace saved in the group registry.')
-    mounted.app.unmount()
-  })
-
   it('pins the common types above everything else', async () => {
     const mounted = await mount()
     const text = content(mounted.root)
@@ -341,7 +465,7 @@ describe('AddEntityDialog', () => {
 
   it('keeps the common group on top of the search results', async () => {
     const mounted = await mount()
-    await typeValue(field(mounted.root, 'Search entity types'), 'organ')
+    await typeValue(field(mounted.root, 'Search entities and types'), 'organ')
     const text = content(mounted.root)
 
     expect(text.indexOf('Common')).toBeLessThan(text.indexOf('Everything else'))

@@ -1,3 +1,4 @@
+import * as DataEntities from '@/lib/dataEntities'
 import * as VueRuntime from 'vue'
 import { defineComponent, h } from 'vue'
 import { describe, expect, it } from 'vitest'
@@ -43,6 +44,7 @@ const TypeBrowser = compileClientComponent(new URL('./TypeBrowser.vue', import.m
   vue: VueRuntime,
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/lib/crate/editor': Editor,
+  '@/lib/dataEntities': DataEntities,
   '@/lib/profiles/uri': Uri,
 })
 

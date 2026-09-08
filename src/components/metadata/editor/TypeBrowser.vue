@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import Input from '@/components/ui/Input.vue'
-import { CURATED_TYPES, isDataType, typeLabel, vocabTypeUri } from '@/lib/crate/editor'
+import { CURATED_TYPES, typeLabel, vocabTypeUri } from '@/lib/crate/editor'
+import { isDataEntity } from '@/lib/dataEntities'
 import { normalizeTypeUri } from '@/lib/profiles/uri'
 import type { VocabIndex, VocabTerm } from '@/lib/profiles/vocabulary'
 
@@ -17,6 +18,8 @@ const props = defineProps<{
   onlyMatching?: boolean
   /** Contextual entities only: the types that describe stored data are hidden. */
   excludeData?: boolean
+  /** Picks an unambiguous search result unless the host mixes in other options. */
+  autoSelect?: boolean
 }>()
 const emit = defineEmits<{
   (e: 'update:modelValue', type: string): void
@@ -38,7 +41,7 @@ const curated = computed(() => CURATED_TYPES.map((type) => ({
 const rangeTypes = computed(() => new Set((props.vocab?.classesInRange(props.range) ?? []).map((term) => term.uri)))
 
 function allowed(type: string): boolean {
-  if (props.excludeData && isDataType(type)) return false
+  if (props.excludeData && isDataEntity([type])) return false
   if (!props.onlyMatching || !rangeTypes.value.size) return true
   return rangeTypes.value.has(vocabTypeUri(type))
 }
@@ -66,6 +69,7 @@ const results = computed(() => {
 
 // One candidate needs no click: it is the answer to the search.
 watch(results, (value) => {
+  if (props.autoSelect === false) return
   const only = [...value.shortlist, ...value.all]
   if (only.length === 1 && only[0].type !== props.modelValue) emit('update:modelValue', only[0].type)
 })

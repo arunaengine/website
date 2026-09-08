@@ -17,7 +17,6 @@ import {
 import * as Editor from '@/lib/crate/editor'
 import * as Orphans from '@/lib/crate/orphans'
 import * as References from '@/lib/crate/references'
-import * as Registry from '@/lib/crate/registry'
 import * as Utils from '@/lib/utils'
 import type { LookupHit } from '@/lib/lookup/types'
 
@@ -55,11 +54,9 @@ const InputStub = defineComponent({
 })
 
 const rorMatch = vi.fn<(name: string) => Promise<LookupHit | null>>(async () => null)
-const saveToRegistry = vi.fn()
 afterEach(() => {
   rorMatch.mockReset()
   rorMatch.mockResolvedValue(null)
-  saveToRegistry.mockReset()
 })
 
 const EntityHeader = compileClientComponent(new URL('./EntityHeader.vue', import.meta.url), {
@@ -76,8 +73,6 @@ const EntityHeader = compileClientComponent(new URL('./EntityHeader.vue', import
   '@/lib/crate/editor': Editor,
   '@/lib/crate/orphans': Orphans,
   '@/lib/crate/references': References,
-  '@/lib/crate/registry': Registry,
-  '@/composables/useEntityRegistry': { saveToRegistry },
   '@/lib/lookup/ror': { matchRorByName: rorMatch },
   '@/lib/utils': Utils,
 })
@@ -126,39 +121,10 @@ function control(root: HostNode, label: string): HostNode {
 }
 
 describe('EntityHeader', () => {
-  it('saves only a reference to the entity in its saved dataset', async () => {
-    saveToRegistry.mockResolvedValue({ documentId: 'reg' })
-    const base = seeded()
-    const org = Editor.addEntity(base, { type: 'Organization', name: 'Example Institute', id: '#institute' })
-    const draft = { ...Editor.addValue(org.draft, '#ada-lovelace', 'affiliation', { kind: 'reference', value: '#institute' }), groupId: 'group-1', documentId: 'source-1' }
-    const person = Editor.findEntity(draft, '#ada-lovelace')!
-    const mounted = await mountApp(EntityHeader, { props: { draft, entity: person, vocab: null } })
-
-    await click(button(mounted.root, 'Save to group registry'))
-
-    expect(saveToRegistry).toHaveBeenCalledWith('group-1', { documentId: 'source-1', entityId: person.id })
-    expect(content(mounted.root)).toContain('Reference saved to the group registry')
+  it('does not offer a manual registry action', async () => {
+    const mounted = await mount('#ada-lovelace')
+    expect(content(mounted.root)).not.toContain('registry')
     mounted.app.unmount()
-  })
-
-  it('explains that a new source dataset must be saved first', async () => {
-    const draft = { ...seeded(), groupId: 'group-1' }
-    const mounted = await mountApp(EntityHeader, { props: {
-      draft, entity: Editor.findEntity(draft, '#ada-lovelace')!, vocab: null,
-    } })
-    expect(button(mounted.root, 'Save to group registry').props.disabled).toBe(true)
-    expect(content(mounted.root)).toContain('Save the dataset first')
-    mounted.app.unmount()
-  })
-
-  it('offers the registry only for contextual entities of a group draft', async () => {
-    const root = await mount('./')
-    expect(content(root.root)).not.toContain('Save to group registry')
-    root.app.unmount()
-
-    const person = await mount('#ada-lovelace')
-    expect(content(person.root)).not.toContain('Save to group registry')
-    person.app.unmount()
   })
 
   it('offers the two ways out of a file the dataset cannot reach', async () => {

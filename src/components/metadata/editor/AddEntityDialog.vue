@@ -33,9 +33,10 @@ import {
 } from '@/lib/crate/editor'
 import { linkReference } from '@/lib/crate/references'
 import { copyEntity, entitiesOfType, referenceKey } from '@/lib/crate/registry'
-import { findCandidates, resolveReference, saveToRegistry, type ReuseCandidate } from '@/composables/useEntityRegistry'
+import { findCandidates, findRecentCandidates, resolveReference, type ReuseCandidate } from '@/composables/useEntityRegistry'
 import { useAruna } from '@/composables/useAruna'
 import { isAbsoluteUri } from '@/lib/profiles/uri'
+import { isDataEntity } from '@/lib/dataEntities'
 import { defaultProperties, defaultRows } from '@/lib/crate/typeDefaults'
 import { fetchOrcidRecord, normalizeOrcidId } from '@/lib/lookup/orcid'
 import { fetchRorRecord, matchRorByName, normalizeRorId } from '@/lib/lookup/ror'
@@ -79,24 +80,43 @@ const linkAs = ref('')
 // A ROR match belongs to the hit it was started for, and to no later one.
 let hitToken = 0
 
-// Entities of the picked type saved in the group registry or found in other
-// datasets; a pick copies one instead of typing it again.
+// Recent entities are shown before a type is picked. The selected type also
+// searches every readable dataset, and a pick copies one instead of retyping it.
+const recentCandidates = ref<ReuseCandidate[]>([])
 const candidates = ref<ReuseCandidate[]>([])
+const recentState = ref<'idle' | 'loading' | 'ready' | 'failed'>('idle')
 const candidateState = ref<'idle' | 'loading' | 'ready' | 'failed'>('idle')
 const candidatesPartial = ref(false)
+const recentPartial = ref(false)
 const picked = ref<ReuseCandidate | null>(null)
-const pinNote = ref('')
-const registryUnavailable = ref(false)
 const reuseBusy = ref(false)
 const { apiBaseUrl, authToken } = useAruna()
 let candidateToken = 0
+let recentToken = 0
+
+watch([() => props.open, () => props.draft.documentId, apiBaseUrl, authToken], ([open]) => {
+  picked.value = null
+  recentCandidates.value = []
+  recentPartial.value = false
+  recentState.value = open ? 'loading' : 'idle'
+  const token = ++recentToken
+  if (!open) return
+  findRecentCandidates({ excludeDocumentId: props.draft.documentId })
+    .then((result) => {
+      if (token !== recentToken) return
+      recentCandidates.value = result.candidates
+      recentPartial.value = result.partial
+      recentState.value = 'ready'
+    })
+    .catch(() => {
+      if (token === recentToken) recentState.value = 'failed'
+    })
+}, { immediate: true })
 
 watch([type, () => props.draft.groupId, () => props.draft.documentId, apiBaseUrl, authToken], ([next]) => {
+  if (next && picked.value && !entitiesOfType([picked.value.entity], next).length) unpick()
   candidates.value = []
   candidatesPartial.value = false
-  picked.value = null
-  pinNote.value = ''
-  registryUnavailable.value = false
   candidateState.value = next ? 'loading' : 'idle'
   const token = ++candidateToken
   if (!next) return
@@ -105,24 +125,57 @@ watch([type, () => props.draft.groupId, () => props.draft.documentId, apiBaseUrl
       if (token !== candidateToken) return
       candidates.value = result.candidates
       candidatesPartial.value = result.partial
-      registryUnavailable.value = result.unavailable
       candidateState.value = 'ready'
     })
     .catch(() => {
       if (token === candidateToken) candidateState.value = 'failed'
     })
 })
-onScopeDispose(() => { candidateToken += 1 })
+onScopeDispose(() => {
+  candidateToken += 1
+  recentToken += 1
+})
+
+const rangeTypes = computed(() => new Set((props.vocab?.classesInRange(props.range) ?? []).map((term) => term.uri)))
+
+function candidateType(candidate: ReuseCandidate): string {
+  if (props.excludeData && isDataEntity(candidate.entity.types)) return ''
+  return candidate.entity.types.find((entry) => {
+    return !onlyMatching.value || !rangeTypes.value.size || rangeTypes.value.has(vocabTypeUri(entry))
+  }) ?? ''
+}
+
+const shownRecent = computed(() => {
+  const needle = query.value.trim().toLowerCase()
+  return recentCandidates.value
+    .filter((candidate) => candidateType(candidate))
+    .filter((candidate) => !isAbsoluteUri(candidate.entity.id) || !findEntity(props.draft, candidate.entity.id))
+    .filter((candidate) => !needle || [displayName(candidate.entity), candidate.entity.id,
+      ...(candidate.entity.properties.identifier ?? []).map((value) => value.value),
+      typeLabel(candidateType(candidate)), candidate.source.title]
+      .some((value) => value.toLowerCase().includes(needle)))
+    .slice(0, 8)
+})
 
 const shownCandidates = computed(() => {
   const needle = name.value.trim().toLowerCase()
-  return candidates.value
+  const seen = new Set<string>()
+  return [...recentCandidates.value, ...candidates.value]
+    .filter((candidate) => !props.excludeData || !isDataEntity(candidate.entity.types))
+    .filter((candidate) => entitiesOfType([candidate.entity], type.value).length)
+    .filter((candidate) => {
+      const key = referenceKey(candidate.reference)
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
     .filter((candidate) => !isAbsoluteUri(candidate.entity.id) || !findEntity(props.draft, candidate.entity.id))
     .filter((candidate) => !needle || displayName(candidate.entity).toLowerCase().includes(needle))
     .slice(0, 8)
 })
 
 function pick(candidate: ReuseCandidate) {
+  if (!type.value) type.value = candidateType(candidate)
   picked.value = candidate
   name.value = displayName(candidate.entity)
   identifier.value = candidate.entity.id
@@ -142,19 +195,6 @@ function unpick() {
 watch(identifier, (next) => {
   if (picked.value && next !== picked.value.entity.id) picked.value = null
 })
-
-async function pin(candidate: ReuseCandidate) {
-  const groupId = props.draft.groupId
-  const token = candidateToken
-  if (!groupId) return
-  pinNote.value = ''
-  try {
-    await saveToRegistry(groupId, candidate.reference)
-    if (token === candidateToken) pinNote.value = `Reference to ${displayName(candidate.entity)} saved in the group registry.`
-  } catch (error) {
-    if (token === candidateToken) pinNote.value = `Could not save to the group registry: ${errorMessage(error)}`
-  }
-}
 
 const linkOptions = computed(() => {
   if (!props.offerLink || !type.value) return []
@@ -327,9 +367,9 @@ async function create() {
     const token = candidateToken
     reuseBusy.value = true
     try {
-      const current = await resolveReference(candidate.reference, candidate.source.registry)
+      const current = await resolveReference(candidate.reference)
       if (token !== candidateToken || !props.open || picked.value !== candidate) return
-      if (!entitiesOfType([current.entity], type.value).length) throw new Error('The saved entity type changed. Search again.')
+      if (!candidateType(current) || !entitiesOfType([current.entity], type.value).length) throw new Error('The saved entity type changed. Search again.')
       const source = name.value.trim() && name.value.trim() !== displayName(candidate.entity)
         ? { ...current.entity, properties: { ...current.entity.properties, name: text(name.value.trim()) } }
         : current.entity
@@ -377,10 +417,34 @@ async function create() {
       <div class="min-w-0 border-b border-border px-4 py-3 pr-10">
         <DialogTitle class="text-sm">Add an entity</DialogTitle>
         <DialogDescription class="mt-0.5 text-xs">
-          Search for the kind of thing this is. Everything in the dataset is described the same way.
+          Reuse something from a recent dataset, or choose the kind of thing to add.
         </DialogDescription>
       </div>
-      <CommandPane v-model="query" placeholder="Search every type" aria-label="Search entity types">
+      <CommandPane v-model="query" placeholder="Search recent entities or types" aria-label="Search entities and types" :busy="recentState === 'loading'">
+        <div v-if="recentState === 'failed'" class="px-2.5 py-2 text-xs text-muted-foreground">
+          Could not load entities from recent datasets.
+        </div>
+        <div v-else-if="shownRecent.length">
+          <p class="px-2.5 pb-1 pt-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            From recent datasets
+          </p>
+          <button
+            v-for="candidate in shownRecent"
+            :key="referenceKey(candidate.reference)"
+            type="button"
+            role="option"
+            class="flex w-full min-w-0 flex-col items-start gap-0.5 rounded-md px-2.5 py-1.5 text-left hover:bg-muted/40 data-[active=true]:bg-muted"
+            @click="pick(candidate)"
+          >
+            <span class="w-full truncate text-sm font-medium text-foreground">{{ displayName(candidate.entity) }}</span>
+            <span class="w-full truncate text-[11px] text-muted-foreground">
+              {{ typeLabel(candidateType(candidate)) }} · {{ candidate.source.title }}
+            </span>
+          </button>
+        </div>
+        <p v-if="recentPartial" class="px-2.5 py-1 text-[11px] text-muted-foreground">
+          Some recent datasets could not be read.
+        </p>
         <TypeBrowser
           v-model="type"
           v-model:only-matching="onlyMatching"
@@ -388,6 +452,7 @@ async function create() {
           :vocab="vocab"
           :range="range"
           :exclude-data="excludeData"
+          :auto-select="false"
         />
       </CommandPane>
     </DialogContent>
@@ -422,19 +487,9 @@ async function create() {
                 >
                   <span class="block truncate font-medium text-foreground">{{ displayName(candidate.entity) }}</span>
                   <span class="block truncate text-[11px] text-muted-foreground">
-                    {{ candidate.source.title }}<template v-if="candidate.source.registry"> · Group registry</template>
+                    {{ candidate.source.title }}
                   </span>
                 </button>
-                <Button
-                  v-if="!candidate.source.registry && draft.groupId"
-                  variant="ghost"
-                  size="sm"
-                  class="h-6 shrink-0 px-2 text-[11px] text-muted-foreground"
-                  @click="pin(candidate)"
-                  title="Save a reference to this entity in its source dataset"
-                >
-                  Save to registry
-                </Button>
               </li>
             </ul>
             <p v-else class="mt-1 text-[11px] text-muted-foreground">
@@ -444,16 +499,12 @@ async function create() {
               Not every dataset could be searched.
             </p>
           </template>
-          <p v-if="registryUnavailable" class="mt-1 text-[11px] text-muted-foreground">
-            Some saved references are unavailable or no longer accessible.
-          </p>
           <Notice v-if="picked" tone="info" class="mt-2 break-words">
             Loads the current saved {{ displayName(picked.entity) }} from
             {{ picked.source.title }}<template v-if="picked.related.length">
               with {{ picked.related.map(displayName).join(', ') }}</template>.
             <button type="button" class="ml-1 underline" @click="unpick">Start from scratch instead</button>
           </Notice>
-          <Notice v-if="pinNote" tone="info" class="mt-2 break-words">{{ pinNote }}</Notice>
         </div>
 
         <div class="min-w-0">
