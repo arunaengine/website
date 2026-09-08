@@ -20,7 +20,7 @@ const props = defineProps<{ groupId: string; groupName?: string }>()
 
 const { joinRequestsEnabled, pendingByGroup, ensureOwnRequestsLoaded, requestJoin, withdrawRequest, busy } =
   useJoinRequests()
-const { currentUser, myGroups } = useAruna()
+const { currentUser, myGroups, sessionEpoch } = useAruna()
 
 // Flag off, signed out, or already a member ⇒ this component renders nothing.
 const visible = computed(
@@ -47,15 +47,17 @@ watch(open, (isOpen) => {
   }
 })
 
+watch([() => props.groupId, sessionEpoch], () => { open.value = false; submitError.value = null })
+
 async function submit() {
+  const groupId = props.groupId
+  const epoch = sessionEpoch.value
   submitError.value = null
   try {
-    await requestJoin(props.groupId, message.value)
-    open.value = false
+    await requestJoin(groupId, message.value)
+    if (groupId === props.groupId && epoch === sessionEpoch.value) open.value = false
   } catch (err) {
-    // A 404 here means the realm advertises the flag but the backend has no
-    // endpoint; surface the raw message honestly.
-    submitError.value = errorMessage(err)
+    if (groupId === props.groupId && epoch === sessionEpoch.value) submitError.value = errorMessage(err)
   }
 }
 
@@ -80,16 +82,16 @@ async function withdraw() {
     </div>
     <template v-else>
       <Button variant="outline" size="sm" :disabled="busy" @click="open = true">
-        <UserPlus class="h-3.5 w-3.5" /> Request to join
+        <UserPlus class="h-3.5 w-3.5" /> Request access
       </Button>
       <Dialog :open="open" @update:open="(v: boolean) => (open = v)">
         <DialogContent class="max-w-md">
           <DialogHeader>
             <DialogTitle class="flex items-center gap-2">
-              <UserPlus class="h-4 w-4 text-primary" /> Request to join {{ groupName || 'this group' }}
+              <UserPlus class="h-4 w-4 text-primary" /> Request access to {{ groupName || 'this group' }}
             </DialogTitle>
             <DialogDescription>
-              The group admins are notified and decide whether to admit you.
+              Group admins review your request and decide whether to admit you.
             </DialogDescription>
           </DialogHeader>
 

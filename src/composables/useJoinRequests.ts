@@ -1,6 +1,5 @@
 import { computed, ref, watch } from 'vue'
 import {
-  apiRequest,
   type CreateJoinRequestRequest,
   type DecideJoinRequestRequest,
   type DecideJoinRequestResponse,
@@ -9,12 +8,8 @@ import {
 } from '@/lib/api'
 import { featureEnabled } from '@/lib/config'
 import { useAruna } from '@/composables/useAruna'
+import { assertCurrentSession, request, sessionEpoch } from '@/composables/aruna/state'
 import { errorMessage } from '@/lib/utils'
-
-// Join requests (aruna#248). The backend does not serve these endpoints yet;
-// every path here is gated behind the `joinRequests` feature flag, so with the
-// default config (features: {}) this module is inert: no HTTP call can fire
-// because every mutation/loader starts with assertEnabled().
 
 const ownRequests = ref<JoinRequest[]>([])
 const ownRequestsLoaded = ref(false)
@@ -24,25 +19,15 @@ const busy = ref(false)
 // ensureOwnRequestsLoaded() in the same tick before ownRequestsLoaded flips.
 let ownRequestsInflight: Promise<void> | null = null
 
-// Sign-out via the non-Keycloak fallback and account switches (manual token swap)
-// change currentUser without a page reload, so the module-singleton own-request
-// cache would otherwise survive and render the previous account's requests.
-// Mirror useNotifications: reset on account change. Reset only (no HTTP, no
-// featureEnabled read), so the flag-off zero-HTTP guarantee is untouched. Keying
-// on the id (not just null) also covers a direct A→B token swap; consumers' own
-// watches then refetch because ownRequestsLoaded is false again.
-if (typeof window !== 'undefined') {
-  const { currentUser } = useAruna()
-  watch(
-    () => currentUser.value?.id,
-    (id, prev) => {
-      if (id === prev) return
-      ownRequests.value = []
-      ownRequestsLoaded.value = false
-      ownRequestsError.value = null
-    },
-  )
-}
+let ownGeneration = 0
+watch(sessionEpoch, () => {
+  ++ownGeneration
+  ownRequests.value = []
+  ownRequestsLoaded.value = false
+  ownRequestsError.value = null
+  ownRequestsInflight = null
+  busy.value = false
+}, { flush: 'sync' })
 
 const joinRequestsEnabled = computed(() => featureEnabled('joinRequests'))
 
@@ -62,25 +47,34 @@ function assertEnabled() {
   }
 }
 
-// Sibling composable to useAruna: it does not export its raw request() helper,
-// but it does export the apiBaseUrl/authToken refs, so we build the same client.
-function request<T>(path: string, options = {}) {
-  const { apiBaseUrl, authToken } = useAruna()
-  return apiRequest<T>(path, options, { baseUrl: apiBaseUrl.value, token: authToken.value })
+async function loadPages(path: string, status?: string): Promise<JoinRequest[]> {
+  const epoch = sessionEpoch.value
+  const requests: JoinRequest[] = []
+  const seen = new Set<string>()
+  let cursor: string | undefined
+  do {
+    const page = await request<ListJoinRequestsResponse>(path, { query: { status, start_after: cursor } })
+    assertCurrentSession(epoch)
+    requests.push(...page.requests)
+    cursor = page.next_start_after ?? undefined
+    if (cursor && seen.has(cursor)) throw new Error('Membership request pagination did not advance.')
+    if (cursor) seen.add(cursor)
+  } while (cursor)
+  return requests
 }
 
-// GET /access/users/join-requests: own pending + recently decided requests.
-// not yet provided by the backend (aruna#248). A missing backend must degrade
-// to an inline notice, so this catches and stores the error rather than throwing.
 async function loadOwnRequests(): Promise<void> {
   assertEnabled()
   ownRequestsError.value = null
+  const epoch = sessionEpoch.value
+  const generation = ++ownGeneration
   try {
-    const response = await request<ListJoinRequestsResponse>('/access/users/join-requests')
-    ownRequests.value = response.requests
+    const requests = await loadPages('/access/users/join-requests')
+    if (epoch !== sessionEpoch.value || generation !== ownGeneration) return
+    ownRequests.value = requests
     ownRequestsLoaded.value = true
   } catch (err) {
-    ownRequestsError.value = errorMessage(err)
+    if (epoch === sessionEpoch.value && generation === ownGeneration) ownRequestsError.value = errorMessage(err)
   }
 }
 
@@ -92,17 +86,19 @@ async function ensureOwnRequestsLoaded(): Promise<void> {
   // Collapse the mount-time fan-out into a single request; callers all await the
   // same in-flight promise and it clears once settled so a later reload can refetch.
   if (!ownRequestsInflight) {
-    ownRequestsInflight = loadOwnRequests().finally(() => {
-      ownRequestsInflight = null
+    const pending = loadOwnRequests().finally(() => {
+      if (ownRequestsInflight === pending) ownRequestsInflight = null
     })
+    ownRequestsInflight = pending
   }
   await ownRequestsInflight
 }
 
-// POST /access/groups/{groupId}/join-requests: not yet provided by the backend (aruna#248).
 async function requestJoin(groupId: string, message?: string): Promise<JoinRequest> {
   assertEnabled()
   busy.value = true
+  const epoch = sessionEpoch.value
+  ++ownGeneration
   try {
     const body: CreateJoinRequestRequest = {}
     if (message && message.trim()) body.message = message.trim()
@@ -110,42 +106,38 @@ async function requestJoin(groupId: string, message?: string): Promise<JoinReque
       method: 'POST',
       body: JSON.stringify(body),
     })
-    ownRequests.value = [created, ...ownRequests.value]
+    assertCurrentSession(epoch)
+    ownRequests.value = [created, ...ownRequests.value.filter((entry) => entry.request_id !== created.request_id)]
+    await loadOwnRequests()
     return created
   } finally {
-    busy.value = false
+    if (epoch === sessionEpoch.value) busy.value = false
   }
 }
 
-// DELETE /access/groups/{group_id}/join-requests/{request_id}: not yet provided by
-// the backend (aruna#248). Requester withdraws a still-pending request (204).
 async function withdrawRequest(req: JoinRequest): Promise<void> {
   assertEnabled()
   busy.value = true
+  const epoch = sessionEpoch.value
+  ++ownGeneration
   try {
     await request<void>(`/access/groups/${req.group_id}/join-requests/${req.request_id}`, {
       method: 'DELETE',
     })
+    assertCurrentSession(epoch)
     ownRequests.value = ownRequests.value.filter((r) => r.request_id !== req.request_id)
+    await loadOwnRequests()
   } finally {
-    busy.value = false
+    if (epoch === sessionEpoch.value) busy.value = false
   }
 }
 
-// GET /access/groups/{groupId}/join-requests?status=pending: admin inbox. The status
-// filter is part of the assumed contract; the client additionally filters
-// status === 'pending' defensively. not yet provided by the backend (aruna#248).
 async function listGroupJoinRequests(groupId: string): Promise<JoinRequest[]> {
   assertEnabled()
-  const response = await request<ListJoinRequestsResponse>(`/access/groups/${groupId}/join-requests`, {
-    query: { status: 'pending' },
-  })
-  return response.requests.filter((r) => r.status === 'pending')
+  return (await loadPages(`/access/groups/${groupId}/join-requests`, 'pending'))
+    .filter((r) => r.status === 'pending')
 }
 
-// POST /access/groups/{groupId}/join-requests/{requestId}/decide: approve (assigns
-// role_ids, defaulting to the "user" role like AddGroupMemberRequest) or deny.
-// not yet provided by the backend (aruna#248).
 async function decideJoinRequest(
   groupId: string,
   requestId: string,
@@ -153,17 +145,18 @@ async function decideJoinRequest(
 ): Promise<DecideJoinRequestResponse> {
   assertEnabled()
   busy.value = true
+  const epoch = sessionEpoch.value
+  ++ownGeneration
   try {
     const response = await request<DecideJoinRequestResponse>(
       `/access/groups/${groupId}/join-requests/${requestId}/decide`,
       { method: 'POST', body: JSON.stringify(input) },
     )
-    // Harmless cross-account safety: if this id happens to be in our own list,
-    // drop it so a stale pending row cannot linger.
+    assertCurrentSession(epoch)
     ownRequests.value = ownRequests.value.filter((r) => r.request_id !== requestId)
     return response
   } finally {
-    busy.value = false
+    if (epoch === sessionEpoch.value) busy.value = false
   }
 }
 

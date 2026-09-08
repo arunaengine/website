@@ -5,6 +5,7 @@ import Input from '@/components/ui/Input.vue'
 import { ref, watch } from 'vue'
 import { Check, X } from '@lucide/vue'
 import { useJoinRequests } from '@/composables/useJoinRequests'
+import { useAruna } from '@/composables/useAruna'
 import { errorMessage, relativeTime } from '@/lib/utils'
 import type { ApiRole, JoinRequest } from '@/lib/api'
 
@@ -13,6 +14,8 @@ const emit = defineEmits<{ (e: 'changed'): void; (e: 'count', n: number): void }
 
 const { listGroupJoinRequests, decideJoinRequest, busy } = useJoinRequests()
 
+const { sessionEpoch } = useAruna()
+let loadGeneration = 0
 const requests = ref<JoinRequest[]>([])
 const loading = ref(false)
 const loadError = ref<string | null>(null)
@@ -28,20 +31,29 @@ function setCount() {
 }
 
 async function reload() {
+  const groupId = props.groupId
+  const epoch = sessionEpoch.value
+  const generation = ++loadGeneration
   loading.value = true
   loadError.value = null
   try {
-    requests.value = await listGroupJoinRequests(props.groupId)
+    const loaded = await listGroupJoinRequests(groupId)
+    if (generation !== loadGeneration || groupId !== props.groupId || epoch !== sessionEpoch.value) return
+    requests.value = loaded
     setCount()
   } catch (err) {
-    // A 404 here means a backend without aruna#248 yet; render it inline.
-    loadError.value = errorMessage(err)
+    if (generation === loadGeneration && groupId === props.groupId && epoch === sessionEpoch.value) loadError.value = errorMessage(err)
   } finally {
-    loading.value = false
+    if (generation === loadGeneration) loading.value = false
   }
 }
 
-watch(() => props.groupId, reload, { immediate: true })
+watch([() => props.groupId, sessionEpoch], () => {
+  requests.value = []
+  expandedId.value = ''
+  decideError.value = null
+  void reload()
+}, { immediate: true })
 
 function startApprove(req: JoinRequest) {
   decideError.value = null
@@ -70,19 +82,22 @@ function toggleRole(roleId: string) {
 }
 
 async function confirm(req: JoinRequest) {
+  const groupId = props.groupId
+  const epoch = sessionEpoch.value
+  if (req.group_id !== groupId) return
   decideError.value = null
   const input =
     mode.value === 'approve'
       ? { approve: true, role_ids: selectedRoleIds.value }
       : { approve: false, ...(denyReason.value.trim() ? { reason: denyReason.value.trim() } : {}) }
   try {
-    await decideJoinRequest(props.groupId, req.request_id, input)
-    requests.value = requests.value.filter((r) => r.request_id !== req.request_id)
-    expandedId.value = ''
-    setCount()
-    emit('changed')
+    await decideJoinRequest(groupId, req.request_id, input)
+    if (groupId !== props.groupId || epoch !== sessionEpoch.value) return
+    if (expandedId.value === req.request_id) expandedId.value = ''
+    await reload()
+    if (groupId === props.groupId && epoch === sessionEpoch.value) emit('changed')
   } catch (err) {
-    decideError.value = errorMessage(err)
+    if (groupId === props.groupId && epoch === sessionEpoch.value) decideError.value = errorMessage(err)
   }
 }
 </script>

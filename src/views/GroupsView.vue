@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
+import Input from '@/components/ui/Input.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import AccessBadge from '@/components/ui/AccessBadge.vue'
@@ -33,6 +34,7 @@ const {
   ownRequestsLoaded,
   ownRequestsError,
   ensureOwnRequestsLoaded,
+  loadOwnRequests,
   withdrawRequest,
   busy,
 } = useJoinRequests()
@@ -44,9 +46,20 @@ const painted = useFirstPaint(() =>
 const route = useRoute()
 const router = useRouter()
 
+const groupQuery = ref('')
+const matchingGroups = computed(() => {
+  const query = groupQuery.value.trim().toLowerCase()
+  return discoverableGroups.value.filter((group) => `${group.name} ${group.id}`.toLowerCase().includes(query))
+})
 const createGroupOpen = ref(false)
 const selectedGroupId = ref('')
-const { busy: refreshBusy, refresh: onRefresh } = useRefresh(refresh)
+async function refreshGroups() {
+  await Promise.all([
+    refresh(),
+    joinRequestsEnabled.value && currentUser.value ? loadOwnRequests() : Promise.resolve(),
+  ])
+}
+const { busy: refreshBusy, refresh: onRefresh } = useRefresh(refreshGroups)
 const spinning = computed(() => refreshBusy.value || loading.value)
 
 async function loadOwnJoinRequests() {
@@ -240,10 +253,12 @@ const shellState = computed<'loading' | 'empty' | 'ready'>(() => {
       <section v-if="discoverableGroups.length" class="surface overflow-hidden">
         <header class="border-b border-border px-5 py-4">
           <h2 class="font-display text-sm font-semibold text-aruna-navy">Other groups in this realm</h2>
-          <p class="text-xs text-muted-foreground">Membership is managed by each group's admins.</p>
+          <p class="text-xs text-muted-foreground">Search for a group and request access from its admins.</p>
+          <Input v-model="groupQuery" class="mt-3 max-w-md" placeholder="Search groups" aria-label="Search other groups" />
         </header>
+        <p v-if="!matchingGroups.length" class="px-5 py-4 text-sm text-muted-foreground">No groups match your search.</p>
         <ul class="divide-y divide-border">
-          <li v-for="group in discoverableGroups" :key="group.id">
+          <li v-for="group in matchingGroups" :key="group.id">
             <div class="flex items-center">
               <button
                 type="button"

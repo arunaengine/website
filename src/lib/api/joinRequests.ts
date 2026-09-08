@@ -1,11 +1,4 @@
-// ── Join requests (aruna#248) ────────────────────────────────────────────────
-// ASSUMED API: these endpoints are NOT yet provided by the backend. Shapes are
-// derived from aruna#248 (create / decide / list / withdraw, approve assigns
-// roles like AddGroupMemberRequest) and existing group-route conventions
-// (snake_case, ULID ids, RFC3339 timestamps, `{ requests: [...] }` wrapper).
-// All consumers are gated behind featureEnabled('joinRequests').
-
-export type JoinRequestStatus = 'pending' | 'approved' | 'denied'
+export type JoinRequestStatus = 'pending' | 'approved' | 'denied' | 'withdrawn'
 
 export interface JoinRequest {
   request_id: string
@@ -30,6 +23,7 @@ export interface CreateJoinRequestRequest {
 
 export interface ListJoinRequestsResponse {
   requests: JoinRequest[]
+  next_start_after?: string | null
 }
 
 export interface DecideJoinRequestRequest {

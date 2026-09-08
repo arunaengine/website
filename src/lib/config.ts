@@ -34,6 +34,7 @@ export const DEFAULT_PORTAL_CONFIG: PortalRuntimeConfig = {
 // here default to off, which is how 'systemBrowserAuth' stays a desktop opt-in.
 const DEFAULT_FEATURES: Record<string, boolean> = {
   jobs: true,
+  joinRequests: true,
   placementAdmin: true,
   policies: true,
   searchCursor: true,
