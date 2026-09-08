@@ -314,6 +314,17 @@ async function leave() {
           </div>
           <div class="truncate font-mono text-[10px] text-muted-foreground">{{ group.group_id }}</div>
         </div>
+        <Button
+          v-if="tab === 'stats' && canManage && joinRequestsEnabled && !joinRequestError && joinRequestCount !== null && joinRequestCount > 0"
+          variant="outline"
+          size="sm"
+          class="mr-auto"
+          aria-label="You have unanswered join requests"
+          @click="tab = 'members'"
+        >
+          <Inbox class="h-3.5 w-3.5 shrink-0 text-primary" />
+          You have unanswered join requests
+        </Button>
         <div class="flex flex-wrap items-center gap-2">
           <AskAiButton :prompt="askPrompt" :subject="`group ${groupId}`" />
           <Button v-if="isMember" variant="outline" size="sm" :disabled="saving" @click="leave">
@@ -322,14 +333,6 @@ async function leave() {
           <JoinRequestButton v-if="group" :group-id="group.group_id" :group-name="group.display_name" />
         </div>
       </header>
-      <section
-        v-if="tab === 'stats' && canManage && joinRequestsEnabled && !joinRequestError && joinRequestCount !== null && joinRequestCount > 0"
-        aria-label="Group notifications"
-        class="border-b border-border px-5 py-4"
-      >
-        <h2 class="font-display text-sm font-semibold text-aruna-navy">Group notifications</h2>
-        <button type="button" class="mt-1 text-sm font-medium text-primary hover:underline" @click="tab = 'members'">There are open member requests</button>
-      </section>
       <div v-if="leaveError" class="border-b border-border px-5 py-2 text-xs text-destructive">{{ leaveError }}</div>
       <RenameGroupDialog
         v-model:open="renameOpen"

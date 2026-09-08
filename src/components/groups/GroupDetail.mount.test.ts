@@ -193,9 +193,9 @@ describe('Group notifications', () => {
     inboxError.value = null
   })
 
-  it('shows only pending notifications below the header and links to Members', async () => {
+  it('shows the pending request box beside the group name and links to Members', async () => {
     const mounted = await mount('/app/groups/g1')
-    const notices = () => nodes(mounted.root).filter((node) => node.props['aria-label'] === 'Group notifications')
+    const notices = () => nodes(mounted.root).filter((node) => node.props['aria-label'] === 'You have unanswered join requests')
     const overview = element(mounted.root, (node) => node.props['data-panel'] === 'stats')
     const members = element(mounted.root, (node) => node.props['data-panel'] === 'members')
     expect(notices()).toHaveLength(0)
@@ -208,11 +208,14 @@ describe('Group notifications', () => {
     const header = element(mounted.root, (node) => node.tag === 'header')
     const tabs = element(mounted.root, (node) => node.props['data-active'] !== undefined)
     const all = nodes(mounted.root)
-    expect(all.indexOf(notice)).toBeGreaterThan(all.indexOf(header))
+    expect(notice.parent).toBe(header)
+    expect(all.indexOf(notice)).toBeGreaterThan(all.indexOf(element(header, (node) => node.tag === 'h4')))
     expect(all.indexOf(notice)).toBeLessThan(all.indexOf(tabs))
+    expect(notice.props.variant).toBe('outline')
+    expect(notice.props.size).toBe('sm')
+    expect(content(mounted.root)).not.toContain('Group notifications')
     expect(nodes(overview)).not.toContain(notice)
-    const hint = element(notice, (node) => node.tag === 'button' && content(node) === 'There are open member requests')
-    await click(hint)
+    await click(notice)
     await settled(mounted.router, 'members')
     expect(mounted.router.currentRoute.value.query.tab).toBe('members')
     expect(members.props.class).not.toContain('hidden')
@@ -234,7 +237,7 @@ describe('Group notifications', () => {
   it('hides the request box from regular group members', async () => {
     group.value = { display_name: 'Genomics lab', group_id: 'g1', realm_id: REALM, roles: [MEMBER_ROLE] }
     const mounted = await mount('/app/groups/g1')
-    expect(nodes(mounted.root).some((node) => node.props['aria-label'] === 'Join requests' || node.props['aria-label'] === 'Group notifications')).toBe(false)
+    expect(nodes(mounted.root).some((node) => node.props['aria-label'] === 'Join requests' || node.props['aria-label'] === 'You have unanswered join requests')).toBe(false)
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })
