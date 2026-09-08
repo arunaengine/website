@@ -22,7 +22,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{ (e: 'changed'): void }>()
 
-const { addGroupMember, removeGroupMember, searchUsers, saving, currentUser } = useAruna()
+const { addGroupMember, removeGroupMember, searchUsers, saving, currentUser, sessionEpoch } = useAruna()
 const { resolveUsers, cachedUser } = useUserDirectory()
 
 // The members endpoint only carries ids; names come from GET /users/{id}
@@ -55,6 +55,7 @@ const searching = ref(false)
 const searchError = ref<string | null>(null)
 const selectedUser = ref<UserSearchHit | null>(null)
 const selectedRoleId = ref('')
+let searchGeneration = 0
 
 const roleOptions = computed(() =>
   props.roles.map((role) => ({ value: role.role_id, label: role.name })),
@@ -74,7 +75,8 @@ watch(
   { immediate: true },
 )
 
-const runSearch = useDebounceFn(async (term: string) => {
+const runSearch = useDebounceFn(async (term: string, generation: number) => {
+  if (generation !== searchGeneration) return
   if (term.length < 2) {
     results.value = []
     return
@@ -83,19 +85,32 @@ const runSearch = useDebounceFn(async (term: string) => {
   searchError.value = null
   try {
     const response = await searchUsers(term)
-    results.value = response.users
+    if (generation === searchGeneration) results.value = response.users
   } catch (err) {
-    searchError.value = errorMessage(err)
-    results.value = []
+    if (generation === searchGeneration) {
+      searchError.value = errorMessage(err)
+      results.value = []
+    }
   } finally {
-    searching.value = false
+    if (generation === searchGeneration) searching.value = false
   }
 }, 250)
 
 watch(query, (term) => {
   if (selectedUser.value && term.trim() === selectedUser.value.name) return
   selectedUser.value = null
-  void runSearch(term.trim())
+  results.value = []
+  void runSearch(term.trim(), ++searchGeneration)
+})
+
+watch([() => props.groupId, sessionEpoch], () => {
+  ++searchGeneration
+  query.value = ''
+  selectedUser.value = null
+  results.value = []
+  searching.value = false
+  memberError.value = null
+  searchError.value = null
 })
 
 function isAdmin(member: GroupMember): boolean {
@@ -104,18 +119,21 @@ function isAdmin(member: GroupMember): boolean {
 
 async function addMember() {
   if (!selectedUser.value) return
+  const groupId = props.groupId
+  const epoch = sessionEpoch.value
   memberError.value = null
   try {
-    await addGroupMember(props.groupId, {
+    await addGroupMember(groupId, {
       user_id: selectedUser.value.user_id,
       ...(selectedRoleId.value ? { role_ids: [selectedRoleId.value] } : {}),
     })
+    if (groupId !== props.groupId || epoch !== sessionEpoch.value) return
     query.value = ''
     results.value = []
     selectedUser.value = null
     emit('changed')
   } catch (err) {
-    memberError.value = errorMessage(err)
+    if (groupId === props.groupId && epoch === sessionEpoch.value) memberError.value = errorMessage(err)
   }
 }
 

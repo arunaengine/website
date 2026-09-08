@@ -14,7 +14,7 @@ import type { GetUserResponse } from '@/lib/api'
 import { ExternalLink, UserRound } from '@lucide/vue'
 
 const route = useRoute()
-const { currentUser } = useAruna()
+const { currentUser, sessionEpoch } = useAruna()
 const { resolveUser } = useUserDirectory()
 
 const userId = computed(() => (route.params.id as string) || '')
@@ -23,19 +23,20 @@ const loading = ref(false)
 const failed = ref(false)
 
 async function load(id: string, force = false) {
+  const epoch = sessionEpoch.value
   loading.value = true
   failed.value = false
   user.value = null
   const resolved = await resolveUser(id, { force })
   // Only apply if the route hasn't moved on meanwhile.
-  if (userId.value === id) {
+  if (userId.value === id && epoch === sessionEpoch.value) {
     user.value = resolved
     failed.value = resolved === null
     loading.value = false
   }
 }
 
-watch(userId, (id) => { if (id) void load(id) }, { immediate: true })
+watch([userId, sessionEpoch], ([id]) => { if (id) void load(id) }, { immediate: true })
 
 const attributes = computed(() => user.value?.attributes ?? {})
 const isSelf = computed(() => currentUser.value?.id === userId.value)

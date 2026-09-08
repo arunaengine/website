@@ -414,3 +414,27 @@ describe('SettingsView default profile', () => {
     expect(text).toContain('1 profile is not listed here.')
   })
 })
+
+describe('profile field visibility', () => {
+  it('defaults only the name to public and saves explicit visibility choices', async () => {
+    currentUser.value = { id: 'user-1', name: 'Ada', email: 'ada@example.test' }
+    userInfo.value = { user: { user_id: 'user-1', attributes: { email: 'ada@example.test' } } }
+    aruna.updateUserProfile.mockClear()
+    const { root, errors } = await mount('?tab=profile')
+    const name = element(root, (node) => node.props['aria-label'] === 'Make Full name public')
+    const email = element(root, (node) => node.props['aria-label'] === 'Make Email public')
+    expect((name as unknown as { checked: boolean }).checked).toBe(true)
+    expect((email as unknown as { checked: boolean }).checked).toBe(false)
+    for (const [node, checked] of [[name, false], [email, true]] as const) {
+      Object.assign(node, { checked })
+      for (const listener of node.listeners.get('change') ?? []) listener({ target: node })
+    }
+    await flush()
+    const save = element(root, (node) => node.tag === 'button' && content(node).includes('Save profile'))
+    await (save.props.onClick as () => Promise<void>)()
+    expect(aruna.updateUserProfile).toHaveBeenCalledWith(expect.objectContaining({
+      set_attributes: expect.objectContaining({ 'profile.visibility.name': 'private', 'profile.visibility.email': 'public' }),
+    }))
+    expect(errors).toEqual([])
+  })
+})

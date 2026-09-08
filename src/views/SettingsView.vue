@@ -103,6 +103,20 @@ const name = ref('')
 const email = ref('')
 const affiliation = ref('')
 const orcid = ref('')
+const visibility = ref<Record<string, boolean>>({})
+const profileFields = computed(() => [...new Set([
+  'name', 'email', 'affiliation', 'orcid',
+  ...Object.keys(userInfo.value?.user.attributes ?? {}).filter((key) =>
+    !key.startsWith('ui.') && !key.startsWith('profile.visibility.')),
+])])
+const fieldLabels: Record<string, string> = { name: 'Full name', email: 'Email', affiliation: 'Affiliation', orcid: 'ORCID' }
+function fieldPublic(key: string): boolean {
+  const value = userInfo.value?.user.attributes?.[`profile.visibility.${key}`]
+  return value === undefined ? key === 'name' : value === 'public'
+}
+watch(userInfo, () => {
+  visibility.value = Object.fromEntries(profileFields.value.map((key) => [key, fieldPublic(key)]))
+}, { immediate: true })
 const preferredProfileId = ref('')
 const profileMessage = ref<string | null>(null)
 const profileError = ref<string | null>(null)
@@ -119,6 +133,7 @@ const profileDirty = computed(() => {
   const user = currentUser.value
   if (!user) return false
   return (
+    profileFields.value.some((key) => visibility.value[key] !== fieldPublic(key)) ||
     name.value !== (user.name ?? '') ||
     email.value !== (user.email ?? '') ||
     affiliation.value !== (user.affiliation ?? '') ||
@@ -190,6 +205,9 @@ async function saveProfile() {
     await updateUserProfile({
       name: name.value,
       set_attributes: {
+        ...Object.fromEntries(profileFields.value
+          .filter((key) => visibility.value[key] !== fieldPublic(key))
+          .map((key) => [`profile.visibility.${key}`, visibility.value[key] ? 'public' : 'private'])),
         email: email.value,
         affiliation: affiliation.value,
         orcid: orcid.value,
@@ -440,7 +458,7 @@ async function revoke(accessKeyId: string) {
         <section class="surface">
           <header class="border-b border-border px-5 py-4">
             <h3 class="font-display text-sm font-semibold text-aruna-navy">Profile</h3>
-            <p class="text-xs text-muted-foreground">Loaded from /access/users/me and saved with PATCH /access/users/me.</p>
+            <p class="text-xs text-muted-foreground">Choose which profile fields other signed-in users in this realm can see and search.</p>
           </header>
           <div v-if="currentUser" class="flex items-center gap-4 border-b border-border px-5 py-5">
             <Avatar :user="currentUser" size="lg" />
@@ -455,6 +473,16 @@ async function revoke(accessKeyId: string) {
             <div><label class="text-xs font-medium text-foreground">Email</label><Input v-model="email" class="mt-1" /></div>
             <div><label class="text-xs font-medium text-foreground">Affiliation</label><Input v-model="affiliation" class="mt-1" /></div>
             <div><label class="text-xs font-medium text-foreground">ORCID</label><Input v-model="orcid" placeholder="0000-0000-0000-0000" class="mt-1" /></div>
+          </div>
+          <div class="border-t border-border px-5 py-4">
+            <h4 class="text-sm font-medium text-foreground">Public profile fields</h4>
+            <p class="mt-1 text-xs text-muted-foreground">Your name is public by default. Other fields stay private unless selected. Private fields remain available to you and authorized realm administrators.</p>
+            <div class="mt-3 flex flex-wrap gap-x-6 gap-y-3">
+              <label v-for="field in profileFields" :key="field" class="flex items-center gap-2 text-sm">
+                <input v-model="visibility[field]" type="checkbox" :aria-label="`Make ${fieldLabels[field] ?? field} public`" class="accent-primary" :disabled="!currentUser || saving" />
+                {{ fieldLabels[field] ?? field }}
+              </label>
+            </div>
           </div>
           <div class="flex items-center justify-between gap-3 border-t border-border px-5 py-3">
             <p class="min-w-0 text-xs" :class="profileError ? 'text-destructive' : profileMessage ? 'text-emerald-700 dark:text-emerald-300' : 'text-muted-foreground'">

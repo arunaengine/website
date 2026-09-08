@@ -62,7 +62,7 @@ export interface GetUserResponse {
 }
 
 // POST /access/users/resolve: batch id → profile resolution (cap 100 ids). `attributes`
-// is the safe scholarly subset only; sensitive keys (e.g. email) are excluded.
+// contains only fields the user marked public. Names are public by default.
 export interface ResolveUserResult {
   user_id: string
   name: string
