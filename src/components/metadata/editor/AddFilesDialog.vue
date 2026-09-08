@@ -34,7 +34,6 @@ import {
 import {
   displayName,
   findEntity,
-  isDataType,
   orderedEntities,
   rootId,
   typeLabel,
@@ -42,6 +41,7 @@ import {
   type DraftEntity,
 } from '@/lib/crate/editor'
 import { isAbsoluteUri } from '@/lib/profiles/uri'
+import { isDataEntity } from '@/lib/dataEntities'
 import type { MetadataDocumentListItem } from '@/lib/api'
 import { formatBytes } from '@/lib/utils'
 import { FileJson2 } from '@lucide/vue'
@@ -99,20 +99,17 @@ const held = computed(() => new Set((targetEntity.value?.properties[props.target
   .filter((value) => value.kind === 'reference')
   .map((value) => value.value)))
 
-// Everything already here that is not the target itself: data entities first,
-// the rest still reachable because a parts list accepts any entity.
+// File attachment offers only data types; contextual references use the entity picker.
 const listed = computed(() => {
   const text = query.value.trim().toLowerCase()
   const candidates = orderedEntities(props.draft).filter((entity) => {
     if (entity.id === props.target.entityId || entity.id === rootId(props.draft)) return false
+    if (!isDataEntity(entity.types)) return false
     if (held.value.has(entity.id)) return false
     if (!text) return true
     return `${displayName(entity)} ${entity.id} ${entity.types.join(' ')}`.toLowerCase().includes(text)
   })
-  return [
-    ...candidates.filter((entity) => entity.types.some(isDataType)),
-    ...candidates.filter((entity) => !entity.types.some(isDataType)),
-  ]
+  return candidates
 })
 const urlInvalid = computed(() => Boolean(url.value.trim()) && !isAbsoluteUri(url.value.trim()))
 
@@ -229,6 +226,7 @@ function addDatasets(items: MetadataDocumentListItem[]) {
 }
 
 function linkExisting(entity: DraftEntity) {
+  if (!isDataEntity(findEntity(props.draft, entity.id)?.types ?? [])) return
   emit('update', linkReference(props.draft, props.target.entityId, props.target.property, entity.id))
 }
 

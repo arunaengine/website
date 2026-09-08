@@ -1,3 +1,4 @@
+import * as DataEntities from '@/lib/dataEntities'
 import * as VueRuntime from 'vue'
 import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -5,6 +6,7 @@ import {
   button,
   click,
   compileClientComponent,
+  content,
   element,
   flush,
   moduleDefault,
@@ -125,6 +127,7 @@ const AddFilesDialog = compileClientComponent(new URL('./AddFilesDialog.vue', im
   },
   '@/lib/crate/references': References,
   '@/lib/crate/editor': Editor,
+  '@/lib/dataEntities': DataEntities,
   '@/lib/profiles/uri': Uri,
   '@/lib/utils': Utils,
 })
@@ -229,6 +232,36 @@ describe('AddFilesDialog', () => {
     expect(updates[0].entities).toHaveLength(2)
     expect(Editor.findEntity(updates[0], './')?.properties.hasPart).toEqual([
       { kind: 'reference', value: 's3://reads/stray.csv' },
+    ])
+    mounted.app.unmount()
+  })
+
+  it('does not offer people or organizations as files to attach', async () => {
+    let draft = Editor.newDraft()
+    for (const [type, id, name] of [
+      ['Person', '#person', 'Ada Lovelace'],
+      ['Organization', '#organization', 'Example Institute'],
+      ['File', 's3://reads/file.csv', 'file.csv'],
+      ['Dataset', 's3://reads/folder/', 'Folder'],
+      ['https://schema.org/ImageObject', 's3://reads/image.png', 'image.png'],
+      ['AudioObject', 's3://reads/audio.ogg', 'audio.ogg'],
+      ['VideoObject', 's3://reads/video.mp4', 'video.mp4'],
+    ]) {
+      draft = Editor.addEntity(draft, { type, id, name }).draft
+    }
+    const updates: Editor.CrateDraft[] = []
+    const mounted = await mount(updates, { draft })
+    expect(content(mounted.root)).not.toContain('Ada Lovelace')
+    expect(content(mounted.root)).not.toContain('Example Institute')
+    expect(content(mounted.root)).toContain('file.csv')
+    expect(content(mounted.root)).toContain('Folder')
+    expect(content(mounted.root)).toContain('image.png')
+    expect(content(mounted.root)).toContain('audio.ogg')
+    expect(content(mounted.root)).toContain('video.mp4')
+    await click(button(mounted.root, 'file.csv'))
+    expect(Editor.findEntity(updates[0], '#person')?.types).toEqual(['Person'])
+    expect(Editor.findEntity(updates[0], './')?.properties.hasPart).toEqual([
+      { kind: 'reference', value: 's3://reads/file.csv' },
     ])
     mounted.app.unmount()
   })
