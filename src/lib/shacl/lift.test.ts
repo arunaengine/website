@@ -104,6 +104,23 @@ describe('union target types', () => {
 })
 
 describe('target bindings', () => {
+  it.each(['GrantShape', 'FundingDetails'])('binds %s to the class on its referencing property', (shapeName) => {
+    const result = liftShapes(fixture('study-grant.ttl').replaceAll('GrantShape', shapeName))
+    expect(result.entities.map((entity) => entity.className)).toEqual(['Dataset', 'Grant'])
+    const dataset = entityFor(result, 'http://schema.org/Dataset')
+    const grant = entityFor(result, 'http://schema.org/Grant')
+    expect(dataset?.propertyRules.map((rule) => rule.valueName).sort())
+      .toEqual(['funding', 'measurementTechnique', 'spatialCoverage', 'temporalCoverage'])
+    expect(ruleFor(dataset, 'funding')).toMatchObject({
+      kind: 'entity', entityTypes: ['http://schema.org/Grant'], obligation: 'MUST',
+    })
+    expect(ruleFor(dataset, 'funding')?.multipleValues).toBeFalsy()
+    expect(grant?.propertyRules.map((rule) => rule.valueName).sort()).toEqual(['funder', 'identifier'])
+    expect(ruleFor(grant, 'identifier')).toMatchObject({ obligation: 'MUST' })
+    expect(ruleFor(grant, 'identifier')?.multipleValues).toBeFalsy()
+    expect(ruleFor(grant, 'funder')).toMatchObject({ kind: 'entity', entityTypes: ['http://schema.org/Organization'] })
+  })
+
   it('merges into the shape they bind', () => {
     const result = lift('target-binding.ttl')
     expect(result.entities.map((entity) => entity.className).sort()).toEqual(['Dataset', 'Profile'])

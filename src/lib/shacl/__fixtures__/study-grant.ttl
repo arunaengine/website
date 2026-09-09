@@ -1,0 +1,50 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix schema: <https://schema.org/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix ex: <https://example.org/aruna-workshop/profiles/drought-resilience-study/1.0#> .
+
+# The Aruna workshop system already requires generic name, description and license
+# and offers keywords by default. This profile therefore adds only study/project
+# context that is useful for this demonstration.
+
+ex:StudyDatasetShape
+    a sh:NodeShape ;
+    sh:targetClass schema:Dataset ;
+    sh:property [
+        sh:path schema:funding ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:class schema:Grant ;
+        sh:node ex:GrantShape ;
+        sh:message "A workshop study must reference exactly one funding Grant." ;
+    ] ;
+    sh:property [
+        sh:path schema:temporalCoverage ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "A workshop study must declare one temporalCoverage interval." ;
+    ] ;
+    sh:property [
+        sh:path schema:spatialCoverage ;
+        sh:maxCount 1 ;
+        sh:class schema:Place ;
+    ] ;
+    sh:property [
+        sh:path schema:measurementTechnique ;
+        sh:datatype xsd:string ;
+    ] .
+
+ex:GrantShape
+    a sh:NodeShape ;
+    sh:property [
+        sh:path schema:identifier ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "The funding Grant must have one identifier (grant number)." ;
+    ] ;
+    sh:property [
+        sh:path schema:funder ;
+        sh:maxCount 1 ;
+        sh:class schema:Organization ;
+    ] .

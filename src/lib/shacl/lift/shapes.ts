@@ -51,18 +51,22 @@ export interface ShapeIndex {
   known: Set<string>
 }
 
-// Which shapes describe the values of a property, and what type each node shape
-// describes. `sh:node` paired with `sh:class` on the same property shape states
-// the class its values belong to (the form this projection emits, including for
-// the crate root), so only a BARE reference makes its target a shape in its own
-// right; an `sh:class` that points at a shape rather than a class is one too.
+// A property's paired sh:class supplies a target-less value shape's type.
+// Bare shape references may instead derive their type from the shape name.
 export function buildShapeIndex(store: Store, nodeShapes: Map<string, Quad_Subject>, notes: Notes): ShapeIndex {
   // A PROPERTY naming a shape says its values must conform to it. A node-level
   // sh:node is composition, not a value reference, so it never lands here.
   const valueShapes = new Set<string>()
+  const referenceTypes = new Map<string, Set<string>>()
   for (const quad of store.getQuads(null, `${SH}node`, null, null)) {
     if (nodeShapes.has(termKey(quad.subject))) continue
-    if (!store.getQuads(quad.subject, `${SH}class`, null, null).length) valueShapes.add(termKey(quad.object))
+    const classes = store.getQuads(quad.subject, `${SH}class`, null, null)
+    if (!classes.length) valueShapes.add(termKey(quad.object))
+    const types = referenceTypes.get(termKey(quad.object)) ?? new Set<string>()
+    for (const { object } of classes) {
+      if (object.termType === 'NamedNode' && !nodeShapes.has(termKey(object))) types.add(canonicalIri(object.value))
+    }
+    referenceTypes.set(termKey(quad.object), types)
   }
   for (const quad of store.getQuads(null, `${SH}class`, null, null)) {
     if (nodeShapes.has(termKey(quad.object))) valueShapes.add(termKey(quad.object))
@@ -101,6 +105,11 @@ export function buildShapeIndex(store: Store, nodeShapes: Map<string, Quad_Subje
     const asserted = shapeTypes(store, shape, nodeShapes, baseChain(walk, key), properties.get(key) ?? [])
     if (asserted.length) {
       types.set(key, asserted.map(canonicalIri))
+      continue
+    }
+    const referenced = referenceTypes.get(key)
+    if (referenced?.size === 1) {
+      types.set(key, [...referenced])
       continue
     }
     // Only a shape something references as a value shape may fall back to its
