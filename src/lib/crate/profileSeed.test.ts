@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { applyProfile, clearProfile, profileExpectation } from './profileSeed'
-import { findEntity, newDraft, setProperty, type CrateDraft } from './editor'
+import { findEntity, newDraft, setProperty, toRoCrate, updateValue, type CrateDraft } from './editor'
+import { contextTermsOf } from '@/lib/profiles/contextTerms'
 import { profileReferenceIri } from '@/composables/aruna/profileIri'
 import { PROCESS_RUN_CRATE_PROFILE, PROCESS_RUN_PROFILE_URI } from '@/lib/profiles/builtinProfiles'
 import type { MetadataProfile } from '@/data/types'
@@ -52,6 +53,39 @@ function profile(): MetadataProfile {
 }
 
 describe('profile seeding', () => {
+  it('exports a selected one-of value with the profile property URI', () => {
+    const chosen = profile()
+    const uri = 'https://example.org/study#studyDesign'
+    chosen.contextTerms = { studyDesign: uri }
+    chosen.propertyRules = [rule({
+      valueName: 'studyDesign', propertyUri: uri, kind: 'enum', enumOptions: ['Field experiment'],
+    })]
+    const iri = 'https://example.org/profile'
+    const draft = updateValue(applyProfile(newDraft(), chosen, iri), './', 'studyDesign', 0, 'Field experiment')
+    const crate = toRoCrate(draft)
+
+    expect(contextTermsOf(crate['@context']).studyDesign).toBe(uri)
+    expect((crate['@graph'] as Record<string, unknown>[]).find((entity) => entity['@id'] === './')?.studyDesign)
+      .toBe('Field experiment')
+    expect(applyProfile(draft, chosen).context).toEqual(draft.context)
+    expect(clearProfile(draft, iri).context).toEqual(draft.context)
+  })
+
+  it('adds rule-derived mappings while preserving imported context definitions', () => {
+    const chosen = profile()
+    chosen.entityRules[0].propertyRules.push(rule({
+      valueName: 'specialty', propertyUri: 'https://example.org/study#specialty',
+    }))
+    chosen.contextTerms = { existing: 'https://example.org/profile#existing' }
+    const context = ['https://w3id.org/ro/crate/1.3/context', {
+      '@language': 'en', existing: { '@id': 'https://example.org/imported#existing', '@type': '@id' },
+    }]
+    const draft = applyProfile({ ...newDraft(), context }, chosen)
+
+    expect(draft.context).toEqual([...context, { specialty: 'https://example.org/study#specialty' }])
+    expect(applyProfile(draft, chosen).context).toEqual(draft.context)
+  })
+
   it('pre-adds a row per required and recommended root property', () => {
     const draft = applyProfile(newDraft(), profile())
     const root = draft.entities[0]

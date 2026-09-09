@@ -5,6 +5,9 @@
 import type { MetadataProfile } from '@/data/types'
 import type { ProfileEntityRule, ProfilePropertyRule, ProfileValueKind } from '@/lib/profiles/types'
 import { MAX_ENTITY_DEPTH } from '@/lib/profiles/entityTree'
+import { buildProfileContext } from '@/lib/profiles/propertyCatalog'
+import { collectContextObjects, contextTermsOf } from '@/lib/profiles/contextTerms'
+import { contextIri, DEFAULT_CRATE_VERSION } from './version'
 import {
   addEntity,
   defaultValue,
@@ -137,9 +140,17 @@ function seedEntity(
 export function applyProfile(draft: CrateDraft, profile: MetadataProfile, iri?: string, previousIri?: string): CrateDraft {
   const root = rootId(draft)
   const declared = findEntity(draft, root)?.properties.conformsTo ?? []
-  const next = iri ? setProperty(draft, root, 'conformsTo', [
+  let next = iri ? setProperty(draft, root, 'conformsTo', [
     ...declared.filter((value) => value.value !== previousIri && value.value !== iri),
     { kind: 'reference', value: iri },
   ]) : draft
+  const context = next.context ?? contextIri(DEFAULT_CRATE_VERSION)
+  const existing: Record<string, string> = {}
+  collectContextObjects(context, existing)
+  const terms = contextTermsOf(buildProfileContext(profile.entityRules, profile.contextTerms))
+  const additions = Object.fromEntries(Object.entries(terms).filter(([key]) => !(key in existing)))
+  if (Object.keys(additions).length) {
+    next = { ...next, context: [...(Array.isArray(context) ? context : [context]), additions] }
+  }
   return seedRows(next, profile, root, expected(profile.propertyRules ?? []), 0)
 }
