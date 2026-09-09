@@ -1,7 +1,6 @@
 import { parseSchemaText, schemaFromEntityRules } from './schema'
 import { effectiveEntitySources } from './sources'
 import { entityRulesToMode, isModeFile, modeToEntityRules, type ModeFile } from './mode'
-import { buildProfileContext } from './propertyCatalog'
 import { collectContextObjects, contextTermsOf } from './contextTerms'
 import { shapesFromEntityRules } from '../shacl/projection'
 import type { LiftNote } from '../shacl/lift'
@@ -17,6 +16,7 @@ import {
   DX_ROLE_SCHEMA,
   DX_ROLE_SPECIFICATION,
   JSON_SCHEMA_DRAFT_2020_12,
+  RO_CRATE_CONTEXT,
   RO_CRATE_PROFILE,
   SHACL_NS,
   type JsonSchema,
@@ -101,7 +101,6 @@ export function buildProfileCrate(input: BuildProfileCrateInput): Record<string,
   const schema = schemaFromEntityRules(input, entities)
   const mode = entityRulesToMode(input, entities, input.importedMode)
   const shapes = combinedShapesText(shapesFromEntityRules(input, entities), input.customShapesText)
-  const context = buildProfileContext(entities)
   const definitions = mintedTermDefinitions(entities)
   const external = input.externalArtifacts
   const htmlId = external?.html.id ?? 'profile.html'
@@ -110,7 +109,8 @@ export function buildProfileCrate(input: BuildProfileCrateInput): Record<string,
   const shapesId = external?.shapes.id ?? 'shapes.ttl'
 
   return {
-    '@context': context,
+    // Dataset aliases live in mode.json; they must not redefine artifact metadata.
+    '@context': RO_CRATE_CONTEXT,
     '@graph': [
       {
         '@id': 'ro-crate-metadata.json',
@@ -306,7 +306,8 @@ export async function resolveProfileArtifacts(
   const pending: Array<{ id: string; url: string; required: boolean }> = []
   for (const id of artifactIds) {
     const entity = entityById(entries, id)
-    if (!entity || typeof entity.text === 'string' || isRecord(entity.text)) continue
+    const text = artifactText(entity)
+    if (!entity || typeof text === 'string' || isRecord(text)) continue
     const resolved = artifactFetchUrl(entity, baseUrl)
     if (resolved) pending.push({ id, ...resolved })
   }
@@ -395,6 +396,10 @@ function isShapesRole(role: string): boolean {
   return role.includes('/constraints') || role.includes('/validation')
 }
 
+function artifactText(artifact: Record<string, unknown> | undefined): unknown {
+  return artifact?.['http://schema.org/text'] ?? artifact?.['https://schema.org/text'] ?? artifact?.text
+}
+
 export function extractShapesTexts(rocrate: unknown): { shapesText?: string; customShapesText?: string } {
   const entries = graph(rocrate)
   const candidates: Array<Record<string, unknown>> = []
@@ -413,7 +418,7 @@ export function extractShapesTexts(rocrate: unknown): { shapesText?: string; cus
   let shapesText: string | undefined
   let customShapesText: string | undefined
   for (const artifact of candidates) {
-    const text = artifact.text
+    const text = artifactText(artifact)
     if (typeof text !== 'string' || !text.trim()) continue
     const isCustom =
       idMatches(artifact['@id'], 'shapes.custom.ttl') || idMatches(idValue(artifact.contentUrl), 'shapes.custom.ttl')
@@ -439,7 +444,8 @@ export function missingShapesArtifacts(rocrate: unknown): string[] {
     if (!idValues(descriptor[DX_HAS_ROLE] ?? descriptor.hasRole).some(isShapesRole)) continue
     for (const id of idValues(descriptor[DX_HAS_ARTIFACT] ?? descriptor.hasArtifact)) {
       const artifact = entityById(entries, id)
-      if (artifact && typeof artifact.text === 'string' && artifact.text.trim()) continue
+      const text = artifactText(artifact)
+      if (typeof text === 'string' && text.trim()) continue
       if (!missing.includes(id)) missing.push(id)
     }
   }
@@ -464,11 +470,11 @@ function splitCombinedShapesText(text: string): { shapesText: string; customShap
 export function extractProfileSchema(rocrate: unknown): JsonSchema | undefined {
   const entries = graph(rocrate)
   const artifact = artifactByRole(entries, (role) => role.includes('/schema'))
-  const roleSchema = parseSchemaText(artifact?.text)
+  const roleSchema = parseSchemaText(artifactText(artifact))
   if (roleSchema) return roleSchema
 
   const schemaEntity = entries.find((entry) => textValue(entry.encodingFormat).includes('application/schema+json'))
-  return parseSchemaText(schemaEntity?.text)
+  return parseSchemaText(artifactText(schemaEntity))
 }
 
 // Locate the mode.json artifact by ResourceDescriptor guidance role, then by
@@ -493,7 +499,7 @@ function extractProfileMode(rocrate: unknown): ModeFile | undefined {
 
 function modeFromArtifact(artifact: Record<string, unknown> | undefined): ModeFile | undefined {
   if (!artifact) return undefined
-  const text = artifact.text
+  const text = artifactText(artifact)
   if (typeof text === 'string') {
     try {
       const parsed = JSON.parse(text)

@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import {
+  buildProfileCrate,
+  extractProfileSchema,
   extractShapesTexts,
   missingShapesArtifacts,
   parseProfileCrate,
@@ -11,6 +13,55 @@ import {
 import { liftShapes } from '../shacl/lift'
 import { controlsFromRules } from './controls'
 import { isDatasetType } from './uri'
+
+describe('private profile artifact context', () => {
+  it('keeps a custom text rule from hiding the embedded SHACL artifact', () => {
+    const propertyUri = 'https://example.org/study/text'
+    const lifted = liftShapes(`
+      @prefix sh: <http://www.w3.org/ns/shacl#> .
+      @prefix schema: <https://schema.org/> .
+      @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+      <https://example.org/Shape> a sh:NodeShape ;
+        sh:targetClass schema:Dataset ;
+        sh:property [ sh:path <${propertyUri}> ; sh:datatype xsd:string ; sh:minCount 1 ; sh:maxCount 1 ] .
+    `)
+    const profile = buildProfileCrate({
+      slug: 'text-profile', name: 'Text profile', description: 'Custom text rule', version: '1.0',
+      datePublished: '2026-09-09', license: 'https://creativecommons.org/licenses/by/4.0/',
+      entityRules: lifted.entities,
+    })
+    const parsed = parseProfileCrate(profile)
+
+    expect(profile['@context']).toBe('https://w3id.org/ro/crate/1.2/context')
+    expect(parsed.contextTerms?.text).toBe(propertyUri)
+    expect(parsed.datasetPropertyRules[0]).toMatchObject({ valueName: 'text', propertyUri, obligation: 'MUST' })
+    expect(parsed.shapesText).toContain(propertyUri)
+    expect(missingShapesArtifacts(profile)).toEqual([])
+  })
+
+  it.each(['http://schema.org/text', 'https://schema.org/text'])('reads repaired artifacts exported with %s', async (predicate) => {
+    const profile = buildProfileCrate({
+      slug: 'repaired', name: 'Repaired profile', description: 'Qualified artifact text', version: '1.0',
+      datePublished: '2026-09-09', license: 'https://creativecommons.org/licenses/by/4.0/',
+      entityRules: liftShapes(fixture('class-chain.ttl')).entities,
+    })
+    const exported = structuredClone(profile)
+    exported['@context'] = [profile['@context'], { text: 'https://example.org/study/text' }]
+    for (const entity of exported['@graph'] as Record<string, unknown>[]) {
+      if (typeof entity.text !== 'string') continue
+      entity[predicate] = entity.text
+      delete entity.text
+    }
+    const { asked, fetch } = server({})
+
+    expect(await resolveProfileArtifacts(exported, fetch, CRATE_URL)).toBe(exported)
+    expect(asked).toEqual([])
+    expect(parseProfileCrate(exported).entityRules).toEqual(parseProfileCrate(profile).entityRules)
+    expect(extractProfileSchema(exported)).toEqual(extractProfileSchema(profile))
+    expect(extractShapesTexts(exported)).toEqual(extractShapesTexts(profile))
+    expect(missingShapesArtifacts(exported)).toEqual([])
+  })
+})
 
 function fixture(name: string): string {
   return readFileSync(fileURLToPath(new URL(`../shacl/__fixtures__/${name}`, import.meta.url)), 'utf8')
