@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
+import Select from '@/components/ui/Select.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
 import DropdownMenu from '@/components/ui/DropdownMenu.vue'
 import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
@@ -70,6 +71,7 @@ const stranding = ref<{ index: number; dropRow: boolean; entity: DraftEntity } |
 const OBLIGATIONS: Readonly<Record<string, string>> = { MUST: 'Required', SHOULD: 'Recommended' }
 const obligation = computed(() => (props.rule ? OBLIGATIONS[props.rule.obligation] ?? '' : ''))
 const hint = computed(() => props.rule?.description ?? '')
+const enumOptions = computed(() => (props.rule?.enumOptions ?? []).map((value) => ({ value, label: value })))
 
 const picker = computed(() => pickerFor(props.property))
 const target = computed(() => ({ entityId: props.entity.id, property: props.property }))
@@ -208,6 +210,14 @@ function created(next: CrateDraft, entityId: string) {
             @select="(id) => emit('select', id)"
             @create="openCreate(index)"
             @link="openLink(index)"
+          />
+          <Select
+            v-else-if="rule?.kind === 'enum'"
+            :model-value="enumOptions.some((option) => option.value === value.value) ? value.value : ''"
+            :options="enumOptions"
+            :aria-label="label"
+            :placeholder="value.value || `Choose ${label.toLowerCase()}`"
+            @update:model-value="(next) => set(index, next)"
           />
           <ValueInput
             v-else

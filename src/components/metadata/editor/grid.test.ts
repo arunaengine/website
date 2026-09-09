@@ -36,6 +36,7 @@ const shared = {
 
 const PropertyRow = compileClientComponent(new URL('./PropertyRow.vue', import.meta.url), {
   ...shared,
+  '@/components/ui/Select.vue': moduleDefault(EmptyStub),
   '@/components/ui/Tooltip.vue': moduleDefault(Passthrough),
   '@/components/ui/DropdownMenu.vue': moduleDefault(Passthrough),
   '@/components/ui/DropdownMenuTrigger.vue': moduleDefault(Passthrough),

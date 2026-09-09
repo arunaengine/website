@@ -84,6 +84,7 @@ const ReferenceValue = compileClientComponent(new URL('./ReferenceValue.vue', im
 const PropertyRow = compileClientComponent(new URL('./PropertyRow.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
+  '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Tooltip.vue': moduleDefault(Passthrough),
   '@/components/ui/DropdownMenu.vue': moduleDefault(Passthrough),

@@ -90,6 +90,7 @@ const PropertyRow = compileClientComponent(new URL('./PropertyRow.vue', import.m
   '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Tooltip.vue': moduleDefault(Passthrough),
+  '@/components/ui/Select.vue': moduleDefault(SelectStub),
   '@/components/ui/DropdownMenu.vue': moduleDefault(Passthrough),
   '@/components/ui/DropdownMenuTrigger.vue': moduleDefault(Passthrough),
   '@/components/ui/DropdownMenuContent.vue': moduleDefault(Passthrough),
@@ -139,6 +140,47 @@ function labels(root: HostNode): string[] {
 }
 
 describe('PropertyRow', () => {
+  it('renders one-of entries as dropdowns and updates only the selected entry', async () => {
+    const updates: Editor.CrateDraft[] = []
+    let draft = Editor.addValue(seeded(), './', 'measurementTechnique', { kind: 'text', value: 'LC-MS' })
+    draft = Editor.addValue(draft, './', 'measurementTechnique', { kind: 'text', value: '' })
+    const mounted = await mount('measurementTechnique', updates, draft, {
+      rule: {
+        id: 'technique', label: 'Technique', description: '', kind: 'enum',
+        propertyUri: 'http://schema.org/measurementTechnique', valueName: 'measurementTechnique',
+        obligation: 'MUST', enumOptions: ['LC-MS', 'MALDI-TOF'], multipleValues: true,
+      },
+    })
+    const selects = nodes(mounted.root).filter((node) => node.tag === 'select')
+    expect(selects).toHaveLength(2)
+    expect(nodes(mounted.root).filter((node) => node.tag === 'input')).toHaveLength(0)
+    expect(content(selects[1])).toBe('LC-MSMALDI-TOF')
+    expect(selects[0].props.value).toBe('LC-MS')
+    selects[1].value = 'MALDI-TOF'
+    await (selects[1].props.onChange as (event: { target: HostNode }) => Promise<void>)({ target: selects[1] })
+    expect(updates[0].entities[0].properties.measurementTechnique).toEqual([
+      { kind: 'text', value: 'LC-MS' }, { kind: 'text', value: 'MALDI-TOF' },
+    ])
+    mounted.app.unmount()
+  })
+
+  it('keeps an existing value outside the one-of options visible without changing it', async () => {
+    const updates: Editor.CrateDraft[] = []
+    const draft = Editor.addValue(seeded(), './', 'measurementTechnique', { kind: 'text', value: 'Existing technique' })
+    const mounted = await mount('measurementTechnique', updates, draft, {
+      rule: {
+        id: 'technique', label: 'Technique', description: '', kind: 'enum',
+        propertyUri: 'http://schema.org/measurementTechnique', valueName: 'measurementTechnique',
+        obligation: 'MUST', enumOptions: ['LC-MS', 'MALDI-TOF'],
+      },
+    })
+    const select = element(mounted.root, (node) => node.tag === 'select')
+    expect(select.props.placeholder).toBe('Existing technique')
+    expect(content(select)).not.toContain('Existing technique')
+    expect(updates).toEqual([])
+    mounted.app.unmount()
+  })
+
   it('says what the profile asks of a seeded row', async () => {
     const draft = Editor.addValue(seeded(), './', 'citation', { kind: 'text', value: '' })
     const mounted = await mount('citation', [], draft, {
