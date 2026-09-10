@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import Input from '@/components/ui/Input.vue'
-import { CURATED_TYPES, typeLabel, vocabTypeUri } from '@/lib/crate/editor'
+import { CURATED_TYPES, typeLabel, vocabTypeUri, type TypeOption } from '@/lib/crate/editor'
 import { isDataEntity } from '@/lib/dataEntities'
-import { normalizeTypeUri } from '@/lib/profiles/uri'
+import { normalizeTypeUri, SCHEMA_ORG } from '@/lib/profiles/uri'
 import type { VocabIndex, VocabTerm } from '@/lib/profiles/vocabulary'
 
 // The one type list: the common types on top, every bundled class behind
@@ -20,6 +20,8 @@ const props = defineProps<{
   excludeData?: boolean
   /** Picks an unambiguous search result unless the host mixes in other options. */
   autoSelect?: boolean
+  /** The types the picked profile describes, offered first whether or not the vocabulary knows them. */
+  profileTypes?: TypeOption[]
 }>()
 const emit = defineEmits<{
   (e: 'update:modelValue', type: string): void
@@ -50,27 +52,36 @@ function asOption(term: VocabTerm) {
   return { type: term.source === 'schema.org' ? term.name : term.uri, label: term.label, description: term.description }
 }
 
+const profiled = computed(() => (props.profileTypes ?? [])
+  .map((option) => ({ ...option, type: normalizeTypeUri(option.type).startsWith(SCHEMA_ORG) ? typeLabel(option.type) : option.type }))
+  .filter((option) => allowed(option.type)))
+
+function outside(options: TypeOption[], taken: TypeOption[]): TypeOption[] {
+  return options.filter((option) => !taken.some((entry) => normalizeTypeUri(entry.type) === normalizeTypeUri(option.type)))
+}
+
 const results = computed(() => {
   if (!text.value) {
-    const shortlist = curated.value.filter((option) => allowed(option.type))
-    const all = (props.vocab?.classes ?? [])
+    const shortlist = outside(curated.value.filter((option) => allowed(option.type)), profiled.value)
+    const all = outside((props.vocab?.classes ?? [])
       .filter((term) => allowed(term.uri) && !CURATED_TYPES.includes(term.name))
       .slice(0, ALL_LIMIT)
-      .map(asOption)
-    return { shortlist, all }
+      .map(asOption), profiled.value)
+    return { profile: profiled.value, shortlist, all }
   }
+  const matches = (option: TypeOption) => option.label.toLowerCase().includes(text.value.toLowerCase())
+  const profile = profiled.value.filter(matches)
   const hits = (props.vocab?.searchClasses(text.value, ALL_LIMIT) ?? [])
     .filter((term) => allowed(term.uri))
     .map(asOption)
-  const shortlist = curated.value.filter((option) =>
-    allowed(option.type) && option.label.toLowerCase().includes(text.value.toLowerCase()))
-  return { shortlist, all: hits.filter((option) => !shortlist.some((entry) => entry.type === option.type)) }
+  const shortlist = outside(curated.value.filter((option) => allowed(option.type) && matches(option)), profile)
+  return { profile, shortlist, all: outside(hits, [...profile, ...shortlist]) }
 })
 
 // One candidate needs no click: it is the answer to the search.
 watch(results, (value) => {
   if (props.autoSelect === false) return
-  const only = [...value.shortlist, ...value.all]
+  const only = [...value.profile, ...value.shortlist, ...value.all]
   if (only.length === 1 && only[0].type !== props.modelValue) emit('update:modelValue', only[0].type)
 })
 
@@ -101,7 +112,7 @@ function isSelected(type: string): boolean {
       </label>
     </div>
 
-    <div v-for="group in [{ title: 'Common', options: results.shortlist }, { title: 'Everything else', options: results.all }]" :key="group.title">
+    <div v-for="group in [{ title: 'From the profile', options: results.profile }, { title: 'Common', options: results.shortlist }, { title: 'Everything else', options: results.all }]" :key="group.title">
       <p v-if="group.options.length" class="px-2.5 pb-1 pt-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
         {{ group.title }}
       </p>
@@ -123,7 +134,7 @@ function isSelected(type: string): boolean {
       </button>
     </div>
 
-    <p v-if="!results.shortlist.length && !results.all.length" class="px-2.5 py-2 text-xs text-muted-foreground">
+    <p v-if="!results.profile.length && !results.shortlist.length && !results.all.length" class="px-2.5 py-2 text-xs text-muted-foreground">
       No type matches that search.
     </p>
   </div>

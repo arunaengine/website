@@ -39,6 +39,7 @@ import {
   entityName,
   findEntity,
   fromRoCrate,
+  isDataType,
   liveIssues,
   newDraft,
   partIds,
@@ -107,6 +108,10 @@ const profileOptions = computed(() =>
   selectableProfiles.value.map((profile) => ({ value: profile.id, label: profile.name })))
 const selectedProfile = computed(() => profiles.value.find((candidate) => candidate.id === profileId.value))
 const expectation = computed(() => (selectedProfile.value ? profileExpectation(selectedProfile.value) : null))
+// The contextual types the profile describes, offered first when adding an entity.
+const profileTypes = computed(() => (selectedProfile.value?.entityRules ?? [])
+  .filter((rule) => !isDataType(rule.type))
+  .map((rule) => ({ type: rule.type, label: rule.label, description: rule.description })))
 
 const groupId = computed({
   get: () => draft.value.groupId ?? '',
@@ -590,6 +595,7 @@ async function save(anyway = false) {
           :selected="selected"
           :issues="issues"
           :group-id="draft.groupId"
+          :profile-types="profileTypes"
           @select="(id) => (selected = id)"
           @update="update"
         />

@@ -40,6 +40,23 @@ const vocab = {
 } as unknown as VocabIndex
 
 describe('TypeBrowser', () => {
+  it('offers the profile types first, vocabulary or not', async () => {
+    const updates: string[] = []
+    const mounted = await mountApp(TypeBrowser, {
+      props: {
+        vocab,
+        modelValue: '',
+        profileTypes: [{ type: 'http://schema.org/Grant', label: 'Grant', description: 'The funding grant.' }],
+        'onUpdate:modelValue': (value: string) => updates.push(value),
+      },
+    })
+
+    await click(button(mounted.root, 'Grant'))
+
+    expect(updates).toEqual(['Grant'])
+    mounted.app.unmount()
+  })
+
   it('emits an external vocabulary class as its absolute IRI', async () => {
     const updates: string[] = []
     const mounted = await mountApp(TypeBrowser, {

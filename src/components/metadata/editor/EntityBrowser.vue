@@ -14,6 +14,7 @@ import {
   type CrateDraft,
   type DraftEntity,
   type LiveIssue,
+  type TypeOption,
 } from '@/lib/crate/editor'
 import { rootParts } from '@/lib/crate/references'
 import type { VocabIndex } from '@/lib/profiles/vocabulary'
@@ -25,6 +26,8 @@ const props = defineProps<{
   selected: string
   issues: LiveIssue[]
   groupId?: string
+  /** The types the picked profile describes, offered first when adding an entity. */
+  profileTypes?: TypeOption[]
 }>()
 const emit = defineEmits<{
   (e: 'select', entityId: string): void
@@ -153,6 +156,7 @@ function pick(entityId: string) {
       :vocab="vocab"
       exclude-data
       offer-link
+      :profile-types="profileTypes"
       @update:open="(value) => (addOpen = value)"
       @created="(created) => { emit('update', created.draft); pick(created.entity.id) }"
     />

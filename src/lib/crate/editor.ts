@@ -224,6 +224,13 @@ export const VALUE_PRESETS: Readonly<Record<string, ReadonlyArray<{ value: strin
   license: LICENSE_PRESETS,
 }
 
+/** One entry of a type list: a crate type name or class IRI with its label. */
+export interface TypeOption {
+  type: string
+  label: string
+  description?: string
+}
+
 export type EntityGroup = 'root' | 'data' | 'contextual'
 
 export function entityGroup(draft: CrateDraft, entity: DraftEntity, parts = partIds(draft)): EntityGroup {

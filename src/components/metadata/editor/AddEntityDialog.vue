@@ -14,6 +14,7 @@ import Spinner from '@/components/ui/Spinner.vue'
 import LookupBox from '@/components/metadata/LookupBox.vue'
 import TypeBrowser from './TypeBrowser.vue'
 import {
+  type TypeOption,
   addEntity,
   autoId,
   displayName,
@@ -58,6 +59,8 @@ const props = defineProps<{
   offerLink?: boolean
   /** Opened from a property row: that row takes the link, so it is shown fixed. */
   linkedFrom?: { entity: string; property: string }
+  /** The types the picked profile describes, offered first. */
+  profileTypes?: TypeOption[]
 }>()
 
 const emit = defineEmits<{
@@ -518,6 +521,7 @@ async function create() {
           :range="range"
           :exclude-data="excludeData"
           :auto-select="false"
+          :profile-types="profileTypes"
         />
       </CommandPane>
     </DialogContent>
