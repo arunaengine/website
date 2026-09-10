@@ -104,6 +104,15 @@ export function isS3PurgeInProgressError(err: unknown): boolean {
   return purgeCode && (status === undefined || status === 503)
 }
 
+// A bucket that is gone answers NoSuchBucket, or a bare 404 named NotFound on
+// a HEAD request, which carries no body for the SDK to read a code from.
+export function isS3BucketMissingError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const error = err as { name?: string; Code?: string; $metadata?: { httpStatusCode?: number } }
+  const code = error.Code ?? error.name
+  return code === 'NoSuchBucket' || code === 'NotFound' || error.$metadata?.httpStatusCode === 404
+}
+
 // DeleteBucket refuses a non-empty bucket with the S3 code "BucketNotEmpty"
 // (HTTP 409). After a full object purge this only happens on a versioning-
 // enabled store, where noncurrent versions and delete markers survive, or

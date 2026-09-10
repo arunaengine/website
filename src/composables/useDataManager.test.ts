@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dataViewReady } from './useDataManager'
+import { dataViewReady, unlistedRecents } from './useDataManager'
 
 type ReadyState = Parameters<typeof dataViewReady>[0]
 
@@ -43,5 +43,18 @@ describe('Data view readiness', () => {
 
   it('opens once the bucket list and the listing settled', () => {
     expect(dataViewReady(state({ bucket: 'data', listedCount: 3 }))).toBe(true)
+  })
+})
+
+describe('Recently browsed cleanup', () => {
+  it('names only the local rows the loaded list lacks', () => {
+    const recent = [
+      { bucket: 'reef-survey', nodeId: null },
+      { bucket: 'archive', nodeId: null },
+      { bucket: 'remote-reads', nodeId: 'node-b' },
+    ]
+
+    expect(unlistedRecents(recent, ['reef-survey'])).toEqual([{ bucket: 'archive', nodeId: null }])
+    expect(unlistedRecents(recent, ['reef-survey', 'archive'])).toEqual([])
   })
 })

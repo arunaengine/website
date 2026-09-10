@@ -8,7 +8,7 @@ import { contextKey, shouldOpenContext } from './s3/context'
 import { useAruna } from './useAruna'
 import { useBrowserSelection } from './useBrowserSelection'
 import { useBuckets } from './useBuckets'
-import { useBucketShortcuts } from './useBucketShortcuts'
+import { useBucketShortcuts, type BucketShortcut } from './useBucketShortcuts'
 import { useGroupContext } from './useGroupSelection'
 import { useRealmNodes } from './useRealmNodes'
 import { useRefresh } from './useRefresh'
@@ -18,6 +18,7 @@ import {
   useS3,
   s3ErrorMessage,
   isS3AuthError,
+  isS3BucketMissingError,
   isS3NetworkError,
   type FolderEntry,
   type ObjectEntry,
@@ -160,6 +161,13 @@ export function stickyBucketStep(state: {
       query: state.groupId ? { group: state.groupId } : {},
     },
   }
+}
+
+// The local "Recently browsed" rows the loaded list does not confirm: each is
+// deleted or owned by another group, and only the node can tell them apart.
+export function unlistedRecents(recent: BucketShortcut[], buckets: string[]): BucketShortcut[] {
+  const listed = new Set(buckets)
+  return recent.filter((entry) => !entry.nodeId && !listed.has(entry.bucket))
 }
 
 export function useDataManager() {
@@ -438,6 +446,22 @@ export function useDataManager() {
     )
   })
 
+  // A deleted bucket would otherwise sit in "Recently browsed" until it is
+  // opened: every loaded list asks the node about the local rows it lacks and
+  // drops the ones that are gone. A row of another group stays.
+  let recentCheckId = 0
+  watch([bucketsLoaded, buckets], async ([loaded]) => {
+    if (!loaded) return
+    const id = ++recentCheckId
+    for (const entry of unlistedRecents(shortcuts.recent.value, buckets.value.map((item) => item.name))) {
+      try {
+        await s3.headBucket(entry.bucket)
+      } catch (err) {
+        if (id === recentCheckId && isS3BucketMissingError(err)) shortcuts.remove(entry.bucket, null)
+      }
+    }
+  }, { immediate: true })
+
   const folders = ref<FolderEntry[]>([])
   const objects = ref<ObjectEntry[]>([])
   const nextToken = ref<string | undefined>(undefined)
@@ -618,6 +642,7 @@ export function useDataManager() {
         } else {
           listError.value = s3ErrorMessage(err)
           listAuthError.value = isS3AuthError(err)
+          if (isS3BucketMissingError(err)) shortcuts.remove(targetBucket, targetNode)
         }
       }
     } finally {

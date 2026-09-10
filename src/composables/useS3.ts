@@ -2,7 +2,7 @@
 // session (minting, refresh, restrictions), client (signed client factory),
 // endpoints (node endpoint selection), objects and buckets.
 import { getCurrentInstance, inject, type InjectionKey } from 'vue'
-import { allowPublicReadCors, createBucket, deleteBucket, listBuckets } from './s3/buckets'
+import { allowPublicReadCors, createBucket, deleteBucket, headBucket, listBuckets } from './s3/buckets'
 import { connectedEndpoint, endpointForNode, resolveObjectUrl } from './s3/endpoints'
 import {
   copyObjectVersion,
@@ -47,6 +47,7 @@ export {
   S3SessionUnavailableError,
   PURGE_IN_PROGRESS_MESSAGE,
   isS3AuthError,
+  isS3BucketMissingError,
   isS3BucketNotEmptyError,
   isS3NetworkError,
   isS3PurgeInProgressError,
@@ -118,6 +119,7 @@ function nodeS3() {
     canWritePrefix,
     canDeletePrefix,
     listBuckets,
+    headBucket,
     createBucket,
     allowPublicReadCors,
     putTextObject,

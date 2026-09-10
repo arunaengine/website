@@ -2,6 +2,7 @@ import {
   CreateBucketCommand,
   DeleteBucketCommand,
   GetBucketCorsCommand,
+  HeadBucketCommand,
   ListBucketsCommand,
   PutBucketCorsCommand,
   type CORSRule,
@@ -18,6 +19,11 @@ export async function listBuckets(): Promise<BucketEntry[]> {
   return (response.Buckets ?? [])
     .filter((bucket) => bucket.Name)
     .map((bucket) => ({ name: bucket.Name as string, createdAt: bucket.CreationDate }))
+}
+
+/** Resolves when the bucket exists; a missing one rejects with a not-found error. */
+export async function headBucket(bucket: string): Promise<void> {
+  await client().send(new HeadBucketCommand({ Bucket: bucket }))
 }
 
 export async function createBucket(name: string): Promise<void> {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { BUCKET_NAME_REQUIREMENT } from '@/lib/bucketName'
-import { s3ErrorMessage, s3ErrorReport } from './errors'
+import { isS3BucketMissingError, s3ErrorMessage, s3ErrorReport } from './errors'
 
 describe('s3 error messages', () => {
   it('never renders the SDK placeholder', () => {
@@ -56,5 +56,12 @@ describe('s3 error messages', () => {
 
     expect(report.message).toBe('The node could not complete the request.')
     expect(report.detail).toContain('operations/src/quota.rs')
+  })
+
+  it('recognizes a bucket that is gone, with or without a body', () => {
+    expect(isS3BucketMissingError({ name: 'NoSuchBucket', message: 'UnknownError' })).toBe(true)
+    expect(isS3BucketMissingError({ name: 'NotFound', $metadata: { httpStatusCode: 404 } })).toBe(true)
+    expect(isS3BucketMissingError({ name: 'AccessDenied', $metadata: { httpStatusCode: 403 } })).toBe(false)
+    expect(isS3BucketMissingError(new TypeError('Failed to fetch'))).toBe(false)
   })
 })
