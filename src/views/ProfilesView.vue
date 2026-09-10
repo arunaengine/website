@@ -337,7 +337,7 @@ function constraintSummary(rule: ProfilePropertyRule): string[] {
                 <div class="flex items-center gap-1.5">
                   <span class="truncate text-sm font-medium text-foreground">{{ profile.name }}</span>
                   <Star v-if="preferredId === profile.id" class="h-3.5 w-3.5 shrink-0 text-amber-500" fill="currentColor" />
-                  <Badge size="sm" :variant="profile.managed ? 'royal' : 'secondary'">{{ profileScope(profile) }}</Badge>
+                  <Badge size="sm" class="shrink-0 whitespace-nowrap" :variant="profile.managed ? 'royal' : 'secondary'">{{ profileScope(profile) }}</Badge>
                 </div>
                 <div class="text-[11px] text-muted-foreground">{{ profile.domain }} · {{ propertyCount(profile) }} properties</div>
                 <p class="mt-1 line-clamp-2 text-[11px] text-muted-foreground/90">{{ profile.description || 'No description in RO-Crate.' }}</p>
