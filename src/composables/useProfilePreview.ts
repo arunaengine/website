@@ -48,7 +48,9 @@ export function useProfilePreview(options: UseProfilePreviewOptions) {
     timer = undefined
   }
 
-  function run(rocrate: unknown): Promise<void> {
+  // Answers whether this run's verdict is the one now on record: a run a
+  // newer one overtook wrote nothing and must not be read as a verdict.
+  function run(rocrate: unknown): Promise<boolean> {
     generation += 1
     const current = generation
     inFlight?.abort()
@@ -57,6 +59,9 @@ export function useProfilePreview(options: UseProfilePreviewOptions) {
     running.value = true
     error.value = null
     rejection.value = null
+    // The previous verdict spoke about another draft; nothing stands in for
+    // the check that is still running.
+    result.value = null
     // Capture request context now; setup failures still use the request error path.
     let request: Promise<ProfileValidationPreviewResponse>
     try {
@@ -74,26 +79,24 @@ export function useProfilePreview(options: UseProfilePreviewOptions) {
     }
     return request
       .then((response) => {
-        if (current !== generation || disposed) return
+        if (current !== generation || disposed) return false
         result.value = response
         running.value = false
+        return true
       })
       .catch((cause) => {
-        if (current !== generation || disposed) return
+        if (current !== generation || disposed) return false
         running.value = false
         if (cause instanceof ApiError && (cause.status === 404 || cause.status === 405)) {
           unavailable.value = true
-          result.value = null
-          return
+          return true
         }
         if (cause instanceof ApiError && cause.status === 400) {
           rejection.value = cause
-          result.value = null
-          return
+          return true
         }
-        // An older verdict must not stand in for the check that just failed.
-        result.value = null
         error.value = errorMessage(cause)
+        return true
       })
   }
 
@@ -119,7 +122,7 @@ export function useProfilePreview(options: UseProfilePreviewOptions) {
   async function verify(rocrate: unknown): Promise<boolean> {
     if (unavailable.value || disposed) return true
     clearTimer()
-    await run(rocrate)
+    if (!await run(rocrate)) return false
     if (rejection.value) return false
     if (error.value || unavailable.value) return true
     return result.value?.accepted !== false

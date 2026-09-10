@@ -75,9 +75,13 @@ const failureReason = computed(() => props.previewUnavailable
   : (props.previewError ?? ''))
 // A node that does not know the picked profile checked the crate's structure
 // only; saying "valid against" it would claim a check that never ran.
+const profileUnchecked = computed(() => {
+  const referenced = props.previewResult?.profile_iri || props.previewResult?.profile_id
+  return Boolean(props.profileName) && (props.previewResult?.state === 'not_profiled' || !referenced)
+})
 const profileLine = computed(() => {
   const referenced = props.previewResult?.profile_iri || props.previewResult?.profile_id
-  if (props.profileName && (props.previewResult?.state === 'not_profiled' || !referenced)) {
+  if (profileUnchecked.value) {
     return `The node did not evaluate ${props.profileName}; it checked the structure of the crate only.`
   }
   return referenced ? `Valid against ${props.profileName || referenced}` : 'No profile referenced'
@@ -123,8 +127,11 @@ function groupName(entityId: string): string {
     <p v-else-if="outcome === 'none'" class="text-xs text-muted-foreground">Not validated yet. Saving validates first.</p>
 
     <div v-else-if="outcome === 'accepted'" class="space-y-3">
-      <Notice tone="success">
-        <p class="flex items-center gap-2"><Check class="h-3.5 w-3.5 shrink-0" /> The node would accept this dataset.</p>
+      <Notice :tone="profileUnchecked ? 'warning' : 'success'">
+        <p class="flex items-center gap-2">
+          <Check class="h-3.5 w-3.5 shrink-0" />
+          {{ profileUnchecked ? 'The node checked only the structure of this dataset.' : 'The node would accept this dataset.' }}
+        </p>
         <p class="mt-0.5 pl-5 text-[11px] text-muted-foreground">{{ profileLine }}</p>
       </Notice>
       <section v-for="group in advisoryGroups" :key="group.entityId" class="rounded-lg border border-border">

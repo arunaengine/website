@@ -110,6 +110,25 @@ describe('server profile validation preview', () => {
     expect(preview.running.value).toBe(false)
   })
 
+  it('never lets an overtaken check pass as a verdict', async () => {
+    // The verdict on record belongs to the newest draft; an older check answers false.
+    const preview = setupPreview()
+    preview.previewNow(CRATE)
+    answer(0, body(true))
+    await flush()
+    expect(preview.result.value?.accepted).toBe(true)
+
+    const verdict = preview.verify({ ...CRATE, name: 'edited' })
+    expect(preview.result.value).toBeNull()
+    preview.previewNow({ ...CRATE, name: 'edited again' })
+    answer(1, body(true))
+    answer(2, body(false))
+    await flush()
+
+    expect(await verdict).toBe(false)
+    expect(preview.result.value?.accepted).toBe(false)
+  })
+
   it('marks the preview unavailable when the node does not serve it', async () => {
     const preview = setupPreview()
 

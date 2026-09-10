@@ -94,7 +94,8 @@ describe('NodeCheckPanel', () => {
     })
     const text = content(mounted.root)
 
-    expect(text).toContain('The node would accept this dataset.')
+    expect(text).not.toContain('The node would accept this dataset.')
+    expect(text).toContain('The node checked only the structure of this dataset.')
     expect(text).toContain('The node did not evaluate Process Run Crate')
     expect(text).not.toContain('Valid against')
     mounted.app.unmount()
