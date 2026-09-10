@@ -34,7 +34,7 @@ import {
   shortIri,
   termKey,
 } from './parse'
-import { datatypeAlternation, isNumberOr, unionTargets, type ShapeIndex } from './shapes'
+import { datatypeAlternation, isNumberOr, isUrlOr, unionTargets, type ShapeIndex } from './shapes'
 
 const DCT_CONFORMS_TO = 'http://purl.org/dc/terms/conformsTo'
 
@@ -101,6 +101,8 @@ interface Facets {
   unionClasses: string[]
   unionNodes: Term[]
   nodeKindIri: boolean
+  /** The projection's URL form: an IRI or a string, either way a link. */
+  urlOr: boolean
   inOptions?: string[]
   patterns: string[]
   minLength?: number
@@ -111,7 +113,7 @@ interface Facets {
 }
 
 function emptyFacets(): Facets {
-  return { nodeTargets: [], unionClasses: [], unionNodes: [], nodeKindIri: false, patterns: [], numberOr: false }
+  return { nodeTargets: [], unionClasses: [], unionNodes: [], nodeKindIri: false, patterns: [], numberOr: false, urlOr: false }
 }
 
 export function liftRuleGroup(
@@ -304,6 +306,10 @@ function readFacets(
       facets.numberOr = true
       continue
     }
+    if (isUrlOr(store, branches)) {
+      facets.urlOr = true
+      continue
+    }
     // An alternative over datatypes alone (the usual "plain or language-tagged
     // string" form) is one value with several literal types; the first is the one
     // the input is built for and nothing is lost, so no note.
@@ -403,6 +409,9 @@ function resolveKind(
     if (targets.length) entityTypes = targets
   } else if (facets.numberOr) {
     kind = 'number'
+  } else if (facets.urlOr) {
+    kind = 'url'
+    takePattern(URL_PATTERN)
   } else if (facets.inOptions) {
     kind = 'enum'
     enumOptions = facets.inOptions
@@ -418,6 +427,10 @@ function resolveKind(
     kind = 'datetime'
   } else if (facets.datatype === `${XSD}anyURI`) {
     kind = 'url'
+  } else if (facets.datatype === undefined && (facets.minValue !== undefined || facets.maxValue !== undefined)) {
+    // A numeric range with no datatype compares numbers; typing the rule as
+    // text would emit xsd:string beside it and refuse every value.
+    kind = 'number'
   } else if (facets.datatype === `${XSD}string` || facets.datatype === undefined) {
     // Kind-derived patterns round-trip to their kinds; leftover patterns stay
     // author constraints.

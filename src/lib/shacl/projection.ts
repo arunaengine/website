@@ -237,7 +237,9 @@ function valueConstraintLines(rule: ProfilePropertyRule, ns: string, entities: P
       break
     }
     case 'url':
-      lines.push('  sh:datatype xsd:string')
+      // A crate links a license or a homepage as an IRI as often as it writes
+      // the URL out; a bare xsd:string would refuse the linked form.
+      lines.push('  sh:or ( [ sh:nodeKind sh:IRI ] [ sh:datatype xsd:string ] )')
       derivedPattern = URL_PATTERN
       stringLike = true
       break

@@ -238,6 +238,38 @@ describe('the ChemicalSubstance binding', () => {
     expect(danglingRules(result)).toEqual([])
   })
 
+  it('round trips a URL rule that accepts a link or a string', () => {
+    const entity: ProfileEntityRule = {
+      id: 'dataset', label: 'Dataset', description: '', type: 'http://schema.org/Dataset', className: 'Dataset',
+      propertyRules: [{
+        id: 'license', label: 'License', description: 'License URL.', kind: 'url',
+        propertyUri: 'http://schema.org/license', valueName: 'license', obligation: 'MUST',
+      }],
+    }
+    const turtle = shapesFromEntityRules({ slug: 'fixture', name: 'Fixture' }, [entity])
+    expect(turtle).toContain('sh:or ( [ sh:nodeKind sh:IRI ] [ sh:datatype xsd:string ] )')
+
+    const license = ruleFor(entityFor(liftShapes(turtle), 'http://schema.org/Dataset'), 'license')
+    expect(license?.kind).toBe('url')
+    expect(license?.pattern).toBeUndefined()
+  })
+
+  it('reads a numeric range without a datatype as a number', () => {
+    // A text rule would emit xsd:string beside sh:minInclusive and refuse every value.
+    const turtle = `
+      @prefix sh: <http://www.w3.org/ns/shacl#> .
+      @prefix schema: <https://schema.org/> .
+      <https://example.org/GeoShape> a sh:NodeShape ;
+        sh:targetClass schema:GeoCoordinates ;
+        sh:property [ sh:path schema:latitude ; sh:minCount 1 ; sh:minInclusive -90 ; sh:maxInclusive 90 ] .
+    `
+    const geo = entityFor(liftShapes(turtle), 'http://schema.org/GeoCoordinates')
+    const latitude = ruleFor(geo, 'latitude')
+
+    expect(latitude?.kind).toBe('number')
+    expect(latitude).toMatchObject({ minValue: -90, maxValue: 90, obligation: 'MUST' })
+  })
+
   it('reads literal properties as text', () => {
     const substance = entityFor(result, 'http://schema.org/ChemicalSubstance')
     expect(ruleFor(substance, 'name')?.kind).toBe('text')

@@ -345,6 +345,19 @@ export function isNumberOr(store: Store, items: Quad_Object[]): boolean {
   return new Set(datatypes).size === 2 && datatypes.includes(`${XSD}double`) && datatypes.includes(`${XSD}integer`)
 }
 
+// True when the sh:or branches are exactly the projection's URL form: a bare
+// IRI or a string, ( [ sh:nodeKind sh:IRI ] [ sh:datatype xsd:string ] ) in either order.
+export function isUrlOr(store: Store, items: Quad_Object[]): boolean {
+  if (items.length !== 2) return false
+  const forms = items.map((item) => {
+    if (item.termType !== 'BlankNode' && item.termType !== 'NamedNode') return ''
+    const quads = store.getQuads(item as Quad_Subject, null, null, null)
+    if (quads.length !== 1) return ''
+    return `${quads[0].predicate.value} ${quads[0].object.value}`
+  })
+  return forms.includes(`${SH}nodeKind ${SH}IRI`) && forms.includes(`${SH}datatype ${XSD}string`)
+}
+
 // The projection's "no entries at all, or at least N" node-level alternative,
 // read back as a minItems for the path it constrains.
 export function readEntryCountOr(store: Store, head: Quad_Subject): { path: string; minItems: number } | undefined {
