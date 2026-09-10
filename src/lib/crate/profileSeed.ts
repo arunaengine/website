@@ -13,10 +13,12 @@ import {
   defaultValue,
   findEntity,
   isDataType,
+  partIds,
   rootId,
   setProperty,
   typeLabel,
   type CrateDraft,
+  type DraftValue,
   type DraftValueKind,
   type ProfileExpectation,
   type ProfileShape,
@@ -119,9 +121,16 @@ function seedRows(
       next = seedEntity(next, profile, created.entity.id, target, depth + 1)
       continue
     }
-    next = setProperty(next, entityId, rule.valueName, [defaultValue(draftKind(rule.kind))])
+    next = setProperty(next, entityId, rule.valueName, [seedValue(rule)])
   }
   return next
+}
+
+/** An empty row of the rule's kind, pre-filled when the rule names a default. */
+function seedValue(rule: ProfilePropertyRule): DraftValue {
+  const empty = defaultValue(draftKind(rule.kind))
+  const preset = rule.defaultValue?.trim()
+  return preset && empty.kind !== 'reference' ? { ...empty, value: preset } : empty
 }
 
 /** The rows the profile's shape for this type asks a created entity for. */
@@ -134,6 +143,21 @@ function seedEntity(
 ): CrateDraft {
   const rule = ruleFor(profile, type)
   return rule ? seedRows(draft, profile, entityId, expected(rule.propertyRules), depth) : draft
+}
+
+// Seeds the entities `next` holds that `previous` did not: whatever the author
+// just created starts with the rows the profile's shape for its type asks for.
+// Files and folders are described where they were picked and stay untouched.
+export function seedNewEntities(previous: CrateDraft, next: CrateDraft, profile: MetadataProfile): CrateDraft {
+  const known = new Set(previous.entities.map((entity) => entity.id))
+  const parts = partIds(next)
+  let seeded = next
+  for (const entity of next.entities) {
+    if (known.has(entity.id) || parts.has(entity.id)) continue
+    const type = entity.types.find((candidate) => ruleFor(profile, candidate))
+    if (type) seeded = seedEntity(seeded, profile, entity.id, type, 0)
+  }
+  return seeded
 }
 
 /** Declares the profile on the root and seeds what it asks the dataset for. */

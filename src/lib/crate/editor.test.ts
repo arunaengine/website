@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import {
   addEntity,
+  alignValueKinds,
   allowedKinds,
   addValue,
   autoId,
@@ -132,6 +133,20 @@ describe('crate draft', () => {
     const draft = addValue(newDraft(), './', 'publisher', { kind: 'reference', value: '#org' })
     expect(promoteValue(draft, './', 'publisher', 0, 'Organization')).toBeUndefined()
     expect(promoteValue(newDraft(), './', 'license', 0, 'CreativeWork')).toBeUndefined()
+  })
+
+  it('describes a license linked as a bare URL', () => {
+    // An imported crate names the license by IRI only; More details creates the work under it.
+    const license = 'https://creativecommons.org/licenses/by/4.0/'
+    const draft = updateValue(newDraft(), './', 'license', 0, license)
+    const linked = { ...draft, entities: draft.entities.map((entity) => (entity.id === './'
+      ? { ...entity, properties: { ...entity.properties, license: [{ kind: 'reference' as const, value: license }] } }
+      : entity)) }
+    const promoted = promoteValue(linked, './', 'license', 0, 'CreativeWork')
+
+    expect(promoted?.entity).toMatchObject({ id: license, types: ['CreativeWork'], properties: { name: [{ kind: 'text', value: 'CC BY 4.0' }] } })
+    expect(findEntity(promoted!.draft, './')?.properties.license).toEqual([{ kind: 'reference', value: license }])
+    expect(promoteValue(promoted!.draft, './', 'license', 0, 'CreativeWork')).toBeUndefined()
   })
 
   it('round trips a crate through the model', () => {
@@ -366,6 +381,43 @@ describe('live issues', () => {
       .toMatchObject({ severity: 'error', message: 'Genomics requires affiliation on the run agent.' })
     expect(issues.find((issue) => issue.property === 'email'))
       .toMatchObject({ severity: 'warning', message: 'Genomics recommends email on the run agent.' })
+  })
+
+  it('blocks a value the profile wants as a number', () => {
+    const geo = addEntity(seeded(), { type: 'GeoCoordinates', name: 'Site' })
+    const draft = addValue(geo.draft, geo.entity.id, 'latitude', { kind: 'text', value: 'fifty' })
+    const profile = expectation({
+      shapes: { GeoCoordinates: shape('Site', [propertyRule({ valueName: 'latitude', label: 'Latitude', kind: 'number' })]) },
+    })
+    const issue = liveIssues(draft, null, profile).find((entry) => entry.key === `profile:number:${geo.entity.id}:latitude`)
+
+    expect(issue).toMatchObject({ severity: 'error', message: 'Latitude on Site must be a number.' })
+    const fixed = addValue(geo.draft, geo.entity.id, 'latitude', { kind: 'text', value: '50.6' })
+    expect(liveIssues(fixed, null, profile).some((entry) => entry.key.startsWith('profile:number:'))).toBe(false)
+  })
+
+  it('retypes a coordinate to what the profile or the vocabulary expects', () => {
+    const geo = addEntity(seeded(), { type: 'GeoCoordinates', name: 'Site' })
+    const asText = addValue(
+      addValue(geo.draft, geo.entity.id, 'latitude', { kind: 'text', value: '50.6' }),
+      geo.entity.id, 'longitude', { kind: 'text', value: 'eight' })
+    const numberRule = expectation({
+      shapes: { GeoCoordinates: shape('Site', [propertyRule({ valueName: 'latitude', kind: 'number' })]) },
+    })
+
+    const byRule = alignValueKinds(asText, null, numberRule)
+    expect(findEntity(byRule, geo.entity.id)?.properties.latitude).toEqual([{ kind: 'number', value: '50.6' }])
+    const byVocab = alignValueKinds(asText, vocab, null)
+    expect(findEntity(byVocab, geo.entity.id)?.properties.latitude).toEqual([{ kind: 'number', value: '50.6' }])
+    expect(findEntity(byVocab, geo.entity.id)?.properties.longitude).toEqual([{ kind: 'text', value: 'eight' }])
+    expect(toRoCrate(byVocab)['@graph']).toContainEqual(expect.objectContaining({ latitude: 50.6 }))
+
+    const textRule = expectation({
+      shapes: { GeoCoordinates: shape('Site', [propertyRule({ valueName: 'latitude', kind: 'text' })]) },
+    })
+    expect(findEntity(alignValueKinds(byRule, null, textRule), geo.entity.id)?.properties.latitude)
+      .toEqual([{ kind: 'text', value: '50.6' }])
+    expect(alignValueKinds(byRule, null, numberRule)).toBe(byRule)
   })
 
   it('names an empty row by the rule that asked for it', () => {

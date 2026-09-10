@@ -33,8 +33,9 @@ import { isAssignableProfile } from '@/lib/profiles/assignable'
 import { loadVocabIndex, type VocabIndex } from '@/lib/profiles/vocabulary'
 import { collectIssues, rejectionIssues, type WriteIssue } from '@/lib/crate/issues'
 import { joinPath, splitPath } from '@/lib/crate/paths'
-import { applyProfile, clearProfile, profileExpectation } from '@/lib/crate/profileSeed'
+import { applyProfile, clearProfile, profileExpectation, seedNewEntities } from '@/lib/crate/profileSeed'
 import {
+  alignValueKinds,
   entityName,
   findEntity,
   fromRoCrate,
@@ -174,6 +175,7 @@ async function load() {
     selected.value = rootId(draft.value)
     pendingSeed.value = ''
     profileId.value = declaredProfile()
+    draft.value = alignValueKinds(draft.value, vocab.value, expectation.value)
   } catch (error) {
     if (generation === loadGeneration && mode.value === 'edit' && documentId.value === id) {
       loadError.value = errorMessage(error)
@@ -261,6 +263,16 @@ watch([crate, profileId], () => {
   saveIssues.value = []
   submitError.value = null
   if (!blockers.value.length) preview.preview(crate.value)
+  // The last verdict spoke about another draft; it must not stand in for one
+  // the node has not seen.
+  else preview.reset()
+})
+
+// A crate may carry a number as text or the other way round; the rules that
+// apply, and the vocabulary once loaded, decide which the node should see.
+watch([expectation, vocab], ([rules, index]) => {
+  const aligned = alignValueKinds(draft.value, index, rules)
+  if (aligned !== draft.value) draft.value = aligned
 })
 
 // What the assistant may do to the open draft while this view is mounted. It
@@ -283,8 +295,10 @@ provideEditorBridge({
   },
 })
 
+// An entity created while a profile is picked starts with the rows its shape asks for.
 function update(next: CrateDraft) {
-  draft.value = next
+  const profile = selectedProfile.value
+  draft.value = profile ? seedNewEntities(draft.value, next, profile) : next
   if (!findEntity(next, selected.value)) selected.value = rootId(next)
 }
 
@@ -298,6 +312,7 @@ function imported(next: CrateDraft) {
   selected.value = rootId(draft.value)
   preview.reset()
   syncProfileId()
+  draft.value = alignValueKinds(draft.value, vocab.value, expectation.value)
 }
 
 function hasRules(rules: ProfileExpectation | null): boolean {

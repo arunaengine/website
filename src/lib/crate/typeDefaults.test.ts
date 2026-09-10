@@ -25,6 +25,8 @@ describe('defaultProperties', () => {
     expect(entries('MediaObject')).toEqual(['encodingFormat:text', 'contentUrl:url'])
     expect(entries('Place')).toEqual(['address:text', 'url:url'])
     expect(entries('Event')).toEqual(['startDate:date', 'endDate:date', 'location:reference'])
+    expect(entries('GeoCoordinates')).toEqual(['latitude:number', 'longitude:number'])
+    expect(entries('Grant')).toEqual(['identifier:text', 'funder:reference'])
   })
 
   it('takes the kind the vocabulary allows over the listed one', () => {

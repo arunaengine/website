@@ -62,6 +62,14 @@ const BY_TYPE: Readonly<Record<string, ReadonlyArray<DefaultProperty>>> = {
     { key: 'address', kind: 'text' },
     { key: 'url', kind: 'url' },
   ],
+  GeoCoordinates: [
+    { key: 'latitude', kind: 'number' },
+    { key: 'longitude', kind: 'number' },
+  ],
+  Grant: [
+    { key: 'identifier', kind: 'text' },
+    { key: 'funder', kind: 'reference' },
+  ],
   Event: [
     { key: 'startDate', kind: 'date' },
     { key: 'endDate', kind: 'date' },

@@ -502,6 +502,12 @@ export function changeKind(
     (position === index ? { kind, value: entry.value } : entry)))
 }
 
+/** A reference to a URL outside the crate, which "More details" may describe. */
+export function isExternalReference(draft: CrateDraft, value: DraftValue): boolean {
+  const text = value.value.trim()
+  return value.kind === 'reference' && isAbsoluteUri(text) && !findEntity(draft, text)
+}
+
 /**
  * Turns one literal value into a linked entity of `type`: a URL becomes the
  * entity's identifier, a preset keeps its label as the name, plain text becomes
@@ -516,7 +522,8 @@ export function promoteValue(
 ): { draft: CrateDraft; entity: DraftEntity } | undefined {
   const value = findEntity(draft, entityId)?.properties[property]?.[index]
   const text = value?.value.trim() ?? ''
-  if (!value || value.kind === 'reference' || !text) return undefined
+  if (!value || !text) return undefined
+  if (value.kind === 'reference' && !isExternalReference(draft, value)) return undefined
   const preset = VALUE_PRESETS[property]?.find((candidate) => candidate.value === text)
   const email = !isAbsoluteUri(text) && /^[^\s@]+@[^\s@]+$/.test(text) ? text : ''
   const url = isAbsoluteUri(text) ? text : ''
@@ -742,8 +749,72 @@ function shapeIssues(
         })
       }
     }
+    for (const rule of [...shape.required, ...shape.recommended, ...shape.optional]) {
+      if (!NUMERIC_KINDS.has(rule.kind)) continue
+      const rows = entity.properties[rule.valueName] ?? []
+      if (!rows.some((value) => value.kind !== 'reference' && value.value.trim() && !numeric(value.value, rule.kind))) continue
+      issues.push({
+        key: `profile:number:${entity.id}:${rule.valueName}`,
+        severity: 'error',
+        message: `${rule.label} on ${displayName(entity)} must be a ${rule.kind === 'integer' ? 'whole number' : 'number'}.`,
+        entityId: entity.id,
+        property: rule.valueName,
+      })
+    }
   }
   return issues
+}
+
+const NUMERIC_KINDS: ReadonlySet<string> = new Set(['number', 'integer'])
+
+/** Whether a value reads as a finite number, or a whole one for an integer rule. */
+function numeric(value: string, kind = 'number'): boolean {
+  const text = value.trim()
+  if (!text || !Number.isFinite(Number(text))) return false
+  return kind !== 'integer' || Number.isInteger(Number(text))
+}
+
+/** The literal kind a property is meant to hold: the profile's rule first, else the vocabulary. */
+function literalKind(vocab: VocabIndex | null, shape: ProfileShape | undefined, property: string): 'number' | 'text' | undefined {
+  const rule = shapeRule(shape, property)
+  if (rule) {
+    if (NUMERIC_KINDS.has(rule.kind)) return 'number'
+    return rule.kind === 'text' || rule.kind === 'longtext' ? 'text' : undefined
+  }
+  const kind = propertyTerm(vocab, property)?.kind
+  return kind && NUMERIC_KINDS.has(kind) ? 'number' : undefined
+}
+
+// Re-types rows that read the same either way: a coordinate imported as the
+// text "50.6" becomes a number where the profile or vocabulary expects one, and
+// a number becomes text where the profile asks for text. The rest is reported.
+export function alignValueKinds(
+  draft: CrateDraft,
+  vocab: VocabIndex | null,
+  profile: ProfileExpectation | null,
+): CrateDraft {
+  const parts = partIds(draft)
+  let changed = false
+  const entities = draft.entities.map((entity) => {
+    const shape = profileShape(draft, entity, profile, parts)
+    let touched = false
+    const properties = { ...entity.properties }
+    for (const [property, list] of Object.entries(properties)) {
+      const expected = literalKind(vocab, shape, property)
+      if (!expected) continue
+      const next = list.map((value) => {
+        if (expected === 'number' && value.kind === 'text' && numeric(value.value)) return { ...value, kind: 'number' as const }
+        if (expected === 'text' && value.kind === 'number') return { ...value, kind: 'text' as const }
+        return value
+      })
+      if (next.every((value, index) => value === list[index])) continue
+      properties[property] = next
+      touched = true
+    }
+    if (touched) changed = true
+    return touched ? { ...entity, properties } : entity
+  })
+  return changed ? withEntities(draft, entities) : draft
 }
 
 /** The rows of one property as the profile validator reads them. */

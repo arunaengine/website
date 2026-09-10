@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { applyProfile, clearProfile, profileExpectation } from './profileSeed'
-import { findEntity, newDraft, setProperty, toRoCrate, updateValue, type CrateDraft } from './editor'
+import { applyProfile, clearProfile, profileExpectation, seedNewEntities } from './profileSeed'
+import { addEntity, findEntity, newDraft, setProperty, toRoCrate, updateValue, type CrateDraft } from './editor'
 import { contextTermsOf } from '@/lib/profiles/contextTerms'
 import { profileReferenceIri } from '@/composables/aruna/profileIri'
 import { PROCESS_RUN_CRATE_PROFILE, PROCESS_RUN_PROFILE_URI } from '@/lib/profiles/builtinProfiles'
@@ -92,6 +92,24 @@ describe('profile seeding', () => {
 
     expect(root.properties.identifier).toEqual([{ kind: 'text', value: '' }])
     expect(root.properties.citation).toEqual([{ kind: 'text', value: '' }])
+  })
+
+  it('pre-fills a row with the default the rule names', () => {
+    const withDefault = profile()
+    withDefault.propertyRules = [rule({ valueName: 'identifier', defaultValue: 'doi:10.1234/pending' })]
+    const draft = applyProfile(newDraft(), withDefault)
+
+    expect(draft.entities[0].properties.identifier).toEqual([{ kind: 'text', value: 'doi:10.1234/pending' }])
+  })
+
+  it('seeds an entity created later with the rows its shape asks for', () => {
+    const before = applyProfile(newDraft(), profile())
+    const created = addEntity(before, { type: 'Person', name: 'Grace Hopper' })
+    const seeded = seedNewEntities(before, created.draft, profile())
+
+    expect(findEntity(seeded, created.entity.id)?.properties.affiliation).toEqual([{ kind: 'text', value: '' }])
+    expect(findEntity(seeded, '#person')?.properties.affiliation).toEqual([{ kind: 'text', value: '' }])
+    expect(seedNewEntities(seeded, seeded, profile())).toBe(seeded)
   })
 
   it('leaves an optional property to the author', () => {
