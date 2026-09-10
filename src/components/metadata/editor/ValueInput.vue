@@ -27,8 +27,16 @@ const multiline = computed(() =>
   props.modelValue.kind === 'longtext'
   || (props.modelValue.kind === 'text' && props.modelValue.value.length > LONG_TEXT))
 
+// An empty reference row offers the presets too: picking one links the URL.
 const presetting = computed(() =>
-  Boolean(props.presets?.length) && (props.modelValue.kind === 'text' || props.modelValue.kind === 'url'))
+  Boolean(props.presets?.length)
+  && (props.modelValue.kind === 'text' || props.modelValue.kind === 'url' || props.modelValue.kind === 'reference'))
+
+// The same license is written in more than one way; a preset matches its
+// value whatever the scheme, case, trailing slash or .html page.
+function presetKey(value: string): string {
+  return value.trim().toLowerCase().replace(/^http:/, 'https:').replace(/\.html$/, '').replace(/\/+$/, '')
+}
 
 const presetOptions = computed(() => [
   ...(props.presets ?? []).map((preset) => ({ value: preset.value, label: preset.label })),
@@ -36,7 +44,8 @@ const presetOptions = computed(() => [
 ])
 
 const presetChoice = computed(() => {
-  const match = props.presets?.find((preset) => preset.value === props.modelValue.value)
+  const key = presetKey(props.modelValue.value)
+  const match = key ? props.presets?.find((preset) => presetKey(preset.value) === key) : undefined
   if (match) return match.value
   return props.modelValue.value || freeText.value ? OTHER : ''
 })

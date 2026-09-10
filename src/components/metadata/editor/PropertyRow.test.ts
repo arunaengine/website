@@ -246,6 +246,34 @@ describe('PropertyRow', () => {
     mounted.app.unmount()
   })
 
+  it('offers the license presets on an empty reference row', async () => {
+    // A profile that wants the license as an entity seeds a reference row.
+    const updates: Editor.CrateDraft[] = []
+    const draft = Editor.setProperty(seeded(), './', 'license', [{ kind: 'reference', value: '' }])
+    const mounted = await mount('license', updates, draft)
+    const select = element(mounted.root, (node) => node.props['aria-label'] === 'License preset')
+
+    select.value = 'https://creativecommons.org/licenses/by/4.0/'
+    await (select.props.onChange as (event: { target: HostNode }) => Promise<void>)({ target: select })
+
+    expect(updates[0].entities[0].properties.license).toEqual([
+      { kind: 'reference', value: 'https://creativecommons.org/licenses/by/4.0/' },
+    ])
+    mounted.app.unmount()
+  })
+
+  it('offers More details on a license linked by URL only', async () => {
+    const updates: Editor.CrateDraft[] = []
+    const license = 'https://creativecommons.org/licenses/by/4.0/'
+    const draft = Editor.setProperty(seeded(), './', 'license', [{ kind: 'reference', value: license }])
+    const mounted = await mount('license', updates, draft, { promoteTo: 'CreativeWork' })
+
+    await click(button(mounted.root, 'More details'))
+
+    expect(Editor.findEntity(updates[0], license)?.types).toEqual(['CreativeWork'])
+    mounted.app.unmount()
+  })
+
   it('does not link unsafe absolute reference IRIs', async () => {
     const draft = Editor.addValue(seeded(), './', 'author', { kind: 'reference', value: 'javascript:alert(1)' })
     const mounted = await mount('author', [], draft)

@@ -24,6 +24,7 @@ import {
   changeKind,
   defaultValue,
   displayName,
+  isExternalReference,
   promoteValue,
   propertyTerm,
   removeValue,
@@ -102,7 +103,8 @@ function promote(index: number) {
 }
 
 function promotable(value: DraftValue): boolean {
-  return Boolean(props.promoteTo) && value.kind !== 'reference' && Boolean(value.value.trim())
+  if (!props.promoteTo || !value.value.trim()) return false
+  return value.kind !== 'reference' || isExternalReference(props.draft, value)
 }
 
 function addEntry(kind: DraftValueKind) {
@@ -201,8 +203,15 @@ function created(next: CrateDraft, entityId: string) {
       <p v-if="hint" class="text-[11px] text-muted-foreground">{{ hint }}</p>
       <div v-for="(value, index) in values" :key="index" class="flex items-start gap-1">
         <div class="relative min-w-0 flex-1">
+          <ValueInput
+            v-if="value.kind === 'reference' && !value.value.trim() && presets"
+            :model-value="value"
+            :label="label"
+            :presets="presets"
+            @update:model-value="(next) => set(index, next.value)"
+          />
           <ReferenceValue
-            v-if="value.kind === 'reference'"
+            v-else-if="value.kind === 'reference'"
             :draft="draft"
             :value="value.value"
             :label="label"
