@@ -21,6 +21,7 @@ import {
   type ProfileExpectation,
 } from '@/lib/crate/editor'
 import { pickerFor } from '@/lib/crate/pickers'
+import { seedRules } from '@/lib/crate/profileSeed'
 import type { VocabIndex } from '@/lib/profiles/vocabulary'
 import { Plus } from '@lucide/vue'
 
@@ -62,7 +63,18 @@ function addProperty(picked: { key: string; kind: DraftValueKind }) {
     filesFor.value = picked.key
     return
   }
+  const rule = suggested.value.find((candidate) => candidate.valueName === picked.key)
+  if (rule && props.profileRules) {
+    emit('update', seedRules(props.draft, props.profileRules, entity.value.id, [rule]))
+    return
+  }
   emit('update', addValue(props.draft, entity.value.id, picked.key, defaultValue(picked.kind)))
+}
+
+// One click on what the profile still offers, each field with its own fields.
+function addOptional() {
+  if (!entity.value || !props.profileRules) return
+  emit('update', seedRules(props.draft, props.profileRules, entity.value.id, suggested.value))
 }
 </script>
 
@@ -102,6 +114,9 @@ function addProperty(picked: { key: string; kind: DraftValueKind }) {
     <div class="flex flex-wrap items-center gap-2 border-t border-border px-5 py-3">
       <Button variant="outline" size="sm" @click="propertyOpen = true">
         <Plus class="h-3.5 w-3.5" /> Add property
+      </Button>
+      <Button v-if="suggested.length" variant="outline" size="sm" @click="addOptional">
+        <Plus class="h-3.5 w-3.5" /> Add all optional fields
       </Button>
       <AddPropertyDialog
         v-if="propertyOpen"

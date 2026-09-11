@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyProfile, clearProfile, profileExpectation, seedNewEntities } from './profileSeed'
+import { applyProfile, clearProfile, profileExpectation, seedNewEntities, seedRules } from './profileSeed'
 import { addEntity, findEntity, newDraft, setProperty, toRoCrate, updateValue, type CrateDraft } from './editor'
 import { contextTermsOf } from '@/lib/profiles/contextTerms'
 import { profileReferenceIri } from '@/composables/aruna/profileIri'
@@ -227,6 +227,93 @@ describe('profile seeding', () => {
       .toEqual(['name', 'description', 'endTime', 'agent', 'result'])
     expect(expectation.shapes.CreateAction.optional.map((entry) => entry.valueName))
       .toContain('startTime')
+  })
+})
+
+/** A profile whose optional spatial coverage describes a place and its point. */
+function placeProfile(): MetadataProfile {
+  const base = profile()
+  base.propertyRules = [
+    ...(base.propertyRules ?? []),
+    rule({
+      valueName: 'spatialCoverage',
+      label: 'Spatial coverage',
+      kind: 'entity',
+      entityTypes: ['http://schema.org/Place'],
+      obligation: 'MAY',
+    }),
+    rule({ valueName: 'inLanguage', label: 'Language', obligation: 'MAY' }),
+  ]
+  base.entityRules = [
+    ...(base.entityRules ?? []),
+    {
+      id: 'place',
+      label: 'Place',
+      description: '',
+      type: 'http://schema.org/Place',
+      className: 'Place',
+      propertyRules: [
+        rule({ valueName: 'name', label: 'Name', obligation: 'SHOULD' }),
+        rule({
+          valueName: 'geo',
+          label: 'Geo',
+          kind: 'entity',
+          entityTypes: ['http://schema.org/GeoCoordinates'],
+          obligation: 'MAY',
+        }),
+      ],
+    },
+    {
+      id: 'point',
+      label: 'Geo coordinates',
+      description: '',
+      type: 'http://schema.org/GeoCoordinates',
+      className: 'GeoCoordinates',
+      propertyRules: [
+        rule({ valueName: 'latitude', label: 'Latitude', kind: 'number', obligation: 'MAY' }),
+        rule({ valueName: 'longitude', label: 'Longitude', kind: 'number', obligation: 'MAY' }),
+      ],
+    },
+  ]
+  return base
+}
+
+describe('seeding an optional rule', () => {
+  const chosen = placeProfile()
+  const expectation = profileExpectation(chosen)
+
+  function optional(valueName: string): ProfilePropertyRule {
+    const found = expectation.root.optional.find((entry) => entry.valueName === valueName)
+    if (!found) throw new Error(`No optional rule ${valueName}`)
+    return found
+  }
+
+  it('creates the entity a picked reference describes with its own rows', () => {
+    const draft = seedRules(newDraft(), expectation, './', [optional('spatialCoverage')])
+    const place = linked(draft, './', 'spatialCoverage')
+    const point = linked(draft, place?.id ?? '', 'geo')
+
+    expect(place?.types).toEqual(['http://schema.org/Place'])
+    expect(place?.properties.name).toEqual([{ kind: 'text', value: '' }])
+    expect(point?.types).toEqual(['http://schema.org/GeoCoordinates'])
+    expect(point?.properties.latitude).toEqual([{ kind: 'number', value: '' }])
+    expect(point?.properties.longitude).toEqual([{ kind: 'number', value: '' }])
+  })
+
+  it('seeds every optional rule the profile still offers', () => {
+    const draft = seedRules(newDraft(), expectation, './', expectation.root.optional)
+
+    expect(findEntity(draft, './')?.properties.inLanguage).toEqual([{ kind: 'text', value: '' }])
+    expect(linked(draft, './', 'spatialCoverage')).toBeDefined()
+  })
+
+  it('keeps what the author wrote and creates each entity once', () => {
+    const written = setProperty(newDraft(), './', 'inLanguage', [{ kind: 'text', value: 'German' }])
+    const once = seedRules(written, expectation, './', expectation.root.optional)
+    const twice = seedRules(once, expectation, './', expectation.root.optional)
+
+    expect(findEntity(twice, './')?.properties.inLanguage).toEqual([{ kind: 'text', value: 'German' }])
+    expect(twice.entities.map((entity) => entity.id)).toEqual(once.entities.map((entity) => entity.id))
   })
 })
 

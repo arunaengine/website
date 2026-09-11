@@ -47,6 +47,9 @@ export function draftKind(kind: ProfileValueKind): DraftValueKind {
   return KINDS[kind] ?? 'text'
 }
 
+/** The rows a created entity of one type starts with. */
+type RulesFor = (type: string) => ProfilePropertyRule[]
+
 /** The rows a profile pre-adds: everything it asks for, MAY left to the author. */
 function expected(rules: ProfilePropertyRule[]): ProfilePropertyRule[] {
   return rules.filter((rule) => rule.obligation === 'MUST' || rule.obligation === 'SHOULD')
@@ -106,7 +109,7 @@ export function clearProfile(draft: CrateDraft, previousIri?: string): CrateDraf
  */
 function seedRows(
   draft: CrateDraft,
-  profile: MetadataProfile,
+  rulesFor: RulesFor,
   entityId: string,
   rules: ProfilePropertyRule[],
   depth: number,
@@ -118,7 +121,7 @@ function seedRows(
     if (target && !isDataType(target) && depth < MAX_ENTITY_DEPTH) {
       const created = addEntity(next, { type: target })
       next = linkReference(created.draft, entityId, rule.valueName, created.entity.id)
-      next = seedEntity(next, profile, created.entity.id, target, depth + 1)
+      next = seedRows(next, rulesFor, created.entity.id, rulesFor(target), depth + 1)
       continue
     }
     next = setProperty(next, entityId, rule.valueName, [seedValue(rule)])
@@ -133,16 +136,38 @@ function seedValue(rule: ProfilePropertyRule): DraftValue {
   return preset && empty.kind !== 'reference' ? { ...empty, value: preset } : empty
 }
 
-/** The rows the profile's shape for this type asks a created entity for. */
-function seedEntity(
+/** The rows the profile's shape for a created type asks for. */
+function profileRows(profile: MetadataProfile): RulesFor {
+  return (type) => expected(ruleFor(profile, type)?.propertyRules ?? [])
+}
+
+// Every rule a shape holds, so a picked field arrives with its own fields. A
+// type is expanded once per picked rule, so shapes pointing at each other stop.
+function shapeRows(profile: ProfileExpectation): RulesFor {
+  const seen = new Set<string>()
+  return (type) => {
+    const label = typeLabel(type)
+    if (seen.has(label)) return []
+    seen.add(label)
+    const shape = profile.shapes[label]
+    return shape ? [...shape.required, ...shape.recommended, ...shape.optional] : []
+  }
+}
+
+/**
+ * Seeds the rows the author picked from the profile: a reference gets its typed
+ * entity created and linked, carrying the rows that type's shape describes,
+ * optional ones included. Rows that already exist are left untouched.
+ */
+export function seedRules(
   draft: CrateDraft,
-  profile: MetadataProfile,
+  profile: ProfileExpectation,
   entityId: string,
-  type: string,
-  depth: number,
+  rules: ProfilePropertyRule[],
 ): CrateDraft {
-  const rule = ruleFor(profile, type)
-  return rule ? seedRows(draft, profile, entityId, expected(rule.propertyRules), depth) : draft
+  let next = draft
+  for (const rule of rules) next = seedRows(next, shapeRows(profile), entityId, [rule], 0)
+  return next
 }
 
 // Seeds the entities `next` holds that `previous` did not: whatever the author
@@ -151,11 +176,12 @@ function seedEntity(
 export function seedNewEntities(previous: CrateDraft, next: CrateDraft, profile: MetadataProfile): CrateDraft {
   const known = new Set(previous.entities.map((entity) => entity.id))
   const parts = partIds(next)
+  const rows = profileRows(profile)
   let seeded = next
   for (const entity of next.entities) {
     if (known.has(entity.id) || parts.has(entity.id)) continue
     const type = entity.types.find((candidate) => ruleFor(profile, candidate))
-    if (type) seeded = seedEntity(seeded, profile, entity.id, type, 0)
+    if (type) seeded = seedRows(seeded, rows, entity.id, rows(type), 0)
   }
   return seeded
 }
@@ -176,5 +202,5 @@ export function applyProfile(draft: CrateDraft, profile: MetadataProfile, iri?: 
   if (Object.keys(additions).length) {
     next = { ...next, context: [...(Array.isArray(context) ? context : [context]), additions] }
   }
-  return seedRows(next, profile, root, expected(profile.propertyRules ?? []), 0)
+  return seedRows(next, profileRows(profile), root, expected(profile.propertyRules ?? []), 0)
 }

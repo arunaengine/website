@@ -11,6 +11,7 @@ import {
 } from '@/test/clientRender'
 import * as Editor from '@/lib/crate/editor'
 import * as Pickers from '@/lib/crate/pickers'
+import * as ProfileSeed from '@/lib/crate/profileSeed'
 
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
 const EmptyStub = defineComponent(() => () => null)
@@ -27,10 +28,55 @@ const PropertyStub = defineComponent({
   setup: (props, { emit }) => () => h('span', [
     h('button', { onClick: () => emit('pick', { key: 'hasPart', kind: 'reference' }) }, 'Pick parts'),
     h('button', { onClick: () => emit('pick', { key: 'publisher', kind: 'text' }) }, 'Pick publisher'),
+    h('button', {
+      onClick: () => emit('pick', {
+        key: (props.suggestions as Array<{ valueName: string }>)[0]?.valueName ?? '',
+        kind: 'reference',
+      }),
+    }, 'Pick suggestion'),
     h('p', `Suggests ${(props.suggestions as Array<{ valueName: string }>)
       .map((rule) => rule.valueName).join(', ') || 'nothing'} from ${props.profileName || 'no profile'}`),
   ]),
 })
+
+function entityRule(valueName: string, type: string) {
+  return { ...rule(valueName, 'MAY'), kind: 'entity' as const, entityTypes: [type] }
+}
+
+/** A profile whose optional spatial coverage describes a place and its point. */
+function placeRules(): Editor.ProfileExpectation {
+  return {
+    name: 'Workshop study',
+    root: {
+      label: 'Root dataset',
+      required: [],
+      recommended: [],
+      optional: [entityRule('spatialCoverage', 'http://schema.org/Place'), rule('inLanguage', 'MAY')],
+    },
+    shapes: {
+      Place: {
+        label: 'Place',
+        required: [],
+        recommended: [rule('name', 'SHOULD')],
+        optional: [entityRule('geo', 'http://schema.org/GeoCoordinates')],
+      },
+      GeoCoordinates: {
+        label: 'Geo coordinates',
+        required: [],
+        recommended: [],
+        optional: [rule('latitude', 'MAY'), rule('longitude', 'MAY')],
+      },
+    },
+    types: [],
+    contents: [],
+  }
+}
+
+/** The entity one reference row points at. */
+function linked(draft: Editor.CrateDraft, entityId: string, property: string) {
+  const target = Editor.findEntity(draft, entityId)?.properties[property]?.[0]?.value ?? ''
+  return Editor.findEntity(draft, target)
+}
 
 function rule(valueName: string, obligation: string) {
   return {
@@ -57,6 +103,7 @@ const EntityEditor = compileClientComponent(new URL('./EntityEditor.vue', import
   './AddFilesDialog.vue': moduleDefault(FilesStub),
   '@/lib/crate/editor': Editor,
   '@/lib/crate/pickers': Pickers,
+  '@/lib/crate/profileSeed': ProfileSeed,
 })
 
 function mount(
@@ -125,6 +172,32 @@ describe('EntityEditor', () => {
     await click(button(mounted.root, 'Add property'))
 
     expect(content(mounted.root)).toContain('Suggests startTime, error from Process Run Crate')
+    mounted.app.unmount()
+  })
+
+  it('seeds a picked profile field with the fields it describes', async () => {
+    const updates: Editor.CrateDraft[] = []
+    const mounted = await mount(updates, Editor.newDraft(), './', placeRules())
+
+    await click(button(mounted.root, 'Add property'))
+    await click(button(mounted.root, 'Pick suggestion'))
+    const place = linked(updates[0], './', 'spatialCoverage')
+    const point = linked(updates[0], place?.id ?? '', 'geo')
+
+    expect(place?.properties.name).toEqual([{ kind: 'text', value: '' }])
+    expect(point?.properties.latitude).toEqual([{ kind: 'text', value: '' }])
+    expect(point?.properties.longitude).toEqual([{ kind: 'text', value: '' }])
+    mounted.app.unmount()
+  })
+
+  it('adds every optional field the profile still offers at once', async () => {
+    const updates: Editor.CrateDraft[] = []
+    const mounted = await mount(updates, Editor.newDraft(), './', placeRules())
+
+    await click(button(mounted.root, 'Add all optional fields'))
+
+    expect(Editor.findEntity(updates[0], './')?.properties.inLanguage).toEqual([{ kind: 'text', value: '' }])
+    expect(linked(updates[0], './', 'spatialCoverage')?.types).toEqual(['http://schema.org/Place'])
     mounted.app.unmount()
   })
 
