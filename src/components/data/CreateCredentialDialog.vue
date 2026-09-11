@@ -96,7 +96,7 @@ function hasWriteAccess(groupId: string): boolean {
 const groupOptions = computed(() =>
   myGroups.value.map((group) => ({
     value: group.id,
-    label: hasWriteAccess(group.id) ? group.name : `${group.name} (no write access)`,
+    label: hasWriteAccess(group.id) ? group.name : `${group.name} (read only)`,
   })),
 )
 
@@ -257,7 +257,7 @@ async function submitToken() {
               </div>
               <Button variant="outline" size="sm" @click="addRestriction"><Plus class="h-3.5 w-3.5" /> Add restriction</Button>
               <p class="text-[11px] leading-relaxed text-muted-foreground">
-                Patterns are S3 key paths. Relative patterns are scoped under the group root. Only a trailing <code class="font-mono">/**</code> wildcard is supported; other wildcards are rejected. Without restrictions the key gets the group's full access.
+                Patterns are S3 key paths. Relative patterns are scoped under the group root. Only a trailing <code class="font-mono">/**</code> wildcard is supported; other wildcards are rejected. Without restrictions the key carries your own access in the group, read only included.
               </p>
             </div>
           </div>
