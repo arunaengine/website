@@ -13,11 +13,15 @@ import DialogTitle from '@/components/ui/DialogTitle.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Select from '@/components/ui/Select.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import StatusDot from '@/components/ui/StatusDot.vue'
 import NotebookDependencies from '@/components/notebook/NotebookDependencies.vue'
 import { injectNotebook } from '@/composables/notebookContext'
+import { useAruna } from '@/composables/useAruna'
 import { useNow } from '@/composables/useNow'
 import { useRealmNodes } from '@/composables/useRealmNodes'
+import { listRunningSessions, type RunningSession } from '@/lib/notebook/sessions'
+import { errorMessage, relativeTime } from '@/lib/utils'
 import { SESSION_RUNTIMES, dependencyFileName, dependencyKind } from '@/lib/notebook/runtimes'
 import type { NotebookDependencies as DependencySpec } from '@/lib/notebook/nbformat'
 import { DEFAULT_KERNEL_CPU, DEFAULT_KERNEL_RAM, sessionProblems, sessionStartDraft } from '@/lib/notebook/submit'
@@ -27,8 +31,9 @@ import { useComputeAdmin } from '@/composables/useComputeAdmin'
 import { ChevronDown, CircleStop, Play, RotateCcw } from '@lucide/vue'
 
 const { notebook, session } = injectNotebook()
+const { apiBaseUrl, authToken } = useAruna()
 const { getComputeConfig } = useComputeAdmin()
-const { nodes, displayName } = useRealmNodes()
+const { nodes, displayName, nodeById } = useRealmNodes()
 const now = useNow(1_000)
 
 const kernelOpen = ref(false)
@@ -70,6 +75,66 @@ const idleOptions = computed(() => [
   { value: '', label: 'Realm default' },
   ...IDLE_PICKS.filter((option) => Number(option.value) !== realmIdleMs.value),
 ])
+
+// The sessions that are already running, so a kernel another browser started
+// can be picked up here. Every listing is bound to the dialog opening and to
+// the API base it was read from.
+const foundSessions = ref<RunningSession[]>([])
+const sessionsLoading = ref(false)
+const sessionsError = ref('')
+const uncheckedJobs = ref(0)
+let listGeneration = 0
+
+async function loadSessions() {
+  const request = ++listGeneration
+  const base = apiBaseUrl.value
+  const token = authToken.value
+  const active = () => request === listGeneration && base === apiBaseUrl.value
+  sessionsLoading.value = true
+  sessionsError.value = ''
+  try {
+    const found = await listRunningSessions({
+      client: { baseUrl: base, token },
+      nodeClient: (id) => ({ baseUrl: nodeById(id)?.apiBase ?? base, token }),
+    })
+    if (!active()) return
+    foundSessions.value = found.sessions
+    uncheckedJobs.value = found.unchecked
+  } catch (cause) {
+    if (!active()) return
+    foundSessions.value = []
+    uncheckedJobs.value = 0
+    sessionsError.value = errorMessage(cause)
+  } finally {
+    if (active()) sessionsLoading.value = false
+  }
+}
+
+watch([kernelOpen, session.running], ([open, live]) => {
+  // A closed dialog and an attached session drop what is still in flight.
+  listGeneration += 1
+  sessionsLoading.value = false
+  if (open && !live) void loadSessions()
+})
+
+/** A session of this notebook's bucket and runtime is the one it wants. */
+function matches(entry: RunningSession): boolean {
+  return entry.bucket === meta.value?.workspace_bucket && entry.runtime === meta.value?.runtime
+}
+const sessionRows = computed(() =>
+  [...foundSessions.value].sort((a, b) => Number(matches(b)) - Number(matches(a))),
+)
+function runtimeLabel(id: string): string {
+  return SESSION_RUNTIMES.find((entry) => entry.id === id)?.label ?? id
+}
+function startedLabel(entry: RunningSession): string {
+  return entry.startedAtMs ? relativeTime(new Date(entry.startedAtMs).toISOString()) : 'start time unknown'
+}
+
+async function attachSession(entry: RunningSession) {
+  await session.attachTo(entry.jobId, entry.nodeId)
+  if (!session.error.value) kernelOpen.value = false
+}
 
 const stateLabel = computed(() => {
   if (session.restarting.value) return 'Restarting'
@@ -220,6 +285,44 @@ async function saveDependencies(value: DependencySpec, restart: boolean) {
         <Notice v-if="session.running.value" tone="info">
           The kernel is running, so these settings are locked. Restart it to apply a change.
         </Notice>
+
+        <div v-if="!session.running.value" class="space-y-2 rounded-md border border-border/70 bg-muted/30 px-3 py-2">
+          <div class="flex items-center justify-between gap-2">
+            <p class="text-xs font-medium text-foreground">Running sessions</p>
+            <Button variant="outline" size="sm" :disabled="sessionsLoading" @click="loadSessions()">Refresh</Button>
+          </div>
+          <Spinner v-if="sessionsLoading" label="Looking for running sessions…" show-label />
+          <Notice v-else-if="sessionsError" tone="error">Running sessions could not be listed: {{ sessionsError }}</Notice>
+          <template v-else>
+            <p v-if="!sessionRows.length" class="text-[11px] text-muted-foreground">
+              No running session was found. Start a kernel below.
+            </p>
+            <ul v-else class="space-y-1.5">
+              <li v-for="entry in sessionRows" :key="entry.jobId" class="flex flex-wrap items-center justify-between gap-2">
+                <div class="min-w-0">
+                  <p class="truncate text-xs text-foreground">
+                    {{ runtimeLabel(entry.runtime) }} on {{ displayName(entry.nodeId) }}
+                  </p>
+                  <p class="truncate text-[11px] text-muted-foreground">
+                    {{ entry.bucket }}, started {{ startedLabel(entry) }}
+                    <span v-if="!matches(entry)">, other bucket or runtime</span>
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  :disabled="session.attaching.value"
+                  @click="attachSession(entry)"
+                >
+                  Attach
+                </Button>
+              </li>
+            </ul>
+            <p v-if="uncheckedJobs" class="text-[11px] text-muted-foreground">
+              Some running jobs did not answer, so this list may be incomplete.
+            </p>
+          </template>
+        </div>
 
         <div class="grid gap-3 sm:grid-cols-2">
           <label class="space-y-1">

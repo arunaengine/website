@@ -1,7 +1,18 @@
 import { computed, defineComponent, h, ref, type Component } from 'vue'
 import * as VueRuntime from 'vue'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const jobs = vi.hoisted(() => ({ listJobs: vi.fn() }))
+vi.mock('@/lib/jobs', () => jobs)
+const sessionApi = vi.hoisted(() => ({ getSessionState: vi.fn() }))
+vi.mock('@/lib/notebook/session', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/notebook/session')>()),
+  getSessionState: sessionApi.getSessionState,
+}))
+
 import * as ComputeAdmin from '@/lib/computeAdmin'
+import * as Utils from '@/lib/utils'
+import * as NotebookSessions from '@/lib/notebook/sessions'
 import * as StateBadge from '@/lib/stateBadge'
 import * as NotebookDocument from '@/lib/notebook/document'
 import * as NotebookRuntimes from '@/lib/notebook/runtimes'
@@ -89,6 +100,8 @@ function fakeContext(overrides: { state?: Record<string, unknown> | null; runnin
       runCells: vi.fn(),
       jobId: ref(overrides.running ? '01JOB' : ''),
       nodeId: ref(overrides.running ? 'node-a' : ''),
+      attaching: ref(false),
+      attachTo: vi.fn(),
       starting: ref(false),
       ending: ref(false),
       restarting: ref(false),
@@ -125,11 +138,15 @@ function sessionBar(): Component {
     '@/components/ui/Input.vue': moduleDefault(InputStub),
     '@/components/ui/Notice.vue': moduleDefault(Slotted('aside')),
     '@/components/ui/Select.vue': moduleDefault(SelectStub),
+    '@/components/ui/Spinner.vue': moduleDefault(Slotted('span')),
     '@/components/ui/StatusDot.vue': moduleDefault(Slotted('span')),
     '@/lib/stateBadge': StateBadge,
     '@/components/notebook/NotebookDependencies.vue': moduleDefault(Slotted('div')),
     '@/composables/notebookContext': { injectNotebook: () => context },
-    '@/composables/useAruna': { useAruna: () => ({ myGroups: ref([{ id: 'group-1', name: 'Lab' }]) }) },
+    '@/composables/useAruna': { useAruna: () => ({
+      myGroups: ref([{ id: 'group-1', name: 'Lab' }]),
+      apiBaseUrl: ref('/api/v1'), authToken: ref('bearer-token'),
+    }) },
     '@/composables/useNow': { useNow: () => ref(1_000) },
     '@/composables/useComputeAdmin': {
       useComputeAdmin: () => ({
@@ -140,9 +157,12 @@ function sessionBar(): Component {
       useRealmNodes: () => ({
         nodes: ref([{ nodeId: 'node-a', label: 'Node A', executorKinds: ['docker'] }]),
         displayName: () => 'Node A',
+        nodeById: () => ({ apiBase: 'https://node-a.example/api/v1' }),
       }),
     },
     '@/lib/notebook/runtimes': NotebookRuntimes,
+    '@/lib/notebook/sessions': NotebookSessions,
+    '@/lib/utils': Utils,
     '@/lib/notebook/document': NotebookDocument,
     '@/lib/notebook/submit': NotebookSubmit,
     '@/lib/computeAdmin': ComputeAdmin,
@@ -163,6 +183,26 @@ function select(root: HostNode, label: string): HostNode {
 
 async function openOptions(root: HostNode) {
   await bubbleClick(element(root, (node) => node.props['aria-label'] === 'Kernel'))
+}
+
+beforeEach(() => {
+  jobs.listJobs.mockReset().mockResolvedValue({ jobs: [] })
+  sessionApi.getSessionState.mockReset()
+})
+
+function runningJob(bucket = 'lab-data') {
+  return {
+    job_id: '01JOB', kind: 'execution', state: 'running', workspace_mode: 'existing',
+    workspace_bucket: bucket,
+    family: { execution_list: [{ executor_node_id: 'node-a', canonical: true }] },
+  }
+}
+
+function runningSession(overrides: Record<string, unknown> = {}) {
+  return {
+    job_id: '01JOB', state: 'ready', runtime: 'python-notebook', workspace_bucket: 'lab-data',
+    executor_node_id: 'node-a', started_at_ms: Date.now() - 60_000, cells: [], ...overrides,
+  }
 }
 
 describe('the session bar', () => {
@@ -268,6 +308,37 @@ describe('the session bar', () => {
     expect(idle.props.disabled).toBe(true)
     const labels = (idle.props.options as { label: string }[]).map((option) => option.label)
     expect(labels).toEqual(['Realm default', '5 minutes', '15 minutes'])
+  })
+
+  it('offers the running sessions the kernel dialog found', async () => {
+    jobs.listJobs.mockResolvedValue({ jobs: [runningJob()] })
+    sessionApi.getSessionState.mockResolvedValue(runningSession())
+    const root = await render()
+    await openOptions(root)
+    await flush()
+    expect(jobs.listJobs).toHaveBeenCalledWith({ state: 'running', limit: 50 }, { baseUrl: '/api/v1', token: 'bearer-token' })
+    expect(content(root)).toContain('Python')
+    expect(content(root)).toContain('Node A')
+    await click(button(root, 'Attach'))
+    expect(context.session.attachTo).toHaveBeenCalledWith('01JOB', 'node-a')
+  })
+
+  it('marks a session that works in another bucket', async () => {
+    jobs.listJobs.mockResolvedValue({ jobs: [runningJob('other-bucket')] })
+    sessionApi.getSessionState.mockResolvedValue(runningSession({ workspace_bucket: 'other-bucket' }))
+    const root = await render()
+    await openOptions(root)
+    await flush()
+    expect(content(root)).toContain('other bucket or runtime')
+  })
+
+  it('says the running sessions could not be listed', async () => {
+    jobs.listJobs.mockRejectedValue(new Error('jobs unavailable'))
+    const root = await render()
+    await openOptions(root)
+    await flush()
+    expect(content(root)).toContain('could not be listed')
+    expect(content(root)).not.toContain('No running session was found')
   })
 
   it('hides the value the compute config reports', async () => {
