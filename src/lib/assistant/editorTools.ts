@@ -384,8 +384,12 @@ export function editorTools(bridge: EditorBridge, gate: ApprovalGate): ToolSet {
           return { profile_id: '' }
         }
         const profiles = bridge.profiles()
-        const match = profiles.find((profile) => sameText(profile.id, wanted))
-          ?? profiles.find((profile) => sameText(profile.name, wanted))
+        const named = profiles.filter((profile) => sameText(profile.name, wanted))
+        const match = profiles.find((profile) => sameText(profile.id, wanted)) ?? (named.length === 1 ? named[0] : undefined)
+        if (!match && named.length > 1) {
+          const ids = named.map((profile) => profile.id).join(', ')
+          return { error: `More than one profile is named ${profileId}: ${ids}. Name the one you mean by its id.` }
+        }
         if (!match) {
           const known = profiles.map((profile) => `${profile.id} (${profile.name})`).join(', ')
           return { error: `No profile ${profileId} in this realm.${known ? ` Available: ${known}.` : ''}` }

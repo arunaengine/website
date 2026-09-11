@@ -27,7 +27,7 @@ function seedDraft(): CrateDraft {
   return addValue(withPerson.draft, rootId(base), 'author', { kind: 'reference', value: '#alice' })
 }
 
-function harness(approve = true) {
+function harness(approve = true, profiles = [{ id: 'p-1', name: 'Workshop study profile' }]) {
   let draft = seedDraft()
   const applyProfile = vi.fn()
   const validate = vi.fn(async () => ({ accepted: true, findings: [] }))
@@ -44,7 +44,7 @@ function harness(approve = true) {
       partCount: 1,
       types: ['Dataset', 'Person'],
     }),
-    profiles: () => [{ id: 'p-1', name: 'Workshop study profile' }],
+    profiles: () => profiles,
     rules: (entityId, types) => {
       const known = draft.entities.find((entity) => entity.id === entityId)?.types
       const list = types ?? known ?? []
@@ -316,6 +316,15 @@ describe('draft tools', () => {
     expect(await runTool(scene.tools.apply_profile, { profile_id: '  workshop study profile ' }))
       .toEqual({ profile_id: 'p-1' })
     expect(scene.applyProfile).toHaveBeenCalledWith('p-1')
+  })
+
+  it('refuses a name more than one profile carries', async () => {
+    const twins = harness(true, [{ id: 'p-1', name: 'Study' }, { id: 'p-2', name: 'study' }])
+
+    expect(await runTool(twins.tools.apply_profile, { profile_id: 'Study' }))
+      .toEqual({ error: 'More than one profile is named Study: p-1, p-2. Name the one you mean by its id.' })
+    expect(twins.applyProfile).not.toHaveBeenCalled()
+    expect(await runTool(twins.tools.apply_profile, { profile_id: 'p-2' })).toEqual({ profile_id: 'p-2' })
   })
 
   it('removes the declared profile for an empty id', async () => {
