@@ -10,9 +10,9 @@ async function render() {
   const noteCellInputs = vi.fn()
   const addSessionInputs = vi.fn()
   const stub = defineComponent({ setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()) })
-  const picker = defineComponent({ setup: (_, { emit }) => () => h('button', {
+  const picker = defineComponent({ props: ['destination'], setup: (props, { emit }) => () => h('button', {
     onClick: () => emit('add', { kind: 'file', url: 's3://source/input.txt', name: 'input.txt' }),
-  }, 'Pick input') })
+  }, `Pick input into ${props.destination}`) })
   const modules: Record<string, unknown> = {
     vue: VueRuntime,
     '@lucide/vue': new Proxy({}, { get: () => stub }),
@@ -49,7 +49,8 @@ describe('notebook input provenance', () => {
     const { root, app, generation, activeCellId, noteCellInputs, addSessionInputs } = await render()
     let finish = (_result: unknown) => {}
     addSessionInputs.mockReturnValue(new Promise((resolve) => { finish = resolve }))
-    await click(button(root, 'Pick input'))
+    expect(content(root)).toContain('Pick input into workspace/data/')
+    await click(button(root, 'Pick input into workspace/data/'))
     activeCellId.value = 'second'
     if (changed) generation.value += 1
     finish({ staged: [{ dest_key: 'data/input.txt', version_id: 'source-version', blake3: 'hash' }] })

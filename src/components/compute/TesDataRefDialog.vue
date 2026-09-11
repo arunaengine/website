@@ -30,8 +30,10 @@ const props = withDefaults(
     mode: 'input'
     /** Default container directory the picks mount under. */
     mountDefault?: string
+    /** Where the caller puts the picks itself; hides the mount directory. */
+    destination?: string
   }>(),
-  { mountDefault: '/inputs/' },
+  { mountDefault: '/inputs/', destination: undefined },
 )
 const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
@@ -52,8 +54,8 @@ const folderError = ref<string | null>(null)
 // "Mount under": the container directory every pick is staged below. Folders
 // keep their name as a subdirectory of it.
 const mountDir = ref(props.mountDefault)
-const mountDirValid = computed(() => validContainerDir(mountDir.value))
-const mountDirNormalized = computed(() => normalizeContainerDir(mountDir.value))
+const mountDirValid = computed(() => Boolean(props.destination) || validContainerDir(mountDir.value))
+const mountDirNormalized = computed(() => props.destination ?? normalizeContainerDir(mountDir.value))
 
 type Selection = { bucket: string; objects: ObjectEntry[]; folders: FolderEntry[] }
 const pendingSelection = ref<Selection | null>(null)
@@ -178,7 +180,7 @@ watch(
         <p v-else class="flex items-center gap-2"><LogIn class="h-3.5 w-3.5" /> Sign in first to create credentials.</p>
       </div>
       <template v-else>
-        <div data-tutorial="input-mount" class="max-w-sm">
+        <div v-if="!destination" data-tutorial="input-mount" class="max-w-sm">
           <label class="text-xs font-medium text-foreground">Mount under</label>
           <Input
             v-model="mountDir"

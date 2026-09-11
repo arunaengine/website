@@ -90,6 +90,7 @@ async function stage(entry: TesDataRefEntry) {
     const result = await addSessionInputs(session.jobId.value, items, session.client.value)
     if (!active()) return
     const staged = result.staged.length
+    if (staged) panelRevision.value += 1
     if (cellId && staged) {
       notebook.noteCellInputs(
         cellId,
@@ -135,7 +136,7 @@ async function stage(entry: TesDataRefEntry) {
       </div>
     </div>
 
-    <TesDataRefDialog v-model:open="addOpen" mode="input" @add="stage" />
+    <TesDataRefDialog v-model:open="addOpen" mode="input" :destination="`${bucket}/${NOTEBOOK_DATA_PREFIX}`" @add="stage" />
 
     <!-- The data manager's own import, pointed at the notebook's data folder. -->
     <AddDataDialog
