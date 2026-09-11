@@ -53,15 +53,19 @@ const ButtonStub = defineComponent({
   inheritAttrs: false,
   setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()),
 })
-const PopoverStub = defineComponent((_, { slots }) => () =>
-  h('div', { 'data-popover': '' }, [slots.default?.(), slots.content?.()]))
+const PopoverStub = defineComponent({
+  inheritAttrs: false,
+  setup: (_, { attrs, slots }) => () =>
+    h('div', { ...attrs, 'data-popover': '' }, [slots.default?.(), slots.content?.()]),
+})
 const SelectStub = defineComponent({
-  props: { modelValue: String, options: { type: Array, default: () => [] }, ariaLabel: String },
+  props: { modelValue: String, options: { type: Array, default: () => [] }, ariaLabel: String, raised: Boolean },
   emits: ['update:modelValue'],
   setup: (props, { emit }) => () =>
-    h('div', { 'aria-label': props.ariaLabel }, (props.options as Array<{ value: string; label: string }>).map(
-      (option) => h('button', { onClick: () => emit('update:modelValue', option.value) }, option.label),
-    )),
+    h('div', { 'aria-label': props.ariaLabel, 'data-raised': String(props.raised) },
+      (props.options as Array<{ value: string; label: string }>).map(
+        (option) => h('button', { onClick: () => emit('update:modelValue', option.value) }, option.label),
+      )),
 })
 // Typing reports a draft; a change event stands in for a pick or Enter.
 const ComboboxStub = defineComponent({
@@ -69,11 +73,13 @@ const ComboboxStub = defineComponent({
     modelValue: { type: String, default: '' },
     ariaLabel: String,
     suggestions: { type: Array, default: () => [] },
+    raised: Boolean,
   },
   emits: ['update:modelValue', 'update:draft'],
   setup: (props, { emit }) => () =>
     h('input', {
       'aria-label': props.ariaLabel,
+      'data-raised': String(props.raised),
       value: props.modelValue,
       'data-suggestions': (props.suggestions as Array<{ id: string }>).map((model) => model.id).join(','),
       onInput: (event: { target: { value: unknown } }) => emit('update:draft', String(event.target.value ?? '')),
@@ -183,6 +189,21 @@ describe('AssistantSettings', () => {
     await click(button(root, 'High'))
 
     expect(setReasoningEffort).toHaveBeenCalledWith('high')
+  })
+
+  it('lifts the popover and its lists over the floating panel', async () => {
+    const { root } = await mountApp(AssistantSettings, { props: { raised: true } })
+
+    expect(element(root, (node) => node.props['data-popover'] !== undefined).props.raised).toBe(true)
+    expect(combobox(root).props['data-raised']).toBe('true')
+    expect(element(root, (node) => node.props['aria-label'] === 'Writes').props['data-raised']).toBe('true')
+  })
+
+  it('leaves the lists on the usual layer on the assistant page', async () => {
+    const { root } = await mountApp(AssistantSettings)
+
+    expect(element(root, (node) => node.props['data-popover'] !== undefined).props.raised).toBe(false)
+    expect(combobox(root).props['data-raised']).toBe('false')
   })
 
   it('offers and selects xhigh when the model advertises it', async () => {

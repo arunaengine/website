@@ -76,6 +76,14 @@ describe('Select', () => {
     expect(element(root, (node) => node.props.role === 'root').props.modelValue).toBe('')
   })
 
+  it('opens the list above the assistant panel when raised', async () => {
+    const { root, errors } = await mountApp(Select, { props: { options, modelValue: 'p1', raised: true } })
+    expect(errors).toEqual([])
+
+    const content = nodes(root).map((node) => String(node.props.class ?? '')).join(' ')
+    expect(content).toContain('z-[var(--z-assistant-modal)]')
+  })
+
   it('shows the empty option as selected for an empty model value', async () => {
     const { root, errors } = await mountApp(Select, { props: { options, modelValue: '' } })
     expect(errors).toEqual([])

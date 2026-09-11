@@ -17,6 +17,8 @@ const props = defineProps<{
   class?: string
   /** An empty id is reported as invalid; leave unset where no model is fine. */
   required?: boolean
+  /** Set inside the assistant panel, which floats above the modal layer. */
+  raised?: boolean
 }>()
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void
@@ -142,7 +144,8 @@ function onBlur() {
           align="start"
           :side-offset="4"
           data-portal-list
-          class="z-50 w-[var(--radix-popover-trigger-width)] outline-none"
+          class="w-[var(--radix-popover-trigger-width)] outline-none"
+          :class="props.raised ? 'z-[var(--z-assistant-modal)]' : 'z-50'"
           @open-auto-focus.prevent
           @close-auto-focus.prevent
         >

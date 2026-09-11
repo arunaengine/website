@@ -14,7 +14,9 @@ import { Settings } from '@lucide/vue'
 const props = withDefaults(defineProps<{
   side?: 'top' | 'bottom'
   align?: 'start' | 'center' | 'end'
-}>(), { side: 'top', align: 'end' })
+  /** Set inside the assistant panel, so the popover and its lists float above it. */
+  raised?: boolean
+}>(), { side: 'top', align: 'end', raised: false })
 
 const {
   provider,
@@ -57,7 +59,7 @@ const writeChoices = [
 </script>
 
 <template>
-  <Popover :side="props.side" :align="props.align">
+  <Popover :side="props.side" :align="props.align" :raised="props.raised">
     <slot />
     <template #content>
       <div class="space-y-3">
@@ -70,6 +72,7 @@ const writeChoices = [
             v-else
             :model-value="shownProvider"
             :options="providerOptions"
+            :raised="props.raised"
             class="mt-1 h-8 text-xs"
             aria-label="Provider"
             @update:model-value="selectProvider"
@@ -80,6 +83,7 @@ const writeChoices = [
           <ModelCombobox
             :model-value="shownModel"
             :suggestions="modelChoices"
+            :raised="props.raised"
             class="mt-1 h-8"
             aria-label="Model"
             required
@@ -95,6 +99,7 @@ const writeChoices = [
           <Select
             :model-value="reasoningEffort"
             :options="effortChoices"
+            :raised="props.raised"
             class="mt-1 h-8 text-xs"
             aria-label="Reasoning"
             @update:model-value="setReasoningEffort"
@@ -105,6 +110,7 @@ const writeChoices = [
           <Select
             :model-value="webSearch ? 'on' : 'off'"
             :options="searchChoices"
+            :raised="props.raised"
             class="mt-1 h-8 text-xs"
             aria-label="Web search"
             @update:model-value="(value: string) => setWebSearch(value === 'on')"
@@ -118,6 +124,7 @@ const writeChoices = [
           <Select
             :model-value="approveWrites ? 'ask' : 'auto'"
             :options="writeChoices"
+            :raised="props.raised"
             class="mt-1 h-8 text-xs"
             aria-label="Writes"
             @update:model-value="(value: string) => setApproveWrites(value === 'ask')"

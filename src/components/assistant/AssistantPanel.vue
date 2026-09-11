@@ -75,7 +75,7 @@ function openFullView() {
     />
 
     <div class="border-t border-border px-3 py-2">
-      <ChatComposer />
+      <ChatComposer raised />
     </div>
 
     <AssistantFileDialog raised />

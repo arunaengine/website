@@ -33,6 +33,8 @@ const props = defineProps<
     ariaLabel?: string
     // Visible prefix inside the trigger ("State: All") for filter controls.
     label?: string
+    /** Set inside the assistant panel, which floats above the modal layer. */
+    raised?: boolean
   }
 >()
 const emits = defineEmits<{ (e: 'update:modelValue', v: string): void }>()
@@ -71,7 +73,8 @@ const triggerClasses = computed(() =>
       <SelectContent
         position="popper"
         :side-offset="4"
-        class="relative z-50 max-h-96 min-w-[10rem] max-w-[min(32rem,calc(100vw-2rem))] overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+        :class="props.raised ? 'z-[var(--z-assistant-modal)]' : 'z-50'"
+        class="relative max-h-96 min-w-[10rem] max-w-[min(32rem,calc(100vw-2rem))] overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
       >
         <SelectViewport class="p-1">
           <SelectItem

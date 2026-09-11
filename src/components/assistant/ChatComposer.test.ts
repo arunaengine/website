@@ -61,7 +61,10 @@ const ButtonStub = defineComponent({
   setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()),
 })
 const NoticeStub = defineComponent((_, { slots }) => () => h('div', { 'data-notice': '' }, slots.default?.()))
-const SettingsStub = defineComponent((_, { slots }) => () => h('div', { 'data-settings': '' }, slots.default?.()))
+const SettingsStub = defineComponent({
+  inheritAttrs: false,
+  setup: (_, { attrs, slots }) => () => h('div', { ...attrs, 'data-settings': '' }, slots.default?.()),
+})
 const Passthrough = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
 const DialogStub = defineComponent({
   props: { open: Boolean },
@@ -157,6 +160,12 @@ describe('ChatComposer', () => {
     await click(control(root, 'Send'))
 
     expect(send).not.toHaveBeenCalled()
+  })
+
+  it('lifts the settings over the floating panel', async () => {
+    const { root } = await mountApp(ChatComposer, { props: { raised: true } })
+
+    expect(element(root, (node) => node.props['data-settings'] !== undefined).props.raised).toBe(true)
   })
 
   it('asks for the model list when the cogwheel opens the settings', async () => {

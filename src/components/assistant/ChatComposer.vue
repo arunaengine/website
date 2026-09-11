@@ -28,7 +28,14 @@ import { SendHorizontal, Settings2 } from '@lucide/vue'
 /** About eight rows; the card scrolls inside itself beyond that. */
 const MAX_HEIGHT = 200
 
-const props = withDefaults(defineProps<{ size?: 'compact' | 'full' }>(), { size: 'compact' })
+const props = withDefaults(
+  defineProps<{
+    size?: 'compact' | 'full'
+    /** Set in the floating panel, so the settings popover opens above it. */
+    raised?: boolean
+  }>(),
+  { size: 'compact', raised: false },
+)
 
 const route = useRoute()
 const { currentUser, profiles, myGroups, discoverableGroups, realmInfo, usageInfo } = useAruna()
@@ -194,7 +201,7 @@ function onKeydown(event: KeyboardEvent) {
         @keydown="onKeydown"
       />
       <div class="flex items-center justify-end gap-1 px-2 pb-2">
-        <AssistantSettings>
+        <AssistantSettings :raised="props.raised">
           <Button
             variant="ghost"
             size="icon-sm"
