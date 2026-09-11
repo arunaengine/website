@@ -106,7 +106,7 @@ function addTypedConnectorPath() {
       @unsupported="entriesUnsupported = true"
       @list-failed="entriesListingFailed = true"
     />
-    <div v-if="entriesUnsupported || entriesListingFailed" class="space-y-2">
+    <div class="space-y-2">
       <Notice v-if="entriesUnsupported" tone="warning">
         Browsing connector contents is not supported by this node yet. Type the source path instead.
       </Notice>

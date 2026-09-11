@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
+import Input from '@/components/ui/Input.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Notice from '@/components/ui/Notice.vue'
@@ -36,6 +37,7 @@ const emit = defineEmits<{
 const { listConnectorEntries } = useAruna()
 
 const path = ref('')
+const filter = ref('')
 const entries = ref<ConnectorEntry[]>([])
 const truncated = ref(false)
 const loading = ref(false)
@@ -82,12 +84,23 @@ watch(
   () => [props.groupId, props.connectorId],
   () => {
     path.value = ''
+    filter.value = ''
     selected.value = new Map()
     void load()
   },
   { immediate: true },
 )
-watch(path, () => void load())
+watch(path, () => {
+  filter.value = ''
+  void load()
+})
+
+// The listing endpoint has no search, so the filter narrows the loaded folder.
+const visibleEntries = computed(() => {
+  const needle = filter.value.trim().toLowerCase()
+  if (!needle) return entries.value
+  return entries.value.filter((entry) => entry.name.toLowerCase().includes(needle))
+})
 
 // Path segments only; the root is the breadcrumb's home icon.
 const crumbs = computed(() => {
@@ -156,6 +169,12 @@ defineExpose({ reload: load })
             </button>
           </template>
         </nav>
+        <Input
+          v-model="filter"
+          class="h-7 w-36 shrink-0 text-xs"
+          placeholder="Filter entries"
+          aria-label="Filter entries"
+        />
         <RefreshButton :busy="spinning" size="xs" label="Reload" class="shrink-0" @click="onReload" />
       </div>
 
@@ -168,7 +187,7 @@ defineExpose({ reload: load })
           <Spinner v-if="loading && !entries.length" show-label label="Listing…" class="px-3 py-3" />
           <table v-else class="w-full text-sm">
             <tbody>
-              <tr v-for="entry in entries" :key="entry.path" class="border-t border-border first:border-t-0 hover:bg-muted/30">
+              <tr v-for="entry in visibleEntries" :key="entry.path" class="border-t border-border first:border-t-0 hover:bg-muted/30">
                 <td v-if="selectable" class="whitespace-nowrap px-2 py-1.5">
                   <template v-if="checkedPaths?.has(entry.path)">
                     <input
@@ -219,6 +238,9 @@ defineExpose({ reload: load })
               </tr>
               <tr v-if="!loading && !entries.length && !gatewayError">
                 <td :colspan="selectable ? 4 : 3" class="px-3 py-6 text-center text-xs text-muted-foreground">This folder is empty.</td>
+              </tr>
+              <tr v-else-if="!loading && !visibleEntries.length && !gatewayError">
+                <td :colspan="selectable ? 4 : 3" class="px-3 py-6 text-center text-xs text-muted-foreground">No entries match.</td>
               </tr>
             </tbody>
           </table>
