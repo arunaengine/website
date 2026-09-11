@@ -22,6 +22,7 @@ import * as Assignable from '@/lib/profiles/assignable'
 import { PROCESS_RUN_CRATE_PROFILE } from '@/lib/profiles/builtinProfiles'
 import * as Utils from '@/lib/utils'
 import * as GroupAdmin from '@/lib/groupAdmin'
+import { assistantAvailable } from '@/composables/assistantState'
 
 const route = reactive<{ name: string; params: Record<string, string>; query: Record<string, string> }>({
   name: 'dataset-new',
@@ -268,6 +269,17 @@ const DiscardStub = defineComponent({
       ])
     : null,
 })
+// The real button, so the header is checked against its own availability gate.
+const AskAiButton = compileClientComponent(new URL('../components/assistant/AskAiButton.vue', import.meta.url), {
+  vue: VueRuntime,
+  '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
+  '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+  '@/components/ui/IconButton.vue': moduleDefault(EmptyStub),
+  '@/composables/assistantState': { assistantAvailable },
+  '@/composables/useAssistantChat': { useAssistantChat: () => ({ openWith: vi.fn() }) },
+  '@/lib/utils': Utils,
+})
+
 const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vue', import.meta.url), {
   vue: VueRuntime,
   'vue-router': {
@@ -277,6 +289,7 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
     onBeforeRouteLeave: (guard: () => Promise<boolean>) => { leaveGuard = guard },
   },
   '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
+  '@/components/assistant/AskAiButton.vue': moduleDefault(AskAiButton),
   '@/components/dashboard/PageHeader.vue': moduleDefault(PageHeaderStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Notice.vue': moduleDefault(NoticeStub),
@@ -431,6 +444,7 @@ beforeEach(() => {
   previewUnavailable.value = false
   importDraft.value = null
   leaveGuard = null
+  assistantAvailable.value = false
 })
 
 describe('DatasetEditorView', () => {
@@ -1343,6 +1357,18 @@ describe('DatasetEditorView draft guard', () => {
 
     await expect(leaveGuard?.()).resolves.toBe(true)
     expect(content(mounted.root)).not.toContain('Discard this draft?')
+    mounted.app.unmount()
+  })
+
+  it('offers the assistant once a provider is configured', async () => {
+    const without = await mountApp(DatasetEditorView)
+    expect(content(without.root)).not.toContain('Ask AI')
+    without.app.unmount()
+
+    assistantAvailable.value = true
+    const mounted = await mountApp(DatasetEditorView)
+
+    expect(button(mounted.root, 'Ask AI').props['aria-label']).toBe('Ask AI about this')
     mounted.app.unmount()
   })
 })

@@ -295,6 +295,7 @@ const NodeCheckPanel = compileClientComponent(url('components/metadata/editor/No
 const IssueDrawer = compileClientComponent(url('components/metadata/editor/IssueDrawer.vue'), editorShared)
 const DatasetEditorView = compileClientComponent(url('views/DatasetEditorView.vue'), {
   ...editorShared,
+  '@/components/assistant/AskAiButton.vue': moduleDefault(GenericStub),
   '@/components/groups/CreateGroupDialog.vue': moduleDefault(GenericStub),
   '@/components/metadata/ImportCrateDialog.vue': moduleDefault(GenericStub),
   '@/components/metadata/editor/DatasetLocationDialog.vue': moduleDefault(GenericStub),

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { onBeforeRouteLeave, RouterLink, useRoute, useRouter } from 'vue-router'
+import AskAiButton from '@/components/assistant/AskAiButton.vue'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
@@ -662,6 +663,7 @@ async function save(anyway = false) {
         </span>
       </template>
       <template #actions>
+        <AskAiButton size="sm" prompt="Help me describe this dataset." subject="the dataset draft" />
         <Button variant="outline" size="sm" @click="locationOpen = true">
           <FolderTree class="h-3.5 w-3.5" /> Location
         </Button>
