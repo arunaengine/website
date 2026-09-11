@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import CommandDialog from '@/components/ui/CommandDialog.vue'
 import {
@@ -172,7 +173,7 @@ function add() {
     <template v-else>
       <template v-if="fromProfile.length">
         <p class="px-2.5 pb-1 pt-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-          Suggested by {{ profileName }}
+          Optional in {{ profileName }}
         </p>
         <button
           v-for="rule in fromProfile"
@@ -183,6 +184,7 @@ function add() {
           @click="pick(rule.valueName, draftKind(rule.kind))"
         >
           <span class="text-xs font-medium text-foreground">{{ rule.label }}</span>
+          <Badge class="ml-1.5" variant="accent" size="sm">Profile</Badge>
           <span v-if="rule.description" class="line-clamp-1 text-[11px] text-muted-foreground">{{ rule.description }}</span>
         </button>
       </template>

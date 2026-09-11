@@ -25,6 +25,7 @@ beforeAll(async () => {
 })
 
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
+const BadgeStub = defineComponent((_, { slots }) => () => h('span', slots.default?.()))
 // The dialog shell reduced to its header, its search box and its slots. The
 // search box goes away once the host has picked something, as it does live.
 const CommandDialogStub = defineComponent({
@@ -57,6 +58,7 @@ const CommandDialogStub = defineComponent({
 
 const AddPropertyDialog = compileClientComponent(new URL('./AddPropertyDialog.vue', import.meta.url), {
   vue: VueRuntime,
+  '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/CommandDialog.vue': moduleDefault(CommandDialogStub),
   '@/lib/crate/editor': Editor,
@@ -188,7 +190,7 @@ describe('AddPropertyDialog', () => {
     })
     const text = content(mounted.root)
 
-    expect(text).toContain('Suggested by Process Run Crate')
+    expect(text).toContain('Optional in Process Run Crate')
     expect(text).toContain('When the run started.')
     // The profile's own suggestion is listed above the vocabulary's.
     expect(text.indexOf('Start time')).toBeLessThan(text.indexOf('License'))
@@ -196,6 +198,17 @@ describe('AddPropertyDialog', () => {
 
     // The rule knows the kind, so the picker does not ask again.
     expect(picked).toEqual([{ key: 'startTime', kind: 'datetime' }])
+    mounted.app.unmount()
+  })
+
+  it('keeps the profile section first and badged while searching', async () => {
+    const mounted = await mount(dataset, [], { suggestions: [startTime], profileName: 'Process Run Crate' })
+    await typeValue(search(mounted.root), 'time')
+    const text = content(mounted.root)
+
+    expect(text).toContain('Optional in Process Run Crate')
+    expect(content(row(mounted.root, 'Start time'))).toContain('Profile')
+    expect(text.indexOf('Optional in Process Run Crate')).toBeLessThan(text.indexOf('Temporal coverage'))
     mounted.app.unmount()
   })
 
