@@ -15,10 +15,12 @@ import {
   rootId,
   setProperty,
   setTypes,
+  VALUE_PRESETS,
   type CrateDraft,
   type DraftEntity,
   type DraftValue,
 } from '@/lib/crate/editor'
+import type { ProfileObligation, ProfilePropertyRule, ProfileValueKind } from '@/lib/profiles/types'
 import type { DraftContext } from './prompt'
 import { fetchOrcidRecord } from '@/lib/lookup/orcid'
 import { fetchRorRecord } from '@/lib/lookup/ror'
@@ -32,6 +34,8 @@ export interface EditorBridge {
   /** What the system prompt says about the open draft. */
   summary: () => DraftContext
   profiles: () => Array<{ id: string; name: string }>
+  /** The profile rules on this entity; `types` describes one not created yet. */
+  rules: (entityId: string, types?: string[]) => ProfilePropertyRule[]
   applyProfile: (profileId: string) => void
   validate: () => Promise<unknown>
 }
@@ -78,6 +82,78 @@ function entityJson(entity: DraftEntity): Record<string, unknown> {
   return { '@id': entity.id, '@type': entity.types, ...properties, ...entity.extra }
 }
 
+/** What the editor's own row offers for a property: its rule and its options. */
+interface ProfileField {
+  property: string
+  obligation?: ProfileObligation
+  kind?: ProfileValueKind
+  options?: string[] | Array<{ value: string; label: string }>
+  description?: string
+}
+
+function presetsFor(property: string): Array<{ value: string; label: string }> | undefined {
+  const presets = VALUE_PRESETS[property]
+  return presets ? presets.map((preset) => ({ ...preset })) : undefined
+}
+
+function optionsOf(rule: ProfilePropertyRule): ProfileField['options'] {
+  if (rule.kind === 'enum' && rule.enumOptions?.length) return [...rule.enumOptions]
+  return presetsFor(rule.valueName)
+}
+
+/** The rules and the fixed choices behind the rows of one entity. */
+function fieldsOf(entity: DraftEntity, rules: ProfilePropertyRule[]): ProfileField[] {
+  const fields: ProfileField[] = rules.map((rule) => {
+    const options = optionsOf(rule)
+    return {
+      property: rule.valueName,
+      obligation: rule.obligation,
+      kind: rule.kind,
+      ...(options ? { options } : {}),
+      ...(rule.description ? { description: rule.description } : {}),
+    }
+  })
+  for (const property of Object.keys(entity.properties)) {
+    const options = fields.some((field) => field.property === property) ? undefined : presetsFor(property)
+    if (options) fields.push({ property, options })
+  }
+  return fields
+}
+
+function sameText(left: string, right: string): boolean {
+  return left.trim().toLowerCase() === right.trim().toLowerCase()
+}
+
+function isFailure(value: unknown): value is Failure {
+  return typeof value === 'object' && value !== null && 'error' in value
+}
+
+/**
+ * Maps written values onto the choices the row offers. An enum rule takes one of
+ * its options and nothing else; a preset property also accepts a custom value,
+ * because its row keeps a free input beside the presets.
+ */
+function chosenValues(rules: ProfilePropertyRule[], property: string, list: DraftValue[]): DraftValue[] | Failure {
+  const rule = rules.find((candidate) => candidate.valueName === property)
+  const options = rule?.kind === 'enum' ? rule.enumOptions ?? [] : []
+  const presets = presetsFor(property)
+  const chosen: DraftValue[] = []
+  for (const value of list) {
+    if (options.length && value.value.trim()) {
+      const option = options.find((candidate) => sameText(candidate, value.value))
+      if (!option) {
+        return { error: `${property} takes one of these options: ${options.join(', ')}. Nothing was written.` }
+      }
+      chosen.push({ ...value, value: option })
+      continue
+    }
+    const preset = presets?.find((candidate) =>
+      sameText(candidate.value, value.value) || sameText(candidate.label, value.value))
+    chosen.push(preset ? { ...value, value: preset.value } : value)
+  }
+  return chosen
+}
+
 function rows(raw: unknown): DraftValue[] | undefined {
   return draftValues(raw)
 }
@@ -104,17 +180,35 @@ export function editorTools(bridge: EditorBridge, gate: ApprovalGate): ToolSet {
     return seen.get(entity.id) === stableJson(entityJson(entity))
   }
 
-  function applyEdit(draft: CrateDraft, input: EditInput): CrateDraft {
-    let next = draft
+  // Nothing is written before every value passed the rules, so a refused option
+  // leaves the whole call without an effect.
+  function applyEdit(draft: CrateDraft, input: EditInput): CrateDraft | Failure {
+    const rules = bridge.rules(input.id)
+    const sets: Array<[string, DraftValue[]]> = []
+    const pushes: Array<[string, DraftValue[]]> = []
     for (const [property, value] of Object.entries(input.set ?? {})) {
-      next = setProperty(next, input.id, property, rows(value) ?? [])
+      const chosen = chosenValues(rules, property, rows(value) ?? [])
+      if (isFailure(chosen)) return chosen
+      sets.push([property, chosen])
     }
     for (const [property, value] of Object.entries(input.push ?? {})) {
+      const chosen = chosenValues(rules, property, rows(value) ?? [])
+      if (isFailure(chosen)) return chosen
+      pushes.push([property, chosen])
+    }
+    let next = draft
+    for (const [property, list] of sets) next = setProperty(next, input.id, property, list)
+    for (const [property, list] of pushes) {
       const existing = findEntity(next, input.id)?.properties[property] ?? []
-      next = setProperty(next, input.id, property, [...existing, ...(rows(value) ?? [])])
+      next = setProperty(next, input.id, property, [...existing, ...list])
     }
     for (const property of input.delete ?? []) next = setProperty(next, input.id, property, [])
     return next
+  }
+
+  /** The entity as JSON-LD, with the rows' rules and options beside it. */
+  function entityAnswer(entity: DraftEntity): Record<string, unknown> {
+    return { ...entityJson(entity), fields: fieldsOf(entity, bridge.rules(entity.id)) }
   }
 
   return {
@@ -125,7 +219,7 @@ export function editorTools(bridge: EditorBridge, gate: ApprovalGate): ToolSet {
         const entity = findEntity(bridge.draft(), id)
         if (!entity) return NO_ENTITY(id)
         remember(entity)
-        return entityJson(entity)
+        return entityAnswer(entity)
       },
     }),
 
@@ -140,10 +234,11 @@ export function editorTools(bridge: EditorBridge, gate: ApprovalGate): ToolSet {
         if (!entity) return NO_ENTITY(input.id)
         if (!guard(entity)) return { error: STALE_READ }
         const next = applyEdit(draft, input)
+        if (isFailure(next)) return next
         bridge.update(next)
         const updated = findEntity(next, input.id)
         if (updated) remember(updated)
-        return updated ? entityJson(updated) : NO_ENTITY(input.id)
+        return updated ? entityAnswer(updated) : NO_ENTITY(input.id)
       },
     }),
 
@@ -157,10 +252,14 @@ export function editorTools(bridge: EditorBridge, gate: ApprovalGate): ToolSet {
         properties: ANY_MAP,
       }, ['types']),
       execute: (input) => {
+        const rules = bridge.rules(input.id ?? '', input.types)
         const properties: Record<string, DraftValue[]> = {}
         for (const [property, value] of Object.entries(input.properties ?? {})) {
           const list = rows(value)
-          if (list) properties[property] = list
+          if (!list) continue
+          const chosen = chosenValues(rules, property, list)
+          if (isFailure(chosen)) return chosen
+          properties[property] = chosen
         }
         const type = input.types[0] ?? 'Thing'
         const name = properties.name?.[0]?.value ?? ''
@@ -171,7 +270,7 @@ export function editorTools(bridge: EditorBridge, gate: ApprovalGate): ToolSet {
           if (known) {
             remember(known)
             return {
-              ...entityJson(known),
+              ...entityAnswer(known),
               note: `reused the existing entity ${known.id} with the same name`,
             }
           }
@@ -185,7 +284,7 @@ export function editorTools(bridge: EditorBridge, gate: ApprovalGate): ToolSet {
         const entity = findEntity(draft, added.entity.id) ?? added.entity
         bridge.update(draft)
         remember(entity)
-        return entityJson(entity)
+        return entityAnswer(entity)
       },
     }),
 
@@ -276,14 +375,23 @@ export function editorTools(bridge: EditorBridge, gate: ApprovalGate): ToolSet {
     }),
 
     apply_profile: tool({
-      description: 'Declares a realm metadata profile on the draft and seeds the rows it requires. An empty profile_id removes the declared profile again.',
+      description: 'Declares a realm metadata profile on the draft and seeds the rows it requires. Takes the profile id or its name. An empty profile_id removes the declared profile again.',
       inputSchema: schema<{ profile_id: string }>({ profile_id: STRING }, ['profile_id']),
       execute: ({ profile_id: profileId }) => {
-        if (profileId && !bridge.profiles().some((profile) => profile.id === profileId)) {
-          return { error: `No profile ${profileId} in this realm.` }
+        const wanted = profileId.trim()
+        if (!wanted) {
+          bridge.applyProfile('')
+          return { profile_id: '' }
         }
-        bridge.applyProfile(profileId)
-        return { profile_id: profileId }
+        const profiles = bridge.profiles()
+        const match = profiles.find((profile) => sameText(profile.id, wanted))
+          ?? profiles.find((profile) => sameText(profile.name, wanted))
+        if (!match) {
+          const known = profiles.map((profile) => `${profile.id} (${profile.name})`).join(', ')
+          return { error: `No profile ${profileId} in this realm.${known ? ` Available: ${known}.` : ''}` }
+        }
+        bridge.applyProfile(match.id)
+        return { profile_id: match.id }
       },
     }),
 

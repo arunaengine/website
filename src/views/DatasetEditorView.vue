@@ -43,6 +43,7 @@ import {
   liveIssues,
   newDraft,
   partIds,
+  profileShape,
   rootEntity,
   rootId,
   toRoCrate,
@@ -293,6 +294,11 @@ provideEditorBridge({
     types: [...new Set(draft.value.entities.flatMap((entity) => entity.types.map(typeLabel)))],
   }),
   profiles: () => selectableProfiles.value.map((profile) => ({ id: profile.id, name: profile.name })),
+  rules: (entityId, types) => {
+    const entity = findEntity(draft.value, entityId) ?? { id: entityId, types: types ?? [], properties: {} }
+    const shape = profileShape(draft.value, entity, expectation.value)
+    return shape ? [...shape.required, ...shape.recommended, ...shape.optional] : []
+  },
   applyProfile: pickProfile,
   validate: async () => {
     await preview.verify(crate.value)

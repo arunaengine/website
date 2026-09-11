@@ -2,7 +2,24 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { editorTools, STALE_READ, type EditorBridge } from './editorTools'
 import { DENIAL_MESSAGE, type ApprovalGate } from './types'
 import { addEntity, addValue, newDraft, rootId, type CrateDraft } from '@/lib/crate/editor'
+import type { ProfilePropertyRule } from '@/lib/profiles/types'
 import { runTool } from '@/test/aiTool'
+
+function enumRule(valueName: string, options: string[], label: string): ProfilePropertyRule {
+  return {
+    id: `rule-${valueName}`,
+    label,
+    description: `${label} of this entity.`,
+    kind: 'enum',
+    propertyUri: `https://schema.org/${valueName}`,
+    valueName,
+    obligation: 'MUST',
+    enumOptions: options,
+  }
+}
+
+const ACCESS_RULE = enumRule('conditionsOfAccess', ['open', 'restricted'], 'Conditions of access')
+const TITLE_RULE = enumRule('honorificPrefix', ['Dr', 'Prof'], 'Honorific prefix')
 
 function seedDraft(): CrateDraft {
   const base = newDraft()
@@ -27,7 +44,13 @@ function harness(approve = true) {
       partCount: 1,
       types: ['Dataset', 'Person'],
     }),
-    profiles: () => [{ id: 'p-1', name: 'Base' }],
+    profiles: () => [{ id: 'p-1', name: 'Workshop study profile' }],
+    rules: (entityId, types) => {
+      const known = draft.entities.find((entity) => entity.id === entityId)?.types
+      const list = types ?? known ?? []
+      if (list.includes('Person')) return [TITLE_RULE]
+      return entityId === rootId(draft) ? [ACCESS_RULE] : []
+    },
     applyProfile,
     validate,
   }
@@ -45,6 +68,25 @@ describe('read_entity', () => {
   it('answers the entity as JSON-LD', async () => {
     const output = await runTool(scene.tools.read_entity, { id: '#alice' })
     expect(output).toMatchObject({ '@id': '#alice', '@type': ['Person'], name: 'Alice' })
+  })
+
+  it('lists the rules and the fixed options of the rows beside the entity', async () => {
+    const output = await runTool(scene.tools.read_entity, { id: rootId(scene.current()) }) as Record<string, unknown>
+
+    expect(output.fields).toContainEqual({
+      property: 'conditionsOfAccess',
+      obligation: 'MUST',
+      kind: 'enum',
+      options: ['open', 'restricted'],
+      description: 'Conditions of access of this entity.',
+    })
+    // The license row offers presets even where no profile rule names it.
+    expect(output.fields).toContainEqual({
+      property: 'license',
+      options: expect.arrayContaining([
+        { value: 'https://creativecommons.org/licenses/by/4.0/', label: 'CC BY 4.0' },
+      ]),
+    })
   })
 
   it('reports an unknown identifier instead of throwing', async () => {
@@ -88,6 +130,76 @@ describe('edit_entity read-before-edit guard', () => {
     const output = await runTool(scene.tools.edit_entity, { id: '#alice', delete: ['name'] })
 
     expect(output).not.toHaveProperty('name')
+  })
+})
+
+
+describe('fixed options', () => {
+  it('refuses a value an enum rule does not offer and writes nothing', async () => {
+    const root = rootId(scene.current())
+    await runTool(scene.tools.read_entity, { id: root })
+
+    const output = await runTool(scene.tools.edit_entity, {
+      id: root,
+      set: { conditionsOfAccess: 'public', name: 'Survey' },
+    })
+
+    expect(output).toEqual({
+      error: 'conditionsOfAccess takes one of these options: open, restricted. Nothing was written.',
+    })
+    const entity = scene.current().entities.find((candidate) => candidate.id === root)
+    expect(entity?.properties.conditionsOfAccess).toBeUndefined()
+    expect(entity?.properties.name?.[0].value).toBe('')
+  })
+
+  it('writes an option the way the rule spells it', async () => {
+    const root = rootId(scene.current())
+    await runTool(scene.tools.read_entity, { id: root })
+
+    await runTool(scene.tools.edit_entity, { id: root, set: { conditionsOfAccess: ' OPEN ' } })
+
+    expect(scene.current().entities.find((candidate) => candidate.id === root)
+      ?.properties.conditionsOfAccess?.[0].value).toBe('open')
+  })
+
+  it('maps a preset label onto its value and keeps a custom license', async () => {
+    const root = rootId(scene.current())
+    await runTool(scene.tools.read_entity, { id: root })
+
+    await runTool(scene.tools.edit_entity, { id: root, set: { license: 'cc by 4.0' } })
+    expect(scene.current().entities.find((candidate) => candidate.id === root)?.properties.license?.[0].value)
+      .toBe('https://creativecommons.org/licenses/by/4.0/')
+
+    await runTool(scene.tools.edit_entity, { id: root, set: { license: 'https://example.test/terms' } })
+    expect(scene.current().entities.find((candidate) => candidate.id === root)?.properties.license?.[0].value)
+      .toBe('https://example.test/terms')
+  })
+
+  it('refuses an unknown option on a new entity instead of creating it', async () => {
+    const output = await runTool(scene.tools.create_entity, {
+      types: ['Person'],
+      id: '#bob',
+      properties: { name: 'Bob', honorificPrefix: 'Mr' },
+    })
+
+    expect(output).toEqual({
+      error: 'honorificPrefix takes one of these options: Dr, Prof. Nothing was written.',
+    })
+    expect(scene.current().entities.some((entity) => entity.id === '#bob')).toBe(false)
+  })
+
+  it('creates the entity with the option as written and answers its fields', async () => {
+    const output = await runTool(scene.tools.create_entity, {
+      types: ['Person'],
+      id: '#bob',
+      properties: { name: 'Bob', honorificPrefix: 'prof' },
+    }) as Record<string, unknown>
+
+    expect(output).toMatchObject({ '@id': '#bob', honorificPrefix: 'Prof' })
+    expect(output.fields).toContainEqual(expect.objectContaining({
+      property: 'honorificPrefix',
+      options: ['Dr', 'Prof'],
+    }))
   })
 })
 
@@ -178,7 +290,7 @@ describe('draft tools', () => {
 
     expect(output.profile_id).toBe('p-1')
     expect(output.entity_count).toBe(2)
-    expect(output.available_profiles).toEqual([{ id: 'p-1', name: 'Base' }])
+    expect(output.available_profiles).toEqual([{ id: 'p-1', name: 'Workshop study profile' }])
   })
 
   it('runs the node check and reports the advisory issues beside it', async () => {
@@ -189,14 +301,20 @@ describe('draft tools', () => {
     expect(Array.isArray(output.advisory)).toBe(true)
   })
 
-  it('refuses a profile the realm does not offer', async () => {
+  it('refuses a profile the realm does not offer and names the ones it has', async () => {
     expect(await runTool(scene.tools.apply_profile, { profile_id: 'nope' }))
-      .toEqual({ error: 'No profile nope in this realm.' })
+      .toEqual({ error: 'No profile nope in this realm. Available: p-1 (Workshop study profile).' })
     expect(scene.applyProfile).not.toHaveBeenCalled()
   })
 
   it('applies a profile the realm offers', async () => {
     expect(await runTool(scene.tools.apply_profile, { profile_id: 'p-1' })).toEqual({ profile_id: 'p-1' })
+    expect(scene.applyProfile).toHaveBeenCalledWith('p-1')
+  })
+
+  it('applies a profile the user named instead of its id', async () => {
+    expect(await runTool(scene.tools.apply_profile, { profile_id: '  workshop study profile ' }))
+      .toEqual({ profile_id: 'p-1' })
     expect(scene.applyProfile).toHaveBeenCalledWith('p-1')
   })
 
