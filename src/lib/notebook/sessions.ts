@@ -9,6 +9,8 @@ import { getSessionState, sessionAbsent, sessionNotHere, type SessionRunState } 
 const LIVE_STATE = 'running'
 /** Bound on the per-node confirmations one listing sends. */
 const MAX_CANDIDATES = 12
+/** Bound on the job pages one listing reads while collecting candidates. */
+const MAX_PAGES = 10
 
 export interface RunningSession {
   jobId: string
@@ -23,6 +25,8 @@ export interface RunningSessions {
   sessions: RunningSession[]
   /** Running jobs no node answered for; the list is incomplete then. */
   unchecked: number
+  /** Running jobs were left unread beyond the bound, so more may exist. */
+  truncated: boolean
 }
 
 export interface RunningSessionsOptions {
@@ -72,13 +76,27 @@ async function readSession(
   }
 }
 
+/** Follows the job cursor until enough candidates are collected or it ends. */
+async function candidateJobs(options: RunningSessionsOptions) {
+  const limit = options.limit ?? 50
+  const jobs: JobStatusResponse[] = []
+  let cursor: string | undefined
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const listed = await listJobs({ state: LIVE_STATE, limit, cursor }, options.client)
+    jobs.push(...listed.jobs.filter(candidate))
+    cursor = listed.next_cursor
+    if (!cursor || jobs.length >= MAX_CANDIDATES) break
+  }
+  return { jobs, truncated: Boolean(cursor) }
+}
+
 export async function listRunningSessions(options: RunningSessionsOptions): Promise<RunningSessions> {
-  const page = await listJobs({ state: LIVE_STATE, limit: options.limit ?? 50 }, options.client)
-  const candidates = page.jobs.filter(candidate)
-  const asked = candidates.slice(0, MAX_CANDIDATES)
+  const candidates = await candidateJobs(options)
+  const asked = candidates.jobs.slice(0, MAX_CANDIDATES)
   const found = await Promise.all(asked.map((job) => readSession(job, options, executorNode(job))))
   return {
     sessions: found.filter((entry): entry is RunningSession => entry !== null && entry !== 'unknown'),
-    unchecked: found.filter((entry) => entry === 'unknown').length + (candidates.length - asked.length),
+    unchecked: found.filter((entry) => entry === 'unknown').length + (candidates.jobs.length - asked.length),
+    truncated: candidates.truncated,
   }
 }

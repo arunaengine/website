@@ -84,6 +84,7 @@ describe('listRunningSessions', () => {
     expect(found).toEqual({
       sessions: [{ jobId: '01JOB', nodeId: 'node-a', runtime: 'python-notebook', bucket: 'lab-data', startedAtMs: 5, state: 'ready' }],
       unchecked: 0,
+      truncated: false,
     })
   })
 
@@ -94,7 +95,7 @@ describe('listRunningSessions', () => {
       return sessionState({ job_id: '01OLD', state: 'ended' })
     })
     const found = await listRunningSessions(options)
-    expect(found).toEqual({ sessions: [], unchecked: 0 })
+    expect(found).toEqual({ sessions: [], unchecked: 0, truncated: false })
   })
 
   it('follows the node a session moved to', async () => {
@@ -118,6 +119,29 @@ describe('listRunningSessions', () => {
     const found = await listRunningSessions(options)
     expect(found.sessions.map((entry) => entry.jobId)).toEqual(['01JOB'])
     expect(found.unchecked).toBe(1)
+  })
+
+  it('follows the cursor to the jobs of the next page', async () => {
+    jobs.listJobs.mockImplementation(async (params: { cursor?: string }) => (params.cursor
+      ? { jobs: [job('01TWO')] }
+      : { jobs: [job('01JOB')], next_cursor: 'page-2' }))
+    state.getSessionState.mockImplementation(async (id: string) => sessionState({ job_id: id }))
+    const found = await listRunningSessions(options)
+    expect(jobs.listJobs).toHaveBeenCalledTimes(2)
+    expect(jobs.listJobs).toHaveBeenLastCalledWith({ state: 'running', limit: 50, cursor: 'page-2' }, client)
+    expect(found.sessions.map((entry) => entry.jobId)).toEqual(['01JOB', '01TWO'])
+    expect(found.truncated).toBe(false)
+  })
+
+  it('reports that jobs were left unread beyond the bound', async () => {
+    const page = Array.from({ length: 13 }, (_, index) => job(`01JOB${index}`))
+    jobs.listJobs.mockResolvedValue({ jobs: page, next_cursor: 'page-2' })
+    state.getSessionState.mockImplementation(async (id: string) => sessionState({ job_id: id }))
+    const found = await listRunningSessions(options)
+    expect(jobs.listJobs).toHaveBeenCalledTimes(1)
+    expect(found.sessions).toHaveLength(12)
+    expect(found.unchecked).toBe(1)
+    expect(found.truncated).toBe(true)
   })
 
   it('reports the listing failure instead of an empty list', async () => {
