@@ -369,3 +369,66 @@ describe('the built-in process run profile', () => {
     expect(linked(again, './', 'mentions')?.properties.name).toEqual([{ kind: 'text', value: 'Alignment run' }])
   })
 })
+
+/** A profile whose person points at an organization twice, and back again. */
+function peopleProfile(): MetadataProfile {
+  const base = profile()
+  base.propertyRules = [rule({
+    valueName: 'author',
+    label: 'Author',
+    kind: 'entity',
+    entityTypes: ['http://schema.org/Person'],
+    obligation: 'MAY',
+  })]
+  base.entityRules = [
+    {
+      id: 'person',
+      label: 'Person',
+      description: '',
+      type: 'http://schema.org/Person',
+      className: 'Person',
+      propertyRules: [
+        rule({ valueName: 'affiliation', label: 'Affiliation', kind: 'entity', entityTypes: ['http://schema.org/Organization'] }),
+        rule({ valueName: 'worksFor', label: 'Works for', kind: 'entity', entityTypes: ['http://schema.org/Organization'] }),
+      ],
+    },
+    {
+      id: 'organization',
+      label: 'Organization',
+      description: '',
+      type: 'http://schema.org/Organization',
+      className: 'Organization',
+      propertyRules: [
+        rule({ valueName: 'name', label: 'Name', obligation: 'SHOULD' }),
+        rule({ valueName: 'founder', label: 'Founder', kind: 'entity', entityTypes: ['http://schema.org/Person'], obligation: 'MAY' }),
+      ],
+    },
+  ]
+  return base
+}
+
+describe('seeding a type that appears twice', () => {
+  const expectation = profileExpectation(peopleProfile())
+  const picked = expectation.root.optional[0]
+
+  it('gives both references of one type their own rows', () => {
+    const draft = seedRules(newDraft(), expectation, './', [picked])
+    const person = linked(draft, './', 'author')
+    const affiliation = linked(draft, person?.id ?? '', 'affiliation')
+    const employer = linked(draft, person?.id ?? '', 'worksFor')
+
+    expect(affiliation?.id).not.toBe(employer?.id)
+    expect(affiliation?.properties.name).toEqual([{ kind: 'text', value: '' }])
+    expect(employer?.properties.name).toEqual([{ kind: 'text', value: '' }])
+  })
+
+  it('stops where a shape points back at an ancestor', () => {
+    const draft = seedRules(newDraft(), expectation, './', [picked])
+    const person = linked(draft, './', 'author')
+    const affiliation = linked(draft, person?.id ?? '', 'affiliation')
+    const founder = linked(draft, affiliation?.id ?? '', 'founder')
+
+    expect(founder?.types).toEqual(['http://schema.org/Person'])
+    expect(founder?.properties.affiliation).toBeUndefined()
+  })
+})

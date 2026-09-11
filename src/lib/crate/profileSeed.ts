@@ -47,8 +47,8 @@ export function draftKind(kind: ProfileValueKind): DraftValueKind {
   return KINDS[kind] ?? 'text'
 }
 
-/** The rows a created entity of one type starts with. */
-type RulesFor = (type: string) => ProfilePropertyRule[]
+/** The rows a created entity of one type starts with, given its ancestors. */
+type RulesFor = (type: string, ancestors: readonly string[]) => ProfilePropertyRule[]
 
 /** The rows a profile pre-adds: everything it asks for, MAY left to the author. */
 function expected(rules: ProfilePropertyRule[]): ProfilePropertyRule[] {
@@ -112,16 +112,17 @@ function seedRows(
   rulesFor: RulesFor,
   entityId: string,
   rules: ProfilePropertyRule[],
-  depth: number,
+  ancestors: readonly string[],
 ): CrateDraft {
   let next = draft
   for (const rule of rules) {
     if (findEntity(next, entityId)?.properties[rule.valueName]?.length) continue
     const target = rule.kind === 'entity' ? rule.entityTypes?.[0] : undefined
-    if (target && !isDataType(target) && depth < MAX_ENTITY_DEPTH) {
+    if (target && !isDataType(target) && ancestors.length < MAX_ENTITY_DEPTH) {
       const created = addEntity(next, { type: target })
       next = linkReference(created.draft, entityId, rule.valueName, created.entity.id)
-      next = seedRows(next, rulesFor, created.entity.id, rulesFor(target), depth + 1)
+      const below = [...ancestors, typeLabel(target)]
+      next = seedRows(next, rulesFor, created.entity.id, rulesFor(target, ancestors), below)
       continue
     }
     next = setProperty(next, entityId, rule.valueName, [seedValue(rule)])
@@ -142,13 +143,12 @@ function profileRows(profile: MetadataProfile): RulesFor {
 }
 
 // Every rule a shape holds, so a picked field arrives with its own fields. A
-// type is expanded once per picked rule, so shapes pointing at each other stop.
+// type already on the path back to the root is not expanded again, so shapes
+// pointing at each other stop while two siblings of one type both get rows.
 function shapeRows(profile: ProfileExpectation): RulesFor {
-  const seen = new Set<string>()
-  return (type) => {
+  return (type, ancestors) => {
     const label = typeLabel(type)
-    if (seen.has(label)) return []
-    seen.add(label)
+    if (ancestors.includes(label)) return []
     const shape = profile.shapes[label]
     return shape ? [...shape.required, ...shape.recommended, ...shape.optional] : []
   }
@@ -166,7 +166,8 @@ export function seedRules(
   rules: ProfilePropertyRule[],
 ): CrateDraft {
   let next = draft
-  for (const rule of rules) next = seedRows(next, shapeRows(profile), entityId, [rule], 0)
+  const rows = shapeRows(profile)
+  for (const rule of rules) next = seedRows(next, rows, entityId, [rule], [])
   return next
 }
 
@@ -181,7 +182,7 @@ export function seedNewEntities(previous: CrateDraft, next: CrateDraft, profile:
   for (const entity of next.entities) {
     if (known.has(entity.id) || parts.has(entity.id)) continue
     const type = entity.types.find((candidate) => ruleFor(profile, candidate))
-    if (type) seeded = seedRows(seeded, rows, entity.id, rows(type), 0)
+    if (type) seeded = seedRows(seeded, rows, entity.id, rows(type, []), [])
   }
   return seeded
 }
@@ -202,5 +203,5 @@ export function applyProfile(draft: CrateDraft, profile: MetadataProfile, iri?: 
   if (Object.keys(additions).length) {
     next = { ...next, context: [...(Array.isArray(context) ? context : [context]), additions] }
   }
-  return seedRows(next, profileRows(profile), root, expected(profile.propertyRules ?? []), 0)
+  return seedRows(next, profileRows(profile), root, expected(profile.propertyRules ?? []), [])
 }
