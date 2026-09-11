@@ -741,6 +741,16 @@ function discardTurn(turn: TurnContext | null) {
     message.id !== turn.userMessageId && message.id !== turn.messageId))
 }
 
+// Closing the panel stops the answer but keeps the transcript, so the chat is
+// still there, with a retry, when the page opens the assistant again.
+function stopShownTurn() {
+  if (!activeTurn || activeTurn.resumeText !== undefined) return
+  const turn = abortTurn()
+  if (!turn) return
+  const message = messagesOf(turn.chatId).find((entry) => entry.id === turn.messageId)
+  if (message && !message.error) message.error = 'Closing the assistant stopped this answer.'
+}
+
 // ── Background watchers ────────────────────────────────────────────────────
 
 function saveWatchState() {
@@ -1674,13 +1684,22 @@ export function useAssistantChat() {
     }
   }
 
+  /** The chat a subject already has, wherever the list holds it. */
+  function subjectChat(topic: string): AssistantChatRecord | null {
+    let found: AssistantChatRecord | null = null
+    for (const chat of chatState.chats) if (chat.subject === topic && (!found || chat.updatedAt > found.updatedAt)) found = chat
+    return found
+  }
+
   // Seeds the composer, then opens the panel. The draft is set after openPanel
   // so an epoch reset inside it cannot wipe the seed; nothing is auto-sent.
-  // A subject the running chat is not about starts a fresh one, so a question
-  // from another page does not land in the middle of an unrelated conversation.
+  // A page returns to the chat its subject already has; a subject without one
+  // starts a fresh chat, rather than landing in an unrelated conversation.
   function openWith(prompt: string, subject?: string) {
     openPanel()
     const topic = subject?.trim().slice(0, 80)
+    const mine = topic ? subjectChat(topic) : null
+    if (mine) selectChat(mine.id)
     const current = activeChat()
     if (topic && current && current.messages.length && current.subject !== topic) newChat()
     const chat = activeChat()
@@ -1705,7 +1724,7 @@ export function useAssistantChat() {
   function closePanel() {
     syncEpoch()
     open.value = false
-    abortShownTurn()
+    stopShownTurn()
     persistCurrentChat()
   }
 
