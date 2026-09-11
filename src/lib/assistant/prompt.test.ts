@@ -39,6 +39,35 @@ describe('systemPrompt', () => {
     expect(prompt).toContain('the user presses Run, you never do')
   })
 
+  it('tells the model that some rows take one of a fixed list of options', () => {
+    const prompt = systemPrompt({
+      route: '/app/datasets/new',
+      draft: { profileId: 'p-1', rootName: 'Study', entityCount: 3, partCount: 1, types: ['Dataset'] },
+    })
+
+    expect(prompt).toContain('It declares the profile p-1.')
+    expect(prompt).toContain(
+      'Some properties take one of a fixed list of options; read_entity lists them under fields, '
+      + 'and an option must be used as written.',
+    )
+  })
+
+  it('leaves the option line out when the draft declares no profile', () => {
+    const prompt = systemPrompt({
+      route: '/app/datasets/new',
+      draft: { profileId: '', rootName: '', entityCount: 1, partCount: 0, types: ['Dataset'] },
+    })
+
+    expect(prompt).not.toContain('read_entity lists them under fields')
+  })
+
+  it('asks for apply_profile when the user names a profile', () => {
+    expect(systemPrompt({ route: '/app/datasets/new' })).toContain(
+      'When the user names a profile, call apply_profile with that name or id first, '
+      + 'then fill the rows it seeded.',
+    )
+  })
+
   it('leaves the run form out when no run page is open', () => {
     expect(systemPrompt({ route: '/app/compute' })).not.toContain('A run form is open')
   })

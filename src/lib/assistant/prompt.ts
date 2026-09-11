@@ -88,6 +88,7 @@ const DATASET_AUTHORING = [
   'Never invent a person, an organization, an identifier, a license or a date; ask instead, once.',
   'A field the user declines stays absent; optional fields are never a reason to ask again.',
   'Show the planned crate with show_crate and validate it before anything is created.',
+  'When the user names a profile, call apply_profile with that name or id first, then fill the rows it seeded.',
   'Call create_dataset only after the user confirms; in the dataset editor use the editor tools and let the user save.',
 ]
 
@@ -216,7 +217,11 @@ function draftLines(draft: DraftContext): string[] {
     `An RO-Crate draft is open in the dataset editor: ${draft.entityCount} entities, ${draft.partCount} of them data entities.`,
   ]
   if (draft.rootName) lines.push(`Its name is "${draft.rootName}".`)
-  if (draft.profileId) lines.push(`It declares the profile ${draft.profileId}.`)
+  if (draft.profileId) {
+    lines.push(`It declares the profile ${draft.profileId}.`)
+    lines.push('Some properties take one of a fixed list of options; read_entity lists them under fields, '
+      + 'and an option must be used as written.')
+  }
   if (draft.types.length) lines.push(`Entity types present: ${draft.types.join(', ')}.`)
   lines.push('Edits go into the draft only; the user saves it, you never do.')
   return lines
