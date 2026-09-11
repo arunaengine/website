@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
-import { onBeforeRouteLeave, RouterLink, useRoute, useRouter } from 'vue-router'
+import { onBeforeRouteLeave, onBeforeRouteUpdate, RouterLink, useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import AskAiButton from '@/components/assistant/AskAiButton.vue'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
@@ -447,28 +447,40 @@ watch([() => String(route.query?.profile ?? ''), selectableProfiles], ([wanted, 
   if (match) keepSettled(() => pickProfile(match.id))
 }, { immediate: true })
 
-// Leaving the editor (Discard, a nav click, the browser back button) with
-// unsaved work asks first; the view's own navigation after a save or a
-// confirmed discard leaves silently.
+// Leaving the editor or switching to another dataset (Discard, a nav click,
+// the browser back button) with unsaved work asks first; the view's own
+// navigation after a save or a confirmed discard leaves silently.
 const confirmDiscardOpen = ref(false)
 const allowLeave = ref(false)
 let leave: ((allowed: boolean) => void) | null = null
 
-onBeforeRouteLeave(
-  () =>
-    new Promise<boolean>((resolve) => {
-      if (allowLeave.value || !dirty.value) {
-        resolve(true)
-        return
-      }
-      leave = resolve
-      confirmDiscardOpen.value = true
-    }),
-)
+function askBeforeLeaving(): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    if (allowLeave.value || !dirty.value) {
+      resolve(true)
+      return
+    }
+    leave = resolve
+    confirmDiscardOpen.value = true
+  })
+}
+
+onBeforeRouteLeave(askBeforeLeaving)
+onBeforeRouteUpdate(askBeforeLeaving)
+
+// A push that was aborted or failed keeps the draft here, so the guard must
+// ask again the next time instead of staying open.
+async function leaveTo(target: RouteLocationRaw): Promise<void> {
+  allowLeave.value = true
+  try {
+    if (await router.push(target)) allowLeave.value = false
+  } catch {
+    allowLeave.value = false
+  }
+}
 
 function leaveEditor() {
-  allowLeave.value = true
-  void router.push(mode.value === 'edit'
+  void leaveTo(mode.value === 'edit'
     ? { name: 'dataset', params: { id: documentId.value } }
     : { name: 'datasets' })
 }
@@ -609,8 +621,7 @@ async function save(anyway = false) {
   try {
     if (sourceMode === 'edit') {
       await replaceMetadataRoCrate(targetId, { rocrate: source, public: isPublic })
-      allowLeave.value = true
-      await router.push({ name: 'dataset', params: { id: targetId } })
+      await leaveTo({ name: 'dataset', params: { id: targetId } })
       return
     }
     const result = await createMetadata({
@@ -619,8 +630,7 @@ async function save(anyway = false) {
       public: isPublic,
       rocrate: source,
     })
-    allowLeave.value = true
-    await router.push({ name: 'dataset', params: { id: result.document_id } })
+    await leaveTo({ name: 'dataset', params: { id: result.document_id } })
   } catch (error) {
     // A refused write states its own findings; only anything else needs a line.
     const refused = rejectionIssues(error)

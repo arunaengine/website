@@ -44,6 +44,7 @@ const grantPublicRead = vi.fn()
 const loadProfileCrate = vi.fn(async () => ({}))
 const routerPush = vi.fn(async () => undefined)
 let leaveGuard: (() => Promise<boolean>) | null = null
+let updateGuard: (() => Promise<boolean>) | null = null
 
 const previewResult = ref<Api.ProfileValidationPreviewResponse | null>(null)
 const previewRunning = ref(false)
@@ -287,6 +288,7 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
     useRoute: () => route,
     useRouter: () => ({ push: routerPush }),
     onBeforeRouteLeave: (guard: () => Promise<boolean>) => { leaveGuard = guard },
+    onBeforeRouteUpdate: (guard: () => Promise<boolean>) => { updateGuard = guard },
   },
   '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
   '@/components/assistant/AskAiButton.vue': moduleDefault(AskAiButton),
@@ -444,6 +446,7 @@ beforeEach(() => {
   previewUnavailable.value = false
   importDraft.value = null
   leaveGuard = null
+  updateGuard = null
   assistantAvailable.value = false
 })
 
@@ -1345,6 +1348,35 @@ describe('DatasetEditorView draft guard', () => {
     await click(button(mounted.root, 'Discard draft'))
     expect(routerPush).toHaveBeenCalledWith({ name: 'datasets' })
     await expect(leaveGuard?.()).resolves.toBe(true)
+    mounted.app.unmount()
+  })
+
+  it('asks before another dataset opens on the same route', async () => {
+    const mounted = await mountApp(DatasetEditorView)
+    await click(button(mounted.root, 'Seed dataset'))
+
+    const switching = updateGuard?.()
+    await flush()
+    expect(content(mounted.root)).toContain('Discard this draft?')
+
+    await click(button(mounted.root, 'Keep editing'))
+    await expect(switching).resolves.toBe(false)
+    mounted.app.unmount()
+  })
+
+  it('asks again when the navigation it allowed did not happen', async () => {
+    const mounted = await mountApp(DatasetEditorView)
+    await click(button(mounted.root, 'Seed dataset'))
+    routerPush.mockResolvedValueOnce({ type: 8, message: 'aborted' })
+
+    await click(button(mounted.root, 'Discard'))
+    await click(button(mounted.root, 'Discard draft'))
+    await flush()
+
+    void leaveGuard?.()
+    await flush()
+    expect(content(mounted.root)).toContain('Discard this draft?')
+    await click(button(mounted.root, 'Keep editing'))
     mounted.app.unmount()
   })
 
