@@ -13,10 +13,9 @@ const route = useRoute()
 const saved = useNotebookLocation()
 const initial = ref(saved.location.value)
 watch(saved.scope, () => { initial.value = saved.location.value })
-// The saved location is stored per scope, which already names the active
-// group, so returning here reopens it without waiting for a storage session.
-// The data view is held back meanwhile: its own last-bucket redirect would
-// otherwise win the race and show the picker instead of the notebook.
+// The saved location is stored per scope, so returning here reopens it without
+// a storage session. The data view waits meanwhile, or its own last-bucket
+// redirect would win the race and show the picker instead of the notebook.
 const reopening = computed(() => route.query.browse !== '1' && Boolean(saved.location.value?.key))
 watch([saved.scope, () => route.query.browse], () => {
   if (!reopening.value || !saved.location.value?.key) return

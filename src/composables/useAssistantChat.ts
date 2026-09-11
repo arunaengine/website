@@ -1691,10 +1691,9 @@ export function useAssistantChat() {
     return found
   }
 
-  // Seeds the composer, then opens the panel. The draft is set after openPanel
-  // so an epoch reset inside it cannot wipe the seed; nothing is auto-sent.
-  // A page returns to the chat its subject already has; a subject without one
-  // starts a fresh chat, rather than landing in an unrelated conversation.
+  // Seeds the composer after openPanel, so an epoch reset inside it cannot wipe
+  // the seed; nothing is auto-sent. A page returns to the chat its subject
+  // already has, and a subject without one starts a fresh chat.
   function openWith(prompt: string, subject?: string) {
     openPanel()
     const topic = subject?.trim().slice(0, 80)
