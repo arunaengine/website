@@ -42,7 +42,7 @@ const replaceMetadataRoCrate = vi.fn()
 const getGroup = vi.fn()
 const grantPublicRead = vi.fn()
 const loadProfileCrate = vi.fn(async () => ({}))
-const routerPush = vi.fn(async () => undefined)
+const routerPush = vi.fn(async (): Promise<unknown> => undefined)
 let leaveGuard: (() => Promise<boolean>) | null = null
 let updateGuard: (() => Promise<boolean>) | null = null
 
