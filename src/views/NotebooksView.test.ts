@@ -12,6 +12,7 @@ const view = compileClientComponent(new URL('./NotebooksView.vue', import.meta.u
   vue: VueRuntime,
   'vue-router': { useRouter: () => ({ replace }), useRoute: () => route },
   '@/views/DataManagerView.vue': moduleDefault(DataView),
+  '@/components/ui/Spinner.vue': moduleDefault(defineComponent(() => () => h('span', 'loading'))),
   '@/composables/useGroupSelection': { activeGroupId: ref('group-1') },
   '@/composables/useNotebookLocation': {
     useNotebookLocation: () => ({ scope: ref('scope'), location, remember: vi.fn() }),
@@ -28,12 +29,14 @@ describe('notebooks entry', () => {
   it('resumes the remembered notebook from the sidebar entry', async () => {
     route.query.browse = ''
     location.value = { bucket: 'reef', prefix: 'notebooks', key: 'notebooks/analysis.ipynb' }
-    const { app } = await mountApp(view)
+    const { root, app } = await mountApp(view)
     expect(replace).toHaveBeenCalledWith({
       name: 'notebook',
       params: { bucketId: 'reef', key: 'notebooks/analysis.ipynb' },
       query: { group: 'group-1' },
     })
+    // The data view stays unmounted, so its bucket redirect cannot race.
+    expect(content(root)).not.toContain('data view')
     app.unmount()
   })
 
