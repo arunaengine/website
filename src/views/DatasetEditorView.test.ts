@@ -42,6 +42,7 @@ const getGroup = vi.fn()
 const grantPublicRead = vi.fn()
 const loadProfileCrate = vi.fn(async () => ({}))
 const routerPush = vi.fn(async () => undefined)
+let leaveGuard: (() => Promise<boolean>) | null = null
 
 const previewResult = ref<Api.ProfileValidationPreviewResponse | null>(null)
 const previewRunning = ref(false)
@@ -256,12 +257,24 @@ const NoticeStub = defineComponent({
   setup: (props, { slots }) => () => h('div', [props.title, slots.default?.()]),
 })
 
+const DiscardStub = defineComponent({
+  props: { open: Boolean },
+  emits: ['keep', 'discard'],
+  setup: (props, { emit }) => () => props.open
+    ? h('div', [
+        h('span', 'Discard this draft?'),
+        h('button', { onClick: () => emit('keep') }, 'Keep editing'),
+        h('button', { onClick: () => emit('discard') }, 'Discard draft'),
+      ])
+    : null,
+})
 const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vue', import.meta.url), {
   vue: VueRuntime,
   'vue-router': {
     RouterLink: RouterLinkStub,
     useRoute: () => route,
     useRouter: () => ({ push: routerPush }),
+    onBeforeRouteLeave: (guard: () => Promise<boolean>) => { leaveGuard = guard },
   },
   '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
   '@/components/dashboard/PageHeader.vue': moduleDefault(PageHeaderStub),
@@ -269,6 +282,7 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
   '@/components/ui/Notice.vue': moduleDefault(NoticeStub),
   '@/components/ui/Skeleton.vue': moduleDefault(EmptyStub),
   '@/components/ui/ErrorPanel.vue': moduleDefault(EmptyStub),
+  '@/components/ui/DiscardDraftConfirm.vue': moduleDefault(DiscardStub),
   '@/components/groups/CreateGroupDialog.vue': moduleDefault(EmptyStub),
   '@/components/metadata/ImportCrateDialog.vue': moduleDefault(ImportStub),
   '@/components/metadata/editor/DatasetLocationDialog.vue': moduleDefault(LocationStub),
@@ -416,6 +430,7 @@ beforeEach(() => {
   previewError.value = null
   previewUnavailable.value = false
   importDraft.value = null
+  leaveGuard = null
 })
 
 describe('DatasetEditorView', () => {
@@ -1252,6 +1267,82 @@ describe('DatasetEditorView', () => {
     expect(content(mounted.root)).toContain('New dataset')
     expect(content(mounted.root)).toContain('Document none')
     expect(content(mounted.root)).not.toContain('Example dataset')
+    mounted.app.unmount()
+  })
+})
+
+describe('DatasetEditorView draft guard', () => {
+  it('lets an untouched form leave without asking', async () => {
+    const mounted = await mountApp(DatasetEditorView)
+    await flush()
+
+    await expect(leaveGuard?.()).resolves.toBe(true)
+    expect(content(mounted.root)).not.toContain('Discard this draft?')
+    mounted.app.unmount()
+  })
+
+  it('counts the profile the page seeds itself as settled', async () => {
+    profiles.value = [profileFixture('genomics', 'Genomics', [], ['identifier'])]
+    currentUser.value = { preferredProfileId: 'genomics' }
+    const mounted = await mountApp(DatasetEditorView)
+    await flush()
+    expect(content(mounted.root)).toContain('Declared genomics')
+
+    await expect(leaveGuard?.()).resolves.toBe(true)
+    mounted.app.unmount()
+  })
+
+  it('asks before leaving with unsaved work and keeps the draft', async () => {
+    const mounted = await mountApp(DatasetEditorView)
+    await click(button(mounted.root, 'Seed dataset'))
+
+    const leaving = leaveGuard?.()
+    await flush()
+    expect(content(mounted.root)).toContain('Discard this draft?')
+
+    await click(button(mounted.root, 'Keep editing'))
+    await expect(leaving).resolves.toBe(false)
+    expect(content(mounted.root)).toContain('Example dataset')
+    mounted.app.unmount()
+  })
+
+  it('leaves for the requested route once the discard is confirmed', async () => {
+    const mounted = await mountApp(DatasetEditorView)
+    await click(button(mounted.root, 'Seed dataset'))
+
+    const leaving = leaveGuard?.()
+    await flush()
+    await click(button(mounted.root, 'Discard draft'))
+
+    await expect(leaving).resolves.toBe(true)
+    expect(content(mounted.root)).not.toContain('Discard this draft?')
+    expect(routerPush).not.toHaveBeenCalled()
+    mounted.app.unmount()
+  })
+
+  it('asks on Discard and then leaves the editor', async () => {
+    const mounted = await mountApp(DatasetEditorView)
+    await click(button(mounted.root, 'Seed dataset'))
+
+    await click(button(mounted.root, 'Discard'))
+    expect(routerPush).not.toHaveBeenCalled()
+    expect(content(mounted.root)).toContain('Discard this draft?')
+
+    await click(button(mounted.root, 'Discard draft'))
+    expect(routerPush).toHaveBeenCalledWith({ name: 'datasets' })
+    await expect(leaveGuard?.()).resolves.toBe(true)
+    mounted.app.unmount()
+  })
+
+  it('does not ask on the navigation that follows a save', async () => {
+    const mounted = await mountApp(DatasetEditorView)
+    await click(button(mounted.root, 'Seed dataset'))
+    await click(button(mounted.root, 'Create dataset'))
+    await flush()
+    expect(routerPush).toHaveBeenCalledWith({ name: 'dataset', params: { id: 'dataset-1' } })
+
+    await expect(leaveGuard?.()).resolves.toBe(true)
+    expect(content(mounted.root)).not.toContain('Discard this draft?')
     mounted.app.unmount()
   })
 })

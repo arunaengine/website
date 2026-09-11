@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, ref, shallowRef, watch } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
+import { onBeforeRouteLeave, RouterLink, useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
+import DiscardDraftConfirm from '@/components/ui/DiscardDraftConfirm.vue'
 import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
 import ImportCrateDialog from '@/components/metadata/ImportCrateDialog.vue'
 import DatasetLocationDialog from '@/components/metadata/editor/DatasetLocationDialog.vue'
@@ -95,6 +96,24 @@ const submitError = ref<string | null>(null)
 const saveIssues = ref<WriteIssue[]>([])
 const submitting = ref(false)
 
+// Unsaved work: the baseline is the draft as the page settled it, so a form
+// nobody edited leaves without a question.
+function snapshot(): string {
+  return JSON.stringify(draft.value)
+}
+const baseline = ref(snapshot())
+const dirty = computed(() => baseline.value !== snapshot())
+function markSettled() {
+  baseline.value = snapshot()
+}
+// A change the page makes itself moves the baseline; a draft the user already
+// changed keeps its unsaved work.
+function keepSettled(change: () => void, own = true) {
+  const clean = !dirty.value
+  change()
+  if (own && clean) markSettled()
+}
+
 onMounted(() => void loadVocabIndex().then((index) => (vocab.value = index)))
 
 const rootName = computed(() => entityName(rootEntity(draft.value)))
@@ -117,7 +136,10 @@ const profileTypes = computed(() => (selectedProfile.value?.entityRules ?? [])
 const groupId = computed({
   get: () => draft.value.groupId ?? '',
   set: (value: string) => {
-    draft.value = { ...draft.value, groupId: value }
+    // The first group the portal offers is the page's own; a switch is the user's.
+    keepSettled(() => {
+      draft.value = { ...draft.value, groupId: value }
+    }, !draft.value.groupId)
   },
 })
 useGroupSelection(groupId)
@@ -131,7 +153,12 @@ const location = computed(() => (mode.value === 'create'
   ? { prefix: folder.value ?? prefixes.preselected.value, slug: slug.value ?? slugify(rootName.value) }
   : splitPath(draft.value.path ?? '')))
 watch(location, ({ prefix, slug: name }) => {
-  if (mode.value === 'create') draft.value = { ...draft.value, path: name ? joinPath(prefix, name) : '' }
+  if (mode.value !== 'create') return
+  // The offered folder and the slug the name derives are the page's own; a
+  // location the user picked is unsaved work.
+  keepSettled(() => {
+    draft.value = { ...draft.value, path: name ? joinPath(prefix, name) : '' }
+  }, folder.value === null && slug.value === null)
 }, { immediate: true })
 watch(() => draft.value.groupId, () => (folder.value = null))
 
@@ -160,6 +187,7 @@ async function load() {
     loadError.value = null
     submitError.value = null
     saveIssues.value = []
+    markSettled()
     return
   }
   loading.value = true
@@ -182,6 +210,7 @@ async function load() {
     pendingSeed.value = ''
     profileId.value = declaredProfile()
     draft.value = alignValueKinds(draft.value, vocab.value, expectation.value)
+    markSettled()
   } catch (error) {
     if (generation === loadGeneration && mode.value === 'edit' && documentId.value === id) {
       loadError.value = errorMessage(error)
@@ -277,8 +306,10 @@ watch([crate, profileId], () => {
 // A crate may carry a number as text or the other way round; the rules that
 // apply, and the vocabulary once loaded, decide which the node should see.
 watch([expectation, vocab], ([rules, index]) => {
-  const aligned = alignValueKinds(draft.value, index, rules)
-  if (aligned !== draft.value) draft.value = aligned
+  keepSettled(() => {
+    const aligned = alignValueKinds(draft.value, index, rules)
+    if (aligned !== draft.value) draft.value = aligned
+  })
 })
 
 // What the assistant may do to the open draft while this view is mounted. It
@@ -384,7 +415,9 @@ watch(expectation, (rules) => {
   if (!profile || profile.id !== pendingSeed.value || !hasRules(rules)) return
   pendingSeed.value = ''
   const iri = profileReferenceIri(profile)
-  draft.value = applyProfile(draft.value, profile, iri, iri)
+  keepSettled(() => {
+    draft.value = applyProfile(draft.value, profile, iri, iri)
+  })
 })
 
 // A profile the newly chosen group may not use cannot stay declared.
@@ -403,21 +436,73 @@ watch([mode, currentUser, selectableProfiles], ([currentMode, user, available]) 
     preferredProfileInitialized.value = true
     return
   }
-  if (available.some((profile) => profile.id === preferred)) pickProfile(preferred)
+  if (available.some((profile) => profile.id === preferred)) keepSettled(() => pickProfile(preferred))
 }, { immediate: true })
 
 // A create link may name the profile to start from; a pick already made wins.
 watch([() => String(route.query?.profile ?? ''), selectableProfiles], ([wanted, available]) => {
   if (mode.value !== 'create' || !wanted || profileId.value) return
   const match = available.find((profile) => profile.documentId === wanted || profile.id === wanted)
-  if (match) pickProfile(match.id)
+  if (match) keepSettled(() => pickProfile(match.id))
 }, { immediate: true })
 
-function discard() {
+// Leaving the editor (Discard, a nav click, the browser back button) with
+// unsaved work asks first; the view's own navigation after a save or a
+// confirmed discard leaves silently.
+const confirmDiscardOpen = ref(false)
+const allowLeave = ref(false)
+let leave: ((allowed: boolean) => void) | null = null
+
+onBeforeRouteLeave(
+  () =>
+    new Promise<boolean>((resolve) => {
+      if (allowLeave.value || !dirty.value) {
+        resolve(true)
+        return
+      }
+      leave = resolve
+      confirmDiscardOpen.value = true
+    }),
+)
+
+function leaveEditor() {
+  allowLeave.value = true
   void router.push(mode.value === 'edit'
     ? { name: 'dataset', params: { id: documentId.value } }
     : { name: 'datasets' })
 }
+
+function discard() {
+  if (dirty.value) confirmDiscardOpen.value = true
+  else leaveEditor()
+}
+
+function keepDraft() {
+  confirmDiscardOpen.value = false
+  leave?.(false)
+  leave = null
+}
+
+function discardDraft() {
+  confirmDiscardOpen.value = false
+  if (!leave) {
+    leaveEditor()
+    return
+  }
+  leave(true)
+  leave = null
+}
+
+// A reload or a closed tab would drop the draft just as silently.
+function warnUnload(event: BeforeUnloadEvent) {
+  if (dirty.value) event.preventDefault()
+}
+onMounted(() => {
+  if (typeof window !== 'undefined') window.addEventListener('beforeunload', warnUnload)
+})
+onUnmounted(() => {
+  if (typeof window !== 'undefined') window.removeEventListener('beforeunload', warnUnload)
+})
 
 // Files a public dataset would list without everyone being able to read them.
 const restrictedFiles = ref<RestrictedFile[]>([])
@@ -523,6 +608,7 @@ async function save(anyway = false) {
   try {
     if (sourceMode === 'edit') {
       await replaceMetadataRoCrate(targetId, { rocrate: source, public: isPublic })
+      allowLeave.value = true
       await router.push({ name: 'dataset', params: { id: targetId } })
       return
     }
@@ -532,6 +618,7 @@ async function save(anyway = false) {
       public: isPublic,
       rocrate: source,
     })
+    allowLeave.value = true
     await router.push({ name: 'dataset', params: { id: result.document_id } })
   } catch (error) {
     // A refused write states its own findings; only anything else needs a line.
@@ -545,7 +632,7 @@ async function save(anyway = false) {
 </script>
 
 <template>
-  <div>
+  <div class="relative">
     <PageHeader eyebrow="Datasets" :title="title" :docs="{ topic: 'first-dataset', section: 'Describe the dataset' }">
       <template #description>
         <span class="inline-flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
@@ -724,5 +811,6 @@ async function save(anyway = false) {
     />
     <ImportCrateDialog v-if="mode === 'create'" v-model:open="importOpen" @imported="imported" />
     <CreateGroupDialog v-model:open="createGroupOpen" @created="(group) => (groupId = group.group_id)" />
+    <DiscardDraftConfirm :open="confirmDiscardOpen" @keep="keepDraft" @discard="discardDraft" />
   </div>
 </template>
