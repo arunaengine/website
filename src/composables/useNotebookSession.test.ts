@@ -24,6 +24,7 @@ vi.mock('@/composables/useRealmNodes', () => ({
 
 const jobs = vi.hoisted(() => ({
   getJob: vi.fn(),
+  listJobs: vi.fn(),
   submitJob: vi.fn(),
   cancelJob: vi.fn(),
   submitErrorMessage: (error: unknown) => String((error as Error)?.message ?? error),
@@ -142,6 +143,44 @@ describe('createNotebookSession', () => {
     expect(session.runSessionCell.mock.calls[0][0]).toBe('01JOB')
     expect(store.jobId.value).toBe('01OTHER')
     expect(store.error.value).toBeNull()
+    scope.stop()
+  })
+
+  it('attaches to a session another browser started', async () => {
+    const { notebook, session: store, scope } = await setup()
+    session.getSessionState.mockResolvedValue(state({ job_id: '01OTHER', executor_node_id: 'node-b' }))
+    await store.attachTo('01OTHER', 'node-b')
+    expect(jobs.getJob).not.toHaveBeenCalled()
+    expect(session.getSessionState).toHaveBeenCalledWith('01OTHER', {
+      baseUrl: 'https://node-b.example/api/v1', token: 'bearer-token',
+    })
+    expect(store.jobId.value).toBe('01OTHER')
+    expect(store.live.value).toBe(true)
+    expect(notebook.meta.value?.job_id).toBe('01OTHER')
+    expect(notebook.meta.value?.executor_node_id).toBe('node-b')
+    scope.stop()
+  })
+
+  it('drops the session it was attached to before', async () => {
+    const { notebook, session: store, scope } = await setup()
+    notebook.patchMeta({ job_id: '01JOB', executor_node_id: 'node-a' })
+    session.getSessionState.mockResolvedValue(state())
+    await store.attachSaved()
+    const closed = session.openSessionStream.mock.results[0].value.close
+    session.getSessionState.mockResolvedValue(state({ job_id: '01OTHER', executor_node_id: 'node-b' }))
+    await store.attachTo('01OTHER', 'node-b')
+    expect(closed).toHaveBeenCalled()
+    expect(store.state.value?.job_id).toBe('01OTHER')
+    scope.stop()
+  })
+
+  it('looks up the node when the chosen session names none', async () => {
+    const { session: store, scope } = await setup()
+    jobs.getJob.mockResolvedValue({ state: 'running', family: { execution_list: [{ executor_node_id: 'node-c', canonical: true }] } })
+    session.getSessionState.mockResolvedValue(state({ job_id: '01OTHER', executor_node_id: 'node-c' }))
+    await store.attachTo('01OTHER')
+    expect(jobs.getJob).toHaveBeenCalledWith('01OTHER', { baseUrl: '/api/v1', token: 'bearer-token' })
+    expect(store.nodeId.value).toBe('node-c')
     scope.stop()
   })
 

@@ -6,7 +6,7 @@ import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useS3 } from '@/composables/useS3'
 import type { NotebookStore } from '@/composables/useNotebook'
-import { cancelJob, getJob, submitErrorMessage, submitJob, type JobStatusResponse } from '@/lib/jobs'
+import { cancelJob, getJob, submitErrorMessage, submitJob } from '@/lib/jobs'
 import { ApiError, isRateLimited, type ApiClientOptions } from '@/lib/api'
 import {
   endSession,
@@ -22,6 +22,7 @@ import {
   type SessionState,
   type SessionStream,
 } from '@/lib/notebook/session'
+import { executorNode } from '@/lib/notebook/sessions'
 import { sessionSubmitRequest, type SessionSubmitDraft } from '@/lib/notebook/submit'
 import { clearResumePoint, readResumePoint, writeResumePoint } from '@/lib/notebook/document'
 import { trailing } from '@/lib/throttle'
@@ -32,12 +33,6 @@ const NODE_LOOKUP_TRIES = 20
 const NODE_LOOKUP_DELAY_MS = 1_500
 /** Wait before resending a cell the node rate limited, without a Retry-After. */
 const RATE_LIMIT_WAIT_MS = 2_000
-
-function executorNode(job: JobStatusResponse): string {
-  const executions = job.family?.execution_list ?? []
-  const canonical = executions.find((execution) => execution.canonical) ?? executions[0]
-  return canonical?.executor_node_id ?? ''
-}
 
 /** The submit, plus the dependency file the portal writes before it. The
  * idempotency key is the store's, so a retry keeps the same one. */
@@ -252,6 +247,16 @@ export function createNotebookSession(notebook: NotebookStore) {
     detach()
     jobId.value = meta.job_id
     nodeId.value = meta.executor_node_id ?? ''
+    await attach()
+  }
+
+  /** Picks up a session that is already running, chosen in the kernel dialog. */
+  async function attachTo(id: string, node = ''): Promise<void> {
+    if (!id) return
+    detach()
+    jobId.value = id
+    nodeId.value = node
+    notebook.patchMeta({ job_id: id, executor_node_id: node || undefined })
     await attach()
   }
 
@@ -539,6 +544,7 @@ export function createNotebookSession(notebook: NotebookStore) {
     running,
     attach,
     attachSaved,
+    attachTo,
     refresh,
     start,
     end,
