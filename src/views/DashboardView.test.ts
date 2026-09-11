@@ -2,7 +2,8 @@ import * as VueRuntime from 'vue'
 import { createSSRApp, defineComponent, h, ref, type Component } from 'vue'
 import { renderToString } from '@vue/server-renderer'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { button, click, content, compileClientComponent, flush, moduleDefault, mountApp } from '@/test/clientRender'
+import { button, click, content, compileClientComponent, element, flush, moduleDefault, mountApp } from '@/test/clientRender'
+import { docsTopicBySlug } from '@/docs/v1'
 
 const firstPaintMock = vi.hoisted(() => ({
   useFirstPaint: () => ({ value: true }),
@@ -34,6 +35,7 @@ const listRecentMetadata = vi.fn(async () => [])
 const signIn = vi.fn(async () => undefined)
 const isNewUser = ref(false)
 const dismissOnboarding = vi.fn(async () => undefined)
+const startTour = vi.fn()
 const tesEnabled = ref(true)
 
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
@@ -119,6 +121,7 @@ beforeAll(async () => {
   vi.doMock('@/composables/useOnboarding', () => ({
     useOnboarding: () => ({ isNewUser, dismissOnboarding }),
   }))
+  vi.doMock('@/composables/useTour', () => ({ startTour }))
   vi.doMock('@/lib/config', async () => ({
     ...(await vi.importActual<typeof import('@/lib/config')>('@/lib/config')),
     featureEnabled: () => tesEnabled.value,
@@ -175,6 +178,8 @@ beforeAll(async () => {
     '@/composables/useNotifications': { useNotifications: () => ({ dashboardRevision }) },
     '@/composables/useDashboardScope': { useDashboardScope: () => ({ scope, setScope }) },
     '@/composables/useOnboarding': { useOnboarding: () => ({ isNewUser, dismissOnboarding }) },
+    '@/composables/useTour': { startTour },
+    '@/docs/v1': { docsTopicBySlug },
     '@/lib/config': { featureEnabled: () => tesEnabled.value },
     '@/composables/useRefresh': {
       useRefresh: (run: () => unknown) => ({ busy: ref(false), refresh: run }),
@@ -225,6 +230,7 @@ beforeEach(() => {
   authStageError.value = null
   isNewUser.value = false
   dismissOnboarding.mockClear()
+  startTour.mockClear()
   tesEnabled.value = true
   refresh.mockClear()
   loadInfo.mockClear()
@@ -444,13 +450,35 @@ describe('welcome card', () => {
     isNewUser.value = true
   })
 
-  it('offers both tutorials to an account that has answered nothing', async () => {
+  it('leads with the docs and the tour, tutorials behind them', async () => {
     const text = await renderedText()
 
-    expect(text).toContain('New here? Practise on made-up data.')
-    expect(text).toContain('Start the compute tutorial')
-    expect(text).toContain('Build a profile')
+    expect(text).toContain('New here? Start with the basics.')
+    expect(text).toContain('Open the docs')
+    expect(text).toContain('Take the tour')
+    expect(text).toContain('Compute tutorial')
+    expect(text).toContain('Profile tutorial')
     expect(text).toContain('Not now')
+  })
+
+  it('points the docs button at the portal tour topic', async () => {
+    const mounted = await mountApp(DashboardClient)
+
+    const link = element(mounted.root, (node) => node.tag === 'a' && content(node).trim() === 'Open the docs')
+
+    expect(link.props.to).toEqual({ name: 'docs', params: { topic: 'portal-tour' } })
+    expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('starts the portal tour from the card', async () => {
+    const mounted = await mountApp(DashboardClient)
+
+    await click(button(mounted.root, 'Take the tour'))
+
+    expect(startTour).toHaveBeenCalledWith(docsTopicBySlug('portal-tour')?.tour)
+    expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
   })
 
   it('leaves the compute tutorial out where the node runs nothing', async () => {
@@ -458,26 +486,26 @@ describe('welcome card', () => {
 
     const text = await renderedText()
 
-    expect(text).toContain('Build a profile')
-    expect(text).not.toContain('Start the compute tutorial')
+    expect(text).toContain('Profile tutorial')
+    expect(text).not.toContain('Compute tutorial')
   })
 
   it('stays away from an account that already answered', async () => {
     isNewUser.value = false
 
-    expect(await renderedText()).not.toContain('New here? Practise on made-up data.')
+    expect(await renderedText()).not.toContain('New here? Start with the basics.')
   })
 
   it('stays away while a stored session is still resolving', async () => {
     authPending.value = true
 
-    expect(await renderedText()).not.toContain('New here? Practise on made-up data.')
+    expect(await renderedText()).not.toContain('New here? Start with the basics.')
   })
 
   it('stays away from a visitor who is not signed in', async () => {
     currentUser.value = null
 
-    expect(await renderedText()).not.toContain('New here? Practise on made-up data.')
+    expect(await renderedText()).not.toContain('New here? Start with the basics.')
   })
 
   it('records the refusal when the card is dismissed', async () => {

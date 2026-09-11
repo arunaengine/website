@@ -12,16 +12,18 @@ import StatCard from '@/components/ui/StatCard.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import type { MetadataDoc } from '@/data/types'
-import { ArrowRight, Boxes, Database, FileJson2, Files, FolderOpen, Plus, Activity, Users } from '@lucide/vue'
+import { ArrowRight, BookOpen, Boxes, Database, FileJson2, Files, FolderOpen, Plus, Activity, Users } from '@lucide/vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { useAuth } from '@/composables/useAuth'
 import { useDashboardScope } from '@/composables/useDashboardScope'
 import { useOnboarding } from '@/composables/useOnboarding'
+import { startTour } from '@/composables/useTour'
 import { useNotifications } from '@/composables/useNotifications'
 import { useRefresh } from '@/composables/useRefresh'
 import { useFirstPaint } from '@/composables/useFirstPaint'
+import { docsTopicBySlug } from '@/docs/v1'
 import { featureEnabled } from '@/lib/config'
 import { POLL_SLOW_MS, follow, onWake } from '@/lib/poll'
 import { formatCount } from '@/lib/formatCount'
@@ -35,6 +37,8 @@ const { scope, setScope } = useDashboardScope()
 const { isNewUser, dismissOnboarding } = useOnboarding()
 // Nothing to practise on when this deployment serves no compute.
 const computeTutorialOffered = computed(() => featureEnabled('tes'))
+// The short tour of the dashboard, shared with its docs topic.
+const portalTour = docsTopicBySlug('portal-tour')?.tour ?? []
 const refreshing = ref(false)
 const quotaRevision = ref(0)
 const recentDocs = ref<MetadataDoc[] | null>(null)
@@ -250,26 +254,33 @@ const pageDescription = computed(() =>
       <template v-else>
       <SignInPanel v-if="!currentUser" />
 
-      <!-- First visit: the two interactive tutorials, offered once. -->
+      <!-- First visit: the docs and the short tour first, tutorials behind them. -->
       <section
         v-if="currentUser && !authPending && isNewUser"
-        class="surface flex flex-wrap items-center justify-between gap-4 p-5"
+        class="surface flex flex-wrap items-center gap-4 border-primary/40 bg-primary/5 p-5"
         aria-labelledby="welcome-tutorials-heading"
       >
-        <div class="min-w-0">
+        <span class="grid size-10 shrink-0 place-items-center rounded-md bg-primary/15 text-primary">
+          <BookOpen class="h-5 w-5" />
+        </span>
+        <div class="min-w-0 flex-1">
           <h2 id="welcome-tutorials-heading" class="font-display text-sm font-semibold text-aruna-navy">
-            New here? Practise on made-up data.
+            New here? Start with the basics.
           </h2>
           <p class="mt-1 text-xs text-muted-foreground">
-            Both tutorials walk the real screens without creating anything.
+            The docs explain the portal in a few short pages, and the tour points out the main controls.
           </p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-          <Button v-if="computeTutorialOffered" size="sm" as-child>
-            <RouterLink :to="{ name: 'tutorial-compute' }">Start the compute tutorial</RouterLink>
+          <Button as-child>
+            <RouterLink :to="{ name: 'docs', params: { topic: 'portal-tour' } }">Open the docs</RouterLink>
           </Button>
-          <Button variant="outline" size="sm" as-child>
-            <RouterLink :to="{ name: 'tutorial-profile' }">Build a profile</RouterLink>
+          <Button variant="outline" @click="startTour(portalTour)">Take the tour</Button>
+          <Button v-if="computeTutorialOffered" variant="ghost" size="sm" as-child>
+            <RouterLink :to="{ name: 'tutorial-compute' }">Compute tutorial</RouterLink>
+          </Button>
+          <Button variant="ghost" size="sm" as-child>
+            <RouterLink :to="{ name: 'tutorial-profile' }">Profile tutorial</RouterLink>
           </Button>
           <Button variant="ghost" size="sm" @click="dismissOnboarding">Not now</Button>
         </div>
