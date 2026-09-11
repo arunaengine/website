@@ -290,6 +290,7 @@ const EntityEditor = compileClientComponent(url('components/metadata/editor/Enti
   './AddPropertyDialog.vue': moduleDefault(GenericStub),
   './AddFilesDialog.vue': moduleDefault(GenericStub),
   '@/lib/crate/pickers': CratePickers,
+  '@/lib/crate/profileSeed': CrateProfileSeed,
 })
 const NodeCheckPanel = compileClientComponent(url('components/metadata/editor/NodeCheckPanel.vue'), editorShared)
 const IssueDrawer = compileClientComponent(url('components/metadata/editor/IssueDrawer.vue'), editorShared)
