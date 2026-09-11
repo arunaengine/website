@@ -77,19 +77,20 @@ const idleOptions = computed(() => [
 ])
 
 // The sessions that are already running, so a kernel another browser started
-// can be picked up here. Every listing is bound to the dialog opening and to
-// the API base it was read from.
+// can be picked up here. Every listing is bound to the dialog opening, to the
+// API base and to the account it was read for.
 const foundSessions = ref<RunningSession[]>([])
 const sessionsLoading = ref(false)
 const sessionsError = ref('')
 const uncheckedJobs = ref(0)
+const moreJobs = ref(false)
 let listGeneration = 0
 
 async function loadSessions() {
   const request = ++listGeneration
   const base = apiBaseUrl.value
   const token = authToken.value
-  const active = () => request === listGeneration && base === apiBaseUrl.value
+  const active = () => request === listGeneration && base === apiBaseUrl.value && token === authToken.value
   sessionsLoading.value = true
   sessionsError.value = ''
   try {
@@ -100,10 +101,12 @@ async function loadSessions() {
     if (!active()) return
     foundSessions.value = found.sessions
     uncheckedJobs.value = found.unchecked
+    moreJobs.value = found.truncated
   } catch (cause) {
     if (!active()) return
     foundSessions.value = []
     uncheckedJobs.value = 0
+    moreJobs.value = false
     sessionsError.value = errorMessage(cause)
   } finally {
     if (active()) sessionsLoading.value = false
@@ -120,6 +123,11 @@ watch([kernelOpen, session.running], ([open, live]) => {
 /** A session of this notebook's bucket and runtime is the one it wants. */
 function matches(entry: RunningSession): boolean {
   return entry.bucket === meta.value?.workspace_bucket && entry.runtime === meta.value?.runtime
+}
+// Attaching to another bucket or runtime would run the notebook's inputs
+// somewhere its files panel does not show, so only a match may be picked up.
+function attachTitle(entry: RunningSession): string {
+  return matches(entry) ? '' : 'This session works in another bucket or runtime than this notebook.'
 }
 const sessionRows = computed(() =>
   [...foundSessions.value].sort((a, b) => Number(matches(b)) - Number(matches(a))),
@@ -311,15 +319,17 @@ async function saveDependencies(value: DependencySpec, restart: boolean) {
                 <Button
                   variant="outline"
                   size="sm"
-                  :disabled="session.attaching.value"
+                  :disabled="session.attaching.value || !matches(entry)"
+                  :title="attachTitle(entry)"
                   @click="attachSession(entry)"
                 >
                   Attach
                 </Button>
               </li>
             </ul>
-            <p v-if="uncheckedJobs" class="text-[11px] text-muted-foreground">
-              Some running jobs did not answer, so this list may be incomplete.
+            <p v-if="uncheckedJobs || moreJobs" class="text-[11px] text-muted-foreground">
+              {{ uncheckedJobs ? 'Some running jobs did not answer' : 'More running jobs were not read' }},
+              so this list may be incomplete.
             </p>
           </template>
         </div>

@@ -323,13 +323,26 @@ describe('the session bar', () => {
     expect(context.session.attachTo).toHaveBeenCalledWith('01JOB', 'node-a')
   })
 
-  it('marks a session that works in another bucket', async () => {
+  it('marks a session that works in another bucket and refuses it', async () => {
     jobs.listJobs.mockResolvedValue({ jobs: [runningJob('other-bucket')] })
     sessionApi.getSessionState.mockResolvedValue(runningSession({ workspace_bucket: 'other-bucket' }))
     const root = await render()
     await openOptions(root)
     await flush()
     expect(content(root)).toContain('other bucket or runtime')
+    const attach = button(root, 'Attach')
+    expect(attach.props.disabled).toBe(true)
+    expect(String(attach.props.title)).toContain('another bucket or runtime')
+  })
+
+  it('says that running jobs were left unread', async () => {
+    const page = Array.from({ length: 12 }, (_, index) => ({ ...runningJob(), job_id: `01JOB${index}` }))
+    jobs.listJobs.mockResolvedValue({ jobs: page, next_cursor: 'page-2' })
+    sessionApi.getSessionState.mockResolvedValue(runningSession())
+    const root = await render()
+    await openOptions(root)
+    await flush()
+    expect(content(root)).toContain('this list may be incomplete')
   })
 
   it('says the running sessions could not be listed', async () => {
