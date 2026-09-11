@@ -101,7 +101,8 @@ export function runFormTools(bridge: RunFormBridge, gate: ApprovalGate): ToolSet
     set_run_executor: tool({
       description:
         'Sets what runs: a script runtime (python-uv, deno or bash), or a custom image with its '
-        + 'command line. Fields left out keep their value.',
+        + 'command line. Prefer a runtime; set an image only when the user names it exactly, and '
+        + 'never guess an image name. Fields left out keep their value.',
       inputSchema: schema<{ runtime?: string; image?: string; command?: string; workdir?: string }>({
         runtime: STRING,
         image: STRING,
