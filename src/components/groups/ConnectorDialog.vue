@@ -242,7 +242,7 @@ async function submit() {
 
 <template>
   <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-    <DialogContent class="max-w-md">
+    <DialogContent>
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <Cable class="h-4 w-4 text-primary" />
