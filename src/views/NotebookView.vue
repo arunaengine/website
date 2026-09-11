@@ -52,6 +52,10 @@ provideNotebook({ notebook, session })
 // The assistant may read and change this notebook while the page is open.
 provideNotebookBridge(createNotebookBridge(notebook, session))
 
+// The chat belongs to this notebook alone, so reopening it never resumes the
+// conversation about another one.
+const assistantSubject = computed(() => `the notebook ${bucket.value}/${key.value}`)
+
 const autosaveTimer = ref<ReturnType<typeof setInterval> | null>(null)
 
 async function open() {
@@ -187,7 +191,7 @@ const savedLabel = computed(() => {
   <div>
     <PageHeader eyebrow="Notebooks" :title="notebook.name.value || 'Notebook'" :docs="{ topic: 'notebooks', section: 'The session bar' }">
       <template #actions>
-        <AskAiButton size="default" prompt="Help me with this notebook." subject="the notebook" />
+        <AskAiButton size="default" prompt="Help me with this notebook." :subject="assistantSubject" />
         <Button variant="outline" size="default" as-child>
           <RouterLink :to="{ name: 'notebooks', query: { browse: '1' } }">
             <ArrowLeft class="h-4 w-4" /> Change notebook

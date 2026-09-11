@@ -479,6 +479,10 @@ async function leaveTo(target: RouteLocationRaw): Promise<void> {
   }
 }
 
+// The chat belongs to this draft alone, so reopening the editor for another
+// dataset never resumes the conversation about the one before it.
+const assistantSubject = computed(() => `the dataset draft ${documentId.value || 'new'}`)
+
 function leaveEditor() {
   void leaveTo(mode.value === 'edit'
     ? { name: 'dataset', params: { id: documentId.value } }
@@ -673,7 +677,7 @@ async function save(anyway = false) {
         </span>
       </template>
       <template #actions>
-        <AskAiButton size="sm" prompt="Help me describe this dataset." subject="the dataset draft" />
+        <AskAiButton size="sm" prompt="Help me describe this dataset." :subject="assistantSubject" />
         <Button variant="outline" size="sm" @click="locationOpen = true">
           <FolderTree class="h-3.5 w-3.5" /> Location
         </Button>
