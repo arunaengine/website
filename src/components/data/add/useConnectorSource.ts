@@ -75,9 +75,6 @@ export function useConnectorSource(options: {
   // Set when the entries endpoint is absent on this node; the typed source path
   // stays available as the fallback.
   const entriesUnsupported = ref(false)
-  // Set when the node answered but the source refused a listing (502/504); the
-  // browser stays visible for retries and the typed path unlocks alongside it.
-  const entriesListingFailed = ref(false)
   const connectorPath = ref('')
 
   watch(connectors, () => {
@@ -87,7 +84,6 @@ export function useConnectorSource(options: {
   })
   watch(connectorSel, () => {
     entriesUnsupported.value = false
-    entriesListingFailed.value = false
   })
 
   function typedConnectorPathIsPrefix(path: string): boolean {
@@ -180,7 +176,6 @@ export function useConnectorSource(options: {
     connectorOptions,
     connectorStrategy,
     entriesUnsupported,
-    entriesListingFailed,
     connectorPath,
     connectorPathError,
     existingConnectorPaths,

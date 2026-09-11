@@ -60,7 +60,6 @@ function fakeSource(rows: ConnectorStagingRow[]) {
     connectorOptions: computed(() => [{ value: 'c-1', label: 'archive (s3)' }]),
     connectorStrategy: ref('snapshot'),
     entriesUnsupported: ref(false),
-    entriesListingFailed: ref(false),
     connectorPath,
     connectorPathError: computed(() => false),
     existingConnectorPaths: computed(() => new Set<string>()),

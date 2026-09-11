@@ -30,7 +30,6 @@ const {
   connectorOptions,
   connectorStrategy,
   entriesUnsupported,
-  entriesListingFailed,
   connectorPath,
   connectorPathError,
   existingConnectorPaths,
@@ -104,7 +103,6 @@ function addTypedConnectorPath() {
       selectable
       @add="addConnectorSelection"
       @unsupported="entriesUnsupported = true"
-      @list-failed="entriesListingFailed = true"
     />
     <div class="space-y-2">
       <Notice v-if="entriesUnsupported" tone="warning">
