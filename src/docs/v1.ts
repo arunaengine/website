@@ -693,7 +693,7 @@ export const docsTopics: DocsTopic[] = [
         icon: 'SquareTerminal',
         paragraphs: [
           'Code cells run in the kernel. Text cells hold Markdown. A pipeline cell runs one ordinary job instead, so a heavy step keeps its own image, its own resources and its own record.',
-          'The panel on the left shows the files inside the running kernel, read folder by folder and refreshed when a cell finishes. The data/ folder is the workspace bucket mounted into the kernel: its row menu creates folders, stages stored objects or connector imports into the picked folder, and copies files or whole folders out to another bucket. The rest of the tree is scratch, gone when the session ends; small scratch files can still be downloaded or copied to a bucket.',
+          'The Files panel on the left shows the files inside the running kernel, read folder by folder and refreshed when a cell finishes. Its header sits in the toolbar band, and Hide files folds the whole column away. The data/ folder is the workspace bucket mounted into the kernel: its row menu, also opened by right click, creates folders, stages stored objects or connector imports into the picked folder, renames and deletes entries, and copies files or whole folders out to another bucket. Entries under data/ can be dragged into another data/ folder, and files from the computer can be dropped onto one to upload them. The rest of the tree is scratch, gone when the session ends; small scratch files can still be downloaded or copied to a bucket.',
         ],
         bullets: [
           'Run runs one cell, Run to here runs everything above it as well.',

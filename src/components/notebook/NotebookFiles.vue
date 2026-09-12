@@ -8,7 +8,6 @@ import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
 import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
 import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
-import IconButton from '@/components/ui/IconButton.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
@@ -31,10 +30,8 @@ import {
   FileText,
   Folder,
   FolderPlus,
-  PanelLeft,
   Play,
   Plus,
-  RefreshCw,
 } from '@lucide/vue'
 
 /** The kernel folder the bucket is mounted under; only it can be written from here. */
@@ -60,8 +57,7 @@ interface CopySource {
   keys: string[]
 }
 
-defineProps<{ collapsed?: boolean }>()
-const emit = defineEmits<{ (event: 'toggle'): void; (event: 'start'): void }>()
+const emit = defineEmits<{ (event: 'start'): void }>()
 
 const { notebook, session } = injectNotebook()
 const s3 = useS3()
@@ -106,6 +102,8 @@ watch([notebook.generation, session.jobId], () => {
   importOpen.value = false
   copyOpen.value = false
 }, { flush: 'sync' })
+
+defineExpose({ refresh: () => files.refresh() })
 
 function inData(path: string): boolean {
   return path === DATA_FOLDER || path.startsWith(`${DATA_FOLDER}/`)
@@ -335,15 +333,7 @@ async function copyTo(destination: { bucket: string; prefix: string }) {
 
 <template>
   <aside class="surface min-w-0 overflow-hidden">
-    <header class="flex h-12 items-center gap-1 border-b border-border" :class="collapsed ? 'px-2' : 'px-4'">
-      <h2 v-if="!collapsed" class="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">Files</h2>
-      <IconButton v-if="!collapsed && session.running.value" label="Refresh kernel files" @click="files.refresh()">
-        <RefreshCw class="size-4" />
-      </IconButton>
-      <IconButton :label="collapsed ? 'Expand files' : 'Collapse files'" :aria-expanded="!collapsed" @click="emit('toggle')"><PanelLeft class="size-4" /></IconButton>
-    </header>
-
-    <div v-if="!collapsed" class="space-y-3 px-4 pb-4 pt-3">
+    <div class="space-y-3 px-3 py-3">
       <Notice v-if="note" tone="info">{{ note }}</Notice>
       <Notice v-if="error" tone="error">{{ error }}</Notice>
 

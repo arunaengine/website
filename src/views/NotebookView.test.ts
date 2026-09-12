@@ -45,7 +45,7 @@ async function render() {
     '@/composables/notebookContext': { provideNotebook: vi.fn() },
     '@/composables/useNotebook': { createNotebook: () => notebook },
     '@/composables/useNotebookSession': { createNotebookSession: () => ({
-      detach: vi.fn(), attachSaved: vi.fn(), live: ref(true), ended, jobId: ref('job'), runCells: vi.fn(),
+      detach: vi.fn(), attachSaved: vi.fn(), live: ref(true), ended, jobId: ref('job'), running: ref(true), runCells: vi.fn(),
     }) },
     '@/composables/useAssistantNotebook': { provideNotebookBridge: vi.fn() },
     '@/lib/notebook/bridge': { createNotebookBridge: vi.fn() },
@@ -82,6 +82,25 @@ describe('notebook workspace controls', () => {
     app.unmount()
     expect(notebook.flushCopy).toHaveBeenCalledOnce()
     expect(notebook.flushSave).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the files header in the toolbar band and folds the column away', async () => {
+    const { root, app } = await render()
+    const band = element(root, (node) => String(node.props.class).includes('sticky'))
+    expect(content(band)).toContain('Files')
+    expect(element(band, (node) => node.props.label === 'Refresh kernel files')).toBeTruthy()
+    const grid = band.parent!
+    expect(String(grid.props.class)).toContain('18rem')
+    expect(String(band.props.class)).toContain('18rem')
+    await click(element(band, (node) => node.props.label === 'Hide files'))
+    expect(String(grid.props.class)).toContain('grid-cols-[minmax(0,1fr)]')
+    expect(String(band.props.class)).not.toContain('18rem')
+    expect(content(band)).not.toContain('Files')
+    const show = element(band, (node) => node.tag === 'button')
+    expect(show.props.label).toBe('Show files')
+    await click(show)
+    expect(element(band, (node) => node.props.label === 'Hide files')).toBeTruthy()
+    app.unmount()
   })
 
   it('adds a code cell from the toolbar', async () => {

@@ -42,7 +42,6 @@ const InputStub = defineComponent({
 
 async function render(options: { live?: boolean; running?: boolean; starting?: boolean } = {}) {
   const generation = ref(1)
-  const collapsed = ref(false)
   const activeCellId = ref('first')
   const noteCellInputs = vi.fn()
   const addSessionInputs = vi.fn()
@@ -85,7 +84,6 @@ async function render(options: { live?: boolean; running?: boolean; starting?: b
     '@/lib/notebook/document': { NOTEBOOK_DATA_PREFIX: 'data/' },
     '@/lib/tes': { parseS3Url: () => ({ bucket: 'source', key: 'input.txt' }) },
     '@/lib/utils': { errorMessage: (cause: Error) => cause.message, formatBytes: (bytes: number) => `${bytes} B` },
-    '@/components/ui/IconButton.vue': moduleDefault(ButtonStub),
     '@/components/ui/Button.vue': moduleDefault(ButtonStub),
     '@/components/ui/Input.vue': moduleDefault(InputStub),
     '@/components/ui/DropdownMenuItem.vue': moduleDefault(MenuItem),
@@ -99,7 +97,7 @@ async function render(options: { live?: boolean; running?: boolean; starting?: b
   }
   const component = compileClientComponent(new URL('./NotebookFiles.vue', import.meta.url), modules)
   const onStart = vi.fn()
-  const { root, app } = await mountApp(defineComponent({ setup: () => () => h(component, { collapsed: collapsed.value, onToggle: () => { collapsed.value = !collapsed.value }, onStart }) }))
+  const { root, app } = await mountApp(defineComponent({ setup: () => () => h(component, { onStart }) }))
   await flush()
   return { root, app, generation, activeCellId, noteCellInputs, addSessionInputs, readScratch, s3, session, onStart }
 }
@@ -122,15 +120,6 @@ async function pressEnter(field: HostNode) {
 }
 
 describe('notebook input provenance', () => {
-  it('collapses and expands from the file pane header', async () => {
-    const { root, app } = await render()
-    await click(element(root, (node) => node.props.label === 'Collapse files'))
-    expect(() => element(root, (node) => node.props.label === 'Refresh kernel files')).toThrow()
-    await click(element(root, (node) => node.props.label === 'Expand files'))
-    expect(element(root, (node) => node.props.label === 'Refresh kernel files')).toBeTruthy()
-    app.unmount()
-  })
-
   it.each([false, true])('binds a staged input to the originating cell and document: changed=%s', async (changed) => {
     const { root, app, generation, activeCellId, noteCellInputs, addSessionInputs } = await render()
     let finish = (_result: unknown) => {}
