@@ -14,6 +14,7 @@ import {
   type HostNode,
 } from '@/test/clientRender'
 import * as Editor from '@/lib/crate/editor'
+import * as ProfileSeed from '@/lib/crate/profileSeed'
 import * as Labels from '@/lib/profiles/labels'
 import * as References from '@/lib/crate/references'
 import * as Pickers from '@/lib/crate/pickers'
@@ -114,6 +115,7 @@ const PropertyRow = compileClientComponent(new URL('./PropertyRow.vue', import.m
   './RuleBadge.vue': moduleDefault(RuleBadge),
   './grid': Grid,
   '@/lib/crate/editor': Editor,
+  '@/lib/crate/profileSeed': ProfileSeed,
 })
 
 const PropertyEditor = compileClientComponent(new URL('./PropertyEditor.vue', import.meta.url), {

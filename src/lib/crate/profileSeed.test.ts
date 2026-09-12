@@ -134,6 +134,54 @@ describe('profile seeding', () => {
     expect(person?.properties.affiliation).toEqual([{ kind: 'text', value: '' }])
   })
 
+  it('seeds a URL row, not a work, for a license rule of kind url', () => {
+    const withLicense = profile()
+    withLicense.propertyRules = [rule({ valueName: 'license', label: 'License', kind: 'url' })]
+    const start = setProperty(newDraft(), './', 'license', [])
+    const draft = applyProfile(start, withLicense)
+
+    expect(draft.entities[0].properties.license).toEqual([{ kind: 'url', value: '' }])
+    expect(draft.entities).toHaveLength(1)
+  })
+
+  it('seeds a URL row for an entity rule that only allows external reuse', () => {
+    const reuse = profile()
+    reuse.propertyRules = [rule({
+      valueName: 'license', label: 'License', kind: 'entity',
+      entityTypes: ['http://schema.org/CreativeWork'], entitySources: ['existing-external'],
+    })]
+    const start = setProperty(newDraft(), './', 'license', [])
+    const draft = applyProfile(start, reuse)
+
+    expect(draft.entities[0].properties.license).toEqual([{ kind: 'url', value: '' }])
+    expect(draft.entities).toHaveLength(1)
+    expect(unseedProfile(draft, reuse).entities).toEqual(start.entities)
+  })
+
+  it('seeds a link row for an entity rule that only allows crate reuse', () => {
+    const reuse = profile()
+    reuse.propertyRules = [rule({
+      valueName: 'author', label: 'Author', kind: 'entity',
+      entityTypes: ['http://schema.org/Person'], entitySources: ['existing-crate'],
+    })]
+    const draft = applyProfile(newDraft(), reuse)
+
+    expect(draft.entities[0].properties.author).toEqual([{ kind: 'reference', value: '' }])
+    expect(draft.entities).toHaveLength(1)
+  })
+
+  it('still creates the entity when the rule allows describing a new one', () => {
+    const create = profile()
+    create.propertyRules = [rule({
+      valueName: 'license', label: 'License', kind: 'entity',
+      entityTypes: ['http://schema.org/CreativeWork'], entitySources: ['new', 'existing-external'],
+    })]
+    const draft = applyProfile(setProperty(newDraft(), './', 'license', []), create)
+
+    expect(draft.entities).toHaveLength(2)
+    expect(linked(draft, './', 'license')?.types).toEqual(['http://schema.org/CreativeWork'])
+  })
+
   it('seeds a parts row rather than an empty file the node would refuse', () => {
     const withParts = profile()
     withParts.propertyRules = [

@@ -5,6 +5,7 @@
 import type { MetadataProfile } from '@/data/types'
 import type { ProfileEntityRule, ProfilePropertyRule, ProfileValueKind } from '@/lib/profiles/types'
 import { MAX_ENTITY_DEPTH } from '@/lib/profiles/entityTree'
+import { primaryEntityInput } from '@/lib/profiles/sources'
 import { buildProfileContext } from '@/lib/profiles/propertyCatalog'
 import { collectContextObjects, contextTermsOf } from '@/lib/profiles/contextTerms'
 import { contextIri, DEFAULT_CRATE_VERSION } from './version'
@@ -47,6 +48,18 @@ const KINDS: Readonly<Record<ProfileValueKind, DraftValueKind>> = {
 /** The row kind a profile rule's value kind is edited as. */
 export function draftKind(kind: ProfileValueKind): DraftValueKind {
   return KINDS[kind] ?? 'text'
+}
+
+/** The row kind a rule asks for; a reference reused by IRI only is a URL. */
+export function ruleKind(rule: ProfilePropertyRule): DraftValueKind {
+  if (rule.kind === 'entity' && primaryEntityInput(rule.entitySources) === 'existing-external') return 'url'
+  return draftKind(rule.kind)
+}
+
+/** The type of the entity a rule describes anew; none when it only reuses. */
+function newEntityType(rule: ProfilePropertyRule): string | undefined {
+  if (rule.kind !== 'entity' || primaryEntityInput(rule.entitySources) !== 'new') return undefined
+  return rule.entityTypes?.[0]
 }
 
 /** The rows a created entity of one type starts with, given its ancestors. */
@@ -119,7 +132,7 @@ function seedRows(
   let next = draft
   for (const rule of rules) {
     if (findEntity(next, entityId)?.properties[rule.valueName]?.length) continue
-    const target = rule.kind === 'entity' ? rule.entityTypes?.[0] : undefined
+    const target = newEntityType(rule)
     if (target && !isDataType(target) && ancestors.length < MAX_ENTITY_DEPTH) {
       const created = addEntity(next, { type: target })
       next = linkReference(created.draft, entityId, rule.valueName, created.entity.id)
@@ -134,7 +147,7 @@ function seedRows(
 
 /** An empty row of the rule's kind, pre-filled when the rule names a default. */
 function seedValue(rule: ProfilePropertyRule): DraftValue {
-  const empty = defaultValue(draftKind(rule.kind))
+  const empty = defaultValue(ruleKind(rule))
   const preset = rule.defaultValue?.trim()
   return preset && empty.kind !== 'reference' ? { ...empty, value: preset } : empty
 }

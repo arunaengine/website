@@ -3,6 +3,7 @@ import { defineComponent, h } from 'vue'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { compileClientComponent, moduleDefault, mountApp, nodes } from '@/test/clientRender'
 import * as Editor from '@/lib/crate/editor'
+import * as ProfileSeed from '@/lib/crate/profileSeed'
 import * as Labels from '@/lib/profiles/labels'
 import * as References from '@/lib/crate/references'
 import * as Pickers from '@/lib/crate/pickers'
@@ -62,6 +63,7 @@ const PropertyRow = compileClientComponent(new URL('./PropertyRow.vue', import.m
   '@/components/ui/Notice.vue': moduleDefault(Passthrough),
   '@/lib/crate/references': References,
   '@/lib/crate/pickers': Pickers,
+  '@/lib/crate/profileSeed': ProfileSeed,
 })
 
 const RootForm = compileClientComponent(new URL('./RootForm.vue', import.meta.url), {

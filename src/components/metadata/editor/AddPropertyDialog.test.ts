@@ -201,6 +201,20 @@ describe('AddPropertyDialog', () => {
     mounted.app.unmount()
   })
 
+  it('picks a URL for a profile rule that only allows external reuse', async () => {
+    const picked: Array<{ key: string; kind: string }> = []
+    const license: ProfilePropertyRule = {
+      ...startTime, id: 'license', label: 'License', description: '', kind: 'entity',
+      propertyUri: 'http://schema.org/license', valueName: 'license',
+      entityTypes: ['http://schema.org/CreativeWork'], entitySources: ['existing-external'],
+    }
+    const mounted = await mount(dataset, picked, { suggestions: [license], profileName: 'Genomics' })
+    await click(row(mounted.root, 'License'))
+
+    expect(picked).toEqual([{ key: 'license', kind: 'url' }])
+    mounted.app.unmount()
+  })
+
   it('keeps the profile section first and badged while searching', async () => {
     const mounted = await mount(dataset, [], { suggestions: [startTime], profileName: 'Process Run Crate' })
     await typeValue(search(mounted.root), 'time')

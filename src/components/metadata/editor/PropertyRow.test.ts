@@ -14,12 +14,14 @@ import {
   type HostNode,
 } from '@/test/clientRender'
 import * as Editor from '@/lib/crate/editor'
+import * as ProfileSeed from '@/lib/crate/profileSeed'
 import * as Labels from '@/lib/profiles/labels'
 import * as References from '@/lib/crate/references'
 import * as Pickers from '@/lib/crate/pickers'
 import * as Uri from '@/lib/profiles/uri'
 import * as Utils from '@/lib/utils'
 import * as Grid from './grid'
+import type { ProfilePropertyRule } from '@/lib/profiles/types'
 import { loadVocabIndex, type VocabIndex } from '@/lib/profiles/vocabulary'
 
 let vocab: VocabIndex
@@ -118,6 +120,7 @@ const PropertyRow = compileClientComponent(new URL('./PropertyRow.vue', import.m
   './RuleBadge.vue': moduleDefault(RuleBadge),
   './grid': Grid,
   '@/lib/crate/editor': Editor,
+  '@/lib/crate/profileSeed': ProfileSeed,
 })
 
 function seeded() {
@@ -140,6 +143,13 @@ function mount(
       onUpdate: (next: Editor.CrateDraft) => updates.push(next),
     },
   })
+}
+
+function licenseRule(overrides: Partial<ProfilePropertyRule>): ProfilePropertyRule {
+  return {
+    id: 'license', label: 'License', description: '', kind: 'url',
+    propertyUri: 'http://schema.org/license', valueName: 'license', obligation: 'MUST', ...overrides,
+  }
 }
 
 function labels(root: HostNode): string[] {
@@ -426,6 +436,35 @@ describe('PropertyRow', () => {
     }))
     expect(labels(open.root)).toEqual(expect.arrayContaining(['Text', 'Reference']))
     open.app.unmount()
+  })
+
+  it('puts the kind the profile asks for first in the type menus', async () => {
+    const draft = Editor.setProperty(seeded(), './', 'license', [{ kind: 'url', value: 'https://example.org/l' }])
+    const kindsOf = (root: HostNode) => labels(root).filter((label) => label === 'URL' || label === 'Reference')
+    const plain = await mount('license', [], draft)
+    expect(kindsOf(plain.root)).toEqual(['Reference', 'URL', 'Reference', 'URL'])
+    plain.app.unmount()
+
+    const url = await mount('license', [], draft, { rule: licenseRule({ kind: 'url' }) })
+    expect(kindsOf(url.root)).toEqual(['URL', 'Reference', 'URL', 'Reference'])
+    url.app.unmount()
+
+    const reuse = await mount('license', [], draft, {
+      rule: licenseRule({ kind: 'entity', entityTypes: ['http://schema.org/CreativeWork'], entitySources: ['existing-external'] }),
+    })
+    expect(kindsOf(reuse.root)).toEqual(['URL', 'Reference', 'URL', 'Reference'])
+    reuse.app.unmount()
+  })
+
+  it('offers the blank field in the kind the profile asks for', async () => {
+    const updates: Editor.CrateDraft[] = []
+    const rule = { ...licenseRule({ kind: 'url' }), valueName: 'identifier', propertyUri: 'http://schema.org/identifier' }
+    const mounted = await mount('identifier', updates, seeded(), { always: true, rule })
+
+    await typeValue(element(mounted.root, (node) => node.props['aria-label'] === 'License'), 'https://doi.org/10.1/x')
+
+    expect(updates[0].entities[0].properties.identifier).toEqual([{ kind: 'url', value: 'https://doi.org/10.1/x' }])
+    mounted.app.unmount()
   })
 
   it('deletes the property when its last value goes', async () => {

@@ -14,7 +14,7 @@ import {
   type DraftEntity,
   type DraftValueKind,
 } from '@/lib/crate/editor'
-import { draftKind } from '@/lib/crate/profileSeed'
+import { ruleKind } from '@/lib/crate/profileSeed'
 import type { ProfilePropertyRule } from '@/lib/profiles/types'
 import type { VocabIndex, VocabTerm } from '@/lib/profiles/vocabulary'
 
@@ -181,7 +181,7 @@ function add() {
           type="button"
           role="option"
           :class="OPTION"
-          @click="pick(rule.valueName, draftKind(rule.kind))"
+          @click="pick(rule.valueName, ruleKind(rule))"
         >
           <span class="text-xs font-medium text-foreground">{{ rule.label }}</span>
           <Badge class="ml-1.5" variant="accent" size="sm">Profile</Badge>

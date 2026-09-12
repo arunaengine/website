@@ -42,6 +42,7 @@ import {
 } from '@/lib/crate/editor'
 import { orphanAfterUnlink, setReference, unlinkReference } from '@/lib/crate/references'
 import { DATA_PICKER_LABEL, pickerFor } from '@/lib/crate/pickers'
+import { ruleKind } from '@/lib/crate/profileSeed'
 import type { ProfilePropertyRule } from '@/lib/profiles/types'
 import type { VocabIndex } from '@/lib/profiles/vocabulary'
 import { Info, MoreHorizontal, Plus } from '@lucide/vue'
@@ -80,7 +81,13 @@ const term = computed(() => propertyTerm(props.vocab, props.property))
 const label = computed(() => propertyLabel(props.vocab, props.property, props.rule))
 // The whole name for a truncated one, with the key when the name differs.
 const fullName = computed(() => (label.value === props.property ? label.value : `${label.value} (${props.property})`))
-const kinds = computed(() => allowedKinds(props.vocab, props.property))
+// The kind the profile asks for leads; the vocabulary's other kinds stay offered.
+const kinds = computed(() => {
+  const allowed = allowedKinds(props.vocab, props.property)
+  if (!props.rule) return allowed
+  const asked = ruleKind(props.rule)
+  return [asked, ...allowed.filter((kind) => kind !== asked)]
+})
 const range = computed(() => term.value?.targets ?? [])
 const presets = computed(() => VALUE_PRESETS[props.property])
 const stored = computed(() => props.entity.properties[props.property] ?? [])
