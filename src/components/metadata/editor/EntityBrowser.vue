@@ -79,11 +79,11 @@ function pick(entityId: string) {
 </script>
 
 <template>
-  <aside class="w-full shrink-0 md:w-72">
-    <div class="surface flex flex-col md:sticky md:top-4 md:max-h-[calc(100vh-7rem)]">
+  <aside class="w-full shrink-0 @min-[60rem]:w-72">
+    <div class="surface flex flex-col @min-[60rem]:sticky @min-[60rem]:top-4 @min-[60rem]:max-h-[calc(100vh-7rem)]">
       <button
         type="button"
-        class="flex items-center gap-2 border-b border-border px-3 py-2 text-left text-xs font-medium text-foreground md:hidden"
+        class="flex items-center gap-2 border-b border-border px-3 py-2 text-left text-xs font-medium text-foreground @min-[60rem]:hidden"
         :aria-expanded="listOpen"
         @click="listOpen = !listOpen"
       >
@@ -109,7 +109,7 @@ function pick(entityId: string) {
       </div>
 
       <div
-        class="min-h-0 max-h-64 flex-1 overflow-y-auto md:max-h-none md:block"
+        class="min-h-0 max-h-64 flex-1 overflow-y-auto @min-[60rem]:max-h-none @min-[60rem]:block"
         :class="listOpen ? '' : 'hidden'"
       >
         <section v-for="group in groups" :key="group.key">

@@ -120,6 +120,7 @@ const PropertyEditor = compileClientComponent(new URL('./PropertyEditor.vue', im
   vue: VueRuntime,
   './PropertyRow.vue': moduleDefault(PropertyRow),
   '@/lib/crate/editor': Editor,
+  './grid': Grid,
 })
 
 const RootForm = compileClientComponent(new URL('./RootForm.vue', import.meta.url), {
@@ -336,7 +337,6 @@ describe('RootForm', () => {
 
     expect(nodes(empty.root).filter((node) => node.props.title === 'Required')).toHaveLength(1)
     expect(String(name?.props.class)).toContain('border-aruna-royal/40')
-    expect(String(name?.props.class)).toContain('pr-8 @xs:pr-24')
     expect(String(description?.props.class ?? '')).not.toContain('border-aruna-royal')
     empty.app.unmount()
 

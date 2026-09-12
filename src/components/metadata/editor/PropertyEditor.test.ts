@@ -3,6 +3,7 @@ import { defineComponent, h } from 'vue'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { compileClientComponent, content, moduleDefault, mountApp } from '@/test/clientRender'
 import * as Editor from '@/lib/crate/editor'
+import * as Grid from './grid'
 import { addFilePart } from '@/lib/crate/references'
 import { loadVocabIndex, type VocabIndex } from '@/lib/profiles/vocabulary'
 
@@ -20,6 +21,7 @@ const PropertyEditor = compileClientComponent(new URL('./PropertyEditor.vue', im
   vue: VueRuntime,
   './PropertyRow.vue': moduleDefault(PropertyRowStub),
   '@/lib/crate/editor': Editor,
+  './grid': Grid,
 })
 
 describe('PropertyEditor', () => {

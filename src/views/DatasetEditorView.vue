@@ -700,111 +700,113 @@ async function save(anyway = false) {
     </div>
 
     <template v-else>
-      <div class="container flex flex-col gap-4 py-6 md:flex-row md:items-start md:gap-5">
-        <EntityBrowser
-          :draft="draft"
-          :vocab="vocab"
-          :selected="selected"
-          :issues="issues"
-          :group-id="draft.groupId"
-          :profile-types="profileTypes"
-          @select="(id) => (selected = id)"
-          @update="update"
-        />
-        <div class="min-w-0 flex-1 space-y-5">
-          <div class="inline-flex items-center rounded-md border border-border p-0.5" role="tablist">
-            <button
-              v-for="pane in (['editor', 'graph'] as const)"
-              :key="pane"
-              type="button"
-              role="tab"
-              class="rounded-[3px] px-3 py-1 text-xs font-medium"
-              :class="tab === pane ? 'bg-primary/10 text-foreground' : 'text-muted-foreground hover:text-foreground'"
-              :aria-selected="tab === pane"
-              @click="tab = pane"
-            >
-              {{ pane === 'editor' ? 'Editor' : 'Graph' }}
-            </button>
-          </div>
-
-          <template v-if="tab === 'editor'">
-            <EntityEditor
-              :draft="draft"
-              :selected="selected"
-              :vocab="vocab"
-              :issues="issues"
-              :profiles="profileOptions"
-              :profile-id="profileId"
-              :profile-rules="expectation"
-              @update="update"
-              @select="(id) => (selected = id)"
-              @profile="pickProfile"
-            />
-            <NodeCheckPanel
-              :draft="draft"
-              :rocrate="crate"
-              :profile-name="selectedProfile?.name"
-              :profile-loading="profileRulesLoading"
-              :profile-error="profileRulesError"
-              :blocked="saveBlocked"
-              :preview-result="preview.result.value"
-              :preview-running="preview.running.value"
-              :preview-error="preview.error.value"
-              :preview-unavailable="preview.unavailable.value"
-              :write-issues="writeIssues"
-              :submit-error="submitError"
-              :saving="saving || submitting"
-              :can-save="canSave"
-              :action-label="mode === 'edit' ? 'Save changes' : 'Create dataset'"
-              :busy-label="mode === 'edit' ? 'Saving' : 'Creating'"
-              @preview="preview.previewNow(crate)"
-              @retry-profile="retryProfileRules"
-              @save="save()"
-              @jump="open"
-            >
-              <Notice v-if="restrictedFiles.length || publicUnchecked" tone="warning" :title="restrictedFiles.length ? 'Not everyone can read these files' : 'Some file access could not be checked'">
-                <p v-if="restrictedFiles.length">The dataset is public, but these files are not publicly readable. Readers will see them listed and cannot download them.</p>
-                <p v-if="publicUnchecked">Some files could not be checked. Retry the check, or save anyway knowing that readers may not be able to download all files.</p>
-                <ul class="mt-1 list-disc space-y-0.5 pl-4 font-mono text-[11px]">
-                  <li v-for="file in restrictedFiles" :key="file.entity_id" class="break-all">{{ fileLabel(file) }}</li>
-                </ul>
-                <p v-if="grantUnresolved.length" class="mt-1">
-                  Access could not be granted for these files. An administrator of each owning group can change their roles.
-                </p>
-                <p v-else-if="!canGrantPublic" class="mt-1">
-                  A group administrator can add a public role with read access to these files under the group's roles.
-                </p>
-                <p v-if="grantError" class="mt-1 text-destructive">{{ grantError }}</p>
-                <span class="mt-2 flex flex-wrap gap-2">
-                  <Button variant="outline" size="sm" :disabled="grantBusy" @click="restrictedFiles = []; publicUnchecked = false">Back</Button>
-                  <Button
-                    v-if="canGrantPublic && !grantUnresolved.length"
-                    variant="outline"
-                    size="sm"
-                    :disabled="grantBusy"
-                    @click="makePublic"
-                  >
-                    {{ grantBusy ? 'Granting access' : 'Make the data public' }}
-                  </Button>
-                  <Button v-for="groupId in !canGrantPublic || grantUnresolved.length ? owningGroups : []" :key="groupId" variant="outline" size="sm" as-child>
-                    <RouterLink :to="{ name: 'group', params: { id: groupId }, query: { tab: 'roles' } }">{{ groups.find((group) => group.id === groupId)?.name ?? 'Owning group' }} roles</RouterLink>
-                  </Button>
-                  <Button size="sm" :disabled="grantBusy" @click="save(true)">Save anyway</Button>
-                </span>
-              </Notice>
-            </NodeCheckPanel>
-            <PidWithdraw v-if="mode === 'edit'" :document-id="documentId" />
-          </template>
-          <CrateGraph
-            v-else
-            :source="draft"
-            mode="edit"
+      <div class="@container">
+        <div class="container flex flex-col gap-4 py-6 @min-[60rem]:flex-row @min-[60rem]:items-start @min-[60rem]:gap-5">
+          <EntityBrowser
+            :draft="draft"
             :vocab="vocab"
             :selected="selected"
+            :issues="issues"
+            :group-id="draft.groupId"
+            :profile-types="profileTypes"
             @select="(id) => (selected = id)"
-            @open="open"
             @update="update"
           />
+          <div class="min-w-0 flex-1 space-y-5">
+            <div class="inline-flex items-center rounded-md border border-border p-0.5" role="tablist">
+              <button
+                v-for="pane in (['editor', 'graph'] as const)"
+                :key="pane"
+                type="button"
+                role="tab"
+                class="rounded-[3px] px-3 py-1 text-xs font-medium"
+                :class="tab === pane ? 'bg-primary/10 text-foreground' : 'text-muted-foreground hover:text-foreground'"
+                :aria-selected="tab === pane"
+                @click="tab = pane"
+              >
+                {{ pane === 'editor' ? 'Editor' : 'Graph' }}
+              </button>
+            </div>
+
+            <template v-if="tab === 'editor'">
+              <EntityEditor
+                :draft="draft"
+                :selected="selected"
+                :vocab="vocab"
+                :issues="issues"
+                :profiles="profileOptions"
+                :profile-id="profileId"
+                :profile-rules="expectation"
+                @update="update"
+                @select="(id) => (selected = id)"
+                @profile="pickProfile"
+              />
+              <NodeCheckPanel
+                :draft="draft"
+                :rocrate="crate"
+                :profile-name="selectedProfile?.name"
+                :profile-loading="profileRulesLoading"
+                :profile-error="profileRulesError"
+                :blocked="saveBlocked"
+                :preview-result="preview.result.value"
+                :preview-running="preview.running.value"
+                :preview-error="preview.error.value"
+                :preview-unavailable="preview.unavailable.value"
+                :write-issues="writeIssues"
+                :submit-error="submitError"
+                :saving="saving || submitting"
+                :can-save="canSave"
+                :action-label="mode === 'edit' ? 'Save changes' : 'Create dataset'"
+                :busy-label="mode === 'edit' ? 'Saving' : 'Creating'"
+                @preview="preview.previewNow(crate)"
+                @retry-profile="retryProfileRules"
+                @save="save()"
+                @jump="open"
+              >
+                <Notice v-if="restrictedFiles.length || publicUnchecked" tone="warning" :title="restrictedFiles.length ? 'Not everyone can read these files' : 'Some file access could not be checked'">
+                  <p v-if="restrictedFiles.length">The dataset is public, but these files are not publicly readable. Readers will see them listed and cannot download them.</p>
+                  <p v-if="publicUnchecked">Some files could not be checked. Retry the check, or save anyway knowing that readers may not be able to download all files.</p>
+                  <ul class="mt-1 list-disc space-y-0.5 pl-4 font-mono text-[11px]">
+                    <li v-for="file in restrictedFiles" :key="file.entity_id" class="break-all">{{ fileLabel(file) }}</li>
+                  </ul>
+                  <p v-if="grantUnresolved.length" class="mt-1">
+                    Access could not be granted for these files. An administrator of each owning group can change their roles.
+                  </p>
+                  <p v-else-if="!canGrantPublic" class="mt-1">
+                    A group administrator can add a public role with read access to these files under the group's roles.
+                  </p>
+                  <p v-if="grantError" class="mt-1 text-destructive">{{ grantError }}</p>
+                  <span class="mt-2 flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" :disabled="grantBusy" @click="restrictedFiles = []; publicUnchecked = false">Back</Button>
+                    <Button
+                      v-if="canGrantPublic && !grantUnresolved.length"
+                      variant="outline"
+                      size="sm"
+                      :disabled="grantBusy"
+                      @click="makePublic"
+                    >
+                      {{ grantBusy ? 'Granting access' : 'Make the data public' }}
+                    </Button>
+                    <Button v-for="groupId in !canGrantPublic || grantUnresolved.length ? owningGroups : []" :key="groupId" variant="outline" size="sm" as-child>
+                      <RouterLink :to="{ name: 'group', params: { id: groupId }, query: { tab: 'roles' } }">{{ groups.find((group) => group.id === groupId)?.name ?? 'Owning group' }} roles</RouterLink>
+                    </Button>
+                    <Button size="sm" :disabled="grantBusy" @click="save(true)">Save anyway</Button>
+                  </span>
+                </Notice>
+              </NodeCheckPanel>
+              <PidWithdraw v-if="mode === 'edit'" :document-id="documentId" />
+            </template>
+            <CrateGraph
+              v-else
+              :source="draft"
+              mode="edit"
+              :vocab="vocab"
+              :selected="selected"
+              @select="(id) => (selected = id)"
+              @open="open"
+              @update="update"
+            />
+          </div>
         </div>
       </div>
 

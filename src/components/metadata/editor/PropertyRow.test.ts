@@ -229,7 +229,7 @@ describe('PropertyRow', () => {
     mounted.app.unmount()
   })
 
-  it('puts the required badge inside the first empty field, away from the name', async () => {
+  it('puts the required badge beside the first empty field, away from the name', async () => {
     const draft = Editor.addValue(
       Editor.addValue(seeded(), './', 'citation', { kind: 'text', value: '' }),
       './', 'citation', { kind: 'text', value: '' },
@@ -245,22 +245,20 @@ describe('PropertyRow', () => {
     const info = element(mounted.root, (node) => node.props['aria-label'] === 'About Citation')
     const inputs = nodes(mounted.root).filter((node) => node.tag === 'input')
 
-    // The label column holds only the name and its icon; the badge sits in the first field.
+    // The label column holds only the name and its icon; the badge follows the first field.
     expect(name.parent?.props.class).toBe(Grid.ROW_LABEL)
     expect(nodes(name.parent!)).toContain(info)
     expect(nodes(name.parent!)).not.toContain(badge)
     expect(inputs).toHaveLength(2)
-    expect(String(badge.parent?.props.class)).toContain('@container')
     expect(nodes(badge.parent!)).toContain(inputs[0])
     expect(nodes(badge.parent!)).not.toContain(inputs[1])
+    expect(badge.parent?.children.indexOf(badge)).toBeGreaterThan(badge.parent?.children.findIndex((node) => nodes(node).includes(inputs[0])) ?? -1)
     expect(nodes(mounted.root).filter((node) => node.props.title === 'Required')).toHaveLength(1)
-    expect(String(inputs[0].props.class)).toContain('border-aruna-royal/40')
-    expect(String(inputs[0].props.class)).toContain('pr-8 @xs:pr-24')
-    expect(String(inputs[1].props.class)).toBe('border-aruna-royal/40')
+    expect(inputs.map((input) => String(input.props.class))).toEqual(['border-aruna-royal/40', 'border-aruna-royal/40'])
     mounted.app.unmount()
   })
 
-  it('takes the badge out of a field that holds a value and keeps the tint', async () => {
+  it('takes the badge away from a field that holds a value and keeps the tint', async () => {
     const draft = Editor.addValue(seeded(), './', 'citation', { kind: 'text', value: 'doi:10.1000/one' })
     const mounted = await mount('citation', [], draft, {
       rule: {
@@ -274,7 +272,7 @@ describe('PropertyRow', () => {
     mounted.app.unmount()
   })
 
-  it('keeps the badge clear of a one-of select', async () => {
+  it('tints a recommended one-of select amber beside its badge', async () => {
     const draft = Editor.addValue(seeded(), './', 'measurementTechnique', { kind: 'text', value: '' })
     const mounted = await mount('measurementTechnique', [], draft, {
       rule: {
@@ -285,8 +283,8 @@ describe('PropertyRow', () => {
     })
     const badge = element(mounted.root, (node) => node.props.title === 'Recommended')
 
-    expect(String(badge.props.class)).toContain('right-9')
-    expect(String(element(mounted.root, (node) => node.tag === 'select').props.class)).toBe('border-amber-500/40 pr-8 @xs:pr-24')
+    expect(nodes(badge.parent!)).toContain(element(mounted.root, (node) => node.tag === 'select'))
+    expect(String(element(mounted.root, (node) => node.tag === 'select').props.class)).toBe('border-amber-500/40')
     mounted.app.unmount()
   })
 

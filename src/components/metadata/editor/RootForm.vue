@@ -7,7 +7,7 @@ import PropertyEditor from './PropertyEditor.vue'
 import PropertyRow from './PropertyRow.vue'
 import IssueMark from './IssueMark.vue'
 import RuleBadge from './RuleBadge.vue'
-import { ROW_ACTIONS, ROW_GRID, ROW_LABEL, ROW_VALUE, ruleEmphasis } from './grid'
+import { ROW_ACTIONS, ROW_GRID, ROW_LABEL, ROW_LIST, ROW_VALUE, ruleEmphasis } from './grid'
 import {
   addValue,
   findEntity,
@@ -74,18 +74,20 @@ function addKeyword() {
 
 <template>
   <div>
-    <div class="divide-y divide-border">
+    <div class="divide-y divide-border" :class="ROW_LIST">
       <div :class="ROW_GRID" data-tutorial="dataset-name">
         <label :class="ROW_LABEL" for="root-name">Name</label>
-        <div class="relative @container" :class="ROW_VALUE">
-          <Input
-            id="root-name"
-            :model-value="valueOf('name')"
-            :class="ruleEmphasis(ruleFor('name'), !valueOf('name'))"
-            aria-label="Dataset name"
-            placeholder="What this dataset is called"
-            @update:model-value="(value: string | number) => setText('name', String(value))"
-          />
+        <div class="flex items-start gap-1" :class="ROW_VALUE">
+          <div class="min-w-0 flex-1">
+            <Input
+              id="root-name"
+              :model-value="valueOf('name')"
+              :class="ruleEmphasis(ruleFor('name'))"
+              aria-label="Dataset name"
+              placeholder="What this dataset is called"
+              @update:model-value="(value: string | number) => setText('name', String(value))"
+            />
+          </div>
           <RuleBadge v-if="!valueOf('name')" :rule="ruleFor('name')" />
         </div>
         <div :class="ROW_ACTIONS"><IssueMark :issues="issuesFor('name')" /></div>
@@ -93,16 +95,18 @@ function addKeyword() {
 
       <div :class="ROW_GRID" data-tutorial="dataset-description">
         <label :class="ROW_LABEL" for="root-description">Description</label>
-        <div class="relative @container" :class="ROW_VALUE">
-          <Textarea
-            id="root-description"
-            :model-value="valueOf('description')"
-            rows="3"
-            :class="`font-sans ${ruleEmphasis(ruleFor('description'), !valueOf('description'))}`"
-            aria-label="Dataset description"
-            placeholder="What it contains and how it was made"
-            @update:model-value="(value: string) => setText('description', value, 'longtext')"
-          />
+        <div class="flex items-start gap-1" :class="ROW_VALUE">
+          <div class="min-w-0 flex-1">
+            <Textarea
+              id="root-description"
+              :model-value="valueOf('description')"
+              rows="3"
+              :class="`font-sans ${ruleEmphasis(ruleFor('description'))}`"
+              aria-label="Dataset description"
+              placeholder="What it contains and how it was made"
+              @update:model-value="(value: string) => setText('description', value, 'longtext')"
+            />
+          </div>
           <RuleBadge v-if="!valueOf('description')" :rule="ruleFor('description')" />
         </div>
         <div :class="ROW_ACTIONS"><IssueMark :issues="issuesFor('description')" /></div>
@@ -110,16 +114,18 @@ function addKeyword() {
 
       <div :class="ROW_GRID">
         <label :class="ROW_LABEL" for="root-date">Date published</label>
-        <div class="relative @container" :class="ROW_VALUE">
-          <Input
-            id="root-date"
-            type="date"
-            :model-value="valueOf('datePublished')"
-            :class="ruleEmphasis(ruleFor('datePublished'), !valueOf('datePublished'))"
-            aria-label="Date published"
-            @update:model-value="(value: string | number) => setText('datePublished', String(value), 'date')"
-          />
-          <RuleBadge v-if="!valueOf('datePublished')" :rule="ruleFor('datePublished')" :inset="true" />
+        <div class="flex items-start gap-1" :class="ROW_VALUE">
+          <div class="min-w-0 flex-1">
+            <Input
+              id="root-date"
+              type="date"
+              :model-value="valueOf('datePublished')"
+              :class="ruleEmphasis(ruleFor('datePublished'))"
+              aria-label="Date published"
+              @update:model-value="(value: string | number) => setText('datePublished', String(value), 'date')"
+            />
+          </div>
+          <RuleBadge v-if="!valueOf('datePublished')" :rule="ruleFor('datePublished')" />
         </div>
         <div :class="ROW_ACTIONS"><IssueMark :issues="issuesFor('datePublished')" /></div>
       </div>
@@ -154,56 +160,58 @@ function addKeyword() {
               </button>
             </span>
           </div>
-          <div class="relative min-w-0 @container">
-            <Input
-              id="root-keywords"
-              v-model="keywordDraft"
-              :class="ruleEmphasis(ruleFor('keywords'), !keywords.length && !keywordDraft)"
-              aria-label="Add a keyword"
-              placeholder="Type a keyword and press Enter"
-              @keydown.enter="addKeyword"
-            />
-          <RuleBadge v-if="!keywords.length && !keywordDraft" :rule="ruleFor('keywords')" />
+          <div class="flex items-start gap-1">
+            <div class="min-w-0 flex-1">
+              <Input
+                id="root-keywords"
+                v-model="keywordDraft"
+                :class="ruleEmphasis(ruleFor('keywords'))"
+                aria-label="Add a keyword"
+                placeholder="Type a keyword and press Enter"
+                @keydown.enter="addKeyword"
+              />
+            </div>
+            <RuleBadge v-if="!keywords.length && !keywordDraft" :rule="ruleFor('keywords')" />
+          </div>
         </div>
+        <div :class="ROW_ACTIONS"><IssueMark :issues="issuesFor('keywords')" /></div>
       </div>
-      <div :class="ROW_ACTIONS"><IssueMark :issues="issuesFor('keywords')" /></div>
+
+      <div :class="ROW_GRID" data-tutorial="dataset-profile">
+        <span :class="ROW_LABEL">Profile</span>
+        <div :class="ROW_VALUE">
+          <Select
+            :model-value="profileId"
+            :options="[{ value: '', label: 'No profile' }, ...profiles]"
+            placeholder="No profile"
+            aria-label="Profile"
+            @update:model-value="(value: string) => emit('profile', value)"
+          />
+          <p class="mt-1 text-[11px] text-muted-foreground">
+            A profile pre-fills what it asks for and checks the draft against it. Nothing is locked,
+            and "No profile" removes it again. Public profiles and the profiles of this dataset's group
+            can be assigned; other groups' profiles are not listed.
+          </p>
+        </div>
+        <div :class="ROW_ACTIONS"><IssueMark :issues="issuesFor('conformsTo')" /></div>
+      </div>
     </div>
 
-    <div :class="ROW_GRID" data-tutorial="dataset-profile">
-      <span :class="ROW_LABEL">Profile</span>
-      <div :class="ROW_VALUE">
-        <Select
-          :model-value="profileId"
-          :options="[{ value: '', label: 'No profile' }, ...profiles]"
-          placeholder="No profile"
-          aria-label="Profile"
-          @update:model-value="(value: string) => emit('profile', value)"
-        />
-        <p class="mt-1 text-[11px] text-muted-foreground">
-          A profile pre-fills what it asks for and checks the draft against it. Nothing is locked,
-          and "No profile" removes it again. Public profiles and the profiles of this dataset's group
-          can be assigned; other groups' profiles are not listed.
-        </p>
-      </div>
-      <div :class="ROW_ACTIONS"><IssueMark :issues="issuesFor('conformsTo')" /></div>
+    <div class="border-t border-border">
+      <p class="px-5 pb-1 pt-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        More properties
+      </p>
+      <PropertyEditor
+        v-if="root"
+        :draft="draft"
+        :entity="root"
+        :vocab="vocab"
+        :skip="ROOT_FORM_PROPERTIES"
+        :issues="issues"
+        :shape="shape"
+        @update="(next) => emit('update', next)"
+        @select="(entityId) => emit('select', entityId)"
+      />
     </div>
   </div>
-
-  <div class="border-t border-border">
-    <p class="px-5 pb-1 pt-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-      More properties
-    </p>
-    <PropertyEditor
-      v-if="root"
-      :draft="draft"
-      :entity="root"
-      :vocab="vocab"
-      :skip="ROOT_FORM_PROPERTIES"
-      :issues="issues"
-      :shape="shape"
-      @update="(next) => emit('update', next)"
-      @select="(entityId) => emit('select', entityId)"
-    />
-  </div>
-</div>
-</template>
+  </template>

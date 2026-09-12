@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import PropertyRow from './PropertyRow.vue'
+import { ROW_LIST } from './grid'
 import {
   propertyLabel,
   shapeRule,
@@ -47,7 +48,7 @@ function issuesFor(property: string): LiveIssue[] {
 </script>
 
 <template>
-  <div v-if="properties.length" class="divide-y divide-border">
+  <div v-if="properties.length" class="divide-y divide-border" :class="ROW_LIST">
     <PropertyRow
       v-for="property in properties"
       :key="property"

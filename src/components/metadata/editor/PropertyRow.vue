@@ -71,6 +71,7 @@ const filesOpen = ref(false)
 const stranding = ref<{ index: number; dropRow: boolean; entity: DraftEntity } | null>(null)
 
 const hint = computed(() => props.rule?.description ?? '')
+const emphasis = computed(() => ruleEmphasis(props.rule))
 const enumOptions = computed(() => (props.rule?.enumOptions ?? []).map((value) => ({ value, label: value })))
 
 const picker = computed(() => pickerFor(props.property))
@@ -87,19 +88,9 @@ const stored = computed(() => props.entity.properties[props.property] ?? [])
 const blank = computed<DraftValue>(() => defaultValue(kinds.value.find((kind) => kind !== 'reference') ?? 'text'))
 const values = computed(() => (stored.value.length || !props.always ? stored.value : [blank.value]))
 
-// The badge sits inside the first field while it is empty; a select keeps
-// its arrow clear of it.
+// The badge stands beside the first field while it is still empty.
 function badged(value: DraftValue, index: number): boolean {
   return index === 0 && !value.value.trim()
-}
-
-function selectLike(value: DraftValue): boolean {
-  if (props.rule?.kind === 'enum' || value.kind === 'boolean') return true
-  return Boolean(presets.value) && (value.kind === 'text' || value.kind === 'url' || value.kind === 'reference')
-}
-
-function emphasis(value: DraftValue, index: number): string {
-  return ruleEmphasis(props.rule, badged(value, index))
 }
 
 function set(index: number, value: string) {
@@ -214,13 +205,13 @@ function created(next: CrateDraft, entityId: string) {
     <div class="space-y-2" :class="ROW_VALUE">
       <p v-if="hint" class="text-[11px] text-muted-foreground">{{ hint }}</p>
       <div v-for="(value, index) in values" :key="index" class="flex items-start gap-1">
-        <div class="relative min-w-0 flex-1 @container">
+        <div class="relative min-w-0 flex-1">
           <ValueInput
             v-if="value.kind === 'reference' && !value.value.trim() && presets"
             :model-value="value"
             :label="label"
             :presets="presets"
-            :class="emphasis(value, index)"
+            :class="emphasis"
             @update:model-value="(next) => set(index, next.value)"
           />
           <ReferenceValue
@@ -239,7 +230,7 @@ function created(next: CrateDraft, entityId: string) {
             :options="enumOptions"
             :aria-label="label"
             :placeholder="value.value || `Choose ${label.toLowerCase()}`"
-            :class="emphasis(value, index)"
+            :class="emphasis"
             @update:model-value="(next) => set(index, next)"
           />
           <ValueInput
@@ -247,11 +238,11 @@ function created(next: CrateDraft, entityId: string) {
             :model-value="value"
             :label="label"
             :presets="presets"
-            :class="emphasis(value, index)"
+            :class="emphasis"
             @update:model-value="(next) => set(index, next.value)"
           />
-          <RuleBadge v-if="badged(value, index)" :rule="rule" :inset="selectLike(value)" />
         </div>
+        <RuleBadge v-if="badged(value, index)" :rule="rule" />
         <Button
           v-if="promotable(value)"
           variant="ghost"
