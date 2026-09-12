@@ -278,18 +278,16 @@ async function revoke(accessKeyId: string) {
 
     <Tabs v-model="tab">
       <div class="container pt-6">
-        <div class="overflow-x-auto">
-          <TabsList aria-label="Settings sections">
-            <TabsTrigger
-              v-for="entry in settingsTabs"
-              :key="entry.id"
-              :value="entry.id"
-              :data-tour="SETTINGS_TAB_ANCHORS[entry.id]"
-            >
-              {{ entry.label }}
-            </TabsTrigger>
-          </TabsList>
-        </div>
+        <TabsList aria-label="Settings sections" class="h-auto flex-wrap justify-start">
+          <TabsTrigger
+            v-for="entry in settingsTabs"
+            :key="entry.id"
+            :value="entry.id"
+            :data-tour="SETTINGS_TAB_ANCHORS[entry.id]"
+          >
+            {{ entry.label }}
+          </TabsTrigger>
+        </TabsList>
       </div>
 
       <div v-if="!painted" class="container space-y-5 py-6">

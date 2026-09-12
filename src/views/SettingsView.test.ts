@@ -116,13 +116,14 @@ describe('SettingsView responsive geometry', () => {
     expect(source).not.toContain('onMobileTabsKeydown')
   })
 
-  it('keeps the tab row scrollable and drops the anchored submenu', () => {
+  it('wraps the tab row instead of scrolling it and drops the anchored submenu', () => {
     const listPath = findElementPath(
       root,
       (node) => node.tag === 'TabsList' && staticAttribute(node, 'aria-label') === 'Settings sections',
     )
     expect(listPath).toBeDefined()
-    expect(listPath?.some((node) => classTokens(node).includes('overflow-x-auto'))).toBe(true)
+    expect(listPath?.some((node) => classTokens(node).includes('overflow-x-auto'))).toBe(false)
+    expect(classTokens(listPath!.at(-1)!)).toEqual(expect.arrayContaining(['flex-wrap', 'h-auto']))
     expect(collectElements(root, (node) => node.tag === 'TabsTrigger')).toHaveLength(1)
     expect(source).not.toContain('@4xl:grid-cols-[260px_1fr]')
     expect(source).not.toContain('lg:grid-cols-[260px_1fr]')

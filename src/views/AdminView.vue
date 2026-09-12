@@ -366,13 +366,11 @@ async function save() {
 
     <Tabs v-else v-model="tab">
       <div class="container pt-6">
-        <div class="overflow-x-auto">
-          <TabsList aria-label="Realm administration sections">
-            <TabsTrigger v-for="entry in tabs" :key="entry.id" :value="entry.id">
-              {{ entry.label }}
-            </TabsTrigger>
-          </TabsList>
-        </div>
+        <TabsList aria-label="Realm administration sections" class="h-auto flex-wrap justify-start">
+          <TabsTrigger v-for="entry in tabs" :key="entry.id" :value="entry.id">
+            {{ entry.label }}
+          </TabsTrigger>
+        </TabsList>
       </div>
 
       <TabsContent value="compute" class="mt-0"><ComputeAdminPanel /></TabsContent>
