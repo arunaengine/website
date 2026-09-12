@@ -10,6 +10,8 @@ const props = defineProps<{
   label: string
   /** Well-known values offered as a shortcut beside the free input. */
   presets?: ReadonlyArray<{ value: string; label: string }>
+  /** The row's issue state, drawn on the control's border. */
+  invalid?: 'error' | 'warning'
 }>()
 const emit = defineEmits<{ (e: 'update:modelValue', value: DraftValue): void }>()
 
@@ -74,6 +76,7 @@ function pickPreset(choice: string) {
       :options="presetOptions"
       :placeholder="`Choose ${label.toLowerCase()}`"
       :aria-label="`${label} preset`"
+      :invalid="invalid"
       @update:model-value="pickPreset"
     />
     <Input
@@ -81,6 +84,7 @@ function pickPreset(choice: string) {
       :model-value="modelValue.value"
       :aria-label="label"
       placeholder="https://example.org/license"
+      :invalid="invalid"
       @update:model-value="update"
     />
   </div>
@@ -89,6 +93,7 @@ function pickPreset(choice: string) {
     :model-value="modelValue.value === 'true' ? 'true' : 'false'"
     :options="BOOLEAN_OPTIONS"
     :aria-label="label"
+    :invalid="invalid"
     @update:model-value="update"
   />
   <Textarea
@@ -96,6 +101,7 @@ function pickPreset(choice: string) {
     :model-value="modelValue.value"
     rows="3"
     :aria-label="label"
+    :invalid="invalid"
     @update:model-value="update"
   />
   <Input
@@ -104,6 +110,7 @@ function pickPreset(choice: string) {
     :type="inputType"
     :aria-label="label"
     :placeholder="modelValue.kind === 'url' ? 'https://example.org' : undefined"
+    :invalid="invalid"
     @update:model-value="update"
   />
 </template>

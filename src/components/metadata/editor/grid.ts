@@ -1,3 +1,6 @@
+import type { LiveIssue } from '@/lib/crate/editor'
+import { PROFILE_OBLIGATION_LABELS } from '@/lib/profiles/labels'
+
 // One row template for every editable row in the dataset editor, so the root
 // form and the property rows of every entity share their label and action
 // columns. Changing it here moves every row at once.
@@ -15,9 +18,14 @@ export const ROW_VALUE = 'col-span-full min-w-0 @container @min-[36rem]:col-span
 
 export const ROW_ACTIONS = 'flex w-20 shrink-0 items-center justify-end gap-1'
 
-/** The input tint of a field the picked profile speaks about. */
-export function ruleEmphasis(rule: { obligation: string } | null | undefined): string {
-  if (rule?.obligation === 'MUST') return 'border-aruna-royal/40'
-  if (rule?.obligation === 'SHOULD') return 'border-amber-500/40'
-  return ''
+/** The border state of a field from its issues: blocking red, advisory amber. */
+export function issueState(issues: LiveIssue[]): 'error' | 'warning' | undefined {
+  if (issues.some((issue) => issue.severity === 'error')) return 'error'
+  return issues.length ? 'warning' : undefined
+}
+
+/** The obligation word a field carries for assistive technology. */
+export function ruleTitle(rule: { obligation: string } | null | undefined): string | undefined {
+  const asked = rule?.obligation
+  return asked === 'MUST' || asked === 'SHOULD' ? PROFILE_OBLIGATION_LABELS[asked].label : undefined
 }

@@ -6,8 +6,7 @@ import Textarea from '@/components/ui/Textarea.vue'
 import PropertyEditor from './PropertyEditor.vue'
 import PropertyRow from './PropertyRow.vue'
 import IssueMark from './IssueMark.vue'
-import RuleBadge from './RuleBadge.vue'
-import { ROW_ACTIONS, ROW_GRID, ROW_LABEL, ROW_LIST, ROW_VALUE, ruleEmphasis } from './grid'
+import { ROW_ACTIONS, ROW_GRID, ROW_LABEL, ROW_LIST, ROW_VALUE, issueState, ruleTitle } from './grid'
 import {
   addValue,
   findEntity,
@@ -77,55 +76,50 @@ function addKeyword() {
     <div class="divide-y divide-border" :class="ROW_LIST">
       <div :class="ROW_GRID" data-tutorial="dataset-name">
         <label :class="ROW_LABEL" for="root-name">Name</label>
-        <div class="flex items-start gap-1" :class="ROW_VALUE">
-          <div class="min-w-0 flex-1">
-            <Input
-              id="root-name"
-              :model-value="valueOf('name')"
-              :class="ruleEmphasis(ruleFor('name'))"
-              aria-label="Dataset name"
-              placeholder="What this dataset is called"
-              @update:model-value="(value: string | number) => setText('name', String(value))"
-            />
-          </div>
-          <RuleBadge v-if="!valueOf('name')" :rule="ruleFor('name')" />
+        <div :class="ROW_VALUE">
+          <Input
+            id="root-name"
+            :model-value="valueOf('name')"
+            :invalid="issueState(issuesFor('name'))"
+            :title="ruleTitle(ruleFor('name'))"
+            aria-label="Dataset name"
+            placeholder="What this dataset is called"
+            @update:model-value="(value: string | number) => setText('name', String(value))"
+          />
         </div>
         <div :class="ROW_ACTIONS"><IssueMark :issues="issuesFor('name')" /></div>
       </div>
 
       <div :class="ROW_GRID" data-tutorial="dataset-description">
         <label :class="ROW_LABEL" for="root-description">Description</label>
-        <div class="flex items-start gap-1" :class="ROW_VALUE">
-          <div class="min-w-0 flex-1">
-            <Textarea
-              id="root-description"
-              :model-value="valueOf('description')"
-              rows="3"
-              :class="`font-sans ${ruleEmphasis(ruleFor('description'))}`"
-              aria-label="Dataset description"
-              placeholder="What it contains and how it was made"
-              @update:model-value="(value: string) => setText('description', value, 'longtext')"
-            />
-          </div>
-          <RuleBadge v-if="!valueOf('description')" :rule="ruleFor('description')" />
+        <div :class="ROW_VALUE">
+          <Textarea
+            id="root-description"
+            :model-value="valueOf('description')"
+            rows="3"
+            class="font-sans"
+            :invalid="issueState(issuesFor('description'))"
+            :title="ruleTitle(ruleFor('description'))"
+            aria-label="Dataset description"
+            placeholder="What it contains and how it was made"
+            @update:model-value="(value: string) => setText('description', value, 'longtext')"
+          />
         </div>
         <div :class="ROW_ACTIONS"><IssueMark :issues="issuesFor('description')" /></div>
       </div>
 
       <div :class="ROW_GRID">
         <label :class="ROW_LABEL" for="root-date">Date published</label>
-        <div class="flex items-start gap-1" :class="ROW_VALUE">
-          <div class="min-w-0 flex-1">
-            <Input
-              id="root-date"
-              type="date"
-              :model-value="valueOf('datePublished')"
-              :class="ruleEmphasis(ruleFor('datePublished'))"
-              aria-label="Date published"
-              @update:model-value="(value: string | number) => setText('datePublished', String(value), 'date')"
-            />
-          </div>
-          <RuleBadge v-if="!valueOf('datePublished')" :rule="ruleFor('datePublished')" />
+        <div :class="ROW_VALUE">
+          <Input
+            id="root-date"
+            type="date"
+            :model-value="valueOf('datePublished')"
+            :invalid="issueState(issuesFor('datePublished'))"
+            :title="ruleTitle(ruleFor('datePublished'))"
+            aria-label="Date published"
+            @update:model-value="(value: string | number) => setText('datePublished', String(value), 'date')"
+          />
         </div>
         <div :class="ROW_ACTIONS"><IssueMark :issues="issuesFor('datePublished')" /></div>
       </div>
@@ -160,19 +154,15 @@ function addKeyword() {
               </button>
             </span>
           </div>
-          <div class="flex items-start gap-1">
-            <div class="min-w-0 flex-1">
-              <Input
-                id="root-keywords"
-                v-model="keywordDraft"
-                :class="ruleEmphasis(ruleFor('keywords'))"
-                aria-label="Add a keyword"
-                placeholder="Type a keyword and press Enter"
-                @keydown.enter="addKeyword"
-              />
-            </div>
-            <RuleBadge v-if="!keywords.length && !keywordDraft" :rule="ruleFor('keywords')" />
-          </div>
+          <Input
+            id="root-keywords"
+            v-model="keywordDraft"
+            :invalid="issueState(issuesFor('keywords'))"
+            :title="ruleTitle(ruleFor('keywords'))"
+            aria-label="Add a keyword"
+            placeholder="Type a keyword and press Enter"
+            @keydown.enter="addKeyword"
+          />
         </div>
         <div :class="ROW_ACTIONS"><IssueMark :issues="issuesFor('keywords')" /></div>
       </div>

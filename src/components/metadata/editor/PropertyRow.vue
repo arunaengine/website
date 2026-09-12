@@ -17,8 +17,7 @@ import LinkEntityDialog from './LinkEntityDialog.vue'
 import AddEntityDialog from './AddEntityDialog.vue'
 import AddFilesDialog from './AddFilesDialog.vue'
 import IssueMark from './IssueMark.vue'
-import RuleBadge from './RuleBadge.vue'
-import { ROW_ACTIONS, ROW_GRID, ROW_LABEL, ROW_VALUE, ruleEmphasis } from './grid'
+import { ROW_ACTIONS, ROW_GRID, ROW_LABEL, ROW_VALUE, issueState, ruleTitle } from './grid'
 import {
   addValue,
   allowedKinds,
@@ -57,7 +56,7 @@ const props = defineProps<{
   always?: boolean
   /** "More details" promotes a literal value into a linked entity of this type. */
   promoteTo?: string
-  /** The picked profile's rule for this property, shown as its badge and hint. */
+  /** The picked profile's rule for this property, shown as its hint and title. */
   rule?: ProfilePropertyRule | null
 }>()
 const emit = defineEmits<{
@@ -72,7 +71,8 @@ const filesOpen = ref(false)
 const stranding = ref<{ index: number; dropRow: boolean; entity: DraftEntity } | null>(null)
 
 const hint = computed(() => props.rule?.description ?? '')
-const emphasis = computed(() => ruleEmphasis(props.rule))
+const invalid = computed(() => issueState(props.issues ?? []))
+const obligation = computed(() => ruleTitle(props.rule))
 const enumOptions = computed(() => (props.rule?.enumOptions ?? []).map((value) => ({ value, label: value })))
 
 const picker = computed(() => pickerFor(props.property))
@@ -94,11 +94,6 @@ const stored = computed(() => props.entity.properties[props.property] ?? [])
 // The blank row an always-shown field offers before anything is typed.
 const blank = computed<DraftValue>(() => defaultValue(kinds.value.find((kind) => kind !== 'reference') ?? 'text'))
 const values = computed(() => (stored.value.length || !props.always ? stored.value : [blank.value]))
-
-// The badge stands beside the first field while it is still empty.
-function badged(value: DraftValue, index: number): boolean {
-  return index === 0 && !value.value.trim()
-}
 
 function set(index: number, value: string) {
   if (!stored.value.length) {
@@ -218,7 +213,8 @@ function created(next: CrateDraft, entityId: string) {
             :model-value="value"
             :label="label"
             :presets="presets"
-            :class="emphasis"
+            :invalid="invalid"
+            :title="obligation"
             @update:model-value="(next) => set(index, next.value)"
           />
           <ReferenceValue
@@ -226,6 +222,7 @@ function created(next: CrateDraft, entityId: string) {
             :draft="draft"
             :value="value.value"
             :label="label"
+            :invalid="invalid"
             :add-label="picker === 'data' ? DATA_PICKER_LABEL : undefined"
             @select="(id) => emit('select', id)"
             @create="openCreate(index)"
@@ -237,7 +234,7 @@ function created(next: CrateDraft, entityId: string) {
             :options="enumOptions"
             :aria-label="label"
             :placeholder="value.value || `Choose ${label.toLowerCase()}`"
-            :class="emphasis"
+            :invalid="invalid"
             @update:model-value="(next) => set(index, next)"
           />
           <ValueInput
@@ -245,11 +242,11 @@ function created(next: CrateDraft, entityId: string) {
             :model-value="value"
             :label="label"
             :presets="presets"
-            :class="emphasis"
+            :invalid="invalid"
+            :title="obligation"
             @update:model-value="(next) => set(index, next.value)"
           />
         </div>
-        <RuleBadge v-if="badged(value, index)" :rule="rule" />
         <Button
           v-if="promotable(value)"
           variant="ghost"

@@ -15,7 +15,6 @@ import {
 } from '@/test/clientRender'
 import * as Editor from '@/lib/crate/editor'
 import * as ProfileSeed from '@/lib/crate/profileSeed'
-import * as Labels from '@/lib/profiles/labels'
 import * as References from '@/lib/crate/references'
 import * as Pickers from '@/lib/crate/pickers'
 import * as Uri from '@/lib/profiles/uri'
@@ -84,12 +83,6 @@ const ReferenceValue = compileClientComponent(new URL('./ReferenceValue.vue', im
   '@/lib/utils': Utils,
 })
 
-const RuleBadge = compileClientComponent(new URL('./RuleBadge.vue', import.meta.url), {
-  vue: VueRuntime,
-  '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
-  '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
-  '@/lib/profiles/labels': Labels,
-})
 const PropertyRow = compileClientComponent(new URL('./PropertyRow.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
@@ -112,7 +105,6 @@ const PropertyRow = compileClientComponent(new URL('./PropertyRow.vue', import.m
   '@/lib/crate/references': References,
   '@/lib/crate/pickers': Pickers,
   './IssueMark.vue': moduleDefault(EmptyStub),
-  './RuleBadge.vue': moduleDefault(RuleBadge),
   './grid': Grid,
   '@/lib/crate/editor': Editor,
   '@/lib/crate/profileSeed': ProfileSeed,
@@ -134,7 +126,6 @@ const RootForm = compileClientComponent(new URL('./RootForm.vue', import.meta.ur
   './PropertyEditor.vue': moduleDefault(PropertyEditor),
   './PropertyRow.vue': moduleDefault(PropertyRow),
   './IssueMark.vue': moduleDefault(EmptyStub),
-  './RuleBadge.vue': moduleDefault(RuleBadge),
   './grid': Grid,
   '@/lib/crate/editor': Editor,
   '@/lib/profiles/uri': Uri,
@@ -203,8 +194,8 @@ describe('RootForm', () => {
     })
     const text = content(mounted.root)
 
-    expect(text).toContain('Recommended')
     expect(text).toContain('The action that carried out the run.')
+    expect(text).not.toContain('Recommended')
     mounted.app.unmount()
   })
 
@@ -325,33 +316,35 @@ describe('RootForm', () => {
     mounted.app.unmount()
   })
 
-  it('shows a profile rule on a fixed field as on any row', async () => {
+  it('colours a fixed field by its issue and names the obligation on it', async () => {
     const rule = {
       id: 'name', label: 'Name', description: 'The title of the study.', kind: 'text' as const,
       propertyUri: 'http://schema.org/name', valueName: 'name', obligation: 'MUST' as const,
     }
     const shape = { label: 'Dataset', required: [rule], recommended: [], optional: [] }
+    const profile = { name: 'Genomics', root: shape, shapes: {}, types: [], contents: [] }
+    const blank = Editor.newDraft()
     const empty = await mountApp(RootForm, {
-      props: { draft: Editor.newDraft(), vocab: null, issues: [], profiles: [], profileId: '', shape },
+      props: { draft: blank, vocab: null, issues: Editor.liveIssues(blank, null, profile), profiles: [], profileId: '', shape },
     })
-    const name = nodes(empty.root).find((node) => node.props['aria-label'] === 'Dataset name')
-    const description = nodes(empty.root).find((node) => node.props['aria-label'] === 'Dataset description')
+    const name = field(empty.root, 'Dataset name')
+    const description = field(empty.root, 'Dataset description')
 
-    expect(nodes(empty.root).filter((node) => node.props.title === 'Required')).toHaveLength(1)
-    expect(String(name?.props.class)).toContain('border-aruna-royal/40')
-    expect(String(description?.props.class ?? '')).not.toContain('border-aruna-royal')
+    expect(name.props.invalid).toBe('error')
+    expect(name.props.title).toBe('Required')
+    expect(description.props.invalid).toBe('error')
+    expect(description.props.title).toBeUndefined()
+    expect(content(empty.root)).not.toContain('Required')
     empty.app.unmount()
 
+    const draft = Editor.updateValue(Editor.newDraft(), './', 'name', 0, 'Example dataset')
     const named = await mountApp(RootForm, {
-      props: {
-        draft: Editor.updateValue(Editor.newDraft(), './', 'name', 0, 'Example dataset'),
-        vocab: null, issues: [], profiles: [], profileId: '', shape,
-      },
+      props: { draft, vocab: null, issues: Editor.liveIssues(draft, null, profile), profiles: [], profileId: '', shape },
     })
-    const filled = nodes(named.root).find((node) => node.props['aria-label'] === 'Dataset name')
+    const filled = field(named.root, 'Dataset name')
 
-    expect(nodes(named.root).some((node) => node.props.title === 'Required')).toBe(false)
-    expect(String(filled?.props.class)).toBe('border-aruna-royal/40')
+    expect(filled.props.invalid).toBeUndefined()
+    expect(filled.props.title).toBe('Required')
     named.app.unmount()
   })
 })

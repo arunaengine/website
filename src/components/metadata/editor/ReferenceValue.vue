@@ -15,6 +15,8 @@ const props = defineProps<{
   label: string
   /** One picker owns this property: it is offered instead of Create and Link. */
   addLabel?: string
+  /** The row's issue state, drawn on the linked value's border. */
+  invalid?: 'error' | 'warning'
 }>()
 const emit = defineEmits<{
   (e: 'select', entityId: string): void
@@ -26,6 +28,10 @@ const target = computed(() => findEntity(props.draft, props.value))
 const external = computed(() => !target.value && isHttpUrl(props.value))
 const unresolved = computed(() => Boolean(props.value.trim()) && !target.value && !external.value)
 const icon = computed(() => entityIcon(target.value, target.value?.id === rootId(props.draft)))
+const tint = computed(() => {
+  if (props.invalid === 'error') return 'border-destructive'
+  return props.invalid === 'warning' ? 'border-amber-500/70' : 'border-border'
+})
 </script>
 
 <template>
@@ -47,7 +53,8 @@ const icon = computed(() => entityIcon(target.value, target.value?.id === rootId
     <button
       v-if="target"
       type="button"
-      class="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md border border-border bg-muted/30 px-2.5 text-left hover:bg-muted/60"
+      class="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md border bg-muted/30 px-2.5 text-left hover:bg-muted/60"
+      :class="tint"
       :title="value"
       @click="emit('select', target.id)"
     >
@@ -60,7 +67,8 @@ const icon = computed(() => entityIcon(target.value, target.value?.id === rootId
       :href="value"
       target="_blank"
       rel="noreferrer"
-      class="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md border border-border bg-muted/30 px-2.5 hover:bg-muted/60"
+      class="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md border bg-muted/30 px-2.5 hover:bg-muted/60"
+      :class="tint"
       :title="value"
     >
       <ExternalLink class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />

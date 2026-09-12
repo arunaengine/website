@@ -15,7 +15,6 @@ import {
 } from '@/test/clientRender'
 import * as Editor from '@/lib/crate/editor'
 import * as ProfileSeed from '@/lib/crate/profileSeed'
-import * as Labels from '@/lib/profiles/labels'
 import * as References from '@/lib/crate/references'
 import * as Pickers from '@/lib/crate/pickers'
 import * as Uri from '@/lib/profiles/uri'
@@ -89,12 +88,6 @@ const ReferenceValue = compileClientComponent(new URL('./ReferenceValue.vue', im
   '@/lib/utils': Utils,
 })
 
-const RuleBadge = compileClientComponent(new URL('./RuleBadge.vue', import.meta.url), {
-  vue: VueRuntime,
-  '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
-  '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
-  '@/lib/profiles/labels': Labels,
-})
 const PropertyRow = compileClientComponent(new URL('./PropertyRow.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
@@ -117,7 +110,6 @@ const PropertyRow = compileClientComponent(new URL('./PropertyRow.vue', import.m
   '@/lib/crate/references': References,
   '@/lib/crate/pickers': Pickers,
   './IssueMark.vue': moduleDefault(IssueMarkStub),
-  './RuleBadge.vue': moduleDefault(RuleBadge),
   './grid': Grid,
   '@/lib/crate/editor': Editor,
   '@/lib/crate/profileSeed': ProfileSeed,
@@ -150,6 +142,17 @@ function licenseRule(overrides: Partial<ProfilePropertyRule>): ProfilePropertyRu
     id: 'license', label: 'License', description: '', kind: 'url',
     propertyUri: 'http://schema.org/license', valueName: 'license', obligation: 'MUST', ...overrides,
   }
+}
+
+// The issues the editor raises for one property under a profile with one rule.
+function issuesUnder(
+  draft: Editor.CrateDraft,
+  rule: Editor.ProfileShape['required'][number],
+  level: 'required' | 'recommended',
+): Editor.LiveIssue[] {
+  const root = { label: 'Dataset', required: [], recommended: [], optional: [], [level]: [rule] }
+  return Editor.liveIssues(draft, null, { name: 'Genomics', root, shapes: {}, types: [], contents: [] })
+    .filter((issue) => issue.property === rule.valueName)
 }
 
 function labels(root: HostNode): string[] {
@@ -215,9 +218,9 @@ describe('PropertyRow', () => {
     })
     const text = content(mounted.root)
 
-    expect(text).toContain('Recommended')
     expect(text).toContain('The paper this dataset belongs to.')
-    expect(text).not.toContain('Required')
+    expect(text).not.toContain('Recommended')
+    expect(element(mounted.root, (node) => node.tag === 'input').props.title).toBe('Recommended')
     mounted.app.unmount()
   })
 
@@ -235,70 +238,55 @@ describe('PropertyRow', () => {
       },
     })
 
-    expect(content(mounted.root)).toContain('Required')
+    expect(content(mounted.root)).not.toContain('Required')
+    expect(element(mounted.root, (node) => node.tag === 'input').props.title).toBe('Required')
     mounted.app.unmount()
   })
 
-  it('puts the required badge beside the first empty field, away from the name', async () => {
-    const draft = Editor.addValue(
+  it('colours every empty field of a required row red and clears it once filled', async () => {
+    const rule = {
+      id: 'citation', label: 'Citation', description: '', kind: 'text' as const,
+      propertyUri: 'http://schema.org/citation', valueName: 'citation', obligation: 'MUST' as const,
+    }
+    const blank = Editor.addValue(
       Editor.addValue(seeded(), './', 'citation', { kind: 'text', value: '' }),
       './', 'citation', { kind: 'text', value: '' },
     )
-    const mounted = await mount('citation', [], draft, {
-      rule: {
-        id: 'citation', label: 'Citation', description: '', kind: 'text',
-        propertyUri: 'http://schema.org/citation', valueName: 'citation', obligation: 'MUST',
-      },
-    })
-    const name = element(mounted.root, (node) => node.tag === 'span' && String(node.props.class).includes('truncate'))
-    const badge = element(mounted.root, (node) => node.tag === 'span' && node.props.title === 'Required')
-    const info = element(mounted.root, (node) => node.props['aria-label'] === 'About Citation')
-    const inputs = nodes(mounted.root).filter((node) => node.tag === 'input')
+    const empty = await mount('citation', [], blank, { rule, issues: issuesUnder(blank, rule, 'required') })
+    const inputs = nodes(empty.root).filter((node) => node.tag === 'input')
 
-    // The label column holds only the name and its icon; the badge follows the first field.
-    expect(name.parent?.props.class).toBe(Grid.ROW_LABEL)
-    expect(nodes(name.parent!)).toContain(info)
-    expect(nodes(name.parent!)).not.toContain(badge)
     expect(inputs).toHaveLength(2)
-    expect(nodes(badge.parent!)).toContain(inputs[0])
-    expect(nodes(badge.parent!)).not.toContain(inputs[1])
-    expect(badge.parent?.children.indexOf(badge)).toBeGreaterThan(badge.parent?.children.findIndex((node) => nodes(node).includes(inputs[0])) ?? -1)
-    expect(nodes(mounted.root).filter((node) => node.props.title === 'Required')).toHaveLength(1)
-    expect(inputs.map((input) => String(input.props.class))).toEqual(['border-aruna-royal/40', 'border-aruna-royal/40'])
-    mounted.app.unmount()
+    expect(inputs.map((input) => input.props.invalid)).toEqual(['error', 'error'])
+    expect(inputs.map((input) => input.props.title)).toEqual(['Required', 'Required'])
+    expect(nodes(empty.root).filter((node) => node.props.title === 'Required')).toHaveLength(2)
+    expect(content(empty.root)).toContain('issues:1')
+    empty.app.unmount()
+
+    const filled = Editor.addValue(seeded(), './', 'citation', { kind: 'text', value: 'doi:10.1000/one' })
+    const held = await mount('citation', [], filled, { rule, issues: issuesUnder(filled, rule, 'required') })
+    const input = element(held.root, (node) => node.tag === 'input')
+
+    expect(input.props.invalid).toBeUndefined()
+    expect(input.props.title).toBe('Required')
+    expect(content(held.root)).toContain('issues:0')
+    held.app.unmount()
   })
 
-  it('takes the badge away from a field that holds a value and keeps the tint', async () => {
-    const draft = Editor.addValue(seeded(), './', 'citation', { kind: 'text', value: 'doi:10.1000/one' })
-    const mounted = await mount('citation', [], draft, {
-      rule: {
-        id: 'citation', label: 'Citation', description: '', kind: 'text',
-        propertyUri: 'http://schema.org/citation', valueName: 'citation', obligation: 'MUST',
-      },
-    })
-
-    expect(nodes(mounted.root).some((node) => node.props.title === 'Required')).toBe(false)
-    expect(String(element(mounted.root, (node) => node.tag === 'input').props.class)).toBe('border-aruna-royal/40')
-    mounted.app.unmount()
-  })
-
-  it('tints a recommended one-of select amber beside its badge', async () => {
+  it('colours an empty recommended one-of select amber', async () => {
+    const rule = {
+      id: 'technique', label: 'Technique', description: '', kind: 'enum' as const,
+      propertyUri: 'http://schema.org/measurementTechnique', valueName: 'measurementTechnique',
+      obligation: 'SHOULD' as const, enumOptions: ['LC-MS'],
+    }
     const draft = Editor.addValue(seeded(), './', 'measurementTechnique', { kind: 'text', value: '' })
-    const mounted = await mount('measurementTechnique', [], draft, {
-      rule: {
-        id: 'technique', label: 'Technique', description: '', kind: 'enum',
-        propertyUri: 'http://schema.org/measurementTechnique', valueName: 'measurementTechnique',
-        obligation: 'SHOULD', enumOptions: ['LC-MS'],
-      },
-    })
-    const badge = element(mounted.root, (node) => node.props.title === 'Recommended')
+    const mounted = await mount('measurementTechnique', [], draft, { rule, issues: issuesUnder(draft, rule, 'recommended') })
 
-    expect(nodes(badge.parent!)).toContain(element(mounted.root, (node) => node.tag === 'select'))
-    expect(String(element(mounted.root, (node) => node.tag === 'select').props.class)).toBe('border-amber-500/40')
+    expect(element(mounted.root, (node) => node.tag === 'select').props.invalid).toBe('warning')
+    expect(content(mounted.root)).not.toContain('Recommended')
     mounted.app.unmount()
   })
 
-  it('adds no badge or tint to an optional row', async () => {
+  it('adds no title or tint to an optional row', async () => {
     const draft = Editor.addValue(seeded(), './', 'citation', { kind: 'text', value: '' })
     const mounted = await mount('citation', [], draft, {
       rule: {
@@ -306,9 +294,12 @@ describe('PropertyRow', () => {
         propertyUri: 'http://schema.org/citation', valueName: 'citation', obligation: 'MAY',
       },
     })
+    const input = element(mounted.root, (node) => node.tag === 'input')
+
     expect(nodes(mounted.root).some((node) => node.props.title === 'Required')).toBe(false)
     expect(content(mounted.root)).not.toContain('Required')
-    expect(element(mounted.root, (node) => node.tag === 'input').props.class ?? '').toBe('')
+    expect(input.props.invalid).toBeUndefined()
+    expect(input.props.title).toBeUndefined()
     mounted.app.unmount()
   })
 
