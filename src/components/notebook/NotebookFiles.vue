@@ -168,6 +168,21 @@ const menuCount = computed(() => menuRows.value.length)
 /** The row that takes the tab stop: the focused one, or the first when it is gone. */
 const focusRow = computed(() => rows.value.find((row) => row.path === focused.value)?.path ?? rows.value.find((row) => row.kind !== 'note')?.path)
 const copyLabel = computed(() => (copySources.value.length > 1 ? `${copySources.value.length} items` : copySources.value[0]?.name ?? ''))
+const treeReady = computed(() => session.running.value && !root.value?.starting && Boolean(root.value?.entries || root.value?.error))
+
+/** The breadcrumb folder: the focused folder, the parent of the focused file, or the root. */
+const crumbFolder = computed(() => {
+  const row = rows.value.find((other) => other.path === focused.value)
+  if (!row) return ''
+  return row.kind === 'dir' ? row.path : parentPath(row.path) ?? ''
+})
+const crumbs = computed(() => {
+  const names = crumbFolder.value ? crumbFolder.value.split('/') : []
+  return [{ path: '', name: 'work' }, ...names.map((name, index) => ({ path: names.slice(0, index + 1).join('/'), name }))]
+})
+/** A long path keeps its first and last segment; the ones between hide behind an ellipsis. */
+const shownCrumbs = computed(() => (crumbs.value.length > 3 ? [crumbs.value[0], null, crumbs.value[crumbs.value.length - 1]] : crumbs.value))
+const hiddenCrumbs = computed(() => crumbs.value.slice(1, -1).map((crumb) => crumb.name).join('/'))
 const copyCount = computed(() => copySources.value.reduce((sum, source) => sum + (source.keys.length || 1), 0))
 
 function indent(depth: number) {
@@ -240,6 +255,23 @@ function onClick(row: TreeRow, event: MouseEvent) {
 function select(path: string) {
   selectOnly(path)
   void nextTick(() => rowEls.get(path)?.focus?.())
+}
+
+/** Selects a breadcrumb folder, opens it and brings its row into view; the root clears the selection. */
+function goCrumb(path: string) {
+  if (!path) {
+    selection.value = new Set()
+    anchor.value = null
+    focused.value = null
+    return
+  }
+  if (!isOpen(path)) files.toggle(path)
+  selectOnly(path)
+  void nextTick(() => {
+    const el = rowEls.get(path)
+    el?.scrollIntoView?.({ block: 'nearest' })
+    el?.focus?.()
+  })
 }
 
 /** The rows an action on `row` covers: the whole selection when it is part of one. */
@@ -706,6 +738,19 @@ async function copyTo(destination: { bucket: string; prefix: string }) {
 <template>
   <aside class="surface min-w-0 overflow-hidden">
     <div class="space-y-3 px-3 py-3">
+      <nav v-if="treeReady" aria-label="Current folder" class="flex items-center overflow-hidden whitespace-nowrap text-[11px] text-muted-foreground">
+        <template v-for="(crumb, index) in shownCrumbs" :key="crumb?.path ?? '…'">
+          <ChevronRight v-if="index" class="h-3 w-3 shrink-0" />
+          <span v-if="!crumb" :title="hiddenCrumbs">…</span>
+          <button
+            v-else
+            type="button"
+            class="truncate rounded px-0.5 hover:text-foreground"
+            :aria-current="crumb.path === crumbFolder ? 'location' : undefined"
+            @click="goCrumb(crumb.path)"
+          >{{ crumb.name }}</button>
+        </template>
+      </nav>
       <Notice v-if="note" tone="info">{{ note }}</Notice>
       <Notice v-if="error" tone="error">{{ error }}</Notice>
 

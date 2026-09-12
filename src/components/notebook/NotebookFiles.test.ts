@@ -596,3 +596,47 @@ describe('kernel file selection', () => {
     app.unmount()
   })
 })
+
+describe('kernel folder breadcrumb', () => {
+  const crumbs = (root: HostNode) =>
+    nodes(root).filter((node) => node.tag === 'button' && node.parent?.props['aria-label'] === 'Current folder').map((node) => content(node).trim())
+  const crumb = (root: HostNode, name: string) =>
+    element(root, (node) => node.tag === 'button' && node.parent?.props['aria-label'] === 'Current folder' && content(node).trim() === name)
+
+  it('shows the root, the folder of the focused file and an ellipsis for a long path', async () => {
+    const { root, app } = await render()
+    expect(crumbs(root)).toEqual(['work'])
+    await expand(root, 'data')
+    await expand(root, 'sub')
+    await click(row(root, 'data/sub/a.csv'))
+    expect(crumbs(root)).toEqual(['work', 'data', 'sub'])
+    expect(crumb(root, 'sub').props['aria-current']).toBe('location')
+    expect(crumb(root, 'data').props['aria-current']).toBeUndefined()
+    await expand(root, 'deep')
+    await click(row(root, 'data/sub/deep/z.csv'))
+    expect(crumbs(root)).toEqual(['work', 'deep'])
+    expect(element(root, (node) => node.tag === 'span' && content(node) === '…').props.title).toBe('data/sub')
+    app.unmount()
+  })
+
+  it('selects, opens and scrolls to the folder of a clicked segment', async () => {
+    const { root, app } = await render()
+    await expand(root, 'data')
+    await click(row(root, 'data/sub'))
+    expect(crumbs(root)).toEqual(['work', 'data', 'sub'])
+    expect(row(root, 'data/sub').props['aria-expanded']).toBe(false)
+    const scrollIntoView = vi.fn()
+    Object.assign(row(root, 'data/sub'), { scrollIntoView })
+    await click(crumb(root, 'sub'))
+    expect(row(root, 'data/sub').props['aria-expanded']).toBe(true)
+    expect(selectedPaths(root)).toEqual(['data/sub'])
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
+    await click(crumb(root, 'data'))
+    expect(selectedPaths(root)).toEqual(['data'])
+    expect(crumbs(root)).toEqual(['work', 'data'])
+    await click(crumb(root, 'work'))
+    expect(selectedPaths(root)).toEqual([])
+    expect(crumbs(root)).toEqual(['work'])
+    app.unmount()
+  })
+})
