@@ -227,13 +227,14 @@ const savedLabel = computed(() => {
 
         <div class="grid items-start gap-x-6 gap-y-3" :class="filesOpen ? 'xl:grid-cols-[18rem_minmax(0,1fr)]' : 'grid-cols-[minmax(0,1fr)]'">
           <!-- One sticky band: the files header on the left, the session toolbar on the right. -->
-          <div class="sticky top-14 z-10 col-span-full grid items-center gap-x-6 gap-y-2 bg-background/95 py-2 backdrop-blur" :class="filesOpen ? 'xl:grid-cols-[18rem_minmax(0,1fr)]' : ''">
-            <div v-if="filesOpen" class="flex h-8 min-w-0 items-center gap-1">
-              <h2 class="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">Files</h2>
+          <div class="sticky top-14 z-10 col-span-full flex flex-wrap items-center gap-x-6 gap-y-2 bg-background/95 py-2 backdrop-blur">
+            <!-- Below the wide breakpoint the files group leads the toolbar; at xl it spans the tree column. -->
+            <div v-if="filesOpen" class="flex h-8 shrink-0 items-center gap-1 xl:w-[18rem]">
+              <h2 class="truncate text-sm font-semibold text-foreground xl:flex-1">Files</h2>
               <IconButton v-if="session.running.value" label="Refresh kernel files" class="h-8 w-8" @click="filesPane?.refresh()"><RefreshCw class="size-4" /></IconButton>
               <IconButton label="Hide files" aria-expanded="true" class="h-8 w-8" @click="filesOpen = false"><PanelLeft class="size-4" /></IconButton>
             </div>
-            <div class="flex min-w-0 flex-wrap items-center gap-2">
+            <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
               <IconButton v-if="!filesOpen" label="Show files" aria-expanded="false" class="h-8 w-8" @click="filesOpen = true"><PanelLeft class="size-4" /></IconButton>
               <NotebookSessionBar ref="sessionBar" />
               <Button size="sm" variant="outline" @click="addCell()"><Plus class="size-3.5" /> Add cell</Button>
