@@ -20,6 +20,7 @@ import { injectNotebook } from '@/composables/notebookContext'
 import { useAruna } from '@/composables/useAruna'
 import { useNow } from '@/composables/useNow'
 import { useRealmNodes } from '@/composables/useRealmNodes'
+import { endSession } from '@/lib/notebook/session'
 import { listRunningSessions, type RunningSession } from '@/lib/notebook/sessions'
 import { errorMessage, relativeTime } from '@/lib/utils'
 import { SESSION_RUNTIMES, dependencyFileName, dependencyKind } from '@/lib/notebook/runtimes'
@@ -77,48 +78,63 @@ const idleOptions = computed(() => [
 ])
 
 // The sessions that are already running, so a kernel another browser started
-// can be picked up here. Every listing is bound to the dialog opening, to the
-// API base and to the account it was read for.
+// can be picked up here. Every listing is bound to the document it was read
+// for, to the API base and to the account.
 const foundSessions = ref<RunningSession[]>([])
 const sessionsLoading = ref(false)
 const sessionsError = ref('')
+const endError = ref('')
+const endingIds = ref<string[]>([])
 const uncheckedJobs = ref(0)
 const moreJobs = ref(false)
 let listGeneration = 0
+let listing: Promise<void> = Promise.resolve()
 
-async function loadSessions() {
-  const request = ++listGeneration
+/** Clients bound to the account and realm of the moment a call started. */
+function boundClients() {
   const base = apiBaseUrl.value
   const token = authToken.value
-  const active = () => request === listGeneration && base === apiBaseUrl.value && token === authToken.value
-  sessionsLoading.value = true
-  sessionsError.value = ''
-  try {
-    const found = await listRunningSessions({
-      client: { baseUrl: base, token },
-      nodeClient: (id) => ({ baseUrl: nodeById(id)?.apiBase ?? base, token }),
-    })
-    if (!active()) return
-    foundSessions.value = found.sessions
-    uncheckedJobs.value = found.unchecked
-    moreJobs.value = found.truncated
-  } catch (cause) {
-    if (!active()) return
-    foundSessions.value = []
-    uncheckedJobs.value = 0
-    moreJobs.value = false
-    sessionsError.value = errorMessage(cause)
-  } finally {
-    if (active()) sessionsLoading.value = false
+  return {
+    client: { baseUrl: base, token },
+    nodeClient: (id: string) => ({ baseUrl: nodeById(id)?.apiBase ?? base, token }),
+    active: () => base === apiBaseUrl.value && token === authToken.value,
   }
 }
 
-watch([kernelOpen, session.running], ([open, live]) => {
-  // A closed dialog and an attached session drop what is still in flight.
+function loadSessions(): Promise<void> {
+  const request = ++listGeneration
+  const bound = boundClients()
+  const active = () => request === listGeneration && bound.active()
+  sessionsLoading.value = true
+  sessionsError.value = ''
+  endError.value = ''
+  listing = (async () => {
+    try {
+      const found = await listRunningSessions(bound)
+      if (!active()) return
+      foundSessions.value = found.sessions
+      uncheckedJobs.value = found.unchecked
+      moreJobs.value = found.truncated
+    } catch (cause) {
+      if (!active()) return
+      foundSessions.value = []
+      uncheckedJobs.value = 0
+      moreJobs.value = false
+      sessionsError.value = errorMessage(cause)
+    } finally {
+      if (active()) sessionsLoading.value = false
+    }
+  })()
+  return listing
+}
+
+watch([kernelOpen, session.running, notebook.loading, notebook.generation], ([open, live, loading]) => {
+  // A new document, the dialog and an attached session drop what is in flight.
   listGeneration += 1
   sessionsLoading.value = false
-  if (open && !live) void loadSessions()
-})
+  if (loading || !meta.value) return
+  if (open || !live) void loadSessions()
+}, { immediate: true })
 
 /** A session of this notebook's bucket and runtime is the one it wants. */
 function matches(entry: RunningSession): boolean {
@@ -142,6 +158,32 @@ function startedLabel(entry: RunningSession): string {
 async function attachSession(entry: RunningSession) {
   await session.attachTo(entry.jobId, entry.nodeId)
   if (!session.error.value) kernelOpen.value = false
+}
+
+/** Ends a listed session this notebook is not attached to. */
+async function endListed(entry: RunningSession) {
+  const bound = boundClients()
+  endingIds.value = [...endingIds.value, entry.jobId]
+  endError.value = ''
+  try {
+    await endSession(entry.jobId, bound.nodeClient(entry.nodeId))
+    if (bound.active()) foundSessions.value = foundSessions.value.filter((found) => found.jobId !== entry.jobId)
+  } catch (cause) {
+    if (bound.active()) endError.value = errorMessage(cause)
+  } finally {
+    endingIds.value = endingIds.value.filter((id) => id !== entry.jobId)
+  }
+}
+
+/** A running kernel this notebook could pick up while it has none. */
+const unattachedSession = computed(() =>
+  session.running.value || notebook.loading.value ? null : sessionRows.value.find(matches) ?? null,
+)
+
+/** Waits for the listing in flight; a running kernel asks for a choice first. */
+async function kernelChoiceNeeded(): Promise<boolean> {
+  await listing
+  return !session.running.value && sessionRows.value.some(matches)
 }
 
 const stateLabel = computed(() => {
@@ -224,9 +266,16 @@ async function start(restart = false) {
 const pendingRun = ref(false)
 const runBusy = computed(() => pendingRun.value || session.starting.value || session.restarting.value || session.ending.value || session.kernel.value === 'busy' || Object.values(session.cellStates.value).some((cell) => cell.state === 'queued' || cell.state === 'running'))
 
+const startBlocked = computed(() => runBusy.value || Boolean(problems.value.length) || notebook.loading.value || !meta.value)
+
 async function runNotebook() {
-  if (runBusy.value || problems.value.length || notebook.loading.value || !meta.value) return
+  if (startBlocked.value) return
   if (!session.live.value) {
+    // Reusing a running kernel or starting another one is an explicit choice.
+    if (await kernelChoiceNeeded()) {
+      kernelOpen.value = true
+      return
+    }
     pendingRun.value = true
     await start()
     if (!session.running.value) pendingRun.value = false
@@ -255,9 +304,10 @@ async function saveDependencies(value: DependencySpec, restart: boolean) {
 </script>
 
 <template>
-  <div class="min-w-0 space-y-2">
+  <!-- display: contents lets the hint wrap onto its own toolbar line. -->
+  <div class="contents">
     <div class="flex flex-wrap items-center gap-2">
-      <Button size="sm" :disabled="runBusy || Boolean(problems.length) || notebook.loading.value || !meta" @click="runNotebook">
+      <Button size="sm" :disabled="startBlocked" @click="runNotebook">
         <Play class="size-3.5" /> {{ pendingRun || session.starting.value ? 'Starting…' : session.kernel.value === 'busy' ? 'Running…' : 'Run notebook' }}
       </Button>
       <Button size="sm" variant="outline" aria-label="Kernel" @click="kernelOpen = true">
@@ -269,6 +319,18 @@ async function saveDependencies(value: DependencySpec, restart: boolean) {
         <ChevronDown class="size-3.5" />
       </Button>
     </div>
+
+    <Notice v-if="unattachedSession" tone="warning" class="basis-full">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="min-w-0 flex-1">
+          A kernel is already running ({{ runtimeLabel(unattachedSession.runtime) }} on {{ displayName(unattachedSession.nodeId) }},
+          bucket {{ unattachedSession.bucket }}, started {{ startedLabel(unattachedSession) }}), and this notebook is not attached to it.
+          <template v-if="sessionRows.length > 1">Open Kernel to see all {{ sessionRows.length }} running kernels.</template>
+        </span>
+        <Button variant="outline" size="sm" :disabled="session.attaching.value" @click="attachSession(unattachedSession)">Attach</Button>
+        <Button variant="outline" size="sm" :disabled="startBlocked" @click="start()">Start new kernel</Button>
+      </div>
+    </Notice>
 
     <Dialog v-model:open="kernelOpen">
       <DialogContent class="max-h-[85vh] max-w-lg overflow-y-auto">
@@ -294,7 +356,7 @@ async function saveDependencies(value: DependencySpec, restart: boolean) {
           The kernel is running, so these settings are locked. Restart it to apply a change.
         </Notice>
 
-        <div v-if="!session.running.value" class="space-y-2 rounded-md border border-border/70 bg-muted/30 px-3 py-2">
+        <div class="space-y-2 rounded-md border border-border/70 bg-muted/30 px-3 py-2">
           <div class="flex items-center justify-between gap-2">
             <p class="text-xs font-medium text-foreground">Running sessions</p>
             <Button variant="outline" size="sm" :disabled="sessionsLoading" @click="loadSessions()">Refresh</Button>
@@ -302,29 +364,34 @@ async function saveDependencies(value: DependencySpec, restart: boolean) {
           <Spinner v-if="sessionsLoading" label="Looking for running sessions…" show-label />
           <Notice v-else-if="sessionsError" tone="error">Running sessions could not be listed: {{ sessionsError }}</Notice>
           <template v-else>
+            <Notice v-if="endError" tone="error">The kernel could not be ended: {{ endError }}</Notice>
             <p v-if="!sessionRows.length" class="text-[11px] text-muted-foreground">
-              No running session was found. Start a kernel below.
+              {{ session.running.value ? 'No other running session was found.' : 'No running session was found. Start a kernel below.' }}
             </p>
             <ul v-else class="space-y-1.5">
               <li v-for="entry in sessionRows" :key="entry.jobId" class="flex flex-wrap items-center justify-between gap-2">
                 <div class="min-w-0">
                   <p class="truncate text-xs text-foreground">
                     {{ runtimeLabel(entry.runtime) }} on {{ displayName(entry.nodeId) }}
+                    <Badge v-if="entry.jobId === session.jobId.value" variant="outline" size="sm">Attached</Badge>
                   </p>
                   <p class="truncate text-[11px] text-muted-foreground">
                     {{ entry.bucket }}, started {{ startedLabel(entry) }}
                     <span v-if="!matches(entry)">, other bucket or runtime</span>
                   </p>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  :disabled="session.attaching.value || !matches(entry)"
-                  :title="attachTitle(entry)"
-                  @click="attachSession(entry)"
-                >
-                  Attach
-                </Button>
+                <div v-if="entry.jobId !== session.jobId.value" class="flex items-center gap-1.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    :disabled="session.attaching.value || !matches(entry)"
+                    :title="attachTitle(entry)"
+                    @click="attachSession(entry)"
+                  >
+                    {{ session.running.value ? 'Switch' : 'Attach' }}
+                  </Button>
+                  <Button variant="outline" size="sm" :disabled="endingIds.includes(entry.jobId)" @click="endListed(entry)">End</Button>
+                </div>
               </li>
             </ul>
             <p v-if="uncheckedJobs || moreJobs" class="text-[11px] text-muted-foreground">
@@ -418,12 +485,8 @@ async function saveDependencies(value: DependencySpec, restart: boolean) {
           >
             <RotateCcw class="size-3.5" /> Restart kernel
           </Button>
-          <Button
-            v-else
-            :disabled="runBusy || Boolean(problems.length) || notebook.loading.value || !meta"
-            @click="start()"
-          >
-            <Play class="size-3.5" /> Start kernel
+          <Button v-else :disabled="startBlocked" @click="start()">
+            <Play class="size-3.5" /> {{ sessionRows.length ? 'Start new kernel' : 'Start kernel' }}
           </Button>
         </DialogFooter>
       </DialogContent>

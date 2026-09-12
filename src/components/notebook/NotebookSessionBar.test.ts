@@ -4,14 +4,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const jobs = vi.hoisted(() => ({ listJobs: vi.fn() }))
 vi.mock('@/lib/jobs', () => jobs)
-const sessionApi = vi.hoisted(() => ({ getSessionState: vi.fn() }))
+const sessionApi = vi.hoisted(() => ({ getSessionState: vi.fn(), endSession: vi.fn() }))
 vi.mock('@/lib/notebook/session', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/notebook/session')>()),
   getSessionState: sessionApi.getSessionState,
+  endSession: sessionApi.endSession,
 }))
 
 import * as ComputeAdmin from '@/lib/computeAdmin'
 import * as Utils from '@/lib/utils'
+import * as NotebookSession from '@/lib/notebook/session'
 import * as NotebookSessions from '@/lib/notebook/sessions'
 import * as StateBadge from '@/lib/stateBadge'
 import * as NotebookDocument from '@/lib/notebook/document'
@@ -161,6 +163,7 @@ function sessionBar(): Component {
       }),
     },
     '@/lib/notebook/runtimes': NotebookRuntimes,
+    '@/lib/notebook/session': NotebookSession,
     '@/lib/notebook/sessions': NotebookSessions,
     '@/lib/utils': Utils,
     '@/lib/notebook/document': NotebookDocument,
@@ -188,7 +191,13 @@ async function openOptions(root: HostNode) {
 beforeEach(() => {
   jobs.listJobs.mockReset().mockResolvedValue({ jobs: [] })
   sessionApi.getSessionState.mockReset()
+  sessionApi.endSession.mockReset()
 })
+
+/** How often a button with this label is on screen. */
+function buttonCount(root: HostNode, label: string): number {
+  return content(root).split(label).length - 1
+}
 
 function runningJob(bucket = 'lab-data') {
   return {
@@ -362,6 +371,72 @@ describe('the session bar', () => {
     await flush()
     expect(content(root)).toContain('could not be listed')
     expect(content(root)).not.toContain('No running session was found')
+  })
+
+  it('hints at a running kernel this notebook is not attached to', async () => {
+    jobs.listJobs.mockResolvedValue({ jobs: [runningJob()] })
+    sessionApi.getSessionState.mockResolvedValue(runningSession())
+    const root = await render()
+    await flush()
+    expect(content(root)).toContain('A kernel is already running')
+    expect(content(root)).toContain('Python')
+    expect(content(root)).toContain('lab-data')
+    await click(button(root, 'Attach'))
+    expect(context.session.attachTo).toHaveBeenCalledWith('01JOB', 'node-a')
+    await click(button(root, 'Start new kernel'))
+    expect(context.session.start).toHaveBeenCalledWith(expect.objectContaining({ name: 'counts' }))
+  })
+
+  it.each([
+    ['attached', { running: true, state: { state: 'ready' } }, 'lab-data'],
+    ['another bucket', {}, 'other-bucket'],
+  ])('shows no hint while %s', async (_case, overrides, bucket) => {
+    jobs.listJobs.mockResolvedValue({ jobs: [runningJob(bucket)] })
+    sessionApi.getSessionState.mockResolvedValue(runningSession({ workspace_bucket: bucket }))
+    const root = await render(overrides as Parameters<typeof render>[0])
+    await flush()
+    expect(content(root)).not.toContain('A kernel is already running')
+  })
+
+  it('asks for a choice before starting while a kernel runs', async () => {
+    jobs.listJobs.mockResolvedValue({ jobs: [runningJob()] })
+    sessionApi.getSessionState.mockResolvedValue(runningSession())
+    const root = await render()
+    await flush()
+    await click(button(root, 'Run notebook'))
+    expect(context.session.start).not.toHaveBeenCalled()
+    expect(content(root)).toContain('Running sessions')
+    // The hint and the dialog footer both offer the explicit new kernel.
+    expect(buttonCount(root, 'Start new kernel')).toBe(2)
+    await click(button(root, 'Start new kernel'))
+    expect(context.session.start).toHaveBeenCalledOnce()
+  })
+
+  it('starts right away when no kernel runs', async () => {
+    const root = await render()
+    await flush()
+    await click(button(root, 'Run notebook'))
+    expect(context.session.start).toHaveBeenCalledOnce()
+    expect(content(root)).not.toContain('Running sessions')
+  })
+
+  it('marks the attached session and switches or ends another', async () => {
+    jobs.listJobs.mockResolvedValue({ jobs: ['01JOB', '02JOB', '03JOB'].map((job_id) => ({ ...runningJob(), job_id })) })
+    sessionApi.getSessionState.mockImplementation(async (jobId: string) => runningSession({ job_id: jobId }))
+    sessionApi.endSession.mockResolvedValue({})
+    const root = await render({ running: true, state: { state: 'ready' } })
+    await openOptions(root)
+    await flush()
+    expect(content(root)).toContain('Attached')
+    expect(buttonCount(root, 'Switch')).toBe(2)
+    expect(() => button(root, 'Attach')).toThrow()
+    await click(button(root, 'End'))
+    expect(sessionApi.endSession).toHaveBeenCalledWith('02JOB', { baseUrl: 'https://node-a.example/api/v1', token: 'bearer-token' })
+    expect(buttonCount(root, 'End')).toBe(1)
+    // A successful switch closes the dialog, so it comes last.
+    await click(button(root, 'Switch'))
+    expect(context.session.attachTo).toHaveBeenCalledWith('03JOB', 'node-a')
+    expect(content(root)).not.toContain('Running sessions')
   })
 
   it('hides the value the compute config reports', async () => {
