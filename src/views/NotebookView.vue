@@ -57,6 +57,7 @@ provideNotebookBridge(createNotebookBridge(notebook, session))
 const assistantSubject = computed(() => `the notebook ${bucket.value}/${key.value}`)
 
 const autosaveTimer = ref<ReturnType<typeof setInterval> | null>(null)
+const sessionBar = ref<InstanceType<typeof NotebookSessionBar> | null>(null)
 
 async function open() {
   if (!bucket.value || !key.value) return
@@ -224,11 +225,11 @@ const savedLabel = computed(() => {
         <Notice v-if="notebook.saveError.value" tone="error">{{ notebook.saveError.value }}</Notice>
 
         <div class="grid items-start gap-6" :class="filesOpen ? 'xl:grid-cols-[18rem_minmax(0,1fr)]' : 'xl:grid-cols-[3rem_minmax(0,1fr)]'">
-          <NotebookFiles :collapsed="!filesOpen" class="max-h-[70vh] overflow-auto" @toggle="filesOpen = !filesOpen" />
+          <NotebookFiles :collapsed="!filesOpen" class="max-h-[70vh] overflow-auto" @toggle="filesOpen = !filesOpen" @start="sessionBar?.runNotebook()" />
 
           <div class="min-w-0 space-y-3">
             <div class="sticky top-14 z-10 flex flex-wrap items-center gap-2 bg-background/95 py-2 backdrop-blur">
-              <NotebookSessionBar />
+              <NotebookSessionBar ref="sessionBar" />
               <Button size="sm" variant="outline" @click="addCell()"><Plus class="size-3.5" /> Add cell</Button>
               <span class="flex-1" />
               <span class="text-[11px] text-muted-foreground">{{ savedLabel }}</span>

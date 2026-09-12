@@ -98,9 +98,10 @@ async function render(options: { live?: boolean; running?: boolean; starting?: b
     modules[`@/components/${path}.vue`] = moduleDefault(Slotted)
   }
   const component = compileClientComponent(new URL('./NotebookFiles.vue', import.meta.url), modules)
-  const { root, app } = await mountApp(defineComponent({ setup: () => () => h(component, { collapsed: collapsed.value, onToggle: () => { collapsed.value = !collapsed.value } }) }))
+  const onStart = vi.fn()
+  const { root, app } = await mountApp(defineComponent({ setup: () => () => h(component, { collapsed: collapsed.value, onToggle: () => { collapsed.value = !collapsed.value }, onStart }) }))
   await flush()
-  return { root, app, generation, activeCellId, noteCellInputs, addSessionInputs, readScratch, s3, session }
+  return { root, app, generation, activeCellId, noteCellInputs, addSessionInputs, readScratch, s3, session, onStart }
 }
 
 /** The menu item `label` on the row named `name`. */
@@ -251,6 +252,8 @@ describe('kernel file tree', () => {
     const idle = await render({ live: false, running: false })
     expect(content(idle.root)).toContain('Not running.')
     expect(listScratch).not.toHaveBeenCalled()
+    await click(element(idle.root, (node) => node.tag === 'button' && content(node).includes('Start kernel')))
+    expect(idle.onStart).toHaveBeenCalledOnce()
     idle.app.unmount()
   })
 })

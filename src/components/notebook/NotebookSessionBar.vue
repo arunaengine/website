@@ -177,7 +177,7 @@ async function endListed(entry: RunningSession) {
 
 /** A running kernel this notebook could pick up while it has none. */
 const unattachedSession = computed(() =>
-  session.running.value || notebook.loading.value ? null : sessionRows.value.find(matches) ?? null,
+  session.running.value || notebook.loading.value ? null : sessionRows.value[0] ?? null,
 )
 
 /** Waits for the listing in flight; a running kernel asks for a choice first. */
@@ -301,6 +301,8 @@ async function saveDependencies(value: DependencySpec, restart: boolean) {
   if (!await notebook.save()) return
   if (restart) start(true)
 }
+
+defineExpose({ runNotebook })
 </script>
 
 <template>
@@ -323,11 +325,14 @@ async function saveDependencies(value: DependencySpec, restart: boolean) {
     <Notice v-if="unattachedSession" tone="warning" class="basis-full">
       <div class="flex flex-wrap items-center gap-2">
         <span class="min-w-0 flex-1">
-          A kernel is already running ({{ runtimeLabel(unattachedSession.runtime) }} on {{ displayName(unattachedSession.nodeId) }},
-          bucket {{ unattachedSession.bucket }}, started {{ startedLabel(unattachedSession) }}), and this notebook is not attached to it.
+          <strong>A kernel is already running</strong> ({{ runtimeLabel(unattachedSession.runtime) }} on {{ displayName(unattachedSession.nodeId) }},
+          bucket {{ unattachedSession.bucket }}, started {{ startedLabel(unattachedSession) }}).
+          <template v-if="matches(unattachedSession)">This notebook is not attached to it. Attach to keep using it, or start a new one.</template>
+          <template v-else>It works in another bucket or runtime, so this notebook cannot attach to it. End it from the kernel dialog or start a new one.</template>
           <template v-if="sessionRows.length > 1">Open Kernel to see all {{ sessionRows.length }} running kernels.</template>
         </span>
-        <Button variant="outline" size="sm" :disabled="session.attaching.value" @click="attachSession(unattachedSession)">Attach</Button>
+        <Button v-if="matches(unattachedSession)" size="sm" :disabled="session.attaching.value" @click="attachSession(unattachedSession)">Attach</Button>
+        <Button v-else variant="outline" size="sm" @click="kernelOpen = true">Open kernel</Button>
         <Button variant="outline" size="sm" :disabled="startBlocked" @click="start()">Start new kernel</Button>
       </div>
     </Notice>

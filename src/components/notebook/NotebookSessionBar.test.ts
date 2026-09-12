@@ -387,15 +387,24 @@ describe('the session bar', () => {
     expect(context.session.start).toHaveBeenCalledWith(expect.objectContaining({ name: 'counts' }))
   })
 
-  it.each([
-    ['attached', { running: true, state: { state: 'ready' } }, 'lab-data'],
-    ['another bucket', {}, 'other-bucket'],
-  ])('shows no hint while %s', async (_case, overrides, bucket) => {
-    jobs.listJobs.mockResolvedValue({ jobs: [runningJob(bucket)] })
-    sessionApi.getSessionState.mockResolvedValue(runningSession({ workspace_bucket: bucket }))
-    const root = await render(overrides as Parameters<typeof render>[0])
+  it('shows no hint while attached', async () => {
+    jobs.listJobs.mockResolvedValue({ jobs: [runningJob()] })
+    sessionApi.getSessionState.mockResolvedValue(runningSession())
+    const root = await render({ running: true, state: { state: 'ready' } })
     await flush()
     expect(content(root)).not.toContain('A kernel is already running')
+  })
+
+  it('names a running kernel in another bucket without offering attach', async () => {
+    jobs.listJobs.mockResolvedValue({ jobs: [runningJob('other-bucket')] })
+    sessionApi.getSessionState.mockResolvedValue(runningSession({ workspace_bucket: 'other-bucket' }))
+    const root = await render()
+    await flush()
+    expect(content(root)).toContain('A kernel is already running')
+    expect(content(root)).toContain('cannot attach to it')
+    expect(buttonCount(root, 'Attach')).toBe(0)
+    await click(button(root, 'Open kernel'))
+    expect(content(root)).toContain('Running sessions')
   })
 
   it('asks for a choice before starting while a kernel runs', async () => {

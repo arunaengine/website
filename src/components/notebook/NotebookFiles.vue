@@ -32,6 +32,7 @@ import {
   Folder,
   FolderPlus,
   PanelLeft,
+  Play,
   Plus,
   RefreshCw,
 } from '@lucide/vue'
@@ -60,7 +61,7 @@ interface CopySource {
 }
 
 defineProps<{ collapsed?: boolean }>()
-const emit = defineEmits<{ (event: 'toggle'): void }>()
+const emit = defineEmits<{ (event: 'toggle'): void; (event: 'start'): void }>()
 
 const { notebook, session } = injectNotebook()
 const s3 = useS3()
@@ -346,7 +347,10 @@ async function copyTo(destination: { bucket: string; prefix: string }) {
       <Notice v-if="note" tone="info">{{ note }}</Notice>
       <Notice v-if="error" tone="error">{{ error }}</Notice>
 
-      <EmptyState v-if="!session.running.value" compact title="Not running." description="Start a session to see the files inside the kernel." />
+      <div v-if="!session.running.value" class="space-y-2">
+        <EmptyState compact title="Not running." description="Start a kernel to see the files inside it." />
+        <Button size="sm" class="w-full" @click="emit('start')"><Play class="size-3.5" /> Start kernel</Button>
+      </div>
       <p v-else-if="root?.starting || (!root?.entries && !root?.error && !session.live.value)" class="flex items-center gap-2 text-xs text-muted-foreground">
         <Spinner /> The kernel is starting.
       </p>
