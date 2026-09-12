@@ -242,7 +242,7 @@ const savedLabel = computed(() => {
             </Button>
           </div>
 
-          <NotebookFiles v-if="filesOpen" ref="filesPane" class="max-h-[70vh] overflow-auto xl:sticky xl:top-14 xl:col-start-1 xl:row-start-1 xl:row-span-2" @start="sessionBar?.runNotebook()" @hide="filesOpen = false" />
+          <NotebookFiles v-if="filesOpen" ref="filesPane" class="max-h-[70vh] overflow-auto xl:sticky xl:top-16 xl:mt-2 xl:col-start-1 xl:row-start-1 xl:row-span-2" @start="sessionBar?.runNotebook()" @hide="filesOpen = false" />
 
           <div class="min-w-0 space-y-3" :class="filesOpen ? 'xl:col-start-2 xl:row-start-2' : ''">
             <Notice v-if="imageError" tone="error">{{ imageError }}</Notice>

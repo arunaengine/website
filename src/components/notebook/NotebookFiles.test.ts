@@ -192,7 +192,7 @@ describe('kernel file tree', () => {
     const { root, app, onHide } = await render()
     expect(content(root)).toContain('Files')
     const header = element(root, (node) => node.tag === 'header')
-    expect(String(header.props.class)).toContain('flex h-12 items-center')
+    expect(String(header.props.class)).toContain('flex h-8 items-center')
     listScratch.mockClear()
     await click(element(header, (node) => node.props.label === 'Refresh kernel files'))
     expect(listScratch).toHaveBeenCalledWith('job-a', '', { baseUrl: '/api/v1' })
