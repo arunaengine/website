@@ -84,23 +84,21 @@ describe('notebook workspace controls', () => {
     expect(notebook.flushSave).toHaveBeenCalledOnce()
   })
 
-  it('keeps the files header in the toolbar band and folds the column away', async () => {
+  it('folds the files column away and offers the way back in the toolbar', async () => {
     const { root, app } = await render()
-    const band = element(root, (node) => String(node.props.class).includes('sticky'))
-    expect(content(band)).toContain('Files')
-    expect(element(band, (node) => node.props.label === 'Refresh kernel files')).toBeTruthy()
-    const grid = band.parent!
+    const band = element(root, (node) => String(node.props.class).includes('top-14 z-10'))
+    const grid = band.parent!.parent!
     expect(String(grid.props.class)).toContain('18rem')
-    const files = element(band, (node) => String(node.props.class).includes('xl:w-[18rem]'))
-    expect(String(band.props.class)).toContain('flex-wrap')
-    await click(element(files, (node) => node.props.label === 'Hide files'))
-    expect(String(grid.props.class)).toContain('grid-cols-[minmax(0,1fr)]')
-    expect(() => element(band, (node) => String(node.props.class).includes('xl:w-[18rem]'))).toThrow()
     expect(content(band)).not.toContain('Files')
-    const show = element(band, (node) => node.tag === 'button')
-    expect(show.props.label).toBe('Show files')
+    expect(() => element(band, (node) => node.props.label === 'Show files')).toThrow()
+    const files = element(root, (node) => typeof node.props.onHide === 'function')
+    ;(files.props.onHide as () => void)()
+    await flush()
+    expect(String(grid.props.class)).toContain('grid-cols-[minmax(0,1fr)]')
+    expect(() => element(root, (node) => typeof node.props.onHide === 'function')).toThrow()
+    const show = element(band, (node) => node.props.label === 'Show files')
     await click(show)
-    expect(element(band, (node) => node.props.label === 'Hide files')).toBeTruthy()
+    expect(() => element(root, (node) => typeof node.props.onHide === 'function')).not.toThrow()
     app.unmount()
   })
 

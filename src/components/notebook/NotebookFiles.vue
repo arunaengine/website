@@ -60,7 +60,7 @@ interface CopySource {
   keys: string[]
 }
 
-const emit = defineEmits<{ (event: 'start'): void }>()
+const emit = defineEmits<{ (event: 'start'): void; (event: 'hide'): void }>()
 
 const { notebook, session } = injectNotebook()
 const s3 = useS3()
@@ -737,6 +737,11 @@ async function copyTo(destination: { bucket: string; prefix: string }) {
 
 <template>
   <aside class="surface min-w-0 overflow-hidden">
+    <header class="sticky top-0 z-[1] flex h-12 items-center gap-1 border-b border-border/60 bg-card px-3">
+      <h2 class="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">Files</h2>
+      <IconButton v-if="session.running.value" label="Refresh kernel files" class="h-8 w-8" @click="files.refresh()"><RefreshCw class="size-4" /></IconButton>
+      <IconButton label="Hide files" aria-expanded="true" class="h-8 w-8" @click="emit('hide')"><PanelLeft class="size-4" /></IconButton>
+    </header>
     <div class="space-y-3 px-3 py-3">
       <nav v-if="treeReady" aria-label="Current folder" class="flex items-center overflow-hidden whitespace-nowrap text-[11px] text-muted-foreground">
         <template v-for="(crumb, index) in shownCrumbs" :key="crumb?.path ?? '…'">

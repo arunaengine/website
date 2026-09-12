@@ -32,7 +32,7 @@ import { activeGroupId } from '@/composables/useGroupSelection'
 import { useNotebookLocation } from '@/composables/useNotebookLocation'
 import { SESSION_RUNTIMES } from '@/lib/notebook/runtimes'
 import { errorMessage, relativeTime } from '@/lib/utils'
-import { ArrowLeft, FileText, Lock, Unlock, PanelLeft, Plus, RefreshCw, Save } from '@lucide/vue'
+import { ArrowLeft, FileText, Lock, Unlock, PanelLeft, Plus, Save } from '@lucide/vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -226,15 +226,11 @@ const savedLabel = computed(() => {
         <Notice v-if="notebook.saveError.value" tone="error">{{ notebook.saveError.value }}</Notice>
 
         <div class="grid items-start gap-x-6 gap-y-3" :class="filesOpen ? 'xl:grid-cols-[18rem_minmax(0,1fr)]' : 'grid-cols-[minmax(0,1fr)]'">
-          <!-- One sticky band: the files header on the left, the session toolbar on the right. -->
-          <div class="sticky top-14 z-10 col-span-full flex flex-wrap items-center gap-x-6 gap-y-2 bg-background/95 py-2 backdrop-blur">
-            <!-- Below the wide breakpoint the files group leads the toolbar; at xl it spans the tree column. -->
-            <div v-if="filesOpen" class="flex h-8 shrink-0 items-center gap-1 xl:w-[18rem]">
-              <h2 class="truncate text-sm font-semibold text-foreground xl:flex-1">Files</h2>
-              <IconButton v-if="session.running.value" label="Refresh kernel files" class="h-8 w-8" @click="filesPane?.refresh()"><RefreshCw class="size-4" /></IconButton>
-              <IconButton label="Hide files" aria-expanded="true" class="h-8 w-8" @click="filesOpen = false"><PanelLeft class="size-4" /></IconButton>
-            </div>
-            <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <!-- The files panel carries its own header; the toolbar only offers the way back when it is hidden. -->
+          <NotebookFiles v-if="filesOpen" ref="filesPane" class="max-h-[70vh] overflow-auto xl:sticky xl:top-14" @start="sessionBar?.runNotebook()" @hide="filesOpen = false" />
+
+          <div class="min-w-0 space-y-3">
+            <div class="sticky top-14 z-10 flex flex-wrap items-center gap-2 bg-background/95 py-2 backdrop-blur">
               <IconButton v-if="!filesOpen" label="Show files" aria-expanded="false" class="h-8 w-8" @click="filesOpen = true"><PanelLeft class="size-4" /></IconButton>
               <NotebookSessionBar ref="sessionBar" />
               <Button size="sm" variant="outline" @click="addCell()"><Plus class="size-3.5" /> Add cell</Button>
@@ -247,11 +243,6 @@ const savedLabel = computed(() => {
                 <Spinner v-if="notebook.saving.value" class="text-current" aria-hidden="true" /><Save v-else class="size-3.5" /> Save
               </Button>
             </div>
-          </div>
-
-          <NotebookFiles v-if="filesOpen" ref="filesPane" class="max-h-[70vh] overflow-auto xl:sticky xl:top-26" @start="sessionBar?.runNotebook()" />
-
-          <div class="min-w-0 space-y-3">
             <Notice v-if="imageError" tone="error">{{ imageError }}</Notice>
             <div v-if="notebook.loading.value" class="grid place-items-center py-16">
               <Spinner />

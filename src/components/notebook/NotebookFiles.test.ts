@@ -96,6 +96,7 @@ async function render(options: { live?: boolean; running?: boolean; starting?: b
     '@/lib/tes': { parseS3Url: () => ({ bucket: 'source', key: 'input.txt' }) },
     '@/lib/utils': { errorMessage: (cause: Error) => cause.message, formatBytes: (bytes: number) => `${bytes} B` },
     '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+    '@/components/ui/IconButton.vue': moduleDefault(ButtonStub),
     '@/components/ui/Input.vue': moduleDefault(InputStub),
     '@/components/ui/DropdownMenuItem.vue': moduleDefault(MenuItem),
     '@/components/ui/EmptyState.vue': moduleDefault(textStub),
@@ -108,9 +109,10 @@ async function render(options: { live?: boolean; running?: boolean; starting?: b
   }
   const component = compileClientComponent(new URL('./NotebookFiles.vue', import.meta.url), modules)
   const onStart = vi.fn()
-  const { root, app } = await mountApp(defineComponent({ setup: () => () => h(component, { onStart }) }))
+  const onHide = vi.fn()
+  const { root, app } = await mountApp(defineComponent({ setup: () => () => h(component, { onStart, onHide }) }))
   await flush()
-  return { root, app, generation, activeCellId, noteCellInputs, addSessionInputs, readScratch, s3, session, onStart }
+  return { root, app, generation, activeCellId, noteCellInputs, addSessionInputs, readScratch, s3, session, onStart, onHide }
 }
 
 function row(root: HostNode, path: string): HostNode {
@@ -186,6 +188,17 @@ describe('notebook input provenance', () => {
 })
 
 describe('kernel file tree', () => {
+  it('carries its own header with refresh and hide', async () => {
+    const { root, app, onHide } = await render()
+    expect(content(root)).toContain('Files')
+    listScratch.mockClear()
+    await click(element(root, (node) => node.props.label === 'Refresh kernel files'))
+    expect(listScratch).toHaveBeenCalledWith('job-a', '', { baseUrl: '/api/v1' })
+    await click(element(root, (node) => node.props.label === 'Hide files'))
+    expect(onHide).toHaveBeenCalledOnce()
+    app.unmount()
+  })
+
   it('shows one tree without dot entries and opens folders on demand', async () => {
     const { root, app } = await render()
     expect(listScratch).toHaveBeenCalledWith('job-a', '', { baseUrl: '/api/v1' })
