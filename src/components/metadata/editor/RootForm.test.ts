@@ -14,6 +14,7 @@ import {
   type HostNode,
 } from '@/test/clientRender'
 import * as Editor from '@/lib/crate/editor'
+import * as Labels from '@/lib/profiles/labels'
 import * as References from '@/lib/crate/references'
 import * as Pickers from '@/lib/crate/pickers'
 import * as Uri from '@/lib/profiles/uri'
@@ -85,6 +86,8 @@ const ReferenceValue = compileClientComponent(new URL('./ReferenceValue.vue', im
 const RuleBadge = compileClientComponent(new URL('./RuleBadge.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
+  '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
+  '@/lib/profiles/labels': Labels,
 })
 const PropertyRow = compileClientComponent(new URL('./PropertyRow.vue', import.meta.url), {
   vue: VueRuntime,
@@ -332,9 +335,9 @@ describe('RootForm', () => {
     const description = nodes(empty.root).find((node) => node.props['aria-label'] === 'Dataset description')
 
     expect(nodes(empty.root).filter((node) => node.props.title === 'Required')).toHaveLength(1)
-    expect(String(name?.props.class)).toContain('border-primary/40')
+    expect(String(name?.props.class)).toContain('border-aruna-royal/40')
     expect(String(name?.props.class)).toContain('pr-8 @xs:pr-24')
-    expect(String(description?.props.class ?? '')).not.toContain('border-primary')
+    expect(String(description?.props.class ?? '')).not.toContain('border-aruna-royal')
     empty.app.unmount()
 
     const named = await mountApp(RootForm, {
@@ -346,7 +349,7 @@ describe('RootForm', () => {
     const filled = nodes(named.root).find((node) => node.props['aria-label'] === 'Dataset name')
 
     expect(nodes(named.root).some((node) => node.props.title === 'Required')).toBe(false)
-    expect(String(filled?.props.class)).toBe('border-primary/40')
+    expect(String(filled?.props.class)).toBe('border-aruna-royal/40')
     named.app.unmount()
   })
 })

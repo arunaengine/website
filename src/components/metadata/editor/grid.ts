@@ -13,12 +13,11 @@ export const ROW_VALUE = 'col-span-full min-w-0 sm:col-span-1'
 export const ROW_ACTIONS = 'flex w-20 shrink-0 items-center justify-end gap-1'
 
 /**
- * The input classes of a field the picked profile speaks about: a tint while
- * it is required, and room for the badge inside it while it is still empty.
+ * The input classes of a field the picked profile speaks about: the tint of
+ * its obligation, and room for the badge inside it while it is still empty.
  */
 export function ruleEmphasis(rule: { obligation: string } | null | undefined, empty = false): string {
-  if (!rule || (rule.obligation !== 'MUST' && rule.obligation !== 'SHOULD')) return ''
-  const classes = rule.obligation === 'MUST' ? ['border-primary/40'] : []
-  if (empty) classes.push('pr-8 @xs:pr-24')
-  return classes.join(' ')
+  const tint = rule?.obligation === 'MUST' ? 'border-aruna-royal/40' : rule?.obligation === 'SHOULD' ? 'border-amber-500/40' : ''
+  if (!tint) return ''
+  return empty ? `${tint} pr-8 @xs:pr-24` : tint
 }

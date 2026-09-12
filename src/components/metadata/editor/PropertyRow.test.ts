@@ -14,6 +14,7 @@ import {
   type HostNode,
 } from '@/test/clientRender'
 import * as Editor from '@/lib/crate/editor'
+import * as Labels from '@/lib/profiles/labels'
 import * as References from '@/lib/crate/references'
 import * as Pickers from '@/lib/crate/pickers'
 import * as Uri from '@/lib/profiles/uri'
@@ -89,6 +90,8 @@ const ReferenceValue = compileClientComponent(new URL('./ReferenceValue.vue', im
 const RuleBadge = compileClientComponent(new URL('./RuleBadge.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
+  '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
+  '@/lib/profiles/labels': Labels,
 })
 const PropertyRow = compileClientComponent(new URL('./PropertyRow.vue', import.meta.url), {
   vue: VueRuntime,
@@ -251,9 +254,9 @@ describe('PropertyRow', () => {
     expect(nodes(badge.parent!)).toContain(inputs[0])
     expect(nodes(badge.parent!)).not.toContain(inputs[1])
     expect(nodes(mounted.root).filter((node) => node.props.title === 'Required')).toHaveLength(1)
-    expect(String(inputs[0].props.class)).toContain('border-primary/40')
+    expect(String(inputs[0].props.class)).toContain('border-aruna-royal/40')
     expect(String(inputs[0].props.class)).toContain('pr-8 @xs:pr-24')
-    expect(String(inputs[1].props.class)).toBe('border-primary/40')
+    expect(String(inputs[1].props.class)).toBe('border-aruna-royal/40')
     mounted.app.unmount()
   })
 
@@ -267,7 +270,7 @@ describe('PropertyRow', () => {
     })
 
     expect(nodes(mounted.root).some((node) => node.props.title === 'Required')).toBe(false)
-    expect(String(element(mounted.root, (node) => node.tag === 'input').props.class)).toBe('border-primary/40')
+    expect(String(element(mounted.root, (node) => node.tag === 'input').props.class)).toBe('border-aruna-royal/40')
     mounted.app.unmount()
   })
 
@@ -283,7 +286,7 @@ describe('PropertyRow', () => {
     const badge = element(mounted.root, (node) => node.props.title === 'Recommended')
 
     expect(String(badge.props.class)).toContain('right-9')
-    expect(String(element(mounted.root, (node) => node.tag === 'select').props.class)).toBe('pr-8 @xs:pr-24')
+    expect(String(element(mounted.root, (node) => node.tag === 'select').props.class)).toBe('border-amber-500/40 pr-8 @xs:pr-24')
     mounted.app.unmount()
   })
 

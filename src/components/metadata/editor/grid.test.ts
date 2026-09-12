@@ -3,6 +3,7 @@ import { defineComponent, h } from 'vue'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { compileClientComponent, moduleDefault, mountApp, nodes } from '@/test/clientRender'
 import * as Editor from '@/lib/crate/editor'
+import * as Labels from '@/lib/profiles/labels'
 import * as References from '@/lib/crate/references'
 import * as Pickers from '@/lib/crate/pickers'
 import * as Grid from './grid'
@@ -24,9 +25,12 @@ const InputStub = defineComponent({
   setup: (props, { attrs }) => () => h('input', { ...attrs, value: props.modelValue }),
 })
 
+const BadgeStub = defineComponent((_, { attrs, slots }) => () => h('span', attrs, slots.default?.()))
 const RuleBadge = compileClientComponent(new URL('./RuleBadge.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
+  '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
+  '@/lib/profiles/labels': Labels,
 })
 const shared = {
   vue: VueRuntime,
