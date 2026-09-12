@@ -312,6 +312,8 @@ export function createNotebookSession(notebook: NotebookStore) {
     // Set once this attempt admitted a job; a job from before is not ours.
     let submitted = ''
     try {
+      await notebook.flushSave()
+      if (!active()) return
       // The session stages this file from the bucket, so it must exist first.
       if (draft.dependencyKey && draft.dependencyKind && draft.dependencyText?.trim()) {
         await s3.activateContext(storageNode, draft.groupId)

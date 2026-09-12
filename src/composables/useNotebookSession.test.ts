@@ -75,12 +75,13 @@ function state(overrides: Record<string, unknown> = {}) {
 
 async function setup() {
   s3.getObjectText.mockRejectedValue({ name: 'NoSuchKey' })
-  const notebook = createNotebook(ref('lab-data'), ref('notebooks/counts.ipynb'), () => ({
+  const scope = effectScope()
+  // The notebook lives in the scope too, so stopping it cancels its save timer.
+  const notebook = scope.run(() => createNotebook(ref('lab-data'), ref('notebooks/counts.ipynb'), () => ({
     runtime: 'python-notebook',
     group_id: 'group-1',
-  }))
+  })))!
   await notebook.load()
-  const scope = effectScope()
   const store = scope.run(() => createNotebookSession(notebook))!
   return { notebook, session: store, scope }
 }
@@ -228,6 +229,7 @@ describe('createNotebookSession', () => {
     jobs.submitJob.mockReturnValueOnce(new Promise((resolve) => { finish = resolve }))
     jobs.cancelJob.mockResolvedValue({ state: 'cancelled' })
     const starting = store.start({ groupId: 'group-1', name: 'counts', runtime: 'python-notebook', workspaceBucket: 'lab-data' })
+    await vi.waitFor(() => expect(jobs.submitJob).toHaveBeenCalled())
     aruna.currentUser.value = { id: 'user-b' }
     aruna.apiBaseUrl.value = 'https://another.example/api/v1'
     aruna.authToken.value = 'new-token'

@@ -2,7 +2,7 @@
 // One notebook: files on the left, cells in the middle, the session on top.
 // The document lives in the workspace bucket; the cells run in the session job
 // on the node that holds it.
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
@@ -74,11 +74,22 @@ async function open() {
 function deselectCell(event: MouseEvent) {
   if (!(event.target as Element | null)?.closest?.('.notebook-cell')) notebook.selectCell('')
 }
+// A closed tab gets the crash buffer and a best effort save of waiting edits.
+function leave() {
+  notebook.flushCopy()
+  void notebook.flushSave()
+}
 
 onMounted(() => {
   document.addEventListener('click', deselectCell, true)
+  if (typeof window !== 'undefined') window.addEventListener('pagehide', leave)
   void open()
+  // The retry path: a save that failed is tried again once the notebook is quiet.
   autosaveTimer.value = setInterval(() => void notebook.autosave(), 30_000)
+})
+onBeforeUnmount(() => {
+  if (typeof window !== 'undefined') window.removeEventListener('pagehide', leave)
+  leave()
 })
 onUnmounted(() => {
   document.removeEventListener('click', deselectCell, true)
@@ -182,6 +193,7 @@ function dropCell(event: DragEvent, index?: number, cellId?: string) {
 
 const savedLabel = computed(() => {
   if (notebook.saving.value) return 'Saving…'
+  if (notebook.saveError.value) return 'Save failed'
   if (notebook.dirty.value) return 'Not saved yet'
   return notebook.lastSavedMs.value ? `Saved ${relativeTime(new Date(notebook.lastSavedMs.value).toISOString())}` : ''
 })
@@ -210,12 +222,6 @@ const savedLabel = computed(() => {
       <div class="container space-y-6 py-6">
         <Notice v-if="notebook.loadError.value" tone="error">{{ notebook.loadError.value }}</Notice>
         <Notice v-if="notebook.saveError.value" tone="error">{{ notebook.saveError.value }}</Notice>
-        <Notice v-if="notebook.restoredCopy.value" tone="warning">
-          Unsaved changes from this browser were restored.
-          <Button variant="link" size="sm" class="h-auto p-0" @click="notebook.discardCopy()">
-            Use the stored notebook instead
-          </Button>
-        </Notice>
 
         <div class="grid items-start gap-6" :class="filesOpen ? 'xl:grid-cols-[18rem_minmax(0,1fr)]' : 'xl:grid-cols-[3rem_minmax(0,1fr)]'">
           <NotebookFiles :collapsed="!filesOpen" class="max-h-[70vh] overflow-auto" @toggle="filesOpen = !filesOpen" />

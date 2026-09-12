@@ -3,7 +3,7 @@ import { defineComponent, h, ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as Runtimes from '@/lib/notebook/runtimes'
 import { newCell, type CellKind } from '@/lib/notebook/nbformat'
-import { button, click, compileClientComponent, element, flush, moduleDefault, mountApp } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, element, flush, moduleDefault, mountApp } from '@/test/clientRender'
 
 async function render() {
   const cells = ref(['a', 'b', 'c'].map((id) => ({ ...newCell('code', id), id })))
@@ -17,9 +17,9 @@ async function render() {
     selectCell: (id: string) => { activeCellId.value = id },
     name: ref('analysis'), meta: ref({ runtime: 'python-notebook', group_id: 'group', workspace_bucket: 'lab' }),
     scope: ref('account'), generation: ref(1),
-    saving: ref(false), loading: ref(false), dirty: ref(false), restoredCopy: ref(false),
-    loadError: ref(null), saveError: ref(null), loadDenied: ref(false), lastSavedMs: ref(0),
-    load: vi.fn(async () => {}), autosave: vi.fn(), save: vi.fn(),
+    saving: ref(false), loading: ref(false), dirty: ref(false),
+    loadError: ref(null), saveError: ref<string | null>(null), loadDenied: ref(false), lastSavedMs: ref(0),
+    load: vi.fn(async () => {}), autosave: vi.fn(), save: vi.fn(), flushSave: vi.fn(async () => true), flushCopy: vi.fn(),
   }
   const Slotted = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
   const Button = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
@@ -63,12 +63,27 @@ async function render() {
   vi.stubGlobal('document', { getElementById: () => null, addEventListener: vi.fn(), removeEventListener: vi.fn() })
   const component = compileClientComponent(new URL('./NotebookView.vue', import.meta.url), modules)
   const { root, app } = await mountApp(component)
-  return { root, app, moveCell, addCell, activeCellId, ended, cells, addAttachment }
+  return { root, app, moveCell, addCell, activeCellId, ended, cells, addAttachment, notebook }
 }
 
 afterEach(() => vi.unstubAllGlobals())
 
 describe('notebook workspace controls', () => {
+  it('shows the save state in the toolbar and saves on leave', async () => {
+    const { root, app, notebook } = await render()
+    notebook.lastSavedMs.value = 1
+    await flush()
+    expect(content(root)).toContain('Saved now')
+    notebook.saveError.value = 'offline'
+    await flush()
+    expect(content(root)).toContain('Save failed')
+    expect(content(root)).not.toContain('were restored')
+    expect(notebook.flushSave).not.toHaveBeenCalled()
+    app.unmount()
+    expect(notebook.flushCopy).toHaveBeenCalledOnce()
+    expect(notebook.flushSave).toHaveBeenCalledOnce()
+  })
+
   it('adds a code cell from the toolbar', async () => {
     const { root, app, addCell, activeCellId } = await render()
     await click(button(root, 'Add cell'))

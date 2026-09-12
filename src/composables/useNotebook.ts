@@ -4,7 +4,9 @@
 import { computed, onScopeDispose, ref, watch, type Ref } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { isS3AuthError, useS3 } from '@/composables/useS3'
+import type { S3SessionReference } from '@/composables/s3/session'
 import {
+  AUTOSAVE_DELAY_MS,
   autosaveDue,
   clearWorkingCopy,
   notebookName,
@@ -64,8 +66,6 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
   /** When the last edit happened; null once everything is saved. */
   const changedAt = ref<number | null>(null)
   const lastSavedMs = ref(0)
-  /** True while the notebook shows unsaved edits taken from this browser. */
-  const restoredCopy = ref(false)
   const isNew = ref(false)
 
   const name = computed(() => notebookName(key.value))
@@ -87,8 +87,25 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
     copy.cancel()
     pending = null
   }
+  // Every change is saved two seconds after the last one; every PUT is a
+  // kept version, so nothing waits for a manual save.
+  let saveTimer: ReturnType<typeof setTimeout> | null = null
+  function cancelSave() {
+    if (saveTimer !== null) clearTimeout(saveTimer)
+    saveTimer = null
+  }
+  function scheduleSave() {
+    cancelSave()
+    saveTimer = setTimeout(() => {
+      saveTimer = null
+      if (changedAt.value !== null) void save()
+    }, AUTOSAVE_DELAY_MS)
+  }
   function invalidate() {
     copy.flush()
+    cancelSave()
+    // Edits from the last two seconds go out with the page or the route.
+    if (changedAt.value !== null) void save()
     generation.value += 1
     loadedFrom = null
     notebook.value = null
@@ -110,6 +127,7 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
     changedAt.value = Date.now()
     pending = { ...loadedFrom, doc, changedAt: changedAt.value }
     copy.schedule()
+    scheduleSave()
   }
 
   async function load(): Promise<void> {
@@ -123,7 +141,6 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
     loading.value = true
     loadError.value = null
     loadDenied.value = false
-    restoredCopy.value = false
     try {
       await s3.activateContext(target.nodeId, target.groupId)
       if (request !== generation.value) return
@@ -138,21 +155,31 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
         missing = true
       }
       if (request !== generation.value) return
+      // The crash buffer of this browser wins when it is newer than what is
+      // stored; it is saved right away. Otherwise the stored document wins.
+      const unsaved = readWorkingCopy(target.scope, target.bucket, target.key)
+      let keepCopy = false
+      if (unsaved && unsaved.text !== (text ?? '')) {
+        const storedMs = missing ? 0 : await storedModifiedMs(target, reference)
+        if (request !== generation.value) return
+        keepCopy = unsaved.changed_at_ms > storedMs
+      }
       isNew.value = missing
       notebook.value = text === null ? emptyNotebook(defaults) : parseNotebook(text, defaults)
       // Everything this document does later happens where it was read from.
       loadedFrom = target
       lastSavedMs.value = Date.now()
       changedAt.value = null
-      const unsaved = readWorkingCopy(target.scope, target.bucket, target.key)
-      if (unsaved && unsaved.text !== (text ?? '')) {
-        try {
-          notebook.value = parseNotebook(unsaved.text)
-          restoredCopy.value = true
-          changedAt.value = unsaved.changed_at_ms || Date.now()
-        } catch {
-          clearWorkingCopy(target.scope, target.bucket, target.key)
-        }
+      if (!keepCopy || !unsaved) {
+        if (unsaved) clearWorkingCopy(target.scope, target.bucket, target.key)
+        return
+      }
+      try {
+        notebook.value = parseNotebook(unsaved.text)
+        changedAt.value = unsaved.changed_at_ms || Date.now()
+        void save()
+      } catch {
+        clearWorkingCopy(target.scope, target.bucket, target.key)
       }
     } catch (error) {
       if (request !== generation.value) return
@@ -160,6 +187,19 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
       loadDenied.value = isS3AuthError(error) || !target.groupId
     } finally {
       if (request === generation.value) loading.value = false
+    }
+  }
+
+  /** When the stored object last changed; 0 when that cannot be read. */
+  async function storedModifiedMs(
+    target: { bucket: string; key: string; nodeId: string | null },
+    reference: S3SessionReference,
+  ): Promise<number> {
+    try {
+      const head = await s3.headObject(target.bucket, target.key, target.nodeId, undefined, reference)
+      return head.lastModified?.getTime() ?? 0
+    } catch {
+      return 0
     }
   }
 
@@ -185,12 +225,13 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
       if (request !== generation.value) return false
       lastSavedMs.value = Date.now()
       isNew.value = false
-      restoredCopy.value = false
       // An edit made during the save keeps the notebook unsaved.
       if (changeCount === changedBefore) {
         changedAt.value = null
         dropPending()
         clearWorkingCopy(target.scope, target.bucket, target.key)
+      } else {
+        scheduleSave()
       }
       return true
     } catch (error) {
@@ -202,18 +243,16 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
     }
   }
 
-  /** Saves at most every five minutes, and only after a change. */
+  /** Saves a notebook that changed and has been quiet since; a retry path. */
   async function autosave(): Promise<void> {
-    if (!autosaveDue(changedAt.value, lastSavedMs.value, Date.now())) return
+    if (!autosaveDue(changedAt.value, Date.now())) return
     await save()
   }
 
-  function discardCopy(): void {
-    if (!loadedFrom) return
-    dropPending()
-    clearWorkingCopy(loadedFrom.scope, loadedFrom.bucket, loadedFrom.key)
-    restoredCopy.value = false
-    void load()
+  /** Saves waiting edits now, before a kernel start, a capture or page leave. */
+  async function flushSave(): Promise<boolean> {
+    cancelSave()
+    return changedAt.value === null ? true : save()
   }
 
   function patchMeta(patch: Partial<NotebookAruna>): void {
@@ -383,14 +422,13 @@ export function createNotebook(bucket: Ref<string>, key: Ref<string>, seed: () =
     dirty,
     changedAt,
     lastSavedMs,
-    restoredCopy,
     isNew,
     load,
     save,
     autosave,
+    flushSave,
     /** Writes a pending working copy now, before leaving the page. */
     flushCopy: () => copy.flush(),
-    discardCopy,
     markChanged,
     patchMeta,
     cellById,

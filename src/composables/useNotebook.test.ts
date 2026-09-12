@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 
 const s3 = vi.hoisted(() => ({
-  getObjectText: vi.fn(), putTextObject: vi.fn(), activateContext: vi.fn(),
+  getObjectText: vi.fn(), putTextObject: vi.fn(), headObject: vi.fn(), activateContext: vi.fn(),
   referenceForContext: (nodeId: string, groupId: string) => ({ nodeId, groupId, accessKeyId: 'temporary' }),
 }))
 vi.mock('@/composables/useS3', () => ({ useS3: () => s3, isS3AuthError: () => false }))
@@ -29,13 +29,16 @@ beforeEach(() => {
   apiBaseUrl.value = '/api/v1'
   currentUser.value = { id: 'user-a' }
   nodeInfo.value = { node: { realm_id: 'realm-a', peer_id: 'node-a' } }
+  vi.useFakeTimers()
   vi.stubGlobal('localStorage', memoryStorage())
   s3.getObjectText.mockReset()
   s3.putTextObject.mockReset()
+  s3.headObject.mockReset().mockResolvedValue({ lastModified: new Date(1_000) })
   metadata.create.mockReset().mockResolvedValue({ document_id: 'snapshot-dataset' })
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.unstubAllGlobals()
 })
 
@@ -196,7 +199,7 @@ describe('createNotebook', () => {
     expect(notebook.cells.value[0].source).toBe('')
   })
 
-  it('invalidates the previous document when the route changes', async () => {
+  it('saves the previous document once when the route changes', async () => {
     // Opening another notebook changes the route before the read happens.
     s3.getObjectText.mockRejectedValue({ name: 'NoSuchKey' })
     s3.putTextObject.mockResolvedValue({ versionId: 'v1' })
@@ -210,47 +213,119 @@ describe('createNotebook', () => {
     await notebook.save()
 
     expect(readWorkingCopy(copyScope(), 'lab-data', 'notebooks/b.ipynb')).toBeNull()
-    expect(s3.putTextObject).not.toHaveBeenCalled()
+    expect(s3.putTextObject).toHaveBeenCalledOnce()
+    expect(s3.putTextObject.mock.calls[0].slice(1, 3)).toEqual(['notebooks/a.ipynb', expect.stringContaining('print(1)')])
     expect(notebook.notebook.value).toBeNull()
   })
 
-  it('restores the unsaved copy when it differs from the stored file', async () => {
-    const stored = emptyNotebook({
-      version: 1,
-      runtime: 'python-notebook',
-      workspace_bucket: 'lab-data',
-      group_id: 'group-1',
-    })
+  function storedAndCopy(changedAtMs: number) {
+    const stored = emptyNotebook({ version: 1, runtime: 'python-notebook', workspace_bucket: 'lab-data', group_id: 'group-1' })
     stored.cells[0].source = 'print(1)'
     s3.getObjectText.mockResolvedValue(serializeNotebook(stored))
-    const unsaved = emptyNotebook({
-      version: 1,
-      runtime: 'python-notebook',
-      workspace_bucket: 'lab-data',
-      group_id: 'group-1',
-    })
+    const unsaved = emptyNotebook({ version: 1, runtime: 'python-notebook', workspace_bucket: 'lab-data', group_id: 'group-1' })
     unsaved.cells[0].source = 'print(99)'
     localStorage.setItem(
       workingCopyKey(copyScope(), 'lab-data', 'notebooks/counts.ipynb'),
-      JSON.stringify({ text: serializeNotebook(unsaved), changed_at_ms: 5 }),
+      JSON.stringify({ text: serializeNotebook(unsaved), changed_at_ms: changedAtMs }),
     )
+  }
+
+  it('applies and saves a working copy newer than the stored file', async () => {
+    storedAndCopy(5_000)
+    s3.headObject.mockResolvedValue({ lastModified: new Date(4_000) })
+    s3.putTextObject.mockResolvedValue({ versionId: 'v2' })
     const notebook = store()
     await notebook.load()
-    expect(notebook.restoredCopy.value).toBe(true)
+    expect(notebook.cells.value[0].source).toBe('print(99)')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(s3.putTextObject).toHaveBeenCalledOnce()
+    expect(s3.putTextObject.mock.calls[0][2]).toContain('print(99)')
+    expect(notebook.dirty.value).toBe(false)
+    expect(readWorkingCopy(copyScope(), 'lab-data', 'notebooks/counts.ipynb')).toBeNull()
+  })
+
+  it('drops a working copy older than the stored file', async () => {
+    storedAndCopy(3_000)
+    s3.headObject.mockResolvedValue({ lastModified: new Date(4_000) })
+    const notebook = store()
+    await notebook.load()
+    expect(notebook.cells.value[0].source).toBe('print(1)')
+    expect(notebook.dirty.value).toBe(false)
+    expect(s3.putTextObject).not.toHaveBeenCalled()
+    expect(readWorkingCopy(copyScope(), 'lab-data', 'notebooks/counts.ipynb')).toBeNull()
+  })
+
+  it('keeps the working copy when the stored time cannot be read', async () => {
+    storedAndCopy(5)
+    s3.headObject.mockRejectedValue(new Error('no head'))
+    s3.putTextObject.mockResolvedValue({ versionId: 'v2' })
+    const notebook = store()
+    await notebook.load()
     expect(notebook.cells.value[0].source).toBe('print(99)')
   })
 
-  it('saves at most every five minutes', async () => {
+  it('saves two seconds after the last edit', async () => {
     s3.getObjectText.mockRejectedValue({ name: 'NoSuchKey' })
     s3.putTextObject.mockResolvedValue({ versionId: 'v1' })
     const notebook = store()
     await notebook.load()
-    notebook.setSource(notebook.cells.value[0].id, 'print(2)')
-    await notebook.autosave()
+    const cell = notebook.cells.value[0]
+    notebook.setSource(cell.id, 'print(2)')
+    await vi.advanceTimersByTimeAsync(1_999)
+    notebook.setSource(cell.id, 'print(3)')
+    await vi.advanceTimersByTimeAsync(1_999)
     expect(s3.putTextObject).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(s3.putTextObject).toHaveBeenCalledOnce()
+    expect(s3.putTextObject.mock.calls[0][2]).toContain('print(3)')
+    expect(notebook.dirty.value).toBe(false)
+  })
 
-    notebook.lastSavedMs.value = Date.now() - 300_001
+  it('saves an edit made during a save right after it', async () => {
+    s3.getObjectText.mockRejectedValue({ name: 'NoSuchKey' })
+    let release = () => {}
+    s3.putTextObject.mockImplementationOnce(() => new Promise((resolve) => { release = () => resolve({ versionId: 'v1' }) }))
+    s3.putTextObject.mockResolvedValue({ versionId: 'v2' })
+    const notebook = store()
+    await notebook.load()
+    const cell = notebook.cells.value[0]
+    notebook.setSource(cell.id, 'print(2)')
+    const saved = notebook.save()
+    notebook.setSource(cell.id, 'print(3)')
+    release()
+    await saved
+    expect(notebook.dirty.value).toBe(true)
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(s3.putTextObject).toHaveBeenCalledTimes(2)
+    expect(notebook.dirty.value).toBe(false)
+  })
+
+  it('retries a failed save once the notebook is quiet', async () => {
+    s3.getObjectText.mockRejectedValue({ name: 'NoSuchKey' })
+    s3.putTextObject.mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ versionId: 'v1' })
+    const notebook = store()
+    await notebook.load()
+    notebook.setSource(notebook.cells.value[0].id, 'print(2)')
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(notebook.saveError.value).toBe('offline')
+    expect(notebook.dirty.value).toBe(true)
     await notebook.autosave()
+    expect(s3.putTextObject).toHaveBeenCalledTimes(2)
+    expect(notebook.saveError.value).toBeNull()
+    expect(notebook.dirty.value).toBe(false)
+  })
+
+  it('flushes waiting edits on demand', async () => {
+    s3.getObjectText.mockRejectedValue({ name: 'NoSuchKey' })
+    s3.putTextObject.mockResolvedValue({ versionId: 'v1' })
+    const notebook = store()
+    await notebook.load()
+    expect(await notebook.flushSave()).toBe(true)
+    expect(s3.putTextObject).not.toHaveBeenCalled()
+    notebook.setSource(notebook.cells.value[0].id, 'print(2)')
+    expect(await notebook.flushSave()).toBe(true)
+    expect(s3.putTextObject).toHaveBeenCalledOnce()
+    await vi.advanceTimersByTimeAsync(2_000)
     expect(s3.putTextObject).toHaveBeenCalledOnce()
   })
 
@@ -322,7 +397,8 @@ describe('createNotebook', () => {
     let upload = () => {}
     let release = () => {}
     const entered = new Promise<void>((resolve) => { upload = resolve })
-    s3.putTextObject.mockImplementation(async () => { upload(); await new Promise<void>((resolve) => { release = resolve }); return { versionId: 'frozen-version' } })
+    // Only the snapshot upload is held; a save on the way out goes through.
+    s3.putTextObject.mockImplementationOnce(async () => { upload(); await new Promise<void>((resolve) => { release = resolve }); return { versionId: 'frozen-version' } })
     const result = notebook.capture()
     const outcome = result.then((id) => id, (error: Error) => error.message)
     await entered

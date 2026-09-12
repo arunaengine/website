@@ -573,8 +573,9 @@ export async function headObject(
   key: string,
   nodeId?: string | null,
   versionId?: string,
+  reference?: S3SessionReference,
 ): Promise<ObjectHead> {
-  const response = await client(nodeId).send(
+  const response = await client(nodeId, reference).send(
     new HeadObjectCommand({ Bucket: bucket, Key: key, VersionId: versionId }),
   )
   return {

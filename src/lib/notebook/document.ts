@@ -1,12 +1,12 @@
 // Where a notebook and its files live in the workspace bucket, and the working
-// copy the browser keeps between saves. Every PUT is a kept version, so the
-// portal saves on demand and at most every five minutes.
+// copy the browser keeps between saves. Every PUT is a kept version; the
+// portal saves on demand and two seconds after the last change.
 import { dependencyFileName } from './runtimes'
 
 export const NOTEBOOK_PREFIX = 'notebooks/'
 export const NOTEBOOK_SUFFIX = '.ipynb'
 export const NOTEBOOK_DATA_PREFIX = 'data/'
-export const AUTOSAVE_INTERVAL_MS = 300_000
+export const AUTOSAVE_DELAY_MS = 2_000
 
 /** Folder part of a key, trailing slash included; empty at the bucket root. */
 export function keyFolder(key: string): string {
@@ -130,8 +130,8 @@ export function clearResumePoint(scope: string, jobId: string): void {
   }
 }
 
-/** True when a changed notebook is due for its automatic save. */
-export function autosaveDue(changedAtMs: number | null, lastSavedMs: number, nowMs: number): boolean {
+/** True when a changed notebook has been quiet long enough to save. */
+export function autosaveDue(changedAtMs: number | null, nowMs: number): boolean {
   if (!changedAtMs) return false
-  return nowMs - Math.max(lastSavedMs, 0) >= AUTOSAVE_INTERVAL_MS
+  return nowMs - changedAtMs >= AUTOSAVE_DELAY_MS
 }

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  AUTOSAVE_INTERVAL_MS,
+  AUTOSAVE_DELAY_MS,
   autosaveDue,
   clearResumePoint,
   clearWorkingCopy,
@@ -120,13 +120,13 @@ describe('resume point', () => {
 })
 
 describe('autosaveDue', () => {
-  it('waits the full interval after the last save', () => {
-    expect(autosaveDue(10, 0, AUTOSAVE_INTERVAL_MS - 1)).toBe(false)
-    expect(autosaveDue(10, 0, AUTOSAVE_INTERVAL_MS)).toBe(true)
+  it('waits until the notebook was quiet for the delay', () => {
+    expect(autosaveDue(10, 10 + AUTOSAVE_DELAY_MS - 1)).toBe(false)
+    expect(autosaveDue(10, 10 + AUTOSAVE_DELAY_MS)).toBe(true)
   })
 
   it('stays quiet while nothing changed', () => {
-    expect(autosaveDue(null, 0, AUTOSAVE_INTERVAL_MS * 10)).toBe(false)
+    expect(autosaveDue(null, AUTOSAVE_DELAY_MS * 10)).toBe(false)
   })
 })
 

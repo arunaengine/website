@@ -25,6 +25,9 @@ async function capture() {
   error.value = ''
   captured.value = ''
   try {
+    // The stored notebook should match the snapshot that is captured.
+    await notebook.flushSave()
+    if (generation !== notebook.generation.value) return
     const id = await notebook.capture()
     if (generation === notebook.generation.value) captured.value = id
   } catch (cause) {
