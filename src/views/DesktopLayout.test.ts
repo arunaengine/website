@@ -69,7 +69,12 @@ const DesktopLayoutClient = compileClientComponent(new URL('./DesktopLayout.vue'
   '@/lib/chunk-recovery': { asyncChunkError: vi.fn() },
   '@/components/ui/Notice.vue': moduleDefault(Notice),
   '@/composables/useAruna': { useAruna: () => permissions },
-  '@/composables/assistantState': { assistantAvailable: ref(false), assistantOpen: ref(false) },
+  '@/composables/assistantState': {
+    assistantAvailable: ref(false),
+    assistantOpen: ref(false),
+    assistantPageOpen: ref(false),
+    assistantUnread: ref(0),
+  },
   '@/composables/useTour': { bindTourRouter: () => {}, tourActive: ref(false) },
   '@/lib/tutorial/session': { bindTutorialRouter: () => {}, tutorialActive: ref(false) },
   '@/composables/useDeviceStatus': {
@@ -99,7 +104,12 @@ beforeAll(async () => {
     useRouter: () => ({ resolve: vi.fn(() => ({ fullPath: '/app', matched: [] })) }),
   }))
   vi.doMock('@/composables/useAruna', () => ({ useAruna: () => permissions }))
-  vi.doMock('@/composables/assistantState', () => ({ assistantAvailable: ref(false), assistantOpen: ref(false) }))
+  vi.doMock('@/composables/assistantState', () => ({
+    assistantAvailable: ref(false),
+    assistantOpen: ref(false),
+    assistantPageOpen: ref(false),
+    assistantUnread: ref(0),
+  }))
   vi.doMock('@/composables/useTour', () => ({ bindTourRouter: () => {}, tourActive: ref(false) }))
   vi.doMock('@/lib/tutorial/session', () => ({ bindTutorialRouter: () => {}, tutorialActive: ref(false) }))
   vi.doMock('@/composables/useDeviceStatus', () => ({

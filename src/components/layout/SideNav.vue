@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AppLogo from '@/components/layout/AppLogo.vue'
+import AssistantLauncher from '@/components/assistant/AssistantLauncher.vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { computed, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
@@ -92,6 +93,7 @@ const collapsed = computed(() => narrow.value || manualCollapsed.value)
     </nav>
 
     <div class="border-t border-border/60 px-2.5 py-3 text-xs">
+      <AssistantLauncher :collapsed="collapsed" />
       <button
         v-if="!narrow"
         type="button"
