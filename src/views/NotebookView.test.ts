@@ -87,14 +87,21 @@ describe('notebook workspace controls', () => {
   it('folds the files column away and offers the way back in the toolbar', async () => {
     const { root, app } = await render()
     const band = element(root, (node) => String(node.props.class).includes('top-14 z-10'))
-    const grid = band.parent!.parent!
+    const grid = band.parent!
+    const columns = () => grid.children.filter((node) => node.kind === 'element')
     expect(String(grid.props.class)).toContain('18rem')
+    const [toolbar, files, cells] = columns()
+    expect(toolbar).toBe(band)
+    expect(String(toolbar.props.class)).toContain('xl:col-start-2 xl:row-start-1')
+    expect(typeof files.props.onHide).toBe('function')
+    expect(String(files.props.class)).toContain('xl:col-start-1 xl:row-start-1 xl:row-span-2')
+    expect(String(cells.props.class)).toContain('xl:col-start-2 xl:row-start-2')
     expect(content(band)).not.toContain('Files')
     expect(() => element(band, (node) => node.props.label === 'Show files')).toThrow()
-    const files = element(root, (node) => typeof node.props.onHide === 'function')
     ;(files.props.onHide as () => void)()
     await flush()
     expect(String(grid.props.class)).toContain('grid-cols-[minmax(0,1fr)]')
+    expect(columns()).toHaveLength(2)
     expect(() => element(root, (node) => typeof node.props.onHide === 'function')).toThrow()
     const show = element(band, (node) => node.props.label === 'Show files')
     await click(show)
