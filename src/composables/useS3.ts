@@ -5,6 +5,7 @@ import { getCurrentInstance, inject, type InjectionKey } from 'vue'
 import { allowPublicReadCors, createBucket, deleteBucket, headBucket, listBuckets } from './s3/buckets'
 import { connectedEndpoint, endpointForNode, resolveObjectUrl } from './s3/endpoints'
 import {
+  copyObject,
   copyObjectVersion,
   createFolder,
   deleteObject,
@@ -131,6 +132,7 @@ function nodeS3() {
     uploadObject,
     deleteObject,
     deleteObjectVersion,
+    copyObject,
     copyObjectVersion,
     deletePrefix,
     deleteBucket,

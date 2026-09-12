@@ -472,6 +472,24 @@ export async function copyObjectVersion(
   return { versionId: response.VersionId ?? null }
 }
 
+// Server-side copy of the current version of one object onto another key,
+// in the same or another bucket on this node.
+export async function copyObject(
+  source: { bucket: string; key: string },
+  bucket: string,
+  key: string,
+  nodeId?: string | null,
+): Promise<void> {
+  await client(nodeId).send(
+    new CopyObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      CopySource: `${encodeURIComponent(source.bucket)}/${encodeURI(source.key)}`,
+      MetadataDirective: 'COPY',
+    }),
+  )
+}
+
 // Applies version-less deletes to every current key under `prefix`, including
 // the zero-byte "folder/" marker that listObjectsRecursive deliberately skips,
 // in DeleteObjects batches of up to 1000 keys. In a versioned bucket this
