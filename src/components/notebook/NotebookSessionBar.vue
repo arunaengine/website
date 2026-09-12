@@ -30,7 +30,7 @@ import { DEFAULT_KERNEL_CPU, DEFAULT_KERNEL_RAM, sessionProblems, sessionStartDr
 import { toneVariant, type StateTone } from '@/lib/stateBadge'
 import { DEFAULT_SESSION_IDLE_AFTER_MS } from '@/lib/computeAdmin'
 import { useComputeAdmin } from '@/composables/useComputeAdmin'
-import { ChevronDown, ChevronRight, CircleStop, Link2, Play, RefreshCw, RotateCcw } from '@lucide/vue'
+import { ChevronDown, CircleStop, Play, RefreshCw, RotateCcw } from '@lucide/vue'
 
 const { notebook, session } = injectNotebook()
 const { apiBaseUrl, authToken } = useAruna()
@@ -210,10 +210,12 @@ const stateVariant = computed(() =>
 const kernelLabel = computed(() => {
   if (notebook.loading.value) return 'Loading'
   if (session.live.value) return session.kernel.value === 'busy' ? 'Running a cell' : 'Running'
+  if (unattachedSession.value) return `${sessionRows.value.length} running`
   return session.running.value || session.starting.value ? stateLabel.value : 'Stopped'
 })
 const kernelTone = computed<StateTone>(() => {
   if (session.live.value) return session.kernel.value === 'busy' ? 'progress' : 'done'
+  if (unattachedSession.value) return 'attention'
   return session.running.value || session.starting.value ? 'progress' : 'idle'
 })
 
@@ -321,9 +323,16 @@ defineExpose({ runNotebook })
       <Button size="sm" :disabled="startBlocked" @click="runNotebook">
         <Play class="size-3.5" /> {{ pendingRun || session.starting.value ? 'Starting…' : session.kernel.value === 'busy' ? 'Running…' : 'Run notebook' }}
       </Button>
-      <Button size="sm" variant="outline" aria-label="Kernel" @click="kernelOpen = true">
+      <Button
+        size="sm"
+        variant="outline"
+        aria-label="Kernel"
+        :class="unattachedSession && !session.live.value ? 'border-amber-500/50' : ''"
+        :title="unattachedSession ? hintTitle(unattachedSession) : undefined"
+        @click="kernelOpen = true"
+      >
         Kernel
-        <span class="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <span class="flex items-center gap-1.5 text-xs" :class="unattachedSession && !session.live.value ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'">
           <StatusDot :tone="kernelTone" :label="`Kernel ${kernelLabel}`" />
           {{ kernelLabel }}
         </span>
@@ -331,20 +340,6 @@ defineExpose({ runNotebook })
       </Button>
     </div>
 
-    <button
-      v-if="unattachedSession"
-      type="button"
-      class="inline-flex h-8 items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 text-[11px] text-amber-700 hover:bg-amber-500/20 disabled:opacity-60 dark:text-amber-300"
-      :title="hintTitle(unattachedSession)"
-      :aria-label="matches(unattachedSession) ? 'Attach to the running kernel' : 'Open the kernel dialog'"
-      :disabled="matches(unattachedSession) && session.attaching.value"
-      @click="matches(unattachedSession) ? attachSession(unattachedSession) : (kernelOpen = true)"
-    >
-      <span class="size-2 rounded-full bg-amber-500" aria-hidden="true" />
-      Kernel running
-      <Link2 v-if="matches(unattachedSession)" class="size-3" aria-hidden="true" />
-      <ChevronRight v-else class="size-3" aria-hidden="true" />
-    </button>
 
     <Dialog v-model:open="kernelOpen">
       <DialogContent class="max-h-[85vh] max-w-lg overflow-y-auto">

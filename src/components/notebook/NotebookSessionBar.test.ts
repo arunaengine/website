@@ -379,8 +379,9 @@ describe('the session bar', () => {
     sessionApi.getSessionState.mockResolvedValue(runningSession())
     const root = await render()
     await flush()
-    expect(content(root)).toContain('Kernel running')
-    await click(element(root, (node) => node.props['aria-label'] === 'Attach to the running kernel'))
+    expect(content(root)).toContain('1 running')
+    await openOptions(root)
+    await click(button(root, 'Attach'))
     expect(context.session.attachTo).toHaveBeenCalledWith('01JOB', 'node-a')
   })
 
@@ -389,7 +390,7 @@ describe('the session bar', () => {
     sessionApi.getSessionState.mockResolvedValue(runningSession())
     const root = await render({ running: true, state: { state: 'ready' } })
     await flush()
-    expect(content(root)).not.toContain('Kernel running')
+    expect(content(root)).not.toContain('1 running')
   })
 
   it('names a running kernel in another bucket without offering attach', async () => {
@@ -397,10 +398,10 @@ describe('the session bar', () => {
     sessionApi.getSessionState.mockResolvedValue(runningSession({ workspace_bucket: 'other-bucket' }))
     const root = await render()
     await flush()
-    expect(content(root)).toContain('Kernel running')
-    expect(buttonCount(root, 'Attach')).toBe(0)
-    await click(element(root, (node) => node.props['aria-label'] === 'Open the kernel dialog'))
     expect(content(root)).toContain('1 running')
+    expect(content(root)).not.toContain('Attach')
+    await openOptions(root)
+    expect(content(root)).toContain('other bucket or runtime')
   })
 
   it('asks for a choice before starting while a kernel runs', async () => {
