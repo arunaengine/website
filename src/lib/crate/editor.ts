@@ -275,6 +275,17 @@ export function propertyTerm(vocab: VocabIndex | null, key: string): VocabTerm |
   return vocab.property(key) ?? vocab.propertyNamed(key)
 }
 
+/**
+ * What a row calls its property: the profile's own label, else the
+ * vocabulary's, else the key. A rule label that only repeats the key is the
+ * parser's fallback, not a configured name, so the vocabulary still speaks.
+ */
+export function propertyLabel(vocab: VocabIndex | null, key: string, rule?: ProfilePropertyRule | null): string {
+  const own = rule?.label?.trim() ?? ''
+  if (own && own !== key) return own
+  return propertyTerm(vocab, key)?.label?.trim() || key
+}
+
 /** The value kinds a property accepts, from its range; text when unknown. */
 export function valueKindsFor(vocab: VocabIndex | null, key: string): DraftValueKind[] {
   const term = propertyTerm(vocab, key)

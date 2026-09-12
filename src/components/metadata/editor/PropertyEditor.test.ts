@@ -33,6 +33,23 @@ describe('PropertyEditor', () => {
     mounted.app.unmount()
   })
 
+  it('sorts by the label the profile gives a property', async () => {
+    const draft = Editor.addValue(
+      Editor.addValue(Editor.newDraft(), './', 'measurementTechnique', { kind: 'text', value: '' }),
+      './', 'about', { kind: 'text', value: '' },
+    )
+    const rule = {
+      id: 'technique', label: 'Aardvark count', description: '', kind: 'text' as const,
+      propertyUri: 'http://schema.org/measurementTechnique', valueName: 'measurementTechnique', obligation: 'MUST' as const,
+    }
+    const mounted = await mountApp(PropertyEditor, {
+      props: { draft, entity: draft.entities[0], vocab, shape: { label: 'Dataset', required: [rule], recommended: [], optional: [] } },
+    })
+
+    expect(content(mounted.root).trim()).toBe('name measurementTechnique about datePublished description license')
+    mounted.app.unmount()
+  })
+
   it('leaves out the properties the card renders itself', async () => {
     const draft = addFilePart(Editor.newDraft(), { id: 's3://bucket/one.csv', name: 'one.csv' })
     const mounted = await mountApp(PropertyEditor, {

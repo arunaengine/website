@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import PropertyRow from './PropertyRow.vue'
 import {
-  propertyTerm,
+  propertyLabel,
   shapeRule,
   type CrateDraft,
   type DraftEntity,
@@ -31,7 +31,7 @@ const emit = defineEmits<{
 const properties = computed(() => {
   const skip = new Set(props.skip ?? [])
   const keys = Object.keys(props.entity.properties).filter((key) => !skip.has(key))
-  const label = (key: string) => propertyTerm(props.vocab, key)?.label ?? key
+  const label = (key: string) => propertyLabel(props.vocab, key, shapeRule(props.shape, key))
   return keys.sort((a, b) => {
     if (a === 'name') return -1
     if (b === 'name') return 1
