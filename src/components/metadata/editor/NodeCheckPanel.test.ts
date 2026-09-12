@@ -172,7 +172,7 @@ describe('NodeCheckPanel', () => {
   it('explains a run that could not happen', async () => {
     const mounted = await mount({ previewUnavailable: true })
 
-    expect(content(mounted.root)).toContain('Could not validate: This node does not offer draft validation; the save is still validated.')
+    expect(content(mounted.root)).toContain('Could not validate: This node does not offer draft validation.')
     mounted.app.unmount()
   })
 

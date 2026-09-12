@@ -74,7 +74,7 @@ const outcome = computed<'waiting' | 'checking' | 'rejected' | 'failed' | 'accep
 })
 
 const failureReason = computed(() => props.previewUnavailable
-  ? 'This node does not offer draft validation; the save is still validated.'
+  ? 'This node does not offer draft validation.'
   : (props.previewError ?? ''))
 // A node that does not know the picked profile checked the crate's structure
 // only; saying "valid against" it would claim a check that never ran.
