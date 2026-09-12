@@ -17,7 +17,8 @@ import LinkEntityDialog from './LinkEntityDialog.vue'
 import AddEntityDialog from './AddEntityDialog.vue'
 import AddFilesDialog from './AddFilesDialog.vue'
 import IssueMark from './IssueMark.vue'
-import { ROW_ACTIONS, ROW_GRID, ROW_LABEL } from './grid'
+import RuleBadge from './RuleBadge.vue'
+import { ROW_ACTIONS, ROW_GRID, ROW_LABEL, ROW_VALUE, ruleEmphasis } from './grid'
 import {
   addValue,
   allowedKinds,
@@ -26,6 +27,7 @@ import {
   displayName,
   isExternalReference,
   promoteValue,
+  propertyLabel,
   propertyTerm,
   removeValue,
   setProperty,
@@ -68,16 +70,15 @@ const filesOpen = ref(false)
 // An unlink waiting for an answer about the data entity it would strand.
 const stranding = ref<{ index: number; dropRow: boolean; entity: DraftEntity } | null>(null)
 
-// How the profile builder presents a rule: what it asks for, and why.
-const OBLIGATIONS: Readonly<Record<string, string>> = { MUST: 'Required', SHOULD: 'Recommended' }
-const obligation = computed(() => (props.rule ? OBLIGATIONS[props.rule.obligation] ?? '' : ''))
 const hint = computed(() => props.rule?.description ?? '')
 const enumOptions = computed(() => (props.rule?.enumOptions ?? []).map((value) => ({ value, label: value })))
 
 const picker = computed(() => pickerFor(props.property))
 const target = computed(() => ({ entityId: props.entity.id, property: props.property }))
 const term = computed(() => propertyTerm(props.vocab, props.property))
-const label = computed(() => term.value?.label ?? props.property)
+const label = computed(() => propertyLabel(props.vocab, props.property, props.rule))
+// The whole name for a truncated one, with the key when the name differs.
+const fullName = computed(() => (label.value === props.property ? label.value : `${label.value} (${props.property})`))
 const kinds = computed(() => allowedKinds(props.vocab, props.property))
 const range = computed(() => term.value?.targets ?? [])
 const presets = computed(() => VALUE_PRESETS[props.property])
@@ -85,6 +86,21 @@ const stored = computed(() => props.entity.properties[props.property] ?? [])
 // The blank row an always-shown field offers before anything is typed.
 const blank = computed<DraftValue>(() => defaultValue(kinds.value.find((kind) => kind !== 'reference') ?? 'text'))
 const values = computed(() => (stored.value.length || !props.always ? stored.value : [blank.value]))
+
+// The badge sits inside the first field while it is empty; a select keeps
+// its arrow clear of it.
+function badged(value: DraftValue, index: number): boolean {
+  return index === 0 && !value.value.trim()
+}
+
+function selectLike(value: DraftValue): boolean {
+  if (props.rule?.kind === 'enum' || value.kind === 'boolean') return true
+  return Boolean(presets.value) && (value.kind === 'text' || value.kind === 'url' || value.kind === 'reference')
+}
+
+function emphasis(value: DraftValue, index: number): string {
+  return ruleEmphasis(props.rule, badged(value, index))
+}
 
 function set(index: number, value: string) {
   if (!stored.value.length) {
@@ -183,11 +199,7 @@ function created(next: CrateDraft, entityId: string) {
 <template>
   <div :class="ROW_GRID">
     <div :class="ROW_LABEL">
-      <span class="truncate" :title="property">{{ label }}</span>
-      <span
-        v-if="obligation"
-        class="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary"
-      >{{ obligation }}</span>
+      <span class="truncate" :title="fullName">{{ label }}</span>
       <Tooltip v-if="term?.description" :label="term.description">
         <button
           type="button"
@@ -199,15 +211,16 @@ function created(next: CrateDraft, entityId: string) {
       </Tooltip>
     </div>
 
-    <div class="min-w-0 space-y-2">
+    <div class="space-y-2" :class="ROW_VALUE">
       <p v-if="hint" class="text-[11px] text-muted-foreground">{{ hint }}</p>
       <div v-for="(value, index) in values" :key="index" class="flex items-start gap-1">
-        <div class="relative min-w-0 flex-1">
+        <div class="relative min-w-0 flex-1 @container">
           <ValueInput
             v-if="value.kind === 'reference' && !value.value.trim() && presets"
             :model-value="value"
             :label="label"
             :presets="presets"
+            :class="emphasis(value, index)"
             @update:model-value="(next) => set(index, next.value)"
           />
           <ReferenceValue
@@ -226,6 +239,7 @@ function created(next: CrateDraft, entityId: string) {
             :options="enumOptions"
             :aria-label="label"
             :placeholder="value.value || `Choose ${label.toLowerCase()}`"
+            :class="emphasis(value, index)"
             @update:model-value="(next) => set(index, next)"
           />
           <ValueInput
@@ -233,10 +247,11 @@ function created(next: CrateDraft, entityId: string) {
             :model-value="value"
             :label="label"
             :presets="presets"
+            :class="emphasis(value, index)"
             @update:model-value="(next) => set(index, next.value)"
           />
+          <RuleBadge v-if="badged(value, index)" :rule="rule" :inset="selectLike(value)" />
         </div>
-
         <Button
           v-if="promotable(value)"
           variant="ghost"

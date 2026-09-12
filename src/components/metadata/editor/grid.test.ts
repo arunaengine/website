@@ -24,12 +24,17 @@ const InputStub = defineComponent({
   setup: (props, { attrs }) => () => h('input', { ...attrs, value: props.modelValue }),
 })
 
+const RuleBadge = compileClientComponent(new URL('./RuleBadge.vue', import.meta.url), {
+  vue: VueRuntime,
+  '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
+})
 const shared = {
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   './IssueMark.vue': moduleDefault(EmptyStub),
+  './RuleBadge.vue': moduleDefault(RuleBadge),
   './grid': Grid,
   '@/lib/crate/editor': Editor,
 }

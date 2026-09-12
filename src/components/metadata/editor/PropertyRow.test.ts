@@ -10,6 +10,7 @@ import {
   moduleDefault,
   mountApp,
   nodes,
+  typeValue,
   type HostNode,
 } from '@/test/clientRender'
 import * as Editor from '@/lib/crate/editor'
@@ -85,6 +86,10 @@ const ReferenceValue = compileClientComponent(new URL('./ReferenceValue.vue', im
   '@/lib/utils': Utils,
 })
 
+const RuleBadge = compileClientComponent(new URL('./RuleBadge.vue', import.meta.url), {
+  vue: VueRuntime,
+  '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
+})
 const PropertyRow = compileClientComponent(new URL('./PropertyRow.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
@@ -107,6 +112,7 @@ const PropertyRow = compileClientComponent(new URL('./PropertyRow.vue', import.m
   '@/lib/crate/references': References,
   '@/lib/crate/pickers': Pickers,
   './IssueMark.vue': moduleDefault(IssueMarkStub),
+  './RuleBadge.vue': moduleDefault(RuleBadge),
   './grid': Grid,
   '@/lib/crate/editor': Editor,
 })
@@ -217,6 +223,128 @@ describe('PropertyRow', () => {
     })
 
     expect(content(mounted.root)).toContain('Required')
+    mounted.app.unmount()
+  })
+
+  it('puts the required badge inside the first empty field, away from the name', async () => {
+    const draft = Editor.addValue(
+      Editor.addValue(seeded(), './', 'citation', { kind: 'text', value: '' }),
+      './', 'citation', { kind: 'text', value: '' },
+    )
+    const mounted = await mount('citation', [], draft, {
+      rule: {
+        id: 'citation', label: 'Citation', description: '', kind: 'text',
+        propertyUri: 'http://schema.org/citation', valueName: 'citation', obligation: 'MUST',
+      },
+    })
+    const name = element(mounted.root, (node) => node.tag === 'span' && String(node.props.class).includes('truncate'))
+    const badge = element(mounted.root, (node) => node.tag === 'span' && node.props.title === 'Required')
+    const info = element(mounted.root, (node) => node.props['aria-label'] === 'About Citation')
+    const inputs = nodes(mounted.root).filter((node) => node.tag === 'input')
+
+    // The label column holds only the name and its icon; the badge sits in the first field.
+    expect(name.parent?.props.class).toBe(Grid.ROW_LABEL)
+    expect(nodes(name.parent!)).toContain(info)
+    expect(nodes(name.parent!)).not.toContain(badge)
+    expect(inputs).toHaveLength(2)
+    expect(String(badge.parent?.props.class)).toContain('@container')
+    expect(nodes(badge.parent!)).toContain(inputs[0])
+    expect(nodes(badge.parent!)).not.toContain(inputs[1])
+    expect(nodes(mounted.root).filter((node) => node.props.title === 'Required')).toHaveLength(1)
+    expect(String(inputs[0].props.class)).toContain('border-primary/40')
+    expect(String(inputs[0].props.class)).toContain('pr-8 @xs:pr-24')
+    expect(String(inputs[1].props.class)).toBe('border-primary/40')
+    mounted.app.unmount()
+  })
+
+  it('takes the badge out of a field that holds a value and keeps the tint', async () => {
+    const draft = Editor.addValue(seeded(), './', 'citation', { kind: 'text', value: 'doi:10.1000/one' })
+    const mounted = await mount('citation', [], draft, {
+      rule: {
+        id: 'citation', label: 'Citation', description: '', kind: 'text',
+        propertyUri: 'http://schema.org/citation', valueName: 'citation', obligation: 'MUST',
+      },
+    })
+
+    expect(nodes(mounted.root).some((node) => node.props.title === 'Required')).toBe(false)
+    expect(String(element(mounted.root, (node) => node.tag === 'input').props.class)).toBe('border-primary/40')
+    mounted.app.unmount()
+  })
+
+  it('keeps the badge clear of a one-of select', async () => {
+    const draft = Editor.addValue(seeded(), './', 'measurementTechnique', { kind: 'text', value: '' })
+    const mounted = await mount('measurementTechnique', [], draft, {
+      rule: {
+        id: 'technique', label: 'Technique', description: '', kind: 'enum',
+        propertyUri: 'http://schema.org/measurementTechnique', valueName: 'measurementTechnique',
+        obligation: 'SHOULD', enumOptions: ['LC-MS'],
+      },
+    })
+    const badge = element(mounted.root, (node) => node.props.title === 'Recommended')
+
+    expect(String(badge.props.class)).toContain('right-9')
+    expect(String(element(mounted.root, (node) => node.tag === 'select').props.class)).toBe('pr-8 @xs:pr-24')
+    mounted.app.unmount()
+  })
+
+  it('adds no badge or tint to an optional row', async () => {
+    const draft = Editor.addValue(seeded(), './', 'citation', { kind: 'text', value: '' })
+    const mounted = await mount('citation', [], draft, {
+      rule: {
+        id: 'citation', label: 'Citation', description: '', kind: 'text',
+        propertyUri: 'http://schema.org/citation', valueName: 'citation', obligation: 'MAY',
+      },
+    })
+    expect(nodes(mounted.root).some((node) => node.props.title === 'Required')).toBe(false)
+    expect(content(mounted.root)).not.toContain('Required')
+    expect(element(mounted.root, (node) => node.tag === 'input').props.class ?? '').toBe('')
+    mounted.app.unmount()
+  })
+
+  it('names the row by the profile label, then the vocabulary, then the key', async () => {
+    const technique = {
+      id: 'technique', label: 'Technique', description: '', kind: 'text' as const,
+      propertyUri: 'http://schema.org/measurementTechnique', valueName: 'measurementTechnique', obligation: 'MUST' as const,
+    }
+    const draft = Editor.addValue(
+      Editor.addValue(seeded(), './', 'measurementTechnique', { kind: 'text', value: '' }),
+      './', 'citation', { kind: 'text', value: '' },
+    )
+    const nameOf = (root: HostNode) =>
+      content(element(root, (node) => node.tag === 'span' && String(node.props.class).includes('truncate')))
+    const inputLabel = (root: HostNode) => element(root, (node) => node.tag === 'input').props['aria-label']
+
+    const configured = await mount('measurementTechnique', [], draft, { rule: technique })
+    expect(nameOf(configured.root)).toBe('Technique')
+    expect(inputLabel(configured.root)).toBe('Technique')
+    expect(element(configured.root, (node) => node.tag === 'span' && String(node.props.class).includes('truncate')).props.title)
+      .toBe('Technique (measurementTechnique)')
+
+    const bare = await mount('measurementTechnique', [], draft)
+    expect(nameOf(bare.root)).toBe('measurementTechnique')
+    expect(inputLabel(bare.root)).toBe('measurementTechnique')
+
+    const blank = await mount('citation', [], draft, { rule: { ...technique, label: '   ', valueName: 'citation' } })
+    expect(nameOf(blank.root)).toBe('Citation')
+
+    const repeated = await mount('citation', [], draft, { rule: { ...technique, label: 'citation', valueName: 'citation' } })
+    expect(nameOf(repeated.root)).toBe('Citation')
+    expect(inputLabel(repeated.root)).toBe('Citation')
+    for (const mounted of [configured, bare, blank, repeated]) mounted.app.unmount()
+  })
+
+  it('keeps a long key on the truncating name line and saves under the key', async () => {
+    const key = 'x'.repeat(1000)
+    const updates: Editor.CrateDraft[] = []
+    const draft = Editor.addValue(seeded(), './', key, { kind: 'text', value: '' })
+    const mounted = await mount(key, updates, draft)
+    const name = element(mounted.root, (node) => node.tag === 'span' && String(node.props.class).includes('truncate'))
+    expect(content(name)).toBe(key)
+    expect(element(mounted.root, (node) => node.tag === 'input').props['aria-label']).toBe(key)
+
+    await typeValue(element(mounted.root, (node) => node.tag === 'input'), 'value')
+
+    expect(updates[0].entities[0].properties[key]).toEqual([{ kind: 'text', value: 'value' }])
     mounted.app.unmount()
   })
 

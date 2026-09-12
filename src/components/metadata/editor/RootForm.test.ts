@@ -9,6 +9,7 @@ import {
   flush,
   moduleDefault,
   mountApp,
+  nodes,
   typeValue,
   type HostNode,
 } from '@/test/clientRender'
@@ -81,6 +82,10 @@ const ReferenceValue = compileClientComponent(new URL('./ReferenceValue.vue', im
   '@/lib/utils': Utils,
 })
 
+const RuleBadge = compileClientComponent(new URL('./RuleBadge.vue', import.meta.url), {
+  vue: VueRuntime,
+  '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
+})
 const PropertyRow = compileClientComponent(new URL('./PropertyRow.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
@@ -103,6 +108,7 @@ const PropertyRow = compileClientComponent(new URL('./PropertyRow.vue', import.m
   '@/lib/crate/references': References,
   '@/lib/crate/pickers': Pickers,
   './IssueMark.vue': moduleDefault(EmptyStub),
+  './RuleBadge.vue': moduleDefault(RuleBadge),
   './grid': Grid,
   '@/lib/crate/editor': Editor,
 })
@@ -122,6 +128,7 @@ const RootForm = compileClientComponent(new URL('./RootForm.vue', import.meta.ur
   './PropertyEditor.vue': moduleDefault(PropertyEditor),
   './PropertyRow.vue': moduleDefault(PropertyRow),
   './IssueMark.vue': moduleDefault(EmptyStub),
+  './RuleBadge.vue': moduleDefault(RuleBadge),
   './grid': Grid,
   '@/lib/crate/editor': Editor,
   '@/lib/profiles/uri': Uri,
@@ -310,5 +317,36 @@ describe('RootForm', () => {
 
     expect(content(mounted.root)).toContain("profiles of this dataset's group")
     mounted.app.unmount()
+  })
+
+  it('shows a profile rule on a fixed field as on any row', async () => {
+    const rule = {
+      id: 'name', label: 'Name', description: 'The title of the study.', kind: 'text' as const,
+      propertyUri: 'http://schema.org/name', valueName: 'name', obligation: 'MUST' as const,
+    }
+    const shape = { label: 'Dataset', required: [rule], recommended: [], optional: [] }
+    const empty = await mountApp(RootForm, {
+      props: { draft: Editor.newDraft(), vocab: null, issues: [], profiles: [], profileId: '', shape },
+    })
+    const name = nodes(empty.root).find((node) => node.props['aria-label'] === 'Dataset name')
+    const description = nodes(empty.root).find((node) => node.props['aria-label'] === 'Dataset description')
+
+    expect(nodes(empty.root).filter((node) => node.props.title === 'Required')).toHaveLength(1)
+    expect(String(name?.props.class)).toContain('border-primary/40')
+    expect(String(name?.props.class)).toContain('pr-8 @xs:pr-24')
+    expect(String(description?.props.class ?? '')).not.toContain('border-primary')
+    empty.app.unmount()
+
+    const named = await mountApp(RootForm, {
+      props: {
+        draft: Editor.updateValue(Editor.newDraft(), './', 'name', 0, 'Example dataset'),
+        vocab: null, issues: [], profiles: [], profileId: '', shape,
+      },
+    })
+    const filled = nodes(named.root).find((node) => node.props['aria-label'] === 'Dataset name')
+
+    expect(nodes(named.root).some((node) => node.props.title === 'Required')).toBe(false)
+    expect(String(filled?.props.class)).toBe('border-primary/40')
+    named.app.unmount()
   })
 })

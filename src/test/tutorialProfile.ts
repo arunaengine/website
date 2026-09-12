@@ -280,6 +280,7 @@ const RootForm = compileClientComponent(url('components/metadata/editor/RootForm
   './PropertyEditor.vue': moduleDefault(PropertyEditorStub),
   './PropertyRow.vue': moduleDefault(PropertyRowStub),
   './IssueMark.vue': moduleDefault(GenericStub),
+  './RuleBadge.vue': moduleDefault(GenericStub),
   './grid': EditorGrid,
 })
 const EntityEditor = compileClientComponent(url('components/metadata/editor/EntityEditor.vue'), {
