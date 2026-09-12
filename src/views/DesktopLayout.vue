@@ -28,6 +28,8 @@ const TransfersPanel = defineAsyncComponent({
   onError: asyncChunkError,
 })
 
+import AssistantLauncher from '@/components/assistant/AssistantLauncher.vue'
+
 const AssistantPanel = defineAsyncComponent({
   loader: () => import('@/components/assistant/AssistantPanel.vue'),
   onError: asyncChunkError,
@@ -137,6 +139,7 @@ watch(
     </div>
     <TransfersPanel v-if="uploadQueueItems.length" />
     <AssistantPanel v-if="assistantOpen" />
+    <AssistantLauncher />
     <TourOverlay v-if="tourActive" />
     <TutorialOverlay v-if="tutorialActive" />
   </div>

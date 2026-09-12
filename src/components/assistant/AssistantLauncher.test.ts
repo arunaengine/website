@@ -1,8 +1,7 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { button, click, compileClientComponent, content, element, flush, mountApp } from '@/test/clientRender'
-import * as Nav from '@/components/layout/nav'
+import { click, compileClientComponent, element, flush, mountApp } from '@/test/clientRender'
 
 const openPanel = vi.fn()
 const closePanel = vi.fn()
@@ -10,15 +9,16 @@ const assistantAvailable = ref(false)
 const assistantOpen = ref(false)
 const assistantPageOpen = ref(false)
 const assistantUnread = ref(0)
+const uploadQueueItems = ref<unknown[]>([])
 
 const icons = new Proxy({}, { get: () => defineComponent(() => () => h('i')) })
 
 const AssistantLauncher = compileClientComponent(new URL('./AssistantLauncher.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': icons,
-  '@/components/layout/nav': Nav,
   '@/composables/assistantState': { assistantAvailable, assistantOpen, assistantPageOpen, assistantUnread },
   '@/composables/useAssistantChat': { useAssistantChat: () => ({ openPanel, closePanel }) },
+  '@/composables/uploadQueueState': { uploadQueueItems },
 })
 
 beforeEach(() => {
@@ -28,63 +28,66 @@ beforeEach(() => {
   assistantOpen.value = false
   assistantPageOpen.value = false
   assistantUnread.value = 0
+  uploadQueueItems.value = []
 })
+
+function launcher(root: Parameters<typeof element>[0]) {
+  return element(root, (node) => node.tag === 'button' && node.props.title === 'Assistant')
+}
 
 describe('AssistantLauncher', () => {
   it('stays hidden without a ready provider', async () => {
-    const mounted = await mountApp(AssistantLauncher, { props: { collapsed: false } })
-
-    expect(() => button(mounted.root, 'Assistant')).toThrow()
+    const mounted = await mountApp(AssistantLauncher)
+    await flush()
+    expect(() => launcher(mounted.root)).toThrow()
     mounted.app.unmount()
   })
 
-  it('steps aside while the assistant page shows the chat', async () => {
+  it('steps aside while the panel or the assistant page shows the chat', async () => {
     assistantAvailable.value = true
     assistantPageOpen.value = true
-    const mounted = await mountApp(AssistantLauncher, { props: { collapsed: false } })
-
-    expect(() => button(mounted.root, 'Assistant')).toThrow()
-    mounted.app.unmount()
-  })
-
-  it('opens the panel when closed and closes it when open', async () => {
-    assistantAvailable.value = true
-    const mounted = await mountApp(AssistantLauncher, { props: { collapsed: false } })
-
-    const control = button(mounted.root, 'Assistant')
-    expect(control.props['aria-pressed']).toBe(false)
-    await click(control)
+    const mounted = await mountApp(AssistantLauncher)
     await flush()
-    expect(openPanel).toHaveBeenCalledOnce()
-    expect(closePanel).not.toHaveBeenCalled()
-
+    expect(() => launcher(mounted.root)).toThrow()
+    assistantPageOpen.value = false
     assistantOpen.value = true
     await flush()
-    expect(button(mounted.root, 'Assistant').props['aria-pressed']).toBe(true)
-    await click(button(mounted.root, 'Assistant'))
+    expect(() => launcher(mounted.root)).toThrow()
+    mounted.app.unmount()
+  })
+
+  it('floats bottom right and opens the panel', async () => {
+    assistantAvailable.value = true
+    const mounted = await mountApp(AssistantLauncher)
     await flush()
-    expect(closePanel).toHaveBeenCalledOnce()
+    const control = launcher(mounted.root)
+    expect(String(control.props.class)).toContain('fixed')
+    expect(String(control.props.class)).toContain('rounded-full')
+    expect(String(control.props.class)).toContain('md:right-6')
+    expect(String(control.props.class)).not.toContain('left-')
+    expect('data-assistant-layer' in control.props).toBe(true)
+    await click(control)
     expect(openPanel).toHaveBeenCalledOnce()
     mounted.app.unmount()
   })
 
-  it('keeps only the icon, title and name when the sidebar is collapsed', async () => {
+  it('steps left of the transfers panel while uploads run', async () => {
     assistantAvailable.value = true
-    const mounted = await mountApp(AssistantLauncher, { props: { collapsed: true } })
-
-    const control = element(mounted.root, (node) => node.tag === 'button')
-    expect(content(control)).not.toContain('Assistant')
-    expect(control.props.title).toBe('Assistant')
-    expect(control.props['aria-label']).toBe('Assistant')
+    uploadQueueItems.value = [{ id: 1 }]
+    const mounted = await mountApp(AssistantLauncher)
+    await flush()
+    const control = launcher(mounted.root)
+    expect(String(control.props.class)).toContain('right-[22.5rem]')
+    expect(String(control.props.class)).toContain('max-md:hidden')
     mounted.app.unmount()
   })
 
   it('marks waiting background updates', async () => {
     assistantAvailable.value = true
     assistantUnread.value = 2
-    const mounted = await mountApp(AssistantLauncher, { props: { collapsed: false } })
-
-    expect(button(mounted.root, 'Assistant').props['aria-label']).toBe('Assistant, 2 background updates')
+    const mounted = await mountApp(AssistantLauncher)
+    await flush()
+    expect(launcher(mounted.root).props['aria-label']).toBe('Assistant, 2 background updates')
     expect(() => element(mounted.root, (node) => 'data-unread' in node.props)).not.toThrow()
     mounted.app.unmount()
   })

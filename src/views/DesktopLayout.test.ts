@@ -63,6 +63,7 @@ const DesktopLayoutClient = compileClientComponent(new URL('./DesktopLayout.vue'
   '@/components/layout/RealmUnreachable.vue': moduleDefault(RealmUnreachableStub),
   '@/components/layout/NodeDown.vue': moduleDefault(NodeDownStub),
   '@/components/data/TransfersPanel.vue': moduleDefault(EmptyStub),
+  '@/components/assistant/AssistantLauncher.vue': moduleDefault(EmptyStub),
   '@/components/assistant/AssistantPanel.vue': moduleDefault(EmptyStub),
   '@/components/docs/TourOverlay.vue': moduleDefault(EmptyStub),
   '@/composables/uploadQueueState': { uploadQueueItems: ref([]) },

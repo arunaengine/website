@@ -118,7 +118,7 @@ watch(
          floating transfers panel lives at the layout, bottom-right. -->
     <TransfersPanel v-if="uploadQueueItems.length" />
     <AssistantPanel v-if="assistantOpen" />
-    <AssistantLauncher floating />
+    <AssistantLauncher />
     <TourOverlay v-if="tourActive" />
     <TutorialOverlay v-if="tutorialActive" />
   </div>
