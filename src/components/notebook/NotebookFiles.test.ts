@@ -2,7 +2,7 @@ import { defineComponent, h, ref } from 'vue'
 import * as VueRuntime from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/lib/api'
-import { button, click, compileClientComponent, content, element, flush, moduleDefault, mountApp, typeValue, type HostNode } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, element, flush, moduleDefault, mountApp, nodes, typeValue, type HostNode } from '@/test/clientRender'
 
 const listScratch = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/notebook/session', async (importOriginal) => ({
@@ -27,7 +27,11 @@ const TREE: Record<string, Entry[]> = {
     { name: 'other', kind: 'dir', bytes: 0, modified_ms: 0 },
     { name: '.cache', kind: 'file', bytes: 1, modified_ms: 0 },
   ],
-  'data/sub': [{ name: 'a.csv', kind: 'file', bytes: 5, modified_ms: 0 }],
+  'data/sub': [
+    { name: 'a.csv', kind: 'file', bytes: 5, modified_ms: 0 },
+    { name: 'deep', kind: 'dir', bytes: 0, modified_ms: 0 },
+  ],
+  'data/sub/deep': [{ name: 'z.csv', kind: 'file', bytes: 3, modified_ms: 0 }],
   'data/other': [],
   tmp: [],
 }
@@ -134,15 +138,30 @@ async function pressEnter(field: HostNode) {
   await flush()
 }
 
-async function pressKey(node: HostNode, key: string) {
-  await (node.props.onKeydown as (event: unknown) => void)({ key, target: node, currentTarget: node, preventDefault: vi.fn() })
+async function pressKey(node: HostNode, key: string, keys: Record<string, boolean> = {}) {
+  await (node.props.onKeydown as (event: unknown) => void)({ key, target: node, currentTarget: node, preventDefault: vi.fn(), ...keys })
   await flush()
 }
 
 type Handler = (event: unknown) => Promise<void> | void
+/** A click that holds Shift, Ctrl or Cmd. */
+async function clickWith(node: HostNode, keys: Record<string, boolean>) {
+  await (node.props.onClick as Handler)({ target: node, ...keys })
+  await flush()
+}
+
+async function rightClick(node: HostNode) {
+  await (node.props.onContextmenu as Handler)({ clientX: 1, clientY: 1, preventDefault: vi.fn() })
+  await flush()
+}
+
+function selectedPaths(root: HostNode): string[] {
+  return nodes(root).filter((node) => node.props.role === 'treeitem' && node.props['aria-selected'] === true).map((node) => String(node.props['data-path']))
+}
+
 /** A drag event carrying either an internal row or operating system files. */
 function dragEvent(files: File[] = []) {
-  const dataTransfer = { types: files.length ? ['Files'] : [], files, effectAllowed: '', dropEffect: '', setData: vi.fn() }
+  const dataTransfer = { types: files.length ? ['Files'] : [], files, effectAllowed: '', dropEffect: '', setData: vi.fn(), setDragImage: vi.fn() }
   return { dataTransfer, preventDefault: vi.fn() }
 }
 
@@ -456,5 +475,124 @@ describe('kernel file tree', () => {
     await click(element(idle.root, (node) => node.tag === 'button' && content(node).includes('Start kernel')))
     expect(idle.onStart).toHaveBeenCalledOnce()
     idle.app.unmount()
+  })
+})
+
+describe('kernel file selection', () => {
+  const destructive = (root: HostNode) => element(root, (node) => node.tag === 'button' && node.props.variant === 'destructive')
+
+  it('selects a range with shift click and shift arrows', async () => {
+    const { root, app } = await render()
+    expect(element(root, (node) => node.props.role === 'tree').props['aria-multiselectable']).toBe('true')
+    await expand(root, 'data')
+    await click(row(root, 'data'))
+    await clickWith(row(root, 'data/sub'), { shiftKey: true })
+    expect(selectedPaths(root)).toEqual(['data', 'data/other', 'data/sub'])
+    await pressKey(row(root, 'data/sub'), 'ArrowDown', { shiftKey: true })
+    expect(selectedPaths(root)).toEqual(['data', 'data/other', 'data/sub', 'tmp'])
+    expect(row(root, 'tmp').props.tabindex).toBe(0)
+    await pressKey(row(root, 'tmp'), 'ArrowUp', { shiftKey: true })
+    expect(selectedPaths(root)).toEqual(['data', 'data/other', 'data/sub'])
+    await clickWith(row(root, 'big.bin'), { shiftKey: true })
+    expect(selectedPaths(root)).toEqual(['data', 'data/other', 'data/sub', 'tmp', 'big.bin'])
+    await pressKey(row(root, 'big.bin'), 'Escape')
+    expect(selectedPaths(root)).toEqual(['big.bin'])
+    app.unmount()
+  })
+
+  it('toggles with ctrl click and keeps or replaces the selection on right click', async () => {
+    const { root, app } = await render()
+    await click(row(root, 'data'))
+    await clickWith(row(root, 'tmp'), { ctrlKey: true })
+    expect(selectedPaths(root)).toEqual(['data', 'tmp'])
+    await clickWith(row(root, 'data'), { metaKey: true })
+    expect(selectedPaths(root)).toEqual(['tmp'])
+    await clickWith(row(root, 'data'), { ctrlKey: true })
+    await rightClick(row(root, 'tmp'))
+    expect(selectedPaths(root)).toEqual(['data', 'tmp'])
+    await rightClick(row(root, 'big.bin'))
+    expect(selectedPaths(root)).toEqual(['big.bin'])
+    app.unmount()
+  })
+
+  it('deletes every selected data/ entry after one confirm and blocks rename', async () => {
+    const { root, app, s3 } = await render()
+    await expand(root, 'data')
+    await expand(root, 'sub')
+    await click(row(root, 'data/other'))
+    await clickWith(row(root, 'data/sub/a.csv'), { ctrlKey: true })
+    s3.listObjectsRecursive.mockResolvedValue({ objects: [{ key: 'data/other/' }], truncated: false })
+    const rename = await rowItem(root, 'a.csv', 'Rename')
+    expect(rename.props.disabled).toBe(true)
+    expect(rename.props.title).toBe('Select one item to rename')
+    await click(await rowItem(root, 'a.csv', 'Delete 2 items'))
+    expect(content(root)).toContain('Delete 2 items?')
+    expect(content(root)).toContain('data/other, data/sub/a.csv')
+    await click(destructive(root))
+    expect(s3.deletePrefix).toHaveBeenCalledWith('workspace', 'data/other/')
+    expect(s3.deleteObject).toHaveBeenCalledWith('workspace', 'data/sub/a.csv')
+    expect(selectedPaths(root)).toEqual([])
+    app.unmount()
+  })
+
+  it('refuses to delete a mixed selection but still copies it', async () => {
+    const { root, app, s3, readScratch } = await render()
+    readScratch.mockResolvedValue(new Blob(['hello'], { type: 'text/plain' }))
+    await expand(root, 'data')
+    await expand(root, 'sub')
+    await click(row(root, 'data/sub/a.csv'))
+    await clickWith(row(root, 'out.txt'), { ctrlKey: true })
+    const remove = await rowItem(root, 'a.csv', 'Delete 2 items')
+    expect(remove.props.disabled).toBe(true)
+    expect(remove.props.title).toBe('Only data/ is stored in the bucket')
+    await pressKey(row(root, 'data/sub/a.csv'), 'Delete')
+    expect(content(root)).not.toContain('Delete 2 items?')
+    await click(await rowItem(root, 'a.csv', 'Copy 2 items to bucket'))
+    await click(button(root, 'Copy 2 of 2 items to dest'))
+    expect(s3.copyObject).toHaveBeenCalledWith({ bucket: 'workspace', key: 'data/sub/a.csv' }, 'dest', 'out/a.csv')
+    expect(s3.uploadObject).toHaveBeenCalledWith('dest', 'out/out.txt', expect.objectContaining({ name: 'out.txt' }))
+    expect(content(root)).toContain('Copied 2 items to dest/out/.')
+    app.unmount()
+  })
+
+  it('opens the inline confirm with the Delete key', async () => {
+    const { root, app, s3 } = await render()
+    await expand(root, 'data')
+    await expand(root, 'sub')
+    await click(row(root, 'data/sub/a.csv'))
+    await pressKey(row(root, 'data/sub/a.csv'), 'Delete')
+    expect(content(root)).toContain('Delete a.csv?')
+    await click(destructive(root))
+    expect(s3.deleteObject).toHaveBeenCalledWith('workspace', 'data/sub/a.csv')
+    await click(row(root, 'out.txt'))
+    await pressKey(row(root, 'out.txt'), 'Delete')
+    expect(content(root)).not.toContain('Delete out.txt?')
+    app.unmount()
+  })
+
+  it('moves every selected data/ row by drag and counts them on the chip', async () => {
+    const { root, app, s3 } = await render()
+    const chip = { textContent: '', className: '', style: {}, remove: vi.fn() }
+    vi.stubGlobal('document', { body: { appendChild: vi.fn() }, createElement: () => chip })
+    await expand(root, 'data')
+    await expand(root, 'sub')
+    await expand(root, 'deep')
+    await click(row(root, 'data/sub/a.csv'))
+    await clickWith(row(root, 'data/sub/deep/z.csv'), { ctrlKey: true })
+    const event = dragEvent()
+    await (row(root, 'data/sub/a.csv').props.onDragstart as Handler)(event)
+    expect(chip.textContent).toBe('2 items')
+    expect(event.dataTransfer.setData).toHaveBeenCalledWith('text/plain', 'data/sub/deep/z.csv\ndata/sub/a.csv')
+    await (row(root, 'data/sub').props.onDragover as Handler)(event)
+    expect(event.preventDefault).not.toHaveBeenCalled()
+    await (row(root, 'data/other').props.onDrop as Handler)(event)
+    await flush()
+    expect(s3.copyObject.mock.calls.map((call) => [call[0].key, call[2]])).toEqual([
+      ['data/sub/deep/z.csv', 'data/other/z.csv'],
+      ['data/sub/a.csv', 'data/other/a.csv'],
+    ])
+    expect(s3.deleteObject.mock.calls.map((call) => call[1])).toEqual(['data/sub/deep/z.csv', 'data/sub/a.csv'])
+    expect(content(root)).toContain('Moved 2 items to data/other/.')
+    app.unmount()
   })
 })
