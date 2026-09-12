@@ -1,9 +1,9 @@
 <script setup lang="ts">
-// A tiny confirm shown centered over a creation dialog when the user tries to
-// close it with unsaved draft content. Rendered as an absolutely positioned
-// overlay inside a positioned DialogContent, so it stays within the dialog's
-// focus trap and centers over the dialog in both themes via design tokens.
-import { nextTick, ref, watch, type ComponentPublicInstance } from 'vue'
+// A tiny confirm shown centered in the viewport when the user tries to leave
+// unsaved draft content. It is teleported to the body: a dialog is transformed
+// and would pin a fixed overlay to itself instead of to the viewport.
+import { FocusScope, useBodyScrollLock } from 'radix-vue'
+import { ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 
 const props = defineProps<{ open: boolean }>()
@@ -12,51 +12,61 @@ const emit = defineEmits<{
   (e: 'discard'): void
 }>()
 
-// The outer dialog owns the focus trap, so this overlay moves focus in and
-// restores it itself.
-const keepButton = ref<ComponentPublicInstance | null>(null)
-let focusBefore: HTMLElement | null = null
+// The page and the dialog behind the confirm must both hold still. The body
+// lock is the one radix uses for the dialog itself; the dialog scroll area is
+// found from where this component sits.
+const anchor = ref<HTMLElement | null>(null)
+const bodyLocked = useBodyScrollLock()
+let scrollArea: HTMLElement | null = null
 
 watch(
   () => props.open,
-  async (open) => {
+  (open) => {
+    bodyLocked.value = open
     if (open) {
-      focusBefore = (globalThis.document?.activeElement as HTMLElement | null) ?? null
-      await nextTick()
-      ;(keepButton.value?.$el as HTMLElement | undefined)?.focus?.()
+      scrollArea = anchor.value?.closest<HTMLElement>('[role="dialog"]') ?? null
+      scrollArea?.style.setProperty('overflow', 'hidden')
     } else {
-      focusBefore?.focus?.()
-      focusBefore = null
+      scrollArea?.style.removeProperty('overflow')
+      scrollArea = null
     }
   },
 )
 </script>
 
 <template>
-  <Transition
-    enter-active-class="transition-opacity duration-150"
-    enter-from-class="opacity-0"
-    leave-active-class="transition-opacity duration-100"
-    leave-to-class="opacity-0"
-  >
-    <div
-      v-if="open"
-      class="absolute inset-0 z-30 flex items-center justify-center rounded-xl bg-background/70 p-4 backdrop-blur-sm"
-      @click.self="emit('keep')"
+  <span ref="anchor" hidden />
+  <Teleport to="body">
+    <!-- data-portal-list: a dialog underneath must not read a click in here as
+         a click outside itself. -->
+    <Transition
+      enter-active-class="transition-opacity duration-150"
+      enter-from-class="opacity-0"
+      leave-active-class="transition-opacity duration-100"
+      leave-to-class="opacity-0"
     >
       <div
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="discard-draft-title"
-        class="w-full max-w-xs rounded-lg border border-border bg-popover p-4 text-center shadow-xl"
+        v-if="open"
+        data-portal-list
+        class="pointer-events-auto fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm"
+        @click.self="emit('keep')"
       >
-        <h2 id="discard-draft-title" class="text-sm font-semibold text-foreground">Discard this draft?</h2>
-        <p class="mt-1 text-xs text-muted-foreground">Your changes will be lost and cannot be recovered.</p>
-        <div class="mt-4 flex justify-center gap-2">
-          <Button ref="keepButton" variant="outline" size="sm" @click="emit('keep')">Keep editing</Button>
-          <Button variant="destructive" size="sm" @click="emit('discard')">Discard</Button>
-        </div>
+        <FocusScope as-child trapped loop>
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="discard-draft-title"
+            class="w-full max-w-xs rounded-lg border border-border bg-popover p-4 text-center shadow-xl"
+          >
+            <h2 id="discard-draft-title" class="text-sm font-semibold text-foreground">Discard this draft?</h2>
+            <p class="mt-1 text-xs text-muted-foreground">Your changes will be lost and cannot be recovered.</p>
+            <div class="mt-4 flex justify-center gap-2">
+              <Button variant="outline" size="sm" @click="emit('keep')">Keep editing</Button>
+              <Button variant="destructive" size="sm" @click="emit('discard')">Discard</Button>
+            </div>
+          </div>
+        </FocusScope>
       </div>
-    </div>
-  </Transition>
+    </Transition>
+  </Teleport>
 </template>

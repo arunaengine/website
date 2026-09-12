@@ -130,6 +130,9 @@ function insert(child: HostNode, parent: HostNode, anchor: HostNode | null = nul
   else parent.children.push(child)
 }
 
+/** Where a Teleport to the body lands; the host tree has no document. */
+export const teleportBody = hostNode('element', 'body')
+
 export const renderer = createRenderer<HostNode, HostNode>({
   patchProp(node, key, _previous, value) {
     node.props[key] = value
@@ -161,6 +164,9 @@ export const renderer = createRenderer<HostNode, HostNode>({
   },
   parentNode(node) {
     return node.parent
+  },
+  querySelector(selector) {
+    return selector === 'body' ? teleportBody : null
   },
   nextSibling(node) {
     if (!node.parent) return null
