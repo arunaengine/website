@@ -27,6 +27,8 @@ const props = defineProps<{
   blocked?: string | null
   previewResult?: ProfileValidationPreviewResponse | null
   previewRunning?: boolean
+  /** The node could not answer yet and the check is being retried. */
+  previewWaiting?: boolean
   previewError?: string | null
   previewUnavailable?: boolean
   writeIssues?: WriteIssue[]
@@ -60,7 +62,8 @@ const issueGroups = computed(() => {
 })
 const advisoryGroups = computed(() => issueGroups.value.filter((group) => group.advisory.length))
 
-const outcome = computed<'checking' | 'rejected' | 'failed' | 'accepted' | 'none'>(() => {
+const outcome = computed<'waiting' | 'checking' | 'rejected' | 'failed' | 'accepted' | 'none'>(() => {
+  if (props.previewWaiting) return 'waiting'
   if (props.previewRunning) return 'checking'
   if (props.previewResult?.accepted === false || props.writeIssues?.length || violations.value.length) {
     return 'rejected'
@@ -105,7 +108,7 @@ function groupName(entityId: string): string {
         <h2 class="font-display text-sm font-semibold text-aruna-navy">Validation</h2>
         <p class="text-xs text-muted-foreground">The node validates the dataset exactly as it would on save, without saving anything. Saving validates first.</p>
       </div>
-      <Button variant="outline" size="sm" :disabled="previewRunning" @click="emit('preview')">
+      <Button variant="outline" size="sm" :disabled="previewRunning && !previewWaiting" @click="emit('preview')">
         <Spinner v-if="previewRunning" class="text-current" aria-hidden="true" />
         <RefreshCw v-else class="h-3.5 w-3.5" />
         {{ outcome === 'none' ? 'Validate' : 'Validate again' }}
@@ -120,7 +123,11 @@ function groupName(entityId: string): string {
       <Button variant="link" size="sm" class="h-auto p-0" @click="emit('retry-profile')">Try again</Button>
     </Notice>
 
-    <p v-if="outcome === 'checking'" class="flex items-center gap-2 text-xs text-muted-foreground">
+    <p v-if="outcome === 'waiting'" class="flex items-center gap-2 text-xs text-muted-foreground">
+      <Spinner class="text-primary" aria-hidden="true" /> Waiting for the node to validate…
+    </p>
+
+    <p v-else-if="outcome === 'checking'" class="flex items-center gap-2 text-xs text-muted-foreground">
       <Spinner class="text-primary" aria-hidden="true" /> Validating…
     </p>
 
@@ -151,7 +158,10 @@ function groupName(entityId: string): string {
       </section>
     </div>
 
-    <Notice v-else-if="outcome === 'failed'" tone="warning">Could not validate: {{ failureReason }}</Notice>
+    <Notice v-else-if="outcome === 'failed'" tone="warning">
+      Could not validate: {{ failureReason }}
+      <Button v-if="!previewUnavailable" variant="link" size="sm" class="h-auto p-0" @click="emit('preview')">Validate again</Button>
+    </Notice>
 
     <div v-else-if="outcome === 'rejected'" class="space-y-3">
       <p class="flex items-center gap-2 text-xs font-medium text-destructive">

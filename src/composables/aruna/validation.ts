@@ -1,5 +1,11 @@
-import { apiRequest, type ProfileValidationCapabilitiesResponse, type ProfileValidationStatusResponse } from '@/lib/api'
+import {
+  ApiError,
+  apiRequest,
+  type ProfileValidationCapabilitiesResponse,
+  type ProfileValidationStatusResponse,
+} from '@/lib/api'
 import { errorMessage } from '@/lib/utils'
+import { CRATE_POLL_DELAYS_MS } from './crates'
 import {
   assertCurrentSession,
   capabilitiesLoad,
@@ -143,6 +149,31 @@ export async function loadProfileValidationCapabilities(
   return load
 }
 
+// Right after a profile or dataset write the node answers 503 until the new
+// revision is readable; poll on the crate schedule (at least Retry-After)
+// before the status is reported unavailable. A newer generation stops it.
+async function fetchStatus(
+  documentId: string,
+  generation: number,
+  client: ReturnType<typeof refreshContext>['client'],
+): Promise<ProfileValidationStatusResponse> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await apiRequest<ProfileValidationStatusResponse>(
+        `/metadata/${encodeURIComponent(documentId)}/profile/validation`,
+        {},
+        client,
+      )
+    } catch (err) {
+      const busy = err instanceof ApiError && err.status === 503
+        && (profileValidationStatusGenerations.get(documentId) ?? 0) === generation
+      if (!busy || attempt >= CRATE_POLL_DELAYS_MS.length) throw err
+      const wait = Math.max(err.retryAfter ?? 0, CRATE_POLL_DELAYS_MS[attempt]!)
+      await new Promise((resolve) => setTimeout(resolve, wait))
+    }
+  }
+}
+
 export async function loadProfileValidationStatus(
   documentId: string,
   force = false,
@@ -161,11 +192,7 @@ export async function loadProfileValidationStatus(
     })
   }
   const context = refreshContext()
-  const load = apiRequest<ProfileValidationStatusResponse>(
-    `/metadata/${encodeURIComponent(documentId)}/profile/validation`,
-    {},
-    context.client,
-  ).then((response) => {
+  const load = fetchStatus(documentId, generation, context.client).then((response) => {
     assertCurrentSession(context.epoch)
     if ((profileValidationStatusGenerations.get(documentId) ?? 0) !== generation) {
       return profileValidationStatuses.value[documentId]

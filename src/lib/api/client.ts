@@ -143,6 +143,9 @@ export async function apiRequest<T>(
       message = rateLimitMessage(response)
       code = code ?? 'rate_limited'
       retryAfter = retryAfterMs(response) ?? undefined
+    } else if (response.status === 503) {
+      // A 503 also names when the node expects to be ready, so callers may wait.
+      retryAfter = retryAfterMs(response) ?? undefined
     }
     throw new ApiError(response.status, message, code, details, retryAfter)
   }

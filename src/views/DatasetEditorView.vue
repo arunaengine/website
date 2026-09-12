@@ -264,6 +264,7 @@ const preview = useProfilePreview({
   client: () => ({ baseUrl: apiBaseUrl.value, token: authToken.value ?? undefined }),
   groupId: () => draft.value.groupId,
   isPublic: () => draft.value.visibility === 'public',
+  profiled: () => Boolean(profileId.value),
   ...(desktop
     ? {
         request: (rocrate: unknown, signal: AbortSignal) =>
@@ -278,14 +279,19 @@ const nodeIssues = computed(() => collectIssues(preview.result.value, writeIssue
 const blockers = computed(() => issues.value.filter((issue) => issue.severity === 'error'))
 const violations = computed(() => nodeIssues.value.filter((issue) => issue.severity === 'violation'))
 
+// A profiled draft is only saved once the node could check it.
+const checkFailed = computed(() => Boolean(profileId.value)
+  && (Boolean(preview.error.value) || preview.unavailable.value))
+
 // Nothing invalid is offered to the node: what the editor found, what the node
 // last refused and a check still in flight all hold the save back.
 const canSave = computed(() => Boolean(draft.value.groupId && draft.value.path)
-  && !blockers.value.length && !violations.value.length && !preview.running.value)
+  && !blockers.value.length && !violations.value.length && !preview.running.value && !checkFailed.value)
 const saveBlocked = computed(() => {
   if (canSave.value) return null
   if (!draft.value.groupId || !draft.value.path) return 'Choose a group and a location for this dataset.'
   if (preview.running.value) return 'Waiting for the validation to finish.'
+  if (checkFailed.value) return 'The node cannot validate the profile right now. Retry before saving.'
   if (violations.value.length) return 'The node would reject this dataset.'
   const count = blockers.value.length
   return `Fix ${count === 1 ? '1 problem' : `${count} problems`} before saving.`
@@ -750,6 +756,7 @@ async function save(anyway = false) {
                 :blocked="saveBlocked"
                 :preview-result="preview.result.value"
                 :preview-running="preview.running.value"
+                :preview-waiting="preview.waiting.value"
                 :preview-error="preview.error.value"
                 :preview-unavailable="preview.unavailable.value"
                 :write-issues="writeIssues"
