@@ -8,6 +8,7 @@ import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
 import DropdownMenuItem from '@/components/ui/DropdownMenuItem.vue'
 import DropdownMenuTrigger from '@/components/ui/DropdownMenuTrigger.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import IconButton from '@/components/ui/IconButton.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
@@ -30,9 +31,11 @@ import {
   FileText,
   Folder,
   FolderPlus,
+  PanelLeft,
   Pencil,
   Play,
   Plus,
+  RefreshCw,
   Trash2,
 } from '@lucide/vue'
 
