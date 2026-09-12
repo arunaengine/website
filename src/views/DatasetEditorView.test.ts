@@ -11,6 +11,7 @@ import {
   moduleDefault,
   mountApp,
   typeValue,
+  type HostNode,
 } from '@/test/clientRender'
 import * as Editor from '@/lib/crate/editor'
 import * as ProfileSeed from '@/lib/crate/profileSeed'
@@ -204,6 +205,7 @@ const EditorStub = defineComponent({
       }),
       h('p', `Profiles ${(props.profiles as Array<{ label: string }>).map((profile) => profile.label).join(', ')}`),
       h('p', `Declared ${props.profileId || 'none'}`),
+      h('p', `Rows ${Object.keys(Editor.rootEntity(props.draft as Editor.CrateDraft)?.properties ?? {}).sort().join(' ')}.`),
       ...(props.profiles as Array<{ value: string; label: string }>).map((profile) =>
         h('button', { onClick: () => emit('profile', profile.value) }, `Choose ${profile.label}`)),
       h('button', { onClick: () => emit('profile', '') }, 'Choose no profile'),
@@ -1028,6 +1030,83 @@ describe('DatasetEditorView', () => {
 
     expect(drawerSays(mounted.root)).not.toContain('requires')
     expect(content(mounted.root)).toContain('Checking no profile')
+    mounted.app.unmount()
+  })
+
+  it('restores the untouched form after visiting profiles and leaving', async () => {
+    profiles.value = [
+      profileFixture('pollinator', 'Pollinator', ['measurementTechnique', 'funding'], ['temporalCoverage']),
+      profileFixture('workshop', 'Workshop', ['studyDesign'], ['temporalCoverage']),
+    ]
+    const mounted = await mountApp(DatasetEditorView)
+    await click(button(mounted.root, 'Seed dataset'))
+    const rowsOf = () => /Rows (.*?)\./.exec(content(mounted.root))?.[1]
+    const baseline = { rows: rowsOf(), drawer: drawerSays(mounted.root) }
+
+    await click(button(mounted.root, 'Choose Pollinator'))
+    expect(rowsOf()).toContain('measurementTechnique')
+    await click(button(mounted.root, 'Choose Workshop'))
+    expect(rowsOf()).not.toContain('measurementTechnique')
+    expect(rowsOf()).toContain('studyDesign')
+    expect(rowsOf()).toContain('temporalCoverage')
+    await click(button(mounted.root, 'Choose Pollinator'))
+    expect(rowsOf()).not.toContain('studyDesign')
+    await click(button(mounted.root, 'Choose no profile'))
+
+    expect(rowsOf()).toBe(baseline.rows)
+    expect(drawerSays(mounted.root)).toBe(baseline.drawer)
+    expect(drawerSays(mounted.root)).not.toContain('has no value yet')
+
+    await click(button(mounted.root, 'Create dataset'))
+    await flush()
+    const graph = createMetadata.mock.calls[0][0].rocrate['@graph'] as Array<Record<string, unknown>>
+    const root = graph.find((entity) => entity['@id'] === './')
+    for (const key of ['measurementTechnique', 'funding', 'temporalCoverage', 'studyDesign', 'conformsTo']) {
+      expect(root).not.toHaveProperty(key)
+    }
+    mounted.app.unmount()
+  })
+
+  it('reaches the same form whether a profile is picked directly or after another', async () => {
+    profiles.value = [
+      profileFixture('pollinator', 'Pollinator', ['measurementTechnique'], ['temporalCoverage']),
+      profileFixture('workshop', 'Workshop', ['studyDesign'], ['temporalCoverage']),
+    ]
+    const direct = await mountApp(DatasetEditorView)
+    await click(button(direct.root, 'Seed dataset'))
+    await click(button(direct.root, 'Choose Workshop'))
+    const after = await mountApp(DatasetEditorView)
+    await click(button(after.root, 'Seed dataset'))
+    await click(button(after.root, 'Choose Pollinator'))
+    await click(button(after.root, 'Choose Workshop'))
+    const rowsOf = (root: HostNode) => /Rows (.*?)\./.exec(content(root))?.[1]
+
+    expect(rowsOf(after.root)).toBe(rowsOf(direct.root))
+    expect(drawerSays(after.root)).toBe(drawerSays(direct.root))
+    expect(drawerSays(after.root)).toContain('Workshop requires studyDesign')
+    expect(drawerSays(after.root)).not.toContain('Pollinator')
+    direct.app.unmount()
+    after.app.unmount()
+  })
+
+  it('ignores profile rules that arrive after no profile was chosen', async () => {
+    const rules = deferred<unknown>()
+    loadProfileCrate.mockReturnValue(rules.promise as Promise<Record<string, never>>)
+    profiles.value = [profileFixture('genomics', 'Genomics')]
+    const mounted = await mountApp(DatasetEditorView)
+    await click(button(mounted.root, 'Seed dataset'))
+    const rowsOf = () => /Rows (.*?)\./.exec(content(mounted.root))?.[1]
+    const baseline = rowsOf()
+    await click(button(mounted.root, 'Choose Genomics'))
+    await click(button(mounted.root, 'Choose no profile'))
+
+    rules.resolve({})
+    profiles.value = [profileFixture('genomics', 'Genomics', ['identifier'])]
+    await flush()
+
+    expect(rowsOf()).toBe(baseline)
+    expect(content(mounted.root)).toContain('Declared none')
+    expect(drawerSays(mounted.root)).not.toContain('requires')
     mounted.app.unmount()
   })
 

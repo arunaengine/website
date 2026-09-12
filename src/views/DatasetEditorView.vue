@@ -35,7 +35,7 @@ import { isAssignableProfile } from '@/lib/profiles/assignable'
 import { loadVocabIndex, type VocabIndex } from '@/lib/profiles/vocabulary'
 import { collectIssues, rejectionIssues, type WriteIssue } from '@/lib/crate/issues'
 import { joinPath, splitPath } from '@/lib/crate/paths'
-import { applyProfile, clearProfile, profileExpectation, seedNewEntities } from '@/lib/crate/profileSeed'
+import { applyProfile, clearProfile, profileExpectation, seedNewEntities, unseedProfile } from '@/lib/crate/profileSeed'
 import {
   alignValueKinds,
   entityName,
@@ -371,12 +371,15 @@ function pickProfile(id: string) {
   preview.reset()
   saveIssues.value = []
   submitError.value = null
-  const previousIri = profileReferenceIri(selectedProfile.value)
+  const previous = selectedProfile.value
+  const previousIri = profileReferenceIri(previous)
   profileId.value = id
   const profile = selectedProfile.value
+  // The rows the left profile seeded and nobody filled leave with it.
+  const kept = previous && previous.id !== id ? unseedProfile(draft.value, previous) : draft.value
   draft.value = profile
-    ? applyProfile(draft.value, profile, profileReferenceIri(profile), previousIri)
-    : clearProfile(draft.value, previousIri)
+    ? applyProfile(kept, profile, profileReferenceIri(profile), previousIri)
+    : clearProfile(kept, previousIri)
   pendingSeed.value = profile && !hasRules(expectation.value) ? profile.id : ''
 }
 

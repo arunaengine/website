@@ -14,10 +14,12 @@ import {
   findEntity,
   isDataType,
   partIds,
+  removeEntity,
   rootId,
   setProperty,
   typeLabel,
   type CrateDraft,
+  type DraftEntity,
   type DraftValue,
   type DraftValueKind,
   type ProfileExpectation,
@@ -90,8 +92,8 @@ export function profileExpectation(profile: MetadataProfile): ProfileExpectation
 /**
  * Removes one profile's IRI from the root `conformsTo`, leaving every other
  * declaration (the RO-Crate specification, an external profile) in place and
- * dropping the property when nothing is left. Rows the profile seeded stay:
- * they are empty rows the author can remove, exactly as when switching profiles.
+ * dropping the property when nothing is left. Rows the profile seeded are
+ * `unseedProfile`'s concern, run before this when the profile is left.
  */
 export function clearProfile(draft: CrateDraft, previousIri?: string): CrateDraft {
   if (!previousIri) return draft
@@ -135,6 +137,79 @@ function seedValue(rule: ProfilePropertyRule): DraftValue {
   const empty = defaultValue(draftKind(rule.kind))
   const preset = rule.defaultValue?.trim()
   return preset && empty.kind !== 'reference' ? { ...empty, value: preset } : empty
+}
+
+/** Every reference in the draft pointing at `id`, wherever it sits. */
+function referenceCount(draft: CrateDraft, id: string): number {
+  return draft.entities.flatMap((entity) => Object.values(entity.properties).flat())
+    .filter((value) => value.kind === 'reference' && value.value === id).length
+}
+
+/**
+ * Whether a value still is what the seed put there: an empty row, the rule's
+ * own default, or a link to an entity the seed created that nobody filled.
+ */
+function untouched(
+  draft: CrateDraft,
+  value: DraftValue,
+  rule: ProfilePropertyRule | undefined,
+  rulesFor: RulesFor,
+  seen: Set<string>,
+): boolean {
+  const text = value.value.trim()
+  if (value.kind !== 'reference') {
+    return !text || text === defaultValue(value.kind).value || text === rule?.defaultValue?.trim()
+  }
+  if (!text) return true
+  const target = findEntity(draft, text)
+  if (!target || partIds(draft).has(target.id) || seen.has(target.id)) return false
+  if (referenceCount(draft, target.id) > 1) return false
+  return seedOnly(draft, target, rulesFor, new Set([...seen, target.id]))
+}
+
+/** Whether an entity holds nothing beyond the rows its seed gave it. */
+function seedOnly(draft: CrateDraft, entity: DraftEntity, rulesFor: RulesFor, seen: Set<string>): boolean {
+  const rules = entity.types.flatMap((type) => rulesFor(type, []))
+  return Object.entries(entity.properties).every(([property, list]) => {
+    const rule = rules.find((candidate) => candidate.valueName === property)
+    return list.every((value) => untouched(draft, value, rule, rulesFor, seen))
+  })
+}
+
+/** Drops a seed-only entity and, below it, whatever nothing else holds. */
+function dropSeeded(draft: CrateDraft, id: string): CrateDraft {
+  const entity = findEntity(draft, id)
+  if (!entity) return draft
+  let next = removeEntity(draft, id).draft
+  for (const value of Object.values(entity.properties).flat()) {
+    if (value.kind !== 'reference' || !value.value.trim() || referenceCount(next, value.value)) continue
+    next = dropSeeded(next, value.value)
+  }
+  return next
+}
+
+/**
+ * Takes back what the profile seeded and nobody touched: a row still holding
+ * its seed value goes, with the entity a reference row had created when only
+ * its own seeded rows remain. A row the author filled, retyped into a link or
+ * shared with another reference stays, and so does every row another source
+ * owns, so a profile change never discards entered metadata.
+ */
+export function unseedProfile(draft: CrateDraft, profile: MetadataProfile): CrateDraft {
+  const rulesFor = profileRows(profile)
+  const root = rootId(draft)
+  let next = draft
+  for (const rule of expected(profile.propertyRules ?? [])) {
+    const list = findEntity(next, root)?.properties[rule.valueName] ?? []
+    if (!list.length || !list.every((value) => untouched(next, value, rule, rulesFor, new Set([root])))) continue
+    next = setProperty(next, root, rule.valueName, [])
+    for (const value of list) {
+      if (value.kind === 'reference' && value.value.trim() && !referenceCount(next, value.value)) {
+        next = dropSeeded(next, value.value)
+      }
+    }
+  }
+  return next
 }
 
 /** The rows the profile's shape for a created type asks for. */

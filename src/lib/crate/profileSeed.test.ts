@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { applyProfile, clearProfile, profileExpectation, seedNewEntities, seedRules } from './profileSeed'
-import { addEntity, findEntity, newDraft, setProperty, toRoCrate, updateValue, type CrateDraft } from './editor'
+import { applyProfile, clearProfile, profileExpectation, seedNewEntities, seedRules, unseedProfile } from './profileSeed'
+import { addEntity, addValue, findEntity, newDraft, setProperty, toRoCrate, updateValue, type CrateDraft } from './editor'
 import { contextTermsOf } from '@/lib/profiles/contextTerms'
 import { profileReferenceIri } from '@/composables/aruna/profileIri'
 import { PROCESS_RUN_CRATE_PROFILE, PROCESS_RUN_PROFILE_URI } from '@/lib/profiles/builtinProfiles'
@@ -430,5 +430,122 @@ describe('seeding a type that appears twice', () => {
 
     expect(founder?.types).toEqual(['http://schema.org/Person'])
     expect(founder?.properties.affiliation).toBeUndefined()
+  })
+})
+
+describe('leaving a profile', () => {
+  const first = 'https://example.test/profiles/genomics'
+  const second = 'https://example.test/profiles/ecology'
+
+  /** Genomics with a defaulted identifier, an author and a recommended citation. */
+  function genomics(): MetadataProfile {
+    const base = profile()
+    base.propertyRules = [
+      rule({ valueName: 'identifier', label: 'Identifier', defaultValue: 'GEN-' }),
+      rule({ valueName: 'author', label: 'Author', kind: 'entity', entityTypes: ['http://schema.org/Person'] }),
+      rule({ valueName: 'citation', label: 'Citation', obligation: 'SHOULD' }),
+    ]
+    return base
+  }
+
+  /** Ecology shares the identifier with another default and obligation. */
+  function ecology(): MetadataProfile {
+    const base = profile()
+    base.id = 'profile-2'
+    base.name = 'Ecology'
+    base.propertyRules = [
+      rule({ valueName: 'identifier', label: 'Sample id', obligation: 'SHOULD', defaultValue: 'ECO-' }),
+      rule({ valueName: 'variableMeasured', label: 'Variable measured' }),
+    ]
+    return base
+  }
+
+  function named(): CrateDraft {
+    return setProperty(newDraft(), './', 'name', [{ kind: 'text', value: 'Example dataset' }])
+  }
+
+  function graphOf(draft: CrateDraft) {
+    return toRoCrate(draft)['@graph']
+  }
+
+  it('takes back untouched rows, defaults and the entities it created', () => {
+    const start = named()
+    const seeded = applyProfile(start, genomics(), first)
+    expect(seeded.entities).toHaveLength(2)
+    expect(JSON.stringify(graphOf(seeded))).toContain('GEN-')
+
+    const left = clearProfile(unseedProfile(seeded, genomics()), first)
+
+    expect(left.entities).toEqual(start.entities)
+    expect(graphOf(left)).toEqual(graphOf(start))
+  })
+
+  it('keeps what the author filled and the entity they described', () => {
+    let seeded = applyProfile(named(), genomics(), first)
+    seeded = updateValue(seeded, './', 'citation', 0, 'doi:10.1000/example')
+    const person = linked(seeded, './', 'author')
+    seeded = updateValue(seeded, person?.id ?? '', 'affiliation', 0, 'Example University')
+
+    const left = unseedProfile(seeded, genomics())
+
+    expect(left.entities[0].properties.identifier).toBeUndefined()
+    expect(left.entities[0].properties.citation).toEqual([{ kind: 'text', value: 'doi:10.1000/example' }])
+    expect(linked(left, './', 'author')?.properties.affiliation).toEqual([{ kind: 'text', value: 'Example University' }])
+  })
+
+  it('keeps rows the author added on their own and links they made', () => {
+    const person = addEntity(named(), { type: 'Person', name: 'Ada Lovelace' })
+    let start = addValue(person.draft, './', 'author', { kind: 'reference', value: person.entity.id })
+    start = addValue(start, './', 'funder', { kind: 'text', value: '' })
+    start = addValue(start, './', 'version', { kind: 'text', value: '2' })
+
+    const left = unseedProfile(applyProfile(start, genomics(), first), genomics())
+
+    expect(left.entities[0].properties.author).toEqual([{ kind: 'reference', value: person.entity.id }])
+    expect(findEntity(left, person.entity.id)?.properties.name).toEqual([{ kind: 'text', value: 'Ada Lovelace' }])
+    expect(left.entities[0].properties.funder).toEqual([{ kind: 'text', value: '' }])
+    expect(left.entities[0].properties.version).toEqual([{ kind: 'text', value: '2' }])
+    expect(left.entities[0].properties.identifier).toBeUndefined()
+  })
+
+  it('reaches the same form whether a profile is picked directly or after another', () => {
+    const direct = applyProfile(named(), ecology(), second)
+    const after = applyProfile(unseedProfile(applyProfile(named(), genomics(), first), genomics()), ecology(), second, first)
+
+    expect(after.entities).toEqual(direct.entities)
+    expect(Object.keys(after.entities[0].properties)).toEqual(Object.keys(direct.entities[0].properties))
+    expect(after.entities[0].properties.identifier).toEqual([{ kind: 'text', value: 'ECO-' }])
+  })
+
+  it('keeps an edited shared row instead of the next default', () => {
+    const edited = updateValue(applyProfile(named(), genomics(), first), './', 'identifier', 0, 'GEN-42')
+
+    const next = applyProfile(unseedProfile(edited, genomics()), ecology(), second, first)
+
+    expect(next.entities[0].properties.identifier).toEqual([{ kind: 'text', value: 'GEN-42' }])
+    expect(next.entities[0].properties.variableMeasured).toEqual([{ kind: 'text', value: '' }])
+  })
+
+  it('neither grows nor loses rows over ten switch cycles', () => {
+    const start = named()
+    let draft = start
+    let current: MetadataProfile | undefined
+    const iriOf = (profile: MetadataProfile) => (profile.id === 'profile-1' ? first : second)
+    const pick = (profile?: MetadataProfile) => {
+      if (current) draft = unseedProfile(draft, current)
+      const previous = current ? iriOf(current) : undefined
+      draft = profile ? applyProfile(draft, profile, iriOf(profile), previous) : clearProfile(draft, previous)
+      current = profile
+    }
+    for (let cycle = 0; cycle < 10; cycle += 1) {
+      pick(genomics())
+      pick(ecology())
+      pick(genomics())
+      expect(draft.entities).toEqual(applyProfile(start, genomics(), first).entities)
+      // Picking the current profile again changes nothing.
+      expect(applyProfile(draft, genomics(), first, first)).toEqual(draft)
+      pick()
+      expect(draft.entities).toEqual(start.entities)
+    }
   })
 })
