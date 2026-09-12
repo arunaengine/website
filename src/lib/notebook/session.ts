@@ -73,6 +73,37 @@ export interface StagedInput {
 export interface SessionInputsResponse {
   staged: StagedInput[]
   pending: { dest_key: string; job_id: string }[]
+  /** Items that did not land after the first one did; empty when all landed. */
+  failed: { dest_key: string; error: string }[]
+}
+
+export interface ScratchEntry {
+  name: string
+  kind: 'file' | 'dir'
+  bytes: number
+  modified_ms: number
+}
+
+/** One directory of the session workdir; `path` is relative, empty is the workdir. */
+export interface ScratchListing {
+  path: string
+  entries: ScratchEntry[]
+}
+
+/** The read route answers 413 above this size. */
+export const SCRATCH_READ_LIMIT_BYTES = 8 * 1024 * 1024
+
+// A refusal carries the code and the body the caller needs to react to it.
+async function refusal(response: Response): Promise<ApiError> {
+  let body: Record<string, unknown> = {}
+  try {
+    body = (await response.json()) as Record<string, unknown>
+  } catch {
+    // Not every refusal carries a JSON body.
+  }
+  const message = typeof body.error === 'string' ? body.error : `${response.status} ${response.statusText}`
+  const code = typeof body.code === 'string' ? body.code : undefined
+  return new ApiError(response.status, message, code, body)
 }
 
 function sessionPath(jobId: string, suffix = ''): string {
@@ -110,6 +141,34 @@ export function addSessionInputs(
     { method: 'POST', body: JSON.stringify({ items }) },
     client,
   )
+}
+
+/** 409 `session_starting` or `session_ended` when the kernel cannot answer yet. */
+export function listScratch(jobId: string, path: string, client: ApiClientOptions): Promise<ScratchListing> {
+  return apiRequest<ScratchListing>(sessionPath(jobId, '/scratch'), { query: { path } }, client)
+}
+
+export function scratchReadUrl(jobId: string, path: string, client: ApiClientOptions): URL {
+  return apiUrl(sessionPath(jobId, '/scratch/read'), { path }, client)
+}
+
+/** The bytes of one scratch file; the bearer travels as a header, so no plain link. */
+export async function readScratch(
+  jobId: string,
+  path: string,
+  client: ApiClientOptions,
+  fetchImpl: typeof fetch = globalThis.fetch.bind(globalThis),
+): Promise<Blob> {
+  const headers = new Headers()
+  if (client.token) headers.set('Authorization', `Bearer ${client.token}`)
+  const response = await fetchImpl(scratchReadUrl(jobId, path, client), { headers, cache: 'no-store' })
+  if (!response.ok) throw await refusal(response)
+  return response.blob()
+}
+
+/** The kernel is not ready to answer yet; a caller waits instead of failing. */
+export function sessionStarting(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 409 && error.code === 'session_starting'
 }
 
 /** The node runs this session, or a 409 names the node that does. */
@@ -196,19 +255,6 @@ export function openSessionStream(options: SessionStreamOptions): SessionStream 
     if (event.type === 'gap') lastEventId = 0
     if (event.id) lastEventId = event.id
     options.onEvent(event)
-  }
-
-  // A refusal carries the code and the body the caller needs to react to it.
-  async function refusal(response: Response): Promise<ApiError> {
-    let body: Record<string, unknown> = {}
-    try {
-      body = (await response.json()) as Record<string, unknown>
-    } catch {
-      // Not every refusal carries a JSON body.
-    }
-    const message = typeof body.error === 'string' ? body.error : `${response.status} ${response.statusText}`
-    const code = typeof body.code === 'string' ? body.code : undefined
-    return new ApiError(response.status, message, code, body)
   }
 
   /** One attempt; answers true when the stream was open before it ended. */

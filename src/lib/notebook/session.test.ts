@@ -1,6 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/lib/api'
-import { openSessionStream, sessionAbsent, sessionEventFrom, sessionNotHere, type SessionEvent } from './session'
+import {
+  listScratch,
+  openSessionStream,
+  readScratch,
+  sessionAbsent,
+  sessionEventFrom,
+  sessionNotHere,
+  sessionStarting,
+  type SessionEvent,
+} from './session'
 
 const client = () => ({ baseUrl: 'https://node-a.example/api/v1', token: 'bearer-token' })
 
@@ -279,5 +288,32 @@ describe('session errors', () => {
   it('reads a missing session off a 404', () => {
     expect(sessionAbsent(new ApiError(404, 'not found'))).toBe(true)
     expect(sessionAbsent(new ApiError(409, 'busy'))).toBe(false)
+  })
+})
+
+describe('scratch files', () => {
+  it('lists one directory of the workdir with the bearer', async () => {
+    const listing = { path: 'data', entries: [{ name: 'input.txt', kind: 'file', bytes: 12, modified_ms: 5 }] }
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify(listing), { status: 200 }))
+    vi.stubGlobal('fetch', fetchImpl)
+    await expect(listScratch('job-a', 'data', client())).resolves.toEqual(listing)
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [URL, RequestInit]
+    expect(String(url)).toBe('https://node-a.example/api/v1/compute/jobs/job-a/session/scratch?path=data')
+    expect((init.headers as Headers).get('Authorization')).toBe('Bearer bearer-token')
+  })
+
+  it('reads a file as bytes and hands back a coded refusal', async () => {
+    const fetchImpl = vi.fn(async () => new Response('hello', { status: 200 }))
+    const blob = await readScratch('job-a', 'data/input.txt', client(), fetchImpl as unknown as typeof fetch)
+    await expect(blob.text()).resolves.toBe('hello')
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [URL, RequestInit]
+    expect(String(url)).toBe('https://node-a.example/api/v1/compute/jobs/job-a/session/scratch/read?path=data%2Finput.txt')
+    expect((init.headers as Headers).get('Authorization')).toBe('Bearer bearer-token')
+
+    const refused = vi.fn(async () => new Response(JSON.stringify({ error: 'starting', code: 'session_starting' }), { status: 409 }))
+    const error = await readScratch('job-a', 'x', client(), refused as unknown as typeof fetch).catch((cause) => cause)
+    expect(error).toBeInstanceOf(ApiError)
+    expect(sessionStarting(error)).toBe(true)
+    expect(sessionStarting(new ApiError(409, 'ended', 'session_ended'))).toBe(false)
   })
 })
