@@ -131,6 +131,7 @@ function sessionBar(): Component {
     '@lucide/vue': new Proxy({}, { get: () => IconStub }),
     '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
     '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+    '@/components/ui/IconButton.vue': moduleDefault(ButtonStub),
     '@/components/ui/Dialog.vue': moduleDefault(DialogStub),
     '@/components/ui/DialogContent.vue': moduleDefault(Slotted('div')),
     '@/components/ui/DialogDescription.vue': moduleDefault(Slotted('p')),
@@ -378,8 +379,8 @@ describe('the session bar', () => {
     sessionApi.getSessionState.mockResolvedValue(runningSession())
     const root = await render()
     await flush()
-    expect(content(root)).toContain('Kernel running for this notebook')
-    await click(button(root, 'Attach'))
+    expect(content(root)).toContain('Kernel running')
+    await click(element(root, (node) => node.props['aria-label'] === 'Attach to the running kernel'))
     expect(context.session.attachTo).toHaveBeenCalledWith('01JOB', 'node-a')
   })
 
@@ -396,10 +397,10 @@ describe('the session bar', () => {
     sessionApi.getSessionState.mockResolvedValue(runningSession({ workspace_bucket: 'other-bucket' }))
     const root = await render()
     await flush()
-    expect(content(root)).toContain('Kernel running in other-bucket')
+    expect(content(root)).toContain('Kernel running')
     expect(buttonCount(root, 'Attach')).toBe(0)
-    await click(button(root, 'Open'))
-    expect(content(root)).toContain('Running sessions')
+    await click(element(root, (node) => node.props['aria-label'] === 'Open the kernel dialog'))
+    expect(content(root)).toContain('1 running')
   })
 
   it('asks for a choice before starting while a kernel runs', async () => {
@@ -409,7 +410,7 @@ describe('the session bar', () => {
     await flush()
     await click(button(root, 'Run notebook'))
     expect(context.session.start).not.toHaveBeenCalled()
-    expect(content(root)).toContain('Running sessions')
+    expect(content(root)).toContain('1 running')
     expect(buttonCount(root, 'Start new kernel')).toBe(1)
     await click(button(root, 'Start new kernel'))
     expect(context.session.start).toHaveBeenCalledOnce()
@@ -420,7 +421,7 @@ describe('the session bar', () => {
     await flush()
     await click(button(root, 'Run notebook'))
     expect(context.session.start).toHaveBeenCalledOnce()
-    expect(content(root)).not.toContain('Running sessions')
+    expect(content(root)).not.toContain('1 running')
   })
 
   it('marks the attached session and switches or ends another', async () => {
@@ -439,7 +440,7 @@ describe('the session bar', () => {
     // A successful switch closes the dialog, so it comes last.
     await click(button(root, 'Switch'))
     expect(context.session.attachTo).toHaveBeenCalledWith('03JOB', 'node-a')
-    expect(content(root)).not.toContain('Running sessions')
+    expect(content(root)).not.toContain('1 running')
   })
 
   it('hides the value the compute config reports', async () => {

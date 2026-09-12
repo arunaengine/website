@@ -3,6 +3,7 @@
 // the notebook works in, where it may run, what it needs, and Start or End.
 import { computed, onMounted, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
+import IconButton from '@/components/ui/IconButton.vue'
 import Button from '@/components/ui/Button.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
@@ -29,7 +30,7 @@ import { DEFAULT_KERNEL_CPU, DEFAULT_KERNEL_RAM, sessionProblems, sessionStartDr
 import { toneVariant, type StateTone } from '@/lib/stateBadge'
 import { DEFAULT_SESSION_IDLE_AFTER_MS } from '@/lib/computeAdmin'
 import { useComputeAdmin } from '@/composables/useComputeAdmin'
-import { ChevronDown, CircleStop, Play, RotateCcw } from '@lucide/vue'
+import { ChevronDown, ChevronRight, CircleStop, Link2, Play, RefreshCw, RotateCcw } from '@lucide/vue'
 
 const { notebook, session } = injectNotebook()
 const { apiBaseUrl, authToken } = useAruna()
@@ -330,14 +331,20 @@ defineExpose({ runNotebook })
       </Button>
     </div>
 
-    <span v-if="unattachedSession" class="inline-flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 py-1 pl-2 pr-1 text-xs text-amber-700 dark:text-amber-300">
+    <button
+      v-if="unattachedSession"
+      type="button"
+      class="inline-flex h-8 items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 text-[11px] text-amber-700 hover:bg-amber-500/20 disabled:opacity-60 dark:text-amber-300"
+      :title="hintTitle(unattachedSession)"
+      :aria-label="matches(unattachedSession) ? 'Attach to the running kernel' : 'Open the kernel dialog'"
+      :disabled="matches(unattachedSession) && session.attaching.value"
+      @click="matches(unattachedSession) ? attachSession(unattachedSession) : (kernelOpen = true)"
+    >
       <span class="size-2 rounded-full bg-amber-500" aria-hidden="true" />
-      <span :title="hintTitle(unattachedSession)">
-        {{ matches(unattachedSession) ? 'Kernel running for this notebook' : `Kernel running in ${unattachedSession.bucket}` }}
-      </span>
-      <Button v-if="matches(unattachedSession)" size="sm" class="h-6 px-2" :disabled="session.attaching.value" @click="attachSession(unattachedSession)">Attach</Button>
-      <Button v-else variant="ghost" size="sm" class="h-6 px-2" @click="kernelOpen = true">Open</Button>
-    </span>
+      Kernel running
+      <Link2 v-if="matches(unattachedSession)" class="size-3" aria-hidden="true" />
+      <ChevronRight v-else class="size-3" aria-hidden="true" />
+    </button>
 
     <Dialog v-model:open="kernelOpen">
       <DialogContent class="max-h-[85vh] max-w-lg overflow-y-auto">
@@ -363,10 +370,18 @@ defineExpose({ runNotebook })
           The kernel is running, so these settings are locked. Restart it to apply a change.
         </Notice>
 
-        <div class="space-y-2 rounded-md border border-border/70 bg-muted/30 px-3 py-2">
+        <div
+          class="space-y-2 rounded-md border px-3 py-2"
+          :class="unattachedSession ? 'border-amber-500/50 bg-amber-500/10' : 'border-border/70 bg-muted/30'"
+        >
           <div class="flex items-center justify-between gap-2">
-            <p class="text-xs font-medium text-foreground">Running sessions</p>
-            <Button variant="outline" size="sm" :disabled="sessionsLoading" @click="loadSessions()">Refresh</Button>
+            <p class="flex items-center gap-1.5 text-xs font-medium text-foreground">
+              <span v-if="sessionRows.length" class="size-2 rounded-full" :class="unattachedSession ? 'bg-amber-500' : 'bg-emerald-500'" aria-hidden="true" />
+              {{ sessionRows.length ? `${sessionRows.length} running` : 'Running sessions' }}
+            </p>
+            <IconButton label="Refresh running sessions" :disabled="sessionsLoading" @click="loadSessions()">
+              <RefreshCw class="size-3.5" :class="sessionsLoading ? 'animate-spin' : ''" />
+            </IconButton>
           </div>
           <Spinner v-if="sessionsLoading" label="Looking for running sessions…" show-label />
           <Notice v-else-if="sessionsError" tone="error">Running sessions could not be listed: {{ sessionsError }}</Notice>
@@ -376,10 +391,11 @@ defineExpose({ runNotebook })
               {{ session.running.value ? 'No other running session was found.' : 'No running session was found. Start a kernel below.' }}
             </p>
             <ul v-else class="space-y-1.5">
-              <li v-for="entry in sessionRows" :key="entry.jobId" class="flex flex-wrap items-center justify-between gap-2">
+              <li v-for="entry in sessionRows" :key="entry.jobId" class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
                 <div class="min-w-0">
-                  <p class="truncate text-xs text-foreground">
-                    {{ runtimeLabel(entry.runtime) }} on {{ displayName(entry.nodeId) }}
+                  <p class="flex items-center gap-1.5 truncate text-xs text-foreground">
+                    <span class="size-2 shrink-0 rounded-full" :class="entry.jobId === session.jobId.value ? 'bg-emerald-500' : 'bg-amber-500'" aria-hidden="true" />
+                    <span class="truncate">{{ runtimeLabel(entry.runtime) }} on {{ displayName(entry.nodeId) }}</span>
                     <Badge v-if="entry.jobId === session.jobId.value" variant="outline" size="sm">Attached</Badge>
                   </p>
                   <p class="truncate text-[11px] text-muted-foreground">
@@ -387,7 +403,7 @@ defineExpose({ runNotebook })
                     <span v-if="!matches(entry)">, other bucket or runtime</span>
                   </p>
                 </div>
-                <div v-if="entry.jobId !== session.jobId.value" class="flex items-center gap-1.5">
+                <div v-if="entry.jobId !== session.jobId.value" class="flex shrink-0 items-center gap-1.5">
                   <Button
                     variant="outline"
                     size="sm"
