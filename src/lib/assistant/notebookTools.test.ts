@@ -42,6 +42,21 @@ function call(tools: ToolSet, name: string, input: Record<string, unknown>) {
   return runTool(tools[name], input)
 }
 
+/** Every notebook tool that writes, with an input its bridge accepts. */
+const WRITES: Array<[string, Record<string, unknown>]> = [
+  ['add_notebook_cell', { kind: 'code' }],
+  ['remove_notebook_cell', { cell_id: 'c1' }],
+  ['move_notebook_cell', { cell_id: 'c1', offset: 1 }],
+  ['set_notebook_cell_type', { cell_id: 'c1', kind: 'markdown' }],
+  ['save_notebook', {}],
+  ['capture_notebook', {}],
+  ['edit_notebook_cell', { cell_id: 'c1', source: 'print(2)' }],
+  ['set_notebook_kernel', { dependencies: 'pandas>=2' }],
+  ['start_notebook_kernel', {}],
+  ['stop_notebook_kernel', {}],
+  ['run_notebook_cell', { cell_id: 'c1' }],
+]
+
 describe('notebookTools', () => {
   it.each(['start_notebook_kernel', 'stop_notebook_kernel', 'run_notebook_cell', 'remove_notebook_cell', 'capture_notebook'])('rejects a changed target after approval: %s', async (name) => {
     const api = bridge()
@@ -72,42 +87,36 @@ describe('notebookTools', () => {
   })
 
 
-  it('asks before running a cell even with the gate off', async () => {
+  it.each(WRITES)('%s does not ask while the gate is off', async (name, input) => {
     const api = bridge()
     const { gate: value, asked } = gate(true, false)
-    await call(notebookTools(api, value), 'run_notebook_cell', { cell_id: 'c1' })
-    expect(asked).toEqual([{ name: 'run_notebook_cell', always: true }])
-    expect(api.runCell).toHaveBeenCalledWith('c1')
+    expect(await call(notebookTools(api, value), name, input)).not.toHaveProperty('error')
+    expect(asked).toEqual([])
+  })
+
+  it.each(WRITES)('%s asks through the toggle while the gate is on', async (name, input) => {
+    const api = bridge()
+    const { gate: value, asked } = gate(true, true)
+    expect(await call(notebookTools(api, value), name, input)).not.toHaveProperty('error')
+    expect(asked).toEqual([{ name, always: false }])
   })
 
   it('does not run a cell the user refused', async () => {
     const api = bridge()
-    const { gate: value } = gate(false, false)
+    const { gate: value } = gate(false, true)
     const result = await call(notebookTools(api, value), 'run_notebook_cell', { cell_id: 'c1' })
     expect(result).toEqual({ error: DENIAL_MESSAGE })
     expect(api.runCell).not.toHaveBeenCalled()
   })
 
-  it('edits a cell without asking while the gate is off', async () => {
-    const api = bridge()
-    const { gate: value, asked } = gate(true, false)
-    await call(notebookTools(api, value), 'edit_notebook_cell', { cell_id: 'c1', source: 'print(2)' })
-    expect(asked).toEqual([])
-    expect(api.editCell).toHaveBeenCalledWith('c1', 'print(2)')
-  })
-
-  it('starts and restarts the kernel, always asking first', async () => {
+  it('starts and restarts the kernel without asking while the gate is off', async () => {
     const api = bridge()
     const { gate: value, asked } = gate(true, false)
     const tools = notebookTools(api, value)
     await call(tools, 'start_notebook_kernel', {})
     await call(tools, 'start_notebook_kernel', { restart: true })
     await call(tools, 'stop_notebook_kernel', {})
-    expect(asked).toEqual([
-      { name: 'start_notebook_kernel', always: true },
-      { name: 'start_notebook_kernel', always: true },
-      { name: 'stop_notebook_kernel', always: true },
-    ])
+    expect(asked).toEqual([])
     expect(api.startKernel).toHaveBeenNthCalledWith(1, false)
     expect(api.startKernel).toHaveBeenNthCalledWith(2, true)
     expect(api.stopKernel).toHaveBeenCalled()

@@ -1,5 +1,5 @@
 // Tools that act on the notebook that is open. They are offered only while the
-// notebook page is open, and every write asks through the approval gate.
+// notebook page is open, and every write asks the approval gate while it is on.
 import { jsonSchema, tool, type JSONSchema7, type ToolSet } from 'ai'
 import type { NotebookCellType } from '@/lib/notebook/nbformat'
 import { denied, type ApprovalGate } from './types'
@@ -62,17 +62,16 @@ function schema<INPUT>(properties: Record<string, unknown>, required: string[] =
 const STRING = { type: 'string' } as const
 
 export function notebookTools(bridge: NotebookBridge, gate: ApprovalGate): ToolSet {
-  /** Runs one write: asks the gate first, then applies it. */
+  /** Runs one write: asks the gate while it is on, then applies it. */
   async function write(
     name: string,
     toolCallId: string,
     input: Record<string, unknown>,
     apply: () => Promise<string | null> | (string | null),
-    always = false,
   ) {
     const scope = bridge.scope()
-    if (always || gate.enabled()) {
-      const approved = await gate.ask({ id: toolCallId, name, input }, always)
+    if (gate.enabled()) {
+      const approved = await gate.ask({ id: toolCallId, name, input }, false)
       if (!approved) return denied()
     }
     if (scope !== bridge.scope()) return { error: 'The notebook or kernel changed while waiting for approval. Read the notebook and request the action again.' }
@@ -98,7 +97,7 @@ export function notebookTools(bridge: NotebookBridge, gate: ApprovalGate): ToolS
     remove_notebook_cell: tool({
       description: 'Removes a cell and its stored outputs from the open notebook.',
       inputSchema: schema<{ cell_id: string }>({ cell_id: STRING }, ['cell_id']),
-      execute: (input, { toolCallId }) => write('remove_notebook_cell', toolCallId, input, () => bridge.removeCell(input.cell_id), true),
+      execute: (input, { toolCallId }) => write('remove_notebook_cell', toolCallId, input, () => bridge.removeCell(input.cell_id)),
     }),
     move_notebook_cell: tool({
       description: 'Moves a cell by a signed offset: -1 moves up once and 1 moves down once.',
@@ -120,7 +119,7 @@ export function notebookTools(bridge: NotebookBridge, gate: ApprovalGate): ToolS
       inputSchema: schema<Record<string, never>>({}),
       execute: async (input, { toolCallId }) => {
         let documentId = ''
-        const result = await write('capture_notebook', toolCallId, input, async () => { documentId = await bridge.capture(); return null }, true)
+        const result = await write('capture_notebook', toolCallId, input, async () => { documentId = await bridge.capture(); return null })
         return 'error' in result ? result : { ...result, document_id: documentId }
       },
     }),
@@ -155,25 +154,22 @@ export function notebookTools(bridge: NotebookBridge, gate: ApprovalGate): ToolS
         'Starts the kernel of the open notebook, or restarts a running one with `restart`. A restart '
         + 'installs the saved dependencies again and clears every variable.',
       inputSchema: schema<{ restart?: boolean }>({ restart: { type: 'boolean' } }),
-      // Starting a session spends compute, so it always asks.
       execute: (input, { toolCallId }) =>
-        write('start_notebook_kernel', toolCallId, input, () => bridge.startKernel(input.restart === true), true),
+        write('start_notebook_kernel', toolCallId, input, () => bridge.startKernel(input.restart === true)),
     }),
 
     stop_notebook_kernel: tool({
       description: 'Ends the running session. Its variables are lost; the notebook and its files stay.',
       inputSchema: schema<Record<string, never>>({}),
       execute: (input, { toolCallId }) =>
-        write('stop_notebook_kernel', toolCallId, input, () => bridge.stopKernel(), true),
+        write('stop_notebook_kernel', toolCallId, input, () => bridge.stopKernel()),
     }),
 
     run_notebook_cell: tool({
       description: 'Runs one cell in the running session. Its outputs arrive on the notebook page.',
       inputSchema: schema<{ cell_id: string }>({ cell_id: STRING }, ['cell_id']),
-      // Running a cell executes code with the session's own credential, so it
-      // always asks, whatever the approval toggle says.
       execute: (input, { toolCallId }) =>
-        write('run_notebook_cell', toolCallId, input, () => bridge.runCell(input.cell_id), true),
+        write('run_notebook_cell', toolCallId, input, () => bridge.runCell(input.cell_id)),
     }),
 
     read_notebook_outputs: tool({
