@@ -56,12 +56,13 @@ describe('useSessionFiles', () => {
     files.toggle('data')
     files.toggle('data')
     await settle()
-    expect(listScratch).toHaveBeenCalledTimes(1)
+    // One read for the workdir at start, one for data/.
+    expect(listScratch).toHaveBeenCalledTimes(2)
     vi.advanceTimersByTime(SCRATCH_FRESH_MS + 1)
     files.toggle('data')
     files.toggle('data')
     await settle()
-    expect(listScratch).toHaveBeenCalledTimes(2)
+    expect(listScratch).toHaveBeenCalledTimes(3)
     scope.stop()
   })
 
@@ -110,7 +111,7 @@ describe('useSessionFiles', () => {
     listScratch.mockRejectedValueOnce(new ApiError(409, 'starting', 'session_starting'))
     const scope = effectScope()
     const files = scope.run(() => useSessionFiles(session))!
-    await files.load('')
+    await settle()
     expect(files.directory('')).toMatchObject({ starting: true, error: null, entries: null })
     listScratch.mockRejectedValueOnce(new ApiError(500, 'helper gone'))
     await files.load('')

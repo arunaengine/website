@@ -136,8 +136,8 @@ export function useSessionFiles(session: SessionFilesSource) {
 
   watch(session.jobId, clear, { flush: 'sync' })
   watch(session.ended, (done) => { if (done) clear() }, { flush: 'sync' })
-  // A starting kernel answered 409; the first live state reads the tree.
-  watch(session.live, (live) => { if (live) loadVisible() })
+  // The tree is read at once, and again when a starting kernel became live.
+  watch(session.live, () => { if (session.jobId.value && !session.ended.value) loadVisible() }, { immediate: true })
 
   // A cell that finished may have written files anywhere in the workdir.
   watch(session.cellStates, (cells) => {
