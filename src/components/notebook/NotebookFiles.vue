@@ -80,11 +80,13 @@ const newName = ref('')
 const renaming = ref<string | null>(null)
 const renameName = ref('')
 const confirming = ref<string | null>(null)
-/** A move, rename or delete is running against the bucket. */
+/** A move, rename, delete or upload is running against the bucket. */
 const busy = ref(false)
 
 const selected = ref<string | null>(null)
 const menu = ref<{ path: string; x: number; y: number } | null>(null)
+const dragging = ref<string | null>(null)
+const dropTarget = ref<string | null>(null)
 const rowEls = new Map<string, HTMLElement>()
 
 const copyOpen = ref(false)
@@ -114,6 +116,8 @@ watch([notebook.generation, session.jobId], () => {
   confirming.value = null
   selected.value = null
   menu.value = null
+  dragging.value = null
+  dropTarget.value = null
   addOpen.value = false
   importOpen.value = false
   copyOpen.value = false
@@ -229,6 +233,54 @@ async function openMenu(row: TreeRow, event: MouseEvent) {
     await nextTick()
   }
   menu.value = { path: row.path, x, y }
+}
+
+function startDrag(row: TreeRow, event: DragEvent) {
+  if (!inData(row.path) || row.kind === 'note') return
+  dragging.value = row.path
+  selected.value = row.path
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', row.path)
+  }
+}
+
+function endDrag() {
+  dragging.value = null
+  dropTarget.value = null
+}
+
+/** What a drop on this row would do; only a data/ folder takes anything. */
+function dropKind(row: TreeRow, event: DragEvent): 'files' | 'move' | null {
+  if (row.kind !== 'dir' || !inData(row.path) || !bucket.value || busy.value) return null
+  if (event.dataTransfer?.types.includes('Files')) return 'files'
+  const from = dragging.value
+  if (!from || from === row.path || row.path.startsWith(`${from}/`) || parentPath(from) === row.path) return null
+  return 'move'
+}
+
+function dragOver(row: TreeRow, event: DragEvent) {
+  const kind = dropKind(row, event)
+  if (!kind) {
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'none'
+    if (dropTarget.value === row.path) dropTarget.value = null
+    return
+  }
+  event.preventDefault()
+  if (event.dataTransfer) event.dataTransfer.dropEffect = kind === 'files' ? 'copy' : 'move'
+  dropTarget.value = row.path
+}
+
+function dragLeave(row: TreeRow) {
+  if (dropTarget.value === row.path) dropTarget.value = null
+}
+
+async function dropOn(row: TreeRow, event: DragEvent) {
+  const kind = dropKind(row, event)
+  const source = rows.value.find((other) => other.path === dragging.value)
+  endDrag()
+  if (kind === 'files') await upload(row.path, Array.from(event.dataTransfer?.files ?? []))
+  else if (kind === 'move' && source) await relocate(source, joinPath(row.path, source.name), `Moved ${source.name} to ${row.path}/.`)
 }
 
 /** Keys under the import target, so the import warns before it overwrites one. */
@@ -367,6 +419,33 @@ async function remove(row: TreeRow) {
     if (active()) error.value = errorMessage(cause)
   } finally {
     if (active()) busy.value = false
+  }
+}
+
+/** Uploads dropped operating system files into a data/ folder, one after the other. */
+async function upload(folder: string, list: File[]) {
+  if (!list.length || busy.value) return
+  const active = current()
+  busy.value = true
+  error.value = null
+  let done = 0
+  try {
+    for (const file of list) {
+      note.value = `Uploading ${done + 1} of ${countFiles(list.length)} to ${folder}/…`
+      await s3.uploadObject(bucket.value, joinPath(folder, file.name), file).promise
+      if (!active()) return
+      done += 1
+    }
+    note.value = `Uploaded ${countFiles(done)} to ${folder}/.`
+  } catch (cause) {
+    if (!active()) return
+    note.value = done ? `Uploaded ${done} of ${countFiles(list.length)} to ${folder}/.` : null
+    error.value = errorMessage(cause)
+  } finally {
+    if (active()) {
+      busy.value = false
+      if (done) files.refresh(folder)
+    }
   }
 }
 
@@ -518,13 +597,22 @@ async function copyTo(destination: { bucket: string; prefix: string }) {
             :tabindex="selected === row.path || (!selected && index === 0) ? 0 : -1"
             :aria-selected="selected === row.path"
             :aria-expanded="row.kind === 'dir' ? isOpen(row.path) : undefined"
+            :draggable="inData(row.path)"
             class="grid grid-cols-[1rem_1rem_minmax(0,1fr)_auto_1.25rem] items-center gap-1 rounded px-1 py-0.5 outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            :class="selected === row.path ? 'bg-primary/10' : 'hover:bg-muted/40'"
+            :class="[
+              selected === row.path ? 'bg-primary/10' : 'hover:bg-muted/40',
+              dropTarget === row.path && 'bg-primary/5 ring-1 ring-inset ring-primary',
+            ]"
             :style="indent(row.depth)"
             @click="selected = row.path"
             @dblclick="activate(row)"
             @keydown="onKey(row, $event)"
             @contextmenu.prevent="openMenu(row, $event)"
+            @dragstart="startDrag(row, $event)"
+            @dragend="endDrag"
+            @dragover="dragOver(row, $event)"
+            @dragleave="dragLeave(row)"
+            @drop.prevent="dropOn(row, $event)"
           >
             <button
               v-if="row.kind === 'dir'"

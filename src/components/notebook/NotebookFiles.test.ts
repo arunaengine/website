@@ -140,6 +140,12 @@ async function pressKey(node: HostNode, key: string) {
 }
 
 type Handler = (event: unknown) => Promise<void> | void
+/** A drag event carrying either an internal row or operating system files. */
+function dragEvent(files: File[] = []) {
+  const dataTransfer = { types: files.length ? ['Files'] : [], files, effectAllowed: '', dropEffect: '', setData: vi.fn() }
+  return { dataTransfer, preventDefault: vi.fn() }
+}
+
 afterEach(() => vi.unstubAllGlobals())
 
 describe('notebook input provenance', () => {
@@ -217,6 +223,23 @@ describe('kernel file tree', () => {
     expect(row(root, 'data').props['aria-expanded']).toBe(true)
     await pressKey(row(root, 'data'), 'ArrowUp')
     expect(row(root, 'data').props['aria-selected']).toBe(true)
+    app.unmount()
+  })
+
+  it('downloads a small file on double click', async () => {
+    const { root, app, readScratch } = await render()
+    const link = { href: '', download: '', click: vi.fn() }
+    vi.stubGlobal('document', { createElement: () => link })
+    vi.stubGlobal('URL', { createObjectURL: () => 'blob:out', revokeObjectURL: vi.fn() })
+    readScratch.mockResolvedValue(new Blob(['hello']))
+    await (row(root, 'big.bin').props.onDblclick as Handler)({})
+    await flush()
+    expect(readScratch).not.toHaveBeenCalled()
+    await (row(root, 'out.txt').props.onDblclick as Handler)({})
+    await flush()
+    expect(readScratch).toHaveBeenCalledWith('job-a', 'out.txt', { baseUrl: '/api/v1' })
+    expect(link.download).toBe('out.txt')
+    expect(link.click).toHaveBeenCalledOnce()
     app.unmount()
   })
 
@@ -298,6 +321,89 @@ describe('kernel file tree', () => {
     s3.listObjectsRecursive.mockResolvedValue({ objects: [], truncated: true })
     await click(await rowItem(root, 'sub', 'Copy to bucket'))
     expect(content(root)).toContain('sub/ holds more than 500 files.')
+    app.unmount()
+  })
+
+  it('moves a dropped data/ file by copying and then deleting it', async () => {
+    const { root, app, s3 } = await render()
+    await expand(root, 'data')
+    await expand(root, 'sub')
+    const event = dragEvent()
+    await (row(root, 'data/sub/a.csv').props.onDragstart as Handler)(event)
+    expect(row(root, 'data/sub/a.csv').props.draggable).toBe(true)
+    expect(event.dataTransfer.setData).toHaveBeenCalledWith('text/plain', 'data/sub/a.csv')
+    await (row(root, 'data/sub').props.onDragover as Handler)(event)
+    expect(event.preventDefault).not.toHaveBeenCalled()
+    await (row(root, 'data/other').props.onDragover as Handler)(event)
+    await flush()
+    expect(event.preventDefault).toHaveBeenCalledOnce()
+    expect(event.dataTransfer.dropEffect).toBe('move')
+    expect(String(row(root, 'data/other').props.class)).toContain('ring-primary')
+    listScratch.mockClear()
+    await (row(root, 'data/other').props.onDrop as Handler)(event)
+    await flush()
+    expect(s3.copyObject).toHaveBeenCalledWith({ bucket: 'workspace', key: 'data/sub/a.csv' }, 'workspace', 'data/other/a.csv')
+    expect(s3.deleteObject).toHaveBeenCalledWith('workspace', 'data/sub/a.csv')
+    expect(s3.copyObject.mock.invocationCallOrder[0]).toBeLessThan(s3.deleteObject.mock.invocationCallOrder[0])
+    expect(content(root)).toContain('Moved a.csv to data/other/.')
+    expect(String(row(root, 'data/other').props.class)).not.toContain('ring-primary')
+    expect(listScratch.mock.calls.map((call) => call[1])).toContain('data')
+    app.unmount()
+  })
+
+  it('moves a data/ folder object by object within the bound', async () => {
+    const { root, app, s3 } = await render()
+    await expand(root, 'data')
+    s3.listObjectsRecursive.mockResolvedValue({ objects: [{ key: 'data/sub/' }, { key: 'data/sub/a.csv' }], truncated: false })
+    const event = dragEvent()
+    await (row(root, 'data/sub').props.onDragstart as Handler)(event)
+    await (row(root, 'data/sub').props.onDragover as Handler)(event)
+    expect(event.preventDefault).not.toHaveBeenCalled()
+    await (row(root, 'data/other').props.onDrop as Handler)(event)
+    await flush()
+    expect(s3.copyObject.mock.calls.map((call) => call[2])).toEqual(['data/other/sub/', 'data/other/sub/a.csv'])
+    expect(s3.deleteObject.mock.calls.map((call) => call[1])).toEqual(['data/sub/', 'data/sub/a.csv'])
+    s3.listObjectsRecursive.mockResolvedValue({ objects: [], truncated: true })
+    await (row(root, 'data/sub').props.onDragstart as Handler)(event)
+    await (row(root, 'data/other').props.onDrop as Handler)(event)
+    await flush()
+    expect(content(root)).toContain('sub/ holds more than 500 files. Move a smaller folder.')
+    app.unmount()
+  })
+
+  it('uploads dropped operating system files into the data/ folder', async () => {
+    const { root, app, s3 } = await render()
+    await expand(root, 'data')
+    const event = dragEvent([new File(['a'], 'x.txt'), new File(['b'], 'y.txt')])
+    await (row(root, 'data/sub').props.onDragover as Handler)(event)
+    expect(event.dataTransfer.dropEffect).toBe('copy')
+    await (row(root, 'data/sub').props.onDrop as Handler)(event)
+    await flush()
+    expect(s3.uploadObject.mock.calls.map((call) => [call[0], call[1]])).toEqual([['workspace', 'data/sub/x.txt'], ['workspace', 'data/sub/y.txt']])
+    expect(content(root)).toContain('Uploaded 2 files to data/sub/.')
+    s3.uploadObject.mockReturnValueOnce({ promise: Promise.reject(new Error('quota')), abort: vi.fn() })
+    await (row(root, 'data/sub').props.onDrop as Handler)(event)
+    await flush()
+    expect(content(root)).toContain('quota')
+    app.unmount()
+  })
+
+  it('refuses drops on scratch rows and does not drag them', async () => {
+    const { root, app, s3 } = await render()
+    expect(row(root, 'tmp').props.draggable).toBe(false)
+    const event = dragEvent([new File(['a'], 'x.txt')])
+    await (row(root, 'tmp').props.onDragover as Handler)(event)
+    await flush()
+    expect(event.preventDefault).not.toHaveBeenCalled()
+    expect(event.dataTransfer.dropEffect).toBe('none')
+    expect(String(row(root, 'tmp').props.class)).not.toContain('ring-primary')
+    await (row(root, 'tmp').props.onDrop as Handler)(event)
+    await flush()
+    expect(s3.uploadObject).not.toHaveBeenCalled()
+    const internal = dragEvent()
+    await (row(root, 'out.txt').props.onDragstart as Handler)(internal)
+    await (row(root, 'data').props.onDragover as Handler)(internal)
+    expect(internal.preventDefault).not.toHaveBeenCalled()
     app.unmount()
   })
 
