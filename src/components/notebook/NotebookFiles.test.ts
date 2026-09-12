@@ -1,6 +1,6 @@
 import { defineComponent, h, ref } from 'vue'
 import * as VueRuntime from 'vue'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/lib/api'
 import { button, click, compileClientComponent, content, element, flush, moduleDefault, mountApp, typeValue, type HostNode } from '@/test/clientRender'
 
@@ -22,8 +22,13 @@ const TREE: Record<string, Entry[]> = {
     { name: 'data', kind: 'dir', bytes: 0, modified_ms: 0 },
     { name: 'tmp', kind: 'dir', bytes: 0, modified_ms: 0 },
   ],
-  data: [{ name: 'sub', kind: 'dir', bytes: 0, modified_ms: 0 }, { name: '.cache', kind: 'file', bytes: 1, modified_ms: 0 }],
+  data: [
+    { name: 'sub', kind: 'dir', bytes: 0, modified_ms: 0 },
+    { name: 'other', kind: 'dir', bytes: 0, modified_ms: 0 },
+    { name: '.cache', kind: 'file', bytes: 1, modified_ms: 0 },
+  ],
   'data/sub': [{ name: 'a.csv', kind: 'file', bytes: 5, modified_ms: 0 }],
+  'data/other': [],
   tmp: [],
 }
 
@@ -51,7 +56,9 @@ async function render(options: { live?: boolean; running?: boolean; starting?: b
     listObjectsRecursive: vi.fn(),
     createFolder: vi.fn().mockResolvedValue(undefined),
     copyObject: vi.fn().mockResolvedValue(undefined),
-    uploadObject: vi.fn(() => ({ promise: Promise.resolve(), abort: vi.fn() })),
+    deleteObject: vi.fn().mockResolvedValue(undefined),
+    deletePrefix: vi.fn().mockResolvedValue({ deleted: 1, errors: [] }),
+    uploadObject: vi.fn((_bucket: string, _key: string, _file: File) => ({ promise: Promise.resolve(), abort: vi.fn() })),
   }
   listScratch.mockReset()
   listScratch.mockImplementation(async (_job: string, path: string) => {
@@ -102,10 +109,18 @@ async function render(options: { live?: boolean; running?: boolean; starting?: b
   return { root, app, generation, activeCellId, noteCellInputs, addSessionInputs, readScratch, s3, session, onStart }
 }
 
-/** The menu item `label` on the row named `name`. */
-function rowItem(root: HostNode, name: string, label: string): HostNode {
-  const title = element(root, (node) => node.tag === 'span' && node.props.title === name)
-  return element(title.parent!, (node) => node.tag === 'button' && content(node).trim() === label)
+function row(root: HostNode, path: string): HostNode {
+  return element(root, (node) => node.props['data-path'] === path)
+}
+
+function menuButton(root: HostNode, name: string): HostNode {
+  return element(root, (node) => node.props['aria-label'] === `Actions for ${name}`)
+}
+
+/** Opens the menu of the row named `name` from its three dots and returns the item `label`. */
+async function rowItem(root: HostNode, name: string, label: string): Promise<HostNode> {
+  await click(menuButton(root, name))
+  return element(root, (node) => node.tag === 'button' && content(node).trim() === label)
 }
 
 async function expand(root: HostNode, name: string) {
@@ -119,12 +134,20 @@ async function pressEnter(field: HostNode) {
   await flush()
 }
 
+async function pressKey(node: HostNode, key: string) {
+  await (node.props.onKeydown as (event: unknown) => void)({ key, target: node, currentTarget: node, preventDefault: vi.fn() })
+  await flush()
+}
+
+type Handler = (event: unknown) => Promise<void> | void
+afterEach(() => vi.unstubAllGlobals())
+
 describe('notebook input provenance', () => {
   it.each([false, true])('binds a staged input to the originating cell and document: changed=%s', async (changed) => {
     const { root, app, generation, activeCellId, noteCellInputs, addSessionInputs } = await render()
     let finish = (_result: unknown) => {}
     addSessionInputs.mockReturnValue(new Promise((resolve) => { finish = resolve }))
-    await click(rowItem(root, 'data', 'Add files from buckets'))
+    await click(await rowItem(root, 'data', 'Add files from buckets'))
     await click(button(root, 'Pick input into workspace/data/'))
     activeCellId.value = 'second'
     if (changed) generation.value += 1
@@ -153,12 +176,56 @@ describe('kernel file tree', () => {
     app.unmount()
   })
 
+  it('shows the row menu on every row and opens it on right click', async () => {
+    const { root, app } = await render()
+    for (const name of ['data', 'tmp', 'out.txt', 'big.bin']) {
+      const dots = menuButton(root, name)
+      expect(String(dots.props.class)).not.toContain('opacity-0')
+      expect(String(dots.parent?.props.class)).not.toContain('opacity-0')
+    }
+    expect(() => button(root, 'Download')).toThrow()
+    const event = { clientX: 40, clientY: 50, preventDefault: vi.fn() }
+    await (row(root, 'out.txt').props.onContextmenu as Handler)(event)
+    await flush()
+    expect(event.preventDefault).toHaveBeenCalled()
+    expect(button(root, 'Download').props.disabled).toBe(false)
+    expect(row(root, 'out.txt').props['aria-selected']).toBe(true)
+    const anchor = element(root, (node) => node.props['aria-hidden'] === 'true' && String(node.props.class).includes('fixed'))
+    expect(anchor.props.style).toEqual({ left: '40px', top: '50px' })
+    await (row(root, 'tmp').props.onContextmenu as Handler)(event)
+    await flush()
+    expect(button(root, 'New folder').props.title).toBe('Only data/ is stored in the bucket')
+    expect(() => button(root, 'Download')).toThrow()
+    app.unmount()
+  })
+
+  it('selects with a click and walks the tree with the keyboard', async () => {
+    const { root, app } = await render()
+    await click(row(root, 'data'))
+    expect(String(row(root, 'data').props.class)).toContain('bg-primary/10')
+    expect(row(root, 'data').props.tabindex).toBe(0)
+    expect(row(root, 'tmp').props.tabindex).toBe(-1)
+    await pressKey(row(root, 'data'), 'ArrowRight')
+    expect(row(root, 'data').props['aria-expanded']).toBe(true)
+    await pressKey(row(root, 'data'), 'ArrowDown')
+    expect(row(root, 'data/other').props['aria-selected']).toBe(true)
+    await pressKey(row(root, 'data/other'), 'ArrowLeft')
+    expect(row(root, 'data').props['aria-selected']).toBe(true)
+    await pressKey(row(root, 'data'), 'ArrowLeft')
+    expect(row(root, 'data').props['aria-expanded']).toBe(false)
+    await pressKey(row(root, 'data'), 'Enter')
+    expect(row(root, 'data').props['aria-expanded']).toBe(true)
+    await pressKey(row(root, 'data'), 'ArrowUp')
+    expect(row(root, 'data').props['aria-selected']).toBe(true)
+    app.unmount()
+  })
+
   it('creates a folder under data/ with the marker key and not elsewhere', async () => {
     const { root, app, s3 } = await render()
-    const outside = rowItem(root, 'tmp', 'New folder')
+    const outside = await rowItem(root, 'tmp', 'New folder')
     expect(outside.props.disabled).toBe(true)
     expect(outside.props.title).toBe('Only data/ is stored in the bucket')
-    await click(rowItem(root, 'data', 'New folder'))
+    await click(await rowItem(root, 'data', 'New folder'))
     const field = element(root, (node) => node.props['aria-label'] === 'New folder name')
     await typeValue(field, 'fresh')
     listScratch.mockClear()
@@ -172,7 +239,7 @@ describe('kernel file tree', () => {
     const { root, app, addSessionInputs } = await render()
     await expand(root, 'data')
     await expand(root, 'sub')
-    await click(rowItem(root, 'sub', 'Add files from buckets'))
+    await click(await rowItem(root, 'sub', 'Add files from buckets'))
     expect(content(root)).toContain('Pick input into workspace/data/sub/')
     addSessionInputs.mockResolvedValue({
       staged: [{ dest_key: 'data/sub/input.txt', bytes: 1, blake3: 'hash' }],
@@ -185,8 +252,8 @@ describe('kernel file tree', () => {
     expect(content(root)).toContain('1 of 1 files failed: source gone')
     expect(content(root)).not.toContain('are now in')
     expect(listScratch.mock.calls.map((call) => call[1])).toEqual(expect.arrayContaining(['', 'data', 'data/sub']))
-    expect(rowItem(root, 'tmp', 'Add files from buckets').props.title).toBe('Only data/ is stored in the bucket')
-    await click(rowItem(root, 'sub', 'Import from connector'))
+    expect((await rowItem(root, 'tmp', 'Add files from buckets')).props.title).toBe('Only data/ is stored in the bucket')
+    await click(await rowItem(root, 'sub', 'Import from connector'))
     expect(content(root)).toContain('Import into data/sub/')
     app.unmount()
   })
@@ -195,7 +262,7 @@ describe('kernel file tree', () => {
     const { root, app, s3 } = await render()
     await expand(root, 'data')
     await expand(root, 'sub')
-    await click(rowItem(root, 'a.csv', 'Copy to bucket'))
+    await click(await rowItem(root, 'a.csv', 'Copy to bucket'))
     await click(button(root, 'Copy 1 of a.csv to dest'))
     expect(s3.copyObject).toHaveBeenCalledWith({ bucket: 'workspace', key: 'data/sub/a.csv' }, 'dest', 'out/a.csv')
     expect(content(root)).toContain('Copied a.csv to dest/out/.')
@@ -205,11 +272,11 @@ describe('kernel file tree', () => {
   it('uploads a small scratch file and refuses a large one', async () => {
     const { root, app, s3, readScratch } = await render()
     readScratch.mockResolvedValue(new Blob(['hello'], { type: 'text/plain' }))
-    const large = rowItem(root, 'big.bin', 'Copy to bucket')
+    const large = await rowItem(root, 'big.bin', 'Copy to bucket')
     expect(large.props.disabled).toBe(true)
     expect(large.props.title).toContain(`Larger than ${LIMIT} B`)
-    expect(rowItem(root, 'big.bin', 'Download').props.disabled).toBe(true)
-    await click(rowItem(root, 'out.txt', 'Copy to bucket'))
+    expect((await rowItem(root, 'big.bin', 'Download')).props.disabled).toBe(true)
+    await click(await rowItem(root, 'out.txt', 'Copy to bucket'))
     await click(button(root, 'Copy 1 of out.txt to dest'))
     expect(readScratch).toHaveBeenCalledWith('job-a', 'out.txt', { baseUrl: '/api/v1' })
     expect(s3.uploadObject).toHaveBeenCalledWith('dest', 'out/out.txt', expect.objectContaining({ name: 'out.txt' }))
@@ -220,17 +287,56 @@ describe('kernel file tree', () => {
   it('copies every object below a data/ folder and none from scratch', async () => {
     const { root, app, s3 } = await render()
     await expand(root, 'data')
-    const scratch = rowItem(root, 'tmp', 'Copy to bucket')
+    const scratch = await rowItem(root, 'tmp', 'Copy to bucket')
     expect(scratch.props.disabled).toBe(true)
     s3.listObjectsRecursive.mockResolvedValue({ objects: [{ key: 'data/sub/a.csv' }, { key: 'data/sub/deep/b.csv' }], truncated: false })
-    await click(rowItem(root, 'sub', 'Copy to bucket'))
+    await click(await rowItem(root, 'sub', 'Copy to bucket'))
     expect(s3.listObjectsRecursive).toHaveBeenCalledWith('workspace', 'data/sub/', 500)
     await click(button(root, 'Copy 2 of sub to dest'))
     expect(s3.copyObject.mock.calls.map((call) => call[2])).toEqual(['out/sub/a.csv', 'out/sub/deep/b.csv'])
     expect(content(root)).toContain('Copied 2 files from sub/ to dest/out/sub/.')
     s3.listObjectsRecursive.mockResolvedValue({ objects: [], truncated: true })
-    await click(rowItem(root, 'sub', 'Copy to bucket'))
+    await click(await rowItem(root, 'sub', 'Copy to bucket'))
     expect(content(root)).toContain('sub/ holds more than 500 files.')
+    app.unmount()
+  })
+
+  it('renames a data/ file inline and keeps scratch read only', async () => {
+    const { root, app, s3 } = await render()
+    const scratch = await rowItem(root, 'out.txt', 'Rename')
+    expect(scratch.props.disabled).toBe(true)
+    expect(scratch.props.title).toBe('Only data/ is stored in the bucket')
+    expect((await rowItem(root, 'out.txt', 'Delete')).props.disabled).toBe(true)
+    await expand(root, 'data')
+    await expand(root, 'sub')
+    await click(await rowItem(root, 'a.csv', 'Rename'))
+    const field = element(root, (node) => node.props['aria-label'] === 'New name')
+    expect(field.props.value).toBe('a.csv')
+    await typeValue(field, 'b.csv')
+    await pressEnter(field)
+    expect(s3.copyObject).toHaveBeenCalledWith({ bucket: 'workspace', key: 'data/sub/a.csv' }, 'workspace', 'data/sub/b.csv')
+    expect(s3.deleteObject).toHaveBeenCalledWith('workspace', 'data/sub/a.csv')
+    expect(content(root)).toContain('Renamed a.csv to b.csv.')
+    app.unmount()
+  })
+
+  it('deletes a data/ entry after the inline confirm', async () => {
+    const { root, app, s3 } = await render()
+    await expand(root, 'data')
+    await expand(root, 'sub')
+    await click(await rowItem(root, 'a.csv', 'Delete'))
+    expect(content(root)).toContain('Delete a.csv?')
+    await click(button(root, 'Cancel'))
+    expect(s3.deleteObject).not.toHaveBeenCalled()
+    await click(await rowItem(root, 'a.csv', 'Delete'))
+    await click(element(root, (node) => node.tag === 'button' && node.props.variant === 'destructive'))
+    expect(s3.deleteObject).toHaveBeenCalledWith('workspace', 'data/sub/a.csv')
+    s3.listObjectsRecursive.mockResolvedValue({ objects: [{ key: 'data/sub/a.csv' }], truncated: false })
+    await click(await rowItem(root, 'sub', 'Delete'))
+    expect(content(root)).toContain('Delete sub/?')
+    await click(element(root, (node) => node.tag === 'button' && node.props.variant === 'destructive'))
+    expect(s3.listObjectsRecursive).toHaveBeenCalledWith('workspace', 'data/sub/', 500)
+    expect(s3.deletePrefix).toHaveBeenCalledWith('workspace', 'data/sub/')
     app.unmount()
   })
 
