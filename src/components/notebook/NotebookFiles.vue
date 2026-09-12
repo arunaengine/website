@@ -242,7 +242,21 @@ function startDrag(row: TreeRow, event: DragEvent) {
   if (event.dataTransfer) {
     event.dataTransfer.effectAllowed = 'move'
     event.dataTransfer.setData('text/plain', row.path)
+    setDragImage(event.dataTransfer, row)
   }
+}
+
+// The browser would drag the whole highlighted row; a small name chip travels instead.
+function setDragImage(transfer: DataTransfer, row: TreeRow) {
+  const doc = globalThis.document
+  if (!doc?.body || typeof transfer.setDragImage !== 'function') return
+  const chip = doc.createElement('div')
+  chip.textContent = row.kind === 'dir' ? `${row.name}/` : row.name
+  chip.className = 'pointer-events-none fixed left-0 top-0 rounded-md border border-border bg-popover px-2 py-1 text-xs text-foreground shadow-md'
+  chip.style.transform = 'translate(-9999px, -9999px)'
+  doc.body.appendChild(chip)
+  transfer.setDragImage(chip, 12, 12)
+  setTimeout(() => chip.remove(), 0)
 }
 
 function endDrag() {
