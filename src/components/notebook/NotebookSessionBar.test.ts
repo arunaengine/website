@@ -378,13 +378,9 @@ describe('the session bar', () => {
     sessionApi.getSessionState.mockResolvedValue(runningSession())
     const root = await render()
     await flush()
-    expect(content(root)).toContain('A kernel is already running')
-    expect(content(root)).toContain('Python')
-    expect(content(root)).toContain('lab-data')
+    expect(content(root)).toContain('Kernel running for this notebook')
     await click(button(root, 'Attach'))
     expect(context.session.attachTo).toHaveBeenCalledWith('01JOB', 'node-a')
-    await click(button(root, 'Start new kernel'))
-    expect(context.session.start).toHaveBeenCalledWith(expect.objectContaining({ name: 'counts' }))
   })
 
   it('shows no hint while attached', async () => {
@@ -392,7 +388,7 @@ describe('the session bar', () => {
     sessionApi.getSessionState.mockResolvedValue(runningSession())
     const root = await render({ running: true, state: { state: 'ready' } })
     await flush()
-    expect(content(root)).not.toContain('A kernel is already running')
+    expect(content(root)).not.toContain('Kernel running')
   })
 
   it('names a running kernel in another bucket without offering attach', async () => {
@@ -400,10 +396,9 @@ describe('the session bar', () => {
     sessionApi.getSessionState.mockResolvedValue(runningSession({ workspace_bucket: 'other-bucket' }))
     const root = await render()
     await flush()
-    expect(content(root)).toContain('A kernel is already running')
-    expect(content(root)).toContain('cannot attach to it')
+    expect(content(root)).toContain('Kernel running in other-bucket')
     expect(buttonCount(root, 'Attach')).toBe(0)
-    await click(button(root, 'Open kernel'))
+    await click(button(root, 'Open'))
     expect(content(root)).toContain('Running sessions')
   })
 
@@ -415,8 +410,7 @@ describe('the session bar', () => {
     await click(button(root, 'Run notebook'))
     expect(context.session.start).not.toHaveBeenCalled()
     expect(content(root)).toContain('Running sessions')
-    // The hint and the dialog footer both offer the explicit new kernel.
-    expect(buttonCount(root, 'Start new kernel')).toBe(2)
+    expect(buttonCount(root, 'Start new kernel')).toBe(1)
     await click(button(root, 'Start new kernel'))
     expect(context.session.start).toHaveBeenCalledOnce()
   })

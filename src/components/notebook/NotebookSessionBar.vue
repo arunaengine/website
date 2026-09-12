@@ -180,6 +180,14 @@ const unattachedSession = computed(() =>
   session.running.value || notebook.loading.value ? null : sessionRows.value[0] ?? null,
 )
 
+/** The long form of the inline hint, shown on hover. */
+function hintTitle(entry: RunningSession): string {
+  const where = `${runtimeLabel(entry.runtime)} on ${displayName(entry.nodeId)}, bucket ${entry.bucket}, started ${startedLabel(entry)}`
+  return matches(entry)
+    ? `${where}. This notebook is not attached to it.`
+    : `${where}. It works in another bucket or runtime, so this notebook cannot attach to it.`
+}
+
 /** Waits for the listing in flight; a running kernel asks for a choice first. */
 async function kernelChoiceNeeded(): Promise<boolean> {
   await listing
@@ -322,20 +330,14 @@ defineExpose({ runNotebook })
       </Button>
     </div>
 
-    <Notice v-if="unattachedSession" tone="warning" class="basis-full">
-      <div class="flex flex-wrap items-center gap-2">
-        <span class="min-w-0 flex-1">
-          <strong>A kernel is already running</strong> ({{ runtimeLabel(unattachedSession.runtime) }} on {{ displayName(unattachedSession.nodeId) }},
-          bucket {{ unattachedSession.bucket }}, started {{ startedLabel(unattachedSession) }}).
-          <template v-if="matches(unattachedSession)">This notebook is not attached to it. Attach to keep using it, or start a new one.</template>
-          <template v-else>It works in another bucket or runtime, so this notebook cannot attach to it. End it from the kernel dialog or start a new one.</template>
-          <template v-if="sessionRows.length > 1">Open Kernel to see all {{ sessionRows.length }} running kernels.</template>
-        </span>
-        <Button v-if="matches(unattachedSession)" size="sm" :disabled="session.attaching.value" @click="attachSession(unattachedSession)">Attach</Button>
-        <Button v-else variant="outline" size="sm" @click="kernelOpen = true">Open kernel</Button>
-        <Button variant="outline" size="sm" :disabled="startBlocked" @click="start()">Start new kernel</Button>
-      </div>
-    </Notice>
+    <span v-if="unattachedSession" class="inline-flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 py-1 pl-2 pr-1 text-xs text-amber-700 dark:text-amber-300">
+      <span class="size-2 rounded-full bg-amber-500" aria-hidden="true" />
+      <span :title="hintTitle(unattachedSession)">
+        {{ matches(unattachedSession) ? 'Kernel running for this notebook' : `Kernel running in ${unattachedSession.bucket}` }}
+      </span>
+      <Button v-if="matches(unattachedSession)" size="sm" class="h-6 px-2" :disabled="session.attaching.value" @click="attachSession(unattachedSession)">Attach</Button>
+      <Button v-else variant="ghost" size="sm" class="h-6 px-2" @click="kernelOpen = true">Open</Button>
+    </span>
 
     <Dialog v-model:open="kernelOpen">
       <DialogContent class="max-h-[85vh] max-w-lg overflow-y-auto">
