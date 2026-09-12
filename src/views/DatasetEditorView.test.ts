@@ -49,6 +49,7 @@ let updateGuard: (() => Promise<boolean>) | null = null
 
 const previewResult = ref<Api.ProfileValidationPreviewResponse | null>(null)
 const previewRunning = ref(false)
+const previewWaiting = ref(false)
 const previewError = ref<string | null>(null)
 const previewUnavailable = ref(false)
 const previewRejection = ref<unknown>(null)
@@ -349,6 +350,7 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
     useProfilePreview: () => ({
       result: previewResult,
       running: previewRunning,
+      waiting: previewWaiting,
       error: previewError,
       unavailable: previewUnavailable,
       rejection: previewRejection,
@@ -444,6 +446,7 @@ beforeEach(() => {
   previewResult.value = null
   previewRejection.value = null
   previewRunning.value = false
+  previewWaiting.value = false
   previewError.value = null
   previewUnavailable.value = false
   importDraft.value = null
@@ -1188,6 +1191,29 @@ describe('DatasetEditorView', () => {
     await flush()
 
     expect(button(mounted.root, 'Create dataset').props.disabled).toBe(true)
+    mounted.app.unmount()
+  })
+
+  it('refuses to save a profiled draft the node could not check', async () => {
+    profiles.value = [profileFixture('genomics', 'Genomics')]
+    const mounted = await mountApp(DatasetEditorView)
+    await click(button(mounted.root, 'Seed dataset'))
+    await click(button(mounted.root, 'Choose Genomics'))
+    expect(button(mounted.root, 'Create dataset').props.disabled).toBe(false)
+
+    previewError.value = 'Validator unavailable.'
+    await flush()
+    expect(button(mounted.root, 'Create dataset').props.disabled).toBe(true)
+    expect(content(mounted.root)).toContain('The node cannot validate the profile right now. Retry before saving.')
+
+    previewError.value = null
+    previewUnavailable.value = true
+    await flush()
+    expect(button(mounted.root, 'Create dataset').props.disabled).toBe(true)
+
+    await click(button(mounted.root, 'Choose no profile'))
+    await flush()
+    expect(button(mounted.root, 'Create dataset').props.disabled).toBe(false)
     mounted.app.unmount()
   })
 

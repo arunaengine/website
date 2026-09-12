@@ -176,6 +176,26 @@ describe('NodeCheckPanel', () => {
     mounted.app.unmount()
   })
 
+  it('says it is waiting for the node while a check is retried', async () => {
+    const mounted = await mount({ previewRunning: true, previewWaiting: true })
+
+    expect(content(mounted.root)).toContain('Waiting for the node to validate')
+    expect(content(mounted.root)).not.toContain('Validating…')
+    expect(content(mounted.root)).not.toContain('Could not validate')
+    expect(button(mounted.root, 'Validate again').props.disabled).toBe(false)
+    mounted.app.unmount()
+  })
+
+  it('offers a retry once the check has failed', async () => {
+    const retry = vi.fn()
+    const mounted = await mount({ previewError: 'Validator unavailable.', onPreview: retry })
+
+    expect(content(mounted.root)).toContain('Could not validate: Validator unavailable.')
+    await click(element(mounted.root, (node) => node.props.variant === 'link' && content(node).trim() === 'Validate again'))
+    expect(retry).toHaveBeenCalledTimes(1)
+    mounted.app.unmount()
+  })
+
   it('shows only the run in progress while validating', async () => {
     const mounted = await mount({ previewRunning: true, previewResult: verdict({ accepted: false, state: 'invalid' }) })
 

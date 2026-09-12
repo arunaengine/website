@@ -233,7 +233,42 @@ describe('stored profile rule load states', () => {
 
 describe('revision-bound Profile validation presentation', () => {
   afterEach(() => {
+    vi.useRealTimers()
     vi.mocked(apiRequest).mockReset()
+  })
+
+  it('polls a status the node cannot serve yet before showing it', async () => {
+    vi.useFakeTimers()
+    vi.mocked(apiRequest)
+      .mockRejectedValueOnce(new ApiError(503, 'Profile revision is changing.', 'profile_unavailable', undefined, 1_000))
+      .mockRejectedValueOnce(new ApiError(503, 'Profile revision is changing.', 'profile_unavailable', undefined, 1_000))
+      .mockResolvedValueOnce(validationStatus({ document_id: 'fresh-doc' }))
+    const { loadProfileValidationStatus, profileValidationStatuses } = useAruna()
+
+    const pending = loadProfileValidationStatus('fresh-doc')
+    await vi.advanceTimersByTimeAsync(999)
+    expect(profileValidationStatuses.value['fresh-doc']?.status).toBe('checking')
+    expect(vi.mocked(apiRequest)).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(vi.mocked(apiRequest)).toHaveBeenCalledTimes(2)
+    await vi.advanceTimersByTimeAsync(2_000)
+
+    await expect(pending).resolves.toMatchObject({ status: 'verified' })
+    expect(vi.mocked(apiRequest)).toHaveBeenCalledTimes(3)
+  })
+
+  it('reports the status unavailable once the 503 poll is spent', async () => {
+    vi.useFakeTimers()
+    vi.mocked(apiRequest).mockRejectedValue(new ApiError(503, 'Validator unavailable.', 'validator_unavailable'))
+    const { loadProfileValidationStatus, profileValidationStatuses } = useAruna()
+
+    const pending = loadProfileValidationStatus('busy-doc')
+    const rejected = expect(pending).rejects.toBeInstanceOf(ApiError)
+    await vi.runAllTimersAsync()
+
+    await rejected
+    expect(vi.mocked(apiRequest)).toHaveBeenCalledTimes(8)
+    expect(profileValidationStatuses.value['busy-doc']).toMatchObject({ status: 'unavailable', message: 'Validator unavailable.' })
   })
 
   it('maps backend states into the canonical UI vocabulary', () => {

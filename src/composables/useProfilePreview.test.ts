@@ -165,25 +165,120 @@ describe('server profile validation preview', () => {
     expect(preview.rejection.value).toBeNull()
   })
 
-  it('surfaces a retryable error when the validator is unavailable', async () => {
+  it('waits for the node and retries a 503 before it reports', async () => {
     const preview = setupPreview()
 
     preview.previewNow(CRATE)
-    answer(0, { message: 'Validator unavailable.' }, 503, { 'Retry-After': '5' })
+    answer(0, { message: 'Validator unavailable.' }, 503, { 'Retry-After': '2' })
     await flush()
 
+    expect(preview.waiting.value).toBe(true)
+    expect(preview.running.value).toBe(true)
+    expect(preview.error.value).toBeNull()
     expect(preview.unavailable.value).toBe(false)
+    vi.advanceTimersByTime(1_999)
+    expect(fetch).toHaveBeenCalledTimes(1)
+    vi.advanceTimersByTime(1)
+    expect(fetch).toHaveBeenCalledTimes(2)
+
+    answer(1, body(true))
+    await flush()
+
+    expect(preview.waiting.value).toBe(false)
+    expect(preview.running.value).toBe(false)
+    expect(preview.error.value).toBeNull()
+    expect(preview.result.value?.accepted).toBe(true)
+  })
+
+  it('fails only once the retry budget is spent', async () => {
+    const preview = setupPreview()
+
+    const verdict = preview.verify(CRATE)
+    for (let index = 0; index < 8; index += 1) {
+      answer(index, { message: 'Validator unavailable.' }, 503, { 'Retry-After': '1' })
+      await flush()
+      if (index < 7) {
+        expect(preview.waiting.value).toBe(true)
+        await vi.advanceTimersByTimeAsync(3_000)
+      }
+    }
+
+    expect(fetch).toHaveBeenCalledTimes(8)
+    expect(await verdict).toBe(true)
+    expect(preview.waiting.value).toBe(false)
     expect(preview.running.value).toBe(false)
     expect(preview.error.value).toBe('Validator unavailable.')
     expect(preview.result.value).toBeNull()
 
     preview.previewNow(CRATE)
-    expect(fetch).toHaveBeenCalledTimes(2)
-    answer(1, body(true))
+    expect(fetch).toHaveBeenCalledTimes(9)
+    answer(8, body(true))
     await flush()
 
     expect(preview.error.value).toBeNull()
     expect(preview.result.value?.accepted).toBe(true)
+  })
+
+  it('refuses a profiled draft the node could not check', async () => {
+    scope = effectScope()
+    const preview = scope.run(() => useProfilePreview({ client: () => CLIENT, profiled: () => true }))!
+
+    const failed = preview.verify(CRATE)
+    answer(0, { message: 'Too many requests' }, 429)
+    await flush()
+    expect(await failed).toBe(false)
+    expect(preview.error.value).toContain('Too many requests')
+
+    const missing = preview.verify(CRATE)
+    answer(1, { message: 'Not Found' }, 404)
+    await flush()
+    expect(await missing).toBe(false)
+    expect(preview.unavailable.value).toBe(true)
+    expect(await preview.verify(CRATE)).toBe(false)
+  })
+
+  it('lets an unprofiled draft through when the check could not run', async () => {
+    const preview = setupPreview()
+
+    const failed = preview.verify(CRATE)
+    answer(0, { message: 'Too many requests' }, 429)
+    await flush()
+    expect(await failed).toBe(true)
+
+    const missing = preview.verify(CRATE)
+    answer(1, { message: 'Not Found' }, 404)
+    await flush()
+    expect(await missing).toBe(true)
+    expect(await preview.verify(CRATE)).toBe(true)
+  })
+
+  it('stops waiting when a newer draft or a reset arrives', async () => {
+    const preview = setupPreview()
+
+    preview.previewNow(CRATE)
+    answer(0, { message: 'Validator unavailable.' }, 503)
+    await flush()
+    expect(preview.waiting.value).toBe(true)
+
+    preview.previewNow({ ...CRATE, name: 'edited' })
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(preview.waiting.value).toBe(false)
+    vi.advanceTimersByTime(20_000)
+    expect(fetch).toHaveBeenCalledTimes(2)
+
+    answer(1, { message: 'Validator unavailable.' }, 503)
+    await flush()
+    const verdict = preview.verify({ ...CRATE, name: 'edited' })
+    answer(2, { message: 'Validator unavailable.' }, 503)
+    await flush()
+    expect(preview.waiting.value).toBe(true)
+
+    preview.reset()
+    expect(await verdict).toBe(false)
+    expect(preview.waiting.value).toBe(false)
+    expect(preview.running.value).toBe(false)
+    vi.advanceTimersByTime(20_000)
+    expect(fetch).toHaveBeenCalledTimes(3)
   })
 
   it('renders a synchronous request failure instead of hanging', async () => {
