@@ -158,7 +158,7 @@ const stateVariant = computed(() =>
 // The kernel light and its word, in the portal's shared state tones.
 const kernelLabel = computed(() => {
   if (notebook.loading.value) return 'Loading'
-  if (session.live.value) return session.kernel.value === 'busy' ? 'Busy' : 'Idle'
+  if (session.live.value) return session.kernel.value === 'busy' ? 'Running a cell' : 'Running'
   return session.running.value || session.starting.value ? stateLabel.value : 'Stopped'
 })
 const kernelTone = computed<StateTone>(() => {

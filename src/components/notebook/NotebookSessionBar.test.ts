@@ -240,6 +240,16 @@ describe('the session bar', () => {
     expect(content(root)).toContain('The session ended (idle).')
   })
 
+  it('calls a live kernel running, not idle', async () => {
+    const root = await render({ state: { state: 'ready' }, running: true })
+    const kernel = () => content(element(root, (node) => node.props['aria-label'] === 'Kernel'))
+    expect(kernel()).toContain('Running')
+    expect(kernel()).not.toContain('Idle')
+    ;(context.session.kernel as { value: string }).value = 'busy'
+    await flush()
+    expect(kernel()).toContain('Running a cell')
+  })
+
   it('starts a session with the notebook settings', async () => {
     const root = await render()
     const { start } = context.session as { start: ReturnType<typeof vi.fn> }
