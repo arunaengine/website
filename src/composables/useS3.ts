@@ -59,6 +59,7 @@ export {
 } from './s3/errors'
 export {
   S3_SESSION_REFRESH_WINDOW_MS,
+  SESSION_REFUSED_MESSAGE,
   purgeLegacyS3KeyStorage,
   s3RestrictionsAllowPath,
   s3SessionRefreshJitterMs,

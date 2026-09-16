@@ -134,6 +134,16 @@ describe('portal S3 session migration and selection', () => {
     expect(sessionSet).not.toHaveBeenCalled()
   })
 
+  it('explains a refused mint', async () => {
+    // The node answers a bare 403 when the caller's roles reach none of the group data.
+    apiRequest.mockRejectedValueOnce(Object.assign(new Error('Forbidden'), { name: 'ApiError', status: 403 }))
+
+    const failure = await s3.activateContext(null, 'group-a').catch((error: unknown) => error)
+
+    expect(sessionModule.s3ErrorMessage(failure)).toBe(sessionModule.SESSION_REFUSED_MESSAGE)
+    expect(s3.hasActiveKey.value).toBe(false)
+  })
+
   it('requires an explicit group before minting', async () => {
     await expect(s3.activateContext(null, '   ')).rejects.toThrow(
       'Select a group before opening S3 storage.',

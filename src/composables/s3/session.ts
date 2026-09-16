@@ -8,7 +8,7 @@ import {
 import { useAruna } from '../useAruna'
 import { destroyClients, dropClients } from './cache'
 import { connectedEndpoint, endpointForNode, localNodeId, nodeApiBase } from './endpoints'
-import { s3ErrorMessage } from './errors'
+import { S3SessionUnavailableError, s3ErrorMessage } from './errors'
 
 export interface S3Key {
   accessKeyId: string
@@ -225,6 +225,17 @@ function responseSession(
   }
 }
 
+export const SESSION_REFUSED_MESSAGE =
+  'The node refused an S3 session for this group. Either your roles grant no access to the ' +
+  "group's data on this node, or the node does not know the group yet. A group admin can " +
+  'assign a role that covers data/ or a folder below it.'
+
+// The node answers a bare 403 for a member whose roles reach none of the group data.
+function sessionRefusal(error: unknown): unknown {
+  const status = (error as { status?: unknown } | null)?.status
+  return status === 403 ? new S3SessionUnavailableError(SESSION_REFUSED_MESSAGE) : error
+}
+
 async function mintSession(nodeId: string, groupId: string, userId: string): Promise<PortalS3Session> {
   const key = storeKey(nodeId, groupId)
   const pending = pendingMints.get(key)
@@ -238,7 +249,9 @@ async function mintSession(nodeId: string, groupId: string, userId: string): Pro
       '/access/s3/sessions',
       { method: 'POST', body: JSON.stringify(body) },
       { baseUrl: apiBase, token: authToken.value },
-    )
+    ).catch((error: unknown) => {
+      throw sessionRefusal(error)
+    })
     if (
       generation !== boundaryGeneration ||
       apiBaseUrl.value !== sessionsBoundaryApiBase ||

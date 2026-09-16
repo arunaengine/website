@@ -52,6 +52,7 @@ function plain(message: string): S3ErrorReport {
  */
 export function s3ErrorReport(err: unknown, bucket?: string): S3ErrorReport {
   if (isS3PurgeInProgressError(err)) return plain(PURGE_IN_PROGRESS_MESSAGE)
+  if (err instanceof S3SessionUnavailableError) return plain(err.message)
   if (!err || typeof err !== 'object') return plain(String(err))
   const error = err as {
     name?: string
