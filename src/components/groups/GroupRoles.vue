@@ -1,10 +1,15 @@
 <script setup lang="ts">
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
+import Dialog from '@/components/ui/Dialog.vue'
+import DialogContent from '@/components/ui/DialogContent.vue'
+import DialogDescription from '@/components/ui/DialogDescription.vue'
+import DialogHeader from '@/components/ui/DialogHeader.vue'
+import DialogTitle from '@/components/ui/DialogTitle.vue'
 import RoleBuilder from './RoleBuilder.vue'
 import { describeTarget, pathProblem } from './permission-paths'
 import { computed, ref } from 'vue'
-import { Globe, Lock, Pencil, Plus, Trash2 } from '@lucide/vue'
+import { Globe, Info, Lock, Pencil, Plus, Trash2 } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import type { ApiRole, GroupDetailResponse } from '@/lib/api'
 import { errorMessage } from '@/lib/utils'
@@ -61,6 +66,15 @@ function customRules(role: ApiRole): { path: string; label: string; level: strin
 }
 
 const anyCustom = computed(() => props.group.roles.some((role) => customRules(role).length > 0))
+
+// The column shows the widest level the custom rules grant; the modal names each path.
+function customSummary(role: ApiRole): { level: string; count: number } {
+  const rules = customRules(role)
+  const levels = new Set(rules.map((rule) => rule.level))
+  return { level: levels.has('write') ? 'write' : levels.has('read') ? 'read' : 'deny', count: rules.length }
+}
+
+const rulesOf = ref<ApiRole | null>(null)
 
 const sortedRoles = computed(() => {
   const rank = (role: ApiRole) => {
@@ -139,13 +153,13 @@ async function removeRole(role: ApiRole) {
             <th v-for="scope in scopes" :key="scope.label" class="px-3 py-2 text-left font-semibold" :title="scope.paths.join('\n')">
               {{ scope.label }}
             </th>
-            <th v-if="anyCustom" class="px-3 py-2 text-left font-semibold">Custom rules</th>
+            <th v-if="anyCustom" class="px-3 py-2 text-left font-semibold">Custom</th>
             <th class="px-3 py-2 text-right font-semibold tabular-nums">Assigned</th>
             <th v-if="canManage" class="px-5 py-2 text-right font-semibold">Actions</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="role in sortedRoles" :key="role.role_id" class="border-t border-border align-top">
+          <tr v-for="role in sortedRoles" :key="role.role_id" class="border-t border-border">
             <td class="px-5 py-2.5 font-medium text-foreground">
               {{ role.name }}
               <Badge v-if="role.public" size="sm" variant="success" class="ml-1 uppercase" title="Applies to everyone, including anonymous requests">
@@ -158,13 +172,18 @@ async function removeRole(role: ApiRole) {
               </Badge>
               <span v-else class="text-muted-foreground">-</span>
             </td>
-            <td v-if="anyCustom" class="max-w-xs px-3 py-2.5">
-              <ul v-if="customRules(role).length" class="space-y-1">
-                <li v-for="rule in customRules(role)" :key="rule.path" class="flex items-center gap-1.5 text-xs" :title="rule.path">
-                  <Badge size="sm" :variant="levelVariant(rule.level)" class="shrink-0 uppercase">{{ rule.level }}</Badge>
-                  <span class="min-w-0 truncate text-muted-foreground">{{ rule.label }}</span>
-                </li>
-              </ul>
+            <td v-if="anyCustom" class="px-3 py-2.5">
+              <button
+                v-if="customRules(role).length"
+                type="button"
+                class="inline-flex items-center gap-1 rounded-md px-1 py-0.5 hover:bg-muted"
+                :aria-label="`Show the custom rules of ${role.name}`"
+                @click="rulesOf = role"
+              >
+                <Badge size="sm" :variant="levelVariant(customSummary(role).level)" class="uppercase">{{ customSummary(role).level }}</Badge>
+                <span class="text-[11px] text-muted-foreground">{{ customSummary(role).count }} {{ customSummary(role).count === 1 ? 'rule' : 'rules' }}</span>
+                <Info class="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+              </button>
               <span v-else class="text-muted-foreground">-</span>
             </td>
             <td class="px-3 py-2.5 text-right text-[11px] tabular-nums text-muted-foreground">
@@ -204,6 +223,24 @@ async function removeRole(role: ApiRole) {
     </div>
 
     <div v-if="roleError" class="border-t border-border px-5 py-2 text-xs text-destructive">{{ roleError }}</div>
+
+    <Dialog :open="rulesOf !== null" @update:open="(value: boolean) => { if (!value) rulesOf = null }">
+      <DialogContent v-if="rulesOf" class="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Custom rules of "{{ rulesOf.name }}"</DialogTitle>
+          <DialogDescription>Access rules on parts of this group, beside the broad scopes in the table.</DialogDescription>
+        </DialogHeader>
+        <ul class="divide-y divide-border/60 rounded-md border border-border/60 text-xs">
+          <li v-for="rule in customRules(rulesOf)" :key="rule.path" class="flex items-start gap-2 px-3 py-2">
+            <Badge size="sm" :variant="levelVariant(rule.level)" class="mt-0.5 shrink-0 uppercase">{{ rule.level }}</Badge>
+            <span class="min-w-0">
+              <span class="block">{{ rule.label }}</span>
+              <span class="block break-all font-mono text-[10px] text-muted-foreground">{{ rule.path }}</span>
+            </span>
+          </li>
+        </ul>
+      </DialogContent>
+    </Dialog>
 
     <div v-if="canManage" class="border-t border-border">
       <div v-if="!editor" class="flex flex-wrap items-center gap-2 px-5 py-4">

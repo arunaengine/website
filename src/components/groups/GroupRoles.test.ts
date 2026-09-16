@@ -13,11 +13,21 @@ const BuilderStub = defineComponent({
   setup: (props) => () => h('section', { 'data-builder': props.initialPublic ? 'public' : 'members' }, 'builder'),
 })
 
+const DialogStub = defineComponent({
+  props: { open: Boolean },
+  setup: (props, { slots }) => () => (props.open ? h('div', { role: 'dialog' }, slots.default?.()) : null),
+})
+
 const roles = compileClientComponent(new URL('./GroupRoles.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => IconStub }),
   '@/components/ui/Button.vue': moduleDefault(Slotted('button')),
   '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
+  '@/components/ui/Dialog.vue': moduleDefault(DialogStub),
+  '@/components/ui/DialogContent.vue': moduleDefault(Slotted('div')),
+  '@/components/ui/DialogDescription.vue': moduleDefault(Slotted('p')),
+  '@/components/ui/DialogHeader.vue': moduleDefault(Slotted('div')),
+  '@/components/ui/DialogTitle.vue': moduleDefault(Slotted('h2')),
   './RoleBuilder.vue': moduleDefault(BuilderStub),
   './permission-paths': PermissionPaths,
   '@/composables/useAruna': { useAruna: () => ({ deleteGroupRole: () => Promise.resolve(), saving: ref(false) }) },
@@ -53,16 +63,32 @@ function headers(root: ReturnType<typeof nodes>[number]): string[] {
 }
 
 describe('group roles table', () => {
-  it('keeps one column per broad scope and folds narrower paths into custom rules', async () => {
+  it('keeps one column per broad scope and counts narrower paths as custom', async () => {
     const root = await render()
 
-    expect(headers(root)).toEqual(['Role', 'everything', 'data', 'Custom rules', 'Assigned', 'Actions'])
+    expect(headers(root)).toEqual(['Role', 'everything', 'data', 'Custom', 'Assigned', 'Actions'])
     const study = element(root, (node) => node.tag === 'tr' && content(node).includes('study'))
-    expect(content(study)).toContain('files in "study/" on node node-1')
-    expect(content(study)).toContain('the dataset "reports/x"')
-    expect(content(study)).toContain('2')
-    const open = element(root, (node) => node.tag === 'tr' && content(node).includes('open/'))
+    expect(content(study)).toContain('write')
+    expect(content(study)).toContain('2 rules')
+    expect(content(study)).not.toContain('files in "study/"')
+    const open = element(root, (node) => node.tag === 'tr' && content(node).includes('public'))
     expect(content(open)).toContain('everyone')
+    expect(content(open)).toContain('read')
+    expect(content(open)).toContain('1 rule')
+  })
+
+  it('names every custom rule in a modal', async () => {
+    const root = await render()
+    expect(nodes(root).some((node) => node.props.role === 'dialog')).toBe(false)
+
+    await click(element(root, (node) => node.props['aria-label'] === 'Show the custom rules of study'))
+
+    const modal = element(root, (node) => node.props.role === 'dialog')
+    expect(content(modal)).toContain('Custom rules of "study"')
+    expect(content(modal)).toContain('files in "study/" on node node-1')
+    expect(content(modal)).toContain('the dataset "reports/x"')
+    expect(content(modal)).toContain(`${PREFIX}data/node-1/study/**`)
+    expect(content(modal)).not.toContain('data/**\n')
   })
 
   it('opens the builder as a public role from its own button', async () => {
