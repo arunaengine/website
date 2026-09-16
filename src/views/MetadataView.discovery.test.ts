@@ -8,29 +8,23 @@ function read(path: string): string {
 
 const source = read('../components/metadata/view/DatasetFiles.vue')
 const view = read('./MetadataView.vue')
+const list = read('../components/data/ReferencedBy.vue')
 
 describe('Dataset file discovery presentation', () => {
-  it('runs backlink preflight only from the file action and renders authoritative coverage', () => {
+  it('runs the reference lookup only from the file action and hands it to the shared list', () => {
     expect(source).toContain('@click.stop="loadBacklinks(row)"')
-    expect(source).toContain('await preflightBacklinks(')
     expect(source).toContain("{ target: { kind: 'content_w3ids', content_w3ids: [identity] } }")
-    expect(source).toContain('Authoritative Realm backlink lookup')
-    expect(source).toContain('backlinkResult.coverage.queried_scope')
-    expect(source).toContain('backlinkResult.coverage.node_freshness')
-    expect(source).toContain('backlinkResult.coverage.realm_coverage_complete')
-    expect(source).toContain('backlinkResult.coverage.path_style_endpoint_coverage_complete')
-    expect(source).toContain('backlinkResult.coverage.target_resolution_complete')
-    expect(source).toContain('backlinkTarget.visible_references')
-    expect(source).toContain('Other restricted datasets reference this content')
-    expect(source).toContain("backlinkResult.coverage.queried_scope.replaceAll('_', ' ')")
-    expect(source).toContain("freshness.index_state.replaceAll('_', ' ')")
-    expect(source).toContain('relativeTime(new Date(value).toISOString())')
-    expect(source).toContain('new Date(freshness.oldest_status_updated_at_ms).toISOString()')
+    expect(source).toContain('<ReferencedBy')
+    expect(source).not.toContain('coverage.queried_scope')
+    expect(source).not.toContain('node_freshness')
+    expect(list).toContain('Other restricted datasets reference this file.')
+    expect(list).toContain('Not checked:')
+    expect(list).toContain("section=\"What the reference check covers\"")
   })
 
   it('keeps the loaded cache separate and presents identity apart from location', () => {
     expect(source).toContain('Loaded datasets only:')
-    expect(source.indexOf('Loaded datasets only:')).not.toBe(source.indexOf('Authoritative Realm backlink lookup'))
+    expect(source.indexOf('Loaded datasets only:')).not.toBe(source.indexOf('<ReferencedBy'))
     expect(source).toContain('Content identity: {{ row.id }}')
     expect(source).toContain('Location:')
     expect(source).toContain("row.contentUrl ?? (contentW3id(row) ? '' : row.id)")

@@ -1,23 +1,23 @@
 <script setup lang="ts">
-// The data entities a dataset references, plus the authoritative Realm backlink
-// lookup one file row can run on its content identity.
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+// The data entities a dataset references, plus the datasets that reference one
+// file row, looked up across the Realm on its content identity.
+import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+import ReferencedBy from '@/components/data/ReferencedBy.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import IconButton from '@/components/ui/IconButton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import { useAruna } from '@/composables/useAruna'
+import { useBacklinks } from '@/composables/useBacklinks'
 import { useCrateReferences } from '@/composables/useCrateReferences'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useS3 } from '@/composables/useS3'
 import type { DatasetViewState } from '@/composables/useDatasetView'
-import { preflightBacklinks, type BacklinkPreflightResponse } from '@/lib/backlinks'
 import type { CrateObjectReference } from '@/lib/crateReferences'
 import { dataEntityTreeOf, formatContentSize, type DataEntity, type DataEntityNode } from '@/lib/dataEntities'
 import { termNameFromUri } from '@/lib/profiles/uri'
-import { errorMessage, relativeTime } from '@/lib/utils'
 import { Eye, ExternalLink as ExternalLinkIcon, FileJson2, Folder, Info, Link2 } from '@lucide/vue'
 
 interface PreviewTarget {
@@ -37,7 +37,7 @@ const { detailId, currentCrate, subcrateIris, loadingCrate, crateNotReady } = pr
 const { fetchCrate } = props.state
 
 const s3 = useS3()
-const { currentUser, authToken, apiBaseUrl } = useAruna()
+const { currentUser, apiBaseUrl } = useAruna()
 const { localNodeId, displayName: nodeDisplayName } = useRealmNodes()
 const { hasActiveKey: hasS3Access, endpoint: s3Endpoint } = s3
 
@@ -79,67 +79,33 @@ function contentW3id(row: DataEntity): string | null {
 }
 
 const selectedBacklinkId = ref('')
-const backlinkResult = ref<BacklinkPreflightResponse | null>(null)
-const backlinkError = ref<string | null>(null)
-const backlinkLoading = ref(false)
-let backlinkController: AbortController | null = null
+const {
+  result: backlinkResult,
+  error: backlinkError,
+  busy: backlinkLoading,
+  load: loadBacklinkLookup,
+  reset: resetBacklinks,
+} = useBacklinks()
 
-const backlinkTarget = computed(() => {
-  const result = backlinkResult.value
-  if (!result) return null
-  const selected = dataEntities.value.find((row) => row.id === selectedBacklinkId.value)
-  const identity = selected ? contentW3id(selected) : null
-  return result.targets.find((target) => target.content_w3id === identity) ?? result.targets[0] ?? null
-})
-const backlinkComplete = computed(() => Boolean(
-  backlinkResult.value?.complete && !backlinkResult.value.truncated,
-))
-
-async function loadBacklinks(row: DataEntity) {
+function loadBacklinks(row: DataEntity) {
   const identity = contentW3id(row)
   if (!identity || !currentUser.value) return
-  backlinkController?.abort()
-  const controller = new AbortController()
-  backlinkController = controller
   selectedBacklinkId.value = row.id
-  backlinkResult.value = null
-  backlinkError.value = null
-  backlinkLoading.value = true
-  try {
-    backlinkResult.value = await preflightBacklinks(
-      { target: { kind: 'content_w3ids', content_w3ids: [identity] } },
-      { baseUrl: apiBaseUrl.value, token: authToken.value },
-      controller.signal,
-    )
-  } catch (err) {
-    if (controller.signal.aborted) return
-    backlinkError.value = errorMessage(err)
-  } finally {
-    if (backlinkController === controller) {
-      backlinkController = null
-      backlinkLoading.value = false
-    }
-  }
+  void loadBacklinkLookup(
+    { target: { kind: 'content_w3ids', content_w3ids: [identity] } },
+    apiBaseUrl.value,
+  )
 }
 
 function retryBacklinks() {
   const row = dataEntities.value.find((entry) => entry.id === selectedBacklinkId.value)
-  if (row) void loadBacklinks(row)
-}
-
-function backlinkFreshnessTime(value: number | null): string {
-  return value === null ? 'observation time unavailable' : relativeTime(new Date(value).toISOString())
+  if (row) loadBacklinks(row)
 }
 
 watch(detailId, () => {
-  backlinkController?.abort()
-  backlinkController = null
   selectedBacklinkId.value = ''
-  backlinkResult.value = null
-  backlinkError.value = null
-  backlinkLoading.value = false
+  resetBacklinks()
 })
-onBeforeUnmount(() => backlinkController?.abort())
 
 function entityLink(row: DataEntity): string | undefined {
   const target = row.contentUrl ?? (contentW3id(row) ? '' : row.id)
@@ -243,7 +209,7 @@ function openPreview(row: DataEntity) {
                     variant="ghost"
                     size="sm"
                     :disabled="!currentUser || (backlinkLoading && selectedBacklinkId === row.id)"
-                    :title="currentUser ? 'Run an authoritative Realm backlink lookup' : 'Sign in to inspect dataset backlinks'"
+                    :title="currentUser ? 'Show the datasets that reference this file' : 'Sign in to see which datasets reference this file'"
                     @click.stop="loadBacklinks(row)"
                   >
                     <Link2 class="size-3.5" /> Referenced by
@@ -261,74 +227,13 @@ function openPreview(row: DataEntity) {
               </td>
             </tr>
             <tr v-if="selectedBacklinkId === row.id" class="border-t border-border bg-muted/15">
-              <td colspan="5" class="px-5 py-4">
-                <div class="rounded-md border border-border bg-background p-4" aria-live="polite">
-                  <div class="flex flex-wrap items-center gap-2">
-                    <Link2 class="h-4 w-4 text-primary" />
-                    <h3 class="font-display text-sm font-semibold text-aruna-navy">Authoritative Realm backlink lookup</h3>
-                    <Badge v-if="backlinkResult" :variant="backlinkComplete ? 'success' : 'warn'" size="sm" class="uppercase">
-                      {{ backlinkComplete ? 'Complete' : 'Partial' }}
-                    </Badge>
-                  </div>
-                  <p class="mt-1 break-all font-mono text-[10px] text-muted-foreground">{{ row.id }}</p>
-
-                  <p v-if="backlinkLoading" class="mt-3 text-xs text-muted-foreground">Checking current Realm indexes…</p>
-                  <div v-else-if="backlinkError" class="mt-3 flex flex-wrap items-center gap-2 text-xs text-destructive">
-                    <span>{{ backlinkError }}</span>
-                    <Button variant="outline" size="sm" @click="retryBacklinks">Retry</Button>
-                  </div>
-                  <template v-else-if="backlinkResult">
-                    <dl class="mt-3 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
-                      <div class="surface-muted rounded-md px-3 py-2">
-                        <dt class="text-[10px] uppercase tracking-wider text-muted-foreground">Scope</dt>
-                        <dd class="mt-1 font-medium">{{ backlinkResult.coverage.queried_scope.replaceAll('_', ' ') }}</dd>
-                      </div>
-                      <div class="surface-muted rounded-md px-3 py-2">
-                        <dt class="text-[10px] uppercase tracking-wider text-muted-foreground">Overall coverage</dt>
-                        <dd class="mt-1 font-medium">{{ backlinkResult.complete ? 'Complete' : 'Incomplete' }}</dd>
-                      </div>
-                      <div class="surface-muted rounded-md px-3 py-2">
-                        <dt class="text-[10px] uppercase tracking-wider text-muted-foreground">Realm coverage</dt>
-                        <dd class="mt-1 font-medium">{{ backlinkResult.coverage.realm_coverage_complete ? 'Complete' : 'Incomplete' }}</dd>
-                      </div>
-                      <div class="surface-muted rounded-md px-3 py-2">
-                        <dt class="text-[10px] uppercase tracking-wider text-muted-foreground">Location-form coverage</dt>
-                        <dd class="mt-1 font-medium">{{ backlinkResult.coverage.path_style_endpoint_coverage_complete ? 'Complete' : 'Incomplete' }}</dd>
-                      </div>
-                    </dl>
-                    <div class="mt-3 space-y-1 text-[11px] text-muted-foreground">
-                      <p>Target resolution: {{ backlinkResult.coverage.target_resolution_complete ? 'Complete' : 'Incomplete' }}.</p>
-                      <p>Nodes queried: {{ backlinkResult.nodes_queried }}. Nodes failed: {{ backlinkResult.nodes_failed }}.</p>
-                      <p v-if="backlinkResult.truncated">The authoritative result page is truncated.</p>
-                      <p v-if="backlinkResult.failed_partitions.length" class="break-all">Failed partitions: {{ backlinkResult.failed_partitions.join(', ') }}</p>
-                      <p v-if="backlinkResult.coverage.queried_forms.length" class="break-all">Queried forms: {{ backlinkResult.coverage.queried_forms.join(', ') }}</p>
-                      <p v-for="excluded in backlinkResult.coverage.excluded_forms" :key="excluded.form" class="break-all">Excluded form {{ excluded.form }}: {{ excluded.reason }}</p>
-                    </div>
-                    <div class="mt-3">
-                      <h4 class="font-display text-sm font-semibold text-aruna-navy">Index freshness</h4>
-                      <ul v-if="backlinkResult.coverage.node_freshness.length" class="mt-1 divide-y divide-border/60 rounded-md border border-border/60 text-[11px] text-muted-foreground">
-                        <li v-for="freshness in backlinkResult.coverage.node_freshness" :key="freshness.node_id" class="flex flex-wrap gap-x-2 px-3 py-1.5">
-                          <span class="font-mono" :title="freshness.node_id">{{ nodeDisplayName(freshness.node_id) }}</span>
-                          <span>State: {{ freshness.index_state.replaceAll('_', ' ') }}</span>
-                          <span :title="freshness.oldest_status_updated_at_ms !== null ? new Date(freshness.oldest_status_updated_at_ms).toISOString() : undefined">Oldest status: {{ backlinkFreshnessTime(freshness.oldest_status_updated_at_ms) }}</span>
-                        </li>
-                      </ul>
-                      <p v-else class="mt-1 text-[11px] text-muted-foreground">No per-node freshness detail was returned.</p>
-                    </div>
-                    <div class="mt-3">
-                      <h4 class="font-display text-sm font-semibold text-aruna-navy">Visible referencing datasets</h4>
-                      <ul v-if="backlinkTarget?.visible_references.length" class="mt-1 divide-y divide-border/60 rounded-md border border-border/60">
-                        <li v-for="reference in backlinkTarget.visible_references" :key="reference.document_id" class="px-3 py-2 text-xs">
-                          <RouterLink :to="{ name: 'dataset', params: { id: reference.document_id } }" class="font-medium text-primary hover:underline">{{ reference.title }}</RouterLink>
-                        </li>
-                      </ul>
-                      <p v-else class="mt-1 text-xs text-muted-foreground">
-                        {{ backlinkComplete ? 'No visible referencing datasets were found.' : 'No visible referencing datasets were returned. Coverage is incomplete.' }}
-                      </p>
-                      <p v-if="backlinkTarget?.hidden_references_exist" class="mt-2 text-xs font-medium text-amber-800 dark:text-amber-200">Other restricted datasets reference this content</p>
-                    </div>
-                  </template>
-                </div>
+              <td colspan="5" class="px-5 py-3">
+                <ReferencedBy
+                  :preflight="backlinkResult"
+                  :busy="backlinkLoading"
+                  :error="backlinkError"
+                  @retry="retryBacklinks"
+                />
               </td>
             </tr>
           </template>
