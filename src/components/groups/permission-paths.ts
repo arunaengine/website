@@ -42,6 +42,15 @@ export function describeTarget(suffix: string): string {
   return `"${clean}"`
 }
 
+// Aruna authorizes datasets under meta/, files under data/ and group settings
+// under admin/; a rule anywhere else is stored but never matches a request.
+export function pathProblem(suffix: string): string | null {
+  const clean = suffix.replace(/^\/+/, '')
+  const head = clean.split('/')[0]
+  if (head === '**' || head === 'data' || head === 'meta' || head === 'admin') return null
+  return `"${clean}" grants nothing: a path must start with data/, meta/ or admin/, or be ** for everything.`
+}
+
 export function buildMetaPathTree(documentPaths: string[]): MetaPathFolder {
   const root: MetaPathFolder = { name: '', path: '', folders: [], documents: [] }
   for (const documentPath of [...documentPaths].sort()) {

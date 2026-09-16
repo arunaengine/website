@@ -5,7 +5,7 @@ import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
 import PermissionPathPicker from './PermissionPathPicker.vue'
-import { describeTarget } from './permission-paths'
+import { describeTarget, pathProblem } from './permission-paths'
 import { useAruna } from '@/composables/useAruna'
 import type { ApiRole, GroupDetailResponse, GroupPermissionLevel } from '@/lib/api'
 import { errorMessage } from '@/lib/utils'
@@ -64,6 +64,7 @@ const nameReserved = computed(() => RESERVED_NAMES.includes(name.value.trim()))
 const canSave = computed(() => !!name.value.trim() && !nameReserved.value && grants.value.length > 0 && !saving.value)
 
 const pendingPreview = computed(() => pending.value.map(describeTarget).join(' and '))
+const rawProblem = computed(() => (rawPath.value.trim() ? pathProblem(rawPath.value.trim()) : null))
 
 // The permission map holds one level per path, so re-adding a path updates it.
 function addGrants(suffixes: string[], level: GroupPermissionLevel) {
@@ -92,7 +93,7 @@ function commitPending() {
 
 function commitRaw() {
   const suffix = rawPath.value.trim().replace(/^\/+/, '')
-  if (!suffix) return
+  if (!suffix || rawProblem.value) return
   addGrants([suffix], rawLevel.value)
   rawPath.value = ''
 }
@@ -207,6 +208,7 @@ async function submit() {
               <span class="min-w-0 flex-1 text-xs text-foreground" :title="`${prefix}${grant.suffix}`">
                 {{ describeTarget(grant.suffix) }}
                 <span v-if="grant.level === 'deny'" class="text-muted-foreground">(blocks any other access rule)</span>
+                <span v-else-if="pathProblem(grant.suffix)" class="text-destructive">(outside data, meta and admin, grants nothing)</span>
               </span>
               <Button
                 variant="ghost"
@@ -251,8 +253,9 @@ async function submit() {
                   class="h-8 w-32 shrink-0 text-xs"
                   @update:model-value="(value: string) => (rawLevel = toLevel(value))"
                 />
-                <Button variant="outline" size="sm" class="shrink-0" :disabled="!rawPath.trim()" @click="commitRaw">Add</Button>
+                <Button variant="outline" size="sm" class="shrink-0" :disabled="!rawPath.trim() || !!rawProblem" @click="commitRaw">Add</Button>
               </div>
+              <p v-if="rawProblem" class="mt-1.5 text-[11px] text-destructive">{{ rawProblem }}</p>
               <p class="mt-1.5 text-[11px] text-muted-foreground">
                 Paths are relative to this group; a trailing ** covers everything below the path.
               </p>
