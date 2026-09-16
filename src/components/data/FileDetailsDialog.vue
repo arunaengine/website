@@ -16,15 +16,18 @@ import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import ObjectLocationsPanel from '@/components/data/ObjectLocationsPanel.vue'
 import ReferencedBy from '@/components/data/ReferencedBy.vue'
 import ObjectVersionsPanel from '@/components/data/ObjectVersionsPanel.vue'
+import PublicAccessDialog from '@/components/data/PublicAccessDialog.vue'
 import ObjectRulesEditor from '@/components/storage/ObjectRulesEditor.vue'
 import PolicyColumn from '@/components/storage/PolicyColumn.vue'
 import PreviewBody from '@/components/preview/PreviewBody.vue'
 import { nodeApiBase } from '@/composables/s3/endpoints'
 import { useAruna } from '@/composables/useAruna'
 import { useBacklinks } from '@/composables/useBacklinks'
+import { usePublicAccess } from '@/composables/usePublicAccess'
 import { useS3, s3ErrorMessage } from '@/composables/useS3'
 import { useAssistantObject } from '@/composables/useAssistantObject'
 import { exactFileBacklinkPreflight } from '@/lib/backlinks'
+import type { PublicTarget } from '@/lib/publicAccess'
 import type { DeleteRequest } from '@/lib/deletion/request'
 import { featureEnabled } from '@/lib/config'
 import { isNotebookKey } from '@/lib/notebook/document'
@@ -32,7 +35,7 @@ import { stateVariant } from '@/lib/stateBadge'
 import { formatBytes, relativeTime, truncateMiddle } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { Eye, ListTree, NotebookPen } from '@lucide/vue'
+import { Eye, Globe, ListTree, Lock, NotebookPen } from '@lucide/vue'
 
 const props = defineProps<{
   open: boolean
@@ -105,6 +108,12 @@ async function loadHead() {
     if (seq === headSeq) headBusy.value = false
   }
 }
+
+// Everyone's read access to this key, through the group's "public" role.
+const access = usePublicAccess(computed(() => props.groupId))
+const fileTarget = computed<PublicTarget>(() => ({ kind: 'file', bucket: props.bucket, key: props.objectKey }))
+const filePublic = computed(() => access.isPublic(props.nodeId ?? null, fileTarget.value))
+const publicOpen = ref(false)
 
 // The datasets that reference this key, asked of the node that holds the bucket.
 const {
@@ -273,6 +282,19 @@ const details = computed(() => [
               <span v-else class="text-muted-foreground">unknown</span>
             </dd>
           </div>
+          <div v-if="props.groupId" class="flex items-center justify-between gap-4">
+            <dt class="shrink-0 text-muted-foreground">Public access</dt>
+            <dd class="flex min-w-0 items-center justify-end gap-2">
+              <Badge :variant="filePublic ? 'success' : 'secondary'" size="sm" class="uppercase">
+                <Globe v-if="filePublic" class="mr-0.5 size-3" aria-hidden="true" />
+                <Lock v-else class="mr-0.5 size-3" aria-hidden="true" />
+                {{ filePublic ? 'public' : 'private' }}
+              </Badge>
+              <Button variant="outline" size="sm" @click="publicOpen = true">
+                <Globe class="h-3.5 w-3.5" /> {{ filePublic ? 'Public access…' : 'Make public…' }}
+              </Button>
+            </dd>
+          </div>
         </dl>
         <p v-if="props.referencedFrom" class="mt-3 text-xs text-muted-foreground">
           Referenced from {{ props.referencedFrom.label }}.
@@ -333,4 +355,12 @@ const details = computed(() => [
       </TabsContent>
     </Tabs>
   </DetailDialog>
+  <PublicAccessDialog
+    v-if="props.groupId"
+    v-model:open="publicOpen"
+    :access="access"
+    :node-id="props.nodeId ?? null"
+    :targets="[fileTarget]"
+    :raised="props.raised"
+  />
 </template>

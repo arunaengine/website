@@ -49,6 +49,7 @@ const headObject = vi.fn()
 const hasActiveKey = ref(true)
 const currentUser = ref<{ id: string } | null>({ id: 'u-1' })
 const loadReferences = vi.fn()
+const filePublic = ref(false)
 const resetReferences = vi.fn()
 
 const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.meta.url), {
@@ -68,6 +69,7 @@ const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.
   '@/components/data/ObjectLocationsPanel.vue': moduleDefault(Marker('copies of this version')),
   '@/components/data/ObjectVersionsPanel.vue': moduleDefault(Marker('version rows')),
   '@/components/data/ReferencedBy.vue': moduleDefault(Marker('referencing datasets')),
+  '@/components/data/PublicAccessDialog.vue': moduleDefault(defineComponent({ props: { open: Boolean }, setup: (props) => () => (props.open ? h('section', 'public access dialog') : null) })),
   '@/components/storage/ObjectRulesEditor.vue': moduleDefault(Marker('edit rules for this file')),
   '@/components/storage/PolicyColumn.vue': moduleDefault(Marker('rules this file carries')),
   '@/components/preview/PreviewBody.vue': moduleDefault(defineComponent({ setup: (_, { slots }) => () => h('section', [slots.actions?.(), 'preview']) })),
@@ -78,6 +80,9 @@ const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.
   '@/composables/s3/endpoints': { nodeApiBase: (nodeId: string) => `https://${nodeId}/api/v1` },
   '@/composables/useAruna': {
     useAruna: () => ({ currentUser, apiBaseUrl: ref('https://local/api/v1') }),
+  },
+  '@/composables/usePublicAccess': {
+    usePublicAccess: () => ({ isPublic: () => filePublic.value, groupName: ref('Reef lab') }),
   },
   '@/composables/useBacklinks': {
     useBacklinks: () => ({
@@ -233,5 +238,34 @@ describe('file details references', () => {
     } finally {
       currentUser.value = { id: 'u-1' }
     }
+  })
+})
+
+describe('file details public access', () => {
+  it('shows the state and opens the public access dialog', async () => {
+    filePublic.value = false
+    const { root } = await mount('general')
+    expect(content(root)).toContain('private')
+    expect(content(root)).not.toContain('public access dialog')
+
+    await click(button(root, 'Make public…'))
+
+    expect(content(root)).toContain('public access dialog')
+  })
+
+  it('names a public file', async () => {
+    filePublic.value = true
+    try {
+      const { root } = await mount('general')
+      expect(content(root)).toContain('public')
+      expect(content(root)).toContain('Public access…')
+    } finally {
+      filePublic.value = false
+    }
+  })
+
+  it('has no public access row without a group', async () => {
+    const { root } = await mount('general', { groupId: null })
+    expect(content(root)).not.toContain('Public access')
   })
 })

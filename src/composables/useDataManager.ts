@@ -10,6 +10,7 @@ import { useBrowserSelection } from './useBrowserSelection'
 import { useBuckets } from './useBuckets'
 import { useBucketShortcuts, type BucketShortcut } from './useBucketShortcuts'
 import { useGroupContext } from './useGroupSelection'
+import { usePublicAccess } from './usePublicAccess'
 import { useRealmNodes } from './useRealmNodes'
 import { useRefresh } from './useRefresh'
 import { useStagingReferences } from './useStagingReferences'
@@ -821,6 +822,7 @@ export function useDataManager() {
   const activeGroupId = computed(() =>
     contextReady.value ? s3.activeContext.value?.groupId ?? null : null,
   )
+  const publicAccess = usePublicAccess(activeGroupId)
   const canWriteCurrentPrefix = computed(() =>
     Boolean(
       contextReady.value &&
@@ -1206,6 +1208,7 @@ export function useDataManager() {
     keyTail,
     openSelectedContext,
     activeGroupId,
+    publicAccess,
     effectiveEndpoint,
     remoteEndpointMissing,
     remoteBlocked,

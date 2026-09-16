@@ -249,3 +249,49 @@ describe('notebooks in the bucket', () => {
   })
 })
 
+
+describe('object browser public access', () => {
+  it('asks for the open folder when nothing is ticked, else the ticked entries', async () => {
+    const publicAccess = vi.fn()
+    const manager = fakeManager({ openDetails, download, requestDelete, router: { push }, folders: ref([listedFolder]) })
+    const host = defineComponent({ setup: () => () => h(browser, { manager, onPublicAccess: publicAccess }) })
+    const { root } = await mountApp(host)
+
+    await click(button(root, 'Public access'))
+    expect(publicAccess).toHaveBeenLastCalledWith([{ kind: 'folder', bucket: 'reef', key: 'raw/' }])
+
+    await tick(checkbox(root, `Select ${listedObject.name}`), true)
+    await tick(checkbox(root, `Select ${listedFolder.name}`), true)
+    await click(button(root, 'Public access'))
+    expect(publicAccess).toHaveBeenLastCalledWith([
+      { kind: 'folder', bucket: 'reef', key: listedFolder.prefix },
+      { kind: 'file', bucket: 'reef', key: listedObject.key },
+    ])
+  })
+
+  it('opens the folder details from the row', async () => {
+    const folderDetails = vi.fn()
+    const manager = fakeManager({ openDetails, download, requestDelete, router: { push }, folders: ref([listedFolder]) })
+    const host = defineComponent({ setup: () => () => h(browser, { manager, onFolderDetails: folderDetails }) })
+    const { root } = await mountApp(host)
+
+    await bubbleClick(action(root, 'Folder details'))
+
+    expect(folderDetails).toHaveBeenCalledWith(listedFolder)
+    expect(openDetails).not.toHaveBeenCalledWith(expect.objectContaining({ prefix: listedFolder.prefix }))
+  })
+
+  it('marks public files and folders', async () => {
+    const root = await render({
+      folders: ref([listedFolder]),
+      publicAccess: {
+        isPublic: (_node: string | null, target: { kind: string; key: string }) => target.kind === 'file',
+      },
+    })
+
+    const fileRow = element(root, (node) => node.tag === 'tr' && content(node).includes(listedObject.name))
+    const folderRow = element(root, (node) => node.tag === 'tr' && content(node).includes(`${listedFolder.name}/`))
+    expect(content(fileRow)).toContain('public')
+    expect(content(folderRow)).not.toContain('public')
+  })
+})

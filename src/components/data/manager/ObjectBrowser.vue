@@ -21,6 +21,7 @@ import {
   type ObjectEntry,
 } from '@/composables/useS3'
 import { usePlacementPolicies } from '@/composables/usePlacementPolicies'
+import type { PublicTarget } from '@/lib/publicAccess'
 import { featureEnabled } from '@/lib/config'
 import { isNotebookKey } from '@/lib/notebook/document'
 import { collectDropFiles } from '@/lib/upload/dropEntries'
@@ -35,6 +36,8 @@ import {
   Download,
   Eye,
   FolderPlus,
+  Globe,
+  Info,
   KeyRound,
   Link2,
   MoreHorizontal,
@@ -51,6 +54,8 @@ const emit = defineEmits<{
   (e: 'new-folder'): void
   (e: 'new-notebook'): void
   (e: 'sync-to-node'): void
+  (e: 'public-access', targets: PublicTarget[]): void
+  (e: 'folder-details', folder: FolderEntry): void
 }>()
 
 const s3 = useS3()
@@ -113,7 +118,30 @@ const {
   restoringKey,
   restoreObject,
   requestDelete,
+  publicAccess,
 } = props.manager
+
+// The ticked files and folders, or the open folder when nothing is ticked.
+function publicTargets(): PublicTarget[] {
+  const picked: PublicTarget[] = [
+    ...[...selectedPrefixes.value].map<PublicTarget>((key) => ({ kind: 'folder', bucket: bucket.value, key })),
+    ...[...selectedObjectKeys.value].map<PublicTarget>((key) => ({ kind: 'file', bucket: bucket.value, key })),
+  ]
+  if (picked.length) return picked
+  return [
+    s3Prefix.value
+      ? { kind: 'folder', bucket: bucket.value, key: s3Prefix.value }
+      : { kind: 'bucket', bucket: bucket.value, key: '' },
+  ]
+}
+
+function filePublic(key: string): boolean {
+  return publicAccess.isPublic(remoteNodeId.value, { kind: 'file', bucket: bucket.value, key })
+}
+
+function folderPublic(prefix: string): boolean {
+  return publicAccess.isPublic(remoteNodeId.value, { kind: 'folder', bucket: bucket.value, key: prefix })
+}
 
 // One entry for everything this bucket stores: its settings page. The dot says
 // the bucket carries syncs or placement policies, which only a viewer the node
@@ -262,6 +290,15 @@ async function onDrop(event: DragEvent) {
             @click="deleteSelection"
           >
             <Trash2 class="h-4 w-4" /> Delete selected ({{ selectedCount }})
+          </Button>
+          <Button
+            v-if="activeGroupId"
+            variant="outline"
+            size="sm"
+            :title="selectedCount === 0 ? `Public access for ${s3Prefix ? `the folder ${s3Prefix}` : `the bucket ${bucket}`}` : `Public access for ${selectionSummary}`"
+            @click="emit('public-access', publicTargets())"
+          >
+            <Globe class="h-4 w-4" /> Public access
           </Button>
           <WatchButton
             surface="bucket"
@@ -446,6 +483,9 @@ async function onDrop(event: DragEvent) {
               <td class="px-4 py-2.5">
                 <span class="flex items-center gap-2">
                   <ObjectIcon :name="folder.name" folder class="h-4 w-4" /> {{ folder.name }}/
+                  <Badge v-if="folderPublic(folder.prefix)" variant="success" size="sm" class="shrink-0 uppercase" title="Everyone can read this folder">
+                    <Globe class="mr-0.5 h-3 w-3" aria-hidden="true" /> public
+                  </Badge>
                   <ArrowLeftRight
                     v-if="keyIsSynced(folder.prefix)"
                     class="h-3 w-3 shrink-0 text-primary/40"
@@ -464,6 +504,7 @@ async function onDrop(event: DragEvent) {
               <td class="px-4 py-2.5 text-muted-foreground">-</td>
               <td class="px-4 py-2.5">
                 <div class="flex items-center justify-end gap-1">
+                  <IconButton label="Folder details" @click.stop="emit('folder-details', folder)"><Info class="size-3.5" /></IconButton>
                   <IconButton
                     label="Delete folder…"
                     class="text-destructive hover:text-destructive"
@@ -498,6 +539,9 @@ async function onDrop(event: DragEvent) {
                   <ObjectIcon :name="object.name" class="h-4 w-4" />
                   <span class="truncate" :class="isNotebook(object) ? 'font-medium text-primary' : ''">{{ object.name }}</span>
                   <Badge v-if="isNotebook(object)" variant="royal" size="sm" class="shrink-0">Notebook</Badge>
+                  <Badge v-if="filePublic(object.key)" variant="success" size="sm" class="shrink-0 uppercase" title="Everyone can read this file">
+                    <Globe class="mr-0.5 h-3 w-3" aria-hidden="true" /> public
+                  </Badge>
                   <ArrowLeftRight
                     v-if="keyIsSynced(object.key)"
                     class="h-3 w-3 shrink-0 text-primary/40"

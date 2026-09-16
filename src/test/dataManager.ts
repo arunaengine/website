@@ -177,6 +177,10 @@ export function fakeManager(overrides: Record<string, unknown> = {}) {
     restoringKey: ref(null),
     restoreObject: vi.fn(),
     requestDelete: vi.fn(),
+    publicAccess: {
+      isPublic: () => false,
+      canManage: computed(() => false),
+    },
     ...overrides,
   }
 }
