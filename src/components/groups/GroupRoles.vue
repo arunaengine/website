@@ -2,7 +2,7 @@
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import RoleBuilder from './RoleBuilder.vue'
-import { describeTarget } from './permission-paths'
+import { describeTarget, pathProblem } from './permission-paths'
 import { computed, ref } from 'vue'
 import { Globe, Lock, Pencil, Plus, Trash2 } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
@@ -20,7 +20,7 @@ const { deleteGroupRole, saving } = useAruna()
 
 const roleError = ref<string | null>(null)
 // null = builder closed; { role: null } = create; { role } = edit.
-const editor = ref<{ role: ApiRole | null } | null>(null)
+const editor = ref<{ role: ApiRole | null; isPublic?: boolean } | null>(null)
 
 // Built-in role names the create API rejects, so edit-as-recreate cannot work.
 const BUILTIN_NAMES = ['admin', 'user']
@@ -29,8 +29,10 @@ const pathPrefix = computed(() => `/${props.group.realm_id}/g/${props.group.grou
 
 const wellKnownOrder = ['everything', 'group admin', 'metadata', 'data']
 
-function scopeLabel(path: string): string {
-  if (!path.startsWith(pathPrefix.value)) return path
+// The four broad scopes get a column each; every narrower path is a custom
+// rule listed under one column, so the table never scrolls sideways.
+function scopeLabel(path: string): string | null {
+  if (!path.startsWith(pathPrefix.value)) return null
   const suffix = path.slice(pathPrefix.value.length)
   switch (suffix) {
     case '**':
@@ -45,9 +47,20 @@ function scopeLabel(path: string): string {
     case 'data/**':
       return 'data'
     default:
-      return describeTarget(suffix)
+      return null
   }
 }
+
+function customRules(role: ApiRole): { path: string; label: string; level: string }[] {
+  return Object.entries(role.permissions)
+    .filter(([path]) => scopeLabel(path) === null)
+    .map(([path, level]) => {
+      const suffix = path.startsWith(pathPrefix.value) ? path.slice(pathPrefix.value.length) : path
+      return { path, label: pathProblem(suffix) ? suffix : describeTarget(suffix), level: level.toLowerCase() }
+    })
+}
+
+const anyCustom = computed(() => props.group.roles.some((role) => customRules(role).length > 0))
 
 const sortedRoles = computed(() => {
   const rank = (role: ApiRole) => {
@@ -62,6 +75,7 @@ const scopes = computed(() => {
   for (const role of props.group.roles) {
     for (const path of Object.keys(role.permissions)) {
       const label = scopeLabel(path)
+      if (!label) continue
       const paths = labels.get(label) ?? []
       if (!paths.includes(path)) paths.push(path)
       labels.set(label, paths)
@@ -125,12 +139,13 @@ async function removeRole(role: ApiRole) {
             <th v-for="scope in scopes" :key="scope.label" class="px-3 py-2 text-left font-semibold" :title="scope.paths.join('\n')">
               {{ scope.label }}
             </th>
+            <th v-if="anyCustom" class="px-3 py-2 text-left font-semibold">Custom rules</th>
             <th class="px-3 py-2 text-right font-semibold tabular-nums">Assigned</th>
             <th v-if="canManage" class="px-5 py-2 text-right font-semibold">Actions</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="role in sortedRoles" :key="role.role_id" class="border-t border-border">
+          <tr v-for="role in sortedRoles" :key="role.role_id" class="border-t border-border align-top">
             <td class="px-5 py-2.5 font-medium text-foreground">
               {{ role.name }}
               <Badge v-if="role.public" size="sm" variant="success" class="ml-1 uppercase" title="Applies to everyone, including anonymous requests">
@@ -141,6 +156,15 @@ async function removeRole(role: ApiRole) {
               <Badge v-if="cellLevel(role, scope.paths)" size="sm" :variant="levelVariant(cellLevel(role, scope.paths)!)" class="uppercase">
                 {{ cellLevel(role, scope.paths) }}
               </Badge>
+              <span v-else class="text-muted-foreground">-</span>
+            </td>
+            <td v-if="anyCustom" class="max-w-xs px-3 py-2.5">
+              <ul v-if="customRules(role).length" class="space-y-1">
+                <li v-for="rule in customRules(role)" :key="rule.path" class="flex items-center gap-1.5 text-xs" :title="rule.path">
+                  <Badge size="sm" :variant="levelVariant(rule.level)" class="shrink-0 uppercase">{{ rule.level }}</Badge>
+                  <span class="min-w-0 truncate text-muted-foreground">{{ rule.label }}</span>
+                </li>
+              </ul>
               <span v-else class="text-muted-foreground">-</span>
             </td>
             <td class="px-3 py-2.5 text-right text-[11px] tabular-nums text-muted-foreground">
@@ -182,16 +206,20 @@ async function removeRole(role: ApiRole) {
     <div v-if="roleError" class="border-t border-border px-5 py-2 text-xs text-destructive">{{ roleError }}</div>
 
     <div v-if="canManage" class="border-t border-border">
-      <div v-if="!editor" class="px-5 py-4">
+      <div v-if="!editor" class="flex flex-wrap items-center gap-2 px-5 py-4">
         <Button variant="outline" size="sm" @click="editor = { role: null }">
           <Plus class="h-3.5 w-3.5" /> New role
+        </Button>
+        <Button variant="outline" size="sm" title="A role everyone holds, signed in or not; it can only view" @click="editor = { role: null, isPublic: true }">
+          <Globe class="h-3.5 w-3.5" /> New public role
         </Button>
       </div>
       <RoleBuilder
         v-else
-        :key="editor.role?.role_id ?? 'new'"
+        :key="editor.role?.role_id ?? (editor.isPublic ? 'new-public' : 'new')"
         :group="group"
         :role="editor.role"
+        :initial-public="editor.isPublic"
         @saved="closeEditor(true)"
         @cancel="closeEditor(true)"
       />

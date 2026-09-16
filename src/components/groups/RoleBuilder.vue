@@ -17,6 +17,8 @@ import { errorMessage } from '@/lib/utils'
 const props = defineProps<{
   group: GroupDetailResponse
   role?: ApiRole | null
+  /** Start as a public role, as the "New public role" button asks. */
+  initialPublic?: boolean
 }>()
 
 const emit = defineEmits<{ (e: 'saved'): void; (e: 'cancel'): void }>()
@@ -37,7 +39,7 @@ function toLevel(value: string): GroupPermissionLevel {
 
 // A public role reaches everyone, anonymous visitors included, so the server
 // accepts nothing but read on it; the builder offers nothing else either.
-const isPublic = ref(Boolean(props.role?.public))
+const isPublic = ref(Boolean(props.role ? props.role.public : props.initialPublic))
 const HOLDER_OPTIONS = [
   { value: 'members', label: 'Assigned members' },
   { value: 'everyone', label: 'Everyone (public)' },
@@ -51,7 +53,7 @@ function initialGrants(): Grant[] {
   }))
 }
 
-const name = ref(props.role?.name ?? '')
+const name = ref(props.role?.name ?? (props.initialPublic ? 'public' : ''))
 const grants = ref<Grant[]>(initialGrants())
 const pending = ref<string[]>([])
 const pendingLevel = ref<GroupPermissionLevel>('read')
@@ -163,7 +165,7 @@ async function submit() {
     <div class="flex items-start justify-between gap-2 border-b border-border bg-muted/10 px-5 py-4">
       <div class="min-w-0 flex-1">
         <div class="text-sm font-semibold text-foreground">
-          {{ role ? `Edit role "${role.name}"` : 'New role' }}
+          {{ role ? `Edit role "${role.name}"` : isPublic ? 'New public role' : 'New role' }}
         </div>
         <p class="mt-0.5 text-xs text-muted-foreground">
           A role is a named set of access rules. Name it, select what it covers, choose an access level, and
@@ -198,6 +200,9 @@ async function submit() {
             A public role can only view. Anyone, including visitors who are not signed in, can read what it
             covers. The edit and block levels are not available.
           </span>
+        </p>
+        <p v-else class="mt-1.5 text-xs text-muted-foreground">
+          Members get this role in the Members tab. Choose Everyone for a role that anyone holds, signed in or not.
         </p>
 
         <h3 class="mt-6 text-sm font-semibold text-foreground">Add access</h3>

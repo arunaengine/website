@@ -55,9 +55,9 @@ const builder = compileClientComponent(new URL('./RoleBuilder.vue', import.meta.
 
 const group = { display_name: 'Reef lab', group_id: 'g-1', realm_id: 'realm-1', roles: [] }
 
-async function render(role: Record<string, unknown> | null = null) {
+async function render(role: Record<string, unknown> | null = null, props: Record<string, unknown> = {}) {
   const saved = vi.fn()
-  const host = defineComponent({ setup: () => () => h(builder, { group, role, onSaved: saved }) })
+  const host = defineComponent({ setup: () => () => h(builder, { group, role, onSaved: saved, ...props }) })
   const { root, errors } = await mountApp(host)
   expect(errors).toEqual([])
   return { root, saved }
@@ -145,5 +145,13 @@ describe('role builder public roles', () => {
       public: true,
     })
     expect(deleteGroupRole).toHaveBeenCalledWith('g-1', 'r-1')
+  })
+
+  it('starts public with the public name when asked', async () => {
+    const { root } = await render(null, { initialPublic: true })
+
+    expect(content(root)).toContain('New public role')
+    expect(choice(root, 'Who holds this role').props['data-value']).toBe('everyone')
+    expect(element(root, (node) => node.tag === 'input').props.value).toBe('public')
   })
 })
