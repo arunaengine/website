@@ -4,7 +4,7 @@ import Badge from '@/components/ui/Badge.vue'
 import RoleBuilder from './RoleBuilder.vue'
 import { describeTarget } from './permission-paths'
 import { computed, ref } from 'vue'
-import { Lock, Pencil, Plus, Trash2 } from '@lucide/vue'
+import { Globe, Lock, Pencil, Plus, Trash2 } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import type { ApiRole, GroupDetailResponse } from '@/lib/api'
 import { errorMessage } from '@/lib/utils'
@@ -133,7 +133,9 @@ async function removeRole(role: ApiRole) {
           <tr v-for="role in sortedRoles" :key="role.role_id" class="border-t border-border">
             <td class="px-5 py-2.5 font-medium text-foreground">
               {{ role.name }}
-              <Badge v-if="role.public" size="sm" variant="secondary" class="ml-1 uppercase" title="Applies to everyone, including anonymous requests">public</Badge>
+              <Badge v-if="role.public" size="sm" variant="success" class="ml-1 uppercase" title="Applies to everyone, including anonymous requests">
+                <Globe class="mr-0.5 h-3 w-3" aria-hidden="true" /> public
+              </Badge>
             </td>
             <td v-for="scope in scopes" :key="scope.label" class="px-3 py-2.5">
               <Badge v-if="cellLevel(role, scope.paths)" size="sm" :variant="levelVariant(cellLevel(role, scope.paths)!)" class="uppercase">
@@ -142,7 +144,7 @@ async function removeRole(role: ApiRole) {
               <span v-else class="text-muted-foreground">-</span>
             </td>
             <td class="px-3 py-2.5 text-right text-[11px] tabular-nums text-muted-foreground">
-              {{ role.assigned_users ? role.assigned_users.length : '-' }}
+              {{ role.public ? 'everyone' : role.assigned_users ? role.assigned_users.length : '-' }}
             </td>
             <td v-if="canManage" class="px-5 py-2.5 text-right">
               <span v-if="role.name === 'admin'" class="inline-flex items-center gap-1 text-[11px] text-muted-foreground" title="The admin role cannot be changed or deleted.">

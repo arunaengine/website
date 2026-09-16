@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { ChevronRight, Plus, X } from '@lucide/vue'
+import { computed, ref, watch } from 'vue'
+import { ChevronRight, Globe, Plus, X } from '@lucide/vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
+import OptionToggle from '@/components/ui/OptionToggle.vue'
 import Select from '@/components/ui/Select.vue'
 import PermissionPathPicker from './PermissionPathPicker.vue'
 import { describeTarget, pathProblem } from './permission-paths'
@@ -11,8 +12,8 @@ import type { ApiRole, GroupDetailResponse, GroupPermissionLevel } from '@/lib/a
 import { errorMessage } from '@/lib/utils'
 
 // Composes a role as a list of access rules (path + level) and submits the
-// whole permission map at once. Editing recreates the role with the same name,
-// members and public flag, then removes the old one (there is no update API).
+// whole permission map at once. Editing recreates the role with the same name
+// and members, then removes the old one (there is no update API).
 const props = defineProps<{
   group: GroupDetailResponse
   role?: ApiRole | null
@@ -33,6 +34,14 @@ function toLevel(value: string): GroupPermissionLevel {
   const lower = value.toLowerCase()
   return lower === 'write' || lower === 'deny' ? lower : 'read'
 }
+
+// A public role reaches everyone, anonymous visitors included, so the server
+// accepts nothing but read on it; the builder offers nothing else either.
+const isPublic = ref(Boolean(props.role?.public))
+const HOLDER_OPTIONS = [
+  { value: 'members', label: 'Assigned members' },
+  { value: 'everyone', label: 'Everyone (public)' },
+]
 
 function initialGrants(): Grant[] {
   if (!props.role) return []
@@ -58,10 +67,21 @@ const LEVEL_OPTIONS = [
   { value: 'write', label: 'view & edit' },
   { value: 'deny', label: 'block' },
 ]
+const levelOptions = computed(() => (isPublic.value ? LEVEL_OPTIONS.slice(0, 1) : LEVEL_OPTIONS))
+
+watch(isPublic, (everyone) => {
+  if (!everyone) return
+  for (const grant of grants.value) grant.level = 'read'
+  pendingLevel.value = 'read'
+  rawLevel.value = 'read'
+})
 
 const RESERVED_NAMES = ['admin', 'user']
 const nameReserved = computed(() => RESERVED_NAMES.includes(name.value.trim()))
-const canSave = computed(() => !!name.value.trim() && !nameReserved.value && grants.value.length > 0 && !saving.value)
+const readOnly = computed(() => !isPublic.value || grants.value.every((grant) => grant.level === 'read'))
+const canSave = computed(
+  () => !!name.value.trim() && !nameReserved.value && grants.value.length > 0 && readOnly.value && !saving.value,
+)
 
 const pendingPreview = computed(() => pending.value.map(describeTarget).join(' and '))
 const rawProblem = computed(() => (rawPath.value.trim() ? pathProblem(rawPath.value.trim()) : null))
@@ -114,7 +134,7 @@ async function submit() {
         name: name.value.trim(),
         permissions,
         assigned_users: props.role.assigned_users ?? [],
-        public: props.role.public,
+        public: isPublic.value,
       })
       try {
         await deleteGroupRole(props.group.group_id, props.role.role_id)
@@ -125,7 +145,11 @@ async function submit() {
         return
       }
     } else {
-      await createGroupRole(props.group.group_id, { name: name.value.trim(), permissions })
+      await createGroupRole(props.group.group_id, {
+        name: name.value.trim(),
+        permissions,
+        public: isPublic.value,
+      })
     }
     emit('saved')
   } catch (err) {
@@ -160,6 +184,22 @@ async function submit() {
           </p>
         </div>
 
+        <div class="mt-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Who holds this role</div>
+        <OptionToggle
+          :model-value="isPublic ? 'everyone' : 'members'"
+          :options="HOLDER_OPTIONS"
+          aria-label="Who holds this role"
+          class="mt-1.5"
+          @update:model-value="(value: string) => (isPublic = value === 'everyone')"
+        />
+        <p v-if="isPublic" class="mt-1.5 flex items-start gap-1.5 text-xs text-amber-800 dark:text-amber-300">
+          <Globe class="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <span>
+            A public role can only view. Anyone, including visitors who are not signed in, can read what it
+            covers. The edit and block levels are not available.
+          </span>
+        </p>
+
         <h3 class="mt-6 text-sm font-semibold text-foreground">Add access</h3>
         <PermissionPathPicker
           :group-id="group.group_id"
@@ -173,7 +213,7 @@ async function submit() {
         <div v-if="pending.length" class="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/20 px-3 py-2.5">
           <Select
             :model-value="pendingLevel"
-            :options="LEVEL_OPTIONS"
+            :options="levelOptions"
             aria-label="Access level"
             class="h-8 w-32 shrink-0 text-xs"
             @update:model-value="(value: string) => (pendingLevel = toLevel(value))"
@@ -191,7 +231,7 @@ async function submit() {
       <div class="min-w-0 lg:sticky lg:top-20 lg:self-start">
         <div class="rounded-lg border border-border bg-muted/10 p-4">
           <h2 class="font-display text-sm font-semibold text-aruna-navy">
-            {{ role?.public ? 'Everyone, including anonymous visitors, can' : 'Members with this role can' }}
+            {{ isPublic ? 'Everyone, including anonymous visitors, can' : 'Members with this role can' }}
           </h2>
           <p v-if="!grants.length" class="mt-1.5 text-xs text-muted-foreground">
             Add your first access rule, choose what members of this role can reach.
@@ -200,7 +240,7 @@ async function submit() {
             <li v-for="(grant, index) in grants" :key="grant.suffix" class="flex items-center gap-2">
               <Select
                 :model-value="grant.level"
-                :options="LEVEL_OPTIONS"
+                :options="levelOptions"
                 aria-label="Access level"
                 class="h-8 w-32 shrink-0 text-xs"
                 @update:model-value="(value: string) => (grant.level = toLevel(value))"
@@ -248,7 +288,7 @@ async function submit() {
                 <Input v-model="rawPath" class="h-8 font-mono text-xs" placeholder="data/** or meta/reports/**" @keydown.enter.prevent="commitRaw" />
                 <Select
                   :model-value="rawLevel"
-                  :options="LEVEL_OPTIONS"
+                  :options="levelOptions"
                   aria-label="Access level"
                   class="h-8 w-32 shrink-0 text-xs"
                   @update:model-value="(value: string) => (rawLevel = toLevel(value))"
