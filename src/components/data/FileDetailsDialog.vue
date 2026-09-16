@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // One surface for a file: the details, the version history, and the rules and
 // copies of the chosen version, plus a preview mode that fills the same frame.
+// A folder shows the same general details; it has no versions, copies or preview.
 // The open tab lives in the route (`?object=&tab=`), so a details view is a
 // link a person can share or reload; `tab=preview` is that mode.
 import Badge from '@/components/ui/Badge.vue'
@@ -22,6 +23,7 @@ import PolicyColumn from '@/components/storage/PolicyColumn.vue'
 import PreviewBody from '@/components/preview/PreviewBody.vue'
 import { nodeApiBase } from '@/composables/s3/endpoints'
 import { useAruna } from '@/composables/useAruna'
+import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useBacklinks } from '@/composables/useBacklinks'
 import { usePublicAccess } from '@/composables/usePublicAccess'
 import { useS3, s3ErrorMessage } from '@/composables/useS3'
@@ -62,6 +64,8 @@ const props = defineProps<{
   raised?: boolean
   /** The exact version to show first, as a run's captured output names one. */
   versionId?: string | null
+  /** The key is a folder prefix; only the general details apply. */
+  folder?: boolean
 }>()
 const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
@@ -72,6 +76,7 @@ const emit = defineEmits<{
 
 const s3 = useS3()
 const { currentUser, apiBaseUrl } = useAruna()
+const { displayName: nodeName } = useRealmNodes()
 const { leave } = useAssistantObject()
 const head = ref<{ contentType?: string; versionId?: string } | null>(null)
 const headError = ref<string | null>(null)
@@ -84,7 +89,7 @@ const remote = computed(() => Boolean(props.nodeId))
 const currentVersion = computed(() => pinnedVersion.value ?? head.value?.versionId ?? null)
 // Preview is a mode of this dialog, not a tab: it fills the frame under the
 // same header, and the tabs are one click away.
-const previewMode = computed(() => props.tab === 'preview')
+const previewMode = computed(() => props.tab === 'preview' && !props.folder)
 const detailsTab = computed(() => (previewMode.value ? 'general' : props.tab))
 const notebookLink = computed(() => !remote.value && !pinnedVersion.value && props.groupId &&
   isNotebookKey(props.objectKey) && featureEnabled('tes')
@@ -92,7 +97,7 @@ const notebookLink = computed(() => !remote.value && !pinnedVersion.value && pro
   : null)
 
 async function loadHead() {
-  if (!props.objectKey || remote.value) return
+  if (!props.objectKey || remote.value || props.folder) return
   const seq = ++headSeq
   headBusy.value = true
   headError.value = null
@@ -111,7 +116,11 @@ async function loadHead() {
 
 // Everyone's read access to this key, through the group's "public" role.
 const access = usePublicAccess(computed(() => props.groupId))
-const fileTarget = computed<PublicTarget>(() => ({ kind: 'file', bucket: props.bucket, key: props.objectKey }))
+const fileTarget = computed<PublicTarget>(() => ({
+  kind: props.folder ? 'folder' : 'file',
+  bucket: props.bucket,
+  key: props.objectKey,
+}))
 const filePublic = computed(() => access.isPublic(props.nodeId ?? null, fileTarget.value))
 const publicOpen = ref(false)
 
@@ -131,7 +140,7 @@ const fileReferences = computed(() =>
 
 function loadReferences() {
   const apiBase = props.nodeId ? nodeApiBase(props.nodeId) : apiBaseUrl.value
-  if (!currentUser.value || !apiBase) {
+  if (!currentUser.value || !apiBase || props.folder) {
     resetReferences()
     return
   }
@@ -177,7 +186,11 @@ function openBrowser() {
   emit('update:open', false)
 }
 
-const details = computed(() => [
+const details = computed(() => props.folder ? [
+  { label: 'Bucket', value: props.bucket },
+  { label: 'Folder', value: props.objectKey },
+  { label: 'Node', value: nodeName(props.nodeId) },
+] : [
   { label: 'Key', value: props.objectKey },
   { label: 'Size', value: props.size === undefined ? 'unknown' : formatBytes(props.size) },
   {
@@ -216,6 +229,7 @@ const details = computed(() => [
             <RouterLink :to="notebookLink" @click="leave"><NotebookPen class="h-4 w-4" /> Open notebook</RouterLink>
           </Button>
           <Button
+            v-if="!props.folder"
             variant="outline"
             size="sm"
             @click="emit('update:tab', previewMode ? 'general' : 'preview')"
@@ -258,7 +272,7 @@ const details = computed(() => [
       :model-value="detailsTab"
       @update:model-value="(value: string) => emit('update:tab', value)"
     >
-      <TabsList aria-label="File sections">
+      <TabsList v-if="!props.folder" aria-label="File sections">
         <TabsTrigger value="general">General</TabsTrigger>
         <TabsTrigger value="versions">Versions</TabsTrigger>
         <TabsTrigger value="storage">Storage</TabsTrigger>
@@ -270,7 +284,7 @@ const details = computed(() => [
             <dt class="shrink-0 text-muted-foreground">{{ detail.label }}</dt>
             <dd class="min-w-0 break-all text-right font-mono text-foreground">{{ detail.value }}</dd>
           </div>
-          <div class="flex items-baseline justify-between gap-4">
+          <div v-if="!props.folder" class="flex items-baseline justify-between gap-4">
             <dt class="shrink-0 text-muted-foreground">Current version</dt>
             <dd class="flex min-w-0 items-center justify-end gap-1">
               <Spinner v-if="headBusy" label="Loading the file details" />
@@ -300,8 +314,11 @@ const details = computed(() => [
           Referenced from {{ props.referencedFrom.label }}.
         </p>
         <p v-if="headError" class="mt-3 text-xs text-muted-foreground">{{ headError }}</p>
+        <p v-if="props.folder" class="mt-3 text-xs text-muted-foreground">
+          A public folder rule covers every file below it, including files added later.
+        </p>
         <ReferencedBy
-          v-if="currentUser"
+          v-if="currentUser && !props.folder"
           class="mt-4 border-t border-border pt-3"
           :preflight="fileReferences"
           :busy="referencesBusy"

@@ -19,7 +19,6 @@ import SyncBucketDialog from '@/components/data/SyncBucketDialog.vue'
 import BucketSidebar from '@/components/data/manager/BucketSidebar.vue'
 import DeleteDialog from '@/components/data/DeleteDialog.vue'
 import FileDetailsDialog from '@/components/data/FileDetailsDialog.vue'
-import FolderDetailsDialog from '@/components/data/FolderDetailsDialog.vue'
 import PublicAccessDialog from '@/components/data/PublicAccessDialog.vue'
 import ObjectBrowser from '@/components/data/manager/ObjectBrowser.vue'
 import UploadPanel from '@/components/data/manager/UploadPanel.vue'
@@ -28,7 +27,7 @@ import { useAruna } from '@/composables/useAruna'
 import { useDataManager } from '@/composables/useDataManager'
 import { providePageContext } from '@/composables/usePageContext'
 import { useStaging } from '@/composables/useStaging'
-import { useS3, s3ErrorMessage, type FolderEntry } from '@/composables/useS3'
+import { useS3, s3ErrorMessage } from '@/composables/useS3'
 import { folderNameProblem } from '@/lib/bucketName'
 import { featureEnabled } from '@/lib/config'
 import { isDesktop } from '@/lib/desktop'
@@ -110,7 +109,6 @@ async function onDeleted(result: Parameters<typeof onDeleteCompleted>[0]) {
 // ── Public access ───────────────────────────────────────────────────────────
 const publicOpen = ref(false)
 const publicTargets = ref<PublicTarget[]>([])
-const folderDetails = ref<FolderEntry | null>(null)
 
 function openPublicAccess(targets: PublicTarget[]) {
   publicTargets.value = targets
@@ -326,7 +324,6 @@ async function createFolder() {
           @new-notebook="newNotebookOpen = true"
           @sync-to-node="openSyncDialog"
           @public-access="openPublicAccess"
-          @folder-details="(folder: FolderEntry) => (folderDetails = folder)"
         >
           <UploadPanel :manager="manager" />
         </ObjectBrowser>
@@ -368,22 +365,13 @@ async function createFolder() {
       :targets="publicTargets"
     />
 
-    <FolderDetailsDialog
-      :open="Boolean(folderDetails)"
-      :bucket="bucket"
-      :prefix="folderDetails?.prefix ?? ''"
-      :name="folderDetails?.name ?? ''"
-      :node-id="remoteNodeId"
-      :access="publicAccess"
-      @update:open="(value: boolean) => { if (!value) folderDetails = null }"
-    />
-
     <FileDetailsDialog
       :open="Boolean(detailsKey)"
       :tab="detailsTab"
       :bucket="bucket"
       :object-key="detailsObject?.key ?? ''"
       :name="detailsObject?.name ?? ''"
+      :folder="detailsKey.endsWith('/')"
       :size="detailsObject?.size"
       :last-modified="detailsObject?.lastModified"
       :node-id="remoteNodeId"

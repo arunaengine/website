@@ -37,7 +37,6 @@ import {
   Eye,
   FolderPlus,
   Globe,
-  Info,
   KeyRound,
   Link2,
   MoreHorizontal,
@@ -55,7 +54,6 @@ const emit = defineEmits<{
   (e: 'new-notebook'): void
   (e: 'sync-to-node'): void
   (e: 'public-access', targets: PublicTarget[]): void
-  (e: 'folder-details', folder: FolderEntry): void
 }>()
 
 const s3 = useS3()
@@ -504,13 +502,13 @@ async function onDrop(event: DragEvent) {
               <td class="px-4 py-2.5 text-muted-foreground">-</td>
               <td class="px-4 py-2.5">
                 <div class="flex items-center justify-end gap-1">
-                  <IconButton label="Folder details" @click.stop="emit('folder-details', folder)"><Info class="size-3.5" /></IconButton>
                   <IconButton
                     label="Delete folder…"
                     class="text-destructive hover:text-destructive"
                     :disabled-reason="folderReason(folder.prefix)"
                     @click.stop="deleteFolder(folder)"
                   ><Trash2 class="size-3.5" /></IconButton>
+                  <IconButton label="More about this folder" @click.stop="openDetails({ key: folder.prefix, name: `${folder.name}/` })"><MoreHorizontal class="size-3.5" /></IconButton>
                 </div>
               </td>
             </tr>

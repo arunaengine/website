@@ -81,6 +81,7 @@ const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.
   '@/composables/useAruna': {
     useAruna: () => ({ currentUser, apiBaseUrl: ref('https://local/api/v1') }),
   },
+  '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: () => 'this node' }) },
   '@/composables/usePublicAccess': {
     usePublicAccess: () => ({ isPublic: () => filePublic.value, groupName: ref('Reef lab') }),
   },
@@ -267,5 +268,23 @@ describe('file details public access', () => {
   it('has no public access row without a group', async () => {
     const { root } = await mount('general', { groupId: null })
     expect(content(root)).not.toContain('Public access')
+  })
+})
+
+describe('folder details', () => {
+  it('shows only the general details of a folder', async () => {
+    headObject.mockClear()
+    loadReferences.mockClear()
+    const { root } = await mount('general', { objectKey: 'raw/', name: 'raw/', folder: true })
+
+    expect(content(root)).toContain('Folder')
+    expect(content(root)).toContain('raw/')
+    expect(content(root)).not.toContain('Versions')
+    expect(content(root)).not.toContain('Preview')
+    expect(content(root)).not.toContain('Current version')
+    expect(content(root)).not.toContain('referencing datasets')
+    expect(content(root)).toContain('Make public…')
+    expect(headObject).not.toHaveBeenCalled()
+    expect(loadReferences).not.toHaveBeenCalled()
   })
 })

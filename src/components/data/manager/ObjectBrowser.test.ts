@@ -269,16 +269,20 @@ describe('object browser public access', () => {
     ])
   })
 
-  it('opens the folder details from the row', async () => {
-    const folderDetails = vi.fn()
-    const manager = fakeManager({ openDetails, download, requestDelete, router: { push }, folders: ref([listedFolder]) })
-    const host = defineComponent({ setup: () => () => h(browser, { manager, onFolderDetails: folderDetails }) })
-    const { root } = await mountApp(host)
+  it('opens the same details view for a folder', async () => {
+    openDetails.mockClear()
+    const root = await render({ folders: ref([listedFolder]) })
+    const row = element(root, (node) => node.tag === 'tr' && content(node).includes(`${listedFolder.name}/`))
 
-    await bubbleClick(action(root, 'Folder details'))
+    expect(
+      nodes(row)
+        .filter((node) => node.tag === 'button')
+        .map((node) => String(node.props['aria-label'])),
+    ).toEqual(['Delete folder…', 'More about this folder'])
 
-    expect(folderDetails).toHaveBeenCalledWith(listedFolder)
-    expect(openDetails).not.toHaveBeenCalledWith(expect.objectContaining({ prefix: listedFolder.prefix }))
+    await bubbleClick(action(root, 'More about this folder'))
+
+    expect(openDetails).toHaveBeenCalledWith({ key: listedFolder.prefix, name: `${listedFolder.name}/` })
   })
 
   it('marks public files and folders', async () => {

@@ -1231,7 +1231,7 @@ export const docsTopics: DocsTopic[] = [
         icon: 'Globe',
         bullets: [
           'Public access is a group [role](concept:glossary#role) named public with the public flag: read rules on files, folders or a whole bucket that apply to everyone, signed in or not. The node rejects any other level on a public role.',
-          'Group admins grant or remove it in the Data view (Public access next to Delete selected, the file details, the folder details) and on the bucket settings Overview, which lists every public rule of the bucket.',
+          'Group admins grant or remove it in the Data view (Public access next to Delete selected, or the details of a file or folder) and on the bucket settings Overview, which lists every public rule of the bucket.',
           'A folder rule covers everything below it, so a file under a public folder stays public until that folder rule is removed.',
         ],
       },
