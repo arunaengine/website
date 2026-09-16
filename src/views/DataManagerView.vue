@@ -65,6 +65,7 @@ const {
   openSelectedContext,
   activeGroupId,
   publicAccess,
+  syncsForKey,
   canWriteCurrentPrefix,
   listedKeys,
   references,
@@ -372,6 +373,8 @@ async function createFolder() {
       :object-key="detailsObject?.key ?? ''"
       :name="detailsObject?.name ?? ''"
       :folder="detailsKey.endsWith('/')"
+      :access="publicAccess"
+      :syncs="detailsKey ? syncsForKey(detailsKey) : []"
       :size="detailsObject?.size"
       :last-modified="detailsObject?.lastModified"
       :node-id="remoteNodeId"

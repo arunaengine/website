@@ -10,6 +10,7 @@ import { useBrowserSelection } from './useBrowserSelection'
 import { useBuckets } from './useBuckets'
 import { useBucketShortcuts, type BucketShortcut } from './useBucketShortcuts'
 import { useGroupContext } from './useGroupSelection'
+import type { SyncRow } from './useBucketSyncs'
 import { usePublicAccess } from './usePublicAccess'
 import { useRealmNodes } from './useRealmNodes'
 import { useRefresh } from './useRefresh'
@@ -30,7 +31,7 @@ import { requestScope, type DeleteRequest, type DeletionResult } from '@/lib/del
 import type { DeletedObjectEntry } from '@/lib/objectVersions'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
 import { isWorkspaceBucket } from '@/lib/workspaces'
-import type { BucketSearchHit, SourceConnectorSummary, UsageResponse } from '@/lib/api'
+import type { BucketSearchHit, SourceConnectorSummary, SyncRelationship, UsageResponse } from '@/lib/api'
 import { referenceSourceLabel, referenceSourceName, type ReferenceSourceGroup } from '@/lib/references'
 import { parseArunaArn, prefixesOverlap, syncBucketKey } from '@/lib/sync'
 import { dataWatchPathPrefix, s3EndpointNodeId } from '@/lib/watches'
@@ -312,6 +313,7 @@ export function useDataManager() {
   // of every relationship register, so remote buckets browsed here surface the
   // sync info the connected node's listing already carries.
   const syncByBucket = ref<Map<string, BucketSyncInfo>>(new Map())
+  const syncRelationships = ref<SyncRelationship[]>([])
   let syncOverviewRequestId = 0
 
   // A missing/self node id in an ARN means the connected node.
@@ -340,12 +342,15 @@ export function useDataManager() {
       // its target an incoming one. Dedupe: a same-node relationship appears in
       // both response lists.
       const seen = new Set<string>()
+      const unique: SyncRelationship[] = []
       for (const relationship of [...response.outgoing, ...response.incoming]) {
         if (seen.has(relationship.id)) continue
         seen.add(relationship.id)
+        unique.push(relationship)
         add(relationship.source, 'outgoing')
         add(relationship.target, 'incoming')
       }
+      syncRelationships.value = unique
       syncByBucket.value = map
     } catch {
       // Badges are a progressive enhancement: a transient failure keeps the
@@ -365,6 +370,23 @@ export function useDataManager() {
     const info = bucketSyncInfo.value
     if (!info) return false
     return info.prefixes.some((prefix) => prefixesOverlap(key, prefix))
+  }
+
+  // The relationships behind a row's sync arrow: this bucket's side covers the key.
+  function syncsForKey(key: string): SyncRow[] {
+    const current = syncKeyFor(remoteNodeId.value, bucket.value)
+    const covers = (arn: string) => {
+      const parsed = parseArunaArn(arn)
+      return Boolean(
+        parsed &&
+          syncKeyFor(parsed.nodeId, parsed.bucket) === current &&
+          prefixesOverlap(key, parsed.prefix),
+      )
+    }
+    return syncRelationships.value.flatMap((relationship) => [
+      ...(covers(relationship.source) ? [{ relationship, direction: 'outgoing' as const }] : []),
+      ...(covers(relationship.target) ? [{ relationship, direction: 'incoming' as const }] : []),
+    ])
   }
 
   const showSyncButton = computed(
@@ -1215,6 +1237,7 @@ export function useDataManager() {
     syncByBucket,
     syncKeyFor,
     keyIsSynced,
+    syncsForKey,
     bucketSyncCount,
     showSyncButton,
     loadSyncOverview,

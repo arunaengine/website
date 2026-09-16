@@ -21,15 +21,17 @@ import PublicAccessDialog from '@/components/data/PublicAccessDialog.vue'
 import ObjectRulesEditor from '@/components/storage/ObjectRulesEditor.vue'
 import PolicyColumn from '@/components/storage/PolicyColumn.vue'
 import PreviewBody from '@/components/preview/PreviewBody.vue'
-import { nodeApiBase } from '@/composables/s3/endpoints'
+import { endpointForNode, nodeApiBase } from '@/composables/s3/endpoints'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useBacklinks } from '@/composables/useBacklinks'
-import { usePublicAccess } from '@/composables/usePublicAccess'
+import type { SyncRow } from '@/composables/useBucketSyncs'
+import { usePublicAccess, type PublicAccess } from '@/composables/usePublicAccess'
 import { useS3, s3ErrorMessage } from '@/composables/useS3'
 import { useAssistantObject } from '@/composables/useAssistantObject'
 import { exactFileBacklinkPreflight } from '@/lib/backlinks'
-import type { PublicTarget } from '@/lib/publicAccess'
+import { publicUrl, type PublicTarget } from '@/lib/publicAccess'
+import { arnLocationLabel, parseArunaArn } from '@/lib/sync'
 import type { DeleteRequest } from '@/lib/deletion/request'
 import { featureEnabled } from '@/lib/config'
 import { isNotebookKey } from '@/lib/notebook/document'
@@ -37,7 +39,7 @@ import { stateVariant } from '@/lib/stateBadge'
 import { formatBytes, relativeTime, truncateMiddle } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { Eye, Globe, ListTree, Lock, NotebookPen } from '@lucide/vue'
+import { ArrowLeftRight, Eye, Globe, ListTree, Lock, NotebookPen } from '@lucide/vue'
 
 const props = defineProps<{
   open: boolean
@@ -66,6 +68,10 @@ const props = defineProps<{
   versionId?: string | null
   /** The key is a folder prefix; only the general details apply. */
   folder?: boolean
+  /** The view's shared public access state, so its list badges follow a change here. */
+  access?: PublicAccess
+  /** The sync relationships that cover this key. */
+  syncs?: SyncRow[]
 }>()
 const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
@@ -115,7 +121,7 @@ async function loadHead() {
 }
 
 // Everyone's read access to this key, through the group's "public" role.
-const access = usePublicAccess(computed(() => props.groupId))
+const access = props.access ?? usePublicAccess(computed(() => props.groupId))
 const fileTarget = computed<PublicTarget>(() => ({
   kind: props.folder ? 'folder' : 'file',
   bucket: props.bucket,
@@ -123,6 +129,32 @@ const fileTarget = computed<PublicTarget>(() => ({
 }))
 const filePublic = computed(() => access.isPublic(props.nodeId ?? null, fileTarget.value))
 const publicOpen = ref(false)
+const fileUrl = computed(() => {
+  const endpoint = filePublic.value ? endpointForNode(props.nodeId ?? null) : null
+  return endpoint ? publicUrl(endpoint, fileTarget.value) : null
+})
+
+const syncRows = computed(() =>
+  (props.syncs ?? []).map(({ relationship, direction }) => {
+    const other = direction === 'outgoing' ? relationship.target : relationship.source
+    return {
+      key: `${relationship.id}:${direction}`,
+      direction: direction === 'outgoing' ? 'To' : 'From',
+      node: nodeName(parseArunaArn(other)?.nodeId),
+      location: arnLocationLabel(other),
+      state: relationship.state,
+    }
+  }),
+)
+const syncsLink = computed(() => ({
+  name: 'bucket-storage',
+  params: { bucketId: props.bucket },
+  query: {
+    tab: 'syncs',
+    ...(props.nodeId ? { node: props.nodeId } : {}),
+    ...(props.groupId ? { group: props.groupId } : {}),
+  },
+}))
 
 // The datasets that reference this key, asked of the node that holds the bucket.
 const {
@@ -305,11 +337,30 @@ const details = computed(() => props.folder ? [
                 {{ filePublic ? 'public' : 'private' }}
               </Badge>
               <Button variant="outline" size="sm" @click="publicOpen = true">
-                <Globe class="h-3.5 w-3.5" /> {{ filePublic ? 'Public access…' : 'Make public…' }}
+                <Globe class="h-3.5 w-3.5" /> Access…
               </Button>
             </dd>
           </div>
+          <div v-if="fileUrl" class="flex min-w-0 items-center justify-end gap-1">
+            <a :href="fileUrl" target="_blank" rel="noopener noreferrer" class="min-w-0 truncate font-mono text-[11px] text-primary hover:underline" :title="fileUrl">{{ fileUrl }}</a>
+            <CopyButton :value="fileUrl" label="Copy the public link" />
+          </div>
         </dl>
+        <div v-if="syncRows.length" class="mt-4 border-t border-border pt-3 text-xs">
+          <div class="flex items-center gap-2">
+            <ArrowLeftRight class="h-4 w-4 text-primary" aria-hidden="true" />
+            <span class="font-medium text-foreground">Sync</span>
+            <RouterLink :to="syncsLink" class="ml-auto text-primary hover:underline">Manage syncs</RouterLink>
+          </div>
+          <ul class="mt-2 divide-y divide-border/60 rounded-md border border-border/60">
+            <li v-for="row in syncRows" :key="row.key" class="flex min-w-0 items-center gap-2 px-3 py-2">
+              <span class="shrink-0 text-muted-foreground">{{ row.direction }}</span>
+              <span class="min-w-0 truncate font-mono" :title="row.location">{{ row.location }}</span>
+              <span class="shrink-0 text-muted-foreground">on {{ row.node }}</span>
+              <Badge :variant="stateVariant(row.state)" size="sm" class="ml-auto shrink-0">{{ row.state }}</Badge>
+            </li>
+          </ul>
+        </div>
         <p v-if="props.referencedFrom" class="mt-3 text-xs text-muted-foreground">
           Referenced from {{ props.referencedFrom.label }}.
         </p>

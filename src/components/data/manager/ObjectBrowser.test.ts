@@ -257,12 +257,12 @@ describe('object browser public access', () => {
     const host = defineComponent({ setup: () => () => h(browser, { manager, onPublicAccess: publicAccess }) })
     const { root } = await mountApp(host)
 
-    await click(button(root, 'Public access'))
+    await click(button(root, 'Access'))
     expect(publicAccess).toHaveBeenLastCalledWith([{ kind: 'folder', bucket: 'reef', key: 'raw/' }])
 
     await tick(checkbox(root, `Select ${listedObject.name}`), true)
     await tick(checkbox(root, `Select ${listedFolder.name}`), true)
-    await click(button(root, 'Public access'))
+    await click(button(root, 'Access'))
     expect(publicAccess).toHaveBeenLastCalledWith([
       { kind: 'folder', bucket: 'reef', key: listedFolder.prefix },
       { kind: 'file', bucket: 'reef', key: listedObject.key },

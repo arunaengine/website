@@ -5,6 +5,8 @@ import * as assistantObject from '@/composables/useAssistantObject'
 import * as StateBadge from '@/lib/stateBadge'
 import * as NotebookDocument from '@/lib/notebook/document'
 import * as Utils from '@/lib/utils'
+import * as PublicAccessLib from '@/lib/publicAccess'
+import * as SyncLib from '@/lib/sync'
 import {
   button,
   click,
@@ -14,6 +16,7 @@ import {
   element,
   mountApp,
   moduleDefault,
+  nodes,
 } from '@/test/clientRender'
 
 const Slotted = (tag: string) =>
@@ -55,10 +58,10 @@ const resetReferences = vi.fn()
 const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => IconStub }),
-  'vue-router': { RouterLink: Slotted('a') },
+  'vue-router': { RouterLink: defineComponent({ props: { to: Object }, setup: (props, { slots }) => () => h('a', { to: props.to, 'data-to': JSON.stringify(props.to) }, slots.default?.()) }) },
   '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
-  '@/components/ui/CopyButton.vue': moduleDefault(Slotted('button')),
+  '@/components/ui/CopyButton.vue': moduleDefault(defineComponent({ props: { value: String }, setup: (props) => () => h('button', { 'data-copy': props.value }) })),
   '@/components/ui/DetailDialog.vue': moduleDefault(DetailDialogStub),
   '@/components/ui/DialogTitle.vue': moduleDefault(Slotted('h2')),
   '@/components/ui/Spinner.vue': moduleDefault(Slotted('i')),
@@ -77,7 +80,12 @@ const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.
     useS3: () => ({ headObject, hasActiveKey }),
     s3ErrorMessage: (error: unknown) => String(error),
   },
-  '@/composables/s3/endpoints': { nodeApiBase: (nodeId: string) => `https://${nodeId}/api/v1` },
+  '@/composables/s3/endpoints': {
+    nodeApiBase: (nodeId: string) => `https://${nodeId}/api/v1`,
+    endpointForNode: () => 'https://s3.node-1.example',
+  },
+  '@/lib/publicAccess': PublicAccessLib,
+  '@/lib/sync': SyncLib,
   '@/composables/useAruna': {
     useAruna: () => ({ currentUser, apiBaseUrl: ref('https://local/api/v1') }),
   },
@@ -249,7 +257,9 @@ describe('file details public access', () => {
     expect(content(root)).toContain('private')
     expect(content(root)).not.toContain('public access dialog')
 
-    await click(button(root, 'Make public…'))
+    expect(nodes(root).some((node) => String(node.props['data-copy'] ?? '').startsWith('https://'))).toBe(false)
+
+    await click(button(root, 'Access…'))
 
     expect(content(root)).toContain('public access dialog')
   })
@@ -259,7 +269,10 @@ describe('file details public access', () => {
     try {
       const { root } = await mount('general')
       expect(content(root)).toContain('public')
-      expect(content(root)).toContain('Public access…')
+      expect(content(root)).toContain('Access…')
+      const copy = element(root, (node) => String(node.props['data-copy'] ?? '').startsWith('https://'))
+      expect(copy.props['data-copy']).toBe('https://s3.node-1.example/reef-survey/raw/reads.fastq')
+      expect(content(root)).toContain('https://s3.node-1.example/reef-survey/raw/reads.fastq')
     } finally {
       filePublic.value = false
     }
@@ -283,8 +296,54 @@ describe('folder details', () => {
     expect(content(root)).not.toContain('Preview')
     expect(content(root)).not.toContain('Current version')
     expect(content(root)).not.toContain('referencing datasets')
-    expect(content(root)).toContain('Make public…')
+    expect(content(root)).toContain('Access…')
     expect(headObject).not.toHaveBeenCalled()
     expect(loadReferences).not.toHaveBeenCalled()
+  })
+})
+
+describe('file details shared state and syncs', () => {
+  it('uses the view state it is given, so the list badges follow a change', async () => {
+    filePublic.value = false
+    const shared = { isPublic: () => true, groupName: ref('Reef lab') }
+    const { root } = await mount('general', { access: shared })
+
+    expect(content(root)).toContain('public')
+    expect(nodes(root).some((node) => String(node.props['data-copy'] ?? '').startsWith('https://'))).toBe(true)
+  })
+
+  it('lists the syncs that cover the key and links to their settings', async () => {
+    const relationship = {
+      id: 'sync-1',
+      source: 'arn:aruna:realm-1:node-1:s3/reef-survey/raw',
+      target: 'arn:aruna:realm-1:node-2:s3/reef-mirror/raw',
+      state: 'enabled',
+    }
+    const { root } = await mount('general', {
+      nodeId: null,
+      syncs: [
+        { relationship, direction: 'outgoing' },
+        { relationship: { ...relationship, id: 'sync-2', source: 'arn:aruna:realm-1:node-3:s3/archive' }, direction: 'incoming' },
+      ],
+    })
+
+    const text = content(root)
+    expect(text).toContain('Sync')
+    expect(text).toContain('To')
+    expect(text).toContain('reef-mirror/raw')
+    expect(text).toContain('From')
+    expect(text).toContain('archive')
+    expect(text).toContain('enabled')
+    const link = element(root, (node) => node.tag === 'a' && content(node) === 'Manage syncs')
+    expect(JSON.parse(String(link.props['data-to']))).toEqual({
+      name: 'bucket-storage',
+      params: { bucketId: 'reef-survey' },
+      query: { tab: 'syncs', group: 'g-1' },
+    })
+  })
+
+  it('has no sync section without a covering sync', async () => {
+    const { root } = await mount('general')
+    expect(content(root)).not.toContain('Manage syncs')
   })
 })

@@ -296,7 +296,7 @@ async function onDrop(event: DragEvent) {
             :title="selectedCount === 0 ? `Public access for ${s3Prefix ? `the folder ${s3Prefix}` : `the bucket ${bucket}`}` : `Public access for ${selectionSummary}`"
             @click="emit('public-access', publicTargets())"
           >
-            <Globe class="h-4 w-4" /> Public access
+            <Globe class="h-4 w-4" /> Access
           </Button>
           <WatchButton
             surface="bucket"
