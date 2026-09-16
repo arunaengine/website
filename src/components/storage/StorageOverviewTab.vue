@@ -5,12 +5,15 @@
 // number the backend cannot give.
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+import PublicAccessDialog from '@/components/data/PublicAccessDialog.vue'
+import Button from '@/components/ui/Button.vue'
 import DocsLink from '@/components/ui/DocsLink.vue'
 import DetailList from '@/components/ui/DetailList.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useBucketSyncs } from '@/composables/useBucketSyncs'
 import { usePlacementPolicies } from '@/composables/usePlacementPolicies'
+import { usePublicAccess } from '@/composables/usePublicAccess'
 import {
   ApiError,
   type BucketUsageResponse,
@@ -19,9 +22,10 @@ import {
   type StorageRoutingRule,
 } from '@/lib/api'
 import type { PolicyRefBody } from '@/lib/placementPolicies'
+import { rulesInBucket, targetLabel as publicTargetLabel, type PublicRule, type PublicTarget } from '@/lib/publicAccess'
 import { targetLabel } from '@/lib/storage'
-import { formatBytes, formatNumber } from '@/lib/utils'
-import { Database, HardDrive, ShieldCheck } from '@lucide/vue'
+import { errorMessage, formatBytes, formatNumber } from '@/lib/utils'
+import { Database, Globe, HardDrive, ShieldCheck } from '@lucide/vue'
 
 const props = defineProps<{ bucket: string; groupId: string | null; nodeId: string | null }>()
 
@@ -30,6 +34,26 @@ const { getBucketPlacement, policyName } = usePlacementPolicies()
 
 const bucket = computed(() => props.bucket)
 const nodeId = computed(() => props.nodeId)
+
+// Everyone's read rules inside this bucket, from the group's "public" role.
+const access = usePublicAccess(computed(() => props.groupId))
+const publicRules = computed(() => rulesInBucket(access.role.value, access.root(props.nodeId), props.bucket))
+const bucketTarget = computed<PublicTarget>(() => ({ kind: 'bucket', bucket: props.bucket, key: '' }))
+const publicOpen = ref(false)
+const removingRule = ref<string | null>(null)
+const removeError = ref<string | null>(null)
+
+async function removeRule(entry: PublicRule) {
+  removingRule.value = entry.rule
+  removeError.value = null
+  try {
+    await access.revoke(props.nodeId, [entry.target])
+  } catch (err) {
+    removeError.value = errorMessage(err)
+  } finally {
+    removingRule.value = null
+  }
+}
 const { rows: syncRows, loading: syncsLoading, error: syncsError, load: loadSyncs } = useBucketSyncs(
   bucket,
   nodeId,
@@ -256,6 +280,55 @@ const filesLink = computed(() => ({
           </template>
         </DetailList>
       </div>
+    </section>
+
+    <section v-if="groupId" class="surface lg:col-span-2">
+      <header class="flex items-center gap-2 border-b border-border px-5 py-4">
+        <Globe class="size-4 text-primary" />
+        <h2 class="font-display text-sm font-semibold text-aruna-navy">Public access</h2>
+        <DocsLink icon topic="data-and-deletion" section="Public access" />
+        <Button
+          v-if="access.canManage.value"
+          variant="outline"
+          size="sm"
+          class="ml-auto"
+          @click="publicOpen = true"
+        >
+          <Globe class="h-3.5 w-3.5" /> Whole bucket…
+        </Button>
+      </header>
+      <div class="px-5 py-4 text-sm">
+        <Skeleton v-if="access.loading.value" class="h-4 w-48" />
+        <p v-else-if="access.error.value" class="text-muted-foreground">
+          The group's roles could not be loaded: {{ access.error.value }}
+        </p>
+        <p v-else-if="!publicRules.length" class="text-muted-foreground">
+          Nothing in this bucket is public. Everyone, including visitors who are not signed in, could read
+          what a public rule covers.
+        </p>
+        <ul v-else class="divide-y divide-border/60 rounded-md border border-border/60 text-xs">
+          <li v-for="entry in publicRules" :key="entry.rule" class="flex items-center justify-between gap-3 px-3 py-2">
+            <span class="min-w-0 break-all">Everyone can read {{ publicTargetLabel(entry.target) }}</span>
+            <Button
+              v-if="access.canManage.value"
+              variant="ghost"
+              size="sm"
+              class="shrink-0"
+              :disabled="removingRule !== null"
+              @click="removeRule(entry)"
+            >
+              {{ removingRule === entry.rule ? 'Removing…' : 'Remove' }}
+            </Button>
+          </li>
+        </ul>
+        <p v-if="removeError" class="mt-2 text-xs text-destructive">{{ removeError }}</p>
+      </div>
+      <PublicAccessDialog
+        v-model:open="publicOpen"
+        :access="access"
+        :node-id="nodeId"
+        :targets="[bucketTarget]"
+      />
     </section>
 
     <section class="surface">

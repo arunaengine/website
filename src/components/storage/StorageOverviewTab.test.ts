@@ -4,7 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as Api from '@/lib/api'
 import * as Storage from '@/lib/storage'
 import * as Utils from '@/lib/utils'
-import { compileClientComponent, content, flush, mountApp, moduleDefault, nodes } from '@/test/clientRender'
+import * as PublicAccessLib from '@/lib/publicAccess'
+import { button, click, compileClientComponent, content, flush, mountApp, moduleDefault, nodes } from '@/test/clientRender'
 import type { SyncRow } from '@/composables/useBucketSyncs'
 
 const IconStub = defineComponent((_, { attrs }) => () => h('i', attrs))
@@ -29,12 +30,16 @@ const listGroupBackends = vi.fn()
 const getBucketPlacement = vi.fn()
 const syncRows = ref<SyncRow[]>([])
 const syncsError = ref<string | null>(null)
+const publicRole = ref<{ role_id: string; name: string; permissions: Record<string, string>; public: boolean } | null>(null)
+const revokePublic = vi.fn().mockResolvedValue(undefined)
 
 const tab = compileClientComponent(new URL('./StorageOverviewTab.vue', import.meta.url), {
   vue: VueRuntime,
   'vue-router': { RouterLink: Slotted('a') },
   '@lucide/vue': new Proxy({}, { get: () => IconStub }),
   '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
+  '@/components/ui/Button.vue': moduleDefault(Slotted('button')),
+  '@/components/data/PublicAccessDialog.vue': moduleDefault(defineComponent(() => () => null)),
   '@/components/ui/DocsLink.vue': moduleDefault(Slotted('a')),
   '@/components/ui/DetailList.vue': moduleDefault(DetailListStub),
   '@/components/ui/Skeleton.vue': moduleDefault(Slotted('div')),
@@ -49,6 +54,17 @@ const tab = compileClientComponent(new URL('./StorageOverviewTab.vue', import.me
       load: () => Promise.resolve(0),
     }),
   },
+  '@/composables/usePublicAccess': {
+    usePublicAccess: () => ({
+      role: publicRole,
+      loading: ref(false),
+      error: ref(null),
+      canManage: ref(true),
+      root: () => '/realm-1/g/g-1/data/node-1',
+      revoke: revokePublic,
+    }),
+  },
+  '@/lib/publicAccess': PublicAccessLib,
   '@/composables/usePlacementPolicies': {
     usePlacementPolicies: () => ({
       getBucketPlacement,
@@ -242,5 +258,56 @@ describe('bucket storage overview', () => {
     expect(text).toContain('This bucket is hosted on another node.')
     expect(getBucketRouting).not.toHaveBeenCalled()
     expect(getBucketPlacement).not.toHaveBeenCalled()
+  })
+})
+
+describe('bucket public access overview', () => {
+  const ROOT = '/realm-1/g/g-1/data/node-1'
+
+  async function mountTab() {
+    getBucketRouting.mockResolvedValue({ bucket: 'reef-survey', rules: [], warnings: [] })
+    getGroupRouting.mockResolvedValue({ group_id: 'g-1', warnings: [] })
+    listGroupBackends.mockResolvedValue({ backends: [] })
+    getBucketPlacement.mockResolvedValue({ bucket: 'reef-survey', policies: [], generation: 1 })
+    const { root } = await mountApp(tab, { props: { bucket: 'reef-survey', groupId: 'g-1', nodeId: null } })
+    await flush()
+    return root
+  }
+
+  it('says nothing is public without a rule', async () => {
+    publicRole.value = null
+    const root = await mountTab()
+
+    expect(content(root)).toContain('Public access')
+    expect(content(root)).toContain('Nothing in this bucket is public.')
+  })
+
+  it('lists the bucket rules and removes one', async () => {
+    publicRole.value = {
+      role_id: 'r-public',
+      name: 'public',
+      permissions: {
+        [`${ROOT}/reef-survey/raw/**`]: 'read',
+        [`${ROOT}/reef-survey/notes.md`]: 'read',
+        [`${ROOT}/other/**`]: 'read',
+      },
+      public: true,
+    }
+    try {
+      const root = await mountTab()
+
+      expect(content(root)).toContain('Everyone can read the file notes.md')
+      expect(content(root)).toContain('Everyone can read the folder raw/')
+      expect(content(root)).not.toContain('other')
+
+      const removes = nodes(root).filter((node) => node.tag === 'button' && content(node).trim() === 'Remove')
+      expect(removes).toHaveLength(2)
+      await click(removes[1]!)
+
+      expect(revokePublic).toHaveBeenCalledWith(null, [{ kind: 'folder', bucket: 'reef-survey', key: 'raw/' }])
+      expect(button(root, 'Whole bucket…')).toBeTruthy()
+    } finally {
+      publicRole.value = null
+    }
   })
 })
