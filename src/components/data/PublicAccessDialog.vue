@@ -112,9 +112,9 @@ async function apply(action: 'grant' | 'revoke') {
         </DialogDescription>
       </DialogHeader>
 
-      <div class="space-y-3">
-        <ul class="divide-y divide-border/60 rounded-md border border-border/60 text-xs">
-          <li v-for="row in rows" :key="row.label" class="space-y-1 px-3 py-2">
+      <div class="min-w-0 space-y-3">
+        <ul class="min-w-0 divide-y divide-border/60 rounded-md border border-border/60 text-xs">
+          <li v-for="row in rows" :key="row.label" class="min-w-0 space-y-1 px-3 py-2">
             <div class="flex items-center justify-between gap-3">
               <span class="min-w-0 break-all">{{ row.label }}</span>
               <Badge :variant="row.isPublic ? 'success' : 'secondary'" size="sm" class="shrink-0 uppercase">
@@ -126,7 +126,7 @@ async function apply(action: 'grant' | 'revoke') {
             <p v-if="row.inherited.length" class="text-[11px] text-muted-foreground">
               Through the rule on {{ ruleName(row.inherited[0]) }}
             </p>
-            <p v-if="row.url" class="flex items-center gap-1 text-[11px] text-muted-foreground">
+            <p v-if="row.url" class="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground">
               <span class="min-w-0 truncate font-mono" :title="row.url">{{ row.url }}</span>
               <CopyButton :value="row.url" label="Copy the public address" />
             </p>
