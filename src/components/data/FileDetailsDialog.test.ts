@@ -47,6 +47,9 @@ const ButtonStub = defineComponent({
 
 const headObject = vi.fn()
 const hasActiveKey = ref(true)
+const currentUser = ref<{ id: string } | null>({ id: 'u-1' })
+const loadReferences = vi.fn()
+const resetReferences = vi.fn()
 
 const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.meta.url), {
   vue: VueRuntime,
@@ -64,6 +67,7 @@ const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.
   '@/components/ui/TabsTrigger.vue': moduleDefault(Slotted('button')),
   '@/components/data/ObjectLocationsPanel.vue': moduleDefault(Marker('copies of this version')),
   '@/components/data/ObjectVersionsPanel.vue': moduleDefault(Marker('version rows')),
+  '@/components/data/ReferencedBy.vue': moduleDefault(Marker('referencing datasets')),
   '@/components/storage/ObjectRulesEditor.vue': moduleDefault(Marker('edit rules for this file')),
   '@/components/storage/PolicyColumn.vue': moduleDefault(Marker('rules this file carries')),
   '@/components/preview/PreviewBody.vue': moduleDefault(defineComponent({ setup: (_, { slots }) => () => h('section', [slots.actions?.(), 'preview']) })),
@@ -71,6 +75,20 @@ const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.
     useS3: () => ({ headObject, hasActiveKey }),
     s3ErrorMessage: (error: unknown) => String(error),
   },
+  '@/composables/s3/endpoints': { nodeApiBase: (nodeId: string) => `https://${nodeId}/api/v1` },
+  '@/composables/useAruna': {
+    useAruna: () => ({ currentUser, apiBaseUrl: ref('https://local/api/v1') }),
+  },
+  '@/composables/useBacklinks': {
+    useBacklinks: () => ({
+      result: ref(null),
+      error: ref(null),
+      busy: ref(false),
+      load: loadReferences,
+      reset: resetReferences,
+    }),
+  },
+  '@/lib/backlinks': { exactFileBacklinkPreflight: (response: unknown) => response },
   '@/composables/useAssistantObject': assistantObject,
   '@/lib/config': { featureEnabled: () => true },
   '@/lib/notebook/document': NotebookDocument,
@@ -80,6 +98,8 @@ const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.
 
 async function mount(tab: string, overrides: Record<string, unknown> = {}) {
   headObject.mockResolvedValue({ contentType: 'text/plain', versionId: '01J000000000000000000HEAD' })
+  loadReferences.mockClear()
+  resetReferences.mockClear()
   const tabs: string[] = []
   const closed: boolean[] = []
   const host = defineComponent({
@@ -187,5 +207,31 @@ describe('notebook preview entry', () => {
   ])('does not open unsupported or ambiguous notebook targets: %j', async (overrides) => {
     const { root } = await mount('preview', overrides)
     expect(content(root)).not.toContain('Open notebook')
+  })
+})
+
+describe('file details references', () => {
+  it('asks the node that holds the bucket which datasets reference the file', async () => {
+    const local = await mount('general')
+    expect(content(local.root)).toContain('referencing datasets')
+    expect(loadReferences).toHaveBeenCalledWith(
+      { target: { kind: 'bucket_prefix', bucket: 'reef-survey', prefix: 'raw/reads.fastq' } },
+      'https://local/api/v1',
+    )
+
+    await mount('general', { nodeId: 'remote-node' })
+    expect(loadReferences).toHaveBeenCalledWith(expect.anything(), 'https://remote-node/api/v1')
+  })
+
+  it('skips the lookup for a signed-out viewer', async () => {
+    currentUser.value = null
+    try {
+      const { root } = await mount('general')
+      expect(loadReferences).not.toHaveBeenCalled()
+      expect(resetReferences).toHaveBeenCalled()
+      expect(content(root)).not.toContain('referencing datasets')
+    } finally {
+      currentUser.value = { id: 'u-1' }
+    }
   })
 })

@@ -14,12 +14,17 @@ import TabsContent from '@/components/ui/TabsContent.vue'
 import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import ObjectLocationsPanel from '@/components/data/ObjectLocationsPanel.vue'
+import ReferencedBy from '@/components/data/ReferencedBy.vue'
 import ObjectVersionsPanel from '@/components/data/ObjectVersionsPanel.vue'
 import ObjectRulesEditor from '@/components/storage/ObjectRulesEditor.vue'
 import PolicyColumn from '@/components/storage/PolicyColumn.vue'
 import PreviewBody from '@/components/preview/PreviewBody.vue'
+import { nodeApiBase } from '@/composables/s3/endpoints'
+import { useAruna } from '@/composables/useAruna'
+import { useBacklinks } from '@/composables/useBacklinks'
 import { useS3, s3ErrorMessage } from '@/composables/useS3'
 import { useAssistantObject } from '@/composables/useAssistantObject'
+import { exactFileBacklinkPreflight } from '@/lib/backlinks'
 import type { DeleteRequest } from '@/lib/deletion/request'
 import { featureEnabled } from '@/lib/config'
 import { isNotebookKey } from '@/lib/notebook/document'
@@ -63,6 +68,7 @@ const emit = defineEmits<{
 }>()
 
 const s3 = useS3()
+const { currentUser, apiBaseUrl } = useAruna()
 const { leave } = useAssistantObject()
 const head = ref<{ contentType?: string; versionId?: string } | null>(null)
 const headError = ref<string | null>(null)
@@ -100,12 +106,43 @@ async function loadHead() {
   }
 }
 
+// The datasets that reference this key, asked of the node that holds the bucket.
+const {
+  result: referenceResult,
+  error: referencesError,
+  busy: referencesBusy,
+  load: loadReferenceLookup,
+  reset: resetReferences,
+} = useBacklinks()
+const fileReferences = computed(() =>
+  referenceResult.value
+    ? exactFileBacklinkPreflight(referenceResult.value, props.bucket, props.objectKey)
+    : null,
+)
+
+function loadReferences() {
+  const apiBase = props.nodeId ? nodeApiBase(props.nodeId) : apiBaseUrl.value
+  if (!currentUser.value || !apiBase) {
+    resetReferences()
+    return
+  }
+  void loadReferenceLookup(
+    { target: { kind: 'bucket_prefix', bucket: props.bucket, prefix: props.objectKey } },
+    apiBase,
+  )
+}
+
 watch(
   () => [props.open, props.bucket, props.objectKey, props.revision, props.versionId],
   () => {
     pinnedVersion.value = props.versionId ?? null
-    if (props.open) void loadHead()
-    else head.value = null
+    if (props.open) {
+      void loadHead()
+      loadReferences()
+    } else {
+      head.value = null
+      resetReferences()
+    }
   },
   { immediate: true },
 )
@@ -241,6 +278,14 @@ const details = computed(() => [
           Referenced from {{ props.referencedFrom.label }}.
         </p>
         <p v-if="headError" class="mt-3 text-xs text-muted-foreground">{{ headError }}</p>
+        <ReferencedBy
+          v-if="currentUser"
+          class="mt-4 border-t border-border pt-3"
+          :preflight="fileReferences"
+          :busy="referencesBusy"
+          :error="referencesError"
+          @retry="loadReferences"
+        />
       </TabsContent>
 
       <TabsContent value="versions" class="surface p-4">

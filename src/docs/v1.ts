@@ -1223,6 +1223,7 @@ export const docsTopics: DocsTopic[] = [
           'Index current means a node has finished indexing what it holds. A pending, mixed, or failed index can miss a reference that already exists.',
           'A node that does not answer, a truncated page, or a partial realm view leaves the coverage incomplete. The dialog says so, and an empty result is then not proof that no dataset references the target.',
           'The check informs the decision; storage permissions decide whether the delete is allowed.',
+          'Referenced by on a file, on its dataset page or in its file details, runs the same check and lists the referencing datasets. The Complete or Partial badge opens the coverage details.',
         ],
       },
       {
