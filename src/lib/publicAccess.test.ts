@@ -4,6 +4,7 @@ import {
   coveringRules,
   dataRoot,
   managedRole,
+  publicUrl,
   rulesInBucket,
   targetPath,
   withGrants,
@@ -89,5 +90,18 @@ describe('public access paths', () => {
       { kind: 'folder', bucket: 'reef', key: 'raw/' },
     ])
     expect(rulesInBucket(null, root, 'reef')).toEqual([])
+  })
+})
+
+describe('public address', () => {
+  it('builds path-style addresses with encoded segments', () => {
+    const endpoint = 'https://s3.node-1.example/'
+    expect(publicUrl(endpoint, { kind: 'bucket', bucket: 'reef', key: '' })).toBe('https://s3.node-1.example/reef/')
+    expect(publicUrl(endpoint, { kind: 'folder', bucket: 'reef', key: 'raw data/' })).toBe(
+      'https://s3.node-1.example/reef/raw%20data/',
+    )
+    expect(publicUrl(endpoint, { kind: 'file', bucket: 'reef', key: 'raw/a#1.txt' })).toBe(
+      'https://s3.node-1.example/reef/raw/a%231.txt',
+    )
   })
 })

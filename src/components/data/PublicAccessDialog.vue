@@ -2,9 +2,11 @@
 // Grants or removes everyone's read access for files, folders or a bucket by
 // editing the group's "public" role; the change lands as one role replacement.
 import { computed, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import { Globe, Lock } from '@lucide/vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import CopyButton from '@/components/ui/CopyButton.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
@@ -15,9 +17,9 @@ import DialogTitle from '@/components/ui/DialogTitle.vue'
 import DocsLink from '@/components/ui/DocsLink.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
-import { useRealmNodes } from '@/composables/useRealmNodes'
+import { endpointForNode } from '@/composables/s3/endpoints'
 import type { PublicAccess } from '@/composables/usePublicAccess'
-import { targetLabel, type PublicTarget } from '@/lib/publicAccess'
+import { publicUrl, targetLabel, type PublicTarget } from '@/lib/publicAccess'
 import { errorMessage } from '@/lib/utils'
 
 const props = defineProps<{
@@ -30,7 +32,6 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ (e: 'update:open', value: boolean): void; (e: 'changed'): void }>()
 
-const { displayName } = useRealmNodes()
 const busy = ref(false)
 const submitError = ref<string | null>(null)
 
@@ -47,13 +48,23 @@ const rows = computed(() =>
     const rules = props.access.rulesFor(props.nodeId, target)
     // A rule on a parent keeps the target public after its own rule is gone.
     const inherited = rules.filter((rule) => rule !== path)
-    return { target, label: targetLabel(target), isPublic: rules.length > 0, inherited }
+    const endpoint = rules.length ? endpointForNode(props.nodeId) : null
+    return {
+      target,
+      label: targetLabel(target),
+      isPublic: rules.length > 0,
+      inherited,
+      url: endpoint ? publicUrl(endpoint, target) : null,
+    }
   }),
 )
 
 const anyPrivate = computed(() => rows.value.some((row) => !row.isPublic))
 const anyPublic = computed(() => rows.value.some((row) => row.isPublic))
-const bucket = computed(() => props.targets[0]?.bucket ?? '')
+const rolesLink = computed(() => {
+  const groupId = props.access.detail.value?.group_id
+  return groupId ? { name: 'group', params: { id: groupId }, query: { tab: 'roles' } } : null
+})
 const blocked = computed(() =>
   props.access.loading.value
     ? null
@@ -94,38 +105,33 @@ async function apply(action: 'grant' | 'revoke') {
           <Globe class="h-4 w-4 text-primary" /> Public access
         </DialogTitle>
         <DialogDescription>
-          Public access adds a read rule to the group's "public" role. Anyone, including visitors who
-          are not signed in, can then download what it covers. Editing stays with the group's other roles.
+          Everyone, signed in or not, can read what is public. Managed through the group role
+          <RouterLink v-if="rolesLink && access.role.value" :to="rolesLink" class="font-medium text-primary hover:underline">public</RouterLink>
+          <template v-else><span class="font-medium text-foreground">public</span>, created when needed</template>.
           <DocsLink icon topic="data-and-deletion" section="Public access" class="ml-0.5" />
         </DialogDescription>
       </DialogHeader>
 
       <div class="space-y-3">
         <ul class="divide-y divide-border/60 rounded-md border border-border/60 text-xs">
-          <li v-for="row in rows" :key="row.label" class="flex items-center justify-between gap-3 px-3 py-2">
-            <span class="min-w-0">
-              <span class="block break-all">{{ row.label }}</span>
-              <span v-if="row.inherited.length" class="block text-[11px] text-muted-foreground">
-                Public through the rule on {{ ruleName(row.inherited[0]) }}
-              </span>
-            </span>
-            <Badge :variant="row.isPublic ? 'success' : 'secondary'" size="sm" class="shrink-0 uppercase">
-              <Globe v-if="row.isPublic" class="mr-0.5 size-3" aria-hidden="true" />
-              <Lock v-else class="mr-0.5 size-3" aria-hidden="true" />
-              {{ row.isPublic ? 'public' : 'private' }}
-            </Badge>
+          <li v-for="row in rows" :key="row.label" class="space-y-1 px-3 py-2">
+            <div class="flex items-center justify-between gap-3">
+              <span class="min-w-0 break-all">{{ row.label }}</span>
+              <Badge :variant="row.isPublic ? 'success' : 'secondary'" size="sm" class="shrink-0 uppercase">
+                <Globe v-if="row.isPublic" class="mr-0.5 size-3" aria-hidden="true" />
+                <Lock v-else class="mr-0.5 size-3" aria-hidden="true" />
+                {{ row.isPublic ? 'public' : 'private' }}
+              </Badge>
+            </div>
+            <p v-if="row.inherited.length" class="text-[11px] text-muted-foreground">
+              Through the rule on {{ ruleName(row.inherited[0]) }}
+            </p>
+            <p v-if="row.url" class="flex items-center gap-1 text-[11px] text-muted-foreground">
+              <span class="min-w-0 truncate font-mono" :title="row.url">{{ row.url }}</span>
+              <CopyButton :value="row.url" label="Copy the public address" />
+            </p>
           </li>
         </ul>
-        <p class="text-xs text-muted-foreground">
-          <template v-if="access.groupName.value">Group <span class="font-medium text-foreground">{{ access.groupName.value }}</span>, bucket</template>
-          <template v-else>Bucket</template>
-          <span class="font-mono">{{ bucket }}</span> on {{ displayName(nodeId) }}.
-          <template v-if="access.role.value">
-            The "public" role currently carries {{ Object.keys(access.role.value.permissions).length }}
-            {{ Object.keys(access.role.value.permissions).length === 1 ? 'rule' : 'rules' }}.
-          </template>
-          <template v-else>The group has no "public" role yet; making something public creates it.</template>
-        </p>
         <Spinner v-if="access.loading.value" show-label label="Loading the group's roles…" />
         <Notice v-else-if="blocked" tone="warning">{{ blocked }}</Notice>
         <Notice v-if="submitError" tone="error">{{ submitError }}</Notice>

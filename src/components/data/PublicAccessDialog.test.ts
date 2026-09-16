@@ -3,7 +3,7 @@ import * as VueRuntime from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import * as PublicAccessLib from '@/lib/publicAccess'
 import * as Utils from '@/lib/utils'
-import { button, click, compileClientComponent, content, mountApp, moduleDefault } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, element, mountApp, moduleDefault, nodes } from '@/test/clientRender'
 
 const Slotted = (tag: string) =>
   defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h(tag, attrs, slots.default?.()) })
@@ -20,7 +20,9 @@ const ButtonStub = defineComponent({
 
 const dialog = compileClientComponent(new URL('./PublicAccessDialog.vue', import.meta.url), {
   vue: VueRuntime,
+  'vue-router': { RouterLink: defineComponent({ props: { to: Object }, setup: (props, { slots }) => () => h('a', { 'data-to': JSON.stringify(props.to) }, slots.default?.()) }) },
   '@lucide/vue': new Proxy({}, { get: () => IconStub }),
+  '@/components/ui/CopyButton.vue': moduleDefault(defineComponent({ props: { value: String, label: String }, setup: (props) => () => h('button', { 'data-copy': props.value }, props.label) })),
   '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Dialog.vue': moduleDefault(DialogStub),
@@ -33,7 +35,7 @@ const dialog = compileClientComponent(new URL('./PublicAccessDialog.vue', import
   '@/components/ui/DocsLink.vue': moduleDefault(Slotted('a')),
   '@/components/ui/Notice.vue': moduleDefault(Slotted('div')),
   '@/components/ui/Spinner.vue': moduleDefault(Slotted('i')),
-  '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: () => 'this node' }) },
+  '@/composables/s3/endpoints': { endpointForNode: () => 'https://s3.node-1.example/' },
   '@/lib/publicAccess': PublicAccessLib,
   '@/lib/utils': Utils,
 })
@@ -43,6 +45,7 @@ const ROOT = '/realm-1/g/g-1/data/node-1'
 function fakeAccess(rules: string[], canManage = true) {
   const roles = ref(rules.length ? [{ role_id: 'r', name: 'public', permissions: Object.fromEntries(rules.map((rule) => [rule, 'read'])), public: true }] : [])
   return {
+    detail: ref({ group_id: 'g-1' }),
     loading: ref(false),
     error: ref<string | null>(null),
     canManage: ref(canManage),
@@ -86,7 +89,8 @@ describe('public access dialog', () => {
 
     expect(content(root)).toContain('the file raw/reads.fastq')
     expect(content(root)).toContain('private')
-    expect(content(root)).toContain('no "public" role yet')
+    expect(content(root)).toContain('created when needed')
+    expect(nodes(root).some((node) => node.props['data-copy'])).toBe(false)
     expect(button(root, 'Remove public access').props.disabled).toBe(true)
 
     await click(button(root, 'Make public'))
@@ -101,8 +105,12 @@ describe('public access dialog', () => {
     const { root } = await render(access, [FILE])
 
     expect(content(root)).toContain('public')
-    expect(content(root)).toContain('Public through the rule on reef/raw/')
+    expect(content(root)).toContain('Through the rule on reef/raw/')
     expect(button(root, 'Make public').props.disabled).toBe(true)
+    const copy = element(root, (node) => Boolean(node.props['data-copy']))
+    expect(copy.props['data-copy']).toBe('https://s3.node-1.example/reef/raw/reads.fastq')
+    const link = element(root, (node) => node.tag === 'a' && content(node) === 'public')
+    expect(JSON.parse(String(link.props['data-to']))).toEqual({ name: 'group', params: { id: 'g-1' }, query: { tab: 'roles' } })
 
     await click(button(root, 'Remove public access'))
 

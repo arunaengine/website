@@ -97,6 +97,13 @@ export function rulesInBucket(role: ApiRole | null, root: string, bucket: string
     })
 }
 
+/** The path-style S3 address everyone can read a public target at. */
+export function publicUrl(endpoint: string, target: PublicTarget): string {
+  const base = `${endpoint.replace(/\/+$/, '')}/${encodeURIComponent(target.bucket)}`
+  if (target.kind === 'bucket') return `${base}/`
+  return `${base}/${target.key.split('/').map(encodeURIComponent).join('/')}`
+}
+
 export function targetLabel(target: PublicTarget): string {
   if (target.kind === 'bucket') return `the whole bucket ${target.bucket}`
   if (target.kind === 'folder') return `the folder ${target.key}`
