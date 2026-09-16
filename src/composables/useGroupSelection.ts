@@ -28,6 +28,20 @@ export function rememberGroup(groupId: string) {
 export function setActiveGroup(groupId: string) {
   if (!useAruna().myGroups.value.some((group) => group.id === groupId)) return
   rememberGroup(groupId)
+  void followSession(groupId)
+}
+
+// An S3 session serves one group, so an open one moves to the switched group on
+// its own node: a stored session is reused, a missing one is minted once.
+async function followSession(groupId: string) {
+  try {
+    const { activateContext, activeSession } = await import('./s3/session')
+    const session = activeSession.value
+    if (!session || session.groupId === groupId) return
+    await activateContext(session.issuerNodeId, groupId)
+  } catch {
+    // The view that needs the session reports the failure and offers a retry.
+  }
 }
 
 let pendingReload: Promise<unknown> | null = null

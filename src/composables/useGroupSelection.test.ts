@@ -6,6 +6,8 @@ const loading = ref(false)
 const bootstrapped = ref(true)
 const currentUser = ref<{ id: string } | null>({ id: 'u1' })
 const loadAuthenticated = vi.fn(async () => undefined)
+const activeSession = ref<{ groupId: string; issuerNodeId: string } | null>(null)
+const activateContext = vi.fn(async () => undefined)
 // Both the window focus and the document visibility listener onWake registers.
 let wakeListeners: Array<() => void> = []
 
@@ -59,6 +61,7 @@ async function loadModule(stored = '') {
   vi.doMock('./useAruna', () => ({
     useAruna: () => ({ myGroups, loading, bootstrapped, currentUser, loadAuthenticated }),
   }))
+  vi.doMock('./s3/session', () => ({ activeSession, activateContext }))
   return import('./useGroupSelection')
 }
 
@@ -68,10 +71,13 @@ beforeEach(() => {
   bootstrapped.value = true
   currentUser.value = { id: 'u1' }
   loadAuthenticated.mockClear()
+  activeSession.value = null
+  activateContext.mockClear()
 })
 
 afterEach(() => {
   vi.doUnmock('./useAruna')
+  vi.doUnmock('./s3/session')
   Reflect.deleteProperty(globalThis, 'window')
   Reflect.deleteProperty(globalThis, 'document')
 })
@@ -181,6 +187,56 @@ describe('shared group selection', () => {
 
     expect(storage.getItem(STORED_KEY)).toBe('group-b')
     expect(selected.value).toBe('group-b')
+  })
+})
+
+describe('session follows switch', () => {
+  beforeEach(() => {
+    myGroups.value = [
+      { id: 'group-a', name: 'A' },
+      { id: 'group-b', name: 'B' },
+    ]
+  })
+
+  it('moves an open session to the switched group', async () => {
+    // The stored session of the new group is reused; only a missing one is minted.
+    activeSession.value = { groupId: 'group-a', issuerNodeId: 'node-a' }
+    const { setActiveGroup } = await loadModule('group-a')
+
+    setActiveGroup('group-b')
+    await vi.dynamicImportSettled()
+
+    expect(activateContext).toHaveBeenCalledWith('node-a', 'group-b')
+  })
+
+  it('leaves a session that already serves the group', async () => {
+    activeSession.value = { groupId: 'group-b', issuerNodeId: 'node-a' }
+    const { setActiveGroup } = await loadModule('group-a')
+
+    setActiveGroup('group-b')
+    await vi.dynamicImportSettled()
+
+    expect(activateContext).not.toHaveBeenCalled()
+  })
+
+  it('opens no session when none is open', async () => {
+    const { setActiveGroup } = await loadModule('group-a')
+
+    setActiveGroup('group-b')
+    await vi.dynamicImportSettled()
+
+    expect(activateContext).not.toHaveBeenCalled()
+  })
+
+  it('ignores a group without a membership', async () => {
+    activeSession.value = { groupId: 'group-a', issuerNodeId: 'node-a' }
+    const { setActiveGroup } = await loadModule('group-a')
+
+    setActiveGroup('group-x')
+    await vi.dynamicImportSettled()
+
+    expect(activateContext).not.toHaveBeenCalled()
+    expect(storage.getItem(STORED_KEY)).toBe('group-a')
   })
 })
 
