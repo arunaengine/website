@@ -120,3 +120,26 @@ export function connectorBody(form: ConnectorForm, editing: boolean): Repository
   else if (!editing || form.removeToken || !invenio) body.secret_config = {}
   return body
 }
+
+function sameEndpoint(a: string, b: string): boolean {
+  return a.trim().replace(/\/+$/, '').toLowerCase() === b.trim().replace(/\/+$/, '').toLowerCase()
+}
+
+/** The source record lineage a new link may continue on this endpoint. */
+export function sourceParent(rows: readonly PersistentIdView[], endpoint: string): string | null {
+  const parents = secondaryIdentifiers(rows, 'invenio_parent')
+  const match = parents.find((entry) => !entry.endpoint || sameEndpoint(entry.endpoint, endpoint))
+  return match?.value ?? null
+}
+
+/** An optional metadata override typed as JSON; it must be an object. */
+export function parseOverride(text: string): { value?: Record<string, unknown>; error?: string } {
+  if (!text.trim()) return {}
+  try {
+    const value: unknown = JSON.parse(text)
+    if (value && typeof value === 'object' && !Array.isArray(value)) return { value: value as Record<string, unknown> }
+    return { error: 'The override must be a JSON object.' }
+  } catch {
+    return { error: 'The override is not valid JSON.' }
+  }
+}

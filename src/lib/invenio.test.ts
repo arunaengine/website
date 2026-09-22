@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { connectorBody, doiUrl, failureText, linkStatus, searchHits, searchTotal, secondaryIdentifiers } from './invenio'
+import {
+  connectorBody,
+  doiUrl,
+  failureText,
+  linkStatus,
+  parseOverride,
+  searchHits,
+  searchTotal,
+  secondaryIdentifiers,
+  sourceParent,
+} from './invenio'
 import type { PersistentIdView } from './pid'
 
 describe('invenio search hits', () => {
@@ -95,5 +105,26 @@ describe('repository connector body', () => {
     const body = connectorBody({ ...form, kind: 'oai_pmh', token: 'read', community: 'c' }, true)
     expect(body.secret_config).toEqual({})
     expect(body).not.toHaveProperty('community')
+  })
+})
+
+describe('publish choices', () => {
+  const rows = [{
+    secondary_identifiers: [
+      { kind: 'invenio_parent', value: 'sandbox-parent', endpoint: 'https://sandbox.zenodo.org/api/' },
+      { kind: 'invenio_parent', value: 'zenodo-parent', endpoint: 'https://zenodo.org/api' },
+    ],
+  }] as PersistentIdView[]
+
+  it('offers only the source lineage of the chosen endpoint', () => {
+    expect(sourceParent(rows, 'https://zenodo.org/api/')).toBe('zenodo-parent')
+    expect(sourceParent(rows, 'https://other.example/api/')).toBeNull()
+  })
+
+  it('accepts only a JSON object as metadata override', () => {
+    expect(parseOverride('')).toEqual({})
+    expect(parseOverride('{"title":"A"}')).toEqual({ value: { title: 'A' } })
+    expect(parseOverride('[1]').error).toBeTruthy()
+    expect(parseOverride('{').error).toBeTruthy()
   })
 })
