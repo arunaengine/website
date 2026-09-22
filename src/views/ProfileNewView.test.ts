@@ -40,6 +40,8 @@ const currentUser = ref<{ id: string } | null>({ id: 'user-1' })
 const createMetadata = vi.fn()
 const replaceMetadataRoCrate = vi.fn()
 const loadProfileCrate = vi.fn()
+const fetchRoCrateRaw = vi.fn()
+const sessionEpoch = ref(0)
 const publishProfileArtifacts = vi.fn()
 const listBuckets = vi.fn()
 const s3Endpoint = ref('https://s3.test')
@@ -71,6 +73,8 @@ arunaModule.value = {
   createMetadata,
   replaceMetadataRoCrate,
   loadProfileCrate,
+  fetchRoCrateRaw,
+  sessionEpoch,
   saving,
   currentUser,
 }
@@ -292,6 +296,12 @@ beforeEach(() => {
   })
   replaceMetadataRoCrate.mockReset().mockResolvedValue(undefined)
   loadProfileCrate.mockReset().mockResolvedValue({})
+  fetchRoCrateRaw.mockReset().mockImplementation(async () => Rocrate.buildProfileCrate({
+    slug: 'example', name: storedProfile.name, description: storedProfile.description,
+    version: storedProfile.version, datePublished: '2026-09-01', license: 'https://example.org/license',
+    entityRules: [rootRule],
+  }))
+  sessionEpoch.value = 0
   publishProfileArtifacts.mockReset().mockResolvedValue(undefined)
   listBuckets.mockReset().mockResolvedValue([])
   s3Endpoint.value = 'https://s3.test'
@@ -444,6 +454,104 @@ describe('ProfileNewView edit', () => {
     }))
     expect(createMetadata).not.toHaveBeenCalled()
     expect(routerPush).toHaveBeenCalledWith({ name: 'profile', params: { profileId: 'example' } })
+    mounted.app.unmount()
+  })
+
+  it('preserves unmodeled content through the actual edit and save path', async () => {
+    const original = await fetchRoCrateRaw()
+    loadProfileCrate.mockResolvedValue(Rocrate.parseProfileCrate(original))
+    original['@context'] = [original['@context'], { custom: 'https://example.org/custom/' }]
+    original['custom:provenance'] = { source: 'imported', nested: [1, { keep: true }] }
+    const entries = original['@graph'] as Record<string, unknown>[]
+    const root = entries.find((entry) => entry['@id'] === './')!
+    root['custom:note'] = { '@value': 'Keep this', '@language': 'de' }
+    root['@type'] = [...root['@type'] as string[], 'https://example.org/CustomProfile']
+    root.hasPart = [...root.hasPart as unknown[], { '@id': 'custom.ttl' }]
+    const resources = 'http://www.w3.org/ns/dx/prof/hasResource'
+    root[resources] = [...root[resources] as unknown[], { '@id': '#custom-artifact' }]
+    const custom = [
+      { '@id': 'custom.ttl', '@type': 'File', text: 'verbatim custom constraints', 'custom:flag': false },
+      { '@id': '#custom-artifact', '@type': 'ResourceDescriptor', hasArtifact: { '@id': 'custom.ttl' } },
+      { '@id': '#other', '@type': 'CreativeWork', 'custom:values': [0, false, { nested: ['keep'] }] },
+    ]
+    entries.push(...custom)
+    const metadata = entries.find((entry) => entry['@id'] === 'ro-crate-metadata.json')!
+    metadata['custom:identifier'] = 'keep-descriptor'
+    const before = structuredClone(original)
+    fetchRoCrateRaw.mockResolvedValue(original)
+    const mounted = await mountApp(ProfileNewView)
+    await flush()
+    await typeValue(input(mounted.root, 'data-field', 'name'), 'Edited profile')
+    await click(button(mounted.root, 'Next'))
+    await click(button(mounted.root, 'Next'))
+    await click(button(mounted.root, 'Save profile'))
+    await flush()
+    expect(fetchRoCrateRaw).toHaveBeenLastCalledWith('doc-1')
+    const saved = replaceMetadataRoCrate.mock.calls[0]![1].rocrate
+    expect(saved['@context']).toEqual(original['@context'])
+    expect(saved['custom:provenance']).toEqual(original['custom:provenance'])
+    const savedEntries = saved['@graph'] as Record<string, unknown>[]
+    expect(savedEntries.find((entry) => entry['@id'] === './')).toMatchObject({
+      name: 'Edited profile', 'custom:note': root['custom:note'],
+      datePublished: '2026-09-01', license: { '@id': 'https://example.org/license' },
+      '@type': expect.arrayContaining(['https://example.org/CustomProfile']),
+      hasPart: expect.arrayContaining([{ '@id': 'custom.ttl' }]),
+      [resources]: expect.arrayContaining([{ '@id': '#custom-artifact' }]),
+    })
+    expect(savedEntries).toEqual(expect.arrayContaining(custom))
+    expect(savedEntries.find((entry) => entry['@id'] === 'ro-crate-metadata.json')).toEqual(metadata)
+    expect(original).toEqual(before)
+    mounted.app.unmount()
+  })
+
+  it('refuses an edit seeded only from a summary when the complete profile fails to load', async () => {
+    loadProfileCrate.mockRejectedValue(new Error('The complete profile is unavailable'))
+    route.query = { step: '3' }
+    const mounted = await mountApp(ProfileNewView)
+    await flush()
+    expect(content(mounted.root)).toContain('The complete profile is unavailable')
+    await click(button(mounted.root, 'Save profile'))
+    expect(fetchRoCrateRaw).not.toHaveBeenCalled()
+    expect(replaceMetadataRoCrate).not.toHaveBeenCalled()
+    mounted.app.unmount()
+  })
+
+  it('keeps the draft and refuses replacement when the original crate cannot load', async () => {
+    fetchRoCrateRaw.mockRejectedValue(new Error('Original profile is unavailable'))
+    const mounted = await mountApp(ProfileNewView)
+    await flush()
+    await typeValue(input(mounted.root, 'data-field', 'description'), 'Unsaved changes')
+    await click(button(mounted.root, 'Next'))
+    await click(button(mounted.root, 'Next'))
+    await click(button(mounted.root, 'Save profile'))
+    await flush()
+    expect(replaceMetadataRoCrate).not.toHaveBeenCalled()
+    expect(publishProfileArtifacts).not.toHaveBeenCalled()
+    expect(content(mounted.root)).toContain('Original profile is unavailable')
+    await click(button(mounted.root, 'Back'))
+    await click(button(mounted.root, 'Back'))
+    expect(input(mounted.root, 'data-field', 'description').value).toBe('Unsaved changes')
+    mounted.app.unmount()
+  })
+
+  it.each(['route', 'session'])('refuses a stale original-crate load after the %s changes', async (changed) => {
+    const original = await fetchRoCrateRaw()
+    const pending = deferred<unknown>()
+    fetchRoCrateRaw.mockReturnValue(pending.promise)
+    const mounted = await mountApp(ProfileNewView)
+    await flush()
+    await click(button(mounted.root, 'Next'))
+    await click(button(mounted.root, 'Next'))
+    const save = button(mounted.root, 'Save profile').props.onClick as () => Promise<void>
+    const saving = save()
+    if (changed === 'route') route.params = {}
+    else sessionEpoch.value++
+    await flush()
+    pending.resolve(original)
+    await saving
+    expect(replaceMetadataRoCrate).not.toHaveBeenCalled()
+    expect(createMetadata).not.toHaveBeenCalled()
+    expect(publishProfileArtifacts).not.toHaveBeenCalled()
     mounted.app.unmount()
   })
 

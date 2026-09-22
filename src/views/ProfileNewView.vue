@@ -29,7 +29,7 @@ import { useProfilePublish } from '@/composables/useProfilePublish'
 import { useProfileReferences } from '@/composables/useProfileReferences'
 import { profileReferenceIri } from '@/composables/aruna/profileIri'
 import type { MetadataProfile } from '@/data/types'
-import { buildProfileArtifactTexts, buildProfileCrate } from '@/lib/profiles/rocrate'
+import { buildProfileArtifactTexts, buildProfileCrate, updateProfileCrate } from '@/lib/profiles/rocrate'
 import { entityRulesToMode } from '@/lib/profiles/mode'
 import { parseS3Url } from '@/lib/tes'
 import { errorMessage } from '@/lib/utils'
@@ -44,6 +44,8 @@ const {
   createMetadata,
   replaceMetadataRoCrate,
   loadProfileCrate,
+  fetchRoCrateRaw,
+  sessionEpoch,
 } = useAruna()
 
 // The edit route carries the profile slug; the create route carries none. The
@@ -318,12 +320,21 @@ watch(
     if (!profile) return
     const id = editId.value
     const generation = seedGeneration
-    // A list summary can omit the rule artifacts; materialize the crate first so
-    // the builder never opens on a rule-less draft. A failure keeps the summary.
-    if (profile.documentId) await loadProfileCrate(profile.documentId).catch(() => undefined)
+    // A list summary can omit rules; an incomplete profile must never become a saved replacement.
+    let parsed: Awaited<ReturnType<typeof loadProfileCrate>> | undefined
+    try {
+      parsed = profile.documentId ? await loadProfileCrate(profile.documentId) : undefined
+    } catch (error) {
+      if (generation === seedGeneration && editId.value === id) builder.submitError = errorMessage(error)
+      return
+    }
     if (generation !== seedGeneration || editId.value !== id) return
     const current = editProfile.value
-    if (!seeded.value && current?.id === id) seedDraft(current)
+    if (!seeded.value && current?.id === id) {
+      seedDraft(current)
+      if (parsed?.datePublished) builder.datePublished = parsed.datePublished
+      if (parsed?.license) builder.license = parsed.license
+    }
   },
   { immediate: true },
 )
@@ -345,6 +356,11 @@ async function submit() {
   if (!seeded.value || blockers.value.length || publishing.value) return
   builder.submitError = null
   publishing.value = true
+  const edited = editProfile.value
+  const generation = seedGeneration
+  const epoch = sessionEpoch.value
+  const isPublic = builder.isPublic
+  const groupId = builder.groupId
   try {
     const basics = builder.profileBasics()
     const entityRules = builder.normalizedEntities
@@ -366,24 +382,26 @@ async function submit() {
     const destination = isDefaultDestination
       ? undefined
       : { bucket: chosenBucket, prefix: chosenPrefix || undefined }
-    const externalArtifacts = builder.isPublic
-      ? await publishProfileArtifacts(builder.groupId, basics.slug, buildProfileArtifactTexts(crateInput), destination)
+    const original = edited?.documentId ? await fetchRoCrateRaw(edited.documentId) : undefined
+    if (generation !== seedGeneration || epoch !== sessionEpoch.value) return
+    const externalArtifacts = isPublic
+      ? await publishProfileArtifacts(groupId, basics.slug, buildProfileArtifactTexts(crateInput), destination)
       : undefined
     const profileCrate = buildProfileCrate({ ...crateInput, externalArtifacts })
-    const edited = editProfile.value
+    if (generation !== seedGeneration || epoch !== sessionEpoch.value) return
     if (edited?.documentId) {
       await replaceMetadataRoCrate(edited.documentId, {
-        rocrate: profileCrate,
-        public: builder.isPublic,
+        rocrate: updateProfileCrate(original, profileCrate),
+        public: isPublic,
       })
       submitted.value = true
       void router.push({ name: 'profile', params: { profileId: edited.id } })
       return
     }
     const created = await createMetadata({
-      group_id: builder.groupId,
+      group_id: groupId,
       path: `profiles/${basics.slug}`,
-      public: builder.isPublic,
+      public: isPublic,
       rocrate: profileCrate,
     })
     const profile = profiles.value.find((item) => item.id === basics.slug) ?? {
@@ -406,12 +424,12 @@ async function submit() {
       // imported mode, which would omit builder edits.
       mode: entityRulesToMode(basics, entityRules, builder.importedMode ?? undefined),
       suggestedKeywords: [],
-      managed: builder.isPublic,
+      managed: isPublic,
     }
     submitted.value = true
     void router.push({ name: 'profile', params: { profileId: profile.id } })
   } catch (err) {
-    builder.submitError = errorMessage(err)
+    if (generation === seedGeneration && epoch === sessionEpoch.value) builder.submitError = errorMessage(err)
   } finally {
     publishing.value = false
   }

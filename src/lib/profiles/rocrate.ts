@@ -1,5 +1,6 @@
 import { parseSchemaText, schemaFromEntityRules } from './schema'
 import { effectiveEntitySources } from './sources'
+import { uniqueId } from './emit'
 import { entityRulesToMode, isModeFile, modeToEntityRules, type ModeFile } from './mode'
 import { collectContextObjects, contextTermsOf } from './contextTerms'
 import { shapesFromEntityRules } from '../shacl/projection'
@@ -215,6 +216,117 @@ export function buildProfileCrate(input: BuildProfileCrateInput): Record<string,
       ...definitions,
     ],
   }
+}
+
+// Only the builder's root fields and named artifact slots are replaced.
+export function updateProfileCrate(original: unknown, generated: Record<string, unknown>): Record<string, unknown> {
+  const entries = graph(original)
+  const root = profileRoot(entries)
+  const next = graph(generated)
+  const nextRoot = profileRoot(next)
+  if (!isRecord(original) || !root || typeof root['@id'] !== 'string' || !nextRoot) {
+    throw new Error('The original profile crate could not be read. Reload it before saving.')
+  }
+  const ids = new Map<string, string>([['./', root['@id']]])
+  const existingIds = new Set(entries.map((entry) => idValue(entry['@id'])))
+  const used = new Set(existingIds)
+  const replacements = new Map<string, Record<string, unknown>>()
+  const previous = new Map<Record<string, unknown>, Record<string, unknown>>()
+  const managed = new Set<string>()
+  for (const descriptor of next.filter((entry) => typeContains(entry, DX_RESOURCE_DESCRIPTOR))) {
+    const id = idValue(descriptor['@id'])
+    const old = entries.find((entry) => idMatches(idValue(entry['@id']).replace(/-\d+$/, ''), id)
+      && typeContains(entry, DX_RESOURCE_DESCRIPTOR)
+      && idValue(entry[DX_HAS_ROLE] ?? entry.hasRole) === idValue(descriptor[DX_HAS_ROLE]))
+    const descriptorId = old ? idValue(old['@id']) : uniqueId(id, used)
+    ids.set(id, descriptorId)
+    used.add(descriptorId)
+    if (old) previous.set(descriptor, old)
+    const artifact = entityById(next, idValue(descriptor[DX_HAS_ARTIFACT]))!
+    const artifactId = idValue(artifact['@id'])
+    const oldArtifact = old && entityById(entries, idValue(old[DX_HAS_ARTIFACT] ?? old.hasArtifact))
+    const oldId = oldArtifact && idValue(oldArtifact['@id'])
+    const targetId = oldId && idMatches(oldId.replace(/-\d+$/, ''), artifactId) ? oldId
+      : /^https?:\/\//.test(artifactId) ? artifactId : uniqueId(artifactId, used)
+    ids.set(artifactId, targetId)
+    used.add(targetId)
+    if (oldArtifact) {
+      previous.set(artifact, oldArtifact)
+      managed.add(oldId!)
+    }
+  }
+  const contexts: Record<string, string> = {}
+  collectContextObjects(original['@context'], contexts)
+  const additions: Record<string, unknown>[] = []
+  for (const entry of next) {
+    if (entry === nextRoot || idMatches(entry['@id'], 'ro-crate-metadata.json')) continue
+    const old = previous.get(entry)
+    const changed = remapProfileIds(entry, ids) as Record<string, unknown>
+    if (!old && existingIds.has(idValue(changed['@id']))) continue
+    const merged = { ...old, ...changed }
+    if (old) merged['@type'] = mergeProfileValues(old['@type'], changed['@type'])
+    if (typeContains(entry, DX_RESOURCE_DESCRIPTOR)) {
+      delete merged.hasArtifact
+      delete merged.hasRole
+    } else if (typeContains(entry, 'File')) {
+      for (const key of ['text', 'http://schema.org/text', 'https://schema.org/text', 'contentUrl', 'contentSize', 'sha256']) {
+        if (!(key in changed)) delete merged[key]
+      }
+      const artifactContext = { ...contexts }
+      collectContextObjects(old?.['@context'], artifactContext)
+      if (artifactContext.text && !/^https?:\/\/schema\.org\/text$/.test(artifactContext.text)) {
+        delete merged.text
+        if (old && 'text' in old) merged.text = old.text
+        if ('text' in changed) merged['http://schema.org/text'] = changed.text
+      }
+    }
+    if (old) replacements.set(idValue(old['@id']), merged)
+    else additions.push(merged)
+  }
+  const patchedRoot = { ...root }
+  for (const key of ['name', 'description', 'version', 'datePublished', 'license']) {
+    if (key in nextRoot) patchedRoot[key] = nextRoot[key]
+    else delete patchedRoot[key]
+  }
+  for (const key of ['@type', 'isProfileOf', 'mentions', DX_HAS_RESOURCE]) {
+    if (key in nextRoot) patchedRoot[key] = mergeProfileValues(root[key], remapProfileIds(nextRoot[key], ids))
+  }
+  patchedRoot.hasPart = mergeProfileValues(root.hasPart, remapProfileIds(nextRoot.hasPart, ids), managed)
+  const result = entries.map((entry) => entry === root ? patchedRoot
+    : replacements.get(idValue(entry['@id'])) ?? entry).concat(additions)
+  // An unmodeled reference to an old public artifact must keep its original target.
+  for (const entry of entries) {
+    const id = idValue(entry['@id'])
+    if (!managed.has(id) || result.some((item) => item['@id'] === id)) continue
+    if (result.some((item) => Object.entries(item).some(([key, value]) => key !== '@id' && profileReferences(value, id)))) {
+      result.push(entry)
+      patchedRoot.hasPart = mergeProfileValues(patchedRoot.hasPart, [{ '@id': id }])
+    }
+  }
+  return { ...original, '@graph': result }
+}
+
+function remapProfileIds(value: unknown, ids: Map<string, string>): unknown {
+  if (Array.isArray(value)) return value.map((entry) => remapProfileIds(entry, ids))
+  if (!isRecord(value)) return value
+  return Object.fromEntries(Object.entries(value).map(([key, entry]) =>
+    [key, key === '@id' && typeof entry === 'string' ? ids.get(entry) ?? entry : remapProfileIds(entry, ids)]))
+}
+
+function mergeProfileValues(original: unknown, generated: unknown, removed = new Set<string>()): unknown[] {
+  const values = (value: unknown) => value === undefined ? [] : Array.isArray(value) ? value : [value]
+  const kept = values(original).filter((value) => !removed.has(idValue(value))
+    || (isRecord(value) && Object.keys(value).length > 1))
+  for (const value of values(generated)) {
+    if (!kept.some((entry) => idValue(entry) ? idValue(entry) === idValue(value) : JSON.stringify(entry) === JSON.stringify(value))) kept.push(value)
+  }
+  return kept
+}
+
+function profileReferences(value: unknown, id: string): boolean {
+  if (typeof value === 'string') return value === id
+  if (Array.isArray(value)) return value.some((entry) => profileReferences(entry, id))
+  return isRecord(value) && Object.values(value).some((entry) => profileReferences(entry, id))
 }
 
 // sha256 is an RO-Crate 1.2 context term; contentUrl/contentSize are schema.org.

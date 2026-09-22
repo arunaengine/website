@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import {
   buildProfileCrate,
+  updateProfileCrate,
   extractProfileSchema,
   extractShapesTexts,
   missingShapesArtifacts,
@@ -176,5 +177,115 @@ describe('a public profile crate', () => {
     expect(mode?.text).toBeUndefined()
     expect(extractShapesTexts(published)).toEqual(extractShapesTexts(embedded))
     expect(missingShapesArtifacts(published)).toEqual([])
+  })
+})
+
+describe('preserving an edited profile crate', () => {
+  const input = {
+    slug: 'example', name: 'Profile', description: 'Description', version: '1.0',
+    datePublished: '2026-09-01', license: 'https://example.org/license', entityRules: [],
+  }
+  const role = 'http://www.w3.org/ns/dx/prof/hasArtifact'
+  const external = (name: string) => ({
+    id: `https://w3id.org/aruna/data/${name}`, contentUrl: `https://example.org/${name}`,
+    contentSize: 10, sha256: 'a'.repeat(64),
+  })
+
+  it('keeps the root identity and links after backend identifier expansion', () => {
+    const generated = buildProfileCrate(input)
+    const original = JSON.parse(JSON.stringify(generated).replaceAll('"./"', '"https://example.org/profile/"'))
+    const result = updateProfileCrate(original, buildProfileCrate({ ...input, name: 'Edited' }))
+    const entries = result['@graph'] as Record<string, unknown>[]
+    expect(entries.filter((entry) => entry['@id'] === 'https://example.org/profile/')).toHaveLength(1)
+    expect(entries.some((entry) => entry['@id'] === './')).toBe(false)
+    expect(entries.find((entry) => entry['@id'] === 'profile.html')?.about).toEqual({ '@id': 'https://example.org/profile/' })
+    expect(entries.find((entry) => entry['@id'] === 'https://example.org/profile/')?.name).toBe('Edited')
+  })
+
+  it('replaces public artifact identities without retaining stale text or losing custom attributes', () => {
+    const original = buildProfileCrate(input)
+    const originalEntries = original['@graph'] as Record<string, unknown>[]
+    originalEntries.find((entry) => entry['@id'] === 'mode.json')!['https://example.org/note'] = { keep: true }
+    const generated = buildProfileCrate({ ...input, name: 'Edited', externalArtifacts: {
+      html: external('html'), schema: external('schema'), mode: external('mode'), shapes: external('shapes'),
+    } })
+    const result = updateProfileCrate(original, generated)
+    const entries = result['@graph'] as Record<string, unknown>[]
+    expect(entries.find((entry) => entry['@id'] === '#mode-resource')?.[role]).toEqual({ '@id': external('mode').id })
+    expect(entries.find((entry) => entry['@id'] === external('mode').id)).toMatchObject({
+      contentUrl: external('mode').contentUrl, 'https://example.org/note': { keep: true },
+    })
+    expect(entries.find((entry) => entry['@id'] === external('mode').id)).not.toHaveProperty('text')
+    expect(entries.some((entry) => entry['@id'] === 'mode.json')).toBe(false)
+    expect(entries.find((entry) => entry['@id'] === external('shapes').id)?.text).toBeTypeOf('string')
+  })
+
+  it('preserves custom artifact collisions and references to previous generated artifacts', () => {
+    const original = buildProfileCrate(input)
+    const entries = original['@graph'] as Record<string, unknown>[]
+    const descriptor = entries.find((entry) => entry['@id'] === '#mode-resource')!
+    descriptor['@id'] = '#imported-mode'
+    const customMode = structuredClone(entries.find((entry) => entry['@id'] === 'mode.json')!)
+    entries.push({ '@id': '#annotation', about: { '@id': 'profile.html' }, 'https://example.org/note': 'keep' })
+    const generated = buildProfileCrate({ ...input, externalArtifacts: {
+      html: external('html'), schema: external('schema'), mode: external('mode'), shapes: external('shapes'),
+    } })
+    const result = updateProfileCrate(original, generated)['@graph'] as Record<string, unknown>[]
+    expect(result).toContainEqual(customMode)
+    expect(result).toContainEqual(entries.find((entry) => entry['@id'] === 'profile.html'))
+    expect(result).toContainEqual(entries.find((entry) => entry['@id'] === '#annotation'))
+    expect(result.find((entry) => entry['@id'] === './')?.hasPart).toEqual(expect.arrayContaining([{ '@id': 'profile.html' }]))
+  })
+
+  it('reuses generated slots across repeated saves when imported names collide', () => {
+    const original = buildProfileCrate(input)
+    const entries = original['@graph'] as Record<string, unknown>[]
+    entries.find((entry) => entry['@id'] === '#mode-resource')!['@type'] = 'CreativeWork'
+    const customMode = structuredClone(entries.find((entry) => entry['@id'] === 'mode.json')!)
+    const first = updateProfileCrate(original, buildProfileCrate({ ...input, name: 'First' }))
+    const second = updateProfileCrate(first, buildProfileCrate({ ...input, name: 'Second' }))
+    const saved = second['@graph'] as Record<string, unknown>[]
+    expect(saved).toHaveLength((first['@graph'] as unknown[]).length)
+    expect(saved).toContainEqual(customMode)
+    expect(saved.find((entry) => entry['@id'] === '#mode-resource-2')?.[role]).toEqual({ '@id': 'mode.json-2' })
+    expect(String(saved.find((entry) => entry['@id'] === 'mode.json-2')?.text)).toContain('Second')
+    expect(parseProfileCrate(second).mode?.metadata?.name).toBe('Second')
+  })
+
+  it('removes stale external artifact fields when a public profile becomes embedded', () => {
+    const original = buildProfileCrate({ ...input, externalArtifacts: {
+      html: external('html'), schema: external('schema'), mode: external('mode'), shapes: external('shapes'),
+    } })
+    const result = updateProfileCrate(original, buildProfileCrate({ ...input, name: 'Embedded' }))
+    const entries = result['@graph'] as Record<string, unknown>[]
+    const mode = entries.find((entry) => entry['@id'] === 'mode.json')!
+    expect(mode.text).toBeTypeOf('string')
+    for (const key of ['contentUrl', 'contentSize', 'sha256']) expect(mode).not.toHaveProperty(key)
+    expect(entries.find((entry) => entry['@id'] === '#mode-resource')?.[role]).toEqual({ '@id': 'mode.json' })
+    expect(parseProfileCrate(result).mode?.metadata?.name).toBe('Embedded')
+    expect(new Set(entries.map((entry) => entry['@id'])).size).toBe(entries.length)
+  })
+
+  it.each(['crate', 'artifact'])('preserves a text term shadowed by the %s context', (scope) => {
+    const original = buildProfileCrate(input)
+    const context = { text: 'https://example.org/custom/text' }
+    if (scope === 'crate') original['@context'] = [original['@context'], context]
+    for (const entry of original['@graph'] as Record<string, unknown>[]) {
+      if (!('text' in entry)) continue
+      if (scope === 'artifact') entry['@context'] = context
+      entry['http://schema.org/text'] = entry.text
+      entry.text = 'unmodeled custom value'
+    }
+    const result = updateProfileCrate(original, buildProfileCrate({ ...input, name: 'Edited' }))
+    const entries = result['@graph'] as Record<string, unknown>[]
+    expect(entries.find((entry) => entry['@id'] === 'profile.html')).toMatchObject({
+      text: 'unmodeled custom value', 'http://schema.org/text': expect.stringContaining('Edited'),
+    })
+    expect(extractShapesTexts(result).shapesText).toBeDefined()
+    expect(parseProfileCrate(result).mode?.metadata?.name).toBe('Edited')
+  })
+
+  it('refuses a malformed original rather than replacing it with a generated subset', () => {
+    expect(() => updateProfileCrate({}, buildProfileCrate(input))).toThrow('original profile crate')
   })
 })
