@@ -9,6 +9,7 @@ import { useAruna } from '@/composables/useAruna'
 import { useRefresh } from '@/composables/useRefresh'
 import { ApiError } from '@/lib/api'
 import { graphIriFor } from '@/lib/graphIri'
+import { doiUrl, secondaryIdentifiers } from '@/lib/invenio'
 import { listPersistentIds, pidStateMeta, type PersistentIdView } from '@/lib/pid'
 import { errorMessage } from '@/lib/utils'
 import { Fingerprint } from '@lucide/vue'
@@ -25,6 +26,7 @@ function client() {
 }
 
 const view = ref<PersistentIdView | null>(null)
+const rows = ref<PersistentIdView[]>([])
 const loading = ref(false)
 const loadError = ref<string | null>(null)
 // A private document has no anonymous status: the route answers 404 rather
@@ -74,12 +76,14 @@ async function load() {
   loadError.value = null
   needsSignIn.value = false
   try {
-    const rows = await listPersistentIds(props.documentId, client())
+    const answer = await listPersistentIds(props.documentId, client())
     if (token !== loadToken) return
-    view.value = rows[0] ?? null
+    view.value = answer[0] ?? null
+    rows.value = answer
   } catch (err) {
     if (token !== loadToken) return
     view.value = null
+    rows.value = []
     if (err instanceof ApiError && err.status === 404 && !currentUser.value) needsSignIn.value = true
     else loadError.value = errorMessage(err)
   } finally {
@@ -95,6 +99,7 @@ watch(
   () => {
     resetPoll()
     view.value = null
+    rows.value = []
     void load()
   },
   { immediate: true },
@@ -113,6 +118,8 @@ const spinning = computed(() => refreshBusy.value || loading.value)
 const pid = computed(() => view.value?.value ?? graphIriFor(props.documentId))
 const state = computed(() => view.value?.state ?? 'unknown')
 const meta = computed(() => pidStateMeta(state.value))
+// DOIs come from repositories this dataset was imported from or published to.
+const dois = computed(() => secondaryIdentifiers(rows.value, 'doi'))
 </script>
 
 <template>
@@ -168,6 +175,13 @@ const meta = computed(() => pidStateMeta(state.value))
             The PID authority cannot currently give a definitive record. Try again later.
           </p>
         </template>
+        <div v-if="dois.length" class="space-y-1">
+          <p class="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">DOIs from repositories</p>
+          <p v-for="doi in dois" :key="doi.value" class="flex flex-wrap items-center gap-1 text-xs">
+            <ExternalLink :href="doiUrl(doi.value)" :label="doi.value" />
+            <CopyButton :value="doi.value" label="Copy DOI" />
+          </p>
+        </div>
       </template>
     </div>
   </section>

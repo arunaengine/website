@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { compileClientComponent, content, flush, moduleDefault, mountApp } from '@/test/clientRender'
 import * as Api from '@/lib/api'
 import * as GraphIri from '@/lib/graphIri'
+import * as Invenio from '@/lib/invenio'
 import * as Pid from '@/lib/pid'
 import * as Refresh from '@/composables/useRefresh'
 import * as Utils from '@/lib/utils'
@@ -49,6 +50,7 @@ const PersistentIdSection = compileClientComponent(
     '@/composables/useRefresh': Refresh,
     '@/lib/api': Api,
     '@/lib/graphIri': GraphIri,
+    '@/lib/invenio': Invenio,
     '@/lib/pid': { ...Pid, listPersistentIds },
     '@/lib/utils': Utils,
   },
@@ -117,6 +119,30 @@ describe('PersistentIdSection polling', () => {
     expect(listPersistentIds).toHaveBeenCalledTimes(2)
     await tick(60000)
     expect(listPersistentIds).toHaveBeenCalledTimes(2)
+    mounted.app.unmount()
+  })
+})
+
+describe('PersistentIdSection DOIs', () => {
+  it('lists the DOIs repositories registered for the dataset', async () => {
+    listPersistentIds.mockResolvedValue([{
+      ...view('active'),
+      secondary_identifiers: [
+        { kind: 'doi', value: '10.5281/zenodo.42' },
+        { kind: 'invenio_record', value: '42' },
+      ],
+    }])
+    const mounted = await mount()
+
+    expect(content(mounted.root)).toContain('DOIs from repositories')
+    mounted.app.unmount()
+  })
+
+  it('shows no DOI block for a dataset without one', async () => {
+    listPersistentIds.mockResolvedValue([view('active')])
+    const mounted = await mount()
+
+    expect(content(mounted.root)).not.toContain('DOIs from repositories')
     mounted.app.unmount()
   })
 })
