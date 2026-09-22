@@ -13,6 +13,7 @@ import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Switch from '@/components/ui/Switch.vue'
 import CrateTransferDialog from '@/components/metadata/CrateTransferDialog.vue'
+import InvenioImportDialog from '@/components/metadata/InvenioImportDialog.vue'
 import DatasetBrowse from '@/components/datasets/DatasetBrowse.vue'
 import DatasetResults from '@/components/datasets/DatasetResults.vue'
 import DatasetSearch from '@/components/datasets/DatasetSearch.vue'
@@ -25,7 +26,7 @@ import { useDatasetSearch } from '@/composables/useDatasetSearch'
 import { useSparqlWorkbench } from '@/composables/useSparqlWorkbench'
 import { useJobs } from '@/composables/useJobs'
 import { truncateMiddle } from '@/lib/utils'
-import { Code2, FileArchive, Plus } from '@lucide/vue'
+import { Code2, FileArchive, Import, Plus } from '@lucide/vue'
 
 const router = useRouter()
 const { currentUser } = useAruna()
@@ -48,6 +49,7 @@ const {
 const sparqlState = useSparqlWorkbench(documentScope)
 
 const showCrateImport = ref(false)
+const showInvenioImport = ref(false)
 
 const askPrompt = computed(() =>
   q.value.trim()
@@ -84,6 +86,14 @@ const askPrompt = computed(() =>
         >
           <FileArchive class="h-4 w-4" /> Import RO-Crate dataset
         </Button>
+        <Button
+          v-if="currentUser && jobsEnabled"
+          variant="outline"
+          title="Import a published Invenio or Zenodo record as a new dataset"
+          @click="showInvenioImport = true"
+        >
+          <Import class="h-4 w-4" /> From Invenio or Zenodo
+        </Button>
         <div class="flex items-center gap-2 rounded-md border border-border bg-card px-2 py-1">
           <Code2 class="h-3.5 w-3.5 text-muted-foreground" />
           <span class="text-xs text-foreground/80">SPARQL</span>
@@ -113,5 +123,6 @@ const askPrompt = computed(() =>
     </div>
 
     <CrateTransferDialog v-model:open="showCrateImport" mode="import" />
+    <InvenioImportDialog v-model:open="showInvenioImport" />
   </div>
 </template>
