@@ -1,4 +1,4 @@
-import { apiRequest, type ApiClientOptions } from './api'
+import { apiRequest, type ApiClientOptions, type SecondaryIdentifier } from './api'
 
 // w3id persistent identifiers, verified against aruna api/src/routes/pid.rs.
 // PIDs are minted automatically when a document is persisted; the portal only
@@ -31,6 +31,8 @@ export interface PersistentIdView {
   requested_at_ms: number | null
   minted_at_ms: number | null
   withdrawn_at_ms: number | null
+  // DOIs and repository record ids registered for the document; absent on older nodes.
+  secondary_identifiers?: SecondaryIdentifier[]
 }
 
 // GET /metadata/{document_id}/pids: the typed status is authoritative;
