@@ -59,9 +59,13 @@ const connectorOptions = computed(() =>
 
 // Another group has other connectors; a picked one never carries over.
 watch(groupId, () => (connectorId.value = ''))
-watch(invenioConnectors, (list) => {
-  if (list?.length === 1 && !connectorId.value) connectorId.value = list[0].connector_id
-})
+watch(
+  invenioConnectors,
+  (list) => {
+    if (list?.length === 1 && !connectorId.value) connectorId.value = list[0].connector_id
+  },
+  { immediate: true },
+)
 
 const MODE_OPTIONS = [
   { value: 'copy', label: 'Copy files' },

@@ -62,9 +62,13 @@ const connectorOptions = computed(() =>
   (invenioConnectors.value ?? []).map((entry) => ({ value: entry.connector_id, label: `${entry.name} (${entry.endpoint})` })),
 )
 const connector = computed(() => invenioConnectors.value?.find((entry) => entry.connector_id === connectorId.value) ?? null)
-watch(invenioConnectors, (list) => {
-  if (list?.length === 1 && !connectorId.value) connectorId.value = list[0].connector_id
-})
+watch(
+  invenioConnectors,
+  (list) => {
+    if (list?.length === 1 && !connectorId.value) connectorId.value = list[0].connector_id
+  },
+  { immediate: true },
+)
 
 // The imported source record, when there is one on the chosen endpoint.
 const pidRows = ref<PersistentIdView[]>([])
@@ -108,6 +112,7 @@ watch(
     pidGeneration++
     if (open) void loadPids()
   },
+  { immediate: true },
 )
 watch(sessionEpoch, () => {
   clearForm()
