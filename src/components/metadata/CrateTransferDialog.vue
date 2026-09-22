@@ -2,7 +2,7 @@
 // RO-Crate zip transfer: upload-and-import an archive, or package a document
 // into one. Both are durable jobs, so progress and the per-entry report come
 // from the shared job machinery (useJobDetail) rather than a private poller.
-import { computed, defineAsyncComponent, onUnmounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
@@ -11,40 +11,31 @@ import DialogTitle from '@/components/ui/DialogTitle.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import Button from '@/components/ui/Button.vue'
-import Badge from '@/components/ui/Badge.vue'
-import EmptyState from '@/components/ui/EmptyState.vue'
 import DetailList, { type Detail } from '@/components/ui/DetailList.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import Switch from '@/components/ui/Switch.vue'
-import Progress from '@/components/ui/Progress.vue'
-import JobStateBadge from '@/components/jobs/JobStateBadge.vue'
+import TransferJobStatus from '@/components/metadata/TransferJobStatus.vue'
+import TransferReport from '@/components/metadata/TransferReport.vue'
 import TransferTarget from '@/components/metadata/TransferTarget.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useJobDetail } from '@/composables/useJobs'
 import { useNotifications } from '@/composables/useNotifications'
 import { preflightExport, type ExportPreflight } from '@/lib/exportPreflight'
-import { formatJobProgress, isTerminalJobState, jobProgressPercent } from '@/lib/jobs'
+import { isTerminalJobState } from '@/lib/jobs'
 import { errorMessage, formatBytes } from '@/lib/utils'
 import {
   ARCHIVE_FILE_ACCEPT,
   archiveMediaType,
   downloadArchiveArtifact,
-  displayArchiveRows,
   exportJobResult,
-  fetchArchiveReport,
   importJobResult,
   submitExport,
   submitImport,
   uploadArchive,
-  type ArchiveReportRow,
-  type ExportReportDetail,
-  type ImportReportDetail,
 } from '@/lib/rocrateArchive'
 import { Download, FileArchive, Upload } from '@lucide/vue'
-
-type TransferRow = ArchiveReportRow<Partial<ImportReportDetail & ExportReportDetail>>
 
 const CrateGraph = defineAsyncComponent(() => import('@/components/metadata/CrateGraph.vue'))
 
@@ -118,8 +109,6 @@ const downloadedName = ref<string | null>(null)
 const { job, loadState, loadError, lastPollError, load } = useJobDetail(() => activeJobId.value)
 
 const terminal = computed(() => Boolean(job.value && isTerminalJobState(job.value.state)))
-const progressPercent = computed(() => (job.value ? jobProgressPercent(job.value.progress) : null))
-const progressText = computed(() => (job.value ? formatJobProgress(job.value.progress) : ''))
 const importResult = computed(() => importJobResult(job.value?.result))
 const exportResult = computed(() => exportJobResult(job.value?.result))
 const createdDocumentId = computed(() => importResult.value?.document_id ?? null)
@@ -147,69 +136,10 @@ const exportDetails = computed<Detail[]>(() => {
 })
 const artifactReady = computed(() => job.value?.state === 'succeeded' && Boolean(exportResult.value?.artifact))
 
-const rows = ref<TransferRow[]>([])
-const visibleRows = computed(() => displayArchiveRows(rows.value))
-const reportCursor = ref<string | null>(null)
-const reportPending = ref(false)
-const reportError = ref<string | null>(null)
-const reportLoading = ref(false)
-let reportTimer: number | undefined
-let reportAttempts = 0
-
-const REPORT_PAGE = 200
-// A frozen report lands shortly after the terminal transition; bound the wait.
-const REPORT_RETRY_MS = 2_000
-const REPORT_MAX_RETRIES = 15
-
-function stopReportRetry() {
-  if (reportTimer !== undefined) window.clearTimeout(reportTimer)
-  reportTimer = undefined
-}
-
-async function loadReport(cursor?: string) {
-  const jobId = activeJobId.value
-  if (!jobId || reportLoading.value) return
-  reportLoading.value = true
-  reportError.value = null
-  try {
-    const result = await fetchArchiveReport<Partial<ImportReportDetail & ExportReportDetail>>(jobId, client(), {
-      limit: REPORT_PAGE,
-      cursor,
-    })
-    if (jobId !== activeJobId.value) return
-    if (result.status === 'pending') {
-      reportPending.value = true
-      if (++reportAttempts <= REPORT_MAX_RETRIES) {
-        stopReportRetry()
-        reportTimer = window.setTimeout(() => void loadReport(cursor), REPORT_RETRY_MS)
-      }
-      return
-    }
-    reportPending.value = false
-    rows.value = cursor ? [...rows.value, ...result.page.rows] : result.page.rows
-    reportCursor.value = result.page.next_cursor ?? null
-  } catch (err) {
-    if (jobId === activeJobId.value) reportError.value = errorMessage(err)
-  } finally {
-    reportLoading.value = false
-  }
-}
-
-function retryReport() {
-  reportAttempts = 0
-  void loadReport()
-}
-
-// The report is frozen at the terminal transition, so fetch it exactly once the
-// polled job settles.
 watch(terminal, (settled) => {
-  if (!settled) return
   // An import creates a document the notification stream only reports to
   // watchers, so tell the dashboard itself that its data moved.
-  if (createdDocumentId.value) bumpDashboard()
-  if (rows.value.length || reportLoading.value) return
-  reportAttempts = 0
-  void loadReport()
+  if (settled && createdDocumentId.value) bumpDashboard()
 })
 
 function pickFile(next: File | null) {
@@ -303,13 +233,7 @@ async function downloadArtifact() {
 }
 
 function reset() {
-  stopReportRetry()
   activeJobId.value = null
-  rows.value = []
-  reportCursor.value = null
-  reportPending.value = false
-  reportError.value = null
-  reportAttempts = 0
   submitError.value = null
   downloadedName.value = null
   uploadId.value = null
@@ -319,30 +243,6 @@ function reset() {
 
 // Another document means another export; never show its predecessor's report.
 watch(() => props.documentId, reset)
-watch(
-  () => props.open,
-  (open) => {
-    if (!open) stopReportRetry()
-  },
-)
-onUnmounted(stopReportRetry)
-
-const GOOD_CODES = new Set(['imported', 'included'])
-const BAD_CODES = new Set(['failed', 'denied', 'missing', 'unsupported', 'unsupported_crate_version'])
-
-function codeVariant(code: string): 'success' | 'destructive' | 'warn' {
-  if (GOOD_CODES.has(code)) return 'success'
-  if (BAD_CODES.has(code)) return 'destructive'
-  return 'warn'
-}
-
-function rowSource(row: TransferRow): string {
-  return row.detail.archive_path || row.detail.entity_id || row.entry_key
-}
-
-function rowTarget(row: TransferRow): string {
-  return row.detail.target_key || row.detail.zip_path || ''
-}
 </script>
 
 <template>
@@ -427,21 +327,7 @@ function rowTarget(row: TransferRow): string {
         </div>
 
         <section v-if="activeJobId" class="space-y-3">
-          <div class="flex flex-wrap items-center gap-2">
-            <JobStateBadge v-if="job" :state="job.state" />
-            <Spinner v-if="job && !terminal" label="Working…" class="text-primary" />
-            <span class="text-xs text-muted-foreground">{{ progressText }}</span>
-          </div>
-          <Progress v-if="progressPercent !== null && !terminal" :value="progressPercent" :warn="101" :critical="101" />
-          <Notice v-if="loadState === 'unsupported'" tone="warning">
-            This node does not serve the system jobs API, so the transfer cannot be followed here.
-          </Notice>
-          <div v-else-if="loadState === 'error'" class="space-y-1">
-            <p class="text-xs text-destructive">{{ loadError }}</p>
-            <Button variant="outline" size="sm" @click="load">Try again</Button>
-          </div>
-          <p v-if="lastPollError" class="text-[11px] text-muted-foreground">Auto-refresh failed: {{ lastPollError }}</p>
-          <p v-if="job?.error" class="whitespace-pre-wrap break-words text-xs text-destructive">{{ job.error.message }}</p>
+          <TransferJobStatus :job="job" :load-state="loadState" :load-error="loadError" :last-poll-error="lastPollError" @retry="load" />
 
           <DetailList v-if="importResult" :items="importDetails" />
 
@@ -459,42 +345,7 @@ function rowTarget(row: TransferRow): string {
             <RouterLink :to="{ name: 'dataset', params: { id: createdDocumentId } }">Open the created dataset</RouterLink>
           </Button>
 
-          <div v-if="terminal" class="space-y-2">
-            <div class="flex items-center gap-2">
-              <h3 class="font-display text-sm font-semibold text-aruna-navy">Report</h3>
-              <span v-if="visibleRows.length" class="text-[11px] text-muted-foreground">{{ visibleRows.length }} rows</span>
-            </div>
-            <div v-if="reportPending || reportError" class="flex items-center gap-2">
-              <p class="text-xs" :class="reportError ? 'text-destructive' : 'text-muted-foreground'">
-                {{ reportError || 'The report is still being written…' }}
-              </p>
-              <Button variant="ghost" size="sm" :disabled="reportLoading" @click="retryReport">Retry</Button>
-            </div>
-            <EmptyState v-else-if="!visibleRows.length && !reportLoading" compact title="No further report details." />
-            <div v-else-if="visibleRows.length" class="max-h-64 overflow-y-auto rounded-md border border-border">
-              <table class="w-full text-[11px]">
-                <tbody>
-                  <tr v-for="row in visibleRows" :key="row.entry_key" class="border-b border-border last:border-0 align-top">
-                    <td class="px-2 py-1.5">
-                      <Badge :variant="codeVariant(row.code)" size="sm" class="uppercase">{{ row.code }}</Badge>
-                    </td>
-                    <td class="px-2 py-1.5">
-                      <p class="break-all font-mono text-foreground">{{ rowSource(row) }}</p>
-                      <p v-if="rowTarget(row)" class="break-all font-mono text-muted-foreground">→ {{ rowTarget(row) }}</p>
-                      <p v-if="row.message" class="text-muted-foreground">{{ row.message }}</p>
-                      <p v-if="row.detail.validation" class="text-destructive">
-                        {{ row.detail.validation.code }}: {{ row.detail.validation.message }}
-                      </p>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <Button v-if="reportCursor" variant="outline" size="sm" :disabled="reportLoading" :aria-busy="reportLoading" @click="loadReport(reportCursor ?? undefined)">
-              <Spinner v-if="reportLoading" label="Loading more report rows" class="text-current" />
-              {{ reportLoading ? 'Loading…' : 'Load more rows' }}
-            </Button>
-          </div>
+          <TransferReport :key="activeJobId" :job-id="activeJobId" :settled="terminal" />
         </section>
 
         <p v-if="submitError" class="text-xs text-destructive">{{ submitError }}</p>
