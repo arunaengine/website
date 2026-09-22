@@ -13,6 +13,8 @@ import CrateTransferDialog from '@/components/metadata/CrateTransferDialog.vue'
 import SubcratesSection from '@/components/metadata/SubcratesSection.vue'
 import PersistentIdSection from '@/components/metadata/PersistentIdSection.vue'
 import RunProvenancePanel from '@/components/metadata/RunProvenancePanel.vue'
+import RepositoryLinksSection from '@/components/metadata/view/RepositoryLinksSection.vue'
+import RepositoryPublishDialog from '@/components/metadata/view/RepositoryPublishDialog.vue'
 import DatasetActions from '@/components/metadata/view/DatasetActions.vue'
 import DatasetDetailSkeleton from '@/components/metadata/view/DatasetDetailSkeleton.vue'
 import DatasetFiles from '@/components/metadata/view/DatasetFiles.vue'
@@ -99,6 +101,8 @@ providePageContext(() => {
 
 const tab = ref<'overview' | 'graph'>('overview')
 const showCrateExport = ref(false)
+const showPublish = ref(false)
+const repositoryLinks = ref<InstanceType<typeof RepositoryLinksSection> | null>(null)
 const showDelete = ref(false)
 const deleteError = ref<string | null>(null)
 
@@ -165,6 +169,7 @@ function jumpTo(entityId: string) {
           :state="state"
           @export="showCrateExport = true"
           @import="crateSection?.openImport()"
+          @publish="showPublish = true"
           @raw="crateSection?.openRaw()"
           @delete="deleteError = null; showDelete = true"
         />
@@ -191,6 +196,14 @@ function jumpTo(entityId: string) {
             v-if="fetchedSummary"
             :document-id="detailId"
             :is-public="fetchedSummary.public"
+          />
+
+          <RepositoryLinksSection
+            v-if="fetchedSummary && currentUser"
+            ref="repositoryLinks"
+            :document-id="detailId"
+            :can-write="canWrite"
+            @publish="showPublish = true"
           />
 
           <DetailsSection
@@ -311,6 +324,13 @@ function jumpTo(entityId: string) {
     />
 
     <CrateTransferDialog v-model:open="showCrateExport" mode="export" :document-id="detailId" :document-path="currentPath" />
+    <RepositoryPublishDialog
+      v-if="fetchedSummary"
+      v-model:open="showPublish"
+      :document-id="detailId"
+      :group-id="fetchedSummary.group_id"
+      @linked="repositoryLinks?.reload()"
+    />
 
     <Dialog :open="showDelete" @update:open="(v: boolean) => (showDelete = v)">
       <DialogContent class="max-w-md">

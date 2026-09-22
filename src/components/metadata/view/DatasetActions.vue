@@ -18,12 +18,13 @@ import type { DatasetViewState } from '@/composables/useDatasetView'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
 import { downloadCrateJson } from '@/lib/crateImport'
 import { errorMessage } from '@/lib/utils'
-import { ArrowDownUp, ArrowLeft, ChevronDown, Code2, FileArchive, FileJson2, Pencil, Star, Trash2, Upload } from '@lucide/vue'
+import { ArrowDownUp, ArrowLeft, ChevronDown, Code2, FileArchive, FileJson2, Pencil, Send, Star, Trash2, Upload } from '@lucide/vue'
 
 const props = defineProps<{ state: DatasetViewState }>()
 const emit = defineEmits<{
   (e: 'export'): void
   (e: 'import'): void
+  (e: 'publish'): void
   (e: 'raw'): void
   (e: 'delete'): void
 }>()
@@ -122,6 +123,17 @@ async function toggleFav() {
         <span class="min-w-0">
           <span class="block text-sm font-medium text-foreground">Whole dataset as a zip archive</span>
           <span class="block text-xs leading-relaxed text-muted-foreground">Packages the metadata together with the data files it references. Prepared in the background.</span>
+        </span>
+      </DropdownMenuItem>
+      <DropdownMenuItem
+        v-if="currentUser && jobsEnabled && canWrite"
+        class="cursor-pointer items-start gap-2.5 rounded-md px-2.5 py-2.5"
+        @click="emit('publish')"
+      >
+        <Send class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+        <span class="min-w-0">
+          <span class="block text-sm font-medium text-foreground">Publish to repository</span>
+          <span class="block text-xs leading-relaxed text-muted-foreground">Deposits the dataset in Invenio or Zenodo, once or as a link that follows every change.</span>
         </span>
       </DropdownMenuItem>
       <template v-if="canWrite">
