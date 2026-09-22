@@ -67,6 +67,7 @@ describe('versioned in-portal Docs', () => {
       'notebooks',
       'storage-backend',
       'cli-access-key',
+      'invenio-zenodo',
       'assistant',
       'datasets',
       'realm-nodes-groups',

@@ -795,6 +795,58 @@ export const docsTopics: DocsTopic[] = [
     ],
   },
   {
+    slug: 'invenio-zenodo',
+    kind: 'Guide',
+    title: 'Import from and publish to Invenio or Zenodo',
+    summary: 'Bring published records in as datasets, and deposit datasets in a repository that mints their DOI.',
+    sections: [
+      {
+        title: 'Add the repository to a group',
+        icon: 'Plug',
+        steps: [
+          'Open the group in [Groups](page:groups), then Sources.',
+          'Under Repositories, add an Invenio or Zenodo repository with its API URL, for example https://zenodo.org/api/.',
+          'Add a community when records belong to one. Add a read token only to import restricted records.',
+        ],
+      },
+      {
+        title: 'Import a record',
+        icon: 'Import',
+        steps: [
+          'In [Datasets](page:datasets), choose From Invenio or Zenodo.',
+          'Pick the group and repository, search for the record and select it.',
+          'Choose Copy files, Reference files or Metadata only. Reference files keeps the bytes in the repository and needs a bucket of the same group.',
+          'Follow the import job; the new dataset keeps the record DOI as one of its identifiers.',
+        ],
+      },
+      {
+        title: 'Publish a dataset',
+        icon: 'Send',
+        paragraphs: [
+          'On a dataset page, open Import / export and choose Publish to repository. Keep linked pushes every later change to one open draft; Export once sends the dataset as it is now.',
+          'A dataset imported from a repository can continue that record, so new versions join the same record lineage. Nothing is published until you press Publish or turn on automatic publishing, and a published record cannot be deleted.',
+        ],
+      },
+      {
+        title: 'Your personal access token',
+        icon: 'KeyRound',
+        bullets: [
+          'Create a token with deposit rights in your repository account settings and paste it into the dialog.',
+          'For a link, Aruna stores the token sealed for that one repository endpoint and never shows it again. Change it from the Repositories section when it expires.',
+          'Aruna never asks for your repository password.',
+        ],
+      },
+      {
+        title: 'Follow the link',
+        icon: 'RefreshCw',
+        paragraphs: [
+          'The Repositories section on the dataset page shows each link as enabled, paused or failed with the reason, a waiting push, the last DOI and record, and whether it is published. Push now, publish, pause, change the token or remove the link there. Removing a link keeps the records in the repository.',
+          'The persistent identifier section lists every DOI a repository registered for the dataset. Aruna itself mints no DOI.',
+        ],
+      },
+    ],
+  },
+  {
     slug: 'assistant',
     kind: 'Guide',
     title: 'Turn on the assistant',
