@@ -6,6 +6,7 @@ import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ConnectorsSection from '@/components/groups/ConnectorsSection.vue'
+import RepositoriesSection from '@/components/groups/RepositoriesSection.vue'
 import StorageBackendsSection from '@/components/groups/StorageBackendsSection.vue'
 import GroupRoutingSection from '@/components/groups/GroupRoutingSection.vue'
 import PoliciesSection from '@/components/policies/PoliciesSection.vue'
@@ -555,6 +556,7 @@ async function leave() {
             :can-write="canWriteData"
             @count="connectorCount = $event"
           />
+          <RepositoriesSection :group-id="group.group_id" :can-write="canWriteData" />
         </TabsContent>
 
         <TabsContent v-if="policiesTabVisible" value="policies" class="mt-0">

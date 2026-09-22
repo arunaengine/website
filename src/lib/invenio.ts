@@ -1,4 +1,4 @@
-import type { InvenioLink, InvenioSearchPage, SecondaryIdentifier } from './api'
+import type { InvenioLink, InvenioSearchPage, RepositoryConnectorRequest, SecondaryIdentifier } from './api'
 import type { PersistentIdView } from './pid'
 import { stateVariant, type BadgeVariant } from './stateBadge'
 
@@ -98,4 +98,25 @@ const STATUS_LABEL: Record<string, string> = { enabled: 'Enabled', paused: 'Paus
 export function linkStatus(link: Pick<InvenioLink, 'status'>): { label: string; variant: BadgeVariant } {
   const label = STATUS_LABEL[link.status] ?? link.status
   return { label, variant: stateVariant(link.status) }
+}
+
+export interface ConnectorForm {
+  name: string
+  kind: RepositoryConnectorRequest['kind']
+  endpoint: string
+  community: string
+  token: string
+  removeToken: boolean
+}
+
+// An edit that leaves the token empty keeps the stored one unless removal is
+// asked for; OAI-PMH never carries a token.
+export function connectorBody(form: ConnectorForm, editing: boolean): RepositoryConnectorRequest {
+  const invenio = form.kind === 'invenio'
+  const body: RepositoryConnectorRequest = { name: form.name.trim(), kind: form.kind, endpoint: form.endpoint.trim() }
+  if (invenio && form.community.trim()) body.community = form.community.trim()
+  const typed = invenio ? form.token.trim() : ''
+  if (typed) body.secret_config = { token: typed }
+  else if (!editing || form.removeToken || !invenio) body.secret_config = {}
+  return body
 }

@@ -103,6 +103,7 @@ const GroupDetail = compileClientComponent(new URL('./GroupDetail.vue', import.m
   '@/components/ui/TabsTrigger.vue': moduleDefault(TriggerStub),
   '@/components/ui/TabsContent.vue': moduleDefault(PanelStub),
   '@/components/groups/ConnectorsSection.vue': moduleDefault(Empty),
+  '@/components/groups/RepositoriesSection.vue': moduleDefault(Empty),
   '@/components/groups/StorageBackendsSection.vue': moduleDefault(Empty),
   '@/components/groups/GroupRoutingSection.vue': moduleDefault(Empty),
   '@/components/groups/GroupMembers.vue': moduleDefault(Empty),

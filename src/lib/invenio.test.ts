@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { doiUrl, failureText, linkStatus, searchHits, searchTotal, secondaryIdentifiers } from './invenio'
+import { connectorBody, doiUrl, failureText, linkStatus, searchHits, searchTotal, secondaryIdentifiers } from './invenio'
 import type { PersistentIdView } from './pid'
 
 describe('invenio search hits', () => {
@@ -72,5 +72,28 @@ describe('invenio link state', () => {
     expect(failureText('token_rejected')).toContain('Change the token')
     expect(failureText('quota_exceeded')).toBe('The last push failed: quota exceeded.')
     expect(failureText(null)).toBe('The last push failed.')
+  })
+})
+
+describe('repository connector body', () => {
+  const form = {
+    name: ' Zenodo ', kind: 'invenio' as const, endpoint: ' https://zenodo.org/api/ ', community: '',
+    token: '', removeToken: false,
+  }
+
+  it('keeps a stored token on an edit without a new one', () => {
+    expect(connectorBody(form, true)).toEqual({ name: 'Zenodo', kind: 'invenio', endpoint: 'https://zenodo.org/api/' })
+  })
+
+  it('replaces or removes the token when asked', () => {
+    expect(connectorBody({ ...form, token: 'read' }, true).secret_config).toEqual({ token: 'read' })
+    expect(connectorBody({ ...form, removeToken: true }, true).secret_config).toEqual({})
+    expect(connectorBody(form, false).secret_config).toEqual({})
+  })
+
+  it('never sends a token or community for OAI-PMH', () => {
+    const body = connectorBody({ ...form, kind: 'oai_pmh', token: 'read', community: 'c' }, true)
+    expect(body.secret_config).toEqual({})
+    expect(body).not.toHaveProperty('community')
   })
 })
