@@ -6,6 +6,7 @@ import {
   type InvenioSearchPage,
   type RepositoryConnector,
 } from '@/lib/api'
+import { ownRolesWrite } from '@/lib/groupAdmin'
 import { searchHits, searchTotal } from '@/lib/invenio'
 import { errorMessage } from '@/lib/utils'
 
@@ -39,13 +40,29 @@ export function useRepositoryConnectors(groupId: () => string) {
   return { connectors, loading, error, load }
 }
 
+// The caller's own rights in one group: data WRITE manages connectors, admin
+// WRITE manages every link of the group.
+export function useGroupRights(groupId: () => string) {
+  const { userInfo } = useAruna()
+  const roles = computed(() => userInfo.value?.groups.find((group) => group.group_id === groupId())?.roles ?? [])
+  const base = computed(() => `/${userInfo.value?.realm.realm_id ?? ''}/g/${groupId()}`)
+  return {
+    userId: computed(() => userInfo.value?.user.user_id ?? ''),
+    canWriteData: computed(() => ownRolesWrite(roles.value, `${base.value}/data/**`)),
+    isAdmin: computed(() => ownRolesWrite(roles.value, `${base.value}/admin`)),
+  }
+}
+
 export interface SearchScope {
   groupId: string
   connectorId: string
 }
 
+// Repositories page only through the first 10,000 hits (Zenodo and InvenioRDM).
+const RESULT_WINDOW = 10_000
+
 // Remote record search. Typing waits for a pause; every answer is bound to the
-// query, page, connector and session it was asked for.
+// query, page, connector and session it was asked for. An empty query asks nothing.
 export function useInvenioSearch(scope: () => SearchScope, options: { delayMs?: number; size?: number } = {}) {
   const { apiBaseUrl, authToken, sessionEpoch } = useAruna()
   const delayMs = options.delayMs ?? 350
@@ -69,7 +86,7 @@ export function useInvenioSearch(scope: () => SearchScope, options: { delayMs?: 
     const { groupId, connectorId } = scope()
     result.value = null
     error.value = null
-    loading.value = Boolean(groupId && connectorId)
+    loading.value = Boolean(groupId && connectorId && query.value.trim())
     if (!loading.value) return
     try {
       const answer = await searchInvenioRecords(
@@ -87,7 +104,7 @@ export function useInvenioSearch(scope: () => SearchScope, options: { delayMs?: 
   watch(query, () => {
     // An answer for the previous text must not land after the user moved on.
     generation++
-    loading.value = true
+    loading.value = Boolean(query.value.trim())
     stopTimer()
     timer = setTimeout(() => {
       timer = undefined
@@ -107,11 +124,16 @@ export function useInvenioSearch(scope: () => SearchScope, options: { delayMs?: 
 
   const hits = computed(() => searchHits(result.value))
   const total = computed(() => searchTotal(result.value))
-  const pageCount = computed(() => (total.value === null ? null : Math.max(1, Math.ceil(total.value / size))))
+  const lastPage = Math.floor(RESULT_WINDOW / size)
+  const pageCount = computed(() =>
+    total.value === null ? null : Math.min(lastPage, Math.max(1, Math.ceil(total.value / size))),
+  )
   const hasNext = computed(() => {
     if (pageCount.value !== null) return page.value < pageCount.value
+    if (page.value >= lastPage) return false
     return Boolean(result.value?.links?.next) || hits.value.length === size
   })
+  const idle = computed(() => !query.value.trim())
 
-  return { query, page, result, hits, total, pageCount, hasNext, loading, error, run }
+  return { query, page, result, hits, total, pageCount, hasNext, loading, error, idle, run }
 }

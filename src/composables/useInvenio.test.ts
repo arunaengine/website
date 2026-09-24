@@ -41,14 +41,42 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers())
 
 describe('invenio search', () => {
-  it('waits for a typing pause and drops the answer for older text', async () => {
-    const first = deferred<unknown>()
-    searchInvenioRecords.mockResolvedValueOnce(page('initial')).mockReturnValueOnce(first.promise)
-      .mockResolvedValueOnce(page('ocean'))
+  it('asks nothing for an empty query', async () => {
     const scope = effectScope()
     const search = scope.run(() => useInvenioSearch(() => ({ groupId: 'g1', connectorId: 'c1' }), { delayMs: 300 }))!
     await settle()
-    expect(search.hits.value.map((hit) => hit.title)).toEqual(['initial'])
+    search.query.value = '  '
+    await nextTick()
+    await vi.advanceTimersByTimeAsync(300)
+
+    expect(searchInvenioRecords).not.toHaveBeenCalled()
+    expect(search.idle.value).toBe(true)
+    expect(search.loading.value).toBe(false)
+    scope.stop()
+  })
+
+  it('stops paging at the repository result window', async () => {
+    searchInvenioRecords.mockResolvedValue({ hits: { total: 50_000, hits: [] }, links: { next: 'more' } })
+    const scope = effectScope()
+    const search = scope.run(() => useInvenioSearch(() => ({ groupId: 'g1', connectorId: 'c1' }), { delayMs: 0, size: 25 }))!
+    search.query.value = 'ocean'
+    await nextTick()
+    await settle()
+    expect(search.pageCount.value).toBe(400)
+
+    search.page.value = 400
+    await settle()
+    expect(search.hasNext.value).toBe(false)
+    scope.stop()
+  })
+
+  it('waits for a typing pause and drops the answer for older text', async () => {
+    const first = deferred<unknown>()
+    searchInvenioRecords.mockReturnValueOnce(first.promise).mockResolvedValueOnce(page('ocean'))
+    const scope = effectScope()
+    const search = scope.run(() => useInvenioSearch(() => ({ groupId: 'g1', connectorId: 'c1' }), { delayMs: 300 }))!
+    await settle()
+    expect(searchInvenioRecords).not.toHaveBeenCalled()
 
     search.query.value = 'oce'
     await nextTick()
@@ -56,13 +84,13 @@ describe('invenio search', () => {
     search.query.value = 'ocean'
     await nextTick()
     await vi.advanceTimersByTimeAsync(299)
-    expect(searchInvenioRecords).toHaveBeenCalledTimes(2)
+    expect(searchInvenioRecords).toHaveBeenCalledTimes(1)
     await vi.advanceTimersByTimeAsync(1)
     first.resolve(page('stale'))
     await settle()
 
-    expect(searchInvenioRecords).toHaveBeenCalledTimes(3)
-    expect(searchInvenioRecords.mock.calls[2][0]).toMatchObject({ q: 'ocean', page: 1 })
+    expect(searchInvenioRecords).toHaveBeenCalledTimes(2)
+    expect(searchInvenioRecords.mock.calls[1][0]).toMatchObject({ q: 'ocean', page: 1 })
     expect(search.hits.value.map((hit) => hit.title)).toEqual(['ocean'])
     scope.stop()
   })
@@ -73,6 +101,8 @@ describe('invenio search', () => {
     const connectorId = ref('')
     const scope = effectScope()
     const search = scope.run(() => useInvenioSearch(() => ({ groupId: 'g1', connectorId: connectorId.value })))!
+    search.query.value = 'ocean'
+    await vi.advanceTimersByTimeAsync(400)
     await settle()
     expect(searchInvenioRecords).not.toHaveBeenCalled()
 

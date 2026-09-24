@@ -15,7 +15,7 @@ const props = defineProps<{ groupId: string; connectorId: string; selectedId?: s
 const emit = defineEmits<{ (e: 'pick', hit: InvenioHit): void }>()
 
 const search = useInvenioSearch(() => ({ groupId: props.groupId, connectorId: props.connectorId }))
-const { query, page, hits, total, pageCount, hasNext, loading, error, run } = search
+const { query, page, hits, total, pageCount, hasNext, loading, error, idle, run } = search
 </script>
 
 <template>
@@ -28,6 +28,7 @@ const { query, page, hits, total, pageCount, hasNext, loading, error, run } = se
       <p class="text-xs text-destructive">{{ error }}</p>
       <Button variant="ghost" size="sm" @click="run">Retry</Button>
     </div>
+    <p v-else-if="idle" class="text-[11px] text-muted-foreground">Type words to search the repository.</p>
     <Spinner v-else-if="loading" show-label label="Searching…" class="flex text-xs" />
     <EmptyState v-else-if="!hits.length" compact title="No matching records." />
     <template v-else>

@@ -1,4 +1,13 @@
-import type { InvenioLink, InvenioSearchPage, RepositoryConnectorRequest, SecondaryIdentifier } from './api'
+import {
+  ApiError,
+  type InvenioExportResult,
+  type InvenioLink,
+  type InvenioRecordSource,
+  type InvenioReviewState,
+  type InvenioSearchPage,
+  type RepositoryConnectorRequest,
+  type SecondaryIdentifier,
+} from './api'
 import type { PersistentIdView } from './pid'
 import { stateVariant, type BadgeVariant } from './stateBadge'
 
@@ -82,15 +91,67 @@ export function secondaryIdentifiers(rows: readonly PersistentIdView[], kind: st
 
 const REASON_TEXT: Record<string, string> = {
   remote_changed:
-    'The repository record changed outside Aruna. Check it in the repository, then push again or remove the link.',
+    'The record was changed in the repository outside Aruna. Accept the remote state to continue from it, or remove the link.',
   token_rejected: 'The repository rejected the access token. Change the token to continue.',
   source_unavailable: 'Some data could not be read, so the push stopped. It did not leave files out.',
+  owner_not_holder:
+    'The node that manages this link no longer holds the dataset, so it cannot push. Remove the link and create a new one.',
+  too_many_files: 'Zenodo takes at most 100 files per record. Pack the files into fewer archives, then push again.',
+  update_available: 'A newer version is available in the repository.',
+  local_changed:
+    'This dataset was changed here since the last update, so automatic updates stopped. Update now to take the repository version.',
 }
 
-/** A readable sentence for a failure reason; unknown reasons read as their words. */
+/** A readable sentence for a status reason; unknown reasons read as their words. */
 export function failureText(reason: string | null | undefined): string {
   if (!reason) return 'The last push failed.'
   return REASON_TEXT[reason] ?? `The last push failed: ${reason.replaceAll('_', ' ')}.`
+}
+
+const REVIEW_TEXT: Record<InvenioReviewState, string | null> = {
+  none: null,
+  pending: 'Waiting for community review',
+  accepted: 'Accepted by the community',
+  declined: 'Declined by the community',
+}
+
+export function reviewText(review: InvenioReviewState | undefined): string | null {
+  return review ? REVIEW_TEXT[review] ?? null : null
+}
+
+// Pull links check the remote; push links send changes. Old answers lack direction.
+export function isPullLink(link: Pick<InvenioLink, 'direction'>): boolean {
+  return link.direction === 'pull'
+}
+
+/** Keep polling while a push waits or a community review is open. */
+export function linkBusy(link: InvenioLink): boolean {
+  return link.pending || link.remote.review === 'pending'
+}
+
+export interface LinkRights {
+  // Publish, token and settings changes.
+  owner: boolean
+  // Pause, resume, push, pull and delete.
+  manage: boolean
+}
+
+export function linkRights(link: Pick<InvenioLink, 'created_by'>, userId: string, groupAdmin: boolean): LinkRights {
+  const owner = Boolean(userId) && link.created_by === userId
+  return { owner, manage: owner || groupAdmin }
+}
+
+function nodeRoot(url: string, origin: string): string {
+  try {
+    return new URL(url, origin).href.replace(/\/+$/, '')
+  } catch {
+    return url.replace(/\/+$/, '')
+  }
+}
+
+/** Whether the node the portal talks to manages the link; only that node acts on it. */
+export function managedHere(ownerNodeUrl: string, apiBaseUrl: string, origin: string): boolean {
+  return !ownerNodeUrl || nodeRoot(ownerNodeUrl, origin) === nodeRoot(apiBaseUrl, origin)
 }
 
 const STATUS_LABEL: Record<string, string> = { enabled: 'Enabled', paused: 'Paused', failed: 'Failed' }
@@ -130,6 +191,107 @@ export function sourceParent(rows: readonly PersistentIdView[], endpoint: string
   const parents = secondaryIdentifiers(rows, 'invenio_parent')
   const match = parents.find((entry) => !entry.endpoint || sameEndpoint(entry.endpoint, endpoint))
   return match?.value ?? null
+}
+
+/** The record an import names: a DOI, a record URL or a plain record id. */
+export function recordSource(input: string): InvenioRecordSource | null {
+  const text = input.trim()
+  if (!text) return null
+  const doi = text.match(/^(?:doi:\s*|https?:\/\/(?:dx\.)?doi\.org\/)?(10\.\d{4,}\/\S+)$/i)
+  if (doi) return { doi: doi[1] }
+  if (/^https?:\/\//i.test(text)) return { url: text }
+  return /\s/.test(text) ? null : { record_id: text }
+}
+
+export const REPOSITORY_PRESETS = [
+  { name: 'Zenodo', endpoint: 'https://zenodo.org/api/' },
+  { name: 'Zenodo sandbox', endpoint: 'https://sandbox.zenodo.org/api/' },
+] as const
+
+/** Why the backend would refuse this Invenio endpoint, or null when it looks fine. */
+export function endpointProblem(endpoint: string): string | null {
+  let url: URL
+  try {
+    url = new URL(endpoint.trim())
+  } catch {
+    return 'Enter a full URL, for example https://zenodo.org/api/.'
+  }
+  const host = endpoint.trim().replace(/^[a-z]+:\/\//i, '').split(/[/:]/)[0]
+  if (host !== host.toLowerCase()) return 'Write the host name in lowercase.'
+  const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
+  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && loopback)) {
+    return 'Use https. Plain http is only allowed for localhost.'
+  }
+  if (url.username || url.password || url.search || url.hash) return 'Remove user names, queries and fragments.'
+  return null
+}
+
+/** The account page where a user creates a personal access token. */
+export function tokenPageUrl(endpoint: string): string | null {
+  try {
+    return `${new URL(endpoint).origin}/account/settings/applications/tokens/new/`
+  } catch {
+    return null
+  }
+}
+
+/** Zenodo by name when the endpoint is Zenodo, else the connector name. */
+export function repositoryLabel(connector: { name: string; endpoint: string } | null): string {
+  if (!connector) return 'the repository'
+  try {
+    const host = new URL(connector.endpoint).hostname
+    if (host === 'zenodo.org') return 'Zenodo'
+    if (host === 'sandbox.zenodo.org') return 'Zenodo sandbox'
+  } catch {
+    // A connector name is fine for anything else.
+  }
+  return connector.name
+}
+
+/** The metadata fields a 400 answer names as missing, or null for other errors. */
+export function missingFields(err: unknown): string[] | null {
+  if (!(err instanceof ApiError) || err.status !== 400) return null
+  const missing = err.details?.missing
+  return Array.isArray(missing) ? missing.filter((entry): entry is string => typeof entry === 'string') : null
+}
+
+export interface CreatorDraft {
+  name: string
+  orcid: string
+}
+
+// InvenioRDM needs a family name for a person; "Family, Given" or "Given Family".
+function personName(name: string): { family_name: string; given_name?: string } {
+  const text = name.trim()
+  if (text.includes(',')) {
+    const [family, ...given] = text.split(',')
+    return { family_name: family.trim(), given_name: given.join(',').trim() || undefined }
+  }
+  const parts = text.split(/\s+/)
+  const family = parts.pop() ?? ''
+  return { family_name: family, given_name: parts.join(' ') || undefined }
+}
+
+/** Creators as repository metadata; empty names are left out. */
+export function creatorsMetadata(creators: readonly CreatorDraft[]): Record<string, unknown>[] {
+  return creators
+    .filter((creator) => creator.name.trim())
+    .map((creator) => {
+      const orcid = creator.orcid.trim().replace(/^https?:\/\/orcid\.org\//i, '')
+      return {
+        person_or_org: {
+          type: 'personal',
+          ...personName(creator.name),
+          ...(orcid ? { identifiers: [{ scheme: 'orcid', identifier: orcid }] } : {}),
+        },
+      }
+    })
+}
+
+/** The repository record of a finished one-time export, when the result has one. */
+export function exportRepository(result: unknown): InvenioExportResult['repository'] | null {
+  const repository = record(record(result).repository)
+  return text(repository.id) ? (repository as InvenioExportResult['repository']) : null
 }
 
 /** An optional metadata override typed as JSON; it must be an object. */

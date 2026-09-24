@@ -1,10 +1,20 @@
 import { describe, expect, it } from 'vitest'
+import { ApiError } from './api'
 import {
   connectorBody,
+  creatorsMetadata,
   doiUrl,
+  endpointProblem,
+  exportRepository,
   failureText,
+  linkRights,
   linkStatus,
+  managedHere,
+  missingFields,
   parseOverride,
+  recordSource,
+  repositoryLabel,
+  reviewText,
   searchHits,
   searchTotal,
   secondaryIdentifiers,
@@ -82,6 +92,105 @@ describe('invenio link state', () => {
     expect(failureText('token_rejected')).toContain('Change the token')
     expect(failureText('quota_exceeded')).toBe('The last push failed: quota exceeded.')
     expect(failureText(null)).toBe('The last push failed.')
+  })
+
+  it('has a plain text for every reason of the contract', () => {
+    const reasons = [
+      'owner_not_holder', 'too_many_files', 'update_available', 'local_changed',
+      'remote_changed', 'token_rejected', 'source_unavailable',
+    ]
+    for (const reason of reasons) expect(failureText(reason)).not.toContain(reason.replaceAll('_', ' '))
+    expect(failureText('too_many_files')).toContain('100 files')
+    expect(failureText('remote_changed')).toContain('Accept the remote state')
+  })
+
+  it('names the community review state', () => {
+    expect(reviewText('pending')).toBe('Waiting for community review')
+    expect(reviewText('none')).toBeNull()
+    expect(reviewText(undefined)).toBeNull()
+  })
+
+  it('gives owners every action and group admins only management', () => {
+    expect(linkRights({ created_by: 'u1' }, 'u1', false)).toEqual({ owner: true, manage: true })
+    expect(linkRights({ created_by: 'u1' }, 'u2', true)).toEqual({ owner: false, manage: true })
+    expect(linkRights({ created_by: 'u1' }, 'u2', false)).toEqual({ owner: false, manage: false })
+    expect(linkRights({ created_by: '' }, '', false).owner).toBe(false)
+  })
+
+  it('compares the managing node with the node in use', () => {
+    const origin = 'https://node.test'
+    expect(managedHere('https://node.test/api/v1', '/api/v1', origin)).toBe(true)
+    expect(managedHere('https://node.test/api/v1/', 'https://node.test/api/v1', origin)).toBe(true)
+    expect(managedHere('https://other.test/api/v1', '/api/v1', origin)).toBe(false)
+  })
+})
+
+describe('import record input', () => {
+  it('reads DOIs, record URLs and record ids', () => {
+    expect(recordSource('10.5281/zenodo.123')).toEqual({ doi: '10.5281/zenodo.123' })
+    expect(recordSource('doi:10.5281/zenodo.123')).toEqual({ doi: '10.5281/zenodo.123' })
+    expect(recordSource(' https://doi.org/10.5281/zenodo.99 ')).toEqual({ doi: '10.5281/zenodo.99' })
+    expect(recordSource('https://zenodo.org/records/123')).toEqual({ url: 'https://zenodo.org/records/123' })
+    expect(recordSource('123')).toEqual({ record_id: '123' })
+    expect(recordSource('abc12-3de45')).toEqual({ record_id: 'abc12-3de45' })
+  })
+
+  it('rejects empty input and free text', () => {
+    expect(recordSource('  ')).toBeNull()
+    expect(recordSource('ocean samples')).toBeNull()
+  })
+})
+
+describe('repository endpoints', () => {
+  it('accepts https and http on localhost only', () => {
+    expect(endpointProblem('https://zenodo.org/api/')).toBeNull()
+    expect(endpointProblem('http://localhost:5000/api/')).toBeNull()
+    expect(endpointProblem('http://zenodo.org/api/')).toContain('https')
+    expect(endpointProblem('zenodo.org')).toContain('full URL')
+  })
+
+  it('refuses host names the backend would not read as written', () => {
+    expect(endpointProblem('https://Zenodo.org/api/')).toContain('lowercase')
+    expect(endpointProblem('https://zenodo.org/api/?q=1')).toBeTruthy()
+    expect(endpointProblem('https://user@zenodo.org/api/')).toBeTruthy()
+  })
+
+  it('names Zenodo by its host', () => {
+    expect(repositoryLabel({ name: 'Mine', endpoint: 'https://zenodo.org/api/' })).toBe('Zenodo')
+    expect(repositoryLabel({ name: 'Mine', endpoint: 'https://sandbox.zenodo.org/api/' })).toBe('Zenodo sandbox')
+    expect(repositoryLabel({ name: 'Mine', endpoint: 'https://repo.test/api/' })).toBe('Mine')
+  })
+})
+
+describe('missing publish metadata', () => {
+  it('reads the missing fields of a 400 answer only', () => {
+    const missing = new ApiError(400, 'missing metadata', undefined, { error: 'x', missing: ['creators', 1] })
+    expect(missingFields(missing)).toEqual(['creators'])
+    expect(missingFields(new ApiError(400, 'bad', undefined, { error: 'x' }))).toBeNull()
+    expect(missingFields(new ApiError(409, 'busy', undefined, { missing: ['creators'] }))).toBeNull()
+    expect(missingFields(new Error('x'))).toBeNull()
+  })
+
+  it('maps creators to personal names with an optional ORCID', () => {
+    expect(creatorsMetadata([
+      { name: 'Ada Lovelace', orcid: 'https://orcid.org/0000-0002-1825-0097' },
+      { name: 'Curie, Marie', orcid: '' },
+      { name: '  ', orcid: '0000-0001' },
+    ])).toEqual([
+      {
+        person_or_org: {
+          type: 'personal', family_name: 'Lovelace', given_name: 'Ada',
+          identifiers: [{ scheme: 'orcid', identifier: '0000-0002-1825-0097' }],
+        },
+      },
+      { person_or_org: { type: 'personal', family_name: 'Curie', given_name: 'Marie' } },
+    ])
+  })
+
+  it('reads the record of a finished export', () => {
+    const result = { repository: { id: 'r1', doi: '10.5281/zenodo.2', concept_doi: '10.5281/zenodo.1' } }
+    expect(exportRepository(result)).toEqual(result.repository)
+    expect(exportRepository({ included: 3 })).toBeNull()
   })
 })
 
