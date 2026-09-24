@@ -797,16 +797,17 @@ export const docsTopics: DocsTopic[] = [
   {
     slug: 'invenio-zenodo',
     kind: 'Guide',
-    title: 'Import from and publish to Invenio or Zenodo',
-    summary: 'Bring published records in as datasets, and deposit datasets in a repository that mints their DOI.',
+    title: 'Import from and publish to Zenodo or Invenio',
+    summary: 'Bring published records in as datasets, and publish datasets to Zenodo to get a DOI. Records keep their DOIs.',
     sections: [
       {
         title: 'Add the repository to a group',
         icon: 'Plug',
         steps: [
           'Open the group in [Groups](page:groups), then Sources.',
-          'Under Repositories, add an Invenio or Zenodo repository with its API URL, for example https://zenodo.org/api/.',
-          'Add a community when records belong to one. Add a read token only to import restricted records.',
+          'Under Repositories, add a repository. Zenodo and Zenodo sandbox fill in their API URL for you. Other Invenio repositories need their API URL with https.',
+          'The import and publish dialogs also offer Add Zenodo when the group has no repository yet.',
+          'Add a community to submit published records to it for review. Add a read token only to import restricted records.',
         ],
       },
       {
@@ -814,25 +815,28 @@ export const docsTopics: DocsTopic[] = [
         icon: 'Import',
         steps: [
           'In [Datasets](page:datasets), choose From Invenio or Zenodo.',
-          'Pick the group and repository, search for the record and select it.',
-          'Choose Copy files, Reference files or Metadata only. Reference files keeps the bytes in the repository and needs a bucket of the same group.',
-          'Follow the import job; the new dataset keeps the record DOI as one of its identifiers.',
+          'Pick the group and repository, then paste a DOI, a record link or a record id, or search for the record.',
+          'Copy files is the default. Reference files keeps the bytes in the repository and needs a bucket of the same group. Metadata only skips the files.',
+          'Only the latest version is imported unless you ask for all versions. Keep updated is on by default: Aruna checks the record once a day and offers new versions.',
+          'Follow the import job. The new dataset keeps the record DOIs, including the DOI for all versions.',
         ],
       },
       {
-        title: 'Publish a dataset',
+        title: 'Publish a dataset and get a DOI',
         icon: 'Send',
         paragraphs: [
-          'On a dataset page, open Import / export and choose Publish to repository. Keep linked pushes every later change to one open draft; Export once sends the dataset as it is now.',
-          'A dataset imported from a repository can continue that record, so new versions join the same record lineage. Nothing is published until you press Publish or turn on automatic publishing, and a published record cannot be deleted.',
+          'On a dataset page, open Import / export and choose Publish to repository, then Publish to Zenodo and get a DOI. Aruna creates a draft, reserves its DOI and shows it right away. The DOI becomes active when you publish.',
+          'The draft follows every later change of the dataset. Publish when it is ready. With a community, publishing submits the record for review and the Repositories section shows the review state.',
+          'Files are public by default so anyone can download them once the record is published. Export once sends the dataset as it is now and shows the DOI when the job ends.',
+          'When Zenodo needs more metadata, such as creators, the dialog asks for it. A published record cannot be deleted.',
         ],
       },
       {
         title: 'Your personal access token',
         icon: 'KeyRound',
         bullets: [
-          'Create a token with deposit rights in your repository account settings and paste it into the dialog.',
-          'For a link, Aruna stores the token sealed for that one repository endpoint and never shows it again. Change it from the Repositories section when it expires.',
+          'Create a token on the Zenodo token page with the scopes deposit:write and deposit:actions, then paste it into the dialog.',
+          'For a link, Aruna stores the token sealed for that one repository endpoint and never shows it again. The person who created the link can change it from the Repositories section when it expires.',
           'Aruna never asks for your repository password.',
         ],
       },
@@ -840,8 +844,10 @@ export const docsTopics: DocsTopic[] = [
         title: 'Follow the link',
         icon: 'RefreshCw',
         paragraphs: [
-          'The Repositories section on the dataset page shows each link as enabled, paused or failed with the reason, a waiting push, the last DOI and record, and whether it is published. Push now, publish, pause, change the token or remove the link there. Removing a link keeps the records in the repository.',
-          'The persistent identifier section lists every DOI a repository registered for the dataset. Aruna itself mints no DOI.',
+          'The Repositories section on the dataset page shows each link with its state and reason, the DOI, the record and whether it is published. It refreshes itself while a push runs or a review is open.',
+          'The person who created a link can publish and change its token and settings. Group admins can also push, pause, resume and remove it. A link is managed by the node that created it. Removing a link keeps the records in the repository.',
+          'When the record was changed in the repository, Accept remote state continues from that record. For an imported dataset that is kept updated, Update now takes a new version, and Update automatically does it without asking.',
+          'The persistent identifier section lists every repository DOI of the dataset and whether it was published from here or imported. Aruna itself mints no DOI.',
         ],
       },
     ],
