@@ -5,6 +5,7 @@ import {
   button,
   click,
   compileClientComponent,
+  content,
   flush,
   input,
   moduleDefault,
@@ -20,6 +21,16 @@ const sessionEpoch = ref(0)
 const createInvenioLink = vi.fn()
 const submitInvenioExport = vi.fn()
 const listPersistentIds = vi.fn()
+const getInvenioLink = vi.fn()
+const publishInvenioLink = vi.fn()
+const createRepositoryConnector = vi.fn()
+const loadConnectors = vi.fn()
+const connectors = ref<unknown[] | null>([])
+const canWriteData = ref(true)
+const job = ref<unknown>(null)
+const currentUser = ref<{ name: string; orcid?: string } | null>({ name: 'Ada Lovelace', orcid: '0000-0002-1825-0097' })
+let poller: { run: () => Promise<void>; skip: () => boolean } | null = null
+const ZENODO = { connector_id: 'c1', kind: 'invenio', name: 'Zenodo', endpoint: 'https://zenodo.org/api/' }
 
 const Empty = defineComponent(() => () => null)
 const Slot = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
@@ -55,6 +66,11 @@ const Dialog = compileClientComponent(new URL('./RepositoryPublishDialog.vue', i
   '@/components/ui/DialogDescription.vue': moduleDefault(Slot),
   '@/components/ui/DialogFooter.vue': moduleDefault(Slot),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+  '@/components/ui/CopyButton.vue': moduleDefault(Empty),
+  '@/components/ui/ExternalLink.vue': moduleDefault(defineComponent({
+    props: { label: String, href: String },
+    setup: (props) => () => h('a', { href: props.href }, props.label),
+  })),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Notice.vue': moduleDefault(Slot),
   '@/components/ui/OptionToggle.vue': moduleDefault(ToggleStub),
@@ -64,19 +80,24 @@ const Dialog = compileClientComponent(new URL('./RepositoryPublishDialog.vue', i
   '@/components/ui/Textarea.vue': moduleDefault(Empty),
   '@/components/metadata/TransferJobStatus.vue': moduleDefault(Empty),
   '@/composables/useAruna': {
-    useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('bearer'), sessionEpoch }),
+    useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('bearer'), sessionEpoch, currentUser }),
   },
   '@/composables/useInvenio': {
-    useRepositoryConnectors: () => ({
-      connectors: ref([{ connector_id: 'c1', kind: 'invenio', name: 'Zenodo', endpoint: 'https://zenodo.org/api/' }]),
-      loading: ref(false),
-      error: ref(null),
-    }),
+    useRepositoryConnectors: () => ({ connectors, loading: ref(false), error: ref(null), load: loadConnectors }),
+    useGroupRights: () => ({ canWriteData }),
   },
   '@/composables/useJobs': {
-    useJobDetail: () => ({ job: ref(null), loadState: ref('idle'), loadError: ref(null), lastPollError: ref(null), load: vi.fn() }),
+    useJobDetail: () => ({ job, loadState: ref('idle'), loadError: ref(null), lastPollError: ref(null), load: vi.fn() }),
   },
-  '@/lib/api': { ...Api, createInvenioLink, submitInvenioExport },
+  '@/lib/jobs': { isTerminalJobState: (state: string) => ['succeeded', 'failed', 'cancelled'].includes(state) },
+  '@/lib/poll': {
+    POLL_ACTIVE_MS: 3000,
+    follow: (run: () => Promise<void>, _delay: unknown, skip: () => boolean) => {
+      poller = { run, skip }
+      return () => (poller = null)
+    },
+  },
+  '@/lib/api': { ...Api, createInvenioLink, submitInvenioExport, getInvenioLink, publishInvenioLink, createRepositoryConnector },
   '@/lib/invenio': Invenio,
   '@/lib/pid': { listPersistentIds },
   '@/lib/utils': Utils,
@@ -93,9 +114,20 @@ function tokenInput(root: Parameters<typeof input>[0]) {
   return input(root, 'aria-label', 'Personal access token')
 }
 
+function draftLink(remote: Record<string, unknown>, extra: Record<string, unknown> = {}) {
+  return { link_id: 'l1', document_id: 'd1', status: 'enabled', pending: false, remote: { published: false, ...remote }, ...extra }
+}
+
 beforeEach(() => {
   sessionEpoch.value = 0
-  createInvenioLink.mockReset().mockResolvedValue({ link_id: 'l1' })
+  connectors.value = [ZENODO]
+  canWriteData.value = true
+  job.value = null
+  getInvenioLink.mockReset()
+  publishInvenioLink.mockReset()
+  createRepositoryConnector.mockReset()
+  loadConnectors.mockReset()
+  createInvenioLink.mockReset().mockResolvedValue(draftLink({}, { pending: true }))
   submitInvenioExport.mockReset().mockResolvedValue({ job_id: 'j1', status_url: '/compute/jobs/j1' })
   listPersistentIds.mockReset().mockResolvedValue([
     { secondary_identifiers: [{ kind: 'invenio_parent', value: 'parent-1', endpoint: 'https://zenodo.org/api' }] },
@@ -103,17 +135,110 @@ beforeEach(() => {
 })
 
 describe('RepositoryPublishDialog', () => {
-  it('creates a link that continues the source record and forgets the token', async () => {
+  it('creates a public link that starts a new record and forgets the token', async () => {
     const mounted = await mount()
+    expect(content(mounted.root)).toContain('Publish to Zenodo and get a DOI')
+    expect(content(mounted.root)).toContain('deposit:write and deposit:actions')
     await typeValue(tokenInput(mounted.root), SECRET)
-    await click(button(mounted.root, 'Create link'))
+    await click(button(mounted.root, 'Create draft and reserve DOI'))
 
     expect(createInvenioLink).toHaveBeenCalledWith(
       'd1',
-      { group_id: 'g1', connector_id: 'c1', access_token: SECRET, parent_id: 'parent-1', auto_publish: false, public_files: false },
+      { group_id: 'g1', connector_id: 'c1', access_token: SECRET, auto_publish: false, public_files: true },
       expect.anything(),
     )
-    expect(tokenInput(mounted.root).props.value).toBe('')
+    expect(content(mounted.root)).toContain('Creating the draft and reserving a DOI')
+    mounted.app.unmount()
+  })
+
+  it('shows the reserved DOI and publishes once the push finished', async () => {
+    getInvenioLink
+      .mockResolvedValueOnce(draftLink({ draft_id: 'r1', doi: '10.5281/zenodo.7', doi_reserved: true }, { pending: true }))
+      .mockResolvedValueOnce(draftLink({ draft_id: 'r1', doi: '10.5281/zenodo.7', doi_reserved: true }))
+    publishInvenioLink.mockResolvedValue({ job_id: 'j9', status_url: '/jobs/j9' })
+    const mounted = await mount()
+    await typeValue(tokenInput(mounted.root), SECRET)
+    await click(button(mounted.root, 'Create draft and reserve DOI'))
+    expect(poller?.skip()).toBe(false)
+
+    await poller!.run()
+    await flush()
+    expect(content(mounted.root)).toContain('10.5281/zenodo.7')
+    expect(content(mounted.root)).toContain('Reserved, becomes active when published.')
+    expect(button(mounted.root, 'Publish').props.disabled).toBe(true)
+
+    await poller!.run()
+    await flush()
+    expect(poller?.skip()).toBe(true)
+    await click(button(mounted.root, 'Publish'))
+    expect(publishInvenioLink).toHaveBeenCalledWith('d1', 'l1', expect.anything())
+    mounted.app.unmount()
+  })
+
+  it('asks for creators when the repository needs them and keeps the token', async () => {
+    createInvenioLink
+      .mockRejectedValueOnce(new Api.ApiError(400, 'missing metadata', undefined, { error: 'x', missing: ['creators'] }))
+      .mockResolvedValueOnce(draftLink({}))
+    const mounted = await mount()
+    await typeValue(tokenInput(mounted.root), SECRET)
+    await click(button(mounted.root, 'Create draft and reserve DOI'))
+
+    expect(content(mounted.root)).toContain('needs: creators')
+    expect(input(mounted.root, 'aria-label', 'Creator 1 name').props.value).toBe('Ada Lovelace')
+    expect(tokenInput(mounted.root).props.value).toBe(SECRET)
+    await click(button(mounted.root, 'Create draft and reserve DOI'))
+
+    expect(createInvenioLink.mock.calls[1][1].metadata).toEqual({
+      creators: [{
+        person_or_org: {
+          type: 'personal', family_name: 'Lovelace', given_name: 'Ada',
+          identifiers: [{ scheme: 'orcid', identifier: '0000-0002-1825-0097' }],
+        },
+      }],
+    })
+    mounted.app.unmount()
+  })
+
+  it('adds the Zenodo preset when the group has no repository', async () => {
+    connectors.value = []
+    createRepositoryConnector.mockResolvedValue({ connector_id: 'new' })
+    const mounted = await mount()
+    await click(button(mounted.root, 'Add Zenodo'))
+
+    expect(createRepositoryConnector).toHaveBeenCalledWith(
+      'g1',
+      { name: 'Zenodo', kind: 'invenio', endpoint: 'https://zenodo.org/api/', secret_config: {} },
+      expect.anything(),
+    )
+    expect(loadConnectors).toHaveBeenCalled()
+    mounted.app.unmount()
+  })
+
+  it('offers no preset to a member who cannot manage repositories', async () => {
+    connectors.value = []
+    canWriteData.value = false
+    const mounted = await mount()
+
+    expect(content(mounted.root)).not.toContain('Add Zenodo')
+    expect(content(mounted.root)).toContain('Ask someone who manages')
+    mounted.app.unmount()
+  })
+
+  it('shows the DOIs of a finished one-time export', async () => {
+    const mounted = await mount()
+    await click(button(mounted.root, 'Export once'))
+    await typeValue(tokenInput(mounted.root), SECRET)
+    await click(button(mounted.root, 'Start export'))
+    job.value = {
+      state: 'succeeded',
+      result: { repository: { id: 'r1', doi: '10.5281/zenodo.2', concept_doi: '10.5281/zenodo.1', html_url: 'https://zenodo.org/records/2' } },
+    }
+    await flush()
+    const text = content(mounted.root)
+
+    expect(text).toContain('10.5281/zenodo.2')
+    expect(text).toContain('10.5281/zenodo.1')
+    expect(text).toContain('Open in the repository')
     mounted.app.unmount()
   })
 
@@ -125,7 +250,7 @@ describe('RepositoryPublishDialog', () => {
 
     const [documentId, repository, key] = submitInvenioExport.mock.calls[0]
     expect(documentId).toBe('d1')
-    expect(repository).toMatchObject({ access_token: SECRET, publish: false, public_files: false })
+    expect(repository).toMatchObject({ access_token: SECRET, publish: false, public_files: true })
     expect(key).not.toContain(SECRET)
     mounted.app.unmount()
   })
