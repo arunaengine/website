@@ -181,6 +181,9 @@ const dois = computed(() => secondaryIdentifiers(rows.value, 'doi'))
           <p v-for="doi in dois" :key="doi.value" class="flex flex-wrap items-center gap-1 text-xs">
             <ExternalLink :href="doiUrl(doi.value)" :label="doi.value" />
             <CopyButton :value="doi.value" label="Copy DOI" />
+            <Badge v-if="doi.origin" size="sm" variant="outline">
+              {{ doi.origin === 'published' ? 'Published from here' : 'Imported' }}
+            </Badge>
           </p>
         </div>
       </template>

@@ -128,13 +128,17 @@ describe('PersistentIdSection DOIs', () => {
     listPersistentIds.mockResolvedValue([{
       ...view('active'),
       secondary_identifiers: [
-        { kind: 'doi', value: '10.5281/zenodo.42' },
+        { kind: 'doi', value: '10.5281/zenodo.42', origin: 'published' },
+        { kind: 'doi', value: '10.5281/zenodo.7', origin: 'imported' },
         { kind: 'invenio_record', value: '42' },
       ],
     }])
     const mounted = await mount()
+    const text = content(mounted.root)
 
-    expect(content(mounted.root)).toContain('DOIs from repositories')
+    expect(text).toContain('DOIs from repositories')
+    expect(text).toContain('Published from here')
+    expect(text).toContain('Imported')
     mounted.app.unmount()
   })
 
