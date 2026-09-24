@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Group, bucket and key prefix of a transfer target. The fields render as
 // siblings inside the host's grid; the default slot sits after the group.
-import { computed, ref, watch } from 'vue'
+import { computed, ref, useId, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Spinner from '@/components/ui/Spinner.vue'
@@ -22,6 +22,7 @@ const bucket = defineModel<string>('bucket', { required: true })
 const prefix = defineModel<string>('prefix', { required: true })
 
 const { groups } = useAruna()
+const uid = useId()
 const groupOptions = computed(() => groups.value.map((group) => ({ value: group.id, label: group.name })))
 
 const s3 = useS3()
@@ -136,7 +137,7 @@ watch(
   </div>
   <slot />
   <div>
-    <label class="text-xs font-medium text-foreground">Target bucket</label>
+    <label :for="pickBucket ? undefined : `${uid}-bucket`" class="text-xs font-medium text-foreground">Target bucket</label>
     <Select
       v-if="pickBucket"
       :model-value="bucket"
@@ -146,7 +147,7 @@ watch(
       class="mt-1"
       @update:model-value="onBucketPick"
     />
-    <Input v-else v-model="bucket" placeholder="my-bucket" class="mt-1" />
+    <Input v-else :id="`${uid}-bucket`" v-model="bucket" placeholder="my-bucket" class="mt-1" />
     <Spinner
       v-if="bucketsLoading && !bucketsLoaded"
       show-label
@@ -157,7 +158,7 @@ watch(
   </div>
   <div>
     <div class="flex items-center justify-between gap-2">
-      <label class="text-xs font-medium text-foreground">Key prefix</label>
+      <label :for="`${uid}-prefix`" class="text-xs font-medium text-foreground">Key prefix</label>
       <Button
         v-if="canBrowse && !authRejected && bucket"
         variant="ghost"
@@ -168,7 +169,7 @@ watch(
         <FolderTree class="size-3" /> {{ browserOpen ? 'Hide folders' : 'Browse folders' }}
       </Button>
     </div>
-    <Input v-model="prefix" placeholder="optional/prefix" class="mt-1" />
+    <Input :id="`${uid}-prefix`" v-model="prefix" placeholder="optional/prefix" class="mt-1" />
   </div>
 
   <div v-if="browserOpen && canBrowse && bucket" class="space-y-2 rounded-md border border-border p-2 sm:col-span-2">

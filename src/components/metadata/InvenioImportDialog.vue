@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Imports one published Invenio or Zenodo record as a new dataset through a
-// durable import job.
-import { computed, ref, watch } from 'vue'
+// durable import job. By default a pull link keeps the dataset updated.
+import { computed, ref, useId, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
@@ -10,6 +10,8 @@ import DialogTitle from '@/components/ui/DialogTitle.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import Button from '@/components/ui/Button.vue'
+import CopyButton from '@/components/ui/CopyButton.vue'
+import ExternalLink from '@/components/ui/ExternalLink.vue'
 import DetailList, { type Detail } from '@/components/ui/DetailList.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
@@ -22,12 +24,21 @@ import TransferJobStatus from '@/components/metadata/TransferJobStatus.vue'
 import TransferReport from '@/components/metadata/TransferReport.vue'
 import TransferTarget from '@/components/metadata/TransferTarget.vue'
 import { useAruna } from '@/composables/useAruna'
-import { useRepositoryConnectors } from '@/composables/useInvenio'
+import { useGroupRights, useRepositoryConnectors } from '@/composables/useInvenio'
 import { useJobDetail } from '@/composables/useJobs'
 import { useNotifications } from '@/composables/useNotifications'
-import { lookupPid, submitInvenioImport, type InvenioImportMode, type PidLookupMatch } from '@/lib/api'
-import type { InvenioHit } from '@/lib/invenio'
+import {
+  createRepositoryConnector,
+  lookupPid,
+  submitInvenioImport,
+  type InvenioImportMode,
+  type InvenioRecordSource,
+  type PidLookupMatch,
+  type SecondaryIdentifier,
+} from '@/lib/api'
+import { doiUrl, recordSource, REPOSITORY_PRESETS, secondaryIdentifiers, type InvenioHit } from '@/lib/invenio'
 import { isTerminalJobState } from '@/lib/jobs'
+import { listPersistentIds } from '@/lib/pid'
 import { importJobResult } from '@/lib/rocrateArchive'
 import { errorMessage } from '@/lib/utils'
 import { Import } from '@lucide/vue'
@@ -37,6 +48,7 @@ const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
 
 const { apiBaseUrl, authToken, sessionEpoch } = useAruna()
 const { bumpDashboard } = useNotifications()
+const uid = useId()
 function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
 }
@@ -45,13 +57,23 @@ const groupId = ref('')
 const connectorId = ref('')
 const bucket = ref('')
 const prefix = ref('')
-const recordId = ref('')
+// A record id, a version or concept DOI, or a record URL.
+const recordInput = ref('')
 const documentPath = ref('')
 const mode = ref<InvenioImportMode>('copy')
-const allVersions = ref(true)
+const allVersions = ref(false)
+const keepUpdated = ref(true)
+const autoUpdate = ref(false)
 const isPublic = ref(false)
+const source = computed(() => recordSource(recordInput.value))
 
-const { connectors, loading: connectorsLoading, error: connectorsError } = useRepositoryConnectors(() => groupId.value)
+const {
+  connectors,
+  loading: connectorsLoading,
+  error: connectorsError,
+  load: loadConnectors,
+} = useRepositoryConnectors(() => groupId.value)
+const { canWriteData } = useGroupRights(() => groupId.value)
 const invenioConnectors = computed(() => connectors.value?.filter((entry) => entry.kind === 'invenio') ?? null)
 const connectorOptions = computed(() =>
   (invenioConnectors.value ?? []).map((entry) => ({ value: entry.connector_id, label: entry.name })),
@@ -79,40 +101,77 @@ const MODE_HINT: Record<InvenioImportMode, string> = {
   metadata: 'Only the record metadata is imported, without files.',
 }
 
-// A path the user typed stays; an automatic one follows the picked record.
-let autoPath = ''
-function pickHit(hit: InvenioHit) {
-  recordId.value = hit.id
-  if (!documentPath.value || documentPath.value === autoPath) {
-    autoPath = `datasets/invenio-${hit.id}`
-    documentPath.value = autoPath
+// One click creates the Zenodo preset when the group has no repository yet.
+const addingPreset = ref(false)
+const presetError = ref<string | null>(null)
+async function addPreset() {
+  const group = groupId.value
+  if (addingPreset.value || !group) return
+  const preset = REPOSITORY_PRESETS[0]
+  addingPreset.value = true
+  presetError.value = null
+  try {
+    const created = await createRepositoryConnector(
+      group,
+      { name: preset.name, kind: 'invenio', endpoint: preset.endpoint, secret_config: {} },
+      client(),
+    )
+    if (group !== groupId.value) return
+    await loadConnectors()
+    connectorId.value = created.connector_id
+  } catch (err) {
+    presetError.value = errorMessage(err)
+  } finally {
+    addingPreset.value = false
   }
-  void checkExisting(hit)
+}
+
+function pathName(found: InvenioRecordSource): string {
+  if ('doi' in found) return found.doi.split('/').pop() ?? found.doi
+  const id = 'record_id' in found ? found.record_id : found.url.replace(/\/+$/, '').split('/').pop() ?? ''
+  return `invenio-${id}`
+}
+
+// A path the user typed stays; an automatic one follows the named record.
+let autoPath = ''
+watch(source, (found) => {
+  if (!found || (documentPath.value && documentPath.value !== autoPath)) return
+  autoPath = `datasets/${pathName(found).replace(/[^A-Za-z0-9._-]+/g, '-')}`
+  documentPath.value = autoPath
+})
+
+let pickedDoi = ''
+function pickHit(hit: InvenioHit) {
+  recordInput.value = hit.id
+  pickedDoi = hit.doi
 }
 
 // A record already imported is worth knowing about before a second copy.
-const existing = ref<PidLookupMatch | null>(null)
+const existing = ref<PidLookupMatch[]>([])
 let lookupGeneration = 0
-async function checkExisting(hit: InvenioHit) {
+async function checkExisting(doi: string) {
   const current = ++lookupGeneration
   const epoch = sessionEpoch.value
-  existing.value = null
-  if (!hit.doi) return
+  const input = recordInput.value
+  existing.value = []
+  if (!doi) return
   try {
-    const found = await lookupPid('doi', hit.doi, client())
-    if (current === lookupGeneration && epoch === sessionEpoch.value && recordId.value === hit.id) existing.value = found[0] ?? null
+    const found = await lookupPid('doi', doi, client())
+    if (current === lookupGeneration && epoch === sessionEpoch.value && recordInput.value === input) existing.value = found
   } catch {
     // The hint is optional; a failed lookup proves nothing either way.
   }
 }
-watch(recordId, () => {
-  lookupGeneration++
-  existing.value = null
+watch(recordInput, () => {
+  const found = source.value
+  const doi = found && 'doi' in found ? found.doi : found && 'record_id' in found ? pickedDoi : ''
+  pickedDoi = ''
+  void checkExisting(doi)
 })
 
 // One attempt keeps one idempotency key; any change to the request is a new attempt.
 const attemptKey = ref('')
-watch([groupId, connectorId, recordId, documentPath, bucket, prefix, mode, allVersions, isPublic], () => {
+watch([groupId, connectorId, recordInput, documentPath, bucket, prefix, mode, allVersions, keepUpdated, autoUpdate, isPublic], () => {
   attemptKey.value = ''
 })
 
@@ -135,16 +194,33 @@ const importDetails = computed<Detail[]>(() => {
     : []
 })
 
+// The DOIs the new dataset holds from the imported record.
+const importedDois = ref<SecondaryIdentifier[] | null>(null)
+async function loadImportedDois(documentId: string) {
+  const epoch = sessionEpoch.value
+  try {
+    const rows = await listPersistentIds(documentId, client())
+    if (epoch === sessionEpoch.value && createdDocumentId.value === documentId) {
+      importedDois.value = secondaryIdentifiers(rows, 'doi')
+    }
+  } catch {
+    // The dataset page shows them as well.
+  }
+}
+
 watch(terminal, (settled) => {
-  if (settled && createdDocumentId.value) bumpDashboard()
+  if (!settled || !createdDocumentId.value) return
+  bumpDashboard()
+  void loadImportedDois(createdDocumentId.value)
 })
 
 const ready = computed(() =>
-  Boolean(groupId.value && connectorId.value && recordId.value.trim() && documentPath.value.trim() && bucket.value.trim()),
+  Boolean(groupId.value && connectorId.value && source.value && documentPath.value.trim() && bucket.value.trim()),
 )
 
 async function startImport() {
-  if (!ready.value || busy.value) return
+  const found = source.value
+  if (!ready.value || busy.value || !found) return
   submitError.value = null
   busy.value = true
   const epoch = sessionEpoch.value
@@ -152,11 +228,13 @@ async function startImport() {
   try {
     const submitted = await submitInvenioImport(
       {
+        ...found,
         group_id: groupId.value,
         connector_id: connectorId.value,
-        record_id: recordId.value.trim(),
         mode: mode.value,
         all_versions: allVersions.value,
+        keep_updated: keepUpdated.value,
+        ...(keepUpdated.value ? { auto_update: autoUpdate.value } : {}),
         target: { bucket: bucket.value.trim(), prefix: prefix.value.trim() },
         metadata: { group_id: groupId.value, path: documentPath.value.trim(), public: isPublic.value },
         idempotency_key: attemptKey.value,
@@ -175,9 +253,10 @@ function reset() {
   activeJobId.value = null
   submitError.value = null
   attemptKey.value = ''
-  recordId.value = ''
+  recordInput.value = ''
   documentPath.value = ''
   autoPath = ''
+  importedDois.value = null
 }
 
 // A job started by another account or on another realm is not followed here.
@@ -193,10 +272,11 @@ watch(sessionEpoch, () => {
     <DialogContent class="flex max-h-[88vh] max-w-2xl flex-col">
       <DialogHeader class="pr-8">
         <DialogTitle class="flex items-center gap-2">
-          <Import class="h-4 w-4 text-primary" /> Import from Invenio or Zenodo
+          <Import class="h-4 w-4 text-primary" /> Import from Zenodo or Invenio
         </DialogTitle>
         <DialogDescription>
-          Find a published record in a repository of your group and register it as a new dataset.
+          Name a published record by its DOI, link or id, or search for it, and register it as a new dataset.
+          Its DOIs stay with the dataset.
         </DialogDescription>
       </DialogHeader>
 
@@ -223,8 +303,12 @@ watch(sessionEpoch, () => {
                 <p v-else-if="!groupId" class="mt-2 text-[11px] text-muted-foreground">Choose a group first.</p>
                 <Spinner v-else-if="connectorsLoading" show-label label="Loading repositories…" class="mt-2 flex text-[11px]" />
                 <p v-else-if="connectorsError" class="mt-2 text-[11px] text-destructive">{{ connectorsError }}</p>
+                <div v-else-if="invenioConnectors && canWriteData" class="mt-2 space-y-1">
+                  <Button size="sm" variant="outline" :disabled="addingPreset" @click="addPreset">Add Zenodo</Button>
+                  <p v-if="presetError" class="text-[11px] text-destructive">{{ presetError }}</p>
+                </div>
                 <p v-else-if="invenioConnectors" class="mt-2 text-[11px] text-muted-foreground">
-                  This group has no Invenio repository yet. Add one under the group's Sources.
+                  This group has no repository yet. Ask someone who manages the group's data to add Zenodo.
                   <RouterLink
                     :to="{ name: 'group', params: { id: groupId }, query: { tab: 'sources' } }"
                     class="text-primary hover:underline"
@@ -239,24 +323,33 @@ watch(sessionEpoch, () => {
             v-if="groupId && connectorId"
             :group-id="groupId"
             :connector-id="connectorId"
-            :selected-id="recordId"
+            :selected-id="recordInput"
             @pick="pickHit"
           />
 
           <div class="grid gap-3 sm:grid-cols-2">
             <div>
-              <label class="text-xs font-medium text-foreground">Record id</label>
-              <Input v-model="recordId" placeholder="1234567" class="mt-1 font-mono text-xs" />
+              <label :for="`${uid}-record`" class="text-xs font-medium text-foreground">Record</label>
+              <Input
+                :id="`${uid}-record`"
+                v-model="recordInput"
+                placeholder="10.5281/zenodo.1234567"
+                class="mt-1 font-mono text-xs"
+              />
+              <p class="mt-1 text-[11px]" :class="recordInput.trim() && !source ? 'text-destructive' : 'text-muted-foreground'">
+                A DOI, a record link or a record id.
+              </p>
             </div>
             <div>
-              <label class="text-xs font-medium text-foreground">Dataset path</label>
-              <Input v-model="documentPath" placeholder="datasets/my-dataset" class="mt-1" />
+              <label :for="`${uid}-path`" class="text-xs font-medium text-foreground">Dataset path</label>
+              <Input :id="`${uid}-path`" v-model="documentPath" placeholder="datasets/my-dataset" class="mt-1" />
             </div>
           </div>
-          <Notice v-if="existing" tone="info">
-            A dataset already holds this record's DOI.
+          <Notice v-if="existing.length" tone="info">
+            {{ existing.length === 1 ? 'A dataset already holds' : `${existing.length} datasets already hold` }} this DOI
+            <template v-if="existing[0].origin === 'published'"> as its own published record</template>.
             <RouterLink
-              :to="{ name: 'dataset', params: { id: existing.document_id } }"
+              :to="{ name: 'dataset', params: { id: existing[0].document_id } }"
               class="font-medium text-primary hover:underline"
               @click="emit('update:open', false)"
             >Open it</RouterLink>
@@ -266,9 +359,22 @@ watch(sessionEpoch, () => {
             <OptionToggle v-model="mode" :options="MODE_OPTIONS" aria-label="What to import" />
             <p class="text-[11px] text-muted-foreground">{{ MODE_HINT[mode] }}</p>
           </div>
+          <label class="flex items-start gap-2 text-xs text-foreground">
+            <Switch :checked="keepUpdated" aria-label="Keep updated" @update:checked="keepUpdated = $event" />
+            <span>
+              Keep updated
+              <span class="block text-[11px] text-muted-foreground">
+                Aruna checks the record once a day and offers new versions.
+              </span>
+            </span>
+          </label>
+          <label v-if="keepUpdated" class="flex items-center gap-2 text-xs text-foreground">
+            <Switch :checked="autoUpdate" aria-label="Import new versions automatically" @update:checked="autoUpdate = $event" />
+            Import new versions automatically
+          </label>
           <label class="flex items-center gap-2 text-xs text-foreground">
             <Switch :checked="allVersions" aria-label="Import all versions" @update:checked="allVersions = $event" />
-            Import all published versions
+            Import all published versions, not only the latest
           </label>
           <label class="flex items-center gap-2 text-xs text-foreground">
             <Switch :checked="isPublic" aria-label="Make the imported dataset public" @update:checked="isPublic = $event" />
@@ -279,6 +385,16 @@ watch(sessionEpoch, () => {
         <section v-else class="space-y-3">
           <TransferJobStatus :job="job" :load-state="loadState" :load-error="loadError" :last-poll-error="lastPollError" @retry="load" />
           <DetailList v-if="importResult" :items="importDetails" />
+          <div v-if="importedDois?.length" class="space-y-1 text-xs">
+            <p class="font-medium text-foreground">DOIs of the imported record</p>
+            <p v-for="doi in importedDois" :key="doi.value" class="flex flex-wrap items-center gap-1">
+              <ExternalLink :href="doiUrl(doi.value)" :label="doi.value" />
+              <CopyButton :value="doi.value" label="Copy DOI" />
+            </p>
+          </div>
+          <p v-else-if="importedDois" class="text-[11px] text-muted-foreground">
+            The record DOIs appear on the dataset page once they are registered.
+          </p>
           <div class="flex flex-wrap gap-2">
             <Button v-if="createdDocumentId" variant="outline" size="sm" as-child @click="emit('update:open', false)">
               <RouterLink :to="{ name: 'dataset', params: { id: createdDocumentId } }">Open the created dataset</RouterLink>
