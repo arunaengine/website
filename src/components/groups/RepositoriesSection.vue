@@ -142,7 +142,7 @@ async function confirmDelete(connector: RepositoryConnector) {
           <span class="shrink-0 text-[11px] text-muted-foreground">{{ relativeTime(connector.updated_at) }}</span>
           <template v-if="canWrite">
             <template v-if="confirmingId === connector.connector_id">
-              <span class="text-xs text-foreground">Delete this repository? Existing links stop working.</span>
+              <span class="text-xs text-foreground">Delete this repository? It cannot be deleted while dataset links still use it.</span>
               <Button variant="destructive" size="sm" :disabled="deleting" @click="confirmDelete(connector)">Delete</Button>
               <Button variant="ghost" size="sm" :disabled="deleting" @click="confirmingId = null">Cancel</Button>
             </template>

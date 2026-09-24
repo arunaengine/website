@@ -23,7 +23,7 @@ import {
   type RepositoryConnector,
   type RepositoryConnectorKind,
 } from '@/lib/api'
-import { connectorBody } from '@/lib/invenio'
+import { connectorBody, endpointProblem, REPOSITORY_PRESETS } from '@/lib/invenio'
 import { errorMessage } from '@/lib/utils'
 
 const props = defineProps<{
@@ -53,20 +53,44 @@ const token = ref('')
 const removeToken = ref(false)
 const saving = ref(false)
 const submitError = ref<string | null>(null)
+// A typed token is cleared on submit, so a failed save must ask for it again.
+const tokenLost = ref(false)
 
 const isEdit = computed(() => Boolean(props.connector))
 const isInvenio = computed(() => kind.value === 'invenio')
 const hasStoredToken = computed(() => Boolean(props.connector?.has_secret_config))
-const endpointInvalid = computed(() => {
+const endpointError = computed(() => {
+  if (!endpoint.value.trim()) return null
+  if (isInvenio.value) return endpointProblem(endpoint.value)
   try {
-    return !/^https?:$/.test(new URL(endpoint.value.trim()).protocol)
+    return /^https?:$/.test(new URL(endpoint.value.trim()).protocol) ? null : 'Use an http or https URL.'
   } catch {
-    return true
+    return 'Enter a full URL.'
   }
 })
+// The backend refuses a new endpoint that would silently reuse the stored token.
+const tokenNeedsChoice = computed(() => {
+  const stored = props.connector
+  if (!stored || !hasStoredToken.value || !isInvenio.value || token.value.trim() || removeToken.value) return false
+  const trim = (value: string) => value.trim().replace(/\/+$/, '')
+  return trim(stored.endpoint) !== trim(endpoint.value)
+})
 const submitDisabled = computed(
-  () => saving.value || writesDisabled.value || !name.value.trim() || endpointInvalid.value,
+  () =>
+    saving.value ||
+    writesDisabled.value ||
+    !name.value.trim() ||
+    !endpoint.value.trim() ||
+    Boolean(endpointError.value) ||
+    tokenNeedsChoice.value,
 )
+
+function applyPreset(preset: (typeof REPOSITORY_PRESETS)[number]) {
+  kind.value = 'invenio'
+  endpoint.value = preset.endpoint
+  const presetNames: string[] = REPOSITORY_PRESETS.map((entry) => entry.name)
+  if (!name.value.trim() || presetNames.includes(name.value.trim())) name.value = preset.name
+}
 
 function clearToken() {
   token.value = ''
@@ -84,6 +108,7 @@ watch(
     endpoint.value = source?.endpoint ?? ''
     community.value = source?.community ?? ''
     submitError.value = null
+    tokenLost.value = false
   },
 )
 
@@ -101,7 +126,9 @@ async function submit() {
     { name: name.value, kind: kind.value, endpoint: endpoint.value, community: community.value, token: token.value, removeToken: removeToken.value },
     isEdit.value,
   )
+  const typedToken = Boolean(body.secret_config?.token)
   clearToken()
+  tokenLost.value = false
   const client = { baseUrl: apiBaseUrl.value, token: authToken.value }
   try {
     const saved = props.connector
@@ -111,6 +138,7 @@ async function submit() {
     emit('update:open', false)
   } catch (err) {
     submitError.value = errorMessage(err)
+    tokenLost.value = typedToken
   } finally {
     saving.value = false
   }
@@ -131,6 +159,19 @@ async function submit() {
       </DialogHeader>
 
       <form class="space-y-3" @submit.prevent="submit">
+        <div v-if="!isEdit" class="flex flex-wrap items-center gap-2">
+          <span class="text-xs text-muted-foreground">Quick setup:</span>
+          <Button
+            v-for="preset in REPOSITORY_PRESETS"
+            :key="preset.endpoint"
+            type="button"
+            variant="outline"
+            size="sm"
+            @click="applyPreset(preset)"
+          >
+            {{ preset.name }}
+          </Button>
+        </div>
         <div class="grid gap-3 sm:grid-cols-2">
           <div>
             <label :for="`${uid}-name`" class="text-xs font-medium text-foreground">Name</label>
@@ -157,7 +198,8 @@ async function submit() {
             class="mt-1 font-mono text-xs"
             :placeholder="isInvenio ? 'https://zenodo.org/api/' : 'https://repository.example.org/oai2d'"
           />
-          <p v-if="isInvenio" class="mt-1 text-[11px] text-muted-foreground">
+          <p v-if="endpointError" class="mt-1 text-[11px] text-destructive">{{ endpointError }}</p>
+          <p v-else-if="isInvenio" class="mt-1 text-[11px] text-muted-foreground">
             The repository API root, for example https://zenodo.org/api/ or https://sandbox.zenodo.org/api/.
           </p>
         </div>
@@ -167,6 +209,9 @@ async function submit() {
               Community <span class="text-muted-foreground">(optional)</span>
             </label>
             <Input :id="`${uid}-community`" v-model="community" class="mt-1 font-mono text-xs" placeholder="my-community" />
+            <p class="mt-1 text-[11px] text-muted-foreground">
+              Records published from Aruna are submitted to this community for review.
+            </p>
           </div>
           <fieldset class="space-y-2 rounded-md border border-border p-3">
             <legend class="px-1 text-xs font-semibold text-foreground">Read token (optional)</legend>
@@ -186,9 +231,14 @@ async function submit() {
               <Switch :checked="removeToken" aria-label="Remove the stored token" @update:checked="removeToken = $event" />
               Remove the stored token
             </label>
+            <p v-if="tokenNeedsChoice" class="text-[11px] text-destructive">
+              The stored token belongs to the old address. Enter a new token or remove the stored one.
+            </p>
           </fieldset>
         </template>
-        <Notice v-if="submitError" tone="error">{{ submitError }}</Notice>
+        <Notice v-if="submitError" tone="error">
+          {{ submitError }}<template v-if="tokenLost"> The typed token was cleared, enter it again.</template>
+        </Notice>
         <DialogFooter>
           <DialogClose as-child><Button type="button" variant="outline">Cancel</Button></DialogClose>
           <Button type="submit" :disabled="submitDisabled" :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined">
