@@ -103,6 +103,7 @@ const tab = ref<'overview' | 'graph'>('overview')
 const showCrateExport = ref(false)
 const showPublish = ref(false)
 const repositoryLinks = ref<InstanceType<typeof RepositoryLinksSection> | null>(null)
+const pidSection = ref<InstanceType<typeof PersistentIdSection> | null>(null)
 const showDelete = ref(false)
 const deleteError = ref<string | null>(null)
 
@@ -194,6 +195,7 @@ function jumpTo(entityId: string) {
         <template v-if="tab === 'overview'">
           <PersistentIdSection
             v-if="fetchedSummary"
+            ref="pidSection"
             :document-id="detailId"
             :is-public="fetchedSummary.public"
           />
@@ -202,8 +204,10 @@ function jumpTo(entityId: string) {
             v-if="fetchedSummary && currentUser"
             ref="repositoryLinks"
             :document-id="detailId"
+            :group-id="fetchedSummary.group_id"
             :can-write="canWrite"
             @publish="showPublish = true"
+            @settled="pidSection?.reload()"
           />
 
           <DetailsSection

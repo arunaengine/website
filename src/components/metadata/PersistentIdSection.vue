@@ -113,6 +113,7 @@ function reload() {
 }
 
 const { busy: refreshBusy, refresh: onRefresh } = useRefresh(reload)
+defineExpose({ reload })
 const spinning = computed(() => refreshBusy.value || loading.value)
 
 const pid = computed(() => view.value?.value ?? graphIriFor(props.documentId))
