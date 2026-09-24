@@ -99,12 +99,17 @@ export function searchInvenioRecords(
 
 export type InvenioImportMode = 'copy' | 'reference' | 'metadata'
 
-export interface InvenioImportRequest {
+// The record is named by exactly one of record_id, doi (version or concept) or url.
+export type InvenioRecordSource = { record_id: string } | { doi: string } | { url: string }
+
+export type InvenioImportRequest = InvenioRecordSource & {
   group_id: string
   connector_id: string
-  record_id: string
   mode: InvenioImportMode
   all_versions: boolean
+  // keep_updated creates a pull link; auto_update imports new versions without asking.
+  keep_updated?: boolean
+  auto_update?: boolean
   target: { bucket: string; prefix: string }
   metadata: { group_id: string; path: string; public: boolean }
   idempotency_key?: string
@@ -149,15 +154,27 @@ export function submitInvenioExport(
   )
 }
 
+// The repository side of a finished one-time export job.
+export interface InvenioExportResult {
+  repository: { id: string; doi?: string | null; concept_doi?: string | null; html_url?: string | null }
+}
+
 export type InvenioLinkStatus = 'enabled' | 'paused' | 'failed'
+
+export type InvenioReviewState = 'none' | 'pending' | 'accepted' | 'declined'
 
 export interface InvenioLinkRemote {
   parent_id?: string | null
   draft_id?: string | null
   record_id?: string | null
   doi?: string | null
+  // True while the DOI is only reserved on the open draft.
+  doi_reserved?: boolean
+  concept_doi?: string | null
   record_url?: string | null
   published: boolean
+  review?: InvenioReviewState
+  latest_remote_id?: string | null
 }
 
 export interface InvenioLink {
@@ -168,10 +185,13 @@ export interface InvenioLink {
   endpoint: string
   owner_node_url: string
   created_by: string
+  direction?: 'push' | 'pull'
   // Kept open so a new status renders instead of breaking.
   status: InvenioLinkStatus | (string & {})
   reason?: string | null
+  warning?: string | null
   auto_publish: boolean
+  auto_update?: boolean
   public_files: boolean
   pending: boolean
   remote: InvenioLinkRemote
@@ -193,6 +213,7 @@ export interface CreateInvenioLink {
 export interface PatchInvenioLink {
   paused?: boolean
   auto_publish?: boolean
+  auto_update?: boolean
   public_files?: boolean
   metadata?: Record<string, unknown>
 }
@@ -249,6 +270,20 @@ export function publishInvenioLink(
   return apiRequest(linksPath(documentId, linkId, 'publish'), { method: 'POST' }, client)
 }
 
+// Makes the current remote latest record the new base and clears remote_changed.
+export function acceptRemoteLink(documentId: string, linkId: string, client: ApiClientOptions): Promise<InvenioLink> {
+  return apiRequest(linksPath(documentId, linkId, 'accept-remote'), { method: 'POST' }, client)
+}
+
+// Imports the available remote version into a pull link's dataset.
+export function pullInvenioLink(
+  documentId: string,
+  linkId: string,
+  client: ApiClientOptions,
+): Promise<TransferJobResponse> {
+  return apiRequest(linksPath(documentId, linkId, 'pull'), { method: 'POST' }, client)
+}
+
 export function rotateLinkToken(
   documentId: string,
   linkId: string,
@@ -264,27 +299,33 @@ export function rotateLinkToken(
 
 export type SecondaryIdentifierKind = 'doi' | 'invenio_record' | 'invenio_parent'
 
+// published: this dataset was pushed or exported there; imported: copied from it.
+export type IdentifierOrigin = 'published' | 'imported'
+
 export interface SecondaryIdentifier {
   kind: SecondaryIdentifierKind | (string & {})
   value: string
   endpoint?: string | null
+  origin?: IdentifierOrigin
 }
 
-export interface PidLookupResult {
+export interface PidLookupMatch {
   document_id: string
   pid?: string | null
+  origin: IdentifierOrigin
 }
 
-// GET /pid/lookup: null when no dataset holds the identifier.
+// GET /pid/lookup: every readable dataset holding the identifier, published first.
 export async function lookupPid(
   kind: SecondaryIdentifierKind,
   value: string,
   client: ApiClientOptions,
-): Promise<PidLookupResult | null> {
+): Promise<PidLookupMatch[]> {
   try {
-    return await apiRequest<PidLookupResult>('/pid/lookup', { query: { kind, value } }, client)
+    const body = await apiRequest<{ matches?: PidLookupMatch[] }>('/pid/lookup', { query: { kind, value } }, client)
+    return body?.matches ?? []
   } catch (err) {
-    if (err instanceof ApiError && err.status === 404) return null
+    if (err instanceof ApiError && err.status === 404) return []
     throw err
   }
 }

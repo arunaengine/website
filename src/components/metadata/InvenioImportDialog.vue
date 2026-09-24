@@ -25,7 +25,7 @@ import { useAruna } from '@/composables/useAruna'
 import { useRepositoryConnectors } from '@/composables/useInvenio'
 import { useJobDetail } from '@/composables/useJobs'
 import { useNotifications } from '@/composables/useNotifications'
-import { lookupPid, submitInvenioImport, type InvenioImportMode, type PidLookupResult } from '@/lib/api'
+import { lookupPid, submitInvenioImport, type InvenioImportMode, type PidLookupMatch } from '@/lib/api'
 import type { InvenioHit } from '@/lib/invenio'
 import { isTerminalJobState } from '@/lib/jobs'
 import { importJobResult } from '@/lib/rocrateArchive'
@@ -91,7 +91,7 @@ function pickHit(hit: InvenioHit) {
 }
 
 // A record already imported is worth knowing about before a second copy.
-const existing = ref<PidLookupResult | null>(null)
+const existing = ref<PidLookupMatch | null>(null)
 let lookupGeneration = 0
 async function checkExisting(hit: InvenioHit) {
   const current = ++lookupGeneration
@@ -100,7 +100,7 @@ async function checkExisting(hit: InvenioHit) {
   if (!hit.doi) return
   try {
     const found = await lookupPid('doi', hit.doi, client())
-    if (current === lookupGeneration && epoch === sessionEpoch.value && recordId.value === hit.id) existing.value = found
+    if (current === lookupGeneration && epoch === sessionEpoch.value && recordId.value === hit.id) existing.value = found[0] ?? null
   } catch {
     // The hint is optional; a failed lookup proves nothing either way.
   }

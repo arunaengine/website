@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  acceptRemoteLink,
   createInvenioLink,
   listRepositoryConnectors,
   lookupPid,
   patchInvenioLink,
+  pullInvenioLink,
   replaceRepositoryConnector,
   rotateLinkToken,
   searchInvenioRecords,
@@ -74,12 +76,13 @@ describe('invenio transfers', () => {
   it('flattens the import options beside the target', async () => {
     const calls = stubFetch({ job_id: 'j1', status_url: '/compute/jobs/j1' })
     await submitInvenioImport({
-      group_id: 'g1', connector_id: 'c1', record_id: '123', mode: 'reference', all_versions: false,
-      target: { bucket: 'b', prefix: 'zenodo' }, metadata: { group_id: 'g1', path: 'datasets/z', public: false },
-      idempotency_key: 'key-1',
+      group_id: 'g1', connector_id: 'c1', doi: '10.5281/zenodo.1', mode: 'reference', all_versions: false,
+      keep_updated: true, target: { bucket: 'b', prefix: 'zenodo' },
+      metadata: { group_id: 'g1', path: 'datasets/z', public: false }, idempotency_key: 'key-1',
     }, CLIENT)
 
-    expect(calls[0].body).toMatchObject({ mode: 'reference', all_versions: false, record_id: '123' })
+    expect(calls[0].body).toMatchObject({ mode: 'reference', all_versions: false, doi: '10.5281/zenodo.1', keep_updated: true })
+    expect(calls[0].body).not.toHaveProperty('record_id')
   })
 
   it('wraps a one-time export in the repository field', async () => {
@@ -119,6 +122,17 @@ describe('invenio links', () => {
     expect(calls[0].body).toEqual({ access_token: SECRET })
   })
 
+  it('accepts the remote state and pulls on their own routes', async () => {
+    const calls = stubFetch({ link_id: 'l1' })
+    await acceptRemoteLink('d1', 'l1', CLIENT)
+    await pullInvenioLink('d1', 'l1', CLIENT)
+
+    expect(calls.map((call) => [call.method, call.url])).toEqual([
+      ['POST', 'https://api.test/api/v1/metadata/d1/invenio/links/l1/accept-remote'],
+      ['POST', 'https://api.test/api/v1/metadata/d1/invenio/links/l1/pull'],
+    ])
+  })
+
   it('pauses a link with a patch', async () => {
     const calls = stubFetch({ link_id: 'l1', status: 'paused' })
     await patchInvenioLink('d1', 'l1', { paused: true }, CLIENT)
@@ -131,12 +145,13 @@ describe('invenio links', () => {
 describe('pid lookup', () => {
   it('reads a miss as no dataset', async () => {
     stubFetch({ error: 'not found' }, 404)
-    expect(await lookupPid('doi', '10.5281/zenodo.1', CLIENT)).toBeNull()
+    expect(await lookupPid('doi', '10.5281/zenodo.1', CLIENT)).toEqual([])
   })
 
-  it('returns the holding dataset', async () => {
-    const calls = stubFetch({ document_id: 'd1' })
-    expect(await lookupPid('doi', '10.5281/zenodo.1', CLIENT)).toEqual({ document_id: 'd1' })
+  it('returns every holding dataset', async () => {
+    const matches = [{ document_id: 'd1', origin: 'published' }, { document_id: 'd2', origin: 'imported' }]
+    const calls = stubFetch({ matches })
+    expect(await lookupPid('doi', '10.5281/zenodo.1', CLIENT)).toEqual(matches)
     expect(new URL(calls[0].url).searchParams.get('value')).toBe('10.5281/zenodo.1')
   })
 })
