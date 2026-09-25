@@ -183,7 +183,7 @@ describe('RepositoryPublishDialog', () => {
     await typeValue(tokenInput(mounted.root), SECRET)
     await click(button(mounted.root, 'Create draft and reserve DOI'))
 
-    expect(content(mounted.root)).toContain('needs: creators')
+    expect(content(mounted.root)).toContain('needs creators')
     expect(input(mounted.root, 'aria-label', 'Creator 1 name').props.value).toBe('Ada Lovelace')
     expect(tokenInput(mounted.root).props.value).toBe(SECRET)
     await click(button(mounted.root, 'Create draft and reserve DOI'))
@@ -196,6 +196,42 @@ describe('RepositoryPublishDialog', () => {
         },
       }],
     })
+    mounted.app.unmount()
+  })
+
+  it('asks for a missing title and date and sends them with the dataset resource type', async () => {
+    submitInvenioExport.mockRejectedValueOnce(
+      new Api.ApiError(400, 'missing metadata', undefined, {
+        error: 'x', code: 'missing_metadata', missing: ['title', 'publication_date', 'resource_type'],
+      }),
+    )
+    const mounted = await mount()
+    await click(button(mounted.root, 'Export once'))
+    await typeValue(tokenInput(mounted.root), SECRET)
+    await click(button(mounted.root, 'Start export'))
+
+    expect(content(mounted.root)).toContain('needs a title, a publication date, a resource type')
+    expect(button(mounted.root, 'Start export').props.disabled).toBe(true)
+    await typeValue(input(mounted.root, 'aria-label', 'Title'), 'Soil data')
+    await typeValue(input(mounted.root, 'aria-label', 'Publication date'), '2026-09-01')
+    await click(button(mounted.root, 'Start export'))
+
+    expect(submitInvenioExport.mock.calls[1][1].metadata).toEqual({
+      title: 'Soil data', publication_date: '2026-09-01', resource_type: { id: 'dataset' },
+    })
+    mounted.app.unmount()
+  })
+
+  it('hides publish while the community reviews the record', async () => {
+    getInvenioLink.mockResolvedValue(draftLink({ draft_id: 'r1', doi: '10.5281/zenodo.7', doi_reserved: true, review: 'pending' }))
+    const mounted = await mount()
+    await typeValue(tokenInput(mounted.root), SECRET)
+    await click(button(mounted.root, 'Create draft and reserve DOI'))
+    await poller!.run()
+    await flush()
+
+    expect(content(mounted.root)).toContain('Waiting for community review')
+    expect(content(mounted.root)).not.toContain('Publishing is permanent')
     mounted.app.unmount()
   })
 
@@ -231,7 +267,13 @@ describe('RepositoryPublishDialog', () => {
     await click(button(mounted.root, 'Start export'))
     job.value = {
       state: 'succeeded',
-      result: { repository: { id: 'r1', doi: '10.5281/zenodo.2', concept_doi: '10.5281/zenodo.1', html_url: 'https://zenodo.org/records/2' } },
+      result: {
+        repository: {
+          id: 'r1', url: 'https://zenodo.org/api/records/r1', published: true, parent_id: 'p1', revision_id: 3,
+          doi: '10.5281/zenodo.2', concept_doi: '10.5281/zenodo.1', html_url: 'https://zenodo.org/records/2',
+          in_review: false, warning: 'The file check failed after publishing.',
+        },
+      },
     }
     await flush()
     const text = content(mounted.root)
@@ -239,6 +281,30 @@ describe('RepositoryPublishDialog', () => {
     expect(text).toContain('10.5281/zenodo.2')
     expect(text).toContain('10.5281/zenodo.1')
     expect(text).toContain('Open in the repository')
+    expect(text).toContain('Published')
+    expect(text).toContain('The file check failed after publishing.')
+    mounted.app.unmount()
+  })
+
+  it('shows a one-time export that waits for community review', async () => {
+    const mounted = await mount()
+    await click(button(mounted.root, 'Export once'))
+    await typeValue(tokenInput(mounted.root), SECRET)
+    await click(button(mounted.root, 'Start export'))
+    job.value = {
+      state: 'succeeded',
+      result: {
+        repository: {
+          id: 'r1', url: 'https://zenodo.org/api/records/r1/draft', published: false, parent_id: 'p1', revision_id: 1,
+          doi: '10.5281/zenodo.4', in_review: true,
+        },
+      },
+    }
+    await flush()
+    const text = content(mounted.root)
+
+    expect(text).toContain('Waiting for community review')
+    expect(text).toContain('Reserved, becomes active when published.')
     mounted.app.unmount()
   })
 

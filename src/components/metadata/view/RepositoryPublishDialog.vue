@@ -37,10 +37,13 @@ import {
   doiUrl,
   exportRepository,
   failureText,
+  fieldLabel,
   missingFields,
   parseOverride,
   REPOSITORY_PRESETS,
   repositoryLabel,
+  requiredMetadata,
+  reviewText,
   sourceParent,
   tokenPageUrl,
   type CreatorDraft,
@@ -74,9 +77,11 @@ const overrideText = ref('')
 const busy = ref(false)
 const submitError = ref<string | null>(null)
 const activeJobId = ref<string | null>(null)
-// Fields the repository still needs, from a 400 answer, and the creators typed for it.
+// Fields the repository still needs, from a 400 answer, and the values typed for them.
 const missing = ref<string[] | null>(null)
 const creators = ref<CreatorDraft[]>([])
+const title = ref('')
+const publicationDate = ref('')
 // The link this dialog created; it is followed until its DOI is reserved.
 const link = ref<InvenioLink | null>(null)
 const publishing = ref(false)
@@ -155,17 +160,23 @@ async function addPreset() {
 }
 
 const override = computed(() => parseOverride(overrideText.value))
-const needsCreators = computed(() => Boolean(missing.value?.includes('creators')))
+const needs = (field: string) => Boolean(missing.value?.includes(field))
+const missingText = computed(() => (missing.value ?? []).map(fieldLabel).join(', '))
 const metadata = computed(() => {
-  const people = needsCreators.value ? creatorsMetadata(creators.value) : []
-  const merged = { ...(override.value.value ?? {}), ...(people.length ? { creators: people } : {}) }
+  const people = needs('creators') ? creatorsMetadata(creators.value) : []
+  const typed = requiredMetadata(missing.value ?? [], { title: title.value, publicationDate: publicationDate.value })
+  const merged = { ...(override.value.value ?? {}), ...typed, ...(people.length ? { creators: people } : {}) }
   return Object.keys(merged).length ? merged : undefined
 })
+const filled = computed(
+  () =>
+    !(needs('creators') && !creatorsMetadata(creators.value).length) &&
+    !(needs('title') && !title.value.trim()) &&
+    !(needs('publication_date') && !publicationDate.value),
+)
 const ready = computed(
   () =>
-    Boolean(connectorId.value && accessToken.value.trim() && !override.value.error) &&
-    !(needsCreators.value && !creatorsMetadata(creators.value).length) &&
-    !busy.value,
+    Boolean(connectorId.value && accessToken.value.trim() && !override.value.error) && filled.value && !busy.value,
 )
 
 const { job, loadState, loadError, lastPollError, load } = useJobDetail(() => activeJobId.value)
@@ -174,7 +185,10 @@ const exported = computed(() => (job.value?.state === 'succeeded' ? exportReposi
 
 // The draft and its DOI appear after the first push; publish waits for that push.
 const canPublish = computed(
-  () => Boolean(link.value?.remote.draft_id && !link.value.pending) && !publishing.value && !(activeJobId.value && !jobDone.value),
+  () =>
+    Boolean(link.value?.remote.draft_id && !link.value.pending && link.value.remote.review !== 'pending') &&
+    !publishing.value &&
+    !(activeJobId.value && !jobDone.value),
 )
 const followLink = computed(() => {
   const current = link.value
@@ -235,6 +249,8 @@ function clearForm() {
   continueSource.value = false
   missing.value = null
   creators.value = []
+  title.value = ''
+  publicationDate.value = ''
   link.value = null
   publishError.value = null
   presetError.value = null
@@ -311,6 +327,9 @@ async function submit() {
     missing.value = fields
     if (fields.includes('creators') && !creators.value.length) {
       creators.value = [{ name: currentUser.value?.name ?? '', orcid: currentUser.value?.orcid ?? '' }]
+    }
+    if (fields.includes('publication_date') && !publicationDate.value) {
+      publicationDate.value = new Date().toISOString().slice(0, 10)
     }
   } finally {
     busy.value = false
@@ -429,12 +448,18 @@ async function submit() {
           <fieldset v-if="missing" class="space-y-2 rounded-md border border-border p-3">
             <legend class="px-1 text-xs font-semibold text-foreground">More metadata needed</legend>
             <p class="text-[11px] text-muted-foreground">
-              {{ label === 'the repository' ? 'The repository' : label }} needs: {{ missing.join(', ') }}.
-              <template v-if="missing.some((field) => field !== 'creators')">
+              {{ label === 'the repository' ? 'The repository' : label }} needs {{ missingText }}.
+              <template v-if="needs('resource_type')">The resource type is set to dataset.</template>
+              <template v-if="missing.some((field) => !['title', 'publication_date', 'resource_type', 'creators'].includes(field))">
                 Add the other fields in the dataset or in the advanced override.
               </template>
             </p>
-            <template v-if="needsCreators">
+            <Input v-if="needs('title')" v-model="title" class="h-8 text-xs" placeholder="Title" aria-label="Title" />
+            <label v-if="needs('publication_date')" class="flex items-center gap-2 text-xs text-foreground">
+              Publication date
+              <Input v-model="publicationDate" type="date" class="h-8 w-44 text-xs" aria-label="Publication date" />
+            </label>
+            <template v-if="needs('creators')">
               <div v-for="(creator, index) in creators" :key="index" class="flex flex-wrap items-center gap-2">
                 <Input v-model="creator.name" class="h-8 min-w-40 flex-1 text-xs" placeholder="Family, Given" :aria-label="`Creator ${index + 1} name`" />
                 <Input v-model="creator.orcid" class="h-8 w-44 font-mono text-xs" placeholder="ORCID (optional)" :aria-label="`Creator ${index + 1} ORCID`" />
@@ -485,7 +510,8 @@ async function submit() {
             </p>
           </div>
           <p v-if="link.warning" class="text-amber-700 dark:text-amber-400">{{ link.warning }}</p>
-          <template v-if="link.remote.doi_reserved && !link.remote.published">
+          <p v-if="reviewText(link.remote.review)" class="text-muted-foreground">{{ reviewText(link.remote.review) }}.</p>
+          <template v-if="link.remote.doi_reserved && !link.remote.published && link.remote.review !== 'pending'">
             <p class="text-muted-foreground">
               {{ connector?.community
                 ? `Submitting sends the record to the community ${connector.community} for review. It is published once accepted.`
@@ -514,11 +540,15 @@ async function submit() {
             <dt class="text-muted-foreground">DOI</dt>
             <dd class="flex min-w-0 items-center gap-1">
               <template v-if="exported.doi">
-                <ExternalLink :href="doiUrl(exported.doi)" :label="exported.doi" />
+                <ExternalLink v-if="exported.published" :href="doiUrl(exported.doi)" :label="exported.doi" />
+                <span v-else class="font-mono">{{ exported.doi }}</span>
                 <CopyButton :value="exported.doi" label="Copy DOI" />
+                <span v-if="!exported.published" class="text-muted-foreground">Reserved, becomes active when published.</span>
               </template>
               <span v-else class="text-muted-foreground">Assigned when the record is published</span>
             </dd>
+            <dt class="text-muted-foreground">State</dt>
+            <dd>{{ exported.published ? 'Published' : exported.in_review ? 'Waiting for community review' : 'Draft, not published' }}</dd>
             <template v-if="exported.concept_doi">
               <dt class="text-muted-foreground">All versions</dt>
               <dd class="flex min-w-0 items-center gap-1">
@@ -531,6 +561,7 @@ async function submit() {
               <dd><ExternalLink :href="exported.html_url" label="Open in the repository" /></dd>
             </template>
           </dl>
+          <p v-if="exported?.warning" class="text-xs text-amber-700 dark:text-amber-400">{{ exported.warning }}</p>
           <Button variant="ghost" size="sm" as-child @click="emit('update:open', false)">
             <RouterLink :to="{ name: 'job', params: { jobId: activeJobId } }">Open the job</RouterLink>
           </Button>
