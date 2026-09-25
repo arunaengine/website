@@ -304,6 +304,11 @@ export function repositoryError(err: unknown, connector = false): string {
   return errorMessage(err)
 }
 
+/** A finding of the repository's mapping rules, about files or entities rather than a field. */
+export function isRuleFinding(finding: Pick<ProfileValidationFinding, 'code'>): boolean {
+  return finding.code === 'mapping_violation' || finding.code === 'content_violation'
+}
+
 export interface RequirementRow {
   entityId: string
   property: string

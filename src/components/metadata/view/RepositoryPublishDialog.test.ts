@@ -240,6 +240,20 @@ describe('RepositoryPublishDialog', () => {
     mounted.app.unmount()
   })
 
+  it('points file limits to the dataset instead of a field', async () => {
+    const tooMany = {
+      code: 'content_violation', severity: 'violation', focus_node: './', rule: 'file/max_files',
+      message: 'The crate has 101 file, more than the 100 allowed.', completeness: 'complete',
+    }
+    checkRepository.mockResolvedValue(checked([tooMany]))
+    const mounted = await mount()
+
+    expect(content(mounted.root)).toContain('The crate has 101 file')
+    expect(content(mounted.root)).toContain('for example by removing files')
+    expect(content(mounted.root)).not.toContain('Fields without an input')
+    mounted.app.unmount()
+  })
+
   it('lets the node decide when the check could not run', async () => {
     checkRepository.mockRejectedValue(new Api.ApiError(503, 'node busy'))
     const mounted = await mount()

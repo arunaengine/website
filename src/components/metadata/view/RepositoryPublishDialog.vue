@@ -41,6 +41,7 @@ import {
   doiUrl,
   exportRepository,
   failureText,
+  isRuleFinding,
   parseOverride,
   pullsParent,
   REPOSITORY_PRESETS,
@@ -187,6 +188,8 @@ const override = computed(() => parseOverride(overrideText.value))
 const metadata = computed(() => override.value.value)
 const findings = computed(() => check.value?.findings ?? [])
 const blocked = computed(() => findings.value.some((finding) => finding.severity === 'violation'))
+const blockedBy = (rule: boolean) =>
+  findings.value.some((finding) => finding.severity === 'violation' && isRuleFinding(finding) === rule)
 // The requirement profile the check used, as Turtle for the missing-fields form.
 const profileShapes = computed(() => {
   const iri = check.value?.profile?.iri
@@ -509,8 +512,11 @@ async function submit() {
                 :shapes="profileShapes"
                 @saved="runCheck"
               />
-              <p v-if="blocked" class="text-[11px] text-muted-foreground">
+              <p v-if="blockedBy(false)" class="text-[11px] text-muted-foreground">
                 Fields without an input here can be added in the dataset editor.
+              </p>
+              <p v-if="blockedBy(true)" class="text-[11px] text-muted-foreground">
+                Points about files or entities are fixed in the dataset itself, for example by removing files.
               </p>
               <template v-if="check.mapping.length">
                 <Button variant="ghost" size="sm" class="h-6 px-1 text-xs" @click="showMapping = !showMapping">

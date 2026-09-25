@@ -1,5 +1,6 @@
 <script setup lang="ts">
 // What a repository still needs from the dataset: violations block, warnings do not.
+// Content findings name files the repository will not take.
 import { computed } from 'vue'
 import type { ProfileValidationFinding } from '@/lib/api'
 import { pathMembers } from '@/lib/shacl/mapFindings'
@@ -10,6 +11,11 @@ const props = defineProps<{ findings: readonly ProfileValidationFinding[] }>()
 const ordered = computed(() =>
   [...props.findings].sort((a, b) => Number(b.severity === 'violation') - Number(a.severity === 'violation')),
 )
+
+function heading(finding: ProfileValidationFinding): string {
+  if (finding.severity !== 'violation') return finding.severity === 'warning' ? 'Suggested' : 'Note'
+  return finding.code === 'content_violation' ? 'Not accepted' : 'Needed'
+}
 
 function field(finding: ProfileValidationFinding): string {
   const members = finding.path ? pathMembers(finding.path) : []
@@ -24,7 +30,7 @@ function field(finding: ProfileValidationFinding): string {
       :key="index"
       :class="finding.severity === 'violation' ? 'text-destructive' : finding.severity === 'warning' ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'"
     >
-      <span class="font-medium">{{ finding.severity === 'violation' ? 'Needed' : finding.severity === 'warning' ? 'Suggested' : 'Note' }}:</span>
+      <span class="font-medium">{{ heading(finding) }}:</span>
       <span v-if="field(finding)" class="font-mono"> {{ field(finding) }}</span>
       {{ finding.message }}
     </li>
