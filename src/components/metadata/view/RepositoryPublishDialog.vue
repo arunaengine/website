@@ -43,6 +43,7 @@ import {
   identifierName,
   identifierUrl,
   isRuleFinding,
+  omittedFindings,
   parseOverride,
   pullsParent,
   REPOSITORY_PRESETS,
@@ -372,7 +373,7 @@ async function submit() {
     accessToken.value = token
     checkGeneration++
     checking.value = false
-    check.value = { kind: connector.value?.kind ?? '', profile: check.value?.profile ?? { iri: '' }, ready: false, findings: unmet, mapping: check.value?.mapping ?? [] }
+    check.value = { kind: connector.value?.kind ?? '', profile: check.value?.profile ?? { iri: '' }, ready: false, findings: unmet, omitted_findings: omittedFindings(err), mapping: check.value?.mapping ?? [] }
   } finally {
     busy.value = false
   }
@@ -506,7 +507,7 @@ async function submit() {
               <p class="text-xs font-medium" :class="blocked ? 'text-destructive' : 'text-foreground'">
                 {{ blocked ? `${label === 'the repository' ? 'The repository' : label} needs more metadata.` : 'The dataset meets the requirements.' }}
               </p>
-              <RequirementFindings :findings="findings" />
+              <RequirementFindings :findings="findings" :omitted="check.omitted_findings" />
               <RequirementForm
                 v-if="findings.length && profileShapes"
                 :document-id="props.documentId"

@@ -14,6 +14,7 @@ import {
   linkRights,
   linkStatus,
   managedHere,
+  omittedFindings,
   parseOverride,
   pullsParent,
   recordSource,
@@ -207,6 +208,12 @@ describe('publish requirements', () => {
     expect(unmetFindings(new ApiError(400, 'bad', 'invalid_request', { findings: [finding({})] }))).toBeNull()
     expect(unmetFindings(new ApiError(409, 'busy', 'requirements_unmet', { findings: [] }))).toBeNull()
     expect(unmetFindings(new Error('x'))).toBeNull()
+  })
+
+  it('counts findings left out of a capped refusal', () => {
+    expect(omittedFindings(new ApiError(400, 'unmet', 'requirements_unmet', { findings: [], omitted_findings: 12 }))).toBe(12)
+    expect(omittedFindings(new ApiError(400, 'unmet', 'requirements_unmet', { findings: [] }))).toBeUndefined()
+    expect(omittedFindings(new Error('x'))).toBeUndefined()
   })
 
   it('reads unsupported actions and removed repositories plainly', () => {

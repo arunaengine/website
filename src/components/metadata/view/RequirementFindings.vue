@@ -6,7 +6,8 @@ import type { ProfileValidationFinding } from '@/lib/api'
 import { pathMembers } from '@/lib/shacl/mapFindings'
 import { termNameFromUri } from '@/lib/profiles/uri'
 
-const props = defineProps<{ findings: readonly ProfileValidationFinding[] }>()
+// omitted counts findings the node left out of its capped list.
+const props = defineProps<{ findings: readonly ProfileValidationFinding[]; omitted?: number | null }>()
 
 const ordered = computed(() =>
   [...props.findings].sort((a, b) => Number(b.severity === 'violation') - Number(a.severity === 'violation')),
@@ -34,5 +35,6 @@ function field(finding: ProfileValidationFinding): string {
       <span v-if="field(finding)" class="font-mono"> {{ field(finding) }}</span>
       {{ finding.message }}
     </li>
+    <li v-if="omitted" class="text-muted-foreground">{{ omitted }} more not shown.</li>
   </ul>
 </template>

@@ -128,7 +128,9 @@ export interface RepositoryCheck {
   profile: { iri: string; revision?: string | null }
   // True when no finding is a violation.
   ready: boolean
+  // At most 100 findings, violations first; omitted_findings counts the rest.
   findings: ProfileValidationFinding[]
+  omitted_findings?: number
   mapping: RepositoryMapping[]
 }
 

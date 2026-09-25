@@ -306,6 +306,12 @@ export function unmetFindings(err: unknown): ProfileValidationFinding[] | null {
   return profileValidationFindings(err)
 }
 
+/** How many findings a requirements_unmet answer left out of its capped list. */
+export function omittedFindings(err: unknown): number | undefined {
+  const omitted = err instanceof ApiError ? err.details?.omitted_findings : undefined
+  return typeof omitted === 'number' && omitted > 0 ? omitted : undefined
+}
+
 /** A readable repository error; `connector` reads a 404 as a removed repository. */
 export function repositoryError(err: unknown, connector = false): string {
   if (err instanceof ApiError && err.code === 'not_supported') return 'This kind of repository does not offer this action.'

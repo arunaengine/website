@@ -89,8 +89,12 @@ const Dialog = compileClientComponent(new URL('./RepositoryPublishDialog.vue', i
   '@/components/ui/Textarea.vue': moduleDefault(Empty),
   '@/components/metadata/TransferJobStatus.vue': moduleDefault(Empty),
   './RequirementFindings.vue': moduleDefault(defineComponent({
-    props: { findings: Array },
-    setup: (props) => () => h('ul', (props.findings as Array<{ message: string }>).map((entry) => h('li', entry.message))),
+    props: { findings: Array, omitted: Number },
+    setup: (props) => () =>
+      h('ul', [
+        ...(props.findings as Array<{ message: string }>).map((entry) => h('li', entry.message)),
+        props.omitted ? h('li', `omitted ${props.omitted}`) : null,
+      ]),
   })),
   './RequirementForm.vue': moduleDefault(defineComponent({
     props: { shapes: String },
@@ -228,12 +232,15 @@ describe('RepositoryPublishDialog', () => {
 
   it('shows the unmet requirements of a refused link and keeps the token', async () => {
     createRepositoryLink
-      .mockRejectedValueOnce(new Api.ApiError(400, 'unmet', 'requirements_unmet', { error: 'x', findings: [VIOLATION] }))
+      .mockRejectedValueOnce(
+        new Api.ApiError(400, 'unmet', 'requirements_unmet', { error: 'x', findings: [VIOLATION], omitted_findings: 7 }),
+      )
     const mounted = await mount()
     await typeValue(tokenInput(mounted.root), SECRET)
     await click(button(mounted.root, 'Publish to Zenodo'))
 
     expect(content(mounted.root)).toContain('Add an author.')
+    expect(content(mounted.root)).toContain('omitted 7')
     expect(content(mounted.root)).toContain('needs more metadata')
     expect(tokenInput(mounted.root).props.value).toBe(SECRET)
     expect(button(mounted.root, 'Publish to Zenodo').props.disabled).toBe(true)
