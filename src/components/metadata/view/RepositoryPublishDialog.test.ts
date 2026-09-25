@@ -272,11 +272,19 @@ describe('RepositoryPublishDialog', () => {
   })
 
   it('shows where dataset entities go in the repository', async () => {
-    checkRepository.mockResolvedValue(checked([], [{ entity_id: 'data.csv', target: 'files', field: 'entries' }]))
+    checkRepository.mockResolvedValue(checked([], [
+      { entity_id: './', target: 'record' },
+      { entity_id: './', target: 'record', field: 'title' },
+      { entity_id: 'data.csv', target: 'file' },
+      { entity_id: 'ro-crate-metadata.json', target: 'file' },
+    ]))
     const mounted = await mount()
     await click(button(mounted.root, 'Show what goes where'))
+    const text = content(mounted.root)
 
-    expect(content(mounted.root)).toContain('data.csv to files, field entries')
+    expect(text).toContain('./ to record, field title')
+    expect(text).toContain('data.csv to file')
+    expect(text).toContain('ro-crate-metadata.json to file')
     mounted.app.unmount()
   })
 
