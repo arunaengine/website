@@ -828,7 +828,7 @@ export const docsTopics: DocsTopic[] = [
           'On a dataset page, open Import / export and choose Publish to repository, then Publish to Zenodo and get a DOI. Aruna creates a draft, reserves its DOI and shows it right away. The DOI becomes active when you publish.',
           'The draft follows every later change of the dataset. Publish when it is ready. With a community, publishing submits the record for review and the Repositories section shows the review state.',
           'Files are public by default so anyone can download them once the record is published. Export once sends the dataset as it is now and shows the DOI when the job ends.',
-          'When Zenodo needs more metadata, such as creators, the dialog asks for it. A published record cannot be deleted.',
+          'When Zenodo needs more metadata, such as creators, a title or a publication date, the dialog asks for it. A published record cannot be deleted.',
         ],
       },
       {
@@ -845,7 +845,7 @@ export const docsTopics: DocsTopic[] = [
         icon: 'RefreshCw',
         paragraphs: [
           'The Repositories section on the dataset page shows each link with its state and reason, the DOI, the record and whether it is published. It refreshes itself while a push runs or a review is open.',
-          'The person who created a link can publish and change its token and settings. Group admins can also push, pause, resume and remove it. A link is managed by the node that created it. Removing a link keeps the records in the repository.',
+          'The person who created a link can publish and change its token and settings, including Update automatically. Group admins can also push, update, pause, resume, accept the remote state and remove it. A link is managed by the node that created it. Removing a link keeps the records in the repository.',
           'When the record was changed in the repository, Accept remote state continues from that record. For an imported dataset that is kept updated, Update now takes a new version, and Update automatically does it without asking.',
           'The persistent identifier section lists every repository DOI of the dataset and whether it was published from here or imported. Aruna itself mints no DOI.',
         ],
