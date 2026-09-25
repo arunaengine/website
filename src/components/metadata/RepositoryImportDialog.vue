@@ -37,7 +37,7 @@ import {
   type PidLookupMatch,
   type SecondaryIdentifier,
 } from '@/lib/api'
-import { doiUrl, recordSource, REPOSITORY_PRESETS, secondaryIdentifiers, type RepositoryHit } from '@/lib/repository'
+import { doiUrl, recordSource, repositoryError, REPOSITORY_PRESETS, secondaryIdentifiers, type RepositoryHit } from '@/lib/repository'
 import { isTerminalJobState } from '@/lib/jobs'
 import { listPersistentIds } from '@/lib/pid'
 import { importJobResult } from '@/lib/rocrateArchive'
@@ -265,7 +265,7 @@ async function startImport() {
     )
     if (epoch === sessionEpoch.value) activeJobId.value = submitted.job_id
   } catch (err) {
-    if (epoch === sessionEpoch.value) submitError.value = errorMessage(err)
+    if (epoch === sessionEpoch.value) submitError.value = repositoryError(err, true)
   } finally {
     busy.value = false
   }

@@ -9,7 +9,7 @@ import {
   type RepositoryKind,
 } from '@/lib/api'
 import { ownRolesWrite } from '@/lib/groupAdmin'
-import { searchHits, searchTotal } from '@/lib/repository'
+import { repositoryError, searchHits, searchTotal } from '@/lib/repository'
 import { errorMessage } from '@/lib/utils'
 
 // Repository connectors of one group. `connectors` stays null until the current
@@ -134,7 +134,7 @@ export function useRepositorySearch(scope: () => SearchScope, options: { delayMs
       )
       if (current === generation) result.value = answer
     } catch (err) {
-      if (current === generation) error.value = errorMessage(err)
+      if (current === generation) error.value = repositoryError(err, true)
     } finally {
       if (current === generation) loading.value = false
     }

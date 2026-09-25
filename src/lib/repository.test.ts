@@ -15,6 +15,7 @@ import {
   pullsParent,
   recordSource,
   remoteState,
+  repositoryError,
   repositoryLabel,
   requirementRows,
   reviewText,
@@ -194,6 +195,15 @@ describe('publish requirements', () => {
     expect(unmetFindings(new ApiError(400, 'bad', 'invalid_request', { findings: [finding({})] }))).toBeNull()
     expect(unmetFindings(new ApiError(409, 'busy', 'requirements_unmet', { findings: [] }))).toBeNull()
     expect(unmetFindings(new Error('x'))).toBeNull()
+  })
+
+  it('reads unsupported actions and removed repositories plainly', () => {
+    const unsupported = new ApiError(400, 'this repository kind does not support search', 'not_supported')
+    const missing = new ApiError(404, 'Not found', 'Not found')
+    expect(repositoryError(unsupported)).toBe('This kind of repository does not offer this action.')
+    expect(repositoryError(missing, true)).toContain('It may have been removed')
+    expect(repositoryError(missing)).toBe('Not found')
+    expect(repositoryError(new ApiError(400, 'bad', 'invalid_request'))).toBe('bad')
   })
 
   it('builds one row per failing field a profile rule can edit', () => {

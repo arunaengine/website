@@ -17,6 +17,7 @@ import { isDatasetType, normalizeTypeUri, sameSchemaOrgType } from './profiles/u
 import { crateLocalId } from './shacl/crateIri'
 import { pathMembers } from './shacl/mapFindings'
 import { stateVariant, type BadgeVariant } from './stateBadge'
+import { errorMessage } from './utils'
 
 // Presentation of repository answers: search hits, link states and the
 // secondary identifiers a dataset holds.
@@ -292,6 +293,15 @@ export function repositoryLabel(connector: { name: string; endpoint: string } | 
 export function unmetFindings(err: unknown): ProfileValidationFinding[] | null {
   if (!(err instanceof ApiError) || err.status !== 400 || err.code !== 'requirements_unmet') return null
   return profileValidationFindings(err)
+}
+
+/** A readable repository error; `connector` reads a 404 as a removed repository. */
+export function repositoryError(err: unknown, connector = false): string {
+  if (err instanceof ApiError && err.code === 'not_supported') return 'This kind of repository does not offer this action.'
+  if (connector && err instanceof ApiError && err.status === 404) {
+    return 'The repository was not found. It may have been removed from the group.'
+  }
+  return errorMessage(err)
 }
 
 export interface RequirementRow {

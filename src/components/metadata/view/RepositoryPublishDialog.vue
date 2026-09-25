@@ -44,6 +44,7 @@ import {
   parseOverride,
   pullsParent,
   REPOSITORY_PRESETS,
+  repositoryError,
   repositoryLabel,
   reviewText,
   sourceParent,
@@ -220,7 +221,7 @@ async function runCheck() {
     )
     if (fresh()) check.value = answer
   } catch (err) {
-    if (fresh()) checkError.value = errorMessage(err)
+    if (fresh()) checkError.value = repositoryError(err, true)
   } finally {
     if (fresh()) checking.value = false
   }
@@ -271,7 +272,7 @@ async function publish() {
     const started = await publishRepositoryLink(current.document_id, current.link_id, client())
     if (link.value?.link_id === current.link_id) activeJobId.value = started.job_id
   } catch (err) {
-    if (link.value?.link_id === current.link_id) publishError.value = errorMessage(err)
+    if (link.value?.link_id === current.link_id) publishError.value = repositoryError(err)
   } finally {
     publishing.value = false
   }
@@ -359,7 +360,7 @@ async function submit() {
     if (!current()) return
     const unmet = unmetFindings(err)
     if (!unmet) {
-      submitError.value = errorMessage(err)
+      submitError.value = repositoryError(err, true)
       return
     }
     // Nothing was sent to the repository, so the typed token stays for the retry.

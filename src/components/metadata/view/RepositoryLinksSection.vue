@@ -39,6 +39,7 @@ import {
   linkStatus,
   managedHere,
   remoteState,
+  repositoryError,
   reviewText,
 } from '@/lib/repository'
 import { getJob, isTerminalJobState, type JobState } from '@/lib/jobs'
@@ -210,7 +211,7 @@ async function act(link: RepositoryLink, work: () => Promise<TransferJobResponse
     await load()
   } catch (err) {
     if (epoch === sessionEpoch.value && documentId === props.documentId) {
-      actionError.value = { ...actionError.value, [link.link_id]: errorMessage(err) }
+      actionError.value = { ...actionError.value, [link.link_id]: repositoryError(err) }
     }
   } finally {
     busyId.value = null
