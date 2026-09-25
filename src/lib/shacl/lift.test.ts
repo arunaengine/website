@@ -180,6 +180,29 @@ function deepChain(depth: number): string {
   return lines.join('\n')
 }
 
+describe('alternative paths', () => {
+  it('renders the first member as the field', () => {
+    const result = liftShapes([
+      ...PREFIXES,
+      'ex:DatasetShape a sh:NodeShape ; sh:targetClass schema:Dataset ;',
+      '    sh:property [ sh:path [ sh:alternativePath ( schema:author schema:creator ) ] ; sh:minCount 1 ] .',
+    ].join('\n'))
+    const dataset = entityFor(result, 'http://schema.org/Dataset')
+    expect(ruleFor(dataset, 'author')?.obligation).toBe('MUST')
+    expect(ruleFor(dataset, 'creator')).toBeUndefined()
+    expect(result.notes.some((note) => note.kind === 'partial' && note.message.includes('several paths'))).toBe(true)
+  })
+
+  it('still skips a sequence path', () => {
+    const result = liftShapes([
+      ...PREFIXES,
+      'ex:DatasetShape a sh:NodeShape ; sh:targetClass schema:Dataset ;',
+      '    sh:property [ sh:path ( schema:author schema:name ) ; sh:minCount 1 ] .',
+    ].join('\n'))
+    expect(result.notes.some((note) => note.kind === 'no-field')).toBe(true)
+  })
+})
+
 describe('wide base lattices', () => {
   it('composes each shape once', { timeout: 10_000 }, () => {
     // Without memoization this walks 4^12 paths, which hangs the tab.

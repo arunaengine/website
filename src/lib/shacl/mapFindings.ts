@@ -19,6 +19,13 @@ export interface MappedPreviewFindings {
 // that matches a dataset rule, and is not an info note. Findings the bespoke
 // validator already reports at the same field and severity are dropped
 // entirely (the dedup rule): the bespoke message is the one shown.
+// An alternative path reads "(a | b)"; each member may name the field.
+export function pathMembers(path: string): string[] {
+  const text = path.trim()
+  const inner = text.startsWith('(') && text.endsWith(')') ? text.slice(1, -1) : text
+  return inner.split(' | ').map((member) => member.trim().replace(/^<(.*)>$/, '$1')).filter(Boolean)
+}
+
 export function mapPreviewFindings(
   findings: ProfileValidationFinding[],
   datasetRules: ProfilePropertyRule[],
@@ -35,7 +42,9 @@ export function mapPreviewFindings(
       panel.push(finding)
       continue
     }
-    const rule = datasetRules.find((candidate) => sameSchemaOrgType(candidate.propertyUri, finding.path ?? ''))
+    const rule = pathMembers(finding.path)
+      .map((member) => datasetRules.find((candidate) => sameSchemaOrgType(candidate.propertyUri, member)))
+      .find(Boolean)
     if (!rule) {
       panel.push(finding)
       continue

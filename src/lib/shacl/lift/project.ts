@@ -1,4 +1,4 @@
-import type { Quad_Subject } from 'n3'
+import type { Quad_Subject, Store, Term } from 'n3'
 import { SH } from '../projection'
 import { isDatasetType, sameSchemaOrgType } from '../../profiles/uri'
 import type { ProfileEntityRule, ProfilePropertyRule } from '../../profiles/types'
@@ -337,7 +337,12 @@ export function liftShapes(turtle: string): LiftResult {
         if (seenPropertyShapes.has(termKey(propertyShape))) continue
         seenPropertyShapes.add(termKey(propertyShape))
         const paths = store.getQuads(propertyShape, `${SH}path`, null, null).map((quad) => quad.object)
-        const path = paths.length === 1 && paths[0].termType === 'NamedNode' ? canonicalIri(paths[0].value) : undefined
+        let path = paths.length === 1 && paths[0].termType === 'NamedNode' ? canonicalIri(paths[0].value) : undefined
+        const alternative = !path && paths.length === 1 ? firstAlternative(store, paths[0]) : undefined
+        if (alternative) {
+          path = alternative
+          notes.add('partial', `A property accepts several paths; its field uses the first one, ${shortIri(alternative)}.`, shape.name)
+        }
         if (!path) {
           notes.add('no-field', paths.length
             ? 'A property uses a SHACL path expression (a sequence, alternative or inverse path) that no single input can represent.'
@@ -401,6 +406,14 @@ export function liftShapes(turtle: string): LiftResult {
     shapeCount: nodeShapes.size,
     fieldCount: entities.reduce((total, entity) => total + entity.propertyRules.length, 0),
   }
+}
+
+// sh:alternativePath ( a b ) renders as its first member when that is a plain property.
+function firstAlternative(store: Store, path: Term): string | undefined {
+  if (path.termType !== 'BlankNode') return undefined
+  const lists = store.getQuads(path, `${SH}alternativePath`, null, null)
+  const first = lists.length === 1 ? listItems(store, lists[0].object)?.[0] : undefined
+  return first?.termType === 'NamedNode' ? canonicalIri(first.value) : undefined
 }
 
 // Two shapes in one file can map to the same compact term (opaque numeric term

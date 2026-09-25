@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mapPreviewFindings } from './mapFindings'
+import { mapPreviewFindings, pathMembers } from './mapFindings'
 import { CRATE_BASE_IRI } from './crateIri'
 import type { ProfilePropertyRule, ProfileViolation } from '../profiles/types'
 import type { ProfileValidationFinding } from '../api'
@@ -78,5 +78,16 @@ describe('preview finding placement', () => {
     const mapped = mapPreviewFindings([finding(), finding(), finding({ severity: 'warning' })], [NAME_RULE], [])
 
     expect(mapped.inline.name?.map((item) => item.severity)).toEqual(['error', 'warning'])
+  })
+
+  it('maps an alternative path by the member that names a field', () => {
+    const creatorRule = { ...NAME_RULE, id: 'rule-author', propertyUri: 'http://schema.org/author', valueName: 'author' }
+    const path = '(<http://schema.org/author> | <http://schema.org/creator>)'
+
+    const mapped = mapPreviewFindings([finding({ path })], [creatorRule], [])
+
+    expect(Object.keys(mapped.inline)).toEqual(['author'])
+    expect(pathMembers(path)).toEqual(['http://schema.org/author', 'http://schema.org/creator'])
+    expect(pathMembers('http://schema.org/name')).toEqual(['http://schema.org/name'])
   })
 })
