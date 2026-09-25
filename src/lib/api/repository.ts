@@ -83,6 +83,8 @@ export interface RepositoryCapabilities {
   review: boolean
   pull: boolean
   search: boolean
+  // Records can be imported as datasets.
+  import: boolean
   release_date: boolean
   // The identifier a published record receives, such as doi.
   identifier_kind: string

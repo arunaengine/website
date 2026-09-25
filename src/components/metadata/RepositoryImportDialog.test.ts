@@ -126,7 +126,7 @@ function recordField(root: Parameters<typeof input>[0]) {
 beforeEach(() => {
   connectors.value = [{ connector_id: 'c1', kind: 'invenio', name: 'Zenodo', endpoint: 'https://zenodo.org/api/' }]
   canWriteMeta.value = true
-  capabilities.value = { pull: true, search: true }
+  capabilities.value = { pull: true, search: true, import: true }
   job.value = null
   for (const mock of [submitRepositoryImport, lookupPid, listPersistentIds, createRepositoryConnector, loadConnectors]) mock.mockReset()
   lookupPid.mockResolvedValue([])
@@ -213,7 +213,7 @@ describe('RepositoryImportDialog', () => {
   })
 
   it('offers search and keeping updated only when the repository kind can', async () => {
-    capabilities.value = { pull: false, search: false }
+    capabilities.value = { pull: false, search: false, import: true }
     const mounted = await mount()
     expect(hasButton(mounted.root, 'Pick record 77')).toBe(false)
     expect(content(mounted.root)).not.toContain('Keep updated')
@@ -223,6 +223,15 @@ describe('RepositoryImportDialog', () => {
     await click(button(mounted.root, 'Import record'))
 
     expect(submitRepositoryImport.mock.calls[0][0]).toMatchObject({ keep_updated: false })
+    mounted.app.unmount()
+  })
+
+  it('hides connectors of a kind without imports', async () => {
+    capabilities.value = { pull: true, search: true, import: false }
+    const mounted = await mount()
+    await typeValue(recordField(mounted.root), '42')
+
+    expect(button(mounted.root, 'Import record').props.disabled).toBe(true)
     mounted.app.unmount()
   })
 

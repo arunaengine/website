@@ -79,7 +79,7 @@ watch(canWriteMeta, (allowed) => (keepUpdated.value = allowed), { immediate: tru
 const { kinds, error: kindsError, kindOf } = useRepositoryKinds()
 // Connectors of a kind the node can import from; unknown until both lists answered.
 const repositoryConnectors = computed(() =>
-  connectors.value && kinds.value ? connectors.value.filter((entry) => kindOf(entry.kind)) : null,
+  connectors.value && kinds.value ? connectors.value.filter((entry) => kindOf(entry.kind)?.capabilities.import) : null,
 )
 const connectorOptions = computed(() =>
   (repositoryConnectors.value ?? []).map((entry) => ({ value: entry.connector_id, label: entry.name })),
