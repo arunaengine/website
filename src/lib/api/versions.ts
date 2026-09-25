@@ -147,7 +147,7 @@ export function mergeBranch(
   documentId: string,
   name: string,
   input: { into: string; message?: string },
-  head: string,
+  head: string | undefined,
   client: ApiClientOptions,
 ): Promise<MergeResult> {
   return apiRequest(
