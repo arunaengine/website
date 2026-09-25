@@ -217,6 +217,8 @@ describe('RepositoryImportDialog', () => {
     const mounted = await mount()
     expect(hasButton(mounted.root, 'Pick record 77')).toBe(false)
     expect(content(mounted.root)).not.toContain('Keep updated')
+    await typeValue(recordField(mounted.root), '10.5281/zenodo.42')
+    expect(button(mounted.root, 'Import record').props.disabled).toBe(true)
     await typeValue(recordField(mounted.root), '42')
     await click(button(mounted.root, 'Import record'))
 

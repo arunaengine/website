@@ -66,7 +66,6 @@ const allVersions = ref(false)
 const keepUpdated = ref(true)
 const autoUpdate = ref(false)
 const isPublic = ref(false)
-const source = computed(() => recordSource(recordInput.value))
 
 const {
   connectors,
@@ -89,6 +88,11 @@ const capabilities = computed(
   () => kindOf(repositoryConnectors.value?.find((entry) => entry.connector_id === connectorId.value)?.kind)?.capabilities ?? null,
 )
 const canPull = computed(() => Boolean(capabilities.value?.pull))
+// A kind without search cannot look up a DOI or record link, only a record id.
+const source = computed(() => {
+  const found = recordSource(recordInput.value)
+  return found && (capabilities.value?.search !== false || 'record_id' in found) ? found : null
+})
 
 // Another group has other connectors; a picked one never carries over.
 watch(groupId, () => (connectorId.value = ''))
@@ -360,7 +364,7 @@ watch(sessionEpoch, () => {
                 class="mt-1 font-mono text-xs"
               />
               <p class="mt-1 text-[11px]" :class="recordInput.trim() && !source ? 'text-destructive' : 'text-muted-foreground'">
-                {{ capabilities?.search ? 'A DOI, a record link or a record id.' : 'A DOI, a record link or a record id. This repository cannot be searched here.' }}
+                {{ capabilities?.search === false ? 'A record id. This repository cannot be searched, so DOIs and record links do not work here.' : 'A DOI, a record link or a record id.' }}
               </p>
             </div>
             <div>
