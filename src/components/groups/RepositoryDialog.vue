@@ -185,6 +185,7 @@ async function submit() {
             <Select
               :model-value="kind"
               :options="KIND_OPTIONS"
+              :disabled="isEdit"
               aria-label="Kind"
               class="mt-1"
               @update:model-value="(v: string) => (kind = v as RepositoryConnectorKind)"

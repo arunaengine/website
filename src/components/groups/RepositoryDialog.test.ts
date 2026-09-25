@@ -1,7 +1,7 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h, reactive, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { button, click, compileClientComponent, content, flush, input, moduleDefault, mountApp, typeValue } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, element, flush, input, moduleDefault, mountApp, typeValue } from '@/test/clientRender'
 import * as Api from '@/lib/api'
 import * as Repository from '@/lib/repository'
 import * as Utils from '@/lib/utils'
@@ -41,7 +41,10 @@ const RepositoryDialog = compileClientComponent(new URL('./RepositoryDialog.vue'
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Notice.vue': moduleDefault(Slot),
-  '@/components/ui/Select.vue': moduleDefault(Empty),
+  '@/components/ui/Select.vue': moduleDefault(defineComponent({
+    inheritAttrs: false,
+    setup: (_, { attrs }) => () => h('select', attrs),
+  })),
   '@/components/ui/Switch.vue': moduleDefault(Empty),
   '@/composables/useAruna': {
     useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('bearer'), sessionEpoch }),
@@ -111,6 +114,16 @@ describe('RepositoryDialog', () => {
     expect(content(mounted.root)).toContain('lowercase')
     expect(button(mounted.root, 'Add repository').props.disabled).toBe(true)
     mounted.app.unmount()
+  })
+
+  it('keeps the kind of a stored repository fixed', async () => {
+    const adding = await mount()
+    const kind = (root: typeof adding.root) => element(root, (node) => node.tag === 'select').props.disabled
+    expect(kind(adding.root)).toBe(false)
+    adding.app.unmount()
+    const editing = await mount(STORED)
+    expect(kind(editing.root)).toBe(true)
+    editing.app.unmount()
   })
 
   it('asks for a new token when the endpoint of a stored token changes', async () => {
