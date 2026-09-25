@@ -13,6 +13,7 @@ const createRepositoryConnector = vi.fn()
 const loadConnectors = vi.fn()
 const connectors = ref<unknown[] | null>([])
 const canWriteMeta = ref(true)
+const capabilities = ref<Record<string, boolean>>({ pull: true, search: true })
 const job = ref<unknown>(null)
 
 const Empty = defineComponent(() => () => null)
@@ -80,6 +81,11 @@ const ImportDialog = compileClientComponent(new URL('./RepositoryImportDialog.vu
   '@/composables/useRepository': {
     useRepositoryConnectors: () => ({ connectors, loading: ref(false), error: ref(null), load: loadConnectors }),
     useGroupRights: () => ({ canWriteMeta }),
+    useRepositoryKinds: () => ({
+      kinds: ref([{ kind: 'invenio' }]),
+      error: ref(null),
+      kindOf: (kind: string) => (kind === 'invenio' ? { kind, capabilities: capabilities.value, profiles: [] } : null),
+    }),
   },
   '@/composables/useJobs': {
     useJobDetail: () => ({ job, loadState: ref('idle'), loadError: ref(null), lastPollError: ref(null), load: vi.fn() }),
@@ -104,6 +110,15 @@ async function mount() {
   return mounted
 }
 
+function hasButton(root: Parameters<typeof button>[0], label: string): boolean {
+  try {
+    button(root, label)
+    return true
+  } catch {
+    return false
+  }
+}
+
 function recordField(root: Parameters<typeof input>[0]) {
   return input(root, 'placeholder', '10.5281/zenodo.1234567')
 }
@@ -111,6 +126,7 @@ function recordField(root: Parameters<typeof input>[0]) {
 beforeEach(() => {
   connectors.value = [{ connector_id: 'c1', kind: 'invenio', name: 'Zenodo', endpoint: 'https://zenodo.org/api/' }]
   canWriteMeta.value = true
+  capabilities.value = { pull: true, search: true }
   job.value = null
   for (const mock of [submitRepositoryImport, lookupPid, listPersistentIds, createRepositoryConnector, loadConnectors]) mock.mockReset()
   lookupPid.mockResolvedValue([])
@@ -193,6 +209,27 @@ describe('RepositoryImportDialog', () => {
 
     expect(submitRepositoryImport.mock.calls[0][0]).toMatchObject({ keep_updated: false })
     expect(submitRepositoryImport.mock.calls[0][0]).not.toHaveProperty('auto_update')
+    mounted.app.unmount()
+  })
+
+  it('offers search and keeping updated only when the repository kind can', async () => {
+    capabilities.value = { pull: false, search: false }
+    const mounted = await mount()
+    expect(hasButton(mounted.root, 'Pick record 77')).toBe(false)
+    expect(content(mounted.root)).not.toContain('Keep updated')
+    await typeValue(recordField(mounted.root), '42')
+    await click(button(mounted.root, 'Import record'))
+
+    expect(submitRepositoryImport.mock.calls[0][0]).toMatchObject({ keep_updated: false })
+    mounted.app.unmount()
+  })
+
+  it('hides connectors of a kind the node cannot import from', async () => {
+    connectors.value = [{ connector_id: 'c9', kind: 'oai_pmh', name: 'Harvest', endpoint: 'https://oai.example.org' }]
+    const mounted = await mount()
+    await typeValue(recordField(mounted.root), '42')
+
+    expect(button(mounted.root, 'Import record').props.disabled).toBe(true)
     mounted.app.unmount()
   })
 

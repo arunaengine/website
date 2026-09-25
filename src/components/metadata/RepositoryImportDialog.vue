@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// Imports one published Invenio or Zenodo record as a new dataset through a
-// durable import job. By default a pull link keeps the dataset updated.
+// Imports one published repository record, for example from Zenodo, as a new
+// dataset through a durable import job. A pull link can keep the dataset updated.
 import { computed, ref, useId, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Dialog from '@/components/ui/Dialog.vue'
@@ -24,7 +24,7 @@ import TransferJobStatus from '@/components/metadata/TransferJobStatus.vue'
 import TransferReport from '@/components/metadata/TransferReport.vue'
 import TransferTarget from '@/components/metadata/TransferTarget.vue'
 import { useAruna } from '@/composables/useAruna'
-import { useGroupRights, useRepositoryConnectors } from '@/composables/useRepository'
+import { useGroupRights, useRepositoryConnectors, useRepositoryKinds } from '@/composables/useRepository'
 import { useJobDetail } from '@/composables/useJobs'
 import { useNotifications } from '@/composables/useNotifications'
 import {
@@ -77,15 +77,23 @@ const {
 const { canWriteMeta } = useGroupRights(() => groupId.value)
 // Keeping an import updated needs metadata WRITE in the connector's group.
 watch(canWriteMeta, (allowed) => (keepUpdated.value = allowed), { immediate: true })
-const invenioConnectors = computed(() => connectors.value?.filter((entry) => entry.kind === 'invenio') ?? null)
-const connectorOptions = computed(() =>
-  (invenioConnectors.value ?? []).map((entry) => ({ value: entry.connector_id, label: entry.name })),
+const { kinds, error: kindsError, kindOf } = useRepositoryKinds()
+// Connectors of a kind the node can import from; unknown until both lists answered.
+const repositoryConnectors = computed(() =>
+  connectors.value && kinds.value ? connectors.value.filter((entry) => kindOf(entry.kind)) : null,
 )
+const connectorOptions = computed(() =>
+  (repositoryConnectors.value ?? []).map((entry) => ({ value: entry.connector_id, label: entry.name })),
+)
+const capabilities = computed(
+  () => kindOf(repositoryConnectors.value?.find((entry) => entry.connector_id === connectorId.value)?.kind)?.capabilities ?? null,
+)
+const canPull = computed(() => Boolean(capabilities.value?.pull))
 
 // Another group has other connectors; a picked one never carries over.
 watch(groupId, () => (connectorId.value = ''))
 watch(
-  invenioConnectors,
+  repositoryConnectors,
   (list) => {
     if (list?.length === 1 && !connectorId.value) connectorId.value = list[0].connector_id
   },
@@ -247,8 +255,8 @@ async function startImport() {
         connector_id: connectorId.value,
         mode: mode.value,
         all_versions: allVersions.value,
-        keep_updated: keepUpdated.value,
-        ...(keepUpdated.value ? { auto_update: autoUpdate.value } : {}),
+        keep_updated: keepUpdated.value && canPull.value,
+        ...(keepUpdated.value && canPull.value ? { auto_update: autoUpdate.value } : {}),
         target: { bucket: bucket.value.trim(), prefix: prefix.value.trim() },
         metadata: { group_id: groupId.value, path: documentPath.value.trim(), public: isPublic.value },
         idempotency_key: attemptKey.value,
@@ -286,7 +294,7 @@ watch(sessionEpoch, () => {
     <DialogContent class="flex max-h-[88vh] max-w-2xl flex-col">
       <DialogHeader class="pr-8">
         <DialogTitle class="flex items-center gap-2">
-          <Import class="h-4 w-4 text-primary" /> Import from Zenodo or Invenio
+          <Import class="h-4 w-4 text-primary" /> Import from a repository
         </DialogTitle>
         <DialogDescription>
           Name a published record by its DOI, link or id, or search for it, and register it as a new dataset.
@@ -315,13 +323,14 @@ watch(sessionEpoch, () => {
                   class="mt-1"
                 />
                 <p v-else-if="!groupId" class="mt-2 text-[11px] text-muted-foreground">Choose a group first.</p>
-                <Spinner v-else-if="connectorsLoading" show-label label="Loading repositories…" class="mt-2 flex text-[11px]" />
+                <p v-else-if="kindsError" class="mt-2 text-[11px] text-destructive">{{ kindsError }}</p>
                 <p v-else-if="connectorsError" class="mt-2 text-[11px] text-destructive">{{ connectorsError }}</p>
-                <div v-else-if="invenioConnectors && canWriteMeta" class="mt-2 space-y-1">
+                <Spinner v-else-if="connectorsLoading || !repositoryConnectors" show-label label="Loading repositories…" class="mt-2 flex text-[11px]" />
+                <div v-else-if="repositoryConnectors && canWriteMeta" class="mt-2 space-y-1">
                   <Button size="sm" variant="outline" :disabled="addingPreset" @click="addPreset">Add Zenodo</Button>
                   <p v-if="presetError" role="alert" class="text-[11px] text-destructive">{{ presetError }}</p>
                 </div>
-                <p v-else-if="invenioConnectors" class="mt-2 text-[11px] text-muted-foreground">
+                <p v-else-if="repositoryConnectors" class="mt-2 text-[11px] text-muted-foreground">
                   This group has no repository yet. Ask someone who manages the group's metadata to add Zenodo.
                   <RouterLink
                     :to="{ name: 'group', params: { id: groupId }, query: { tab: 'sources' } }"
@@ -334,7 +343,7 @@ watch(sessionEpoch, () => {
           </div>
 
           <RepositorySearchPanel
-            v-if="groupId && connectorId"
+            v-if="groupId && connectorId && capabilities?.search"
             :group-id="groupId"
             :connector-id="connectorId"
             :selected-id="recordInput"
@@ -351,7 +360,7 @@ watch(sessionEpoch, () => {
                 class="mt-1 font-mono text-xs"
               />
               <p class="mt-1 text-[11px]" :class="recordInput.trim() && !source ? 'text-destructive' : 'text-muted-foreground'">
-                A DOI, a record link or a record id.
+                {{ capabilities?.search ? 'A DOI, a record link or a record id.' : 'A DOI, a record link or a record id. This repository cannot be searched here.' }}
               </p>
             </div>
             <div>
@@ -377,7 +386,7 @@ watch(sessionEpoch, () => {
             <OptionToggle v-model="mode" :options="MODE_OPTIONS" aria-label="What to import" />
             <p class="text-[11px] text-muted-foreground">{{ MODE_HINT[mode] }}</p>
           </div>
-          <label class="flex items-start gap-2 text-xs text-foreground">
+          <label v-if="canPull" class="flex items-start gap-2 text-xs text-foreground">
             <Switch
               :checked="keepUpdated"
               :disabled="!canWriteMeta"
@@ -393,7 +402,7 @@ watch(sessionEpoch, () => {
               </span>
             </span>
           </label>
-          <label v-if="keepUpdated" class="flex items-center gap-2 text-xs text-foreground">
+          <label v-if="keepUpdated && canPull" class="flex items-center gap-2 text-xs text-foreground">
             <Switch :checked="autoUpdate" aria-label="Import new versions automatically" @update:checked="autoUpdate = $event" />
             Import new versions automatically
           </label>

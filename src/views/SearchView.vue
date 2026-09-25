@@ -89,10 +89,10 @@ const askPrompt = computed(() =>
         <Button
           v-if="currentUser && jobsEnabled"
           variant="outline"
-          title="Import a published Invenio or Zenodo record as a new dataset"
+          title="Import a published repository record, for example from Zenodo, as a new dataset"
           @click="showRepositoryImport = true"
         >
-          <Import class="h-4 w-4" /> From Invenio or Zenodo
+          <Import class="h-4 w-4" /> From a repository
         </Button>
         <div class="flex items-center gap-2 rounded-md border border-border bg-card px-2 py-1">
           <Code2 class="h-3.5 w-3.5 text-muted-foreground" />
