@@ -3,6 +3,7 @@
 // Content findings name files the repository will not take.
 import { computed } from 'vue'
 import type { ProfileValidationFinding } from '@/lib/api'
+import { findingHeading } from '@/lib/repository'
 import { pathMembers } from '@/lib/shacl/mapFindings'
 import { termNameFromUri } from '@/lib/profiles/uri'
 
@@ -13,13 +14,9 @@ const ordered = computed(() =>
   [...props.findings].sort((a, b) => Number(b.severity === 'violation') - Number(a.severity === 'violation')),
 )
 
-function heading(finding: ProfileValidationFinding): string {
-  if (finding.severity !== 'violation') return finding.severity === 'warning' ? 'Suggested' : 'Note'
-  return finding.code === 'content_violation' ? 'Not accepted' : 'Needed'
-}
-
+// A structural finding's path is a JSON pointer into the crate, not a field.
 function field(finding: ProfileValidationFinding): string {
-  const members = finding.path ? pathMembers(finding.path) : []
+  const members = finding.path && finding.rule !== 'structural' ? pathMembers(finding.path) : []
   return members.map(termNameFromUri).join(' or ')
 }
 </script>
@@ -31,7 +28,7 @@ function field(finding: ProfileValidationFinding): string {
       :key="index"
       :class="finding.severity === 'violation' ? 'text-destructive' : finding.severity === 'warning' ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'"
     >
-      <span class="font-medium">{{ heading(finding) }}:</span>
+      <span class="font-medium">{{ findingHeading(finding) }}:</span>
       <span v-if="field(finding)" class="font-mono"> {{ field(finding) }}</span>
       {{ finding.message }}
     </li>

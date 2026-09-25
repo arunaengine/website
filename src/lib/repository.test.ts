@@ -9,6 +9,7 @@ import {
   endpointProblem,
   exportRepository,
   failureText,
+  findingHeading,
   identifierName,
   identifierUrl,
   linkRights,
@@ -208,6 +209,23 @@ describe('publish requirements', () => {
     expect(unmetFindings(new ApiError(400, 'bad', 'invalid_request', { findings: [finding({})] }))).toBeNull()
     expect(unmetFindings(new ApiError(409, 'busy', 'requirements_unmet', { findings: [] }))).toBeNull()
     expect(unmetFindings(new Error('x'))).toBeNull()
+  })
+
+  it('names each repository rule finding plainly', () => {
+    const rule = (code: string, name: string) => findingHeading({ code, rule: name, severity: 'violation' })
+    expect(rule('mapping_violation', 'record/min')).toBe('Needed')
+    expect(rule('mapping_violation', 'file/group')).toBe('Not in a group')
+    expect(rule('mapping_violation', 'file/pair')).toBe('Missing its paired file')
+    expect(rule('mapping_violation', 'sample/relation')).toBe('Wrong number of links')
+    const field = { code: 'mapping_violation', rule: 'record/publisher', path: 'publisher', severity: 'violation' as const }
+    expect(findingHeading(field)).toBe('Missing in the repository record')
+    expect(rule('content_violation', 'file/max_file_bytes')).toBe('File too large')
+    expect(rule('content_violation', 'file/max_total_bytes')).toBe('Files too large in total')
+    expect(rule('content_violation', 'file/format')).toBe('Wrong file format')
+    expect(rule('content_violation', 'file/unknown')).toBe('Not accepted')
+    expect(rule('missing_root', 'structural')).toBe('Not a valid RO-Crate')
+    expect(rule('constraint_violation', 'minCount')).toBe('Needed')
+    expect(findingHeading({ code: 'constraint_violation', rule: 'minCount', severity: 'warning' })).toBe('Suggested')
   })
 
   it('counts findings left out of a capped refusal', () => {

@@ -326,6 +326,28 @@ export function isRuleFinding(finding: Pick<ProfileValidationFinding, 'code'>): 
   return finding.code === 'mapping_violation' || finding.code === 'content_violation'
 }
 
+// Plain headings of mapping and content findings, by the rule after the target name.
+const RULE_HEADING: Record<string, string> = {
+  min: 'Needed',
+  group: 'Not in a group',
+  pair: 'Missing its paired file',
+  relation: 'Wrong number of links',
+  max_files: 'Too many files',
+  max_file_bytes: 'File too large',
+  max_total_bytes: 'Files too large in total',
+  format: 'Wrong file format',
+}
+
+/** What kind of problem a finding is; record/<field> means the mapped record lacks that field. */
+export function findingHeading(finding: Pick<ProfileValidationFinding, 'code' | 'rule' | 'severity' | 'path'>): string {
+  if (finding.severity !== 'violation') return finding.severity === 'warning' ? 'Suggested' : 'Note'
+  if (finding.rule === 'structural') return 'Not a valid RO-Crate'
+  if (!isRuleFinding(finding)) return 'Needed'
+  if (finding.path && finding.rule === `record/${finding.path}`) return 'Missing in the repository record'
+  const known = RULE_HEADING[finding.rule.split('/').pop() ?? '']
+  return known ?? (finding.code === 'content_violation' ? 'Not accepted' : 'Needed')
+}
+
 export interface RequirementRow {
   entityId: string
   property: string
