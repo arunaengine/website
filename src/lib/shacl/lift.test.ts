@@ -219,6 +219,10 @@ describe('the built-in repository shapes', () => {
     ])
   })
 
+  it('keeps the single plain text fields single-valued', () => {
+    for (const name of ['name', 'datePublished', 'publisher']) expect(ruleFor(dataset, name)?.multipleValues).toBeFalsy()
+  })
+
   it('points creators at people and organizations', () => {
     expect(ruleFor(dataset, 'author')?.entityTypes).toEqual(['http://schema.org/Person', 'http://schema.org/Organization'])
     expect(result.notes.some((note) => note.message.includes('taken from the shape name'))).toBe(false)
