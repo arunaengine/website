@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { ApiError, type ProfileValidationFinding, type RepositoryLink } from './api'
 import type { CrateDraft } from './crate/editor'
@@ -26,6 +27,7 @@ import {
   unmetFindings,
 } from './repository'
 import type { PersistentIdView } from './pid'
+import { liftShapes } from './shacl/lift'
 
 describe('repository search hits', () => {
   it('maps InvenioRDM and legacy Zenodo hits', () => {
@@ -232,6 +234,23 @@ describe('publish requirements', () => {
     ])
 
     expect(rows.map((row) => [row.entityId, row.property])).toEqual([['./', 'author'], ['./', 'license'], ['#ada', 'name']])
+  })
+
+  it('offers an input for each field the built-in repository shapes miss', () => {
+    const shapes = ['repository-datacite.ttl', 'repository-publisher.ttl']
+      .map((name) => readFileSync(new URL(`./shacl/__fixtures__/${name}`, import.meta.url), 'utf8'))
+    const draft: CrateDraft = { visibility: 'group', entities: [{ id: './', types: ['Dataset'], properties: {} }] }
+    const rows = requirementRows(draft, liftShapes(shapes.join('\n')).entities, [
+      finding({ path: '<http://schema.org/name>' }),
+      finding({ path: '<http://schema.org/datePublished>' }),
+      finding({ path: '(<http://schema.org/author> | <http://schema.org/creator>)' }),
+      finding({ path: '<http://schema.org/publisher>' }),
+      finding({ path: undefined, code: 'content_violation', rule: 'file/max_files' }),
+    ])
+
+    expect(rows.map((row) => [row.property, row.rule.kind])).toEqual([
+      ['name', 'text'], ['datePublished', 'date'], ['author', 'entity'], ['publisher', 'text'],
+    ])
   })
 
   it('reads the record of a finished export', () => {
