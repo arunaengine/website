@@ -21,6 +21,7 @@ import DatasetFiles from '@/components/metadata/view/DatasetFiles.vue'
 import DatasetGraph from '@/components/metadata/view/DatasetGraph.vue'
 import DatasetHeader from '@/components/metadata/view/DatasetHeader.vue'
 import DatasetRelated from '@/components/metadata/view/DatasetRelated.vue'
+import DatasetHistory from '@/components/metadata/history/DatasetHistory.vue'
 import PreviewPane from '@/components/preview/PreviewPane.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
@@ -33,10 +34,12 @@ import Tabs from '@/components/ui/Tabs.vue'
 import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import DataEntityDialog from '@/components/metadata/DataEntityDialog.vue'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
 import { useDatasetView } from '@/composables/useDatasetView'
+import { useDatasetHistory } from '@/composables/useDatasetHistory'
+import { useRouteTab } from '@/composables/useRouteTab'
 import { providePageContext } from '@/composables/usePageContext'
 import { useFirstPaint } from '@/composables/useFirstPaint'
 import { type MetadataDocumentSummary } from '@/lib/api'
@@ -99,7 +102,19 @@ providePageContext(() => {
   }
 })
 
-const tab = ref<'overview' | 'graph'>('overview')
+const routeTab = useRouteTab(['overview', 'graph', 'history'], 'overview')
+const history = useDatasetHistory(
+  detailId,
+  () => docState.value === 'found' && Boolean(currentUser.value),
+  () => routeTab.value === 'history',
+)
+const historySupported = history.supported
+// History needs a signed-in reader and a node with the versions routes.
+const historyShown = computed(() => Boolean(currentUser.value) && historySupported.value !== false)
+const tab = computed({
+  get: () => (routeTab.value === 'history' && !historyShown.value ? 'overview' : routeTab.value),
+  set: (next: string) => (routeTab.value = next),
+})
 const showCrateExport = ref(false)
 const showPublish = ref(false)
 const repositoryLinks = ref<InstanceType<typeof RepositoryLinksSection> | null>(null)
@@ -183,14 +198,17 @@ function jumpTo(entityId: string) {
       <template v-else-if="docState === 'found'">
         <DatasetHeader v-if="current" :doc="current" :state="state" />
 
-        <Tabs :model-value="tab" @update:model-value="(value: string) => (tab = value === 'graph' ? 'graph' : 'overview')">
+        <Tabs :model-value="tab" @update:model-value="(value: string) => (tab = value)">
           <TabsList aria-label="Dataset views">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="graph">Graph</TabsTrigger>
+            <TabsTrigger v-if="historyShown" value="history">History</TabsTrigger>
           </TabsList>
         </Tabs>
 
         <DatasetGraph v-if="tab === 'graph'" :state="state" @open="openInfo" />
+
+        <DatasetHistory v-if="tab === 'history'" :history="history" :state="state" />
 
         <template v-if="tab === 'overview'">
           <PersistentIdSection
