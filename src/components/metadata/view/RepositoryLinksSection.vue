@@ -31,8 +31,9 @@ import {
   type TransferJobResponse,
 } from '@/lib/api'
 import {
-  doiUrl,
   failureText,
+  identifierName,
+  identifierUrl,
   isPullLink,
   linkBusy,
   linkRights,
@@ -137,7 +138,7 @@ function settledSince(before: RepositoryLink[] | null, after: RepositoryLink[]):
   return (before ?? []).some((old) => {
     const now = after.find((entry) => entry.link_id === old.link_id)
     if (!now) return false
-    return (old.pending && !now.pending) || old.remote.doi !== now.remote.doi || old.remote.published !== now.remote.published
+    return (old.pending && !now.pending) || old.remote.identifier !== now.remote.identifier || old.remote.published !== now.remote.published
   })
 }
 
@@ -304,21 +305,30 @@ function reasonTone(link: RepositoryLink): string {
           <p v-if="link.warning" class="text-xs text-amber-700 dark:text-amber-400">{{ link.warning }}</p>
 
           <dl class="grid gap-x-4 gap-y-1 text-xs sm:grid-cols-[auto_1fr]">
-            <dt class="text-muted-foreground">DOI</dt>
+            <dt class="text-muted-foreground">{{ identifierName(link.identifier_kind, true) }}</dt>
             <dd class="flex min-w-0 flex-wrap items-center gap-1">
-              <template v-if="link.remote.doi">
-                <ExternalLink v-if="!link.remote.doi_reserved" :href="doiUrl(link.remote.doi)" :label="link.remote.doi" />
-                <span v-else class="font-mono">{{ link.remote.doi }}</span>
-                <CopyButton :value="link.remote.doi" label="Copy DOI" />
-                <span v-if="link.remote.doi_reserved && can(link, 'reserve_identifier')" class="text-muted-foreground">Reserved, becomes active when published.</span>
+              <template v-if="link.remote.identifier">
+                <ExternalLink
+                  v-if="!link.remote.identifier_reserved && identifierUrl(link.identifier_kind, link.remote.identifier)"
+                  :href="identifierUrl(link.identifier_kind, link.remote.identifier)!"
+                  :label="link.remote.identifier"
+                />
+                <span v-else class="font-mono">{{ link.remote.identifier }}</span>
+                <CopyButton :value="link.remote.identifier" :label="`Copy ${identifierName(link.identifier_kind)}`" />
+                <span v-if="link.remote.identifier_reserved && can(link, 'reserve_identifier')" class="text-muted-foreground">Reserved, becomes active when published.</span>
               </template>
               <span v-else class="text-muted-foreground">None yet</span>
             </dd>
-            <template v-if="link.remote.concept_doi">
+            <template v-if="link.remote.concept_identifier">
               <dt class="text-muted-foreground">All versions</dt>
               <dd class="flex min-w-0 items-center gap-1">
-                <ExternalLink :href="doiUrl(link.remote.concept_doi)" :label="link.remote.concept_doi" />
-                <CopyButton :value="link.remote.concept_doi" label="Copy concept DOI" />
+                <ExternalLink
+                  v-if="identifierUrl(link.identifier_kind, link.remote.concept_identifier)"
+                  :href="identifierUrl(link.identifier_kind, link.remote.concept_identifier)!"
+                  :label="link.remote.concept_identifier"
+                />
+                <span v-else class="font-mono">{{ link.remote.concept_identifier }}</span>
+                <CopyButton :value="link.remote.concept_identifier" :label="`Copy concept ${identifierName(link.identifier_kind)}`" />
               </dd>
             </template>
             <dt class="text-muted-foreground">Record</dt>

@@ -30,8 +30,8 @@ const connectors = ref<unknown[] | null>([])
 const canWriteMeta = ref(true)
 const job = ref<unknown>(null)
 const checkRepository = vi.fn()
-const ALL_CAPABILITIES = { drafts: true, reserve_identifier: true, versions: true, review: true, pull: true, search: true, release_date: true }
-const capabilities = ref<Record<string, boolean>>({ ...ALL_CAPABILITIES })
+const ALL_CAPABILITIES = { drafts: true, reserve_identifier: true, versions: true, review: true, pull: true, search: true, release_date: true, identifier_kind: 'doi' }
+const capabilities = ref<Record<string, boolean | string>>({ ...ALL_CAPABILITIES })
 const PROFILE = { iri: 'https://w3id.org/aruna/profiles/repository/zenodo', name: 'Zenodo', shapes: ['@prefix a: <x:> .', 'a:b a:c a:d .'] }
 let poller: { run: () => Promise<void>; skip: () => boolean } | null = null
 const ZENODO = { connector_id: 'c1', kind: 'invenio', name: 'Zenodo', endpoint: 'https://zenodo.org/api/' }
@@ -145,7 +145,7 @@ async function exportOnce(root: Parameters<typeof input>[0]) {
 }
 
 function draftLink(remote: Record<string, unknown>, extra: Record<string, unknown> = {}) {
-  return { link_id: 'l1', document_id: 'd1', status: 'enabled', pending: false, remote: { published: false, ...remote }, ...extra }
+  return { link_id: 'l1', document_id: 'd1', identifier_kind: 'doi', status: 'enabled', pending: false, remote: { published: false, ...remote }, ...extra }
 }
 
 beforeEach(() => {
@@ -179,14 +179,14 @@ describe('RepositoryPublishDialog', () => {
       { group_id: 'g1', connector_id: 'c1', access_token: SECRET, auto_publish: false, public_files: true },
       expect.anything(),
     )
-    expect(content(mounted.root)).toContain('Creating the draft and reserving a DOI')
+    expect(content(mounted.root)).toContain('Creating the draft and reserving its DOI')
     mounted.app.unmount()
   })
 
   it('shows the reserved DOI and publishes once the push finished', async () => {
     getRepositoryLink
-      .mockResolvedValueOnce(draftLink({ draft_id: 'r1', doi: '10.5281/zenodo.7', doi_reserved: true }, { pending: true }))
-      .mockResolvedValueOnce(draftLink({ draft_id: 'r1', doi: '10.5281/zenodo.7', doi_reserved: true }))
+      .mockResolvedValueOnce(draftLink({ draft_id: 'r1', identifier: '10.5281/zenodo.7', identifier_reserved: true }, { pending: true }))
+      .mockResolvedValueOnce(draftLink({ draft_id: 'r1', identifier: '10.5281/zenodo.7', identifier_reserved: true }))
     publishRepositoryLink.mockResolvedValue({ job_id: 'j9', status_url: '/jobs/j9' })
     const mounted = await mount()
     await typeValue(tokenInput(mounted.root), SECRET)
@@ -298,7 +298,7 @@ describe('RepositoryPublishDialog', () => {
   })
 
   it('stops following a draft without a DOI and still offers publish', async () => {
-    getRepositoryLink.mockResolvedValue(draftLink({ draft_id: 'r1', doi: null }))
+    getRepositoryLink.mockResolvedValue(draftLink({ draft_id: 'r1', identifier: null }))
     const mounted = await mount()
     await typeValue(tokenInput(mounted.root), SECRET)
     await click(button(mounted.root, 'Publish to Zenodo'))
@@ -350,7 +350,7 @@ describe('RepositoryPublishDialog', () => {
   })
 
   it('hides publish while the community reviews the record', async () => {
-    getRepositoryLink.mockResolvedValue(draftLink({ draft_id: 'r1', doi: '10.5281/zenodo.7', doi_reserved: true, review: 'pending' }))
+    getRepositoryLink.mockResolvedValue(draftLink({ draft_id: 'r1', identifier: '10.5281/zenodo.7', identifier_reserved: true, review: 'pending' }))
     const mounted = await mount()
     await typeValue(tokenInput(mounted.root), SECRET)
     await click(button(mounted.root, 'Publish to Zenodo'))
@@ -397,7 +397,7 @@ describe('RepositoryPublishDialog', () => {
       result: {
         repository: {
           id: 'r1', url: 'https://zenodo.org/api/records/r1', published: true, parent_id: 'p1', revision_id: 3,
-          doi: '10.5281/zenodo.2', concept_doi: '10.5281/zenodo.1', html_url: 'https://zenodo.org/records/2',
+          identifier: '10.5281/zenodo.2', concept_identifier: '10.5281/zenodo.1', html_url: 'https://zenodo.org/records/2',
           in_review: false, warning: 'The file check failed after publishing.',
         },
       },
@@ -423,7 +423,7 @@ describe('RepositoryPublishDialog', () => {
       result: {
         repository: {
           id: 'r1', url: 'https://zenodo.org/api/records/r1/draft', published: false, parent_id: 'p1', revision_id: 1,
-          doi: '10.5281/zenodo.4', in_review: true,
+          identifier: '10.5281/zenodo.4', in_review: true,
         },
       },
     }

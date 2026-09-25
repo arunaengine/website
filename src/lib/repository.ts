@@ -84,6 +84,17 @@ export function doiUrl(doi: string): string {
   return `https://doi.org/${doi.replace(/^https?:\/\/(dx\.)?doi\.org\//i, '')}`
 }
 
+/** DOI for a DOI identifier kind, else the plain word identifier, capitalized for headings. */
+export function identifierName(kind: string | null | undefined, heading = false): string {
+  if (kind === 'doi') return 'DOI'
+  return heading ? 'Identifier' : 'identifier'
+}
+
+/** A resolver link for a record identifier; only DOIs have one. */
+export function identifierUrl(kind: string | null | undefined, value: string): string | null {
+  return kind === 'doi' ? doiUrl(value) : null
+}
+
 /** Identifiers of one kind across all PID rows, without duplicates. */
 export function secondaryIdentifiers(rows: readonly PersistentIdView[], kind: string): SecondaryIdentifier[] {
   const seen = new Set<string>()

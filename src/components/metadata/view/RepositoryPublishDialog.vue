@@ -38,9 +38,10 @@ import {
   type RepositoryLink,
 } from '@/lib/api'
 import {
-  doiUrl,
   exportRepository,
   failureText,
+  identifierName,
+  identifierUrl,
   isRuleFinding,
   parseOverride,
   pullsParent,
@@ -109,6 +110,7 @@ const connectorOptions = computed(() =>
 const connector = computed(() => repositoryConnectors.value?.find((entry) => entry.connector_id === connectorId.value) ?? null)
 const capabilities = computed(() => kindOf(connector.value?.kind)?.capabilities ?? null)
 const reserves = computed(() => Boolean(capabilities.value?.reserve_identifier))
+const idKind = computed(() => capabilities.value?.identifier_kind)
 // A community submission only happens where the repository kind has reviews.
 const community = computed(() => (capabilities.value?.review ? connector.value?.community ?? null : null))
 const label = computed(() => repositoryLabel(connector.value))
@@ -391,7 +393,7 @@ async function submit() {
         <template v-if="!link && !activeJobId">
           <p class="text-[11px] text-muted-foreground">
             {{ mode === 'link'
-              ? `Aruna creates a draft${reserves ? ', reserves its DOI' : ''} and keeps the draft in step with this dataset. You publish when it is ready.`
+              ? `Aruna creates a draft${reserves ? `, reserves its ${identifierName(idKind)}` : ''} and keeps the draft in step with this dataset. You publish when it is ready.`
               : 'Creates one repository draft from the dataset as it is now. Later changes are not sent.' }}
           </p>
 
@@ -562,20 +564,24 @@ async function submit() {
         <section v-else-if="link" class="space-y-3 text-xs">
           <p v-if="link.status === 'failed'" class="text-destructive">{{ failureText(link.reason) }}</p>
           <p v-else-if="!link.remote.draft_id" class="flex items-center gap-2 text-muted-foreground">
-            <Spinner class="text-primary" aria-hidden="true" /> {{ reserves ? 'Creating the draft and reserving a DOI…' : 'Creating the draft…' }}
+            <Spinner class="text-primary" aria-hidden="true" /> {{ reserves ? `Creating the draft and reserving its ${identifierName(idKind)}…` : 'Creating the draft…' }}
           </p>
-          <p v-else-if="!link.remote.doi && reserves" class="text-muted-foreground">
-            No DOI was reserved. The repository assigns one on publish.
+          <p v-else-if="!link.remote.identifier && reserves" class="text-muted-foreground">
+            No {{ identifierName(link.identifier_kind) }} was reserved. The repository assigns one on publish.
           </p>
-          <div v-if="link.remote.doi" class="space-y-1">
-            <p class="font-medium text-foreground">DOI</p>
+          <div v-if="link.remote.identifier" class="space-y-1">
+            <p class="font-medium text-foreground">{{ identifierName(link.identifier_kind, true) }}</p>
             <p class="flex flex-wrap items-center gap-1">
-              <span v-if="link.remote.doi_reserved" class="font-mono">{{ link.remote.doi }}</span>
-              <ExternalLink v-else :href="doiUrl(link.remote.doi)" :label="link.remote.doi" />
-              <CopyButton :value="link.remote.doi" label="Copy DOI" />
+              <ExternalLink
+                v-if="!link.remote.identifier_reserved && identifierUrl(link.identifier_kind, link.remote.identifier)"
+                :href="identifierUrl(link.identifier_kind, link.remote.identifier)!"
+                :label="link.remote.identifier"
+              />
+              <span v-else class="font-mono">{{ link.remote.identifier }}</span>
+              <CopyButton :value="link.remote.identifier" :label="`Copy ${identifierName(link.identifier_kind)}`" />
             </p>
-            <p v-if="!link.remote.doi_reserved || reserves" class="text-[11px] text-muted-foreground">
-              {{ link.remote.doi_reserved ? 'Reserved, becomes active when published.' : 'Published and active.' }}
+            <p v-if="!link.remote.identifier_reserved || reserves" class="text-[11px] text-muted-foreground">
+              {{ link.remote.identifier_reserved ? 'Reserved, becomes active when published.' : 'Published and active.' }}
             </p>
           </div>
           <p v-if="link.warning" class="text-amber-700 dark:text-amber-400">{{ link.warning }}</p>
@@ -606,23 +612,32 @@ async function submit() {
         <section v-else class="space-y-3">
           <TransferJobStatus :job="job" :load-state="loadState" :load-error="loadError" :last-poll-error="lastPollError" @retry="load" />
           <dl v-if="exported" class="grid gap-x-4 gap-y-1 text-xs sm:grid-cols-[auto_1fr]">
-            <dt class="text-muted-foreground">DOI</dt>
+            <dt class="text-muted-foreground">{{ identifierName(idKind, true) }}</dt>
             <dd class="flex min-w-0 items-center gap-1">
-              <template v-if="exported.doi">
-                <ExternalLink v-if="exported.published" :href="doiUrl(exported.doi)" :label="exported.doi" />
-                <span v-else class="font-mono">{{ exported.doi }}</span>
-                <CopyButton :value="exported.doi" label="Copy DOI" />
+              <template v-if="exported.identifier">
+                <ExternalLink
+                  v-if="exported.published && identifierUrl(idKind, exported.identifier)"
+                  :href="identifierUrl(idKind, exported.identifier)!"
+                  :label="exported.identifier"
+                />
+                <span v-else class="font-mono">{{ exported.identifier }}</span>
+                <CopyButton :value="exported.identifier" :label="`Copy ${identifierName(idKind)}`" />
                 <span v-if="!exported.published && reserves" class="text-muted-foreground">Reserved, becomes active when published.</span>
               </template>
               <span v-else class="text-muted-foreground">Assigned when the record is published</span>
             </dd>
             <dt class="text-muted-foreground">State</dt>
             <dd>{{ exported.published ? 'Published' : exported.in_review && capabilities?.review ? 'Waiting for community review' : 'Draft, not published' }}</dd>
-            <template v-if="exported.concept_doi">
+            <template v-if="exported.concept_identifier">
               <dt class="text-muted-foreground">All versions</dt>
               <dd class="flex min-w-0 items-center gap-1">
-                <ExternalLink :href="doiUrl(exported.concept_doi)" :label="exported.concept_doi" />
-                <CopyButton :value="exported.concept_doi" label="Copy concept DOI" />
+                <ExternalLink
+                  v-if="identifierUrl(idKind, exported.concept_identifier)"
+                  :href="identifierUrl(idKind, exported.concept_identifier)!"
+                  :label="exported.concept_identifier"
+                />
+                <span v-else class="font-mono">{{ exported.concept_identifier }}</span>
+                <CopyButton :value="exported.concept_identifier" :label="`Copy concept ${identifierName(idKind)}`" />
               </dd>
             </template>
             <template v-if="exported.html_url">

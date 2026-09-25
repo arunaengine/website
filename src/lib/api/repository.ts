@@ -233,10 +233,10 @@ export interface RepositoryRecord {
   published: boolean
   parent_id: string
   revision_id: number
-  // Reserved while the record is a draft, registered once published.
-  doi?: string | null
+  // Of the kind's identifier_kind; reserved while a draft, registered once published.
+  identifier?: string | null
   html_url?: string | null
-  concept_doi?: string | null
+  concept_identifier?: string | null
   // Submitted to the connector's community instead of published.
   in_review: boolean
   // A check that failed after the repository had already published the record.
@@ -259,10 +259,10 @@ export interface RepositoryLinkRemote {
   parent_id?: string | null
   draft_id?: string | null
   record_id?: string | null
-  doi?: string | null
-  // True while the DOI is only reserved on the open draft.
-  doi_reserved?: boolean
-  concept_doi?: string | null
+  identifier?: string | null
+  // True while the identifier is only reserved on the open draft.
+  identifier_reserved?: boolean
+  concept_identifier?: string | null
   record_url?: string | null
   published: boolean
   review?: RepositoryReviewState
@@ -277,6 +277,8 @@ export interface RepositoryLink {
   connector_id: string
   // The repository kind, for example invenio; fixed when the link is created.
   kind: string
+  // The kind of identifier the records receive, such as doi.
+  identifier_kind: string
   endpoint: string
   owner_node_url: string
   created_by: string

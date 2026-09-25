@@ -9,6 +9,8 @@ import {
   endpointProblem,
   exportRepository,
   failureText,
+  identifierName,
+  identifierUrl,
   linkRights,
   linkStatus,
   managedHere,
@@ -85,6 +87,14 @@ describe('repository identifiers', () => {
   it('builds a resolver link once', () => {
     expect(doiUrl('10.1/a')).toBe('https://doi.org/10.1/a')
     expect(doiUrl('https://doi.org/10.1/a')).toBe('https://doi.org/10.1/a')
+  })
+
+  it('names and links only DOIs as DOIs', () => {
+    expect(identifierName('doi')).toBe('DOI')
+    expect(identifierName('handle')).toBe('identifier')
+    expect(identifierName('handle', true)).toBe('Identifier')
+    expect(identifierUrl('doi', '10.1/a')).toBe('https://doi.org/10.1/a')
+    expect(identifierUrl('handle', '20.500/a')).toBeNull()
   })
 })
 
@@ -257,7 +267,7 @@ describe('publish requirements', () => {
     const result = {
       repository: {
         id: 'r1', url: 'https://zenodo.org/api/records/r1', published: false, parent_id: 'p1', revision_id: 2,
-        doi: '10.5281/zenodo.2', concept_doi: '10.5281/zenodo.1', html_url: null, in_review: true, warning: null,
+        identifier: '10.5281/zenodo.2', concept_identifier: '10.5281/zenodo.1', html_url: null, in_review: true, warning: null,
       },
     }
     expect(exportRepository(result)).toEqual(result.repository)

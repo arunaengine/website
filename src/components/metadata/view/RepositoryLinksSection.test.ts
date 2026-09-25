@@ -29,6 +29,7 @@ function link(overrides: Partial<Api.RepositoryLink> = {}): Api.RepositoryLink {
     group_id: 'g1',
     connector_id: 'c1',
     kind: 'invenio',
+    identifier_kind: 'doi',
     endpoint: 'https://zenodo.org/api/',
     owner_node_url: 'https://api.test',
     created_by: 'u1',
@@ -136,7 +137,7 @@ function hasButton(root: Parameters<typeof button>[0], label: string): boolean {
 describe('RepositoryLinksSection', () => {
   it('shows state, waiting push, DOI and a readable failure', async () => {
     listRepositoryLinks.mockResolvedValue([
-      link({ pending: true, remote: { published: true, doi: '10.5281/zenodo.9' } }),
+      link({ pending: true, remote: { published: true, identifier: '10.5281/zenodo.9' } }),
       link({ link_id: 'l2', status: 'failed', reason: 'token_rejected' }),
     ])
     const mounted = await mount()
@@ -148,6 +149,19 @@ describe('RepositoryLinksSection', () => {
     expect(text).toContain('10.5281/zenodo.9')
     expect(text).toContain('Failed')
     expect(text).toContain('Change the token to continue')
+    mounted.app.unmount()
+  })
+
+  it('labels an identifier that is not a DOI plainly', async () => {
+    listRepositoryLinks.mockResolvedValue([
+      link({ identifier_kind: 'handle', remote: { published: true, identifier: '20.500.1/abc' } }),
+    ])
+    const mounted = await mount()
+    const text = content(mounted.root)
+
+    expect(text).toContain('Identifier')
+    expect(text).toContain('20.500.1/abc')
+    expect(text).not.toContain('DOI')
     mounted.app.unmount()
   })
 
@@ -168,7 +182,7 @@ describe('RepositoryLinksSection', () => {
   it('hides review, reserved DOI and pull actions the repository kind does not offer', async () => {
     capabilities.value = { ...ALL_CAPABILITIES, review: false, reserve_identifier: false, pull: false }
     listRepositoryLinks.mockResolvedValue([
-      link({ remote: { published: false, draft_id: 'd', doi: '10.5281/zenodo.1', doi_reserved: true, review: 'accepted' } }),
+      link({ remote: { published: false, draft_id: 'd', identifier: '10.5281/zenodo.1', identifier_reserved: true, review: 'accepted' } }),
       link({ link_id: 'l2', direction: 'pull', reason: 'update_available', auto_update: false }),
     ])
     const mounted = await mount()
@@ -259,7 +273,7 @@ describe('RepositoryLinksSection', () => {
   it('polls while a push waits and stops once it settled', async () => {
     listRepositoryLinks
       .mockResolvedValueOnce([link({ pending: true })])
-      .mockResolvedValueOnce([link({ pending: false, remote: { published: false, doi: '10.5281/zenodo.5', doi_reserved: true } })])
+      .mockResolvedValueOnce([link({ pending: false, remote: { published: false, identifier: '10.5281/zenodo.5', identifier_reserved: true } })])
     const mounted = await mount()
     expect(poller?.skip()).toBe(false)
     expect(poller?.delay()).toBe(3000)
