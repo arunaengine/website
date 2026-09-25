@@ -28,6 +28,7 @@ import { useGroupRights, useRepositoryConnectors } from '@/composables/useInveni
 import { useJobDetail } from '@/composables/useJobs'
 import { useNotifications } from '@/composables/useNotifications'
 import {
+  ApiError,
   createRepositoryConnector,
   lookupPid,
   submitInvenioImport,
@@ -148,18 +149,23 @@ function pickHit(hit: InvenioHit) {
 
 // A record already imported is worth knowing about before a second copy.
 const existing = ref<PidLookupMatch[]>([])
+// Some node did not answer and nothing matched, so the check is open.
+const lookupOpen = ref(false)
 let lookupGeneration = 0
 async function checkExisting(doi: string) {
   const current = ++lookupGeneration
   const epoch = sessionEpoch.value
   const input = recordInput.value
+  const fresh = () => current === lookupGeneration && epoch === sessionEpoch.value && recordInput.value === input
   existing.value = []
+  lookupOpen.value = false
   if (!doi) return
   try {
     const found = await lookupPid('doi', doi, client())
-    if (current === lookupGeneration && epoch === sessionEpoch.value && recordInput.value === input) existing.value = found
-  } catch {
-    // The hint is optional; a failed lookup proves nothing either way.
+    if (fresh()) existing.value = found
+  } catch (err) {
+    // The hint is optional; only an unanswered realm is worth a retry.
+    if (fresh() && err instanceof ApiError && err.status === 503) lookupOpen.value = true
   }
 }
 watch(recordInput, () => {
@@ -345,6 +351,9 @@ watch(sessionEpoch, () => {
               <Input :id="`${uid}-path`" v-model="documentPath" placeholder="datasets/my-dataset" class="mt-1" />
             </div>
           </div>
+          <p v-if="lookupOpen" class="text-[11px] text-muted-foreground">
+            Not every node answered, so Aruna could not check whether a dataset already holds this DOI. Try again later.
+          </p>
           <Notice v-if="existing.length" tone="info">
             {{ existing.length === 1 ? 'A dataset already holds' : `${existing.length} datasets already hold` }} this DOI
             <template v-if="existing[0].origin === 'published'"> as its own published record</template>.

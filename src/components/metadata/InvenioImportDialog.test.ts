@@ -152,6 +152,26 @@ describe('InvenioImportDialog', () => {
     mounted.app.unmount()
   })
 
+  it('asks to try again when not every node answered the DOI check', async () => {
+    lookupPid.mockRejectedValue(new Api.ApiError(503, 'Service unavailable'))
+    const mounted = await mount()
+    await typeValue(recordField(mounted.root), '10.5281/zenodo.42')
+    await flush()
+
+    expect(content(mounted.root)).toContain('Try again later')
+    mounted.app.unmount()
+  })
+
+  it('shows why the repository has no record for a DOI', async () => {
+    submitInvenioImport.mockRejectedValue(new Api.ApiError(400, 'no published record has this DOI'))
+    const mounted = await mount()
+    await typeValue(recordField(mounted.root), '10.5281/zenodo.404')
+    await click(button(mounted.root, 'Import record'))
+
+    expect(content(mounted.root)).toContain('no published record has this DOI')
+    mounted.app.unmount()
+  })
+
   it('shows the imported DOIs after success', async () => {
     listPersistentIds.mockResolvedValue([{
       secondary_identifiers: [
