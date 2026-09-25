@@ -154,9 +154,25 @@ export function submitInvenioExport(
   )
 }
 
-// The repository side of a finished one-time export job.
+// The repository record of a finished one-time export job.
+export interface InvenioRecord {
+  id: string
+  url: string
+  published: boolean
+  parent_id: string
+  revision_id: number
+  // Reserved while the record is a draft, registered once published.
+  doi?: string | null
+  html_url?: string | null
+  concept_doi?: string | null
+  // Submitted to the connector's community instead of published.
+  in_review: boolean
+  // A check that failed after the repository had already published the record.
+  warning?: string | null
+}
+
 export interface InvenioExportResult {
-  repository: { id: string; doi?: string | null; concept_doi?: string | null; html_url?: string | null }
+  repository: InvenioRecord
 }
 
 export type InvenioLinkStatus = 'enabled' | 'paused' | 'failed'
@@ -174,6 +190,7 @@ export interface InvenioLinkRemote {
   record_url?: string | null
   published: boolean
   review?: InvenioReviewState
+  // Pull links: the latest published version at the last check.
   latest_remote_id?: string | null
 }
 
@@ -185,14 +202,17 @@ export interface InvenioLink {
   endpoint: string
   owner_node_url: string
   created_by: string
-  direction?: 'push' | 'pull'
+  direction: 'push' | 'pull'
   // Kept open so a new status renders instead of breaking.
   status: InvenioLinkStatus | (string & {})
   reason?: string | null
   warning?: string | null
   auto_publish: boolean
+  // Pull links only.
   auto_update?: boolean
+  last_checked_at?: string | null
   public_files: boolean
+  // A push is queued or running, or a pull is running.
   pending: boolean
   remote: InvenioLinkRemote
   last_push?: { event_id: string; job_id: string; pushed_at: string } | null
@@ -210,6 +230,7 @@ export interface CreateInvenioLink {
   metadata?: Record<string, unknown>
 }
 
+// auto_update applies to pull links; auto_publish, public_files and metadata to push links.
 export interface PatchInvenioLink {
   paused?: boolean
   auto_publish?: boolean

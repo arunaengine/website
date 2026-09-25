@@ -282,7 +282,7 @@ function reasonTone(link: InvenioLink): string {
             <Badge v-if="!isPullLink(link) && link.auto_publish" size="sm" variant="outline">Publishes automatically</Badge>
             <Badge v-if="isPullLink(link) && link.auto_update" size="sm" variant="outline">Updates automatically</Badge>
           </div>
-          <p v-if="link.reason || link.status === 'failed'" class="text-xs" :class="reasonTone(link)">{{ failureText(link.reason) }}</p>
+          <p v-if="link.reason || link.status === 'failed'" class="text-xs" :class="reasonTone(link)">{{ failureText(link.reason, isPullLink(link)) }}</p>
           <p v-if="link.warning" class="text-xs text-amber-700 dark:text-amber-400">{{ link.warning }}</p>
 
           <dl class="grid gap-x-4 gap-y-1 text-xs sm:grid-cols-[auto_1fr]">
@@ -311,7 +311,7 @@ function reasonTone(link: InvenioLink): string {
             </dd>
             <template v-if="isPullLink(link)">
               <dt class="text-muted-foreground">Last checked</dt>
-              <dd>{{ relativeTime(link.updated_at) }}</dd>
+              <dd>{{ link.last_checked_at ? relativeTime(link.last_checked_at) : 'Not yet' }}</dd>
             </template>
             <dt class="text-muted-foreground">{{ isPullLink(link) ? 'Last update' : 'Last push' }}</dt>
             <dd>
@@ -362,7 +362,7 @@ function reasonTone(link: InvenioLink): string {
             </form>
             <template v-else>
               <Button
-                v-if="link.reason === 'remote_changed' && rights(link).owner"
+                v-if="link.reason === 'remote_changed' && !isPullLink(link)"
                 size="sm"
                 :disabled="busyId !== null"
                 @click="acceptRemote(link)"

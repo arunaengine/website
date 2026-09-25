@@ -1,7 +1,7 @@
 import {
   ApiError,
-  type InvenioExportResult,
   type InvenioLink,
+  type InvenioRecord,
   type InvenioRecordSource,
   type InvenioReviewState,
   type InvenioSearchPage,
@@ -99,13 +99,20 @@ const REASON_TEXT: Record<string, string> = {
   too_many_files: 'Zenodo takes at most 100 files per record. Pack the files into fewer archives, then push again.',
   update_available: 'A newer version is available in the repository.',
   local_changed:
-    'This dataset was changed here since the last update, so automatic updates stopped. Update now to take the repository version.',
+    'A newer version is available. This dataset was changed here since the last update, so it is not imported automatically. Update now replaces the dataset metadata. Local files stay.',
+}
+
+// Pull links read with the group's repository token, not a personal one.
+const PULL_REASON_TEXT: Record<string, string> = {
+  token_rejected:
+    "The repository rejected the group's repository token. Someone who manages the group's data can change it under Sources.",
 }
 
 /** A readable sentence for a status reason; unknown reasons read as their words. */
-export function failureText(reason: string | null | undefined): string {
-  if (!reason) return 'The last push failed.'
-  return REASON_TEXT[reason] ?? `The last push failed: ${reason.replaceAll('_', ' ')}.`
+export function failureText(reason: string | null | undefined, pull = false): string {
+  const failed = pull ? 'The last update failed' : 'The last push failed'
+  if (!reason) return `${failed}.`
+  return (pull ? PULL_REASON_TEXT[reason] : undefined) ?? REASON_TEXT[reason] ?? `${failed}: ${reason.replaceAll('_', ' ')}.`
 }
 
 const REVIEW_TEXT: Record<InvenioReviewState, string | null> = {
@@ -119,7 +126,7 @@ export function reviewText(review: InvenioReviewState | undefined): string | nul
   return review ? REVIEW_TEXT[review] ?? null : null
 }
 
-// Pull links check the remote; push links send changes. Old answers lack direction.
+// Pull links check the remote; push links send changes.
 export function isPullLink(link: Pick<InvenioLink, 'direction'>): boolean {
   return link.direction === 'pull'
 }
@@ -130,9 +137,9 @@ export function linkBusy(link: InvenioLink): boolean {
 }
 
 export interface LinkRights {
-  // Publish, token and settings changes.
+  // Publish, token and settings changes, including auto_update.
   owner: boolean
-  // Pause, resume, push, pull and delete.
+  // Pause, resume, push, pull, accept remote state and delete.
   manage: boolean
 }
 
@@ -255,6 +262,32 @@ export function missingFields(err: unknown): string[] | null {
   return Array.isArray(missing) ? missing.filter((entry): entry is string => typeof entry === 'string') : null
 }
 
+const FIELD_LABEL: Record<string, string> = {
+  title: 'a title',
+  publication_date: 'a publication date',
+  resource_type: 'a resource type',
+  creators: 'creators',
+}
+
+/** A missing field as words, for example "a publication date". */
+export function fieldLabel(field: string): string {
+  return FIELD_LABEL[field] ?? field.replaceAll('_', ' ')
+}
+
+export interface RequiredDraft {
+  title: string
+  publicationDate: string
+}
+
+/** Typed values for the missing title and date, and the dataset resource type. */
+export function requiredMetadata(missing: readonly string[], draft: RequiredDraft): Record<string, unknown> {
+  const metadata: Record<string, unknown> = {}
+  if (missing.includes('title') && draft.title.trim()) metadata.title = draft.title.trim()
+  if (missing.includes('publication_date') && draft.publicationDate) metadata.publication_date = draft.publicationDate
+  if (missing.includes('resource_type')) metadata.resource_type = { id: 'dataset' }
+  return metadata
+}
+
 export interface CreatorDraft {
   name: string
   orcid: string
@@ -289,9 +322,9 @@ export function creatorsMetadata(creators: readonly CreatorDraft[]): Record<stri
 }
 
 /** The repository record of a finished one-time export, when the result has one. */
-export function exportRepository(result: unknown): InvenioExportResult['repository'] | null {
+export function exportRepository(result: unknown): InvenioRecord | null {
   const repository = record(record(result).repository)
-  return text(repository.id) ? (repository as InvenioExportResult['repository']) : null
+  return text(repository.id) ? (repository as unknown as InvenioRecord) : null
 }
 
 /** An optional metadata override typed as JSON; it must be an object. */

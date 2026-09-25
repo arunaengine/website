@@ -7,6 +7,7 @@ import {
   endpointProblem,
   exportRepository,
   failureText,
+  fieldLabel,
   linkRights,
   linkStatus,
   managedHere,
@@ -14,6 +15,7 @@ import {
   parseOverride,
   recordSource,
   repositoryLabel,
+  requiredMetadata,
   reviewText,
   searchHits,
   searchTotal,
@@ -94,6 +96,13 @@ describe('invenio link state', () => {
     expect(failureText(null)).toBe('The last push failed.')
   })
 
+  it('words pull failures as updates and points at the group token', () => {
+    expect(failureText(null, true)).toBe('The last update failed.')
+    expect(failureText('record withdrawn', true)).toBe('The last update failed: record withdrawn.')
+    expect(failureText('token_rejected', true)).toContain("group's repository token")
+    expect(failureText('update_available', true)).toContain('newer version')
+  })
+
   it('has a plain text for every reason of the contract', () => {
     const reasons = [
       'owner_not_holder', 'too_many_files', 'update_available', 'local_changed',
@@ -171,6 +180,17 @@ describe('missing publish metadata', () => {
     expect(missingFields(new Error('x'))).toBeNull()
   })
 
+  it('fills the missing title, date and resource type from the form', () => {
+    const draft = { title: ' Soil data ', publicationDate: '2026-09-25' }
+    expect(requiredMetadata(['title', 'publication_date', 'resource_type', 'creators'], draft)).toEqual({
+      title: 'Soil data', publication_date: '2026-09-25', resource_type: { id: 'dataset' },
+    })
+    expect(requiredMetadata(['creators'], draft)).toEqual({})
+    expect(requiredMetadata(['title'], { title: ' ', publicationDate: '' })).toEqual({})
+    expect(fieldLabel('publication_date')).toBe('a publication date')
+    expect(fieldLabel('rights_holder')).toBe('rights holder')
+  })
+
   it('maps creators to personal names with an optional ORCID', () => {
     expect(creatorsMetadata([
       { name: 'Ada Lovelace', orcid: 'https://orcid.org/0000-0002-1825-0097' },
@@ -188,7 +208,12 @@ describe('missing publish metadata', () => {
   })
 
   it('reads the record of a finished export', () => {
-    const result = { repository: { id: 'r1', doi: '10.5281/zenodo.2', concept_doi: '10.5281/zenodo.1' } }
+    const result = {
+      repository: {
+        id: 'r1', url: 'https://zenodo.org/api/records/r1', published: false, parent_id: 'p1', revision_id: 2,
+        doi: '10.5281/zenodo.2', concept_doi: '10.5281/zenodo.1', html_url: null, in_review: true, warning: null,
+      },
+    }
     expect(exportRepository(result)).toEqual(result.repository)
     expect(exportRepository({ included: 3 })).toBeNull()
   })

@@ -28,6 +28,7 @@ function link(overrides: Partial<Api.InvenioLink> = {}): Api.InvenioLink {
     endpoint: 'https://zenodo.org/api/',
     owner_node_url: 'https://api.test',
     created_by: 'u1',
+    direction: 'push',
     status: 'enabled',
     auto_publish: false,
     public_files: false,
@@ -261,7 +262,9 @@ describe('RepositoryLinksSection', () => {
     mounted.app.unmount()
   })
 
-  it('offers the remote state to the owner after a remote change', async () => {
+  it('offers the remote state to a group admin after a remote change', async () => {
+    userId.value = 'u2'
+    isAdmin.value = true
     listInvenioLinks.mockResolvedValue([link({ status: 'failed', reason: 'remote_changed', warning: 'Checksums differ.' })])
     acceptRemoteLink.mockResolvedValue(link())
     const mounted = await mount()
@@ -273,17 +276,46 @@ describe('RepositoryLinksSection', () => {
   })
 
   it('updates a pull link on request', async () => {
-    listInvenioLinks.mockResolvedValue([link({ direction: 'pull', reason: 'update_available', auto_update: false })])
+    listInvenioLinks.mockResolvedValue([
+      link({ direction: 'pull', reason: 'update_available', auto_update: false, last_checked_at: null }),
+    ])
     pullInvenioLink.mockResolvedValue({ job_id: 'j2', status_url: '/jobs/j2' })
     const mounted = await mount()
     const text = content(mounted.root)
 
     expect(text).toContain('A newer version is available')
     expect(text).toContain('Last checked')
-    expect(hasButton(mounted.root, 'Push now')).toBe(false)
+    expect(text).toContain('Not yet')
+    for (const label of ['Push now', 'Publish', 'Change token', 'Accept remote state']) {
+      expect(hasButton(mounted.root, label)).toBe(false)
+    }
     await click(button(mounted.root, 'Update now'))
     expect(pullInvenioLink).toHaveBeenCalledWith('d1', 'l1', expect.anything())
     expect(poller?.skip()).toBe(false)
+    mounted.app.unmount()
+  })
+
+  it('explains a failed pull without asking for a personal token', async () => {
+    listInvenioLinks.mockResolvedValue([link({ direction: 'pull', status: 'failed', reason: 'token_rejected' })])
+    const mounted = await mount()
+    const text = content(mounted.root)
+
+    expect(text).toContain("the group's repository token")
+    expect(text).not.toContain('Change the token to continue')
+    mounted.app.unmount()
+  })
+
+  it('lets a group admin update a pull link but not switch automatic updates', async () => {
+    userId.value = 'u2'
+    isAdmin.value = true
+    listInvenioLinks.mockResolvedValue([link({ direction: 'pull', reason: 'local_changed', auto_update: true })])
+    pullInvenioLink.mockResolvedValue({ job_id: 'j3', status_url: '/jobs/j3' })
+    const mounted = await mount()
+
+    expect(content(mounted.root)).toContain('not imported automatically')
+    expect(content(mounted.root)).not.toContain('Update automatically')
+    await click(button(mounted.root, 'Update now'))
+    expect(pullInvenioLink).toHaveBeenCalledWith('d1', 'l1', expect.anything())
     mounted.app.unmount()
   })
 })
