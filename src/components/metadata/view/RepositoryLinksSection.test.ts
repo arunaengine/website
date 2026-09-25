@@ -26,6 +26,7 @@ function link(overrides: Partial<Api.RepositoryLink> = {}): Api.RepositoryLink {
     document_id: 'd1',
     group_id: 'g1',
     connector_id: 'c1',
+    kind: 'invenio',
     endpoint: 'https://zenodo.org/api/',
     owner_node_url: 'https://api.test',
     created_by: 'u1',

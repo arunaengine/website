@@ -1,7 +1,8 @@
 import { ApiError, apiRequest, type ApiClientOptions } from './client'
+import type { ProfileValidationFinding } from './profileValidation'
 
-// Invenio and Zenodo repository transfers, following the agreed contract in
-// aruna api/src/routes/invenio.rs. Personal access tokens only travel in
+// Repository transfers (Invenio and Zenodo first), following the contract of
+// the metadata/repository routes. Personal access tokens only travel in
 // request bodies; responses never return them.
 
 export type RepositoryConnectorKind = 'invenio' | 'oai_pmh'
@@ -74,6 +75,73 @@ export function deleteRepositoryConnector(
   return apiRequest(repositoriesPath(groupId, connectorId), { method: 'DELETE' }, client)
 }
 
+// What a repository kind can do; the portal offers only these actions.
+export interface RepositoryCapabilities {
+  drafts: boolean
+  reserve_identifier: boolean
+  versions: boolean
+  review: boolean
+  pull: boolean
+  search: boolean
+  release_date: boolean
+  identifier_kind?: string | null
+}
+
+// A built-in requirement profile; shapes are Turtle sources.
+export interface RepositoryProfile {
+  iri: string
+  name: string
+  shapes: string | string[]
+}
+
+export interface RepositoryKind {
+  kind: string
+  capabilities: RepositoryCapabilities
+  profiles: RepositoryProfile[]
+  targets?: unknown[]
+}
+
+export function listRepositoryKinds(client: ApiClientOptions): Promise<RepositoryKind[]> {
+  return apiRequest('/metadata/repository/kinds', {}, client)
+}
+
+export interface RepositoryCheckRequest {
+  group_id: string
+  connector_id: string
+  metadata?: Record<string, unknown>
+}
+
+// One crate entity and what it becomes in the repository.
+export interface RepositoryMapping {
+  entity_id: string
+  target: string
+  group?: string | null
+  field?: string | null
+}
+
+export interface RepositoryCheck {
+  kind: string
+  profile: { iri: string; revision?: string | null }
+  // True when no finding is a violation.
+  ready: boolean
+  findings: ProfileValidationFinding[]
+  mapping: RepositoryMapping[]
+}
+
+// Checks the dataset against the repository requirements; stores nothing.
+export function checkRepository(
+  documentId: string,
+  request: RepositoryCheckRequest,
+  client: ApiClientOptions,
+  signal?: AbortSignal,
+): Promise<RepositoryCheck> {
+  return apiRequest(
+    `/metadata/${encodeURIComponent(documentId)}/repository/check`,
+    { method: 'POST', body: JSON.stringify(request), signal },
+    client,
+  )
+}
+
 export interface RepositorySearchQuery {
   group_id: string
   connector_id: string
@@ -83,7 +151,7 @@ export interface RepositorySearchQuery {
   all_versions?: boolean
 }
 
-// The native repository answer; src/lib/invenio.ts maps its hits.
+// The native repository answer; src/lib/repository.ts maps its hits.
 export interface RepositorySearchPage {
   hits?: { total?: number | { value?: number }; hits?: unknown[] }
   links?: { next?: string | null }
@@ -94,7 +162,8 @@ export function searchRepositoryRecords(
   client: ApiClientOptions,
   signal?: AbortSignal,
 ): Promise<RepositorySearchPage> {
-  return apiRequest('/metadata/invenio/records', { query: { ...query }, signal }, client)
+  const { group_id: groupId, connector_id: connectorId, ...search } = query
+  return apiRequest(`${repositoriesPath(groupId, connectorId)}/records`, { query: { ...search }, signal }, client)
 }
 
 export type RepositoryImportMode = 'copy' | 'reference' | 'metadata'
@@ -127,14 +196,15 @@ export function submitRepositoryImport(
   request: RepositoryImportRequest,
   client: ApiClientOptions,
 ): Promise<TransferJobResponse> {
-  return apiRequest('/metadata/invenio/imports', { method: 'POST', body: JSON.stringify(request) }, client)
+  return apiRequest('/metadata/repository/imports', { method: 'POST', body: JSON.stringify(request) }, client)
 }
 
 export interface RepositoryExportRequest {
   group_id: string
   connector_id: string
   access_token: string
-  new_version?: string
+  // Continues this published record as a new version.
+  published_id?: string
   metadata?: Record<string, unknown>
   publish: boolean
   public_files: boolean
@@ -148,7 +218,7 @@ export function submitRepositoryExport(
   client: ApiClientOptions,
 ): Promise<TransferJobResponse> {
   return apiRequest(
-    `/metadata/${encodeURIComponent(documentId)}/invenio/exports`,
+    `/metadata/${encodeURIComponent(documentId)}/repository/exports`,
     { method: 'POST', body: JSON.stringify({ repository, idempotency_key: idempotencyKey }) },
     client,
   )
@@ -179,7 +249,11 @@ export type RepositoryLinkStatus = 'enabled' | 'paused' | 'failed'
 
 export type RepositoryReviewState = 'none' | 'pending' | 'accepted' | 'declined'
 
+// Derived by the node from the remote fields below.
+export type RemoteState = 'none' | 'draft' | 'review' | 'published'
+
 export interface RepositoryLinkRemote {
+  state?: RemoteState | (string & {})
   parent_id?: string | null
   draft_id?: string | null
   record_id?: string | null
@@ -199,6 +273,8 @@ export interface RepositoryLink {
   document_id: string
   group_id: string
   connector_id: string
+  // The repository kind, for example invenio; fixed when the link is created.
+  kind: string
   endpoint: string
   owner_node_url: string
   created_by: string
@@ -206,6 +282,8 @@ export interface RepositoryLink {
   // Kept open so a new status renders instead of breaking.
   status: RepositoryLinkStatus | (string & {})
   reason?: string | null
+  // What the dataset still lacks, when reason is requirements_unmet.
+  findings?: ProfileValidationFinding[] | null
   warning?: string | null
   auto_publish: boolean
   // Pull links only.
@@ -240,7 +318,7 @@ export interface PatchRepositoryLink {
 }
 
 function linksPath(documentId: string, linkId?: string, action?: string): string {
-  let path = `/metadata/${encodeURIComponent(documentId)}/invenio/links`
+  let path = `/metadata/${encodeURIComponent(documentId)}/repository/links`
   if (linkId) path += `/${encodeURIComponent(linkId)}`
   return action ? `${path}/${action}` : path
 }

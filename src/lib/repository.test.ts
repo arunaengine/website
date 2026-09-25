@@ -25,7 +25,7 @@ import {
 } from './repository'
 import type { PersistentIdView } from './pid'
 
-describe('invenio search hits', () => {
+describe('repository search hits', () => {
   it('maps InvenioRDM and legacy Zenodo hits', () => {
     const page = {
       hits: {
@@ -64,7 +64,7 @@ describe('invenio search hits', () => {
   })
 })
 
-describe('invenio identifiers', () => {
+describe('repository identifiers', () => {
   it('collects one kind across rows without duplicates', () => {
     const row = {
       secondary_identifiers: [
@@ -84,7 +84,7 @@ describe('invenio identifiers', () => {
   })
 })
 
-describe('invenio link state', () => {
+describe('repository link state', () => {
   it('labels every status with a matching tone', () => {
     expect(linkStatus({ status: 'enabled' })).toEqual({ label: 'Enabled', variant: 'success' })
     expect(linkStatus({ status: 'paused' })).toEqual({ label: 'Paused', variant: 'secondary' })
@@ -108,11 +108,11 @@ describe('invenio link state', () => {
 
   it('has a plain text for every reason of the contract', () => {
     const reasons = [
-      'owner_not_holder', 'too_many_files', 'update_available', 'local_changed',
+      'owner_not_holder', 'requirements_unmet', 'update_available', 'local_changed',
       'remote_changed', 'token_rejected', 'source_unavailable', 'review_declined',
     ]
     for (const reason of reasons) expect(failureText(reason)).not.toContain(reason.replaceAll('_', ' '))
-    expect(failureText('too_many_files')).toContain('100 files')
+    expect(failureText('requirements_unmet')).toContain('repository requirements')
     expect(failureText('remote_changed')).toContain('Accept the remote state')
   })
 

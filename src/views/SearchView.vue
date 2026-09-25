@@ -49,7 +49,7 @@ const {
 const sparqlState = useSparqlWorkbench(documentScope)
 
 const showCrateImport = ref(false)
-const showInvenioImport = ref(false)
+const showRepositoryImport = ref(false)
 
 const askPrompt = computed(() =>
   q.value.trim()
@@ -90,7 +90,7 @@ const askPrompt = computed(() =>
           v-if="currentUser && jobsEnabled"
           variant="outline"
           title="Import a published Invenio or Zenodo record as a new dataset"
-          @click="showInvenioImport = true"
+          @click="showRepositoryImport = true"
         >
           <Import class="h-4 w-4" /> From Invenio or Zenodo
         </Button>
@@ -123,6 +123,6 @@ const askPrompt = computed(() =>
     </div>
 
     <CrateTransferDialog v-model:open="showCrateImport" mode="import" />
-    <RepositoryImportDialog v-model:open="showInvenioImport" />
+    <RepositoryImportDialog v-model:open="showRepositoryImport" />
   </div>
 </template>

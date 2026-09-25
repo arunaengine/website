@@ -40,7 +40,7 @@ beforeEach(() => {
 
 afterEach(() => vi.useRealTimers())
 
-describe('invenio search', () => {
+describe('repository search', () => {
   it('asks nothing for an empty query', async () => {
     const scope = effectScope()
     const search = scope.run(() => useRepositorySearch(() => ({ groupId: 'g1', connectorId: 'c1' }), { delayMs: 300 }))!

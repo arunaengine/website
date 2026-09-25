@@ -11,7 +11,7 @@ import {
 import type { PersistentIdView } from './pid'
 import { stateVariant, type BadgeVariant } from './stateBadge'
 
-// Presentation of Invenio and Zenodo answers: search hits, link states and the
+// Presentation of repository answers: search hits, link states and the
 // secondary identifiers a dataset holds.
 
 export interface RepositoryHit {
@@ -96,7 +96,8 @@ const REASON_TEXT: Record<string, string> = {
   source_unavailable: 'Some data could not be read, so the push stopped. It did not leave files out.',
   owner_not_holder:
     'The node that manages this link no longer holds the dataset, so it cannot push. Remove the link and create a new one.',
-  too_many_files: 'Zenodo takes at most 100 files per record. Pack the files into fewer archives, then push again.',
+  requirements_unmet:
+    'The dataset does not meet the repository requirements. Fix the points below. The link pushes again on the next change.',
   update_available: 'A newer version is available in the repository.',
   local_changed:
     'A newer version is available. This dataset was changed here since the last update, so it is not imported automatically. Update now replaces the dataset metadata. Local files stay.',

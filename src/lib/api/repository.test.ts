@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   acceptRemoteLink,
+  checkRepository,
   createRepositoryLink,
   listRepositoryConnectors,
+  listRepositoryKinds,
   lookupPid,
   patchRepositoryLink,
   pullRepositoryLink,
@@ -61,16 +63,14 @@ describe('repository connector client', () => {
   })
 })
 
-describe('invenio transfers', () => {
+describe('repository transfers', () => {
   it('sends the search as query parameters', async () => {
     const calls = stubFetch({ hits: { total: 0, hits: [] } })
     await searchRepositoryRecords({ group_id: 'g1', connector_id: 'c1', q: 'ocean data', page: 2, size: 10 }, CLIENT)
 
     const url = new URL(calls[0].url)
-    expect(url.pathname).toBe('/api/v1/metadata/invenio/records')
-    expect(Object.fromEntries(url.searchParams)).toEqual({
-      group_id: 'g1', connector_id: 'c1', q: 'ocean data', page: '2', size: '10',
-    })
+    expect(url.pathname).toBe('/api/v1/metadata/groups/g1/repositories/c1/records')
+    expect(Object.fromEntries(url.searchParams)).toEqual({ q: 'ocean data', page: '2', size: '10' })
   })
 
   it('flattens the import options beside the target', async () => {
@@ -81,6 +81,7 @@ describe('invenio transfers', () => {
       metadata: { group_id: 'g1', path: 'datasets/z', public: false }, idempotency_key: 'key-1',
     }, CLIENT)
 
+    expect(calls[0].url).toBe('https://api.test/api/v1/metadata/repository/imports')
     expect(calls[0].body).toMatchObject({ mode: 'reference', all_versions: false, doi: '10.5281/zenodo.1', keep_updated: true })
     expect(calls[0].body).not.toHaveProperty('record_id')
   })
@@ -91,7 +92,7 @@ describe('invenio transfers', () => {
       group_id: 'g1', connector_id: 'c1', access_token: SECRET, publish: false, public_files: false,
     }, 'key-1', CLIENT)
 
-    expect(calls[0].url).toBe('https://api.test/api/v1/metadata/d1/invenio/exports')
+    expect(calls[0].url).toBe('https://api.test/api/v1/metadata/d1/repository/exports')
     expect(calls[0].body).toEqual({
       repository: { group_id: 'g1', connector_id: 'c1', access_token: SECRET, publish: false, public_files: false },
       idempotency_key: 'key-1',
@@ -99,7 +100,24 @@ describe('invenio transfers', () => {
   })
 })
 
-describe('invenio links', () => {
+describe('repository requirements', () => {
+  it('checks a dataset against one connector', async () => {
+    const calls = stubFetch({ kind: 'invenio', ready: true, findings: [], mapping: [] })
+    await checkRepository('d 1', { group_id: 'g1', connector_id: 'c1' }, CLIENT)
+
+    expect(calls[0].method).toBe('POST')
+    expect(calls[0].url).toBe('https://api.test/api/v1/metadata/d%201/repository/check')
+    expect(calls[0].body).toEqual({ group_id: 'g1', connector_id: 'c1' })
+  })
+
+  it('lists the repository kinds', async () => {
+    const calls = stubFetch([{ kind: 'invenio', capabilities: {}, profiles: [] }])
+    expect(await listRepositoryKinds(CLIENT)).toHaveLength(1)
+    expect(calls[0].url).toBe('https://api.test/api/v1/metadata/repository/kinds')
+  })
+})
+
+describe('repository links', () => {
   it('keeps the token in the body only and never logs it', async () => {
     const log = vi.spyOn(console, 'log')
     const warn = vi.spyOn(console, 'warn')
@@ -107,7 +125,7 @@ describe('invenio links', () => {
     await createRepositoryLink('d1', { group_id: 'g1', connector_id: 'c1', access_token: SECRET, parent_id: 'p1' }, CLIENT)
 
     expect(calls[0].method).toBe('POST')
-    expect(calls[0].url).toBe('https://api.test/api/v1/metadata/d1/invenio/links')
+    expect(calls[0].url).toBe('https://api.test/api/v1/metadata/d1/repository/links')
     expect(calls[0].url).not.toContain(SECRET)
     expect(calls[0].body).toMatchObject({ access_token: SECRET, parent_id: 'p1' })
     expect([...log.mock.calls, ...warn.mock.calls].flat().join(' ')).not.toContain(SECRET)
@@ -118,7 +136,7 @@ describe('invenio links', () => {
     await rotateLinkToken('d1', 'l1', SECRET, CLIENT)
 
     expect(calls[0].method).toBe('PUT')
-    expect(calls[0].url).toBe('https://api.test/api/v1/metadata/d1/invenio/links/l1/token')
+    expect(calls[0].url).toBe('https://api.test/api/v1/metadata/d1/repository/links/l1/token')
     expect(calls[0].body).toEqual({ access_token: SECRET })
   })
 
@@ -128,8 +146,8 @@ describe('invenio links', () => {
     await pullRepositoryLink('d1', 'l1', CLIENT)
 
     expect(calls.map((call) => [call.method, call.url])).toEqual([
-      ['POST', 'https://api.test/api/v1/metadata/d1/invenio/links/l1/accept-remote'],
-      ['POST', 'https://api.test/api/v1/metadata/d1/invenio/links/l1/pull'],
+      ['POST', 'https://api.test/api/v1/metadata/d1/repository/links/l1/accept-remote'],
+      ['POST', 'https://api.test/api/v1/metadata/d1/repository/links/l1/pull'],
     ])
   })
 
