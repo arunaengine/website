@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ApiError, type InvenioLink } from './api'
+import { ApiError, type RepositoryLink } from './api'
 import {
   connectorBody,
   creatorsMetadata,
@@ -262,11 +262,11 @@ describe('publish choices', () => {
 
   it('finds an enabled pull link on the same lineage', () => {
     const pull = { direction: 'pull', status: 'enabled', endpoint: 'https://zenodo.org/api/', remote: { parent_id: 'p1', published: true } }
-    const links = [pull] as InvenioLink[]
+    const links = [pull] as RepositoryLink[]
     expect(pullsParent(links, 'p1', 'https://zenodo.org/api')).toBe(true)
     expect(pullsParent(links, 'p2', 'https://zenodo.org/api')).toBe(false)
-    expect(pullsParent([{ ...pull, status: 'paused' }] as InvenioLink[], 'p1', 'https://zenodo.org/api')).toBe(false)
-    expect(pullsParent([{ ...pull, direction: 'push' }] as InvenioLink[], 'p1', 'https://zenodo.org/api')).toBe(false)
+    expect(pullsParent([{ ...pull, status: 'paused' }] as RepositoryLink[], 'p1', 'https://zenodo.org/api')).toBe(false)
+    expect(pullsParent([{ ...pull, direction: 'push' }] as RepositoryLink[], 'p1', 'https://zenodo.org/api')).toBe(false)
   })
 
   it('accepts only a JSON object as metadata override', () => {

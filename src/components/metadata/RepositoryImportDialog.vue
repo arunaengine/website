@@ -31,13 +31,13 @@ import {
   ApiError,
   createRepositoryConnector,
   lookupPid,
-  submitInvenioImport,
-  type InvenioImportMode,
-  type InvenioRecordSource,
+  submitRepositoryImport,
+  type RepositoryImportMode,
+  type RepositoryRecordSource,
   type PidLookupMatch,
   type SecondaryIdentifier,
 } from '@/lib/api'
-import { doiUrl, recordSource, REPOSITORY_PRESETS, secondaryIdentifiers, type InvenioHit } from '@/lib/repository'
+import { doiUrl, recordSource, REPOSITORY_PRESETS, secondaryIdentifiers, type RepositoryHit } from '@/lib/repository'
 import { isTerminalJobState } from '@/lib/jobs'
 import { listPersistentIds } from '@/lib/pid'
 import { importJobResult } from '@/lib/rocrateArchive'
@@ -61,7 +61,7 @@ const prefix = ref('')
 // A record id, a version or concept DOI, or a record URL.
 const recordInput = ref('')
 const documentPath = ref('')
-const mode = ref<InvenioImportMode>('copy')
+const mode = ref<RepositoryImportMode>('copy')
 const allVersions = ref(false)
 const keepUpdated = ref(true)
 const autoUpdate = ref(false)
@@ -97,7 +97,7 @@ const MODE_OPTIONS = [
   { value: 'reference', label: 'Reference files' },
   { value: 'metadata', label: 'Metadata only' },
 ]
-const MODE_HINT: Record<InvenioImportMode, string> = {
+const MODE_HINT: Record<RepositoryImportMode, string> = {
   copy: 'Files are downloaded, checked against their checksums and stored in the target bucket.',
   reference:
     'Files stay in the repository and are read on demand. The target bucket must belong to the same group as the repository.',
@@ -131,7 +131,7 @@ async function addPreset() {
   }
 }
 
-function pathName(found: InvenioRecordSource): string {
+function pathName(found: RepositoryRecordSource): string {
   if ('doi' in found) return found.doi.split('/').pop() ?? found.doi
   const id = 'record_id' in found ? found.record_id : found.url.replace(/\/+$/, '').split('/').pop() ?? ''
   return `invenio-${id}`
@@ -146,7 +146,7 @@ watch(source, (found) => {
 })
 
 let pickedDoi = ''
-function pickHit(hit: InvenioHit) {
+function pickHit(hit: RepositoryHit) {
   // The same hit again changes nothing, so no watcher would clear the DOI.
   if (recordInput.value === hit.id) return
   pickedDoi = hit.doi
@@ -240,7 +240,7 @@ async function startImport() {
   const epoch = sessionEpoch.value
   if (!attemptKey.value) attemptKey.value = crypto.randomUUID()
   try {
-    const submitted = await submitInvenioImport(
+    const submitted = await submitRepositoryImport(
       {
         ...found,
         group_id: groupId.value,

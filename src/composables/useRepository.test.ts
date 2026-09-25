@@ -2,7 +2,7 @@ import { effectScope, nextTick, ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const sessionEpoch = ref(0)
-const searchInvenioRecords = vi.fn()
+const searchRepositoryRecords = vi.fn()
 const listRepositoryConnectors = vi.fn()
 
 vi.mock('@/composables/useAruna', () => ({
@@ -10,11 +10,11 @@ vi.mock('@/composables/useAruna', () => ({
 }))
 vi.mock('@/lib/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/api')>()),
-  searchInvenioRecords,
+  searchRepositoryRecords,
   listRepositoryConnectors,
 }))
 
-const { useInvenioSearch, useRepositoryConnectors } = await import('./useRepository')
+const { useRepositorySearch, useRepositoryConnectors } = await import('./useRepository')
 
 function page(title: string) {
   return { hits: { total: 1, hits: [{ id: title, metadata: { title } }] } }
@@ -34,7 +34,7 @@ async function settle() {
 beforeEach(() => {
   vi.useFakeTimers()
   sessionEpoch.value = 0
-  searchInvenioRecords.mockReset()
+  searchRepositoryRecords.mockReset()
   listRepositoryConnectors.mockReset()
 })
 
@@ -43,22 +43,22 @@ afterEach(() => vi.useRealTimers())
 describe('invenio search', () => {
   it('asks nothing for an empty query', async () => {
     const scope = effectScope()
-    const search = scope.run(() => useInvenioSearch(() => ({ groupId: 'g1', connectorId: 'c1' }), { delayMs: 300 }))!
+    const search = scope.run(() => useRepositorySearch(() => ({ groupId: 'g1', connectorId: 'c1' }), { delayMs: 300 }))!
     await settle()
     search.query.value = '  '
     await nextTick()
     await vi.advanceTimersByTimeAsync(300)
 
-    expect(searchInvenioRecords).not.toHaveBeenCalled()
+    expect(searchRepositoryRecords).not.toHaveBeenCalled()
     expect(search.idle.value).toBe(true)
     expect(search.loading.value).toBe(false)
     scope.stop()
   })
 
   it('stops paging at the repository result window', async () => {
-    searchInvenioRecords.mockResolvedValue({ hits: { total: 50_000, hits: [] }, links: { next: 'more' } })
+    searchRepositoryRecords.mockResolvedValue({ hits: { total: 50_000, hits: [] }, links: { next: 'more' } })
     const scope = effectScope()
-    const search = scope.run(() => useInvenioSearch(() => ({ groupId: 'g1', connectorId: 'c1' }), { delayMs: 0, size: 25 }))!
+    const search = scope.run(() => useRepositorySearch(() => ({ groupId: 'g1', connectorId: 'c1' }), { delayMs: 0, size: 25 }))!
     search.query.value = 'ocean'
     await nextTick()
     await settle()
@@ -72,11 +72,11 @@ describe('invenio search', () => {
 
   it('waits for a typing pause and drops the answer for older text', async () => {
     const first = deferred<unknown>()
-    searchInvenioRecords.mockReturnValueOnce(first.promise).mockResolvedValueOnce(page('ocean'))
+    searchRepositoryRecords.mockReturnValueOnce(first.promise).mockResolvedValueOnce(page('ocean'))
     const scope = effectScope()
-    const search = scope.run(() => useInvenioSearch(() => ({ groupId: 'g1', connectorId: 'c1' }), { delayMs: 300 }))!
+    const search = scope.run(() => useRepositorySearch(() => ({ groupId: 'g1', connectorId: 'c1' }), { delayMs: 300 }))!
     await settle()
-    expect(searchInvenioRecords).not.toHaveBeenCalled()
+    expect(searchRepositoryRecords).not.toHaveBeenCalled()
 
     search.query.value = 'oce'
     await nextTick()
@@ -84,27 +84,27 @@ describe('invenio search', () => {
     search.query.value = 'ocean'
     await nextTick()
     await vi.advanceTimersByTimeAsync(299)
-    expect(searchInvenioRecords).toHaveBeenCalledTimes(1)
+    expect(searchRepositoryRecords).toHaveBeenCalledTimes(1)
     await vi.advanceTimersByTimeAsync(1)
     first.resolve(page('stale'))
     await settle()
 
-    expect(searchInvenioRecords).toHaveBeenCalledTimes(2)
-    expect(searchInvenioRecords.mock.calls[1][0]).toMatchObject({ q: 'ocean', page: 1 })
+    expect(searchRepositoryRecords).toHaveBeenCalledTimes(2)
+    expect(searchRepositoryRecords.mock.calls[1][0]).toMatchObject({ q: 'ocean', page: 1 })
     expect(search.hits.value.map((hit) => hit.title)).toEqual(['ocean'])
     scope.stop()
   })
 
   it('does not search without a connector and never shows a pending page as empty', async () => {
     const pending = deferred<unknown>()
-    searchInvenioRecords.mockReturnValueOnce(pending.promise)
+    searchRepositoryRecords.mockReturnValueOnce(pending.promise)
     const connectorId = ref('')
     const scope = effectScope()
-    const search = scope.run(() => useInvenioSearch(() => ({ groupId: 'g1', connectorId: connectorId.value })))!
+    const search = scope.run(() => useRepositorySearch(() => ({ groupId: 'g1', connectorId: connectorId.value })))!
     search.query.value = 'ocean'
     await vi.advanceTimersByTimeAsync(400)
     await settle()
-    expect(searchInvenioRecords).not.toHaveBeenCalled()
+    expect(searchRepositoryRecords).not.toHaveBeenCalled()
 
     connectorId.value = 'c1'
     await settle()

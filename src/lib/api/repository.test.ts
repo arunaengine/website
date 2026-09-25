@@ -1,16 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   acceptRemoteLink,
-  createInvenioLink,
+  createRepositoryLink,
   listRepositoryConnectors,
   lookupPid,
-  patchInvenioLink,
-  pullInvenioLink,
+  patchRepositoryLink,
+  pullRepositoryLink,
   replaceRepositoryConnector,
   rotateLinkToken,
-  searchInvenioRecords,
-  submitInvenioExport,
-  submitInvenioImport,
+  searchRepositoryRecords,
+  submitRepositoryExport,
+  submitRepositoryImport,
 } from './repository'
 
 const CLIENT = { baseUrl: 'https://api.test/api/v1', token: 'bearer-1' }
@@ -64,7 +64,7 @@ describe('repository connector client', () => {
 describe('invenio transfers', () => {
   it('sends the search as query parameters', async () => {
     const calls = stubFetch({ hits: { total: 0, hits: [] } })
-    await searchInvenioRecords({ group_id: 'g1', connector_id: 'c1', q: 'ocean data', page: 2, size: 10 }, CLIENT)
+    await searchRepositoryRecords({ group_id: 'g1', connector_id: 'c1', q: 'ocean data', page: 2, size: 10 }, CLIENT)
 
     const url = new URL(calls[0].url)
     expect(url.pathname).toBe('/api/v1/metadata/invenio/records')
@@ -75,7 +75,7 @@ describe('invenio transfers', () => {
 
   it('flattens the import options beside the target', async () => {
     const calls = stubFetch({ job_id: 'j1', status_url: '/compute/jobs/j1' })
-    await submitInvenioImport({
+    await submitRepositoryImport({
       group_id: 'g1', connector_id: 'c1', doi: '10.5281/zenodo.1', mode: 'reference', all_versions: false,
       keep_updated: true, target: { bucket: 'b', prefix: 'zenodo' },
       metadata: { group_id: 'g1', path: 'datasets/z', public: false }, idempotency_key: 'key-1',
@@ -87,7 +87,7 @@ describe('invenio transfers', () => {
 
   it('wraps a one-time export in the repository field', async () => {
     const calls = stubFetch({ job_id: 'j1', status_url: '/compute/jobs/j1' })
-    await submitInvenioExport('d1', {
+    await submitRepositoryExport('d1', {
       group_id: 'g1', connector_id: 'c1', access_token: SECRET, publish: false, public_files: false,
     }, 'key-1', CLIENT)
 
@@ -104,7 +104,7 @@ describe('invenio links', () => {
     const log = vi.spyOn(console, 'log')
     const warn = vi.spyOn(console, 'warn')
     const calls = stubFetch({ link_id: 'l1' }, 201)
-    await createInvenioLink('d1', { group_id: 'g1', connector_id: 'c1', access_token: SECRET, parent_id: 'p1' }, CLIENT)
+    await createRepositoryLink('d1', { group_id: 'g1', connector_id: 'c1', access_token: SECRET, parent_id: 'p1' }, CLIENT)
 
     expect(calls[0].method).toBe('POST')
     expect(calls[0].url).toBe('https://api.test/api/v1/metadata/d1/invenio/links')
@@ -125,7 +125,7 @@ describe('invenio links', () => {
   it('accepts the remote state and pulls on their own routes', async () => {
     const calls = stubFetch({ link_id: 'l1' })
     await acceptRemoteLink('d1', 'l1', CLIENT)
-    await pullInvenioLink('d1', 'l1', CLIENT)
+    await pullRepositoryLink('d1', 'l1', CLIENT)
 
     expect(calls.map((call) => [call.method, call.url])).toEqual([
       ['POST', 'https://api.test/api/v1/metadata/d1/invenio/links/l1/accept-remote'],
@@ -135,7 +135,7 @@ describe('invenio links', () => {
 
   it('pauses a link with a patch', async () => {
     const calls = stubFetch({ link_id: 'l1', status: 'paused' })
-    await patchInvenioLink('d1', 'l1', { paused: true }, CLIENT)
+    await patchRepositoryLink('d1', 'l1', { paused: true }, CLIENT)
 
     expect(calls[0].method).toBe('PATCH')
     expect(calls[0].body).toEqual({ paused: true })

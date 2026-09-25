@@ -3,7 +3,7 @@ import { defineComponent, h, reactive, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { button, click, compileClientComponent, content, flush, input, moduleDefault, mountApp, typeValue } from '@/test/clientRender'
 import * as Api from '@/lib/api'
-import * as Invenio from '@/lib/repository'
+import * as Repository from '@/lib/repository'
 import * as Utils from '@/lib/utils'
 
 const createRepositoryConnector = vi.fn()
@@ -48,7 +48,7 @@ const RepositoryDialog = compileClientComponent(new URL('./RepositoryDialog.vue'
   },
   '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled: ref(false) }) },
   '@/lib/api': { ...Api, createRepositoryConnector, replaceRepositoryConnector },
-  '@/lib/repository': Invenio,
+  '@/lib/repository': Repository,
   '@/lib/utils': Utils,
 })
 

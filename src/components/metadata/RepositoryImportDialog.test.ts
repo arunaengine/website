@@ -3,10 +3,10 @@ import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { button, click, compileClientComponent, content, flush, input, moduleDefault, mountApp, typeValue } from '@/test/clientRender'
 import * as Api from '@/lib/api'
-import * as Invenio from '@/lib/repository'
+import * as Repository from '@/lib/repository'
 import * as Utils from '@/lib/utils'
 
-const submitInvenioImport = vi.fn()
+const submitRepositoryImport = vi.fn()
 const lookupPid = vi.fn()
 const listPersistentIds = vi.fn()
 const createRepositoryConnector = vi.fn()
@@ -85,8 +85,8 @@ const ImportDialog = compileClientComponent(new URL('./RepositoryImportDialog.vu
     useJobDetail: () => ({ job, loadState: ref('idle'), loadError: ref(null), lastPollError: ref(null), load: vi.fn() }),
   },
   '@/composables/useNotifications': { useNotifications: () => ({ bumpDashboard: vi.fn() }) },
-  '@/lib/api': { ...Api, submitInvenioImport, lookupPid, createRepositoryConnector },
-  '@/lib/repository': Invenio,
+  '@/lib/api': { ...Api, submitRepositoryImport, lookupPid, createRepositoryConnector },
+  '@/lib/repository': Repository,
   '@/lib/jobs': { isTerminalJobState: (state: string) => ['succeeded', 'failed', 'cancelled'].includes(state) },
   '@/lib/pid': { listPersistentIds },
   '@/lib/rocrateArchive': {
@@ -112,9 +112,9 @@ beforeEach(() => {
   connectors.value = [{ connector_id: 'c1', kind: 'invenio', name: 'Zenodo', endpoint: 'https://zenodo.org/api/' }]
   canWriteMeta.value = true
   job.value = null
-  for (const mock of [submitInvenioImport, lookupPid, listPersistentIds, createRepositoryConnector, loadConnectors]) mock.mockReset()
+  for (const mock of [submitRepositoryImport, lookupPid, listPersistentIds, createRepositoryConnector, loadConnectors]) mock.mockReset()
   lookupPid.mockResolvedValue([])
-  submitInvenioImport.mockResolvedValue({ job_id: 'j1', status_url: '/jobs/j1' })
+  submitRepositoryImport.mockResolvedValue({ job_id: 'j1', status_url: '/jobs/j1' })
 })
 
 describe('RepositoryImportDialog', () => {
@@ -123,7 +123,7 @@ describe('RepositoryImportDialog', () => {
     await typeValue(recordField(mounted.root), 'https://doi.org/10.5281/zenodo.42')
     await click(button(mounted.root, 'Import record'))
 
-    const body = submitInvenioImport.mock.calls[0][0]
+    const body = submitRepositoryImport.mock.calls[0][0]
     expect(body).toMatchObject({
       doi: '10.5281/zenodo.42', group_id: 'g1', connector_id: 'c1', mode: 'copy', all_versions: false,
       keep_updated: true, auto_update: false, metadata: { path: 'datasets/zenodo.42' },
@@ -136,13 +136,13 @@ describe('RepositoryImportDialog', () => {
     const mounted = await mount()
     await typeValue(recordField(mounted.root), 'https://zenodo.org/records/77')
     await click(button(mounted.root, 'Import record'))
-    expect(submitInvenioImport.mock.calls[0][0]).toMatchObject({ url: 'https://zenodo.org/records/77' })
+    expect(submitRepositoryImport.mock.calls[0][0]).toMatchObject({ url: 'https://zenodo.org/records/77' })
     mounted.app.unmount()
 
     const again = await mount()
     await typeValue(recordField(again.root), '77')
     await click(button(again.root, 'Import record'))
-    expect(submitInvenioImport.mock.calls[1][0]).toMatchObject({ record_id: '77' })
+    expect(submitRepositoryImport.mock.calls[1][0]).toMatchObject({ record_id: '77' })
     again.app.unmount()
   })
 
@@ -191,13 +191,13 @@ describe('RepositoryImportDialog', () => {
     await typeValue(recordField(mounted.root), '42')
     await click(button(mounted.root, 'Import record'))
 
-    expect(submitInvenioImport.mock.calls[0][0]).toMatchObject({ keep_updated: false })
-    expect(submitInvenioImport.mock.calls[0][0]).not.toHaveProperty('auto_update')
+    expect(submitRepositoryImport.mock.calls[0][0]).toMatchObject({ keep_updated: false })
+    expect(submitRepositoryImport.mock.calls[0][0]).not.toHaveProperty('auto_update')
     mounted.app.unmount()
   })
 
   it('shows why the repository has no record for a DOI', async () => {
-    submitInvenioImport.mockRejectedValue(new Api.ApiError(400, 'no published record has this DOI'))
+    submitRepositoryImport.mockRejectedValue(new Api.ApiError(400, 'no published record has this DOI'))
     const mounted = await mount()
     await typeValue(recordField(mounted.root), '10.5281/zenodo.404')
     await click(button(mounted.root, 'Import record'))

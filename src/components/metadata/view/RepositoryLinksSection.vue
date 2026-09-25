@@ -18,14 +18,14 @@ import { useGroupRights } from '@/composables/useRepository'
 import {
   ApiError,
   acceptRemoteLink,
-  deleteInvenioLink,
-  listInvenioLinks,
-  patchInvenioLink,
-  publishInvenioLink,
-  pullInvenioLink,
-  pushInvenioLink,
+  deleteRepositoryLink,
+  listRepositoryLinks,
+  patchRepositoryLink,
+  publishRepositoryLink,
+  pullRepositoryLink,
+  pushRepositoryLink,
   rotateLinkToken,
-  type InvenioLink,
+  type RepositoryLink,
   type TransferJobResponse,
 } from '@/lib/api'
 import {
@@ -54,17 +54,17 @@ function client() {
 }
 
 // A link belongs to the group that created it, which may not be the dataset's group.
-function rights(link: InvenioLink) {
+function rights(link: RepositoryLink) {
   return linkRights(link, userId.value, adminOf(link.group_id))
 }
 
 // Only the node that owns a link can act on it or show its jobs.
-function here(link: InvenioLink): boolean {
+function here(link: RepositoryLink): boolean {
   const origin = typeof window === 'undefined' ? 'http://localhost' : window.location.origin
   return managedHere(link.owner_node_url, apiBaseUrl.value, origin)
 }
 
-const links = ref<InvenioLink[] | null>(null)
+const links = ref<RepositoryLink[] | null>(null)
 const loading = ref(false)
 const loadError = ref<string | null>(null)
 const hidden = ref(false)
@@ -93,7 +93,7 @@ async function load(silent = false) {
   if (!silent) loading.value = true
   if (!silent) loadError.value = null
   try {
-    const list = await listInvenioLinks(props.documentId, client())
+    const list = await listRepositoryLinks(props.documentId, client())
     if (!current()) return
     if (settledSince(links.value, list)) emit('settled')
     links.value = list
@@ -123,7 +123,7 @@ watch(
 defineExpose({ reload: () => load() })
 
 // A link that stopped waiting or changed its published record ends a run.
-function settledSince(before: InvenioLink[] | null, after: InvenioLink[]): boolean {
+function settledSince(before: RepositoryLink[] | null, after: RepositoryLink[]): boolean {
   return (before ?? []).some((old) => {
     const now = after.find((entry) => entry.link_id === old.link_id)
     if (!now) return false
@@ -180,7 +180,7 @@ function closeToken() {
   tokenDraft.value = ''
 }
 
-async function act(link: InvenioLink, work: () => Promise<TransferJobResponse | InvenioLink | void>) {
+async function act(link: RepositoryLink, work: () => Promise<TransferJobResponse | RepositoryLink | void>) {
   if (busyId.value) return
   const epoch = sessionEpoch.value
   const documentId = props.documentId
@@ -208,33 +208,33 @@ async function act(link: InvenioLink, work: () => Promise<TransferJobResponse | 
   }
 }
 
-const push = (link: InvenioLink) => act(link, () => pushInvenioLink(props.documentId, link.link_id, client()))
-const publish = (link: InvenioLink) => act(link, () => publishInvenioLink(props.documentId, link.link_id, client()))
-const pull = (link: InvenioLink) => act(link, () => pullInvenioLink(props.documentId, link.link_id, client()))
-const acceptRemote = (link: InvenioLink) => act(link, () => acceptRemoteLink(props.documentId, link.link_id, client()))
-const setAutoUpdate = (link: InvenioLink, value: boolean) =>
-  act(link, () => patchInvenioLink(props.documentId, link.link_id, { auto_update: value }, client()))
+const push = (link: RepositoryLink) => act(link, () => pushRepositoryLink(props.documentId, link.link_id, client()))
+const publish = (link: RepositoryLink) => act(link, () => publishRepositoryLink(props.documentId, link.link_id, client()))
+const pull = (link: RepositoryLink) => act(link, () => pullRepositoryLink(props.documentId, link.link_id, client()))
+const acceptRemote = (link: RepositoryLink) => act(link, () => acceptRemoteLink(props.documentId, link.link_id, client()))
+const setAutoUpdate = (link: RepositoryLink, value: boolean) =>
+  act(link, () => patchRepositoryLink(props.documentId, link.link_id, { auto_update: value }, client()))
 // A paused or failed link is stopped; resuming enables it again.
-function stopped(link: InvenioLink): boolean {
+function stopped(link: RepositoryLink): boolean {
   return link.status === 'paused' || link.status === 'failed'
 }
-const togglePause = (link: InvenioLink) =>
+const togglePause = (link: RepositoryLink) =>
   act(link, async () => {
-    await patchInvenioLink(props.documentId, link.link_id, { paused: !stopped(link) }, client())
+    await patchRepositoryLink(props.documentId, link.link_id, { paused: !stopped(link) }, client())
   })
-const remove = (link: InvenioLink) =>
+const remove = (link: RepositoryLink) =>
   act(link, async () => {
-    await deleteInvenioLink(props.documentId, link.link_id, client())
+    await deleteRepositoryLink(props.documentId, link.link_id, client())
   })
 
-function saveToken(link: InvenioLink) {
+function saveToken(link: RepositoryLink) {
   const token = tokenDraft.value.trim()
   closeToken()
   if (!token) return
   void act(link, () => rotateLinkToken(props.documentId, link.link_id, token, client()))
 }
 
-function openToken(link: InvenioLink) {
+function openToken(link: RepositoryLink) {
   tokenDraft.value = ''
   tokenFor.value = link.link_id
 }
@@ -242,11 +242,11 @@ function openToken(link: InvenioLink) {
 const ordered = computed(() => links.value ?? [])
 
 // Publishing while a push still runs would be refused, so it waits.
-function canPublish(link: InvenioLink): boolean {
+function canPublish(link: RepositoryLink): boolean {
   return Boolean(link.remote.draft_id) && !link.pending && !jobRunning(link.link_id) && link.remote.review !== 'pending'
 }
 
-function reasonTone(link: InvenioLink): string {
+function reasonTone(link: RepositoryLink): string {
   return link.status === 'failed' ? 'text-destructive' : 'text-muted-foreground'
 }
 </script>

@@ -13,17 +13,17 @@ import {
   typeValue,
 } from '@/test/clientRender'
 import * as Api from '@/lib/api'
-import * as Invenio from '@/lib/repository'
+import * as Repository from '@/lib/repository'
 import * as Utils from '@/lib/utils'
 
 const SECRET = 'pat-secret-value'
 const sessionEpoch = ref(0)
-const createInvenioLink = vi.fn()
-const submitInvenioExport = vi.fn()
+const createRepositoryLink = vi.fn()
+const submitRepositoryExport = vi.fn()
 const listPersistentIds = vi.fn()
-const getInvenioLink = vi.fn()
-const listInvenioLinks = vi.fn()
-const publishInvenioLink = vi.fn()
+const getRepositoryLink = vi.fn()
+const listRepositoryLinks = vi.fn()
+const publishRepositoryLink = vi.fn()
 const createRepositoryConnector = vi.fn()
 const loadConnectors = vi.fn()
 const connectors = ref<unknown[] | null>([])
@@ -98,9 +98,9 @@ const Dialog = compileClientComponent(new URL('./RepositoryPublishDialog.vue', i
     },
   },
   '@/lib/api': {
-    ...Api, createInvenioLink, submitInvenioExport, getInvenioLink, listInvenioLinks, publishInvenioLink, createRepositoryConnector,
+    ...Api, createRepositoryLink, submitRepositoryExport, getRepositoryLink, listRepositoryLinks, publishRepositoryLink, createRepositoryConnector,
   },
-  '@/lib/repository': Invenio,
+  '@/lib/repository': Repository,
   '@/lib/pid': { listPersistentIds },
   '@/lib/utils': Utils,
 })
@@ -130,13 +130,13 @@ beforeEach(() => {
   connectors.value = [ZENODO]
   canWriteMeta.value = true
   job.value = null
-  getInvenioLink.mockReset()
-  listInvenioLinks.mockReset().mockResolvedValue([])
-  publishInvenioLink.mockReset()
+  getRepositoryLink.mockReset()
+  listRepositoryLinks.mockReset().mockResolvedValue([])
+  publishRepositoryLink.mockReset()
   createRepositoryConnector.mockReset()
   loadConnectors.mockReset()
-  createInvenioLink.mockReset().mockResolvedValue(draftLink({}, { pending: true }))
-  submitInvenioExport.mockReset().mockResolvedValue({ job_id: 'j1', status_url: '/compute/jobs/j1' })
+  createRepositoryLink.mockReset().mockResolvedValue(draftLink({}, { pending: true }))
+  submitRepositoryExport.mockReset().mockResolvedValue({ job_id: 'j1', status_url: '/compute/jobs/j1' })
   listPersistentIds.mockReset().mockResolvedValue([
     { secondary_identifiers: [{ kind: 'invenio_parent', value: 'parent-1', endpoint: 'https://zenodo.org/api' }] },
   ])
@@ -149,7 +149,7 @@ describe('RepositoryPublishDialog', () => {
     await typeValue(tokenInput(mounted.root), SECRET)
     await click(button(mounted.root, 'Publish to Zenodo'))
 
-    expect(createInvenioLink).toHaveBeenCalledWith(
+    expect(createRepositoryLink).toHaveBeenCalledWith(
       'd1',
       { group_id: 'g1', connector_id: 'c1', access_token: SECRET, auto_publish: false, public_files: true },
       expect.anything(),
@@ -159,10 +159,10 @@ describe('RepositoryPublishDialog', () => {
   })
 
   it('shows the reserved DOI and publishes once the push finished', async () => {
-    getInvenioLink
+    getRepositoryLink
       .mockResolvedValueOnce(draftLink({ draft_id: 'r1', doi: '10.5281/zenodo.7', doi_reserved: true }, { pending: true }))
       .mockResolvedValueOnce(draftLink({ draft_id: 'r1', doi: '10.5281/zenodo.7', doi_reserved: true }))
-    publishInvenioLink.mockResolvedValue({ job_id: 'j9', status_url: '/jobs/j9' })
+    publishRepositoryLink.mockResolvedValue({ job_id: 'j9', status_url: '/jobs/j9' })
     const mounted = await mount()
     await typeValue(tokenInput(mounted.root), SECRET)
     await click(button(mounted.root, 'Publish to Zenodo'))
@@ -178,12 +178,12 @@ describe('RepositoryPublishDialog', () => {
     await flush()
     expect(poller?.skip()).toBe(true)
     await click(button(mounted.root, 'Publish'))
-    expect(publishInvenioLink).toHaveBeenCalledWith('d1', 'l1', expect.anything())
+    expect(publishRepositoryLink).toHaveBeenCalledWith('d1', 'l1', expect.anything())
     mounted.app.unmount()
   })
 
   it('asks for creators when the repository needs them and keeps the token', async () => {
-    createInvenioLink
+    createRepositoryLink
       .mockRejectedValueOnce(new Api.ApiError(400, 'missing metadata', 'missing_metadata', { error: 'x', missing: ['creators'] }))
       .mockResolvedValueOnce(draftLink({}))
     const mounted = await mount()
@@ -195,7 +195,7 @@ describe('RepositoryPublishDialog', () => {
     expect(tokenInput(mounted.root).props.value).toBe(SECRET)
     await click(button(mounted.root, 'Publish to Zenodo'))
 
-    expect(createInvenioLink.mock.calls[1][1].metadata).toEqual({
+    expect(createRepositoryLink.mock.calls[1][1].metadata).toEqual({
       creators: [{
         person_or_org: {
           type: 'personal', family_name: 'Lovelace', given_name: 'Ada',
@@ -207,7 +207,7 @@ describe('RepositoryPublishDialog', () => {
   })
 
   it('asks for a missing title and date and sends them with the dataset resource type', async () => {
-    submitInvenioExport.mockRejectedValueOnce(
+    submitRepositoryExport.mockRejectedValueOnce(
       new Api.ApiError(400, 'missing metadata', 'missing_metadata', {
         error: 'x', code: 'missing_metadata', missing: ['title', 'publication_date', 'resource_type'],
       }),
@@ -223,7 +223,7 @@ describe('RepositoryPublishDialog', () => {
     await typeValue(input(mounted.root, 'aria-label', 'Publication date'), '2026-09-01')
     await click(button(mounted.root, 'Start export'))
 
-    expect(submitInvenioExport.mock.calls[1][1].metadata).toEqual({
+    expect(submitRepositoryExport.mock.calls[1][1].metadata).toEqual({
       title: 'Soil data', publication_date: '2026-09-01', resource_type: { id: 'dataset' },
     })
     mounted.app.unmount()
@@ -231,7 +231,7 @@ describe('RepositoryPublishDialog', () => {
 
   it('asks for a publisher when the repository needs one', async () => {
     connectors.value = [{ connector_id: 'c2', kind: 'invenio', name: 'Institute', endpoint: 'https://rdm.example.org/api/' }]
-    createInvenioLink
+    createRepositoryLink
       .mockRejectedValueOnce(new Api.ApiError(400, 'missing metadata', 'missing_metadata', { missing: ['publisher'] }))
       .mockResolvedValueOnce(draftLink({}))
     const mounted = await mount()
@@ -243,12 +243,12 @@ describe('RepositoryPublishDialog', () => {
     await typeValue(input(mounted.root, 'aria-label', 'Publisher'), 'JLU Giessen')
     await click(button(mounted.root, 'Publish to repository'))
 
-    expect(createInvenioLink.mock.calls[1][1].metadata).toEqual({ publisher: 'JLU Giessen' })
+    expect(createRepositoryLink.mock.calls[1][1].metadata).toEqual({ publisher: 'JLU Giessen' })
     mounted.app.unmount()
   })
 
   it('treats a 400 without the missing metadata code as an error', async () => {
-    createInvenioLink.mockRejectedValueOnce(new Api.ApiError(400, 'bad token', 'invalid_request', { missing: ['creators'] }))
+    createRepositoryLink.mockRejectedValueOnce(new Api.ApiError(400, 'bad token', 'invalid_request', { missing: ['creators'] }))
     const mounted = await mount()
     await typeValue(tokenInput(mounted.root), SECRET)
     await click(button(mounted.root, 'Publish to Zenodo'))
@@ -259,7 +259,7 @@ describe('RepositoryPublishDialog', () => {
   })
 
   it('stops following a draft without a DOI and still offers publish', async () => {
-    getInvenioLink.mockResolvedValue(draftLink({ draft_id: 'r1', doi: null }))
+    getRepositoryLink.mockResolvedValue(draftLink({ draft_id: 'r1', doi: null }))
     const mounted = await mount()
     await typeValue(tokenInput(mounted.root), SECRET)
     await click(button(mounted.root, 'Publish to Zenodo'))
@@ -273,7 +273,7 @@ describe('RepositoryPublishDialog', () => {
   })
 
   it('does not continue a record the dataset imports updates from', async () => {
-    listInvenioLinks.mockResolvedValue([{
+    listRepositoryLinks.mockResolvedValue([{
       link_id: 'p', direction: 'pull', status: 'enabled', endpoint: 'https://zenodo.org/api/',
       remote: { parent_id: 'parent-1', published: true },
     }])
@@ -311,7 +311,7 @@ describe('RepositoryPublishDialog', () => {
   })
 
   it('hides publish while the community reviews the record', async () => {
-    getInvenioLink.mockResolvedValue(draftLink({ draft_id: 'r1', doi: '10.5281/zenodo.7', doi_reserved: true, review: 'pending' }))
+    getRepositoryLink.mockResolvedValue(draftLink({ draft_id: 'r1', doi: '10.5281/zenodo.7', doi_reserved: true, review: 'pending' }))
     const mounted = await mount()
     await typeValue(tokenInput(mounted.root), SECRET)
     await click(button(mounted.root, 'Publish to Zenodo'))
@@ -402,7 +402,7 @@ describe('RepositoryPublishDialog', () => {
     await typeValue(tokenInput(mounted.root), SECRET)
     await click(button(mounted.root, 'Start export'))
 
-    const [documentId, repository, key] = submitInvenioExport.mock.calls[0]
+    const [documentId, repository, key] = submitRepositoryExport.mock.calls[0]
     expect(documentId).toBe('d1')
     expect(repository).toMatchObject({ access_token: SECRET, publish: false, public_files: true })
     expect(key).not.toContain(SECRET)

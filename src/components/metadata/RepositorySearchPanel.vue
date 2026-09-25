@@ -7,14 +7,14 @@ import ExternalLink from '@/components/ui/ExternalLink.vue'
 import Input from '@/components/ui/Input.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import Spinner from '@/components/ui/Spinner.vue'
-import { useInvenioSearch } from '@/composables/useRepository'
-import type { InvenioHit } from '@/lib/repository'
+import { useRepositorySearch } from '@/composables/useRepository'
+import type { RepositoryHit } from '@/lib/repository'
 import { Search } from '@lucide/vue'
 
 const props = defineProps<{ groupId: string; connectorId: string; selectedId?: string }>()
-const emit = defineEmits<{ (e: 'pick', hit: InvenioHit): void }>()
+const emit = defineEmits<{ (e: 'pick', hit: RepositoryHit): void }>()
 
-const search = useInvenioSearch(() => ({ groupId: props.groupId, connectorId: props.connectorId }))
+const search = useRepositorySearch(() => ({ groupId: props.groupId, connectorId: props.connectorId }))
 const { query, page, hits, total, pageCount, hasNext, loading, error, idle, run } = search
 </script>
 

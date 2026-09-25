@@ -24,13 +24,13 @@ import { useAruna } from '@/composables/useAruna'
 import { useGroupRights, useRepositoryConnectors } from '@/composables/useRepository'
 import { useJobDetail } from '@/composables/useJobs'
 import {
-  createInvenioLink,
+  createRepositoryLink,
   createRepositoryConnector,
-  getInvenioLink,
-  listInvenioLinks,
-  publishInvenioLink,
-  submitInvenioExport,
-  type InvenioLink,
+  getRepositoryLink,
+  listRepositoryLinks,
+  publishRepositoryLink,
+  submitRepositoryExport,
+  type RepositoryLink,
 } from '@/lib/api'
 import {
   creatorsMetadata,
@@ -58,7 +58,7 @@ import { Plus, Send, Trash2 } from '@lucide/vue'
 const props = defineProps<{ open: boolean; documentId: string; groupId: string }>()
 const emit = defineEmits<{
   (e: 'update:open', v: boolean): void
-  (e: 'linked', link: InvenioLink): void
+  (e: 'linked', link: RepositoryLink): void
 }>()
 
 const { apiBaseUrl, authToken, sessionEpoch, currentUser } = useAruna()
@@ -86,7 +86,7 @@ const publicationDate = ref('')
 const publisher = ref('')
 const missingBox = ref<HTMLFieldSetElement | null>(null)
 // The link this dialog created; it is followed until its draft exists.
-const link = ref<InvenioLink | null>(null)
+const link = ref<RepositoryLink | null>(null)
 const publishing = ref(false)
 const publishError = ref<string | null>(null)
 
@@ -121,7 +121,7 @@ watch(
 // The source record, when there is one on the chosen endpoint, and the links
 // that may already import updates from it.
 const pidRows = ref<PersistentIdView[]>([])
-const datasetLinks = ref<InvenioLink[]>([])
+const datasetLinks = ref<RepositoryLink[]>([])
 let pidGeneration = 0
 async function loadPids() {
   const current = ++pidGeneration
@@ -130,7 +130,7 @@ async function loadPids() {
   datasetLinks.value = []
   try {
     // Links a caller may not read count as none.
-    const links = listInvenioLinks(documentId, client()).catch(() => [])
+    const links = listRepositoryLinks(documentId, client()).catch(() => [])
     const [rows, pulled] = await Promise.all([listPersistentIds(documentId, client()), links])
     if (current === pidGeneration) {
       pidRows.value = rows
@@ -220,7 +220,7 @@ async function refreshLink() {
   if (!current) return
   const epoch = sessionEpoch.value
   try {
-    const answer = await getInvenioLink(current.document_id, current.link_id, client())
+    const answer = await getRepositoryLink(current.document_id, current.link_id, client())
     if (epoch === sessionEpoch.value && link.value?.link_id === answer.link_id) link.value = answer
   } catch {
     // The next tick asks again; the link list on the page stays the record.
@@ -240,7 +240,7 @@ async function publish() {
   publishing.value = true
   publishError.value = null
   try {
-    const started = await publishInvenioLink(current.document_id, current.link_id, client())
+    const started = await publishRepositoryLink(current.document_id, current.link_id, client())
     if (link.value?.link_id === current.link_id) activeJobId.value = started.job_id
   } catch (err) {
     if (link.value?.link_id === current.link_id) publishError.value = errorMessage(err)
@@ -305,7 +305,7 @@ async function submit() {
   const current = () => epoch === sessionEpoch.value && documentId === props.documentId && props.open
   try {
     if (mode.value === 'link') {
-      const created = await createInvenioLink(
+      const created = await createRepositoryLink(
         documentId,
         {
           group_id: props.groupId,
@@ -322,7 +322,7 @@ async function submit() {
       link.value = created
       emit('linked', created)
     } else {
-      const submitted = await submitInvenioExport(
+      const submitted = await submitRepositoryExport(
         documentId,
         {
           group_id: props.groupId,

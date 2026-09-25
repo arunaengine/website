@@ -2,8 +2,8 @@ import { computed, onScopeDispose, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import {
   listRepositoryConnectors,
-  searchInvenioRecords,
-  type InvenioSearchPage,
+  searchRepositoryRecords,
+  type RepositorySearchPage,
   type RepositoryConnector,
 } from '@/lib/api'
 import { ownRolesWrite } from '@/lib/groupAdmin'
@@ -65,13 +65,13 @@ const RESULT_WINDOW = 10_000
 
 // Remote record search. Typing waits for a pause; every answer is bound to the
 // query, page, connector and session it was asked for. An empty query asks nothing.
-export function useInvenioSearch(scope: () => SearchScope, options: { delayMs?: number; size?: number } = {}) {
+export function useRepositorySearch(scope: () => SearchScope, options: { delayMs?: number; size?: number } = {}) {
   const { apiBaseUrl, authToken, sessionEpoch } = useAruna()
   const delayMs = options.delayMs ?? 350
   const size = options.size ?? 10
   const query = ref('')
   const page = ref(1)
-  const result = ref<InvenioSearchPage | null>(null)
+  const result = ref<RepositorySearchPage | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
   let generation = 0
@@ -91,7 +91,7 @@ export function useInvenioSearch(scope: () => SearchScope, options: { delayMs?: 
     loading.value = Boolean(groupId && connectorId && query.value.trim())
     if (!loading.value) return
     try {
-      const answer = await searchInvenioRecords(
+      const answer = await searchRepositoryRecords(
         { group_id: groupId, connector_id: connectorId, q: query.value.trim(), page: page.value, size },
         { baseUrl: apiBaseUrl.value, token: authToken.value },
       )

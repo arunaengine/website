@@ -1,10 +1,10 @@
 import {
   ApiError,
-  type InvenioLink,
-  type InvenioRecord,
-  type InvenioRecordSource,
-  type InvenioReviewState,
-  type InvenioSearchPage,
+  type RepositoryLink,
+  type RepositoryRecord,
+  type RepositoryRecordSource,
+  type RepositoryReviewState,
+  type RepositorySearchPage,
   type RepositoryConnectorRequest,
   type SecondaryIdentifier,
 } from './api'
@@ -14,7 +14,7 @@ import { stateVariant, type BadgeVariant } from './stateBadge'
 // Presentation of Invenio and Zenodo answers: search hits, link states and the
 // secondary identifiers a dataset holds.
 
-export interface InvenioHit {
+export interface RepositoryHit {
   id: string
   title: string
   date: string
@@ -41,7 +41,7 @@ function creatorName(value: unknown): string {
 }
 
 /** One search hit, or null when it has no record id to import. */
-export function searchHit(raw: unknown): InvenioHit | null {
+export function searchHit(raw: unknown): RepositoryHit | null {
   const hit = record(raw)
   const id = text(hit.id) || text(hit.recid)
   if (!id) return null
@@ -59,13 +59,13 @@ export function searchHit(raw: unknown): InvenioHit | null {
   }
 }
 
-export function searchHits(page: InvenioSearchPage | null): InvenioHit[] {
+export function searchHits(page: RepositorySearchPage | null): RepositoryHit[] {
   const hits = page?.hits?.hits
   return Array.isArray(hits) ? hits.flatMap((raw) => searchHit(raw) ?? []) : []
 }
 
 /** Total number of matches, or null when the repository did not say. */
-export function searchTotal(page: InvenioSearchPage | null): number | null {
+export function searchTotal(page: RepositorySearchPage | null): number | null {
   const total = page?.hits?.total
   if (typeof total === 'number') return total
   if (total && typeof total.value === 'number') return total.value
@@ -120,24 +120,24 @@ export function failureText(reason: string | null | undefined, pull = false): st
   return (pull ? PULL_REASON_TEXT[reason] : undefined) ?? REASON_TEXT[reason] ?? `${failed}: ${reason.replaceAll('_', ' ')}.`
 }
 
-const REVIEW_TEXT: Record<InvenioReviewState, string | null> = {
+const REVIEW_TEXT: Record<RepositoryReviewState, string | null> = {
   none: null,
   pending: 'Waiting for community review',
   accepted: 'Accepted by the community',
   declined: 'Declined by the community',
 }
 
-export function reviewText(review: InvenioReviewState | undefined): string | null {
+export function reviewText(review: RepositoryReviewState | undefined): string | null {
   return review ? REVIEW_TEXT[review] ?? null : null
 }
 
 // Pull links check the remote; push links send changes.
-export function isPullLink(link: Pick<InvenioLink, 'direction'>): boolean {
+export function isPullLink(link: Pick<RepositoryLink, 'direction'>): boolean {
   return link.direction === 'pull'
 }
 
 /** Keep polling while a push waits or a community review is open. */
-export function linkBusy(link: InvenioLink): boolean {
+export function linkBusy(link: RepositoryLink): boolean {
   return link.pending || link.remote.review === 'pending'
 }
 
@@ -148,7 +148,7 @@ export interface LinkRights {
   manage: boolean
 }
 
-export function linkRights(link: Pick<InvenioLink, 'created_by'>, userId: string, groupAdmin: boolean): LinkRights {
+export function linkRights(link: Pick<RepositoryLink, 'created_by'>, userId: string, groupAdmin: boolean): LinkRights {
   const owner = Boolean(userId) && link.created_by === userId
   return { owner, manage: owner || groupAdmin }
 }
@@ -168,7 +168,7 @@ export function managedHere(ownerNodeUrl: string, apiBaseUrl: string, origin: st
 
 const STATUS_LABEL: Record<string, string> = { enabled: 'Enabled', paused: 'Paused', failed: 'Failed' }
 
-export function linkStatus(link: Pick<InvenioLink, 'status'>): { label: string; variant: BadgeVariant } {
+export function linkStatus(link: Pick<RepositoryLink, 'status'>): { label: string; variant: BadgeVariant } {
   const label = STATUS_LABEL[link.status] ?? link.status
   return { label, variant: stateVariant(link.status) }
 }
@@ -205,7 +205,7 @@ export function sourceParent(rows: readonly PersistentIdView[], endpoint: string
 }
 
 /** Whether an enabled pull link already imports updates from this record lineage. */
-export function pullsParent(links: readonly InvenioLink[], parentId: string, endpoint: string): boolean {
+export function pullsParent(links: readonly RepositoryLink[], parentId: string, endpoint: string): boolean {
   return links.some(
     (link) =>
       isPullLink(link) && link.status === 'enabled' && link.remote.parent_id === parentId && sameEndpoint(link.endpoint, endpoint),
@@ -213,7 +213,7 @@ export function pullsParent(links: readonly InvenioLink[], parentId: string, end
 }
 
 /** The record an import names: a DOI, a record URL or a plain record id. */
-export function recordSource(input: string): InvenioRecordSource | null {
+export function recordSource(input: string): RepositoryRecordSource | null {
   const text = input.trim()
   if (!text) return null
   const doi = text.match(/^(?:doi:\s*|https?:\/\/(?:dx\.)?doi\.org\/)?(10\.\d{4,}\/\S+)$/i)
@@ -337,9 +337,9 @@ export function creatorsMetadata(creators: readonly CreatorDraft[]): Record<stri
 }
 
 /** The repository record of a finished one-time export, when the result has one. */
-export function exportRepository(result: unknown): InvenioRecord | null {
+export function exportRepository(result: unknown): RepositoryRecord | null {
   const repository = record(record(result).repository)
-  return text(repository.id) ? (repository as unknown as InvenioRecord) : null
+  return text(repository.id) ? (repository as unknown as RepositoryRecord) : null
 }
 
 /** An optional metadata override typed as JSON; it must be an object. */

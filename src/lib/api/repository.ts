@@ -74,7 +74,7 @@ export function deleteRepositoryConnector(
   return apiRequest(repositoriesPath(groupId, connectorId), { method: 'DELETE' }, client)
 }
 
-export interface InvenioSearchQuery {
+export interface RepositorySearchQuery {
   group_id: string
   connector_id: string
   q: string
@@ -84,28 +84,28 @@ export interface InvenioSearchQuery {
 }
 
 // The native repository answer; src/lib/invenio.ts maps its hits.
-export interface InvenioSearchPage {
+export interface RepositorySearchPage {
   hits?: { total?: number | { value?: number }; hits?: unknown[] }
   links?: { next?: string | null }
 }
 
-export function searchInvenioRecords(
-  query: InvenioSearchQuery,
+export function searchRepositoryRecords(
+  query: RepositorySearchQuery,
   client: ApiClientOptions,
   signal?: AbortSignal,
-): Promise<InvenioSearchPage> {
+): Promise<RepositorySearchPage> {
   return apiRequest('/metadata/invenio/records', { query: { ...query }, signal }, client)
 }
 
-export type InvenioImportMode = 'copy' | 'reference' | 'metadata'
+export type RepositoryImportMode = 'copy' | 'reference' | 'metadata'
 
 // The record is named by exactly one of record_id, doi (version or concept) or url.
-export type InvenioRecordSource = { record_id: string } | { doi: string } | { url: string }
+export type RepositoryRecordSource = { record_id: string } | { doi: string } | { url: string }
 
-export type InvenioImportRequest = InvenioRecordSource & {
+export type RepositoryImportRequest = RepositoryRecordSource & {
   group_id: string
   connector_id: string
-  mode: InvenioImportMode
+  mode: RepositoryImportMode
   all_versions: boolean
   // keep_updated creates a pull link; auto_update imports new versions without asking.
   keep_updated?: boolean
@@ -123,14 +123,14 @@ export interface TransferJobResponse {
   report_url?: string
 }
 
-export function submitInvenioImport(
-  request: InvenioImportRequest,
+export function submitRepositoryImport(
+  request: RepositoryImportRequest,
   client: ApiClientOptions,
 ): Promise<TransferJobResponse> {
   return apiRequest('/metadata/invenio/imports', { method: 'POST', body: JSON.stringify(request) }, client)
 }
 
-export interface InvenioExportRequest {
+export interface RepositoryExportRequest {
   group_id: string
   connector_id: string
   access_token: string
@@ -141,9 +141,9 @@ export interface InvenioExportRequest {
 }
 
 // One-time export: the token is used for this job and is not kept on a link.
-export function submitInvenioExport(
+export function submitRepositoryExport(
   documentId: string,
-  repository: InvenioExportRequest,
+  repository: RepositoryExportRequest,
   idempotencyKey: string,
   client: ApiClientOptions,
 ): Promise<TransferJobResponse> {
@@ -155,7 +155,7 @@ export function submitInvenioExport(
 }
 
 // The repository record of a finished one-time export job.
-export interface InvenioRecord {
+export interface RepositoryRecord {
   id: string
   url: string
   published: boolean
@@ -171,15 +171,15 @@ export interface InvenioRecord {
   warning?: string | null
 }
 
-export interface InvenioExportResult {
-  repository: InvenioRecord
+export interface RepositoryExportResult {
+  repository: RepositoryRecord
 }
 
-export type InvenioLinkStatus = 'enabled' | 'paused' | 'failed'
+export type RepositoryLinkStatus = 'enabled' | 'paused' | 'failed'
 
-export type InvenioReviewState = 'none' | 'pending' | 'accepted' | 'declined'
+export type RepositoryReviewState = 'none' | 'pending' | 'accepted' | 'declined'
 
-export interface InvenioLinkRemote {
+export interface RepositoryLinkRemote {
   parent_id?: string | null
   draft_id?: string | null
   record_id?: string | null
@@ -189,12 +189,12 @@ export interface InvenioLinkRemote {
   concept_doi?: string | null
   record_url?: string | null
   published: boolean
-  review?: InvenioReviewState
+  review?: RepositoryReviewState
   // Pull links: the latest published version at the last check.
   latest_remote_id?: string | null
 }
 
-export interface InvenioLink {
+export interface RepositoryLink {
   link_id: string
   document_id: string
   group_id: string
@@ -204,7 +204,7 @@ export interface InvenioLink {
   created_by: string
   direction: 'push' | 'pull'
   // Kept open so a new status renders instead of breaking.
-  status: InvenioLinkStatus | (string & {})
+  status: RepositoryLinkStatus | (string & {})
   reason?: string | null
   warning?: string | null
   auto_publish: boolean
@@ -214,13 +214,13 @@ export interface InvenioLink {
   public_files: boolean
   // A push is queued or running, or a pull is running.
   pending: boolean
-  remote: InvenioLinkRemote
+  remote: RepositoryLinkRemote
   last_push?: { event_id: string; job_id: string; pushed_at: string } | null
   created_at: string
   updated_at: string
 }
 
-export interface CreateInvenioLink {
+export interface CreateRepositoryLink {
   group_id: string
   connector_id: string
   access_token: string
@@ -231,7 +231,7 @@ export interface CreateInvenioLink {
 }
 
 // auto_update applies to pull links; auto_publish, public_files and metadata to push links.
-export interface PatchInvenioLink {
+export interface PatchRepositoryLink {
   paused?: boolean
   auto_publish?: boolean
   auto_update?: boolean
@@ -245,37 +245,37 @@ function linksPath(documentId: string, linkId?: string, action?: string): string
   return action ? `${path}/${action}` : path
 }
 
-export function listInvenioLinks(documentId: string, client: ApiClientOptions): Promise<InvenioLink[]> {
+export function listRepositoryLinks(documentId: string, client: ApiClientOptions): Promise<RepositoryLink[]> {
   return apiRequest(linksPath(documentId), {}, client)
 }
 
-export function getInvenioLink(documentId: string, linkId: string, client: ApiClientOptions): Promise<InvenioLink> {
+export function getRepositoryLink(documentId: string, linkId: string, client: ApiClientOptions): Promise<RepositoryLink> {
   return apiRequest(linksPath(documentId, linkId), {}, client)
 }
 
-export function createInvenioLink(
+export function createRepositoryLink(
   documentId: string,
-  input: CreateInvenioLink,
+  input: CreateRepositoryLink,
   client: ApiClientOptions,
-): Promise<InvenioLink> {
+): Promise<RepositoryLink> {
   return apiRequest(linksPath(documentId), { method: 'POST', body: JSON.stringify(input) }, client)
 }
 
-export function patchInvenioLink(
+export function patchRepositoryLink(
   documentId: string,
   linkId: string,
-  input: PatchInvenioLink,
+  input: PatchRepositoryLink,
   client: ApiClientOptions,
-): Promise<InvenioLink> {
+): Promise<RepositoryLink> {
   return apiRequest(linksPath(documentId, linkId), { method: 'PATCH', body: JSON.stringify(input) }, client)
 }
 
 // Removes the link and its sealed token; records in the repository stay.
-export function deleteInvenioLink(documentId: string, linkId: string, client: ApiClientOptions): Promise<void> {
+export function deleteRepositoryLink(documentId: string, linkId: string, client: ApiClientOptions): Promise<void> {
   return apiRequest(linksPath(documentId, linkId), { method: 'DELETE' }, client)
 }
 
-export function pushInvenioLink(
+export function pushRepositoryLink(
   documentId: string,
   linkId: string,
   client: ApiClientOptions,
@@ -283,7 +283,7 @@ export function pushInvenioLink(
   return apiRequest(linksPath(documentId, linkId, 'push'), { method: 'POST' }, client)
 }
 
-export function publishInvenioLink(
+export function publishRepositoryLink(
   documentId: string,
   linkId: string,
   client: ApiClientOptions,
@@ -292,12 +292,12 @@ export function publishInvenioLink(
 }
 
 // Makes the current remote latest record the new base and clears remote_changed.
-export function acceptRemoteLink(documentId: string, linkId: string, client: ApiClientOptions): Promise<InvenioLink> {
+export function acceptRemoteLink(documentId: string, linkId: string, client: ApiClientOptions): Promise<RepositoryLink> {
   return apiRequest(linksPath(documentId, linkId, 'accept-remote'), { method: 'POST' }, client)
 }
 
 // Imports the available remote version into a pull link's dataset.
-export function pullInvenioLink(
+export function pullRepositoryLink(
   documentId: string,
   linkId: string,
   client: ApiClientOptions,
