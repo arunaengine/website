@@ -50,8 +50,6 @@ export function useGroupRights(groupId: () => string) {
   }
   return {
     userId: computed(() => userInfo.value?.user.user_id ?? ''),
-    canWriteData: computed(() => writes(groupId(), 'data/**')),
-    isAdmin: computed(() => writes(groupId(), 'admin')),
     canWriteMeta: computed(() => writes(groupId(), 'meta/**')),
     adminOf: (group: string) => writes(group, 'admin'),
   }

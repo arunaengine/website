@@ -12,7 +12,7 @@ const listPersistentIds = vi.fn()
 const createRepositoryConnector = vi.fn()
 const loadConnectors = vi.fn()
 const connectors = ref<unknown[] | null>([])
-const canWriteData = ref(true)
+const canWriteMeta = ref(true)
 const job = ref<unknown>(null)
 
 const Empty = defineComponent(() => () => null)
@@ -30,6 +30,11 @@ const InputStub = defineComponent({
       value: props.modelValue,
       onInput: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value),
     }),
+})
+const SearchStub = defineComponent({
+  emits: ['pick'],
+  setup: (_, { emit }) => () =>
+    h('button', { onClick: () => emit('pick', { id: '77', doi: '10.5281/zenodo.77' }) }, 'Pick record 77'),
 })
 // Fills the target the way a user would; the dialog only needs the models.
 const TargetStub = defineComponent({
@@ -65,7 +70,7 @@ const ImportDialog = compileClientComponent(new URL('./InvenioImportDialog.vue',
   '@/components/ui/Select.vue': moduleDefault(Empty),
   '@/components/ui/Spinner.vue': moduleDefault(Empty),
   '@/components/ui/Switch.vue': moduleDefault(Empty),
-  '@/components/metadata/InvenioSearchPanel.vue': moduleDefault(Empty),
+  '@/components/metadata/InvenioSearchPanel.vue': moduleDefault(SearchStub),
   '@/components/metadata/TransferJobStatus.vue': moduleDefault(Empty),
   '@/components/metadata/TransferReport.vue': moduleDefault(Empty),
   '@/components/metadata/TransferTarget.vue': moduleDefault(TargetStub),
@@ -74,7 +79,7 @@ const ImportDialog = compileClientComponent(new URL('./InvenioImportDialog.vue',
   },
   '@/composables/useInvenio': {
     useRepositoryConnectors: () => ({ connectors, loading: ref(false), error: ref(null), load: loadConnectors }),
-    useGroupRights: () => ({ canWriteData }),
+    useGroupRights: () => ({ canWriteMeta }),
   },
   '@/composables/useJobs': {
     useJobDetail: () => ({ job, loadState: ref('idle'), loadError: ref(null), lastPollError: ref(null), load: vi.fn() }),
@@ -105,7 +110,7 @@ function recordField(root: Parameters<typeof input>[0]) {
 
 beforeEach(() => {
   connectors.value = [{ connector_id: 'c1', kind: 'invenio', name: 'Zenodo', endpoint: 'https://zenodo.org/api/' }]
-  canWriteData.value = true
+  canWriteMeta.value = true
   job.value = null
   for (const mock of [submitInvenioImport, lookupPid, listPersistentIds, createRepositoryConnector, loadConnectors]) mock.mockReset()
   lookupPid.mockResolvedValue([])
@@ -158,7 +163,36 @@ describe('InvenioImportDialog', () => {
     await typeValue(recordField(mounted.root), '10.5281/zenodo.42')
     await flush()
 
-    expect(content(mounted.root)).toContain('Try again later')
+    expect(content(mounted.root)).toContain('could not check')
+    lookupPid.mockResolvedValue([{ document_id: 'd1', origin: 'imported' }])
+    await click(button(mounted.root, 'Retry'))
+
+    expect(lookupPid).toHaveBeenCalledTimes(2)
+    expect(lookupPid).toHaveBeenLastCalledWith('doi', '10.5281/zenodo.42', expect.anything())
+    expect(content(mounted.root)).toContain('A dataset already holds this DOI')
+    mounted.app.unmount()
+  })
+
+  it('forgets the DOI of a hit picked twice once another record is typed', async () => {
+    const mounted = await mount()
+    await click(button(mounted.root, 'Pick record 77'))
+    await click(button(mounted.root, 'Pick record 77'))
+    await typeValue(recordField(mounted.root), '88')
+
+    expect(lookupPid).toHaveBeenCalledTimes(1)
+    expect(lookupPid).toHaveBeenCalledWith('doi', '10.5281/zenodo.77', expect.anything())
+    mounted.app.unmount()
+  })
+
+  it('does not keep an import updated without metadata write in the group', async () => {
+    canWriteMeta.value = false
+    const mounted = await mount()
+    expect(content(mounted.root)).toContain("Needs write access to the group's metadata.")
+    await typeValue(recordField(mounted.root), '42')
+    await click(button(mounted.root, 'Import record'))
+
+    expect(submitInvenioImport.mock.calls[0][0]).toMatchObject({ keep_updated: false })
+    expect(submitInvenioImport.mock.calls[0][0]).not.toHaveProperty('auto_update')
     mounted.app.unmount()
   })
 

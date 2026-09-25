@@ -99,7 +99,7 @@ async function confirmDelete(connector: RepositoryConnector) {
       <Library class="h-4 w-4 text-primary" /> Repositories
     </h3>
     <p v-if="hidden" class="text-xs text-muted-foreground">
-      Repositories are only visible with read access to the group's data.
+      Repositories are only visible with read access to the group's metadata.
     </p>
     <Skeleton v-else-if="loading && !connectors" class="h-12" />
     <ErrorPanel v-else-if="loadError" :message="loadError" @retry="load" />

@@ -74,7 +74,9 @@ const {
   error: connectorsError,
   load: loadConnectors,
 } = useRepositoryConnectors(() => groupId.value)
-const { canWriteData } = useGroupRights(() => groupId.value)
+const { canWriteMeta } = useGroupRights(() => groupId.value)
+// Keeping an import updated needs metadata WRITE in the connector's group.
+watch(canWriteMeta, (allowed) => (keepUpdated.value = allowed), { immediate: true })
 const invenioConnectors = computed(() => connectors.value?.filter((entry) => entry.kind === 'invenio') ?? null)
 const connectorOptions = computed(() =>
   (invenioConnectors.value ?? []).map((entry) => ({ value: entry.connector_id, label: entry.name })),
@@ -109,6 +111,8 @@ async function addPreset() {
   const group = groupId.value
   if (addingPreset.value || !group) return
   const preset = REPOSITORY_PRESETS[0]
+  const epoch = sessionEpoch.value
+  const current = () => group === groupId.value && epoch === sessionEpoch.value
   addingPreset.value = true
   presetError.value = null
   try {
@@ -117,11 +121,11 @@ async function addPreset() {
       { name: preset.name, kind: 'invenio', endpoint: preset.endpoint, secret_config: {} },
       client(),
     )
-    if (group !== groupId.value) return
+    if (!current()) return
     await loadConnectors()
-    connectorId.value = created.connector_id
+    if (current()) connectorId.value = created.connector_id
   } catch (err) {
-    presetError.value = errorMessage(err)
+    if (current()) presetError.value = errorMessage(err)
   } finally {
     addingPreset.value = false
   }
@@ -143,8 +147,10 @@ watch(source, (found) => {
 
 let pickedDoi = ''
 function pickHit(hit: InvenioHit) {
-  recordInput.value = hit.id
+  // The same hit again changes nothing, so no watcher would clear the DOI.
+  if (recordInput.value === hit.id) return
   pickedDoi = hit.doi
+  recordInput.value = hit.id
 }
 
 // A record already imported is worth knowing about before a second copy.
@@ -152,7 +158,9 @@ const existing = ref<PidLookupMatch[]>([])
 // Some node did not answer and nothing matched, so the check is open.
 const lookupOpen = ref(false)
 let lookupGeneration = 0
+let lookupDoi = ''
 async function checkExisting(doi: string) {
+  lookupDoi = doi
   const current = ++lookupGeneration
   const epoch = sessionEpoch.value
   const input = recordInput.value
@@ -309,12 +317,12 @@ watch(sessionEpoch, () => {
                 <p v-else-if="!groupId" class="mt-2 text-[11px] text-muted-foreground">Choose a group first.</p>
                 <Spinner v-else-if="connectorsLoading" show-label label="Loading repositories…" class="mt-2 flex text-[11px]" />
                 <p v-else-if="connectorsError" class="mt-2 text-[11px] text-destructive">{{ connectorsError }}</p>
-                <div v-else-if="invenioConnectors && canWriteData" class="mt-2 space-y-1">
+                <div v-else-if="invenioConnectors && canWriteMeta" class="mt-2 space-y-1">
                   <Button size="sm" variant="outline" :disabled="addingPreset" @click="addPreset">Add Zenodo</Button>
-                  <p v-if="presetError" class="text-[11px] text-destructive">{{ presetError }}</p>
+                  <p v-if="presetError" role="alert" class="text-[11px] text-destructive">{{ presetError }}</p>
                 </div>
                 <p v-else-if="invenioConnectors" class="mt-2 text-[11px] text-muted-foreground">
-                  This group has no repository yet. Ask someone who manages the group's data to add Zenodo.
+                  This group has no repository yet. Ask someone who manages the group's metadata to add Zenodo.
                   <RouterLink
                     :to="{ name: 'group', params: { id: groupId }, query: { tab: 'sources' } }"
                     class="text-primary hover:underline"
@@ -351,8 +359,9 @@ watch(sessionEpoch, () => {
               <Input :id="`${uid}-path`" v-model="documentPath" placeholder="datasets/my-dataset" class="mt-1" />
             </div>
           </div>
-          <p v-if="lookupOpen" class="text-[11px] text-muted-foreground">
-            Not every node answered, so Aruna could not check whether a dataset already holds this DOI. Try again later.
+          <p v-if="lookupOpen" class="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+            Not every node answered, so Aruna could not check whether a dataset already holds this DOI.
+            <Button variant="ghost" size="sm" class="h-6 px-1 text-xs" @click="checkExisting(lookupDoi)">Retry</Button>
           </p>
           <Notice v-if="existing.length" tone="info">
             {{ existing.length === 1 ? 'A dataset already holds' : `${existing.length} datasets already hold` }} this DOI
@@ -369,11 +378,18 @@ watch(sessionEpoch, () => {
             <p class="text-[11px] text-muted-foreground">{{ MODE_HINT[mode] }}</p>
           </div>
           <label class="flex items-start gap-2 text-xs text-foreground">
-            <Switch :checked="keepUpdated" aria-label="Keep updated" @update:checked="keepUpdated = $event" />
+            <Switch
+              :checked="keepUpdated"
+              :disabled="!canWriteMeta"
+              aria-label="Keep updated"
+              @update:checked="keepUpdated = $event"
+            />
             <span>
               Keep updated
               <span class="block text-[11px] text-muted-foreground">
-                Aruna checks the record once a day and offers new versions.
+                {{ canWriteMeta
+                  ? 'Aruna checks the record once a day and offers new versions.'
+                  : "Needs write access to the group's metadata." }}
               </span>
             </span>
           </label>
@@ -415,7 +431,7 @@ watch(sessionEpoch, () => {
           <TransferReport :key="activeJobId" :job-id="activeJobId" :settled="terminal" />
         </section>
 
-        <p v-if="submitError" class="text-xs text-destructive">{{ submitError }}</p>
+        <p v-if="submitError" role="alert" class="text-xs text-destructive">{{ submitError }}</p>
       </div>
 
       <DialogFooter>

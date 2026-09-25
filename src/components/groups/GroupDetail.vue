@@ -166,6 +166,13 @@ const canWriteData = computed(() => {
   return hasGroupWrite(detail, `/${detail.realm_id}/g/${detail.group_id}/data/**`, currentUser.value?.id ?? '')
 })
 
+// Repository connectors: WRITE on /{realm}/g/{gid}/meta/**.
+const canWriteMeta = computed(() => {
+  const detail = group.value
+  if (!detail) return false
+  return hasGroupWrite(detail, `/${detail.realm_id}/g/${detail.group_id}/meta/**`, currentUser.value?.id ?? '')
+})
+
 // Group admin (api ensure_group_admin), the gate storage, routing and request
 // policies share, not the write rights objects need.
 const canAdminGroup = computed(() => {
@@ -556,7 +563,7 @@ async function leave() {
             :can-write="canWriteData"
             @count="connectorCount = $event"
           />
-          <RepositoriesSection :group-id="group.group_id" :can-write="canWriteData" />
+          <RepositoriesSection :group-id="group.group_id" :can-write="canWriteMeta" />
         </TabsContent>
 
         <TabsContent v-if="policiesTabVisible" value="policies" class="mt-0">

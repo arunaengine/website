@@ -15,9 +15,10 @@ const acceptRemoteLink = vi.fn()
 const pullInvenioLink = vi.fn()
 const getJob = vi.fn()
 const userId = ref('u1')
-const isAdmin = ref(false)
-// The captured poll: run is one tick, skip says whether the tick would idle.
-let poller: { run: () => Promise<void>; skip: () => boolean } | null = null
+// Groups the caller administers.
+const adminGroups = ref<string[]>([])
+// The captured poll: run is one tick, delay the next wait, skip whether the tick would idle.
+let poller: { run: () => Promise<void>; delay: () => number; skip: () => boolean } | null = null
 
 function link(overrides: Partial<Api.InvenioLink> = {}): Api.InvenioLink {
   return {
@@ -73,12 +74,15 @@ const Section = compileClientComponent(new URL('./RepositoryLinksSection.vue', i
   '@/components/ui/RefreshButton.vue': moduleDefault(Empty),
   '@/components/ui/Skeleton.vue': moduleDefault(Empty),
   '@/components/ui/Switch.vue': moduleDefault(Empty),
-  '@/composables/useInvenio': { useGroupRights: () => ({ userId, isAdmin }) },
+  '@/composables/useInvenio': {
+    useGroupRights: () => ({ userId, adminOf: (group: string) => adminGroups.value.includes(group) }),
+  },
   '@/lib/jobs': { getJob, isTerminalJobState: (state: string) => ['succeeded', 'failed', 'cancelled'].includes(state) },
   '@/lib/poll': {
     POLL_ACTIVE_MS: 3000,
-    follow: (run: () => Promise<void>, _delay: unknown, skip: () => boolean) => {
-      poller = { run, skip }
+    POLL_SLOW_MS: 15000,
+    follow: (run: () => Promise<void>, delay: () => number, skip: () => boolean) => {
+      poller = { run, delay, skip }
       return () => (poller = null)
     },
   },
@@ -103,7 +107,7 @@ async function mount(documentId = 'd1') {
 beforeEach(() => {
   sessionEpoch.value = 0
   userId.value = 'u1'
-  isAdmin.value = false
+  adminGroups.value = []
   for (const mock of [onSettled, listInvenioLinks, patchInvenioLink, rotateLinkToken, pushInvenioLink, acceptRemoteLink, pullInvenioLink, getJob]) {
     mock.mockReset()
   }
@@ -170,6 +174,33 @@ describe('RepositoryLinksSection', () => {
     mounted.app.unmount()
   })
 
+  it('resumes a failed pull link', async () => {
+    listInvenioLinks.mockResolvedValue([link({ direction: 'pull', status: 'failed', reason: 'source_unavailable' })])
+    patchInvenioLink.mockResolvedValue(link({ direction: 'pull' }))
+    const mounted = await mount()
+
+    expect(content(mounted.root)).toContain('withdrawn or deleted')
+    expect(hasButton(mounted.root, 'Pause')).toBe(false)
+    await click(button(mounted.root, 'Resume'))
+    expect(patchInvenioLink).toHaveBeenCalledWith('d1', 'l1', { paused: false }, expect.anything())
+    mounted.app.unmount()
+  })
+
+  it('takes admin rights from the group of the link, not of the dataset', async () => {
+    userId.value = 'u2'
+    adminGroups.value = ['g1']
+    listInvenioLinks.mockResolvedValue([link({ group_id: 'g2' })])
+    const mounted = await mount()
+    expect(hasButton(mounted.root, 'Push now')).toBe(false)
+    mounted.app.unmount()
+
+    adminGroups.value = ['g2']
+    const other = await mount()
+    expect(hasButton(other.root, 'Push now')).toBe(true)
+    expect(hasButton(other.root, 'Remove link')).toBe(true)
+    other.app.unmount()
+  })
+
   it('clears the token draft when the session changes', async () => {
     listInvenioLinks.mockResolvedValue([link()])
     const mounted = await mount()
@@ -190,6 +221,7 @@ describe('RepositoryLinksSection', () => {
       .mockResolvedValueOnce([link({ pending: false, remote: { published: false, doi: '10.5281/zenodo.5', doi_reserved: true } })])
     const mounted = await mount()
     expect(poller?.skip()).toBe(false)
+    expect(poller?.delay()).toBe(3000)
 
     await poller!.run()
     await flush()
@@ -223,6 +255,7 @@ describe('RepositoryLinksSection', () => {
     const mounted = await mount()
 
     expect(poller?.skip()).toBe(false)
+    expect(poller?.delay()).toBe(15000)
     expect(content(mounted.root)).toContain('Waiting for community review')
     expect(hasButton(mounted.root, 'Publish')).toBe(false)
     mounted.app.unmount()
@@ -230,7 +263,7 @@ describe('RepositoryLinksSection', () => {
 
   it('gives a group admin management but not the owner actions', async () => {
     userId.value = 'u2'
-    isAdmin.value = true
+    adminGroups.value = ['g1']
     listInvenioLinks.mockResolvedValue([link({ remote: { published: false, draft_id: 'd' } })])
     const mounted = await mount()
 
@@ -264,7 +297,7 @@ describe('RepositoryLinksSection', () => {
 
   it('offers the remote state to a group admin after a remote change', async () => {
     userId.value = 'u2'
-    isAdmin.value = true
+    adminGroups.value = ['g1']
     listInvenioLinks.mockResolvedValue([link({ status: 'failed', reason: 'remote_changed', warning: 'Checksums differ.' })])
     acceptRemoteLink.mockResolvedValue(link())
     const mounted = await mount()
@@ -307,7 +340,7 @@ describe('RepositoryLinksSection', () => {
 
   it('lets a group admin update a pull link but not switch automatic updates', async () => {
     userId.value = 'u2'
-    isAdmin.value = true
+    adminGroups.value = ['g1']
     listInvenioLinks.mockResolvedValue([link({ direction: 'pull', reason: 'local_changed', auto_update: true })])
     pullInvenioLink.mockResolvedValue({ job_id: 'j3', status_url: '/jobs/j3' })
     const mounted = await mount()

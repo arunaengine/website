@@ -8,6 +8,8 @@ import * as Utils from '@/lib/utils'
 
 const createRepositoryConnector = vi.fn()
 const replaceRepositoryConnector = vi.fn()
+const onSaved = vi.fn()
+const sessionEpoch = ref(0)
 
 const Empty = defineComponent(() => () => null)
 const Slot = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
@@ -42,7 +44,7 @@ const RepositoryDialog = compileClientComponent(new URL('./RepositoryDialog.vue'
   '@/components/ui/Select.vue': moduleDefault(Empty),
   '@/components/ui/Switch.vue': moduleDefault(Empty),
   '@/composables/useAruna': {
-    useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('bearer'), sessionEpoch: ref(0) }),
+    useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('bearer'), sessionEpoch }),
   },
   '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled: ref(false) }) },
   '@/lib/api': { ...Api, createRepositoryConnector, replaceRepositoryConnector },
@@ -56,7 +58,7 @@ const STORED = {
 }
 
 async function mount(connector: unknown = null) {
-  const state = reactive({ open: false, groupId: 'g1', connector })
+  const state = reactive({ open: false, groupId: 'g1', connector, onSaved })
   const mounted = await mountApp(defineComponent(() => () => h(RepositoryDialog, state)))
   state.open = true
   await flush()
@@ -82,6 +84,8 @@ function findForm(root: Parameters<typeof button>[0]): Parameters<typeof button>
 beforeEach(() => {
   createRepositoryConnector.mockReset()
   replaceRepositoryConnector.mockReset()
+  onSaved.mockReset()
+  sessionEpoch.value = 0
 })
 
 describe('RepositoryDialog', () => {
@@ -117,6 +121,21 @@ describe('RepositoryDialog', () => {
     expect(button(mounted.root, 'Save changes').props.disabled).toBe(true)
     await typeValue(input(mounted.root, 'aria-label', 'Read token'), 'new-token')
     expect(button(mounted.root, 'Save changes').props.disabled).toBe(false)
+    mounted.app.unmount()
+  })
+
+  it('drops a save that answers after the session changed', async () => {
+    let answer: (value: unknown) => void = () => {}
+    createRepositoryConnector.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+    const mounted = await mount()
+    await click(button(mounted.root, 'Zenodo sandbox'))
+    const pending = submit(mounted.root)
+    sessionEpoch.value++
+    await flush()
+    answer(STORED)
+    await pending
+
+    expect(onSaved).not.toHaveBeenCalled()
     mounted.app.unmount()
   })
 

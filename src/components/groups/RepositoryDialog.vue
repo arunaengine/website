@@ -130,13 +130,16 @@ async function submit() {
   clearToken()
   tokenLost.value = false
   const client = { baseUrl: apiBaseUrl.value, token: authToken.value }
+  const epoch = sessionEpoch.value
   try {
     const saved = props.connector
       ? await replaceRepositoryConnector(props.groupId, props.connector.connector_id, body, client)
       : await createRepositoryConnector(props.groupId, body, client)
+    if (epoch !== sessionEpoch.value) return
     emit('saved', saved)
     emit('update:open', false)
   } catch (err) {
+    if (epoch !== sessionEpoch.value) return
     submitError.value = errorMessage(err)
     tokenLost.value = typedToken
   } finally {

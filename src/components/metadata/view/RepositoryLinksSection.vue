@@ -39,7 +39,7 @@ import {
   reviewText,
 } from '@/lib/invenio'
 import { getJob, isTerminalJobState, type JobState } from '@/lib/jobs'
-import { follow, POLL_ACTIVE_MS } from '@/lib/poll'
+import { follow, POLL_ACTIVE_MS, POLL_SLOW_MS } from '@/lib/poll'
 import { errorMessage, relativeTime } from '@/lib/utils'
 import { Library, Plus } from '@lucide/vue'
 
@@ -48,13 +48,14 @@ const props = defineProps<{ documentId: string; groupId: string; canWrite: boole
 const emit = defineEmits<{ (e: 'publish'): void; (e: 'settled'): void }>()
 
 const { apiBaseUrl, authToken, sessionEpoch } = useAruna()
-const { userId, isAdmin } = useGroupRights(() => props.groupId)
+const { userId, adminOf } = useGroupRights(() => props.groupId)
 function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
 }
 
+// A link belongs to the group that created it, which may not be the dataset's group.
 function rights(link: InvenioLink) {
-  return linkRights(link, userId.value, isAdmin.value)
+  return linkRights(link, userId.value, adminOf(link.group_id))
 }
 
 // Only the node that owns a link can act on it or show its jobs.
@@ -137,9 +138,10 @@ function jobRunning(linkId: string): boolean {
   return !state || !isTerminalJobState(state)
 }
 
-const needsPoll = computed(
-  () => (links.value ?? []).some(linkBusy) || Object.keys(startedJob.value).some(jobRunning),
+const running = computed(
+  () => (links.value ?? []).some((link) => link.pending) || Object.keys(startedJob.value).some(jobRunning),
 )
+const needsPoll = computed(() => running.value || (links.value ?? []).some(linkBusy))
 
 async function poll() {
   const epoch = sessionEpoch.value
@@ -160,7 +162,8 @@ async function poll() {
   await load(true)
 }
 
-const stopPoll = follow(poll, () => POLL_ACTIVE_MS, () => !needsPoll.value)
+// A community review takes days, so waiting only for one polls slowly.
+const stopPoll = follow(poll, () => (running.value ? POLL_ACTIVE_MS : POLL_SLOW_MS), () => !needsPoll.value)
 onUnmounted(stopPoll)
 
 function resetActions() {
@@ -211,9 +214,13 @@ const pull = (link: InvenioLink) => act(link, () => pullInvenioLink(props.docume
 const acceptRemote = (link: InvenioLink) => act(link, () => acceptRemoteLink(props.documentId, link.link_id, client()))
 const setAutoUpdate = (link: InvenioLink, value: boolean) =>
   act(link, () => patchInvenioLink(props.documentId, link.link_id, { auto_update: value }, client()))
+// A paused or failed link is stopped; resuming enables it again.
+function stopped(link: InvenioLink): boolean {
+  return link.status === 'paused' || link.status === 'failed'
+}
 const togglePause = (link: InvenioLink) =>
   act(link, async () => {
-    await patchInvenioLink(props.documentId, link.link_id, { paused: link.status !== 'paused' }, client())
+    await patchInvenioLink(props.documentId, link.link_id, { paused: !stopped(link) }, client())
   })
 const remove = (link: InvenioLink) =>
   act(link, async () => {
@@ -333,7 +340,7 @@ function reasonTone(link: InvenioLink): string {
             <RouterLink :to="{ name: 'job', params: { jobId: startedJob[link.link_id].job_id } }" class="text-primary hover:underline">job</RouterLink>
             for this link{{ jobRunning(link.link_id) ? ' is running.' : '.' }}
           </p>
-          <p v-if="actionError[link.link_id]" class="text-xs text-destructive">{{ actionError[link.link_id] }}</p>
+          <p v-if="actionError[link.link_id]" role="alert" class="text-xs text-destructive">{{ actionError[link.link_id] }}</p>
 
           <div v-if="canWrite && here(link) && rights(link).manage" class="flex flex-wrap items-center gap-2">
             <template v-if="confirming?.id === link.link_id && confirming.action === 'publish'">
@@ -409,7 +416,7 @@ function reasonTone(link: InvenioLink): string {
                 </Button>
               </template>
               <Button variant="outline" size="sm" :disabled="busyId !== null" @click="togglePause(link)">
-                {{ link.status === 'paused' ? 'Resume' : 'Pause' }}
+                {{ stopped(link) ? 'Resume' : 'Pause' }}
               </Button>
               <Button v-if="rights(link).owner && !isPullLink(link)" variant="ghost" size="sm" :disabled="busyId !== null" @click="openToken(link)">
                 Change token
