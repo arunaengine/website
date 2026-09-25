@@ -4,22 +4,18 @@ import type { CrateDraft } from './crate/editor'
 import type { ProfileEntityRule, ProfilePropertyRule } from './profiles/types'
 import {
   connectorBody,
-  creatorsMetadata,
   doiUrl,
   endpointProblem,
   exportRepository,
   failureText,
-  fieldLabel,
   linkRights,
   linkStatus,
   managedHere,
-  missingFields,
   parseOverride,
   pullsParent,
   recordSource,
   remoteState,
   repositoryLabel,
-  requiredMetadata,
   requirementRows,
   reviewText,
   searchHits,
@@ -184,46 +180,6 @@ describe('repository endpoints', () => {
     expect(repositoryLabel({ name: 'Mine', endpoint: 'https://sandbox.zenodo.org/api/' })).toBe('Zenodo sandbox')
     expect(repositoryLabel({ name: 'Mine', endpoint: 'https://repo.test/api/' })).toBe('Mine')
   })
-})
-
-describe('missing publish metadata', () => {
-  it('reads the missing fields of a 400 answer only', () => {
-    const missing = new ApiError(400, 'missing metadata', 'missing_metadata', { error: 'x', missing: ['creators', 1] })
-    expect(missingFields(missing)).toEqual(['creators'])
-    expect(missingFields(new ApiError(400, 'bad', 'invalid_request', { missing: ['creators'] }))).toBeNull()
-    expect(missingFields(new ApiError(400, 'bad', undefined, { error: 'x' }))).toBeNull()
-    expect(missingFields(new ApiError(409, 'busy', undefined, { missing: ['creators'] }))).toBeNull()
-    expect(missingFields(new Error('x'))).toBeNull()
-  })
-
-  it('fills the missing title, date and resource type from the form', () => {
-    const draft = { title: ' Soil data ', publicationDate: '2026-09-25', publisher: ' JLU Giessen ' }
-    expect(requiredMetadata(['title', 'publication_date', 'resource_type', 'publisher', 'creators'], draft)).toEqual({
-      title: 'Soil data', publication_date: '2026-09-25', resource_type: { id: 'dataset' }, publisher: 'JLU Giessen',
-    })
-    expect(requiredMetadata(['creators'], draft)).toEqual({})
-    expect(requiredMetadata(['title', 'publisher'], { title: ' ', publicationDate: '', publisher: ' ' })).toEqual({})
-    expect(fieldLabel('publisher')).toBe('a publisher')
-    expect(fieldLabel('publication_date')).toBe('a publication date')
-    expect(fieldLabel('rights_holder')).toBe('rights holder')
-  })
-
-  it('maps creators to personal names with an optional ORCID', () => {
-    expect(creatorsMetadata([
-      { name: 'Ada Lovelace', orcid: 'https://orcid.org/0000-0002-1825-0097' },
-      { name: 'Curie, Marie', orcid: '' },
-      { name: '  ', orcid: '0000-0001' },
-    ])).toEqual([
-      {
-        person_or_org: {
-          type: 'personal', family_name: 'Lovelace', given_name: 'Ada',
-          identifiers: [{ scheme: 'orcid', identifier: '0000-0002-1825-0097' }],
-        },
-      },
-      { person_or_org: { type: 'personal', family_name: 'Curie', given_name: 'Marie' } },
-    ])
-  })
-
 })
 
 describe('publish requirements', () => {

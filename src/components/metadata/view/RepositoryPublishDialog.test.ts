@@ -29,9 +29,18 @@ const loadConnectors = vi.fn()
 const connectors = ref<unknown[] | null>([])
 const canWriteMeta = ref(true)
 const job = ref<unknown>(null)
-const currentUser = ref<{ name: string; orcid?: string } | null>({ name: 'Ada Lovelace', orcid: '0000-0002-1825-0097' })
+const checkRepository = vi.fn()
+const ALL_CAPABILITIES = { drafts: true, reserve_identifier: true, versions: true, review: true, pull: true, search: true, release_date: true }
+const capabilities = ref<Record<string, boolean>>({ ...ALL_CAPABILITIES })
+const PROFILE = { iri: 'https://w3id.org/aruna/profiles/repository/zenodo', name: 'Zenodo', shapes: ['@prefix a: <x:> .', 'a:b a:c a:d .'] }
 let poller: { run: () => Promise<void>; skip: () => boolean } | null = null
 const ZENODO = { connector_id: 'c1', kind: 'invenio', name: 'Zenodo', endpoint: 'https://zenodo.org/api/' }
+const VIOLATION = { code: 'constraint_violation', severity: 'violation', focus_node: './', path: 'http://schema.org/author', rule: 'minCount', message: 'Add an author.', completeness: 'complete' }
+const WARNING = { ...VIOLATION, severity: 'warning', path: 'http://schema.org/license', message: 'Add a license.' }
+
+function checked(findings: unknown[] = [], mapping: unknown[] = []) {
+  return { kind: 'invenio', profile: { iri: PROFILE.iri }, ready: !findings.length, findings, mapping }
+}
 
 const Empty = defineComponent(() => () => null)
 const Slot = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
@@ -79,12 +88,26 @@ const Dialog = compileClientComponent(new URL('./RepositoryPublishDialog.vue', i
   '@/components/ui/Switch.vue': moduleDefault(SwitchStub),
   '@/components/ui/Textarea.vue': moduleDefault(Empty),
   '@/components/metadata/TransferJobStatus.vue': moduleDefault(Empty),
+  './RequirementFindings.vue': moduleDefault(defineComponent({
+    props: { findings: Array },
+    setup: (props) => () => h('ul', (props.findings as Array<{ message: string }>).map((entry) => h('li', entry.message))),
+  })),
+  './RequirementForm.vue': moduleDefault(defineComponent({
+    props: { shapes: String },
+    emits: ['saved'],
+    setup: (props, { emit }) => () => h('button', { onClick: () => emit('saved') }, `Save form ${props.shapes?.length ?? 0}`),
+  })),
   '@/composables/useAruna': {
-    useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('bearer'), sessionEpoch, currentUser }),
+    useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('bearer'), sessionEpoch }),
   },
   '@/composables/useRepository': {
     useRepositoryConnectors: () => ({ connectors, loading: ref(false), error: ref(null), load: loadConnectors }),
     useGroupRights: () => ({ canWriteMeta }),
+    useRepositoryKinds: () => ({
+      kinds: ref([{ kind: 'invenio' }]),
+      error: ref(null),
+      kindOf: (kind: string) => (kind === 'invenio' ? { kind, capabilities: capabilities.value, profiles: [PROFILE] } : null),
+    }),
   },
   '@/composables/useJobs': {
     useJobDetail: () => ({ job, loadState: ref('idle'), loadError: ref(null), lastPollError: ref(null), load: vi.fn() }),
@@ -98,7 +121,7 @@ const Dialog = compileClientComponent(new URL('./RepositoryPublishDialog.vue', i
     },
   },
   '@/lib/api': {
-    ...Api, createRepositoryLink, submitRepositoryExport, getRepositoryLink, listRepositoryLinks, publishRepositoryLink, createRepositoryConnector,
+    ...Api, checkRepository, createRepositoryLink, submitRepositoryExport, getRepositoryLink, listRepositoryLinks, publishRepositoryLink, createRepositoryConnector,
   },
   '@/lib/repository': Repository,
   '@/lib/pid': { listPersistentIds },
@@ -130,6 +153,8 @@ beforeEach(() => {
   connectors.value = [ZENODO]
   canWriteMeta.value = true
   job.value = null
+  capabilities.value = { ...ALL_CAPABILITIES }
+  checkRepository.mockReset().mockResolvedValue(checked())
   getRepositoryLink.mockReset()
   listRepositoryLinks.mockReset().mockResolvedValue([])
   publishRepositoryLink.mockReset()
@@ -182,78 +207,78 @@ describe('RepositoryPublishDialog', () => {
     mounted.app.unmount()
   })
 
-  it('asks for creators when the repository needs them and keeps the token', async () => {
+  it('checks the dataset first and blocks publishing on a violation', async () => {
+    checkRepository.mockResolvedValueOnce(checked([VIOLATION, WARNING])).mockResolvedValueOnce(checked([WARNING]))
+    const mounted = await mount()
+    await typeValue(tokenInput(mounted.root), SECRET)
+
+    expect(checkRepository).toHaveBeenCalledWith('d1', { group_id: 'g1', connector_id: 'c1' }, expect.anything())
+    expect(content(mounted.root)).toContain('Add an author.')
+    expect(content(mounted.root)).toContain('Add a license.')
+    expect(button(mounted.root, 'Publish to Zenodo').props.disabled).toBe(true)
+
+    // The form gets the joined profile shapes and a save checks again.
+    await click(button(mounted.root, `Save form ${PROFILE.shapes.join('\n').length}`))
+    await flush()
+    expect(checkRepository).toHaveBeenCalledTimes(2)
+    expect(content(mounted.root)).not.toContain('Add an author.')
+    expect(button(mounted.root, 'Publish to Zenodo').props.disabled).toBe(false)
+    mounted.app.unmount()
+  })
+
+  it('shows the unmet requirements of a refused link and keeps the token', async () => {
     createRepositoryLink
-      .mockRejectedValueOnce(new Api.ApiError(400, 'missing metadata', 'missing_metadata', { error: 'x', missing: ['creators'] }))
-      .mockResolvedValueOnce(draftLink({}))
+      .mockRejectedValueOnce(new Api.ApiError(400, 'unmet', 'requirements_unmet', { error: 'x', findings: [VIOLATION] }))
     const mounted = await mount()
     await typeValue(tokenInput(mounted.root), SECRET)
     await click(button(mounted.root, 'Publish to Zenodo'))
 
-    expect(content(mounted.root)).toContain('needs creators')
-    expect(input(mounted.root, 'aria-label', 'Creator 1 name').props.value).toBe('Ada Lovelace')
+    expect(content(mounted.root)).toContain('Add an author.')
+    expect(content(mounted.root)).toContain('needs more metadata')
     expect(tokenInput(mounted.root).props.value).toBe(SECRET)
+    expect(button(mounted.root, 'Publish to Zenodo').props.disabled).toBe(true)
+    mounted.app.unmount()
+  })
+
+  it('lets the node decide when the check could not run', async () => {
+    checkRepository.mockRejectedValue(new Api.ApiError(503, 'node busy'))
+    const mounted = await mount()
+    await typeValue(tokenInput(mounted.root), SECRET)
+
+    expect(content(mounted.root)).toContain('The check did not run: node busy')
+    expect(button(mounted.root, 'Publish to Zenodo').props.disabled).toBe(false)
+    mounted.app.unmount()
+  })
+
+  it('shows where dataset entities go in the repository', async () => {
+    checkRepository.mockResolvedValue(checked([], [{ entity_id: 'data.csv', target: 'files', field: 'entries' }]))
+    const mounted = await mount()
+    await click(button(mounted.root, 'Show what goes where'))
+
+    expect(content(mounted.root)).toContain('data.csv to files, field entries')
+    mounted.app.unmount()
+  })
+
+  it('leaves out DOI reservation and review texts the repository kind does not have', async () => {
+    capabilities.value = { ...ALL_CAPABILITIES, reserve_identifier: false, review: false }
+    connectors.value = [{ ...ZENODO, community: 'ecology' }]
+    const mounted = await mount()
+    expect(content(mounted.root)).not.toContain('reserves its DOI')
+    expect(content(mounted.root)).not.toContain('community ecology')
+    await typeValue(tokenInput(mounted.root), SECRET)
     await click(button(mounted.root, 'Publish to Zenodo'))
 
-    expect(createRepositoryLink.mock.calls[1][1].metadata).toEqual({
-      creators: [{
-        person_or_org: {
-          type: 'personal', family_name: 'Lovelace', given_name: 'Ada',
-          identifiers: [{ scheme: 'orcid', identifier: '0000-0002-1825-0097' }],
-        },
-      }],
-    })
+    expect(content(mounted.root)).toContain('Creating the draft…')
     mounted.app.unmount()
   })
 
-  it('asks for a missing title and date and sends them with the dataset resource type', async () => {
-    submitRepositoryExport.mockRejectedValueOnce(
-      new Api.ApiError(400, 'missing metadata', 'missing_metadata', {
-        error: 'x', code: 'missing_metadata', missing: ['title', 'publication_date', 'resource_type'],
-      }),
-    )
-    const mounted = await mount()
-    await exportOnce(mounted.root)
-    await typeValue(tokenInput(mounted.root), SECRET)
-    await click(button(mounted.root, 'Start export'))
-
-    expect(content(mounted.root)).toContain('needs a title, a publication date, a resource type')
-    expect(button(mounted.root, 'Start export').props.disabled).toBe(true)
-    await typeValue(input(mounted.root, 'aria-label', 'Title'), 'Soil data')
-    await typeValue(input(mounted.root, 'aria-label', 'Publication date'), '2026-09-01')
-    await click(button(mounted.root, 'Start export'))
-
-    expect(submitRepositoryExport.mock.calls[1][1].metadata).toEqual({
-      title: 'Soil data', publication_date: '2026-09-01', resource_type: { id: 'dataset' },
-    })
-    mounted.app.unmount()
-  })
-
-  it('asks for a publisher when the repository needs one', async () => {
-    connectors.value = [{ connector_id: 'c2', kind: 'invenio', name: 'Institute', endpoint: 'https://rdm.example.org/api/' }]
-    createRepositoryLink
-      .mockRejectedValueOnce(new Api.ApiError(400, 'missing metadata', 'missing_metadata', { missing: ['publisher'] }))
-      .mockResolvedValueOnce(draftLink({}))
-    const mounted = await mount()
-    await typeValue(tokenInput(mounted.root), SECRET)
-    await click(button(mounted.root, 'Publish to repository'))
-
-    expect(content(mounted.root)).toContain('needs a publisher')
-    expect(button(mounted.root, 'Publish to repository').props.disabled).toBe(true)
-    await typeValue(input(mounted.root, 'aria-label', 'Publisher'), 'JLU Giessen')
-    await click(button(mounted.root, 'Publish to repository'))
-
-    expect(createRepositoryLink.mock.calls[1][1].metadata).toEqual({ publisher: 'JLU Giessen' })
-    mounted.app.unmount()
-  })
-
-  it('treats a 400 without the missing metadata code as an error', async () => {
-    createRepositoryLink.mockRejectedValueOnce(new Api.ApiError(400, 'bad token', 'invalid_request', { missing: ['creators'] }))
+  it('treats a 400 without the requirements code as an error', async () => {
+    createRepositoryLink.mockRejectedValueOnce(new Api.ApiError(400, 'bad token', 'invalid_request', { findings: [VIOLATION] }))
     const mounted = await mount()
     await typeValue(tokenInput(mounted.root), SECRET)
     await click(button(mounted.root, 'Publish to Zenodo'))
 
-    expect(content(mounted.root)).not.toContain('More metadata needed')
+    expect(content(mounted.root)).not.toContain('Add an author.')
     expect(content(mounted.root)).toContain('bad token')
     mounted.app.unmount()
   })

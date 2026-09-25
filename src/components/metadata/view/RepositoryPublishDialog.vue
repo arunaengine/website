@@ -1,8 +1,9 @@
 <script setup lang="ts">
-// Publishes a dataset to an Invenio or Zenodo repository: either a lasting link
-// that pushes every change and reserves a DOI, or a one-time export. The personal
-// access token is held only in this component's memory and cleared on every exit.
-import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+// Publishes a dataset to a repository such as Zenodo: either a lasting link that
+// pushes every change, or a one-time export. The dataset is checked against the
+// repository requirements first. The personal access token is held only in this
+// component's memory and cleared on every exit.
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
@@ -20,40 +21,40 @@ import Spinner from '@/components/ui/Spinner.vue'
 import Switch from '@/components/ui/Switch.vue'
 import Textarea from '@/components/ui/Textarea.vue'
 import TransferJobStatus from '@/components/metadata/TransferJobStatus.vue'
+import RequirementFindings from './RequirementFindings.vue'
+import RequirementForm from './RequirementForm.vue'
 import { useAruna } from '@/composables/useAruna'
-import { useGroupRights, useRepositoryConnectors } from '@/composables/useRepository'
+import { useGroupRights, useRepositoryConnectors, useRepositoryKinds } from '@/composables/useRepository'
 import { useJobDetail } from '@/composables/useJobs'
 import {
+  checkRepository,
   createRepositoryLink,
   createRepositoryConnector,
   getRepositoryLink,
   listRepositoryLinks,
   publishRepositoryLink,
   submitRepositoryExport,
+  type RepositoryCheck,
   type RepositoryLink,
 } from '@/lib/api'
 import {
-  creatorsMetadata,
   doiUrl,
   exportRepository,
   failureText,
-  fieldLabel,
-  missingFields,
   parseOverride,
   pullsParent,
   REPOSITORY_PRESETS,
   repositoryLabel,
-  requiredMetadata,
   reviewText,
   sourceParent,
   tokenPageUrl,
-  type CreatorDraft,
+  unmetFindings,
 } from '@/lib/repository'
 import { isTerminalJobState } from '@/lib/jobs'
 import { follow, POLL_ACTIVE_MS } from '@/lib/poll'
 import { listPersistentIds, type PersistentIdView } from '@/lib/pid'
 import { errorMessage } from '@/lib/utils'
-import { Plus, Send, Trash2 } from '@lucide/vue'
+import { Plus, Send } from '@lucide/vue'
 
 const props = defineProps<{ open: boolean; documentId: string; groupId: string }>()
 const emit = defineEmits<{
@@ -61,7 +62,7 @@ const emit = defineEmits<{
   (e: 'linked', link: RepositoryLink): void
 }>()
 
-const { apiBaseUrl, authToken, sessionEpoch, currentUser } = useAruna()
+const { apiBaseUrl, authToken, sessionEpoch } = useAruna()
 function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
 }
@@ -78,13 +79,11 @@ const overrideText = ref('')
 const busy = ref(false)
 const submitError = ref<string | null>(null)
 const activeJobId = ref<string | null>(null)
-// Fields the repository still needs, from a 400 answer, and the values typed for them.
-const missing = ref<string[] | null>(null)
-const creators = ref<CreatorDraft[]>([])
-const title = ref('')
-const publicationDate = ref('')
-const publisher = ref('')
-const missingBox = ref<HTMLFieldSetElement | null>(null)
+// The requirement check of the chosen repository, or the findings of a refusal.
+const check = ref<RepositoryCheck | null>(null)
+const checking = ref(false)
+const checkError = ref<string | null>(null)
+const showMapping = ref(false)
 // The link this dialog created; it is followed until its draft exists.
 const link = ref<RepositoryLink | null>(null)
 const publishing = ref(false)
@@ -97,11 +96,19 @@ const {
   load: loadConnectors,
 } = useRepositoryConnectors(() => props.groupId)
 const { canWriteMeta } = useGroupRights(() => props.groupId)
-const invenioConnectors = computed(() => connectors.value?.filter((entry) => entry.kind === 'invenio') ?? null)
-const connectorOptions = computed(() =>
-  (invenioConnectors.value ?? []).map((entry) => ({ value: entry.connector_id, label: `${entry.name} (${entry.endpoint})` })),
+const { kinds, error: kindsError, kindOf } = useRepositoryKinds()
+// Connectors of a kind the node can publish to; unknown until both lists answered.
+const repositoryConnectors = computed(() =>
+  connectors.value && kinds.value ? connectors.value.filter((entry) => kindOf(entry.kind)) : null,
 )
-const connector = computed(() => invenioConnectors.value?.find((entry) => entry.connector_id === connectorId.value) ?? null)
+const connectorOptions = computed(() =>
+  (repositoryConnectors.value ?? []).map((entry) => ({ value: entry.connector_id, label: `${entry.name} (${entry.endpoint})` })),
+)
+const connector = computed(() => repositoryConnectors.value?.find((entry) => entry.connector_id === connectorId.value) ?? null)
+const capabilities = computed(() => kindOf(connector.value?.kind)?.capabilities ?? null)
+const reserves = computed(() => Boolean(capabilities.value?.reserve_identifier))
+// A community submission only happens where the repository kind has reviews.
+const community = computed(() => (capabilities.value?.review ? connector.value?.community ?? null : null))
 const label = computed(() => repositoryLabel(connector.value))
 const tokenPage = computed(() => (connector.value ? tokenPageUrl(connector.value.endpoint) : null))
 const publishName = computed(() => (label.value.startsWith('Zenodo') ? `Publish to ${label.value}` : 'Publish to repository'))
@@ -111,7 +118,7 @@ watch(
   () => (connectorId.value = ''),
 )
 watch(
-  invenioConnectors,
+  repositoryConnectors,
   (list) => {
     if (list?.length === 1 && !connectorId.value) connectorId.value = list[0].connector_id
   },
@@ -174,30 +181,52 @@ async function addPreset() {
   }
 }
 
+// Repository-only extras; required fields always come from the dataset.
 const override = computed(() => parseOverride(overrideText.value))
-const needs = (field: string) => Boolean(missing.value?.includes(field))
-const missingText = computed(() => (missing.value ?? []).map(fieldLabel).join(', '))
-const metadata = computed(() => {
-  const people = needs('creators') ? creatorsMetadata(creators.value) : []
-  const typed = requiredMetadata(missing.value ?? [], {
-    title: title.value,
-    publicationDate: publicationDate.value,
-    publisher: publisher.value,
-  })
-  const merged = { ...(override.value.value ?? {}), ...typed, ...(people.length ? { creators: people } : {}) }
-  return Object.keys(merged).length ? merged : undefined
+const metadata = computed(() => override.value.value)
+const findings = computed(() => check.value?.findings ?? [])
+const blocked = computed(() => findings.value.some((finding) => finding.severity === 'violation'))
+// The requirement profile the check used, as Turtle for the missing-fields form.
+const profileShapes = computed(() => {
+  const iri = check.value?.profile?.iri
+  const profile = kindOf(check.value?.kind ?? connector.value?.kind)?.profiles.find((entry) => entry.iri === iri)
+  if (!profile) return ''
+  return Array.isArray(profile.shapes) ? profile.shapes.join('\n') : profile.shapes
 })
-const filled = computed(
-  () =>
-    !(needs('creators') && !creatorsMetadata(creators.value).length) &&
-    !(needs('title') && !title.value.trim()) &&
-    !(needs('publication_date') && !publicationDate.value) &&
-    !(needs('publisher') && !publisher.value.trim()),
-)
+// A failed check does not block: the node checks again before it writes anything.
 const ready = computed(
   () =>
-    Boolean(connectorId.value && accessToken.value.trim() && !override.value.error) && filled.value && !busy.value,
+    Boolean(connectorId.value && accessToken.value.trim() && !override.value.error) &&
+    !checking.value &&
+    !blocked.value &&
+    !busy.value,
 )
+
+let checkGeneration = 0
+async function runCheck() {
+  const current = ++checkGeneration
+  const epoch = sessionEpoch.value
+  const documentId = props.documentId
+  const chosen = connectorId.value
+  const fresh = () => current === checkGeneration && epoch === sessionEpoch.value && documentId === props.documentId
+  check.value = null
+  checkError.value = null
+  checking.value = Boolean(props.open && chosen)
+  if (!checking.value) return
+  try {
+    const answer = await checkRepository(
+      documentId,
+      { group_id: props.groupId, connector_id: chosen, ...(metadata.value ? { metadata: metadata.value } : {}) },
+      client(),
+    )
+    if (fresh()) check.value = answer
+  } catch (err) {
+    if (fresh()) checkError.value = errorMessage(err)
+  } finally {
+    if (fresh()) checking.value = false
+  }
+}
+watch([() => props.open, () => props.documentId, connectorId], () => void runCheck(), { immediate: true })
 
 const { job, loadState, loadError, lastPollError, load } = useJobDetail(() => activeJobId.value)
 const jobDone = computed(() => Boolean(job.value && isTerminalJobState(job.value.state)))
@@ -249,14 +278,6 @@ async function publish() {
   }
 }
 
-function addCreator() {
-  creators.value = [...creators.value, { name: '', orcid: '' }]
-}
-
-function removeCreator(index: number) {
-  creators.value = creators.value.filter((_, at) => at !== index)
-}
-
 function clearForm() {
   accessToken.value = ''
   submitError.value = null
@@ -268,11 +289,7 @@ function clearForm() {
   autoPublish.value = false
   publicFiles.value = true
   continueSource.value = false
-  missing.value = null
-  creators.value = []
-  title.value = ''
-  publicationDate.value = ''
-  publisher.value = ''
+  showMapping.value = false
   link.value = null
   publishError.value = null
   presetError.value = null
@@ -290,6 +307,8 @@ watch(
 watch(sessionEpoch, () => {
   clearForm()
   pidGeneration++
+  checkGeneration++
+  check.value = null
   if (props.open) emit('update:open', false)
 })
 
@@ -339,22 +358,16 @@ async function submit() {
     }
   } catch (err) {
     if (!current()) return
-    const fields = missingFields(err)
-    if (!fields) {
+    const unmet = unmetFindings(err)
+    if (!unmet) {
       submitError.value = errorMessage(err)
       return
     }
     // Nothing was sent to the repository, so the typed token stays for the retry.
     accessToken.value = token
-    missing.value = fields
-    if (fields.includes('creators') && !creators.value.length) {
-      creators.value = [{ name: currentUser.value?.name ?? '', orcid: currentUser.value?.orcid ?? '' }]
-    }
-    if (fields.includes('publication_date') && !publicationDate.value) {
-      publicationDate.value = new Date().toISOString().slice(0, 10)
-    }
-    await nextTick()
-    missingBox.value?.querySelector?.('input')?.focus()
+    checkGeneration++
+    checking.value = false
+    check.value = { kind: connector.value?.kind ?? '', profile: check.value?.profile ?? { iri: '' }, ready: false, findings: unmet, mapping: check.value?.mapping ?? [] }
   } finally {
     busy.value = false
   }
@@ -367,7 +380,7 @@ async function submit() {
       <DialogHeader class="pr-8">
         <DialogTitle class="flex items-center gap-2"><Send class="h-4 w-4 text-primary" /> Publish to {{ label === 'the repository' ? 'a repository' : label }}</DialogTitle>
         <DialogDescription>
-          Publishing to Zenodo or another Invenio repository is how this dataset gets a DOI. The repository mints it.
+          Publishing to a repository such as Zenodo is how this dataset gets a DOI. The repository mints it.
         </DialogDescription>
       </DialogHeader>
 
@@ -375,7 +388,7 @@ async function submit() {
         <template v-if="!link && !activeJobId">
           <p class="text-[11px] text-muted-foreground">
             {{ mode === 'link'
-              ? 'Aruna creates a draft, reserves its DOI and keeps the draft in step with this dataset. You publish when it is ready.'
+              ? `Aruna creates a draft${reserves ? ', reserves its DOI' : ''} and keeps the draft in step with this dataset. You publish when it is ready.`
               : 'Creates one repository draft from the dataset as it is now. Later changes are not sent.' }}
           </p>
 
@@ -389,9 +402,10 @@ async function submit() {
               aria-label="Repository"
               class="mt-1"
             />
-            <Spinner v-else-if="connectorsLoading" show-label label="Loading repositories…" class="mt-2 flex text-[11px]" />
+            <p v-else-if="kindsError" class="mt-2 text-[11px] text-destructive">{{ kindsError }}</p>
             <p v-else-if="connectorsError" class="mt-2 text-[11px] text-destructive">{{ connectorsError }}</p>
-            <div v-else-if="invenioConnectors && canWriteMeta" class="mt-2 space-y-1">
+            <Spinner v-else-if="connectorsLoading || !repositoryConnectors" show-label label="Loading repositories…" class="mt-2 flex text-[11px]" />
+            <div v-else-if="canWriteMeta" class="mt-2 space-y-1">
               <Button size="sm" variant="outline" :disabled="addingPreset" @click="addPreset">
                 <Plus class="h-3.5 w-3.5" /> Add Zenodo
               </Button>
@@ -405,11 +419,11 @@ async function submit() {
               </p>
               <p v-if="presetError" role="alert" class="text-[11px] text-destructive">{{ presetError }}</p>
             </div>
-            <p v-else-if="invenioConnectors" class="mt-2 text-[11px] text-muted-foreground">
+            <p v-else class="mt-2 text-[11px] text-muted-foreground">
               This dataset's group has no repository yet. Ask someone who manages the group's metadata to add Zenodo.
             </p>
-            <p v-if="connector?.community" class="mt-1 text-[11px] text-muted-foreground">
-              Records are submitted to the community {{ connector.community }} for review.
+            <p v-if="community" class="mt-1 text-[11px] text-muted-foreground">
+              Records are submitted to the community {{ community }} for review.
             </p>
           </div>
 
@@ -475,34 +489,42 @@ async function submit() {
             A published repository record cannot be deleted. Its files stay citable under their DOI.
           </Notice>
 
-          <fieldset v-if="missing" ref="missingBox" class="space-y-2 rounded-md border border-border p-3">
-            <legend class="px-1 text-xs font-semibold text-foreground">More metadata needed</legend>
-            <p class="text-[11px] text-muted-foreground">
-              {{ label === 'the repository' ? 'The repository' : label }} needs {{ missingText }}.
-              <template v-if="needs('resource_type')">The resource type is set to dataset.</template>
-              <template v-if="missing.some((field) => !['title', 'publication_date', 'publisher', 'resource_type', 'creators'].includes(field))">
-                Add the other fields in the dataset or in the advanced override.
-              </template>
+          <section v-if="connectorId" class="space-y-2 rounded-md border border-border p-3" aria-label="Repository requirements">
+            <p v-if="checking" class="flex items-center gap-2 text-[11px] text-muted-foreground">
+              <Spinner class="text-primary" aria-hidden="true" /> Checking the dataset against {{ label }}…
             </p>
-            <Input v-if="needs('title')" v-model="title" class="h-8 text-xs" placeholder="Title" aria-label="Title" />
-            <label v-if="needs('publication_date')" class="flex items-center gap-2 text-xs text-foreground">
-              Publication date
-              <Input v-model="publicationDate" type="date" class="h-8 w-44 text-xs" aria-label="Publication date" />
-            </label>
-            <Input v-if="needs('publisher')" v-model="publisher" class="h-8 text-xs" placeholder="Publisher, for example your institution" aria-label="Publisher" />
-            <template v-if="needs('creators')">
-              <div v-for="(creator, index) in creators" :key="index" class="flex flex-wrap items-center gap-2">
-                <Input v-model="creator.name" class="h-8 min-w-40 flex-1 text-xs" placeholder="Family, Given" :aria-label="`Creator ${index + 1} name`" />
-                <Input v-model="creator.orcid" class="h-8 w-44 font-mono text-xs" placeholder="ORCID (optional)" :aria-label="`Creator ${index + 1} ORCID`" />
-                <Button variant="ghost" size="icon-sm" :aria-label="`Remove creator ${index + 1}`" @click="removeCreator(index)">
-                  <Trash2 class="h-3.5 w-3.5" />
+            <p v-else-if="checkError" class="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+              The check did not run: {{ checkError }}
+              <Button variant="ghost" size="sm" class="h-6 px-1 text-xs" @click="runCheck">Retry</Button>
+            </p>
+            <template v-else-if="check">
+              <p class="text-xs font-medium" :class="blocked ? 'text-destructive' : 'text-foreground'">
+                {{ blocked ? `${label === 'the repository' ? 'The repository' : label} needs more metadata.` : 'The dataset meets the requirements.' }}
+              </p>
+              <RequirementFindings :findings="findings" />
+              <RequirementForm
+                v-if="findings.length && profileShapes"
+                :document-id="props.documentId"
+                :findings="findings"
+                :shapes="profileShapes"
+                @saved="runCheck"
+              />
+              <p v-if="blocked" class="text-[11px] text-muted-foreground">
+                Fields without an input here can be added in the dataset editor.
+              </p>
+              <template v-if="check.mapping.length">
+                <Button variant="ghost" size="sm" class="h-6 px-1 text-xs" @click="showMapping = !showMapping">
+                  {{ showMapping ? 'Hide what goes where' : 'Show what goes where' }}
                 </Button>
-              </div>
-              <Button variant="ghost" size="sm" class="h-6 px-1 text-xs" @click="addCreator">
-                <Plus class="h-3.5 w-3.5" /> Add creator
-              </Button>
+                <ul v-if="showMapping" class="space-y-0.5 text-[11px] text-muted-foreground">
+                  <li v-for="(entry, index) in check.mapping" :key="index">
+                    <span class="font-mono">{{ entry.entity_id }}</span>
+                    to {{ entry.target }}<template v-if="entry.field">, field {{ entry.field }}</template>
+                  </li>
+                </ul>
+              </template>
             </template>
-          </fieldset>
+          </section>
 
           <div>
             <Button variant="ghost" size="sm" class="h-6 px-1 text-xs" @click="showAdvanced = !showAdvanced">
@@ -525,7 +547,7 @@ async function submit() {
                 aria-label="Metadata override"
               />
               <p class="mt-1 text-[11px]" :class="override.error ? 'text-destructive' : 'text-muted-foreground'">
-                {{ override.error ?? 'Repository metadata fields written over the ones mapped from the dataset.' }}
+                {{ override.error ?? 'Extra repository fields the dataset cannot hold. Required fields always come from the dataset.' }}
               </p>
             </template>
           </div>
@@ -534,9 +556,9 @@ async function submit() {
         <section v-else-if="link" class="space-y-3 text-xs">
           <p v-if="link.status === 'failed'" class="text-destructive">{{ failureText(link.reason) }}</p>
           <p v-else-if="!link.remote.draft_id" class="flex items-center gap-2 text-muted-foreground">
-            <Spinner class="text-primary" aria-hidden="true" /> Creating the draft and reserving a DOI…
+            <Spinner class="text-primary" aria-hidden="true" /> {{ reserves ? 'Creating the draft and reserving a DOI…' : 'Creating the draft…' }}
           </p>
-          <p v-else-if="!link.remote.doi" class="text-muted-foreground">
+          <p v-else-if="!link.remote.doi && reserves" class="text-muted-foreground">
             No DOI was reserved. The repository assigns one on publish.
           </p>
           <div v-if="link.remote.doi" class="space-y-1">
@@ -546,21 +568,21 @@ async function submit() {
               <ExternalLink v-else :href="doiUrl(link.remote.doi)" :label="link.remote.doi" />
               <CopyButton :value="link.remote.doi" label="Copy DOI" />
             </p>
-            <p class="text-[11px] text-muted-foreground">
+            <p v-if="!link.remote.doi_reserved || reserves" class="text-[11px] text-muted-foreground">
               {{ link.remote.doi_reserved ? 'Reserved, becomes active when published.' : 'Published and active.' }}
             </p>
           </div>
           <p v-if="link.warning" class="text-amber-700 dark:text-amber-400">{{ link.warning }}</p>
-          <p v-if="reviewText(link.remote.review)" class="text-muted-foreground">{{ reviewText(link.remote.review) }}.</p>
+          <p v-if="capabilities?.review && reviewText(link.remote.review)" class="text-muted-foreground">{{ reviewText(link.remote.review) }}.</p>
           <template v-if="link.remote.draft_id && !link.remote.published && link.remote.review !== 'pending'">
             <p class="text-muted-foreground">
-              {{ connector?.community
-                ? `Submitting sends the record to the community ${connector.community} for review. It is published once accepted.`
+              {{ community
+                ? `Submitting sends the record to the community ${community} for review. It is published once accepted.`
                 : 'Publishing is permanent. A published record cannot be deleted.' }}
             </p>
             <Button size="sm" :disabled="!canPublish" @click="publish">
               <Spinner v-if="publishing" class="text-current" aria-hidden="true" />
-              {{ connector?.community ? 'Submit for review' : 'Publish' }}
+              {{ community ? 'Submit for review' : 'Publish' }}
             </Button>
             <p v-if="link.pending" class="text-[11px] text-muted-foreground">Publishing waits until the running push has finished.</p>
           </template>
@@ -584,12 +606,12 @@ async function submit() {
                 <ExternalLink v-if="exported.published" :href="doiUrl(exported.doi)" :label="exported.doi" />
                 <span v-else class="font-mono">{{ exported.doi }}</span>
                 <CopyButton :value="exported.doi" label="Copy DOI" />
-                <span v-if="!exported.published" class="text-muted-foreground">Reserved, becomes active when published.</span>
+                <span v-if="!exported.published && reserves" class="text-muted-foreground">Reserved, becomes active when published.</span>
               </template>
               <span v-else class="text-muted-foreground">Assigned when the record is published</span>
             </dd>
             <dt class="text-muted-foreground">State</dt>
-            <dd>{{ exported.published ? 'Published' : exported.in_review ? 'Waiting for community review' : 'Draft, not published' }}</dd>
+            <dd>{{ exported.published ? 'Published' : exported.in_review && capabilities?.review ? 'Waiting for community review' : 'Draft, not published' }}</dd>
             <template v-if="exported.concept_doi">
               <dt class="text-muted-foreground">All versions</dt>
               <dd class="flex min-w-0 items-center gap-1">
