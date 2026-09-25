@@ -100,12 +100,17 @@ const REASON_TEXT: Record<string, string> = {
   update_available: 'A newer version is available in the repository.',
   local_changed:
     'A newer version is available. This dataset was changed here since the last update, so it is not imported automatically. Update now replaces the dataset metadata. Local files stay.',
+  review_declined:
+    'The community declined the record, so it is not published automatically. Publish to submit it again.',
 }
 
 // Pull links read with the group's repository token, not a personal one.
 const PULL_REASON_TEXT: Record<string, string> = {
   token_rejected:
-    "The repository rejected the group's repository token. Someone who manages the group's data can change it under Sources.",
+    "The repository rejected the group's repository token. Someone who manages the group's metadata can change it under Sources.",
+  source_unavailable: 'The record was withdrawn or deleted in the repository, so no updates can be imported.',
+  owner_not_holder:
+    'The node that manages this link no longer holds the dataset, so it cannot import updates. Remove the link.',
 }
 
 /** A readable sentence for a status reason; unknown reasons read as their words. */
@@ -194,10 +199,17 @@ function sameEndpoint(a: string, b: string): boolean {
 }
 
 /** The source record lineage a new link may continue on this endpoint. */
-export function sourceParent(rows: readonly PersistentIdView[], endpoint: string): string | null {
+export function sourceParent(rows: readonly PersistentIdView[], endpoint: string): SecondaryIdentifier | null {
   const parents = secondaryIdentifiers(rows, 'invenio_parent')
-  const match = parents.find((entry) => !entry.endpoint || sameEndpoint(entry.endpoint, endpoint))
-  return match?.value ?? null
+  return parents.find((entry) => !entry.endpoint || sameEndpoint(entry.endpoint, endpoint)) ?? null
+}
+
+/** Whether an enabled pull link already imports updates from this record lineage. */
+export function pullsParent(links: readonly InvenioLink[], parentId: string, endpoint: string): boolean {
+  return links.some(
+    (link) =>
+      isPullLink(link) && link.status === 'enabled' && link.remote.parent_id === parentId && sameEndpoint(link.endpoint, endpoint),
+  )
 }
 
 /** The record an import names: a DOI, a record URL or a plain record id. */
@@ -257,7 +269,7 @@ export function repositoryLabel(connector: { name: string; endpoint: string } | 
 
 /** The metadata fields a 400 answer names as missing, or null for other errors. */
 export function missingFields(err: unknown): string[] | null {
-  if (!(err instanceof ApiError) || err.status !== 400) return null
+  if (!(err instanceof ApiError) || err.status !== 400 || err.code !== 'missing_metadata') return null
   const missing = err.details?.missing
   return Array.isArray(missing) ? missing.filter((entry): entry is string => typeof entry === 'string') : null
 }
@@ -267,6 +279,7 @@ const FIELD_LABEL: Record<string, string> = {
   publication_date: 'a publication date',
   resource_type: 'a resource type',
   creators: 'creators',
+  publisher: 'a publisher',
 }
 
 /** A missing field as words, for example "a publication date". */
@@ -277,13 +290,15 @@ export function fieldLabel(field: string): string {
 export interface RequiredDraft {
   title: string
   publicationDate: string
+  publisher: string
 }
 
-/** Typed values for the missing title and date, and the dataset resource type. */
+/** Typed values for the missing title, date and publisher, and the dataset resource type. */
 export function requiredMetadata(missing: readonly string[], draft: RequiredDraft): Record<string, unknown> {
   const metadata: Record<string, unknown> = {}
   if (missing.includes('title') && draft.title.trim()) metadata.title = draft.title.trim()
   if (missing.includes('publication_date') && draft.publicationDate) metadata.publication_date = draft.publicationDate
+  if (missing.includes('publisher') && draft.publisher.trim()) metadata.publisher = draft.publisher.trim()
   if (missing.includes('resource_type')) metadata.resource_type = { id: 'dataset' }
   return metadata
 }

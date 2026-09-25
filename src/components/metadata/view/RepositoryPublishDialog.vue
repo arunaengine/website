@@ -2,7 +2,7 @@
 // Publishes a dataset to an Invenio or Zenodo repository: either a lasting link
 // that pushes every change and reserves a DOI, or a one-time export. The personal
 // access token is held only in this component's memory and cleared on every exit.
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
@@ -15,7 +15,6 @@ import CopyButton from '@/components/ui/CopyButton.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
-import OptionToggle from '@/components/ui/OptionToggle.vue'
 import Select from '@/components/ui/Select.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import Switch from '@/components/ui/Switch.vue'
@@ -28,6 +27,7 @@ import {
   createInvenioLink,
   createRepositoryConnector,
   getInvenioLink,
+  listInvenioLinks,
   publishInvenioLink,
   submitInvenioExport,
   type InvenioLink,
@@ -40,6 +40,7 @@ import {
   fieldLabel,
   missingFields,
   parseOverride,
+  pullsParent,
   REPOSITORY_PRESETS,
   repositoryLabel,
   requiredMetadata,
@@ -82,7 +83,9 @@ const missing = ref<string[] | null>(null)
 const creators = ref<CreatorDraft[]>([])
 const title = ref('')
 const publicationDate = ref('')
-// The link this dialog created; it is followed until its DOI is reserved.
+const publisher = ref('')
+const missingBox = ref<HTMLFieldSetElement | null>(null)
+// The link this dialog created; it is followed until its draft exists.
 const link = ref<InvenioLink | null>(null)
 const publishing = ref(false)
 const publishError = ref<string | null>(null)
@@ -93,7 +96,7 @@ const {
   error: connectorsError,
   load: loadConnectors,
 } = useRepositoryConnectors(() => props.groupId)
-const { canWriteData } = useGroupRights(() => props.groupId)
+const { canWriteMeta } = useGroupRights(() => props.groupId)
 const invenioConnectors = computed(() => connectors.value?.filter((entry) => entry.kind === 'invenio') ?? null)
 const connectorOptions = computed(() =>
   (invenioConnectors.value ?? []).map((entry) => ({ value: entry.connector_id, label: `${entry.name} (${entry.endpoint})` })),
@@ -101,10 +104,7 @@ const connectorOptions = computed(() =>
 const connector = computed(() => invenioConnectors.value?.find((entry) => entry.connector_id === connectorId.value) ?? null)
 const label = computed(() => repositoryLabel(connector.value))
 const tokenPage = computed(() => (connector.value ? tokenPageUrl(connector.value.endpoint) : null))
-const MODE_OPTIONS = computed(() => [
-  { value: 'link', label: `Publish to ${label.value} and get a DOI` },
-  { value: 'export', label: 'Export once' },
-])
+const publishName = computed(() => (label.value.startsWith('Zenodo') ? `Publish to ${label.value}` : 'Publish to repository'))
 // Another group has other connectors; a picked one never carries over.
 watch(
   () => props.groupId,
@@ -118,21 +118,34 @@ watch(
   { immediate: true },
 )
 
-// The imported source record, when there is one on the chosen endpoint.
+// The source record, when there is one on the chosen endpoint, and the links
+// that may already import updates from it.
 const pidRows = ref<PersistentIdView[]>([])
+const datasetLinks = ref<InvenioLink[]>([])
 let pidGeneration = 0
 async function loadPids() {
   const current = ++pidGeneration
   const documentId = props.documentId
   pidRows.value = []
+  datasetLinks.value = []
   try {
-    const rows = await listPersistentIds(documentId, client())
-    if (current === pidGeneration) pidRows.value = rows
+    // Links a caller may not read count as none.
+    const links = listInvenioLinks(documentId, client()).catch(() => [])
+    const [rows, pulled] = await Promise.all([listPersistentIds(documentId, client()), links])
+    if (current === pidGeneration) {
+      pidRows.value = rows
+      datasetLinks.value = pulled
+    }
   } catch {
     // Without identifiers the link simply starts a new record.
   }
 }
-const parentId = computed(() => (connector.value ? sourceParent(pidRows.value, connector.value.endpoint) : null))
+const parent = computed(() => (connector.value ? sourceParent(pidRows.value, connector.value.endpoint) : null))
+const parentId = computed(() => parent.value?.value ?? null)
+// Pushing into a record this dataset also imports updates from would loop.
+const parentPulled = computed(() =>
+  Boolean(parent.value && connector.value && pullsParent(datasetLinks.value, parent.value.value, connector.value.endpoint)),
+)
 
 // One click creates the Zenodo preset when the group has no repository yet.
 const addingPreset = ref(false)
@@ -141,6 +154,8 @@ async function addPreset() {
   if (addingPreset.value) return
   const preset = REPOSITORY_PRESETS[0]
   const groupId = props.groupId
+  const epoch = sessionEpoch.value
+  const current = () => groupId === props.groupId && epoch === sessionEpoch.value
   addingPreset.value = true
   presetError.value = null
   try {
@@ -149,11 +164,11 @@ async function addPreset() {
       { name: preset.name, kind: 'invenio', endpoint: preset.endpoint, secret_config: {} },
       client(),
     )
-    if (groupId !== props.groupId) return
+    if (!current()) return
     await loadConnectors()
-    connectorId.value = created.connector_id
+    if (current()) connectorId.value = created.connector_id
   } catch (err) {
-    presetError.value = errorMessage(err)
+    if (current()) presetError.value = errorMessage(err)
   } finally {
     addingPreset.value = false
   }
@@ -164,7 +179,11 @@ const needs = (field: string) => Boolean(missing.value?.includes(field))
 const missingText = computed(() => (missing.value ?? []).map(fieldLabel).join(', '))
 const metadata = computed(() => {
   const people = needs('creators') ? creatorsMetadata(creators.value) : []
-  const typed = requiredMetadata(missing.value ?? [], { title: title.value, publicationDate: publicationDate.value })
+  const typed = requiredMetadata(missing.value ?? [], {
+    title: title.value,
+    publicationDate: publicationDate.value,
+    publisher: publisher.value,
+  })
   const merged = { ...(override.value.value ?? {}), ...typed, ...(people.length ? { creators: people } : {}) }
   return Object.keys(merged).length ? merged : undefined
 })
@@ -172,7 +191,8 @@ const filled = computed(
   () =>
     !(needs('creators') && !creatorsMetadata(creators.value).length) &&
     !(needs('title') && !title.value.trim()) &&
-    !(needs('publication_date') && !publicationDate.value),
+    !(needs('publication_date') && !publicationDate.value) &&
+    !(needs('publisher') && !publisher.value.trim()),
 )
 const ready = computed(
   () =>
@@ -183,7 +203,7 @@ const { job, loadState, loadError, lastPollError, load } = useJobDetail(() => ac
 const jobDone = computed(() => Boolean(job.value && isTerminalJobState(job.value.state)))
 const exported = computed(() => (job.value?.state === 'succeeded' ? exportRepository(job.value.result) : null))
 
-// The draft and its DOI appear after the first push; publish waits for that push.
+// The draft appears after the first push; publish waits for that push.
 const canPublish = computed(
   () =>
     Boolean(link.value?.remote.draft_id && !link.value.pending && link.value.remote.review !== 'pending') &&
@@ -193,7 +213,7 @@ const canPublish = computed(
 const followLink = computed(() => {
   const current = link.value
   if (!current || !props.open || current.status === 'failed') return false
-  return current.pending || !current.remote.doi || (Boolean(activeJobId.value) && !jobDone.value)
+  return current.pending || !current.remote.draft_id || (Boolean(activeJobId.value) && !jobDone.value)
 })
 async function refreshLink() {
   const current = link.value
@@ -243,6 +263,7 @@ function clearForm() {
   activeJobId.value = null
   overrideText.value = ''
   showAdvanced.value = false
+  mode.value = 'link'
   publishNow.value = false
   autoPublish.value = false
   publicFiles.value = true
@@ -251,6 +272,7 @@ function clearForm() {
   creators.value = []
   title.value = ''
   publicationDate.value = ''
+  publisher.value = ''
   link.value = null
   publishError.value = null
   presetError.value = null
@@ -289,7 +311,7 @@ async function submit() {
           group_id: props.groupId,
           connector_id: connectorId.value,
           access_token: token,
-          ...(parentId.value && continueSource.value ? { parent_id: parentId.value } : {}),
+          ...(parentId.value && continueSource.value && !parentPulled.value ? { parent_id: parentId.value } : {}),
           auto_publish: autoPublish.value,
           public_files: publicFiles.value,
           ...(metadata.value ? { metadata: metadata.value } : {}),
@@ -331,6 +353,8 @@ async function submit() {
     if (fields.includes('publication_date') && !publicationDate.value) {
       publicationDate.value = new Date().toISOString().slice(0, 10)
     }
+    await nextTick()
+    missingBox.value?.querySelector?.('input')?.focus()
   } finally {
     busy.value = false
   }
@@ -349,14 +373,11 @@ async function submit() {
 
       <div class="scrollbar-thin min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
         <template v-if="!link && !activeJobId">
-          <div class="space-y-1.5">
-            <OptionToggle v-model="mode" :options="MODE_OPTIONS" aria-label="Kind of publication" />
-            <p class="text-[11px] text-muted-foreground">
-              {{ mode === 'link'
-                ? 'Aruna creates a draft, reserves its DOI and keeps the draft in step with this dataset. You publish when it is ready.'
-                : 'Creates one repository draft from the dataset as it is now. Later changes are not sent.' }}
-            </p>
-          </div>
+          <p class="text-[11px] text-muted-foreground">
+            {{ mode === 'link'
+              ? 'Aruna creates a draft, reserves its DOI and keeps the draft in step with this dataset. You publish when it is ready.'
+              : 'Creates one repository draft from the dataset as it is now. Later changes are not sent.' }}
+          </p>
 
           <div>
             <label class="text-xs font-medium text-foreground">Repository</label>
@@ -370,7 +391,7 @@ async function submit() {
             />
             <Spinner v-else-if="connectorsLoading" show-label label="Loading repositories…" class="mt-2 flex text-[11px]" />
             <p v-else-if="connectorsError" class="mt-2 text-[11px] text-destructive">{{ connectorsError }}</p>
-            <div v-else-if="invenioConnectors && canWriteData" class="mt-2 space-y-1">
+            <div v-else-if="invenioConnectors && canWriteMeta" class="mt-2 space-y-1">
               <Button size="sm" variant="outline" :disabled="addingPreset" @click="addPreset">
                 <Plus class="h-3.5 w-3.5" /> Add Zenodo
               </Button>
@@ -382,10 +403,10 @@ async function submit() {
                   @click="emit('update:open', false)"
                 >Sources</RouterLink>.
               </p>
-              <p v-if="presetError" class="text-[11px] text-destructive">{{ presetError }}</p>
+              <p v-if="presetError" role="alert" class="text-[11px] text-destructive">{{ presetError }}</p>
             </div>
             <p v-else-if="invenioConnectors" class="mt-2 text-[11px] text-muted-foreground">
-              This dataset's group has no repository yet. Ask someone who manages the group's data to add Zenodo.
+              This dataset's group has no repository yet. Ask someone who manages the group's metadata to add Zenodo.
             </p>
             <p v-if="connector?.community" class="mt-1 text-[11px] text-muted-foreground">
               Records are submitted to the community {{ connector.community }} for review.
@@ -414,28 +435,37 @@ async function submit() {
             </p>
           </div>
 
-          <label v-if="mode === 'link' && parentId" class="flex items-start gap-2 text-xs text-foreground">
+          <p v-if="mode === 'link' && parentPulled" class="text-[11px] text-muted-foreground">
+            This dataset imports updates from its source record ({{ parentId }}), so the new link starts a new record.
+          </p>
+          <label v-else-if="mode === 'link' && parent" class="flex items-start gap-2 text-xs text-foreground">
             <Switch :checked="continueSource" aria-label="Continue the source record" @update:checked="continueSource = $event" />
             <span>
-              Continue the source record
+              {{ parent.origin === 'published' ? 'Continue the published record' : 'Continue the source record' }}
               <span class="block text-[11px] text-muted-foreground">
-                Only if you own that record on the repository. New versions then join the record this dataset
-                was imported from ({{ parentId }}) instead of starting a new one.
+                <template v-if="parent.origin === 'published'">
+                  New versions then join the record this dataset was published to before ({{ parentId }}) instead of
+                  starting a new one.
+                </template>
+                <template v-else>
+                  Only if you own that record on the repository. New versions then join the record this dataset
+                  was imported from ({{ parentId }}) instead of starting a new one.
+                </template>
               </span>
             </span>
           </label>
           <label v-if="mode === 'link'" class="flex items-center gap-2 text-xs text-foreground">
             <Switch :checked="autoPublish" aria-label="Publish automatically" @update:checked="autoPublish = $event" />
-            Publish every push automatically
+            Publish automatically when the draft has been unchanged for 15 minutes
           </label>
           <label v-else class="flex items-center gap-2 text-xs text-foreground">
             <Switch :checked="publishNow" aria-label="Publish right away" @update:checked="publishNow = $event" />
             Publish right away
           </label>
           <label class="flex items-start gap-2 text-xs text-foreground">
-            <Switch :checked="publicFiles" aria-label="Make files public" @update:checked="publicFiles = $event" />
+            <Switch :checked="publicFiles" aria-label="Files are public on the repository" @update:checked="publicFiles = $event" />
             <span>
-              Make files public
+              Files are public on the repository
               <span class="block text-[11px] text-muted-foreground">
                 {{ publicFiles ? 'Anyone can download the files once the record is published.' : 'Only the metadata is public; files stay restricted.' }}
               </span>
@@ -445,12 +475,12 @@ async function submit() {
             A published repository record cannot be deleted. Its files stay citable under their DOI.
           </Notice>
 
-          <fieldset v-if="missing" class="space-y-2 rounded-md border border-border p-3">
+          <fieldset v-if="missing" ref="missingBox" class="space-y-2 rounded-md border border-border p-3">
             <legend class="px-1 text-xs font-semibold text-foreground">More metadata needed</legend>
             <p class="text-[11px] text-muted-foreground">
               {{ label === 'the repository' ? 'The repository' : label }} needs {{ missingText }}.
               <template v-if="needs('resource_type')">The resource type is set to dataset.</template>
-              <template v-if="missing.some((field) => !['title', 'publication_date', 'resource_type', 'creators'].includes(field))">
+              <template v-if="missing.some((field) => !['title', 'publication_date', 'publisher', 'resource_type', 'creators'].includes(field))">
                 Add the other fields in the dataset or in the advanced override.
               </template>
             </p>
@@ -459,6 +489,7 @@ async function submit() {
               Publication date
               <Input v-model="publicationDate" type="date" class="h-8 w-44 text-xs" aria-label="Publication date" />
             </label>
+            <Input v-if="needs('publisher')" v-model="publisher" class="h-8 text-xs" placeholder="Publisher, for example your institution" aria-label="Publisher" />
             <template v-if="needs('creators')">
               <div v-for="(creator, index) in creators" :key="index" class="flex flex-wrap items-center gap-2">
                 <Input v-model="creator.name" class="h-8 min-w-40 flex-1 text-xs" placeholder="Family, Given" :aria-label="`Creator ${index + 1} name`" />
@@ -475,9 +506,16 @@ async function submit() {
 
           <div>
             <Button variant="ghost" size="sm" class="h-6 px-1 text-xs" @click="showAdvanced = !showAdvanced">
-              {{ showAdvanced ? 'Hide advanced' : 'Advanced metadata override' }}
+              {{ showAdvanced ? 'Hide advanced' : 'Advanced options' }}
             </Button>
             <template v-if="showAdvanced">
+              <label class="mt-1 flex items-start gap-2 text-xs text-foreground">
+                <Switch :checked="mode === 'export'" aria-label="Export once" @update:checked="mode = $event ? 'export' : 'link'" />
+                <span>
+                  Export once
+                  <span class="block text-[11px] text-muted-foreground">No lasting link. Later changes are not sent.</span>
+                </span>
+              </label>
               <Textarea
                 v-model="overrideText"
                 rows="5"
@@ -495,8 +533,11 @@ async function submit() {
 
         <section v-else-if="link" class="space-y-3 text-xs">
           <p v-if="link.status === 'failed'" class="text-destructive">{{ failureText(link.reason) }}</p>
-          <p v-else-if="!link.remote.doi" class="flex items-center gap-2 text-muted-foreground">
+          <p v-else-if="!link.remote.draft_id" class="flex items-center gap-2 text-muted-foreground">
             <Spinner class="text-primary" aria-hidden="true" /> Creating the draft and reserving a DOI…
+          </p>
+          <p v-else-if="!link.remote.doi" class="text-muted-foreground">
+            No DOI was reserved. The repository assigns one on publish.
           </p>
           <div v-if="link.remote.doi" class="space-y-1">
             <p class="font-medium text-foreground">DOI</p>
@@ -511,7 +552,7 @@ async function submit() {
           </div>
           <p v-if="link.warning" class="text-amber-700 dark:text-amber-400">{{ link.warning }}</p>
           <p v-if="reviewText(link.remote.review)" class="text-muted-foreground">{{ reviewText(link.remote.review) }}.</p>
-          <template v-if="link.remote.doi_reserved && !link.remote.published && link.remote.review !== 'pending'">
+          <template v-if="link.remote.draft_id && !link.remote.published && link.remote.review !== 'pending'">
             <p class="text-muted-foreground">
               {{ connector?.community
                 ? `Submitting sends the record to the community ${connector.community} for review. It is published once accepted.`
@@ -523,7 +564,7 @@ async function submit() {
             </Button>
             <p v-if="link.pending" class="text-[11px] text-muted-foreground">Publishing waits until the running push has finished.</p>
           </template>
-          <p v-if="publishError" class="text-destructive">{{ publishError }}</p>
+          <p v-if="publishError" role="alert" class="text-destructive">{{ publishError }}</p>
           <TransferJobStatus
             v-if="activeJobId"
             :job="job"
@@ -575,7 +616,7 @@ async function submit() {
         <Button v-if="!link && !activeJobId" :disabled="!ready" @click="submit">
           <Spinner v-if="busy" class="text-current" aria-hidden="true" />
           <Send v-else class="h-4 w-4" />
-          {{ busy ? 'Starting…' : mode === 'link' ? 'Create draft and reserve DOI' : 'Start export' }}
+          {{ busy ? 'Starting…' : mode === 'link' ? publishName : 'Start export' }}
         </Button>
       </DialogFooter>
     </DialogContent>

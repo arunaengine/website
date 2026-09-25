@@ -40,16 +40,20 @@ export function useRepositoryConnectors(groupId: () => string) {
   return { connectors, loading, error, load }
 }
 
-// The caller's own rights in one group: data WRITE manages connectors, admin
-// WRITE manages every link of the group.
+// The caller's own rights: metadata WRITE in a group manages its repository
+// connectors and kept imports, admin WRITE manages every link of that group.
 export function useGroupRights(groupId: () => string) {
   const { userInfo } = useAruna()
-  const roles = computed(() => userInfo.value?.groups.find((group) => group.group_id === groupId())?.roles ?? [])
-  const base = computed(() => `/${userInfo.value?.realm.realm_id ?? ''}/g/${groupId()}`)
+  function writes(group: string, scope: string): boolean {
+    const roles = userInfo.value?.groups.find((entry) => entry.group_id === group)?.roles ?? []
+    return ownRolesWrite(roles, `/${userInfo.value?.realm.realm_id ?? ''}/g/${group}/${scope}`)
+  }
   return {
     userId: computed(() => userInfo.value?.user.user_id ?? ''),
-    canWriteData: computed(() => ownRolesWrite(roles.value, `${base.value}/data/**`)),
-    isAdmin: computed(() => ownRolesWrite(roles.value, `${base.value}/admin`)),
+    canWriteData: computed(() => writes(groupId(), 'data/**')),
+    isAdmin: computed(() => writes(groupId(), 'admin')),
+    canWriteMeta: computed(() => writes(groupId(), 'meta/**')),
+    adminOf: (group: string) => writes(group, 'admin'),
   }
 }
 

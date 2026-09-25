@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ApiError } from './api'
+import { ApiError, type InvenioLink } from './api'
 import {
   connectorBody,
   creatorsMetadata,
@@ -13,6 +13,7 @@ import {
   managedHere,
   missingFields,
   parseOverride,
+  pullsParent,
   recordSource,
   repositoryLabel,
   requiredMetadata,
@@ -101,12 +102,14 @@ describe('invenio link state', () => {
     expect(failureText('record withdrawn', true)).toBe('The last update failed: record withdrawn.')
     expect(failureText('token_rejected', true)).toContain("group's repository token")
     expect(failureText('update_available', true)).toContain('newer version')
+    expect(failureText('source_unavailable', true)).toContain('withdrawn or deleted')
+    expect(failureText('owner_not_holder', true)).toContain('cannot import updates')
   })
 
   it('has a plain text for every reason of the contract', () => {
     const reasons = [
       'owner_not_holder', 'too_many_files', 'update_available', 'local_changed',
-      'remote_changed', 'token_rejected', 'source_unavailable',
+      'remote_changed', 'token_rejected', 'source_unavailable', 'review_declined',
     ]
     for (const reason of reasons) expect(failureText(reason)).not.toContain(reason.replaceAll('_', ' '))
     expect(failureText('too_many_files')).toContain('100 files')
@@ -173,20 +176,22 @@ describe('repository endpoints', () => {
 
 describe('missing publish metadata', () => {
   it('reads the missing fields of a 400 answer only', () => {
-    const missing = new ApiError(400, 'missing metadata', undefined, { error: 'x', missing: ['creators', 1] })
+    const missing = new ApiError(400, 'missing metadata', 'missing_metadata', { error: 'x', missing: ['creators', 1] })
     expect(missingFields(missing)).toEqual(['creators'])
+    expect(missingFields(new ApiError(400, 'bad', 'invalid_request', { missing: ['creators'] }))).toBeNull()
     expect(missingFields(new ApiError(400, 'bad', undefined, { error: 'x' }))).toBeNull()
     expect(missingFields(new ApiError(409, 'busy', undefined, { missing: ['creators'] }))).toBeNull()
     expect(missingFields(new Error('x'))).toBeNull()
   })
 
   it('fills the missing title, date and resource type from the form', () => {
-    const draft = { title: ' Soil data ', publicationDate: '2026-09-25' }
-    expect(requiredMetadata(['title', 'publication_date', 'resource_type', 'creators'], draft)).toEqual({
-      title: 'Soil data', publication_date: '2026-09-25', resource_type: { id: 'dataset' },
+    const draft = { title: ' Soil data ', publicationDate: '2026-09-25', publisher: ' JLU Giessen ' }
+    expect(requiredMetadata(['title', 'publication_date', 'resource_type', 'publisher', 'creators'], draft)).toEqual({
+      title: 'Soil data', publication_date: '2026-09-25', resource_type: { id: 'dataset' }, publisher: 'JLU Giessen',
     })
     expect(requiredMetadata(['creators'], draft)).toEqual({})
-    expect(requiredMetadata(['title'], { title: ' ', publicationDate: '' })).toEqual({})
+    expect(requiredMetadata(['title', 'publisher'], { title: ' ', publicationDate: '', publisher: ' ' })).toEqual({})
+    expect(fieldLabel('publisher')).toBe('a publisher')
     expect(fieldLabel('publication_date')).toBe('a publication date')
     expect(fieldLabel('rights_holder')).toBe('rights holder')
   })
@@ -251,8 +256,17 @@ describe('publish choices', () => {
   }] as PersistentIdView[]
 
   it('offers only the source lineage of the chosen endpoint', () => {
-    expect(sourceParent(rows, 'https://zenodo.org/api/')).toBe('zenodo-parent')
+    expect(sourceParent(rows, 'https://zenodo.org/api/')?.value).toBe('zenodo-parent')
     expect(sourceParent(rows, 'https://other.example/api/')).toBeNull()
+  })
+
+  it('finds an enabled pull link on the same lineage', () => {
+    const pull = { direction: 'pull', status: 'enabled', endpoint: 'https://zenodo.org/api/', remote: { parent_id: 'p1', published: true } }
+    const links = [pull] as InvenioLink[]
+    expect(pullsParent(links, 'p1', 'https://zenodo.org/api')).toBe(true)
+    expect(pullsParent(links, 'p2', 'https://zenodo.org/api')).toBe(false)
+    expect(pullsParent([{ ...pull, status: 'paused' }] as InvenioLink[], 'p1', 'https://zenodo.org/api')).toBe(false)
+    expect(pullsParent([{ ...pull, direction: 'push' }] as InvenioLink[], 'p1', 'https://zenodo.org/api')).toBe(false)
   })
 
   it('accepts only a JSON object as metadata override', () => {
