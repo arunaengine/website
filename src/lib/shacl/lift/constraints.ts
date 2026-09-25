@@ -8,6 +8,7 @@ import {
   XSD,
 } from '../projection'
 import { ALL_ENTITY_SOURCES } from '../../profiles/sources'
+import { CURATED_ENTITY_TYPES } from '../../profiles/entityTypes'
 import { CURATED_PROPERTY_TERMS, type PropertyTermOption } from '../../profiles/propertyCatalog'
 import { isHasPartUri } from '../../profiles/emit'
 import { sameSchemaOrgType, SCHEMA_ORG } from '../../profiles/uri'
@@ -400,7 +401,7 @@ function resolveKind(
     }
     for (const uri of facets.unionClasses) classTarget(uri).forEach(addTarget)
     for (const node of [...facets.nodeTargets, ...facets.unionNodes]) {
-      const resolved = index.types.get(termKey(node))
+      const resolved = formlessRange(index, node, path) ?? index.types.get(termKey(node))
       if (resolved?.length) resolved.forEach(addTarget)
       // A shape reference alongside sh:class only repeats the class, so an
       // unresolvable one there says nothing extra and needs no note.
@@ -500,6 +501,17 @@ const BASELINE_KINDS: Array<[string, ProfileValueKind]> = [
 
 function baselineKind(path: string): ProfileValueKind | undefined {
   return BASELINE_KINDS.find(([uri]) => sameSchemaOrgType(path, uri))?.[1]
+}
+
+// A type minted from the name of a shape without fields would get no form; the
+// term's documented range, such as Person or Organization for author, is used instead.
+function formlessRange(index: ShapeIndex, node: Term, path: string): string[] | undefined {
+  const key = termKey(node)
+  const minted = index.types.get(key)?.[0]
+  if (!index.derived.has(key) || index.properties.get(key)?.length) return undefined
+  if (!minted || CURATED_ENTITY_TYPES.some((type) => sameSchemaOrgType(type.uri, minted))) return undefined
+  const range = catalogTerm(path)?.suggestedEntityTypes?.filter((type) => type !== `${SCHEMA_ORG}Thing`)
+  return range?.length ? [...range] : undefined
 }
 
 // Why a shape reference could not be pointed at a type.

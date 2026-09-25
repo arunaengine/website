@@ -203,6 +203,28 @@ describe('alternative paths', () => {
   })
 })
 
+// Copies of the node's shipped operations/src/metadata/datacite.ttl and publisher.ttl.
+describe('the built-in repository shapes', () => {
+  const result = liftShapes([fixture('repository-datacite.ttl'), fixture('repository-publisher.ttl')].join('\n'))
+  const dataset = entityFor(result, 'http://schema.org/Dataset')
+
+  it('lifts every required record field onto the root dataset', () => {
+    expect(result.entities).toHaveLength(1)
+    expect(dataset?.propertyRules.map((rule) => [rule.valueName, rule.kind, rule.obligation])).toEqual([
+      ['name', 'text', 'MUST'],
+      ['datePublished', 'date', 'MUST'],
+      ['author', 'entity', 'MUST'],
+      ['license', 'url', 'SHOULD'],
+      ['publisher', 'text', 'MUST'],
+    ])
+  })
+
+  it('points creators at people and organizations', () => {
+    expect(ruleFor(dataset, 'author')?.entityTypes).toEqual(['http://schema.org/Person', 'http://schema.org/Organization'])
+    expect(result.notes.some((note) => note.message.includes('taken from the shape name'))).toBe(false)
+  })
+})
+
 describe('wide base lattices', () => {
   it('composes each shape once', { timeout: 10_000 }, () => {
     // Without memoization this walks 4^12 paths, which hangs the tab.

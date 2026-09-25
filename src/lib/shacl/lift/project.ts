@@ -244,7 +244,7 @@ export function liftShapes(turtle: string): LiftResult {
     // references, so it becomes their own form, never the crate root, which is
     // what a target-less shape falls back to.
     const indexed = index.types.get(shapeKey)?.[0]
-    if (indexed && index.derived.has(shapeKey)) {
+    if (indexed && index.derived.has(shapeKey) && info.propertyShapes.length) {
       notes.add('partial', `${name} names no class for the entities it describes, so its rules were imported as ${shortIri(indexed)}, taken from the shape name.`, name)
     }
     const key = targetClass ?? nodeClass ?? indexed ?? (info.referenced ? undefined : ROOT_KEY)
