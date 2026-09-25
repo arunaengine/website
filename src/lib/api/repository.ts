@@ -84,21 +84,23 @@ export interface RepositoryCapabilities {
   pull: boolean
   search: boolean
   release_date: boolean
-  identifier_kind?: string | null
+  // The identifier a published record receives, such as doi.
+  identifier_kind: string
 }
 
 // A built-in requirement profile; shapes are Turtle sources.
 export interface RepositoryProfile {
   iri: string
   name: string
-  shapes: string | string[]
+  shapes: string[]
 }
 
 export interface RepositoryKind {
   kind: string
   capabilities: RepositoryCapabilities
   profiles: RepositoryProfile[]
-  targets?: unknown[]
+  // Mapping rules: which crate entities become which repository objects.
+  targets: unknown[]
 }
 
 export function listRepositoryKinds(client: ApiClientOptions): Promise<RepositoryKind[]> {

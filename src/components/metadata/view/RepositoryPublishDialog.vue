@@ -190,8 +190,7 @@ const blocked = computed(() => findings.value.some((finding) => finding.severity
 const profileShapes = computed(() => {
   const iri = check.value?.profile?.iri
   const profile = kindOf(check.value?.kind ?? connector.value?.kind)?.profiles.find((entry) => entry.iri === iri)
-  if (!profile) return ''
-  return Array.isArray(profile.shapes) ? profile.shapes.join('\n') : profile.shapes
+  return profile ? profile.shapes.join('\n') : ''
 })
 // A failed check does not block: the node checks again before it writes anything.
 const ready = computed(
