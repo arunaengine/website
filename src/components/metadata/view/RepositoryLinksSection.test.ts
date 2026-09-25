@@ -17,6 +17,8 @@ const getJob = vi.fn()
 const userId = ref('u1')
 // Groups the caller administers.
 const adminGroups = ref<string[]>([])
+const ALL_CAPABILITIES = { drafts: true, reserve_identifier: true, versions: true, review: true, pull: true, search: true, release_date: true }
+const capabilities = ref<Record<string, boolean>>({ ...ALL_CAPABILITIES })
 // The captured poll: run is one tick, delay the next wait, skip whether the tick would idle.
 let poller: { run: () => Promise<void>; delay: () => number; skip: () => boolean } | null = null
 
@@ -77,7 +79,14 @@ const Section = compileClientComponent(new URL('./RepositoryLinksSection.vue', i
   '@/components/ui/Switch.vue': moduleDefault(Empty),
   '@/composables/useRepository': {
     useGroupRights: () => ({ userId, adminOf: (group: string) => adminGroups.value.includes(group) }),
+    useRepositoryKinds: () => ({
+      kindOf: (kind: string) => (kind === 'invenio' ? { kind, capabilities: capabilities.value, profiles: [] } : null),
+    }),
   },
+  './RequirementFindings.vue': moduleDefault(defineComponent({
+    props: { findings: Array },
+    setup: (props) => () => h('ul', (props.findings as Array<{ message: string }>).map((entry) => h('li', entry.message))),
+  })),
   '@/lib/jobs': { getJob, isTerminalJobState: (state: string) => ['succeeded', 'failed', 'cancelled'].includes(state) },
   '@/lib/poll': {
     POLL_ACTIVE_MS: 3000,
@@ -109,6 +118,7 @@ beforeEach(() => {
   sessionEpoch.value = 0
   userId.value = 'u1'
   adminGroups.value = []
+  capabilities.value = { ...ALL_CAPABILITIES }
   for (const mock of [onSettled, listRepositoryLinks, patchRepositoryLink, rotateLinkToken, pushRepositoryLink, acceptRemoteLink, pullRepositoryLink, getJob]) {
     mock.mockReset()
   }
@@ -138,6 +148,36 @@ describe('RepositoryLinksSection', () => {
     expect(text).toContain('10.5281/zenodo.9')
     expect(text).toContain('Failed')
     expect(text).toContain('Change the token to continue')
+    mounted.app.unmount()
+  })
+
+  it('shows the remote state and what the dataset still lacks', async () => {
+    const finding = { code: 'constraint_violation', severity: 'violation', rule: 'minCount', message: 'Add an author.', completeness: 'complete' }
+    listRepositoryLinks.mockResolvedValue([
+      link({ status: 'failed', reason: 'requirements_unmet', findings: [finding] as Api.ProfileValidationFinding[], remote: { state: 'review', published: false } }),
+    ])
+    const mounted = await mount()
+    const text = content(mounted.root)
+
+    expect(text).toContain('In review')
+    expect(text).toContain('repository requirements')
+    expect(text).toContain('Add an author.')
+    mounted.app.unmount()
+  })
+
+  it('hides review, reserved DOI and pull actions the repository kind does not offer', async () => {
+    capabilities.value = { ...ALL_CAPABILITIES, review: false, reserve_identifier: false, pull: false }
+    listRepositoryLinks.mockResolvedValue([
+      link({ remote: { published: false, draft_id: 'd', doi: '10.5281/zenodo.1', doi_reserved: true, review: 'accepted' } }),
+      link({ link_id: 'l2', direction: 'pull', reason: 'update_available', auto_update: false }),
+    ])
+    const mounted = await mount()
+    const text = content(mounted.root)
+
+    expect(text).not.toContain('Accepted by the community')
+    expect(text).not.toContain('Reserved, becomes active')
+    expect(hasButton(mounted.root, 'Update now')).toBe(false)
+    expect(text).not.toContain('Update automatically')
     mounted.app.unmount()
   })
 

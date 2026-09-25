@@ -15,6 +15,7 @@ import {
   parseOverride,
   pullsParent,
   recordSource,
+  remoteState,
   repositoryLabel,
   requiredMetadata,
   reviewText,
@@ -114,6 +115,13 @@ describe('repository link state', () => {
     for (const reason of reasons) expect(failureText(reason)).not.toContain(reason.replaceAll('_', ' '))
     expect(failureText('requirements_unmet')).toContain('repository requirements')
     expect(failureText('remote_changed')).toContain('Accept the remote state')
+  })
+
+  it('labels the remote record state and falls back to published', () => {
+    expect(remoteState({ state: 'review', published: false }).label).toBe('In review')
+    expect(remoteState({ state: 'none', published: false }).label).toBe('No record yet')
+    expect(remoteState({ published: true })).toEqual({ label: 'Published', variant: 'success' })
+    expect(remoteState({ state: 'withdrawn', published: false }).label).toBe('withdrawn')
   })
 
   it('names the community review state', () => {

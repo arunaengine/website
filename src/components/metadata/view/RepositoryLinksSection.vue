@@ -13,8 +13,9 @@ import Input from '@/components/ui/Input.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import Switch from '@/components/ui/Switch.vue'
+import RequirementFindings from './RequirementFindings.vue'
 import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
-import { useGroupRights } from '@/composables/useRepository'
+import { useGroupRights, useRepositoryKinds } from '@/composables/useRepository'
 import {
   ApiError,
   acceptRemoteLink,
@@ -25,6 +26,7 @@ import {
   pullRepositoryLink,
   pushRepositoryLink,
   rotateLinkToken,
+  type RepositoryCapabilities,
   type RepositoryLink,
   type TransferJobResponse,
 } from '@/lib/api'
@@ -36,6 +38,7 @@ import {
   linkRights,
   linkStatus,
   managedHere,
+  remoteState,
   reviewText,
 } from '@/lib/repository'
 import { getJob, isTerminalJobState, type JobState } from '@/lib/jobs'
@@ -49,6 +52,7 @@ const emit = defineEmits<{ (e: 'publish'): void; (e: 'settled'): void }>()
 
 const { apiBaseUrl, authToken, sessionEpoch } = useAruna()
 const { userId, adminOf } = useGroupRights(() => props.groupId)
+const { kindOf } = useRepositoryKinds()
 function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
 }
@@ -56,6 +60,11 @@ function client() {
 // A link belongs to the group that created it, which may not be the dataset's group.
 function rights(link: RepositoryLink) {
   return linkRights(link, userId.value, adminOf(link.group_id))
+}
+
+// An action the link's repository kind does not offer stays hidden, also while unknown.
+function can(link: RepositoryLink, capability: Exclude<keyof RepositoryCapabilities, 'identifier_kind'>): boolean {
+  return Boolean(kindOf(link.kind)?.capabilities[capability])
 }
 
 // Only the node that owns a link can act on it or show its jobs.
@@ -280,16 +289,17 @@ function reasonTone(link: RepositoryLink): string {
             <Badge size="sm" :variant="linkStatus(link).variant">{{ linkStatus(link).label }}</Badge>
             <Badge v-if="isPullLink(link)" size="sm" variant="outline">Imports updates</Badge>
             <Badge v-if="link.pending" size="sm" variant="sky">{{ isPullLink(link) ? 'Update running' : 'Push waiting' }}</Badge>
-            <Badge v-if="!isPullLink(link)" size="sm" :variant="link.remote.published ? 'success' : 'secondary'">
-              {{ link.remote.published ? 'Published' : 'Not published' }}
+            <Badge v-if="!isPullLink(link)" size="sm" :variant="remoteState(link.remote).variant">
+              {{ remoteState(link.remote).label }}
             </Badge>
-            <Badge v-if="reviewText(link.remote.review)" size="sm" :variant="link.remote.review === 'declined' ? 'destructive' : 'outline'">
+            <Badge v-if="can(link, 'review') && reviewText(link.remote.review)" size="sm" :variant="link.remote.review === 'declined' ? 'destructive' : 'outline'">
               {{ reviewText(link.remote.review) }}
             </Badge>
             <Badge v-if="!isPullLink(link) && link.auto_publish" size="sm" variant="outline">Publishes automatically</Badge>
             <Badge v-if="isPullLink(link) && link.auto_update" size="sm" variant="outline">Updates automatically</Badge>
           </div>
           <p v-if="link.reason || link.status === 'failed'" class="text-xs" :class="reasonTone(link)">{{ failureText(link.reason, isPullLink(link)) }}</p>
+          <RequirementFindings v-if="link.reason === 'requirements_unmet' && link.findings?.length" :findings="link.findings" />
           <p v-if="link.warning" class="text-xs text-amber-700 dark:text-amber-400">{{ link.warning }}</p>
 
           <dl class="grid gap-x-4 gap-y-1 text-xs sm:grid-cols-[auto_1fr]">
@@ -299,7 +309,7 @@ function reasonTone(link: RepositoryLink): string {
                 <ExternalLink v-if="!link.remote.doi_reserved" :href="doiUrl(link.remote.doi)" :label="link.remote.doi" />
                 <span v-else class="font-mono">{{ link.remote.doi }}</span>
                 <CopyButton :value="link.remote.doi" label="Copy DOI" />
-                <span v-if="link.remote.doi_reserved" class="text-muted-foreground">Reserved, becomes active when published.</span>
+                <span v-if="link.remote.doi_reserved && can(link, 'reserve_identifier')" class="text-muted-foreground">Reserved, becomes active when published.</span>
               </template>
               <span v-else class="text-muted-foreground">None yet</span>
             </dd>
@@ -378,14 +388,14 @@ function reasonTone(link: RepositoryLink): string {
               </Button>
               <template v-if="isPullLink(link)">
                 <Button
-                  v-if="link.reason === 'update_available' || link.reason === 'local_changed'"
+                  v-if="can(link, 'pull') && (link.reason === 'update_available' || link.reason === 'local_changed')"
                   size="sm"
                   :disabled="busyId !== null || link.pending || jobRunning(link.link_id)"
                   @click="pull(link)"
                 >
                   Update now
                 </Button>
-                <label v-if="rights(link).owner" class="flex items-center gap-2 text-xs text-foreground">
+                <label v-if="can(link, 'pull') && rights(link).owner" class="flex items-center gap-2 text-xs text-foreground">
                   <Switch
                     :checked="Boolean(link.auto_update)"
                     :disabled="busyId !== null"

@@ -132,6 +132,19 @@ export function reviewText(review: RepositoryReviewState | undefined): string | 
   return review ? REVIEW_TEXT[review] ?? null : null
 }
 
+const REMOTE_STATE: Record<string, { label: string; variant: BadgeVariant }> = {
+  none: { label: 'No record yet', variant: 'secondary' },
+  draft: { label: 'Draft', variant: 'secondary' },
+  review: { label: 'In review', variant: 'outline' },
+  published: { label: 'Published', variant: 'success' },
+}
+
+/** The remote record state of a push link; older nodes only say whether it is published. */
+export function remoteState(remote: RepositoryLink['remote']): { label: string; variant: BadgeVariant } {
+  const state = remote.state ?? (remote.published ? 'published' : 'draft')
+  return REMOTE_STATE[state] ?? { label: state.replaceAll('_', ' '), variant: 'secondary' }
+}
+
 // Pull links check the remote; push links send changes.
 export function isPullLink(link: Pick<RepositoryLink, 'direction'>): boolean {
   return link.direction === 'pull'

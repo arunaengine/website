@@ -2,9 +2,11 @@ import { computed, onScopeDispose, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import {
   listRepositoryConnectors,
+  listRepositoryKinds,
   searchRepositoryRecords,
   type RepositorySearchPage,
   type RepositoryConnector,
+  type RepositoryKind,
 } from '@/lib/api'
 import { ownRolesWrite } from '@/lib/groupAdmin'
 import { searchHits, searchTotal } from '@/lib/repository'
@@ -38,6 +40,41 @@ export function useRepositoryConnectors(groupId: () => string) {
 
   watch([groupId, sessionEpoch], () => void load(), { immediate: true })
   return { connectors, loading, error, load }
+}
+
+// One request per node and session; a failed one is asked again next time.
+const kindRequests = new Map<string, Promise<RepositoryKind[]>>()
+
+// The repository kinds the node supports and what each can do. `kinds` stays
+// null until the node answered, so unknown never reads as unsupported.
+export function useRepositoryKinds() {
+  const { apiBaseUrl, authToken, sessionEpoch } = useAruna()
+  const kinds = ref<RepositoryKind[] | null>(null)
+  const error = ref<string | null>(null)
+  let generation = 0
+
+  async function load() {
+    const current = ++generation
+    const key = `${apiBaseUrl.value}|${sessionEpoch.value}`
+    kinds.value = null
+    error.value = null
+    let request = kindRequests.get(key)
+    if (!request) {
+      request = listRepositoryKinds({ baseUrl: apiBaseUrl.value, token: authToken.value })
+      kindRequests.set(key, request)
+    }
+    try {
+      const list = await request
+      if (current === generation) kinds.value = list
+    } catch (err) {
+      if (kindRequests.get(key) === request) kindRequests.delete(key)
+      if (current === generation) error.value = errorMessage(err)
+    }
+  }
+
+  watch([apiBaseUrl, sessionEpoch], () => void load(), { immediate: true })
+  const kindOf = (kind: string | undefined) => kinds.value?.find((entry) => entry.kind === kind) ?? null
+  return { kinds, error, load, kindOf }
 }
 
 // The caller's own rights: metadata WRITE in a group manages its repository

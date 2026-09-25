@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const sessionEpoch = ref(0)
 const searchRepositoryRecords = vi.fn()
 const listRepositoryConnectors = vi.fn()
+const listRepositoryKinds = vi.fn()
 
 vi.mock('@/composables/useAruna', () => ({
   useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('bearer'), sessionEpoch }),
@@ -12,9 +13,10 @@ vi.mock('@/lib/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/api')>()),
   searchRepositoryRecords,
   listRepositoryConnectors,
+  listRepositoryKinds,
 }))
 
-const { useRepositorySearch, useRepositoryConnectors } = await import('./useRepository')
+const { useRepositorySearch, useRepositoryConnectors, useRepositoryKinds } = await import('./useRepository')
 
 function page(title: string) {
   return { hits: { total: 1, hits: [{ id: title, metadata: { title } }] } }
@@ -36,6 +38,7 @@ beforeEach(() => {
   sessionEpoch.value = 0
   searchRepositoryRecords.mockReset()
   listRepositoryConnectors.mockReset()
+  listRepositoryKinds.mockReset()
 })
 
 afterEach(() => vi.useRealTimers())
@@ -144,6 +147,37 @@ describe('repository connectors', () => {
     sessionEpoch.value++
     await settle()
     expect(state.connectors.value).toBeNull()
+    scope.stop()
+  })
+})
+
+describe('repository kinds', () => {
+  it('asks the node once per session', async () => {
+    sessionEpoch.value = 101
+    listRepositoryKinds.mockResolvedValue([{ kind: 'invenio', capabilities: { pull: true }, profiles: [] }])
+    const scope = effectScope()
+    const first = scope.run(() => useRepositoryKinds())!
+    const second = scope.run(() => useRepositoryKinds())!
+    await settle()
+
+    expect(listRepositoryKinds).toHaveBeenCalledTimes(1)
+    expect(second.kindOf('invenio')?.capabilities.pull).toBe(true)
+    expect(first.kindOf('ena')).toBeNull()
+    scope.stop()
+  })
+
+  it('asks again after a failed answer', async () => {
+    sessionEpoch.value = 102
+    listRepositoryKinds.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce([])
+    const scope = effectScope()
+    const state = scope.run(() => useRepositoryKinds())!
+    await settle()
+    expect(state.error.value).toBe('offline')
+    expect(state.kinds.value).toBeNull()
+
+    await state.load()
+    expect(state.kinds.value).toEqual([])
+    expect(listRepositoryKinds).toHaveBeenCalledTimes(2)
     scope.stop()
   })
 })
