@@ -797,7 +797,7 @@ export const docsTopics: DocsTopic[] = [
   {
     slug: 'invenio-zenodo',
     kind: 'Guide',
-    title: 'Import from and publish to Zenodo or Invenio',
+    title: 'Import from and publish to Zenodo and other repositories',
     summary: 'Bring published records in as datasets, and publish datasets to Zenodo to get a DOI. Records keep their DOIs.',
     sections: [
       {
@@ -814,10 +814,10 @@ export const docsTopics: DocsTopic[] = [
         title: 'Import a record',
         icon: 'Import',
         steps: [
-          'In [Datasets](page:datasets), choose From Invenio or Zenodo.',
-          'Pick the group and repository, then paste a DOI, a record link or a record id, or search for the record.',
+          'In [Datasets](page:datasets), choose From a repository.',
+          'Pick the group and repository, then paste a DOI, a record link or a record id. Where the repository supports search, you can also search for the record.',
           'Copy files is the default. Reference files keeps the bytes in the repository and needs a bucket of the same group. Metadata only skips the files.',
-          'Only the latest version is imported unless you ask for all versions. Keep updated is on by default when you can write the group metadata: Aruna checks the record once a day and offers new versions.',
+          'Only the latest version is imported unless you ask for all versions. Where the repository supports updates, Keep updated is on by default when you can write the group metadata: Aruna checks the record once a day and offers new versions.',
           'Follow the import job. The new dataset keeps the record DOIs, including the DOI for all versions.',
         ],
       },
@@ -825,10 +825,10 @@ export const docsTopics: DocsTopic[] = [
         title: 'Publish a dataset and get a DOI',
         icon: 'Send',
         paragraphs: [
-          'On a dataset page, open Import / export and choose Publish to repository, then Publish to Zenodo. This needs write access to the dataset. Aruna creates a draft, reserves its DOI and shows it right away. The DOI becomes active when you publish.',
+          'On a dataset page, open Import / export and choose Publish to repository, then Publish to Zenodo. This needs write access to the dataset. Aruna creates a draft and, where the repository reserves DOIs, shows the DOI right away. The DOI becomes active when you publish.',
           'The draft follows every later change of the dataset. Publish when it is ready. With a community, publishing submits the record for review and the Repositories section shows the review state. After a declined review Aruna stops publishing automatically; Publish submits it again.',
-          'Files are public on the repository by default, so anyone can download them once the record is published. Under Advanced options, Export once sends the dataset as it is now and shows the DOI when the job ends.',
-          'When Zenodo needs more metadata, such as creators, a title, a publication date or a publisher, the dialog asks for it. A published record cannot be deleted.',
+          'Files are public on the repository by default, so anyone can download them once the record is published. Under Advanced options, Export once sends the dataset as it is now and shows the DOI when the job ends. Advanced options also take extra repository fields as JSON. Required fields always come from the dataset.',
+          'The dialog first checks the dataset against the repository requirements. A missing required field, such as an author or creator, a title, a publication date or a publisher, blocks publishing. A missing license is only a warning. The dialog shows inputs for the missing fields, saves them into the dataset and checks again. Show what goes where lists which dataset entries become which repository fields. A published record cannot be deleted.',
         ],
       },
       {
@@ -844,7 +844,8 @@ export const docsTopics: DocsTopic[] = [
         title: 'Follow the link',
         icon: 'RefreshCw',
         paragraphs: [
-          'The Repositories section on the dataset page shows each link with its state and reason, the DOI, the record and whether it is published. It refreshes itself while a push runs or a review is open.',
+          'The Repositories section on the dataset page shows each link with its state and reason, the DOI, the record and its state in the repository. It refreshes itself while a push runs or a review is open.',
+          'When the dataset no longer meets the repository requirements, the link lists what is missing. It pushes again after the next change of the dataset.',
           'The person who created a link can publish and change its token and settings, including Update automatically. Admins of the group that created the link can also push, update, pause, resume, accept the remote state and remove it. A link is managed by the node that created it. Removing a link keeps the records in the repository.',
           'When the record was changed in the repository, Accept remote state continues from that record. For an imported dataset that is kept updated, Update now takes a new version, and Update automatically does it without asking.',
           'The persistent identifier section lists every repository DOI of the dataset and whether it was published from here or imported. Aruna itself mints no DOI.',

@@ -276,7 +276,7 @@ function reasonTone(link: RepositoryLink): string {
         v-else-if="links && !links.length"
         compact
         title="Not linked to a repository."
-        :description="canWrite ? 'Publish it to Invenio or Zenodo to get a DOI from the repository.' : undefined"
+        :description="canWrite ? 'Publish it to a repository such as Zenodo to get a DOI.' : undefined"
       >
         <Button v-if="canWrite" size="sm" variant="outline" @click="emit('publish')">
           <Plus class="h-3.5 w-3.5" /> Publish to repository

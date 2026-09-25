@@ -133,7 +133,7 @@ async function toggleFav() {
         <Send class="mt-0.5 h-4 w-4 shrink-0 text-primary" />
         <span class="min-w-0">
           <span class="block text-sm font-medium text-foreground">Publish to repository</span>
-          <span class="block text-xs leading-relaxed text-muted-foreground">Deposits the dataset in Invenio or Zenodo, once or as a link that follows every change.</span>
+          <span class="block text-xs leading-relaxed text-muted-foreground">Deposits the dataset in a repository such as Zenodo, once or as a link that follows every change.</span>
         </span>
       </DropdownMenuItem>
       <template v-if="canWrite">
