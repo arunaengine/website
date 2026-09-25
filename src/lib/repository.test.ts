@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { ApiError, type RepositoryLink } from './api'
+import { ApiError, type ProfileValidationFinding, type RepositoryLink } from './api'
+import type { CrateDraft } from './crate/editor'
+import type { ProfileEntityRule, ProfilePropertyRule } from './profiles/types'
 import {
   connectorBody,
   creatorsMetadata,
@@ -18,11 +20,13 @@ import {
   remoteState,
   repositoryLabel,
   requiredMetadata,
+  requirementRows,
   reviewText,
   searchHits,
   searchTotal,
   secondaryIdentifiers,
   sourceParent,
+  unmetFindings,
 } from './repository'
 import type { PersistentIdView } from './pid'
 
@@ -218,6 +222,50 @@ describe('missing publish metadata', () => {
       },
       { person_or_org: { type: 'personal', family_name: 'Curie', given_name: 'Marie' } },
     ])
+  })
+
+})
+
+describe('publish requirements', () => {
+  const finding = (overrides: Partial<ProfileValidationFinding>): ProfileValidationFinding => ({
+    code: 'constraint_violation', severity: 'violation', focus_node: './', path: 'http://schema.org/name',
+    rule: 'minCount', message: 'Missing.', completeness: 'complete', ...overrides,
+  })
+
+  it('reads the findings of a requirements_unmet answer only', () => {
+    const unmet = new ApiError(400, 'unmet', 'requirements_unmet', { error: 'x', findings: [finding({}), { code: 1 }] })
+    expect(unmetFindings(unmet)).toEqual([finding({})])
+    expect(unmetFindings(new ApiError(400, 'bad', 'invalid_request', { findings: [finding({})] }))).toBeNull()
+    expect(unmetFindings(new ApiError(409, 'busy', 'requirements_unmet', { findings: [] }))).toBeNull()
+    expect(unmetFindings(new Error('x'))).toBeNull()
+  })
+
+  it('builds one row per failing field a profile rule can edit', () => {
+    const rule = (valueName: string): ProfilePropertyRule => ({
+      id: valueName, label: valueName, description: '', kind: 'text', propertyUri: `http://schema.org/${valueName}`,
+      valueName, obligation: 'MUST',
+    })
+    const entities: ProfileEntityRule[] = [
+      { id: 'dataset', label: 'Root dataset', description: '', type: 'http://schema.org/Dataset', className: 'Dataset', propertyRules: [rule('author'), rule('license')] },
+      { id: 'person', label: 'Person', description: '', type: 'http://schema.org/Person', className: 'Person', propertyRules: [rule('name')] },
+    ]
+    const draft: CrateDraft = {
+      visibility: 'group',
+      entities: [
+        { id: './', types: ['Dataset'], properties: {} },
+        { id: '#ada', types: ['Person'], properties: {} },
+      ],
+    }
+    const rows = requirementRows(draft, entities, [
+      finding({ path: '(<http://schema.org/author> | <http://schema.org/creator>)' }),
+      finding({ path: 'http://schema.org/author' }),
+      finding({ path: 'http://schema.org/license', severity: 'warning' }),
+      finding({ focus_node: 'https://craqle.invalid/validation/document#ada' }),
+      finding({ path: 'http://schema.org/publisher' }),
+      finding({ path: 'http://schema.org/license', severity: 'info' }),
+    ])
+
+    expect(rows.map((row) => [row.entityId, row.property])).toEqual([['./', 'author'], ['./', 'license'], ['#ada', 'name']])
   })
 
   it('reads the record of a finished export', () => {

@@ -1,5 +1,7 @@
 import {
   ApiError,
+  profileValidationFindings,
+  type ProfileValidationFinding,
   type RepositoryLink,
   type RepositoryRecord,
   type RepositoryRecordSource,
@@ -9,6 +11,11 @@ import {
   type SecondaryIdentifier,
 } from './api'
 import type { PersistentIdView } from './pid'
+import { findEntity, rootEntity, rootId, type CrateDraft, type DraftEntity } from './crate/editor'
+import type { ProfileEntityRule, ProfilePropertyRule } from './profiles/types'
+import { isDatasetType, normalizeTypeUri, sameSchemaOrgType } from './profiles/uri'
+import { crateLocalId } from './shacl/crateIri'
+import { pathMembers } from './shacl/mapFindings'
 import { stateVariant, type BadgeVariant } from './stateBadge'
 
 // Presentation of repository answers: search hits, link states and the
@@ -348,6 +355,51 @@ export function creatorsMetadata(creators: readonly CreatorDraft[]): Record<stri
         },
       }
     })
+}
+
+/** The findings of a 400 requirements_unmet answer, or null for other errors. */
+export function unmetFindings(err: unknown): ProfileValidationFinding[] | null {
+  if (!(err instanceof ApiError) || err.status !== 400 || err.code !== 'requirements_unmet') return null
+  return profileValidationFindings(err)
+}
+
+export interface RequirementRow {
+  entityId: string
+  property: string
+  rule: ProfilePropertyRule
+}
+
+// The backend reports the root as ./ and other entities by their crate id.
+function focusEntity(draft: CrateDraft, focus: string): DraftEntity | undefined {
+  const id = crateLocalId(focus)
+  if (id === './') return findEntity(draft, id) ?? rootEntity(draft)
+  return findEntity(draft, id) ?? draft.entities.find((entity) => entity.id.startsWith('#') && focus.endsWith(entity.id))
+}
+
+/** One form row per failing field that a lifted profile rule can edit. */
+export function requirementRows(
+  draft: CrateDraft,
+  entities: readonly ProfileEntityRule[],
+  findings: readonly ProfileValidationFinding[],
+): RequirementRow[] {
+  const rows: RequirementRow[] = []
+  for (const finding of findings) {
+    if (finding.severity === 'info' || !finding.path) continue
+    const entity = focusEntity(draft, finding.focus_node ?? '')
+    if (!entity) continue
+    const root = entity.id === rootId(draft)
+    const shape = entities.find((candidate) =>
+      root
+        ? isDatasetType(candidate.type)
+        : entity.types.some((type) => sameSchemaOrgType(normalizeTypeUri(type), candidate.type)),
+    )
+    const rule = pathMembers(finding.path)
+      .map((member) => shape?.propertyRules.find((candidate) => sameSchemaOrgType(candidate.propertyUri, member)))
+      .find(Boolean)
+    if (!rule || rows.some((row) => row.entityId === entity.id && row.property === rule.valueName)) continue
+    rows.push({ entityId: entity.id, property: rule.valueName, rule })
+  }
+  return rows
 }
 
 /** The repository record of a finished one-time export, when the result has one. */
