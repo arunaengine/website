@@ -815,7 +815,7 @@ export const docsTopics: DocsTopic[] = [
         icon: 'Import',
         steps: [
           'In [Datasets](page:datasets), choose From a repository.',
-          'Pick the group and repository, then paste a DOI, a record link or a record id. Where the repository supports search, you can also search for the record.',
+          'Pick the group and repository, then paste a DOI, a record link or a record id. Where the repository supports search, you can also search for the record. Where it does not, only a record id works.',
           'Copy files is the default. Reference files keeps the bytes in the repository and needs a bucket of the same group. Metadata only skips the files.',
           'Only the latest version is imported unless you ask for all versions. Where the repository supports updates, Keep updated is on by default when you can write the group metadata: Aruna checks the record once a day and offers new versions.',
           'Follow the import job. The new dataset keeps the record DOIs, including the DOI for all versions.',
@@ -828,7 +828,7 @@ export const docsTopics: DocsTopic[] = [
           'On a dataset page, open Import / export and choose Publish to repository, then Publish to Zenodo. This needs write access to the dataset. Aruna creates a draft and, where the repository reserves DOIs, shows the DOI right away. The DOI becomes active when you publish.',
           'The draft follows every later change of the dataset. Publish when it is ready. With a community, publishing submits the record for review and the Repositories section shows the review state. After a declined review Aruna stops publishing automatically; Publish submits it again.',
           'Files are public on the repository by default, so anyone can download them once the record is published. Under Advanced options, Export once sends the dataset as it is now and shows the DOI when the job ends. Advanced options also take extra repository fields as JSON. Required fields always come from the dataset.',
-          'The dialog first checks the dataset against the repository requirements. A missing required field, such as an author or creator, a title, a publication date or a publisher, blocks publishing. A missing license is only a warning. The dialog shows inputs for the missing fields, saves them into the dataset and checks again. Show what goes where lists which dataset entries become which repository fields. A published record cannot be deleted.',
+          'The dialog first checks the dataset against the repository requirements. A missing required field blocks publishing: an author or creator, a title, a publication date and, on Invenio repositories other than Zenodo, a publisher. A missing license is only a warning. A record takes at most 100 files. The dialog shows inputs for the missing fields, saves them into the dataset and checks again. Show what goes where lists which dataset entries become which repository fields. A published record cannot be deleted.',
         ],
       },
       {
