@@ -11,7 +11,7 @@ import {
   searchInvenioRecords,
   submitInvenioExport,
   submitInvenioImport,
-} from './invenio'
+} from './repository'
 
 const CLIENT = { baseUrl: 'https://api.test/api/v1', token: 'bearer-1' }
 const SECRET = 'pat-secret-value'

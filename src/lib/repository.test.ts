@@ -22,7 +22,7 @@ import {
   searchTotal,
   secondaryIdentifiers,
   sourceParent,
-} from './invenio'
+} from './repository'
 import type { PersistentIdView } from './pid'
 
 describe('invenio search hits', () => {

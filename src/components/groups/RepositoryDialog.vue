@@ -23,7 +23,7 @@ import {
   type RepositoryConnector,
   type RepositoryConnectorKind,
 } from '@/lib/api'
-import { connectorBody, endpointProblem, REPOSITORY_PRESETS } from '@/lib/invenio'
+import { connectorBody, endpointProblem, REPOSITORY_PRESETS } from '@/lib/repository'
 import { errorMessage } from '@/lib/utils'
 
 const props = defineProps<{

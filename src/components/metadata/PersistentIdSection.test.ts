@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { compileClientComponent, content, flush, moduleDefault, mountApp } from '@/test/clientRender'
 import * as Api from '@/lib/api'
 import * as GraphIri from '@/lib/graphIri'
-import * as Invenio from '@/lib/invenio'
+import * as Invenio from '@/lib/repository'
 import * as Pid from '@/lib/pid'
 import * as Refresh from '@/composables/useRefresh'
 import * as Utils from '@/lib/utils'
@@ -50,7 +50,7 @@ const PersistentIdSection = compileClientComponent(
     '@/composables/useRefresh': Refresh,
     '@/lib/api': Api,
     '@/lib/graphIri': GraphIri,
-    '@/lib/invenio': Invenio,
+    '@/lib/repository': Invenio,
     '@/lib/pid': { ...Pid, listPersistentIds },
     '@/lib/utils': Utils,
   },

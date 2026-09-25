@@ -14,7 +14,7 @@ vi.mock('@/lib/api', async (importOriginal) => ({
   listRepositoryConnectors,
 }))
 
-const { useInvenioSearch, useRepositoryConnectors } = await import('./useInvenio')
+const { useInvenioSearch, useRepositoryConnectors } = await import('./useRepository')
 
 function page(title: string) {
   return { hits: { total: 1, hits: [{ id: title, metadata: { title } }] } }

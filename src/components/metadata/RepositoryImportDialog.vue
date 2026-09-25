@@ -19,12 +19,12 @@ import OptionToggle from '@/components/ui/OptionToggle.vue'
 import Select from '@/components/ui/Select.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import Switch from '@/components/ui/Switch.vue'
-import InvenioSearchPanel from '@/components/metadata/InvenioSearchPanel.vue'
+import RepositorySearchPanel from '@/components/metadata/RepositorySearchPanel.vue'
 import TransferJobStatus from '@/components/metadata/TransferJobStatus.vue'
 import TransferReport from '@/components/metadata/TransferReport.vue'
 import TransferTarget from '@/components/metadata/TransferTarget.vue'
 import { useAruna } from '@/composables/useAruna'
-import { useGroupRights, useRepositoryConnectors } from '@/composables/useInvenio'
+import { useGroupRights, useRepositoryConnectors } from '@/composables/useRepository'
 import { useJobDetail } from '@/composables/useJobs'
 import { useNotifications } from '@/composables/useNotifications'
 import {
@@ -37,7 +37,7 @@ import {
   type PidLookupMatch,
   type SecondaryIdentifier,
 } from '@/lib/api'
-import { doiUrl, recordSource, REPOSITORY_PRESETS, secondaryIdentifiers, type InvenioHit } from '@/lib/invenio'
+import { doiUrl, recordSource, REPOSITORY_PRESETS, secondaryIdentifiers, type InvenioHit } from '@/lib/repository'
 import { isTerminalJobState } from '@/lib/jobs'
 import { listPersistentIds } from '@/lib/pid'
 import { importJobResult } from '@/lib/rocrateArchive'
@@ -333,7 +333,7 @@ watch(sessionEpoch, () => {
             </TransferTarget>
           </div>
 
-          <InvenioSearchPanel
+          <RepositorySearchPanel
             v-if="groupId && connectorId"
             :group-id="groupId"
             :connector-id="connectorId"

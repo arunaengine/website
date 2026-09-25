@@ -7,8 +7,8 @@ import ExternalLink from '@/components/ui/ExternalLink.vue'
 import Input from '@/components/ui/Input.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import Spinner from '@/components/ui/Spinner.vue'
-import { useInvenioSearch } from '@/composables/useInvenio'
-import type { InvenioHit } from '@/lib/invenio'
+import { useInvenioSearch } from '@/composables/useRepository'
+import type { InvenioHit } from '@/lib/repository'
 import { Search } from '@lucide/vue'
 
 const props = defineProps<{ groupId: string; connectorId: string; selectedId?: string }>()

@@ -7,7 +7,7 @@ import {
   type RepositoryConnector,
 } from '@/lib/api'
 import { ownRolesWrite } from '@/lib/groupAdmin'
-import { searchHits, searchTotal } from '@/lib/invenio'
+import { searchHits, searchTotal } from '@/lib/repository'
 import { errorMessage } from '@/lib/utils'
 
 // Repository connectors of one group. `connectors` stays null until the current

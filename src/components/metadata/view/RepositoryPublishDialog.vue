@@ -21,7 +21,7 @@ import Switch from '@/components/ui/Switch.vue'
 import Textarea from '@/components/ui/Textarea.vue'
 import TransferJobStatus from '@/components/metadata/TransferJobStatus.vue'
 import { useAruna } from '@/composables/useAruna'
-import { useGroupRights, useRepositoryConnectors } from '@/composables/useInvenio'
+import { useGroupRights, useRepositoryConnectors } from '@/composables/useRepository'
 import { useJobDetail } from '@/composables/useJobs'
 import {
   createInvenioLink,
@@ -48,7 +48,7 @@ import {
   sourceParent,
   tokenPageUrl,
   type CreatorDraft,
-} from '@/lib/invenio'
+} from '@/lib/repository'
 import { isTerminalJobState } from '@/lib/jobs'
 import { follow, POLL_ACTIVE_MS } from '@/lib/poll'
 import { listPersistentIds, type PersistentIdView } from '@/lib/pid'

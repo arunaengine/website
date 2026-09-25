@@ -13,7 +13,7 @@ import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Switch from '@/components/ui/Switch.vue'
 import CrateTransferDialog from '@/components/metadata/CrateTransferDialog.vue'
-import InvenioImportDialog from '@/components/metadata/InvenioImportDialog.vue'
+import RepositoryImportDialog from '@/components/metadata/RepositoryImportDialog.vue'
 import DatasetBrowse from '@/components/datasets/DatasetBrowse.vue'
 import DatasetResults from '@/components/datasets/DatasetResults.vue'
 import DatasetSearch from '@/components/datasets/DatasetSearch.vue'
@@ -123,6 +123,6 @@ const askPrompt = computed(() =>
     </div>
 
     <CrateTransferDialog v-model:open="showCrateImport" mode="import" />
-    <InvenioImportDialog v-model:open="showInvenioImport" />
+    <RepositoryImportDialog v-model:open="showInvenioImport" />
   </div>
 </template>

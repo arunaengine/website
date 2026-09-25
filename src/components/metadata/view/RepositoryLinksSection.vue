@@ -14,7 +14,7 @@ import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import Switch from '@/components/ui/Switch.vue'
 import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
-import { useGroupRights } from '@/composables/useInvenio'
+import { useGroupRights } from '@/composables/useRepository'
 import {
   ApiError,
   acceptRemoteLink,
@@ -37,7 +37,7 @@ import {
   linkStatus,
   managedHere,
   reviewText,
-} from '@/lib/invenio'
+} from '@/lib/repository'
 import { getJob, isTerminalJobState, type JobState } from '@/lib/jobs'
 import { follow, POLL_ACTIVE_MS, POLL_SLOW_MS } from '@/lib/poll'
 import { errorMessage, relativeTime } from '@/lib/utils'

@@ -13,7 +13,7 @@ import {
   typeValue,
 } from '@/test/clientRender'
 import * as Api from '@/lib/api'
-import * as Invenio from '@/lib/invenio'
+import * as Invenio from '@/lib/repository'
 import * as Utils from '@/lib/utils'
 
 const SECRET = 'pat-secret-value'
@@ -82,7 +82,7 @@ const Dialog = compileClientComponent(new URL('./RepositoryPublishDialog.vue', i
   '@/composables/useAruna': {
     useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('bearer'), sessionEpoch, currentUser }),
   },
-  '@/composables/useInvenio': {
+  '@/composables/useRepository': {
     useRepositoryConnectors: () => ({ connectors, loading: ref(false), error: ref(null), load: loadConnectors }),
     useGroupRights: () => ({ canWriteMeta }),
   },
@@ -100,7 +100,7 @@ const Dialog = compileClientComponent(new URL('./RepositoryPublishDialog.vue', i
   '@/lib/api': {
     ...Api, createInvenioLink, submitInvenioExport, getInvenioLink, listInvenioLinks, publishInvenioLink, createRepositoryConnector,
   },
-  '@/lib/invenio': Invenio,
+  '@/lib/repository': Invenio,
   '@/lib/pid': { listPersistentIds },
   '@/lib/utils': Utils,
 })

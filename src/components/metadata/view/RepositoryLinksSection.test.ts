@@ -3,7 +3,7 @@ import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { button, click, compileClientComponent, content, flush, moduleDefault, mountApp } from '@/test/clientRender'
 import * as Api from '@/lib/api'
-import * as Invenio from '@/lib/invenio'
+import * as Invenio from '@/lib/repository'
 import * as Utils from '@/lib/utils'
 
 const sessionEpoch = ref(0)
@@ -74,7 +74,7 @@ const Section = compileClientComponent(new URL('./RepositoryLinksSection.vue', i
   '@/components/ui/RefreshButton.vue': moduleDefault(Empty),
   '@/components/ui/Skeleton.vue': moduleDefault(Empty),
   '@/components/ui/Switch.vue': moduleDefault(Empty),
-  '@/composables/useInvenio': {
+  '@/composables/useRepository': {
     useGroupRights: () => ({ userId, adminOf: (group: string) => adminGroups.value.includes(group) }),
   },
   '@/lib/jobs': { getJob, isTerminalJobState: (state: string) => ['succeeded', 'failed', 'cancelled'].includes(state) },
@@ -91,7 +91,7 @@ const Section = compileClientComponent(new URL('./RepositoryLinksSection.vue', i
     useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('bearer'), sessionEpoch }),
   },
   '@/lib/api': { ...Api, listInvenioLinks, patchInvenioLink, rotateLinkToken, pushInvenioLink, acceptRemoteLink, pullInvenioLink },
-  '@/lib/invenio': Invenio,
+  '@/lib/repository': Invenio,
   '@/lib/utils': Utils,
 })
 

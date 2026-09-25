@@ -3,7 +3,7 @@ import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { button, click, compileClientComponent, content, flush, input, moduleDefault, mountApp, typeValue } from '@/test/clientRender'
 import * as Api from '@/lib/api'
-import * as Invenio from '@/lib/invenio'
+import * as Invenio from '@/lib/repository'
 import * as Utils from '@/lib/utils'
 
 const submitInvenioImport = vi.fn()
@@ -47,7 +47,7 @@ const TargetStub = defineComponent({
   },
 })
 
-const ImportDialog = compileClientComponent(new URL('./InvenioImportDialog.vue', import.meta.url), {
+const ImportDialog = compileClientComponent(new URL('./RepositoryImportDialog.vue', import.meta.url), {
   vue: VueRuntime,
   'vue-router': { RouterLink: Slot },
   '@lucide/vue': new Proxy({}, { get: () => Empty }),
@@ -70,14 +70,14 @@ const ImportDialog = compileClientComponent(new URL('./InvenioImportDialog.vue',
   '@/components/ui/Select.vue': moduleDefault(Empty),
   '@/components/ui/Spinner.vue': moduleDefault(Empty),
   '@/components/ui/Switch.vue': moduleDefault(Empty),
-  '@/components/metadata/InvenioSearchPanel.vue': moduleDefault(SearchStub),
+  '@/components/metadata/RepositorySearchPanel.vue': moduleDefault(SearchStub),
   '@/components/metadata/TransferJobStatus.vue': moduleDefault(Empty),
   '@/components/metadata/TransferReport.vue': moduleDefault(Empty),
   '@/components/metadata/TransferTarget.vue': moduleDefault(TargetStub),
   '@/composables/useAruna': {
     useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('bearer'), sessionEpoch: ref(0) }),
   },
-  '@/composables/useInvenio': {
+  '@/composables/useRepository': {
     useRepositoryConnectors: () => ({ connectors, loading: ref(false), error: ref(null), load: loadConnectors }),
     useGroupRights: () => ({ canWriteMeta }),
   },
@@ -86,7 +86,7 @@ const ImportDialog = compileClientComponent(new URL('./InvenioImportDialog.vue',
   },
   '@/composables/useNotifications': { useNotifications: () => ({ bumpDashboard: vi.fn() }) },
   '@/lib/api': { ...Api, submitInvenioImport, lookupPid, createRepositoryConnector },
-  '@/lib/invenio': Invenio,
+  '@/lib/repository': Invenio,
   '@/lib/jobs': { isTerminalJobState: (state: string) => ['succeeded', 'failed', 'cancelled'].includes(state) },
   '@/lib/pid': { listPersistentIds },
   '@/lib/rocrateArchive': {
@@ -117,7 +117,7 @@ beforeEach(() => {
   submitInvenioImport.mockResolvedValue({ job_id: 'j1', status_url: '/jobs/j1' })
 })
 
-describe('InvenioImportDialog', () => {
+describe('RepositoryImportDialog', () => {
   it('sends a typed DOI as doi and keeps the dataset updated by default', async () => {
     const mounted = await mount()
     await typeValue(recordField(mounted.root), 'https://doi.org/10.5281/zenodo.42')
