@@ -391,8 +391,8 @@ function resolveKind(
     // type its values are instead.
     const classTarget = (uri: string) => index.types.get(termKey(namedNode(uri))) ?? [uri]
     if (facets.classIri) {
-      // Projection emits class+node for describe-new rules; absent entitySources
-      // is the stored form of ['new'].
+      // Projection emits sh:class (older files add sh:node) for describe-new
+      // rules; absent entitySources is the stored form of ['new'].
       classTarget(facets.classIri).forEach(addTarget)
     } else {
       // A bare sh:node / sh:nodeKind sh:IRI is the reuse-allowing form; the

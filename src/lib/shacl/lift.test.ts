@@ -372,6 +372,65 @@ describe('projection round trip', () => {
   }
 })
 
+describe('entity references without sh:node', () => {
+  const entities: ProfileEntityRule[] = [
+    {
+      id: 'dataset',
+      label: 'Dataset',
+      description: '',
+      type: 'http://schema.org/Dataset',
+      className: 'Dataset',
+      propertyRules: [{
+        id: 'about',
+        label: 'About',
+        description: '',
+        kind: 'entity',
+        propertyUri: 'http://schema.org/about',
+        valueName: 'about',
+        obligation: 'MUST',
+        entityTypes: ['http://schema.org/Person'],
+      }],
+    },
+    {
+      id: 'person',
+      label: 'Person',
+      description: '',
+      type: 'http://schema.org/Person',
+      className: 'Person',
+      propertyRules: [{
+        id: 'name',
+        label: 'Name',
+        description: '',
+        kind: 'text',
+        propertyUri: 'http://schema.org/name',
+        valueName: 'name',
+        obligation: 'SHOULD',
+      }],
+    },
+  ]
+  const turtle = shapesFromEntityRules({ slug: 'fixture', name: 'Fixture' }, entities)
+
+  it('lifts the reference and the target form', () => {
+    const result = liftShapes(turtle)
+
+    expect(turtle).not.toContain('sh:node ')
+    expect(ruleFor(entityFor(result, 'http://schema.org/Dataset'), 'about')?.entityTypes).toEqual(['http://schema.org/Person'])
+    expect(ruleFor(entityFor(result, 'http://schema.org/Person'), 'name')?.obligation).toBe('SHOULD')
+    expect(danglingRules(result)).toEqual([])
+  })
+
+  it('lifts a stored sh:node profile the same', () => {
+    // Profiles saved before the change still name the target shape.
+    const stored = turtle.replace(
+      'sh:class schema:Person',
+      'sh:class schema:Person ;\n  sh:node <https://w3id.org/aruna/profiles/fixture#shape-Person>',
+    )
+
+    expect(stored).toContain('sh:node ')
+    expect(signature(liftShapes(stored).entities)).toBe(signature(liftShapes(turtle).entities))
+  })
+})
+
 describe('type URI normalization', () => {
   it('passes a minted type through', () => {
     // Load bearing: lift mints types under schemes the projection must emit

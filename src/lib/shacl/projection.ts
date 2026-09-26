@@ -298,12 +298,13 @@ function valueConstraintLines(rule: ProfilePropertyRule, ns: string, entities: P
 }
 
 // One sh:or branch (or the flat single-target form) for an entity target type:
-// sh:class always, plus sh:node <target shape> when the profile defines a rule
-// for that type (its own shape then validates the described entity).
+// sh:class always. A class-targeted shape already checks the entity with its own
+// severities, so sh:node is added only for the untargeted root dataset shape.
 function classBranch(type: string, ns: string, entities: ProfileEntityRule[]): string[] {
   const branch = [`sh:class ${iri(type)}`]
   const target = entities.find((entity) => sameSchemaOrgType(entity.type, type))
-  if (target) branch.push(`sh:node ${iri(`${ns}shape-${fragmentSafe(target.className || termNameFromUri(target.type))}`)}`)
+  const root = entities.find((entity) => isDatasetType(entity.type))
+  if (target && target === root) branch.push(`sh:node ${iri(`${ns}shape-${fragmentSafe(target.className || termNameFromUri(target.type))}`)}`)
   return branch
 }
 
