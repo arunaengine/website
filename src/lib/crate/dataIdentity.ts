@@ -115,3 +115,18 @@ export function objectRoute(bucket: string, key: string) {
   const route = folderRoute(bucket, key.includes('/') ? key.slice(0, key.lastIndexOf('/')) : '')
   return { ...route, query: { ...route.query, object: key } }
 }
+
+/** The bucket a dataset stores its files in while nobody chose one. */
+export function defaultStorageBucket(groupId: string): string {
+  return `datasets-${groupId.toLowerCase()}`
+}
+
+/** A picked bucket and prefix, or null for the default; an empty bucket means the default one. */
+export function chosenStorage(
+  choice: { bucket: string; prefix: string },
+  groupId: string,
+): { bucket: string; prefix: string } | null {
+  const prefix = choice.prefix.trim()
+  if (!choice.bucket && !prefix) return null
+  return { bucket: choice.bucket || defaultStorageBucket(groupId), prefix }
+}

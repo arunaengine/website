@@ -1,3 +1,5 @@
+import type { StorageLocation } from './versions'
+
 export interface MetadataDocumentListItem {
   document_id: string
   group_id: string
@@ -39,6 +41,9 @@ export interface ReplaceMetadataRoCrateRequest {
   message?: string
 }
 
+// Optional on create; omitted means the default storage location.
+type CreateStorage = { storage_location?: StorageLocation }
+
 export interface SparqlResponse {
   kind: 'Solutions' | 'Boolean'
   value: Array<Record<string, string>> | boolean
@@ -69,7 +74,7 @@ export interface CreateMetadataRoCrateRequest {
   message?: string
 }
 
-export type CreateMetadataRequest = CreateMetadataScaffoldRequest | CreateMetadataRoCrateRequest
+export type CreateMetadataRequest = (CreateMetadataScaffoldRequest | CreateMetadataRoCrateRequest) & CreateStorage
 
 // The API flattens the summary fields onto the response body
 // (CreateMetadataResponse uses #[serde(flatten)]).

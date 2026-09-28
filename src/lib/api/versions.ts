@@ -214,6 +214,36 @@ export interface GitRepository {
   refs: Record<string, string>
   /** Layout of main: an ARC or a plain RO-Crate. */
   layout?: 'arc' | 'rocrate'
+  /** Where pushed files are stored; absent on older nodes. */
+  storage_location?: DatasetStorageLocation
+}
+
+/** A bucket and a key prefix inside it. */
+export interface StorageLocation {
+  bucket: string
+  prefix: string
+}
+
+// GET/PUT /metadata/{id}/storage-location: always the effective location;
+// `default` is true while nobody chose one (bucket datasets-<group>, prefix <id>/).
+export interface DatasetStorageLocation extends StorageLocation {
+  default: boolean
+}
+
+export function getStorageLocation(documentId: string, client: ApiClientOptions): Promise<DatasetStorageLocation> {
+  return apiRequest(metadataPath(documentId, 'storage-location'), {}, client)
+}
+
+export function setStorageLocation(
+  documentId: string,
+  location: StorageLocation,
+  client: ApiClientOptions,
+): Promise<DatasetStorageLocation> {
+  return apiRequest(
+    metadataPath(documentId, 'storage-location'),
+    { method: 'PUT', body: JSON.stringify(location) },
+    client,
+  )
 }
 
 export function getGitRepository(documentId: string, client: ApiClientOptions): Promise<GitRepository> {
