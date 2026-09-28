@@ -926,8 +926,29 @@ export const docsTopics: DocsTopic[] = [
         title: 'Large files with Git LFS',
         icon: 'HardDrive',
         paragraphs: [
-          'Git LFS works with this repository. Its address is the clone URL followed by `/info/lfs`, which Git LFS finds by itself. Track large files with `git lfs track`, then commit and push as usual.',
-          'A push is refused when it points at LFS files the node did not receive, or when it changes a file that someone else locked with `git lfs lock`.',
+          'Every dataset repository has its own Git LFS endpoint: the clone URL followed by `/info/lfs`, for example `https://api.node-1.example.org/api/v1/git/<dataset id>.git/info/lfs`. Git LFS finds it by itself from the clone URL, so you do not need to configure it.',
+          'Git LFS signs in the same way as Git. The `http.extraHeader` setting with your token and a credential helper with the token as password both work for LFS as well.',
+          'Data files that the dataset already keeps in Aruna storage appear in a clone as LFS pointer files, and Aruna adds the matching `.gitattributes` rules. Run `git lfs pull` to download their content.',
+          'Uploaded LFS files are stored on the node in the group storage bucket for Git (`arc-<group id>`) under `git-lfs/<dataset id>/<sha256>` and count towards the group quota. The node checks the size and the SHA-256 of every upload before it is used.',
+        ],
+        steps: [
+          'Install Git LFS once on your computer: `git lfs install`.',
+          'Clone the dataset and download LFS content: `git clone <clone URL>`, then `git lfs pull` inside the clone.',
+          'Choose which files go to LFS, for example `git lfs track "*.fastq.gz"`. This writes a rule to `.gitattributes`; commit that file too.',
+          'Add, commit and push as usual. `git push` uploads the LFS content first, then the commit. In a plain RO-Crate, a new LFS file is added to `ro-crate-metadata.json` like any other new file.',
+          'Check what LFS manages with `git lfs ls-files`.',
+        ],
+      },
+      {
+        title: 'LFS rules and file locks',
+        icon: 'Shield',
+        bullets: [
+          'A push is refused when it points at LFS files the node did not receive. Push again once the upload finished.',
+          'Lock a file before you change it so others do not edit it at the same time: `git lfs lock <path>`, list locks with `git lfs locks`, release with `git lfs unlock <path>`. Locking needs write access to the dataset.',
+          'A lock applies on every node that holds the dataset. A push that changes a file locked by someone else is refused.',
+          'Only the lock owner can release a lock. Another writer can take it over with `git lfs unlock --force <path>`.',
+          'To let Git LFS check locks before every push, run `git config lfs.<clone URL>/info/lfs.locksverify true` in the clone.',
+          'Downloading a file that another node holds copies it to the node you use first, so the first download can take longer.',
         ],
       },
       {
