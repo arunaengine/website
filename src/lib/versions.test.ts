@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError, type DatasetBranch, type DatasetVersion } from '@/lib/api'
-import { authorName, historyProblem, propertyRow, sortBranches, valueText, writeMessage } from './versions'
+import { authorName, historyProblem, propertyRow, valueText, visibleBranches, writeMessage } from './versions'
 
 function version(author: DatasetVersion['author']): DatasetVersion {
   return {
@@ -52,13 +52,13 @@ describe('authorName', () => {
   })
 })
 
-describe('sortBranches', () => {
-  it('puts main first, drafts next and protected lines last', () => {
+describe('visibleBranches', () => {
+  it('puts main first, then drafts, and hides other protected lines', () => {
     const branch = (name: string, protectedBranch: boolean) =>
       ({ name, protected: protectedBranch, version: 'v', head: version({ name: 'Aruna', email: '' }) }) as DatasetBranch
-    const names = sortBranches([branch('aruna', true), branch('draft/b', false), branch('main', true), branch('draft/a', false)])
+    const names = visibleBranches([branch('aruna', true), branch('draft/b', false), branch('main', true), branch('draft/a', false)])
       .map((entry) => entry.name)
-    expect(names).toEqual(['main', 'draft/a', 'draft/b', 'aruna'])
+    expect(names).toEqual(['main', 'draft/a', 'draft/b'])
   })
 })
 

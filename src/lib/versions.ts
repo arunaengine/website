@@ -1,7 +1,7 @@
 // Display rules for the dataset History tab: values, property changes, authors
 // and the error codes of the versions API.
 import { ApiError, type DatasetBranch, type DatasetVersion, type PropertyChange } from '@/lib/api'
-import { errorMessage } from '@/lib/utils'
+import { errorMessage, relativeTime } from '@/lib/utils'
 
 export const NO_VALUE = 'no value'
 
@@ -50,15 +50,15 @@ export function shortVersion(version: string): string {
   return version.slice(0, 8)
 }
 
-// main first, then drafts by name, then other protected lines such as aruna.
-export function sortBranches(branches: DatasetBranch[]): DatasetBranch[] {
-  const rank = (branch: DatasetBranch) => (branch.name === 'main' ? 0 : branch.protected ? 2 : 1)
-  return [...branches].sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name))
+// main first, then drafts by name; protected lines such as aruna stay hidden.
+export function visibleBranches(branches: DatasetBranch[]): DatasetBranch[] {
+  const shown = branches.filter((branch) => branch.name === 'main' || !branch.protected)
+  return shown.sort((a, b) => Number(b.name === 'main') - Number(a.name === 'main') || a.name.localeCompare(b.name))
 }
 
 export function branchLabel(branch: DatasetBranch): string {
   if (branch.name === 'main') return 'main (live metadata)'
-  return branch.protected ? `${branch.name} (read only)` : branch.name
+  return `${branch.name} (${relativeTime(branch.head.created_at)})`
 }
 
 export type HistoryProblem = 'missing' | 'not-holder' | 'unsupported' | 'forbidden' | 'error'

@@ -126,4 +126,18 @@ describe('useDatasetHistory', () => {
     await settle()
     expect(history.branch.value).toBe('main')
   })
+
+  it('hides the aruna branch and its conflicts', async () => {
+    route.query = { branch: 'aruna' }
+    listVersions.mockResolvedValue({ versions: [] })
+    listConflicts.mockResolvedValue([
+      { id: 'c1', branch: 'aruna', tag: null, version: version('x') },
+      { id: 'c2', branch: 'main', tag: null, version: version('y') },
+    ])
+    const { history } = start()
+    await settle()
+    expect(history.branches.value?.map((entry) => entry.name)).toEqual(['main', 'draft/a'])
+    expect(history.conflicts.value.map((conflict) => conflict.id)).toEqual(['c2'])
+    expect(history.branch.value).toBe('main')
+  })
 })

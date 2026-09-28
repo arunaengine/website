@@ -35,14 +35,10 @@ const { branches, tags, conflicts, branch, selected, isDraft, versions, nextCurs
 const { canWrite } = props.state
 
 const branchOptions = computed(() => {
-  const options = (branches.value ?? []).map((entry) => ({
-    value: entry.name,
-    label: entry.protected ? branchLabel(entry) : `${entry.name} (${relativeTime(entry.head.created_at)})`,
-  }))
+  const options = (branches.value ?? []).map((entry) => ({ value: entry.name, label: branchLabel(entry) }))
   if (!options.some((option) => option.value === branch.value)) options.unshift({ value: branch.value, label: branch.value })
   return options
 })
-const readOnly = computed(() => Boolean(selected.value?.protected) && branch.value !== 'main')
 
 function absolute(iso: string): string {
   return new Date(iso).toLocaleString()
@@ -199,9 +195,6 @@ function discardKept(conflict: VersionConflict) {
           <Button variant="ghost" size="sm" class="text-destructive" @click="deleteDraft"><Trash2 class="h-3.5 w-3.5" /> Delete</Button>
         </template>
       </div>
-      <p v-else-if="readOnly" class="text-xs text-muted-foreground">
-        Read only. Aruna writes a version here for each metadata graph edit.
-      </p>
 
       <ListSkeleton v-if="history.state.value === 'loading'" label="Loading versions" />
       <EmptyState v-else-if="history.state.value === 'missing'" title="No versions yet" description="Versions appear here once the dataset's metadata is saved." />

@@ -17,7 +17,7 @@ import {
   type DatasetVersion,
   type VersionConflict,
 } from '@/lib/api'
-import { authorName, historyProblem, sortBranches, type HistoryProblem } from '@/lib/versions'
+import { authorName, historyProblem, visibleBranches, type HistoryProblem } from '@/lib/versions'
 import { errorMessage } from '@/lib/utils'
 
 const PAGE_SIZE = 50
@@ -97,11 +97,11 @@ export function useDatasetHistory(documentId: Ref<string>, enabled: () => boolea
       if (!live()) return false
       supported.value = true
       refsProblem.value = null
-      branches.value = sortBranches(branchList)
+      branches.value = visibleBranches(branchList)
       tags.value = tagList
-      conflicts.value = conflictList
-      resolveAuthors(conflictList.map((conflict) => conflict.version))
-      if (branch.value !== 'main' && !branchList.some((entry) => entry.name === branch.value)) branch.value = 'main'
+      conflicts.value = conflictList.filter((conflict) => conflict.branch !== 'aruna')
+      resolveAuthors(conflicts.value.map((conflict) => conflict.version))
+      if (branch.value !== 'main' && !branches.value.some((entry) => entry.name === branch.value)) branch.value = 'main'
       return true
     } catch (err) {
       if (!live()) return false
