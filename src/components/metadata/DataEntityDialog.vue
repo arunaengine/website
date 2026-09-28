@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
@@ -14,6 +15,8 @@ import ExternalLink from '@/components/ui/ExternalLink.vue'
 import DetailList, { type Detail } from '@/components/ui/DetailList.vue'
 import EntityFieldList from '@/components/metadata/EntityFieldList.vue'
 import { ArrowLeft, Check, Copy, File as FileIcon, Folder, Info } from '@lucide/vue'
+import { useS3 } from '@/composables/useS3'
+import { objectLocation, objectRoute, parseDataIdentity } from '@/lib/crate/dataIdentity'
 import { presentDataEntity } from '@/lib/cratePresenter'
 import { formatContentSize } from '@/lib/dataEntities'
 import { termNameFromUri } from '@/lib/profiles/uri'
@@ -74,15 +77,22 @@ const typeChips = computed(() =>
   })),
 )
 
-const details = computed<Detail[]>(() =>
-  entity.value
-    ? [
-        { key: 'size', label: 'Size', value: formatContentSize(entity.value.contentSize) },
-        { key: 'format', label: 'Format', value: entity.value.encodingFormat || '-' },
-        { key: 'location', label: 'Location', value: entity.value.contentUrl || '-' },
-      ]
-    : [],
-)
+const s3 = useS3()
+const identity = computed(() => (entity.value ? parseDataIdentity(entity.value, s3.endpoint.value) : null))
+
+// The content address and the S3 path stand apart; any other contentUrl stays a plain location.
+const details = computed<Detail[]>(() => {
+  const found = identity.value
+  if (!entity.value || !found) return []
+  return [
+    { key: 'size', label: 'Size', value: formatContentSize(entity.value.contentSize) },
+    { key: 'format', label: 'Format', value: entity.value.encodingFormat || '-' },
+    ...(found.contentId ? [{ key: 'content', label: 'Content address', value: found.contentId, mono: true }] : []),
+    found.s3
+      ? { key: 's3', label: 'S3 path', value: objectLocation(found.s3.bucket, found.s3.key), mono: true }
+      : { key: 'location', label: 'Location', value: entity.value.contentUrl || '-' },
+  ]
+})
 
 const copied = ref(false)
 let copyTimer: number | undefined
@@ -129,6 +139,15 @@ async function copyId() {
         </div>
 
         <DetailList :items="details">
+          <template #s3="{ item }">
+            <RouterLink
+              v-if="identity?.s3"
+              :to="objectRoute(identity.s3.bucket, identity.s3.key)"
+              class="text-primary hover:underline"
+              title="Open in the bucket browser"
+              @click="emit('update:open', false)"
+            >{{ item.value }}</RouterLink>
+          </template>
           <template #location>
             <ExternalLink v-if="entity.contentUrl" :href="entity.contentUrl" :label="entity.contentUrl" :title="entity.contentUrl" />
             <span v-else>-</span>
