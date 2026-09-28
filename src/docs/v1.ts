@@ -887,7 +887,7 @@ export const docsTopics: DocsTopic[] = [
         bullets: [
           'ARC: `isa.investigation.xlsx` and the folders `studies/`, `assays/`, `workflows/` and `runs/`, see [ARC](concept:glossary#arc).',
           'Plain RO-Crate: `ro-crate-metadata.json` and your data files, in any folders you like.',
-          'Both layouts carry `ro-crate-metadata.json`, and Aruna adds `aruna-metadata.json`.',
+          'Both layouts carry `ro-crate-metadata.json`. An ARC also has `aruna-metadata.json`, which Aruna writes.',
           'Edits in the portal also become versions in this repository, so pull before you start.',
         ],
       },
