@@ -13,7 +13,9 @@ import { isHttpUrl, relativeTime } from '@/lib/utils'
 import { CircleHelp, Layers, ListChecks } from '@lucide/vue'
 import { computed } from 'vue'
 
-const props = defineProps<{ doc: MetadataDoc; state: DatasetViewState }>()
+// published: a push link holds a published record; unknown stays false.
+const props = defineProps<{ doc: MetadataDoc; state: DatasetViewState; published?: boolean }>()
+const emit = defineEmits<{ (e: 'published'): void }>()
 
 const askPrompt = computed(
   () => `Summarize the dataset "${props.doc.title}" (${props.doc.ulid}): its files, license, and how it was made.`,
@@ -60,6 +62,15 @@ const {
         <AuthorChips :crate="currentCrate" class="mt-4" />
       </div>
       <div class="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+        <button
+          v-if="published"
+          type="button"
+          class="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label="Published. Show where this dataset is published"
+          @click="emit('published')"
+        >
+          <Badge variant="success" class="cursor-pointer hover:opacity-80">Published</Badge>
+        </button>
         <Badge variant="secondary">{{ relativeTime(doc.updatedAt) }}</Badge>
         <Badge v-if="projectCrate" variant="outline" size="sm" class="gap-1 uppercase"><Layers class="h-3 w-3" /> Project dataset</Badge>
         <AskAiButton :prompt="askPrompt" :subject="`dataset ${doc.ulid}`" icon-only />

@@ -15,6 +15,7 @@ import PersistentIdSection from '@/components/metadata/PersistentIdSection.vue'
 import RunProvenancePanel from '@/components/metadata/RunProvenancePanel.vue'
 import RepositoryLinksSection from '@/components/metadata/view/RepositoryLinksSection.vue'
 import RepositoryPublishDialog from '@/components/metadata/view/RepositoryPublishDialog.vue'
+import PublishedDialog from '@/components/metadata/view/PublishedDialog.vue'
 import DatasetActions from '@/components/metadata/view/DatasetActions.vue'
 import DatasetDetailSkeleton from '@/components/metadata/view/DatasetDetailSkeleton.vue'
 import DatasetFiles from '@/components/metadata/view/DatasetFiles.vue'
@@ -34,7 +35,7 @@ import Tabs from '@/components/ui/Tabs.vue'
 import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import DataEntityDialog from '@/components/metadata/DataEntityDialog.vue'
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
 import { useAruna } from '@/composables/useAruna'
 import { useDatasetView } from '@/composables/useDatasetView'
@@ -42,12 +43,13 @@ import { useDatasetHistory } from '@/composables/useDatasetHistory'
 import { useRouteTab } from '@/composables/useRouteTab'
 import { providePageContext } from '@/composables/usePageContext'
 import { useFirstPaint } from '@/composables/useFirstPaint'
-import { type MetadataDocumentSummary } from '@/lib/api'
+import { type MetadataDocumentSummary, type RepositoryLink } from '@/lib/api'
+import { publishedLinks } from '@/lib/repository'
 import { errorMessage, truncateMiddle } from '@/lib/utils'
 import { ArrowLeft, Code2 } from '@lucide/vue'
 
 const router = useRouter()
-const { currentUser, saving, deleteMetadataDocument, fullCrates } = useAruna()
+const { currentUser, saving, deleteMetadataDocument, fullCrates, sessionEpoch } = useAruna()
 
 const state = useDatasetView()
 const {
@@ -119,6 +121,18 @@ const showCrateExport = ref(false)
 const showPublish = ref(false)
 const repositoryLinks = ref<InstanceType<typeof RepositoryLinksSection> | null>(null)
 const pidSection = ref<InstanceType<typeof PersistentIdSection> | null>(null)
+// The Repositories section loads the links; null means unknown.
+const repositoryList = ref<RepositoryLink[] | null>(null)
+watch([detailId, sessionEpoch], () => (repositoryList.value = null))
+const published = computed(() => publishedLinks(repositoryList.value))
+const showPublished = ref(false)
+
+async function manageRepositories() {
+  showPublished.value = false
+  tab.value = 'overview'
+  await nextTick()
+  repositoryLinks.value?.$el?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+}
 const showDelete = ref(false)
 const deleteError = ref<string | null>(null)
 
@@ -196,7 +210,13 @@ function jumpTo(entityId: string) {
       <DatasetDetailSkeleton v-if="!painted" />
 
       <template v-else-if="docState === 'found'">
-        <DatasetHeader v-if="current" :doc="current" :state="state" />
+        <DatasetHeader
+          v-if="current"
+          :doc="current"
+          :state="state"
+          :published="published.length > 0"
+          @published="showPublished = true"
+        />
 
         <Tabs :model-value="tab" @update:model-value="(value: string) => (tab = value)">
           <TabsList aria-label="Dataset views">
@@ -210,24 +230,28 @@ function jumpTo(entityId: string) {
 
         <DatasetHistory v-if="tab === 'history'" :history="history" :state="state" />
 
+        <PersistentIdSection
+          v-if="tab === 'overview' && fetchedSummary"
+          ref="pidSection"
+          :document-id="detailId"
+          :is-public="fetchedSummary.public"
+          :links="repositoryList"
+        />
+
+        <!-- Stays mounted on every tab: the header badge needs its links. -->
+        <RepositoryLinksSection
+          v-if="fetchedSummary && currentUser"
+          ref="repositoryLinks"
+          :class="{ hidden: tab !== 'overview' }"
+          :document-id="detailId"
+          :group-id="fetchedSummary.group_id"
+          :can-write="canWrite"
+          @publish="showPublish = true"
+          @settled="pidSection?.reload()"
+          @links="(list: RepositoryLink[] | null) => (repositoryList = list)"
+        />
+
         <template v-if="tab === 'overview'">
-          <PersistentIdSection
-            v-if="fetchedSummary"
-            ref="pidSection"
-            :document-id="detailId"
-            :is-public="fetchedSummary.public"
-          />
-
-          <RepositoryLinksSection
-            v-if="fetchedSummary && currentUser"
-            ref="repositoryLinks"
-            :document-id="detailId"
-            :group-id="fetchedSummary.group_id"
-            :can-write="canWrite"
-            @publish="showPublish = true"
-            @settled="pidSection?.reload()"
-          />
-
           <DetailsSection
             :fields="presentation.fields"
             :loading="loadingCrate"
@@ -353,6 +377,7 @@ function jumpTo(entityId: string) {
       :group-id="fetchedSummary.group_id"
       @linked="repositoryLinks?.reload()"
     />
+    <PublishedDialog v-model:open="showPublished" :links="published" @manage="manageRepositories" />
 
     <Dialog :open="showDelete" @update:open="(v: boolean) => (showDelete = v)">
       <DialogContent class="max-w-md">

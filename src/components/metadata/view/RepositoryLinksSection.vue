@@ -1,12 +1,12 @@
 <script setup lang="ts">
 // Repository links of one dataset: their state, the last pushed record and the
 // actions a writer may take. Removing a link leaves the repository records.
+// Without links the section stays out of sight; publishing starts from the page actions.
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
-import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
 import Input from '@/components/ui/Input.vue'
@@ -50,7 +50,12 @@ import { Library, Plus } from '@lucide/vue'
 
 const props = defineProps<{ documentId: string; groupId: string; canWrite: boolean }>()
 // settled: a push, publish or pull finished, so identifiers may have changed.
-const emit = defineEmits<{ (e: 'publish'): void; (e: 'settled'): void }>()
+// links: the current list, or null while unknown.
+const emit = defineEmits<{
+  (e: 'publish'): void
+  (e: 'settled'): void
+  (e: 'links', links: RepositoryLink[] | null): void
+}>()
 
 const { apiBaseUrl, authToken, sessionEpoch } = useAruna()
 const { userId, adminOf } = useGroupRights(() => props.groupId)
@@ -102,10 +107,10 @@ function scope() {
 async function load(silent = false) {
   const current = scope()
   if (!silent) loading.value = true
-  if (!silent) loadError.value = null
   try {
     const list = await listRepositoryLinks(props.documentId, client())
     if (!current()) return
+    loadError.value = null
     if (settledSince(links.value, list)) emit('settled')
     links.value = list
   } catch (err) {
@@ -125,6 +130,7 @@ watch(
   () => {
     links.value = null
     hidden.value = false
+    loadError.value = null
     resetActions()
     void load()
   },
@@ -132,6 +138,7 @@ watch(
 )
 
 defineExpose({ reload: () => load() })
+watch(links, (list) => emit('links', list))
 
 // A link that stopped waiting or changed its published record ends a run.
 function settledSince(before: RepositoryLink[] | null, after: RepositoryLink[]): boolean {
@@ -263,7 +270,7 @@ function reasonTone(link: RepositoryLink): string {
 </script>
 
 <template>
-  <section v-if="!hidden" class="surface overflow-hidden">
+  <section v-if="!hidden && (loadError || links?.length)" class="surface overflow-hidden">
     <header class="flex items-center justify-between gap-2 border-b border-border px-5 py-3.5">
       <div class="flex items-center gap-2 text-sm font-medium text-foreground">
         <Library class="h-4 w-4 text-primary" /> Repositories
@@ -274,16 +281,6 @@ function reasonTone(link: RepositoryLink): string {
     <div class="p-5">
       <Skeleton v-if="loading && !links" class="h-16" />
       <ErrorPanel v-else-if="loadError" :message="loadError" @retry="load" />
-      <EmptyState
-        v-else-if="links && !links.length"
-        compact
-        title="Not linked to a repository."
-        :description="canWrite ? 'Publish it to a repository such as Zenodo to get a DOI.' : undefined"
-      >
-        <Button v-if="canWrite" size="sm" variant="outline" @click="emit('publish')">
-          <Plus class="h-3.5 w-3.5" /> Publish to repository
-        </Button>
-      </EmptyState>
       <ul v-else-if="links" class="space-y-4">
         <li v-for="link in ordered" :key="link.link_id" class="space-y-2 rounded-md border border-border p-3">
           <div class="flex flex-wrap items-center gap-2">

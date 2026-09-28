@@ -18,4 +18,11 @@ describe('MetadataView', () => {
     expect(source).toContain('@jump="jumpTo"')
     expect(source).toContain("tab.value = 'overview'")
   })
+
+  it('keeps the repository links loaded on every tab for the published badge', () => {
+    expect(source).toContain(':class="{ hidden: tab !== \'overview\' }"')
+    expect(source).toContain(':published="published.length > 0"')
+    expect(source).toContain('<PublishedDialog v-model:open="showPublished" :links="published" @manage="manageRepositories" />')
+    expect(source).toContain('@publish="showPublish = true"')
+  })
 })

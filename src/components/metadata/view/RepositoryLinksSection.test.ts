@@ -195,11 +195,29 @@ describe('RepositoryLinksSection', () => {
     mounted.app.unmount()
   })
 
-  it('does not read a pending list as empty', async () => {
-    listRepositoryLinks.mockReturnValue(new Promise(() => undefined))
-    const mounted = await mount()
+  it('stays hidden without links and appears once one exists', async () => {
+    listRepositoryLinks.mockResolvedValueOnce([]).mockResolvedValueOnce([link()])
+    const onLinks = vi.fn()
+    const mounted = await mountApp(Section, { props: { documentId: 'd1', groupId: 'g1', canWrite: true, onLinks } })
+    await flush()
 
-    expect(content(mounted.root)).not.toContain('Not linked to a repository.')
+    expect(content(mounted.root)).toBe('')
+    expect(onLinks).toHaveBeenLastCalledWith([])
+    await (mounted.app._instance?.exposed as { reload: () => Promise<void> } | undefined)?.reload()
+    await flush()
+    expect(content(mounted.root)).toContain('Repositories')
+    expect(onLinks).toHaveBeenLastCalledWith([link()])
+    mounted.app.unmount()
+  })
+
+  it('does not report a pending list as empty', async () => {
+    listRepositoryLinks.mockReturnValue(new Promise(() => undefined))
+    const onLinks = vi.fn()
+    const mounted = await mountApp(Section, { props: { documentId: 'd1', groupId: 'g1', canWrite: true, onLinks } })
+    await flush()
+
+    expect(content(mounted.root)).toBe('')
+    expect(onLinks).not.toHaveBeenCalled()
     mounted.app.unmount()
   })
 
@@ -214,8 +232,7 @@ describe('RepositoryLinksSection', () => {
     answer([link()])
     await flush()
 
-    expect(content(mounted.root)).toContain('Not linked to a repository.')
-    expect(content(mounted.root)).not.toContain('zenodo.org')
+    expect(content(mounted.root)).toBe('')
     mounted.app.unmount()
   })
 
