@@ -74,7 +74,7 @@ export interface PromptContext {
 const CONVENTIONS = [
   'Aruna dataset metadata is one RO-Crate JSON-LD graph.',
   'A dataset declares at most one conformsTo profile.',
-  'A file entity carries contentUrl as s3://bucket/key.',
+  'A file entity has its content address https://w3id.org/aruna/data/<blake3 hex> as @id when known, else its s3://bucket/key, and contentUrl as s3://bucket/key.',
   'Validate a crate before saving it; a write is refused on a failing verdict.',
   'A 201 does not mean readable yet, so poll the raw view after a write.',
   'Scripts run in sandboxed containers with the network off unless dependencies are declared.',
