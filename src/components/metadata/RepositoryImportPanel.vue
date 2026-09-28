@@ -3,11 +3,6 @@
 // dataset through a durable import job. A pull link can keep the dataset updated.
 import { computed, ref, useId, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import Dialog from '@/components/ui/Dialog.vue'
-import DialogContent from '@/components/ui/DialogContent.vue'
-import DialogHeader from '@/components/ui/DialogHeader.vue'
-import DialogTitle from '@/components/ui/DialogTitle.vue'
-import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import Button from '@/components/ui/Button.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
@@ -44,8 +39,9 @@ import { importJobResult } from '@/lib/rocrateArchive'
 import { errorMessage } from '@/lib/utils'
 import { Import } from '@lucide/vue'
 
-const props = defineProps<{ open: boolean }>()
-const emit = defineEmits<{ (e: 'update:open', v: boolean): void }>()
+// active: the panel is on screen, so its target pickers may load.
+const props = defineProps<{ active: boolean }>()
+const emit = defineEmits<{ (e: 'close'): void }>()
 
 const { apiBaseUrl, authToken, sessionEpoch } = useAruna()
 const { bumpDashboard } = useNotifications()
@@ -289,173 +285,165 @@ function reset() {
 watch(sessionEpoch, () => {
   reset()
   groupId.value = ''
-  if (props.open) emit('update:open', false)
+  if (props.active) emit('close')
 })
 </script>
 
 <template>
-  <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-    <DialogContent class="flex max-h-[88vh] max-w-2xl flex-col">
-      <DialogHeader class="pr-8">
-        <DialogTitle class="flex items-center gap-2">
-          <Import class="h-4 w-4 text-primary" /> Import from a repository
-        </DialogTitle>
-        <DialogDescription>
+  <div class="flex min-h-0 flex-1 flex-col gap-4">
+    <div class="scrollbar-thin min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+      <template v-if="!activeJobId">
+        <p class="text-xs text-muted-foreground">
           Name a published record by its DOI, link or id, or search for it, and register it as a new dataset.
           Its DOIs stay with the dataset.
-        </DialogDescription>
-      </DialogHeader>
-
-      <div class="scrollbar-thin min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
-        <template v-if="!activeJobId">
-          <div class="grid gap-3 sm:grid-cols-2">
-            <TransferTarget
-              v-model:group-id="groupId"
-              v-model:bucket="bucket"
-              v-model:prefix="prefix"
-              :active="props.open"
-              @navigate="emit('update:open', false)"
-            >
-              <div>
-                <label class="text-xs font-medium text-foreground">Repository</label>
-                <Select
-                  v-if="connectorOptions.length"
-                  v-model="connectorId"
-                  :options="connectorOptions"
-                  placeholder="Choose a repository"
-                  aria-label="Repository"
-                  class="mt-1"
-                />
-                <p v-else-if="!groupId" class="mt-2 text-[11px] text-muted-foreground">Choose a group first.</p>
-                <p v-else-if="kindsError" class="mt-2 text-[11px] text-destructive">{{ kindsError }}</p>
-                <p v-else-if="connectorsError" class="mt-2 text-[11px] text-destructive">{{ connectorsError }}</p>
-                <Spinner v-else-if="connectorsLoading || !repositoryConnectors" show-label label="Loading repositories…" class="mt-2 flex text-[11px]" />
-                <div v-else-if="repositoryConnectors && canWriteMeta" class="mt-2 space-y-1">
-                  <Button size="sm" variant="outline" :disabled="addingPreset" @click="addPreset">Add Zenodo</Button>
-                  <p v-if="presetError" role="alert" class="text-[11px] text-destructive">{{ presetError }}</p>
-                </div>
-                <p v-else-if="repositoryConnectors" class="mt-2 text-[11px] text-muted-foreground">
-                  This group has no repository yet. Ask someone who manages the group's metadata to add Zenodo.
-                  <RouterLink
-                    :to="{ name: 'group', params: { id: groupId }, query: { tab: 'sources' } }"
-                    class="text-primary hover:underline"
-                    @click="emit('update:open', false)"
-                  >Open the group</RouterLink>
-                </p>
-              </div>
-            </TransferTarget>
-          </div>
-
-          <RepositorySearchPanel
-            v-if="groupId && connectorId && capabilities?.search"
-            :group-id="groupId"
-            :connector-id="connectorId"
-            :selected-id="recordInput"
-            @pick="pickHit"
-          />
-
-          <div class="grid gap-3 sm:grid-cols-2">
+        </p>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <TransferTarget
+            v-model:group-id="groupId"
+            v-model:bucket="bucket"
+            v-model:prefix="prefix"
+            :active="props.active"
+            @navigate="emit('close')"
+          >
             <div>
-              <label :for="`${uid}-record`" class="text-xs font-medium text-foreground">Record</label>
-              <Input
-                :id="`${uid}-record`"
-                v-model="recordInput"
-                placeholder="10.5281/zenodo.1234567"
-                class="mt-1 font-mono text-xs"
+              <label class="text-xs font-medium text-foreground">Repository</label>
+              <Select
+                v-if="connectorOptions.length"
+                v-model="connectorId"
+                :options="connectorOptions"
+                placeholder="Choose a repository"
+                aria-label="Repository"
+                class="mt-1"
               />
-              <p class="mt-1 text-[11px]" :class="recordInput.trim() && !source ? 'text-destructive' : 'text-muted-foreground'">
-                {{ capabilities?.search === false ? 'A record id. This repository cannot be searched, so DOIs and record links do not work here.' : 'A DOI, a record link or a record id.' }}
+              <p v-else-if="!groupId" class="mt-2 text-[11px] text-muted-foreground">Choose a group first.</p>
+              <p v-else-if="kindsError" class="mt-2 text-[11px] text-destructive">{{ kindsError }}</p>
+              <p v-else-if="connectorsError" class="mt-2 text-[11px] text-destructive">{{ connectorsError }}</p>
+              <Spinner v-else-if="connectorsLoading || !repositoryConnectors" show-label label="Loading repositories…" class="mt-2 flex text-[11px]" />
+              <div v-else-if="repositoryConnectors && canWriteMeta" class="mt-2 space-y-1">
+                <Button size="sm" variant="outline" :disabled="addingPreset" @click="addPreset">Add Zenodo</Button>
+                <p v-if="presetError" role="alert" class="text-[11px] text-destructive">{{ presetError }}</p>
+              </div>
+              <p v-else-if="repositoryConnectors" class="mt-2 text-[11px] text-muted-foreground">
+                This group has no repository yet. Ask someone who manages the group's metadata to add Zenodo.
+                <RouterLink
+                  :to="{ name: 'group', params: { id: groupId }, query: { tab: 'sources' } }"
+                  class="text-primary hover:underline"
+                  @click="emit('close')"
+                >Open the group</RouterLink>
               </p>
             </div>
-            <div>
-              <label :for="`${uid}-path`" class="text-xs font-medium text-foreground">Dataset path</label>
-              <Input :id="`${uid}-path`" v-model="documentPath" placeholder="datasets/my-dataset" class="mt-1" />
-            </div>
-          </div>
-          <p v-if="lookupOpen" class="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-            Not every node answered, so Aruna could not check whether a dataset already holds this DOI.
-            <Button variant="ghost" size="sm" class="h-6 px-1 text-xs" @click="checkExisting(lookupDoi)">Retry</Button>
-          </p>
-          <Notice v-if="existing.length" tone="info">
-            {{ existing.length === 1 ? 'A dataset already holds' : `${existing.length} datasets already hold` }} this DOI
-            <template v-if="existing[0].origin === 'published'"> as its own published record</template>.
-            <RouterLink
-              :to="{ name: 'dataset', params: { id: existing[0].document_id } }"
-              class="font-medium text-primary hover:underline"
-              @click="emit('update:open', false)"
-            >Open it</RouterLink>
-          </Notice>
+          </TransferTarget>
+        </div>
 
-          <div class="space-y-1.5">
-            <OptionToggle v-model="mode" :options="MODE_OPTIONS" aria-label="What to import" />
-            <p class="text-[11px] text-muted-foreground">{{ MODE_HINT[mode] }}</p>
-          </div>
-          <label v-if="canPull" class="flex items-start gap-2 text-xs text-foreground">
-            <Switch
-              :checked="keepUpdated"
-              :disabled="!canWriteMeta"
-              aria-label="Keep updated"
-              @update:checked="keepUpdated = $event"
+        <RepositorySearchPanel
+          v-if="groupId && connectorId && capabilities?.search"
+          :group-id="groupId"
+          :connector-id="connectorId"
+          :selected-id="recordInput"
+          @pick="pickHit"
+        />
+
+        <div class="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label :for="`${uid}-record`" class="text-xs font-medium text-foreground">Record</label>
+            <Input
+              :id="`${uid}-record`"
+              v-model="recordInput"
+              placeholder="10.5281/zenodo.1234567"
+              class="mt-1 font-mono text-xs"
             />
-            <span>
-              Keep updated
-              <span class="block text-[11px] text-muted-foreground">
-                {{ canWriteMeta
-                  ? 'Aruna checks the record once a day and offers new versions.'
-                  : "Needs write access to the group's metadata." }}
-              </span>
-            </span>
-          </label>
-          <label v-if="keepUpdated && canPull" class="flex items-center gap-2 text-xs text-foreground">
-            <Switch :checked="autoUpdate" aria-label="Import new versions automatically" @update:checked="autoUpdate = $event" />
-            Import new versions automatically
-          </label>
-          <label class="flex items-center gap-2 text-xs text-foreground">
-            <Switch :checked="allVersions" aria-label="Import all versions" @update:checked="allVersions = $event" />
-            Import all published versions, not only the latest
-          </label>
-          <label class="flex items-center gap-2 text-xs text-foreground">
-            <Switch :checked="isPublic" aria-label="Make the imported dataset public" @update:checked="isPublic = $event" />
-            Make the imported dataset public
-          </label>
-        </template>
-
-        <section v-else class="space-y-3">
-          <TransferJobStatus :job="job" :load-state="loadState" :load-error="loadError" :last-poll-error="lastPollError" @retry="load" />
-          <DetailList v-if="importResult" :items="importDetails" />
-          <div v-if="importedDois?.length" class="space-y-1 text-xs">
-            <p class="font-medium text-foreground">DOIs of the imported record</p>
-            <p v-for="doi in importedDois" :key="doi.value" class="flex flex-wrap items-center gap-1">
-              <ExternalLink :href="doiUrl(doi.value)" :label="doi.value" />
-              <CopyButton :value="doi.value" label="Copy DOI" />
+            <p class="mt-1 text-[11px]" :class="recordInput.trim() && !source ? 'text-destructive' : 'text-muted-foreground'">
+              {{ capabilities?.search === false ? 'A record id. This repository cannot be searched, so DOIs and record links do not work here.' : 'A DOI, a record link or a record id.' }}
             </p>
           </div>
-          <p v-else-if="importedDois" class="text-[11px] text-muted-foreground">
-            The record DOIs appear on the dataset page once they are registered.
-          </p>
-          <div class="flex flex-wrap gap-2">
-            <Button v-if="createdDocumentId" variant="outline" size="sm" as-child @click="emit('update:open', false)">
-              <RouterLink :to="{ name: 'dataset', params: { id: createdDocumentId } }">Open the created dataset</RouterLink>
-            </Button>
-            <Button variant="ghost" size="sm" as-child @click="emit('update:open', false)">
-              <RouterLink :to="{ name: 'job', params: { jobId: activeJobId } }">Open the job</RouterLink>
-            </Button>
+          <div>
+            <label :for="`${uid}-path`" class="text-xs font-medium text-foreground">Dataset path</label>
+            <Input :id="`${uid}-path`" v-model="documentPath" placeholder="datasets/my-dataset" class="mt-1" />
           </div>
-          <TransferReport :key="activeJobId" :job-id="activeJobId" :settled="terminal" />
-        </section>
+        </div>
+        <p v-if="lookupOpen" class="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+          Not every node answered, so Aruna could not check whether a dataset already holds this DOI.
+          <Button variant="ghost" size="sm" class="h-6 px-1 text-xs" @click="checkExisting(lookupDoi)">Retry</Button>
+        </p>
+        <Notice v-if="existing.length" tone="info">
+          {{ existing.length === 1 ? 'A dataset already holds' : `${existing.length} datasets already hold` }} this DOI
+          <template v-if="existing[0].origin === 'published'"> as its own published record</template>.
+          <RouterLink
+            :to="{ name: 'dataset', params: { id: existing[0].document_id } }"
+            class="font-medium text-primary hover:underline"
+            @click="emit('close')"
+          >Open it</RouterLink>
+        </Notice>
 
-        <p v-if="submitError" role="alert" class="text-xs text-destructive">{{ submitError }}</p>
-      </div>
+        <div class="space-y-1.5">
+          <OptionToggle v-model="mode" :options="MODE_OPTIONS" aria-label="What to import" />
+          <p class="text-[11px] text-muted-foreground">{{ MODE_HINT[mode] }}</p>
+        </div>
+        <label v-if="canPull" class="flex items-start gap-2 text-xs text-foreground">
+          <Switch
+            :checked="keepUpdated"
+            :disabled="!canWriteMeta"
+            aria-label="Keep updated"
+            @update:checked="keepUpdated = $event"
+          />
+          <span>
+            Keep updated
+            <span class="block text-[11px] text-muted-foreground">
+              {{ canWriteMeta
+                ? 'Aruna checks the record once a day and offers new versions.'
+                : "Needs write access to the group's metadata." }}
+            </span>
+          </span>
+        </label>
+        <label v-if="keepUpdated && canPull" class="flex items-center gap-2 text-xs text-foreground">
+          <Switch :checked="autoUpdate" aria-label="Import new versions automatically" @update:checked="autoUpdate = $event" />
+          Import new versions automatically
+        </label>
+        <label class="flex items-center gap-2 text-xs text-foreground">
+          <Switch :checked="allVersions" aria-label="Import all versions" @update:checked="allVersions = $event" />
+          Import all published versions, not only the latest
+        </label>
+        <label class="flex items-center gap-2 text-xs text-foreground">
+          <Switch :checked="isPublic" aria-label="Make the imported dataset public" @update:checked="isPublic = $event" />
+          Make the imported dataset public
+        </label>
+      </template>
 
-      <DialogFooter>
-        <Button variant="outline" @click="emit('update:open', false)">Close</Button>
-        <Button v-if="activeJobId && terminal" variant="outline" @click="reset">Import another</Button>
-        <Button v-if="!activeJobId" :disabled="!ready || busy" @click="startImport">
-          <Spinner v-if="busy" class="text-current" aria-hidden="true" />
-          <Import v-else class="h-4 w-4" />
-          {{ busy ? 'Starting…' : 'Import record' }}
-        </Button>
-      </DialogFooter>
-    </DialogContent>
-  </Dialog>
+      <section v-else class="space-y-3">
+        <TransferJobStatus :job="job" :load-state="loadState" :load-error="loadError" :last-poll-error="lastPollError" @retry="load" />
+        <DetailList v-if="importResult" :items="importDetails" />
+        <div v-if="importedDois?.length" class="space-y-1 text-xs">
+          <p class="font-medium text-foreground">DOIs of the imported record</p>
+          <p v-for="doi in importedDois" :key="doi.value" class="flex flex-wrap items-center gap-1">
+            <ExternalLink :href="doiUrl(doi.value)" :label="doi.value" />
+            <CopyButton :value="doi.value" label="Copy DOI" />
+          </p>
+        </div>
+        <p v-else-if="importedDois" class="text-[11px] text-muted-foreground">
+          The record DOIs appear on the dataset page once they are registered.
+        </p>
+        <div class="flex flex-wrap gap-2">
+          <Button v-if="createdDocumentId" variant="outline" size="sm" as-child @click="emit('close')">
+            <RouterLink :to="{ name: 'dataset', params: { id: createdDocumentId } }">Open the created dataset</RouterLink>
+          </Button>
+          <Button variant="ghost" size="sm" as-child @click="emit('close')">
+            <RouterLink :to="{ name: 'job', params: { jobId: activeJobId } }">Open the job</RouterLink>
+          </Button>
+        </div>
+        <TransferReport :key="activeJobId" :job-id="activeJobId" :settled="terminal" />
+      </section>
+
+      <p v-if="submitError" role="alert" class="text-xs text-destructive">{{ submitError }}</p>
+    </div>
+
+    <DialogFooter>
+      <Button variant="outline" @click="emit('close')">Close</Button>
+      <Button v-if="activeJobId && terminal" variant="outline" @click="reset">Import another</Button>
+      <Button v-if="!activeJobId" :disabled="!ready || busy" @click="startImport">
+        <Spinner v-if="busy" class="text-current" aria-hidden="true" />
+        <Import v-else class="h-4 w-4" />
+        {{ busy ? 'Starting…' : 'Import record' }}
+      </Button>
+    </DialogFooter>
+  </div>
 </template>

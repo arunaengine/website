@@ -12,8 +12,7 @@ import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Switch from '@/components/ui/Switch.vue'
-import CrateTransferDialog from '@/components/metadata/CrateTransferDialog.vue'
-import RepositoryImportDialog from '@/components/metadata/RepositoryImportDialog.vue'
+import ImportDatasetDialog from '@/components/metadata/ImportDatasetDialog.vue'
 import DatasetBrowse from '@/components/datasets/DatasetBrowse.vue'
 import DatasetResults from '@/components/datasets/DatasetResults.vue'
 import DatasetSearch from '@/components/datasets/DatasetSearch.vue'
@@ -26,7 +25,7 @@ import { useDatasetSearch } from '@/composables/useDatasetSearch'
 import { useSparqlWorkbench } from '@/composables/useSparqlWorkbench'
 import { useJobs } from '@/composables/useJobs'
 import { truncateMiddle } from '@/lib/utils'
-import { Code2, FileArchive, Import, Plus } from '@lucide/vue'
+import { Code2, Import, Plus } from '@lucide/vue'
 
 const router = useRouter()
 const { currentUser } = useAruna()
@@ -48,8 +47,7 @@ const {
 } = state
 const sparqlState = useSparqlWorkbench(documentScope)
 
-const showCrateImport = ref(false)
-const showRepositoryImport = ref(false)
+const showImport = ref(false)
 
 const askPrompt = computed(() =>
   q.value.trim()
@@ -76,23 +74,15 @@ const askPrompt = computed(() =>
       <template #actions>
         <AskAiButton :prompt="askPrompt" subject="dataset search" size="default" />
         <Button :disabled="!currentUser" @click="router.push({ name: 'dataset-new' })"><Plus class="h-4 w-4" /> Create dataset</Button>
-        <!-- Importing an archive registers a NEW document, so it lives here next
-             to Create dataset rather than on a single dataset's page. -->
+        <!-- An import registers a NEW document, so it lives here next to Create
+             dataset rather than on a single dataset's page. -->
         <Button
           v-if="currentUser && jobsEnabled"
           variant="outline"
-          title="Upload an RO-Crate zip or eln archive and register it as a new dataset"
-          @click="showCrateImport = true"
+          title="Import an RO-Crate archive or a repository record as a new dataset"
+          @click="showImport = true"
         >
-          <FileArchive class="h-4 w-4" /> Import RO-Crate dataset
-        </Button>
-        <Button
-          v-if="currentUser && jobsEnabled"
-          variant="outline"
-          title="Import a published repository record, for example from Zenodo, as a new dataset"
-          @click="showRepositoryImport = true"
-        >
-          <Import class="h-4 w-4" /> From a repository
+          <Import class="h-4 w-4" /> Import
         </Button>
         <div class="flex items-center gap-2 rounded-md border border-border bg-card px-2 py-1">
           <Code2 class="h-3.5 w-3.5 text-muted-foreground" />
@@ -122,7 +112,6 @@ const askPrompt = computed(() =>
       <SparqlWorkbench v-else :state="sparqlState" />
     </div>
 
-    <CrateTransferDialog v-model:open="showCrateImport" mode="import" />
-    <RepositoryImportDialog v-model:open="showRepositoryImport" />
+    <ImportDatasetDialog v-model:open="showImport" />
   </div>
 </template>

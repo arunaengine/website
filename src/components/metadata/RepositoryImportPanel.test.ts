@@ -37,7 +37,7 @@ const SearchStub = defineComponent({
   setup: (_, { emit }) => () =>
     h('button', { onClick: () => emit('pick', { id: '77', doi: '10.5281/zenodo.77' }) }, 'Pick record 77'),
 })
-// Fills the target the way a user would; the dialog only needs the models.
+// Fills the target the way a user would; the panel only needs the models.
 const TargetStub = defineComponent({
   props: { groupId: String, bucket: String, prefix: String },
   emits: ['update:groupId', 'update:bucket', 'update:prefix'],
@@ -48,15 +48,10 @@ const TargetStub = defineComponent({
   },
 })
 
-const ImportDialog = compileClientComponent(new URL('./RepositoryImportDialog.vue', import.meta.url), {
+const ImportPanel = compileClientComponent(new URL('./RepositoryImportPanel.vue', import.meta.url), {
   vue: VueRuntime,
   'vue-router': { RouterLink: Slot },
   '@lucide/vue': new Proxy({}, { get: () => Empty }),
-  '@/components/ui/Dialog.vue': moduleDefault(Slot),
-  '@/components/ui/DialogContent.vue': moduleDefault(Slot),
-  '@/components/ui/DialogHeader.vue': moduleDefault(Slot),
-  '@/components/ui/DialogTitle.vue': moduleDefault(Slot),
-  '@/components/ui/DialogDescription.vue': moduleDefault(Slot),
   '@/components/ui/DialogFooter.vue': moduleDefault(Slot),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/CopyButton.vue': moduleDefault(Empty),
@@ -102,7 +97,7 @@ const ImportDialog = compileClientComponent(new URL('./RepositoryImportDialog.vu
 })
 
 async function mount() {
-  const mounted = await mountApp(ImportDialog, { props: { open: true } })
+  const mounted = await mountApp(ImportPanel, { props: { active: true } })
   // The group pick reloads its connectors, which preselects the only one.
   connectors.value = [...(connectors.value ?? [])]
   await flush()
@@ -133,7 +128,7 @@ beforeEach(() => {
   submitRepositoryImport.mockResolvedValue({ job_id: 'j1', status_url: '/jobs/j1' })
 })
 
-describe('RepositoryImportDialog', () => {
+describe('RepositoryImportPanel', () => {
   it('sends a typed DOI as doi and keeps the dataset updated by default', async () => {
     const mounted = await mount()
     await typeValue(recordField(mounted.root), 'https://doi.org/10.5281/zenodo.42')
