@@ -178,7 +178,7 @@ export function useDatasetHistory(documentId: Ref<string>, enabled: () => boolea
       refsProblem.value = null
       versions.value = null
       listProblem.value = null
-      if (enabled()) void refresh()
+      if (enabled() && active()) void refresh()
     },
     { immediate: true },
   )
@@ -187,8 +187,11 @@ export function useDatasetHistory(documentId: Ref<string>, enabled: () => boolea
     if (enabled() && active() && branches.value) void loadList()
   })
 
+  // Refs load when the tab opens, so the overview makes no history calls.
   watch(active, (on) => {
-    if (on && enabled() && branches.value && versions.value === null && !listProblem.value) void loadList()
+    if (!on || !enabled()) return
+    if (branches.value === null && !refsProblem.value) void refresh()
+    else if (branches.value && versions.value === null && !listProblem.value) void loadList()
   })
 
   return {

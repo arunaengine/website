@@ -31,7 +31,8 @@ function repository(documentId = 'd1') {
 }
 
 beforeEach(() => {
-  sessionEpoch.value = 0
+  // A fresh session per test keeps the row's shared answer cache apart.
+  sessionEpoch.value += 100
   getGitRepository.mockReset()
 })
 
@@ -68,6 +69,19 @@ describe('DatasetGitRow', () => {
 
     expect(content(mounted.root)).not.toMatch(/Git repository (ARC|RO-Crate)/)
     mounted.app.unmount()
+  })
+
+  it('reuses the answer when the row mounts again', async () => {
+    getGitRepository.mockResolvedValue(repository())
+    const first = await mountApp(DatasetGitRow, { props: { documentId: 'd1' } })
+    await flush()
+    first.app.unmount()
+    const second = await mountApp(DatasetGitRow, { props: { documentId: 'd1' } })
+    await flush()
+
+    expect(content(second.root)).toContain(CLONE)
+    expect(getGitRepository).toHaveBeenCalledTimes(1)
+    second.app.unmount()
   })
 
   it.each([404, 403, 503])('stays hidden when the node answers %i', async (status) => {

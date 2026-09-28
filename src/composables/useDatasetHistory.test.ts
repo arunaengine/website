@@ -140,4 +140,19 @@ describe('useDatasetHistory', () => {
     expect(history.conflicts.value.map((conflict) => conflict.id)).toEqual(['c2'])
     expect(history.branch.value).toBe('main')
   })
+  it('loads nothing until the history tab opens', async () => {
+    listVersions.mockResolvedValue({ versions: [version('a')], next_cursor: null })
+    const open = ref(false)
+    const scope = effectScope()
+    const history = scope.run(() => useDatasetHistory(ref('d1'), () => true, () => open.value))!
+    await settle()
+    expect(listBranches).not.toHaveBeenCalled()
+    expect(listVersions).not.toHaveBeenCalled()
+
+    open.value = true
+    await settle()
+    expect(listBranches).toHaveBeenCalledTimes(1)
+    expect(history.versions.value).not.toBeNull()
+    scope.stop()
+  })
 })

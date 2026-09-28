@@ -1,3 +1,9 @@
+<script lang="ts">
+// Tab switches remount the row; one answer per dataset and session serves a minute.
+const answers = new Map<string, { at: number; url: string | null; layout: string | null }>()
+const ANSWER_TTL_MS = 60_000
+</script>
+
 <script setup lang="ts">
 // The clone address of a dataset's Git repository. Nothing shows until the node
 // answers; a node without Git or a reader without access shows no row.
@@ -19,6 +25,13 @@ watch(
   [() => props.documentId, sessionEpoch],
   async () => {
     const current = ++generation
+    const key = `${sessionEpoch.value}:${apiBaseUrl.value}:${props.documentId}`
+    const kept = answers.get(key)
+    if (kept && Date.now() - kept.at < ANSWER_TTL_MS) {
+      cloneUrl.value = kept.url
+      layout.value = kept.layout
+      return
+    }
     cloneUrl.value = null
     layout.value = null
     try {
@@ -26,6 +39,7 @@ watch(
       if (current !== generation) return
       cloneUrl.value = repository.clone_url || null
       layout.value = repository.layout === 'arc' ? 'ARC' : repository.layout === 'rocrate' ? 'RO-Crate' : null
+      answers.set(key, { at: Date.now(), url: cloneUrl.value, layout: layout.value })
     } catch {
       // Missing, refused or unavailable: the row stays hidden.
     }
