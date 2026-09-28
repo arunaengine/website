@@ -4,10 +4,12 @@
 // location is the identity. The picker and the upload path both come here.
 
 import {
+  ARUNA_CONTENT_W3ID_PREFIX,
   arunaContentReference,
   resolveContentIdentity,
   type ContentIdentityOptions,
 } from '@/lib/contentIdentity'
+import { isAbsoluteUri } from '@/lib/profiles/uri'
 
 export interface DataEntityIdentity {
   /** The entity's `@id`: the content w3id when resolvable, else the location. */
@@ -28,4 +30,71 @@ export async function dataEntityIdentity(
   const contentUrl = objectLocation(bucket, key)
   const resolved = arunaContentReference(contentUrl, await resolveContentIdentity(bucket, key, options))
   return { id: resolved.id, contentUrl }
+}
+
+/** What a data entity's `@id` and `contentUrl` say about its bytes, in any written form. */
+export interface ParsedDataIdentity {
+  /** The content w3id (`https://w3id.org/aruna/data/<blake3 hex>`). */
+  contentId: string | null
+  s3: { bucket: string; key: string } | null
+  /** Node and version of an older versioned ARN `@id`. */
+  arn: { realmId: string; nodeId: string; version: string } | null
+  /** Path inside the crate, from `localPath` or a relative `@id`. */
+  localPath: string | null
+}
+
+const CONTENT_ID = /^https:\/\/w3id\.org\/aruna\/data\/[0-9a-f]{64}$/i
+const ARN_ID = /^arn:aruna:([^:]+):([^:]+):s3\/([^/]+)\/(.+)@([^@/]+)$/
+
+export function isContentId(value: string | null | undefined): value is string {
+  return Boolean(value && CONTENT_ID.test(value))
+}
+
+function decodeKey(key: string): string {
+  try {
+    return decodeURIComponent(key)
+  } catch {
+    return key
+  }
+}
+
+// s3://bucket/key (a trailing ?versionId pins a version), or path-style on the node endpoint.
+export function parseObjectUrl(url: string, endpoint?: string | null): { bucket: string; key: string } | null {
+  let rest: string | null = null
+  if (url.startsWith('s3://')) rest = url.slice('s3://'.length).replace(/\?versionId=[^/]*$/, '')
+  else if (endpoint) {
+    const base = endpoint.replace(/\/+$/, '')
+    if (url.startsWith(`${base}/`)) rest = decodeKey(url.slice(base.length + 1))
+  }
+  if (rest === null) return null
+  const slash = rest.indexOf('/')
+  const bucket = rest.slice(0, slash)
+  const key = rest.slice(slash + 1)
+  return slash > 0 && key ? { bucket, key } : null
+}
+
+function parseArnId(id: string) {
+  if (!id.startsWith(ARUNA_CONTENT_W3ID_PREFIX)) return null
+  const match = ARN_ID.exec(id.slice(ARUNA_CONTENT_W3ID_PREFIX.length))
+  if (!match) return null
+  const [, realmId, nodeId, bucket, key, version] = match as unknown as string[]
+  return { arn: { realmId, nodeId, version }, s3: { bucket, key: decodeKey(key) } }
+}
+
+// Reads every form: the current one (content w3id `@id`, s3 `contentUrl`), an
+// older versioned ARN `@id` with a content w3id `contentUrl`, an s3 `@id`, or a relative `@id`.
+export function parseDataIdentity(
+  entity: { id: string; contentUrl?: string | null; localPath?: string | null },
+  endpoint?: string | null,
+): ParsedDataIdentity {
+  const { id } = entity
+  const contentUrl = entity.contentUrl ?? ''
+  const versioned = parseArnId(id)
+  const relative = Boolean(id) && !id.startsWith('#') && !isAbsoluteUri(id)
+  return {
+    contentId: isContentId(id) ? id : isContentId(contentUrl) ? contentUrl : null,
+    s3: parseObjectUrl(contentUrl, endpoint) ?? parseObjectUrl(id, endpoint) ?? versioned?.s3 ?? null,
+    arn: versioned?.arn ?? null,
+    localPath: entity.localPath || (relative ? id : null),
+  }
 }

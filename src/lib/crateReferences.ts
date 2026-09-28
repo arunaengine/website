@@ -1,4 +1,5 @@
 import type { MetadataDocumentListItem } from './api'
+import { parseDataIdentity } from './crate/dataIdentity'
 
 export interface CrateObjectReference {
   documentId: string
@@ -6,12 +7,12 @@ export interface CrateObjectReference {
 }
 
 // Builds an index of "bucket/key" -> referencing documents from client-side
-// crate caches ONLY (never issues a request). Backlink coverage has three
-// authored forms to account for: a canonical content W3ID @id with a path-style
-// contentUrl, a legacy s3://{bucket}/{key} @id, and a legacy path-style
-// {s3endpoint}/{bucket}/{key} @id. This location index sees the canonical form
-// through contentUrl and both legacy locations through @id; complete server-side
-// claims must query all three identities.
+// crate caches ONLY (never issues a request). Backlink coverage has four
+// authored forms to account for: a canonical content W3ID @id with an s3 or
+// path-style contentUrl, a versioned ARN W3ID @id, a legacy s3://{bucket}/{key}
+// @id, and a legacy path-style {s3endpoint}/{bucket}/{key} @id. This location
+// index sees each through parseDataIdentity; complete server-side claims must
+// query all of these identities.
 // The lookup is honest-by-construction: it only knows about crates the portal
 // has already fetched this session, so the badge tooltip says exactly that.
 export function buildCrateReferenceIndex(
@@ -109,23 +110,6 @@ function collectUrls(value: unknown): string[] {
 }
 
 export function toBucketKey(url: string, endpoint: string | null): string | null {
-  let rest: string | null = null
-  if (url.startsWith('s3://')) {
-    rest = url.slice('s3://'.length)
-  } else if (endpoint) {
-    const base = endpoint.replace(/\/$/, '')
-    if (url.startsWith(`${base}/`)) rest = url.slice(base.length + 1)
-  }
-  if (rest === null) return null
-  const slash = rest.indexOf('/')
-  if (slash < 0) return null
-  const bucket = rest.slice(0, slash)
-  let key = rest.slice(slash + 1)
-  if (!bucket || !key) return null
-  try {
-    key = decodeURIComponent(key)
-  } catch {
-    // Keep the raw key when it is not valid percent-encoding.
-  }
-  return `${bucket}/${key}`
+  const s3 = parseDataIdentity({ id: url }, endpoint).s3
+  return s3 ? `${s3.bucket}/${s3.key}` : null
 }
