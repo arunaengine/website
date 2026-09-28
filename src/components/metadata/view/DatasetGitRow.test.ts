@@ -1,8 +1,9 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { compileClientComponent, content, flush, moduleDefault, mountApp } from '@/test/clientRender'
+import { compileClientComponent, content, element, flush, moduleDefault, mountApp } from '@/test/clientRender'
 import * as Api from '@/lib/api'
+import * as DataIdentity from '@/lib/crate/dataIdentity'
 
 const sessionEpoch = ref(0)
 const getGitRepository = vi.fn()
@@ -11,6 +12,11 @@ const BadgeStub = defineComponent((_, { slots }) => () => h('span', slots.defaul
 const DocsLinkStub = defineComponent({
   props: { topic: String, label: String },
   setup: (props) => () => h('a', { 'data-topic': props.topic }, props.label),
+})
+
+const LinkStub = defineComponent({
+  props: { to: { type: Object, required: true } },
+  setup: (props, { slots }) => () => h('a', { to: props.to }, slots.default?.()),
 })
 
 const DatasetGitRow = compileClientComponent(new URL('./DatasetGitRow.vue', import.meta.url), {
@@ -22,6 +28,8 @@ const DatasetGitRow = compileClientComponent(new URL('./DatasetGitRow.vue', impo
     useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('bearer'), sessionEpoch }),
   },
   '@/lib/api': { ...Api, getGitRepository },
+  '@/lib/crate/dataIdentity': DataIdentity,
+  'vue-router': { RouterLink: LinkStub },
 })
 
 const CLONE = 'https://api.test/git/d1.git'
@@ -68,6 +76,46 @@ describe('DatasetGitRow', () => {
     await flush()
 
     expect(content(mounted.root)).not.toMatch(/Git repository (ARC|RO-Crate)/)
+    mounted.app.unmount()
+  })
+
+  it('says where pushed files are stored', async () => {
+    getGitRepository.mockResolvedValue({
+      ...repository(),
+      storage_location: { bucket: 'datasets-g1', prefix: 'd1/', default: true },
+    })
+    const mounted = await mountApp(DatasetGitRow, { props: { documentId: 'd1', groupId: 'G1' } })
+    await flush()
+
+    expect(content(mounted.root)).toContain('Files you push are stored in datasets-g1/d1/.')
+    expect(element(mounted.root, (node) => node.tag === 'a' && Boolean(node.props.to)).props.to).toEqual({
+      name: 'bucket',
+      params: { bucketId: 'datasets-g1' },
+      query: { prefix: 'd1', group: 'G1' },
+    })
+    mounted.app.unmount()
+  })
+
+  it('shows a location changed on the page over the cached one', async () => {
+    getGitRepository.mockResolvedValue({
+      ...repository(),
+      storage_location: { bucket: 'datasets-g1', prefix: 'd1/', default: true },
+    })
+    const mounted = await mountApp(DatasetGitRow, {
+      props: { documentId: 'd1', changed: { bucket: 'raw', prefix: 'reads/' } },
+    })
+    await flush()
+
+    expect(content(mounted.root)).toContain('Files you push are stored in raw/reads/.')
+    mounted.app.unmount()
+  })
+
+  it('leaves out the storage sentence for an older node', async () => {
+    getGitRepository.mockResolvedValue(repository())
+    const mounted = await mountApp(DatasetGitRow, { props: { documentId: 'd1' } })
+    await flush()
+
+    expect(content(mounted.root)).not.toContain('Files you push')
     mounted.app.unmount()
   })
 
