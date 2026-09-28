@@ -17,6 +17,7 @@ import * as Editor from '@/lib/crate/editor'
 import * as ProfileSeed from '@/lib/crate/profileSeed'
 import * as Issues from '@/lib/crate/issues'
 import * as Paths from '@/lib/crate/paths'
+import * as DataIdentity from '@/lib/crate/dataIdentity'
 import * as Api from '@/lib/api'
 import * as Emit from '@/lib/profiles/emit'
 import * as Assignable from '@/lib/profiles/assignable'
@@ -153,7 +154,7 @@ const LocationStub = defineComponent({
     folder: { type: String, default: '' },
     slug: { type: String, default: '' },
   },
-  emits: ['update:open', 'update', 'folder', 'slug', 'create-group'],
+  emits: ['update:open', 'update', 'folder', 'slug', 'create-group', 'storage'],
   setup(props, { emit }) {
     return () => props.open
       ? h('div', [
@@ -165,6 +166,7 @@ const LocationStub = defineComponent({
           onInput: (event: { target: { value: string } }) => emit('slug', event.target.value),
         }),
         h('button', { onClick: () => emit('folder', 'other') }, 'Pick other folder'),
+        h('button', { onClick: () => emit('storage', { bucket: '', prefix: ' shared/ ' }) }, 'Pick storage prefix'),
         h('button', { onClick: () => emit('update', { ...props.draft, visibility: 'public' }) }, 'Make public'),
         ...(props.groupOptions as Array<{ value: string; label: string }>).map((option) =>
           h('button', {
@@ -386,6 +388,7 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
   '@/lib/crate/profileSeed': ProfileSeed,
   '@/lib/crate/issues': Issues,
   '@/lib/crate/paths': Paths,
+  '@/lib/crate/dataIdentity': DataIdentity,
 })
 
 // An accepted verdict that still names two files not everyone can read.
@@ -563,6 +566,30 @@ describe('DatasetEditorView', () => {
     await flush()
 
     expect(createMetadata.mock.calls[0][0]).toMatchObject({ group_id: 'group-2' })
+    mounted.app.unmount()
+  })
+
+  it('leaves the storage location to the node by default', async () => {
+    const mounted = await mountApp(DatasetEditorView)
+    await click(button(mounted.root, 'Seed dataset'))
+    await click(button(mounted.root, 'Create dataset'))
+    await flush()
+
+    expect(createMetadata.mock.calls[0][0]).not.toHaveProperty('storage_location')
+    mounted.app.unmount()
+  })
+
+  it('sends a chosen storage location', async () => {
+    const mounted = await mountApp(DatasetEditorView)
+    await openLocation(mounted.root)
+    await click(button(mounted.root, 'Pick storage prefix'))
+    await click(button(mounted.root, 'Seed dataset'))
+    await click(button(mounted.root, 'Create dataset'))
+    await flush()
+
+    expect(createMetadata.mock.calls[0][0]).toMatchObject({
+      storage_location: { bucket: 'datasets-group-1', prefix: 'shared/' },
+    })
     mounted.app.unmount()
   })
 

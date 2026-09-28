@@ -37,6 +37,7 @@ import { loadVocabIndex, type VocabIndex } from '@/lib/profiles/vocabulary'
 import { collectIssues, rejectionIssues, type WriteIssue } from '@/lib/crate/issues'
 import type { MetadataProfile } from '@/data/types'
 import { joinPath, splitPath } from '@/lib/crate/paths'
+import { chosenStorage } from '@/lib/crate/dataIdentity'
 import { applyProfile, clearProfile, profileExpectation, seedNewEntities, unseedProfile } from '@/lib/crate/profileSeed'
 import {
   alignValueKinds,
@@ -164,7 +165,12 @@ watch(location, ({ prefix, slug: name }) => {
     draft.value = { ...draft.value, path: name ? joinPath(prefix, name) : '' }
   }, folder.value === null && slug.value === null)
 }, { immediate: true })
-watch(() => draft.value.groupId, () => (folder.value = null))
+// Where files pushed with Git go; empty means the group's default.
+const storage = ref({ bucket: '', prefix: '' })
+watch(() => draft.value.groupId, () => {
+  folder.value = null
+  storage.value = { bucket: '', prefix: '' }
+})
 
 // Only a new dataset can still collide; a stored one owns its path.
 const { taken: pathTaken, checking: pathChecking } = usePathTaken(
@@ -625,6 +631,7 @@ async function save(anyway = false) {
   const groupId = draft.value.groupId ?? ''
   const path = draft.value.path?.trim() ?? ''
   const message = versionMessage.value.trim()
+  const storageLocation = chosenStorage(storage.value, groupId)
   submitting.value = true
   submitError.value = null
   saveIssues.value = []
@@ -667,6 +674,7 @@ async function save(anyway = false) {
       public: isPublic,
       rocrate: source,
       ...optional,
+      ...(storageLocation ? { storage_location: storageLocation } : {}),
     })
     versionMessage.value = ''
     await leaveTo({ name: 'dataset', params: { id: result.document_id } })
@@ -866,7 +874,9 @@ async function save(anyway = false) {
       @update="update"
       @folder="(value) => (folder = value)"
       @slug="(value) => (slug = value || null)"
+      :storage="storage"
       @create-group="createGroupOpen = true"
+      @storage="(value) => (storage = value)"
     />
     <ImportCrateDialog v-if="mode === 'create'" v-model:open="importOpen" @imported="imported" />
     <CreateGroupDialog v-model:open="createGroupOpen" @created="(group) => (groupId = group.group_id)" />

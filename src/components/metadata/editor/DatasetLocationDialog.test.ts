@@ -17,6 +17,7 @@ import {
   type HostNode,
 } from '@/test/clientRender'
 import * as PermissionPaths from '@/components/groups/permission-paths'
+import * as DataIdentity from '@/lib/crate/dataIdentity'
 import * as Editor from '@/lib/crate/editor'
 import * as Paths from '@/lib/crate/paths'
 import * as Emit from '@/lib/profiles/emit'
@@ -52,6 +53,13 @@ const GroupSelectStub = defineComponent({
   ]),
 })
 
+const StorageStub = defineComponent({
+  props: { groupId: { type: String, default: '' } },
+  emits: ['update:modelValue'],
+  setup: (props, { emit }) => () =>
+    h('button', { onClick: () => emit('update:modelValue', { bucket: 'raw', prefix: 'reads/' }) }, `Storage in ${props.groupId}`),
+})
+
 const icons = new Proxy({}, { get: () => EmptyStub })
 
 const LocationFolderTree = compileClientComponent(new URL('./LocationFolderTree.vue', import.meta.url), {
@@ -83,6 +91,8 @@ const DatasetLocationDialog = compileClientComponent(
     '@/lib/crate/paths': Paths,
     '@/lib/profiles/emit': Emit,
     '@/lib/crate/editor': Editor,
+    '@/lib/crate/dataIdentity': DataIdentity,
+    '@/components/metadata/StorageLocationFields.vue': moduleDefault(StorageStub),
   },
 )
 
@@ -101,10 +111,11 @@ interface Seen {
   slugs: string[]
   opens: boolean[]
   createGroup: ReturnType<typeof vi.fn>
+  storage: Array<{ bucket: string; prefix: string }>
 }
 
 function seen(): Seen {
-  return { updates: [], folders: [], slugs: [], opens: [], createGroup: vi.fn() }
+  return { updates: [], folders: [], slugs: [], opens: [], createGroup: vi.fn(), storage: [] }
 }
 
 async function memoryRouter() {
@@ -144,6 +155,7 @@ async function mount(
       onSlug: (slug: string) => events.slugs.push(slug),
       'onUpdate:open': (value: boolean) => events.opens.push(value),
       onCreateGroup: events.createGroup,
+      onStorage: (storage: { bucket: string; prefix: string }) => events.storage.push(storage),
     },
   })
 }
@@ -162,6 +174,21 @@ beforeEach(() => {
 })
 
 describe('dataset location dialog', () => {
+  it('offers an optional storage location for a new dataset', async () => {
+    const events = seen()
+    const { root } = await mount(draftAt('reads'), events)
+
+    expect(content(root)).toContain("in the group's datasets bucket, datasets-group-1")
+    await click(button(root, 'Storage in group-1'))
+    expect(events.storage).toEqual([{ bucket: 'raw', prefix: 'reads/' }])
+  })
+
+  it('keeps the storage location out of an existing dataset', async () => {
+    const { root } = await mount(draftAt('reads'), seen(), 'edit')
+
+    expect(content(root)).not.toContain('Storage location')
+  })
+
   it('renders the group folders and their datasets', async () => {
     documentPaths.value = ['datasets/one', 'datasets/deep/two', 'profiles/hidden', 'top']
     const events = seen()

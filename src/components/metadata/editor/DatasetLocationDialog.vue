@@ -15,6 +15,8 @@ import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import GroupSelect from '@/components/groups/GroupSelect.vue'
 import LocationFolderTree from './LocationFolderTree.vue'
+import StorageLocationFields from '@/components/metadata/StorageLocationFields.vue'
+import { defaultStorageBucket } from '@/lib/crate/dataIdentity'
 import { useAruna } from '@/composables/useAruna'
 import { joinPath } from '@/lib/crate/paths'
 import { slugify } from '@/lib/profiles/emit'
@@ -35,6 +37,8 @@ const props = defineProps<{
   /** Whether the group already stores a dataset at this path, and the lookup. */
   taken?: boolean
   checking?: boolean
+  /** Where files pushed with Git go; an empty bucket and prefix mean the default. */
+  storage?: { bucket: string; prefix: string }
 }>()
 const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
@@ -42,6 +46,7 @@ const emit = defineEmits<{
   (e: 'folder', folder: string): void
   (e: 'slug', slug: string): void
   (e: 'create-group'): void
+  (e: 'storage', storage: { bucket: string; prefix: string }): void
 }>()
 
 const VISIBILITY = [
@@ -182,6 +187,20 @@ const fullPath = computed(() => {
               </p>
             </div>
           </template>
+        </section>
+
+        <section v-if="mode === 'create' && draft.groupId" class="min-w-0">
+          <p class="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Storage location</p>
+          <p class="mb-2 text-[11px] text-muted-foreground">
+            Where files pushed to this dataset with Git are stored. Optional. Default: a folder named after
+            the dataset id in the group's datasets bucket, {{ defaultStorageBucket(draft.groupId) }}.
+          </p>
+          <StorageLocationFields
+            :group-id="draft.groupId"
+            :model-value="storage ?? { bucket: '', prefix: '' }"
+            prefix-placeholder="Default: a folder named after the dataset id"
+            @update:model-value="(value) => emit('storage', value)"
+          />
         </section>
 
         <section class="min-w-0">
