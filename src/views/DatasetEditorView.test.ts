@@ -257,6 +257,15 @@ const NodeCheckStub = defineComponent({
     h('button', { disabled: !props.canSave, onClick: () => emit('save') }, props.actionLabel),
   ]),
 })
+const InputStub = defineComponent({
+  props: { modelValue: { type: String, default: '' } },
+  emits: ['update:modelValue'],
+  setup: (props, { attrs, emit }) => () => h('input', {
+    ...attrs,
+    value: props.modelValue,
+    onInput: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value),
+  }),
+})
 const NoticeStub = defineComponent({
   props: { title: { type: String, default: '' } },
   setup: (props, { slots }) => () => h('div', [props.title, slots.default?.()]),
@@ -297,6 +306,7 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
   '@/components/assistant/AskAiButton.vue': moduleDefault(AskAiButton),
   '@/components/dashboard/PageHeader.vue': moduleDefault(PageHeaderStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+  '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Notice.vue': moduleDefault(NoticeStub),
   '@/components/ui/Skeleton.vue': moduleDefault(EmptyStub),
   '@/components/ui/ErrorPanel.vue': moduleDefault(EmptyStub),
@@ -776,6 +786,24 @@ describe('DatasetEditorView', () => {
     mounted.app.unmount()
   })
 
+  it('keeps the version message through a refusal and sends it trimmed', async () => {
+    verify.mockResolvedValueOnce(false)
+    const mounted = await mountApp(DatasetEditorView)
+    await click(button(mounted.root, 'Seed dataset'))
+    const message = () => element(mounted.root, (node) => node.tag === 'input' && String(node.props.placeholder ?? '').startsWith('Describe this change'))
+    await typeValue(message(), '  Add the run 42 files ')
+    await click(button(mounted.root, 'Create dataset'))
+    await flush()
+    expect(createMetadata).not.toHaveBeenCalled()
+    expect(message().props.value).toBe('  Add the run 42 files ')
+
+    await click(button(mounted.root, 'Create dataset'))
+    await flush()
+    expect(createMetadata.mock.calls[0][0]).toMatchObject({ message: 'Add the run 42 files' })
+    expect(message().props.value).toBe('')
+    mounted.app.unmount()
+  })
+
   it('pauses a public draft whose files are not readable by everyone', async () => {
     previewResult.value = restrictedVerdict()
     const mounted = await mountApp(DatasetEditorView)
@@ -933,9 +961,23 @@ describe('DatasetEditorView', () => {
       rocrate: expect.objectContaining({ '@graph': expect.any(Array) }),
       public: false,
     })
+    expect('message' in replaceMetadataRoCrate.mock.calls[0][1]).toBe(false)
     const saved = replaceMetadataRoCrate.mock.calls[0][1].rocrate as Record<string, unknown>
     expect((saved['@graph'] as Array<Record<string, unknown>>).some((entity) => entity['@id'] === '#ada-lovelace')).toBe(true)
     expect(routerPush).toHaveBeenCalledWith({ name: 'dataset', params: { id: 'dataset-1' } })
+    mounted.app.unmount()
+  })
+
+  it('sends the version message with saved changes', async () => {
+    route.name = 'dataset-edit'
+    route.params = { id: 'dataset-1' }
+    const mounted = await mountApp(DatasetEditorView)
+    await flush()
+    await typeValue(element(mounted.root, (node) => node.tag === 'input' && String(node.props.placeholder ?? '').startsWith('Describe this change')), 'Fix the license')
+    await click(button(mounted.root, 'Save changes'))
+    await flush()
+
+    expect(replaceMetadataRoCrate.mock.calls[0][1]).toMatchObject({ public: false, message: 'Fix the license' })
     mounted.app.unmount()
   })
 

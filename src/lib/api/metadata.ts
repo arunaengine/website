@@ -35,6 +35,8 @@ export interface ReplaceMetadataRoCrateRequest {
   rocrate: unknown
   // Omitted keeps the document's current visibility.
   public?: boolean
+  // Shown in the dataset history; omitted lets the node choose one.
+  message?: string
 }
 
 export interface SparqlResponse {
@@ -56,6 +58,7 @@ export interface CreateMetadataScaffoldRequest {
   date_published: string
   license: string
   public?: boolean
+  message?: string
 }
 
 export interface CreateMetadataRoCrateRequest {
@@ -63,6 +66,7 @@ export interface CreateMetadataRoCrateRequest {
   path: string
   public?: boolean
   rocrate: unknown
+  message?: string
 }
 
 export type CreateMetadataRequest = CreateMetadataScaffoldRequest | CreateMetadataRoCrateRequest

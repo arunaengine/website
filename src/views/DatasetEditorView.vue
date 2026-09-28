@@ -4,6 +4,7 @@ import { onBeforeRouteLeave, onBeforeRouteUpdate, RouterLink, useRoute, useRoute
 import AskAiButton from '@/components/assistant/AskAiButton.vue'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
+import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
@@ -97,6 +98,7 @@ const profileRulesError = ref<string | null>(null)
 const submitError = ref<string | null>(null)
 const saveIssues = ref<WriteIssue[]>([])
 const submitting = ref(false)
+const versionMessage = ref('')
 
 // Unsaved work: the baseline is the draft as the page settled it, so a form
 // nobody edited leaves without a question.
@@ -622,6 +624,7 @@ async function save(anyway = false) {
   const isPublic = draft.value.visibility === 'public'
   const groupId = draft.value.groupId ?? ''
   const path = draft.value.path?.trim() ?? ''
+  const message = versionMessage.value.trim()
   submitting.value = true
   submitError.value = null
   saveIssues.value = []
@@ -651,8 +654,10 @@ async function save(anyway = false) {
   restrictedFiles.value = []
   publicUnchecked.value = false
   try {
+    const optional = message ? { message } : {}
     if (sourceMode === 'edit') {
-      await replaceMetadataRoCrate(targetId, { rocrate: source, public: isPublic })
+      await replaceMetadataRoCrate(targetId, { rocrate: source, public: isPublic, ...optional })
+      versionMessage.value = ''
       await leaveTo({ name: 'dataset', params: { id: targetId } })
       return
     }
@@ -661,7 +666,9 @@ async function save(anyway = false) {
       path,
       public: isPublic,
       rocrate: source,
+      ...optional,
     })
+    versionMessage.value = ''
     await leaveTo({ name: 'dataset', params: { id: result.document_id } })
   } catch (error) {
     // A refused write states its own findings; only anything else needs a line.
@@ -819,6 +826,11 @@ async function save(anyway = false) {
                     <Button size="sm" :disabled="grantBusy" @click="save(true)">Save anyway</Button>
                   </span>
                 </Notice>
+                <label class="grid gap-1.5 text-sm">
+                  <span class="font-medium text-foreground">Version message <span class="font-normal text-muted-foreground">(optional)</span></span>
+                  <Input v-model="versionMessage" placeholder="Describe this change, for example: Add the LC-MS run 42 files" />
+                  <span class="text-xs text-muted-foreground">Shown in the dataset history.</span>
+                </label>
               </NodeCheckPanel>
               <PidWithdraw v-if="mode === 'edit'" :document-id="documentId" />
             </template>
