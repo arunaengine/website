@@ -21,6 +21,7 @@ import DatasetDetailSkeleton from '@/components/metadata/view/DatasetDetailSkele
 import DatasetFiles from '@/components/metadata/view/DatasetFiles.vue'
 import DatasetGraph from '@/components/metadata/view/DatasetGraph.vue'
 import DatasetHeader from '@/components/metadata/view/DatasetHeader.vue'
+import DatasetGitRow from '@/components/metadata/view/DatasetGitRow.vue'
 import DatasetRelated from '@/components/metadata/view/DatasetRelated.vue'
 import DatasetHistory from '@/components/metadata/history/DatasetHistory.vue'
 import PreviewPane from '@/components/preview/PreviewPane.vue'
@@ -302,6 +303,7 @@ function jumpTo(entityId: string) {
                 <RouterLink :to="{ name: 'datasets', query: { expert: '1', document: detailId } }"><Code2 class="h-3.5 w-3.5" /> Query this dataset</RouterLink>
               </Button>
             </div>
+            <DatasetGitRow v-if="currentUser" :document-id="detailId" />
           </section>
         </template>
 

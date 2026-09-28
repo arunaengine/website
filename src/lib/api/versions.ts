@@ -199,3 +199,21 @@ export function mergeConflict(
 export function discardConflict(documentId: string, id: string, client: ApiClientOptions): Promise<void> {
   return apiRequest(metadataPath(documentId, `conflicts/${encodeURIComponent(id)}`), { method: 'DELETE' }, client)
 }
+
+// GET /metadata/{id}/git: the dataset's Git repository (snapshot.rs RepositoryStatus).
+export interface GitRepository {
+  document_id: string
+  clone_url: string
+  lfs_url: string
+  bucket: string
+  revision?: string | null
+  /** Head of the protected aruna branch. */
+  commit?: string | null
+  /** The last conversion failed and no newer snapshot replaced it. */
+  error?: string | null
+  refs: Record<string, string>
+}
+
+export function getGitRepository(documentId: string, client: ApiClientOptions): Promise<GitRepository> {
+  return apiRequest(metadataPath(documentId, 'git'), {}, client)
+}
