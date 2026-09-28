@@ -369,7 +369,7 @@ function jumpTo(entityId: string) {
       @jump="jumpTo"
     />
 
-    <CrateTransferDialog v-model:open="showCrateExport" mode="export" :document-id="detailId" :document-path="currentPath" />
+    <CrateTransferDialog v-model:open="showCrateExport" :document-id="detailId" :document-path="currentPath" />
     <RepositoryPublishDialog
       v-if="fetchedSummary"
       v-model:open="showPublish"

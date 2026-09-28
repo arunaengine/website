@@ -442,7 +442,7 @@ export const docsTopics: DocsTopic[] = [
         bullets: [
           'Have a [group](concept:realm-nodes-groups#groups-own-your-work); the editor shows the owning group under the title.',
           'Upload the files you want to attach first; the [upload guide](concept:upload-data) shows how.',
-          'New description: Create dataset. Existing [RO-Crate](concept:datasets#the-bundle-is-an-ro-crate) archive: Import RO-Crate dataset.',
+          'New description: Create dataset. Existing [RO-Crate](concept:datasets#the-bundle-is-an-ro-crate) archive: Import, then RO-Crate archive.',
         ],
       },
       {
@@ -493,7 +493,7 @@ export const docsTopics: DocsTopic[] = [
         title: 'Import an existing RO-Crate',
         icon: 'Import',
         steps: [
-          'Choose Import RO-Crate dataset and pick the archive.',
+          'Choose Import, then RO-Crate archive, and pick the archive.',
           'Review detected version, files, [purpose](concept:datasets#one-catalog-three-purposes), [Profile](concept:profiles-conformance) references, and destination.',
           'Confirm and follow the preparation to a [Complete or a recoverable Partial](concept:states-and-retry) state.',
         ],
@@ -814,7 +814,7 @@ export const docsTopics: DocsTopic[] = [
         title: 'Import a record',
         icon: 'Import',
         steps: [
-          'In [Datasets](page:datasets), choose From a repository.',
+          'In [Datasets](page:datasets), choose Import, then From a repository.',
           'Pick the group and repository, then paste a DOI, a record link or a record id. Where the repository supports search, you can also search for the record. Where it does not, only a record id works.',
           'Copy files is the default. Reference files keeps the bytes in the repository and needs a bucket of the same group. Metadata only skips the files.',
           'Only the latest version is imported unless you ask for all versions. Where the repository supports updates, Keep updated is on by default when you can write the group metadata: Aruna checks the record once a day and offers new versions.',
@@ -1179,7 +1179,7 @@ export const docsTopics: DocsTopic[] = [
         icon: 'CirclePlus',
         bullets: [
           'Create dataset starts a new portal-authored RO-Crate and lets you choose its owning [group](concept:realm-nodes-groups) and an optional Profile.',
-          'Import RO-Crate dataset accepts an existing RO-Crate archive, previews it, and registers it as a new dataset.',
+          'Import accepts an existing RO-Crate archive or a repository record and registers it as a new dataset.',
           'These are separate intents. Import does not overwrite an existing dataset unless an explicit replacement workflow says so.',
         ],
       },
