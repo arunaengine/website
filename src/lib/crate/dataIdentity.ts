@@ -98,3 +98,20 @@ export function parseDataIdentity(
     localPath: entity.localPath || (relative ? id : null),
   }
 }
+
+/** The data browser opened at a folder; `prefix` may end in a slash. */
+export function folderRoute(bucket: string, prefix: string, groupId?: string | null) {
+  const folder = prefix.replace(/^\/+|\/+$/g, '')
+  return {
+    name: 'bucket',
+    params: { bucketId: bucket },
+    query: { ...(folder ? { prefix: folder } : {}), ...(groupId ? { group: groupId } : {}) },
+  }
+}
+
+/** The data browser opened at one object's folder with its details, or at a folder key. */
+export function objectRoute(bucket: string, key: string) {
+  if (key.endsWith('/')) return folderRoute(bucket, key)
+  const route = folderRoute(bucket, key.includes('/') ? key.slice(0, key.lastIndexOf('/')) : '')
+  return { ...route, query: { ...route.query, object: key } }
+}

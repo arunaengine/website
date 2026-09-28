@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { dataEntityIdentity, objectLocation, parseDataIdentity } from './dataIdentity'
+import { dataEntityIdentity, folderRoute, objectLocation, objectRoute, parseDataIdentity } from './dataIdentity'
 
 const BLAKE3 = 'a'.repeat(64)
 
@@ -89,6 +89,22 @@ describe('parseDataIdentity', () => {
       s3: null,
       arn: null,
       localPath: null,
+    })
+  })
+})
+
+describe('bucket browser routes', () => {
+  it('opens an object in its folder and a folder key as the folder', () => {
+    expect(objectRoute('reads', 'raw/one.csv')).toEqual({
+      name: 'bucket',
+      params: { bucketId: 'reads' },
+      query: { prefix: 'raw', object: 'raw/one.csv' },
+    })
+    expect(objectRoute('reads', 'raw/')).toEqual({ name: 'bucket', params: { bucketId: 'reads' }, query: { prefix: 'raw' } })
+    expect(folderRoute('datasets-g1', 'D1/', 'G1')).toEqual({
+      name: 'bucket',
+      params: { bucketId: 'datasets-g1' },
+      query: { prefix: 'D1', group: 'G1' },
     })
   })
 })

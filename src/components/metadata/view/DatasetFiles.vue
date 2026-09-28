@@ -16,6 +16,7 @@ import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useS3 } from '@/composables/useS3'
 import type { DatasetViewState } from '@/composables/useDatasetView'
 import type { CrateObjectReference } from '@/lib/crateReferences'
+import { objectLocation, objectRoute, parseDataIdentity } from '@/lib/crate/dataIdentity'
 import { dataEntityTreeOf, formatContentSize, type DataEntity, type DataEntityNode } from '@/lib/dataEntities'
 import { termNameFromUri } from '@/lib/profiles/uri'
 import { Eye, ExternalLink as ExternalLinkIcon, FileJson2, Folder, Info, Link2 } from '@lucide/vue'
@@ -72,10 +73,12 @@ const referencedBy = computed(() => {
   return map
 })
 
-const CONTENT_W3ID_PREFIX = 'https://w3id.org/aruna/data/'
+function identityOf(row: DataEntity) {
+  return parseDataIdentity(row, s3Endpoint.value)
+}
 
 function contentW3id(row: DataEntity): string | null {
-  return row.id.startsWith(CONTENT_W3ID_PREFIX) ? row.id : null
+  return identityOf(row).contentId
 }
 
 const selectedBacklinkId = ref('')
@@ -112,15 +115,19 @@ function entityLink(row: DataEntity): string | undefined {
   return target.startsWith('http') ? target : undefined
 }
 
-function s3RefOf(id: string): { bucket: string; key: string } | null {
-  const match = /^s3:\/\/([^/]+)\/(.+)$/.exec(id)
-  return match ? { bucket: match[1] as string, key: match[2] as string } : null
+// Where the bytes are: the S3 path when any form names one, else the written contentUrl.
+function locationText(row: DataEntity): string {
+  const s3 = identityOf(row).s3
+  return s3 ? objectLocation(s3.bucket, s3.key) : row.contentUrl ?? ''
 }
 
-// Profile artifacts carry a content-addressed W3ID as @id and the real S3
-// location in contentUrl, so the preview target prefers contentUrl.
 function previewRef(row: DataEntity): { bucket: string; key: string } | null {
-  return (row.contentUrl ? s3RefOf(row.contentUrl) : null) ?? s3RefOf(row.id)
+  return identityOf(row).s3
+}
+
+function browserRoute(row: DataEntity) {
+  const s3 = identityOf(row).s3
+  return s3 ? objectRoute(s3.bucket, s3.key) : undefined
 }
 
 function canPreview(row: DataEntity): boolean {
@@ -185,12 +192,13 @@ function openPreview(row: DataEntity) {
                   <span class="truncate">{{ row.name }}</span>
                 </span>
                 <span v-if="contentW3id(row)" class="mt-0.5 block break-all font-mono text-[10px] font-normal text-muted-foreground">
-                  Content identity: {{ row.id }}
+                  Content identity: {{ contentW3id(row) }}
                 </span>
-                <span v-if="row.contentUrl" class="mt-0.5 block break-all text-[10px] font-normal text-muted-foreground">
+                <span v-if="locationText(row)" class="mt-0.5 block break-all text-[10px] font-normal text-muted-foreground">
                   Location:
-                  <a v-if="entityLink(row)" :href="entityLink(row)" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline" @click.stop>{{ row.contentUrl }}</a>
-                  <span v-else class="font-mono">{{ row.contentUrl }}</span>
+                  <RouterLink v-if="browserRoute(row)" :to="browserRoute(row)!" class="font-mono text-primary hover:underline" @click.stop>{{ locationText(row) }}</RouterLink>
+                  <a v-else-if="entityLink(row)" :href="entityLink(row)" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline" @click.stop>{{ row.contentUrl }}</a>
+                  <span v-else class="font-mono">{{ locationText(row) }}</span>
                 </span>
                 <span v-if="referencedBy.get(row.id)?.length" class="mt-1 flex flex-wrap items-center gap-x-1.5 text-[11px] font-normal text-muted-foreground">
                   <Link2 class="h-3 w-3 shrink-0" /> Loaded datasets only:
