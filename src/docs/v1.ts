@@ -857,7 +857,7 @@ export const docsTopics: DocsTopic[] = [
     slug: 'dataset-git',
     kind: 'Guide',
     title: 'Work with a dataset in Git',
-    summary: 'Clone a dataset as an ARC, change it with Git and push it back. Aruna checks every push and shares it with the other nodes that hold the dataset.',
+    summary: 'Clone a dataset, change it with Git and push it back. A repository is either an ARC or a plain RO-Crate. Aruna checks every push and shares it with the other nodes that hold the dataset.',
     sections: [
       {
         title: 'Find the clone URL',
@@ -881,9 +881,13 @@ export const docsTopics: DocsTopic[] = [
       {
         title: 'What the repository holds',
         icon: 'Files',
+        paragraphs: [
+          'A repository has one of two layouts. Aruna picks it from the content: a commit with `isa.investigation.xlsx` at the top is an ARC, any other commit is a plain RO-Crate. A dataset whose metadata cannot be turned into an ARC gets a plain RO-Crate repository.',
+        ],
         bullets: [
-          'The dataset as an [ARC](concept:glossary#arc): `isa.investigation.xlsx` and the folders `studies/`, `assays/`, `workflows/` and `runs/`.',
-          '`ro-crate-metadata.json` and `aruna-metadata.json`, which carry the dataset metadata.',
+          'ARC: `isa.investigation.xlsx` and the folders `studies/`, `assays/`, `workflows/` and `runs/`, see [ARC](concept:glossary#arc).',
+          'Plain RO-Crate: `ro-crate-metadata.json` and your data files, in any folders you like.',
+          'Both layouts carry `ro-crate-metadata.json`, and Aruna adds `aruna-metadata.json`.',
           'Edits in the portal also become versions in this repository, so pull before you start.',
         ],
       },
@@ -893,8 +897,20 @@ export const docsTopics: DocsTopic[] = [
         steps: [
           'Change the files and commit.',
           'Push to `main`. This updates the dataset metadata in your name, so it needs write access to the dataset.',
-          'Aruna checks the ARC first: `isa.investigation.xlsx` must be there, and each folder under `studies/`, `assays/`, `workflows/` and `runs/` needs its `isa.study.xlsx`, `isa.assay.xlsx`, `workflow.cwl` or `run.cwl`. When the check fails or the metadata change cannot be applied, the push is refused and nothing changes.',
+          'In an ARC, Aruna checks the ARC first: `isa.investigation.xlsx` must be there, and each folder under `studies/`, `assays/`, `workflows/` and `runs/` needs its `isa.study.xlsx`, `isa.assay.xlsx`, `workflow.cwl` or `run.cwl`.',
+          'In a plain RO-Crate, `ro-crate-metadata.json` is required and must be a valid RO-Crate.',
+          'When a check fails or the metadata change cannot be applied, the push is refused and nothing changes.',
           'Aruna keeps one branch for its own versions. It does not accept pushes; work on `main` or on your own branches.',
+        ],
+      },
+      {
+        title: 'Add and remove files in a plain RO-Crate',
+        icon: 'File',
+        bullets: [
+          'Add a file and push it. You do not need to edit `ro-crate-metadata.json`: Aruna adds a File entry for every new file that is not described yet and links it from the dataset.',
+          'Pull after the push. Aruna commits the updated `ro-crate-metadata.json` to `main` as its own version.',
+          'To remove a file, delete the file itself. Its entry can stay or go.',
+          'Removing a file entry from `ro-crate-metadata.json` while the file stays in the repository is not allowed: the push is refused and names the file.',
         ],
       },
       {
