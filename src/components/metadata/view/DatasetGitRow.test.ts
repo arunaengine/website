@@ -7,6 +7,7 @@ import * as Api from '@/lib/api'
 const sessionEpoch = ref(0)
 const getGitRepository = vi.fn()
 const Empty = defineComponent(() => () => null)
+const BadgeStub = defineComponent((_, { slots }) => () => h('span', slots.default?.()))
 const DocsLinkStub = defineComponent({
   props: { topic: String, label: String },
   setup: (props) => () => h('a', { 'data-topic': props.topic }, props.label),
@@ -14,6 +15,7 @@ const DocsLinkStub = defineComponent({
 
 const DatasetGitRow = compileClientComponent(new URL('./DatasetGitRow.vue', import.meta.url), {
   vue: VueRuntime,
+  '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
   '@/components/ui/CopyButton.vue': moduleDefault(Empty),
   '@/components/ui/DocsLink.vue': moduleDefault(DocsLinkStub),
   '@/composables/useAruna': {
@@ -44,6 +46,27 @@ describe('DatasetGitRow', () => {
     expect(text).toContain('Git repository')
     expect(text).toContain(CLONE)
     expect(text).toContain('How to use Git with a dataset')
+    mounted.app.unmount()
+  })
+
+  it.each([
+    ['rocrate', 'RO-Crate'],
+    ['arc', 'ARC'],
+  ])('labels a %s repository', async (layout, label) => {
+    getGitRepository.mockResolvedValue({ ...repository(), layout })
+    const mounted = await mountApp(DatasetGitRow, { props: { documentId: 'd1' } })
+    await flush()
+
+    expect(content(mounted.root)).toContain(`Git repository ${label}`)
+    mounted.app.unmount()
+  })
+
+  it('shows no layout when the node sends none', async () => {
+    getGitRepository.mockResolvedValue(repository())
+    const mounted = await mountApp(DatasetGitRow, { props: { documentId: 'd1' } })
+    await flush()
+
+    expect(content(mounted.root)).not.toMatch(/Git repository (ARC|RO-Crate)/)
     mounted.app.unmount()
   })
 

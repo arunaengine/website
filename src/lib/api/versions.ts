@@ -212,6 +212,8 @@ export interface GitRepository {
   /** The last conversion failed and no newer snapshot replaced it. */
   error?: string | null
   refs: Record<string, string>
+  /** Layout of main: an ARC or a plain RO-Crate. */
+  layout?: 'arc' | 'rocrate'
 }
 
 export function getGitRepository(documentId: string, client: ApiClientOptions): Promise<GitRepository> {
