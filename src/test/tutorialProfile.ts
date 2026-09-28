@@ -27,6 +27,7 @@ import * as ArunaState from '@/composables/aruna/state'
 import * as CrateEditor from '@/lib/crate/editor'
 import * as CrateIssues from '@/lib/crate/issues'
 import * as CratePaths from '@/lib/crate/paths'
+import * as DataIdentity from '@/lib/crate/dataIdentity'
 import * as CratePickers from '@/lib/crate/pickers'
 import * as CrateProfileSeed from '@/lib/crate/profileSeed'
 import * as EditorGrid from '@/components/metadata/editor/grid'
@@ -323,6 +324,7 @@ const DatasetEditorView = compileClientComponent(url('views/DatasetEditorView.vu
   '@/lib/profiles/assignable': Assignable,
   '@/lib/profiles/vocabulary': { loadVocabIndex: async () => null },
   '@/lib/crate/paths': CratePaths,
+  '@/lib/crate/dataIdentity': DataIdentity,
   '@/lib/crate/profileSeed': CrateProfileSeed,
 })
 
