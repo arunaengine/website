@@ -9,7 +9,8 @@ import { useAruna } from '@/composables/useAruna'
 import { useUserDirectory } from '@/composables/useUserDirectory'
 import { useS3 } from '@/composables/useS3'
 import { featureEnabled } from '@/lib/config'
-import { drsDownloadHref, drsObjectHref, isDrsReference, parseS3Url } from '@/lib/tes'
+import { drsDownloadHref, drsObjectHref, isDrsReference } from '@/lib/tes'
+import { parseDataIdentity } from '@/lib/crate/dataIdentity'
 import { isArunaUserId } from '@/lib/identifiers'
 import type { RunCrateFileRef, RunCrateModel } from '@/lib/runCrate'
 import { formatBytes, isHttpUrl, relativeTime, shortUserId, truncateMiddle } from '@/lib/utils'
@@ -103,7 +104,7 @@ function s3Link(bucketId: string, key: string): ResolvedLink {
 
 function resolveRef(ref: RunCrateFileRef): ResolvedLink {
   const url = ref.contentUrl ?? ref.id
-  const parsed = parseS3Url(url, s3.endpoint.value)
+  const parsed = parseDataIdentity(ref, s3.endpoint.value).s3
   if (parsed) return s3Link(parsed.bucket, parsed.key)
   if (isDrsReference(url) && !/^drs:\/\//i.test(url)) {
     return { kind: 'drs', object: drsObjectHref(apiBaseUrl.value, url), download: drsDownloadHref(apiBaseUrl.value, url) }
