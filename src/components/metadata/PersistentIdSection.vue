@@ -7,9 +7,9 @@ import CopyButton from '@/components/ui/CopyButton.vue'
 import ExternalLink from '@/components/ui/ExternalLink.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRefresh } from '@/composables/useRefresh'
-import { ApiError } from '@/lib/api'
+import { ApiError, type RepositoryLink } from '@/lib/api'
 import { graphIriFor } from '@/lib/graphIri'
-import { doiUrl, secondaryIdentifiers } from '@/lib/repository'
+import { doiRows, doiUrl, secondaryIdentifiers } from '@/lib/repository'
 import { listPersistentIds, pidStateMeta, type PersistentIdView } from '@/lib/pid'
 import { errorMessage } from '@/lib/utils'
 import { Fingerprint } from '@lucide/vue'
@@ -17,6 +17,7 @@ import { Fingerprint } from '@lucide/vue'
 const props = defineProps<{
   documentId: string
   isPublic: boolean
+  links?: RepositoryLink[] | null
 }>()
 
 const { apiBaseUrl, authToken, currentUser } = useAruna()
@@ -120,20 +121,21 @@ const pid = computed(() => view.value?.value ?? graphIriFor(props.documentId))
 const state = computed(() => view.value?.state ?? 'unknown')
 const meta = computed(() => pidStateMeta(state.value))
 // DOIs come from repositories this dataset was imported from or published to.
-const dois = computed(() => secondaryIdentifiers(rows.value, 'doi'))
+const dois = computed(() => doiRows(secondaryIdentifiers(rows.value, 'doi'), props.links ?? null))
 </script>
 
 <template>
   <section class="surface overflow-hidden">
     <header class="flex items-center justify-between gap-2 border-b border-border px-5 py-3.5">
       <div class="flex items-center gap-2 text-sm font-medium text-foreground">
-        <Fingerprint class="h-4 w-4 text-primary" /> Persistent identifier
+        <Fingerprint class="h-4 w-4 text-primary" /> Identifiers
       </div>
       <RefreshButton :busy="spinning" sr-label="Re-check PID status" @click="onRefresh" />
     </header>
 
     <div class="space-y-3 p-5">
       <div class="flex flex-wrap items-center gap-2">
+        <span class="w-10 shrink-0 text-xs text-muted-foreground">PID</span>
         <code class="min-w-0 break-all font-mono text-xs text-foreground">{{ pid }}</code>
         <CopyButton :value="pid" label="Copy PID" />
         <Skeleton v-if="loading" class="h-5 w-24" />
@@ -176,17 +178,13 @@ const dois = computed(() => secondaryIdentifiers(rows.value, 'doi'))
             The PID authority cannot currently give a definitive record. Try again later.
           </p>
         </template>
-        <div v-if="dois.length" class="space-y-1">
-          <p class="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">DOIs from repositories</p>
-          <p v-for="doi in dois" :key="doi.value" class="flex flex-wrap items-center gap-1 text-xs">
-            <ExternalLink :href="doiUrl(doi.value)" :label="doi.value" />
-            <CopyButton :value="doi.value" label="Copy DOI" />
-            <Badge v-if="doi.origin" size="sm" variant="outline">
-              {{ doi.origin === 'published' ? 'Published from here' : 'Imported' }}
-            </Badge>
-          </p>
-        </div>
       </template>
+      <div v-for="doi in dois" :key="doi.value" class="flex flex-wrap items-center gap-2">
+        <span class="w-10 shrink-0 text-xs text-muted-foreground">DOI</span>
+        <ExternalLink :href="doiUrl(doi.value)" :label="doi.value" class="font-mono text-xs" />
+        <CopyButton :value="doi.value" label="Copy DOI" />
+        <Badge v-if="doi.source" size="sm" variant="outline">{{ doi.source }}</Badge>
+      </div>
     </div>
   </section>
 </template>

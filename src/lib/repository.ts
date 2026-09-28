@@ -300,6 +300,47 @@ export function repositoryLabel(connector: { name: string; endpoint: string } | 
   return connector.name
 }
 
+/** Zenodo by name, else the host of a link's endpoint. */
+export function endpointLabel(endpoint: string): string {
+  let host = endpoint
+  try {
+    host = new URL(endpoint).hostname
+  } catch {
+    // The raw endpoint text is the fallback.
+  }
+  return repositoryLabel({ name: host, endpoint })
+}
+
+/** Push links whose record is published; pull links point at someone else's record. */
+export function publishedLinks(links: readonly RepositoryLink[] | null): RepositoryLink[] {
+  return (links ?? []).filter((link) => !isPullLink(link) && link.remote.published)
+}
+
+export interface DoiRow {
+  value: string
+  source: string
+}
+
+// A published link names the repository and whether a DOI covers one version or all.
+export function doiRows(dois: readonly SecondaryIdentifier[], links: readonly RepositoryLink[] | null): DoiRow[] {
+  const published = publishedLinks(links).filter((link) => link.identifier_kind === 'doi')
+  const linkSource = (link: RepositoryLink, value: string) =>
+    `${endpointLabel(link.endpoint)}, ${value === link.remote.concept_identifier ? 'all versions' : 'version'}`
+  const rows: DoiRow[] = []
+  const add = (value: string, source: string) => {
+    if (!rows.some((row) => row.value === value)) rows.push({ value, source })
+  }
+  for (const doi of dois) {
+    const link = published.find((entry) => [entry.remote.identifier, entry.remote.concept_identifier].includes(doi.value))
+    if (link) add(doi.value, linkSource(link, doi.value))
+    else add(doi.value, doi.origin === 'published' ? 'Published from here' : doi.origin === 'imported' ? 'Imported' : '')
+  }
+  for (const link of published) {
+    for (const value of [link.remote.identifier, link.remote.concept_identifier]) if (value) add(value, linkSource(link, value))
+  }
+  return rows
+}
+
 /** The findings of a 400 requirements_unmet answer, or null for other errors. */
 export function unmetFindings(err: unknown): ProfileValidationFinding[] | null {
   if (!(err instanceof ApiError) || err.status !== 400 || err.code !== 'requirements_unmet') return null

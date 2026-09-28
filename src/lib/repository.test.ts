@@ -5,7 +5,9 @@ import type { CrateDraft } from './crate/editor'
 import type { ProfileEntityRule, ProfilePropertyRule } from './profiles/types'
 import {
   connectorBody,
+  doiRows,
   doiUrl,
+  endpointLabel,
   endpointProblem,
   exportRepository,
   failureText,
@@ -17,6 +19,7 @@ import {
   managedHere,
   omittedFindings,
   parseOverride,
+  publishedLinks,
   pullsParent,
   recordSource,
   remoteState,
@@ -97,6 +100,36 @@ describe('repository identifiers', () => {
     expect(identifierName('handle', true)).toBe('Identifier')
     expect(identifierUrl('doi', '10.1/a')).toBe('https://doi.org/10.1/a')
     expect(identifierUrl('handle', '20.500/a')).toBeNull()
+  })
+
+  it('counts only published push links as published', () => {
+    const push = { link_id: 'a', direction: 'push', endpoint: 'https://zenodo.org/api/', identifier_kind: 'doi', remote: { published: true } }
+    const links = [
+      push,
+      { ...push, link_id: 'b', remote: { published: false } },
+      { ...push, link_id: 'c', direction: 'pull' },
+    ] as RepositoryLink[]
+
+    expect(publishedLinks(links).map((link) => link.link_id)).toEqual(['a'])
+    expect(publishedLinks(null)).toEqual([])
+    expect(endpointLabel('https://rdm.example.org/api/')).toBe('rdm.example.org')
+  })
+
+  it('labels each DOI with its repository and version scope', () => {
+    const link = {
+      direction: 'push',
+      endpoint: 'https://zenodo.org/api/',
+      identifier_kind: 'doi',
+      remote: { published: true, identifier: '10.1/v2', concept_identifier: '10.1/all' },
+    } as RepositoryLink
+    const dois = [{ kind: 'doi', value: '10.1/v2', origin: 'published' as const }, { kind: 'doi', value: '10.1/old', origin: 'imported' as const }]
+
+    expect(doiRows(dois, [link])).toEqual([
+      { value: '10.1/v2', source: 'Zenodo, version' },
+      { value: '10.1/old', source: 'Imported' },
+      { value: '10.1/all', source: 'Zenodo, all versions' },
+    ])
+    expect(doiRows(dois, null).map((row) => row.source)).toEqual(['Published from here', 'Imported'])
   })
 })
 

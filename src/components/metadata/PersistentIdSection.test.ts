@@ -37,7 +37,10 @@ const PersistentIdSection = compileClientComponent(
     '@lucide/vue': new Proxy({}, { get: () => EmptyStub }),
     '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
     '@/components/ui/CopyButton.vue': moduleDefault(EmptyStub),
-    '@/components/ui/ExternalLink.vue': moduleDefault(EmptyStub),
+    '@/components/ui/ExternalLink.vue': moduleDefault(defineComponent({
+      props: { label: String },
+      setup: (props) => () => h('a', props.label),
+    })),
     '@/components/ui/RefreshButton.vue': moduleDefault(EmptyStub),
     '@/components/ui/Skeleton.vue': moduleDefault(EmptyStub),
     '@/composables/useAruna': {
@@ -56,8 +59,8 @@ const PersistentIdSection = compileClientComponent(
   },
 )
 
-function mount() {
-  return mountApp(PersistentIdSection, { props: { documentId: 'dataset-1', isPublic: true } })
+function mount(links: Api.RepositoryLink[] | null = null) {
+  return mountApp(PersistentIdSection, { props: { documentId: 'dataset-1', isPublic: true, links } })
 }
 
 async function tick(ms: number) {
@@ -136,17 +139,37 @@ describe('PersistentIdSection DOIs', () => {
     const mounted = await mount()
     const text = content(mounted.root)
 
-    expect(text).toContain('DOIs from repositories')
-    expect(text).toContain('Published from here')
+    expect(text).toContain('Identifiers')
+    expect(text).toContain('DOI10.5281/zenodo.42Published from here')
     expect(text).toContain('Imported')
     mounted.app.unmount()
   })
 
-  it('shows no DOI block for a dataset without one', async () => {
+  it('shows no DOI row for a dataset without one', async () => {
     listPersistentIds.mockResolvedValue([view('active')])
     const mounted = await mount()
 
-    expect(content(mounted.root)).not.toContain('DOIs from repositories')
+    expect(content(mounted.root)).not.toContain('DOI')
+    mounted.app.unmount()
+  })
+
+  it('names the repository and the version scope of published DOIs', async () => {
+    listPersistentIds.mockResolvedValue([{
+      ...view('active'),
+      secondary_identifiers: [{ kind: 'doi', value: '10.5281/zenodo.42', origin: 'published' }],
+    }])
+    const published = {
+      link_id: 'l1',
+      direction: 'push',
+      identifier_kind: 'doi',
+      endpoint: 'https://zenodo.org/api/',
+      remote: { published: true, identifier: '10.5281/zenodo.42', concept_identifier: '10.5281/zenodo.41' },
+    } as Api.RepositoryLink
+    const mounted = await mount([published])
+    const text = content(mounted.root)
+
+    expect(text).toContain('DOI10.5281/zenodo.42Zenodo, version')
+    expect(text).toContain('DOI10.5281/zenodo.41Zenodo, all versions')
     mounted.app.unmount()
   })
 })
