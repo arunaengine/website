@@ -41,7 +41,7 @@ export const glossaryTopic: DocsTopic = {
       title: 'ARC',
       icon: 'GitBranch',
       paragraphs: [
-        'An Annotated Research Context: a Git repository that keeps a project in ISA spreadsheets with folders for studies, assays, workflows and runs. Every dataset can be [cloned and pushed as an ARC](concept:dataset-git).',
+        'An Annotated Research Context: a Git repository that keeps a project in ISA spreadsheets with folders for studies, assays, workflows and runs. A dataset that follows ARC can be [cloned and pushed as an ARC](concept:dataset-git).',
       ],
     },
     {

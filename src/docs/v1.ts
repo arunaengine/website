@@ -865,7 +865,7 @@ export const docsTopics: DocsTopic[] = [
         steps: [
           'Open the dataset and go to Advanced at the bottom of the page.',
           'Under Git repository, copy the clone URL. It ends with the dataset id and `.git`.',
-          'The row shows only when you are signed in and the node offers Git for this dataset.',
+          'The row shows only when you are signed in and the node offers Git for this dataset. It also says where the files you push are stored.',
         ],
       },
       {
@@ -889,6 +889,17 @@ export const docsTopics: DocsTopic[] = [
           'Plain RO-Crate: `ro-crate-metadata.json` and your data files, in any folders you like.',
           'Both layouts carry `ro-crate-metadata.json`. An ARC also has `aruna-metadata.json`, which Aruna writes.',
           'Edits in the portal also become versions in this repository, so pull before you start.',
+        ],
+      },
+      {
+        title: 'Where pushed files are stored',
+        icon: 'HardDrive',
+        bullets: [
+          'Files you push are stored in the dataset\'s storage location. By default that is the bucket `datasets-<group id>`, in a folder named after the dataset id.',
+          'Choose another bucket and folder when you create the dataset, under Storage location in the location dialog, or later with Change next to Storage location under Advanced on the dataset page.',
+          'Inside Aruna, a data file entry has the file\'s content address `https://w3id.org/aruna/data/<blake3 hex>` as `@id` and its S3 path `s3://<bucket>/<key>` as `contentUrl`.',
+          'In Git, the same entry uses the file\'s relative path as `@id`, and the file is a Git LFS file. Clone and push convert between the two forms automatically.',
+          'Files are content addressed: the same content always has the same address.',
         ],
       },
       {
@@ -929,7 +940,7 @@ export const docsTopics: DocsTopic[] = [
           'Every dataset repository has its own Git LFS endpoint: the clone URL followed by `/info/lfs`, for example `https://api.node-1.example.org/api/v1/git/<dataset id>.git/info/lfs`. Git LFS finds it by itself from the clone URL, so you do not need to configure it.',
           'Git LFS signs in the same way as Git. The `http.extraHeader` setting with your token and a credential helper with the token as password both work for LFS as well.',
           'Data files that the dataset already keeps in Aruna storage appear in a clone as LFS pointer files, and Aruna adds the matching `.gitattributes` rules. Run `git lfs pull` to download their content.',
-          'Uploaded LFS files are stored on the node in the group storage bucket for Git (`arc-<group id>`) under `git-lfs/<dataset id>/<sha256>` and count towards the group quota. The node checks the size and the SHA-256 of every upload before it is used.',
+          'Uploaded LFS files are stored on the node in the dataset\'s storage location and count towards the group quota. The node checks the size and the SHA-256 of every upload before it is used.',
         ],
         steps: [
           'Install Git LFS once on your computer: `git lfs install`.',
@@ -1280,6 +1291,7 @@ export const docsTopics: DocsTopic[] = [
         icon: 'Split',
         paragraphs: [
           'The dataset record is the graph. The file bytes live in [buckets](concept:data-and-deletion) or external locations, and editing or deleting the record never silently touches them.',
+          'Files pushed with Git go to the dataset\'s storage location, shown under Advanced on the dataset page. See [Work with a dataset in Git](concept:dataset-git).',
         ],
       },
       {
@@ -1477,7 +1489,8 @@ export const docsTopics: DocsTopic[] = [
         title: 'File identities',
         icon: 'Hash',
         paragraphs: [
-          'Aruna-held bytes get a content-addressed https://w3id.org/aruna/data/{blake3-hex} derived from the bytes themselves; contentUrl records a location. Imported external content keeps its source identity.',
+          'Aruna-held bytes get a content-addressed https://w3id.org/aruna/data/{blake3-hex} derived from the bytes themselves. It is the `@id` of the data file entry, and contentUrl records the S3 path s3://{bucket}/{key}. The same content always has the same address. Imported external content keeps its source identity.',
+          'Older entries may carry an address that names the node, bucket, key and version instead. The portal still reads them and links to the file.',
         ],
       },
     ],
