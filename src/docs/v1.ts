@@ -844,11 +844,82 @@ export const docsTopics: DocsTopic[] = [
         title: 'Follow the link',
         icon: 'RefreshCw',
         paragraphs: [
-          'The Repositories section on the dataset page shows each link with its state and reason, the DOI, the record and its state in the repository. It refreshes itself while a push runs or a review is open.',
+          'The Repositories section on the dataset page appears once the dataset has a link. It shows each link with its state and reason, the DOI, the record and its state in the repository. It refreshes itself while a push runs or a review is open. When a record is published, a Published badge at the top of the page opens a summary.',
           'When the dataset no longer meets the repository requirements, the link lists what is missing. It pushes again after the next change of the dataset.',
           'The person who created a link can publish and change its token and settings, including Update automatically. Admins of the group that created the link can also push, update, pause, resume, accept the remote state and remove it. A link is managed by the node that created it. Removing a link keeps the records in the repository.',
           'When the record was changed in the repository, Accept remote state continues from that record. For an imported dataset that is kept updated, Update now takes a new version, and Update automatically does it without asking.',
-          'The persistent identifier section lists every repository DOI of the dataset and whether it was published from here or imported. Aruna itself mints no DOI.',
+          'The Identifiers section lists every repository DOI of the dataset next to its PID, with the repository and whether the DOI covers one version or all versions, or whether it was imported. Aruna itself mints no DOI.',
+        ],
+      },
+    ],
+  },
+  {
+    slug: 'dataset-git',
+    kind: 'Guide',
+    title: 'Work with a dataset in Git',
+    summary: 'Clone a dataset as an ARC, change it with Git and push it back. Aruna checks every push and shares it with the other nodes that hold the dataset.',
+    sections: [
+      {
+        title: 'Find the clone URL',
+        icon: 'Link2',
+        steps: [
+          'Open the dataset and go to Advanced at the bottom of the page.',
+          'Under Git repository, copy the clone URL. It ends with the dataset id and `.git`.',
+          'The row shows only when you are signed in and the node offers Git for this dataset.',
+        ],
+      },
+      {
+        title: 'Sign in with your Aruna token',
+        icon: 'KeyRound',
+        paragraphs: [
+          'Git signs in with an Aruna bearer token, the same kind of token the portal and the API use. Cloning and pulling need read access to the dataset. Pushing needs write access and a token without path restrictions.',
+          'Send the token as a header: `git -c http.extraHeader="Authorization: Bearer $ARUNA_TOKEN" clone <clone URL>`. Inside the clone, `git config http.extraHeader "Authorization: Bearer $ARUNA_TOKEN"` keeps it for later pulls and pushes.',
+          'Or let Git ask for it: enter any user name and the token as the password. A credential helper such as `git config --global credential.helper cache` remembers it for a while.',
+          'Keep the token secret: anyone holding it acts as you. Your sessions are listed under [Settings](page:settings), Access & connection, where you can revoke them.',
+        ],
+      },
+      {
+        title: 'What the repository holds',
+        icon: 'Files',
+        bullets: [
+          'The dataset as an [ARC](concept:glossary#arc): `isa.investigation.xlsx` and the folders `studies/`, `assays/`, `workflows/` and `runs/`.',
+          '`ro-crate-metadata.json` and `aruna-metadata.json`, which carry the dataset metadata.',
+          'Edits in the portal also become versions in this repository, so pull before you start.',
+        ],
+      },
+      {
+        title: 'Change and push',
+        icon: 'Upload',
+        steps: [
+          'Change the files and commit.',
+          'Push to `main`. This updates the dataset metadata in your name, so it needs write access to the dataset.',
+          'Aruna checks the ARC first: `isa.investigation.xlsx` must be there, and each folder under `studies/`, `assays/`, `workflows/` and `runs/` needs its `isa.study.xlsx`, `isa.assay.xlsx`, `workflow.cwl` or `run.cwl`. When the check fails or the metadata change cannot be applied, the push is refused and nothing changes.',
+          'Aruna keeps one branch for its own versions. It does not accept pushes; work on `main` or on your own branches.',
+        ],
+      },
+      {
+        title: 'Branches and tags',
+        icon: 'GitBranch',
+        bullets: [
+          'Push your own branches for work in progress. They change the dataset only when they are merged into `main`, with Git or in the History tab.',
+          'Tags mark one version. A pushed tag cannot move to another version; delete it and push it again.',
+          'The `main` branch cannot be deleted.',
+        ],
+      },
+      {
+        title: 'Large files with Git LFS',
+        icon: 'HardDrive',
+        paragraphs: [
+          'Git LFS works with this repository. Its address is the clone URL followed by `/info/lfs`, which Git LFS finds by itself. Track large files with `git lfs track`, then commit and push as usual.',
+          'A push is refused when it points at LFS files the node did not receive, or when it changes a file that someone else locked with `git lfs lock`.',
+        ],
+      },
+      {
+        title: 'Several nodes',
+        icon: 'Share2',
+        paragraphs: [
+          'Every node that holds the dataset serves the same repository, and each accepted push reaches the other holders.',
+          'When two people push to the same branch on different nodes at the same time, the first push is kept. The other change is not lost: the History tab lists it as a change that did not apply, where you can compare, merge or discard it.',
         ],
       },
     ],

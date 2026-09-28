@@ -68,6 +68,7 @@ describe('versioned in-portal Docs', () => {
       'storage-backend',
       'cli-access-key',
       'invenio-zenodo',
+      'dataset-git',
       'assistant',
       'datasets',
       'realm-nodes-groups',
