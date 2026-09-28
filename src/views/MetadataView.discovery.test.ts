@@ -25,7 +25,7 @@ describe('Dataset file discovery presentation', () => {
   it('keeps the loaded cache separate and presents identity apart from location', () => {
     expect(source).toContain('Loaded datasets only:')
     expect(source.indexOf('Loaded datasets only:')).not.toBe(source.indexOf('<ReferencedBy'))
-    expect(source).toContain('Content identity: {{ row.id }}')
+    expect(source).toContain('Content identity: {{ contentW3id(row) }}')
     expect(source).toContain('Location:')
     expect(source).toContain("row.contentUrl ?? (contentW3id(row) ? '' : row.id)")
     expect(view).toContain("query: { expert: '1', document: detailId }")
