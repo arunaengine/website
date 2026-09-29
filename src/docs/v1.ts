@@ -895,8 +895,9 @@ export const docsTopics: DocsTopic[] = [
         title: 'Where pushed files are stored',
         icon: 'HardDrive',
         bullets: [
-          'Files you push are stored in the dataset\'s storage location. By default that is the bucket `datasets-<group id>`, in a folder named after the dataset id.',
-          'Choose another bucket and folder when you create the dataset, under Storage location in the location dialog, or later with Change next to Storage location under Advanced on the dataset page.',
+          'Files you push are stored in the dataset\'s storage location. By default that is the group\'s default storage location, in a folder named after the dataset id.',
+          'Every group starts with the generated bucket `datasets-<group id>` as its default. Group admins can change it under Default storage location in the Storage tab of the group page. This does not move existing datasets or their files.',
+          'The location dialog prefills the group default when you create a dataset. Choose another bucket and folder there, or later with Change next to Storage location under Advanced on the dataset page.',
           'Inside Aruna, a data file entry has the file\'s content address `https://w3id.org/aruna/data/<blake3 hex>` as `@id` and its S3 path `s3://<bucket>/<key>` as `contentUrl`.',
           'In Git, the same entry uses the file\'s relative path as `@id`, and the file is a Git LFS file. Clone and push convert between the two forms automatically.',
           'Files are content addressed: the same content always has the same address.',
@@ -939,13 +940,14 @@ export const docsTopics: DocsTopic[] = [
         paragraphs: [
           'Every dataset repository has its own Git LFS endpoint: the clone URL followed by `/info/lfs`, for example `https://api.node-1.example.org/api/v1/git/<dataset id>.git/info/lfs`. Git LFS finds it by itself from the clone URL, so you do not need to configure it.',
           'Git LFS signs in the same way as Git. The `http.extraHeader` setting with your token and a credential helper with the token as password both work for LFS as well.',
-          'Data files that the dataset already keeps in Aruna storage appear in a clone as LFS pointer files, and Aruna adds the matching `.gitattributes` rules. Run `git lfs pull` to download their content.',
+          'Data files that the dataset already keeps in Aruna storage appear in a clone as LFS pointer files. Run `git lfs pull` to download their content.',
+          'The commits Aruna makes include a `.gitattributes` file that sends every file through Git LFS, except the metadata files: `ro-crate-metadata.json`, `aruna-metadata.json`, the `isa.*.xlsx` files, `.gitattributes` and `.gitignore`. After cloning, `git add` turns a data file into an LFS pointer by itself; you only need Git LFS installed.',
+          'One push can add at most 4 MiB of new Git objects. File content sent through Git LFS does not count towards this limit.',
           'Uploaded LFS files are stored on the node in the dataset\'s storage location and count towards the group quota. The node checks the size and the SHA-256 of every upload before it is used.',
         ],
         steps: [
           'Install Git LFS once on your computer: `git lfs install`.',
           'Clone the dataset and download LFS content: `git clone <clone URL>`, then `git lfs pull` inside the clone.',
-          'Choose which files go to LFS, for example `git lfs track "*.fastq.gz"`. This writes a rule to `.gitattributes`; commit that file too.',
           'Add, commit and push as usual. `git push` uploads the LFS content first, then the commit. In a plain RO-Crate, a new LFS file is added to `ro-crate-metadata.json` like any other new file.',
           'Check what LFS manages with `git lfs ls-files`.',
         ],
@@ -959,7 +961,7 @@ export const docsTopics: DocsTopic[] = [
           'A lock applies on every node that holds the dataset. A push that changes a file locked by someone else is refused.',
           'Only the lock owner can release a lock. Another writer can take it over with `git lfs unlock --force <path>`.',
           'To let Git LFS check locks before every push, run `git config lfs.<clone URL>/info/lfs.locksverify true` in the clone.',
-          'Downloading a file that another node holds copies it to the node you use first, so the first download can take longer.',
+          'Downloading a file that only another node holds is relayed from that node. The file is not copied to the node you use.',
         ],
       },
       {
