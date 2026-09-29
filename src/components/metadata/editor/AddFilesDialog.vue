@@ -42,7 +42,7 @@ import {
 } from '@/lib/crate/editor'
 import { isAbsoluteUri } from '@/lib/profiles/uri'
 import { isDataEntity } from '@/lib/dataEntities'
-import type { MetadataDocumentListItem } from '@/lib/api'
+import { getStorageLocation, type MetadataDocumentListItem, type StorageLocation } from '@/lib/api'
 import { formatBytes } from '@/lib/utils'
 import { FileJson2 } from '@lucide/vue'
 
@@ -59,7 +59,7 @@ const emit = defineEmits<{
   (e: 'update', draft: CrateDraft): void
 }>()
 
-const { apiBaseUrl, authToken, nodeInfo } = useAruna()
+const { apiBaseUrl, authToken, nodeInfo, getGroup } = useAruna()
 const s3 = useS3()
 const queue = useUploadQueue()
 
@@ -128,12 +128,26 @@ watch(() => props.open, (open) => {
 async function loadBuckets() {
   bucketError.value = ''
   try {
-    const entries = await s3.listBuckets()
+    const [entries, stored] = await Promise.all([s3.listBuckets(), storageLocation()])
     buckets.value = entries.map((entry) => ({ value: entry.name, label: entry.name }))
-    bucket.value = buckets.value[0]?.value ?? ''
+    const found = stored && buckets.value.some((entry) => entry.value === stored.bucket) ? stored : null
+    bucket.value = found?.bucket ?? buckets.value[0]?.value ?? ''
+    if (found && !prefix.value) prefix.value = found.prefix
   } catch (error) {
     bucketError.value = s3ErrorMessage(error)
   }
+}
+
+// The dataset's storage location, or the group default for a new dataset; null when unknown.
+async function storageLocation(): Promise<StorageLocation | null> {
+  try {
+    if (props.draft.documentId)
+      return await getStorageLocation(props.draft.documentId, { baseUrl: apiBaseUrl.value, token: authToken.value })
+    if (props.groupId) return (await getGroup(props.groupId)).dataset_location ?? null
+  } catch {
+    // Unknown: the first listed bucket is picked.
+  }
+  return null
 }
 
 function formatOf(name: string): string | undefined {

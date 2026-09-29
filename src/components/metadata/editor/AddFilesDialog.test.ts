@@ -23,6 +23,9 @@ import * as Utils from '@/lib/utils'
 // pinned to the two forms it answers with.
 const BLAKE3 = 'a'.repeat(64)
 let resolvable = true
+let bucketNames = ['reads']
+const getGroup = vi.fn()
+const getStorageLocation = vi.fn()
 
 interface QueuedUpload {
   id: number
@@ -106,11 +109,12 @@ const AddFilesDialog = compileClientComponent(new URL('./AddFilesDialog.vue', im
       apiBaseUrl: ref('https://api.example.test'),
       authToken: ref('token'),
       nodeInfo: ref({ node: { realm_id: 'realm-1', peer_id: 'node-1' } }),
+      getGroup,
     }),
   },
   '@/composables/useS3': {
     useS3: () => ({
-      listBuckets: async () => [{ name: 'reads' }],
+      listBuckets: async () => bucketNames.map((name) => ({ name })),
       activeContext: ref({ groupId: 'group-1' }),
       headObject: async () => ({ versionId: '01VERSION', metadata: {} }),
     }),
@@ -125,6 +129,7 @@ const AddFilesDialog = compileClientComponent(new URL('./AddFilesDialog.vue', im
       contentUrl: `s3://${bucket}/${key}`,
     }),
   },
+  '@/lib/api': { getStorageLocation },
   '@/lib/crate/references': References,
   '@/lib/crate/editor': Editor,
   '@/lib/dataEntities': DataEntities,
@@ -151,7 +156,10 @@ beforeEach(() => {
   items.value = []
   counter = 0
   resolvable = true
+  bucketNames = ['reads']
   enqueue.mockClear()
+  getGroup.mockReset().mockResolvedValue({ dataset_location: null })
+  getStorageLocation.mockReset()
 })
 
 describe('AddFilesDialog', () => {
@@ -304,6 +312,36 @@ describe('AddFilesDialog', () => {
         contentSize: [{ value: '64' }],
       },
     })
+    mounted.app.unmount()
+  })
+
+  it('uploads to the storage location of the dataset', async () => {
+    bucketNames = ['reads', 'lab']
+    getStorageLocation.mockResolvedValue({ bucket: 'lab', prefix: 'p/d1/', default: false })
+    const mounted = await mount([], { draft: { ...Editor.newDraft(), documentId: 'd1' } })
+    await flush()
+
+    await click(button(mounted.root, 'Pick files'))
+    expect(getStorageLocation).toHaveBeenCalledWith('d1', { baseUrl: 'https://api.example.test', token: 'token' })
+    expect(enqueue).toHaveBeenCalledWith(
+      [{ name: 'two.json', size: 64 }],
+      { bucket: 'lab', prefix: 'p/d1/', groupId: 'group-1' },
+    )
+    mounted.app.unmount()
+  })
+
+  it('uploads to the group default for a new dataset', async () => {
+    bucketNames = ['reads', 'lab']
+    getGroup.mockResolvedValue({ dataset_location: { bucket: 'lab', prefix: 'projects/' } })
+    const mounted = await mount([])
+    await flush()
+
+    await click(button(mounted.root, 'Pick files'))
+    expect(getGroup).toHaveBeenCalledWith('group-1')
+    expect(enqueue).toHaveBeenCalledWith(
+      [{ name: 'two.json', size: 64 }],
+      { bucket: 'lab', prefix: 'projects/', groupId: 'group-1' },
+    )
     mounted.app.unmount()
   })
 })
