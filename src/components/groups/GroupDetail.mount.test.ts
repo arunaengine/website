@@ -106,6 +106,7 @@ const GroupDetail = compileClientComponent(new URL('./GroupDetail.vue', import.m
   '@/components/groups/RepositoriesSection.vue': moduleDefault(Empty),
   '@/components/groups/StorageBackendsSection.vue': moduleDefault(Empty),
   '@/components/groups/GroupRoutingSection.vue': moduleDefault(Empty),
+  '@/components/groups/GroupLocationSection.vue': moduleDefault(Empty),
   '@/components/groups/GroupMembers.vue': moduleDefault(Empty),
   '@/components/groups/GroupDetailSkeleton.vue': moduleDefault(Empty),
   '@/components/groups/GroupRoles.vue': moduleDefault(Empty),

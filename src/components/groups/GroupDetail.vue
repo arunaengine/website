@@ -9,6 +9,7 @@ import ConnectorsSection from '@/components/groups/ConnectorsSection.vue'
 import RepositoriesSection from '@/components/groups/RepositoriesSection.vue'
 import StorageBackendsSection from '@/components/groups/StorageBackendsSection.vue'
 import GroupRoutingSection from '@/components/groups/GroupRoutingSection.vue'
+import GroupLocationSection from '@/components/groups/GroupLocationSection.vue'
 import PoliciesSection from '@/components/policies/PoliciesSection.vue'
 import EffectivePolicies from '@/components/policies/EffectivePolicies.vue'
 import GroupMembers from '@/components/groups/GroupMembers.vue'
@@ -516,6 +517,7 @@ async function leave() {
           </RouterLink>
         </div>
       </div>
+          <GroupLocationSection v-if="isMember && !canAdminStorage" :group="group" :can-admin="false" class="border-t border-border" />
         </TabsContent>
 
         <TabsContent value="members" :force-mount="canManage && joinRequestsEnabled" :class="tab === 'members' ? 'mt-0' : 'mt-0 hidden'">
@@ -602,6 +604,7 @@ async function leave() {
               </p>
             </div>
           </div>
+          <GroupLocationSection :group="group" can-admin class="border-t border-border" @changed="group = $event" />
         </TabsContent>
       </Tabs>
     </template>
