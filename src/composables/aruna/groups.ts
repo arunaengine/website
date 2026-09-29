@@ -12,11 +12,13 @@ import {
   type UsageHistoryResolution,
   type UsageHistoryResponse,
   type UsageResponse,
+  type StorageLocation,
+  setGroupLocation as putGroupLocation,
 } from '@/lib/api'
 import { roleSummary, slugify } from './format'
 import { loadAuthenticated } from './identity'
 import { realm } from './realm'
-import { apiGroups, request, saving, userInfo } from './state'
+import { apiGroups, assertCurrentSession, refreshContext, request, saving, userInfo } from './state'
 
 // Throws ApiError with status 409 and the server's verbatim message when the
 // caller is over the owned-group cap.
@@ -55,6 +57,17 @@ export async function updateGroup(
 
 export async function getGroup(groupId: string): Promise<GroupDetailResponse> {
   return request<GroupDetailResponse>(`/access/groups/${groupId}`)
+}
+
+// null restores the generated group bucket; existing datasets keep their location.
+export async function setGroupLocation(
+  groupId: string,
+  location: StorageLocation | null,
+): Promise<GroupDetailResponse> {
+  const context = refreshContext()
+  const updated = await putGroupLocation(groupId, location, context.client)
+  assertCurrentSession(context.epoch)
+  return updated
 }
 
 export async function getGroupUsage(groupId: string): Promise<UsageResponse> {

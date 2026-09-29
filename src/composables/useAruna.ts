@@ -51,6 +51,7 @@ import {
   listGroupMembers,
   myGroups,
   removeGroupMember,
+  setGroupLocation,
   updateGroup,
 } from './aruna/groups'
 import {
@@ -225,6 +226,7 @@ export function useAruna() {
     createGroup,
     updateGroup,
     getGroup,
+    setGroupLocation,
     getGroupUsage,
     getGroupUsageHistory,
     createS3Credentials,

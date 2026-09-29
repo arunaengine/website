@@ -1,5 +1,6 @@
 import { apiRequest, type ApiClientOptions } from './client'
 import type { ApiRole } from './users'
+import type { StorageLocation } from './versions'
 
 export interface ApiGroup {
   group_id: string
@@ -29,6 +30,22 @@ export interface GroupDetailResponse {
   group_id: string
   realm_id: string
   roles: ApiRole[]
+  /** Where new datasets store their files; null for non-members, absent on older nodes. */
+  dataset_location?: StorageLocation | null
+}
+
+// PUT /access/groups/{id}/storage-location: null restores the generated group
+// bucket. Existing datasets keep their location; a 400 carries the reason.
+export function setGroupLocation(
+  groupId: string,
+  location: StorageLocation | null,
+  client: ApiClientOptions = {},
+): Promise<GroupDetailResponse> {
+  return apiRequest<GroupDetailResponse>(
+    `/access/groups/${encodeURIComponent(groupId)}/storage-location`,
+    { method: 'PUT', body: JSON.stringify({ location }) },
+    client,
+  )
 }
 
 export interface GroupMemberRole {
