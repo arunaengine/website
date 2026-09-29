@@ -158,7 +158,7 @@ beforeEach(() => {
   resolvable = true
   bucketNames = ['reads']
   enqueue.mockClear()
-  getGroup.mockReset().mockResolvedValue({ dataset_location: null })
+  getGroup.mockReset().mockResolvedValue({ dataset_location: { bucket: 'reads', prefix: '' } })
   getStorageLocation.mockReset()
 })
 
@@ -342,6 +342,28 @@ describe('AddFilesDialog', () => {
       [{ name: 'two.json', size: 64 }],
       { bucket: 'lab', prefix: 'projects/', groupId: 'group-1' },
     )
+    mounted.app.unmount()
+  })
+
+  it('picks no other bucket when the storage location bucket is not listed', async () => {
+    bucketNames = ['reads']
+    getGroup.mockResolvedValue({ dataset_location: { bucket: 'lab', prefix: 'projects/' } })
+    const mounted = await mount([])
+    await flush()
+
+    expect(content(mounted.root)).toContain('The storage location bucket lab is not available to this session.')
+    expect(() => button(mounted.root, 'Pick files')).toThrow()
+    expect(enqueue).not.toHaveBeenCalled()
+    mounted.app.unmount()
+  })
+
+  it('asks for a bucket when the storage location is unknown', async () => {
+    getGroup.mockRejectedValue(new Error('offline'))
+    const mounted = await mount([])
+    await flush()
+
+    expect(content(mounted.root)).toContain('Choose a bucket to upload to.')
+    expect(() => button(mounted.root, 'Pick files')).toThrow()
     mounted.app.unmount()
   })
 })

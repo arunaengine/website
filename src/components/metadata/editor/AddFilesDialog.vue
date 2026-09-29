@@ -84,6 +84,8 @@ const bucket = ref('')
 const prefix = ref('')
 const buckets = ref<Array<{ value: string; label: string }>>([])
 const bucketError = ref('')
+// The storage location's bucket when this S3 session does not list it.
+const missingBucket = ref('')
 const uploading = ref<number[]>([])
 const linked = ref(new Set<number>())
 const datasetsOpen = ref(false)
@@ -127,12 +129,16 @@ watch(() => props.open, (open) => {
 
 async function loadBuckets() {
   bucketError.value = ''
+  missingBucket.value = ''
+  bucket.value = ''
   try {
     const [entries, stored] = await Promise.all([s3.listBuckets(), storageLocation()])
     buckets.value = entries.map((entry) => ({ value: entry.name, label: entry.name }))
     const found = stored && buckets.value.some((entry) => entry.value === stored.bucket) ? stored : null
-    bucket.value = found?.bucket ?? buckets.value[0]?.value ?? ''
+    // Never another bucket: without the storage location the user picks one.
+    bucket.value = found?.bucket ?? ''
     if (found && !prefix.value) prefix.value = found.prefix
+    if (stored && !found) missingBucket.value = stored.bucket
   } catch (error) {
     bucketError.value = s3ErrorMessage(error)
   }
@@ -299,7 +305,11 @@ function addUrl() {
               <Input v-model="prefix" class="mt-1" aria-label="Upload folder" placeholder="raw/reads" />
             </div>
           </div>
-          <UploadTab @add="upload" />
+          <Notice v-if="missingBucket">
+            The storage location bucket {{ missingBucket }} is not available to this session. Choose a bucket to upload to.
+          </Notice>
+          <UploadTab v-if="bucket" @add="upload" />
+          <p v-else-if="!missingBucket" class="text-xs text-muted-foreground">Choose a bucket to upload to.</p>
           <ul v-if="uploads.length" class="divide-y divide-border rounded-md border border-border">
             <li v-for="item in uploads" :key="item.id" class="space-y-1 px-3 py-2">
               <div class="flex items-center gap-2 text-xs">
