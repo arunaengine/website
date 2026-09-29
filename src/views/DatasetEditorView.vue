@@ -37,7 +37,7 @@ import { loadVocabIndex, type VocabIndex } from '@/lib/profiles/vocabulary'
 import { collectIssues, rejectionIssues, type WriteIssue } from '@/lib/crate/issues'
 import type { MetadataProfile } from '@/data/types'
 import { joinPath, splitPath } from '@/lib/crate/paths'
-import { chosenStorage } from '@/lib/crate/dataIdentity'
+import { chosenStorage, groupStorage } from '@/lib/crate/dataIdentity'
 import { applyProfile, clearProfile, profileExpectation, seedNewEntities, unseedProfile } from '@/lib/crate/profileSeed'
 import {
   alignValueKinds,
@@ -165,12 +165,26 @@ watch(location, ({ prefix, slug: name }) => {
     draft.value = { ...draft.value, path: name ? joinPath(prefix, name) : '' }
   }, folder.value === null && slug.value === null)
 }, { immediate: true })
-// Where files pushed with Git go; empty means the group's default.
+// Where files pushed with Git go, prefilled with the group's default; empty
+// until that is known, and nothing is sent while it stays unchanged.
 const storage = ref({ bucket: '', prefix: '' })
-watch(() => draft.value.groupId, () => {
+const groupLocation = ref<{ bucket: string; prefix: string } | null>(null)
+let groupLocationRead = 0
+watch(() => draft.value.groupId, async (groupId) => {
+  const current = ++groupLocationRead
   folder.value = null
   storage.value = { bucket: '', prefix: '' }
-})
+  groupLocation.value = null
+  if (!groupId || mode.value !== 'create') return
+  try {
+    const detail = await getGroup(groupId)
+    if (current !== groupLocationRead) return
+    groupLocation.value = groupStorage(groupId, detail.dataset_location)
+    if (!storage.value.bucket) storage.value = { ...groupLocation.value }
+  } catch {
+    // Unknown: the node applies the group default when nothing is sent.
+  }
+}, { immediate: true })
 
 // Only a new dataset can still collide; a stored one owns its path.
 const { taken: pathTaken, checking: pathChecking } = usePathTaken(
@@ -631,7 +645,7 @@ async function save(anyway = false) {
   const groupId = draft.value.groupId ?? ''
   const path = draft.value.path?.trim() ?? ''
   const message = versionMessage.value.trim()
-  const storageLocation = chosenStorage(storage.value, groupId)
+  const storageLocation = chosenStorage(storage.value, groupLocation.value)
   submitting.value = true
   submitError.value = null
   saveIssues.value = []
@@ -875,6 +889,7 @@ async function save(anyway = false) {
       @folder="(value) => (folder = value)"
       @slug="(value) => (slug = value || null)"
       :storage="storage"
+      :group-location="groupLocation"
       @create-group="createGroupOpen = true"
       @storage="(value) => (storage = value)"
     />

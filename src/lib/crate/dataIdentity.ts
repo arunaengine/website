@@ -121,12 +121,21 @@ export function defaultStorageBucket(groupId: string): string {
   return `datasets-${groupId.toLowerCase()}`
 }
 
-/** A picked bucket and prefix, or null for the default; an empty bucket means the default one. */
+/** The group's default location; an older node without one uses the generated bucket. */
+export function groupStorage(
+  groupId: string,
+  location?: { bucket: string; prefix: string } | null,
+): { bucket: string; prefix: string } {
+  return location ?? { bucket: defaultStorageBucket(groupId), prefix: '' }
+}
+
+/** A picked bucket and prefix, or null while nothing is picked or it equals the group default. */
 export function chosenStorage(
   choice: { bucket: string; prefix: string },
-  groupId: string,
+  groupDefault: { bucket: string; prefix: string } | null,
 ): { bucket: string; prefix: string } | null {
   const prefix = choice.prefix.trim()
-  if (!choice.bucket && !prefix) return null
-  return { bucket: choice.bucket || defaultStorageBucket(groupId), prefix }
+  if (!choice.bucket) return null
+  if (groupDefault && choice.bucket === groupDefault.bucket && prefix === groupDefault.prefix) return null
+  return { bucket: choice.bucket, prefix }
 }

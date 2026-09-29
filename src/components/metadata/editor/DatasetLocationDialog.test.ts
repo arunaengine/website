@@ -174,13 +174,32 @@ beforeEach(() => {
 })
 
 describe('dataset location dialog', () => {
-  it('offers an optional storage location for a new dataset', async () => {
+  it('offers a storage location for a new dataset', async () => {
     const events = seen()
     const { root } = await mount(draftAt('reads'), events)
 
-    expect(content(root)).toContain("in the group's datasets bucket, datasets-group-1")
     await click(button(root, 'Storage in group-1'))
     expect(events.storage).toEqual([{ bucket: 'raw', prefix: 'reads/' }])
+  })
+
+  it('shows where files of the group default go', async () => {
+    const location = { bucket: 'lab', prefix: 'projects/' }
+    const { root } = await mount(draftAt('reads'), seen(), 'create', { storage: location, groupLocation: location })
+
+    expect(content(root)).toContain('Files go to lab/projects/<dataset id>/')
+    expect(() => button(root, 'Use the group default')).toThrow()
+  })
+
+  it('goes back to the group default from a changed location', async () => {
+    const events = seen()
+    const { root } = await mount(draftAt('reads'), events, 'create', {
+      storage: { bucket: 'raw', prefix: 'cruise/' },
+      groupLocation: { bucket: 'lab', prefix: 'projects/' },
+    })
+
+    expect(content(root)).toContain('Files go to raw/cruise/')
+    await click(button(root, 'Use the group default'))
+    expect(events.storage).toEqual([{ bucket: 'lab', prefix: 'projects/' }])
   })
 
   it('keeps the storage location out of an existing dataset', async () => {

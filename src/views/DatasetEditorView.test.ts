@@ -153,12 +153,15 @@ const LocationStub = defineComponent({
     groupOptions: { type: Array, default: () => [] },
     folder: { type: String, default: '' },
     slug: { type: String, default: '' },
+    storage: { type: Object, default: null },
+    groupLocation: { type: Object, default: null },
   },
   emits: ['update:open', 'update', 'folder', 'slug', 'create-group', 'storage'],
   setup(props, { emit }) {
     return () => props.open
       ? h('div', [
         h('p', `Location ${props.mode}`),
+        h('p', `Storage ${props.storage?.bucket}/${props.storage?.prefix} default ${props.groupLocation?.bucket}`),
         h('input', { 'aria-label': 'Dataset path', value: Paths.joinPath(props.folder, props.slug) }),
         h('input', {
           'aria-label': 'Dataset slug',
@@ -166,7 +169,7 @@ const LocationStub = defineComponent({
           onInput: (event: { target: { value: string } }) => emit('slug', event.target.value),
         }),
         h('button', { onClick: () => emit('folder', 'other') }, 'Pick other folder'),
-        h('button', { onClick: () => emit('storage', { bucket: '', prefix: ' shared/ ' }) }, 'Pick storage prefix'),
+        h('button', { onClick: () => emit('storage', { bucket: 'raw', prefix: ' shared/ ' }) }, 'Pick storage prefix'),
         h('button', { onClick: () => emit('update', { ...props.draft, visibility: 'public' }) }, 'Make public'),
         ...(props.groupOptions as Array<{ value: string; label: string }>).map((option) =>
           h('button', {
@@ -588,8 +591,25 @@ describe('DatasetEditorView', () => {
     await flush()
 
     expect(createMetadata.mock.calls[0][0]).toMatchObject({
-      storage_location: { bucket: 'datasets-group-1', prefix: 'shared/' },
+      storage_location: { bucket: 'raw', prefix: 'shared/' },
     })
+    mounted.app.unmount()
+  })
+
+  it('prefills the group default and sends nothing while it is unchanged', async () => {
+    getGroup.mockResolvedValue({
+      group_id: 'group-1', realm_id: 'realm-1', display_name: 'Research group', roles: [],
+      dataset_location: { bucket: 'lab', prefix: 'projects/' },
+    })
+    const mounted = await mountApp(DatasetEditorView)
+    await flush()
+    await openLocation(mounted.root)
+
+    expect(content(mounted.root)).toContain('Storage lab/projects/ default lab')
+    await click(button(mounted.root, 'Seed dataset'))
+    await click(button(mounted.root, 'Create dataset'))
+    await flush()
+    expect(createMetadata.mock.calls[0][0]).not.toHaveProperty('storage_location')
     mounted.app.unmount()
   })
 

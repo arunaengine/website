@@ -8,6 +8,7 @@ import * as DataIdentity from '@/lib/crate/dataIdentity'
 const sessionEpoch = ref(0)
 const getStorageLocation = vi.fn()
 const setStorageLocation = vi.fn()
+const getGroup = vi.fn()
 const Slot = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
 const ButtonStub = defineComponent({
   inheritAttrs: false,
@@ -45,7 +46,7 @@ const DatasetStorageRow = compileClientComponent(new URL('./DatasetStorageRow.vu
   '@/components/ui/Notice.vue': moduleDefault(Slot),
   '@/components/metadata/StorageLocationFields.vue': moduleDefault(FieldsStub),
   '@/composables/useAruna': {
-    useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('bearer'), sessionEpoch }),
+    useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('bearer'), sessionEpoch, getGroup }),
   },
   '@/lib/api': { ...Api, getStorageLocation, setStorageLocation },
   '@/lib/crate/dataIdentity': DataIdentity,
@@ -63,6 +64,7 @@ async function render(canWrite = true, onChanged = vi.fn()) {
 beforeEach(() => {
   getStorageLocation.mockReset()
   setStorageLocation.mockReset()
+  getGroup.mockReset().mockResolvedValue({ group_id: 'G1', realm_id: 'r', display_name: 'G', roles: [], dataset_location: null })
 })
 
 describe('DatasetStorageRow', () => {
@@ -109,7 +111,7 @@ describe('DatasetStorageRow', () => {
     const mounted = await render(true, onChanged)
 
     await click(button(mounted.root, 'Change'))
-    expect(content(mounted.root)).toContain('Choice {"bucket":"","prefix":""}')
+    expect(content(mounted.root)).toContain('Choice {"bucket":"datasets-g1","prefix":"d1/"}')
     await click(button(mounted.root, 'Pick raw'))
     await click(button(mounted.root, 'Save'))
 
@@ -130,6 +132,30 @@ describe('DatasetStorageRow', () => {
     await click(button(mounted.root, 'Save'))
 
     expect(setStorageLocation).toHaveBeenCalledWith('d1', { bucket: 'datasets-g1', prefix: 'd1/' }, CLIENT)
+    mounted.app.unmount()
+  })
+
+  it('marks the group default plus the dataset folder as the default', async () => {
+    getGroup.mockResolvedValue({ group_id: 'G1', realm_id: 'r', display_name: 'G', roles: [], dataset_location: { bucket: 'lab', prefix: 'p/' } })
+    getStorageLocation.mockResolvedValue({ bucket: 'lab', prefix: 'p/d1/', default: false })
+    const mounted = await render()
+
+    expect(content(mounted.root)).toContain('Storage location Default')
+    mounted.app.unmount()
+  })
+
+  it('does not trust the default flag when the group default moved', async () => {
+    getGroup.mockResolvedValue({ group_id: 'G1', realm_id: 'r', display_name: 'G', roles: [], dataset_location: { bucket: 'lab', prefix: 'p/' } })
+    getStorageLocation.mockResolvedValue(DEFAULT)
+    setStorageLocation.mockResolvedValue({ bucket: 'lab', prefix: 'p/d1/', default: false })
+    const mounted = await render()
+
+    expect(content(mounted.root)).not.toContain('Default')
+    await click(button(mounted.root, 'Change'))
+    expect(content(mounted.root)).toContain('Default: lab/p/d1/')
+    await click(button(mounted.root, 'Use the group default'))
+    await click(button(mounted.root, 'Save'))
+    expect(setStorageLocation).toHaveBeenCalledWith('d1', { bucket: 'lab', prefix: 'p/d1/' }, CLIENT)
     mounted.app.unmount()
   })
 

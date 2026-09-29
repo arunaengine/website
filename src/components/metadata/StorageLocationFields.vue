@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Bucket and prefix for a dataset's files. The group's buckets are listed only
-// while an S3 session for that group is active; the default bucket is always offered.
+// while an S3 session for that group is active; the generated bucket is always offered.
 import { computed, ref, watch } from 'vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
@@ -9,9 +9,11 @@ import { defaultStorageBucket } from '@/lib/crate/dataIdentity'
 
 const props = defineProps<{
   groupId: string
-  /** An empty bucket means the default bucket. */
+  /** An empty bucket shows the default bucket until one is picked. */
   modelValue: { bucket: string; prefix: string }
   prefixPlaceholder: string
+  /** The group's default location, labelled as such. */
+  defaultLocation?: { bucket: string; prefix: string } | null
 }>()
 const emit = defineEmits<{ (e: 'update:modelValue', value: { bucket: string; prefix: string }): void }>()
 
@@ -41,13 +43,19 @@ watch([() => props.groupId, sessionGroup], async ([groupId, active]) => {
   }
 }, { immediate: true })
 
+const shownBucket = computed(() => props.modelValue.bucket || props.defaultLocation?.bucket || defaultBucket.value)
+
 const options = computed(() => {
-  const names = [...new Set([defaultBucket.value, props.modelValue.bucket, ...listed.value].filter(Boolean))]
-  return names.map((name) => ({ value: name, label: name === defaultBucket.value ? `${name} (default)` : name }))
+  const groupBucket = props.defaultLocation?.bucket
+  const names = [...new Set([groupBucket, defaultBucket.value, props.modelValue.bucket, ...listed.value].filter(Boolean))] as string[]
+  return names.map((name) => ({
+    value: name,
+    label: name === groupBucket ? `${name} (group default)` : !groupBucket && name === defaultBucket.value ? `${name} (default)` : name,
+  }))
 })
 
 function pickBucket(value: string) {
-  emit('update:modelValue', { ...props.modelValue, bucket: value === defaultBucket.value ? '' : value })
+  emit('update:modelValue', { ...props.modelValue, bucket: value })
 }
 </script>
 
@@ -58,7 +66,7 @@ function pickBucket(value: string) {
       <Select
         class="mt-1"
         :options="options"
-        :model-value="modelValue.bucket || defaultBucket"
+        :model-value="shownBucket"
         aria-label="Storage bucket"
         @update:model-value="pickBucket"
       />
@@ -70,7 +78,7 @@ function pickBucket(value: string) {
         :model-value="modelValue.prefix"
         :placeholder="prefixPlaceholder"
         aria-label="Storage prefix"
-        @update:model-value="(value: string | number) => emit('update:modelValue', { ...modelValue, prefix: String(value) })"
+        @update:model-value="(value: string | number) => emit('update:modelValue', { bucket: shownBucket, prefix: String(value) })"
       />
     </div>
     <p v-if="listing === 'loading'" class="text-[11px] text-muted-foreground sm:col-span-2">Loading the group's buckets.</p>

@@ -16,7 +16,7 @@ import Notice from '@/components/ui/Notice.vue'
 import GroupSelect from '@/components/groups/GroupSelect.vue'
 import LocationFolderTree from './LocationFolderTree.vue'
 import StorageLocationFields from '@/components/metadata/StorageLocationFields.vue'
-import { defaultStorageBucket } from '@/lib/crate/dataIdentity'
+import { chosenStorage } from '@/lib/crate/dataIdentity'
 import { useAruna } from '@/composables/useAruna'
 import { joinPath } from '@/lib/crate/paths'
 import { slugify } from '@/lib/profiles/emit'
@@ -37,8 +37,10 @@ const props = defineProps<{
   /** Whether the group already stores a dataset at this path, and the lookup. */
   taken?: boolean
   checking?: boolean
-  /** Where files pushed with Git go; an empty bucket and prefix mean the default. */
+  /** Where files pushed with Git go; an empty bucket means the group default. */
   storage?: { bucket: string; prefix: string }
+  /** The group's default storage location, once known. */
+  groupLocation?: { bucket: string; prefix: string } | null
 }>()
 const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
@@ -78,6 +80,15 @@ function createFolder() {
 const previewPath = computed(() => (props.mode === 'edit'
   ? props.draft.path || 'No path yet'
   : joinPath(props.folder, props.slug || '…')))
+
+const storageChoice = computed(() => props.storage ?? { bucket: '', prefix: '' })
+const storageIsDefault = computed(() => !chosenStorage(storageChoice.value, props.groupLocation ?? null))
+// The default gets a folder named after the dataset id; a picked location is used as it is.
+const storageTarget = computed(() => {
+  const base = props.groupLocation
+  if (!storageIsDefault.value) return `${storageChoice.value.bucket}/${storageChoice.value.prefix.trim()}`
+  return base ? `${base.bucket}/${base.prefix}<dataset id>/` : ''
+})
 
 const fullPath = computed(() => {
   const group = props.draft.groupId || '…'
@@ -192,15 +203,28 @@ const fullPath = computed(() => {
         <section v-if="mode === 'create' && draft.groupId" class="min-w-0">
           <p class="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Storage location</p>
           <p class="mb-2 text-[11px] text-muted-foreground">
-            Where files pushed to this dataset with Git are stored. Optional. Default: a folder named after
-            the dataset id in the group's datasets bucket, {{ defaultStorageBucket(draft.groupId) }}.
+            Where files pushed to this dataset with Git are stored. Prefilled with the group's default storage location.
+            The folder named after the dataset id is added when the dataset is created.
           </p>
           <StorageLocationFields
             :group-id="draft.groupId"
-            :model-value="storage ?? { bucket: '', prefix: '' }"
-            prefix-placeholder="Default: a folder named after the dataset id"
+            :model-value="storageChoice"
+            :default-location="groupLocation"
+            prefix-placeholder="folder/"
             @update:model-value="(value) => emit('storage', value)"
           />
+          <p v-if="storageTarget" class="mt-2 break-all text-[11px] text-muted-foreground">
+            Files go to <span class="font-mono text-foreground">{{ storageTarget }}</span>
+            <Button
+              v-if="!storageIsDefault && groupLocation"
+              variant="link"
+              size="sm"
+              class="ml-1 h-auto p-0 text-xs"
+              @click="emit('storage', { ...groupLocation })"
+            >
+              Use the group default
+            </Button>
+          </p>
         </section>
 
         <section class="min-w-0">

@@ -1,14 +1,19 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import { compileClientComponent, content, element, flush, mountApp, moduleDefault } from '@/test/clientRender'
+import { compileClientComponent, content, element, flush, mountApp, moduleDefault, typeValue } from '@/test/clientRender'
 import * as DataIdentity from '@/lib/crate/dataIdentity'
 
 const activeGroup = ref('group-1')
 const listBuckets = vi.fn()
 const SelectStub = defineComponent({
   props: { options: { type: Array, default: () => [] }, modelValue: String },
-  setup: (props) => () => h('select', { value: props.modelValue, options: props.options }),
+  emits: ['update:modelValue'],
+  setup: (props, { emit }) => () => h('select', {
+    value: props.modelValue,
+    options: props.options,
+    onInput: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value),
+  }),
 })
 const InputStub = defineComponent(() => () => h('input'))
 
@@ -26,9 +31,9 @@ const StorageLocationFields = compileClientComponent(new URL('./StorageLocationF
   '@/lib/crate/dataIdentity': DataIdentity,
 })
 
-async function render() {
+async function render(extra: Record<string, unknown> = {}) {
   const mounted = await mountApp(StorageLocationFields, {
-    props: { groupId: 'Group-1', modelValue: { bucket: '', prefix: '' }, prefixPlaceholder: 'folder/' },
+    props: { groupId: 'Group-1', modelValue: { bucket: '', prefix: '' }, prefixPlaceholder: 'folder/', ...extra },
   })
   await flush()
   return mounted
@@ -60,6 +65,22 @@ describe('StorageLocationFields', () => {
     expect(listBuckets).not.toHaveBeenCalled()
     expect(options(mounted.root)).toEqual([{ value: 'datasets-group-1', label: 'datasets-group-1 (default)' }])
     expect(content(mounted.root)).toContain('Other buckets are listed once S3 access for this group is active.')
+    mounted.app.unmount()
+  })
+
+  it('labels the group default and keeps a picked generated bucket', async () => {
+    activeGroup.value = 'other'
+    const picked = vi.fn()
+    const mounted = await render({ defaultLocation: { bucket: 'lab', prefix: 'p/' }, 'onUpdate:modelValue': picked })
+    const select = element(mounted.root, (node) => node.tag === 'select')
+
+    expect(select.props.options).toEqual([
+      { value: 'lab', label: 'lab (group default)' },
+      { value: 'datasets-group-1', label: 'datasets-group-1' },
+    ])
+    expect(select.props.value).toBe('lab')
+    await typeValue(select, 'datasets-group-1')
+    expect(picked).toHaveBeenCalledWith({ bucket: 'datasets-group-1', prefix: '' })
     mounted.app.unmount()
   })
 })
