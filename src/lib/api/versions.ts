@@ -226,8 +226,9 @@ export interface StorageLocation {
   prefix: string
 }
 
-// GET/PUT /metadata/{id}/storage-location: always the effective location;
-// `default` is true while nobody chose one (bucket datasets-<group>, prefix <id>/).
+// GET/PUT /metadata/{id}/storage-location: always the effective location. `default`
+// is true only when the dataset has no recorded location; new datasets record the
+// group default plus `<dataset id>/` when they are created.
 export interface DatasetStorageLocation extends StorageLocation {
   default: boolean
 }
