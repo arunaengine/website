@@ -216,6 +216,8 @@ export interface GitRepository {
   layout?: 'arc' | 'rocrate'
   /** Where pushed files are stored; absent on older nodes. */
   storage_location?: DatasetStorageLocation
+  /** A newer snapshot or pushed metadata is still being applied; refs show the last completed state. */
+  pending?: boolean
 }
 
 /** A bucket and a key prefix inside it. */

@@ -14,6 +14,12 @@ const DocsLinkStub = defineComponent({
   setup: (props) => () => h('a', { 'data-topic': props.topic }, props.label),
 })
 
+const NoticeStub = defineComponent({
+  props: { tone: String, title: String },
+  setup: (props, { slots }) => () => h('div', { 'data-tone': props.tone }, [props.title, ' ', slots.default?.()]),
+})
+const SpinnerStub = defineComponent({ props: { label: String }, setup: (props) => () => h('span', props.label) })
+
 const LinkStub = defineComponent({
   props: { to: { type: Object, required: true } },
   setup: (props, { slots }) => () => h('a', { to: props.to }, slots.default?.()),
@@ -24,6 +30,8 @@ const DatasetGitRow = compileClientComponent(new URL('./DatasetGitRow.vue', impo
   '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
   '@/components/ui/CopyButton.vue': moduleDefault(Empty),
   '@/components/ui/DocsLink.vue': moduleDefault(DocsLinkStub),
+  '@/components/ui/Notice.vue': moduleDefault(NoticeStub),
+  '@/components/ui/Spinner.vue': moduleDefault(SpinnerStub),
   '@/composables/useAruna': {
     useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('bearer'), sessionEpoch }),
   },
@@ -129,6 +137,44 @@ describe('DatasetGitRow', () => {
 
     expect(content(second.root)).toContain(CLONE)
     expect(getGitRepository).toHaveBeenCalledTimes(1)
+    second.app.unmount()
+  })
+
+  it('notes that data files use Git LFS and the push limit', async () => {
+    getGitRepository.mockResolvedValue(repository())
+    const mounted = await mountApp(DatasetGitRow, { props: { documentId: 'd1' } })
+    await flush()
+    const text = content(mounted.root)
+
+    expect(text).toContain('Data files use Git LFS')
+    expect(text).toContain('git-lfs must be installed')
+    expect(text).toContain('at most 4 MiB of new Git objects')
+    expect(text).not.toContain('Updating snapshot')
+    mounted.app.unmount()
+  })
+
+  it('shows a failed conversion as a warning', async () => {
+    getGitRepository.mockResolvedValue({ ...repository(), error: 'assays/seq is missing isa.assay.xlsx' })
+    const mounted = await mountApp(DatasetGitRow, { props: { documentId: 'd1' } })
+    await flush()
+    const warning = element(mounted.root, (node) => node.props['data-tone'] === 'warning')
+
+    expect(content(warning)).toContain('The last change could not be turned into a new version')
+    expect(content(warning)).toContain('assays/seq is missing isa.assay.xlsx')
+    mounted.app.unmount()
+  })
+
+  it('marks a pending snapshot and asks again on the next mount', async () => {
+    getGitRepository.mockResolvedValueOnce({ ...repository(), pending: true }).mockResolvedValue(repository())
+    const first = await mountApp(DatasetGitRow, { props: { documentId: 'd1' } })
+    await flush()
+    expect(content(first.root)).toContain('Updating snapshot')
+    first.app.unmount()
+
+    const second = await mountApp(DatasetGitRow, { props: { documentId: 'd1' } })
+    await flush()
+    expect(getGitRepository).toHaveBeenCalledTimes(2)
+    expect(content(second.root)).not.toContain('Updating snapshot')
     second.app.unmount()
   })
 
