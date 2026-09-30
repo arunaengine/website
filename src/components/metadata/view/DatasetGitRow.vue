@@ -9,7 +9,7 @@ const ANSWER_TTL_MS = 60_000
 <script setup lang="ts">
 // The clone address of a dataset's Git repository. Nothing shows until the node
 // answers; a node without Git or a reader without access shows no row.
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
@@ -31,11 +31,43 @@ const failure = ref<string | null>(null)
 const pending = ref(false)
 const shownStorage = computed(() => props.changed ?? storage.value)
 let generation = 0
+// A pending snapshot is asked about again, with growing pauses, until it is finished.
+let retry: ReturnType<typeof setTimeout> | undefined
+const RETRY_MS = [2_000, 4_000, 8_000, 15_000]
+
+onBeforeUnmount(() => {
+  generation++
+  clearTimeout(retry)
+})
+
+async function load(current: number, key: string, attempt: number) {
+  try {
+    const repository = await getGitRepository(props.documentId, { baseUrl: apiBaseUrl.value, token: authToken.value })
+    if (current !== generation) return
+    cloneUrl.value = repository.clone_url || null
+    layout.value = repository.layout === 'arc' ? 'ARC' : repository.layout === 'rocrate' ? 'RO-Crate' : null
+    storage.value = repository.storage_location ?? null
+    failure.value = repository.error || null
+    pending.value = repository.pending === true
+    // A pending answer is not kept, so the next visit shows the finished state.
+    if (!pending.value) {
+      answers.set(key, { at: Date.now(), url: cloneUrl.value, layout: layout.value, storage: storage.value, error: failure.value })
+      return
+    }
+    const pause = RETRY_MS[Math.min(attempt, RETRY_MS.length - 1)]
+    retry = setTimeout(() => {
+      if (current === generation) void load(current, key, attempt + 1)
+    }, pause)
+  } catch {
+    // Missing, refused or unavailable: the row stays hidden.
+  }
+}
 
 watch(
   [() => props.documentId, sessionEpoch],
   async () => {
     const current = ++generation
+    clearTimeout(retry)
     const key = `${sessionEpoch.value}:${apiBaseUrl.value}:${props.documentId}`
     const kept = answers.get(key)
     if (kept && Date.now() - kept.at < ANSWER_TTL_MS) {
@@ -51,20 +83,7 @@ watch(
     storage.value = null
     failure.value = null
     pending.value = false
-    try {
-      const repository = await getGitRepository(props.documentId, { baseUrl: apiBaseUrl.value, token: authToken.value })
-      if (current !== generation) return
-      cloneUrl.value = repository.clone_url || null
-      layout.value = repository.layout === 'arc' ? 'ARC' : repository.layout === 'rocrate' ? 'RO-Crate' : null
-      storage.value = repository.storage_location ?? null
-      failure.value = repository.error || null
-      pending.value = repository.pending === true
-      // A pending answer is not kept, so the next visit shows the finished state.
-      if (!pending.value)
-        answers.set(key, { at: Date.now(), url: cloneUrl.value, layout: layout.value, storage: storage.value, error: failure.value })
-    } catch {
-      // Missing, refused or unavailable: the row stays hidden.
-    }
+    await load(current, key, 0)
   },
   { immediate: true },
 )

@@ -178,6 +178,27 @@ describe('DatasetGitRow', () => {
     second.app.unmount()
   })
 
+  it('asks again while the snapshot is pending and stops once it is finished', async () => {
+    vi.useFakeTimers()
+    try {
+      getGitRepository.mockResolvedValueOnce({ ...repository(), pending: true }).mockResolvedValue(repository())
+      const mounted = await mountApp(DatasetGitRow, { props: { documentId: 'd1' } })
+      await flush()
+      expect(content(mounted.root)).toContain('Updating snapshot')
+
+      await vi.advanceTimersByTimeAsync(2_000)
+      await flush()
+      expect(getGitRepository).toHaveBeenCalledTimes(2)
+      expect(content(mounted.root)).not.toContain('Updating snapshot')
+
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(getGitRepository).toHaveBeenCalledTimes(2)
+      mounted.app.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it.each([404, 403, 503])('stays hidden when the node answers %i', async (status) => {
     getGitRepository.mockRejectedValue(new Api.ApiError(status, 'no'))
     const mounted = await mountApp(DatasetGitRow, { props: { documentId: 'd1' } })
