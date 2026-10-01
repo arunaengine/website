@@ -201,6 +201,48 @@ describe('multipart upload completion', () => {
     expect(of(AbortMultipartUploadCommand)).toHaveLength(0)
   })
 
+  it('repeats a failed part without aborting the upload', async () => {
+    multipart([() => Promise.resolve({ ETag: '"object"' })])
+    const answer = respond
+    const failed = deferred()
+    let failures = 0
+    respond = (command) => {
+      if (command instanceof UploadPartCommand && command.input.PartNumber === 1 && failures < 2) {
+        failures += 1
+        failed.resolve()
+        return Promise.reject(networkError())
+      }
+      return answer(command)
+    }
+    const handle = uploadObject('bucket', 'key', payload(UPLOAD_PART_SIZE + 1))
+
+    await failed.promise
+    await vi.advanceTimersByTimeAsync(2000 + 4000)
+    await expect(handle.promise).resolves.toBeUndefined()
+
+    const parts = of(UploadPartCommand).map((command) => command.input.PartNumber)
+    expect(parts.filter((part) => part === 1)).toHaveLength(3)
+    expect(of(CreateMultipartUploadCommand)).toHaveLength(1)
+    expect(of(CompleteMultipartUploadCommand)[0]?.input.MultipartUpload?.Parts).toHaveLength(2)
+    expect(of(AbortMultipartUploadCommand)).toHaveLength(0)
+  })
+
+  it('aborts at once when a part is refused for good', async () => {
+    multipart([])
+    const answer = respond
+    respond = (command) =>
+      command instanceof UploadPartCommand && command.input.PartNumber === 1
+        ? Promise.reject(s3Error('AccessDenied', 403))
+        : answer(command)
+    const handle = uploadObject('bucket', 'key', payload(UPLOAD_PART_SIZE + 1))
+
+    await expect(handle.promise).rejects.toMatchObject({ name: 'AccessDenied' })
+
+    const parts = of(UploadPartCommand).map((command) => command.input.PartNumber)
+    expect(parts.filter((part) => part === 1)).toHaveLength(1)
+    expect(of(AbortMultipartUploadCommand)).toHaveLength(1)
+  })
+
   it('sends one PutObject for a file below the part size', async () => {
     respond = async () => ({ ETag: '"object"' })
     const handle = uploadObject('bucket', 'key', payload(1024))

@@ -9,6 +9,7 @@ import {
   ListObjectsV2Command,
   ListObjectVersionsCommand,
   PutObjectCommand,
+  UploadPartCommand,
   type CompleteMultipartUploadCommandInput,
   type S3Client,
 } from '@aws-sdk/client-s3'
@@ -178,6 +179,11 @@ const COMPLETION_WINDOW_MS = 10 * 60 * 1000
 const COMPLETION_BACKOFF_MS = 2000
 const COMPLETION_BACKOFF_CAP_MS = 30 * 1000
 
+// One failed part makes lib-storage abort the whole upload, so a transient
+// part failure is repeated first. A part number may be uploaded again safely.
+const PART_ATTEMPTS = 4
+const PART_BACKOFF_MS = 2000
+
 // Faults that a repeated completion can never clear. Everything else is judged
 // by transport: a lost request, a timeout or a 5xx may be repeated, a 4xx not.
 const TERMINAL_COMPLETION_CODES = new Set([
@@ -213,7 +219,7 @@ interface CompletionRecorder {
 // lib-storage sends every request through the client, so wrapping send()
 // captures the completion it assembled, upload id and part list included,
 // without reading its internals.
-function recordCompletion(s3: S3Client): CompletionRecorder {
+function recordCompletion(s3: S3Client, canceled: { value: boolean }): CompletionRecorder {
   let completion: CompleteMultipartUploadCommandInput | null = null
   const send = s3.send.bind(s3) as unknown as (command: unknown) => Promise<unknown>
   const recorded = new Proxy(s3, {
@@ -221,6 +227,7 @@ function recordCompletion(s3: S3Client): CompletionRecorder {
       if (property !== 'send') return Reflect.get(target, property)
       return (command: unknown) => {
         if (command instanceof CompleteMultipartUploadCommand) completion = command.input
+        if (command instanceof UploadPartCommand) return sendPart(send, command, canceled)
         return send(command)
       }
     },
@@ -230,6 +237,25 @@ function recordCompletion(s3: S3Client): CompletionRecorder {
 
 function pause(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+// A part is judged by the same transport rules as a completion.
+async function sendPart(
+  send: (command: unknown) => Promise<unknown>,
+  command: UploadPartCommand,
+  canceled: { value: boolean },
+): Promise<unknown> {
+  let delay = PART_BACKOFF_MS
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await send(command)
+    } catch (err) {
+      if (attempt >= PART_ATTEMPTS || canceled.value || !retryableCompletion(err)) throw err
+      await pause(delay)
+      if (canceled.value) throw err
+      delay *= 2
+    }
+  }
 }
 
 // Best effort: the original failure is what the caller must see, and a node
@@ -314,7 +340,8 @@ export function uploadObject(
   sessionReference?: S3SessionReference,
   onCompletionRetry?: (attempt: number, error: unknown) => void,
 ): UploadHandle {
-  const recorder = recordCompletion(client(nodeId, sessionReference))
+  const canceled = { value: false }
+  const recorder = recordCompletion(client(nodeId, sessionReference), canceled)
   const upload = new Upload({
     client: recorder.client,
     params: {
@@ -332,7 +359,6 @@ export function uploadObject(
       onProgress(progress.loaded ?? 0, progress.total ?? file.size)
     })
   }
-  const canceled = { value: false }
   return {
     promise: finishUpload(upload, recorder, canceled, onCompletionRetry),
     abort: async () => {
