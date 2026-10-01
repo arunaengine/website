@@ -359,6 +359,20 @@ export async function ensureSession(groupId: string): Promise<void> {
   return flight
 }
 
+/**
+ * Replaces a session the node no longer accepts, such as one a migration removed. A new
+ * session for the same node and group is minted without changing the active context.
+ */
+export async function replaceSession(reference: S3SessionReference): Promise<void> {
+  const key = storeKey(reference.nodeId, reference.groupId)
+  const session = sessions.value.get(key)
+  const user = currentUser.value
+  if (!session || session.accessKeyId !== reference.accessKeyId || !user) return
+  expireSession(key)
+  await mintSession(reference.nodeId, reference.groupId, user.id)
+  if (activeSessionKey.value === key) scheduleActiveSession()
+}
+
 export function clearSessions(): void {
   boundaryGeneration++
   activationGeneration++

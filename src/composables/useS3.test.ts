@@ -245,6 +245,23 @@ describe('portal S3 session signing and refresh', () => {
     expect(apiRequest).toHaveBeenCalledTimes(2)
   })
 
+  it('replaces a session the node no longer accepts', async () => {
+    apiRequest
+      .mockResolvedValueOnce(sessionResponse())
+      .mockResolvedValueOnce(sessionResponse({ access_key_id: 'session-key-b', session_token: 'token-b' }))
+    await s3.activateContext(null, 'group-a')
+    const rejected = s3.referenceForContext(null, 'group-a')!
+
+    await s3.replaceSession(rejected)
+
+    expect(apiRequest.mock.calls[1]?.[0]).toBe('/access/s3/sessions')
+    expect(s3.referenceForContext(null, 'group-a')?.accessKeyId).toBe('session-key-b')
+    expect(s3.activeSession.value).toMatchObject({ accessKeyId: 'session-key-b', state: 'active' })
+    // A stale reference to an already replaced session mints nothing more.
+    await s3.replaceSession(rejected)
+    expect(apiRequest).toHaveBeenCalledTimes(2)
+  })
+
   it('surfaces a failed refresh, keeps the valid session, and blocks it at expiry', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-08-19T10:00:00.000Z'))

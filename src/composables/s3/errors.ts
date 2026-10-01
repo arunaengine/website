@@ -156,6 +156,14 @@ export function isS3NetworkError(err: unknown): boolean {
   return /failed to fetch|networkerror|load failed|network request failed/i.test(message)
 }
 
+/** The node no longer knows the session, for example after a migration removed it. */
+export function isS3SessionRejected(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const error = err as { name?: string; Code?: string }
+  const code = error.Code ?? error.name
+  return code === 'InvalidAccessKeyId' || code === 'InvalidToken'
+}
+
 // A rejected or expired session surfaces as one of these SDK error names or as
 // a 401/403 from the node. Keep those distinct from transient network faults so
 // the UI can offer to open a fresh session.
