@@ -7,9 +7,11 @@ import {
   changePassphrase,
   createVault,
   keyFingerprint,
+  minPassphraseLength,
   openData,
   openKeypair,
   parseVaultPayload,
+  passphraseLongEnough,
   rotateKeypair,
   sealData,
   sealKeypair,
@@ -190,5 +192,15 @@ describe('vault keypairs', () => {
     expect(parsed.keys[0].retired_at).toBeNull()
     expect(() => parseVaultPayload(JSON.stringify({ ...payload, keys: [{ ...entry, public: 7 }] }))).toThrow(VaultFormatError)
     expect(() => parseVaultPayload(JSON.stringify({ ...payload, keys: [{ ...entry, retired_at: 1 }] }))).toThrow(VaultFormatError)
+  })
+})
+
+describe('passphrase length', () => {
+  it('asks key holders for at least 12 characters', () => {
+    expect(minPassphraseLength(false)).toBe(8)
+    expect(minPassphraseLength(true)).toBe(12)
+    expect(passphraseLongEnough('a'.repeat(11), false)).toBe(true)
+    expect(passphraseLongEnough('a'.repeat(11), true)).toBe(false)
+    expect(passphraseLongEnough('a'.repeat(12), true)).toBe(true)
   })
 })

@@ -11,6 +11,8 @@ export const VAULT_VERSION = 1 as const
 export const VAULT_KDF_NAME = 'pbkdf2-sha256' as const
 export const VAULT_KDF_ITERATIONS = 600_000
 export const MIN_PASSPHRASE_LENGTH = 8
+/** A key holder's vault opens bucket keys, so its passphrase must be longer. */
+export const MIN_KEY_HOLDER_PASSPHRASE_LENGTH = 12
 export const X25519_KIND = 'x25519'
 /** Bound to every AES-GCM operation of this payload version. */
 const ADDITIONAL_DATA = new TextEncoder().encode('aruna user vault v1')
@@ -260,6 +262,14 @@ export async function unlockVault(payload: VaultPayload, passphrase: string): Pr
 export async function unlockWithRecovery(payload: VaultPayload, recoveryCode: string): Promise<CryptoKey> {
   const { kek, block, failure } = await keyFor(payload, { recoveryCode })
   return unwrapMaster(block, kek, false, failure)
+}
+
+export function minPassphraseLength(keyHolder: boolean): number {
+  return keyHolder ? MIN_KEY_HOLDER_PASSPHRASE_LENGTH : MIN_PASSPHRASE_LENGTH
+}
+
+export function passphraseLongEnough(passphrase: string, keyHolder: boolean): boolean {
+  return passphrase.length >= minPassphraseLength(keyHolder)
 }
 
 /** Re-wraps the master key under the new passphrase; the recovery code and the data stay as they are. */
