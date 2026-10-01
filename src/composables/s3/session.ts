@@ -179,7 +179,8 @@ function scheduleActiveSession(): void {
   )
   // A failed refresh is not retried automatically. The still-valid session can
   // finish known work, but no request with an unknown outcome is replayed.
-  if (session.lastUsedAt === null || session.state === 'warning') return
+  // A pending refresh re-arms the timer itself once it finishes.
+  if (session.lastUsedAt === null || session.state !== 'active') return
   const refreshAt =
     session.expiresAt - S3_SESSION_REFRESH_WINDOW_MS + s3SessionRefreshJitterMs(session.accessKeyId)
   const delay = Math.max(0, refreshAt - Date.now())
@@ -273,7 +274,9 @@ async function mintSession(nodeId: string, groupId: string, userId: string): Pro
 
 async function refreshSession(key: string): Promise<void> {
   const session = sessions.value.get(key)
-  if (!sessionUsable(session) || activeSessionKey.value !== key) return
+  if (!sessionUsable(session) || session.state === 'refreshing' || activeSessionKey.value !== key) {
+    return
+  }
   putSession(key, { ...session, state: 'refreshing', warning: null })
   try {
     const response = await apiRequest<S3SessionResponse>(

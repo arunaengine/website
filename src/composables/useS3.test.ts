@@ -213,6 +213,38 @@ describe('portal S3 session signing and refresh', () => {
     )
   })
 
+  it('starts no second refresh while one is pending', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-19T10:00:00.000Z'))
+    const minted = sessionResponse()
+    let finishRefresh: (response: S3SessionResponse) => void = () => {}
+    apiRequest
+      .mockResolvedValueOnce(minted)
+      .mockReturnValueOnce(new Promise((resolve) => (finishRefresh = resolve)))
+    await s3.activateContext(null, 'group-a')
+    await s3.downloadUrl('bucket-a', 'object.txt', null)
+    const boundary =
+      60 * 60 * 1000 -
+      sessionModule.S3_SESSION_REFRESH_WINDOW_MS +
+      sessionModule.s3SessionRefreshJitterMs(minted.access_key_id)
+
+    await vi.advanceTimersByTimeAsync(boundary)
+    expect(s3.activeSession.value?.state).toBe('refreshing')
+    await s3.downloadUrl('bucket-a', 'object.txt', null)
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(apiRequest).toHaveBeenCalledTimes(2)
+
+    finishRefresh(
+      sessionResponse({
+        session_token: 'token-b',
+        expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      }),
+    )
+    await vi.advanceTimersByTimeAsync(0)
+    expect(s3.activeSession.value).toMatchObject({ state: 'active', sessionToken: 'token-b' })
+    expect(apiRequest).toHaveBeenCalledTimes(2)
+  })
+
   it('surfaces a failed refresh, keeps the valid session, and blocks it at expiry', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-08-19T10:00:00.000Z'))
