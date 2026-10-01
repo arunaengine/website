@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from './client'
-import { deleteVault, readVault, saveVault, vaultConflicted, vaultUnsupported } from './userVault'
+import { deleteVault, readVault, saveVault, vaultConflicted, vaultUnavailable, vaultUnsupported } from './userVault'
 
 const CLIENT = { baseUrl: 'https://api.test/api/v1', token: 'bearer-1' }
 
@@ -34,24 +34,25 @@ afterEach(() => {
 
 describe('user vault client', () => {
   it('reads the vault with the bearer', async () => {
-    const calls = stubFetch({ payload: null, revision: 0, updated_at: null })
+    const calls = stubFetch({ heads: [] })
 
     const response = await readVault(CLIENT)
 
-    expect(response).toEqual({ payload: null, revision: 0, updated_at: null })
+    expect(response).toEqual({ heads: [] })
     expect(calls[0].url).toBe('https://api.test/api/v1/access/users/me/vault')
     expect(calls[0].method).toBe('GET')
     expect(calls[0].authorization).toBe('Bearer bearer-1')
   })
 
-  it('saves the payload with the held revision', async () => {
-    const calls = stubFetch({ payload: '{"version":1}', revision: 3, updated_at: '2026-09-06T00:00:00Z' })
+  it('saves the payload with the heads it replaces', async () => {
+    const head = { revision: 'R3', predecessors: ['R1', 'R2'], payload: '{"version":1}', updated_at: '2026-09-06T00:00:00Z' }
+    const calls = stubFetch({ heads: [head] })
 
-    const response = await saveVault({ payload: '{"version":1}', revision: 2 }, CLIENT)
+    const response = await saveVault({ payload: '{"version":1}', predecessors: ['R1', 'R2'] }, CLIENT)
 
-    expect(response.revision).toBe(3)
+    expect(response.heads).toEqual([head])
     expect(calls[0].method).toBe('PUT')
-    expect(calls[0].body).toEqual({ payload: '{"version":1}', revision: 2 })
+    expect(calls[0].body).toEqual({ payload: '{"version":1}', predecessors: ['R1', 'R2'] })
   })
 
   it('deletes the vault', async () => {
@@ -63,12 +64,14 @@ describe('user vault client', () => {
     expect(calls[0].url).toBe('https://api.test/api/v1/access/users/me/vault')
   })
 
-  it('tells a node without the route from a stale write', () => {
+  it('tells a node without the route from a retry and an unreachable holder', () => {
     expect(vaultUnsupported(new ApiError(404, 'not found'))).toBe(true)
     expect(vaultUnsupported(new ApiError(405, 'method not allowed'))).toBe(true)
     expect(vaultUnsupported(new ApiError(409, 'stale'))).toBe(false)
     expect(vaultConflicted(new ApiError(409, 'stale'))).toBe(true)
     expect(vaultConflicted(new ApiError(500, 'boom'))).toBe(false)
     expect(vaultConflicted(new Error('offline'))).toBe(false)
+    expect(vaultUnavailable(new ApiError(503, 'vault_unavailable'))).toBe(true)
+    expect(vaultUnavailable(new ApiError(500, 'boom'))).toBe(false)
   })
 })

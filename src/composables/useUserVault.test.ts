@@ -2,10 +2,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { validateBrowserProvider } from '@/lib/assistant/browserProviders'
 import * as Crypto from '@/lib/vault/crypto'
 
-// A stand-in node: one payload, one revision, a stale write refused with 409.
-// Every restart below re-imports the modules, so the fakes tell the status
-// apart by a field rather than by a class that would differ per import.
-const node = { payload: null as string | null, revision: 0, unsupported: false }
+// A stand-in for the vault holders: each save is a head that replaces its
+// predecessors, so two saves from the same state stay as two heads. Every
+// restart below re-imports the modules, so the fakes tell the status apart by
+// a field rather than by a class that would differ per import.
+interface FakeHead {
+  revision: string
+  predecessors: string[]
+  payload: string
+  updated_at: string
+}
+const node = { heads: [] as FakeHead[], count: 0, unsupported: false }
 function refused(status: number, message: string) {
   return Object.assign(new Error(message), { status })
 }
@@ -14,18 +21,21 @@ function status(error: unknown): number {
 }
 const readVault = vi.fn(async () => {
   if (node.unsupported) throw refused(404, 'no such route')
-  return { payload: node.payload, revision: node.revision, updated_at: null }
+  return { heads: [...node.heads] }
 })
-const saveVault = vi.fn(async (request: { payload: string; revision?: number }) => {
-  if (request.revision !== undefined && request.revision !== node.revision) throw refused(409, 'stale')
-  node.payload = request.payload
-  node.revision += 1
-  return { payload: node.payload, revision: node.revision, updated_at: '2026-09-06T00:00:00Z' }
+const saveVault = vi.fn(async (request: { payload: string; predecessors: string[] }) => {
+  node.count += 1
+  const head = {
+    revision: `R${String(node.count).padStart(4, '0')}`,
+    predecessors: request.predecessors,
+    payload: request.payload,
+    updated_at: '2026-10-01T00:00:00Z',
+  }
+  node.heads = [...node.heads.filter((known) => !request.predecessors.includes(known.revision)), head]
+  return { heads: [...node.heads] }
 })
-// A delete leaves a tombstone: the revision keeps counting, as on the node.
 const deleteVault = vi.fn(async () => {
-  if (node.payload !== null) node.revision += 1
-  node.payload = null
+  node.heads = []
 })
 
 // The remembered key, as the browser's IndexedDB would keep it.
@@ -41,6 +51,7 @@ vi.mock('@/lib/api', () => ({
   saveVault,
   deleteVault,
   vaultConflicted: (error: unknown) => status(error) === 409,
+  vaultUnavailable: (error: unknown) => status(error) === 503,
   vaultUnsupported: (error: unknown) => status(error) === 404 || status(error) === 405,
   apiErrorMessage: (error: unknown) => (error instanceof Error ? error.message : String(error)),
 }))
@@ -92,14 +103,15 @@ async function boot(options: { load?: boolean } = {}) {
 
 /** What the node holds, opened the way another browser would open it. */
 async function nodeProviders(passphrase: string) {
-  const payload = Crypto.parseVaultPayload(node.payload ?? '')
+  expect(node.heads).toHaveLength(1)
+  const payload = Crypto.parseVaultPayload(node.heads[0].payload)
   const key = await Crypto.unlockVault(payload, passphrase)
   return (await Crypto.openData(key, payload)).providers
 }
 
 beforeEach(() => {
-  node.payload = null
-  node.revision = 0
+  node.heads = []
+  node.count = 0
   node.unsupported = false
   remembered.clear()
   readVault.mockClear()
@@ -116,8 +128,7 @@ describe('useUserVault', () => {
 
     expect(code).toMatch(/^([0-9A-HJKMNP-TV-Z]{4}-){12}[0-9A-HJKMNP-TV-Z]{4}$/)
     expect(vault.state.value).toBe('unlocked')
-    expect(vault.remoteRevision.value).toBe(1)
-    expect(saveVault.mock.calls[0][0].revision).toBe(0)
+    expect(saveVault.mock.calls[0][0].predecessors).toEqual([])
     expect(remembered.size).toBe(1)
     expect([...remembered.values()][0].extractable).toBe(false)
 
@@ -147,38 +158,82 @@ describe('useUserVault', () => {
     expect(remembered.size).toBe(1)
   })
 
-  it('saves with the held revision and folds in what another browser wrote', async () => {
+  it('merges two heads on load and saves over both', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', false)
+    const first = node.heads[0]
+    // Another browser saves from the same state, so the holders keep two heads.
+    const other = await boot()
+    await other.vault.saveProviders([local])
+    node.heads = [first, ...node.heads]
+
+    const restarted = await boot()
+
+    expect(saveVault.mock.calls.at(-1)?.[0].predecessors).toEqual(['R0002', 'R0001'])
+    expect(restarted.vault.providers.value).toEqual([local])
+    expect(await nodeProviders('correct horse')).toEqual([local])
+  })
+
+  it('merges the heads a save answers with', async () => {
     const { vault } = await boot()
     await vault.create('correct horse', false)
     await vault.saveProviders([work])
-    expect(vault.remoteRevision.value).toBe(2)
-
-    // Another browser adds a provider behind this one's back.
+    // Another browser adds a provider from the same state.
     const other = await boot()
     await other.vault.saveProviders([...other.vault.providers.value, local])
-    expect(node.revision).toBe(3)
-
     const edited = { ...work, label: 'Work (edited)' }
+
     await vault.saveProviders([edited])
 
-    expect(saveVault.mock.calls.map((call) => call[0].revision)).toEqual([0, 1, 2, 2, 3])
-    expect(vault.remoteRevision.value).toBe(4)
+    expect(saveVault.mock.calls.at(-1)?.[0].predecessors).toEqual(['R0004', 'R0003'])
     expect(vault.providers.value).toEqual([edited, local])
     expect(await nodeProviders('correct horse')).toEqual([edited, local])
   })
 
-  it('gives up when the keys were replaced in another browser', async () => {
+  it('merges the heads on unlock with the passphrase', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', false)
+    vault.lock()
+    node.heads.push({ ...node.heads[0], revision: 'R0009' })
+
+    const restarted = await boot()
+    expect(restarted.vault.state.value).toBe('locked')
+    expect(saveVault).toHaveBeenCalledTimes(1)
+    await restarted.vault.unlock('correct horse')
+
+    expect(saveVault.mock.calls.at(-1)?.[0].predecessors).toEqual(['R0009', 'R0001'])
+    expect(node.heads).toHaveLength(1)
+  })
+
+  it('keeps a head another master key sealed out of the merge', async () => {
     const { vault } = await boot()
     await vault.create('correct horse', false)
 
-    // The other browser reset the keys and set them up again with a new master key.
+    // The other browser reset the keys and set them up again with a new master key,
+    // while this one still saved on the old vault.
     const other = await boot()
     await other.vault.reset()
     await other.vault.create('new horse', false)
-    await other.vault.saveProviders([local])
+    await vault.saveProviders([work])
 
-    await expect(vault.saveProviders([work])).rejects.toThrow('changed in another browser')
-    expect(vault.state.value).toBe('locked')
+    expect(node.heads).toHaveLength(2)
+    expect(vault.providers.value).toEqual([work])
+    const again = await boot()
+    again.vault.lock()
+    await again.vault.unlock('new horse')
+    expect(again.vault.providers.value).toEqual([])
+    expect(node.heads).toHaveLength(2)
+  })
+
+  it('retries once on a lost concurrent write', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', false)
+    saveVault.mockRejectedValueOnce(refused(409, 'retry'))
+
+    await vault.saveProviders([work])
+
+    expect(await nodeProviders('correct horse')).toEqual([work])
+    expect(readVault).toHaveBeenCalledTimes(2)
   })
 
   it('opens the keys with the recovery code and sets a new passphrase from it', async () => {
@@ -220,7 +275,7 @@ describe('useUserVault', () => {
     await vault.reset()
 
     expect(vault.state.value).toBe('absent')
-    expect(node.payload).toBeNull()
+    expect(node.heads).toEqual([])
     expect(remembered.size).toBe(0)
     expect(vault.providers.value).toEqual([])
   })
@@ -231,11 +286,10 @@ describe('useUserVault', () => {
     await vault.saveProviders([work])
 
     await vault.reset()
-    expect(vault.remoteRevision.value).toBe(node.revision)
     await vault.create('new horse', false)
 
     expect(vault.state.value).toBe('unlocked')
-    expect(saveVault.mock.calls.at(-1)?.[0].revision).toBe(3)
+    expect(saveVault.mock.calls.at(-1)?.[0].predecessors).toEqual([])
     expect(await nodeProviders('new horse')).toEqual([])
   })
 
