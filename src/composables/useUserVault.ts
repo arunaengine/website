@@ -7,6 +7,8 @@ import { ref, watch } from 'vue'
 import {
   apiErrorMessage,
   deleteVault,
+  listUserKeys,
+  publishUserKey,
   readVault,
   saveVault,
   vaultConflicted,
@@ -17,10 +19,13 @@ import { validateBrowserProvider, type BrowserProvider } from '@/lib/assistant/b
 import { assistantChatScopeKey } from '@/lib/assistant/chatHistory'
 import {
   VaultUnlockError,
+  activeKeypair,
   changePassphrase as rewrapMaster,
   createVault,
   openData,
+  openKeypair,
   parseVaultPayload,
+  rotateKeypair,
   sealData,
   unlockVault,
   unlockWithRecovery as unwrapWithRecovery,
@@ -31,6 +36,11 @@ import { browserKeyStore } from '@/lib/vault/keyStore'
 import { apiBaseUrl, authToken, realmInfo, sessionEpoch, userInfo } from './aruna/state'
 
 export type VaultState = 'absent' | 'locked' | 'unlocked' | 'unsupported'
+/**
+ * The key directory check after an unlock. `mismatch`: the newest published key is
+ * not one of this vault's keys. `unavailable`: the check or the publish did not finish.
+ */
+export type OwnKeyState = 'unknown' | 'matches' | 'mismatch' | 'unavailable'
 
 const REPLACED = 'Your provider keys were changed in another browser. Unlock them again.'
 
@@ -50,6 +60,7 @@ const loaded = ref(false)
 const loading = ref(false)
 const error = ref<string | null>(null)
 const providers = ref<BrowserProvider[]>([])
+const ownKey = ref<OwnKeyState>('unknown')
 const keyStore = browserKeyStore()
 let payload: VaultPayload | null = null
 /** What the holders returned, newest first. */
@@ -117,6 +128,7 @@ function clearLocal() {
   predecessors = []
   masterKey = null
   providers.value = []
+  ownKey.value = 'unknown'
   state.value = 'absent'
   loaded.value = false
   loading.value = false
@@ -218,6 +230,54 @@ async function putPayload(next: VaultPayload, run: number): Promise<boolean> {
   return adoptHeads(response.heads, run)
 }
 
+/**
+ * Compares the newest key in the directory with this vault's active keypair, opened
+ * so its public key is known to match the private key. Publishes the active key when
+ * the directory holds none or an older key of this vault.
+ */
+async function checkOwnKey(run: number) {
+  const current = payload
+  const key = masterKey
+  const active = current && activeKeypair(current.keys)
+  const userId = userInfo.value?.user.user_id
+  const saved = active && heads.some((head) => head.payload.keys.some((entry) => entry.id === active.id))
+  if (!current || !key || !active || !userId || !saved) {
+    ownKey.value = 'unavailable'
+    return
+  }
+  // A lock or a session change while this runs makes the answer stale.
+  const stale = () => run !== generation || masterKey !== key
+  try {
+    await openKeypair(key, active)
+    const newest = (await listUserKeys(userId, client())).keys[0]
+    if (stale()) return
+    if (newest?.public_key === active.public) {
+      ownKey.value = 'matches'
+      return
+    }
+    if (newest && !current.keys.some((entry) => entry.public === newest.public_key)) {
+      ownKey.value = 'mismatch'
+      return
+    }
+    await publishUserKey({ key_id: active.id, public_key: active.public, has_recovery: Boolean(current.recovery) }, client())
+    if (!stale()) ownKey.value = 'matches'
+  } catch {
+    if (!stale()) ownKey.value = 'unavailable'
+  }
+}
+
+/** Adds a keypair when the vault has none, saves it with any merge, then checks the directory. */
+async function finishUnlock(run: number, saveDue: boolean) {
+  if (payload && masterKey && !activeKeypair(payload.keys)) {
+    const keys = await rotateKeypair(masterKey, payload.keys)
+    if (run !== generation || !payload) return
+    payload = { ...payload, keys }
+    saveDue = true
+  }
+  if (saveDue) await saveMerge(run)
+  if (run === generation) void checkOwnKey(run)
+}
+
 /** Saves a merge once; when that fails the next save carries the merge. */
 async function saveMerge(run: number) {
   if (!payload) return
@@ -244,7 +304,7 @@ function load(): Promise<void> {
       const mergeDue = await settle(scope, response.heads)
       if (run !== generation) return
       loaded.value = true
-      if (mergeDue) await saveMerge(run)
+      if (state.value === 'unlocked') await finishUnlock(run, mergeDue)
     } catch (cause) {
       if (run !== generation) return
       if (vaultUnsupported(cause)) {
@@ -320,6 +380,7 @@ function lock() {
   const scope = scopeKey
   masterKey = null
   providers.value = []
+  ownKey.value = 'unknown'
   state.value = payload ? 'locked' : 'absent'
   forgetKey(scope)
 }
@@ -334,10 +395,12 @@ async function create(passphrase: string, withRecovery: boolean): Promise<string
   if (payload) throw new Error('Your provider keys are already set up.')
   const run = generation
   const created = await createVault(passphrase, withRecovery)
+  created.payload.keys = await rotateKeypair(created.masterKey, [])
   const response = await saveVault({ payload: JSON.stringify(created.payload), predecessors: [] }, client())
   if (run !== generation) throw new Error(REPLACED)
   await adoptHeads(response.heads, run, created.masterKey)
   await rememberKey(scope, created.masterKey)
+  await finishUnlock(run, false)
   return created.recoveryCode
 }
 
@@ -362,7 +425,7 @@ async function unlockWith(open: (current: VaultPayload) => Promise<CryptoKey>) {
   if (run !== generation) throw new Error(REPLACED)
   unlocked(merged, key)
   await rememberKey(scope, key)
-  if (merged.revisions.length > 1) await saveMerge(run)
+  await finishUnlock(run, merged.revisions.length > 1)
 }
 
 function unlock(passphrase: string): Promise<void> {
@@ -377,6 +440,14 @@ function unlockWithRecovery(recoveryCode: string): Promise<void> {
 async function changePassphrase(secret: VaultSecret, newPassphrase: string): Promise<void> {
   requirePayload()
   await saveWithRetry((current) => rewrapMaster(current, secret, newPassphrase))
+}
+
+/** Retires the active keypair, adds a new one and publishes it. */
+async function rotateKey(): Promise<void> {
+  const { key } = requireUnlocked()
+  const run = generation
+  await saveWithRetry(async (current) => ({ ...current, keys: await rotateKeypair(key, current.keys) }))
+  if (run === generation) void checkOwnKey(run)
 }
 
 async function reset(): Promise<void> {
@@ -430,6 +501,7 @@ export function useUserVault() {
     loading,
     error,
     providers,
+    ownKey,
     load,
     create,
     unlock,
@@ -438,5 +510,6 @@ export function useUserVault() {
     changePassphrase,
     reset,
     saveProviders,
+    rotateKey,
   }
 }

@@ -37,6 +37,16 @@ const saveVault = vi.fn(async (request: { payload: string; predecessors: string[
 const deleteVault = vi.fn(async () => {
   node.heads = []
 })
+// The key directory, newest record first.
+const directory: { key_id: string; public_key: string; has_recovery: boolean }[] = []
+const listUserKeys = vi.fn(async (userId: string) => {
+  if (userId !== 'u-1') throw refused(400, 'wrong user')
+  return { keys: [...directory] }
+})
+const publishUserKey = vi.fn(async (request: { key_id: string; public_key: string; has_recovery: boolean }) => {
+  directory.unshift(request)
+  return request
+})
 
 // The remembered key, as the browser's IndexedDB would keep it.
 const remembered = new Map<string, CryptoKey>()
@@ -50,6 +60,8 @@ vi.mock('@/lib/api', () => ({
   readVault,
   saveVault,
   deleteVault,
+  listUserKeys,
+  publishUserKey,
   vaultConflicted: (error: unknown) => status(error) === 409,
   vaultUnavailable: (error: unknown) => status(error) === 503,
   vaultUnsupported: (error: unknown) => status(error) === 404 || status(error) === 405,
@@ -114,6 +126,9 @@ beforeEach(() => {
   node.count = 0
   node.unsupported = false
   remembered.clear()
+  directory.length = 0
+  listUserKeys.mockClear()
+  publishUserKey.mockClear()
   readVault.mockClear()
   saveVault.mockClear()
   deleteVault.mockClear()
@@ -291,6 +306,76 @@ describe('useUserVault', () => {
     expect(vault.state.value).toBe('unlocked')
     expect(saveVault.mock.calls.at(-1)?.[0].predecessors).toEqual([])
     expect(await nodeProviders('new horse')).toEqual([])
+  })
+
+  it('creates a keypair with the vault and publishes it', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', true)
+
+    const saved = Crypto.parseVaultPayload(node.heads[0].payload)
+    expect(saved.keys).toHaveLength(1)
+    expect(saveVault).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(vault.ownKey.value).toBe('matches'))
+    expect(publishUserKey.mock.calls[0][0]).toEqual({ key_id: saved.keys[0].id, public_key: saved.keys[0].public, has_recovery: true })
+
+    // The next unlock finds its own key and publishes nothing.
+    const restarted = await boot()
+    await vi.waitFor(() => expect(restarted.vault.ownKey.value).toBe('matches'))
+    expect(publishUserKey).toHaveBeenCalledTimes(1)
+  })
+
+  it('adds a keypair on unlock to a vault without one', async () => {
+    const created = await Crypto.createVault('correct horse', false, { iterations: 500 })
+    node.heads = [{ revision: 'R0000', predecessors: [], payload: JSON.stringify(created.payload), updated_at: '' }]
+    const { vault } = await boot()
+
+    await vault.unlock('correct horse')
+
+    expect(saveVault.mock.calls[0][0].predecessors).toEqual(['R0000'])
+    const saved = Crypto.parseVaultPayload(node.heads[0].payload)
+    expect(Crypto.activeKeypair(saved.keys)).not.toBeNull()
+    await vi.waitFor(() => expect(vault.ownKey.value).toBe('matches'))
+    expect(directory[0].public_key).toBe(saved.keys[0].public)
+  })
+
+  it('reports a directory key that is not its own', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', false)
+    await vi.waitFor(() => expect(vault.ownKey.value).toBe('matches'))
+    directory.unshift({ key_id: 'k-other', public_key: btoa('o'.repeat(32)), has_recovery: false })
+
+    const restarted = await boot()
+
+    await vi.waitFor(() => expect(restarted.vault.ownKey.value).toBe('mismatch'))
+    expect(publishUserKey).toHaveBeenCalledTimes(1)
+  })
+
+  it('publishes again after a rotation, and when the directory holds an older own key', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', false)
+    await vi.waitFor(() => expect(vault.ownKey.value).toBe('matches'))
+
+    publishUserKey.mockRejectedValueOnce(refused(503, 'vault_unavailable'))
+    await vault.rotateKey()
+    await vi.waitFor(() => expect(vault.ownKey.value).toBe('unavailable'))
+
+    const restarted = await boot()
+    await vi.waitFor(() => expect(restarted.vault.ownKey.value).toBe('matches'))
+    const saved = Crypto.parseVaultPayload(node.heads[0].payload)
+    expect(saved.keys).toHaveLength(2)
+    expect(directory[0].public_key).toBe(Crypto.activeKeypair(saved.keys)?.public)
+  })
+
+  it('does not publish a keypair the holders did not keep', async () => {
+    const created = await Crypto.createVault('correct horse', false, { iterations: 500 })
+    node.heads = [{ revision: 'R0000', predecessors: [], payload: JSON.stringify(created.payload), updated_at: '' }]
+    const { vault } = await boot()
+    saveVault.mockRejectedValueOnce(refused(503, 'vault_unavailable'))
+
+    await vault.unlock('correct horse')
+
+    await vi.waitFor(() => expect(vault.ownKey.value).toBe('unavailable'))
+    expect(publishUserKey).not.toHaveBeenCalled()
   })
 
   it('reports a node without the route', async () => {

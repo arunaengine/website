@@ -66,3 +66,48 @@ export function deleteVault(
 ): Promise<void> {
   return apiRequest<void>(PATH, { method: 'DELETE', signal }, client)
 }
+
+// --- Key directory (/access/users/{id}/keys) ---
+
+export interface PublishUserKeyRequest {
+  /** The id of the keypair in the vault `keys` slot. */
+  key_id: string
+  /** Standard base64 of the 32-byte X25519 public key. */
+  public_key: string
+  has_recovery: boolean
+}
+
+export interface UserKeyRecord {
+  record_id: string
+  key_id: string
+  public_key: string
+  /** Lowercase hex SHA-256 of the public key. */
+  fingerprint: string
+  has_recovery: boolean
+  created_at: string
+}
+
+export interface UserKeysResponse {
+  /** Newest first; the first key is the one to seal to. */
+  keys: UserKeyRecord[]
+}
+
+export function publishUserKey(
+  request: PublishUserKeyRequest,
+  client: ApiClientOptions = {},
+  signal?: AbortSignal,
+): Promise<UserKeyRecord> {
+  return apiRequest<UserKeyRecord>(
+    '/access/users/me/keys',
+    { method: 'POST', body: JSON.stringify(request), signal },
+    client,
+  )
+}
+
+export function listUserKeys(
+  userId: string,
+  client: ApiClientOptions = {},
+  signal?: AbortSignal,
+): Promise<UserKeysResponse> {
+  return apiRequest<UserKeysResponse>(`/access/users/${encodeURIComponent(userId)}/keys`, { signal }, client)
+}

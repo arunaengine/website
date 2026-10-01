@@ -1,6 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from './client'
-import { deleteVault, readVault, saveVault, vaultConflicted, vaultUnavailable, vaultUnsupported } from './userVault'
+import {
+  deleteVault,
+  listUserKeys,
+  publishUserKey,
+  readVault,
+  saveVault,
+  vaultConflicted,
+  vaultUnavailable,
+  vaultUnsupported,
+} from './userVault'
 
 const CLIENT = { baseUrl: 'https://api.test/api/v1', token: 'bearer-1' }
 
@@ -62,6 +71,24 @@ describe('user vault client', () => {
 
     expect(calls[0].method).toBe('DELETE')
     expect(calls[0].url).toBe('https://api.test/api/v1/access/users/me/vault')
+  })
+
+  it('publishes the own key and reads the keys of a user', async () => {
+    const record = { record_id: 'K1', key_id: 'k-1', public_key: 'cHVi', fingerprint: 'ab', has_recovery: true, created_at: '2026-10-01T00:00:00Z' }
+    const calls = stubFetch(record, 201)
+
+    await publishUserKey({ key_id: 'k-1', public_key: 'cHVi', has_recovery: true }, CLIENT)
+
+    expect(calls[0].method).toBe('POST')
+    expect(calls[0].url).toBe('https://api.test/api/v1/access/users/me/keys')
+    expect(calls[0].body).toEqual({ key_id: 'k-1', public_key: 'cHVi', has_recovery: true })
+  })
+
+  it('reads the keys of a user by id', async () => {
+    const calls = stubFetch({ keys: [] })
+
+    expect(await listUserKeys('01K6A5@realm', CLIENT)).toEqual({ keys: [] })
+    expect(calls[0].url).toBe('https://api.test/api/v1/access/users/01K6A5%40realm/keys')
   })
 
   it('tells a node without the route from a retry and an unreachable holder', () => {
