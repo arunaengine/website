@@ -3,11 +3,15 @@
 // wraps the random master key; the master key seals the data. An optional
 // recovery code wraps a second copy of the master key. The master key stays a
 // WebCrypto handle: it is generated, wrapped and unwrapped, never exported.
+// The `keys` slot holds the user's X25519 keypairs, the private key sealed with
+// the master key; the newest pair that is not retired is the active one.
+import { fromBase64Url, importPrivateKey, type X25519Pair } from './hpke'
 
 export const VAULT_VERSION = 1 as const
 export const VAULT_KDF_NAME = 'pbkdf2-sha256' as const
 export const VAULT_KDF_ITERATIONS = 600_000
 export const MIN_PASSPHRASE_LENGTH = 8
+export const X25519_KIND = 'x25519'
 /** Bound to every AES-GCM operation of this payload version. */
 const ADDITIONAL_DATA = new TextEncoder().encode('aruna user vault v1')
 const SALT_BYTES = 16
@@ -35,13 +39,23 @@ export interface VaultSealed {
   sealed: string
 }
 
+/** One keypair in the `keys` slot; all binary fields are standard base64. */
+export interface VaultKeyEntry {
+  id: string
+  kind: string
+  public: string
+  nonce: string
+  wrapped_private: string
+  created_at: string
+  retired_at: string | null
+}
+
 export interface VaultPayload {
   version: typeof VAULT_VERSION
   kdf: VaultKdf
   master: VaultWrapped
   recovery?: VaultRecovery
-  /** Reserved for identity keypairs; always empty today. */
-  keys: unknown[]
+  keys: VaultKeyEntry[]
   data: VaultSealed
 }
 
@@ -272,6 +286,63 @@ export async function sealData(masterKey: CryptoKey, data: VaultData): Promise<V
   return { nonce: toBase64(nonce), sealed: toBase64(new Uint8Array(sealed)) }
 }
 
+/** Seals a raw X25519 private key into a `keys` entry; tests give a fixed nonce. */
+export async function sealKeypair(
+  masterKey: CryptoKey,
+  id: string,
+  privateKey: Uint8Array<ArrayBuffer>,
+  createdAt: string,
+  nonce: Uint8Array<ArrayBuffer> = randomBytes(NONCE_BYTES),
+): Promise<VaultKeyEntry> {
+  const { publicKey } = await importPrivateKey(privateKey)
+  const wrapped = await crypto.subtle.encrypt(gcm(nonce), masterKey, privateKey)
+  return {
+    id,
+    kind: X25519_KIND,
+    public: toBase64(publicKey),
+    nonce: toBase64(nonce),
+    wrapped_private: toBase64(new Uint8Array(wrapped)),
+    created_at: createdAt,
+    retired_at: null,
+  }
+}
+
+/** Retires the active keypairs and appends a fresh one; old pairs stay for reading. */
+export async function rotateKeypair(masterKey: CryptoKey, keys: VaultKeyEntry[], now = new Date()): Promise<VaultKeyEntry[]> {
+  const at = now.toISOString()
+  const pair = (await crypto.subtle.generateKey({ name: 'X25519' }, true, ['deriveBits'])) as CryptoKeyPair
+  const jwk = await crypto.subtle.exportKey('jwk', pair.privateKey)
+  const entry = await sealKeypair(masterKey, crypto.randomUUID(), fromBase64Url(jwk.d ?? ''), at)
+  return [...keys.map((key) => (key.retired_at ? key : { ...key, retired_at: at })), entry]
+}
+
+/** The newest X25519 keypair that is not retired. */
+export function activeKeypair(keys: VaultKeyEntry[]): VaultKeyEntry | null {
+  const active = keys.filter((key) => key.kind === X25519_KIND && !key.retired_at)
+  active.sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id))
+  return active.at(-1) ?? null
+}
+
+/** Opens a `keys` entry and checks that its public key belongs to the private key. */
+export async function openKeypair(masterKey: CryptoKey, entry: VaultKeyEntry): Promise<X25519Pair> {
+  if (entry.kind !== X25519_KIND) throw new VaultFormatError('The vault key is not readable.')
+  let plain: ArrayBuffer
+  try {
+    plain = await crypto.subtle.decrypt(gcm(fromBase64(entry.nonce)), masterKey, fromBase64(entry.wrapped_private))
+  } catch {
+    throw new VaultUnlockError('This key does not open the vault.')
+  }
+  const pair = await importPrivateKey(new Uint8Array(plain))
+  if (toBase64(pair.publicKey) !== entry.public) throw new VaultFormatError('The vault key is not readable.')
+  return pair
+}
+
+/** Lowercase hex SHA-256 of a raw public key, the fingerprint the key directory stores. */
+export async function keyFingerprint(publicKey: Uint8Array<ArrayBuffer>): Promise<string> {
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', publicKey))
+  return Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
 export async function openData(masterKey: CryptoKey, payload: VaultPayload): Promise<VaultData> {
   const nonce = fromBase64(payload.data.nonce)
   const sealed = fromBase64(payload.data.sealed)
@@ -303,6 +374,21 @@ function wrappedBlock(value: unknown, message: string): VaultWrapped {
   return { nonce: text(input.nonce, message), wrapped: text(input.wrapped, message) }
 }
 
+function keyEntry(value: unknown, message: string): VaultKeyEntry {
+  const input = record(value, message)
+  const retired = input.retired_at ?? null
+  if (retired !== null && typeof retired !== 'string') throw new VaultFormatError(message)
+  return {
+    id: text(input.id, message),
+    kind: text(input.kind, message),
+    public: text(input.public, message),
+    nonce: text(input.nonce, message),
+    wrapped_private: text(input.wrapped_private, message),
+    created_at: text(input.created_at, message),
+    retired_at: retired,
+  }
+}
+
 /** Reads the payload text the node returned; a version this portal does not know is refused. */
 export function parseVaultPayload(serialized: string): VaultPayload {
   const unreadable = 'The vault payload is not readable.'
@@ -332,7 +418,7 @@ export function parseVaultPayload(serialized: string): VaultPayload {
     ...(recovery
       ? { recovery: { salt: text(recovery.salt, unreadable), ...wrappedBlock(recovery, unreadable) } }
       : {}),
-    keys: input.keys,
+    keys: input.keys.map((entry) => keyEntry(entry, unreadable)),
     data: { nonce: text(data.nonce, unreadable), sealed: text(data.sealed, unreadable) },
   }
 }
