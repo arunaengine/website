@@ -207,6 +207,8 @@ function retryableCompletion(err: unknown): boolean {
   if (code === 'OperationAborted') return true
   if (isS3AuthError(err)) return false
   const status = error.$metadata?.httpStatusCode
+  // A 2xx body that could not be read, such as a cut-off keepalive, leaves the outcome unknown.
+  if (status !== undefined && status < 300) return !error.Code
   if (status !== undefined) return status >= 500
   return isS3NetworkError(err) || code === 'TimeoutError'
 }

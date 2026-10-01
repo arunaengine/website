@@ -116,6 +116,29 @@ describe('multipart upload completion', () => {
     expect(retries).toEqual([2])
   })
 
+  it('repeats a completion whose 200 response was cut off', async () => {
+    const first = deferred()
+    multipart([
+      () => {
+        first.resolve()
+        return Promise.reject(
+          Object.assign(new Error('@aws-sdk XML parse error: no root element.'), {
+            $metadata: { httpStatusCode: 200 },
+          }),
+        )
+      },
+      () => Promise.resolve({ ETag: '"object"' }),
+    ])
+    const handle = uploadObject('bucket', 'key', payload(UPLOAD_PART_SIZE + 1))
+
+    await first.promise
+    await vi.advanceTimersByTimeAsync(2000)
+    await expect(handle.promise).resolves.toBeUndefined()
+
+    expect(of(CompleteMultipartUploadCommand)).toHaveLength(2)
+    expect(of(AbortMultipartUploadCommand)).toHaveLength(0)
+  })
+
   it('waits out a completion the node is already running', async () => {
     // OperationAborted means the node holds an in-flight completion for this
     // upload id; the retry joins it.
