@@ -11,6 +11,7 @@ import {
   deleteObject,
   deleteObjectVersion,
   deletePrefix,
+  discardUpload,
   downloadUrl,
   fetchUrlText,
   getObjectBlob,
@@ -21,6 +22,7 @@ import {
   listObjectsRecursive,
   listObjectVersions,
   putTextObject,
+  resumeUpload,
   uploadObject,
 } from './s3/objects'
 import {
@@ -134,6 +136,8 @@ function nodeS3() {
     listDeletedObjects,
     createFolder,
     uploadObject,
+    resumeUpload,
+    discardUpload,
     deleteObject,
     deleteObjectVersion,
     copyObject,

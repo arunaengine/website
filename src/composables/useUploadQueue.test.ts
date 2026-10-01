@@ -8,6 +8,9 @@ const sessionRevision = ref(0)
 const references = new Map<string, S3SessionReference>()
 const expired = new Set<string>()
 const uploadObject = vi.fn()
+const resumeUpload = vi.fn()
+const discardUpload = vi.fn(async () => undefined)
+const replaceSession = vi.fn(async () => undefined)
 
 function contextKey(nodeId: string | null, groupId: string): string {
   return `${nodeId ?? 'local'}|${groupId}`
@@ -28,9 +31,14 @@ beforeAll(async () => {
       sessionState: (reference: S3SessionReference) =>
         expired.has(referenceKey(reference)) ? 'expired' : 'usable',
       uploadObject,
+      resumeUpload,
+      discardUpload,
+      replaceSession,
     }),
     s3ErrorMessage: (error: unknown) => String(error),
     isS3QuotaError: () => false,
+    isS3SessionRejected: (error: unknown) =>
+      (error as { name?: string } | null)?.name === 'InvalidAccessKeyId',
   }))
   queue = (await import('./useUploadQueue')).useUploadQueue()
 })
@@ -43,7 +51,7 @@ function file(name: string): File {
   return { name, size: 10, type: 'text/plain' } as File
 }
 
-function deferredHandle(): {
+function deferredHandle(uploadId: string | null = null): {
   handle: UploadHandle
   resolve: () => void
   reject: (error: unknown) => void
@@ -54,7 +62,11 @@ function deferredHandle(): {
     resolve = done
     reject = fail
   })
-  return { handle: { promise, abort: vi.fn(async () => undefined) }, resolve, reject }
+  return {
+    handle: { promise, abort: vi.fn(async () => undefined), uploadId: () => uploadId },
+    resolve,
+    reject,
+  }
 }
 
 describe('upload queue session attribution', () => {
@@ -215,5 +227,77 @@ describe('upload queue completion status', () => {
     expect(item.error).toBeUndefined()
     reject(new Error('Upload aborted.'))
     await vi.waitFor(() => expect(item.state).toBe('canceled'))
+  })
+})
+
+describe('upload queue resume', () => {
+  const sessionD: S3SessionReference = {
+    nodeId: 'node-d',
+    groupId: 'group-d',
+    accessKeyId: 'session-d',
+  }
+
+  function failed(name: string, error: unknown) {
+    references.set(contextKey('node-d', 'group-d'), sessionD)
+    const first = deferredHandle('upload-1')
+    uploadObject.mockReset()
+    resumeUpload.mockReset()
+    uploadObject.mockReturnValueOnce(first.handle)
+    queue.enqueue([file(name)], { bucket: 'bucket-d', prefix: '', groupId: 'group-d', nodeId: 'node-d' })
+    const item = queue.items.value.find((entry) => entry.name === name)!
+    first.reject(error)
+    return item
+  }
+
+  it('continues the kept multipart upload on retry', async () => {
+    const item = failed('resumed', new Error('part failed'))
+    await vi.waitFor(() => expect(item.state).toBe('error'))
+    expect(item.uploadId).toBe('upload-1')
+    const resumed = deferredHandle()
+    resumeUpload.mockReturnValueOnce(resumed.handle)
+
+    queue.retry(item)
+
+    await vi.waitFor(() => expect(resumeUpload).toHaveBeenCalledTimes(1))
+    expect(resumeUpload.mock.calls[0]?.slice(0, 4)).toEqual(['bucket-d', 'resumed', expect.anything(), 'upload-1'])
+    expect(uploadObject).toHaveBeenCalledTimes(1)
+    resumed.resolve()
+    await vi.waitFor(() => expect(item.state).toBe('done'))
+    expect(item.uploadId).toBeUndefined()
+  })
+
+  it('starts over when the node dropped the kept upload', async () => {
+    const item = failed('dropped', new Error('part failed'))
+    await vi.waitFor(() => expect(item.state).toBe('error'))
+    const resumed = deferredHandle('upload-1')
+    const fresh = deferredHandle()
+    resumeUpload.mockReturnValueOnce(resumed.handle)
+    uploadObject.mockReturnValueOnce(fresh.handle)
+
+    queue.retry(item)
+    resumed.reject(Object.assign(new Error('gone'), { name: 'NoSuchUpload' }))
+
+    await vi.waitFor(() => expect(uploadObject).toHaveBeenCalledTimes(2))
+    fresh.resolve()
+    await vi.waitFor(() => expect(item.state).toBe('done'))
+  })
+
+  it('drops the kept parts when a failed row is dismissed', async () => {
+    const item = failed('dismissed', new Error('part failed'))
+    await vi.waitFor(() => expect(item.state).toBe('error'))
+    discardUpload.mockClear()
+
+    queue.dismiss(item.id)
+
+    expect(discardUpload).toHaveBeenCalledWith('bucket-d', 'dismissed', 'upload-1', 'node-d', sessionD)
+  })
+
+  it('replaces a session the node no longer accepts', async () => {
+    replaceSession.mockClear()
+    const item = failed('rejected', Object.assign(new Error('unknown key'), { name: 'InvalidAccessKeyId' }))
+
+    await vi.waitFor(() => expect(item.pausedForSession).toBe(true))
+    expect(replaceSession).toHaveBeenCalledWith(sessionD)
+    expect(item.uploadId).toBe('upload-1')
   })
 })

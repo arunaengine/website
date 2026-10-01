@@ -3,6 +3,7 @@ import {
   useS3,
   s3ErrorMessage,
   isS3QuotaError,
+  isS3SessionRejected,
   type S3SessionReference,
   type UploadHandle,
 } from './useS3'
@@ -119,26 +120,37 @@ async function run(item: UploadQueueItem): Promise<void> {
   item.progress = 0
   item.finishing = undefined
   touch()
+  const session = item.session
+  const onProgress = (loaded: number, total: number) => {
+    item.progress = total ? Math.round((loaded / total) * 100) : 0
+    if (total && loaded >= total) item.finishing = true
+    touch()
+  }
+  const onRetry = (attempt: number, error: unknown) => {
+    // The parts are on the node; only the completion is being repeated.
+    item.error = `Finishing the upload, attempt ${attempt}… ${s3ErrorMessage(error)}`
+    touch()
+  }
+  const fresh = () =>
+    s3.uploadObject(item.bucket, item.key, file, onProgress, item.nodeId, session, onRetry, true)
+  let handle: UploadHandle | undefined
   try {
-    const handle = s3.uploadObject(
-      item.bucket,
-      item.key,
-      file,
-      (loaded, total) => {
-        item.progress = total ? Math.round((loaded / total) * 100) : 0
-        if (total && loaded >= total) item.finishing = true
-        touch()
-      },
-      item.nodeId,
-      item.session,
-      (attempt, error) => {
-        // The parts are on the node; only the completion is being repeated.
-        item.error = `Finishing the upload, attempt ${attempt}… ${s3ErrorMessage(error)}`
-        touch()
-      },
-    )
+    handle = item.uploadId
+      ? s3.resumeUpload(item.bucket, item.key, file, item.uploadId, onProgress, item.nodeId, session, onRetry)
+      : fresh()
     handles.set(item.id, handle)
-    await handle.promise
+    try {
+      await handle.promise
+    } catch (err) {
+      const code = (err as { Code?: string; name?: string } | null)
+      if (!item.uploadId || (code?.Code ?? code?.name) !== 'NoSuchUpload') throw err
+      // The node dropped the kept upload, so this attempt starts over from the first part.
+      item.uploadId = undefined
+      handle = fresh()
+      handles.set(item.id, handle)
+      await handle.promise
+    }
+    item.uploadId = undefined
     if (item.state === 'uploading') {
       item.state = 'done'
       item.error = undefined
@@ -148,10 +160,15 @@ async function run(item: UploadQueueItem): Promise<void> {
       lastCompleted.value = { bucket: item.bucket, key: item.key, nodeId: item.nodeId, at: Date.now() }
     }
   } catch (err) {
+    // A failed attempt keeps its parts on the node, so Retry sends only the missing ones.
+    item.uploadId = handle?.uploadId() ?? undefined
     // cancel() may have flipped the state to 'canceled' during the await, which
     // TS's synchronous control-flow analysis cannot see; widen before compare.
     if ((item.state as UploadItemState) !== 'canceled') {
-      if (item.session && s3.sessionState(item.session) !== 'usable') {
+      if (item.session && isS3SessionRejected(err)) {
+        pauseForSession(item, 'The node no longer accepts this S3 session; a new one is being created.')
+        void s3.replaceSession(item.session).catch(() => undefined)
+      } else if (item.session && s3.sessionState(item.session) !== 'usable') {
         pauseForSession(item, 'The S3 session expired while this upload was running.')
       } else if (isS3QuotaError(err)) {
         item.state = 'error'
@@ -214,12 +231,26 @@ function dismiss(id: number): void {
   const item = items.value.find((entry) => entry.id === id)
   if (!item || item.state === 'queued' || item.state === 'uploading') return
   files.delete(id)
+  discardKept(item)
   items.value = items.value.filter((entry) => entry.id !== id)
+}
+
+// A row that leaves the queue can no longer resume, so its kept parts are dropped on the node.
+function discardKept(item: UploadQueueItem): void {
+  const uploadId = item.uploadId
+  item.uploadId = undefined
+  if (!uploadId || !item.session) return
+  void s3
+    .discardUpload(item.bucket, item.key, uploadId, item.nodeId, item.session)
+    .catch(() => undefined)
 }
 
 function clearFinished(): void {
   for (const item of items.value) {
-    if (item.state !== 'queued' && item.state !== 'uploading' && !item.pausedForSession) files.delete(item.id)
+    if (item.state !== 'queued' && item.state !== 'uploading' && !item.pausedForSession) {
+      files.delete(item.id)
+      discardKept(item)
+    }
   }
   items.value = items.value.filter(
     (item) => item.state === 'queued' || item.state === 'uploading' || item.pausedForSession,

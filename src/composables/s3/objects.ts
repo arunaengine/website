@@ -2,15 +2,18 @@ import {
   AbortMultipartUploadCommand,
   CompleteMultipartUploadCommand,
   CopyObjectCommand,
+  CreateMultipartUploadCommand,
   DeleteObjectCommand,
   DeleteObjectsCommand,
   GetObjectCommand,
   HeadObjectCommand,
   ListObjectsV2Command,
+  ListPartsCommand,
   ListObjectVersionsCommand,
   PutObjectCommand,
   UploadPartCommand,
   type CompleteMultipartUploadCommandInput,
+  type Part,
   type S3Client,
 } from '@aws-sdk/client-s3'
 import { Upload } from '@aws-sdk/lib-storage'
@@ -62,6 +65,8 @@ export interface ObjectHead {
 export interface UploadHandle {
   promise: Promise<void>
   abort: () => Promise<void>
+  /** The multipart upload a failed attempt kept on the node for `resumeUpload`. */
+  uploadId: () => string | null
 }
 
 export interface DeletePrefixResult {
@@ -170,6 +175,13 @@ export async function listObjectsRecursive(
 // parts; abort() tells the node to drop the parts already written.
 export const UPLOAD_PART_SIZE = 16 * 1024 * 1024
 const UPLOAD_CONCURRENCY = 3
+const MAX_UPLOAD_PARTS = 10_000
+const MIB = 1024 * 1024
+
+/** Parts grow in whole MiB above the default so any file fits the S3 limit of 10,000 parts. */
+export function uploadPartSize(bytes: number): number {
+  return Math.max(UPLOAD_PART_SIZE, Math.ceil(bytes / MAX_UPLOAD_PARTS / MIB) * MIB)
+}
 
 // Composing a multi-GB object out of its parts keeps the node busy for minutes
 // and a proxy in between may drop the idle connection first. The parts are
@@ -216,13 +228,21 @@ function retryableCompletion(err: unknown): boolean {
 interface CompletionRecorder {
   client: S3Client
   completion: () => CompleteMultipartUploadCommandInput | null
+  uploadId: () => string | null
+  /** Aborts the kept multipart upload, if any, so its parts leave the node. */
+  discard: () => Promise<void>
 }
 
 // lib-storage sends every request through the client, so wrapping send()
-// captures the completion it assembled, upload id and part list included,
-// without reading its internals.
-function recordCompletion(s3: S3Client, canceled: { value: boolean }): CompletionRecorder {
+// captures the upload id and the completion it assembled without reading its internals.
+function recordCompletion(
+  s3: S3Client,
+  canceled: { value: boolean },
+  target: { Bucket: string; Key: string },
+  initialUploadId: string | null = null,
+): CompletionRecorder {
   let completion: CompleteMultipartUploadCommandInput | null = null
+  let uploadId = initialUploadId
   const send = s3.send.bind(s3) as unknown as (command: unknown) => Promise<unknown>
   const recorded = new Proxy(s3, {
     get(target, property) {
@@ -230,11 +250,26 @@ function recordCompletion(s3: S3Client, canceled: { value: boolean }): Completio
       return (command: unknown) => {
         if (command instanceof CompleteMultipartUploadCommand) completion = command.input
         if (command instanceof UploadPartCommand) return sendPart(send, command, canceled)
+        if (command instanceof CreateMultipartUploadCommand) {
+          return send(command).then((created) => {
+            uploadId = (created as { UploadId?: string }).UploadId ?? null
+            return created
+          })
+        }
         return send(command)
       }
     },
   })
-  return { client: recorded, completion: () => completion }
+  return {
+    client: recorded,
+    completion: () => completion,
+    uploadId: () => uploadId,
+    discard: async () => {
+      const kept = uploadId
+      uploadId = null
+      if (kept) await abortMultipart(recorded, { ...target, UploadId: kept })
+    },
+  }
 }
 
 function pause(ms: number): Promise<void> {
@@ -296,8 +331,9 @@ async function retryCompletion(
     await pause(delay)
     if (canceled.value) break
     try {
-      await s3.send(new CompleteMultipartUploadCommand(completion))
-      return
+      const result = await s3.send(new CompleteMultipartUploadCommand(completion))
+      if (result.ETag) return
+      failure = missingResult()
     } catch (err) {
       failure = err
     }
@@ -306,31 +342,55 @@ async function retryCompletion(
   throw failure
 }
 
-async function finishUpload(
-  upload: Upload,
+// A 200 without a completion result, such as a proxy page, proves nothing; repeating joins the node.
+function missingResult(): Error {
+  return Object.assign(new Error('The node answered the completion without a result.'), {
+    $metadata: { httpStatusCode: 200 },
+  })
+}
+
+async function settleCompletion(
   recorder: CompletionRecorder,
+  completion: CompleteMultipartUploadCommandInput,
+  first: unknown,
   canceled: { value: boolean },
   onRetry?: (attempt: number, error: unknown) => void,
 ): Promise<void> {
   try {
-    await upload.done()
-    return
-  } catch (err) {
-    const completion = recorder.completion()
-    // A part that never made it is already cleaned up by lib-storage itself,
-    // and a canceled upload was aborted by the handle.
-    if (!completion || canceled.value) throw err
-    try {
-      await retryCompletion(recorder.client, completion, err, canceled, onRetry)
-    } catch (exhausted) {
-      // Only a permanent failure justifies dropping the parts: a completion the
-      // node may still be running has to outlive the retry window.
-      if (!canceled.value && !retryableCompletion(exhausted)) {
-        await abortMultipart(recorder.client, completion)
-      }
-      throw exhausted
-    }
+    await retryCompletion(recorder.client, completion, first, canceled, onRetry)
+  } catch (exhausted) {
+    // Only a permanent failure justifies dropping the parts: a completion the
+    // node may still be running has to outlive the retry window.
+    if (!canceled.value && !retryableCompletion(exhausted)) await recorder.discard()
+    throw exhausted
   }
+}
+
+async function finishUpload(
+  upload: Upload,
+  recorder: CompletionRecorder,
+  canceled: { value: boolean },
+  resumable: boolean,
+  onRetry?: (attempt: number, error: unknown) => void,
+): Promise<void> {
+  let failure: unknown
+  try {
+    const result = await upload.done()
+    const completion = recorder.completion()
+    if (!completion || (result as { ETag?: string }).ETag) return
+    failure = missingResult()
+  } catch (err) {
+    // A canceled upload was aborted by the handle.
+    if (canceled.value) throw err
+    if (!recorder.completion()) {
+      // A part failed after its own retries; only a resumable upload keeps the stored parts.
+      if (!resumable) await recorder.discard()
+      throw err
+    }
+    failure = err
+  }
+  const completion = recorder.completion()
+  if (completion) await settleCompletion(recorder, completion, failure, canceled, onRetry)
 }
 
 export function uploadObject(
@@ -341,9 +401,13 @@ export function uploadObject(
   nodeId?: string | null,
   sessionReference?: S3SessionReference,
   onCompletionRetry?: (attempt: number, error: unknown) => void,
+  resumable = false,
 ): UploadHandle {
   const canceled = { value: false }
-  const recorder = recordCompletion(client(nodeId, sessionReference), canceled)
+  const recorder = recordCompletion(client(nodeId, sessionReference), canceled, {
+    Bucket: bucket,
+    Key: key,
+  })
   const upload = new Upload({
     client: recorder.client,
     params: {
@@ -352,9 +416,10 @@ export function uploadObject(
       Body: file,
       ContentType: file.type || 'application/octet-stream',
     },
-    partSize: UPLOAD_PART_SIZE,
+    partSize: uploadPartSize(file.size),
     queueSize: UPLOAD_CONCURRENCY,
-    leavePartsOnError: false,
+    // The recorder owns the parts: it keeps them for a resume or discards them.
+    leavePartsOnError: true,
   })
   if (onProgress) {
     upload.on('httpUploadProgress', (progress) => {
@@ -362,14 +427,122 @@ export function uploadObject(
     })
   }
   return {
-    promise: finishUpload(upload, recorder, canceled, onCompletionRetry),
+    promise: finishUpload(upload, recorder, canceled, resumable, onCompletionRetry),
     abort: async () => {
       canceled.value = true
       await upload.abort()
-      const completion = recorder.completion()
-      if (completion) await abortMultipart(recorder.client, completion)
+      await recorder.discard()
     },
+    uploadId: recorder.uploadId,
   }
+}
+
+async function storedParts(
+  s3: S3Client,
+  target: { Bucket: string; Key: string; UploadId: string },
+): Promise<Map<number, Part>> {
+  const parts = new Map<number, Part>()
+  let marker: string | undefined
+  for (;;) {
+    const page = await s3.send(new ListPartsCommand({ ...target, PartNumberMarker: marker }))
+    for (const part of page.Parts ?? []) if (part.PartNumber) parts.set(part.PartNumber, part)
+    if (!page.IsTruncated || !page.NextPartNumberMarker) return parts
+    marker = page.NextPartNumberMarker
+  }
+}
+
+/**
+ * Continues a multipart upload a failed attempt kept on the node. Stored parts of the expected
+ * size are reused and only the missing ones are sent. NoSuchUpload means the node dropped it.
+ */
+export function resumeUpload(
+  bucket: string,
+  key: string,
+  file: File,
+  uploadId: string,
+  onProgress?: (loaded: number, total: number) => void,
+  nodeId?: string | null,
+  sessionReference?: S3SessionReference,
+  onCompletionRetry?: (attempt: number, error: unknown) => void,
+): UploadHandle {
+  const canceled = { value: false }
+  const target = { Bucket: bucket, Key: key, UploadId: uploadId }
+  const recorder = recordCompletion(client(nodeId, sessionReference), canceled, target, uploadId)
+  const run = async () => {
+    const partSize = uploadPartSize(file.size)
+    const count = Math.max(1, Math.ceil(file.size / partSize))
+    const stored = await storedParts(recorder.client, target)
+    const etags = new Map<number, string>()
+    const missing: number[] = []
+    let loaded = 0
+    for (let number = 1; number <= count; number += 1) {
+      const size = Math.min(partSize, file.size - (number - 1) * partSize)
+      const part = stored.get(number)
+      if (part?.ETag && part.Size === size) {
+        etags.set(number, part.ETag)
+        loaded += size
+      } else {
+        missing.push(number)
+      }
+    }
+    onProgress?.(loaded, file.size)
+    const worker = async () => {
+      for (let number = missing.shift(); number !== undefined; number = missing.shift()) {
+        if (canceled.value) throw new DOMException('The upload was canceled.', 'AbortError')
+        const start = (number - 1) * partSize
+        const body = file.slice(start, Math.min(start + partSize, file.size))
+        const sent = await recorder.client.send(
+          new UploadPartCommand({ ...target, PartNumber: number, Body: body }),
+        )
+        if (!sent.ETag) throw new Error(`The node returned no ETag for part ${number}.`)
+        etags.set(number, sent.ETag)
+        loaded += body.size
+        onProgress?.(loaded, file.size)
+      }
+    }
+    await Promise.all(Array.from({ length: UPLOAD_CONCURRENCY }, worker))
+    const completion: CompleteMultipartUploadCommandInput = {
+      ...target,
+      MultipartUpload: {
+        Parts: [...etags]
+          .sort(([left], [right]) => left - right)
+          .map(([PartNumber, ETag]) => ({ PartNumber, ETag })),
+      },
+    }
+    let failure: unknown
+    try {
+      const result = await recorder.client.send(new CompleteMultipartUploadCommand(completion))
+      if (result.ETag) return
+      failure = missingResult()
+    } catch (err) {
+      if (canceled.value) throw err
+      failure = err
+    }
+    await settleCompletion(recorder, completion, failure, canceled, onCompletionRetry)
+  }
+  return {
+    promise: run(),
+    abort: async () => {
+      canceled.value = true
+      await recorder.discard()
+    },
+    uploadId: recorder.uploadId,
+  }
+}
+
+/** Drops a multipart upload a failed attempt kept, so its parts leave the node. */
+export async function discardUpload(
+  bucket: string,
+  key: string,
+  uploadId: string,
+  nodeId?: string | null,
+  sessionReference?: S3SessionReference,
+): Promise<void> {
+  await abortMultipart(client(nodeId, sessionReference), {
+    Bucket: bucket,
+    Key: key,
+    UploadId: uploadId,
+  })
 }
 
 // S3 folder convention: a zero-byte object whose key ends in '/'.

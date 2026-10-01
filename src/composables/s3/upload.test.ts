@@ -3,6 +3,7 @@ import {
   AbortMultipartUploadCommand,
   CompleteMultipartUploadCommand,
   CreateMultipartUploadCommand,
+  ListPartsCommand,
   PutObjectCommand,
   S3Client,
   UploadPartCommand,
@@ -25,7 +26,7 @@ const fakeClient = {
 
 vi.mock('./client', () => ({ client: () => fakeClient }))
 
-const { UPLOAD_PART_SIZE, uploadObject } = await import('./objects')
+const { UPLOAD_PART_SIZE, resumeUpload, uploadObject, uploadPartSize } = await import('./objects')
 
 function payload(bytes: number): File {
   return new File([new Uint8Array(bytes)], 'payload.bin', { type: 'application/octet-stream' })
@@ -325,5 +326,98 @@ describe('completion answered with an error inside a 200 response', () => {
     )
 
     await expect(s3.send(completion)).resolves.toMatchObject({ Key: 'key', ETag: '"object"' })
+  })
+})
+
+describe('multipart upload resume', () => {
+  beforeEach(() => {
+    sent.length = 0
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('keeps the parts of a resumable upload whose part failed for good', async () => {
+    multipart([])
+    const answer = respond
+    respond = (command) =>
+      command instanceof UploadPartCommand && command.input.PartNumber === 2
+        ? Promise.reject(s3Error('AccessDenied', 403))
+        : answer(command)
+    const handle = uploadObject(
+      'bucket',
+      'key',
+      payload(UPLOAD_PART_SIZE + 1),
+      undefined,
+      null,
+      undefined,
+      undefined,
+      true,
+    )
+
+    await expect(handle.promise).rejects.toMatchObject({ name: 'AccessDenied' })
+    expect(handle.uploadId()).toBe('upload-1')
+    expect(of(AbortMultipartUploadCommand)).toHaveLength(0)
+  })
+
+  it('sends only the parts the node does not hold yet', async () => {
+    multipart([() => Promise.resolve({ ETag: '"object"' })])
+    const answer = respond
+    respond = (command) =>
+      command instanceof ListPartsCommand
+        ? Promise.resolve({
+            Parts: [
+              { PartNumber: 1, ETag: '"part-1"', Size: UPLOAD_PART_SIZE },
+              // A short stored part is not the expected part and is sent again.
+              { PartNumber: 2, ETag: '"short"', Size: 1 },
+            ],
+          })
+        : answer(command)
+    const progress: number[] = []
+    const handle = resumeUpload(
+      'bucket',
+      'key',
+      payload(2 * UPLOAD_PART_SIZE + 1),
+      'upload-1',
+      (loaded) => progress.push(loaded),
+    )
+
+    await expect(handle.promise).resolves.toBeUndefined()
+
+    const parts = of(UploadPartCommand).map((command) => command.input.PartNumber).sort()
+    expect(parts).toEqual([2, 3])
+    expect(of(CompleteMultipartUploadCommand)[0]?.input.MultipartUpload?.Parts).toEqual([
+      { PartNumber: 1, ETag: '"part-1"' },
+      { PartNumber: 2, ETag: '"part-2"' },
+      { PartNumber: 3, ETag: '"part-3"' },
+    ])
+    expect(progress[0]).toBe(UPLOAD_PART_SIZE)
+    expect(progress.at(-1)).toBe(2 * UPLOAD_PART_SIZE + 1)
+  })
+
+  it('repeats a completion answered without a result', async () => {
+    const first = deferred()
+    multipart([
+      () => {
+        first.resolve()
+        return Promise.resolve({})
+      },
+      () => Promise.resolve({ ETag: '"object"' }),
+    ])
+    const handle = uploadObject('bucket', 'key', payload(UPLOAD_PART_SIZE + 1))
+
+    await first.promise
+    await vi.advanceTimersByTimeAsync(2000)
+    await expect(handle.promise).resolves.toBeUndefined()
+    expect(of(CompleteMultipartUploadCommand)).toHaveLength(2)
+  })
+
+  it('sizes parts so any file fits 10,000 parts', () => {
+    expect(uploadPartSize(1024)).toBe(UPLOAD_PART_SIZE)
+    const huge = 400 * 1024 ** 3
+    expect(Math.ceil(huge / uploadPartSize(huge))).toBeLessThanOrEqual(10_000)
+    expect(uploadPartSize(huge) % (1024 * 1024)).toBe(0)
   })
 })

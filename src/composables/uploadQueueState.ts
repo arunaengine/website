@@ -30,6 +30,8 @@ export interface UploadQueueItem {
   // material while already signed requests finish with their original values.
   session: S3SessionReference | null
   pausedForSession?: boolean
+  // The multipart upload a failed attempt kept on the node; Retry continues it.
+  uploadId?: string
 }
 
 export const uploadQueueItems = ref<UploadQueueItem[]>([])
