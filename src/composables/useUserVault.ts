@@ -12,6 +12,7 @@ import {
   readVault,
   saveVault,
   vaultConflicted,
+  vaultUnavailable,
   vaultUnsupported,
   type UserVaultHead,
 } from '@/lib/api'
@@ -61,6 +62,8 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const providers = ref<BrowserProvider[]>([])
 const ownKey = ref<OwnKeyState>('unknown')
+/** True while the vault comes from this browser's cache because no holder answered. */
+const fromCache = ref(false)
 const keyStore = browserKeyStore()
 let payload: VaultPayload | null = null
 /** What the holders returned, newest first. */
@@ -101,6 +104,21 @@ function forgetKey(scope: string) {
   })
 }
 
+function cacheHeads(scope: string, list: UserVaultHead[]) {
+  if (!scope) return
+  void keyStore?.saveHeads(scope, list).catch(() => {
+    // Without a usable store there is no cache; the holders still have the vault.
+  })
+}
+
+async function cachedHeads(scope: string): Promise<UserVaultHead[] | null> {
+  try {
+    return (await keyStore?.loadHeads(scope)) ?? null
+  } catch {
+    return null
+  }
+}
+
 function forgetKeys() {
   void keyStore?.clear().catch(() => {
     // Same as above: nothing was kept where nothing can be written.
@@ -129,6 +147,7 @@ function clearLocal() {
   masterKey = null
   providers.value = []
   ownKey.value = 'unknown'
+  fromCache.value = false
   state.value = 'absent'
   loaded.value = false
   loading.value = false
@@ -185,6 +204,7 @@ async function adoptHeads(list: UserVaultHead[], run: number, key = masterKey): 
   const merged = key && parsed.length ? await mergeHeads(parsed, key) : null
   if (run !== generation) throw new Error(REPLACED)
   heads = parsed
+  cacheHeads(scopeKey, list)
   if (merged && key) {
     unlocked(merged, key)
     return merged.revisions.length > 1
@@ -197,6 +217,7 @@ async function adoptHeads(list: UserVaultHead[], run: number, key = masterKey): 
 /** Puts what the node holds into place, opening it with a key this browser remembers. */
 async function settle(scope: string, list: UserVaultHead[]): Promise<boolean> {
   if (!list.length) {
+    cacheHeads(scope, [])
     heads = []
     predecessors = []
     payload = null
@@ -303,6 +324,7 @@ function load(): Promise<void> {
       if (run !== generation) return
       const mergeDue = await settle(scope, response.heads)
       if (run !== generation) return
+      fromCache.value = false
       loaded.value = true
       if (state.value === 'unlocked') await finishUnlock(run, mergeDue)
     } catch (cause) {
@@ -312,6 +334,7 @@ function load(): Promise<void> {
         loaded.value = true
         return
       }
+      if (vaultUnavailable(cause) && await loadCached(scope, run)) return
       error.value = apiErrorMessage(cause)
     } finally {
       if (run === generation) {
@@ -322,6 +345,18 @@ function load(): Promise<void> {
   })()
   inFlight = promise
   return promise
+}
+
+/** Opens the heads this browser cached last; the directory check waits for the holders. */
+async function loadCached(scope: string, run: number): Promise<boolean> {
+  const cached = await cachedHeads(scope)
+  if (run !== generation || !cached?.length) return false
+  await settle(scope, cached)
+  if (run !== generation) return false
+  fromCache.value = true
+  ownKey.value = 'unavailable'
+  loaded.value = true
+  return true
 }
 
 function requireScope(): string {
@@ -502,6 +537,7 @@ export function useUserVault() {
     error,
     providers,
     ownKey,
+    fromCache,
     load,
     create,
     unlock,

@@ -48,8 +48,9 @@ const publishUserKey = vi.fn(async (request: { key_id: string; public_key: strin
   return request
 })
 
-// The remembered key, as the browser's IndexedDB would keep it.
+// The remembered key and the cached heads, as the browser's IndexedDB would keep them.
 const remembered = new Map<string, CryptoKey>()
+const cached = new Map<string, FakeHead[]>()
 
 vi.mock('@/lib/api', () => ({
   ApiError: class extends Error {},
@@ -76,8 +77,14 @@ vi.mock('@/lib/vault/keyStore', () => ({
     remove: async (scope: string) => {
       remembered.delete(scope)
     },
+    loadHeads: async (scope: string) => cached.get(scope) ?? null,
+    saveHeads: async (scope: string, heads: FakeHead[]) => {
+      if (heads.length) cached.set(scope, heads)
+      else cached.delete(scope)
+    },
     clear: async () => {
       remembered.clear()
+      cached.clear()
     },
   }),
 }))
@@ -126,6 +133,7 @@ beforeEach(() => {
   node.count = 0
   node.unsupported = false
   remembered.clear()
+  cached.clear()
   directory.length = 0
   listUserKeys.mockClear()
   publishUserKey.mockClear()
@@ -376,6 +384,60 @@ describe('useUserVault', () => {
 
     await vi.waitFor(() => expect(vault.ownKey.value).toBe('unavailable'))
     expect(publishUserKey).not.toHaveBeenCalled()
+  })
+
+  it('opens the cached vault when no holder answers', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', false)
+    await vault.saveProviders([work])
+    readVault.mockRejectedValueOnce(refused(503, 'vault_unavailable'))
+
+    const restarted = await boot()
+
+    expect(restarted.vault.state.value).toBe('unlocked')
+    expect(restarted.vault.fromCache.value).toBe(true)
+    expect(restarted.vault.error.value).toBeNull()
+    expect(restarted.vault.providers.value).toEqual([work])
+    expect(restarted.vault.ownKey.value).toBe('unavailable')
+    expect(listUserKeys).toHaveBeenCalledTimes(1)
+  })
+
+  it('unlocks the cached vault with the passphrase after a lock', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', false)
+    await vault.saveProviders([work])
+    vault.lock()
+    expect(cached.size).toBe(1)
+    readVault.mockRejectedValueOnce(refused(503, 'vault_unavailable'))
+
+    const restarted = await boot()
+    expect(restarted.vault.state.value).toBe('locked')
+    await restarted.vault.unlock('correct horse')
+
+    expect(restarted.vault.providers.value).toEqual([work])
+  })
+
+  it('reports an unreachable holder without a cache', async () => {
+    readVault.mockRejectedValueOnce(refused(503, 'vault_unavailable'))
+
+    const { vault } = await boot()
+
+    expect(vault.fromCache.value).toBe(false)
+    expect(vault.error.value).toBe('vault_unavailable')
+    expect(vault.loaded.value).toBe(false)
+  })
+
+  it('forgets the cache with the vault and with the session', async () => {
+    const { vault, state } = await boot()
+    await vault.create('correct horse', false)
+    await vault.reset()
+    expect(cached.size).toBe(0)
+
+    await vault.create('correct horse', false)
+    expect(cached.size).toBe(1)
+    state.sessionEpoch.value += 1
+    await Promise.resolve()
+    expect(cached.size).toBe(0)
   })
 
   it('reports a node without the route', async () => {
