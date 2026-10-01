@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { validateBrowserProvider } from '@/lib/assistant/browserProviders'
+import { assistantChatScopeKey } from '@/lib/assistant/chatHistory'
 import * as Crypto from '@/lib/vault/crypto'
 
 // A stand-in for the vault holders: each save is a head that replaces its
@@ -51,6 +52,12 @@ const publishUserKey = vi.fn(async (request: { key_id: string; public_key: strin
 // The remembered key and the cached heads, as the browser's IndexedDB would keep them.
 const remembered = new Map<string, CryptoKey>()
 const cached = new Map<string, FakeHead[]>()
+const SCOPE = assistantChatScopeKey({ apiBaseUrl: 'https://node.test/api/v1', realmId: 'r-1', userId: 'u-1' })
+const stored = new Map<string, string>()
+vi.stubGlobal('localStorage', {
+  getItem: (name: string) => stored.get(name) ?? null,
+  setItem: (name: string, value: string) => stored.set(name, value),
+})
 
 vi.mock('@/lib/api', () => ({
   ApiError: class extends Error {},
@@ -134,6 +141,7 @@ beforeEach(() => {
   node.unsupported = false
   remembered.clear()
   cached.clear()
+  stored.clear()
   directory.length = 0
   listUserKeys.mockClear()
   publishUserKey.mockClear()
@@ -437,6 +445,44 @@ describe('useUserVault', () => {
     expect(cached.size).toBe(1)
     state.sessionEpoch.value += 1
     await Promise.resolve()
+    expect(cached.size).toBe(0)
+  })
+
+  it('shows the recreate notice once for a vault from before the holders', async () => {
+    // An older portal remembered a key, but the holders have no vault and nothing is cached.
+    remembered.set(SCOPE, {} as CryptoKey)
+    const { vault } = await boot()
+    expect(remembered.size).toBe(0)
+    expect(vault.recreateNotice.value).toBe(true)
+
+    const restarted = await boot()
+    expect(restarted.vault.recreateNotice.value).toBe(true)
+    restarted.vault.dismissRecreateNotice()
+    expect(restarted.vault.recreateNotice.value).toBe(false)
+
+    expect((await boot()).vault.recreateNotice.value).toBe(false)
+  })
+
+  it('creating the vault again ends the notice', async () => {
+    remembered.set(SCOPE, {} as CryptoKey)
+    const { vault } = await boot()
+
+    await vault.create('correct horse', false)
+
+    expect(vault.recreateNotice.value).toBe(false)
+    await vault.reset()
+    expect((await boot()).vault.recreateNotice.value).toBe(false)
+  })
+
+  it('shows no notice when another browser deleted a cached vault', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', false)
+    node.heads = []
+
+    const restarted = await boot()
+
+    expect(restarted.vault.state.value).toBe('absent')
+    expect(restarted.vault.recreateNotice.value).toBe(false)
     expect(cached.size).toBe(0)
   })
 

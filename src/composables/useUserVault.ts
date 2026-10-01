@@ -64,6 +64,12 @@ const providers = ref<BrowserProvider[]>([])
 const ownKey = ref<OwnKeyState>('unknown')
 /** True while the vault comes from this browser's cache because no holder answered. */
 const fromCache = ref(false)
+/**
+ * True once for a browser that unlocked a vault the holders no longer have and
+ * never cached, which is a vault from before vaults moved to the holders.
+ */
+const recreateNotice = ref(false)
+const NOTICE_PREFIX = 'aruna.vault.recreateNotice:'
 const keyStore = browserKeyStore()
 let payload: VaultPayload | null = null
 /** What the holders returned, newest first. */
@@ -119,6 +125,27 @@ async function cachedHeads(scope: string): Promise<UserVaultHead[] | null> {
   }
 }
 
+function noticeState(scope: string): string | null {
+  try {
+    return globalThis.localStorage?.getItem(NOTICE_PREFIX + scope) ?? null
+  } catch {
+    return null
+  }
+}
+
+function storeNotice(scope: string, value: 'pending' | 'seen') {
+  try {
+    globalThis.localStorage?.setItem(NOTICE_PREFIX + scope, value)
+  } catch {
+    // Without storage the notice shows once per page load at most.
+  }
+}
+
+function dismissRecreateNotice() {
+  recreateNotice.value = false
+  if (scopeKey) storeNotice(scopeKey, 'seen')
+}
+
 function forgetKeys() {
   void keyStore?.clear().catch(() => {
     // Same as above: nothing was kept where nothing can be written.
@@ -148,6 +175,7 @@ function clearLocal() {
   providers.value = []
   ownKey.value = 'unknown'
   fromCache.value = false
+  recreateNotice.value = false
   state.value = 'absent'
   loaded.value = false
   loading.value = false
@@ -217,6 +245,10 @@ async function adoptHeads(list: UserVaultHead[], run: number, key = masterKey): 
 /** Puts what the node holds into place, opening it with a key this browser remembers. */
 async function settle(scope: string, list: UserVaultHead[]): Promise<boolean> {
   if (!list.length) {
+    const run = generation
+    const lost = await rememberedKey(scope) && !(await cachedHeads(scope))
+    if (run !== generation) throw new Error(REPLACED)
+    if (lost && noticeState(scope) !== 'seen') storeNotice(scope, 'pending')
     cacheHeads(scope, [])
     heads = []
     predecessors = []
@@ -325,6 +357,7 @@ function load(): Promise<void> {
       const mergeDue = await settle(scope, response.heads)
       if (run !== generation) return
       fromCache.value = false
+      recreateNotice.value = state.value === 'absent' && noticeState(scope) === 'pending'
       loaded.value = true
       if (state.value === 'unlocked') await finishUnlock(run, mergeDue)
     } catch (cause) {
@@ -434,6 +467,7 @@ async function create(passphrase: string, withRecovery: boolean): Promise<string
   const response = await saveVault({ payload: JSON.stringify(created.payload), predecessors: [] }, client())
   if (run !== generation) throw new Error(REPLACED)
   await adoptHeads(response.heads, run, created.masterKey)
+  if (noticeState(scope) === 'pending') dismissRecreateNotice()
   await rememberKey(scope, created.masterKey)
   await finishUnlock(run, false)
   return created.recoveryCode
@@ -538,6 +572,7 @@ export function useUserVault() {
     providers,
     ownKey,
     fromCache,
+    recreateNotice,
     load,
     create,
     unlock,
@@ -547,5 +582,6 @@ export function useUserVault() {
     reset,
     saveProviders,
     rotateKey,
+    dismissRecreateNotice,
   }
 }
