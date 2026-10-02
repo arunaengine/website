@@ -185,11 +185,10 @@ export function uploadPartSize(bytes: number): number {
   return Math.max(UPLOAD_PART_SIZE, Math.ceil(bytes / MAX_UPLOAD_PARTS / MIB) * MIB)
 }
 
-// Composing a multi-GB object out of its parts keeps the node busy for minutes
-// and a proxy in between may drop the idle connection first. The parts are
-// already stored, so a lost completion is repeated with the same upload id
-// until the object exists or this window closes.
-const COMPLETION_WINDOW_MS = 10 * 60 * 1000
+// Hashing a multi-GB object after its parts are assembled keeps the node busy for minutes,
+// and a proxy in between may drop the connection first. A repeated completion only joins
+// the running one, so it is repeated for as long as the node lets a completion run.
+const COMPLETION_WINDOW_MS = 2 * 60 * 60 * 1000
 const COMPLETION_BACKOFF_MS = 2000
 const COMPLETION_BACKOFF_CAP_MS = 30 * 1000
 

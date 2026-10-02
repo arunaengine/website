@@ -210,17 +210,18 @@ describe('multipart upload completion', () => {
     })
 
     const started = Date.now()
-    for (let round = 0; round < 15 && !settled; round += 1) {
-      await vi.advanceTimersByTimeAsync(60_000)
+    for (let round = 0; round < 30 && !settled; round += 1) {
+      await vi.advanceTimersByTimeAsync(10 * 60_000)
     }
 
     await expect(failure).resolves.toMatchObject({ name: 'OperationAborted' })
+    // The node lets one completion run for two hours, so the portal waits that long.
     const elapsed = Date.now() - started
-    expect(elapsed).toBeGreaterThanOrEqual(9 * 60 * 1000)
-    expect(elapsed).toBeLessThanOrEqual(11 * 60 * 1000)
+    expect(elapsed).toBeGreaterThanOrEqual(119 * 60 * 1000)
+    expect(elapsed).toBeLessThanOrEqual(130 * 60 * 1000)
     const attempts = of(CompleteMultipartUploadCommand).length
-    expect(attempts).toBeGreaterThan(5)
-    expect(attempts).toBeLessThan(30)
+    expect(attempts).toBeGreaterThan(100)
+    expect(attempts).toBeLessThan(300)
     // The node is still assembling the object, so the parts must survive.
     expect(of(AbortMultipartUploadCommand)).toHaveLength(0)
   })
