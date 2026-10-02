@@ -286,16 +286,19 @@ async function refreshSession(key: string): Promise<void> {
     )
     const current = sessions.value.get(key)
     if (!current || current.accessKeyId !== session.accessKeyId) return
-    putSession(
-      key,
-      responseSession(response, {
-        nodeId: session.issuerNodeId,
-        groupId: session.groupId,
-        userId: session.userId,
-        apiBase: session.apiBase,
-        previous: session,
-      }),
-    )
+    const refreshed = responseSession(response, {
+      nodeId: session.issuerNodeId,
+      groupId: session.groupId,
+      userId: session.userId,
+      apiBase: session.apiBase,
+      previous: session,
+    })
+    // Rotating again without a later expiry would only replace credentials still in use.
+    if (refreshed.expiresAt <= session.expiresAt) {
+      refreshed.state = 'warning'
+      refreshed.warning = `This S3 session cannot outlast your sign-in. It remains valid until ${new Date(refreshed.expiresAt).toLocaleTimeString()}.`
+    }
+    putSession(key, refreshed)
   } catch (error) {
     const current = sessions.value.get(key)
     if (!current || current.accessKeyId !== session.accessKeyId) return
@@ -394,7 +397,7 @@ watch(apiBaseUrl, (base) => {
   clearSessions()
 })
 
-watch([authToken, currentUser], ([token, user]) => {
+watch([authToken, currentUser], ([token, user], [previousToken]) => {
   if (!token) {
     knownUserId = null
     if (sessions.value.size) clearSessions()
@@ -405,7 +408,17 @@ watch([authToken, currentUser], ([token, user]) => {
   if (!user) return
   if (knownUserId && knownUserId !== user.id) clearSessions()
   knownUserId = user.id
+  if (token !== previousToken) retryRefresh()
 })
+
+// A renewed bearer token may let a session whose refresh failed move its expiry later.
+function retryRefresh(): void {
+  const key = activeSessionKey.value
+  const session = key ? sessions.value.get(key) : undefined
+  if (!key || !sessionUsable(session) || session.state !== 'warning') return
+  putSession(key, { ...session, state: 'active', warning: null })
+  scheduleActiveSession()
+}
 
 export function sessionForReference(reference: S3SessionReference): PortalS3Session | null {
   const session = sessions.value.get(storeKey(reference.nodeId, reference.groupId)) ?? null

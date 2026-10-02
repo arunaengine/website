@@ -290,6 +290,44 @@ describe('portal S3 session signing and refresh', () => {
   })
 })
 
+describe('portal S3 session refresh limits', () => {
+  it('stops refreshing a session the sign-in cannot extend until the sign-in is renewed', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-19T10:00:00.000Z'))
+    const minted = sessionResponse()
+    apiRequest
+      .mockResolvedValueOnce(minted)
+      .mockResolvedValueOnce(sessionResponse({ session_token: 'token-b', expires_at: minted.expires_at }))
+      .mockResolvedValueOnce(
+        sessionResponse({
+          session_token: 'token-c',
+          expires_at: new Date(Date.now() + 115 * 60 * 1000).toISOString(),
+        }),
+      )
+    await s3.activateContext(null, 'group-a')
+    await s3.downloadUrl('bucket-a', 'object.txt', null)
+    const boundary =
+      60 * 60 * 1000 -
+      sessionModule.S3_SESSION_REFRESH_WINDOW_MS +
+      sessionModule.s3SessionRefreshJitterMs(minted.access_key_id)
+
+    await vi.advanceTimersByTimeAsync(boundary)
+    expect(apiRequest).toHaveBeenCalledTimes(2)
+    expect(s3.activeSession.value).toMatchObject({ state: 'warning', sessionToken: 'token-b' })
+
+    // Using the session again must not rotate the credentials once more.
+    await s3.downloadUrl('bucket-a', 'object.txt', null)
+    await vi.advanceTimersByTimeAsync(60 * 1000)
+    expect(apiRequest).toHaveBeenCalledTimes(2)
+
+    authToken.value = 'bearer-a-renewed'
+    await nextTick()
+    await vi.advanceTimersByTimeAsync(sessionModule.s3SessionRefreshJitterMs(minted.access_key_id))
+    expect(apiRequest).toHaveBeenCalledTimes(3)
+    expect(s3.activeSession.value).toMatchObject({ state: 'active', sessionToken: 'token-c' })
+  })
+})
+
 describe('portal S3 session boundaries and node scope', () => {
   it('keeps sessions for a same-user token refresh and clears them for user or API changes', async () => {
     await s3.activateContext(null, 'group-a')
