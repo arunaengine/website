@@ -471,7 +471,11 @@ export function resumeUpload(
   const run = async () => {
     const partSize = uploadPartSize(file.size)
     const count = Math.max(1, Math.ceil(file.size / partSize))
+    const stop = () => {
+      if (canceled.value) throw new DOMException('The upload was canceled.', 'AbortError')
+    }
     const stored = await storedParts(recorder.client, target)
+    stop()
     const etags = new Map<number, string>()
     const missing: number[] = []
     let loaded = 0
@@ -486,21 +490,31 @@ export function resumeUpload(
       }
     }
     onProgress?.(loaded, file.size)
+    let failed = false
     const worker = async () => {
-      for (let number = missing.shift(); number !== undefined; number = missing.shift()) {
-        if (canceled.value) throw new DOMException('The upload was canceled.', 'AbortError')
-        const start = (number - 1) * partSize
-        const body = file.slice(start, Math.min(start + partSize, file.size))
-        const sent = await recorder.client.send(
-          new UploadPartCommand({ ...target, PartNumber: number, Body: body }),
-        )
-        if (!sent.ETag) throw new Error(`The node returned no ETag for part ${number}.`)
-        etags.set(number, sent.ETag)
-        loaded += body.size
-        onProgress?.(loaded, file.size)
+      try {
+        for (let number = missing.shift(); number !== undefined && !failed; number = missing.shift()) {
+          stop()
+          const start = (number - 1) * partSize
+          const body = file.slice(start, Math.min(start + partSize, file.size))
+          const sent = await recorder.client.send(
+            new UploadPartCommand({ ...target, PartNumber: number, Body: body }),
+          )
+          if (!sent.ETag) throw new Error(`The node returned no ETag for part ${number}.`)
+          etags.set(number, sent.ETag)
+          loaded += body.size
+          onProgress?.(loaded, file.size)
+        }
+      } catch (err) {
+        failed = true
+        throw err
       }
     }
-    await Promise.all(Array.from({ length: UPLOAD_CONCURRENCY }, worker))
+    // One failed part stops the others from starting more; the attempt ends once all have settled.
+    const settled = await Promise.allSettled(Array.from({ length: UPLOAD_CONCURRENCY }, worker))
+    const rejected = settled.find((result) => result.status === 'rejected')
+    if (rejected) throw rejected.reason
+    stop()
     const completion: CompleteMultipartUploadCommandInput = {
       ...target,
       MultipartUpload: {

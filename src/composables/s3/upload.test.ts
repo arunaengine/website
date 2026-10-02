@@ -397,6 +397,59 @@ describe('multipart upload resume', () => {
     expect(progress.at(-1)).toBe(2 * UPLOAD_PART_SIZE + 1)
   })
 
+  it('sends no completion once canceled while listing the stored parts', async () => {
+    multipart([() => Promise.resolve({ ETag: '"object"' })])
+    const answer = respond
+    const listed = deferred()
+    respond = (command) =>
+      command instanceof ListPartsCommand
+        ? listed.promise.then(() => ({
+            Parts: [{ PartNumber: 1, ETag: '"part-1"', Size: 1 }],
+          }))
+        : answer(command)
+    const handle = resumeUpload('bucket', 'key', payload(1), 'upload-1')
+
+    await handle.abort()
+    listed.resolve()
+
+    await expect(handle.promise).rejects.toMatchObject({ name: 'AbortError' })
+    expect(of(CompleteMultipartUploadCommand)).toHaveLength(0)
+  })
+
+  it('starts no part after one failed and settles the others first', async () => {
+    multipart([])
+    const answer = respond
+    const second = deferred()
+    let secondDone = false
+    respond = (command) => {
+      if (command instanceof ListPartsCommand) return Promise.resolve({ Parts: [] })
+      if (command instanceof UploadPartCommand && command.input.PartNumber === 1) {
+        return Promise.reject(s3Error('AccessDenied', 403))
+      }
+      if (command instanceof UploadPartCommand && command.input.PartNumber === 2) {
+        return second.promise.then(() => {
+          secondDone = true
+          return { ETag: '"part-2"' }
+        })
+      }
+      return answer(command)
+    }
+    const handle = resumeUpload('bucket', 'key', payload(5 * UPLOAD_PART_SIZE), 'upload-1')
+    let ended = false
+    void handle.promise.catch(() => {
+      ended = true
+    })
+
+    await vi.advanceTimersByTimeAsync(0)
+    expect(ended).toBe(false)
+    second.resolve()
+
+    await expect(handle.promise).rejects.toMatchObject({ name: 'AccessDenied' })
+    expect(secondDone).toBe(true)
+    const parts = of(UploadPartCommand).map((command) => command.input.PartNumber)
+    expect(parts).toEqual([1, 2, 3])
+  })
+
   it('repeats a completion answered without a result', async () => {
     const first = deferred()
     multipart([
