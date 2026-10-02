@@ -32,6 +32,8 @@ export interface UploadQueueItem {
   pausedForSession?: boolean
   // The multipart upload a failed attempt kept on the node; Retry continues it.
   uploadId?: string
+  // A completion was sent for the kept upload, so the node may have stored the object.
+  completionSent?: boolean
 }
 
 export const uploadQueueItems = ref<UploadQueueItem[]>([])

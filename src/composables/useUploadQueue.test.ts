@@ -51,7 +51,7 @@ function file(name: string): File {
   return { name, size: 10, type: 'text/plain' } as File
 }
 
-function deferredHandle(uploadId: string | null = null): {
+function deferredHandle(uploadId: string | null = null, completionSent = false): {
   handle: UploadHandle
   resolve: () => void
   reject: (error: unknown) => void
@@ -63,7 +63,12 @@ function deferredHandle(uploadId: string | null = null): {
     reject = fail
   })
   return {
-    handle: { promise, abort: vi.fn(async () => undefined), uploadId: () => uploadId },
+    handle: {
+      promise,
+      abort: vi.fn(async () => undefined),
+      uploadId: () => uploadId,
+      completionSent: () => completionSent,
+    },
     resolve,
     reject,
   }
@@ -83,7 +88,7 @@ describe('upload queue session attribution', () => {
     }
     references.set(contextKey(null, 'group-a'), sessionA)
     references.set(contextKey('node-b', 'group-b'), sessionB)
-    const handles = Array.from({ length: 4 }, deferredHandle)
+    const handles = Array.from({ length: 4 }, () => deferredHandle())
     uploadObject.mockReset()
     for (const entry of handles) uploadObject.mockReturnValueOnce(entry.handle)
 
@@ -237,9 +242,9 @@ describe('upload queue resume', () => {
     accessKeyId: 'session-d',
   }
 
-  function failed(name: string, error: unknown) {
+  function failed(name: string, error: unknown, completionSent = false) {
     references.set(contextKey('node-d', 'group-d'), sessionD)
-    const first = deferredHandle('upload-1')
+    const first = deferredHandle('upload-1', completionSent)
     uploadObject.mockReset()
     resumeUpload.mockReset()
     uploadObject.mockReturnValueOnce(first.handle)
@@ -280,6 +285,21 @@ describe('upload queue resume', () => {
     await vi.waitFor(() => expect(uploadObject).toHaveBeenCalledTimes(2))
     fresh.resolve()
     await vi.waitFor(() => expect(item.state).toBe('done'))
+  })
+
+  it('does not start over when a sent completion may have stored the file', async () => {
+    const item = failed('completed', new Error('completion lost'), true)
+    await vi.waitFor(() => expect(item.state).toBe('error'))
+    const resumed = deferredHandle('upload-1')
+    resumeUpload.mockReturnValueOnce(resumed.handle)
+
+    queue.retry(item)
+    resumed.reject(Object.assign(new Error('gone'), { name: 'NoSuchUpload' }))
+
+    await vi.waitFor(() => expect(item.state).toBe('error'))
+    expect(item.error).toContain('may already be stored')
+    expect(uploadObject).toHaveBeenCalledTimes(1)
+    expect(item.uploadId).toBeUndefined()
   })
 
   it('drops the kept parts when a failed row is dismissed', async () => {

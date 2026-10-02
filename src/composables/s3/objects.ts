@@ -67,6 +67,8 @@ export interface UploadHandle {
   abort: () => Promise<void>
   /** The multipart upload a failed attempt kept on the node for `resumeUpload`. */
   uploadId: () => string | null
+  /** Whether this attempt sent a completion, which the node may have finished. */
+  completionSent: () => boolean
 }
 
 export interface DeletePrefixResult {
@@ -434,6 +436,7 @@ export function uploadObject(
       await recorder.discard()
     },
     uploadId: recorder.uploadId,
+    completionSent: () => recorder.completion() !== null,
   }
 }
 
@@ -541,6 +544,7 @@ export function resumeUpload(
       await recorder.discard()
     },
     uploadId: recorder.uploadId,
+    completionSent: () => recorder.completion() !== null,
   }
 }
 

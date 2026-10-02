@@ -41,6 +41,10 @@ let counter = 0
 // part PUTs; the browser's per-host connection pool serializes the rest.
 const MAX_CONCURRENT_FILES = 3
 
+const UPLOAD_OUTCOME_UNKNOWN =
+  'The node no longer has this upload, but its completion was already sent, so the file may ' +
+  'already be stored. Check the bucket; Retry uploads the whole file again.'
+
 const lastCompleted = ref<{ bucket: string; key: string; nodeId: string | null; at: number } | null>(null)
 
 function sessionOf(nodeId: string | null, groupId: string | null): S3SessionReference | null {
@@ -134,6 +138,7 @@ async function run(item: UploadQueueItem): Promise<void> {
   const fresh = () =>
     s3.uploadObject(item.bucket, item.key, file, onProgress, item.nodeId, session, onRetry, true)
   let handle: UploadHandle | undefined
+  let gone = false
   try {
     handle = item.uploadId
       ? s3.resumeUpload(item.bucket, item.key, file, item.uploadId, onProgress, item.nodeId, session, onRetry)
@@ -144,6 +149,11 @@ async function run(item: UploadQueueItem): Promise<void> {
     } catch (err) {
       const code = (err as { Code?: string; name?: string } | null)
       if (!item.uploadId || (code?.Code ?? code?.name) !== 'NoSuchUpload') throw err
+      if (item.completionSent || handle.completionSent()) {
+        // A completion the node finished also ends the upload, so starting over could store it twice.
+        gone = true
+        throw new Error(UPLOAD_OUTCOME_UNKNOWN)
+      }
       // The node dropped the kept upload, so this attempt starts over from the first part.
       item.uploadId = undefined
       handle = fresh()
@@ -151,6 +161,7 @@ async function run(item: UploadQueueItem): Promise<void> {
       await handle.promise
     }
     item.uploadId = undefined
+    item.completionSent = undefined
     if (item.state === 'uploading') {
       item.state = 'done'
       item.error = undefined
@@ -161,7 +172,8 @@ async function run(item: UploadQueueItem): Promise<void> {
     }
   } catch (err) {
     // A failed attempt keeps its parts on the node, so Retry sends only the missing ones.
-    item.uploadId = handle?.uploadId() ?? undefined
+    item.uploadId = gone ? undefined : (handle?.uploadId() ?? undefined)
+    item.completionSent = item.uploadId ? item.completionSent || handle?.completionSent() : undefined
     // cancel() may have flipped the state to 'canceled' during the await, which
     // TS's synchronous control-flow analysis cannot see; widen before compare.
     if ((item.state as UploadItemState) !== 'canceled') {
