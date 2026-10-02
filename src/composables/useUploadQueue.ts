@@ -177,7 +177,14 @@ async function run(item: UploadQueueItem): Promise<void> {
     // cancel() may have flipped the state to 'canceled' during the await, which
     // TS's synchronous control-flow analysis cannot see; widen before compare.
     if ((item.state as UploadItemState) !== 'canceled') {
-      if (item.session && isS3SessionRejected(err)) {
+      const replacement = sessionOf(item.nodeId, item.groupId)
+      const rejected = item.session && isS3SessionRejected(err)
+      if (rejected && replacement && replacement.accessKeyId !== item.session?.accessKeyId) {
+        // Another file already replaced the refused session, and its revision event has passed.
+        item.session = replacement
+        item.state = 'queued'
+        item.error = undefined
+      } else if (item.session && rejected) {
         pauseForSession(item, 'The node no longer accepts this S3 session; a new one is being created.')
         void s3.replaceSession(item.session).catch(() => undefined)
       } else if (item.session && s3.sessionState(item.session) !== 'usable') {

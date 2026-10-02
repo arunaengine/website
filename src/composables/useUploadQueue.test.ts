@@ -320,4 +320,20 @@ describe('upload queue resume', () => {
     expect(replaceSession).toHaveBeenCalledWith(sessionD)
     expect(item.uploadId).toBe('upload-1')
   })
+
+  it('moves to a replacement session that already exists', async () => {
+    replaceSession.mockClear()
+    const replaced: S3SessionReference = { ...sessionD, accessKeyId: 'session-d2' }
+    const item = failed('late', Object.assign(new Error('unknown key'), { name: 'InvalidAccessKeyId' }))
+    const resumed = deferredHandle()
+    resumeUpload.mockReturnValueOnce(resumed.handle)
+    references.set(contextKey('node-d', 'group-d'), replaced)
+
+    await vi.waitFor(() => expect(resumeUpload).toHaveBeenCalledTimes(1))
+    expect(replaceSession).not.toHaveBeenCalled()
+    expect(item.pausedForSession).toBeUndefined()
+    expect(resumeUpload.mock.calls[0]?.[6]).toEqual(replaced)
+    resumed.resolve()
+    await vi.waitFor(() => expect(item.state).toBe('done'))
+  })
 })
