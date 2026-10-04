@@ -165,7 +165,9 @@ function confirmRemoval() {
             </Button>
           </li>
         </ul>
-        <p v-if="!list.length" class="text-xs text-muted-foreground">This bucket has no key holders.</p>
+        <p v-if="!list.length" class="text-xs text-muted-foreground">
+          {{ partial ? 'No key holder could be looked up.' : 'This bucket has no key holders.' }}
+        </p>
         <Notice tone="warning">Removing a key holder does not erase copies of the key they already made.</Notice>
       </template>
 

@@ -169,4 +169,12 @@ describe('bucket key holder list', () => {
     expect(button(root, 'Remove anyway').props.disabled).toBe(true)
     expect(remove).not.toHaveBeenCalled()
   })
+
+  it('claims no key holders only for a complete list', async () => {
+    expect(content(await render([]))).toContain('This bucket has no key holders.')
+
+    const partial = content(await render([], true, false))
+    expect(partial).toContain('No key holder could be looked up.')
+    expect(partial).not.toContain('has no key holders')
+  })
 })
