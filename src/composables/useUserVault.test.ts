@@ -521,6 +521,79 @@ describe('useUserVault', () => {
     expect(readVault).toHaveBeenCalledTimes(2)
   })
 
+  it('drops a read that was running when a reset deleted the vault', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', false)
+    const decrypt = crypto.subtle.decrypt.bind(crypto.subtle)
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const held = vi.spyOn(crypto.subtle, 'decrypt').mockImplementationOnce(async (...args) => {
+      await gate
+      return decrypt(...args)
+    })
+
+    const reading = vault.load()
+    await vi.waitFor(() => expect(held).toHaveBeenCalled())
+    held.mockRestore()
+    await vault.reset()
+    release()
+    await reading
+
+    expect(vault.state.value).toBe('absent')
+    expect(vault.loading.value).toBe(false)
+  })
+
+  it('drops a read that began while a reset deleted the vault', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', false)
+    let deleted!: () => void
+    deleteVault.mockImplementationOnce(() => new Promise<void>((resolve) => (deleted = () => {
+      node.heads = []
+      resolve()
+    })))
+    const decrypt = crypto.subtle.decrypt.bind(crypto.subtle)
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const held = vi.spyOn(crypto.subtle, 'decrypt').mockImplementationOnce(async (...args) => {
+      await gate
+      return decrypt(...args)
+    })
+
+    const resetting = vault.reset()
+    const reading = vault.load()
+    await vi.waitFor(() => expect(held).toHaveBeenCalled())
+    held.mockRestore()
+    deleted()
+    await resetting
+    release()
+    await reading
+
+    expect(vault.state.value).toBe('absent')
+  })
+
+  it('drops an unlock that was running when a reset deleted the vault', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', false)
+    vault.lock()
+    const decrypt = crypto.subtle.decrypt.bind(crypto.subtle)
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const held = vi.spyOn(crypto.subtle, 'decrypt').mockImplementationOnce(async (...args) => {
+      await gate
+      return decrypt(...args)
+    })
+
+    const unlocking = vault.unlock('correct horse')
+    await vi.waitFor(() => expect(held).toHaveBeenCalled())
+    held.mockRestore()
+    await vault.reset()
+    release()
+
+    await expect(unlocking).rejects.toThrow('changed in another browser')
+    expect(vault.state.value).toBe('absent')
+    expect(remembered.size).toBe(0)
+  })
+
   it('refuses a holder passphrase shorter than twelve characters', async () => {
     const { vault } = await boot()
     await expect(vault.create('eleven char', false)).rejects.toThrow('at least 12 characters')

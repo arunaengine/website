@@ -597,12 +597,23 @@ async function openUserKey(keyId: string): Promise<X25519Pair | null> {
   return entry ? openKeypair(key, entry) : null
 }
 
+/** Ends every read, unlock and key check already running, for good. */
+function endRunningWork() {
+  generation += 1
+  inFlight = null
+  loading.value = false
+  keyCheck = null
+}
+
 async function reset(): Promise<void> {
   const scope = scopeKey
   const session = sessionGeneration
+  // Work running before or during the deletion read the old vault; none of it may restore it.
+  endRunningWork()
   await deleteVault(client())
   // The deletion belongs to this account and session; another one keeps its own state.
   if (session !== sessionGeneration) return
+  endRunningWork()
   payload = null
   masterKey = null
   providers.value = []
