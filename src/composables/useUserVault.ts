@@ -274,10 +274,13 @@ async function settle(scope: string, list: UserVaultHead[]): Promise<boolean> {
       return await adoptHeads(list, run, key)
     } catch (cause) {
       if (!(cause instanceof VaultUnlockError)) throw cause
+      // A lock or session change during the merge owns the remembered key now.
+      if (run !== generation) throw new Error(REPLACED)
       forgetKey(scope)
     }
   }
   await adoptHeads(list, run, null)
+  if (run !== generation) throw new Error(REPLACED)
   masterKey = null
   providers.value = []
   state.value = 'locked'

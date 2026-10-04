@@ -53,6 +53,8 @@ const publishUserKey = vi.fn(async (request: { key_id: string; public_key: strin
 const cachedLoads = vi.fn(async (scope: string): Promise<FakeHead[] | null> => cached.get(scope) ?? null)
 const remembered = new Map<string, CryptoKey>()
 const cached = new Map<string, FakeHead[]>()
+/** Runs inside the vault's heads cache write, so a test can act right after the heads are taken. */
+let onSaveHeads: (() => void) | null = null
 const SCOPE = assistantChatScopeKey({ apiBaseUrl: 'https://node.test/api/v1', realmId: 'r-1', userId: 'u-1' })
 const stored = new Map<string, string>()
 vi.stubGlobal('localStorage', {
@@ -87,6 +89,7 @@ vi.mock('@/lib/vault/keyStore', () => ({
     },
     loadHeads: (scope: string) => cachedLoads(scope),
     saveHeads: async (scope: string, heads: FakeHead[]) => {
+      onSaveHeads?.()
       if (heads.length) cached.set(scope, heads)
       else cached.delete(scope)
     },
@@ -143,6 +146,7 @@ beforeEach(() => {
   remembered.clear()
   cached.clear()
   stored.clear()
+  onSaveHeads = null
   directory.length = 0
   listUserKeys.mockClear()
   publishUserKey.mockClear()
@@ -684,6 +688,40 @@ describe('useUserVault', () => {
 
     expect(vault.state.value).toBe('unlocked')
     expect(remembered.size).toBe(1)
+  })
+
+  it('keeps the key of a newer session when an older read finds its remembered key no longer fits', async () => {
+    const { vault, state } = await boot()
+    await vault.create('correct horse', false)
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const held = vi.spyOn(crypto.subtle, 'decrypt').mockImplementationOnce(async () => {
+      await gate
+      throw new DOMException('The key does not fit.', 'OperationError')
+    })
+
+    const reading = vault.load()
+    await vi.waitFor(() => expect(held).toHaveBeenCalled())
+    held.mockRestore()
+    state.sessionEpoch.value += 1
+    await vault.load()
+    await vault.unlock('correct horse')
+    release()
+    await reading
+
+    expect(vault.state.value).toBe('unlocked')
+    expect(remembered.size).toBe(1)
+  })
+
+  it('stays cleared when a session change lands right after a read took the heads', async () => {
+    const { vault, state } = await boot()
+    await vault.create('correct horse', false)
+    vault.lock()
+    onSaveHeads = () => queueMicrotask(() => (state.sessionEpoch.value += 1))
+
+    await vault.load()
+
+    expect(vault.state.value).toBe('absent')
   })
 
   it('refuses to save while locked', async () => {
