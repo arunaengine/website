@@ -571,6 +571,22 @@ describe('useUserVault', () => {
     expect(vault.state.value).toBe('absent')
   })
 
+  it('lets the delayed read after a reset leave alone a vault created meanwhile', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', false)
+    let answer!: () => void
+    readVault.mockImplementationOnce(() => new Promise((resolve) => (answer = () => resolve({ heads: [] }))))
+
+    const resetting = vault.reset()
+    await vi.waitFor(() => expect(answer).toBeDefined())
+    await vault.create('other horse battery', false)
+    answer()
+    await resetting
+
+    expect(vault.state.value).toBe('unlocked')
+    expect(remembered.size).toBe(1)
+  })
+
   it('drops an unlock that was running when a reset deleted the vault', async () => {
     const { vault } = await boot()
     await vault.create('correct horse', false)

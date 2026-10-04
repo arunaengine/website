@@ -97,6 +97,8 @@ let inFlight: Promise<void> | null = null
 let keyCheck: Promise<void> | null = null
 /** Grows with every account or session change, unlike `generation`, which a lock advances too. */
 let sessionGeneration = 0
+/** Grows when a read, create, unlock or save starts, so an older follow-up read yields to it. */
+let vaultWork = 0
 
 function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
@@ -409,6 +411,7 @@ function load(): Promise<void> {
   if (inFlight && scope === scopeKey) return inFlight
   scopeKey = scope
   const run = generation
+  vaultWork += 1
   loading.value = true
   error.value = null
   const promise = (async () => {
@@ -478,6 +481,7 @@ async function saveWithRetry(build: (current: VaultPayload) => Promise<VaultPayl
   const run = generation
   const target = writeTarget()
   requirePayload()
+  vaultWork += 1
   for (let attempt = 0; ; attempt += 1) {
     const next = await build(requirePayload())
     try {
@@ -539,6 +543,7 @@ async function create(passphrase: string, withRecovery: boolean): Promise<string
   }
   if (payload) throw new Error('Your provider keys are already set up.')
   requireHolderLength(passphrase)
+  vaultWork += 1
   const run = generation
   const session = sessionGeneration
   const target = writeTarget()
@@ -565,6 +570,7 @@ async function create(passphrase: string, withRecovery: boolean): Promise<string
 async function unlockWith(open: (current: VaultPayload) => Promise<CryptoKey>) {
   const scope = requireScope()
   requirePayload()
+  vaultWork += 1
   const run = generation
   let key: CryptoKey | null = null
   let failure: unknown = null
@@ -651,9 +657,11 @@ async function reset(): Promise<void> {
   providers.value = []
   state.value = 'absent'
   forgetKey(scope)
+  const work = vaultWork
   // A save made at the same time on another holder outlives the delete.
   const response = await readVault(client())
-  if (session === sessionGeneration) await settle(scope, response.heads)
+  // A read, create, unlock or save that began meanwhile owns the state; this answer is older.
+  if (session === sessionGeneration && work === vaultWork) await settle(scope, response.heads)
 }
 
 /** Drops the held recovery code once the user stored it. */
