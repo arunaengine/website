@@ -99,6 +99,8 @@ let keyCheck: Promise<void> | null = null
 let sessionGeneration = 0
 /** Grows when a read, create, unlock or save starts, so an older follow-up read yields to it. */
 let vaultWork = 0
+/** Grows with every lock in this tab, so a create a lock ended after its save can say so. */
+let locks = 0
 
 function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
@@ -516,6 +518,7 @@ export function reapplyChange(
 
 function lock() {
   const scope = scopeKey
+  locks += 1
   // Work started before the lock belongs to the unlocked vault: none of it may open it again.
   generation += 1
   inFlight = null
@@ -546,6 +549,7 @@ async function create(passphrase: string, withRecovery: boolean): Promise<string
   vaultWork += 1
   const run = generation
   const session = sessionGeneration
+  const lockCount = locks
   const target = writeTarget()
   const created = await createVault(passphrase, withRecovery)
   created.payload.keys = await rotateKeypair(created.masterKey, [])
@@ -557,9 +561,16 @@ async function create(passphrase: string, withRecovery: boolean): Promise<string
   const response = await saveVault({ payload: JSON.stringify(created.payload), predecessors: [] }, target.client)
   // The vault exists now, so its code stays for this account and session, also past a lock.
   if (session === sessionGeneration && target.scope === currentScope()) recovery.value = held
-  if (run !== generation) throw new Error(REPLACED)
-  await adoptHeads(response.heads, run, created.masterKey)
-  if (run !== generation) throw new Error(REPLACED)
+  try {
+    if (run !== generation) throw new Error(REPLACED)
+    await adoptHeads(response.heads, run, created.masterKey)
+    if (run !== generation) throw new Error(REPLACED)
+  } catch (cause) {
+    // A lock in this session after the save keeps the new vault, and its code for the next unlock.
+    if (run === generation || session !== sessionGeneration || locks === lockCount) throw cause
+    const next = held ? 'Your recovery code appears after the next unlock.' : 'Unlock them to use them.'
+    throw new Error(`Your provider keys were set up and then locked. ${next}`)
+  }
   if (noticeState(scope) === 'pending') dismissRecreateNotice()
   await rememberKey(scope, created.masterKey)
   await finishUnlock(run, false)

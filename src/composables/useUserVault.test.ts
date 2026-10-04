@@ -817,7 +817,9 @@ describe('useUserVault', () => {
     const { vault } = await boot()
     onSaveHeads = () => queueMicrotask(() => vault.lock())
 
-    await expect(vault.create('correct horse', false)).rejects.toThrow('changed in another browser')
+    await expect(vault.create('correct horse', false)).rejects.toThrow(
+      'Your provider keys were set up and then locked. Unlock them to use them.',
+    )
 
     expect(vault.state.value).toBe('locked')
     expect(remembered.size).toBe(0)
@@ -899,7 +901,9 @@ describe('useUserVault', () => {
     const { vault } = await boot()
     onSaveHeads = () => queueMicrotask(() => vault.lock())
 
-    await expect(vault.create('correct horse', true)).rejects.toThrow('changed in another browser')
+    await expect(vault.create('correct horse', true)).rejects.toThrow(
+      'Your provider keys were set up and then locked. Your recovery code appears after the next unlock.',
+    )
     onSaveHeads = null
     expect(vault.recoveryCode.value).toBeNull()
     await vault.unlock('correct horse')
