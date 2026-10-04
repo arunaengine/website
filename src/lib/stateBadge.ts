@@ -95,6 +95,19 @@ const STATE_TONE: Record<string, StateTone> = {
   offline: 'attention',
   unreachable: 'attention',
   reachable: 'done',
+  // Bucket encryption.
+  'not encrypted': 'idle',
+  locked: 'idle',
+  unlocked: 'done',
+  'timed unlock': 'progress',
+  'locked since restart': 'attention',
+  met: 'done',
+  'not met': 'attention',
+  finished: 'done',
+  'cleanup open': 'progress',
+  'removing old copies': 'progress',
+  'waiting for an unlock': 'attention',
+  blocked: 'attention',
 }
 
 /** The tone for a state string; anything unknown reads as a neutral count. */
