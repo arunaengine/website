@@ -985,6 +985,27 @@ describe('useUserVault', () => {
     expect(vault.recoveryCode.value).toMatch(/^([0-9A-HJKMNP-TV-Z]{4}-){12}[0-9A-HJKMNP-TV-Z]{4}$/)
   })
 
+  it('shows a recovery code only while the head with its recovery block is unlocked', async () => {
+    const other = await boot()
+    await other.vault.create('other horse battery', false)
+    const theirs = node.heads[0]
+    node.heads = []
+    remembered.clear()
+    const { vault } = await boot()
+    const code = await vault.create('correct horse', true)
+    node.heads = [theirs, ...node.heads]
+    vault.lock()
+    await vault.load()
+
+    await vault.unlock('other horse battery')
+    expect(vault.state.value).toBe('unlocked')
+    expect(vault.recoveryCode.value).toBeNull()
+
+    vault.lock()
+    await vault.unlock('correct horse')
+    expect(vault.recoveryCode.value).toBe(code)
+  })
+
   it('drops a recovery code once the vault on the node carries another recovery block', async () => {
     const { vault } = await boot()
     await vault.create('correct horse', true)

@@ -82,8 +82,13 @@ interface HeldRecovery {
 }
 /** The recovery code of a vault this account and session made, in memory only, until dismissed. */
 const recovery = shallowRef<HeldRecovery | null>(null)
-/** The held recovery code while the vault is unlocked; a lock hides it until the next unlock. */
-const recoveryCode = computed(() => (state.value === 'unlocked' ? (recovery.value?.code ?? null) : null))
+/** The recovery block id of the head unlocked now. */
+const unlockedBlock = shallowRef<string | null>(null)
+/** The held code while the head with its recovery block is unlocked; otherwise hidden, not dropped. */
+const recoveryCode = computed(() => {
+  const held = recovery.value
+  return state.value === 'unlocked' && held && unlockedBlock.value === held.block ? held.code : null
+})
 const NOTICE_PREFIX = 'aruna.vault.recreateNotice:'
 const keyStore = browserKeyStore()
 let payload: VaultPayload | null = null
@@ -238,6 +243,7 @@ function matchRecovery(read: number) {
 
 function unlocked(merged: Merged, key: CryptoKey) {
   payload = merged.payload
+  unlockedBlock.value = recoveryBlock(merged.payload)
   predecessors = merged.revisions
   masterKey = key
   providers.value = merged.providers
