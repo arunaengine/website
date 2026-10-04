@@ -151,6 +151,10 @@ export interface BucketHolderEntry {
 
 export interface BucketHoldersResponse {
   holders: BucketHolderEntry[]
+  /** False when some holders could not be looked up; the list is then partial. */
+  complete: boolean
+  /** Holders whose key directory lookup failed. */
+  unresolved: number
   recovery: RecoveryStatus
   /** Opaque revision of the holder set; a removal names it so a changed set is refused. */
   revision: string

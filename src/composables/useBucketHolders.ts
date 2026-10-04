@@ -13,6 +13,7 @@ import {
   type BucketEncryptionResponse,
   type BucketHolderEntry,
   type BucketHoldersResponse,
+  type RecoveryStatus,
 } from '@/lib/api'
 import { encryptionError } from '@/lib/bucketEncryption'
 
@@ -27,12 +28,22 @@ export interface HolderSource {
 
 export type HoldersState = 'loading' | 'ready' | 'refused' | 'failed'
 export type RemovalResult = 'removed' | 'confirm'
+/** `unknown`: a remaining recovery code is unknown, or the list is partial. */
+export type RecoveryAfter = 'kept' | 'unmet' | 'unknown'
 
-/** True when removing `userId` would leave fewer than two ready holders and no ready recovery code. */
-export function breaksRecovery(holders: BucketHolderEntry[], userId: string): boolean {
-  const remaining = holders.filter((holder) => holder.user_id !== userId && holder.state === 'ready')
+/** Whether two ready holders, or one with a recovery code, remain after removing `userId`. */
+export function recoveryAfter(response: BucketHoldersResponse, userId: string): RecoveryAfter {
+  const remaining = response.holders.filter((holder) => holder.user_id !== userId && holder.state === 'ready')
   const ready = new Set(remaining.map((holder) => holder.user_id))
-  return ready.size < 2 && !remaining.some((holder) => holder.has_recovery === true)
+  if (ready.size >= 2 || remaining.some((holder) => holder.has_recovery === true)) return 'kept'
+  const uncertain = response.complete !== true || remaining.some((holder) => holder.has_recovery === null)
+  return uncertain ? 'unknown' : 'unmet'
+}
+
+/** A partial list proves recovery only when its resolved holders already meet the rule. */
+export function listedRecovery(response: BucketHoldersResponse): RecoveryStatus {
+  if (response.complete === true || response.recovery.state === 'met') return response.recovery
+  return { ...response.recovery, state: 'unknown' }
 }
 
 export function useBucketHolders(source: HolderSource, bucket: Ref<string>) {

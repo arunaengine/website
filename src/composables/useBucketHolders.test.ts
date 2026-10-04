@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { effectScope, ref } from 'vue'
 import * as Api from '@/lib/api'
 import type { BucketEncryptionResponse, BucketHolderEntry, BucketHoldersResponse } from '@/lib/api'
-import { breaksRecovery, useBucketHolders } from './useBucketHolders'
+import { listedRecovery, recoveryAfter, useBucketHolders } from './useBucketHolders'
 
 const listBucketHolders = vi.fn()
 const removeBucketHolder = vi.fn()
@@ -28,7 +28,13 @@ function holder(userId: string, overrides: Partial<BucketHolderEntry> = {}): Buc
 }
 
 function listing(entries: BucketHolderEntry[], revision = 'rev-1'): BucketHoldersResponse {
-  return { holders: entries, recovery: { state: 'met', ready_holders: 2, ready_with_recovery: 0 }, revision }
+  return {
+    holders: entries,
+    complete: true,
+    unresolved: 0,
+    recovery: { state: 'met', ready_holders: 2, ready_with_recovery: 0 },
+    revision,
+  }
 }
 
 const NODE = { baseUrl: 'https://b.test/api/v1', token: 't' }
@@ -70,11 +76,24 @@ afterEach(() => {
 
 describe('bucket key holders', () => {
   it('foresees a removal that breaks recovery', () => {
-    expect(breaksRecovery([holder('A'), holder('B')], 'A')).toBe(true)
-    expect(breaksRecovery([holder('A'), holder('B'), holder('C')], 'A')).toBe(false)
-    expect(breaksRecovery([holder('A'), holder('B', { has_recovery: true })], 'A')).toBe(false)
-    expect(breaksRecovery([holder('A'), holder('B'), holder('C', { state: 'pending' })], 'A')).toBe(true)
-    expect(breaksRecovery([holder('A'), holder('B', { has_recovery: null })], 'A')).toBe(true)
+    const after = (entries: BucketHolderEntry[], complete = true) =>
+      recoveryAfter({ ...listing(entries), complete }, 'A')
+    expect(after([holder('A'), holder('B')])).toBe('unmet')
+    expect(after([holder('A'), holder('B'), holder('C')])).toBe('kept')
+    expect(after([holder('A'), holder('B', { has_recovery: true })])).toBe('kept')
+    expect(after([holder('A'), holder('B'), holder('C', { state: 'pending' })])).toBe('unmet')
+    expect(after([holder('A'), holder('B', { has_recovery: null })])).toBe('unknown')
+    expect(after([holder('A'), holder('B')], false)).toBe('unknown')
+    expect(after([holder('A'), holder('B'), holder('C')], false)).toBe('kept')
+  })
+
+  it('reads recovery from a partial list as unknown unless its resolved holders meet it', () => {
+    const degraded = { state: 'degraded' as const, ready_holders: 1, ready_with_recovery: 0 }
+    const partial = { ...listing([holder('A')]), complete: false, unresolved: 2 }
+
+    expect(listedRecovery({ ...partial, recovery: degraded }).state).toBe('unknown')
+    expect(listedRecovery(partial).state).toBe('met')
+    expect(listedRecovery({ ...listing([holder('A')]), recovery: degraded }).state).toBe('degraded')
   })
 
   it('drops a holder list that arrives after the bucket changed', async () => {

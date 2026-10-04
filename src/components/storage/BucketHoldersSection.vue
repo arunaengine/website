@@ -15,7 +15,13 @@ import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { useAruna } from '@/composables/useAruna'
-import { breaksRecovery, useBucketHolders, type HolderSource } from '@/composables/useBucketHolders'
+import {
+  listedRecovery,
+  recoveryAfter,
+  useBucketHolders,
+  type HolderSource,
+  type RecoveryAfter,
+} from '@/composables/useBucketHolders'
 import type { BucketHolderEntry, UserSearchHit } from '@/lib/api'
 import { HOLDER_STATE_LABEL, ORIGIN_LABEL, encryptionError, recoverySummary } from '@/lib/bucketEncryption'
 import { stateVariant } from '@/lib/stateBadge'
@@ -27,10 +33,12 @@ const { searchUsers } = useAruna()
 const { holders, state, error, grant, remove } = useBucketHolders(props.source, toRef(props, 'bucket'))
 
 const list = computed(() => holders.value?.holders ?? [])
-const recovery = computed(() => recoverySummary(holders.value?.recovery ?? null))
+const recovery = computed(() => recoverySummary(holders.value ? listedRecovery(holders.value) : null))
+const partial = computed(() => Boolean(holders.value && holders.value.complete !== true))
 const busy = ref<string | null>(null)
 const failure = ref<string | null>(null)
 const pending = ref<BucketHolderEntry | null>(null)
+const pendingRecovery = ref<Exclude<RecoveryAfter, 'kept'>>('unmet')
 const accepted = ref(false)
 
 const query = ref('')
@@ -73,6 +81,7 @@ async function removeHolder(entry: BucketHolderEntry, confirm: boolean) {
   failure.value = null
   try {
     const result = await remove(entry.user_id, confirm)
+    if (result === 'confirm' && pending.value !== entry) pendingRecovery.value = 'unmet'
     pending.value = result === 'confirm' ? entry : null
     accepted.value = false
   } catch (cause) {
@@ -83,10 +92,14 @@ async function removeHolder(entry: BucketHolderEntry, confirm: boolean) {
 }
 
 function startRemove(entry: BucketHolderEntry) {
-  if (breaksRecovery(list.value, entry.user_id)) {
-    accepted.value = false
-    pending.value = entry
-  } else void removeHolder(entry, false)
+  const after = holders.value ? recoveryAfter(holders.value, entry.user_id) : 'unknown'
+  if (after === 'kept') {
+    void removeHolder(entry, false)
+    return
+  }
+  accepted.value = false
+  pendingRecovery.value = after
+  pending.value = entry
 }
 </script>
 
@@ -102,6 +115,10 @@ function startRemove(entry: BucketHolderEntry) {
       <Notice v-else-if="state === 'failed'" tone="error" :title="error ?? undefined">The key holders are unknown.</Notice>
       <template v-else-if="holders">
         <p class="text-xs text-muted-foreground">{{ recovery.detail }}</p>
+        <Notice v-if="partial" tone="warning" data-partial>
+          {{ holders?.unresolved || 'Some' }} key {{ holders?.unresolved === 1 ? 'holder' : 'holders' }} could not be looked up,
+          so this list is partial.
+        </Notice>
         <ul class="divide-y divide-border text-sm">
           <li v-for="entry in list" :key="entry.user_id" class="flex flex-wrap items-center gap-2 py-2">
             <span class="min-w-0 flex-1 truncate" :title="entry.user_id">{{ nameOf(entry) }}</span>
@@ -155,13 +172,22 @@ function startRemove(entry: BucketHolderEntry) {
         <DialogHeader>
           <DialogTitle>Remove {{ pending ? nameOf(pending) : '' }}?</DialogTitle>
           <DialogDescription>
-            After this removal the bucket has fewer than two ready key holders and none with a recovery code. If the
-            last key is lost, the data in this bucket cannot be read again.
+            <template v-if="pendingRecovery === 'unmet'">
+              After this removal the recovery rule is not met: fewer than two ready key holders remain, and none has a
+              recovery code.
+            </template>
+            <template v-else>
+              After this removal the recovery rule cannot be verified: a remaining recovery code is unknown, or some key
+              holders could not be looked up.
+            </template>
+            If the remaining usable key is then lost too, the data in this bucket cannot be read again.
           </DialogDescription>
         </DialogHeader>
         <label class="flex items-start gap-2 text-xs text-muted-foreground">
           <input type="checkbox" class="mt-0.5" :checked="accepted" @click="accepted = !accepted" />
-          <span>I accept that recovery is no longer possible.</span>
+          <span>
+            {{ pendingRecovery === 'unmet' ? 'I accept that the recovery rule is not met.' : 'I accept that recovery cannot be verified.' }}
+          </span>
         </label>
         <DialogFooter>
           <Button variant="outline" size="sm" @click="pending = null">Cancel</Button>

@@ -5,7 +5,7 @@ import type { BucketHolderEntry, BucketHoldersResponse } from '@/lib/api'
 import * as Wording from '@/lib/bucketEncryption'
 import * as StateBadge from '@/lib/stateBadge'
 import * as Utils from '@/lib/utils'
-import { breaksRecovery, type HoldersState } from '@/composables/useBucketHolders'
+import { listedRecovery, recoveryAfter, type HoldersState } from '@/composables/useBucketHolders'
 import { button, click, compileClientComponent, content, element, mountApp, moduleDefault } from '@/test/clientRender'
 
 const holders = ref<BucketHoldersResponse | null>(null)
@@ -35,7 +35,8 @@ const section = compileClientComponent(new URL('./BucketHoldersSection.vue', imp
   '@/components/ui/Spinner.vue': moduleDefault(defineComponent(() => () => h('span', 'loading'))),
   '@/composables/useAruna': { useAruna: () => ({ searchUsers: async () => ({ users: [] }) }) },
   '@/composables/useBucketHolders': {
-    breaksRecovery,
+    listedRecovery,
+    recoveryAfter,
     useBucketHolders: () => ({ holders, state, error: ref('The directory did not answer.'), load: vi.fn(), grant: vi.fn(), remove }),
   },
   '@/lib/bucketEncryption': Wording,
@@ -47,8 +48,9 @@ function holder(userId: string, overrides: Partial<BucketHolderEntry> = {}): Buc
   return { user_id: userId, name: userId, origin: 'explicit', state: 'ready', has_recovery: false, granted_by: null, granted_at_ms: null, ...overrides }
 }
 
-async function render(entries: BucketHolderEntry[], canManage = true) {
-  holders.value = { holders: entries, recovery: { state: 'met', ready_holders: 2, ready_with_recovery: 0 }, revision: 'rev-1' }
+async function render(entries: BucketHolderEntry[], canManage = true, complete = true) {
+  const recovery = { state: complete ? ('met' as const) : ('degraded' as const), ready_holders: 2, ready_with_recovery: 0 }
+  holders.value = { holders: entries, complete, unresolved: complete ? 0 : 2, recovery, revision: 'rev-1' }
   const source = { client: () => ({}), binder: () => () => true, load: async () => undefined }
   const { root } = await mountApp(section, { props: { bucket: 'reef', canManage, source } })
   return root
@@ -88,12 +90,25 @@ describe('bucket key holder list', () => {
 
     await click(rowButton(root, 'Bo'))
     expect(remove).not.toHaveBeenCalled()
-    expect(content(root)).toContain('cannot be read again')
+    expect(content(root)).toContain('the recovery rule is not met')
+    expect(content(root)).toContain('If the remaining usable key is then lost too')
     expect(button(root, 'Remove anyway').props.disabled).toBe(true)
     await click(element(root, (node) => node.tag === 'input' && node.props.type === 'checkbox'))
     await click(button(root, 'Remove anyway'))
 
     expect(remove).toHaveBeenCalledWith('Bo', true)
+  })
+
+  it('marks a partial list and asks before a removal whose effect cannot be verified', async () => {
+    const root = await render([holder('Ada'), holder('Bo')], true, false)
+
+    expect(content(root)).toContain('2 key holders could not be looked up, so this list is partial.')
+    expect(content(root)).toContain('Recovery: Unknown')
+    await click(rowButton(root, 'Bo'))
+
+    expect(remove).not.toHaveBeenCalled()
+    expect(content(root)).toContain('the recovery rule cannot be verified')
+    expect(content(root)).toContain('I accept that recovery cannot be verified.')
   })
 
   it('asks when the node says the removal breaks recovery', async () => {
