@@ -22,8 +22,11 @@ import { authToken, nodeInfo, realmInfo, sessionEpoch, userInfo } from './aruna/
 import { localNodeId, nodeApiBase } from './s3/endpoints'
 import { useUserVault } from './useUserVault'
 
-/** `missing`: the node does not report encryption for this bucket, which is not "off". */
-export type EncryptionLoadState = 'loading' | 'ready' | 'missing' | 'refused' | 'unresolved' | 'failed'
+/**
+ * `missing`: the node does not report encryption for this bucket, which is not "off".
+ * `stale`: the last read failed; the status is the previous answer and changes are held back.
+ */
+export type EncryptionLoadState = 'loading' | 'ready' | 'stale' | 'missing' | 'refused' | 'unresolved' | 'failed'
 export type EncryptionAction = 'unlock' | 'extend' | 'lock' | 'save' | 'rotate'
 
 export function useBucketEncryption(bucket: Ref<string>, nodeId: Ref<string | null>, groupId: Ref<string | null>) {
@@ -90,8 +93,8 @@ export function useBucketEncryption(bucket: Ref<string>, nodeId: Ref<string | nu
     ])
     if (!live()) return
     refreshing.value = false
-    compression.value = compressed.status === 'fulfilled' ? compressed.value : null
     if (encryption.status === 'fulfilled') {
+      compression.value = compressed.status === 'fulfilled' ? compressed.value : null
       status.value = encryption.value
       revision.value += 1
       state.value = 'ready'
@@ -99,13 +102,21 @@ export function useBucketEncryption(bucket: Ref<string>, nodeId: Ref<string | nu
       outcomeUnknown.value = false
       return
     }
-    status.value = null
-    state.value = failed(encryption.reason)
+    const next = failed(encryption.reason)
     error.value = apiErrorMessage(encryption.reason)
+    if (next === 'failed' && status.value) {
+      // A passing failure keeps the last answer, marked out of date, so an open draft survives.
+      state.value = 'stale'
+      return
+    }
+    status.value = null
+    compression.value = null
+    state.value = next
   }
 
   async function run<T>(action: EncryptionAction, work: (bound: () => boolean) => Promise<T>): Promise<T | null> {
     if (busy.value) throw new Error('Another change to this bucket is still running.')
+    if (state.value !== 'ready') throw new Error('The state of this bucket is not known right now. Read it again first.')
     const bound = binder()
     busy.value = action
     let outcome: { done: true; value: T } | { done: false; cause: unknown }

@@ -34,7 +34,12 @@ const encryption = useBucketEncryption(toRef(props, 'bucket'), toRef(props, 'nod
 const { status, compression, state, error, refreshing, busy, outcomeUnknown } = encryption
 
 const encrypted = computed(() => Boolean(status.value && status.value.mode !== 'off'))
-const lock = computed(() => (status.value ? lockView(status.value) : null))
+const stale = computed(() => state.value === 'stale')
+const lock = computed(() => {
+  if (!status.value) return null
+  if (stale.value) return { label: 'Unknown', detail: 'The last read failed, so the lock state is not known right now.' }
+  return lockView(status.value)
+})
 const recovery = computed(() => recoverySummary(status.value?.recovery ?? null))
 const transition = computed(() => (status.value?.transition ? transitionView(status.value.transition) : null))
 
@@ -98,6 +103,11 @@ const WARNINGS = [
     </Notice>
 
     <template v-else-if="status">
+      <Notice v-if="stale" tone="warning" title="This state may be out of date" data-stale>
+        The node did not answer the last read: {{ error }}. Below is what it reported before. Changes wait until it
+        answers again.
+        <RefreshButton class="mt-2" label="Read the state again" :busy="refreshing" @click="encryption.load()" />
+      </Notice>
       <section class="surface">
         <header class="flex flex-wrap items-center gap-2 border-b border-border px-5 py-4">
           <KeyRound class="size-4 text-primary" />
@@ -138,7 +148,7 @@ const WARNINGS = [
         v-if="keyCount"
         :bucket="bucket"
         :status="status"
-        :busy="Boolean(busy)"
+        :busy="Boolean(busy) || stale"
         :outcome-unknown="outcomeUnknown"
         :unlock="encryption.unlock"
         :extend="encryption.extend"
@@ -149,13 +159,14 @@ const WARNINGS = [
         v-if="(encrypted || keyCount) && (caller?.holder || caller?.admin)"
         :bucket="bucket"
         :can-manage="Boolean(caller?.admin)"
+        :frozen="stale"
         :source="encryption"
       />
 
       <BucketEncryptionSettings
         v-if="caller?.admin"
         :status="status"
-        :busy="Boolean(busy)"
+        :busy="Boolean(busy) || stale"
         :save="encryption.save"
         :rotate="encryption.rotate"
       />

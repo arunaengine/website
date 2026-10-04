@@ -27,7 +27,8 @@ import { HOLDER_STATE_LABEL, ORIGIN_LABEL, encryptionError, recoverySummary } fr
 import { stateVariant } from '@/lib/stateBadge'
 import { errorMessage, shortUserId } from '@/lib/utils'
 
-const props = defineProps<{ bucket: string; canManage: boolean; source: HolderSource }>()
+/** `frozen`: the bucket state is out of date, so no change is sent. */
+const props = defineProps<{ bucket: string; canManage: boolean; frozen?: boolean; source: HolderSource }>()
 
 const { searchUsers } = useAruna()
 const { holders, state, error, grant, remove } = useBucketHolders(props.source, toRef(props, 'bucket'))
@@ -145,7 +146,7 @@ function startRemove(entry: BucketHolderEntry) {
               v-if="canManage && entry.origin === 'explicit'"
               size="sm"
               variant="outline"
-              :disabled="busy !== null"
+              :disabled="busy !== null || frozen"
               @click="startRemove(entry)"
             >
               Remove
@@ -160,7 +161,7 @@ function startRemove(entry: BucketHolderEntry) {
         <label class="text-xs font-medium text-foreground" for="holder-search">Grant a key holder</label>
         <div class="relative flex gap-2">
           <Input id="holder-search" v-model="query" placeholder="Search users (min 2 characters)" />
-          <Button size="sm" :disabled="!chosen || busy !== null" @click="addHolder">Grant</Button>
+          <Button size="sm" :disabled="!chosen || busy !== null || frozen" @click="addHolder">Grant</Button>
           <div
             v-if="searchState !== 'idle' && !chosen"
             class="absolute top-10 z-10 w-full rounded-md border border-border bg-popover shadow-md"
@@ -215,7 +216,7 @@ function startRemove(entry: BucketHolderEntry) {
           <Button
             variant="destructive"
             size="sm"
-            :disabled="!accepted || busy !== null"
+            :disabled="!accepted || busy !== null || frozen"
             @click="pending && removeHolder(pending, true)"
           >
             Remove anyway

@@ -35,7 +35,9 @@ const load = vi.fn()
 const tab = compileClientComponent(new URL('./BucketEncryptionTab.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => Slotted('i') }),
-  '@/components/storage/BucketEncryptionSettings.vue': moduleDefault(defineComponent(() => () => h('section', 'mode settings'))),
+  '@/components/storage/BucketEncryptionSettings.vue': moduleDefault(
+    defineComponent({ props: { busy: Boolean }, setup: (props) => () => h('section', `mode settings, busy ${props.busy}`) }),
+  ),
   '@/components/storage/BucketHoldersSection.vue': moduleDefault(defineComponent(() => () => h('section', 'holder list'))),
   '@/components/storage/BucketKeyAccess.vue': moduleDefault(KeyAccessStub),
   '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
@@ -125,6 +127,17 @@ describe('bucket encryption tab', () => {
     expect(content(root)).toContain('Unlocking stays blocked')
     await click(element(root, (node) => node.props.label === 'Read the state again'))
     expect(load).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the settings draft owner mounted and holds back changes while the state is out of date', async () => {
+    const admin = { holder: true, ready_copy: true, admin: true }
+    const text = await render('stale', encrypted({ caller: admin }))
+
+    expect(text).toContain('This state may be out of date')
+    expect(text).toContain('The node did not answer.')
+    expect(text).toContain('Unknown')
+    expect(text).not.toContain('Locked since restart')
+    expect(text).toContain('mode settings, busy true')
   })
 
   it('shows the lock state, key, format and recovery of a vault-locked bucket', async () => {

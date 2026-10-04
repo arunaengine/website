@@ -127,6 +127,23 @@ describe('bucket encryption state', () => {
     expect(refused.encryption.status.value).toBeNull()
   })
 
+  it('keeps the last answer marked out of date after a passing failure and holds back changes', async () => {
+    const { encryption } = setup()
+    await vi.waitFor(() => expect(encryption.state.value).toBe('ready'))
+    getBucketEncryption.mockRejectedValueOnce(new TypeError('network down'))
+
+    await encryption.load()
+
+    expect(encryption.state.value).toBe('stale')
+    expect(encryption.status.value?.bucket_id).toBe('B1')
+    await expect(encryption.lock()).rejects.toThrow('not known right now')
+    expect(lockBucket).not.toHaveBeenCalled()
+    getBucketEncryption.mockRejectedValueOnce(new Api.ApiError(404, 'Not found'))
+    await encryption.load()
+    expect(encryption.state.value).toBe('missing')
+    expect(encryption.status.value).toBeNull()
+  })
+
   it('unlocks with the context of the shown key and reads the status before answering', async () => {
     const { encryption } = setup()
     await vi.waitFor(() => expect(encryption.state.value).toBe('ready'))
