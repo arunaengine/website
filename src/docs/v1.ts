@@ -830,7 +830,7 @@ export const docsTopics: DocsTopic[] = [
           'Choose Unlock. Your vault opens in this browser; enter its passphrase when it is locked.',
           'Pick how long the unlock lasts, within the bucket maximum.',
           'The browser opens your copy of the bucket key and sends only the bucket key to the node that hosts the bucket.',
-          'Extend a timed unlock, or choose Lock now when you are done.',
+          'Extend a timed unlock, or choose Lock all keys when you are done. It locks every key of the bucket, previous keys included.',
         ],
         paragraphs: [
           'An unlock lets every reader with access on that node read the bucket until it locks. When the node does not confirm an unlock, the portal reads the bucket state first and never sends the key again on its own.',

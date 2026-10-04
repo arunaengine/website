@@ -122,7 +122,8 @@ describe('bucket key access', () => {
     const root = await render(status({ generations: [key(3, 'active'), key(2, 'source', OPEN)] }))
 
     await click(button(row(root, 2), 'Extend'))
-    await click(button(root, 'Lock now'))
+    expect(content(root)).toContain('Locks every key of this bucket at once, previous keys included.')
+    await click(button(root, 'Lock all keys'))
 
     expect(extend).toHaveBeenCalledWith(2, undefined)
     expect(lock).toHaveBeenCalledOnce()

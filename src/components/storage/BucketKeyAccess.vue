@@ -101,7 +101,10 @@ function extendKey(key: BucketKeyGeneration) {
         </li>
       </ul>
       <div class="flex flex-wrap items-center gap-2">
-        <Button v-if="canLock" size="sm" variant="outline" :disabled="busy" @click="act(lock)">Lock now</Button>
+        <template v-if="canLock">
+          <Button size="sm" variant="outline" :disabled="busy" @click="act(lock)">Lock all keys</Button>
+          <span class="text-xs text-muted-foreground">Locks every key of this bucket at once, previous keys included.</span>
+        </template>
         <span v-if="!anyAction" class="text-xs text-muted-foreground">No key action is open to you right now.</span>
       </div>
       <Notice v-if="actionError" tone="error">{{ actionError }}</Notice>
