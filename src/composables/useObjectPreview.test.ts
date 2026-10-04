@@ -82,4 +82,29 @@ describe('preview of a locked bucket', () => {
     expect(preview.status.value).toBe('error')
     expect(preview.lockedLink.value).toBeNull()
   })
+
+  it('lets an older load neither end the waiting state of a newer one nor overwrite its content', async () => {
+    let failOld!: (reason: unknown) => void
+    getObjectText.mockReturnValueOnce(new Promise((_, reject) => (failOld = reject)))
+    getObjectText.mockRejectedValueOnce(LOCKED)
+    const preview = useObjectPreview()
+
+    const old = preview.load({ ...TARGET, key: 'old.txt' })
+    await preview.load(TARGET)
+    failOld(new Error('late failure'))
+    await old
+
+    expect(preview.status.value).toBe('locked')
+    expect(preview.errorMessage.value).toBeNull()
+
+    let answerOld!: (value: string) => void
+    getObjectText.mockReturnValueOnce(new Promise((resolve) => (answerOld = resolve)))
+    getObjectText.mockResolvedValueOnce('new text')
+    const older = preview.load({ ...TARGET, key: 'old.txt' })
+    await preview.load(TARGET)
+    answerOld('old text')
+    await older
+
+    expect(preview.text.value).toBe('new text')
+  })
 })
