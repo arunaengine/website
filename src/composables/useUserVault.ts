@@ -85,6 +85,8 @@ let generation = 0
 let requested = false
 let inFlight: Promise<void> | null = null
 let keyCheck: Promise<void> | null = null
+/** Grows with every account or session change, unlike `generation`, which a lock advances too. */
+let sessionGeneration = 0
 
 function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
@@ -171,6 +173,7 @@ async function openProviders(current: VaultPayload, key: CryptoKey): Promise<Bro
 
 function clearLocal() {
   generation += 1
+  sessionGeneration += 1
   inFlight = null
   keyCheck = null
   payload = null
@@ -572,14 +575,18 @@ async function openUserKey(keyId: string): Promise<X25519Pair | null> {
 
 async function reset(): Promise<void> {
   const scope = scopeKey
+  const session = sessionGeneration
   await deleteVault(client())
+  // The deletion belongs to this account and session; another one keeps its own state.
+  if (session !== sessionGeneration) return
   payload = null
   masterKey = null
   providers.value = []
   state.value = 'absent'
   forgetKey(scope)
   // A save made at the same time on another holder outlives the delete.
-  await settle(scope, (await readVault(client())).heads)
+  const response = await readVault(client())
+  if (session === sessionGeneration) await settle(scope, response.heads)
 }
 
 async function saveProviders(next: BrowserProvider[]): Promise<void> {

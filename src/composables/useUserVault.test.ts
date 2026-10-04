@@ -500,6 +500,23 @@ describe('useUserVault', () => {
     expect(vault.state.value).toBe('locked')
   })
 
+  it('applies a reset only to the session that started it', async () => {
+    const { vault, state } = await boot()
+    await vault.create('correct horse', false)
+    let finish!: () => void
+    deleteVault.mockImplementationOnce(() => new Promise<void>((resolve) => (finish = resolve)))
+
+    const resetting = vault.reset()
+    state.sessionEpoch.value += 1
+    await vault.load()
+    expect(vault.state.value).toBe('locked')
+    finish()
+    await resetting
+
+    expect(vault.state.value).toBe('locked')
+    expect(readVault).toHaveBeenCalledTimes(2)
+  })
+
   it('refuses a holder passphrase shorter than twelve characters', async () => {
     const { vault } = await boot()
     await expect(vault.create('eleven char', false)).rejects.toThrow('at least 12 characters')
