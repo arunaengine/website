@@ -57,7 +57,7 @@ const VaultSettings = compileClientComponent(new URL('./VaultSettings.vue', impo
   './VaultUnlockForm.vue': moduleDefault(UnlockStub),
   './VaultCreateForm.vue': moduleDefault(CreateStub),
   '@/composables/useUserVault': { useUserVault: () => ({ state, error, lock, changePassphrase, reset }) },
-  '@/lib/vault/crypto': { MIN_PASSPHRASE_LENGTH: 8 },
+  '@/lib/vault/crypto': { MIN_KEY_HOLDER_PASSPHRASE_LENGTH: 12 },
   '@/lib/utils': { errorMessage },
 })
 
@@ -118,12 +118,12 @@ describe('VaultSettings', () => {
     const box = dialog(root)
 
     await typeValue(field(box, 'vault-current'), 'old horse')
-    await typeValue(field(box, 'vault-next'), 'new horse!')
+    await typeValue(field(box, 'vault-next'), 'new horse battery')
     expect(button(box, 'Change passphrase').props.disabled).toBe(true)
-    await typeValue(field(box, 'vault-next-repeat'), 'new horse!')
+    await typeValue(field(box, 'vault-next-repeat'), 'new horse battery')
     await click(button(box, 'Change passphrase'))
 
-    expect(changePassphrase).toHaveBeenCalledWith({ passphrase: 'old horse' }, 'new horse!')
+    expect(changePassphrase).toHaveBeenCalledWith({ passphrase: 'old horse' }, 'new horse battery')
     expect(() => dialog(root)).toThrow()
   })
 
@@ -133,11 +133,11 @@ describe('VaultSettings', () => {
     await click(button(dialog(root), 'Use the recovery code'))
 
     await typeValue(field(dialog(root), 'vault-current'), 'ABCD-EFGH')
-    await typeValue(field(dialog(root), 'vault-next'), 'new horse!')
-    await typeValue(field(dialog(root), 'vault-next-repeat'), 'new horse!')
+    await typeValue(field(dialog(root), 'vault-next'), 'new horse battery')
+    await typeValue(field(dialog(root), 'vault-next-repeat'), 'new horse battery')
     await click(button(dialog(root), 'Change passphrase'))
 
-    expect(changePassphrase).toHaveBeenCalledWith({ recoveryCode: 'ABCD-EFGH' }, 'new horse!')
+    expect(changePassphrase).toHaveBeenCalledWith({ recoveryCode: 'ABCD-EFGH' }, 'new horse battery')
   })
 
   it('names what a reset loses before deleting the keys', async () => {

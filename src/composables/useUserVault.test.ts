@@ -244,14 +244,14 @@ describe('useUserVault', () => {
     // while this one still saved on the old vault.
     const other = await boot()
     await other.vault.reset()
-    await other.vault.create('new horse', false)
+    await other.vault.create('new horse battery', false)
     await vault.saveProviders([work])
 
     expect(node.heads).toHaveLength(2)
     expect(vault.providers.value).toEqual([work])
     const again = await boot()
     again.vault.lock()
-    await again.vault.unlock('new horse')
+    await again.vault.unlock('new horse battery')
     expect(again.vault.providers.value).toEqual([])
     expect(node.heads).toHaveLength(2)
   })
@@ -269,7 +269,7 @@ describe('useUserVault', () => {
 
   it('opens the keys with the recovery code and sets a new passphrase from it', async () => {
     const { vault } = await boot()
-    const code = await vault.create('forgotten', true)
+    const code = await vault.create('forgotten passphrase', true)
     await vault.saveProviders([work])
     vault.lock()
 
@@ -277,24 +277,24 @@ describe('useUserVault', () => {
     await vault.unlockWithRecovery(code ?? '')
     expect(vault.providers.value).toEqual([work])
 
-    await vault.changePassphrase({ recoveryCode: code ?? '' }, 'remembered')
+    await vault.changePassphrase({ recoveryCode: code ?? '' }, 'remembered passphrase')
     vault.lock()
-    await vault.unlock('remembered')
+    await vault.unlock('remembered passphrase')
     expect(vault.state.value).toBe('unlocked')
-    expect(await nodeProviders('remembered')).toEqual([work])
+    expect(await nodeProviders('remembered passphrase')).toEqual([work])
   })
 
   it('changes the passphrase and refuses the old one', async () => {
     const { vault } = await boot()
-    await vault.create('first', false)
+    await vault.create('first passphrase', false)
 
-    await expect(vault.changePassphrase({ passphrase: 'wrong' }, 'second')).rejects.toThrow('Wrong passphrase.')
-    await vault.changePassphrase({ passphrase: 'first' }, 'second')
+    await expect(vault.changePassphrase({ passphrase: 'wrong' }, 'second passphrase')).rejects.toThrow('Wrong passphrase.')
+    await vault.changePassphrase({ passphrase: 'first passphrase' }, 'second passphrase')
 
     const restarted = await boot()
     restarted.vault.lock()
-    await expect(restarted.vault.unlock('first')).rejects.toThrow('Wrong passphrase.')
-    await restarted.vault.unlock('second')
+    await expect(restarted.vault.unlock('first passphrase')).rejects.toThrow('Wrong passphrase.')
+    await restarted.vault.unlock('second passphrase')
     expect(restarted.vault.state.value).toBe('unlocked')
   })
 
@@ -317,11 +317,11 @@ describe('useUserVault', () => {
     await vault.saveProviders([work])
 
     await vault.reset()
-    await vault.create('new horse', false)
+    await vault.create('new horse battery', false)
 
     expect(vault.state.value).toBe('unlocked')
     expect(saveVault.mock.calls.at(-1)?.[0].predecessors).toEqual([])
-    expect(await nodeProviders('new horse')).toEqual([])
+    expect(await nodeProviders('new horse battery')).toEqual([])
   })
 
   it('creates a keypair with the vault and publishes it', async () => {
@@ -392,6 +392,47 @@ describe('useUserVault', () => {
 
     await vi.waitFor(() => expect(vault.ownKey.value).toBe('unavailable'))
     expect(publishUserKey).not.toHaveBeenCalled()
+  })
+
+  it('finishes the directory check before create and unlock resolve', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', true)
+    expect(vault.ownKey.value).toBe('matches')
+    expect(publishUserKey).toHaveBeenCalledTimes(1)
+
+    vault.lock()
+    directory.length = 0
+    await vault.unlock('correct horse')
+
+    expect(vault.ownKey.value).toBe('matches')
+    expect(publishUserKey).toHaveBeenCalledTimes(2)
+  })
+
+  it('checks the directory on request and publishes a missing key once', async () => {
+    const { vault } = await boot()
+    expect(await vault.checkKey()).toBe('unknown')
+    await vault.create('correct horse', false)
+    directory.length = 0
+    listUserKeys.mockClear()
+
+    const answers = await Promise.all([vault.checkKey(), vault.checkKey()])
+
+    expect(answers).toEqual(['matches', 'matches'])
+    expect(listUserKeys).toHaveBeenCalledTimes(1)
+    expect(publishUserKey).toHaveBeenCalledTimes(2)
+    expect(directory).toHaveLength(1)
+  })
+
+  it('refuses a holder passphrase shorter than twelve characters', async () => {
+    const { vault } = await boot()
+    await expect(vault.create('eleven char', false)).rejects.toThrow('at least 12 characters')
+    expect(saveVault).not.toHaveBeenCalled()
+
+    await vault.create('twelve chars', false)
+    await expect(vault.changePassphrase({ passphrase: 'twelve chars' }, 'too short')).rejects.toThrow(
+      'at least 12 characters',
+    )
+    expect(saveVault).toHaveBeenCalledTimes(1)
   })
 
   it('opens the cached vault when no holder answers', async () => {

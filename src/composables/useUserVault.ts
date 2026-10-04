@@ -19,6 +19,7 @@ import {
 import { validateBrowserProvider, type BrowserProvider } from '@/lib/assistant/browserProviders'
 import { assistantChatScopeKey } from '@/lib/assistant/chatHistory'
 import {
+  MIN_KEY_HOLDER_PASSPHRASE_LENGTH,
   VaultUnlockError,
   activeKeypair,
   changePassphrase as rewrapMaster,
@@ -26,6 +27,7 @@ import {
   openData,
   openKeypair,
   parseVaultPayload,
+  passphraseLongEnough,
   rotateKeypair,
   sealData,
   unlockVault,
@@ -81,6 +83,7 @@ let scopeKey = ''
 let generation = 0
 let requested = false
 let inFlight: Promise<void> | null = null
+let keyCheck: Promise<void> | null = null
 
 function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
@@ -168,6 +171,7 @@ async function openProviders(current: VaultPayload, key: CryptoKey): Promise<Bro
 function clearLocal() {
   generation += 1
   inFlight = null
+  keyCheck = null
   payload = null
   heads = []
   predecessors = []
@@ -319,6 +323,15 @@ async function checkOwnKey(run: number) {
   }
 }
 
+/** One directory check at a time, so two callers never publish the same key twice. */
+function checkOnce(run: number): Promise<void> {
+  const check = keyCheck ?? checkOwnKey(run).finally(() => {
+    if (keyCheck === check) keyCheck = null
+  })
+  keyCheck = check
+  return check
+}
+
 /** Adds a keypair when the vault has none, saves it with any merge, then checks the directory. */
 async function finishUnlock(run: number, saveDue: boolean) {
   if (payload && masterKey && !activeKeypair(payload.keys)) {
@@ -328,7 +341,7 @@ async function finishUnlock(run: number, saveDue: boolean) {
     saveDue = true
   }
   if (saveDue) await saveMerge(run)
-  if (run === generation) void checkOwnKey(run)
+  if (run === generation) await checkOnce(run)
 }
 
 /** Saves a merge once; when that fails the next save carries the merge. */
@@ -446,11 +459,18 @@ export function reapplyChange(
 
 function lock() {
   const scope = scopeKey
+  keyCheck = null
   masterKey = null
   providers.value = []
   ownKey.value = 'unknown'
   state.value = payload ? 'locked' : 'absent'
   forgetKey(scope)
+}
+
+function requireHolderLength(passphrase: string) {
+  if (!passphraseLongEnough(passphrase, true)) {
+    throw new Error(`The passphrase needs at least ${MIN_KEY_HOLDER_PASSPHRASE_LENGTH} characters.`)
+  }
 }
 
 async function create(passphrase: string, withRecovery: boolean): Promise<string | null> {
@@ -461,6 +481,7 @@ async function create(passphrase: string, withRecovery: boolean): Promise<string
     throw new Error('The provider keys on this node could not be read yet. Reload the page and try again.')
   }
   if (payload) throw new Error('Your provider keys are already set up.')
+  requireHolderLength(passphrase)
   const run = generation
   const created = await createVault(passphrase, withRecovery)
   created.payload.keys = await rotateKeypair(created.masterKey, [])
@@ -507,6 +528,7 @@ function unlockWithRecovery(recoveryCode: string): Promise<void> {
 
 /** The current passphrase or the recovery code proves the change; the keys stay unlocked. */
 async function changePassphrase(secret: VaultSecret, newPassphrase: string): Promise<void> {
+  requireHolderLength(newPassphrase)
   requirePayload()
   await saveWithRetry((current) => rewrapMaster(current, secret, newPassphrase))
 }
@@ -516,7 +538,13 @@ async function rotateKey(): Promise<void> {
   const { key } = requireUnlocked()
   const run = generation
   await saveWithRetry(async (current) => ({ ...current, keys: await rotateKeypair(key, current.keys) }))
-  if (run === generation) void checkOwnKey(run)
+  if (run === generation) await checkOnce(run)
+}
+
+/** Checks the key directory again and waits for the answer and any publication. */
+async function checkKey(): Promise<OwnKeyState> {
+  if (state.value === 'unlocked') await checkOnce(generation)
+  return ownKey.value
 }
 
 async function reset(): Promise<void> {
@@ -582,6 +610,7 @@ export function useUserVault() {
     reset,
     saveProviders,
     rotateKey,
+    checkKey,
     dismissRecreateNotice,
   }
 }

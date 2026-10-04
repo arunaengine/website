@@ -43,7 +43,7 @@ const VaultCreateForm = compileClientComponent(new URL('./VaultCreateForm.vue', 
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Notice.vue': moduleDefault(NoticeStub),
   '@/composables/useUserVault': { useUserVault: () => ({ create }) },
-  '@/lib/vault/crypto': { MIN_PASSPHRASE_LENGTH: 8 },
+  '@/lib/vault/crypto': { MIN_KEY_HOLDER_PASSPHRASE_LENGTH: 12 },
   '@/lib/utils': { errorMessage },
 })
 
@@ -68,6 +68,9 @@ describe('VaultCreateForm', () => {
   it('needs a long enough passphrase typed twice', async () => {
     const { root } = await mountApp(Host)
     await fill(root, 'short', 'short')
+    expect(button(root, 'Create').props.disabled).toBe(true)
+
+    await fill(root, 'eleven char')
     expect(button(root, 'Create').props.disabled).toBe(true)
 
     await fill(root, 'correct horse', 'correct house')

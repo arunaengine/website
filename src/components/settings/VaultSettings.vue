@@ -15,7 +15,7 @@ import Notice from '@/components/ui/Notice.vue'
 import VaultCreateForm from './VaultCreateForm.vue'
 import VaultUnlockForm from './VaultUnlockForm.vue'
 import { useUserVault } from '@/composables/useUserVault'
-import { MIN_PASSPHRASE_LENGTH } from '@/lib/vault/crypto'
+import { MIN_KEY_HOLDER_PASSPHRASE_LENGTH } from '@/lib/vault/crypto'
 import { errorMessage } from '@/lib/utils'
 
 const { state, error, lock, changePassphrase, reset } = useUserVault()
@@ -31,7 +31,7 @@ const failure = ref<string | null>(null)
 
 const canChange = computed(() =>
   current.value.trim().length > 0
-  && next.value.length >= MIN_PASSPHRASE_LENGTH
+  && next.value.length >= MIN_KEY_HOLDER_PASSPHRASE_LENGTH
   && repeat.value === next.value
   && !busy.value)
 
@@ -155,7 +155,7 @@ async function confirmReset() {
               type="password"
               class="mt-1.5"
               autocomplete="new-password"
-              :placeholder="`At least ${MIN_PASSPHRASE_LENGTH} characters`"
+              :placeholder="`At least ${MIN_KEY_HOLDER_PASSPHRASE_LENGTH} characters`"
             />
           </div>
           <div>
