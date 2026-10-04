@@ -667,7 +667,7 @@ async function confirmDelete() {
           <p v-if="failed && stderrTail" class="truncate font-mono text-[11px]" :title="executorStderr(0)">
             stderr: {{ stderrTail }}
           </p>
-          <p v-if="task.state === 'QUEUED'" class="flex flex-wrap items-center gap-2 text-[11px]">
+          <p v-if="task.state === 'QUEUED' && !awaitingKey" class="flex flex-wrap items-center gap-2 text-[11px]">
             One node answers and runs it; another steps in after a while without a response.
             <DocsLink topic="compute-run" section="Follow the run" />
           </p>

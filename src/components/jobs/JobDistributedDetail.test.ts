@@ -924,6 +924,7 @@ describe('distributed job detail components', () => {
     expect(mounted.errors).toEqual([])
     expect(content(mounted.root)).toContain(`waits for ${JSON.stringify(waits)}`)
     expect(content(mounted.root)).not.toContain('Queued, waiting for a node')
+    expect(content(mounted.root)).not.toContain('another steps in')
     mounted.app.unmount()
   })
 
