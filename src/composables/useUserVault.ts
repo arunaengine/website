@@ -503,6 +503,7 @@ async function create(passphrase: string, withRecovery: boolean): Promise<string
   const response = await saveVault({ payload: JSON.stringify(created.payload), predecessors: [] }, client())
   if (run !== generation) throw new Error(REPLACED)
   await adoptHeads(response.heads, run, created.masterKey)
+  if (run !== generation) throw new Error(REPLACED)
   if (noticeState(scope) === 'pending') dismissRecreateNotice()
   await rememberKey(scope, created.masterKey)
   await finishUnlock(run, false)

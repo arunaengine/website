@@ -724,6 +724,16 @@ describe('useUserVault', () => {
     expect(vault.state.value).toBe('absent')
   })
 
+  it('remembers no key of a vault it made when a lock lands right after the save', async () => {
+    const { vault } = await boot()
+    onSaveHeads = () => queueMicrotask(() => vault.lock())
+
+    await expect(vault.create('correct horse', false)).rejects.toThrow('changed in another browser')
+
+    expect(vault.state.value).toBe('locked')
+    expect(remembered.size).toBe(0)
+  })
+
   it('refuses to save while locked', async () => {
     const { vault } = await boot()
     await vault.create('correct horse', false)
