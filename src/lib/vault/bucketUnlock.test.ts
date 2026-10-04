@@ -155,6 +155,23 @@ describe('bucket unlock from the browser', () => {
     expect(sent).toHaveLength(0)
   })
 
+  it('names a vault locked while the copies were tried instead of a copy that did not open', async () => {
+    node([COPY], UNLOCKED)
+    const keys = vault()
+    const decrypt = crypto.subtle.decrypt.bind(crypto.subtle)
+    const opening = vi.spyOn(crypto.subtle, 'decrypt').mockImplementation(async (...args) => {
+      keys.lifetime.open = false
+      return decrypt(...args)
+    })
+    const otherBucket = { ...TARGET, publicKey: base64(hex(vector.recipient_public)) }
+
+    try {
+      await expect(unlockWithVault(otherBucket, keys, always)).rejects.toThrow(VaultClosedError)
+    } finally {
+      opening.mockRestore()
+    }
+  })
+
   it('reports an unknown outcome once and does not send the key again', async () => {
     const sent = node([COPY], () => Promise.reject(new TypeError('network down')))
 

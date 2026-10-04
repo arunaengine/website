@@ -127,4 +127,14 @@ describe('bucket unlock dialog', () => {
 
     expect(content(root)).toContain('this key does not belong to the bucket')
   })
+
+  it('claims nothing about a result it does not show', async () => {
+    unlock.mockResolvedValueOnce(null)
+    const root = await render()
+
+    await click(button(root, 'Unlock'))
+
+    expect(content(root)).toContain('so the result is not shown')
+    expect(content(root)).not.toContain('Nothing was sent')
+  })
 })

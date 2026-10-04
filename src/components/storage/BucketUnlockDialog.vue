@@ -62,7 +62,9 @@ async function submit() {
   failure.value = null
   try {
     outcome.value = await props.unlock(props.generation, duration.value ? Number(duration.value) : undefined)
-    if (!outcome.value) failure.value = 'The bucket changed while it was being unlocked. Nothing was sent.'
+    if (!outcome.value) {
+      failure.value = 'The bucket or your session changed meanwhile, so the result is not shown. Check the bucket state.'
+    }
   } catch (cause) {
     failure.value = encryptionError(cause)
   } finally {

@@ -87,6 +87,8 @@ async function openFirst(
       if (!(cause instanceof SealOpenError || cause instanceof BucketKeyMismatchError)) throw cause
     }
   }
+  // A lock or a context change while the copies were tried outranks why none opened.
+  guard()
   if (!copies.length) {
     throw new NoUsableCopyError('You have no ready copy of this bucket key yet. Another key holder must unlock the bucket first.')
   }
