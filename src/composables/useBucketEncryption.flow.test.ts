@@ -28,32 +28,86 @@ async function retiredVault(): Promise<string> {
   return JSON.stringify({ ...created.payload, keys: [{ ...entry, retired_at: '2026-10-02T00:00:00Z' }] })
 }
 
+/** Enough of IndexedDB for the vault key store; every value it is given is recorded. */
+function fakeIndexedDb(writes: unknown[]) {
+  const stores = new Map<string, Map<unknown, unknown>>()
+  const answer = <T>(value: () => T) => {
+    const request: { result?: T; onsuccess?: () => void; onerror?: () => void } = {}
+    queueMicrotask(() => {
+      request.result = value()
+      request.onsuccess?.()
+    })
+    return request
+  }
+  const database = {
+    objectStoreNames: { contains: (name: string) => stores.has(name) },
+    createObjectStore: (name: string) => stores.set(name, new Map()),
+    transaction: (name: string) => ({
+      objectStore: () => {
+        const store = stores.get(name)!
+        return {
+          get: (key: unknown) => answer(() => store.get(key)),
+          put: (value: unknown, key: unknown) => {
+            writes.push(value)
+            return answer(() => store.set(key, value))
+          },
+          delete: (key: unknown) => answer(() => store.delete(key)),
+          clear: () => answer(() => store.clear()),
+        }
+      },
+    }),
+    close() {},
+  }
+  return {
+    open: () => {
+      const request: { result?: unknown; onupgradeneeded?: () => void; onsuccess?: () => void } = {}
+      queueMicrotask(() => {
+        request.result = database
+        request.onupgradeneeded?.()
+        request.onsuccess?.()
+      })
+      return request
+    },
+  }
+}
+
 interface NodeCall {
   method: string
   url: URL
   key?: string
 }
 
-async function fakeNodes() {
+async function fakeNodes(options: { decrypting?: boolean } = {}) {
   const calls: NodeCall[] = []
   const stored: string[] = []
+  const idbWrites: unknown[] = []
   const directory = [{ record_id: 'R1', key_id: KEY_ID, public_key: base64(copy.recipient_public), fingerprint: '', has_recovery: true, created_at: '' }]
   let heads = [{ revision: 'R0001', predecessors: [], payload: await retiredVault(), updated_at: '' }]
   let unlocked = false
-  const status = () => ({
-    bucket: 'reef',
-    mode: 'vault_locked',
-    bucket_id: copy.bucket_id,
-    storage_generation: 1,
-    key_generation: copy.generation,
+  const unlockState = () =>
+    unlocked
+      ? { state: 'unlocked', lock_reason: null, locked_at_ms: null, session_id: 'S1', unlocked_at_ms: 2, deadline_ms: 3_600_002, max_deadline_ms: null }
+      : { state: 'locked', lock_reason: 'restart', locked_at_ms: 1, session_id: null, unlocked_at_ms: null, deadline_ms: null, max_deadline_ms: null }
+  const vectorKey = () => ({
+    generation: copy.generation,
+    role: options.decrypting ? 'source' : 'active',
     public_key: base64(copy.bucket_public),
     fingerprint: copy.bucket_fingerprint,
+    unlock: unlockState(),
+  })
+  const status = () => ({
+    bucket: 'reef',
+    mode: options.decrypting ? 'off' : 'vault_locked',
+    bucket_id: copy.bucket_id,
+    storage_generation: 1,
+    key_generation: options.decrypting ? copy.generation + 1 : copy.generation,
+    public_key: options.decrypting ? null : base64(copy.bucket_public),
+    fingerprint: options.decrypting ? null : copy.bucket_fingerprint,
     cipher: 'chacha20_poly1305',
     block_keys: 'content_derived',
     max_unlock_ms: null,
-    unlock: unlocked
-      ? { state: 'unlocked', lock_reason: null, locked_at_ms: null, session_id: 'S1', unlocked_at_ms: 2, deadline_ms: 3_600_002, max_deadline_ms: null }
-      : { state: 'locked', lock_reason: 'restart', locked_at_ms: 1, session_id: null, unlocked_at_ms: null, deadline_ms: null, max_deadline_ms: null },
+    unlock: options.decrypting ? null : unlockState(),
+    generations: [vectorKey()],
     holders: { ready: 1, pending: 0, missing_key: 0 },
     recovery: { state: 'met', ready_holders: 1, ready_with_recovery: 1 },
     transition: null,
@@ -70,6 +124,7 @@ async function fakeNodes() {
   }
   vi.stubGlobal('window', { location: { origin: 'https://portal.test' } })
   vi.stubGlobal('localStorage', { getItem: () => null, setItem: (_: string, value: string) => stored.push(value) })
+  vi.stubGlobal('indexedDB', fakeIndexedDb(idbWrites))
   vi.stubGlobal('fetch', vi.fn(async (input: URL, init: RequestInit) => {
     const url = new URL(String(input))
     const method = init.method ?? 'GET'
@@ -94,11 +149,26 @@ async function fakeNodes() {
     if (path.endsWith('/copies/me')) return json({ copies: [sealedCopy] })
     if (path.endsWith('/unlock')) {
       unlocked = true
-      return json(status().unlock)
+      return json(unlockState())
     }
     return new Response('{}', { status: 404 })
   }))
-  return { calls, stored }
+  return { calls, stored, idbWrites }
+}
+
+/** Nothing this browser keeps, in storage or IndexedDB, holds the bucket key in any encoding. */
+function expectNoStoredKey(stored: string[], idbWrites: unknown[]) {
+  expect(idbWrites.length).toBeGreaterThan(0)
+  for (const value of [...stored, ...idbWrites]) {
+    if (value instanceof CryptoKey) {
+      expect(value.extractable).toBe(false)
+      expect(value.algorithm.name).toBe('AES-GCM')
+      continue
+    }
+    const text = JSON.stringify(value)
+    expect(text).not.toContain(copy.bucket_private)
+    expect(text).not.toContain(base64(copy.bucket_private))
+  }
 }
 
 async function signIn() {
@@ -122,7 +192,7 @@ afterEach(() => {
 
 describe('unlocking a vault-locked bucket from the browser', () => {
   it('opens the copy with a retired vault key and sends only that bucket key to its node', async () => {
-    const { calls, stored } = await fakeNodes()
+    const { calls, stored, idbWrites } = await fakeNodes()
     const { vault: keys, useBucketEncryption } = await signIn()
     await keys.load()
     await keys.unlock(PASSPHRASE)
@@ -146,11 +216,25 @@ describe('unlocking a vault-locked bucket from the browser', () => {
     const fetched = calls.findIndex((call) => call.url.pathname.endsWith('/copies/me'))
     expect(published).toBeGreaterThanOrEqual(0)
     expect(published).toBeLessThan(fetched)
-    // Nothing the browser stored holds the bucket key in any encoding.
-    for (const value of stored) {
-      expect(value).not.toContain(copy.bucket_private)
-      expect(value).not.toContain(base64(copy.bucket_private))
-    }
+    expectNoStoredKey(stored, idbWrites)
+  })
+
+  it('unlocks the previous key of a bucket whose stored versions are being decrypted', async () => {
+    const { calls, stored, idbWrites } = await fakeNodes({ decrypting: true })
+    const { vault: keys, useBucketEncryption } = await signIn()
+    await keys.load()
+    await keys.unlock(PASSPHRASE)
+    const encryption = scope.run(() => useBucketEncryption(ref('reef'), ref(copy.node_id), ref('g-1')))!
+    await vi.waitFor(() => expect(encryption.state.value).toBe('ready'))
+
+    const outcome = await encryption.unlock(copy.generation)
+
+    expect(outcome).toMatchObject({ kind: 'unlocked' })
+    const unlock = calls.find((call) => call.url.pathname.endsWith('/unlock'))!
+    expect(unlock.key).toBe(copy.bucket_private)
+    expect(unlock.url.searchParams.get('generation')).toBe(String(copy.generation))
+    expect(encryption.status.value?.generations?.[0].unlock.state).toBe('unlocked')
+    expectNoStoredKey(stored, idbWrites)
   })
 
   it('sends nothing for a bucket shown under another session', async () => {
