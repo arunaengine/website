@@ -108,20 +108,20 @@ export function useBucketEncryption(bucket: Ref<string>, nodeId: Ref<string | nu
     if (busy.value) throw new Error('Another change to this bucket is still running.')
     const bound = binder()
     busy.value = action
+    let outcome: { done: true; value: T } | { done: false; cause: unknown }
     try {
-      const result = await work(bound)
-      return bound() ? result : null
+      outcome = { done: true, value: await work(bound) }
     } catch (cause) {
-      // A failure of a request from an older context is as stale as its success.
-      if (!bound()) return null
-      throw cause
-    } finally {
-      // The status is read again before any outcome is shown, also after a failure.
-      if (bound()) {
-        await load()
-        busy.value = null
-      }
+      outcome = { done: false, cause }
     }
+    // The status is read again before any outcome is shown, also after a failure. A request
+    // from an older context delivers nothing and leaves the busy flag of the new one alone.
+    if (!bound()) return null
+    await load()
+    if (!bound()) return null
+    busy.value = null
+    if (!outcome.done) throw outcome.cause
+    return outcome.value
   }
 
   /** The generation as the current status lists it, active or source. */

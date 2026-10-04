@@ -244,6 +244,30 @@ describe('bucket encryption state', () => {
     expect(extendUnlock.mock.calls[0].slice(0, 2)).toEqual(['reef', { generation: 1, session_id: 'S1', duration_ms: 60_000 }])
   })
 
+  it('leaves the busy flag and result of a newer context alone when an old refresh ends', async () => {
+    const { encryption, bucket } = setup()
+    await vi.waitFor(() => expect(encryption.state.value).toBe('ready'))
+    const refresh = deferred<Api.BucketEncryptionResponse>()
+    lockBucket.mockResolvedValueOnce(OPEN)
+    getBucketEncryption.mockReturnValueOnce(refresh.promise)
+
+    const first = encryption.lock()
+    await vi.waitFor(() => expect(getBucketEncryption).toHaveBeenCalledTimes(2))
+    bucket.value = 'other'
+    await vi.waitFor(() => expect(encryption.state.value).toBe('ready'))
+    const second = deferred<unknown>()
+    lockBucket.mockReturnValueOnce(second.promise)
+    const next = encryption.lock()
+    expect(encryption.busy.value).toBe('lock')
+    refresh.resolve(status())
+
+    expect(await first).toBeNull()
+    expect(encryption.busy.value).toBe('lock')
+    second.resolve(OPEN)
+    expect(await next).toEqual(OPEN)
+    expect(encryption.busy.value).toBeNull()
+  })
+
   it('stops the unlock when the bucket key changes under it', async () => {
     const { encryption } = setup()
     await vi.waitFor(() => expect(encryption.state.value).toBe('ready'))
