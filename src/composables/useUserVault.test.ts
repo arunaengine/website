@@ -24,7 +24,7 @@ const readVault = vi.fn(async () => {
   if (node.unsupported) throw refused(404, 'no such route')
   return { heads: [...node.heads] }
 })
-const saveVault = vi.fn(async (request: { payload: string; predecessors: string[] }) => {
+const saveVault = vi.fn(async (request: { payload: string; predecessors: string[] }, _client?: object) => {
   node.count += 1
   const head = {
     revision: `R${String(node.count).padStart(4, '0')}`,
@@ -732,6 +732,61 @@ describe('useUserVault', () => {
 
     expect(vault.state.value).toBe('locked')
     expect(remembered.size).toBe(0)
+  })
+
+  it('sends no new vault once the account changed while its keys were made', async () => {
+    const { vault, state } = await boot()
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const derive = crypto.subtle.deriveKey.bind(crypto.subtle)
+    const held = vi.spyOn(crypto.subtle, 'deriveKey').mockImplementationOnce(async (...args) => {
+      await gate
+      return derive(...args)
+    })
+
+    const creating = vault.create('correct horse', true)
+    await vi.waitFor(() => expect(held).toHaveBeenCalled())
+    held.mockRestore()
+    state.userInfo.value = { user: { user_id: 'u-2' }, realm: { realm_id: 'r-1' } } as never
+    release()
+
+    await expect(creating).rejects.toThrow('changed in another browser')
+    expect(saveVault).not.toHaveBeenCalled()
+  })
+
+  it('sends a vault save only in the session it began in, with the token it began with', async () => {
+    const { vault, state } = await boot()
+    await vault.create('correct horse', false)
+    const seal = crypto.subtle.encrypt.bind(crypto.subtle)
+    function holdSeal() {
+      let release!: () => void
+      const gate = new Promise<void>((resolve) => (release = resolve))
+      const held = vi.spyOn(crypto.subtle, 'encrypt').mockImplementationOnce(async (...args) => {
+        await gate
+        return seal(...args)
+      })
+      return { held, release }
+    }
+
+    const first = holdSeal()
+    const saving = vault.saveProviders([work])
+    await vi.waitFor(() => expect(first.held).toHaveBeenCalled())
+    first.held.mockRestore()
+    state.authToken.value = 'token-2'
+    first.release()
+    await saving
+    expect(saveVault.mock.calls.at(-1)?.[1]).toEqual({ baseUrl: 'https://node.test/api/v1', token: 'token' })
+
+    const sent = saveVault.mock.calls.length
+    const second = holdSeal()
+    const ended = vault.saveProviders([work, local])
+    await vi.waitFor(() => expect(second.held).toHaveBeenCalled())
+    second.held.mockRestore()
+    state.sessionEpoch.value += 1
+    second.release()
+
+    await expect(ended).rejects.toThrow('changed in another browser')
+    expect(saveVault).toHaveBeenCalledTimes(sent)
   })
 
   it('refuses to save while locked', async () => {

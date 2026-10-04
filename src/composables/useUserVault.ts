@@ -14,6 +14,7 @@ import {
   vaultConflicted,
   vaultUnavailable,
   vaultUnsupported,
+  type ApiClientOptions,
   type UserVaultHead,
 } from '@/lib/api'
 import { validateBrowserProvider, type BrowserProvider } from '@/lib/assistant/browserProviders'
@@ -99,6 +100,21 @@ function currentScope(): string {
   const realmId = userInfo.value?.realm.realm_id ?? realmInfo.value?.realm_id ?? ''
   if (!token || !userId || !realmId || !apiBaseUrl.value) return ''
   return assistantChatScopeKey({ apiBaseUrl: apiBaseUrl.value, realmId, userId })
+}
+
+/** The API base and token a vault write began with, and the account scope they belong to. */
+interface WriteTarget {
+  scope: string
+  client: ApiClientOptions
+}
+
+function writeTarget(): WriteTarget {
+  return { scope: currentScope(), client: client() }
+}
+
+/** True once a lock, or an account, session or API base change, ended the write. */
+function writeEnded(run: number, target: WriteTarget): boolean {
+  return run !== generation || target.scope !== currentScope()
 }
 
 async function rememberKey(scope: string, key: CryptoKey) {
@@ -288,8 +304,9 @@ async function settle(scope: string, list: UserVaultHead[]): Promise<boolean> {
 }
 
 /** Saves `next` over every held head and takes the heads the holder answers with. */
-async function putPayload(next: VaultPayload, run: number): Promise<boolean> {
-  const response = await saveVault({ payload: JSON.stringify(next), predecessors }, client())
+async function putPayload(next: VaultPayload, run: number, target = writeTarget()): Promise<boolean> {
+  if (writeEnded(run, target)) throw new Error(REPLACED)
+  const response = await saveVault({ payload: JSON.stringify(next), predecessors }, target.client)
   if (run !== generation) throw new Error(REPLACED)
   return adoptHeads(response.heads, run)
 }
@@ -352,10 +369,10 @@ async function finishUnlock(run: number, saveDue: boolean) {
 }
 
 /** Saves a merge once; when that fails the next save carries the merge. */
-async function saveMerge(run: number) {
+async function saveMerge(run: number, target?: WriteTarget) {
   if (!payload) return
   try {
-    await putPayload(payload, run)
+    await putPayload(payload, run, target)
   } catch {
     // The merged payload and its predecessors stay in place for the next save.
   }
@@ -435,15 +452,16 @@ function requireUnlocked(): { current: VaultPayload; key: CryptoKey } {
 /** Saves over the held heads; when a holder lost a concurrent write, rebuilds on a fresh read once. */
 async function saveWithRetry(build: (current: VaultPayload) => Promise<VaultPayload>): Promise<void> {
   const run = generation
+  const target = writeTarget()
   requirePayload()
   for (let attempt = 0; ; attempt += 1) {
     const next = await build(requirePayload())
     try {
-      if (await putPayload(next, run)) await saveMerge(run)
+      if (await putPayload(next, run, target)) await saveMerge(run, target)
       return
     } catch (cause) {
       if (!vaultConflicted(cause) || attempt > 0 || run !== generation) throw cause
-      const response = await readVault(client())
+      const response = await readVault(target.client)
       if (run !== generation || !response.heads.length) throw new Error(REPLACED)
       await adoptHeads(response.heads, run)
     }
@@ -498,9 +516,11 @@ async function create(passphrase: string, withRecovery: boolean): Promise<string
   if (payload) throw new Error('Your provider keys are already set up.')
   requireHolderLength(passphrase)
   const run = generation
+  const target = writeTarget()
   const created = await createVault(passphrase, withRecovery)
   created.payload.keys = await rotateKeypair(created.masterKey, [])
-  const response = await saveVault({ payload: JSON.stringify(created.payload), predecessors: [] }, client())
+  if (writeEnded(run, target)) throw new Error(REPLACED)
+  const response = await saveVault({ payload: JSON.stringify(created.payload), predecessors: [] }, target.client)
   if (run !== generation) throw new Error(REPLACED)
   await adoptHeads(response.heads, run, created.masterKey)
   if (run !== generation) throw new Error(REPLACED)
