@@ -1,6 +1,6 @@
-// ── Bucket encryption (/data/buckets/{bucket}/storage/encryption) ──────────
-// Node-local: every request goes to the API base of the node hosting the bucket,
-// never through S3. An older node answers 404: "not reported here", never "off".
+// Bucket encryption routes. Every request goes to the API base of the node that
+// hosts the bucket, never through S3. An older node answers 404: "not reported
+// here", never "off".
 import { ApiError, apiRequest, type ApiClientOptions } from './client'
 
 export type EncryptionMode = 'off' | 'node_managed' | 'vault_locked'

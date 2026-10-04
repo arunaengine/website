@@ -1,6 +1,6 @@
-// ── Bucket compression (GET /data/buckets/{bucket}/storage/compression) ────
-// Node-local, asked of the bucket's own node. An encrypted bucket compresses
-// inside Pithos at the nearest supported level, which `effective_level` names.
+// The compression setting of a bucket, asked of the bucket's own node. An
+// encrypted bucket compresses inside Pithos at the nearest supported level,
+// which `effective_level` names.
 import { apiRequest, type ApiClientOptions } from './client'
 
 export interface BucketCompressionResponse {
