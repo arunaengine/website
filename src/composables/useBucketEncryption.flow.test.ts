@@ -1,7 +1,7 @@
 // The whole browser unlock against fake nodes: the real vault, copy opening,
 // unlock flow and bucket state, with the shared vectors as the node's data.
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ref } from 'vue'
+import { effectScope, ref } from 'vue'
 import copy from '@/lib/vault/__fixtures__/bucket-copy.json'
 import { createVault, sealKeypair } from '@/lib/vault/crypto'
 
@@ -112,7 +112,11 @@ async function signIn() {
   return { state, vault: useUserVault(), useBucketEncryption }
 }
 
+let scope = effectScope()
+
 afterEach(() => {
+  scope.stop()
+  scope = effectScope()
   vi.unstubAllGlobals()
 })
 
@@ -122,7 +126,7 @@ describe('unlocking a vault-locked bucket from the browser', () => {
     const { vault: keys, useBucketEncryption } = await signIn()
     await keys.load()
     await keys.unlock(PASSPHRASE)
-    const encryption = useBucketEncryption(ref('reef'), ref(copy.node_id), ref('g-1'))
+    const encryption = scope.run(() => useBucketEncryption(ref('reef'), ref(copy.node_id), ref('g-1')))!
     await vi.waitFor(() => expect(encryption.state.value).toBe('ready'))
 
     const outcome = await encryption.unlock(3_600_000)
@@ -154,7 +158,7 @@ describe('unlocking a vault-locked bucket from the browser', () => {
     const { state, vault: keys, useBucketEncryption } = await signIn()
     await keys.load()
     await keys.unlock(PASSPHRASE)
-    const encryption = useBucketEncryption(ref('reef'), ref(copy.node_id), ref('g-1'))
+    const encryption = scope.run(() => useBucketEncryption(ref('reef'), ref(copy.node_id), ref('g-1')))!
     await vi.waitFor(() => expect(encryption.state.value).toBe('ready'))
 
     const pending = encryption.unlock()

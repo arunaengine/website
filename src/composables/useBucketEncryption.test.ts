@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ref } from 'vue'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { effectScope, ref, type EffectScope } from 'vue'
 import * as Api from '@/lib/api'
 import { authToken, sessionEpoch, userInfo } from './aruna/state'
 import { useBucketEncryption } from './useBucketEncryption'
@@ -53,12 +53,20 @@ function deferred<T>() {
   return { promise, resolve, reject }
 }
 
+const scopes: EffectScope[] = []
+
 function setup(node: string | null = 'node-b') {
   const bucket = ref('reef')
   const nodeId = ref<string | null>(node)
-  const encryption = useBucketEncryption(bucket, nodeId, ref('g-1'))
-  return { encryption, bucket, nodeId }
+  const scope = effectScope()
+  scopes.push(scope)
+  const encryption = scope.run(() => useBucketEncryption(bucket, nodeId, ref('g-1')))!
+  return { encryption, bucket, nodeId, scope }
 }
+
+afterEach(() => {
+  for (const scope of scopes.splice(0)) scope.stop()
+})
 
 beforeEach(() => {
   getBucketEncryption.mockReset().mockResolvedValue(status())
@@ -158,6 +166,42 @@ describe('bucket encryption state', () => {
 
     expect(await answer).toBeNull()
     expect(live()).toBe(false)
+  })
+
+  it('keeps an unlock dead after the page left the bucket and came back', async () => {
+    const { encryption, bucket } = setup()
+    await vi.waitFor(() => expect(encryption.state.value).toBe('ready'))
+    const pending = deferred<unknown>()
+    unlockWithVault.mockReturnValue(pending.promise)
+
+    const answer = encryption.unlock()
+    await vi.waitFor(() => expect(unlockWithVault).toHaveBeenCalled())
+    const live = unlockWithVault.mock.calls[0][2] as () => boolean
+    bucket.value = 'other'
+    bucket.value = 'reef'
+    await vi.waitFor(() => expect(encryption.state.value).toBe('ready'))
+    pending.resolve({ kind: 'unlocked', status: {}, ownKey: 'matches' })
+
+    expect(live()).toBe(false)
+    expect(await answer).toBeNull()
+  })
+
+  it('drops the answer and the failure of a request whose state was disposed', async () => {
+    const { encryption, scope } = setup()
+    await vi.waitFor(() => expect(encryption.state.value).toBe('ready'))
+    const pending = deferred<unknown>()
+    unlockWithVault.mockReturnValue(pending.promise)
+    const loadsBefore = getBucketEncryption.mock.calls.length
+
+    const answer = encryption.unlock()
+    await vi.waitFor(() => expect(unlockWithVault).toHaveBeenCalled())
+    const live = unlockWithVault.mock.calls[0][2] as () => boolean
+    scope.stop()
+    pending.reject(new Api.ApiError(400, 'refused', 'wrong_key'))
+
+    expect(live()).toBe(false)
+    expect(await answer).toBeNull()
+    expect(getBucketEncryption.mock.calls.length).toBe(loadsBefore)
   })
 
   it('stops the unlock when the bucket key changes under it', async () => {

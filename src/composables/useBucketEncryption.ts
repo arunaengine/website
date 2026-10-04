@@ -1,7 +1,7 @@
 // Encryption state of one bucket, asked of the node that hosts it. An answer is
 // kept only while the account, session, realm, node API base, group and bucket
 // it was asked for are still current; anything else is dropped unseen.
-import { computed, ref, watch, type Ref } from 'vue'
+import { computed, onScopeDispose, ref, watch, type Ref } from 'vue'
 import {
   ApiError,
   apiErrorMessage,
@@ -35,6 +35,9 @@ export function useBucketEncryption(bucket: Ref<string>, nodeId: Ref<string | nu
   const busy = ref<EncryptionAction | null>(null)
   /** An unlock whose answer never came; only a successful status read clears it. */
   const outcomeUnknown = ref(false)
+  // Grows on every context change and on disposal and never goes back, so a
+  // request from bucket A stays dead when the page returns to bucket A.
+  let generation = 0
   let loads = 0
 
   const scope = computed(() => {
@@ -55,10 +58,10 @@ export function useBucketEncryption(bucket: Ref<string>, nodeId: Ref<string | nu
     return { baseUrl: scope.value.apiBase, token: authToken.value }
   }
 
-  /** A check that stays true while the scope a request started in is current. */
+  /** A check that stays true until the context changes or the state is disposed. */
   function binder(): () => boolean {
-    const key = scopeKey.value
-    return () => scopeKey.value === key
+    const captured = generation
+    return () => captured === generation
   }
 
   function failed(cause: unknown): EncryptionLoadState {
@@ -104,6 +107,10 @@ export function useBucketEncryption(bucket: Ref<string>, nodeId: Ref<string | nu
     try {
       const result = await work(bound)
       return bound() ? result : null
+    } catch (cause) {
+      // A failure of a request from an older context is as stale as its success.
+      if (!bound()) return null
+      throw cause
     } finally {
       // The status is read again before any outcome is shown, also after a failure.
       if (bound()) {
@@ -163,6 +170,7 @@ export function useBucketEncryption(bucket: Ref<string>, nodeId: Ref<string | nu
   watch(
     scopeKey,
     () => {
+      generation += 1
       status.value = null
       compression.value = null
       error.value = null
@@ -172,8 +180,11 @@ export function useBucketEncryption(bucket: Ref<string>, nodeId: Ref<string | nu
       state.value = 'loading'
       void load()
     },
-    { immediate: true },
+    { immediate: true, flush: 'sync' },
   )
+  onScopeDispose(() => {
+    generation += 1
+  })
 
   return {
     status,
