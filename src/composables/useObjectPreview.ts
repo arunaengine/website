@@ -116,6 +116,8 @@ export function useObjectPreview() {
   /** `unknown`: the node answered without saying whether encrypted versions remain. */
   const lockCheck = ref<'idle' | 'checking' | 'still' | 'unknown' | 'failed'>('idle')
   const lockedTarget = shallowRef<PreviewTarget | null>(null)
+  /** The S3 issuer node the current load reads from when its target omits the node. */
+  let issuerNode: string | null = null
   let currentTarget: PreviewTarget | null = null
   // One controller per load: a reset cancels every probe of the load it ends.
   let probes = new AbortController()
@@ -253,6 +255,7 @@ export function useObjectPreview() {
   // Every await below is followed by a check of `id`: a newer load owns the state.
   async function load(target: PreviewTarget) {
     reset()
+    issuerNode = s3.activeSession?.value?.issuerNodeId ?? null
     const id = loadId
     currentTarget = target
     status.value = 'loading'
@@ -325,9 +328,12 @@ export function useObjectPreview() {
     }
   }
 
+  // The node a locked bucket was read from: an omitted node is the S3 issuer, null the connected node.
+  const nodeOf = (target: PreviewTarget) => (target.nodeId === undefined ? issuerNode : target.nodeId)
+
   const lockedLink = computed(() =>
     status.value === 'locked' && lockedTarget.value
-      ? bucketUnlockLink(lockedTarget.value.bucket, lockedTarget.value.nodeId)
+      ? bucketUnlockLink(lockedTarget.value.bucket, nodeOf(lockedTarget.value))
       : null,
   )
 
@@ -337,7 +343,7 @@ export function useObjectPreview() {
     if (!target || status.value !== 'locked') return
     const id = loadId
     lockCheck.value = 'checking'
-    const node = target.nodeId ?? localNodeId()
+    const node = nodeOf(target) ?? localNodeId()
     const baseUrl = node ? nodeApiBase(node) : null
     try {
       if (!baseUrl) throw new Error('The node publishes no API address.')

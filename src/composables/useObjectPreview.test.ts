@@ -81,6 +81,29 @@ describe('preview of a locked bucket', () => {
     expect(preview.text.value).toBe('plain text')
   })
 
+  it('links and rechecks a locked bucket on the S3 issuer node when the preview omits its node', async () => {
+    activeSession.value = { ...SESSION, issuerNodeId: 'node-b' }
+    getObjectText.mockRejectedValue(LOCKED)
+    const preview = useObjectPreview()
+
+    await preview.load({ bucket: 'reef', key: 'notes.txt' })
+    expect(preview.lockedLink.value).toMatchObject({ query: { node: 'node-b' } })
+    getBucketEncryption.mockResolvedValueOnce(lockState('locked'))
+    await preview.recheck()
+    expect(getBucketEncryption.mock.calls[0][1]).toMatchObject({ baseUrl: 'https://node-b.test/api/v1' })
+
+    // Null is the connected node, whatever node the S3 session was issued by.
+    await preview.load({ bucket: 'reef', key: 'notes.txt', nodeId: null })
+    expect(preview.lockedLink.value).toEqual({
+      name: 'bucket-storage',
+      params: { bucketId: 'reef' },
+      query: { tab: 'encryption' },
+    })
+    getBucketEncryption.mockResolvedValueOnce(lockState('locked'))
+    await preview.recheck()
+    expect(getBucketEncryption.mock.calls[1][1]).toMatchObject({ baseUrl: 'https://node-a.test/api/v1' })
+  })
+
   it('keeps an ordinary refusal an error', async () => {
     getObjectText.mockRejectedValue(Object.assign(new Error('denied'), { $metadata: { httpStatusCode: 403 } }))
     const preview = useObjectPreview()
