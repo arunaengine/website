@@ -59,7 +59,7 @@ const body = compileClientComponent(new URL('./PreviewBody.vue', import.meta.url
   './DownloadCard.vue': moduleDefault(Slotted('div')),
 })
 
-const shown = reactive({ active: true, bucket: 'reef', objectKey: 'a.txt', name: 'a.txt', nodeId: null as string | null })
+const shown = reactive({ active: true, bucket: 'reef', objectKey: 'a.txt', name: 'a.txt', nodeId: null as string | null | undefined })
 const Host = defineComponent(() => () => h(body, { ...shown }))
 const anchor = { href: '', download: '', rel: '', click: vi.fn(), remove: vi.fn() }
 
@@ -93,12 +93,19 @@ describe('preview body', () => {
     await flush()
     preview.sessionKey.value = 'session-2'
     await flush()
+    // Null is the connected node, an omitted node the active S3 session's node.
+    shown.nodeId = null
+    await flush()
+    shown.nodeId = undefined
+    await flush()
 
-    expect(load.mock.calls.map(([target]) => [target.bucket, target.nodeId ?? null])).toEqual([
+    expect(load.mock.calls.map(([target]) => [target.bucket, target.nodeId])).toEqual([
       ['reef', null],
       ['other', null],
       ['other', 'node-b'],
       ['other', 'node-b'],
+      ['other', null],
+      ['other', undefined],
     ])
   })
 

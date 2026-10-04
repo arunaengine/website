@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { effectScope } from 'vue'
+import { effectScope, shallowRef } from 'vue'
 import * as Api from '@/lib/api'
 import type { BucketEncryptionResponse, BucketUnlockStatus } from '@/lib/api'
 import { useObjectPreview } from './useObjectPreview'
@@ -7,9 +7,12 @@ import { useObjectPreview } from './useObjectPreview'
 const getObjectText = vi.fn()
 const probeAccess = vi.fn()
 const getBucketEncryption = vi.fn()
+const downloadUrl = vi.fn()
+const SESSION = { issuerNodeId: 'node-a', groupId: 'G1', accessKeyId: 'AK1', expiresAt: 1_000_000 }
+const activeSession = shallowRef(SESSION)
 
 vi.mock('./useS3', () => ({
-  useS3: () => ({ getObjectText, probeAccess, downloadUrl: async () => 'https://b.test/presigned' }),
+  useS3: () => ({ getObjectText, probeAccess, downloadUrl, activeSession }),
   s3ErrorMessage: (error: unknown) => (error instanceof Error ? error.message : String(error)),
 }))
 vi.mock('./s3/endpoints', () => ({
@@ -39,6 +42,8 @@ beforeEach(() => {
   getObjectText.mockReset()
   probeAccess.mockReset().mockResolvedValue('open')
   getBucketEncryption.mockReset()
+  downloadUrl.mockReset().mockResolvedValue('https://b.test/presigned')
+  activeSession.value = SESSION
 })
 
 describe('preview of a locked bucket', () => {
@@ -194,6 +199,39 @@ describe('preview of a locked bucket', () => {
     expect(preview.urlFor({ ...clip, bucket: 'other' })).toBeNull()
     expect(preview.urlFor({ ...clip, nodeId: 'node-c' })).toBeNull()
     expect(preview.urlFor({ ...clip, versionId: 'v2' })).toBeNull()
+  })
+
+  it('hands out its signed URL only under the S3 session that signed it', async () => {
+    const preview = useObjectPreview()
+    // No node: the URL is signed by the active S3 session's node, which null does not mean.
+    const clip = { bucket: 'reef', key: 'clip.mp4' }
+    await preview.load(clip)
+    const signed = preview.sessionKey.value
+    expect(preview.urlFor(clip)).toBe('https://b.test/presigned')
+    expect(preview.urlFor({ ...clip, nodeId: null })).toBeNull()
+
+    activeSession.value = { ...SESSION, issuerNodeId: 'node-b' }
+    expect(preview.sessionKey.value).not.toBe(signed)
+    expect(preview.urlFor(clip)).toBeNull()
+
+    // A credential refresh keeps the access key and moves the expiry.
+    activeSession.value = { ...SESSION, expiresAt: SESSION.expiresAt + 60_000 }
+    expect(preview.sessionKey.value).not.toBe(signed)
+    expect(preview.urlFor(clip)).toBeNull()
+  })
+
+  it('binds a signed URL to the S3 session it was signed under, not the one it arrived in', async () => {
+    let sign!: (url: string) => void
+    downloadUrl.mockReturnValueOnce(new Promise((resolve) => (sign = resolve)))
+    const preview = useObjectPreview()
+    const clip = { bucket: 'reef', key: 'clip.mp4' }
+
+    const loading = preview.load(clip)
+    activeSession.value = { ...SESSION, issuerNodeId: 'node-b' }
+    sign('https://a.test/presigned')
+    await loading
+
+    expect(preview.urlFor(clip)).toBeNull()
   })
 
   it('ends every pending request when the preview is disposed', async () => {

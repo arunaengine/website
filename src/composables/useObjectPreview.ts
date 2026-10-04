@@ -132,10 +132,21 @@ export function useObjectPreview() {
   const sizeNote = ref<string | null>(null)
   const referenced = ref(false)
   let referenceProbeId = 0
-  /** Account, session and S3 group a preview is read under; a change means reading again. */
-  const sessionKey = computed(() =>
-    [sessionEpoch.value, userInfo.value?.user.user_id ?? '', s3.activeContext?.value?.groupId ?? ''].join('\u0000'),
-  )
+  // Account, session and the S3 session a URL is signed under: issuer node, group, access key
+  // and expiry, which a credential refresh moves. A change means reading again.
+  const sessionKey = computed(() => {
+    const session = s3.activeSession?.value
+    return [
+      sessionEpoch.value,
+      userInfo.value?.user.user_id ?? '',
+      session?.issuerNodeId ?? '',
+      session?.groupId ?? '',
+      session?.accessKeyId ?? '',
+      session?.expiresAt ?? '',
+    ].join('\u0000')
+  })
+  /** The session key the current signed URL was made under. */
+  let signedUnder = ''
 
   function reset() {
     probes.abort()
@@ -182,14 +193,15 @@ export function useObjectPreview() {
     status.value = 'locked'
   }
 
-  /** The signed URL of the current load, only when it was signed for `target`. */
+  // The signed URL of the current load, only for the same object under the same S3 session. An
+  // omitted node (the active session's node) and null (the connected node) stay different.
   function urlFor(target: PreviewTarget): string | null {
     const shown = currentTarget
-    if (!shown || !directUrl.value) return null
+    if (!shown || !directUrl.value || signedUnder !== sessionKey.value) return null
     const same =
       shown.bucket === target.bucket &&
       shown.key === target.key &&
-      (shown.nodeId ?? null) === (target.nodeId ?? null) &&
+      shown.nodeId === target.nodeId &&
       (shown.versionId ?? null) === (target.versionId ?? null)
     return same ? directUrl.value : null
   }
@@ -216,11 +228,13 @@ export function useObjectPreview() {
     kind.value = 'download'
     sizeNote.value = `This file is ${formatBytes(actual)}, above the ${formatBytes(cap)} preview limit.`
     try {
+      const signingKey = sessionKey.value
       const url = await s3.downloadUrl(target.bucket, target.key, target.nodeId, target.versionId)
       if (id !== loadId) return
       const open = await checkAccess(url, id, target)
       if (id !== loadId || !open) return
       directUrl.value = url
+      signedUnder = signingKey
       status.value = 'ready'
     } catch (err) {
       if (id !== loadId) return
@@ -241,11 +255,13 @@ export function useObjectPreview() {
     try {
       if (classified.kind === 'media' || classified.kind === 'pdf' || classified.kind === 'download') {
         if (classified.kind === 'media') mediaKind.value = mediaSubtype(target)
+        const signingKey = sessionKey.value
         const url = await s3.downloadUrl(target.bucket, target.key, target.nodeId, target.versionId)
         if (id !== loadId) return
         const open = await checkAccess(url, id, target)
         if (id !== loadId || !open) return
         directUrl.value = url
+        signedUnder = signingKey
         status.value = 'ready'
         return
       }
@@ -288,8 +304,12 @@ export function useObjectPreview() {
       if (err instanceof TypeError) corsBlocked.value = true
       else errorMessage.value = s3ErrorMessage(err)
       try {
+        const signingKey = sessionKey.value
         const url = await s3.downloadUrl(target.bucket, target.key, target.nodeId, target.versionId)
-        if (id === loadId) directUrl.value = url
+        if (id === loadId) {
+          directUrl.value = url
+          signedUnder = signingKey
+        }
       } catch {
         // Leave directUrl null; the pane still offers its own download button.
       }
