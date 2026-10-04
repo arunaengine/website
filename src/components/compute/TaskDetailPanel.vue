@@ -17,6 +17,7 @@ import CountedList from '@/components/ui/CountedList.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 import DocsLink from '@/components/ui/DocsLink.vue'
 import JobExecutionsTable from '@/components/jobs/JobExecutionsTable.vue'
+import JobKeyWait from '@/components/jobs/JobKeyWait.vue'
 import JobPlacementFigure from '@/components/jobs/JobPlacementFigure.vue'
 import RunLogDialog, { type LogStream } from '@/components/compute/RunLogDialog.vue'
 import TaskHeader from '@/components/compute/TaskHeader.vue'
@@ -299,9 +300,13 @@ interface Summary {
   tone: 'error' | 'warning' | 'info' | 'success'
   headline: string
 }
+// TES has no state for a run that waits for a locked bucket; the native job says so.
+const awaitingKey = computed(() => nativeJob.value?.state === 'awaiting_key' && !isTerminalTesState(task.value?.state))
+
 const summary = computed<Summary | null>(() => {
   const state = task.value?.state
   if (!state) return null
+  if (awaitingKey.value) return { tone: 'warning', headline: 'Waiting for a bucket unlock' }
   const duration = runDuration.value
   const where = executorKind.value ? ` on ${executorKind.value}` : ''
   switch (state) {
@@ -667,6 +672,7 @@ async function confirmDelete() {
             <DocsLink topic="compute-run" section="Follow the run" />
           </p>
         </Notice>
+        <JobKeyWait v-if="awaitingKey" :waits="nativeJob?.awaiting_keys ?? []" />
         <p v-if="lastPollError" class="text-[11px] text-muted-foreground">Refresh failed, retrying.</p>
 
         <section class="space-y-3">

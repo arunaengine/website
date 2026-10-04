@@ -275,6 +275,9 @@ function taskPanel(getTask: unknown, getJob: unknown, deleteJob: unknown = vi.fn
     '@/components/ui/Pagination.vue': moduleDefault(PaginationStub),
     '@/components/jobs/JobPlacementFigure.vue': moduleDefault(PlacementFigureStub),
     '@/components/jobs/JobExecutionsTable.vue': moduleDefault(ExecutionsTableStub),
+    '@/components/jobs/JobKeyWait.vue': moduleDefault(
+      defineComponent({ props: { waits: Array }, setup: (props) => () => h('aside', `waits for ${JSON.stringify(props.waits)}`) }),
+    ),
     '@/components/compute/RunLogDialog.vue': moduleDefault(PassThroughStub),
     '@/components/compute/TaskHeader.vue': moduleDefault(PassThroughStub),
     '@/components/assistant/AskAiButton.vue': moduleDefault(PassThroughStub),
@@ -899,6 +902,28 @@ describe('distributed job detail components', () => {
     expect(text).toContain('Distributed execution detail could not be loaded.')
     expect(text).not.toContain('native family detail')
     expect(text).not.toContain('ERROR:')
+    mounted.app.unmount()
+  })
+
+  it('says a queued run waits for a bucket unlock when its native job does', async () => {
+    const getTask = vi.fn(async () => ({
+      id: 'waiting-run',
+      state: 'QUEUED',
+      executors: [{ image: 'alpine', command: ['sh'] }],
+      inputs: [],
+      outputs: [],
+      logs: [],
+      tags: {},
+    }))
+    const waits = [{ node_id: 'node-b', bucket: 'reef' }]
+    const getJob = vi.fn(async () => ({ state: 'awaiting_key', awaiting_keys: waits, family: null }))
+
+    const mounted = await mount(taskPanel(getTask, getJob), { taskId: 'waiting-run', open: true })
+    await vi.waitFor(() => expect(content(mounted.root)).toContain('Waiting for a bucket unlock'))
+
+    expect(mounted.errors).toEqual([])
+    expect(content(mounted.root)).toContain(`waits for ${JSON.stringify(waits)}`)
+    expect(content(mounted.root)).not.toContain('Queued, waiting for a node')
     mounted.app.unmount()
   })
 
