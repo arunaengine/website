@@ -80,6 +80,10 @@ describe('bucket encryption wording', () => {
     expect(transitionView(visited)).toMatchObject({ state: 'Cleanup open', complete: false })
     expect(transitionView({ ...visited, cleanup_remaining: null }).complete).toBe(false)
     expect(transitionView({ ...visited, cleanup_remaining: 0 })).toMatchObject({ state: 'Finished', complete: true })
+    expect(transitionView({ ...visited, cleanup_remaining: 0, failed: 2 })).toMatchObject({
+      state: 'Some versions failed',
+      complete: false,
+    })
     expect(transitionView({ ...TRANSITION, remaining: null }).detail).toContain('an unknown number left')
   })
 

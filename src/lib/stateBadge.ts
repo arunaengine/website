@@ -106,6 +106,7 @@ const STATE_TONE: Record<string, StateTone> = {
   'not met': 'attention',
   finished: 'done',
   'cleanup open': 'progress',
+  'some versions failed': 'attention',
   'removing old copies': 'progress',
   'waiting for an unlock': 'attention',
   blocked: 'attention',

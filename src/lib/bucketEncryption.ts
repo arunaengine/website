@@ -181,11 +181,13 @@ export function transitionView(transition: EncryptionTransition): TransitionView
       ? 'old copies still to count'
       : `${transition.cleanup_remaining} old ${transition.cleanup_remaining === 1 ? 'copy' : 'copies'} to remove`
   const failed = transition.failed ? `, ${transition.failed} failed` : ''
-  const complete =
-    transition.state === 'finished' && transition.remaining === 0 && transition.cleanup_remaining === 0
+  const settled = transition.remaining === 0 && transition.failed === 0 && transition.cleanup_remaining === 0
+  const complete = transition.state === 'finished' && settled
+  // A node that says finished with work left is not believed.
+  const unsettled = transition.failed ? 'Some versions failed' : 'Cleanup open'
   return {
     title: known(KIND_LABEL, transition.kind),
-    state: complete ? 'Finished' : transition.state === 'finished' ? 'Cleanup open' : known(STATE_LABEL, transition.state),
+    state: complete ? 'Finished' : transition.state === 'finished' ? unsettled : known(STATE_LABEL, transition.state),
     detail: `${transition.done} done, ${remaining} left${failed}, ${cleanup}.`,
     complete,
   }
