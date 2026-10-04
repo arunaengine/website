@@ -130,4 +130,21 @@ describe('preview of a locked bucket', () => {
     expect(preview.status.value).toBe('locked')
     expect(probeAccess).toHaveBeenCalledWith('https://b.test/presigned')
   })
+
+  it('loads again once the node confirms the bucket is plain, and keeps an unreported key state unknown', async () => {
+    getObjectText.mockRejectedValueOnce(LOCKED)
+    const preview = useObjectPreview()
+    await preview.load(TARGET)
+
+    getBucketEncryption.mockResolvedValueOnce({ mode: 'off' } as BucketEncryptionResponse)
+    await preview.recheck()
+    expect(preview.lockCheck.value).toBe('unknown')
+    expect(getObjectText).toHaveBeenCalledTimes(1)
+
+    getBucketEncryption.mockResolvedValueOnce({ mode: 'off', generations: [] } as unknown as BucketEncryptionResponse)
+    getObjectText.mockResolvedValueOnce('plain again')
+    await preview.recheck()
+    expect(preview.status.value).toBe('ready')
+    expect(preview.text.value).toBe('plain again')
+  })
 })

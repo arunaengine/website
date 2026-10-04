@@ -113,7 +113,8 @@ export function useObjectPreview() {
 
   /** `locked`: the bucket is encrypted and locked, so the content waits for an unlock. */
   const status = ref<'idle' | 'loading' | 'ready' | 'error' | 'locked'>('idle')
-  const lockCheck = ref<'idle' | 'checking' | 'still' | 'failed'>('idle')
+  /** `unknown`: the node answered without saying whether encrypted versions remain. */
+  const lockCheck = ref<'idle' | 'checking' | 'still' | 'unknown' | 'failed'>('idle')
   const lockedTarget = shallowRef<PreviewTarget | null>(null)
   let currentTarget: PreviewTarget | null = null
   let loadId = 0
@@ -280,8 +281,11 @@ export function useObjectPreview() {
       if (!baseUrl) throw new Error('The node publishes no API address.')
       const answer = await getBucketEncryption(target.bucket, { baseUrl, token: authToken.value })
       if (id !== loadId) return
-      if (keyGenerations(answer).list.some((key) => key.unlock.state === 'unlocked')) await load(target)
-      else lockCheck.value = 'still'
+      const { list, reported } = keyGenerations(answer)
+      // An unlocked key, or a bucket confirmed plain with no key left, may serve the content now.
+      const plain = answer.mode === 'off' && reported && list.length === 0
+      if (plain || list.some((key) => key.unlock.state === 'unlocked')) await load(target)
+      else lockCheck.value = answer.mode === 'off' && !reported ? 'unknown' : 'still'
     } catch {
       if (id === loadId) lockCheck.value = 'failed'
     }

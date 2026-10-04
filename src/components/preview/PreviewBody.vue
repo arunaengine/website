@@ -186,6 +186,7 @@ async function download() {
       </p>
       <p v-if="preview.lockCheck.value === 'still'">The bucket is still locked.</p>
       <p v-else-if="preview.lockCheck.value === 'failed'">The lock state of the bucket could not be read.</p>
+      <p v-else-if="preview.lockCheck.value === 'unknown'">The node did not say whether the bucket still needs a key.</p>
       <Button variant="outline" size="sm" :disabled="preview.lockCheck.value === 'checking'" @click="preview.recheck()">
         Check again
       </Button>
