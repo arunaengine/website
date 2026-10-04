@@ -1,7 +1,7 @@
 import { defineComponent, h, reactive, ref } from 'vue'
 import * as VueRuntime from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { button, click, compileClientComponent, element, flush, mountApp, moduleDefault } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, element, flush, mountApp, moduleDefault } from '@/test/clientRender'
 
 const Slotted = (tag: string) =>
   defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h(tag, attrs, slots.default?.()) })
@@ -21,6 +21,7 @@ const preview = {
   objectUrl: ref(null),
   directUrl: ref<string | null>(null),
   errorMessage: ref(null),
+  downloadError: ref<string | null>(null),
   corsBlocked: ref(false),
   sizeNote: ref(null),
   referenced: ref(false),
@@ -69,6 +70,7 @@ beforeEach(() => {
   preview.status.value = 'idle'
   preview.kind.value = 'download'
   preview.directUrl.value = null
+  preview.downloadError.value = null
   preview.markLocked.mockReset()
   token = 1
   load.mockReset()
@@ -134,6 +136,22 @@ describe('preview body', () => {
 
     expect(checkAccess).not.toHaveBeenCalled()
     expect(anchor.click).not.toHaveBeenCalled()
+  })
+
+  it('reports a failed download beside a locked or ready preview instead of replacing it', async () => {
+    downloadUrl.mockRejectedValue(new Error('signing failed'))
+    preview.status.value = 'locked'
+    const { root } = await mountApp(Host)
+
+    await click(button(root, 'Download'))
+    expect(preview.status.value).toBe('locked')
+    expect(preview.downloadError.value).toBe('Error: signing failed')
+
+    preview.status.value = 'ready'
+    await click(button(root, 'Download'))
+    await flush()
+    expect(preview.status.value).toBe('ready')
+    expect(content(element(root, (node) => node.tag === 'aside'))).toContain('signing failed')
   })
 
   it('acts on viewer reports only for the file it still shows', async () => {

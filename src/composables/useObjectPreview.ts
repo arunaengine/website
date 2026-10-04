@@ -128,6 +128,8 @@ export function useObjectPreview() {
   const objectUrl = ref<string | null>(null)
   const directUrl = ref<string | null>(null)
   const errorMessage = ref<string | null>(null)
+  /** A failed download of the current load; it never replaces what the preview shows. */
+  const downloadError = ref<string | null>(null)
   const corsBlocked = ref(false)
   const sizeNote = ref<string | null>(null)
   const referenced = ref(false)
@@ -161,6 +163,7 @@ export function useObjectPreview() {
     objectUrl.value = null
     directUrl.value = null
     errorMessage.value = null
+    downloadError.value = null
     corsBlocked.value = false
     sizeNote.value = null
     referenced.value = false
@@ -224,6 +227,10 @@ export function useObjectPreview() {
     return status.value !== 'locked'
   }
 
+  // A result may settle load `id` only while it is current and no probe of it confirmed a lock.
+  // Only a reset, and so a recheck or reload, ends a confirmed lock.
+  const settles = (id: number) => id === loadId && status.value !== 'locked'
+
   async function fallbackDownload(target: PreviewTarget, cap: number, actual: number, id: number) {
     kind.value = 'download'
     sizeNote.value = `This file is ${formatBytes(actual)}, above the ${formatBytes(cap)} preview limit.`
@@ -237,7 +244,7 @@ export function useObjectPreview() {
       signedUnder = signingKey
       status.value = 'ready'
     } catch (err) {
-      if (id !== loadId) return
+      if (!settles(id)) return
       errorMessage.value = s3ErrorMessage(err)
       status.value = 'error'
     }
@@ -274,7 +281,7 @@ export function useObjectPreview() {
 
       if (classified.kind === 'image') {
         const blob = await s3.getObjectBlob(target.bucket, target.key, target.nodeId, target.versionId)
-        if (id !== loadId) return
+        if (!settles(id)) return
         if (blob.size > cap) {
           await fallbackDownload(target, cap, blob.size, id)
           return
@@ -282,7 +289,7 @@ export function useObjectPreview() {
         objectUrl.value = URL.createObjectURL(blob)
       } else {
         const content = await s3.getObjectText(target.bucket, target.key, target.nodeId, target.versionId)
-        if (id !== loadId) return
+        if (!settles(id)) return
         // Coarse guard for objects whose size was not listed up front.
         if (content.length > cap) {
           await fallbackDownload(target, cap, content.length, id)
@@ -299,6 +306,7 @@ export function useObjectPreview() {
         status.value = 'locked'
         return
       }
+      if (!settles(id)) return
       // A cross-origin fetch blocked by bucket CORS (or an offline node) rejects
       // with a TypeError and no response; anything else is a real read error.
       if (err instanceof TypeError) corsBlocked.value = true
@@ -306,14 +314,14 @@ export function useObjectPreview() {
       try {
         const signingKey = sessionKey.value
         const url = await s3.downloadUrl(target.bucket, target.key, target.nodeId, target.versionId)
-        if (id === loadId) {
+        if (settles(id)) {
           directUrl.value = url
           signedUnder = signingKey
         }
       } catch {
         // Leave directUrl null; the pane still offers its own download button.
       }
-      if (id === loadId) status.value = 'error'
+      if (settles(id)) status.value = 'error'
     }
   }
 
@@ -367,6 +375,7 @@ export function useObjectPreview() {
     objectUrl,
     directUrl,
     errorMessage,
+    downloadError,
     corsBlocked,
     sizeNote,
     referenced,

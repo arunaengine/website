@@ -100,6 +100,7 @@ watch(
 // A download belongs to the preview it was started from; a newer one drops its result.
 async function download() {
   if (!props.objectKey) return
+  preview.downloadError.value = null
   const id = preview.loadToken()
   const target = shownTarget()
   try {
@@ -125,9 +126,7 @@ async function download() {
     anchor.click()
     anchor.remove()
   } catch (err) {
-    if (!preview.isCurrent(id)) return
-    preview.errorMessage.value = s3ErrorMessage(err)
-    preview.status.value = 'error'
+    if (preview.isCurrent(id)) preview.downloadError.value = s3ErrorMessage(err)
   }
 }
 
@@ -180,6 +179,8 @@ function pdfLocked(url: string) {
         </Button>
       </div>
     </div>
+
+    <Notice v-if="preview.downloadError.value" tone="error">{{ preview.downloadError.value }}</Notice>
 
     <Spinner
       v-if="preview.status.value === 'loading'"

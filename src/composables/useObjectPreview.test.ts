@@ -263,6 +263,34 @@ describe('preview of a locked bucket', () => {
     expect(preview.directUrl.value).toBeNull()
   })
 
+  it('keeps a lock a download probe confirmed when the earlier read ends later', async () => {
+    let fail!: (reason: unknown) => void
+    getObjectText.mockReturnValueOnce(new Promise((_, reject) => (fail = reject)))
+    const preview = useObjectPreview()
+
+    const failing = preview.load(TARGET)
+    probeAccess.mockResolvedValueOnce('locked')
+    expect(await preview.checkAccess('https://b.test/presigned', preview.loadToken(), TARGET)).toBe(false)
+    fail(new Error('connection reset'))
+    await failing
+
+    expect(preview.status.value).toBe('locked')
+    expect(preview.errorMessage.value).toBeNull()
+    probeAccess.mockResolvedValueOnce('unknown')
+    expect(await preview.checkAccess('https://b.test/presigned', preview.loadToken(), TARGET)).toBe(false)
+
+    let answer!: (value: string) => void
+    getObjectText.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+    const reading = preview.load(TARGET)
+    probeAccess.mockResolvedValueOnce('locked')
+    await preview.checkAccess('https://b.test/presigned', preview.loadToken(), TARGET)
+    answer('plain text')
+    await reading
+
+    expect(preview.status.value).toBe('locked')
+    expect(preview.text.value).toBeNull()
+  })
+
   it('never reads a cancelled probe as permission', async () => {
     probeAccess.mockImplementationOnce(
       (_url: string, signal: AbortSignal) =>
