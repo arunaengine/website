@@ -108,6 +108,15 @@ describe('bucket key access', () => {
     expect(content(root)).toContain('unlock dialog for source 1')
   })
 
+  it('says an extension the node did not answer may or may not have applied', async () => {
+    extend.mockRejectedValueOnce(new Api.ApiError(503, 'unavailable'))
+    const root = await render(status({ generations: [key(2, 'active', OPEN)] }))
+
+    await click(button(root, 'Extend'))
+
+    expect(content(root)).toContain('did not confirm this change')
+  })
+
   it('extends the session of the chosen key and words a refused lock', async () => {
     lock.mockRejectedValueOnce(new Api.ApiError(409, 'conflict', 'session_mismatch'))
     const root = await render(status({ generations: [key(3, 'active'), key(2, 'source', OPEN)] }))
@@ -123,7 +132,6 @@ describe('bucket key access', () => {
   it('holds back a second unlock while the last one is unconfirmed', async () => {
     const root = await render(status(), true)
 
-    expect(content(root)).toContain('The last unlock was not confirmed')
     expect(button(root, 'Unlock').props.disabled).toBe(true)
   })
 

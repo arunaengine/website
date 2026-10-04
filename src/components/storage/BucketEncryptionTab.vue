@@ -79,6 +79,9 @@ const WARNINGS = [
 
 <template>
   <div class="space-y-5">
+    <Notice v-if="outcomeUnknown" tone="warning" title="The last unlock was not confirmed" data-unconfirmed>
+      Unlocking stays blocked until the node reports its state again; the key is never sent twice on its own.
+    </Notice>
     <SectionSkeleton v-if="state === 'loading'" label="Loading the encryption state" />
     <Notice v-else-if="state === 'missing'" tone="info" title="Encryption is not reported here">
       The node that hosts this bucket does not report its encryption. It may run an older Aruna version.
@@ -91,6 +94,7 @@ const WARNINGS = [
     </Notice>
     <Notice v-else-if="state === 'failed'" tone="error" :title="error ?? undefined">
       The encryption state is unknown until the node answers.
+      <RefreshButton class="mt-2" label="Read the state again" :busy="refreshing" @click="encryption.load()" />
     </Notice>
 
     <template v-else-if="status">

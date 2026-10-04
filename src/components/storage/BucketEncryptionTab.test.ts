@@ -1,11 +1,11 @@
 import { defineComponent, h, ref } from 'vue'
 import * as VueRuntime from 'vue'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BucketCompressionResponse, BucketEncryptionResponse } from '@/lib/api'
 import * as Wording from '@/lib/bucketEncryption'
 import * as StateBadge from '@/lib/stateBadge'
 import type { EncryptionLoadState } from '@/composables/useBucketEncryption'
-import { compileClientComponent, content, mountApp, moduleDefault } from '@/test/clientRender'
+import { click, compileClientComponent, content, element, mountApp, moduleDefault } from '@/test/clientRender'
 
 const status = ref<BucketEncryptionResponse | null>(null)
 const compression = ref<BucketCompressionResponse | null>(null)
@@ -30,6 +30,8 @@ const KeyAccessStub = defineComponent({
   setup: (props) => () => h('section', `key access for ${(props.status as BucketEncryptionResponse).bucket}`),
 })
 
+const load = vi.fn()
+
 const tab = compileClientComponent(new URL('./BucketEncryptionTab.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => Slotted('i') }),
@@ -53,7 +55,7 @@ const tab = compileClientComponent(new URL('./BucketEncryptionTab.vue', import.m
       busy: ref(null),
       outcomeUnknown,
       nodeId: ref('node-b'),
-      load: () => undefined,
+      load,
     }),
   },
   '@/lib/bucketEncryption': Wording,
@@ -103,6 +105,7 @@ async function render(next: EncryptionLoadState, value: BucketEncryptionResponse
 
 beforeEach(() => {
   outcomeUnknown.value = false
+  load.mockReset()
 })
 
 describe('bucket encryption tab', () => {
@@ -112,6 +115,16 @@ describe('bucket encryption tab', () => {
     expect(missing).toContain('does not report its encryption')
     expect(missing).not.toContain('Off')
     expect(await render('failed')).toContain('unknown until the node answers')
+  })
+
+  it('keeps the unconfirmed unlock and a way to read again when the state read fails', async () => {
+    outcomeUnknown.value = true
+    const root = await mount('failed')
+
+    expect(content(root)).toContain('The last unlock was not confirmed')
+    expect(content(root)).toContain('Unlocking stays blocked')
+    await click(element(root, (node) => node.props.label === 'Read the state again'))
+    expect(load).toHaveBeenCalledOnce()
   })
 
   it('shows the lock state, key, format and recovery of a vault-locked bucket', async () => {

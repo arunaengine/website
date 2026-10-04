@@ -8,7 +8,7 @@ import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Select from '@/components/ui/Select.vue'
 import type { BucketEncryptionResponse, BucketKeyGeneration } from '@/lib/api'
-import { ROLE_LABEL, durationOptions, encryptionError, keyGenerations, unlockView } from '@/lib/bucketEncryption'
+import { ROLE_LABEL, actionError as actionMessage, durationOptions, keyGenerations, unlockView } from '@/lib/bucketEncryption'
 import { stateVariant } from '@/lib/stateBadge'
 import type { UnlockOutcome } from '@/lib/vault/bucketUnlock'
 
@@ -48,7 +48,7 @@ async function act(work: () => Promise<unknown>) {
   try {
     await work()
   } catch (cause) {
-    actionError.value = encryptionError(cause)
+    actionError.value = actionMessage(cause)
   }
 }
 
@@ -64,9 +64,6 @@ function extendKey(key: BucketKeyGeneration) {
       <h2 class="font-display text-sm font-semibold text-aruna-navy">Key access</h2>
     </header>
     <div class="space-y-3 px-5 py-4">
-      <Notice v-if="outcomeUnknown" tone="warning" title="The last unlock was not confirmed">
-        Read the state again before you try once more; the key is never sent twice on its own.
-      </Notice>
       <Notice v-if="!keys.reported" tone="info">
         The node did not list its key generations, so only the active key is shown.
       </Notice>

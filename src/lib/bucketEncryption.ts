@@ -256,6 +256,14 @@ export function encryptionError(error: unknown): string {
   return REFUSALS[code] ?? apiErrorMessage(error)
 }
 
+/** Only a 4xx says a change was not applied; a 5xx or a lost answer leaves it open. */
+export function actionError(error: unknown): string {
+  const uncertain = !(error instanceof ApiError) || error.status >= 500
+  return uncertain
+    ? 'The node did not confirm this change. The state shown is what it reports now; check it before you retry.'
+    : encryptionError(error)
+}
+
 /** The settings an admin may change with PUT; the key generation is the one shown. */
 export interface EncryptionDraft {
   mode: EncryptionMode
