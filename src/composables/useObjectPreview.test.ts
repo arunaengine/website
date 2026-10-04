@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { effectScope } from 'vue'
 import * as Api from '@/lib/api'
 import type { BucketEncryptionResponse, BucketUnlockStatus } from '@/lib/api'
 import { useObjectPreview } from './useObjectPreview'
@@ -193,5 +194,18 @@ describe('preview of a locked bucket', () => {
     expect(preview.urlFor({ ...clip, bucket: 'other' })).toBeNull()
     expect(preview.urlFor({ ...clip, nodeId: 'node-c' })).toBeNull()
     expect(preview.urlFor({ ...clip, versionId: 'v2' })).toBeNull()
+  })
+
+  it('ends every pending request when the preview is disposed', async () => {
+    const scope = effectScope()
+    const preview = scope.run(() => useObjectPreview())!
+    await preview.load({ ...TARGET, key: 'clip.mp4' })
+    const token = preview.loadToken()
+
+    scope.stop()
+
+    expect(preview.isCurrent(token)).toBe(false)
+    expect(preview.status.value).toBe('idle')
+    expect(await preview.checkAccess('https://b.test/presigned', token)).toBe(false)
   })
 })

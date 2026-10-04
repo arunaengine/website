@@ -1,4 +1,4 @@
-import { computed, ref, shallowRef } from 'vue'
+import { computed, getCurrentScope, onScopeDispose, ref, shallowRef } from 'vue'
 import { getBucketEncryption } from '@/lib/api'
 import { bucketUnlockLink, keyGenerations } from '@/lib/bucketEncryption'
 import { formatBytes } from '@/lib/utils'
@@ -325,6 +325,9 @@ export function useObjectPreview() {
       if (id === loadId) lockCheck.value = 'failed'
     }
   }
+
+  // A disposed preview starts nothing new and lets no pending work finish into it.
+  if (getCurrentScope()) onScopeDispose(reset)
 
   return {
     status,
