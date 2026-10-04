@@ -75,7 +75,13 @@ export function lockView(status: BucketEncryptionResponse): LockView {
   if (unlock.state === 'unlocked') {
     return unlock.deadline_ms !== null
       ? { label: 'Timed unlock', detail: `Locks itself at ${at(unlock.deadline_ms)}.` }
-      : { label: 'Unlocked', detail: 'Until a key holder locks it or the node restarts.' }
+      : {
+          label: 'Unlocked',
+          detail:
+            status.mode === 'node_managed'
+              ? 'The node holds its own key copy and unlocks the bucket again after a restart.'
+              : 'Until a key holder locks it or the node restarts.',
+        }
   }
   if (unlock.lock_reason === 'restart') {
     return { label: 'Locked since restart', detail: 'The node restarted. A key holder must unlock it again.' }

@@ -46,6 +46,7 @@ describe('bucket encryption wording', () => {
     expect(lockView(bucket(LOCKED)).label).toBe('Locked')
     expect(lockView(bucket({ ...LOCKED, lock_reason: 'restart' })).label).toBe('Locked since restart')
     expect(lockView(bucket({ ...LOCKED, state: 'unlocked', lock_reason: null })).label).toBe('Unlocked')
+    expect(lockView(bucket({ ...LOCKED, state: 'unlocked' }, 'node_managed')).detail).toContain('again after a restart')
     expect(lockView(bucket({ ...LOCKED, state: 'unlocked', deadline_ms: 5_000 })).label).toBe('Timed unlock')
     expect(lockView(bucket(null)).label).toBe('Unknown')
     expect(lockView(bucket(null, 'off')).label).toBe('Not encrypted')
