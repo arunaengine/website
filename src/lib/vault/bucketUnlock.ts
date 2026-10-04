@@ -16,6 +16,8 @@ import { SealOpenError, fromBase64Url, type X25519Pair } from './hpke'
 export interface UnlockVault {
   checkKey(): Promise<string>
   openUserKey(keyId: string): Promise<X25519Pair | null>
+  /** A check that stays true while the vault stays unlocked with the same key. */
+  whileUnlocked(): () => boolean
 }
 
 export interface UnlockTarget {
@@ -41,6 +43,14 @@ export class UnlockStaleError extends Error {
   }
 }
 
+/** The vault was locked during the unlock, so the opened key was dropped unsent. */
+export class VaultClosedError extends Error {
+  constructor() {
+    super('Your vault was locked, so the bucket key was not sent.')
+    this.name = 'VaultClosedError'
+  }
+}
+
 /** No copy of the caller opens with this vault. */
 export class NoUsableCopyError extends Error {
   constructor(message: string) {
@@ -61,13 +71,13 @@ async function openFirst(
   copies: SealedCopyEntry[],
   target: UnlockTarget,
   vault: UnlockVault,
-  current: () => boolean,
+  guard: () => void,
 ): Promise<Uint8Array<ArrayBuffer>> {
   const publicKey = bytes(target.publicKey)
   let held = false
   for (const copy of copies) {
     const pair = await vault.openUserKey(copy.key_id)
-    if (!current()) throw new UnlockStaleError()
+    guard()
     if (!pair) continue
     held = true
     try {
@@ -95,23 +105,28 @@ export async function unlockWithVault(
   current: () => boolean,
 ): Promise<UnlockOutcome> {
   const ownKey = await vault.checkKey()
-  if (!current()) throw new UnlockStaleError()
+  const vaultOpen = vault.whileUnlocked()
+  const guard = () => {
+    if (!current()) throw new UnlockStaleError()
+    if (!vaultOpen()) throw new VaultClosedError()
+  }
+  guard()
   const { bucketId, generation } = target.context
   const response = await getMyCopies(target.bucket, generation, target.client)
-  if (!current()) throw new UnlockStaleError()
+  guard()
   const copies = response.copies
     .filter((copy) => copy.bucket_id === bucketId && copy.generation === generation)
     .sort((a, b) => b.created_at_ms - a.created_at_ms)
-  const key = await openFirst(copies, target, vault, current)
+  const key = await openFirst(copies, target, vault, guard)
   try {
-    if (!current()) throw new UnlockStaleError()
+    guard()
     const request = { bucket_id: bucketId, generation, duration_ms: target.durationMs }
     const status = await unlockBucket(target.bucket, request, key, target.client)
     return { kind: 'unlocked', status, ownKey }
   } catch (cause) {
     // Only a 4xx says the key was not applied; a 5xx or a lost answer says nothing.
     const answered = cause instanceof ApiError && cause.status < 500
-    if (answered || cause instanceof UnlockStaleError) throw cause
+    if (answered || cause instanceof UnlockStaleError || cause instanceof VaultClosedError) throw cause
     return { kind: 'unknown', ownKey }
   } finally {
     key.fill(0)

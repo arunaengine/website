@@ -548,6 +548,13 @@ async function checkKey(): Promise<OwnKeyState> {
   return ownKey.value
 }
 
+/** A check that stays true while the vault stays unlocked with the same key. */
+function whileUnlocked(): () => boolean {
+  const key = masterKey
+  const run = generation
+  return () => key !== null && masterKey === key && run === generation && state.value === 'unlocked'
+}
+
 /** Opens a keypair of the unlocked vault by id, retired ones included; null when it has none. */
 async function openUserKey(keyId: string): Promise<X25519Pair | null> {
   const { current, key } = requireUnlocked()
@@ -620,6 +627,7 @@ export function useUserVault() {
     rotateKey,
     checkKey,
     openUserKey,
+    whileUnlocked,
     dismissRecreateNotice,
   }
 }

@@ -437,6 +437,21 @@ describe('useUserVault', () => {
     await expect(vault.openUserKey(first.id)).rejects.toThrow('Unlock your provider keys first.')
   })
 
+  it('ends a key disclosure binding when the vault locks or the session changes', async () => {
+    const { vault, state } = await boot()
+    await vault.create('correct horse', false)
+    const beforeLock = vault.whileUnlocked()
+    expect(beforeLock()).toBe(true)
+
+    vault.lock()
+    expect(beforeLock()).toBe(false)
+    await vault.unlock('correct horse')
+    expect(beforeLock()).toBe(false)
+    const afterUnlock = vault.whileUnlocked()
+    state.sessionEpoch.value += 1
+    expect(afterUnlock()).toBe(false)
+  })
+
   it('refuses a holder passphrase shorter than twelve characters', async () => {
     const { vault } = await boot()
     await expect(vault.create('eleven char', false)).rejects.toThrow('at least 12 characters')

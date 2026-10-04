@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/lib/api'
 import vector from './__fixtures__/bucket-copy.json'
 import { importPrivateKey } from './hpke'
-import { NoUsableCopyError, UnlockStaleError, unlockWithVault, type UnlockTarget } from './bucketUnlock'
+import { NoUsableCopyError, UnlockStaleError, VaultClosedError, unlockWithVault, type UnlockTarget } from './bucketUnlock'
 
 function hex(text: string): Uint8Array<ArrayBuffer> {
   return Uint8Array.from(text.match(/../g) ?? [], (pair) => parseInt(pair, 16))
@@ -58,8 +58,11 @@ function node(copies: unknown[], unlock: () => Response | Promise<Response>) {
 
 function vault(keyIds = [vector.key_id]) {
   const order: string[] = []
+  const lifetime = { open: true }
   return {
     order,
+    lifetime,
+    whileUnlocked: () => () => lifetime.open,
     checkKey: vi.fn(async () => {
       order.push('check')
       return 'matches'
@@ -118,6 +121,21 @@ describe('bucket unlock from the browser', () => {
 
     expect(checks).toBe(4)
     expect(sent.map((call) => call.method)).toEqual(['GET'])
+  })
+
+  it('drops the opened key when the vault locks before it is sent', async () => {
+    const sent = node([COPY], UNLOCKED)
+    const keys = vault()
+    const open = keys.openUserKey.getMockImplementation()!
+    keys.openUserKey.mockImplementation(async (keyId: string) => {
+      const pair = await open(keyId)
+      keys.lifetime.open = false
+      return pair
+    })
+
+    await expect(unlockWithVault(TARGET, keys, always)).rejects.toThrow(VaultClosedError)
+
+    expect(sent.filter((call) => call.method === 'POST')).toHaveLength(0)
   })
 
   it('reports an unknown outcome once and does not send the key again', async () => {

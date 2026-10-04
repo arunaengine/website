@@ -252,4 +252,21 @@ describe('unlocking a vault-locked bucket from the browser', () => {
     expect(outcome === null || outcome instanceof Error).toBe(true)
     expect(calls.some((call) => call.url.pathname.endsWith('/unlock'))).toBe(false)
   })
+
+  it('drops the key when the vault is locked before it is sent', async () => {
+    const { calls } = await fakeNodes()
+    const { vault: keys, useBucketEncryption } = await signIn()
+    await keys.load()
+    await keys.unlock(PASSPHRASE)
+    const encryption = scope.run(() => useBucketEncryption(ref('reef'), ref(copy.node_id), ref('g-1')))!
+    await vi.waitFor(() => expect(encryption.state.value).toBe('ready'))
+
+    const pending = encryption.unlock(copy.generation)
+    keys.lock()
+    const outcome = await pending.catch((error: unknown) => error)
+
+    expect(outcome).toBeInstanceOf(Error)
+    expect((outcome as Error).message).toBe('Your vault was locked, so the bucket key was not sent.')
+    expect(calls.some((call) => call.url.pathname.endsWith('/unlock'))).toBe(false)
+  })
 })
