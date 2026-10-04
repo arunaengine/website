@@ -25,7 +25,7 @@ import {
 import type { BucketHolderEntry, UserSearchHit } from '@/lib/api'
 import { HOLDER_STATE_LABEL, ORIGIN_LABEL, encryptionError, recoverySummary } from '@/lib/bucketEncryption'
 import { stateVariant } from '@/lib/stateBadge'
-import { shortUserId } from '@/lib/utils'
+import { errorMessage, shortUserId } from '@/lib/utils'
 
 const props = defineProps<{ bucket: string; canManage: boolean; source: HolderSource }>()
 
@@ -44,16 +44,28 @@ const accepted = ref(false)
 const query = ref('')
 const results = ref<UserSearchHit[]>([])
 const chosen = ref<UserSearchHit | null>(null)
+const searchState = ref<'idle' | 'searching' | 'done' | 'failed'>('idle')
+const searchError = ref<string | null>(null)
 let searches = 0
 const runSearch = useDebounceFn(async (term: string, run: number) => {
   if (term.length < 2 || run !== searches) return
-  const response = await searchUsers(term).catch(() => ({ users: [] }))
-  if (run === searches) results.value = response.users.filter((hit) => !list.value.some((h) => h.user_id === hit.user_id))
+  try {
+    const response = await searchUsers(term)
+    if (run !== searches) return
+    results.value = response.users.filter((hit) => !list.value.some((holder) => holder.user_id === hit.user_id))
+    searchState.value = 'done'
+  } catch (cause) {
+    if (run !== searches) return
+    searchError.value = errorMessage(cause)
+    searchState.value = 'failed'
+  }
 }, 250)
 watch(query, (term) => {
   if (chosen.value && term === chosen.value.name) return
   chosen.value = null
   results.value = []
+  searchError.value = null
+  searchState.value = term.trim().length >= 2 ? 'searching' : 'idle'
   void runSearch(term.trim(), ++searches)
 })
 
@@ -149,7 +161,16 @@ function startRemove(entry: BucketHolderEntry) {
         <div class="relative flex gap-2">
           <Input id="holder-search" v-model="query" placeholder="Search users (min 2 characters)" />
           <Button size="sm" :disabled="!chosen || busy !== null" @click="addHolder">Grant</Button>
-          <div v-if="results.length && !chosen" class="absolute top-10 z-10 w-full rounded-md border border-border bg-popover shadow-md">
+          <div
+            v-if="searchState !== 'idle' && !chosen"
+            class="absolute top-10 z-10 w-full rounded-md border border-border bg-popover shadow-md"
+            data-search-results
+          >
+            <p v-if="searchState === 'searching'" class="px-3 py-2 text-xs text-muted-foreground">Searching…</p>
+            <p v-else-if="searchState === 'failed'" class="px-3 py-2 text-xs text-destructive">
+              The user search failed: {{ searchError }}
+            </p>
+            <p v-else-if="!results.length" class="px-3 py-2 text-xs text-muted-foreground">No matching users.</p>
             <button
               v-for="hit in results"
               :key="hit.user_id"

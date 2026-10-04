@@ -6,11 +6,12 @@ import * as Wording from '@/lib/bucketEncryption'
 import * as StateBadge from '@/lib/stateBadge'
 import * as Utils from '@/lib/utils'
 import { listedRecovery, recoveryAfter, type HoldersState } from '@/composables/useBucketHolders'
-import { button, click, compileClientComponent, content, element, mountApp, moduleDefault } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, element, flush, mountApp, moduleDefault } from '@/test/clientRender'
 
 const holders = ref<BucketHoldersResponse | null>(null)
 const state = ref<HoldersState>('ready')
 const remove = vi.fn()
+const searchUsers = vi.fn()
 
 const Slotted = (tag: string) =>
   defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h(tag, attrs, slots.default?.()) })
@@ -33,7 +34,7 @@ const section = compileClientComponent(new URL('./BucketHoldersSection.vue', imp
   '@/components/ui/Input.vue': moduleDefault(Slotted('input')),
   '@/components/ui/Notice.vue': moduleDefault(Slotted('aside')),
   '@/components/ui/Spinner.vue': moduleDefault(defineComponent(() => () => h('span', 'loading'))),
-  '@/composables/useAruna': { useAruna: () => ({ searchUsers: async () => ({ users: [] }) }) },
+  '@/composables/useAruna': { useAruna: () => ({ searchUsers }) },
   '@/composables/useBucketHolders': {
     listedRecovery,
     recoveryAfter,
@@ -64,6 +65,7 @@ function rowButton(root: Awaited<ReturnType<typeof render>>, name: string) {
 beforeEach(() => {
   state.value = 'ready'
   remove.mockReset().mockResolvedValue('removed')
+  searchUsers.mockReset().mockResolvedValue({ users: [] })
 })
 
 describe('bucket key holder list', () => {
@@ -136,5 +138,21 @@ describe('bucket key holder list', () => {
 
     expect(content(root)).toContain('The key holders are unknown.')
     expect(content(root)).not.toContain('no key holders')
+  })
+
+  it('shows a running and a failed user search instead of no match', async () => {
+    let fail!: (reason: unknown) => void
+    searchUsers.mockReturnValueOnce(new Promise((_, reject) => (fail = reject)))
+    const root = await render([holder('Ada')])
+    const search = element(root, (node) => node.tag === 'input' && node.props.id === 'holder-search')
+
+    ;(search.props['onUpdate:modelValue'] as (value: string) => void)('Bo')
+    await flush()
+    expect(content(root)).toContain('Searching…')
+    fail(new Error('The directory did not answer.'))
+    await flush()
+
+    expect(content(root)).toContain('The user search failed: The directory did not answer.')
+    expect(content(root)).not.toContain('No matching users.')
   })
 })
