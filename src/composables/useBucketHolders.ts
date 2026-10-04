@@ -108,11 +108,12 @@ export function useBucketHolders(source: HolderSource, bucket: Ref<string>) {
     } catch (cause) {
       if (!current()) return false
       await refresh(current)
+      if (!current()) return false
       throw cause
     }
     if (!current()) return false
     await refresh(current)
-    return true
+    return current()
   }
 
   // Without `confirmRecovery` a removal that breaks recovery comes back as `confirm`. `revision`
@@ -126,13 +127,14 @@ export function useBucketHolders(source: HolderSource, bucket: Ref<string>) {
       if (encryptionRefusal(cause, 409, ENCRYPTION_CODES.confirmRecovery)) return 'confirm'
       if (encryptionRefusal(cause, 409, ENCRYPTION_CODES.staleHolders)) {
         await refresh(current)
+        if (!current()) return 'stale'
         throw new Error('The key holders changed meanwhile. Check the list and try again.')
       }
       throw cause
     }
     if (!current()) return 'stale'
     await refresh(current)
-    return 'removed'
+    return current() ? 'removed' : 'stale'
   }
 
   return { holders, state, error, load, grant, remove }

@@ -182,4 +182,25 @@ describe('bucket key holders', () => {
     expect(await removing).toBe('stale')
     expect(source.load).not.toHaveBeenCalled()
   })
+
+  it('drops the outcome of a grant or removal whose key generation changed during the final refresh', async () => {
+    const holders = holdersOf()
+    await vi.waitFor(() => expect(holders.state.value).toBe('ready'))
+    const rotate = async () => {
+      shown.value = { bucket_id: 'B1', key_generation: (shown.value?.key_generation ?? 0) + 1 } as BucketEncryptionResponse
+    }
+
+    source.load.mockImplementationOnce(rotate)
+    expect(await holders.grant('C')).toBe(false)
+    source.load.mockImplementationOnce(rotate)
+    expect(await holders.remove('A', true, 'rev-1')).toBe('stale')
+
+    grantBucketHolder.mockRejectedValueOnce(new Api.ApiError(500, 'grant failed'))
+    source.load.mockImplementationOnce(rotate)
+    expect(await holders.grant('C')).toBe(false)
+    removeBucketHolder.mockRejectedValueOnce(refusal('stale_holders'))
+    source.load.mockImplementationOnce(rotate)
+    expect(await holders.remove('A', false, 'rev-1')).toBe('stale')
+    expect(source.load).toHaveBeenCalledTimes(4)
+  })
 })
