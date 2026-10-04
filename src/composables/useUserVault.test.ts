@@ -906,6 +906,20 @@ describe('useUserVault', () => {
     expect(vault.recoveryCode.value).toBeNull()
   })
 
+  it('drops a recovery code once the vault on the node carries another recovery block', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', true)
+    const other = await boot()
+    await other.vault.reset()
+    await other.vault.create('other horse battery', true)
+
+    await vault.load()
+    expect(vault.state.value).toBe('locked')
+    await vault.unlock('other horse battery')
+
+    expect(vault.recoveryCode.value).toBeNull()
+  })
+
   it('never shows a recovery code to another session, or after a reset', async () => {
     const { vault, state } = await boot()
     await vault.create('correct horse', true)

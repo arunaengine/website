@@ -73,10 +73,15 @@ const fromCache = ref(false)
  * never cached, which is a vault from before vaults moved to the holders.
  */
 const recreateNotice = ref(false)
+/** A recovery code and the id of the saved recovery block it opens. */
+interface HeldRecovery {
+  code: string
+  block: string
+}
 /** The recovery code of a vault this account and session made, in memory only, until dismissed. */
-const recovery = shallowRef<string | null>(null)
+const recovery = shallowRef<HeldRecovery | null>(null)
 /** The held recovery code while the vault is unlocked; a lock hides it until the next unlock. */
-const recoveryCode = computed(() => (state.value === 'unlocked' ? recovery.value : null))
+const recoveryCode = computed(() => (state.value === 'unlocked' ? (recovery.value?.code ?? null) : null))
 const NOTICE_PREFIX = 'aruna.vault.recreateNotice:'
 const keyStore = browserKeyStore()
 let payload: VaultPayload | null = null
@@ -211,8 +216,20 @@ function clearLocal() {
   error.value = null
 }
 
+/** The id of a payload's recovery block: its salt and wrapped key, which a new block replaces. */
+function recoveryBlock(current: VaultPayload | null): string | null {
+  const block = current?.recovery
+  return block ? [block.salt, block.nonce, block.wrapped].join('\u0000') : null
+}
+
+/** Drops a held recovery code once the vault in place carries another recovery block. */
+function matchRecovery() {
+  if (recovery.value && recovery.value.block !== recoveryBlock(payload)) recovery.value = null
+}
+
 function unlocked(merged: Merged, key: CryptoKey) {
   payload = merged.payload
+  matchRecovery()
   predecessors = merged.revisions
   masterKey = key
   providers.value = merged.providers
@@ -267,6 +284,7 @@ async function adoptHeads(list: UserVaultHead[], run: number, key = masterKey): 
     return merged.revisions.length > 1
   }
   payload = parsed[0]?.payload ?? null
+  matchRecovery()
   predecessors = parsed[0] ? [parsed[0].revision] : []
   return false
 }
@@ -282,6 +300,7 @@ async function settle(scope: string, list: UserVaultHead[]): Promise<boolean> {
     heads = []
     predecessors = []
     payload = null
+    matchRecovery()
     masterKey = null
     providers.value = []
     state.value = 'absent'
@@ -528,7 +547,10 @@ async function create(passphrase: string, withRecovery: boolean): Promise<string
   if (writeEnded(run, target)) throw new Error(REPLACED)
   const response = await saveVault({ payload: JSON.stringify(created.payload), predecessors: [] }, target.client)
   // The vault exists now, so its code stays for this account and session, also past a lock.
-  if (session === sessionGeneration && target.scope === currentScope()) recovery.value = created.recoveryCode
+  if (session === sessionGeneration && target.scope === currentScope()) {
+    const block = recoveryBlock(created.payload)
+    recovery.value = created.recoveryCode && block ? { code: created.recoveryCode, block } : null
+  }
   if (run !== generation) throw new Error(REPLACED)
   await adoptHeads(response.heads, run, created.masterKey)
   if (run !== generation) throw new Error(REPLACED)
