@@ -30,12 +30,32 @@ describe('object reads', () => {
     const fetch = vi.fn().mockResolvedValue(new Response('', { status: 403, headers: { 'x-aruna-bucket-locked': 'true' } }))
     vi.stubGlobal('fetch', fetch)
     expect(await probeObjectAccess('https://s3.example/object')).toBe('locked')
-    expect(fetch.mock.calls[0][1]).toEqual({ headers: { Range: 'bytes=0-0' } })
+    expect(fetch.mock.calls[0][1]).toMatchObject({ headers: { Range: 'bytes=0-0' } })
 
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('x', { status: 206 })))
     expect(await probeObjectAccess('https://s3.example/object')).toBe('open')
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('cors')))
     expect(await probeObjectAccess('https://s3.example/object')).toBe('unknown')
     expect(await probeObjectAccess('blob:local')).toBe('unknown')
+  })
+
+  it('gives up a silent probe after its time limit and when its caller cancels it', async () => {
+    const silent = vi.fn((_url: string, init: RequestInit) =>
+      new Promise<Response>((_, reject) => init.signal?.addEventListener('abort', () => reject(new Error('aborted')))),
+    )
+    vi.stubGlobal('fetch', silent)
+    vi.useFakeTimers()
+    try {
+      const slow = probeObjectAccess('https://s3.example/object')
+      await vi.advanceTimersByTimeAsync(10_000)
+      expect(await slow).toBe('unknown')
+
+      const caller = new AbortController()
+      const cancelled = probeObjectAccess('https://s3.example/object', caller.signal)
+      caller.abort()
+      expect(await cancelled).toBe('unknown')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
