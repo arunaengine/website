@@ -119,6 +119,12 @@ async function download() {
     preview.status.value = 'error'
   }
 }
+
+// A player that cannot read its URL is waiting for a key only when a probe confirms the lock.
+async function mediaFailed() {
+  const url = preview.directUrl.value
+  if (url) await preview.checkAccess(url, preview.loadToken())
+}
 </script>
 
 <template>
@@ -238,6 +244,7 @@ async function download() {
         :url="preview.directUrl.value"
         :media-kind="preview.mediaKind.value"
         :name="props.name"
+        @failed="mediaFailed"
       />
       <PdfPreview
         v-else-if="preview.kind.value === 'pdf' && preview.directUrl.value"
