@@ -809,7 +809,7 @@ export const docsTopics: DocsTopic[] = [
           'Vault-locked: only key holders unlock the bucket, and a node restart locks it again.',
         ],
         paragraphs: [
-          'Writes, listing and HEAD work while a bucket is locked. Downloads, previews and jobs that need its content wait for an unlock. The content hash stays visible in metadata, so equal files are still recognisable.',
+          'Writes, listing and HEAD work while a bucket is locked. Downloads, previews and jobs that need its content wait for an unlock; a preview links to the Encryption tab and loads again once the bucket is unlocked. The content hash stays visible in metadata, so equal files are still recognisable.',
           'S3 clients see an encrypted bucket like SSE-S3 (`x-amz-server-side-encryption: AES256`) and send no key.',
         ],
       },
@@ -843,7 +843,8 @@ export const docsTopics: DocsTopic[] = [
         paragraphs: [
           'Group admins change the mode, the cipher, the block keys and the longest unlock on the same tab. Open uploads must finish first.',
           'Turning encryption on needs no unlock: stored versions are encrypted in the background. Turning it off, changing the format, switching between modes and rotating the key need the bucket unlocked.',
-          'The tab shows the progress of the rewrite. It is complete only after the old copies are removed.',
+          'The tab shows the progress of the rewrite. It is complete only when no version is left or failed and the old copies are removed.',
+          'While stored versions are rewritten, the tab also lists the previous key with its fingerprint. Key holders unlock it the same way, also after encryption was turned off for new writes.',
           'Rotation grants every stored version to a new key without rewriting the data. It does not invalidate an old backup that still holds the old key.',
         ],
       },
