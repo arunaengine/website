@@ -134,6 +134,7 @@ describe('bucket encryption state', () => {
     expect(vault).toEqual({ name: 'vault' })
     expect(live()).toBe(true)
     expect(encryption.status.value?.unlock?.session_id).toBe('S2')
+    expect(encryption.revision.value).toBe(2)
     expect(encryption.busy.value).toBeNull()
   })
 

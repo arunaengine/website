@@ -24,8 +24,7 @@ import { shortUserId } from '@/lib/utils'
 const props = defineProps<{ bucket: string; canManage: boolean; source: HolderSource }>()
 
 const { searchUsers } = useAruna()
-const { holders, state, error, load, grant, remove } = useBucketHolders(props.source, toRef(props, 'bucket'))
-watch(() => props.bucket, () => void load(), { immediate: true })
+const { holders, state, error, grant, remove } = useBucketHolders(props.source, toRef(props, 'bucket'))
 
 const list = computed(() => holders.value?.holders ?? [])
 const recovery = computed(() => recoverySummary(holders.value?.recovery ?? null))

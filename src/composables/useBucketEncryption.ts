@@ -34,6 +34,8 @@ export function useBucketEncryption(bucket: Ref<string>, nodeId: Ref<string | nu
   const error = ref<string | null>(null)
   const refreshing = ref(false)
   const busy = ref<EncryptionAction | null>(null)
+  /** Counts successful status reads. */
+  const revision = ref(0)
   /** An unlock whose answer never came; only a successful status read clears it. */
   const outcomeUnknown = ref(false)
   // Grows on every context change and on disposal and never goes back, so a
@@ -91,6 +93,7 @@ export function useBucketEncryption(bucket: Ref<string>, nodeId: Ref<string | nu
     compression.value = compressed.status === 'fulfilled' ? compressed.value : null
     if (encryption.status === 'fulfilled') {
       status.value = encryption.value
+      revision.value += 1
       state.value = 'ready'
       error.value = null
       outcomeUnknown.value = false
@@ -199,6 +202,7 @@ export function useBucketEncryption(bucket: Ref<string>, nodeId: Ref<string | nu
     refreshing,
     busy,
     outcomeUnknown,
+    revision,
     nodeId: computed(() => scope.value.nodeId || null),
     load,
     unlock,

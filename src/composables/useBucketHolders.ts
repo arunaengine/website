@@ -1,7 +1,7 @@
 // Key holders of one encrypted bucket, asked of the node that hosts it. Removal
 // names the holder revision it saw, so a changed set is refused, and breaking
 // the recovery rule needs an explicit confirmation.
-import { ref, type Ref } from 'vue'
+import { computed, ref, watch, type Ref } from 'vue'
 import {
   ApiError,
   ENCRYPTION_CODES,
@@ -10,6 +10,7 @@ import {
   listBucketHolders,
   removeBucketHolder,
   type ApiClientOptions,
+  type BucketEncryptionResponse,
   type BucketHolderEntry,
   type BucketHoldersResponse,
 } from '@/lib/api'
@@ -19,6 +20,9 @@ export interface HolderSource {
   client(): ApiClientOptions
   binder(): () => boolean
   load(): Promise<void>
+  status: Ref<BucketEncryptionResponse | null>
+  /** Grows with every status read, so key actions and refreshes read the holders again. */
+  revision: Ref<number>
 }
 
 export type HoldersState = 'loading' | 'ready' | 'refused' | 'failed'
@@ -36,19 +40,22 @@ export function useBucketHolders(source: HolderSource, bucket: Ref<string>) {
   const state = ref<HoldersState>('loading')
   const error = ref<string | null>(null)
   let loads = 0
+  // Holders belong to one bucket identity and key generation; another one starts empty.
+  const identity = computed(() => `${bucket.value}/${source.status.value?.bucket_id ?? ''}/${source.status.value?.key_generation ?? ''}`)
 
   async function load(): Promise<void> {
     const run = ++loads
     const bound = source.binder()
+    const seen = identity.value
     state.value = holders.value ? state.value : 'loading'
     try {
       const response = await listBucketHolders(bucket.value, source.client())
-      if (!bound() || run !== loads) return
+      if (!bound() || run !== loads || identity.value !== seen) return
       holders.value = response
       state.value = 'ready'
       error.value = null
     } catch (cause) {
-      if (!bound() || run !== loads) return
+      if (!bound() || run !== loads || identity.value !== seen) return
       holders.value = null
       const refused = cause instanceof ApiError && (cause.status === 401 || cause.status === 403)
       state.value = refused ? 'refused' : 'failed'
@@ -56,10 +63,23 @@ export function useBucketHolders(source: HolderSource, bucket: Ref<string>) {
     }
   }
 
+  /** A new status read bumps the revision, which reads the holders again. */
   async function refresh(bound: () => boolean) {
-    if (!bound()) return
-    await Promise.all([load(), source.load()])
+    if (bound()) await source.load()
   }
+
+  watch(
+    identity,
+    () => {
+      loads += 1
+      holders.value = null
+      state.value = 'loading'
+      error.value = null
+      void load()
+    },
+    { immediate: true },
+  )
+  watch(source.revision, () => void load())
 
   async function grant(userId: string): Promise<void> {
     const bound = source.binder()
