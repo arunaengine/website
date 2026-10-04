@@ -10,7 +10,10 @@ import Skeleton from '@/components/ui/Skeleton.vue'
 import { ExternalLink, FileText } from '@lucide/vue'
 
 const props = defineProps<{ url: string; name?: string }>()
-const emit = defineEmits<{ (e: 'locked'): void }>()
+/** `locked` names the URL whose read a locked bucket refused. */
+const emit = defineEmits<{ (e: 'locked', url: string): void }>()
+// A viewer that is gone neither reports nor keeps what its read returns.
+const reading = new AbortController()
 
 const blobUrl = ref<string | null>(null)
 const failed = ref(false)
@@ -21,23 +24,27 @@ function openTab() {
 }
 
 onMounted(async () => {
+  const url = props.url
   try {
-    const response = await fetch(props.url)
+    const response = await fetch(url, { signal: reading.signal })
+    if (reading.signal.aborted) return
     if (response.status === 403 && response.headers.get(BUCKET_LOCKED_HEADER) === 'true') {
-      emit('locked')
+      emit('locked', url)
       return
     }
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
     const blob = await response.blob()
+    if (reading.signal.aborted) return
     blobUrl.value = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }))
   } catch {
-    failed.value = true
+    if (!reading.signal.aborted) failed.value = true
   } finally {
-    loading.value = false
+    if (!reading.signal.aborted) loading.value = false
   }
 })
 
 onBeforeUnmount(() => {
+  reading.abort()
   if (blobUrl.value) URL.revokeObjectURL(blobUrl.value)
 })
 </script>

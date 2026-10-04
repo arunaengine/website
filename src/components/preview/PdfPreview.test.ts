@@ -29,7 +29,20 @@ describe('pdf preview', () => {
     await mountApp(pdf, { props: { url: 'https://b.test/presigned', onLocked } })
     await flush()
 
-    expect(onLocked).toHaveBeenCalledOnce()
+    expect(onLocked).toHaveBeenCalledWith('https://b.test/presigned')
+  })
+
+  it('reports nothing once it is gone before its read answers', async () => {
+    let answer!: (response: Response) => void
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((resolve) => (answer = resolve))))
+    const onLocked = vi.fn()
+
+    const { app } = await mountApp(pdf, { props: { url: 'https://b.test/presigned', onLocked } })
+    app.unmount()
+    answer(new Response('<Error/>', { status: 403, headers: { 'x-aruna-bucket-locked': 'true' } }))
+    await flush()
+
+    expect(onLocked).not.toHaveBeenCalled()
   })
 
   it('keeps an ordinary refusal a loading failure', async () => {

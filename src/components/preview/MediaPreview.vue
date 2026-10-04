@@ -1,7 +1,7 @@
 <script setup lang="ts">
-defineProps<{ url: string; mediaKind: 'video' | 'audio'; name?: string }>()
-// The player reports a failed read, so the preview can check whether the bucket locked.
-const emit = defineEmits<{ (e: 'failed'): void }>()
+const props = defineProps<{ url: string; mediaKind: 'video' | 'audio'; name?: string }>()
+// The player reports which URL it failed to read, so the preview checks only its own file.
+const emit = defineEmits<{ (e: 'failed', url: string): void }>()
 </script>
 
 <template>
@@ -12,8 +12,8 @@ const emit = defineEmits<{ (e: 'failed'): void }>()
       controls
       preload="metadata"
       class="max-h-[68vh] w-full max-w-full rounded"
-      @error="emit('failed')"
+      @error="emit('failed', props.url)"
     />
-    <audio v-else :src="url" controls preload="metadata" class="w-full" @error="emit('failed')" />
+    <audio v-else :src="url" controls preload="metadata" class="w-full" @error="emit('failed', props.url)" />
   </div>
 </template>

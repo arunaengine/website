@@ -132,9 +132,13 @@ async function download() {
 }
 
 // A player that cannot read its URL is waiting for a key only when a probe confirms the lock.
-async function mediaFailed() {
-  const url = preview.directUrl.value
-  if (url) await preview.checkAccess(url, preview.loadToken())
+// Reports about a URL the preview no longer shows are ignored.
+async function mediaFailed(url: string) {
+  if (url === preview.directUrl.value) await preview.checkAccess(url, preview.loadToken())
+}
+
+function pdfLocked(url: string) {
+  if (url === preview.directUrl.value) preview.markLocked()
 }
 </script>
 
@@ -261,7 +265,7 @@ async function mediaFailed() {
         v-else-if="preview.kind.value === 'pdf' && preview.directUrl.value"
         :url="preview.directUrl.value"
         :name="props.name"
-        @locked="preview.markLocked()"
+        @locked="pdfLocked"
       />
       <DownloadCard
         v-else

@@ -12,7 +12,7 @@ describe('media preview', () => {
 
       ;(element(root, (node) => node.tag === mediaKind).props.onError as () => void)()
 
-      expect(onFailed).toHaveBeenCalledOnce()
+      expect(onFailed).toHaveBeenCalledWith('https://b.test/presigned')
     }
   })
 })

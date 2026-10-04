@@ -1,7 +1,7 @@
 import { defineComponent, h, reactive, ref } from 'vue'
 import * as VueRuntime from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { button, click, compileClientComponent, flush, mountApp, moduleDefault } from '@/test/clientRender'
+import { button, click, compileClientComponent, element, flush, mountApp, moduleDefault } from '@/test/clientRender'
 
 const Slotted = (tag: string) =>
   defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h(tag, attrs, slots.default?.()) })
@@ -54,8 +54,8 @@ const body = compileClientComponent(new URL('./PreviewBody.vue', import.meta.url
   './MarkdownPreview.vue': moduleDefault(Slotted('div')),
   './CsvPreview.vue': moduleDefault(Slotted('div')),
   './ImagePreview.vue': moduleDefault(Slotted('div')),
-  './MediaPreview.vue': moduleDefault(Slotted('div')),
-  './PdfPreview.vue': moduleDefault(Slotted('div')),
+  './MediaPreview.vue': moduleDefault(Slotted('video')),
+  './PdfPreview.vue': moduleDefault(Slotted('object')),
   './DownloadCard.vue': moduleDefault(Slotted('div')),
 })
 
@@ -66,6 +66,10 @@ const anchor = { href: '', download: '', rel: '', click: vi.fn(), remove: vi.fn(
 beforeEach(() => {
   Object.assign(shown, { active: true, bucket: 'reef', objectKey: 'a.txt', name: 'a.txt', nodeId: null })
   preview.sessionKey.value = 'session-1'
+  preview.status.value = 'idle'
+  preview.kind.value = 'download'
+  preview.directUrl.value = null
+  preview.markLocked.mockReset()
   token = 1
   load.mockReset()
   urlFor.mockReset().mockReturnValue(null)
@@ -123,5 +127,27 @@ describe('preview body', () => {
 
     expect(checkAccess).not.toHaveBeenCalled()
     expect(anchor.click).not.toHaveBeenCalled()
+  })
+
+  it('acts on viewer reports only for the file it still shows', async () => {
+    preview.status.value = 'ready'
+    preview.kind.value = 'media'
+    preview.directUrl.value = 'https://signed/current'
+    const { root } = await mountApp(Host)
+    await vi.waitFor(() => element(root, (node) => node.tag === 'video'))
+    const player = element(root, (node) => node.tag === 'video')
+
+    await (player.props.onFailed as (url: string) => Promise<void>)('https://signed/old')
+    expect(checkAccess).not.toHaveBeenCalled()
+    await (player.props.onFailed as (url: string) => Promise<void>)('https://signed/current')
+    expect(checkAccess).toHaveBeenCalledWith('https://signed/current', 1)
+
+    preview.kind.value = 'pdf'
+    await vi.waitFor(() => element(root, (node) => node.tag === 'object'))
+    const pdf = element(root, (node) => node.tag === 'object')
+    ;(pdf.props.onLocked as (url: string) => void)('https://signed/old')
+    expect(preview.markLocked).not.toHaveBeenCalled()
+    ;(pdf.props.onLocked as (url: string) => void)('https://signed/current')
+    expect(preview.markLocked).toHaveBeenCalledOnce()
   })
 })
