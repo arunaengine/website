@@ -18,8 +18,8 @@ import {
   MODE_LABEL,
   ROTATION_NOTES,
   changeNeedsUnlock,
+  actionError,
   changeNotes,
-  encryptionError,
   maxUnlockOptions,
   type EncryptionDraft,
 } from '@/lib/bucketEncryption'
@@ -28,23 +28,38 @@ const props = defineProps<{
   status: BucketEncryptionResponse
   busy: boolean
   save: (request: EncryptionDraft & { expected_generation: number }) => Promise<unknown>
-  rotate: () => Promise<unknown>
+  rotate: (expectedGeneration: number) => Promise<unknown>
 }>()
 
 const mode = ref<EncryptionMode>('off')
 const cipher = ref<BlockCipher>('chacha20_poly1305')
 const blockKeys = ref<BlockKeys>('content_derived')
 const maxUnlock = ref('')
-const confirming = ref<'save' | 'rotate' | null>(null)
 const failure = ref<string | null>(null)
 
-function reset() {
-  mode.value = props.status.mode
-  cipher.value = props.status.cipher
-  blockKeys.value = props.status.block_keys
-  maxUnlock.value = props.status.max_unlock_ms === null ? '' : String(props.status.max_unlock_ms)
+function settingsOf(status: BucketEncryptionResponse): EncryptionDraft {
+  return { mode: status.mode, cipher: status.cipher, block_keys: status.block_keys, max_unlock_ms: status.max_unlock_ms }
 }
-watch(() => props.status, reset, { immediate: true })
+
+function same(a: EncryptionDraft, b: EncryptionDraft): boolean {
+  return a.mode === b.mode && a.cipher === b.cipher && a.block_keys === b.block_keys && a.max_unlock_ms === b.max_unlock_ms
+}
+
+function apply(next: EncryptionDraft) {
+  mode.value = next.mode
+  cipher.value = next.cipher
+  blockKeys.value = next.block_keys
+  maxUnlock.value = next.max_unlock_ms === null ? '' : String(next.max_unlock_ms)
+}
+
+/** The node's settings the draft started from; a refresh keeps a draft that differs from them. */
+const base = ref<EncryptionDraft>(settingsOf(props.status))
+apply(base.value)
+
+function reset() {
+  base.value = settingsOf(props.status)
+  apply(base.value)
+}
 
 const options = (labels: Record<string, string>) => Object.entries(labels).map(([value, label]) => ({ value, label }))
 const draft = computed<EncryptionDraft>(() => ({
@@ -53,27 +68,56 @@ const draft = computed<EncryptionDraft>(() => ({
   block_keys: blockKeys.value,
   max_unlock_ms: maxUnlock.value ? Number(maxUnlock.value) : null,
 }))
-const changed = computed(
-  () =>
-    draft.value.mode !== props.status.mode ||
-    draft.value.cipher !== props.status.cipher ||
-    draft.value.block_keys !== props.status.block_keys ||
-    draft.value.max_unlock_ms !== props.status.max_unlock_ms,
+const changed = computed(() => !same(draft.value, base.value))
+watch(
+  () => props.status,
+  (next) => {
+    if (!changed.value) apply(settingsOf(next))
+    base.value = settingsOf(next)
+  },
 )
 const locked = computed(() => props.status.unlock?.state !== 'unlocked')
 const blockedByLock = computed(() => locked.value && changeNeedsUnlock(props.status, draft.value))
 const notes = computed(() => changeNotes(props.status, draft.value))
 const canRotate = computed(() => props.status.mode !== 'off' && !locked.value)
 
+/** What a confirmation was opened for; a change of the bucket under it asks for a new one. */
+interface Pending {
+  action: 'save' | 'rotate'
+  draft: EncryptionDraft
+  generation: number
+  notes: string[]
+  context: string
+}
+const pending = ref<Pending | null>(null)
+
+function contextOf(status: BucketEncryptionResponse): string {
+  return JSON.stringify([status.bucket_id, status.key_generation, status.storage_generation, settingsOf(status)])
+}
+
+const stale = computed(() => pending.value !== null && pending.value.context !== contextOf(props.status))
+
+function ask(action: Pending['action']) {
+  failure.value = null
+  pending.value = {
+    action,
+    draft: { ...draft.value },
+    generation: props.status.key_generation,
+    notes: action === 'rotate' ? ROTATION_NOTES : notes.value,
+    context: contextOf(props.status),
+  }
+}
+
 async function confirm() {
-  const action = confirming.value
+  const asked = pending.value
+  if (!asked || stale.value) return
   failure.value = null
   try {
-    if (action === 'save') await props.save({ ...draft.value, expected_generation: props.status.key_generation })
-    else if (action === 'rotate') await props.rotate()
-    confirming.value = null
+    if (asked.action === 'save') await props.save({ ...asked.draft, expected_generation: asked.generation })
+    else await props.rotate(asked.generation)
+    if (pending.value === asked) pending.value = null
   } catch (cause) {
-    failure.value = encryptionError(cause)
+    failure.value = actionError(cause)
   }
 }
 </script>
@@ -105,7 +149,7 @@ async function confirm() {
       <Notice v-if="changed && notes.length" tone="info" :lines="notes" />
       <Notice v-if="changed && blockedByLock" tone="warning">Unlock the bucket first; this change reads the stored data.</Notice>
       <div class="flex flex-wrap items-center gap-2">
-        <Button size="sm" :disabled="!changed || blockedByLock || busy" @click="confirming = 'save'">Save changes</Button>
+        <Button size="sm" :disabled="!changed || blockedByLock || busy" @click="ask('save')">Save changes</Button>
         <Button v-if="changed" size="sm" variant="outline" :disabled="busy" @click="reset">Discard</Button>
         <Button
           v-if="status.mode !== 'off'"
@@ -113,7 +157,7 @@ async function confirm() {
           size="sm"
           variant="outline"
           :disabled="!canRotate || busy"
-          @click="confirming = 'rotate'"
+          @click="ask('rotate')"
         >
           Rotate key
         </Button>
@@ -121,22 +165,25 @@ async function confirm() {
       <p v-if="status.mode !== 'off' && locked" class="text-[11px] text-muted-foreground">
         Rotation needs the bucket unlocked.
       </p>
-      <Notice v-if="failure && !confirming" tone="error">{{ failure }}</Notice>
+      <Notice v-if="failure && !pending" tone="error">{{ failure }}</Notice>
     </div>
 
-    <Dialog :open="confirming !== null" @update:open="(open: boolean) => !open && (confirming = null)">
+    <Dialog :open="pending !== null" @update:open="(open: boolean) => !open && (pending = null)">
       <DialogContent class="max-w-md">
         <DialogHeader>
-          <DialogTitle>{{ confirming === 'rotate' ? 'Rotate the bucket key?' : 'Change the encryption?' }}</DialogTitle>
+          <DialogTitle>{{ pending?.action === 'rotate' ? 'Rotate the bucket key?' : 'Change the encryption?' }}</DialogTitle>
           <DialogDescription>
-            {{ confirming === 'rotate' ? 'Open uploads must finish first.' : 'Open uploads must finish first; new writes follow the new setting.' }}
+            {{ pending?.action === 'rotate' ? 'Open uploads must finish first.' : 'Open uploads must finish first; new writes follow the new setting.' }}
           </DialogDescription>
         </DialogHeader>
-        <Notice v-if="confirming === 'rotate' || notes.length" tone="warning" :lines="confirming === 'rotate' ? ROTATION_NOTES : notes" />
+        <Notice v-if="pending?.notes.length" tone="warning" :lines="pending.notes" />
+        <Notice v-if="stale" tone="warning">
+          The bucket settings or its key changed while this was open. Close it and review the change again.
+        </Notice>
         <Notice v-if="failure" tone="error">{{ failure }}</Notice>
         <DialogFooter>
-          <Button variant="outline" size="sm" @click="confirming = null">Cancel</Button>
-          <Button size="sm" :disabled="busy" @click="confirm">{{ confirming === 'rotate' ? 'Rotate' : 'Save' }}</Button>
+          <Button variant="outline" size="sm" @click="pending = null">Cancel</Button>
+          <Button size="sm" :disabled="busy || stale" @click="confirm">{{ pending?.action === 'rotate' ? 'Rotate' : 'Save' }}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

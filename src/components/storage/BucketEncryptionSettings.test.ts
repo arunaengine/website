@@ -1,4 +1,4 @@
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, ref } from 'vue'
 import * as VueRuntime from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as Api from '@/lib/api'
@@ -58,9 +58,23 @@ function status(overrides: Partial<BucketEncryptionResponse> = {}): BucketEncryp
 
 const UNLOCKED = { state: 'unlocked' as const, lock_reason: null, locked_at_ms: null, session_id: 'S', unlocked_at_ms: 1, deadline_ms: null, max_deadline_ms: null }
 
+const shown = ref<BucketEncryptionResponse | null>(null)
+const Host = defineComponent(() => () => h(settings, { status: shown.value, busy: false, save, rotate }))
+
 async function render(value: BucketEncryptionResponse) {
-  const { root } = await mountApp(settings, { props: { status: value, busy: false, save, rotate } })
+  shown.value = value
+  const { root } = await mountApp(Host)
   return root
+}
+
+/** The node answers again, as after a refresh or another admin's change. */
+async function replace(value: BucketEncryptionResponse) {
+  shown.value = value
+  await flush()
+}
+
+function selected(root: Awaited<ReturnType<typeof render>>, label: string): unknown {
+  return element(root, (node) => node.tag === 'select' && node.props['aria-label'] === label).props.modelValue
 }
 
 function dialog(root: Awaited<ReturnType<typeof render>>) {
@@ -116,7 +130,31 @@ describe('bucket encryption settings', () => {
     expect(content(root)).toContain('does not invalidate an old backup')
     await click(button(dialog(root), 'Rotate'))
 
-    expect(rotate).toHaveBeenCalledOnce()
+    expect(rotate).toHaveBeenCalledWith(5)
     expect(content(root)).toContain('Uploads to this bucket are still open')
+  })
+
+  it('keeps a changed draft when the node answers again, and follows it otherwise', async () => {
+    const root = await render(status({ mode: 'vault_locked', unlock: UNLOCKED }))
+
+    await choose(root, 'Encryption mode', 'off')
+    await replace(status({ mode: 'vault_locked', unlock: UNLOCKED }))
+    expect(selected(root, 'Encryption mode')).toBe('off')
+
+    await click(button(root, 'Discard'))
+    await replace(status({ mode: 'vault_locked', unlock: UNLOCKED, max_unlock_ms: 3_600_000 }))
+    expect(selected(root, 'Longest unlock')).toBe('3600000')
+  })
+
+  it('asks again when the bucket changes while a confirmation is open', async () => {
+    const root = await render(status({ unlock: UNLOCKED }))
+
+    await click(button(root, 'Rotate key'))
+    await replace(status({ unlock: UNLOCKED, key_generation: 6 }))
+
+    expect(content(dialog(root))).toContain('review the change again')
+    expect(button(dialog(root), 'Rotate').props.disabled).toBe(true)
+    await click(button(dialog(root), 'Rotate'))
+    expect(rotate).not.toHaveBeenCalled()
   })
 })

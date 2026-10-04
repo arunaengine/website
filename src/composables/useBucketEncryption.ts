@@ -168,10 +168,8 @@ export function useBucketEncryption(bucket: Ref<string>, nodeId: Ref<string | nu
     return run('save', () => putBucketEncryption(scope.value.bucket, request, client()))
   }
 
-  function rotate() {
-    const generation = status.value?.key_generation
-    if (generation === undefined) return Promise.reject(new Error('The bucket status is not known.'))
-    return run('rotate', () => rotateBucketKey(scope.value.bucket, generation, client()))
+  function rotate(expectedGeneration: number) {
+    return run('rotate', () => rotateBucketKey(scope.value.bucket, expectedGeneration, client()))
   }
 
   watch(
