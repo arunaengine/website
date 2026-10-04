@@ -809,7 +809,7 @@ export const docsTopics: DocsTopic[] = [
           'Vault-locked: only key holders unlock the bucket, and a node restart locks it again.',
         ],
         paragraphs: [
-          'Writes, listing and HEAD work while a bucket is locked. Downloads, previews and jobs that need its content wait for an unlock; a preview links to the Encryption tab and loads again once the bucket is unlocked. The content hash stays visible in metadata, so equal files are still recognisable.',
+          'Writes, listing and HEAD work while a bucket is locked. Downloads, previews and jobs that need its content wait for an unlock; a preview links to the Encryption tab, and its Check again button loads it once the node reports the bucket unlocked. The content hash stays visible in metadata, so equal files are still recognisable.',
           'S3 clients see an encrypted bucket like SSE-S3 (`x-amz-server-side-encryption: AES256`) and send no key.',
         ],
       },
@@ -817,7 +817,7 @@ export const docsTopics: DocsTopic[] = [
         title: 'Key holders and recovery',
         icon: 'Users',
         paragraphs: [
-          'Key holders are the bucket creator, the group admins and users granted explicitly. Each one has a copy of the bucket key, sealed to the key in their vault. A user who loses group-admin rights loses the right to unlock at once.',
+          'Key holders are the bucket creator, the group admins and users granted explicitly. Each one has a copy of the bucket key, sealed to the key in their vault. A user who loses group-admin rights loses the implicit right to unlock at once; a creator and explicit grants stay valid.',
           'A vault-locked bucket needs a recovery code or two ready key holders. Removing a key holder that breaks this rule needs a confirmation, and removing a key holder does not erase copies they already made.',
           'Your vault passphrase needs at least 12 characters, because the vault opens bucket keys. Set it up under [Settings](page:settings), Provider keys.',
         ],
