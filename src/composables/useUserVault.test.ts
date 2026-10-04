@@ -423,6 +423,20 @@ describe('useUserVault', () => {
     expect(directory).toHaveLength(1)
   })
 
+  it('opens a retired keypair by id for an older bucket copy', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', false)
+    const first = Crypto.parseVaultPayload(node.heads[0].payload).keys[0]
+    await vault.rotateKey()
+
+    const pair = await vault.openUserKey(first.id)
+
+    expect(pair && btoa(String.fromCharCode(...pair.publicKey))).toBe(first.public)
+    expect(await vault.openUserKey('not-in-this-vault')).toBeNull()
+    vault.lock()
+    await expect(vault.openUserKey(first.id)).rejects.toThrow('Unlock your provider keys first.')
+  })
+
   it('refuses a holder passphrase shorter than twelve characters', async () => {
     const { vault } = await boot()
     await expect(vault.create('eleven char', false)).rejects.toThrow('at least 12 characters')

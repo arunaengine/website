@@ -35,6 +35,7 @@ import {
   type VaultPayload,
   type VaultSecret,
 } from '@/lib/vault/crypto'
+import type { X25519Pair } from '@/lib/vault/hpke'
 import { browserKeyStore } from '@/lib/vault/keyStore'
 import { apiBaseUrl, authToken, realmInfo, sessionEpoch, userInfo } from './aruna/state'
 
@@ -547,6 +548,13 @@ async function checkKey(): Promise<OwnKeyState> {
   return ownKey.value
 }
 
+/** Opens a keypair of the unlocked vault by id, retired ones included; null when it has none. */
+async function openUserKey(keyId: string): Promise<X25519Pair | null> {
+  const { current, key } = requireUnlocked()
+  const entry = current.keys.find((candidate) => candidate.id === keyId)
+  return entry ? openKeypair(key, entry) : null
+}
+
 async function reset(): Promise<void> {
   const scope = scopeKey
   await deleteVault(client())
@@ -611,6 +619,7 @@ export function useUserVault() {
     saveProviders,
     rotateKey,
     checkKey,
+    openUserKey,
     dismissRecreateNotice,
   }
 }

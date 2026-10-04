@@ -342,9 +342,14 @@ export async function openKeypair(masterKey: CryptoKey, entry: VaultKeyEntry): P
   } catch {
     throw new VaultUnlockError('This key does not open the vault.')
   }
-  const pair = await importPrivateKey(new Uint8Array(plain))
-  if (toBase64(pair.publicKey) !== entry.public) throw new VaultFormatError('The vault key is not readable.')
-  return pair
+  const raw = new Uint8Array(plain)
+  try {
+    const pair = await importPrivateKey(raw)
+    if (toBase64(pair.publicKey) !== entry.public) throw new VaultFormatError('The vault key is not readable.')
+    return pair
+  } finally {
+    raw.fill(0)
+  }
 }
 
 /** Lowercase hex SHA-256 of a raw public key, the fingerprint the key directory stores. */

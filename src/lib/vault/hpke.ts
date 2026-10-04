@@ -82,10 +82,14 @@ async function labeledExpand(
 /** Imports a raw X25519 private key and computes its public key. */
 export async function importPrivateKey(raw: Uint8Array): Promise<X25519Pair> {
   const pkcs8 = concat(PKCS8_PREFIX, raw)
-  const probe = await crypto.subtle.importKey('pkcs8', pkcs8, X25519, true, ['deriveBits'])
-  const jwk = await crypto.subtle.exportKey('jwk', probe)
-  const privateKey = await crypto.subtle.importKey('jwk', jwk, X25519, false, ['deriveBits'])
-  return { privateKey, publicKey: fromBase64Url(jwk.x ?? '') }
+  try {
+    const probe = await crypto.subtle.importKey('pkcs8', pkcs8, X25519, true, ['deriveBits'])
+    const jwk = await crypto.subtle.exportKey('jwk', probe)
+    const privateKey = await crypto.subtle.importKey('jwk', jwk, X25519, false, ['deriveBits'])
+    return { privateKey, publicKey: fromBase64Url(jwk.x ?? '') }
+  } finally {
+    pkcs8.fill(0)
+  }
 }
 
 /** DeriveKeyPair of RFC 9180, which the test vectors use for the ephemeral key. */
