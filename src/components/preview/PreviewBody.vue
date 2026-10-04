@@ -170,6 +170,26 @@ async function download() {
       <Button variant="outline" size="sm" @click="download"><Download class="h-4 w-4" /> Download</Button>
     </Notice>
 
+    <Notice
+      v-else-if="preview.status.value === 'locked'"
+      tone="warning"
+      title="Waiting for a bucket unlock"
+      class="space-y-2 px-5 py-6"
+      data-preview-locked
+    >
+      <p>
+        This bucket is encrypted and locked, so its content cannot be shown. A key holder unlocks it on the
+        <RouterLink v-if="preview.lockedLink.value" :to="preview.lockedLink.value" class="font-medium underline">
+          Encryption tab of the bucket</RouterLink
+        >.
+      </p>
+      <p v-if="preview.lockCheck.value === 'still'">The bucket is still locked.</p>
+      <p v-else-if="preview.lockCheck.value === 'failed'">The lock state of the bucket could not be read.</p>
+      <Button variant="outline" size="sm" :disabled="preview.lockCheck.value === 'checking'" @click="preview.recheck()">
+        Check again
+      </Button>
+    </Notice>
+
     <ErrorPanel
       v-else-if="preview.status.value === 'error'"
       :message="preview.errorMessage.value ?? 'This object could not be previewed.'"

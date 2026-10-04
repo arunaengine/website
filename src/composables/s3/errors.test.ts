@@ -1,6 +1,23 @@
 import { describe, expect, it } from 'vitest'
 import { BUCKET_NAME_REQUIREMENT } from '@/lib/bucketName'
-import { isS3BucketMissingError, s3ErrorMessage, s3ErrorReport } from './errors'
+import { isS3BucketLockedError, isS3BucketMissingError, s3ErrorMessage, s3ErrorReport } from './errors'
+
+describe('locked bucket refusals', () => {
+  it('tells a locked bucket from an ordinary refusal only by the header', () => {
+    const sdkLocked = Object.defineProperty(
+      { name: 'AccessDenied', message: 'Bucket is locked', $metadata: { httpStatusCode: 403 } },
+      '$response',
+      { value: { headers: { 'x-aruna-bucket-locked': 'true' } }, enumerable: false },
+    )
+    const denied = { name: 'AccessDenied', message: 'Access Denied', $metadata: { httpStatusCode: 403 } }
+
+    expect(isS3BucketLockedError(sdkLocked)).toBe(true)
+    expect(isS3BucketLockedError({ bucketLocked: true })).toBe(true)
+    expect(isS3BucketLockedError(denied)).toBe(false)
+    expect(s3ErrorMessage(sdkLocked)).toContain('This bucket is locked.')
+    expect(s3ErrorMessage(denied)).toBe('This session is not allowed to do that.')
+  })
+})
 
 describe('s3 error messages', () => {
   it('never renders the SDK placeholder', () => {

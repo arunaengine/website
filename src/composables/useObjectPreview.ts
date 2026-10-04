@@ -1,6 +1,11 @@
-import { ref } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
+import { getBucketEncryption } from '@/lib/api'
+import { bucketUnlockLink, keyGenerations } from '@/lib/bucketEncryption'
 import { formatBytes } from '@/lib/utils'
 import { hasReferenceMetadata } from '@/lib/references'
+import { authToken } from './aruna/state'
+import { isS3BucketLockedError } from './s3/errors'
+import { localNodeId, nodeApiBase } from './s3/endpoints'
 import { s3ErrorMessage, useS3 } from './useS3'
 
 export type PreviewKind = 'text' | 'markdown' | 'table' | 'image' | 'media' | 'pdf' | 'download'
@@ -106,7 +111,11 @@ function mediaSubtype(target: { key: string; contentType?: string }): MediaKind 
 export function useObjectPreview() {
   const s3 = useS3()
 
-  const status = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  /** `locked`: the bucket is encrypted and locked, so the content waits for an unlock. */
+  const status = ref<'idle' | 'loading' | 'ready' | 'error' | 'locked'>('idle')
+  const lockCheck = ref<'idle' | 'checking' | 'still' | 'failed'>('idle')
+  const lockedTarget = shallowRef<PreviewTarget | null>(null)
+  let loadId = 0
   const kind = ref<PreviewKind>('download')
   const language = ref<string | undefined>(undefined)
   const mediaKind = ref<MediaKind>('video')
@@ -134,6 +143,9 @@ export function useObjectPreview() {
     corsBlocked.value = false
     sizeNote.value = null
     referenced.value = false
+    lockCheck.value = 'idle'
+    lockedTarget.value = null
+    ++loadId
     ++referenceProbeId
   }
 
@@ -166,6 +178,7 @@ export function useObjectPreview() {
 
   async function load(target: PreviewTarget) {
     reset()
+    const id = loadId
     status.value = 'loading'
     const classified = classifyObject(target)
     kind.value = classified.kind
@@ -203,6 +216,11 @@ export function useObjectPreview() {
       }
       status.value = 'ready'
     } catch (err) {
+      if (id === loadId && isS3BucketLockedError(err)) {
+        lockedTarget.value = target
+        status.value = 'locked'
+        return
+      }
       // A cross-origin fetch blocked by bucket CORS (or an offline node) rejects
       // with a TypeError and no response; anything else is a real read error.
       if (err instanceof TypeError) corsBlocked.value = true
@@ -216,8 +234,36 @@ export function useObjectPreview() {
     }
   }
 
+  const lockedLink = computed(() =>
+    status.value === 'locked' && lockedTarget.value
+      ? bucketUnlockLink(lockedTarget.value.bucket, lockedTarget.value.nodeId)
+      : null,
+  )
+
+  /** Reads the bucket's lock state on its node and loads again only after an observed unlock. */
+  async function recheck(): Promise<void> {
+    const target = lockedTarget.value
+    if (!target || status.value !== 'locked') return
+    const id = loadId
+    lockCheck.value = 'checking'
+    const node = target.nodeId ?? localNodeId()
+    const baseUrl = node ? nodeApiBase(node) : null
+    try {
+      if (!baseUrl) throw new Error('The node publishes no API address.')
+      const answer = await getBucketEncryption(target.bucket, { baseUrl, token: authToken.value })
+      if (id !== loadId) return
+      if (keyGenerations(answer).list.some((key) => key.unlock.state === 'unlocked')) await load(target)
+      else lockCheck.value = 'still'
+    } catch {
+      if (id === loadId) lockCheck.value = 'failed'
+    }
+  }
+
   return {
     status,
+    lockCheck,
+    lockedLink,
+    recheck,
     kind,
     language,
     mediaKind,

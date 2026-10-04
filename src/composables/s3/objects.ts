@@ -29,7 +29,7 @@ import { drsDownloadHref, isDrsReference } from '@/lib/tes'
 import { useAruna } from '../useAruna'
 import { client } from './client'
 import { resolveObjectUrl } from './endpoints'
-import { isS3AuthError, isS3NetworkError, PURGE_IN_PROGRESS_MESSAGE } from './errors'
+import { BUCKET_LOCKED_HEADER, isS3AuthError, isS3NetworkError, PURGE_IN_PROGRESS_MESSAGE } from './errors'
 import { hasActiveKey, type S3SessionReference } from './session'
 
 export interface ObjectEntry {
@@ -848,6 +848,7 @@ async function fetchObject(
   if (!response.ok) {
     throw Object.assign(new Error(`The object could not be fetched (HTTP ${response.status}).`), {
       $metadata: { httpStatusCode: response.status },
+      bucketLocked: response.status === 403 && response.headers.get(BUCKET_LOCKED_HEADER) === 'true',
     })
   }
   return response
