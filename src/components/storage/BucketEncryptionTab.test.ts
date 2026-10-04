@@ -47,6 +47,7 @@ const tab = compileClientComponent(new URL('./BucketEncryptionTab.vue', import.m
   '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/DetailList.vue': moduleDefault(DetailStub),
+  '@/components/ui/DocsLink.vue': moduleDefault(Slotted('a')),
   '@/components/ui/NodeLabel.vue': moduleDefault(Slotted('span')),
   '@/components/ui/Notice.vue': moduleDefault(NoticeStub),
   '@/components/ui/RefreshButton.vue': moduleDefault(Slotted('button')),

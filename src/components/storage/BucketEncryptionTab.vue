@@ -8,6 +8,7 @@ import BucketUnlockDialog from '@/components/storage/BucketUnlockDialog.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import DetailList, { type Detail } from '@/components/ui/DetailList.vue'
+import DocsLink from '@/components/ui/DocsLink.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
 import Notice from '@/components/ui/Notice.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
@@ -118,6 +119,7 @@ const WARNINGS = [
         <header class="flex flex-wrap items-center gap-2 border-b border-border px-5 py-4">
           <KeyRound class="size-4 text-primary" />
           <h2 class="font-display text-sm font-semibold text-aruna-navy">Encryption</h2>
+          <DocsLink icon topic="encrypted-buckets" />
           <Badge v-if="lock" :variant="stateVariant(lock.label)" data-lock-state>{{ lock.label }}</Badge>
           <span class="ml-auto inline-flex items-center gap-2 text-[11px] text-muted-foreground">
             <template v-if="encryption.nodeId.value">

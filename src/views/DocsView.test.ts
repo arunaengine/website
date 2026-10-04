@@ -67,6 +67,7 @@ describe('versioned in-portal Docs', () => {
       'notebooks',
       'storage-backend',
       'cli-access-key',
+      'encrypted-buckets',
       'invenio-zenodo',
       'dataset-git',
       'assistant',
