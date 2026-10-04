@@ -109,8 +109,8 @@ export async function unlockWithVault(
     const status = await unlockBucket(target.bucket, request, key, target.client)
     return { kind: 'unlocked', status, ownKey }
   } catch (cause) {
-    // A gateway error or a lost answer does not say whether the node applied the key.
-    const answered = cause instanceof ApiError && cause.status !== 502 && cause.status !== 504
+    // Only a 4xx says the key was not applied; a 5xx or a lost answer says nothing.
+    const answered = cause instanceof ApiError && cause.status < 500
     if (answered || cause instanceof UnlockStaleError) throw cause
     return { kind: 'unknown', ownKey }
   } finally {

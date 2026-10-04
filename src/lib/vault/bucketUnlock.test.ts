@@ -130,6 +130,15 @@ describe('bucket unlock from the browser', () => {
     expect(sent[1].body?.every((byte) => byte === 0)).toBe(true)
   })
 
+  it('treats any server error as an unknown outcome', async () => {
+    for (const status of [500, 503]) {
+      const sent = node([COPY], () => new Response(JSON.stringify({ error: 'down' }), { status }))
+
+      expect(await unlockWithVault(TARGET, vault(), always)).toEqual({ kind: 'unknown', ownKey: 'matches' })
+      expect(sent.filter((call) => call.method === 'POST')).toHaveLength(1)
+    }
+  })
+
   it('passes on a refusal from the node and still clears the key', async () => {
     const sent = node([COPY], () => new Response(JSON.stringify({ error: 'no', code: 'wrong_key' }), { status: 400 }))
 
