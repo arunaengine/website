@@ -57,8 +57,14 @@ async function hmac(key: Uint8Array<ArrayBuffer>, data: Uint8Array<ArrayBuffer>)
   return new Uint8Array(await crypto.subtle.sign('HMAC', handle, data))
 }
 
-function labeledExtract(suite: Uint8Array, salt: Uint8Array<ArrayBuffer>, label: string, ikm: Uint8Array) {
-  return hmac(salt, concat(VERSION_LABEL, suite, ENCODER.encode(label), ikm))
+/** The input holds the key material, so it is cleared once signed. */
+async function labeledExtract(suite: Uint8Array, salt: Uint8Array<ArrayBuffer>, label: string, ikm: Uint8Array) {
+  const input = concat(VERSION_LABEL, suite, ENCODER.encode(label), ikm)
+  try {
+    return await hmac(salt, input)
+  } finally {
+    input.fill(0)
+  }
 }
 
 async function labeledExpand(
@@ -71,12 +77,22 @@ async function labeledExpand(
   const labeled = concat(Uint8Array.of(length >> 8, length & 255), VERSION_LABEL, suite, ENCODER.encode(label), info)
   let block = new Uint8Array(0)
   const out = new Uint8Array(length)
-  for (let at = 0, counter = 1; at < length; counter += 1) {
-    block = await hmac(prk, concat(block, labeled, Uint8Array.of(counter)))
-    out.set(block.subarray(0, length - at), at)
-    at += block.length
+  try {
+    for (let at = 0, counter = 1; at < length; counter += 1) {
+      const input = concat(block, labeled, Uint8Array.of(counter))
+      block.fill(0)
+      try {
+        block = await hmac(prk, input)
+      } finally {
+        input.fill(0)
+      }
+      out.set(block.subarray(0, length - at), at)
+      at += block.length
+    }
+    return out
+  } finally {
+    block.fill(0)
   }
-  return out
 }
 
 /** Imports a raw X25519 private key and computes its public key. */
@@ -95,14 +111,24 @@ export async function importPrivateKey(raw: Uint8Array): Promise<X25519Pair> {
 /** DeriveKeyPair of RFC 9180, which the test vectors use for the ephemeral key. */
 export async function deriveKeyPair(ikm: Uint8Array): Promise<Uint8Array<ArrayBuffer>> {
   const prk = await labeledExtract(KEM_SUITE, new Uint8Array(0), 'dkp_prk', ikm)
-  return labeledExpand(KEM_SUITE, prk, 'sk', new Uint8Array(0), KEY_BYTES)
+  try {
+    return await labeledExpand(KEM_SUITE, prk, 'sk', new Uint8Array(0), KEY_BYTES)
+  } finally {
+    prk.fill(0)
+  }
 }
 
 async function sharedSecret(privateKey: CryptoKey, peer: Uint8Array<ArrayBuffer>, context: Uint8Array) {
   const peerKey = await crypto.subtle.importKey('raw', peer, X25519, false, [])
   const dh = new Uint8Array(await crypto.subtle.deriveBits({ name: 'X25519', public: peerKey }, privateKey, 256))
-  const prk = await labeledExtract(KEM_SUITE, new Uint8Array(0), 'eae_prk', dh)
-  return labeledExpand(KEM_SUITE, prk, 'shared_secret', context, HASH_BYTES)
+  let prk: Uint8Array<ArrayBuffer> | null = null
+  try {
+    prk = await labeledExtract(KEM_SUITE, new Uint8Array(0), 'eae_prk', dh)
+    return await labeledExpand(KEM_SUITE, prk, 'shared_secret', context, HASH_BYTES)
+  } finally {
+    dh.fill(0)
+    prk?.fill(0)
+  }
 }
 
 async function keySchedule(shared: Uint8Array<ArrayBuffer>, info: Uint8Array) {
@@ -111,10 +137,19 @@ async function keySchedule(shared: Uint8Array<ArrayBuffer>, info: Uint8Array) {
   const infoHash = await labeledExtract(HPKE_SUITE, empty, 'info_hash', info)
   const context = concat(Uint8Array.of(0), pskIdHash, infoHash)
   const secret = await labeledExtract(HPKE_SUITE, shared, 'secret', empty)
-  const raw = await labeledExpand(HPKE_SUITE, secret, 'key', context, KEY_BYTES)
-  const key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt'])
-  const nonce = await labeledExpand(HPKE_SUITE, secret, 'base_nonce', context, NONCE_BYTES)
-  return { key, nonce }
+  try {
+    const raw = await labeledExpand(HPKE_SUITE, secret, 'key', context, KEY_BYTES)
+    let key: CryptoKey
+    try {
+      key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt'])
+    } finally {
+      raw.fill(0)
+    }
+    const nonce = await labeledExpand(HPKE_SUITE, secret, 'base_nonce', context, NONCE_BYTES)
+    return { key, nonce }
+  } finally {
+    secret.fill(0)
+  }
 }
 
 async function ephemeralPair(): Promise<X25519Pair> {
@@ -133,9 +168,13 @@ export async function sealTo(
 ): Promise<SealedSecret> {
   const { privateKey, publicKey: enc } = ephemeral ?? await ephemeralPair()
   const shared = await sharedSecret(privateKey, recipient, concat(enc, recipient))
-  const { key, nonce } = await keySchedule(shared, info)
-  const sealed = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce, additionalData: aad }, key, plain)
-  return { enc, ciphertext: new Uint8Array(sealed) }
+  try {
+    const { key, nonce } = await keySchedule(shared, info)
+    const sealed = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce, additionalData: aad }, key, plain)
+    return { enc, ciphertext: new Uint8Array(sealed) }
+  } finally {
+    shared.fill(0)
+  }
 }
 
 /** Opens a sealed secret with the recipient's keypair. */
@@ -145,13 +184,16 @@ export async function openSealed(
   info: Uint8Array,
   aad: Uint8Array<ArrayBuffer>,
 ): Promise<Uint8Array<ArrayBuffer>> {
+  let shared: Uint8Array<ArrayBuffer> | null = null
   try {
     const context = concat(sealed.enc, recipient.publicKey)
-    const shared = await sharedSecret(recipient.privateKey, sealed.enc, context)
+    shared = await sharedSecret(recipient.privateKey, sealed.enc, context)
     const { key, nonce } = await keySchedule(shared, info)
     const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: nonce, additionalData: aad }, key, sealed.ciphertext)
     return new Uint8Array(plain)
   } catch {
     throw new SealOpenError()
+  } finally {
+    shared?.fill(0)
   }
 }
