@@ -41,6 +41,7 @@ const DialogStub = defineComponent({
 const tab = compileClientComponent(new URL('./BucketEncryptionTab.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => Slotted('i') }),
+  '@/components/storage/BucketEncryptionSettings.vue': moduleDefault(defineComponent(() => () => h('section', 'mode settings'))),
   '@/components/storage/BucketHoldersSection.vue': moduleDefault(defineComponent(() => () => h('section', 'holder list'))),
   '@/components/storage/BucketUnlockDialog.vue': moduleDefault(DialogStub),
   '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
@@ -215,6 +216,9 @@ describe('bucket encryption tab', () => {
     expect(text).toContain('No key action is open to you right now.')
     expect(text).not.toContain('Lock now')
     expect(text).not.toContain('holder list')
+    expect(text).not.toContain('mode settings')
     expect(await render('ready', encrypted())).toContain('holder list')
+    const admin = { holder: false, ready_copy: false, admin: true }
+    expect(await render('ready', encrypted({ mode: 'off', caller: admin }))).toContain('mode settings')
   })
 })

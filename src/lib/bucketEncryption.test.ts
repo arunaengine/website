@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { BucketEncryptionResponse, BucketUnlockStatus, EncryptionTransition } from './api'
 import {
+  changeNeedsUnlock,
+  changeNotes,
   compressionSummary,
   holderSummary,
   lockView,
@@ -77,5 +79,19 @@ describe('bucket encryption wording', () => {
     expect(transitionView({ ...visited, cleanup_remaining: null }).complete).toBe(false)
     expect(transitionView({ ...visited, cleanup_remaining: 0 })).toMatchObject({ state: 'Finished', complete: true })
     expect(transitionView({ ...TRANSITION, remaining: null }).detail).toContain('an unknown number left')
+  })
+
+  it('says which mode changes need an unlock and what they do', () => {
+    const plain = { mode: 'off', cipher: 'chacha20_poly1305', block_keys: 'content_derived' } as BucketEncryptionResponse
+    const managed = { ...plain, mode: 'node_managed' } as BucketEncryptionResponse
+    const draft = { mode: 'vault_locked' as const, cipher: plain.cipher, block_keys: plain.block_keys, max_unlock_ms: null }
+
+    expect(changeNeedsUnlock(plain, draft)).toBe(false)
+    expect(changeNotes(plain, draft).join(' ')).toContain('no unlock is needed')
+    expect(changeNeedsUnlock(managed, draft)).toBe(true)
+    expect(changeNotes(managed, draft).join(' ')).toContain('An old backup of the node still holds the old key.')
+    expect(changeNeedsUnlock(managed, { ...draft, mode: 'node_managed', max_unlock_ms: 5 })).toBe(false)
+    expect(changeNeedsUnlock(managed, { ...draft, mode: 'node_managed', cipher: 'aes256_gcm' })).toBe(true)
+    expect(changeNeedsUnlock(managed, { ...draft, mode: 'off' })).toBe(true)
   })
 })

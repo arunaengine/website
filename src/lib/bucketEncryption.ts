@@ -204,3 +204,61 @@ export function encryptionError(error: unknown): string {
   const code = error instanceof ApiError ? (error.code ?? '') : ''
   return REFUSALS[code] ?? apiErrorMessage(error)
 }
+
+/** The settings an admin may change with PUT; the key generation is the one shown. */
+export interface EncryptionDraft {
+  mode: EncryptionMode
+  cipher: BlockCipher
+  block_keys: BlockKeys
+  max_unlock_ms: number | null
+}
+
+function formatChanged(from: BucketEncryptionResponse, to: EncryptionDraft): boolean {
+  return from.cipher !== to.cipher || from.block_keys !== to.block_keys
+}
+
+/** Changes that read stored data or the private key need the bucket unlocked first. */
+export function changeNeedsUnlock(from: BucketEncryptionResponse, to: EncryptionDraft): boolean {
+  if (from.mode === 'off') return false
+  return to.mode !== from.mode || formatChanged(from, to)
+}
+
+/** Short notes on what a change does, shown before it is saved. */
+export function changeNotes(from: BucketEncryptionResponse, to: EncryptionDraft): string[] {
+  const notes: string[] = []
+  if (from.mode === 'off' && to.mode !== 'off') {
+    notes.push('Stored versions are encrypted in the background with the public key; no unlock is needed.')
+    notes.push('Old plaintext copies are removed where the storage backend allows it; old backups keep them.')
+  } else if (from.mode !== 'off' && to.mode === 'off') {
+    notes.push('Stored versions are decrypted in the background; the keys stay until every version is rewritten.')
+  } else if (from.mode === 'vault_locked' && to.mode === 'node_managed') {
+    notes.push('The node keeps its own copy of the key and unlocks the bucket at startup.')
+    notes.push('This protects only against the storage provider, not against this node.')
+  } else if (from.mode === 'node_managed' && to.mode === 'vault_locked') {
+    notes.push('A new key is made, stored versions are granted to it, and the node copy is removed.')
+    notes.push('An old backup of the node still holds the old key.')
+  }
+  if (to.mode !== 'off' && from.mode !== 'off' && formatChanged(from, to)) {
+    notes.push('Stored versions are written again in the new format.')
+  }
+  if (to.mode === 'vault_locked') {
+    notes.push('A node restart locks the bucket. Recovery needs a usable recovery code or another ready key holder.')
+  }
+  return notes
+}
+
+export const ROTATION_NOTES = [
+  'A new key is made and every stored version is granted to it; the data itself is not rewritten.',
+  'Rotation does not invalidate an old backup that still holds the old key.',
+]
+
+export function maxUnlockOptions(current: number | null): { value: string; label: string }[] {
+  const options = [
+    { value: '', label: 'No limit: until lock or restart' },
+    ...[HOUR, 8 * HOUR, 24 * HOUR, 7 * 24 * HOUR].map((ms) => ({ value: String(ms), label: formatDuration(ms) })),
+  ]
+  if (current !== null && !options.some((option) => option.value === String(current))) {
+    options.push({ value: String(current), label: formatDuration(current) })
+  }
+  return options
+}
