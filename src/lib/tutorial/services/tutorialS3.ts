@@ -83,6 +83,7 @@ export function tutorialS3(userId: string): S3Surface {
     }),
     headObject: async (bucket: string, key: string) => objectHead(bucket, key),
     downloadUrl: async (bucket: string, key: string) => `${TUTORIAL_ENDPOINT}/${bucket}/${key}`,
+    probeAccess: async () => 'open' as const,
     getObjectText: async (bucket: string, key: string) => {
       const artifact = artifactFor(bucket, key)
       if (artifact?.text !== undefined) return artifact.text

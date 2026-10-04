@@ -4,10 +4,11 @@ import type { BucketEncryptionResponse, BucketUnlockStatus } from '@/lib/api'
 import { useObjectPreview } from './useObjectPreview'
 
 const getObjectText = vi.fn()
+const probeAccess = vi.fn()
 const getBucketEncryption = vi.fn()
 
 vi.mock('./useS3', () => ({
-  useS3: () => ({ getObjectText, downloadUrl: async () => 'https://b.test/presigned' }),
+  useS3: () => ({ getObjectText, probeAccess, downloadUrl: async () => 'https://b.test/presigned' }),
   s3ErrorMessage: (error: unknown) => (error instanceof Error ? error.message : String(error)),
 }))
 vi.mock('./s3/endpoints', () => ({
@@ -35,6 +36,7 @@ function lockState(state: BucketUnlockStatus['state']): BucketEncryptionResponse
 
 beforeEach(() => {
   getObjectText.mockReset()
+  probeAccess.mockReset().mockResolvedValue('open')
   getBucketEncryption.mockReset()
 })
 
@@ -106,5 +108,26 @@ describe('preview of a locked bucket', () => {
     await older
 
     expect(preview.text.value).toBe('new text')
+  })
+
+  it('reads one byte before it offers a direct viewer, an oversized download or the download button', async () => {
+    probeAccess.mockResolvedValue('locked')
+    const preview = useObjectPreview()
+
+    await preview.load({ ...TARGET, key: 'clip.mp4' })
+    expect(preview.status.value).toBe('locked')
+    expect(preview.directUrl.value).toBeNull()
+
+    await preview.load({ ...TARGET, size: 50 * 1024 * 1024 })
+    expect(preview.status.value).toBe('locked')
+    expect(getObjectText).not.toHaveBeenCalled()
+
+    probeAccess.mockResolvedValue('open')
+    await preview.load({ ...TARGET, key: 'paper.pdf' })
+    expect(preview.status.value).toBe('ready')
+    probeAccess.mockResolvedValueOnce('locked')
+    expect(await preview.checkAccess('https://b.test/presigned')).toBe(false)
+    expect(preview.status.value).toBe('locked')
+    expect(probeAccess).toHaveBeenCalledWith('https://b.test/presigned')
   })
 })

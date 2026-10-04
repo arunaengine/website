@@ -21,6 +21,7 @@ import {
   listObjects,
   listObjectsRecursive,
   listObjectVersions,
+  probeObjectAccess,
   putTextObject,
   resumeUpload,
   uploadObject,
@@ -150,5 +151,6 @@ function nodeS3() {
     getObjectText,
     getObjectBlob,
     fetchUrlText,
+    probeAccess: probeObjectAccess,
   }
 }

@@ -3,12 +3,14 @@
 // api/src/csp.rs serves `frame-src blob:`); the bytes are fetched over the
 // already-allowed connect-src path, so the iframe never touches the S3 origin.
 import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { BUCKET_LOCKED_HEADER } from '@/composables/s3/errors'
 import Button from '@/components/ui/Button.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import { ExternalLink, FileText } from '@lucide/vue'
 
 const props = defineProps<{ url: string; name?: string }>()
+const emit = defineEmits<{ (e: 'locked'): void }>()
 
 const blobUrl = ref<string | null>(null)
 const failed = ref(false)
@@ -21,6 +23,10 @@ function openTab() {
 onMounted(async () => {
   try {
     const response = await fetch(props.url)
+    if (response.status === 403 && response.headers.get(BUCKET_LOCKED_HEADER) === 'true') {
+      emit('locked')
+      return
+    }
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
     const blob = await response.blob()
     blobUrl.value = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }))

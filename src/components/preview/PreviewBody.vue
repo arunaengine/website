@@ -94,6 +94,7 @@ async function download() {
         props.versionId ?? undefined,
         props.name,
       ))
+    if (!(await preview.checkAccess(url))) return
     // In the document, not detached: a detached anchor is ignored by some
     // browsers, and the name travels in the response's Content-Disposition.
     const anchor = document.createElement('a')
@@ -231,6 +232,7 @@ async function download() {
         v-else-if="preview.kind.value === 'pdf' && preview.directUrl.value"
         :url="preview.directUrl.value"
         :name="props.name"
+        @locked="preview.markLocked()"
       />
       <DownloadCard
         v-else

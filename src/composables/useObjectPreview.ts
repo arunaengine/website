@@ -115,6 +115,7 @@ export function useObjectPreview() {
   const status = ref<'idle' | 'loading' | 'ready' | 'error' | 'locked'>('idle')
   const lockCheck = ref<'idle' | 'checking' | 'still' | 'failed'>('idle')
   const lockedTarget = shallowRef<PreviewTarget | null>(null)
+  let currentTarget: PreviewTarget | null = null
   let loadId = 0
   const kind = ref<PreviewKind>('download')
   const language = ref<string | undefined>(undefined)
@@ -145,6 +146,7 @@ export function useObjectPreview() {
     referenced.value = false
     lockCheck.value = 'idle'
     lockedTarget.value = null
+    currentTarget = null
     ++loadId
     ++referenceProbeId
   }
@@ -164,12 +166,27 @@ export function useObjectPreview() {
     }
   }
 
+  /** Switches the current preview to waiting for a bucket unlock. */
+  function markLocked() {
+    if (!currentTarget) return
+    lockedTarget.value = currentTarget
+    status.value = 'locked'
+  }
+
+  /** False when a newer load took over, or when the bucket turned out to be locked. */
+  async function checkAccess(url: string, id = loadId): Promise<boolean> {
+    const access = await s3.probeAccess(url)
+    if (id !== loadId) return false
+    if (access === 'locked') markLocked()
+    return access !== 'locked'
+  }
+
   async function fallbackDownload(target: PreviewTarget, cap: number, actual: number, id: number) {
     kind.value = 'download'
     sizeNote.value = `This file is ${formatBytes(actual)}, above the ${formatBytes(cap)} preview limit.`
     try {
       const url = await s3.downloadUrl(target.bucket, target.key, target.nodeId, target.versionId)
-      if (id !== loadId) return
+      if (id !== loadId || !(await checkAccess(url, id))) return
       directUrl.value = url
       status.value = 'ready'
     } catch (err) {
@@ -183,6 +200,7 @@ export function useObjectPreview() {
   async function load(target: PreviewTarget) {
     reset()
     const id = loadId
+    currentTarget = target
     status.value = 'loading'
     const classified = classifyObject(target)
     kind.value = classified.kind
@@ -191,7 +209,7 @@ export function useObjectPreview() {
       if (classified.kind === 'media' || classified.kind === 'pdf' || classified.kind === 'download') {
         if (classified.kind === 'media') mediaKind.value = mediaSubtype(target)
         const url = await s3.downloadUrl(target.bucket, target.key, target.nodeId, target.versionId)
-        if (id !== loadId) return
+        if (id !== loadId || !(await checkAccess(url, id))) return
         directUrl.value = url
         status.value = 'ready'
         return
@@ -274,6 +292,8 @@ export function useObjectPreview() {
     lockCheck,
     lockedLink,
     recheck,
+    markLocked,
+    checkAccess,
     kind,
     language,
     mediaKind,
