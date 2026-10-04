@@ -208,4 +208,35 @@ describe('preview of a locked bucket', () => {
     expect(preview.status.value).toBe('idle')
     expect(await preview.checkAccess('https://b.test/presigned', token)).toBe(false)
   })
+
+  it('keeps a lock one probe confirmed when an earlier probe of the same load answers later', async () => {
+    let first!: (value: string) => void
+    probeAccess.mockImplementationOnce(() => new Promise((resolve) => (first = resolve)))
+    const preview = useObjectPreview()
+
+    const media = preview.load({ ...TARGET, key: 'clip.mp4' })
+    await vi.waitFor(() => expect(probeAccess).toHaveBeenCalledTimes(1))
+    probeAccess.mockResolvedValueOnce('locked')
+    expect(await preview.checkAccess('https://b.test/presigned', preview.loadToken())).toBe(false)
+    first('open')
+    await media
+
+    expect(preview.status.value).toBe('locked')
+    expect(preview.directUrl.value).toBeNull()
+  })
+
+  it('never reads a cancelled probe as permission', async () => {
+    probeAccess.mockImplementationOnce(
+      (_url: string, signal: AbortSignal) =>
+        new Promise((resolve) => signal.addEventListener('abort', () => resolve('unknown'))),
+    )
+    const preview = useObjectPreview()
+    await preview.load(TARGET)
+    const token = preview.loadToken()
+
+    const check = preview.checkAccess('https://b.test/presigned', token)
+    preview.reset()
+
+    expect(await check).toBe(false)
+  })
 })
