@@ -2,6 +2,7 @@
 // The encryption of one bucket as the node that hosts it reports it: mode, lock
 // state, key fingerprint, format, holders, recovery and any rewrite that runs.
 import { computed, ref, toRef } from 'vue'
+import BucketHoldersSection from '@/components/storage/BucketHoldersSection.vue'
 import BucketUnlockDialog from '@/components/storage/BucketUnlockDialog.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
@@ -180,6 +181,13 @@ const WARNINGS = [
           <Notice v-if="actionError" tone="error">{{ actionError }}</Notice>
         </div>
       </section>
+
+      <BucketHoldersSection
+        v-if="encrypted && (caller?.holder || caller?.admin)"
+        :bucket="bucket"
+        :can-manage="Boolean(caller?.admin)"
+        :source="encryption"
+      />
 
       <Notice v-if="encrypted" tone="warning" :lines="WARNINGS" />
 

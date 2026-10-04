@@ -108,6 +108,8 @@ const STATE_TONE: Record<string, StateTone> = {
   'removing old copies': 'progress',
   'waiting for an unlock': 'attention',
   blocked: 'attention',
+  'no usable key': 'attention',
+  'directory unavailable': 'attention',
 }
 
 /** The tone for a state string; anything unknown reads as a neutral count. */

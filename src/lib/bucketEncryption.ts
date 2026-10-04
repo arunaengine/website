@@ -10,7 +10,9 @@ import {
   type BucketEncryptionResponse,
   type EncryptionMode,
   type EncryptionTransition,
+  type HolderOrigin,
   type HolderReadiness,
+  type HolderState,
   type RecoveryStatus,
 } from './api'
 import { formatDuration } from './utils'
@@ -29,6 +31,19 @@ export const CIPHER_LABEL: Record<BlockCipher, string> = {
 export const BLOCK_KEYS_LABEL: Record<BlockKeys, string> = {
   content_derived: 'Derived from block content',
   unique: 'A new key for every block',
+}
+
+export const ORIGIN_LABEL: Record<HolderOrigin, string> = {
+  creator: 'Creator',
+  admin: 'Group admin',
+  explicit: 'Granted',
+}
+
+export const HOLDER_STATE_LABEL: Record<HolderState, string> = {
+  ready: 'Ready',
+  pending: 'Pending',
+  missing_key: 'No usable key',
+  unavailable: 'Directory unavailable',
 }
 
 const UNKNOWN = 'Unknown'
