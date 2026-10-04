@@ -1,9 +1,8 @@
 <script setup lang="ts">
-// The passphrase that seals provider keys on the node, chosen once. A
-// recovery code, when asked for, is shown here a single time.
+// The passphrase that seals provider keys on the node, chosen once. A recovery code,
+// when asked for, is shown by VaultRecoveryCode, which stays while the vault state changes.
 import { computed, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
-import CopyButton from '@/components/ui/CopyButton.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import { useUserVault } from '@/composables/useUserVault'
@@ -18,7 +17,6 @@ const repeat = ref('')
 const withRecovery = ref(true)
 const busy = ref(false)
 const failure = ref<string | null>(null)
-const recoveryCode = ref<string | null>(null)
 
 const tooShort = computed(() => passphrase.value.length > 0 && passphrase.value.length < MIN_KEY_HOLDER_PASSPHRASE_LENGTH)
 const mismatch = computed(() => repeat.value.length > 0 && repeat.value !== passphrase.value)
@@ -30,11 +28,10 @@ async function submit() {
   busy.value = true
   failure.value = null
   try {
-    const code = await create(passphrase.value, withRecovery.value)
+    await create(passphrase.value, withRecovery.value)
     passphrase.value = ''
     repeat.value = ''
-    if (code) recoveryCode.value = code
-    else emit('done')
+    emit('done')
   } catch (cause) {
     failure.value = errorMessage(cause)
   } finally {
@@ -44,19 +41,7 @@ async function submit() {
 </script>
 
 <template>
-  <div v-if="recoveryCode" class="space-y-3">
-    <Notice tone="success" title="Your recovery code">
-      It is shown only this once. Keep it somewhere safe: it opens your provider keys when you forget the passphrase.
-    </Notice>
-    <div class="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
-      <code class="min-w-0 flex-1 break-all font-mono text-xs" data-recovery-code>{{ recoveryCode }}</code>
-      <CopyButton :value="recoveryCode" label="Copy the recovery code" />
-    </div>
-    <div class="flex justify-end">
-      <Button size="sm" @click="emit('done')">Done</Button>
-    </div>
-  </div>
-  <div v-else class="space-y-3">
+  <div class="space-y-3">
     <div class="grid gap-3 sm:grid-cols-2">
       <div>
         <label class="text-xs font-medium text-foreground" for="vault-passphrase">Passphrase</label>

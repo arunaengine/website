@@ -13,6 +13,7 @@ import DialogTitle from '@/components/ui/DialogTitle.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import VaultCreateForm from './VaultCreateForm.vue'
+import VaultRecoveryCode from './VaultRecoveryCode.vue'
 import VaultUnlockForm from './VaultUnlockForm.vue'
 import { useUserVault } from '@/composables/useUserVault'
 import { MIN_KEY_HOLDER_PASSPHRASE_LENGTH } from '@/lib/vault/crypto'
@@ -88,6 +89,7 @@ async function confirmReset() {
       </p>
     </header>
     <div class="px-5 py-4">
+      <VaultRecoveryCode class="mb-4" />
       <Notice v-if="error" tone="error">The provider keys on this node could not be read: {{ error }}</Notice>
       <p v-else-if="state === 'unsupported'" class="text-xs text-muted-foreground">
         This node cannot keep provider keys. Keys stay in this browser session.

@@ -7,6 +7,7 @@ import {
   compileClientComponent,
   content,
   element,
+  flush,
   moduleDefault,
   mountApp,
   typeValue,
@@ -16,6 +17,10 @@ import { errorMessage } from '@/lib/utils'
 
 const state = ref<VaultState>('unlocked')
 const error = ref<string | null>(null)
+const recoveryCode = ref<string | null>(null)
+const dismissRecovery = vi.fn(() => {
+  recoveryCode.value = null
+})
 const lock = vi.fn()
 const changePassphrase = vi.fn(async (_secret: unknown, _next: string) => {})
 const reset = vi.fn(async () => {})
@@ -42,6 +47,14 @@ const InputStub = defineComponent({
 const UnlockStub = defineComponent(() => () => h('div', { 'data-unlock': '' }))
 const CreateStub = defineComponent(() => () => h('div', { 'data-create': '' }))
 
+const VaultRecoveryCode = compileClientComponent(new URL('./VaultRecoveryCode.vue', import.meta.url), {
+  vue: VueRuntime,
+  '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+  '@/components/ui/CopyButton.vue': moduleDefault(Passthrough),
+  '@/components/ui/Notice.vue': moduleDefault(Passthrough),
+  '@/composables/useUserVault': { useUserVault: () => ({ recoveryCode, dismissRecovery }) },
+})
+
 const VaultSettings = compileClientComponent(new URL('./VaultSettings.vue', import.meta.url), {
   vue: VueRuntime,
   '@/components/ui/Badge.vue': moduleDefault(Passthrough),
@@ -56,6 +69,7 @@ const VaultSettings = compileClientComponent(new URL('./VaultSettings.vue', impo
   '@/components/ui/Notice.vue': moduleDefault(Passthrough),
   './VaultUnlockForm.vue': moduleDefault(UnlockStub),
   './VaultCreateForm.vue': moduleDefault(CreateStub),
+  './VaultRecoveryCode.vue': moduleDefault(VaultRecoveryCode),
   '@/composables/useUserVault': { useUserVault: () => ({ state, error, lock, changePassphrase, reset }) },
   '@/lib/vault/crypto': { MIN_KEY_HOLDER_PASSPHRASE_LENGTH: 12 },
   '@/lib/utils': { errorMessage },
@@ -72,12 +86,29 @@ function dialog(root: Parameters<typeof content>[0]) {
 beforeEach(() => {
   state.value = 'unlocked'
   error.value = null
+  recoveryCode.value = null
+  dismissRecovery.mockClear()
   lock.mockClear()
   changePassphrase.mockClear()
   reset.mockClear()
 })
 
 describe('VaultSettings', () => {
+  it('shows the recovery code of keys just set up until it was stored', async () => {
+    state.value = 'absent'
+    const { root } = await mountApp(VaultSettings)
+
+    state.value = 'unlocked'
+    recoveryCode.value = 'ABCD-EFGH'
+    await flush()
+    expect(content(root)).toContain('ABCD-EFGH')
+    expect(content(root)).toContain('Keep it somewhere safe')
+
+    await click(button(root, 'I stored it'))
+    expect(dismissRecovery).toHaveBeenCalledOnce()
+    expect(content(root)).not.toContain('ABCD-EFGH')
+  })
+
   it('offers to choose a passphrase for a user who has no keys on the node', async () => {
     state.value = 'absent'
     const { root } = await mountApp(VaultSettings)

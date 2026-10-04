@@ -31,15 +31,10 @@ const InputStub = defineComponent({
     }),
 })
 const NoticeStub = defineComponent((_, { attrs, slots }) => () => h('div', attrs, [attrs.title as string, slots.default?.()]))
-const CopyStub = defineComponent({
-  props: { value: String, label: String },
-  setup: (props) => () => h('button', { 'aria-label': props.label, 'data-copy': props.value }),
-})
 
 const VaultCreateForm = compileClientComponent(new URL('./VaultCreateForm.vue', import.meta.url), {
   vue: VueRuntime,
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
-  '@/components/ui/CopyButton.vue': moduleDefault(CopyStub),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Notice.vue': moduleDefault(NoticeStub),
   '@/composables/useUserVault': { useUserVault: () => ({ create }) },
@@ -80,22 +75,17 @@ describe('VaultCreateForm', () => {
     expect(button(root, 'Create').props.disabled).toBe(false)
   })
 
-  it('shows the recovery code once with a copy control', async () => {
+  it('leaves the recovery code to the vault and finishes once the keys are set up', async () => {
     const { root } = await mountApp(Host)
     await fill(root, 'correct horse')
     await click(button(root, 'Create'))
 
     expect(create).toHaveBeenCalledWith('correct horse', true)
-    expect(content(root)).toContain('ABCD-EFGH')
-    expect(content(root)).toContain('shown only this once')
-    expect(element(root, (node) => node.props['data-copy'] === 'ABCD-EFGH')).toBeDefined()
-    expect(done).not.toHaveBeenCalled()
-
-    await click(button(root, 'Done'))
+    expect(content(root)).not.toContain('ABCD-EFGH')
     expect(done).toHaveBeenCalledOnce()
   })
 
-  it('finishes right away when no recovery code was asked for', async () => {
+  it('creates no recovery code when none was asked for', async () => {
     const { root } = await mountApp(Host)
     await click(element(root, (node) => node.tag === 'input' && node.props.type === 'checkbox'))
     await fill(root, 'correct horse')
