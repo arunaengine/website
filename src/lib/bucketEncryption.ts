@@ -129,8 +129,20 @@ export function compressionSummary(
     : `${requested}, applied as level ${compression.effective_level} in Pithos`
 }
 
+const MINUTE = 60_000
+const HOUR = 60 * MINUTE
+const DAY = 24 * HOUR
+
+/** "15 minutes", "8 hours", "7 days"; an uneven length keeps the compact form. */
+export function spanLabel(ms: number): string {
+  for (const [size, unit] of [[DAY, 'day'], [HOUR, 'hour'], [MINUTE, 'minute']] as const) {
+    if (ms >= size && ms % size === 0) return `${ms / size} ${unit}${ms === size ? '' : 's'}`
+  }
+  return formatDuration(ms)
+}
+
 export function maxUnlockLabel(ms: number | null): string {
-  return ms === null ? 'Until lock or restart' : formatDuration(ms)
+  return ms === null ? 'Until lock or restart' : spanLabel(ms)
 }
 
 const KIND_LABEL: Record<EncryptionTransition['kind'], string> = {
@@ -173,19 +185,13 @@ export function transitionView(transition: EncryptionTransition): TransitionView
   }
 }
 
-const HOUR = 3_600_000
-const DURATIONS: [number, string][] = [
-  [HOUR / 4, '15 minutes'],
-  [HOUR, '1 hour'],
-  [8 * HOUR, '8 hours'],
-  [24 * HOUR, '24 hours'],
-]
+const DURATIONS = [15 * MINUTE, HOUR, 8 * HOUR, DAY]
 
 /** Unlock lengths within the bucket maximum; '' leaves it to the node: the maximum, or until lock. */
 export function durationOptions(maxMs: number | null): { value: string; label: string }[] {
-  const fallback = maxMs === null ? 'Until lock or restart' : `The bucket maximum (${formatDuration(maxMs)})`
-  const shorter = DURATIONS.filter(([ms]) => maxMs === null || ms < maxMs)
-  return [{ value: '', label: fallback }, ...shorter.map(([ms, label]) => ({ value: String(ms), label }))]
+  const fallback = maxMs === null ? 'Until lock or restart' : `The bucket maximum (${spanLabel(maxMs)})`
+  const shorter = DURATIONS.filter((ms) => maxMs === null || ms < maxMs)
+  return [{ value: '', label: fallback }, ...shorter.map((ms) => ({ value: String(ms), label: spanLabel(ms) }))]
 }
 
 const REFUSALS: Record<string, string> = {
@@ -256,10 +262,10 @@ export const ROTATION_NOTES = [
 export function maxUnlockOptions(current: number | null): { value: string; label: string }[] {
   const options = [
     { value: '', label: 'No limit: until lock or restart' },
-    ...[HOUR, 8 * HOUR, 24 * HOUR, 7 * 24 * HOUR].map((ms) => ({ value: String(ms), label: formatDuration(ms) })),
+    ...[HOUR, 8 * HOUR, DAY, 7 * DAY].map((ms) => ({ value: String(ms), label: spanLabel(ms) })),
   ]
   if (current !== null && !options.some((option) => option.value === String(current))) {
-    options.push({ value: String(current), label: formatDuration(current) })
+    options.push({ value: String(current), label: spanLabel(current) })
   }
   return options
 }

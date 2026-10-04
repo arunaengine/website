@@ -71,7 +71,7 @@ describe('bucket unlock dialog', () => {
     const root = await render(8 * 3_600_000)
     const select = element(root, (node) => node.tag === 'select')
 
-    expect(content(select)).toBe('The bucket maximum (8h 00m)15 minutes1 hour')
+    expect(content(select)).toBe('The bucket maximum (8 hours)15 minutes1 hour')
     ;(select.props['onUpdate:modelValue'] as (value: string) => void)('3600000')
     await flush()
     await click(button(root, 'Unlock'))

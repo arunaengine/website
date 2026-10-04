@@ -8,6 +8,7 @@ import {
   lockView,
   modeLabel,
   recoverySummary,
+  spanLabel,
   transitionView,
 } from './bucketEncryption'
 import { stateTone } from './stateBadge'
@@ -93,5 +94,12 @@ describe('bucket encryption wording', () => {
     expect(changeNeedsUnlock(managed, { ...draft, mode: 'node_managed', max_unlock_ms: 5 })).toBe(false)
     expect(changeNeedsUnlock(managed, { ...draft, mode: 'node_managed', cipher: 'aes256_gcm' })).toBe(true)
     expect(changeNeedsUnlock(managed, { ...draft, mode: 'off' })).toBe(true)
+  })
+
+  it('names unlock lengths in whole units', () => {
+    expect(spanLabel(15 * 60_000)).toBe('15 minutes')
+    expect(spanLabel(3_600_000)).toBe('1 hour')
+    expect(spanLabel(7 * 86_400_000)).toBe('7 days')
+    expect(spanLabel(90_500)).toBe('1m 31s')
   })
 })
