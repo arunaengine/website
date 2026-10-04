@@ -38,8 +38,14 @@ const recovery = computed(() => recoverySummary(holders.value ? listedRecovery(h
 const partial = computed(() => Boolean(holders.value && holders.value.complete !== true))
 const busy = ref<string | null>(null)
 const failure = ref<string | null>(null)
-const pending = ref<BucketHolderEntry | null>(null)
-const pendingRecovery = ref<Exclude<RecoveryAfter, 'kept'>>('unmet')
+/** A confirmation belongs to the holder set it was shown for; a newer set needs a new one. */
+interface PendingRemoval {
+  entry: BucketHolderEntry
+  revision: string
+  recovery: Exclude<RecoveryAfter, 'kept'>
+}
+const pending = ref<PendingRemoval | null>(null)
+const pendingStale = computed(() => Boolean(pending.value && holders.value?.revision !== pending.value.revision))
 const accepted = ref(false)
 
 const query = ref('')
@@ -89,13 +95,13 @@ async function addHolder() {
   }
 }
 
-async function removeHolder(entry: BucketHolderEntry, confirm: boolean) {
+async function removeHolder(entry: BucketHolderEntry, confirm: boolean, revision: string) {
   busy.value = entry.user_id
   failure.value = null
   try {
-    const result = await remove(entry.user_id, confirm)
-    if (result === 'confirm' && pending.value !== entry) pendingRecovery.value = 'unmet'
-    pending.value = result === 'confirm' ? entry : null
+    const result = await remove(entry.user_id, confirm, revision)
+    const recovery = pending.value?.entry === entry ? pending.value.recovery : 'unmet'
+    pending.value = result === 'confirm' ? { entry, revision, recovery } : null
     accepted.value = false
   } catch (cause) {
     failure.value = encryptionError(cause)
@@ -105,14 +111,20 @@ async function removeHolder(entry: BucketHolderEntry, confirm: boolean) {
 }
 
 function startRemove(entry: BucketHolderEntry) {
-  const after = holders.value ? recoveryAfter(holders.value, entry.user_id) : 'unknown'
+  const shown = holders.value
+  if (!shown) return
+  const after = recoveryAfter(shown, entry.user_id)
   if (after === 'kept') {
-    void removeHolder(entry, false)
+    void removeHolder(entry, false, shown.revision)
     return
   }
   accepted.value = false
-  pendingRecovery.value = after
-  pending.value = entry
+  pending.value = { entry, revision: shown.revision, recovery: after }
+}
+
+function confirmRemoval() {
+  const asked = pending.value
+  if (asked && !pendingStale.value) void removeHolder(asked.entry, true, asked.revision)
 }
 </script>
 
@@ -192,9 +204,9 @@ function startRemove(entry: BucketHolderEntry) {
     <Dialog :open="Boolean(pending)" @update:open="(open: boolean) => !open && (pending = null)">
       <DialogContent class="max-w-md">
         <DialogHeader>
-          <DialogTitle>Remove {{ pending ? nameOf(pending) : '' }}?</DialogTitle>
+          <DialogTitle>Remove {{ pending ? nameOf(pending.entry) : '' }}?</DialogTitle>
           <DialogDescription>
-            <template v-if="pendingRecovery === 'unmet'">
+            <template v-if="pending?.recovery === 'unmet'">
               After this removal the recovery rule is not met: fewer than two ready key holders remain, and none has a
               recovery code.
             </template>
@@ -205,10 +217,13 @@ function startRemove(entry: BucketHolderEntry) {
             If the remaining usable key is then lost too, the data in this bucket cannot be read again.
           </DialogDescription>
         </DialogHeader>
+        <Notice v-if="pendingStale" tone="warning">
+          The key holders changed while this was open. Close it and check the list again.
+        </Notice>
         <label class="flex items-start gap-2 text-xs text-muted-foreground">
           <input type="checkbox" class="mt-0.5" :checked="accepted" @click="accepted = !accepted" />
           <span>
-            {{ pendingRecovery === 'unmet' ? 'I accept that the recovery rule is not met.' : 'I accept that recovery cannot be verified.' }}
+            {{ pending?.recovery === 'unmet' ? 'I accept that the recovery rule is not met.' : 'I accept that recovery cannot be verified.' }}
           </span>
         </label>
         <DialogFooter>
@@ -216,8 +231,8 @@ function startRemove(entry: BucketHolderEntry) {
           <Button
             variant="destructive"
             size="sm"
-            :disabled="!accepted || busy !== null || frozen"
-            @click="pending && removeHolder(pending, true)"
+            :disabled="!accepted || busy !== null || frozen || pendingStale"
+            @click="confirmRemoval"
           >
             Remove anyway
           </Button>

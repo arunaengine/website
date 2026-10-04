@@ -101,10 +101,9 @@ export function useBucketHolders(source: HolderSource, bucket: Ref<string>) {
     }
   }
 
-  /** Without `confirmRecovery`, a removal that breaks recovery comes back as `confirm`. */
-  async function remove(userId: string, confirmRecovery: boolean): Promise<RemovalResult> {
-    const revision = holders.value?.revision
-    if (!revision) throw new Error('The key holders are not known yet.')
+  // Without `confirmRecovery` a removal that breaks recovery comes back as `confirm`. `revision`
+  // names the holder set the caller showed; the node refuses the removal once the set changed.
+  async function remove(userId: string, confirmRecovery: boolean, revision: string): Promise<RemovalResult> {
     const bound = source.binder()
     try {
       await removeBucketHolder(bucket.value, userId, revision, confirmRecovery, source.client())

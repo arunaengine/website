@@ -84,7 +84,7 @@ describe('bucket key holder list', () => {
     expect(text).toContain('does not erase copies')
     expect(() => rowButton(root, 'Ada')).toThrow()
     await click(rowButton(root, 'Cy'))
-    expect(remove).toHaveBeenCalledWith('Cy', false)
+    expect(remove).toHaveBeenCalledWith('Cy', false, 'rev-1')
   })
 
   it('asks before a removal that breaks recovery and sends the confirmation', async () => {
@@ -98,7 +98,7 @@ describe('bucket key holder list', () => {
     await click(element(root, (node) => node.tag === 'input' && node.props.type === 'checkbox'))
     await click(button(root, 'Remove anyway'))
 
-    expect(remove).toHaveBeenCalledWith('Bo', true)
+    expect(remove).toHaveBeenCalledWith('Bo', true, 'rev-1')
   })
 
   it('marks a partial list and asks before a removal whose effect cannot be verified', async () => {
@@ -119,7 +119,7 @@ describe('bucket key holder list', () => {
 
     await click(rowButton(root, 'Cy'))
 
-    expect(remove).toHaveBeenCalledWith('Cy', false)
+    expect(remove).toHaveBeenCalledWith('Cy', false, 'rev-1')
     expect(content(root)).toContain('Remove Cy?')
   })
 
@@ -154,5 +154,19 @@ describe('bucket key holder list', () => {
 
     expect(content(root)).toContain('The user search failed: The directory did not answer.')
     expect(content(root)).not.toContain('No matching users.')
+  })
+
+  it('asks again when the holder set changes while the removal warning is open', async () => {
+    const root = await render([holder('Ada'), holder('Bo')])
+    await click(rowButton(root, 'Bo'))
+    await click(element(root, (node) => node.tag === 'input' && node.props.type === 'checkbox'))
+
+    holders.value = { ...holders.value!, revision: 'rev-2' }
+    await flush()
+    await click(button(root, 'Remove anyway'))
+
+    expect(content(root)).toContain('The key holders changed while this was open.')
+    expect(button(root, 'Remove anyway').props.disabled).toBe(true)
+    expect(remove).not.toHaveBeenCalled()
   })
 })

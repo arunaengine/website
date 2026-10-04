@@ -112,8 +112,8 @@ describe('bucket key holders', () => {
     await vi.waitFor(() => expect(holders.state.value).toBe('ready'))
     removeBucketHolder.mockRejectedValueOnce(refusal('recovery_confirmation_required'))
 
-    expect(await holders.remove('A', false)).toBe('confirm')
-    expect(await holders.remove('A', true)).toBe('removed')
+    expect(await holders.remove('A', false, 'rev-1')).toBe('confirm')
+    expect(await holders.remove('A', true, 'rev-1')).toBe('removed')
 
     expect(removeBucketHolder.mock.calls.map((call) => call.slice(0, 4))).toEqual([
       ['reef', 'A', 'rev-1', false],
@@ -128,7 +128,7 @@ describe('bucket key holders', () => {
     removeBucketHolder.mockRejectedValueOnce(refusal('stale_holders'))
     listBucketHolders.mockResolvedValue(listing([holder('A'), holder('B'), holder('C')], 'rev-2'))
 
-    await expect(holders.remove('A', false)).rejects.toThrow('changed meanwhile')
+    await expect(holders.remove('A', false, 'rev-1')).rejects.toThrow('changed meanwhile')
 
     await vi.waitFor(() => expect(holders.holders.value?.revision).toBe('rev-2'))
   })
