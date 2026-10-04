@@ -16,13 +16,16 @@ import Select from '@/components/ui/Select.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { useUserVault } from '@/composables/useUserVault'
 import { durationOptions, encryptionError } from '@/lib/bucketEncryption'
+import type { KeyRole } from '@/lib/api'
 import type { UnlockOutcome } from '@/lib/vault/bucketUnlock'
 
 const props = defineProps<{
   open: boolean
   bucket: string
+  generation: number
+  role: KeyRole
   maxUnlockMs: number | null
-  unlock: (durationMs?: number) => Promise<UnlockOutcome | null>
+  unlock: (generation: number, durationMs?: number) => Promise<UnlockOutcome | null>
 }>()
 const emit = defineEmits<{ (e: 'update:open', open: boolean): void }>()
 
@@ -58,7 +61,7 @@ async function submit() {
   busy.value = true
   failure.value = null
   try {
-    outcome.value = await props.unlock(duration.value ? Number(duration.value) : undefined)
+    outcome.value = await props.unlock(props.generation, duration.value ? Number(duration.value) : undefined)
     if (!outcome.value) failure.value = 'The bucket changed while it was being unlocked. Nothing was sent.'
   } catch (cause) {
     failure.value = encryptionError(cause)
@@ -74,8 +77,9 @@ async function submit() {
       <DialogHeader>
         <DialogTitle>Unlock {{ bucket }}</DialogTitle>
         <DialogDescription>
-          Your vault opens your copy of the bucket key in this browser. Only the bucket key and the unlock length go to
-          the node.
+          Your vault opens your copy of key generation {{ generation }} in this browser. Only that key and the unlock
+          length go to the node.
+          <template v-if="role === 'source'">It is the previous key, needed while stored versions are rewritten.</template>
         </DialogDescription>
       </DialogHeader>
 

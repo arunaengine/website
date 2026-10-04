@@ -16,6 +16,7 @@ import {
   type BucketEncryptionResponse,
   type PutBucketEncryptionRequest,
 } from '@/lib/api'
+import { keyGenerations } from '@/lib/bucketEncryption'
 import { unlockWithVault, type UnlockOutcome } from '@/lib/vault/bucketUnlock'
 import { authToken, nodeInfo, realmInfo, sessionEpoch, userInfo } from './aruna/state'
 import { localNodeId, nodeApiBase } from './s3/endpoints'
@@ -120,16 +121,22 @@ export function useBucketEncryption(bucket: Ref<string>, nodeId: Ref<string | nu
     }
   }
 
-  /** Opens the caller's copy in this browser and sends only the bucket key to the node. */
-  function unlock(durationMs?: number): Promise<UnlockOutcome | null> {
-    const seen = status.value
+  /** The generation as the current status lists it, active or source. */
+  function keyOf(keyGeneration: number) {
+    return status.value ? keyGenerations(status.value).list.find((entry) => entry.generation === keyGeneration) : undefined
+  }
+
+  /** Opens the caller's copy of one generation here and sends only that key to the node. */
+  function unlock(keyGeneration: number, durationMs?: number): Promise<UnlockOutcome | null> {
     if (outcomeUnknown.value) {
       return Promise.reject(new Error('The last unlock was not confirmed. Reload the status before trying again.'))
     }
-    if (!seen?.bucket_id || !seen.public_key) return Promise.reject(new Error('This bucket has no key to unlock.'))
-    const { bucket_id: bucketId, key_generation: generation, public_key: publicKey } = seen
+    const bucketId = status.value?.bucket_id
+    const publicKey = keyOf(keyGeneration)?.public_key
+    if (!bucketId || !publicKey) return Promise.reject(new Error('This bucket has no such key to unlock.'))
+    const generation = keyGeneration
     return run('unlock', async (bound) => {
-      const live = () => bound() && status.value?.bucket_id === bucketId && status.value.key_generation === generation
+      const live = () => bound() && status.value?.bucket_id === bucketId && keyOf(generation)?.public_key === publicKey
       const { realmId, nodeId: node, userId } = scope.value
       const outcome = await unlockWithVault(
         {
@@ -147,9 +154,9 @@ export function useBucketEncryption(bucket: Ref<string>, nodeId: Ref<string | nu
     })
   }
 
-  function extend(durationMs?: number) {
-    const session = status.value?.unlock?.session_id
-    if (!session) return Promise.reject(new Error('The bucket is not unlocked.'))
+  function extend(keyGeneration: number, durationMs?: number) {
+    const session = keyOf(keyGeneration)?.unlock.session_id
+    if (!session) return Promise.reject(new Error('This key is not unlocked.'))
     return run('extend', () => extendUnlock(scope.value.bucket, { session_id: session, duration_ms: durationMs }, client()))
   }
 

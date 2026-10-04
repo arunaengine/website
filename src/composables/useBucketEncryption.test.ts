@@ -120,7 +120,7 @@ describe('bucket encryption state', () => {
     unlockWithVault.mockResolvedValue({ kind: 'unlocked', status: { state: 'unlocked' }, ownKey: 'matches' })
     getBucketEncryption.mockResolvedValue(status({ unlock: { ...status().unlock!, state: 'unlocked', session_id: 'S2' } }))
 
-    const outcome = await encryption.unlock(60_000)
+    const outcome = await encryption.unlock(2, 60_000)
 
     expect(outcome?.kind).toBe('unlocked')
     const [target, vault, live] = unlockWithVault.mock.calls[0]
@@ -143,10 +143,10 @@ describe('bucket encryption state', () => {
     unlockWithVault.mockResolvedValue({ kind: 'unknown', ownKey: 'matches' })
     getBucketEncryption.mockRejectedValueOnce(new TypeError('network down'))
 
-    await encryption.unlock()
+    await encryption.unlock(2)
 
     expect(encryption.outcomeUnknown.value).toBe(true)
-    await expect(encryption.unlock()).rejects.toThrow('not confirmed')
+    await expect(encryption.unlock(2)).rejects.toThrow('not confirmed')
     expect(unlockWithVault).toHaveBeenCalledTimes(1)
     await encryption.load()
     expect(encryption.outcomeUnknown.value).toBe(false)
@@ -158,7 +158,7 @@ describe('bucket encryption state', () => {
     const pending = deferred<unknown>()
     unlockWithVault.mockReturnValue(pending.promise)
 
-    const answer = encryption.unlock()
+    const answer = encryption.unlock(2)
     await vi.waitFor(() => expect(unlockWithVault).toHaveBeenCalled())
     const live = unlockWithVault.mock.calls[0][2] as () => boolean
     sessionEpoch.value += 1
@@ -174,7 +174,7 @@ describe('bucket encryption state', () => {
     const pending = deferred<unknown>()
     unlockWithVault.mockReturnValue(pending.promise)
 
-    const answer = encryption.unlock()
+    const answer = encryption.unlock(2)
     await vi.waitFor(() => expect(unlockWithVault).toHaveBeenCalled())
     const live = unlockWithVault.mock.calls[0][2] as () => boolean
     bucket.value = 'other'
@@ -193,7 +193,7 @@ describe('bucket encryption state', () => {
     unlockWithVault.mockReturnValue(pending.promise)
     const loadsBefore = getBucketEncryption.mock.calls.length
 
-    const answer = encryption.unlock()
+    const answer = encryption.unlock(2)
     await vi.waitFor(() => expect(unlockWithVault).toHaveBeenCalled())
     const live = unlockWithVault.mock.calls[0][2] as () => boolean
     scope.stop()
@@ -204,15 +204,34 @@ describe('bucket encryption state', () => {
     expect(getBucketEncryption.mock.calls.length).toBe(loadsBefore)
   })
 
+  it('unlocks and extends a source key of a bucket whose new writes are not encrypted', async () => {
+    const locked = status().unlock!
+    const source = { generation: 1, role: 'source' as const, public_key: 'PK1', fingerprint: 'f1', unlock: locked }
+    getBucketEncryption.mockResolvedValue(
+      status({ mode: 'off', public_key: null, fingerprint: null, unlock: null, key_generation: 2, generations: [source] }),
+    )
+    const { encryption } = setup()
+    await vi.waitFor(() => expect(encryption.state.value).toBe('ready'))
+    unlockWithVault.mockResolvedValue({ kind: 'unlocked', status: {}, ownKey: 'matches' })
+
+    await encryption.unlock(1)
+    await expect(encryption.unlock(2)).rejects.toThrow('no such key')
+
+    const [target] = unlockWithVault.mock.calls[0]
+    expect(target.publicKey).toBe('PK1')
+    expect(target.context).toMatchObject({ bucketId: 'B1', generation: 1 })
+    await expect(encryption.extend(1)).rejects.toThrow('not unlocked')
+  })
+
   it('stops the unlock when the bucket key changes under it', async () => {
     const { encryption } = setup()
     await vi.waitFor(() => expect(encryption.state.value).toBe('ready'))
     unlockWithVault.mockImplementation(async (_target, _vault, live: () => boolean) => {
-      getBucketEncryption.mockResolvedValue(status({ key_generation: 3 }))
+      getBucketEncryption.mockResolvedValue(status({ public_key: 'PK-new' }))
       await encryption.load()
       return { kind: live() ? 'unlocked' : 'stale' }
     })
 
-    expect((await encryption.unlock())?.kind).toBe('stale')
+    expect((await encryption.unlock(2))?.kind).toBe('stale')
   })
 })

@@ -129,7 +129,7 @@ describe('unlocking a vault-locked bucket from the browser', () => {
     const encryption = scope.run(() => useBucketEncryption(ref('reef'), ref(copy.node_id), ref('g-1')))!
     await vi.waitFor(() => expect(encryption.state.value).toBe('ready'))
 
-    const outcome = await encryption.unlock(3_600_000)
+    const outcome = await encryption.unlock(copy.generation, 3_600_000)
 
     expect(outcome).toMatchObject({ kind: 'unlocked', ownKey: 'matches' })
     expect(encryption.status.value?.unlock?.state).toBe('unlocked')
@@ -161,7 +161,7 @@ describe('unlocking a vault-locked bucket from the browser', () => {
     const encryption = scope.run(() => useBucketEncryption(ref('reef'), ref(copy.node_id), ref('g-1')))!
     await vi.waitFor(() => expect(encryption.state.value).toBe('ready'))
 
-    const pending = encryption.unlock()
+    const pending = encryption.unlock(copy.generation)
     state.sessionEpoch.value += 1
     const outcome = await pending.catch((error: unknown) => error)
 

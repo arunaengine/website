@@ -54,8 +54,9 @@ const dialog = compileClientComponent(new URL('./BucketUnlockDialog.vue', import
   '@/lib/bucketEncryption': Wording,
 })
 
-async function render(maxUnlockMs: number | null = null) {
-  const { root } = await mountApp(dialog, { props: { open: true, bucket: 'reef', maxUnlockMs, unlock } })
+async function render(maxUnlockMs: number | null = null, role = 'active') {
+  const props = { open: true, bucket: 'reef', generation: 2, role, maxUnlockMs, unlock }
+  const { root } = await mountApp(dialog, { props })
   return root
 }
 
@@ -76,7 +77,7 @@ describe('bucket unlock dialog', () => {
     await flush()
     await click(button(root, 'Unlock'))
 
-    expect(unlock).toHaveBeenCalledWith(3_600_000)
+    expect(unlock).toHaveBeenCalledWith(2, 3_600_000)
     expect(content(root)).toContain('The node confirmed the unlock.')
   })
 
@@ -86,7 +87,11 @@ describe('bucket unlock dialog', () => {
     expect(content(root)).toContain('share one disk')
     await click(button(root, 'Unlock'))
 
-    expect(unlock).toHaveBeenCalledWith(undefined)
+    expect(unlock).toHaveBeenCalledWith(2, undefined)
+  })
+
+  it('names the previous key it unlocks', async () => {
+    expect(content(await render(null, 'source'))).toContain('It is the previous key')
   })
 
   it('asks for the passphrase first, or points to the vault setup', async () => {
