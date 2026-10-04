@@ -288,10 +288,10 @@ async function mergeHeads(list: Head[], key: CryptoKey): Promise<Merged> {
 }
 
 /** Takes what the holders returned; with a key it merges, so true means a save is due. */
-async function adoptHeads(list: UserVaultHead[], run: number, key = masterKey): Promise<boolean> {
+async function adoptHeads(list: UserVaultHead[], run: number, key = masterKey, current = () => true): Promise<boolean> {
   const parsed = parseHeads(list)
   const merged = key && parsed.length ? await mergeHeads(parsed, key) : null
-  if (run !== generation) throw new Error(REPLACED)
+  if (run !== generation || !current()) throw new Error(REPLACED)
   heads = parsed
   cacheHeads(scopeKey, list)
   if (merged && key) {
@@ -303,12 +303,13 @@ async function adoptHeads(list: UserVaultHead[], run: number, key = masterKey): 
   return false
 }
 
-/** Puts what the node holds into place, opening it with a key this browser remembers. */
-async function settle(scope: string, list: UserVaultHead[]): Promise<boolean> {
+// Puts what the node holds into place, opening it with a key this browser remembers. `current`
+// must still hold after every await before the state or the cache changes.
+async function settle(scope: string, list: UserVaultHead[], current = () => true): Promise<boolean> {
   if (!list.length) {
     const run = generation
     const lost = await rememberedKey(scope) && !(await cachedHeads(scope))
-    if (run !== generation) throw new Error(REPLACED)
+    if (run !== generation || !current()) throw new Error(REPLACED)
     if (lost && noticeState(scope) !== 'seen') storeNotice(scope, 'pending')
     cacheHeads(scope, [])
     heads = []
@@ -324,16 +325,16 @@ async function settle(scope: string, list: UserVaultHead[]): Promise<boolean> {
   const key = masterKey ?? await rememberedKey(scope)
   if (key) {
     try {
-      return await adoptHeads(list, run, key)
+      return await adoptHeads(list, run, key, current)
     } catch (cause) {
       if (!(cause instanceof VaultUnlockError)) throw cause
       // A lock or session change during the merge owns the remembered key now.
-      if (run !== generation) throw new Error(REPLACED)
+      if (run !== generation || !current()) throw new Error(REPLACED)
       forgetKey(scope)
     }
   }
-  await adoptHeads(list, run, null)
-  if (run !== generation) throw new Error(REPLACED)
+  await adoptHeads(list, run, null, current)
+  if (run !== generation || !current()) throw new Error(REPLACED)
   masterKey = null
   providers.value = []
   state.value = 'locked'
@@ -689,7 +690,13 @@ async function reset(): Promise<void> {
   // A save made at the same time on another holder outlives the delete.
   const response = await readVault(client())
   // A read, create, unlock or save that began meanwhile owns the state; this answer is older.
-  if (session === sessionGeneration && work === vaultWork) await settle(scope, response.heads)
+  const current = () => session === sessionGeneration && work === vaultWork
+  if (!current()) return
+  try {
+    await settle(scope, response.heads, current)
+  } catch (cause) {
+    if (current()) throw cause
+  }
 }
 
 /** Drops the held recovery code once the user stored it. */

@@ -50,6 +50,7 @@ const publishUserKey = vi.fn(async (request: { key_id: string; public_key: strin
 })
 
 // The remembered key and the cached heads, as the browser's IndexedDB would keep them.
+const rememberedLoads = vi.fn(async (scope: string) => remembered.get(scope) ?? null)
 const cachedLoads = vi.fn(async (scope: string): Promise<FakeHead[] | null> => cached.get(scope) ?? null)
 const remembered = new Map<string, CryptoKey>()
 const cached = new Map<string, FakeHead[]>()
@@ -80,7 +81,7 @@ vi.mock('@/lib/api', () => ({
 }))
 vi.mock('@/lib/vault/keyStore', () => ({
   browserKeyStore: () => ({
-    load: async (scope: string) => remembered.get(scope) ?? null,
+    load: (scope: string) => rememberedLoads(scope),
     save: async (scope: string, key: CryptoKey) => {
       remembered.set(scope, key)
     },
@@ -585,6 +586,29 @@ describe('useUserVault', () => {
 
     expect(vault.state.value).toBe('unlocked')
     expect(remembered.size).toBe(1)
+  })
+
+  it('lets a reset that waits on the browser store leave alone a vault created meanwhile', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', false)
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    let waiting = false
+    rememberedLoads.mockImplementationOnce(async (scope: string) => {
+      waiting = true
+      await gate
+      return remembered.get(scope) ?? null
+    })
+
+    const resetting = vault.reset()
+    await vi.waitFor(() => expect(waiting).toBe(true))
+    await vault.create('other horse battery', false)
+    release()
+    await resetting
+
+    expect(vault.state.value).toBe('unlocked')
+    expect(remembered.size).toBe(1)
+    expect(node.heads).toHaveLength(1)
   })
 
   it('drops an unlock that was running when a reset deleted the vault', async () => {
