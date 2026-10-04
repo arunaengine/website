@@ -663,6 +663,29 @@ describe('useUserVault', () => {
     expect(saveVault).not.toHaveBeenCalled()
   })
 
+  it('locks no newer session when an older save finds its key no longer opens the vault', async () => {
+    const { vault, state } = await boot()
+    await vault.create('correct horse', false)
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const held = vi.spyOn(crypto.subtle, 'decrypt').mockImplementationOnce(async () => {
+      await gate
+      throw new DOMException('The key does not fit.', 'OperationError')
+    })
+
+    const saving = vault.saveProviders([work])
+    await vi.waitFor(() => expect(held).toHaveBeenCalled())
+    held.mockRestore()
+    state.sessionEpoch.value += 1
+    await vault.load()
+    await vault.unlock('correct horse')
+    release()
+    await expect(saving).rejects.toThrow('changed in another browser')
+
+    expect(vault.state.value).toBe('unlocked')
+    expect(remembered.size).toBe(1)
+  })
+
   it('refuses to save while locked', async () => {
     const { vault } = await boot()
     await vault.create('correct horse', false)

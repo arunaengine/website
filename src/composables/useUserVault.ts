@@ -592,6 +592,7 @@ async function reset(): Promise<void> {
 async function saveProviders(next: BrowserProvider[]): Promise<void> {
   const { key } = requireUnlocked()
   const base = providers.value
+  const run = generation
   try {
     await saveWithRetry(async (current) => {
       const merged = reapplyChange(await openProviders(current, key), base, next)
@@ -599,7 +600,8 @@ async function saveProviders(next: BrowserProvider[]): Promise<void> {
     })
   } catch (cause) {
     if (cause instanceof VaultUnlockError) {
-      lock()
+      // A lock or session change since the save began owns the vault; it stays as it is.
+      if (run === generation) lock()
       throw new Error(REPLACED)
     }
     throw cause
