@@ -77,6 +77,8 @@ const recreateNotice = ref(false)
 interface HeldRecovery {
   code: string
   block: string
+  /** Only a read sent after this many reads may rule the code out; none may while its save runs. */
+  settled: number
 }
 /** The recovery code of a vault this account and session made, in memory only, until dismissed. */
 const recovery = shallowRef<HeldRecovery | null>(null)
@@ -99,6 +101,8 @@ let keyCheck: Promise<void> | null = null
 let sessionGeneration = 0
 /** Grows when a read, create, unlock or save starts, so an older follow-up read yields to it. */
 let vaultWork = 0
+/** Counts the vault reads sent to the node, so a held code yields only to a read sent after its save. */
+let readsSent = 0
 /** Grows with every lock in this tab, so a create a lock ended after its save can say so. */
 let locks = 0
 
@@ -226,14 +230,14 @@ function recoveryBlock(current: VaultPayload | null): string | null {
   return block ? [block.salt, block.nonce, block.wrapped].join('\u0000') : null
 }
 
-/** Drops a held recovery code once the vault in place carries another recovery block. */
-function matchRecovery() {
-  if (recovery.value && recovery.value.block !== recoveryBlock(payload)) recovery.value = null
+/** Drops a held code once read `read`, sent after its save, finds another recovery block or none. */
+function matchRecovery(read: number) {
+  const held = recovery.value
+  if (held && read > held.settled && held.block !== recoveryBlock(payload)) recovery.value = null
 }
 
 function unlocked(merged: Merged, key: CryptoKey) {
   payload = merged.payload
-  matchRecovery()
   predecessors = merged.revisions
   masterKey = key
   providers.value = merged.providers
@@ -288,7 +292,6 @@ async function adoptHeads(list: UserVaultHead[], run: number, key = masterKey): 
     return merged.revisions.length > 1
   }
   payload = parsed[0]?.payload ?? null
-  matchRecovery()
   predecessors = parsed[0] ? [parsed[0].revision] : []
   return false
 }
@@ -304,7 +307,6 @@ async function settle(scope: string, list: UserVaultHead[]): Promise<boolean> {
     heads = []
     predecessors = []
     payload = null
-    matchRecovery()
     masterKey = null
     providers.value = []
     state.value = 'absent'
@@ -418,10 +420,12 @@ function load(): Promise<void> {
   error.value = null
   const promise = (async () => {
     try {
+      const read = ++readsSent
       const response = await readVault(client())
       if (run !== generation) return
       const mergeDue = await settle(scope, response.heads)
       if (run !== generation) return
+      matchRecovery(read)
       fromCache.value = false
       recreateNotice.value = state.value === 'absent' && noticeState(scope) === 'pending'
       loaded.value = true
@@ -556,11 +560,12 @@ async function create(passphrase: string, withRecovery: boolean): Promise<string
   if (writeEnded(run, target)) throw new Error(REPLACED)
   // Held before the save: when its answer is lost, a later read that finds this block shows it.
   const block = recoveryBlock(created.payload)
-  const held = created.recoveryCode && block ? { code: created.recoveryCode, block } : null
+  const held = created.recoveryCode && block ? { code: created.recoveryCode, block, settled: Infinity } : null
   recovery.value = held
-  const response = await saveVault({ payload: JSON.stringify(created.payload), predecessors: [] }, target.client)
-  // The vault exists now, so its code stays for this account and session, also past a lock.
-  if (session === sessionGeneration && target.scope === currentScope()) recovery.value = held
+  const request = { payload: JSON.stringify(created.payload), predecessors: [] }
+  const response = await saveVault(request, target.client).finally(() => {
+    if (held) held.settled = readsSent
+  })
   try {
     if (run !== generation) throw new Error(REPLACED)
     await adoptHeads(response.heads, run, created.masterKey)

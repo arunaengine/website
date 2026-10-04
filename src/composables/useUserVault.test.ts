@@ -942,6 +942,29 @@ describe('useUserVault', () => {
     expect(saveVault).toHaveBeenCalledOnce()
   })
 
+  it('keeps the code of a save in flight through a read that finds no vault yet', async () => {
+    const { vault } = await boot()
+    const save = saveVault.getMockImplementation()!
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    saveVault.mockImplementationOnce(async (request) => {
+      await gate
+      await save(request)
+      throw new TypeError('network down')
+    })
+
+    const creating = vault.create('correct horse', true)
+    await vi.waitFor(() => expect(saveVault).toHaveBeenCalled())
+    await vault.load()
+    expect(vault.state.value).toBe('absent')
+    release()
+    await expect(creating).rejects.toThrow('network down')
+    await vault.load()
+    await vault.unlock('correct horse')
+
+    expect(vault.recoveryCode.value).toMatch(/^([0-9A-HJKMNP-TV-Z]{4}-){12}[0-9A-HJKMNP-TV-Z]{4}$/)
+  })
+
   it('drops a recovery code once the vault on the node carries another recovery block', async () => {
     const { vault } = await boot()
     await vault.create('correct horse', true)
