@@ -825,6 +825,26 @@ describe('useUserVault', () => {
     expect(remembered.size).toBe(0)
   })
 
+  it('says plainly that nothing was saved when a lock comes before the save', async () => {
+    const { vault } = await boot()
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const derive = crypto.subtle.deriveKey.bind(crypto.subtle)
+    const held = vi.spyOn(crypto.subtle, 'deriveKey').mockImplementationOnce(async (...args) => {
+      await gate
+      return derive(...args)
+    })
+
+    const creating = vault.create('correct horse', true)
+    await vi.waitFor(() => expect(held).toHaveBeenCalled())
+    held.mockRestore()
+    vault.lock()
+    release()
+
+    await expect(creating).rejects.toThrow('Your provider keys were locked before they were saved, so nothing was saved.')
+    expect(saveVault).not.toHaveBeenCalled()
+  })
+
   it('sends no new vault once the account changed while its keys were made', async () => {
     const { vault, state } = await boot()
     let release!: () => void

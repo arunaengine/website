@@ -557,7 +557,12 @@ async function create(passphrase: string, withRecovery: boolean): Promise<string
   const target = writeTarget()
   const created = await createVault(passphrase, withRecovery)
   created.payload.keys = await rotateKeypair(created.masterKey, [])
-  if (writeEnded(run, target)) throw new Error(REPLACED)
+  if (writeEnded(run, target)) {
+    if (session === sessionGeneration && locks !== lockCount) {
+      throw new Error('Your provider keys were locked before they were saved, so nothing was saved.')
+    }
+    throw new Error(REPLACED)
+  }
   // Held before the save: when its answer is lost, a later read that finds this block shows it.
   const block = recoveryBlock(created.payload)
   const held = created.recoveryCode && block ? { code: created.recoveryCode, block, settled: Infinity } : null
