@@ -1,14 +1,17 @@
 // Words for the encryption state of a bucket. A value the node did not report
 // reads as unknown, never as zero, empty, off or complete.
-import type {
-  BlockCipher,
-  BlockKeys,
-  BucketCompressionResponse,
-  BucketEncryptionResponse,
-  EncryptionMode,
-  EncryptionTransition,
-  HolderReadiness,
-  RecoveryStatus,
+import {
+  ApiError,
+  apiErrorMessage,
+  ENCRYPTION_CODES,
+  type BlockCipher,
+  type BlockKeys,
+  type BucketCompressionResponse,
+  type BucketEncryptionResponse,
+  type EncryptionMode,
+  type EncryptionTransition,
+  type HolderReadiness,
+  type RecoveryStatus,
 } from './api'
 import { formatDuration } from './utils'
 
@@ -152,4 +155,37 @@ export function transitionView(transition: EncryptionTransition): TransitionView
     detail: `${transition.done} done, ${remaining} left${failed}, ${cleanup}.`,
     complete,
   }
+}
+
+const HOUR = 3_600_000
+const DURATIONS: [number, string][] = [
+  [HOUR / 4, '15 minutes'],
+  [HOUR, '1 hour'],
+  [8 * HOUR, '8 hours'],
+  [24 * HOUR, '24 hours'],
+]
+
+/** Unlock lengths within the bucket maximum; '' leaves it to the node: the maximum, or until lock. */
+export function durationOptions(maxMs: number | null): { value: string; label: string }[] {
+  const fallback = maxMs === null ? 'Until lock or restart' : `The bucket maximum (${formatDuration(maxMs)})`
+  const shorter = DURATIONS.filter(([ms]) => maxMs === null || ms < maxMs)
+  return [{ value: '', label: fallback }, ...shorter.map(([ms, label]) => ({ value: String(ms), label }))]
+}
+
+const REFUSALS: Record<string, string> = {
+  [ENCRYPTION_CODES.wrongKey]: 'The node says this key does not belong to the bucket.',
+  [ENCRYPTION_CODES.invalidDuration]: 'The node refused this unlock length.',
+  [ENCRYPTION_CODES.staleGeneration]: 'The bucket key changed meanwhile. Read the state again and retry.',
+  [ENCRYPTION_CODES.sessionMismatch]: 'The bucket was locked or unlocked again meanwhile. Read the state again.',
+  [ENCRYPTION_CODES.capacity]: 'The node holds as many unlocked buckets as it can. Lock another one first.',
+  [ENCRYPTION_CODES.openUploads]: 'Uploads to this bucket are still open. Finish or abort them first.',
+  [ENCRYPTION_CODES.locked]: 'The bucket is locked. A key holder must unlock it first.',
+  [ENCRYPTION_CODES.recoveryUnmet]:
+    'Vault-locked needs two ready key holders, or one with a recovery code.',
+}
+
+/** A node refusal in plain words, by its code; anything else keeps the node's message. */
+export function encryptionError(error: unknown): string {
+  const code = error instanceof ApiError ? (error.code ?? '') : ''
+  return REFUSALS[code] ?? apiErrorMessage(error)
 }

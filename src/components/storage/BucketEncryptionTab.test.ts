@@ -1,15 +1,20 @@
 import { defineComponent, h, ref } from 'vue'
 import * as VueRuntime from 'vue'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import * as Api from '@/lib/api'
 import type { BucketCompressionResponse, BucketEncryptionResponse } from '@/lib/api'
 import * as Wording from '@/lib/bucketEncryption'
 import * as StateBadge from '@/lib/stateBadge'
 import type { EncryptionLoadState } from '@/composables/useBucketEncryption'
-import { compileClientComponent, content, mountApp, moduleDefault } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, mountApp, moduleDefault } from '@/test/clientRender'
 
 const status = ref<BucketEncryptionResponse | null>(null)
 const compression = ref<BucketCompressionResponse | null>(null)
 const state = ref<EncryptionLoadState>('loading')
+const outcomeUnknown = ref(false)
+const lock = vi.fn()
+const extend = vi.fn()
+const unlock = vi.fn()
 
 const Slotted = (tag: string) =>
   defineComponent({ inheritAttrs: false, setup: (_, { attrs, slots }) => () => h(tag, attrs, slots.default?.()) })
@@ -24,14 +29,26 @@ const DetailStub = defineComponent({
     h('dl', (props.items as { label: string; value: string }[]).map((item) => h('p', `${item.label}: ${item.value}`))),
 })
 
+const ButtonStub = defineComponent({
+  inheritAttrs: false,
+  setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()),
+})
+const DialogStub = defineComponent({
+  props: { open: Boolean },
+  setup: (props) => () => h('div', props.open ? 'unlock dialog open' : ''),
+})
+
 const tab = compileClientComponent(new URL('./BucketEncryptionTab.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => Slotted('i') }),
+  '@/components/storage/BucketUnlockDialog.vue': moduleDefault(DialogStub),
   '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
+  '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/DetailList.vue': moduleDefault(DetailStub),
   '@/components/ui/NodeLabel.vue': moduleDefault(Slotted('span')),
   '@/components/ui/Notice.vue': moduleDefault(NoticeStub),
   '@/components/ui/RefreshButton.vue': moduleDefault(Slotted('button')),
+  '@/components/ui/Select.vue': moduleDefault(Slotted('select')),
   '@/components/ui/SectionSkeleton.vue': moduleDefault(defineComponent(() => () => h('section', 'loading placeholder'))),
   '@/composables/useBucketEncryption': {
     useBucketEncryption: () => ({
@@ -40,8 +57,13 @@ const tab = compileClientComponent(new URL('./BucketEncryptionTab.vue', import.m
       state,
       error: ref('The node did not answer.'),
       refreshing: ref(false),
+      busy: ref(null),
+      outcomeUnknown,
       nodeId: ref('node-b'),
       load: () => undefined,
+      lock,
+      extend,
+      unlock,
     }),
   },
   '@/lib/bucketEncryption': Wording,
@@ -77,13 +99,32 @@ function encrypted(overrides: Partial<BucketEncryptionResponse> = {}): BucketEnc
   }
 }
 
-async function render(next: EncryptionLoadState, value: BucketEncryptionResponse | null = null) {
+async function mount(next: EncryptionLoadState, value: BucketEncryptionResponse | null = null) {
   state.value = next
   status.value = value
   compression.value = { bucket: 'reef', mode: 'zstd', level: 3, effective_level: 4 }
   const { root } = await mountApp(tab, { props: { bucket: 'reef', nodeId: 'node-b', groupId: 'g-1' } })
-  return content(root)
+  return root
 }
+
+async function render(next: EncryptionLoadState, value: BucketEncryptionResponse | null = null) {
+  return content(await mount(next, value))
+}
+
+const OPEN = {
+  state: 'unlocked' as const,
+  lock_reason: null,
+  locked_at_ms: null,
+  session_id: 'S1',
+  unlocked_at_ms: 1,
+  deadline_ms: 9_000,
+  max_deadline_ms: null,
+}
+
+beforeEach(() => {
+  outcomeUnknown.value = false
+  lock.mockReset().mockResolvedValue(null)
+})
 
 describe('bucket encryption tab', () => {
   it('never shows an unreported state as encryption off', async () => {
@@ -136,5 +177,41 @@ describe('bucket encryption tab', () => {
     expect(text).not.toContain('Key fingerprint')
     expect(text).toContain('Compression: zstd level 3')
     expect(text).not.toContain('applied as level')
+  })
+
+  it('offers a ready key holder the unlock dialog for a locked bucket', async () => {
+    const root = await mount('ready', encrypted())
+
+    expect(content(root)).not.toContain('Lock now')
+    await click(button(root, 'Unlock'))
+    expect(content(root)).toContain('unlock dialog open')
+  })
+
+  it('offers extend and lock while unlocked and words a refusal', async () => {
+    lock.mockRejectedValueOnce(new Api.ApiError(409, 'conflict', 'session_mismatch'))
+    const root = await mount('ready', encrypted({ unlock: OPEN }))
+
+    expect(content(root)).toContain('Timed unlock')
+    expect(content(root)).toContain('Extend')
+    await click(button(root, 'Lock now'))
+
+    expect(lock).toHaveBeenCalledOnce()
+    expect(content(root)).toContain('locked or unlocked again meanwhile')
+  })
+
+  it('holds back a second unlock while the last one is unconfirmed', async () => {
+    outcomeUnknown.value = true
+    const root = await mount('ready', encrypted())
+
+    expect(content(root)).toContain('The last unlock was not confirmed')
+    expect(button(root, 'Unlock').props.disabled).toBe(true)
+  })
+
+  it('offers a reader no key action', async () => {
+    const reader = { holder: false, ready_copy: false, admin: false }
+    const text = await render('ready', encrypted({ unlock: OPEN, caller: reader }))
+
+    expect(text).toContain('No key action is open to you right now.')
+    expect(text).not.toContain('Lock now')
   })
 })

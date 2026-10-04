@@ -1,18 +1,23 @@
 <script setup lang="ts">
 // The encryption of one bucket as the node that hosts it reports it: mode, lock
 // state, key fingerprint, format, holders, recovery and any rewrite that runs.
-import { computed, toRef } from 'vue'
+import { computed, ref, toRef } from 'vue'
+import BucketUnlockDialog from '@/components/storage/BucketUnlockDialog.vue'
 import Badge from '@/components/ui/Badge.vue'
+import Button from '@/components/ui/Button.vue'
 import DetailList, { type Detail } from '@/components/ui/DetailList.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
 import Notice from '@/components/ui/Notice.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import SectionSkeleton from '@/components/ui/SectionSkeleton.vue'
+import Select from '@/components/ui/Select.vue'
 import { useBucketEncryption } from '@/composables/useBucketEncryption'
 import {
   blockKeysLabel,
   cipherLabel,
   compressionSummary,
+  durationOptions,
+  encryptionError,
   holderSummary,
   lockView,
   maxUnlockLabel,
@@ -26,7 +31,7 @@ import { KeyRound } from '@lucide/vue'
 const props = defineProps<{ bucket: string; nodeId: string | null; groupId: string | null }>()
 
 const encryption = useBucketEncryption(toRef(props, 'bucket'), toRef(props, 'nodeId'), toRef(props, 'groupId'))
-const { status, compression, state, error, refreshing } = encryption
+const { status, compression, state, error, refreshing, busy, outcomeUnknown } = encryption
 
 const encrypted = computed(() => Boolean(status.value && status.value.mode !== 'off'))
 const lock = computed(() => (status.value ? lockView(status.value) : null))
@@ -61,6 +66,27 @@ const permitted = computed(() => {
   if (!lines.length) lines.push('You may read this state. Unlocking and settings need a key holder or a group admin.')
   return lines
 })
+
+const unlockOpen = ref(false)
+const extendBy = ref('')
+const actionError = ref<string | null>(null)
+const unlocked = computed(() => status.value?.unlock?.state === 'unlocked')
+const caller = computed(() => status.value?.caller)
+const canUnlock = computed(
+  () => encrypted.value && status.value?.unlock?.state === 'locked' && Boolean(caller.value?.holder && caller.value.ready_copy),
+)
+const canExtend = computed(() => unlocked.value && Boolean(caller.value?.holder && status.value?.unlock?.session_id))
+const canLock = computed(() => unlocked.value && Boolean(caller.value?.holder || caller.value?.admin))
+const extendOptions = computed(() => durationOptions(status.value?.max_unlock_ms ?? null))
+
+async function act(work: () => Promise<unknown>) {
+  actionError.value = null
+  try {
+    await work()
+  } catch (cause) {
+    actionError.value = encryptionError(cause)
+  }
+}
 
 const WARNINGS = [
   'An unlock lets every reader with access on this node read the bucket until it locks.',
@@ -121,7 +147,48 @@ const WARNINGS = [
         </div>
       </section>
 
+      <section v-if="encrypted" class="surface" data-key-access>
+        <header class="flex items-center gap-2 border-b border-border px-5 py-4">
+          <h2 class="font-display text-sm font-semibold text-aruna-navy">Key access</h2>
+        </header>
+        <div class="space-y-3 px-5 py-4">
+          <Notice v-if="outcomeUnknown" tone="warning" title="The last unlock was not confirmed">
+            Read the state again before you try once more; the key is never sent twice on its own.
+          </Notice>
+          <div class="flex flex-wrap items-center gap-2">
+            <Button v-if="canUnlock" size="sm" :disabled="Boolean(busy) || outcomeUnknown" @click="unlockOpen = true">
+              Unlock
+            </Button>
+            <template v-if="canExtend">
+              <Select v-model="extendBy" class="w-56" :options="extendOptions" aria-label="Extend the unlock by" />
+              <Button
+                size="sm"
+                variant="outline"
+                :disabled="Boolean(busy)"
+                @click="act(() => encryption.extend(extendBy ? Number(extendBy) : undefined))"
+              >
+                Extend
+              </Button>
+            </template>
+            <Button v-if="canLock" size="sm" variant="outline" :disabled="Boolean(busy)" @click="act(encryption.lock)">
+              Lock now
+            </Button>
+            <span v-if="!canUnlock && !canExtend && !canLock" class="text-xs text-muted-foreground">
+              No key action is open to you right now.
+            </span>
+          </div>
+          <Notice v-if="actionError" tone="error">{{ actionError }}</Notice>
+        </div>
+      </section>
+
       <Notice v-if="encrypted" tone="warning" :lines="WARNINGS" />
+
+      <BucketUnlockDialog
+        v-model:open="unlockOpen"
+        :bucket="bucket"
+        :max-unlock-ms="status.max_unlock_ms"
+        :unlock="encryption.unlock"
+      />
     </template>
   </div>
 </template>
