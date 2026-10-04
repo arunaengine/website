@@ -328,6 +328,7 @@ function jobPanel(job: JobStatusResponse): Component {
     '@/components/jobs/JobFamilySection.vue': moduleDefault(
       defineComponent(() => () => h('section', 'native family detail')),
     ),
+    '@/components/jobs/JobKeyWait.vue': moduleDefault(defineComponent(() => () => h('aside', 'waits for an unlock'))),
     '@/components/jobs/JobReportPanel.vue': moduleDefault(PassThroughStub),
     '@/components/jobs/JobStateBadge.vue': moduleDefault(JobStateBadgeStub),
     '@/composables/useJobs': {
@@ -389,6 +390,29 @@ describe('distributed job detail components', () => {
     { destination_key: 'in/reference.fa', bytes: 314572800, source_node_id: 'node-bielefeld', transfer_ms: 4000 },
     { destination_key: 'in/config.yaml', bytes: 2048, source_node_id: null, transfer_ms: 0 },
   ]
+
+  it('tells a job that waits for a bucket key apart from a failed one', async () => {
+    const waiting: JobStatusResponse = {
+      job_id: '01JJRSTVWXYZ0123456789ABCE',
+      kind: 'staging',
+      state: 'awaiting_key',
+      attempts: 0,
+      cancel_requested: false,
+      created_at: '2026-04-09T14:23:11.123+00:00',
+      updated_at: '2026-04-09T14:31:47.902+00:00',
+      progress: { current: 0, unit: 'inputs' },
+      workspace_mode: 'none',
+      awaiting_keys: [{ node_id: 'node-b', bucket: 'reef' }],
+    }
+
+    const mounted = await mount(jobPanel(waiting), { jobId: waiting.job_id, open: true })
+
+    expect(mounted.errors).toEqual([])
+    expect(content(mounted.root)).toContain('waits for an unlock')
+    expect(Jobs.JOB_STATE_META.awaiting_key).toEqual({ label: 'Waiting for a key', variant: 'warn' })
+    expect(Jobs.isTerminalJobState('awaiting_key')).toBe(false)
+    mounted.app.unmount()
+  })
 
   it('states no workspace detail, whatever the node reports', async () => {
     // A node may still serve a mode and a bucket; a run owns neither any more.

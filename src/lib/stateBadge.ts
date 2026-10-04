@@ -60,6 +60,7 @@ const STATE_TONE: Record<string, StateTone> = {
   preempted: 'attention',
   // System job states.
   claimed: 'progress',
+  awaiting_key: 'attention',
   preparing: 'progress',
   ready: 'info',
   cancelling: 'attention',

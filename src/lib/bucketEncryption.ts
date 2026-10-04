@@ -15,6 +15,7 @@ import {
   type HolderState,
   type RecoveryStatus,
 } from './api'
+import type { RouteLocationRaw } from 'vue-router'
 import { formatDuration } from './utils'
 
 export const MODE_LABEL: Record<EncryptionMode, string> = {
@@ -261,4 +262,13 @@ export function maxUnlockOptions(current: number | null): { value: string; label
     options.push({ value: String(current), label: formatDuration(current) })
   }
   return options
+}
+
+/** The Encryption tab of a bucket on the node that hosts it, where a key holder unlocks it. */
+export function bucketUnlockLink(bucket: string, nodeId?: string | null, groupId?: string | null): RouteLocationRaw {
+  return {
+    name: 'bucket-storage',
+    params: { bucketId: bucket },
+    query: { tab: 'encryption', ...(nodeId ? { node: nodeId } : {}), ...(groupId ? { group: groupId } : {}) },
+  }
 }

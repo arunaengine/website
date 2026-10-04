@@ -59,7 +59,7 @@ const {
 // Grouped state chips over the loaded list (the tasks-panel treatment).
 type StateGroup = 'all' | 'active' | 'done' | 'failed' | 'cancelled'
 const GROUP_STATES: Record<Exclude<StateGroup, 'all'>, JobState[]> = {
-  active: ['queued', 'claimed', 'preparing', 'ready', 'running', 'cancelling'],
+  active: ['queued', 'awaiting_key', 'claimed', 'preparing', 'ready', 'running', 'cancelling'],
   done: ['succeeded'],
   failed: ['failed', 'indeterminate'],
   cancelled: ['cancelled'],

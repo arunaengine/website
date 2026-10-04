@@ -11,6 +11,7 @@ import { errorMessage } from './utils'
 // JobState::name(): stable machine-readable names, closed set.
 export type JobState =
   | 'queued'
+  | 'awaiting_key'
   | 'claimed'
   | 'preparing'
   | 'ready'
@@ -148,12 +149,21 @@ export interface JobStatusResponse {
   workspace_mode: string
   /** Present for a notebook session: the catalog runtime it runs. */
   session_runtime?: string
+  /** The locked buckets an `awaiting_key` job waits for; omitted in other states. */
+  awaiting_keys?: JobKeyWait[]
   // This node spent its attempts without a job-specific verdict; not a proven
   // failure. Served with a default, so an older node omits it.
   locally_exhausted?: boolean
   // Set only on the node-local path; a job answered from the family omits it.
   run_crate?: unknown
   family?: JobFamilyResponse
+}
+
+/** A locked bucket a job needs; an unlock of it lets the job go on. */
+export interface JobKeyWait {
+  node_id: string
+  bucket: string
+  group_id?: string
 }
 
 export interface JobListResponse {
@@ -689,6 +699,7 @@ export function placementVerdict(placement?: PlacementLike | null): PlacementVer
 
 export const JOB_STATE_ORDER: JobState[] = [
   'queued',
+  'awaiting_key',
   'claimed',
   'preparing',
   'ready',
@@ -709,6 +720,7 @@ export function isTerminalJobState(state: JobState): boolean {
 
 const JOB_STATE_LABEL: Record<JobState, string> = {
   queued: 'Queued',
+  awaiting_key: 'Waiting for a key',
   claimed: 'Claimed',
   preparing: 'Preparing',
   ready: 'Ready',
