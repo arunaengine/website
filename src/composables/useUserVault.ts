@@ -460,6 +460,10 @@ export function reapplyChange(
 
 function lock() {
   const scope = scopeKey
+  // Work started before the lock belongs to the unlocked vault: none of it may open it again.
+  generation += 1
+  inFlight = null
+  loading.value = false
   keyCheck = null
   masterKey = null
   providers.value = []

@@ -58,11 +58,15 @@ function node(copies: unknown[], unlock: () => Response | Promise<Response>) {
 
 function vault(keyIds = [vector.key_id]) {
   const order: string[] = []
-  const lifetime = { open: true }
+  // `epoch` grows with every lock, as the vault generation does.
+  const lifetime = { open: true, epoch: 0 }
   return {
     order,
     lifetime,
-    whileUnlocked: () => () => lifetime.open,
+    whileUnlocked: () => {
+      const epoch = lifetime.epoch
+      return () => lifetime.open && lifetime.epoch === epoch
+    },
     checkKey: vi.fn(async () => {
       order.push('check')
       return 'matches'
@@ -136,6 +140,19 @@ describe('bucket unlock from the browser', () => {
     await expect(unlockWithVault(TARGET, keys, always)).rejects.toThrow(VaultClosedError)
 
     expect(sent.filter((call) => call.method === 'POST')).toHaveLength(0)
+  })
+
+  it('stays cancelled when the vault is locked and opened again during the directory check', async () => {
+    const sent = node([COPY], UNLOCKED)
+    const keys = vault()
+    keys.checkKey.mockImplementation(async () => {
+      keys.lifetime.epoch += 1
+      return 'matches'
+    })
+
+    await expect(unlockWithVault(TARGET, keys, always)).rejects.toThrow(VaultClosedError)
+
+    expect(sent).toHaveLength(0)
   })
 
   it('reports an unknown outcome once and does not send the key again', async () => {

@@ -104,12 +104,14 @@ export async function unlockWithVault(
   vault: UnlockVault,
   current: () => boolean,
 ): Promise<UnlockOutcome> {
-  const ownKey = await vault.checkKey()
+  // Taken before the first await: a lock at any later point ends this unlock for good.
   const vaultOpen = vault.whileUnlocked()
   const guard = () => {
     if (!current()) throw new UnlockStaleError()
     if (!vaultOpen()) throw new VaultClosedError()
   }
+  guard()
+  const ownKey = await vault.checkKey()
   guard()
   const { bucketId, generation } = target.context
   const response = await getMyCopies(target.bucket, generation, target.client)

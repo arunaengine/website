@@ -452,6 +452,31 @@ describe('useUserVault', () => {
     expect(afterUnlock()).toBe(false)
   })
 
+  it('stays locked when a read that began before the lock finishes after it', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', false)
+    const lifetime = vault.whileUnlocked()
+    const decrypt = crypto.subtle.decrypt.bind(crypto.subtle)
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const held = vi.spyOn(crypto.subtle, 'decrypt').mockImplementationOnce(async (...args) => {
+      await gate
+      return decrypt(...args)
+    })
+
+    const reading = vault.load()
+    await vi.waitFor(() => expect(held).toHaveBeenCalled())
+    vault.lock()
+    release()
+    await reading
+    held.mockRestore()
+
+    expect(vault.state.value).toBe('locked')
+    expect(vault.loading.value).toBe(false)
+    expect(lifetime()).toBe(false)
+    expect(vault.whileUnlocked()()).toBe(false)
+  })
+
   it('refuses a holder passphrase shorter than twelve characters', async () => {
     const { vault } = await boot()
     await expect(vault.create('eleven char', false)).rejects.toThrow('at least 12 characters')
