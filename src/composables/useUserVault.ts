@@ -235,10 +235,11 @@ function recoveryBlock(current: VaultPayload | null): string | null {
   return block ? [block.salt, block.nonce, block.wrapped].join('\u0000') : null
 }
 
-/** Drops a held code once read `read`, sent after its save, finds another recovery block or none. */
+/** Drops a held code once read `read`, sent after its save, returns no head with its recovery block. */
 function matchRecovery(read: number) {
   const held = recovery.value
-  if (held && read > held.settled && held.block !== recoveryBlock(payload)) recovery.value = null
+  if (!held || read <= held.settled) return
+  if (!heads.some((head) => recoveryBlock(head.payload) === held.block)) recovery.value = null
 }
 
 function unlocked(merged: Merged, key: CryptoKey) {

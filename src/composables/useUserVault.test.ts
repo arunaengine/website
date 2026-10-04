@@ -1006,6 +1006,24 @@ describe('useUserVault', () => {
     expect(vault.recoveryCode.value).toBe(code)
   })
 
+  it('keeps a recovery code while a read still returns its head behind a newer one', async () => {
+    const { vault } = await boot()
+    const code = await vault.create('correct horse', true)
+    const ours = node.heads[0]
+    const other = await boot()
+    await other.vault.reset()
+    await other.vault.create('other horse battery', false)
+    node.heads = [ours, ...node.heads]
+    vault.lock()
+    remembered.clear()
+
+    await vault.load()
+    expect(vault.state.value).toBe('locked')
+    await vault.unlock('correct horse')
+
+    expect(vault.recoveryCode.value).toBe(code)
+  })
+
   it('drops a recovery code once the vault on the node carries another recovery block', async () => {
     const { vault } = await boot()
     await vault.create('correct horse', true)
