@@ -3,7 +3,7 @@ import { getBucketEncryption } from '@/lib/api'
 import { bucketUnlockLink, keyGenerations } from '@/lib/bucketEncryption'
 import { formatBytes } from '@/lib/utils'
 import { hasReferenceMetadata } from '@/lib/references'
-import { authToken } from './aruna/state'
+import { authToken, sessionEpoch, userInfo } from './aruna/state'
 import { isS3BucketLockedError } from './s3/errors'
 import { localNodeId, nodeApiBase } from './s3/endpoints'
 import { s3ErrorMessage, useS3 } from './useS3'
@@ -131,6 +131,10 @@ export function useObjectPreview() {
   const sizeNote = ref<string | null>(null)
   const referenced = ref(false)
   let referenceProbeId = 0
+  /** Account, session and S3 group a preview is read under; a change means reading again. */
+  const sessionKey = computed(() =>
+    [sessionEpoch.value, userInfo.value?.user.user_id ?? '', s3.activeContext?.value?.groupId ?? ''].join('\u0000'),
+  )
 
   function reset() {
     probe?.abort()
@@ -175,6 +179,18 @@ export function useObjectPreview() {
     if (!target) return
     lockedTarget.value = target
     status.value = 'locked'
+  }
+
+  /** The signed URL of the current load, only when it was signed for `target`. */
+  function urlFor(target: PreviewTarget): string | null {
+    const shown = currentTarget
+    if (!shown || !directUrl.value) return null
+    const same =
+      shown.bucket === target.bucket &&
+      shown.key === target.key &&
+      (shown.nodeId ?? null) === (target.nodeId ?? null) &&
+      (shown.versionId ?? null) === (target.versionId ?? null)
+    return same ? directUrl.value : null
   }
 
   /** The load a request starts in; `isCurrent` turns false once a newer load or a reset begins. */
@@ -319,6 +335,8 @@ export function useObjectPreview() {
     checkAccess,
     loadToken,
     isCurrent,
+    sessionKey,
+    urlFor,
     kind,
     language,
     mediaKind,

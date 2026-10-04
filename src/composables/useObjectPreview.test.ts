@@ -183,4 +183,15 @@ describe('preview of a locked bucket', () => {
     expect(await preview.checkAccess('https://b.test/presigned', preview.loadToken(), TARGET)).toBe(false)
     expect(preview.lockedLink.value).toMatchObject({ params: { bucketId: 'reef' } })
   })
+
+  it('hands out its signed URL only for the object it was signed for', async () => {
+    const preview = useObjectPreview()
+    const clip = { ...TARGET, key: 'clip.mp4' }
+    await preview.load(clip)
+
+    expect(preview.urlFor(clip)).toBe('https://b.test/presigned')
+    expect(preview.urlFor({ ...clip, bucket: 'other' })).toBeNull()
+    expect(preview.urlFor({ ...clip, nodeId: 'node-c' })).toBeNull()
+    expect(preview.urlFor({ ...clip, versionId: 'v2' })).toBeNull()
+  })
 })

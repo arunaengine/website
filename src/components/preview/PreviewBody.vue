@@ -77,8 +77,19 @@ function reload() {
   if (props.probeReference && !props.referencedFrom) void preview.probeReferenced(target)
 }
 
+// Any change of the object, its bucket or node, or the account and session reads it again.
 watch(
-  () => [props.active, props.objectKey, props.versionId] as const,
+  () =>
+    [
+      props.active,
+      props.bucket,
+      props.nodeId ?? null,
+      props.objectKey,
+      props.versionId ?? null,
+      props.size,
+      props.contentType,
+      preview.sessionKey.value,
+    ] as const,
   ([active]) => {
     if (active && props.objectKey) reload()
     else preview.reset()
@@ -93,7 +104,7 @@ async function download() {
   const target = shownTarget()
   try {
     const url =
-      preview.directUrl.value
+      preview.urlFor(target)
       ?? (await s3.downloadUrl(
         props.bucket,
         props.objectKey,
