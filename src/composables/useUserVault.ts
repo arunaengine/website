@@ -381,7 +381,11 @@ function load(): Promise<void> {
         loaded.value = true
         return
       }
-      if (vaultUnavailable(cause) && await loadCached(scope, run)) return
+      if (vaultUnavailable(cause)) {
+        const cached = await loadCached(scope, run)
+        // A lock or a newer read during the cache read owns the state now.
+        if (cached || run !== generation) return
+      }
       error.value = apiErrorMessage(cause)
     } finally {
       if (run === generation) {

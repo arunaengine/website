@@ -50,6 +50,7 @@ const publishUserKey = vi.fn(async (request: { key_id: string; public_key: strin
 })
 
 // The remembered key and the cached heads, as the browser's IndexedDB would keep them.
+const cachedLoads = vi.fn(async (scope: string): Promise<FakeHead[] | null> => cached.get(scope) ?? null)
 const remembered = new Map<string, CryptoKey>()
 const cached = new Map<string, FakeHead[]>()
 const SCOPE = assistantChatScopeKey({ apiBaseUrl: 'https://node.test/api/v1', realmId: 'r-1', userId: 'u-1' })
@@ -84,7 +85,7 @@ vi.mock('@/lib/vault/keyStore', () => ({
     remove: async (scope: string) => {
       remembered.delete(scope)
     },
-    loadHeads: async (scope: string) => cached.get(scope) ?? null,
+    loadHeads: (scope: string) => cachedLoads(scope),
     saveHeads: async (scope: string, heads: FakeHead[]) => {
       if (heads.length) cached.set(scope, heads)
       else cached.delete(scope)
@@ -475,6 +476,28 @@ describe('useUserVault', () => {
     expect(vault.loading.value).toBe(false)
     expect(lifetime()).toBe(false)
     expect(vault.whileUnlocked()()).toBe(false)
+  })
+
+  it('writes no error from a cache read that a lock and a newer read overtook', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', false)
+    readVault.mockRejectedValueOnce(refused(503, 'vault_unavailable'))
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const loadHeads = cachedLoads.mockImplementationOnce(async (scope: string) => {
+      await gate
+      return cached.get(scope) ?? null
+    })
+
+    const old = vault.load()
+    await vi.waitFor(() => expect(loadHeads).toHaveBeenCalled())
+    vault.lock()
+    await vault.load()
+    release()
+    await old
+
+    expect(vault.error.value).toBeNull()
+    expect(vault.state.value).toBe('locked')
   })
 
   it('refuses a holder passphrase shorter than twelve characters', async () => {
