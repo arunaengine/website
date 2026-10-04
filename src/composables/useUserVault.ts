@@ -3,7 +3,7 @@
 // handle and is remembered in IndexedDB so one passphrase entry serves the
 // whole browser until the user locks the keys or signs out. Several heads are
 // merged once the key is known and saved with every merged head as predecessor.
-import { ref, watch } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
 import {
   apiErrorMessage,
   deleteVault,
@@ -73,6 +73,10 @@ const fromCache = ref(false)
  * never cached, which is a vault from before vaults moved to the holders.
  */
 const recreateNotice = ref(false)
+/** The recovery code of a vault this account and session made, in memory only, until dismissed. */
+const recovery = shallowRef<string | null>(null)
+/** The held recovery code while the vault is unlocked; a lock hides it until the next unlock. */
+const recoveryCode = computed(() => (state.value === 'unlocked' ? recovery.value : null))
 const NOTICE_PREFIX = 'aruna.vault.recreateNotice:'
 const keyStore = browserKeyStore()
 let payload: VaultPayload | null = null
@@ -200,6 +204,7 @@ function clearLocal() {
   ownKey.value = 'unknown'
   fromCache.value = false
   recreateNotice.value = false
+  recovery.value = null
   state.value = 'absent'
   loaded.value = false
   loading.value = false
@@ -516,11 +521,14 @@ async function create(passphrase: string, withRecovery: boolean): Promise<string
   if (payload) throw new Error('Your provider keys are already set up.')
   requireHolderLength(passphrase)
   const run = generation
+  const session = sessionGeneration
   const target = writeTarget()
   const created = await createVault(passphrase, withRecovery)
   created.payload.keys = await rotateKeypair(created.masterKey, [])
   if (writeEnded(run, target)) throw new Error(REPLACED)
   const response = await saveVault({ payload: JSON.stringify(created.payload), predecessors: [] }, target.client)
+  // The vault exists now, so its code stays for this account and session, also past a lock.
+  if (session === sessionGeneration && target.scope === currentScope()) recovery.value = created.recoveryCode
   if (run !== generation) throw new Error(REPLACED)
   await adoptHeads(response.heads, run, created.masterKey)
   if (run !== generation) throw new Error(REPLACED)
@@ -614,6 +622,7 @@ async function reset(): Promise<void> {
   // The deletion belongs to this account and session; another one keeps its own state.
   if (session !== sessionGeneration) return
   endRunningWork()
+  recovery.value = null
   payload = null
   masterKey = null
   providers.value = []
@@ -622,6 +631,11 @@ async function reset(): Promise<void> {
   // A save made at the same time on another holder outlives the delete.
   const response = await readVault(client())
   if (session === sessionGeneration) await settle(scope, response.heads)
+}
+
+/** Drops the held recovery code once the user stored it. */
+function dismissRecovery() {
+  recovery.value = null
 }
 
 async function saveProviders(next: BrowserProvider[]): Promise<void> {
@@ -668,6 +682,7 @@ export function useUserVault() {
     ownKey,
     fromCache,
     recreateNotice,
+    recoveryCode,
     load,
     create,
     unlock,
@@ -681,5 +696,6 @@ export function useUserVault() {
     openUserKey,
     whileUnlocked,
     dismissRecreateNotice,
+    dismissRecovery,
   }
 }

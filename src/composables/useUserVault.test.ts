@@ -862,6 +862,69 @@ describe('useUserVault', () => {
     expect(saveVault).toHaveBeenCalledTimes(sent)
   })
 
+  it('holds the recovery code of a new vault until it is dismissed, hidden while locked', async () => {
+    const { vault } = await boot()
+    const code = await vault.create('correct horse', true)
+
+    expect(vault.recoveryCode.value).toBe(code)
+    vault.lock()
+    expect(vault.recoveryCode.value).toBeNull()
+    await vault.unlock('correct horse')
+    expect(vault.recoveryCode.value).toBe(code)
+
+    vault.dismissRecovery()
+    expect(vault.recoveryCode.value).toBeNull()
+    vault.lock()
+    await vault.unlock('correct horse')
+    expect(vault.recoveryCode.value).toBeNull()
+  })
+
+  it('shows the code of a vault whose creation a lock ended once the same session unlocks', async () => {
+    const { vault } = await boot()
+    onSaveHeads = () => queueMicrotask(() => vault.lock())
+
+    await expect(vault.create('correct horse', true)).rejects.toThrow('changed in another browser')
+    onSaveHeads = null
+    expect(vault.recoveryCode.value).toBeNull()
+    await vault.unlock('correct horse')
+
+    expect(vault.recoveryCode.value).toMatch(/^([0-9A-HJKMNP-TV-Z]{4}-){12}[0-9A-HJKMNP-TV-Z]{4}$/)
+  })
+
+  it('keeps the code of a vault saved while the session changed from the new session', async () => {
+    const { vault, state } = await boot()
+    const save = saveVault.getMockImplementation()!
+    saveVault.mockImplementationOnce(async (request) => {
+      state.sessionEpoch.value += 1
+      return save(request)
+    })
+
+    await expect(vault.create('correct horse', true)).rejects.toThrow('changed in another browser')
+    await vault.load()
+    await vault.unlock('correct horse')
+
+    expect(vault.recoveryCode.value).toBeNull()
+  })
+
+  it('never shows a recovery code to another session, or after a reset', async () => {
+    const { vault, state } = await boot()
+    await vault.create('correct horse', true)
+    state.sessionEpoch.value += 1
+    await vault.load()
+    await vault.unlock('correct horse')
+    expect(vault.recoveryCode.value).toBeNull()
+
+    vault.lock()
+    await vault.reset()
+    await vault.create('correct horse', true)
+    // A save on another holder outlives the delete, so the keys open again after the reset.
+    deleteVault.mockImplementationOnce(async () => {})
+    await vault.reset()
+    expect(vault.state.value).toBe('locked')
+    await vault.unlock('correct horse')
+    expect(vault.recoveryCode.value).toBeNull()
+  })
+
   it('refuses to save while locked', async () => {
     const { vault } = await boot()
     await vault.create('correct horse', false)
