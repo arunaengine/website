@@ -906,6 +906,22 @@ describe('useUserVault', () => {
     expect(vault.recoveryCode.value).toBeNull()
   })
 
+  it('shows the code of a vault whose save answer was lost once a later read finds it', async () => {
+    const { vault } = await boot()
+    const save = saveVault.getMockImplementation()!
+    saveVault.mockImplementationOnce(async (request) => {
+      await save(request)
+      throw new TypeError('network down')
+    })
+
+    await expect(vault.create('correct horse', true)).rejects.toThrow('network down')
+    await vault.load()
+    await vault.unlock('correct horse')
+
+    expect(vault.recoveryCode.value).toMatch(/^([0-9A-HJKMNP-TV-Z]{4}-){12}[0-9A-HJKMNP-TV-Z]{4}$/)
+    expect(saveVault).toHaveBeenCalledOnce()
+  })
+
   it('drops a recovery code once the vault on the node carries another recovery block', async () => {
     const { vault } = await boot()
     await vault.create('correct horse', true)

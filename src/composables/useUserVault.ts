@@ -545,12 +545,13 @@ async function create(passphrase: string, withRecovery: boolean): Promise<string
   const created = await createVault(passphrase, withRecovery)
   created.payload.keys = await rotateKeypair(created.masterKey, [])
   if (writeEnded(run, target)) throw new Error(REPLACED)
+  // Held before the save: when its answer is lost, a later read that finds this block shows it.
+  const block = recoveryBlock(created.payload)
+  const held = created.recoveryCode && block ? { code: created.recoveryCode, block } : null
+  recovery.value = held
   const response = await saveVault({ payload: JSON.stringify(created.payload), predecessors: [] }, target.client)
   // The vault exists now, so its code stays for this account and session, also past a lock.
-  if (session === sessionGeneration && target.scope === currentScope()) {
-    const block = recoveryBlock(created.payload)
-    recovery.value = created.recoveryCode && block ? { code: created.recoveryCode, block } : null
-  }
+  if (session === sessionGeneration && target.scope === currentScope()) recovery.value = held
   if (run !== generation) throw new Error(REPLACED)
   await adoptHeads(response.heads, run, created.masterKey)
   if (run !== generation) throw new Error(REPLACED)
