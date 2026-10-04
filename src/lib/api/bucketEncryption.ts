@@ -71,6 +71,19 @@ export interface EncryptionCaller {
   admin: boolean
 }
 
+export type KeyRole = 'active' | 'source'
+
+/** A key generation the node still needs: the active one, or the source of a running change. */
+export interface BucketKeyGeneration {
+  generation: number
+  role: KeyRole
+  /** Standard base64 of the 32-byte X25519 public key. */
+  public_key: string
+  /** Lowercase hex SHA-256 of the public key. */
+  fingerprint: string
+  unlock: BucketUnlockStatus
+}
+
 export interface BucketEncryptionResponse {
   bucket: string
   mode: EncryptionMode
@@ -87,8 +100,10 @@ export interface BucketEncryptionResponse {
   block_keys: BlockKeys
   /** Longest unlock a holder may ask for; null means until lock or restart. */
   max_unlock_ms: number | null
-  /** Null while encryption is off. */
+  /** The active generation's unlock state; null while encryption is off. */
   unlock: BucketUnlockStatus | null
+  /** Every generation the node still needs, also while mode is off; absent on an older node. */
+  generations?: BucketKeyGeneration[]
   holders: HolderReadiness | null
   recovery: RecoveryStatus | null
   transition: EncryptionTransition | null

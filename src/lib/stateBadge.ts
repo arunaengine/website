@@ -98,6 +98,8 @@ const STATE_TONE: Record<string, StateTone> = {
   reachable: 'done',
   // Bucket encryption.
   'not encrypted': 'idle',
+  'not encrypted for new writes': 'count',
+  decrypting: 'progress',
   locked: 'idle',
   unlocked: 'done',
   'timed unlock': 'progress',

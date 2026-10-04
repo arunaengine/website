@@ -8,6 +8,8 @@ import {
   type BlockKeys,
   type BucketCompressionResponse,
   type BucketEncryptionResponse,
+  type BucketKeyGeneration,
+  type BucketUnlockStatus,
   type EncryptionMode,
   type EncryptionTransition,
   type HolderOrigin,
@@ -67,20 +69,54 @@ function at(ms: number): string {
   return new Date(ms).toLocaleString()
 }
 
+export const ROLE_LABEL: Record<BucketKeyGeneration['role'], string> = {
+  active: 'Active key',
+  source: 'Previous key',
+}
+
+export interface KeyGenerations {
+  list: BucketKeyGeneration[]
+  /** False for a node that did not list its generations: only the active key is known. */
+  reported: boolean
+}
+
+export function keyGenerations(status: BucketEncryptionResponse): KeyGenerations {
+  if (status.generations) return { list: status.generations, reported: true }
+  const { public_key: publicKey, fingerprint, unlock } = status
+  if (status.mode === 'off' || !publicKey || !fingerprint || !unlock) return { list: [], reported: false }
+  const active = { generation: status.key_generation, role: 'active' as const, public_key: publicKey, fingerprint, unlock }
+  return { list: [active], reported: false }
+}
+
 /** Locked, unlocked, timed unlock or locked since restart; unknown when the node gave no lock state. */
 export function lockView(status: BucketEncryptionResponse): LockView {
-  if (status.mode === 'off') return { label: 'Not encrypted', detail: 'Stored bytes are readable without a key.' }
-  const unlock = status.unlock
-  if (!unlock) return { label: UNKNOWN, detail: 'The node did not report whether the bucket is unlocked.' }
+  if (status.mode === 'off') {
+    const { list, reported } = keyGenerations(status)
+    if (list.length) {
+      return {
+        label: 'Decrypting',
+        detail: 'New writes are not encrypted. Older versions stay encrypted until the rewrite ends, and reading them needs an unlock.',
+      }
+    }
+    if (!reported) {
+      return { label: 'Not encrypted for new writes', detail: 'The node did not say whether older versions are still encrypted.' }
+    }
+    return { label: 'Not encrypted', detail: 'Stored bytes are readable without a key.' }
+  }
+  if (!status.unlock) return { label: UNKNOWN, detail: 'The node did not report whether the bucket is unlocked.' }
+  return unlockView(status.unlock, status.mode === 'node_managed')
+}
+
+/** The lock state of one key generation. */
+export function unlockView(unlock: BucketUnlockStatus, nodeManaged: boolean): LockView {
   if (unlock.state === 'unlocked') {
     return unlock.deadline_ms !== null
       ? { label: 'Timed unlock', detail: `Locks itself at ${at(unlock.deadline_ms)}.` }
       : {
           label: 'Unlocked',
-          detail:
-            status.mode === 'node_managed'
-              ? 'The node holds its own key copy and unlocks the bucket again after a restart.'
-              : 'Until a key holder locks it or the node restarts.',
+          detail: nodeManaged
+            ? 'The node holds its own key copy and unlocks the bucket again after a restart.'
+            : 'Until a key holder locks it or the node restarts.',
         }
   }
   if (unlock.lock_reason === 'restart') {

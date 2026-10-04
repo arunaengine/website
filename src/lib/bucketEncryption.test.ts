@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { BucketEncryptionResponse, BucketUnlockStatus, EncryptionTransition } from './api'
 import {
+  keyGenerations,
   changeNeedsUnlock,
   changeNotes,
   compressionSummary,
@@ -49,7 +50,8 @@ describe('bucket encryption wording', () => {
     expect(lockView(bucket({ ...LOCKED, state: 'unlocked' }, 'node_managed')).detail).toContain('again after a restart')
     expect(lockView(bucket({ ...LOCKED, state: 'unlocked', deadline_ms: 5_000 })).label).toBe('Timed unlock')
     expect(lockView(bucket(null)).label).toBe('Unknown')
-    expect(lockView(bucket(null, 'off')).label).toBe('Not encrypted')
+    expect(lockView({ ...bucket(null, 'off'), generations: [] }).label).toBe('Not encrypted')
+    expect(lockView(bucket(null, 'off')).label).toBe('Not encrypted for new writes')
     expect(stateTone('Locked since restart')).toBe('attention')
   })
 
@@ -106,5 +108,19 @@ describe('bucket encryption wording', () => {
     expect(spanLabel(3_600_000)).toBe('1 hour')
     expect(spanLabel(7 * 86_400_000)).toBe('7 days')
     expect(spanLabel(90_500)).toBe('1m 31s')
+  })
+
+  it('keeps a bucket with an encrypted source generation from reading as plain', () => {
+    const source = { generation: 3, role: 'source' as const, public_key: 'PK3', fingerprint: 'f3', unlock: LOCKED }
+    const off = { ...bucket(null, 'off'), generations: [source] }
+
+    expect(lockView(off)).toMatchObject({ label: 'Decrypting' })
+    expect(lockView(off).detail).toContain('reading them needs an unlock')
+    expect(keyGenerations(off)).toEqual({ list: [source], reported: true })
+    const older = { ...bucket(LOCKED), key_generation: 4, public_key: 'PK4', fingerprint: 'f4' }
+    expect(keyGenerations(older)).toEqual({
+      list: [{ generation: 4, role: 'active', public_key: 'PK4', fingerprint: 'f4', unlock: LOCKED }],
+      reported: false,
+    })
   })
 })
