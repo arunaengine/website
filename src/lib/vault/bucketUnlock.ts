@@ -87,10 +87,8 @@ async function openFirst(
   )
 }
 
-/**
- * `current` must stay true for the account, session, realm, API base, node, group,
- * bucket id, key generation and request that started the unlock.
- */
+// `current` must stay true for the account, session, realm, API base, node, group,
+// bucket id, key generation and request that started the unlock.
 export async function unlockWithVault(
   target: UnlockTarget,
   vault: UnlockVault,

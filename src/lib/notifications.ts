@@ -104,8 +104,8 @@ export const NOTIFICATION_KINDS: Record<string, NotificationKindDescriptor> = {
         ? { name: 'bucket', params: { bucketId: n.bucket }, query: n.node_id ? { node: n.node_id } : {} }
         : null,
   },
-  // Encryption stage 4: sent to each key holder when a node restart locked a
-  // vault-locked bucket that was unlocked before; opens its Encryption tab.
+  // Sent to each key holder when a node restart locked a vault-locked bucket
+  // that was unlocked before; opens its Encryption tab on that node.
   bucket_locked_by_restart: {
     icon: Lock,
     title: (n) => (n.bucket ? `A node restart locked ${n.bucket}` : 'A node restart locked a bucket'),

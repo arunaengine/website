@@ -31,10 +31,8 @@ export interface HolderReadiness {
   missing_key: number | null
 }
 
-/**
- * `met`: two ready holders, or one whose directory record declares a recovery code.
- * `unknown`: the key directory did not answer, so the rule could not be checked.
- */
+// `met`: two ready holders, or one whose directory record declares a recovery code.
+// `unknown`: the key directory did not answer, so the rule could not be checked.
 export interface RecoveryStatus {
   state: 'met' | 'degraded' | 'unknown'
   ready_holders: number | null

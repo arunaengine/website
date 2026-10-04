@@ -110,10 +110,8 @@ function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
   return a.length === b.length && a.every((byte, index) => byte === b[index])
 }
 
-/**
- * Opens a copy and checks that the key in it belongs to `bucketPublic`. The
- * caller owns the returned raw key and must clear it.
- */
+// Opens a copy and checks that the key in it belongs to `bucketPublic`. The
+// caller owns the returned raw key and must clear it.
 export async function openBucketCopy(
   recipient: X25519Pair,
   sealed: SealedSecret,
