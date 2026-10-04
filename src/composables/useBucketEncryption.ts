@@ -160,7 +160,8 @@ export function useBucketEncryption(bucket: Ref<string>, nodeId: Ref<string | nu
   function extend(keyGeneration: number, durationMs?: number) {
     const session = keyOf(keyGeneration)?.unlock.session_id
     if (!session) return Promise.reject(new Error('This key is not unlocked.'))
-    return run('extend', () => extendUnlock(scope.value.bucket, { session_id: session, duration_ms: durationMs }, client()))
+    const request = { generation: keyGeneration, session_id: session, duration_ms: durationMs }
+    return run('extend', () => extendUnlock(scope.value.bucket, request, client()))
   }
 
   function lock() {

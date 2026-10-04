@@ -7,6 +7,7 @@ import { useBucketEncryption } from './useBucketEncryption'
 const getBucketEncryption = vi.fn()
 const getBucketCompression = vi.fn()
 const lockBucket = vi.fn()
+const extendUnlock = vi.fn()
 const unlockWithVault = vi.fn()
 
 vi.mock('@/lib/api', async (importOriginal) => ({
@@ -14,6 +15,7 @@ vi.mock('@/lib/api', async (importOriginal) => ({
   getBucketEncryption: (...args: unknown[]) => getBucketEncryption(...args),
   getBucketCompression: (...args: unknown[]) => getBucketCompression(...args),
   lockBucket: (...args: unknown[]) => lockBucket(...args),
+  extendUnlock: (...args: unknown[]) => extendUnlock(...args),
 }))
 vi.mock('@/lib/vault/bucketUnlock', () => ({ unlockWithVault: (...args: unknown[]) => unlockWithVault(...args) }))
 vi.mock('./useUserVault', () => ({ useUserVault: () => ({ name: 'vault' }) }))
@@ -41,6 +43,16 @@ function status(overrides: Partial<Api.BucketEncryptionResponse> = {}): Api.Buck
     caller: { holder: true, ready_copy: true, admin: false },
     ...overrides,
   }
+}
+
+const OPEN: Api.BucketUnlockStatus = {
+  state: 'unlocked',
+  lock_reason: null,
+  locked_at_ms: null,
+  session_id: 'S1',
+  unlocked_at_ms: 1,
+  deadline_ms: null,
+  max_deadline_ms: null,
 }
 
 function deferred<T>() {
@@ -72,6 +84,7 @@ beforeEach(() => {
   getBucketEncryption.mockReset().mockResolvedValue(status())
   getBucketCompression.mockReset().mockResolvedValue({ bucket: 'reef', mode: 'zstd', level: 3, effective_level: 4 })
   lockBucket.mockReset()
+  extendUnlock.mockReset()
   unlockWithVault.mockReset()
   authToken.value = 'bearer-1'
   userInfo.value = { user: { user_id: 'u-1' }, realm: { realm_id: 'r-1' } } as never
@@ -222,6 +235,13 @@ describe('bucket encryption state', () => {
     expect(target.publicKey).toBe('PK1')
     expect(target.context).toMatchObject({ bucketId: 'B1', generation: 1 })
     await expect(encryption.extend(1)).rejects.toThrow('not unlocked')
+    getBucketEncryption.mockResolvedValue(
+      status({ mode: 'off', public_key: null, fingerprint: null, unlock: null, generations: [{ ...source, unlock: OPEN }] }),
+    )
+    await encryption.load()
+    extendUnlock.mockResolvedValue(OPEN)
+    await encryption.extend(1, 60_000)
+    expect(extendUnlock.mock.calls[0].slice(0, 2)).toEqual(['reef', { generation: 1, session_id: 'S1', duration_ms: 60_000 }])
   })
 
   it('stops the unlock when the bucket key changes under it', async () => {

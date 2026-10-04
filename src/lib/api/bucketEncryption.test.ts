@@ -69,11 +69,11 @@ describe('bucket encryption client', () => {
   it('names the session to extend and locks without a body', async () => {
     const calls = stubFetch(UNLOCKED)
 
-    await extendUnlock('reef', { session_id: 'S1', duration_ms: 5_000 }, NODE)
+    await extendUnlock('reef', { generation: 2, session_id: 'S1', duration_ms: 5_000 }, NODE)
     await lockBucket('reef', NODE)
 
     expect(calls[0].url.pathname).toBe('/api/v1/data/buckets/reef/storage/encryption/extend')
-    expect(JSON.parse(String(calls[0].body))).toEqual({ session_id: 'S1', duration_ms: 5_000 })
+    expect(JSON.parse(String(calls[0].body))).toEqual({ generation: 2, session_id: 'S1', duration_ms: 5_000 })
     expect(calls[1].url.pathname).toBe('/api/v1/data/buckets/reef/storage/encryption/lock')
     expect(calls[1].body).toBeUndefined()
   })

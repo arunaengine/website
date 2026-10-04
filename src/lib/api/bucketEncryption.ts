@@ -129,6 +129,8 @@ export interface UnlockBucketRequest {
 }
 
 export interface ExtendUnlockRequest {
+  /** The key generation whose unlock session is extended. */
+  generation: number
   session_id: string
   /** Measured from now; absent means the bucket maximum, or until lock or restart. */
   duration_ms?: number
