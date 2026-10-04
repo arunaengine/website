@@ -163,4 +163,23 @@ describe('bucket key holders', () => {
 
     expect(holders.holders.value?.holders.map((entry) => entry.user_id)).toEqual(['NEW'])
   })
+
+  it('drops the outcome of a grant or removal whose key generation changed meanwhile', async () => {
+    const holders = holdersOf()
+    await vi.waitFor(() => expect(holders.state.value).toBe('ready'))
+    let refuse!: (reason: unknown) => void
+    grantBucketHolder.mockReturnValueOnce(new Promise((_, reject) => (refuse = reject)))
+    let removed!: () => void
+    removeBucketHolder.mockReturnValueOnce(new Promise<void>((resolve) => (removed = resolve)))
+
+    const granting = holders.grant('C')
+    const removing = holders.remove('A', false, 'rev-1')
+    shown.value = { bucket_id: 'B1', key_generation: 3 } as BucketEncryptionResponse
+    refuse(refusal('stale_generation'))
+    removed()
+
+    expect(await granting).toBe(false)
+    expect(await removing).toBe('stale')
+    expect(source.load).not.toHaveBeenCalled()
+  })
 })

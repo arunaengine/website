@@ -27,7 +27,8 @@ export interface HolderSource {
 }
 
 export type HoldersState = 'loading' | 'ready' | 'refused' | 'failed'
-export type RemovalResult = 'removed' | 'confirm'
+/** `stale`: the bucket or its key changed while the removal ran; its outcome is not shown. */
+export type RemovalResult = 'removed' | 'confirm' | 'stale'
 /** `unknown`: a remaining recovery code is unknown, or the list is partial. */
 export type RecoveryAfter = 'kept' | 'unmet' | 'unknown'
 
@@ -92,30 +93,45 @@ export function useBucketHolders(source: HolderSource, bucket: Ref<string>) {
   )
   watch(source.revision, () => void load())
 
-  async function grant(userId: string): Promise<void> {
+  /** True while the bucket context and the key identity a request began with still hold. */
+  function holderBinder(): () => boolean {
     const bound = source.binder()
+    const seen = identity.value
+    return () => bound() && identity.value === seen
+  }
+
+  /** False when a newer bucket context owns the outcome; its success and failure are dropped. */
+  async function grant(userId: string): Promise<boolean> {
+    const current = holderBinder()
     try {
       await grantBucketHolder(bucket.value, userId, source.client())
-    } finally {
-      await refresh(bound)
+    } catch (cause) {
+      if (!current()) return false
+      await refresh(current)
+      throw cause
     }
+    if (!current()) return false
+    await refresh(current)
+    return true
   }
 
   // Without `confirmRecovery` a removal that breaks recovery comes back as `confirm`. `revision`
   // names the holder set the caller showed; the node refuses the removal once the set changed.
   async function remove(userId: string, confirmRecovery: boolean, revision: string): Promise<RemovalResult> {
-    const bound = source.binder()
+    const current = holderBinder()
     try {
       await removeBucketHolder(bucket.value, userId, revision, confirmRecovery, source.client())
     } catch (cause) {
+      if (!current()) return 'stale'
       if (encryptionRefusal(cause, 409, ENCRYPTION_CODES.confirmRecovery)) return 'confirm'
       if (encryptionRefusal(cause, 409, ENCRYPTION_CODES.staleHolders)) {
-        await refresh(bound)
+        await refresh(current)
         throw new Error('The key holders changed meanwhile. Check the list and try again.')
       }
       throw cause
     }
-    await refresh(bound)
+    if (!current()) return 'stale'
+    await refresh(current)
     return 'removed'
   }
 

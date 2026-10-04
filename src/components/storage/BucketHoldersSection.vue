@@ -85,9 +85,10 @@ async function addHolder() {
   busy.value = chosen.value.user_id
   failure.value = null
   try {
-    await grant(chosen.value.user_id)
-    query.value = ''
-    chosen.value = null
+    if (await grant(chosen.value.user_id)) {
+      query.value = ''
+      chosen.value = null
+    }
   } catch (cause) {
     failure.value = encryptionError(cause)
   } finally {
