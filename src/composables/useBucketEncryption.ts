@@ -22,10 +22,8 @@ import { authToken, nodeInfo, realmInfo, sessionEpoch, userInfo } from './aruna/
 import { localNodeId, nodeApiBase } from './s3/endpoints'
 import { useUserVault } from './useUserVault'
 
-/**
- * `missing`: the node does not report encryption for this bucket, which is not "off".
- * `stale`: the last read failed; the status is the previous answer and changes are held back.
- */
+// `missing`: the node does not report encryption for this bucket, which is not "off".
+// `stale`: the last read failed; the status is the previous answer and changes are held back.
 export type EncryptionLoadState = 'loading' | 'ready' | 'stale' | 'missing' | 'refused' | 'unresolved' | 'failed'
 export type EncryptionAction = 'unlock' | 'extend' | 'lock' | 'save' | 'rotate'
 
