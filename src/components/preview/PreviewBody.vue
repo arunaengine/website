@@ -58,9 +58,8 @@ const preview = useObjectPreview()
 const isHtml = computed(() =>
   /\.x?html?$/i.test(props.name) || (props.contentType ?? '').toLowerCase().startsWith('text/html'))
 
-function reload() {
-  if (!props.objectKey) return
-  const target = {
+function shownTarget() {
+  return {
     bucket: props.bucket,
     key: props.objectKey,
     size: props.size,
@@ -68,6 +67,11 @@ function reload() {
     nodeId: props.nodeId,
     versionId: props.versionId ?? undefined,
   }
+}
+
+function reload() {
+  if (!props.objectKey) return
+  const target = shownTarget()
   void preview.load(target)
   // After load(): its reset() would drop an earlier-started probe.
   if (props.probeReference && !props.referencedFrom) void preview.probeReferenced(target)
@@ -82,8 +86,11 @@ watch(
   { immediate: true },
 )
 
+// A download belongs to the preview it was started from; a newer one drops its result.
 async function download() {
   if (!props.objectKey) return
+  const id = preview.loadToken()
+  const target = shownTarget()
   try {
     const url =
       preview.directUrl.value
@@ -94,7 +101,9 @@ async function download() {
         props.versionId ?? undefined,
         props.name,
       ))
-    if (!(await preview.checkAccess(url))) return
+    if (!preview.isCurrent(id)) return
+    const open = await preview.checkAccess(url, id, target)
+    if (!preview.isCurrent(id) || !open) return
     // In the document, not detached: a detached anchor is ignored by some
     // browsers, and the name travels in the response's Content-Disposition.
     const anchor = document.createElement('a')
@@ -105,6 +114,7 @@ async function download() {
     anchor.click()
     anchor.remove()
   } catch (err) {
+    if (!preview.isCurrent(id)) return
     preview.errorMessage.value = s3ErrorMessage(err)
     preview.status.value = 'error'
   }

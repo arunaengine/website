@@ -117,6 +117,7 @@ export function useObjectPreview() {
   const lockCheck = ref<'idle' | 'checking' | 'still' | 'unknown' | 'failed'>('idle')
   const lockedTarget = shallowRef<PreviewTarget | null>(null)
   let currentTarget: PreviewTarget | null = null
+  let probe: AbortController | null = null
   let loadId = 0
   const kind = ref<PreviewKind>('download')
   const language = ref<string | undefined>(undefined)
@@ -132,6 +133,8 @@ export function useObjectPreview() {
   let referenceProbeId = 0
 
   function reset() {
+    probe?.abort()
+    probe = null
     if (objectUrl.value) URL.revokeObjectURL(objectUrl.value)
     status.value = 'idle'
     kind.value = 'download'
@@ -167,19 +170,31 @@ export function useObjectPreview() {
     }
   }
 
-  /** Switches the current preview to waiting for a bucket unlock. */
-  function markLocked() {
-    if (!currentTarget) return
-    lockedTarget.value = currentTarget
+  /** Switches the preview to waiting for a bucket unlock of `target`. */
+  function markLocked(target = currentTarget) {
+    if (!target) return
+    lockedTarget.value = target
     status.value = 'locked'
   }
 
-  /** False when a newer load took over, or when the bucket turned out to be locked. */
-  async function checkAccess(url: string, id = loadId): Promise<boolean> {
-    const access = await s3.probeAccess(url)
-    if (id !== loadId) return false
-    if (access === 'locked') markLocked()
-    return access !== 'locked'
+  /** The load a request starts in; `isCurrent` turns false once a newer load or a reset begins. */
+  const loadToken = () => loadId
+  const isCurrent = (id: number) => id === loadId
+
+  // False when a newer load took over, or when the bucket of `target` turned out to be locked.
+  // A newer probe cancels an older one, which then reads as unclear and blocks nothing.
+  async function checkAccess(url: string, id: number, target = currentTarget): Promise<boolean> {
+    probe?.abort()
+    const controller = new AbortController()
+    probe = controller
+    try {
+      const access = await s3.probeAccess(url, controller.signal)
+      if (id !== loadId) return false
+      if (access === 'locked') markLocked(target)
+      return access !== 'locked'
+    } finally {
+      if (probe === controller) probe = null
+    }
   }
 
   async function fallbackDownload(target: PreviewTarget, cap: number, actual: number, id: number) {
@@ -187,7 +202,9 @@ export function useObjectPreview() {
     sizeNote.value = `This file is ${formatBytes(actual)}, above the ${formatBytes(cap)} preview limit.`
     try {
       const url = await s3.downloadUrl(target.bucket, target.key, target.nodeId, target.versionId)
-      if (id !== loadId || !(await checkAccess(url, id))) return
+      if (id !== loadId) return
+      const open = await checkAccess(url, id, target)
+      if (id !== loadId || !open) return
       directUrl.value = url
       status.value = 'ready'
     } catch (err) {
@@ -210,7 +227,9 @@ export function useObjectPreview() {
       if (classified.kind === 'media' || classified.kind === 'pdf' || classified.kind === 'download') {
         if (classified.kind === 'media') mediaKind.value = mediaSubtype(target)
         const url = await s3.downloadUrl(target.bucket, target.key, target.nodeId, target.versionId)
-        if (id !== loadId || !(await checkAccess(url, id))) return
+        if (id !== loadId) return
+        const open = await checkAccess(url, id, target)
+        if (id !== loadId || !open) return
         directUrl.value = url
         status.value = 'ready'
         return
@@ -298,6 +317,8 @@ export function useObjectPreview() {
     recheck,
     markLocked,
     checkAccess,
+    loadToken,
+    isCurrent,
     kind,
     language,
     mediaKind,

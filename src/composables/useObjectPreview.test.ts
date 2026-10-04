@@ -126,9 +126,9 @@ describe('preview of a locked bucket', () => {
     await preview.load({ ...TARGET, key: 'paper.pdf' })
     expect(preview.status.value).toBe('ready')
     probeAccess.mockResolvedValueOnce('locked')
-    expect(await preview.checkAccess('https://b.test/presigned')).toBe(false)
+    expect(await preview.checkAccess('https://b.test/presigned', preview.loadToken())).toBe(false)
     expect(preview.status.value).toBe('locked')
-    expect(probeAccess).toHaveBeenCalledWith('https://b.test/presigned')
+    expect(probeAccess).toHaveBeenCalledWith('https://b.test/presigned', expect.any(AbortSignal))
   })
 
   it('loads again once the node confirms the bucket is plain, and keeps an unreported key state unknown', async () => {
@@ -146,5 +146,41 @@ describe('preview of a locked bucket', () => {
     await preview.recheck()
     expect(preview.status.value).toBe('ready')
     expect(preview.text.value).toBe('plain again')
+  })
+
+  it('cancels the probe of an older load and never gives its URL to a newer preview', async () => {
+    let answer!: (value: string) => void
+    probeAccess.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)))
+    getObjectText.mockResolvedValueOnce('newer text')
+    const preview = useObjectPreview()
+
+    const media = preview.load({ ...TARGET, key: 'clip.mp4' })
+    await vi.waitFor(() => expect(probeAccess).toHaveBeenCalled())
+    await preview.load(TARGET)
+    answer('open')
+    await media
+
+    const signal = probeAccess.mock.calls[0][1] as AbortSignal
+    expect(signal.aborted).toBe(true)
+    expect(preview.text.value).toBe('newer text')
+    expect(preview.directUrl.value).toBeNull()
+    expect(preview.status.value).toBe('ready')
+  })
+
+  it('lets a check from an older preview neither lock nor link the newer one', async () => {
+    const preview = useObjectPreview()
+    await preview.load({ ...TARGET, key: 'clip.mp4' })
+    const older = preview.loadToken()
+    getObjectText.mockResolvedValueOnce('other text')
+    await preview.load({ ...TARGET, bucket: 'other', key: 'b.txt' })
+    probeAccess.mockResolvedValueOnce('locked')
+
+    expect(await preview.checkAccess('https://b.test/presigned', older, TARGET)).toBe(false)
+    expect(preview.status.value).toBe('ready')
+    expect(preview.lockedLink.value).toBeNull()
+
+    probeAccess.mockResolvedValueOnce('locked')
+    expect(await preview.checkAccess('https://b.test/presigned', preview.loadToken(), TARGET)).toBe(false)
+    expect(preview.lockedLink.value).toMatchObject({ params: { bucketId: 'reef' } })
   })
 })
