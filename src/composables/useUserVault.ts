@@ -688,12 +688,11 @@ async function reset(): Promise<void> {
   forgetKey(scope)
   const work = vaultWork
   // A save made at the same time on another holder outlives the delete.
-  const response = await readVault(client())
   // A read, create, unlock or save that began meanwhile owns the state; this answer is older.
   const current = () => session === sessionGeneration && work === vaultWork
-  if (!current()) return
   try {
-    await settle(scope, response.heads, current)
+    const response = await readVault(client())
+    if (current()) await settle(scope, response.heads, current)
   } catch (cause) {
     if (current()) throw cause
   }

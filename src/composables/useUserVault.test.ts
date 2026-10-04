@@ -611,6 +611,24 @@ describe('useUserVault', () => {
     expect(node.heads).toHaveLength(1)
   })
 
+  it('reports no failed read after a reset once a newer read took over', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', false)
+    let fail!: () => void
+    readVault.mockImplementationOnce(() => new Promise((_, reject) => (fail = () => reject(new Error('offline')))))
+
+    const resetting = vault.reset()
+    await vi.waitFor(() => expect(fail).toBeDefined())
+    await vault.load()
+    fail()
+
+    await expect(resetting).resolves.toBeUndefined()
+    expect(vault.state.value).toBe('absent')
+
+    readVault.mockRejectedValueOnce(new Error('offline'))
+    await expect(vault.reset()).rejects.toThrow('offline')
+  })
+
   it('drops an unlock that was running when a reset deleted the vault', async () => {
     const { vault } = await boot()
     await vault.create('correct horse', false)
