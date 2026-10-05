@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError, type BucketEncryptionResponse, type BucketUnlockStatus, type EncryptionTransition } from './api'
 import {
+  actionError,
   encryptionError,
   keyGenerations,
   changeNeedsUnlock,
@@ -56,6 +57,13 @@ describe('bucket encryption wording', () => {
     expect(refusal(501, 'not_supported')).toContain('does not support')
     expect(refusal(403, 'Forbidden')).toContain('need group admin rights')
     expect(refusal(409, 'something_new')).toBe('node text')
+  })
+
+  it('reads a 501 not_supported as a refusal and other server errors as unconfirmed', () => {
+    expect(actionError(new ApiError(501, 'node text', 'not_supported'))).toContain('does not support')
+    expect(actionError(new ApiError(503, 'node text', 'unlock_capacity'))).toContain('did not confirm this change')
+    expect(actionError(new ApiError(500, 'node text', 'Internal error'))).toContain('did not confirm this change')
+    expect(actionError(new TypeError('network down'))).toContain('did not confirm this change')
   })
 
   it('names the four lock states and an unreported one', () => {

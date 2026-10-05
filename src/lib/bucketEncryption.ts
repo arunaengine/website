@@ -266,9 +266,11 @@ export function encryptionError(error: unknown): string {
   return REFUSALS[code] ?? (refused ? NO_RIGHTS : apiErrorMessage(error))
 }
 
-/** Only a 4xx says a change was not applied; a 5xx or a lost answer leaves it open. */
+/** Only a 4xx or a 501 `not_supported` says a change was not applied; another 5xx or a lost answer leaves it open. */
 export function actionError(error: unknown): string {
-  const uncertain = !(error instanceof ApiError) || error.status >= 500
+  const unsupported =
+    error instanceof ApiError && error.status === 501 && error.code === ENCRYPTION_CODES.notSupported
+  const uncertain = !(error instanceof ApiError) || (error.status >= 500 && !unsupported)
   return uncertain
     ? 'The node did not confirm this change. The state shown is what it reports now; check it before you retry.'
     : encryptionError(error)
