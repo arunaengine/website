@@ -237,7 +237,8 @@ describe('CreateCredentialDialog', () => {
   it('says why the node refused a key with encrypted buckets', async () => {
     const refusals: Array<[Api.ApiError, string]> = [
       [new Api.ApiError(409, 'locked', 'bucket_locked'), 'A chosen bucket is locked now.'],
-      [new Api.ApiError(403, 'forbidden'), 'You must be a current key holder of every chosen bucket.'],
+      [new Api.ApiError(403, 'forbidden', 'not_holder'), 'You are not a current key holder of every chosen bucket'],
+      [new Api.ApiError(403, 'Group access denied'), 'Group access denied'],
       [new Api.ApiError(400, 'plain', 'bucket_not_encrypted'), 'A chosen bucket is not encrypted'],
     ]
     for (const [refusal, message] of refusals) {

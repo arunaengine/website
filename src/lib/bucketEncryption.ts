@@ -4,6 +4,7 @@ import {
   ApiError,
   apiErrorMessage,
   ENCRYPTION_CODES,
+  encryptionRefusal,
   type BlockCipher,
   type BlockKeys,
   type BucketCompressionResponse,
@@ -291,6 +292,17 @@ export function actionError(error: unknown): string {
   return uncertain
     ? 'The node did not confirm this change. The state shown is what it reports now; check it before you retry.'
     : encryptionError(error)
+}
+
+/** A refused copy of an encrypted source bucket, by its code; null for any other refusal. */
+export function copyRefusal(error: unknown): string | null {
+  if (encryptionRefusal(error, 403, ENCRYPTION_CODES.notHolder)) {
+    return 'Only key holders of the source bucket may store a copy unencrypted.'
+  }
+  if (encryptionRefusal(error, 403, ENCRYPTION_CODES.plaintextRequired)) {
+    return 'The source bucket is encrypted and the target bucket is not, so the copy was refused. A key holder of the source bucket may store it unencrypted instead.'
+  }
+  return null
 }
 
 /** The settings an admin may change with PUT; the storage generation is the one shown. */

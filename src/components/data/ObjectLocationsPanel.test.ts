@@ -2,6 +2,7 @@ import { defineComponent, h, ref } from 'vue'
 import * as VueRuntime from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as Api from '@/lib/api'
+import * as Wording from '@/lib/bucketEncryption'
 import * as StateBadge from '@/lib/stateBadge'
 import * as Storage from '@/lib/storage'
 import * as Utils from '@/lib/utils'
@@ -65,6 +66,7 @@ const panel = compileClientComponent(new URL('./ObjectLocationsPanel.vue', impor
     useRealmNodes: () => ({ displayName: (id: string) => `Node ${id}`, nodes: realmNodes }),
   },
   '@/lib/api': Api,
+  '@/lib/bucketEncryption': Wording,
   '@/lib/stateBadge': StateBadge,
   '@/lib/storage': Storage,
   '@/lib/utils': Utils,
@@ -183,14 +185,19 @@ describe('object locations panel', () => {
 
   it('explains why a copy of an encrypted bucket was refused', async () => {
     realmNodes.value = [{ nodeId: 'node-b', label: 'Node B', reachable: true }]
-    replicateBlob.mockRejectedValue(new Api.ApiError(403, 'forbidden'))
     sourceEncrypted.value = true
     const root = await mount([copy()])
-
-    await click(button(root, 'Node B'))
-    await click(button(root, 'Replicate'))
-
+    const refusals: Array<[string | undefined, string]> = [
+      ['plaintext_required', 'The source bucket is encrypted and the target bucket is not'],
+      ['not_holder', 'Only key holders of the source bucket may store a copy unencrypted.'],
+      [undefined, 'Adding a copy needs WRITE permission on this file.'],
+    ]
+    for (const [code, message] of refusals) {
+      replicateBlob.mockRejectedValueOnce(new Api.ApiError(403, 'forbidden', code))
+      await click(button(root, 'Node B'))
+      await click(button(root, 'Replicate'))
+      expect(content(root)).toContain(message)
+    }
     expect(replicateBlob.mock.calls[0][0]).not.toHaveProperty('plaintext')
-    expect(content(root)).toContain('the bucket on that node must be encrypted too')
   })
 })

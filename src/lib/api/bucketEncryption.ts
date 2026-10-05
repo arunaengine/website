@@ -241,6 +241,7 @@ export const ENCRYPTION_CODES = {
   notSupported: 'not_supported',
   objectTooLarge: 'object_too_large',
   bucketNotEncrypted: 'bucket_not_encrypted',
+  plaintextRequired: 'plaintext_required',
 } as const
 
 function base(bucket: string): string {

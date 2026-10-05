@@ -197,7 +197,9 @@ function tokenRefusal(err: unknown): string {
   if (err.status === 409 && err.code === ENCRYPTION_CODES.locked) {
     return 'A chosen bucket is locked now. Unlock it on its Encryption tab, or leave it out, and try again.'
   }
-  if (err.status === 403) return 'The node refused the key. You must be a current key holder of every chosen bucket.'
+  if (err.status === 403 && err.code === ENCRYPTION_CODES.notHolder) {
+    return 'You are not a current key holder of every chosen bucket, so the key was not created.'
+  }
   if (err.status === 400 && err.code === ENCRYPTION_CODES.bucketNotEncrypted) {
     return 'A chosen bucket is not encrypted, so it needs no session token. Leave it out and try again.'
   }

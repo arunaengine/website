@@ -18,6 +18,7 @@ import { Copy, Server } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useEncryptedSource } from '@/composables/useEncryptedSource'
 import { useRealmNodes } from '@/composables/useRealmNodes'
+import { copyRefusal } from '@/lib/bucketEncryption'
 import { copyHeldBack, copyOrigin, copyState } from '@/lib/storage'
 import { stateVariant, toneVariant } from '@/lib/stateBadge'
 import { truncateMiddle, errorMessage } from '@/lib/utils'
@@ -170,11 +171,7 @@ async function replicate() {
     if (err instanceof ApiError && (err.status === 404 || err.status === 405)) {
       replicateUnsupported.value = true
     } else if (err instanceof ApiError && err.status === 403) {
-      replicateError.value = unencrypted
-        ? 'Adding a copy needs WRITE permission on this file, and only key holders of this bucket may store it unencrypted.'
-        : sourceEncrypted.value
-          ? 'Adding a copy needs WRITE permission on this file. This bucket is encrypted, so the bucket on that node must be encrypted too, unless you store the copy unencrypted.'
-          : 'Adding a copy needs WRITE permission on this file.'
+      replicateError.value = copyRefusal(err) ?? 'Adding a copy needs WRITE permission on this file.'
     } else {
       replicateError.value = errorMessage(err)
     }

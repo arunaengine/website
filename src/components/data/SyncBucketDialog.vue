@@ -18,6 +18,7 @@ import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useEncryptedSource } from '@/composables/useEncryptedSource'
 import { useRealmNodes } from '@/composables/useRealmNodes'
+import { copyRefusal } from '@/lib/bucketEncryption'
 import { ApiError, type BucketSearchHit, type CreateSyncRelationshipRequest, type SyncMode, type SyncReferenceHandling, type SyncRelationship } from '@/lib/api'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import { errorMessage } from '@/lib/utils'
@@ -221,7 +222,7 @@ async function submit() {
     emit('created', relationship)
     emit('update:open', false)
   } catch (err) {
-    error.value = describeError(err, sourceEncrypted.value === true, unencrypted)
+    error.value = describeError(err)
   } finally {
     busy.value = false
   }
@@ -238,18 +239,12 @@ function reverseRequest(request: CreateSyncRelationshipRequest): CreateSyncRelat
   }
 }
 
-function describeError(err: unknown, encryptedSource = false, unencrypted = false): string {
+function describeError(err: unknown): string {
   if (err instanceof ApiError) {
     if (err.status === 409) return 'This sync relationship already exists.'
     if (err.status === 502) return 'The target node is unreachable right now, the relationship was not created.'
     if (err.status === 401 || err.status === 403) {
-      if (unencrypted) {
-        return 'You need read access on the source bucket, and only its key holders may store an unencrypted copy.'
-      }
-      if (encryptedSource) {
-        return 'You need read access on the source bucket. It is encrypted, so the target bucket must be encrypted too, unless you store the copy unencrypted.'
-      }
-      return 'You need read access on the source bucket to set up a sync.'
+      return copyRefusal(err) ?? 'You need read access on the source bucket to set up a sync.'
     }
     return err.message
   }

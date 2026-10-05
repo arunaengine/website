@@ -2,6 +2,7 @@ import { computed, defineComponent, h, ref } from 'vue'
 import * as VueRuntime from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import * as Api from '@/lib/api'
+import * as Wording from '@/lib/bucketEncryption'
 import * as Utils from '@/lib/utils'
 import * as Workspaces from '@/lib/workspaces'
 import { button, click, compileClientComponent, content, flush, mountApp, moduleDefault } from '@/test/clientRender'
@@ -92,6 +93,7 @@ const dialog = compileClientComponent(new URL('./SyncBucketDialog.vue', import.m
     }),
   },
   '@/lib/api': Api,
+  '@/lib/bucketEncryption': Wording,
   '@/lib/workspaces': Workspaces,
   '@/lib/utils': Utils,
 })
@@ -231,17 +233,18 @@ describe('sync bucket dialog', () => {
     expect(createSyncRelationship.mock.calls[0][0]).not.toHaveProperty('plaintext')
   })
 
-  it('explains a refused copy of an encrypted source', async () => {
+  it('names each refusal of a copy by its code and keeps the read access text otherwise', async () => {
     const root = await render(true)
-    createSyncRelationship.mockRejectedValueOnce(new Api.ApiError(403, 'forbidden'))
-
     await click(button(root, 'Node B'))
-    await click(button(root, 'Sync now'))
-    expect(content(root)).toContain('the target bucket must be encrypted too, unless you store the copy unencrypted')
-
-    createSyncRelationship.mockRejectedValueOnce(new Api.ApiError(403, 'forbidden'))
-    await click(button(root, 'Store the copy unencrypted'))
-    await click(button(root, 'Sync now'))
-    expect(content(root)).toContain('only its key holders may store an unencrypted copy')
+    const refusals: Array<[string | undefined, string]> = [
+      ['plaintext_required', 'The source bucket is encrypted and the target bucket is not'],
+      ['not_holder', 'Only key holders of the source bucket may store a copy unencrypted.'],
+      [undefined, 'You need read access on the source bucket to set up a sync.'],
+    ]
+    for (const [code, message] of refusals) {
+      createSyncRelationship.mockRejectedValueOnce(new Api.ApiError(403, 'forbidden', code))
+      await click(button(root, 'Sync now'))
+      expect(content(root)).toContain(message)
+    }
   })
 })
