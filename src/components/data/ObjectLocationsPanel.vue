@@ -11,10 +11,12 @@ import RefreshButton from '@/components/ui/RefreshButton.vue'
 import RefusalNote from '@/components/ui/RefusalNote.vue'
 import Select from '@/components/ui/Select.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
+import Switch from '@/components/ui/Switch.vue'
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { Copy, Server } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
+import { useEncryptedSource } from '@/composables/useEncryptedSource'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { copyHeldBack, copyOrigin, copyState } from '@/lib/storage'
 import { stateVariant, toneVariant } from '@/lib/stateBadge'
@@ -32,7 +34,7 @@ const props = defineProps<{
   groupId: string | null
 }>()
 
-const { getBlobLocations, replicateBlob } = useAruna()
+const { apiBaseUrl, getBlobLocations, replicateBlob } = useAruna()
 const realmNodes = useRealmNodes()
 
 const summary = ref<BlobLocationsResponse | null>(null)
@@ -128,6 +130,12 @@ const replicating = ref(false)
 const replicateError = ref<string | null>(null)
 const replicateNote = ref<string | null>(null)
 const replicateUnsupported = ref(false)
+const replicaPlaintext = ref(false)
+const sourceEncrypted = useEncryptedSource(
+  computed(() => props.bucket),
+  apiBaseUrl,
+  computed(() => props.active && !remote.value),
+)
 
 const covered = computed(
   () => new Set((summary.value?.copies ?? [])
@@ -145,21 +153,28 @@ async function replicate() {
   replicating.value = true
   replicateError.value = null
   replicateNote.value = null
+  const unencrypted = sourceEncrypted.value === true && replicaPlaintext.value
   try {
     await replicateBlob({
       bucket: props.bucket,
       path: props.objectKey,
       version_id: summary.value?.version_id,
       node_id: replicaTarget.value,
+      ...(unencrypted ? { plaintext: true } : {}),
     })
     replicateNote.value = `A copy was queued for ${realmNodes.displayName(replicaTarget.value)}. It is stored once that node reports it below.`
     replicaTarget.value = ''
+    replicaPlaintext.value = false
     await load()
   } catch (err) {
     if (err instanceof ApiError && (err.status === 404 || err.status === 405)) {
       replicateUnsupported.value = true
     } else if (err instanceof ApiError && err.status === 403) {
-      replicateError.value = 'Adding a copy needs WRITE permission on this file.'
+      replicateError.value = unencrypted
+        ? 'Adding a copy needs WRITE permission on this file, and only key holders of this bucket may store it unencrypted.'
+        : sourceEncrypted.value
+          ? 'Adding a copy needs WRITE permission on this file. This bucket is encrypted, so the bucket on that node must be encrypted too, unless you store the copy unencrypted.'
+          : 'Adding a copy needs WRITE permission on this file.'
     } else {
       replicateError.value = errorMessage(err)
     }
@@ -303,6 +318,26 @@ Only the node that holds a file can say where its copies are; open the bucket on
               <Copy class="h-3.5 w-3.5" /> {{ replicating ? 'Queueing…' : 'Replicate' }}
             </Button>
           </div>
+          <template v-if="sourceEncrypted && replicaTargets.length">
+            <label class="flex items-center justify-between gap-3 text-xs">
+              <span>
+                <span class="font-medium text-foreground">Store the copy unencrypted</span>
+                <span class="block text-[11px] text-muted-foreground">
+                  This bucket is encrypted. This is needed when the bucket on that node is not encrypted, and only key
+                  holders of this bucket may choose it.
+                </span>
+              </span>
+              <Switch
+                :checked="replicaPlaintext"
+                aria-label="Store the copy unencrypted"
+                @update:checked="(v: boolean) => (replicaPlaintext = v)"
+              />
+            </label>
+            <Notice v-if="replicaPlaintext" tone="warning">
+              The copy is stored unencrypted on that node. Anyone who may read this bucket there can read it without a
+              key.
+            </Notice>
+          </template>
           <p v-if="replicateNote" class="text-[11px] text-emerald-700 dark:text-emerald-300">{{ replicateNote }}</p>
           <p v-if="replicateError" class="text-[11px] text-destructive">{{ replicateError }}</p>
         </div>

@@ -16,6 +16,7 @@ import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
 import { useAruna } from '@/composables/useAruna'
+import { useEncryptedSource } from '@/composables/useEncryptedSource'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { ApiError, type BucketSearchHit, type CreateSyncRelationshipRequest, type SyncMode, type SyncReferenceHandling, type SyncRelationship } from '@/lib/api'
 import { isWorkspaceBucket } from '@/lib/workspaces'
@@ -45,7 +46,7 @@ const emit = defineEmits<{
   (e: 'created', relationship: SyncRelationship): void
 }>()
 
-const { createSyncRelationship } = useAruna()
+const { apiBaseUrl, createSyncRelationship } = useAruna()
 const realmNodes = useRealmNodes()
 
 const pullMode = computed(() => Boolean(props.sourceNodeId))
@@ -78,6 +79,7 @@ const mode = ref<SyncMode>('once')
 const referenceHandling = ref<SyncReferenceHandling>('materialize')
 const replicateDeletes = ref(false)
 const bothDirections = ref(false)
+const plaintext = ref(false)
 const busy = ref(false)
 const error = ref<string | null>(null)
 
@@ -93,10 +95,19 @@ watch(
     referenceHandling.value = 'materialize'
     replicateDeletes.value = false
     bothDirections.value = false
+    plaintext.value = false
     busy.value = false
     error.value = null
   },
 )
+
+const sourceEncrypted = useEncryptedSource(
+  computed(() => props.sourceBucket),
+  computed(() => (pullMode.value ? sourceApiBase.value : apiBaseUrl.value)),
+  computed(() => props.open),
+)
+// A reference sync copies no data, so it has nothing to store unencrypted.
+const offerPlaintext = computed(() => sourceEncrypted.value === true && mode.value !== 'reference')
 
 const nodeOptions = computed(() =>
   realmNodes.nodes.value.map((node) => ({
@@ -188,9 +199,10 @@ async function submit() {
     reference_handling: mode.value === 'reference' ? 'preserve' : referenceHandling.value,
     replicate_deletes: replicateDeletes.value,
   }
+  const unencrypted = offerPlaintext.value && plaintext.value
   try {
     const relationship = await createSyncRelationship(
-      request,
+      unencrypted ? { ...request, plaintext: true } : request,
       pullMode.value && sourceApiBase.value ? { baseUrl: sourceApiBase.value } : {},
     )
     if (bothDirections.value) {
@@ -209,7 +221,7 @@ async function submit() {
     emit('created', relationship)
     emit('update:open', false)
   } catch (err) {
-    error.value = describeError(err)
+    error.value = describeError(err, sourceEncrypted.value === true, unencrypted)
   } finally {
     busy.value = false
   }
@@ -226,11 +238,19 @@ function reverseRequest(request: CreateSyncRelationshipRequest): CreateSyncRelat
   }
 }
 
-function describeError(err: unknown): string {
+function describeError(err: unknown, encryptedSource = false, unencrypted = false): string {
   if (err instanceof ApiError) {
     if (err.status === 409) return 'This sync relationship already exists.'
     if (err.status === 502) return 'The target node is unreachable right now, the relationship was not created.'
-    if (err.status === 401 || err.status === 403) return 'You need read access on the source bucket to set up a sync.'
+    if (err.status === 401 || err.status === 403) {
+      if (unencrypted) {
+        return 'You need read access on the source bucket, and only its key holders may store an unencrypted copy.'
+      }
+      if (encryptedSource) {
+        return 'You need read access on the source bucket. It is encrypted, so the target bucket must be encrypted too, unless you store the copy unencrypted.'
+      }
+      return 'You need read access on the source bucket to set up a sync.'
+    }
     return err.message
   }
   return errorMessage(err)
@@ -380,6 +400,26 @@ function describeError(err: unknown): string {
             @update:checked="(v: boolean) => (bothDirections = v)"
           />
         </label>
+
+        <template v-if="offerPlaintext">
+          <label class="flex items-center justify-between gap-3 text-xs">
+            <span>
+              <span class="font-medium text-foreground">Store the copy unencrypted</span>
+              <span class="block text-[11px] text-muted-foreground">
+                The source bucket is encrypted. This is needed when the target bucket is not encrypted, and only key
+                holders of the source bucket may choose it.
+              </span>
+            </span>
+            <Switch
+              :checked="plaintext"
+              aria-label="Store the copy unencrypted"
+              @update:checked="(v: boolean) => (plaintext = v)"
+            />
+          </label>
+          <Notice v-if="plaintext" tone="warning">
+            The copy is stored unencrypted at the target. Anyone who may read the target bucket can read it without a key.
+          </Notice>
+        </template>
 
         <Notice v-if="reverseUnavailable" tone="warning">
           {{ targetNodeLabel }} does not publish an API URL, so the sync back cannot be created from here.

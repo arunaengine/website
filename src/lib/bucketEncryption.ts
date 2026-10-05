@@ -88,6 +88,11 @@ export function keyGenerations(status: BucketEncryptionResponse): KeyGenerations
   return { list: [active], reported: false }
 }
 
+/** Stored versions may be encrypted: the mode is on, or a decryption still keeps its keys. */
+export function holdsEncrypted(status: BucketEncryptionResponse): boolean {
+  return status.mode !== 'off' || keyGenerations(status).list.length > 0
+}
+
 /** An S3 key may get a session token for an encrypted bucket that is unlocked here and held by the caller. */
 export function tokenEligible(status: BucketEncryptionResponse): boolean {
   return status.mode !== 'off' && status.unlock?.state === 'unlocked' && status.caller.holder

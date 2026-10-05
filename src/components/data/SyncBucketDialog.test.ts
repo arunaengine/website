@@ -60,6 +60,7 @@ const NODES = [
   { nodeId: 'node-b', label: 'Node B', isLocal: false, reachable: true, apiBase: 'http://b/api/v1' },
 ]
 const createSyncRelationship = vi.fn()
+const sourceEncrypted = ref<boolean | null>(null)
 
 const dialog = compileClientComponent(new URL('./SyncBucketDialog.vue', import.meta.url), {
   vue: VueRuntime,
@@ -80,7 +81,8 @@ const dialog = compileClientComponent(new URL('./SyncBucketDialog.vue', import.m
   '@/components/ui/DialogFooter.vue': moduleDefault(Slotted('footer')),
   '@/components/ui/DialogClose.vue': moduleDefault(Slotted('div')),
   '@/components/data/BucketSearchBox.vue': moduleDefault(SearchBoxStub),
-  '@/composables/useAruna': { useAruna: () => ({ createSyncRelationship }) },
+  '@/composables/useAruna': { useAruna: () => ({ apiBaseUrl: ref('http://a/api/v1'), createSyncRelationship }) },
+  '@/composables/useEncryptedSource': { useEncryptedSource: () => sourceEncrypted },
   '@/composables/useRealmNodes': {
     useRealmNodes: () => ({
       nodes: computed(() => NODES),
@@ -95,7 +97,8 @@ const dialog = compileClientComponent(new URL('./SyncBucketDialog.vue', import.m
 })
 
 // The dialog resets its fields when `open` flips to true, as the page does.
-async function render() {
+async function render(encrypted: boolean | null = null) {
+  sourceEncrypted.value = encrypted
   createSyncRelationship.mockReset()
   createSyncRelationship.mockResolvedValue({ id: 's-1' })
   const open = ref(false)
@@ -193,5 +196,52 @@ describe('sync bucket dialog', () => {
 
     expect(button(root, 'Sync now').props.disabled).toBe(true)
     expect(content(root)).toContain('Source and target are the same bucket and prefix')
+  })
+
+  it('offers an unencrypted copy only for an encrypted source', async () => {
+    for (const state of [null, false]) {
+      expect(content(await render(state))).not.toContain('Store the copy unencrypted')
+    }
+
+    const root = await render(true)
+    expect(content(root)).toContain('Store the copy unencrypted')
+    await click(button(root, 'Reference'))
+    expect(content(root)).not.toContain('Store the copy unencrypted')
+  })
+
+  it('asks for an unencrypted copy with a warning, but not for the sync back', async () => {
+    const root = await render(true)
+
+    await click(button(root, 'Node B'))
+    await click(button(root, 'Store the copy unencrypted'))
+    expect(content(root)).toContain('The copy is stored unencrypted at the target.')
+    await click(button(root, 'Sync in both directions'))
+    await click(button(root, 'Sync now'))
+
+    expect(createSyncRelationship.mock.calls[0][0]).toMatchObject({ plaintext: true })
+    expect(createSyncRelationship.mock.calls[1][0]).not.toHaveProperty('plaintext')
+  })
+
+  it('sends no plaintext flag unless it is chosen', async () => {
+    const root = await render(true)
+
+    await click(button(root, 'Node B'))
+    await click(button(root, 'Sync now'))
+
+    expect(createSyncRelationship.mock.calls[0][0]).not.toHaveProperty('plaintext')
+  })
+
+  it('explains a refused copy of an encrypted source', async () => {
+    const root = await render(true)
+    createSyncRelationship.mockRejectedValueOnce(new Api.ApiError(403, 'forbidden'))
+
+    await click(button(root, 'Node B'))
+    await click(button(root, 'Sync now'))
+    expect(content(root)).toContain('the target bucket must be encrypted too, unless you store the copy unencrypted')
+
+    createSyncRelationship.mockRejectedValueOnce(new Api.ApiError(403, 'forbidden'))
+    await click(button(root, 'Store the copy unencrypted'))
+    await click(button(root, 'Sync now'))
+    expect(content(root)).toContain('only its key holders may store an unencrypted copy')
   })
 })
