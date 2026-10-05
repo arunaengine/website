@@ -58,9 +58,8 @@ const preview = useObjectPreview()
 const isHtml = computed(() =>
   /\.x?html?$/i.test(props.name) || (props.contentType ?? '').toLowerCase().startsWith('text/html'))
 
-function reload() {
-  if (!props.objectKey) return
-  const target = {
+function shownTarget() {
+  return {
     bucket: props.bucket,
     key: props.objectKey,
     size: props.size,
@@ -68,13 +67,29 @@ function reload() {
     nodeId: props.nodeId,
     versionId: props.versionId ?? undefined,
   }
+}
+
+function reload() {
+  if (!props.objectKey) return
+  const target = shownTarget()
   void preview.load(target)
   // After load(): its reset() would drop an earlier-started probe.
   if (props.probeReference && !props.referencedFrom) void preview.probeReferenced(target)
 }
 
+// Any change of the object, its bucket or node, or the account and session reads it again.
 watch(
-  () => [props.active, props.objectKey, props.versionId] as const,
+  () =>
+    [
+      props.active,
+      props.bucket,
+      props.nodeId ?? null,
+      props.objectKey,
+      props.versionId ?? null,
+      props.size,
+      props.contentType,
+      preview.sessionKey.value,
+    ] as const,
   ([active]) => {
     if (active && props.objectKey) reload()
     else preview.reset()
@@ -82,11 +97,15 @@ watch(
   { immediate: true },
 )
 
+// A download belongs to the preview it was started from; a newer one drops its result.
 async function download() {
   if (!props.objectKey) return
+  preview.downloadError.value = null
+  const id = preview.loadToken()
+  const target = shownTarget()
   try {
     const url =
-      preview.directUrl.value
+      preview.urlFor(target)
       ?? (await s3.downloadUrl(
         props.bucket,
         props.objectKey,
@@ -94,6 +113,9 @@ async function download() {
         props.versionId ?? undefined,
         props.name,
       ))
+    if (!preview.isCurrent(id)) return
+    const open = await preview.checkAccess(url, id, target)
+    if (!preview.isCurrent(id) || !open) return
     // In the document, not detached: a detached anchor is ignored by some
     // browsers, and the name travels in the response's Content-Disposition.
     const anchor = document.createElement('a')
@@ -104,9 +126,18 @@ async function download() {
     anchor.click()
     anchor.remove()
   } catch (err) {
-    preview.errorMessage.value = s3ErrorMessage(err)
-    preview.status.value = 'error'
+    if (preview.isCurrent(id)) preview.downloadError.value = s3ErrorMessage(err)
   }
+}
+
+// A player that cannot read its URL is waiting for a key only when a probe confirms the lock.
+// Reports about a URL the preview no longer shows are ignored.
+async function mediaFailed(url: string) {
+  if (url === preview.directUrl.value) await preview.checkAccess(url, preview.loadToken())
+}
+
+function pdfLocked(url: string) {
+  if (url === preview.directUrl.value) preview.markLocked()
 }
 </script>
 
@@ -149,6 +180,8 @@ async function download() {
       </div>
     </div>
 
+    <Notice v-if="preview.downloadError.value" tone="error">{{ preview.downloadError.value }}</Notice>
+
     <Spinner
       v-if="preview.status.value === 'loading'"
       show-label
@@ -168,6 +201,27 @@ async function download() {
         file still works.
       </p>
       <Button variant="outline" size="sm" @click="download"><Download class="h-4 w-4" /> Download</Button>
+    </Notice>
+
+    <Notice
+      v-else-if="preview.status.value === 'locked'"
+      tone="warning"
+      title="Waiting for a bucket unlock"
+      class="space-y-2 px-5 py-6"
+      data-preview-locked
+    >
+      <p>
+        This bucket is encrypted and locked, so its content cannot be shown. A key holder unlocks it on the
+        <RouterLink v-if="preview.lockedLink.value" :to="preview.lockedLink.value" class="font-medium underline">
+          Encryption tab of the bucket</RouterLink
+        >.
+      </p>
+      <p v-if="preview.lockCheck.value === 'still'">The bucket is still locked.</p>
+      <p v-else-if="preview.lockCheck.value === 'failed'">The lock state of the bucket could not be read.</p>
+      <p v-else-if="preview.lockCheck.value === 'unknown'">The node did not say whether the bucket still needs a key.</p>
+      <Button variant="outline" size="sm" :disabled="preview.lockCheck.value === 'checking'" @click="preview.recheck()">
+        Check again
+      </Button>
     </Notice>
 
     <ErrorPanel
@@ -206,11 +260,13 @@ async function download() {
         :url="preview.directUrl.value"
         :media-kind="preview.mediaKind.value"
         :name="props.name"
+        @failed="mediaFailed"
       />
       <PdfPreview
         v-else-if="preview.kind.value === 'pdf' && preview.directUrl.value"
         :url="preview.directUrl.value"
         :name="props.name"
+        @locked="pdfLocked"
       />
       <DownloadCard
         v-else

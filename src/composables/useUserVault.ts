@@ -3,7 +3,7 @@
 // handle and is remembered in IndexedDB so one passphrase entry serves the
 // whole browser until the user locks the keys or signs out. Several heads are
 // merged once the key is known and saved with every merged head as predecessor.
-import { ref, watch } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
 import {
   apiErrorMessage,
   deleteVault,
@@ -14,11 +14,13 @@ import {
   vaultConflicted,
   vaultUnavailable,
   vaultUnsupported,
+  type ApiClientOptions,
   type UserVaultHead,
 } from '@/lib/api'
 import { validateBrowserProvider, type BrowserProvider } from '@/lib/assistant/browserProviders'
 import { assistantChatScopeKey } from '@/lib/assistant/chatHistory'
 import {
+  MIN_KEY_HOLDER_PASSPHRASE_LENGTH,
   VaultUnlockError,
   activeKeypair,
   changePassphrase as rewrapMaster,
@@ -26,6 +28,7 @@ import {
   openData,
   openKeypair,
   parseVaultPayload,
+  passphraseLongEnough,
   rotateKeypair,
   sealData,
   unlockVault,
@@ -33,6 +36,7 @@ import {
   type VaultPayload,
   type VaultSecret,
 } from '@/lib/vault/crypto'
+import type { X25519Pair } from '@/lib/vault/hpke'
 import { browserKeyStore } from '@/lib/vault/keyStore'
 import { apiBaseUrl, authToken, realmInfo, sessionEpoch, userInfo } from './aruna/state'
 
@@ -69,6 +73,22 @@ const fromCache = ref(false)
  * never cached, which is a vault from before vaults moved to the holders.
  */
 const recreateNotice = ref(false)
+/** A recovery code and the id of the saved recovery block it opens. */
+interface HeldRecovery {
+  code: string
+  block: string
+  /** Only a read sent after this many reads may rule the code out; none may while its save runs. */
+  settled: number
+}
+/** The recovery code of a vault this account and session made, in memory only, until dismissed. */
+const recovery = shallowRef<HeldRecovery | null>(null)
+/** The recovery block id of the head unlocked now. */
+const unlockedBlock = shallowRef<string | null>(null)
+/** The held code while the head with its recovery block is unlocked; otherwise hidden, not dropped. */
+const recoveryCode = computed(() => {
+  const held = recovery.value
+  return state.value === 'unlocked' && held && unlockedBlock.value === held.block ? held.code : null
+})
 const NOTICE_PREFIX = 'aruna.vault.recreateNotice:'
 const keyStore = browserKeyStore()
 let payload: VaultPayload | null = null
@@ -81,6 +101,15 @@ let scopeKey = ''
 let generation = 0
 let requested = false
 let inFlight: Promise<void> | null = null
+let keyCheck: Promise<void> | null = null
+/** Grows with every account or session change, unlike `generation`, which a lock advances too. */
+let sessionGeneration = 0
+/** Grows when a read, create, unlock or save starts, so an older follow-up read yields to it. */
+let vaultWork = 0
+/** Counts the vault reads sent to the node, so a held code yields only to a read sent after its save. */
+let readsSent = 0
+/** Grows with every lock in this tab, so a create a lock ended after its save can say so. */
+let locks = 0
 
 function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
@@ -93,6 +122,21 @@ function currentScope(): string {
   const realmId = userInfo.value?.realm.realm_id ?? realmInfo.value?.realm_id ?? ''
   if (!token || !userId || !realmId || !apiBaseUrl.value) return ''
   return assistantChatScopeKey({ apiBaseUrl: apiBaseUrl.value, realmId, userId })
+}
+
+/** The API base and token a vault write began with, and the account scope they belong to. */
+interface WriteTarget {
+  scope: string
+  client: ApiClientOptions
+}
+
+function writeTarget(): WriteTarget {
+  return { scope: currentScope(), client: client() }
+}
+
+/** True once a lock, or an account, session or API base change, ended the write. */
+function writeEnded(run: number, target: WriteTarget): boolean {
+  return run !== generation || target.scope !== currentScope()
 }
 
 async function rememberKey(scope: string, key: CryptoKey) {
@@ -167,7 +211,9 @@ async function openProviders(current: VaultPayload, key: CryptoKey): Promise<Bro
 
 function clearLocal() {
   generation += 1
+  sessionGeneration += 1
   inFlight = null
+  keyCheck = null
   payload = null
   heads = []
   predecessors = []
@@ -176,14 +222,29 @@ function clearLocal() {
   ownKey.value = 'unknown'
   fromCache.value = false
   recreateNotice.value = false
+  recovery.value = null
   state.value = 'absent'
   loaded.value = false
   loading.value = false
   error.value = null
 }
 
+/** The id of a payload's recovery block: its salt and wrapped key, which a new block replaces. */
+function recoveryBlock(current: VaultPayload | null): string | null {
+  const block = current?.recovery
+  return block ? [block.salt, block.nonce, block.wrapped].join('\u0000') : null
+}
+
+/** Drops a held code once read `read`, sent after its save, returns no head with its recovery block. */
+function matchRecovery(read: number) {
+  const held = recovery.value
+  if (!held || read <= held.settled) return
+  if (!heads.some((head) => recoveryBlock(head.payload) === held.block)) recovery.value = null
+}
+
 function unlocked(merged: Merged, key: CryptoKey) {
   payload = merged.payload
+  unlockedBlock.value = recoveryBlock(merged.payload)
   predecessors = merged.revisions
   masterKey = key
   providers.value = merged.providers
@@ -227,10 +288,10 @@ async function mergeHeads(list: Head[], key: CryptoKey): Promise<Merged> {
 }
 
 /** Takes what the holders returned; with a key it merges, so true means a save is due. */
-async function adoptHeads(list: UserVaultHead[], run: number, key = masterKey): Promise<boolean> {
+async function adoptHeads(list: UserVaultHead[], run: number, key = masterKey, current = () => true): Promise<boolean> {
   const parsed = parseHeads(list)
   const merged = key && parsed.length ? await mergeHeads(parsed, key) : null
-  if (run !== generation) throw new Error(REPLACED)
+  if (run !== generation || !current()) throw new Error(REPLACED)
   heads = parsed
   cacheHeads(scopeKey, list)
   if (merged && key) {
@@ -242,12 +303,13 @@ async function adoptHeads(list: UserVaultHead[], run: number, key = masterKey): 
   return false
 }
 
-/** Puts what the node holds into place, opening it with a key this browser remembers. */
-async function settle(scope: string, list: UserVaultHead[]): Promise<boolean> {
+// Puts what the node holds into place, opening it with a key this browser remembers. `current`
+// must still hold after every await before the state or the cache changes.
+async function settle(scope: string, list: UserVaultHead[], current = () => true): Promise<boolean> {
   if (!list.length) {
     const run = generation
     const lost = await rememberedKey(scope) && !(await cachedHeads(scope))
-    if (run !== generation) throw new Error(REPLACED)
+    if (run !== generation || !current()) throw new Error(REPLACED)
     if (lost && noticeState(scope) !== 'seen') storeNotice(scope, 'pending')
     cacheHeads(scope, [])
     heads = []
@@ -263,13 +325,16 @@ async function settle(scope: string, list: UserVaultHead[]): Promise<boolean> {
   const key = masterKey ?? await rememberedKey(scope)
   if (key) {
     try {
-      return await adoptHeads(list, run, key)
+      return await adoptHeads(list, run, key, current)
     } catch (cause) {
       if (!(cause instanceof VaultUnlockError)) throw cause
+      // A lock or session change during the merge owns the remembered key now.
+      if (run !== generation || !current()) throw new Error(REPLACED)
       forgetKey(scope)
     }
   }
-  await adoptHeads(list, run, null)
+  await adoptHeads(list, run, null, current)
+  if (run !== generation || !current()) throw new Error(REPLACED)
   masterKey = null
   providers.value = []
   state.value = 'locked'
@@ -277,8 +342,9 @@ async function settle(scope: string, list: UserVaultHead[]): Promise<boolean> {
 }
 
 /** Saves `next` over every held head and takes the heads the holder answers with. */
-async function putPayload(next: VaultPayload, run: number): Promise<boolean> {
-  const response = await saveVault({ payload: JSON.stringify(next), predecessors }, client())
+async function putPayload(next: VaultPayload, run: number, target = writeTarget()): Promise<boolean> {
+  if (writeEnded(run, target)) throw new Error(REPLACED)
+  const response = await saveVault({ payload: JSON.stringify(next), predecessors }, target.client)
   if (run !== generation) throw new Error(REPLACED)
   return adoptHeads(response.heads, run)
 }
@@ -319,6 +385,15 @@ async function checkOwnKey(run: number) {
   }
 }
 
+/** One directory check at a time, so two callers never publish the same key twice. */
+function checkOnce(run: number): Promise<void> {
+  const check = keyCheck ?? checkOwnKey(run).finally(() => {
+    if (keyCheck === check) keyCheck = null
+  })
+  keyCheck = check
+  return check
+}
+
 /** Adds a keypair when the vault has none, saves it with any merge, then checks the directory. */
 async function finishUnlock(run: number, saveDue: boolean) {
   if (payload && masterKey && !activeKeypair(payload.keys)) {
@@ -328,14 +403,14 @@ async function finishUnlock(run: number, saveDue: boolean) {
     saveDue = true
   }
   if (saveDue) await saveMerge(run)
-  if (run === generation) void checkOwnKey(run)
+  if (run === generation) await checkOnce(run)
 }
 
 /** Saves a merge once; when that fails the next save carries the merge. */
-async function saveMerge(run: number) {
+async function saveMerge(run: number, target?: WriteTarget) {
   if (!payload) return
   try {
-    await putPayload(payload, run)
+    await putPayload(payload, run, target)
   } catch {
     // The merged payload and its predecessors stay in place for the next save.
   }
@@ -348,14 +423,17 @@ function load(): Promise<void> {
   if (inFlight && scope === scopeKey) return inFlight
   scopeKey = scope
   const run = generation
+  vaultWork += 1
   loading.value = true
   error.value = null
   const promise = (async () => {
     try {
+      const read = ++readsSent
       const response = await readVault(client())
       if (run !== generation) return
       const mergeDue = await settle(scope, response.heads)
       if (run !== generation) return
+      matchRecovery(read)
       fromCache.value = false
       recreateNotice.value = state.value === 'absent' && noticeState(scope) === 'pending'
       loaded.value = true
@@ -367,7 +445,11 @@ function load(): Promise<void> {
         loaded.value = true
         return
       }
-      if (vaultUnavailable(cause) && await loadCached(scope, run)) return
+      if (vaultUnavailable(cause)) {
+        const cached = await loadCached(scope, run)
+        // A lock or a newer read during the cache read owns the state now.
+        if (cached || run !== generation) return
+      }
       error.value = apiErrorMessage(cause)
     } finally {
       if (run === generation) {
@@ -411,15 +493,17 @@ function requireUnlocked(): { current: VaultPayload; key: CryptoKey } {
 /** Saves over the held heads; when a holder lost a concurrent write, rebuilds on a fresh read once. */
 async function saveWithRetry(build: (current: VaultPayload) => Promise<VaultPayload>): Promise<void> {
   const run = generation
+  const target = writeTarget()
   requirePayload()
+  vaultWork += 1
   for (let attempt = 0; ; attempt += 1) {
     const next = await build(requirePayload())
     try {
-      if (await putPayload(next, run)) await saveMerge(run)
+      if (await putPayload(next, run, target)) await saveMerge(run, target)
       return
     } catch (cause) {
       if (!vaultConflicted(cause) || attempt > 0 || run !== generation) throw cause
-      const response = await readVault(client())
+      const response = await readVault(target.client)
       if (run !== generation || !response.heads.length) throw new Error(REPLACED)
       await adoptHeads(response.heads, run)
     }
@@ -446,11 +530,23 @@ export function reapplyChange(
 
 function lock() {
   const scope = scopeKey
+  locks += 1
+  // Work started before the lock belongs to the unlocked vault: none of it may open it again.
+  generation += 1
+  inFlight = null
+  loading.value = false
+  keyCheck = null
   masterKey = null
   providers.value = []
   ownKey.value = 'unknown'
   state.value = payload ? 'locked' : 'absent'
   forgetKey(scope)
+}
+
+function requireHolderLength(passphrase: string) {
+  if (!passphraseLongEnough(passphrase, true)) {
+    throw new Error(`The passphrase needs at least ${MIN_KEY_HOLDER_PASSPHRASE_LENGTH} characters.`)
+  }
 }
 
 async function create(passphrase: string, withRecovery: boolean): Promise<string | null> {
@@ -461,12 +557,38 @@ async function create(passphrase: string, withRecovery: boolean): Promise<string
     throw new Error('The provider keys on this node could not be read yet. Reload the page and try again.')
   }
   if (payload) throw new Error('Your provider keys are already set up.')
+  requireHolderLength(passphrase)
+  vaultWork += 1
   const run = generation
+  const session = sessionGeneration
+  const lockCount = locks
+  const target = writeTarget()
   const created = await createVault(passphrase, withRecovery)
   created.payload.keys = await rotateKeypair(created.masterKey, [])
-  const response = await saveVault({ payload: JSON.stringify(created.payload), predecessors: [] }, client())
-  if (run !== generation) throw new Error(REPLACED)
-  await adoptHeads(response.heads, run, created.masterKey)
+  if (writeEnded(run, target)) {
+    if (session === sessionGeneration && locks !== lockCount) {
+      throw new Error('Your provider keys were locked before they were saved, so nothing was saved.')
+    }
+    throw new Error(REPLACED)
+  }
+  // Held before the save: when its answer is lost, a later read that finds this block shows it.
+  const block = recoveryBlock(created.payload)
+  const held = created.recoveryCode && block ? { code: created.recoveryCode, block, settled: Infinity } : null
+  recovery.value = held
+  const request = { payload: JSON.stringify(created.payload), predecessors: [] }
+  const response = await saveVault(request, target.client).finally(() => {
+    if (held) held.settled = readsSent
+  })
+  try {
+    if (run !== generation) throw new Error(REPLACED)
+    await adoptHeads(response.heads, run, created.masterKey)
+    if (run !== generation) throw new Error(REPLACED)
+  } catch (cause) {
+    // A lock in this session after the save keeps the new vault, and its code for the next unlock.
+    if (run === generation || session !== sessionGeneration || locks === lockCount) throw cause
+    const next = held ? 'Your recovery code appears after the next unlock.' : 'Unlock them to use them.'
+    throw new Error(`Your provider keys were set up and then locked. ${next}`)
+  }
   if (noticeState(scope) === 'pending') dismissRecreateNotice()
   await rememberKey(scope, created.masterKey)
   await finishUnlock(run, false)
@@ -477,6 +599,7 @@ async function create(passphrase: string, withRecovery: boolean): Promise<string
 async function unlockWith(open: (current: VaultPayload) => Promise<CryptoKey>) {
   const scope = requireScope()
   requirePayload()
+  vaultWork += 1
   const run = generation
   let key: CryptoKey | null = null
   let failure: unknown = null
@@ -507,6 +630,7 @@ function unlockWithRecovery(recoveryCode: string): Promise<void> {
 
 /** The current passphrase or the recovery code proves the change; the keys stay unlocked. */
 async function changePassphrase(secret: VaultSecret, newPassphrase: string): Promise<void> {
+  requireHolderLength(newPassphrase)
   requirePayload()
   await saveWithRetry((current) => rewrapMaster(current, secret, newPassphrase))
 }
@@ -516,24 +640,73 @@ async function rotateKey(): Promise<void> {
   const { key } = requireUnlocked()
   const run = generation
   await saveWithRetry(async (current) => ({ ...current, keys: await rotateKeypair(key, current.keys) }))
-  if (run === generation) void checkOwnKey(run)
+  if (run === generation) await checkOnce(run)
+}
+
+/** Checks the key directory again and waits for the answer and any publication. */
+async function checkKey(): Promise<OwnKeyState> {
+  if (state.value === 'unlocked') await checkOnce(generation)
+  return ownKey.value
+}
+
+/** A check that stays true while the vault stays unlocked with the same key. */
+function whileUnlocked(): () => boolean {
+  const key = masterKey
+  const run = generation
+  return () => key !== null && masterKey === key && run === generation && state.value === 'unlocked'
+}
+
+/** Opens a keypair of the unlocked vault by id, retired ones included; null when it has none. */
+async function openUserKey(keyId: string): Promise<X25519Pair | null> {
+  const { current, key } = requireUnlocked()
+  const entry = current.keys.find((candidate) => candidate.id === keyId)
+  return entry ? openKeypair(key, entry) : null
+}
+
+/** Ends every read, unlock and key check already running, for good. */
+function endRunningWork() {
+  generation += 1
+  inFlight = null
+  loading.value = false
+  keyCheck = null
 }
 
 async function reset(): Promise<void> {
   const scope = scopeKey
+  const session = sessionGeneration
+  // Work running before or during the deletion read the old vault; none of it may restore it.
+  endRunningWork()
   await deleteVault(client())
+  // The deletion belongs to this account and session; another one keeps its own state.
+  if (session !== sessionGeneration) return
+  endRunningWork()
+  recovery.value = null
   payload = null
   masterKey = null
   providers.value = []
   state.value = 'absent'
   forgetKey(scope)
+  const work = vaultWork
   // A save made at the same time on another holder outlives the delete.
-  await settle(scope, (await readVault(client())).heads)
+  // A read, create, unlock or save that began meanwhile owns the state; this answer is older.
+  const current = () => session === sessionGeneration && work === vaultWork
+  try {
+    const response = await readVault(client())
+    if (current()) await settle(scope, response.heads, current)
+  } catch (cause) {
+    if (current()) throw cause
+  }
+}
+
+/** Drops the held recovery code once the user stored it. */
+function dismissRecovery() {
+  recovery.value = null
 }
 
 async function saveProviders(next: BrowserProvider[]): Promise<void> {
   const { key } = requireUnlocked()
   const base = providers.value
+  const run = generation
   try {
     await saveWithRetry(async (current) => {
       const merged = reapplyChange(await openProviders(current, key), base, next)
@@ -541,7 +714,8 @@ async function saveProviders(next: BrowserProvider[]): Promise<void> {
     })
   } catch (cause) {
     if (cause instanceof VaultUnlockError) {
-      lock()
+      // A lock or session change since the save began owns the vault; it stays as it is.
+      if (run === generation) lock()
       throw new Error(REPLACED)
     }
     throw cause
@@ -573,6 +747,7 @@ export function useUserVault() {
     ownKey,
     fromCache,
     recreateNotice,
+    recoveryCode,
     load,
     create,
     unlock,
@@ -582,6 +757,10 @@ export function useUserVault() {
     reset,
     saveProviders,
     rotateKey,
+    checkKey,
+    openUserKey,
+    whileUnlocked,
     dismissRecreateNotice,
+    dismissRecovery,
   }
 }

@@ -29,7 +29,7 @@ import { drsDownloadHref, isDrsReference } from '@/lib/tes'
 import { useAruna } from '../useAruna'
 import { client } from './client'
 import { resolveObjectUrl } from './endpoints'
-import { isS3AuthError, isS3NetworkError, PURGE_IN_PROGRESS_MESSAGE } from './errors'
+import { BUCKET_LOCKED_HEADER, isS3AuthError, isS3NetworkError, PURGE_IN_PROGRESS_MESSAGE } from './errors'
 import { hasActiveKey, type S3SessionReference } from './session'
 
 export interface ObjectEntry {
@@ -848,9 +848,36 @@ async function fetchObject(
   if (!response.ok) {
     throw Object.assign(new Error(`The object could not be fetched (HTTP ${response.status}).`), {
       $metadata: { httpStatusCode: response.status },
+      bucketLocked: response.status === 403 && response.headers.get(BUCKET_LOCKED_HEADER) === 'true',
     })
   }
   return response
+}
+
+const PROBE_TIMEOUT_MS = 10_000
+
+// Reads one byte through a signed URL, so a locked bucket is seen before a viewer or a
+// download is offered. A failed, cancelled, slow or unclear probe never blocks: `unknown`.
+export async function probeObjectAccess(
+  url: string,
+  signal?: AbortSignal,
+): Promise<'open' | 'locked' | 'unknown'> {
+  if (!/^https?:/i.test(url) || signal?.aborted) return 'unknown'
+  const controller = new AbortController()
+  const stop = () => controller.abort()
+  const timer = globalThis.setTimeout(stop, PROBE_TIMEOUT_MS)
+  signal?.addEventListener('abort', stop, { once: true })
+  try {
+    const response = await fetch(url, { headers: { Range: 'bytes=0-0' }, signal: controller.signal })
+    void response.body?.cancel().catch(() => undefined)
+    if (response.status === 403 && response.headers.get(BUCKET_LOCKED_HEADER) === 'true') return 'locked'
+    return response.ok ? 'open' : 'unknown'
+  } catch {
+    return 'unknown'
+  } finally {
+    globalThis.clearTimeout(timer)
+    signal?.removeEventListener('abort', stop)
+  }
 }
 
 export async function getObjectText(

@@ -275,6 +275,9 @@ function taskPanel(getTask: unknown, getJob: unknown, deleteJob: unknown = vi.fn
     '@/components/ui/Pagination.vue': moduleDefault(PaginationStub),
     '@/components/jobs/JobPlacementFigure.vue': moduleDefault(PlacementFigureStub),
     '@/components/jobs/JobExecutionsTable.vue': moduleDefault(ExecutionsTableStub),
+    '@/components/jobs/JobKeyWait.vue': moduleDefault(
+      defineComponent({ props: { waits: Array }, setup: (props) => () => h('aside', `waits for ${JSON.stringify(props.waits)}`) }),
+    ),
     '@/components/compute/RunLogDialog.vue': moduleDefault(PassThroughStub),
     '@/components/compute/TaskHeader.vue': moduleDefault(PassThroughStub),
     '@/components/assistant/AskAiButton.vue': moduleDefault(PassThroughStub),
@@ -328,6 +331,7 @@ function jobPanel(job: JobStatusResponse): Component {
     '@/components/jobs/JobFamilySection.vue': moduleDefault(
       defineComponent(() => () => h('section', 'native family detail')),
     ),
+    '@/components/jobs/JobKeyWait.vue': moduleDefault(defineComponent(() => () => h('aside', 'waits for an unlock'))),
     '@/components/jobs/JobReportPanel.vue': moduleDefault(PassThroughStub),
     '@/components/jobs/JobStateBadge.vue': moduleDefault(JobStateBadgeStub),
     '@/composables/useJobs': {
@@ -389,6 +393,29 @@ describe('distributed job detail components', () => {
     { destination_key: 'in/reference.fa', bytes: 314572800, source_node_id: 'node-bielefeld', transfer_ms: 4000 },
     { destination_key: 'in/config.yaml', bytes: 2048, source_node_id: null, transfer_ms: 0 },
   ]
+
+  it('tells a job that waits for a bucket key apart from a failed one', async () => {
+    const waiting: JobStatusResponse = {
+      job_id: '01JJRSTVWXYZ0123456789ABCE',
+      kind: 'staging',
+      state: 'awaiting_key',
+      attempts: 0,
+      cancel_requested: false,
+      created_at: '2026-04-09T14:23:11.123+00:00',
+      updated_at: '2026-04-09T14:31:47.902+00:00',
+      progress: { current: 0, unit: 'inputs' },
+      workspace_mode: 'none',
+      awaiting_keys: [{ node_id: 'node-b', bucket: 'reef' }],
+    }
+
+    const mounted = await mount(jobPanel(waiting), { jobId: waiting.job_id, open: true })
+
+    expect(mounted.errors).toEqual([])
+    expect(content(mounted.root)).toContain('waits for an unlock')
+    expect(Jobs.JOB_STATE_META.awaiting_key).toEqual({ label: 'Waiting for a key', variant: 'warn' })
+    expect(Jobs.isTerminalJobState('awaiting_key')).toBe(false)
+    mounted.app.unmount()
+  })
 
   it('states no workspace detail, whatever the node reports', async () => {
     // A node may still serve a mode and a bucket; a run owns neither any more.
@@ -875,6 +902,29 @@ describe('distributed job detail components', () => {
     expect(text).toContain('Distributed execution detail could not be loaded.')
     expect(text).not.toContain('native family detail')
     expect(text).not.toContain('ERROR:')
+    mounted.app.unmount()
+  })
+
+  it('says a queued run waits for a bucket unlock when its native job does', async () => {
+    const getTask = vi.fn(async () => ({
+      id: 'waiting-run',
+      state: 'QUEUED',
+      executors: [{ image: 'alpine', command: ['sh'] }],
+      inputs: [],
+      outputs: [],
+      logs: [],
+      tags: {},
+    }))
+    const waits = [{ node_id: 'node-b', bucket: 'reef' }]
+    const getJob = vi.fn(async () => ({ state: 'awaiting_key', awaiting_keys: waits, family: null }))
+
+    const mounted = await mount(taskPanel(getTask, getJob), { taskId: 'waiting-run', open: true })
+    await vi.waitFor(() => expect(content(mounted.root)).toContain('Waiting for a bucket unlock'))
+
+    expect(mounted.errors).toEqual([])
+    expect(content(mounted.root)).toContain(`waits for ${JSON.stringify(waits)}`)
+    expect(content(mounted.root)).not.toContain('Queued, waiting for a node')
+    expect(content(mounted.root)).not.toContain('another steps in')
     mounted.app.unmount()
   })
 

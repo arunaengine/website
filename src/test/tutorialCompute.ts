@@ -305,6 +305,7 @@ const TaskDetailPanel = compileClientComponent(url('components/compute/TaskDetai
   '@/components/ui/Pagination.vue': moduleDefault(GenericStub),
   '@/components/jobs/JobPlacementFigure.vue': moduleDefault(GenericStub),
   '@/components/jobs/JobExecutionsTable.vue': moduleDefault(GenericStub),
+  '@/components/jobs/JobKeyWait.vue': moduleDefault(GenericStub),
   '@/components/compute/RunLogDialog.vue': moduleDefault(GenericStub),
   '@/components/compute/TaskHeader.vue': moduleDefault(TaskHeaderStub),
   '@/components/assistant/AskAiButton.vue': moduleDefault(GenericStub),

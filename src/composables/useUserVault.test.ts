@@ -24,7 +24,7 @@ const readVault = vi.fn(async () => {
   if (node.unsupported) throw refused(404, 'no such route')
   return { heads: [...node.heads] }
 })
-const saveVault = vi.fn(async (request: { payload: string; predecessors: string[] }) => {
+const saveVault = vi.fn(async (request: { payload: string; predecessors: string[] }, _client?: object) => {
   node.count += 1
   const head = {
     revision: `R${String(node.count).padStart(4, '0')}`,
@@ -50,8 +50,12 @@ const publishUserKey = vi.fn(async (request: { key_id: string; public_key: strin
 })
 
 // The remembered key and the cached heads, as the browser's IndexedDB would keep them.
+const rememberedLoads = vi.fn(async (scope: string) => remembered.get(scope) ?? null)
+const cachedLoads = vi.fn(async (scope: string): Promise<FakeHead[] | null> => cached.get(scope) ?? null)
 const remembered = new Map<string, CryptoKey>()
 const cached = new Map<string, FakeHead[]>()
+/** Runs inside the vault's heads cache write, so a test can act right after the heads are taken. */
+let onSaveHeads: (() => void) | null = null
 const SCOPE = assistantChatScopeKey({ apiBaseUrl: 'https://node.test/api/v1', realmId: 'r-1', userId: 'u-1' })
 const stored = new Map<string, string>()
 vi.stubGlobal('localStorage', {
@@ -77,15 +81,16 @@ vi.mock('@/lib/api', () => ({
 }))
 vi.mock('@/lib/vault/keyStore', () => ({
   browserKeyStore: () => ({
-    load: async (scope: string) => remembered.get(scope) ?? null,
+    load: (scope: string) => rememberedLoads(scope),
     save: async (scope: string, key: CryptoKey) => {
       remembered.set(scope, key)
     },
     remove: async (scope: string) => {
       remembered.delete(scope)
     },
-    loadHeads: async (scope: string) => cached.get(scope) ?? null,
+    loadHeads: (scope: string) => cachedLoads(scope),
     saveHeads: async (scope: string, heads: FakeHead[]) => {
+      onSaveHeads?.()
       if (heads.length) cached.set(scope, heads)
       else cached.delete(scope)
     },
@@ -142,6 +147,7 @@ beforeEach(() => {
   remembered.clear()
   cached.clear()
   stored.clear()
+  onSaveHeads = null
   directory.length = 0
   listUserKeys.mockClear()
   publishUserKey.mockClear()
@@ -244,14 +250,14 @@ describe('useUserVault', () => {
     // while this one still saved on the old vault.
     const other = await boot()
     await other.vault.reset()
-    await other.vault.create('new horse', false)
+    await other.vault.create('new horse battery', false)
     await vault.saveProviders([work])
 
     expect(node.heads).toHaveLength(2)
     expect(vault.providers.value).toEqual([work])
     const again = await boot()
     again.vault.lock()
-    await again.vault.unlock('new horse')
+    await again.vault.unlock('new horse battery')
     expect(again.vault.providers.value).toEqual([])
     expect(node.heads).toHaveLength(2)
   })
@@ -269,7 +275,7 @@ describe('useUserVault', () => {
 
   it('opens the keys with the recovery code and sets a new passphrase from it', async () => {
     const { vault } = await boot()
-    const code = await vault.create('forgotten', true)
+    const code = await vault.create('forgotten passphrase', true)
     await vault.saveProviders([work])
     vault.lock()
 
@@ -277,24 +283,24 @@ describe('useUserVault', () => {
     await vault.unlockWithRecovery(code ?? '')
     expect(vault.providers.value).toEqual([work])
 
-    await vault.changePassphrase({ recoveryCode: code ?? '' }, 'remembered')
+    await vault.changePassphrase({ recoveryCode: code ?? '' }, 'remembered passphrase')
     vault.lock()
-    await vault.unlock('remembered')
+    await vault.unlock('remembered passphrase')
     expect(vault.state.value).toBe('unlocked')
-    expect(await nodeProviders('remembered')).toEqual([work])
+    expect(await nodeProviders('remembered passphrase')).toEqual([work])
   })
 
   it('changes the passphrase and refuses the old one', async () => {
     const { vault } = await boot()
-    await vault.create('first', false)
+    await vault.create('first passphrase', false)
 
-    await expect(vault.changePassphrase({ passphrase: 'wrong' }, 'second')).rejects.toThrow('Wrong passphrase.')
-    await vault.changePassphrase({ passphrase: 'first' }, 'second')
+    await expect(vault.changePassphrase({ passphrase: 'wrong' }, 'second passphrase')).rejects.toThrow('Wrong passphrase.')
+    await vault.changePassphrase({ passphrase: 'first passphrase' }, 'second passphrase')
 
     const restarted = await boot()
     restarted.vault.lock()
-    await expect(restarted.vault.unlock('first')).rejects.toThrow('Wrong passphrase.')
-    await restarted.vault.unlock('second')
+    await expect(restarted.vault.unlock('first passphrase')).rejects.toThrow('Wrong passphrase.')
+    await restarted.vault.unlock('second passphrase')
     expect(restarted.vault.state.value).toBe('unlocked')
   })
 
@@ -317,11 +323,11 @@ describe('useUserVault', () => {
     await vault.saveProviders([work])
 
     await vault.reset()
-    await vault.create('new horse', false)
+    await vault.create('new horse battery', false)
 
     expect(vault.state.value).toBe('unlocked')
     expect(saveVault.mock.calls.at(-1)?.[0].predecessors).toEqual([])
-    expect(await nodeProviders('new horse')).toEqual([])
+    expect(await nodeProviders('new horse battery')).toEqual([])
   })
 
   it('creates a keypair with the vault and publishes it', async () => {
@@ -392,6 +398,270 @@ describe('useUserVault', () => {
 
     await vi.waitFor(() => expect(vault.ownKey.value).toBe('unavailable'))
     expect(publishUserKey).not.toHaveBeenCalled()
+  })
+
+  it('finishes the directory check before create and unlock resolve', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', true)
+    expect(vault.ownKey.value).toBe('matches')
+    expect(publishUserKey).toHaveBeenCalledTimes(1)
+
+    vault.lock()
+    directory.length = 0
+    await vault.unlock('correct horse')
+
+    expect(vault.ownKey.value).toBe('matches')
+    expect(publishUserKey).toHaveBeenCalledTimes(2)
+  })
+
+  it('checks the directory on request and publishes a missing key once', async () => {
+    const { vault } = await boot()
+    expect(await vault.checkKey()).toBe('unknown')
+    await vault.create('correct horse', false)
+    directory.length = 0
+    listUserKeys.mockClear()
+
+    const answers = await Promise.all([vault.checkKey(), vault.checkKey()])
+
+    expect(answers).toEqual(['matches', 'matches'])
+    expect(listUserKeys).toHaveBeenCalledTimes(1)
+    expect(publishUserKey).toHaveBeenCalledTimes(2)
+    expect(directory).toHaveLength(1)
+  })
+
+  it('opens a retired keypair by id for an older bucket copy', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', false)
+    const first = Crypto.parseVaultPayload(node.heads[0].payload).keys[0]
+    await vault.rotateKey()
+
+    const pair = await vault.openUserKey(first.id)
+
+    expect(pair && btoa(String.fromCharCode(...pair.publicKey))).toBe(first.public)
+    expect(await vault.openUserKey('not-in-this-vault')).toBeNull()
+    vault.lock()
+    await expect(vault.openUserKey(first.id)).rejects.toThrow('Unlock your provider keys first.')
+  })
+
+  it('ends a key disclosure binding when the vault locks or the session changes', async () => {
+    const { vault, state } = await boot()
+    await vault.create('correct horse', false)
+    const beforeLock = vault.whileUnlocked()
+    expect(beforeLock()).toBe(true)
+
+    vault.lock()
+    expect(beforeLock()).toBe(false)
+    await vault.unlock('correct horse')
+    expect(beforeLock()).toBe(false)
+    const afterUnlock = vault.whileUnlocked()
+    state.sessionEpoch.value += 1
+    expect(afterUnlock()).toBe(false)
+  })
+
+  it('stays locked when a read that began before the lock finishes after it', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', false)
+    const lifetime = vault.whileUnlocked()
+    const decrypt = crypto.subtle.decrypt.bind(crypto.subtle)
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const held = vi.spyOn(crypto.subtle, 'decrypt').mockImplementationOnce(async (...args) => {
+      await gate
+      return decrypt(...args)
+    })
+
+    const reading = vault.load()
+    await vi.waitFor(() => expect(held).toHaveBeenCalled())
+    vault.lock()
+    release()
+    await reading
+    held.mockRestore()
+
+    expect(vault.state.value).toBe('locked')
+    expect(vault.loading.value).toBe(false)
+    expect(lifetime()).toBe(false)
+    expect(vault.whileUnlocked()()).toBe(false)
+  })
+
+  it('writes no error from a cache read that a lock and a newer read overtook', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', false)
+    readVault.mockRejectedValueOnce(refused(503, 'vault_unavailable'))
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const loadHeads = cachedLoads.mockImplementationOnce(async (scope: string) => {
+      await gate
+      return cached.get(scope) ?? null
+    })
+
+    const old = vault.load()
+    await vi.waitFor(() => expect(loadHeads).toHaveBeenCalled())
+    vault.lock()
+    await vault.load()
+    release()
+    await old
+
+    expect(vault.error.value).toBeNull()
+    expect(vault.state.value).toBe('locked')
+  })
+
+  it('applies a reset only to the session that started it', async () => {
+    const { vault, state } = await boot()
+    await vault.create('correct horse', false)
+    let finish!: () => void
+    deleteVault.mockImplementationOnce(() => new Promise<void>((resolve) => (finish = resolve)))
+
+    const resetting = vault.reset()
+    state.sessionEpoch.value += 1
+    await vault.load()
+    expect(vault.state.value).toBe('locked')
+    finish()
+    await resetting
+
+    expect(vault.state.value).toBe('locked')
+    expect(readVault).toHaveBeenCalledTimes(2)
+  })
+
+  it('drops a read that was running when a reset deleted the vault', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', false)
+    const decrypt = crypto.subtle.decrypt.bind(crypto.subtle)
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const held = vi.spyOn(crypto.subtle, 'decrypt').mockImplementationOnce(async (...args) => {
+      await gate
+      return decrypt(...args)
+    })
+
+    const reading = vault.load()
+    await vi.waitFor(() => expect(held).toHaveBeenCalled())
+    held.mockRestore()
+    await vault.reset()
+    release()
+    await reading
+
+    expect(vault.state.value).toBe('absent')
+    expect(vault.loading.value).toBe(false)
+  })
+
+  it('drops a read that began while a reset deleted the vault', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', false)
+    let deleted!: () => void
+    deleteVault.mockImplementationOnce(() => new Promise<void>((resolve) => (deleted = () => {
+      node.heads = []
+      resolve()
+    })))
+    const decrypt = crypto.subtle.decrypt.bind(crypto.subtle)
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const held = vi.spyOn(crypto.subtle, 'decrypt').mockImplementationOnce(async (...args) => {
+      await gate
+      return decrypt(...args)
+    })
+
+    const resetting = vault.reset()
+    const reading = vault.load()
+    await vi.waitFor(() => expect(held).toHaveBeenCalled())
+    held.mockRestore()
+    deleted()
+    await resetting
+    release()
+    await reading
+
+    expect(vault.state.value).toBe('absent')
+  })
+
+  it('lets the delayed read after a reset leave alone a vault created meanwhile', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', false)
+    let answer!: () => void
+    readVault.mockImplementationOnce(() => new Promise((resolve) => (answer = () => resolve({ heads: [] }))))
+
+    const resetting = vault.reset()
+    await vi.waitFor(() => expect(answer).toBeDefined())
+    await vault.create('other horse battery', false)
+    answer()
+    await resetting
+
+    expect(vault.state.value).toBe('unlocked')
+    expect(remembered.size).toBe(1)
+  })
+
+  it('lets a reset that waits on the browser store leave alone a vault created meanwhile', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', false)
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    let waiting = false
+    rememberedLoads.mockImplementationOnce(async (scope: string) => {
+      waiting = true
+      await gate
+      return remembered.get(scope) ?? null
+    })
+
+    const resetting = vault.reset()
+    await vi.waitFor(() => expect(waiting).toBe(true))
+    await vault.create('other horse battery', false)
+    release()
+    await resetting
+
+    expect(vault.state.value).toBe('unlocked')
+    expect(remembered.size).toBe(1)
+    expect(node.heads).toHaveLength(1)
+  })
+
+  it('reports no failed read after a reset once a newer read took over', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', false)
+    let fail!: () => void
+    readVault.mockImplementationOnce(() => new Promise((_, reject) => (fail = () => reject(new Error('offline')))))
+
+    const resetting = vault.reset()
+    await vi.waitFor(() => expect(fail).toBeDefined())
+    await vault.load()
+    fail()
+
+    await expect(resetting).resolves.toBeUndefined()
+    expect(vault.state.value).toBe('absent')
+
+    readVault.mockRejectedValueOnce(new Error('offline'))
+    await expect(vault.reset()).rejects.toThrow('offline')
+  })
+
+  it('drops an unlock that was running when a reset deleted the vault', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', false)
+    vault.lock()
+    const decrypt = crypto.subtle.decrypt.bind(crypto.subtle)
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const held = vi.spyOn(crypto.subtle, 'decrypt').mockImplementationOnce(async (...args) => {
+      await gate
+      return decrypt(...args)
+    })
+
+    const unlocking = vault.unlock('correct horse')
+    await vi.waitFor(() => expect(held).toHaveBeenCalled())
+    held.mockRestore()
+    await vault.reset()
+    release()
+
+    await expect(unlocking).rejects.toThrow('changed in another browser')
+    expect(vault.state.value).toBe('absent')
+    expect(remembered.size).toBe(0)
+  })
+
+  it('refuses a holder passphrase shorter than twelve characters', async () => {
+    const { vault } = await boot()
+    await expect(vault.create('eleven char', false)).rejects.toThrow('at least 12 characters')
+    expect(saveVault).not.toHaveBeenCalled()
+
+    await vault.create('twelve chars', false)
+    await expect(vault.changePassphrase({ passphrase: 'twelve chars' }, 'too short')).rejects.toThrow(
+      'at least 12 characters',
+    )
+    expect(saveVault).toHaveBeenCalledTimes(1)
   })
 
   it('opens the cached vault when no holder answers', async () => {
@@ -526,6 +796,307 @@ describe('useUserVault', () => {
     expect(failed.vault.error.value).toBe('offline')
     await expect(failed.vault.create('x', false)).rejects.toThrow('could not be read yet')
     expect(saveVault).not.toHaveBeenCalled()
+  })
+
+  it('locks no newer session when an older save finds its key no longer opens the vault', async () => {
+    const { vault, state } = await boot()
+    await vault.create('correct horse', false)
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const held = vi.spyOn(crypto.subtle, 'decrypt').mockImplementationOnce(async () => {
+      await gate
+      throw new DOMException('The key does not fit.', 'OperationError')
+    })
+
+    const saving = vault.saveProviders([work])
+    await vi.waitFor(() => expect(held).toHaveBeenCalled())
+    held.mockRestore()
+    state.sessionEpoch.value += 1
+    await vault.load()
+    await vault.unlock('correct horse')
+    release()
+    await expect(saving).rejects.toThrow('changed in another browser')
+
+    expect(vault.state.value).toBe('unlocked')
+    expect(remembered.size).toBe(1)
+  })
+
+  it('keeps the key of a newer session when an older read finds its remembered key no longer fits', async () => {
+    const { vault, state } = await boot()
+    await vault.create('correct horse', false)
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const held = vi.spyOn(crypto.subtle, 'decrypt').mockImplementationOnce(async () => {
+      await gate
+      throw new DOMException('The key does not fit.', 'OperationError')
+    })
+
+    const reading = vault.load()
+    await vi.waitFor(() => expect(held).toHaveBeenCalled())
+    held.mockRestore()
+    state.sessionEpoch.value += 1
+    await vault.load()
+    await vault.unlock('correct horse')
+    release()
+    await reading
+
+    expect(vault.state.value).toBe('unlocked')
+    expect(remembered.size).toBe(1)
+  })
+
+  it('stays cleared when a session change lands right after a read took the heads', async () => {
+    const { vault, state } = await boot()
+    await vault.create('correct horse', false)
+    vault.lock()
+    onSaveHeads = () => queueMicrotask(() => (state.sessionEpoch.value += 1))
+
+    await vault.load()
+
+    expect(vault.state.value).toBe('absent')
+  })
+
+  it('remembers no key of a vault it made when a lock lands right after the save', async () => {
+    const { vault } = await boot()
+    onSaveHeads = () => queueMicrotask(() => vault.lock())
+
+    await expect(vault.create('correct horse', false)).rejects.toThrow(
+      'Your provider keys were set up and then locked. Unlock them to use them.',
+    )
+
+    expect(vault.state.value).toBe('locked')
+    expect(remembered.size).toBe(0)
+  })
+
+  it('says plainly that nothing was saved when a lock comes before the save', async () => {
+    const { vault } = await boot()
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const derive = crypto.subtle.deriveKey.bind(crypto.subtle)
+    const held = vi.spyOn(crypto.subtle, 'deriveKey').mockImplementationOnce(async (...args) => {
+      await gate
+      return derive(...args)
+    })
+
+    const creating = vault.create('correct horse', true)
+    await vi.waitFor(() => expect(held).toHaveBeenCalled())
+    held.mockRestore()
+    vault.lock()
+    release()
+
+    await expect(creating).rejects.toThrow('Your provider keys were locked before they were saved, so nothing was saved.')
+    expect(saveVault).not.toHaveBeenCalled()
+  })
+
+  it('sends no new vault once the account changed while its keys were made', async () => {
+    const { vault, state } = await boot()
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const derive = crypto.subtle.deriveKey.bind(crypto.subtle)
+    const held = vi.spyOn(crypto.subtle, 'deriveKey').mockImplementationOnce(async (...args) => {
+      await gate
+      return derive(...args)
+    })
+
+    const creating = vault.create('correct horse', true)
+    await vi.waitFor(() => expect(held).toHaveBeenCalled())
+    held.mockRestore()
+    state.userInfo.value = { user: { user_id: 'u-2' }, realm: { realm_id: 'r-1' } } as never
+    release()
+
+    await expect(creating).rejects.toThrow('changed in another browser')
+    expect(saveVault).not.toHaveBeenCalled()
+  })
+
+  it('sends a vault save only in the session it began in, with the token it began with', async () => {
+    const { vault, state } = await boot()
+    await vault.create('correct horse', false)
+    const seal = crypto.subtle.encrypt.bind(crypto.subtle)
+    function holdSeal() {
+      let release!: () => void
+      const gate = new Promise<void>((resolve) => (release = resolve))
+      const held = vi.spyOn(crypto.subtle, 'encrypt').mockImplementationOnce(async (...args) => {
+        await gate
+        return seal(...args)
+      })
+      return { held, release }
+    }
+
+    const first = holdSeal()
+    const saving = vault.saveProviders([work])
+    await vi.waitFor(() => expect(first.held).toHaveBeenCalled())
+    first.held.mockRestore()
+    state.authToken.value = 'token-2'
+    first.release()
+    await saving
+    expect(saveVault.mock.calls.at(-1)?.[1]).toEqual({ baseUrl: 'https://node.test/api/v1', token: 'token' })
+
+    const sent = saveVault.mock.calls.length
+    const second = holdSeal()
+    const ended = vault.saveProviders([work, local])
+    await vi.waitFor(() => expect(second.held).toHaveBeenCalled())
+    second.held.mockRestore()
+    state.sessionEpoch.value += 1
+    second.release()
+
+    await expect(ended).rejects.toThrow('changed in another browser')
+    expect(saveVault).toHaveBeenCalledTimes(sent)
+  })
+
+  it('holds the recovery code of a new vault until it is dismissed, hidden while locked', async () => {
+    const { vault } = await boot()
+    const code = await vault.create('correct horse', true)
+
+    expect(vault.recoveryCode.value).toBe(code)
+    vault.lock()
+    expect(vault.recoveryCode.value).toBeNull()
+    await vault.unlock('correct horse')
+    expect(vault.recoveryCode.value).toBe(code)
+
+    vault.dismissRecovery()
+    expect(vault.recoveryCode.value).toBeNull()
+    vault.lock()
+    await vault.unlock('correct horse')
+    expect(vault.recoveryCode.value).toBeNull()
+  })
+
+  it('shows the code of a vault whose creation a lock ended once the same session unlocks', async () => {
+    const { vault } = await boot()
+    onSaveHeads = () => queueMicrotask(() => vault.lock())
+
+    await expect(vault.create('correct horse', true)).rejects.toThrow(
+      'Your provider keys were set up and then locked. Your recovery code appears after the next unlock.',
+    )
+    onSaveHeads = null
+    expect(vault.recoveryCode.value).toBeNull()
+    await vault.unlock('correct horse')
+
+    expect(vault.recoveryCode.value).toMatch(/^([0-9A-HJKMNP-TV-Z]{4}-){12}[0-9A-HJKMNP-TV-Z]{4}$/)
+  })
+
+  it('keeps the code of a vault saved while the session changed from the new session', async () => {
+    const { vault, state } = await boot()
+    const save = saveVault.getMockImplementation()!
+    saveVault.mockImplementationOnce(async (request) => {
+      state.sessionEpoch.value += 1
+      return save(request)
+    })
+
+    await expect(vault.create('correct horse', true)).rejects.toThrow('changed in another browser')
+    await vault.load()
+    await vault.unlock('correct horse')
+
+    expect(vault.recoveryCode.value).toBeNull()
+  })
+
+  it('shows the code of a vault whose save answer was lost once a later read finds it', async () => {
+    const { vault } = await boot()
+    const save = saveVault.getMockImplementation()!
+    saveVault.mockImplementationOnce(async (request) => {
+      await save(request)
+      throw new TypeError('network down')
+    })
+
+    await expect(vault.create('correct horse', true)).rejects.toThrow('network down')
+    await vault.load()
+    await vault.unlock('correct horse')
+
+    expect(vault.recoveryCode.value).toMatch(/^([0-9A-HJKMNP-TV-Z]{4}-){12}[0-9A-HJKMNP-TV-Z]{4}$/)
+    expect(saveVault).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the code of a save in flight through a read that finds no vault yet', async () => {
+    const { vault } = await boot()
+    const save = saveVault.getMockImplementation()!
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    saveVault.mockImplementationOnce(async (request) => {
+      await gate
+      await save(request)
+      throw new TypeError('network down')
+    })
+
+    const creating = vault.create('correct horse', true)
+    await vi.waitFor(() => expect(saveVault).toHaveBeenCalled())
+    await vault.load()
+    expect(vault.state.value).toBe('absent')
+    release()
+    await expect(creating).rejects.toThrow('network down')
+    await vault.load()
+    await vault.unlock('correct horse')
+
+    expect(vault.recoveryCode.value).toMatch(/^([0-9A-HJKMNP-TV-Z]{4}-){12}[0-9A-HJKMNP-TV-Z]{4}$/)
+  })
+
+  it('shows a recovery code only while the head with its recovery block is unlocked', async () => {
+    const other = await boot()
+    await other.vault.create('other horse battery', false)
+    const theirs = node.heads[0]
+    node.heads = []
+    remembered.clear()
+    const { vault } = await boot()
+    const code = await vault.create('correct horse', true)
+    node.heads = [theirs, ...node.heads]
+    vault.lock()
+    await vault.load()
+
+    await vault.unlock('other horse battery')
+    expect(vault.state.value).toBe('unlocked')
+    expect(vault.recoveryCode.value).toBeNull()
+
+    vault.lock()
+    await vault.unlock('correct horse')
+    expect(vault.recoveryCode.value).toBe(code)
+  })
+
+  it('keeps a recovery code while a read still returns its head behind a newer one', async () => {
+    const { vault } = await boot()
+    const code = await vault.create('correct horse', true)
+    const ours = node.heads[0]
+    const other = await boot()
+    await other.vault.reset()
+    await other.vault.create('other horse battery', false)
+    node.heads = [ours, ...node.heads]
+    vault.lock()
+    remembered.clear()
+
+    await vault.load()
+    expect(vault.state.value).toBe('locked')
+    await vault.unlock('correct horse')
+
+    expect(vault.recoveryCode.value).toBe(code)
+  })
+
+  it('drops a recovery code once the vault on the node carries another recovery block', async () => {
+    const { vault } = await boot()
+    await vault.create('correct horse', true)
+    const other = await boot()
+    await other.vault.reset()
+    await other.vault.create('other horse battery', true)
+
+    await vault.load()
+    expect(vault.state.value).toBe('locked')
+    await vault.unlock('other horse battery')
+
+    expect(vault.recoveryCode.value).toBeNull()
+  })
+
+  it('never shows a recovery code to another session, or after a reset', async () => {
+    const { vault, state } = await boot()
+    await vault.create('correct horse', true)
+    state.sessionEpoch.value += 1
+    await vault.load()
+    await vault.unlock('correct horse')
+    expect(vault.recoveryCode.value).toBeNull()
+
+    vault.lock()
+    await vault.reset()
+    await vault.create('correct horse', true)
+    // A save on another holder outlives the delete, so the keys open again after the reset.
+    deleteVault.mockImplementationOnce(async () => {})
+    await vault.reset()
+    expect(vault.state.value).toBe('locked')
+    await vault.unlock('correct horse')
+    expect(vault.recoveryCode.value).toBeNull()
   })
 
   it('refuses to save while locked', async () => {

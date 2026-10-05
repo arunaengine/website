@@ -36,6 +36,22 @@ const CODE_SENTENCES: Record<string, string> = {
 
 const NODE_FAILURE_SENTENCE = 'The node could not complete the request.'
 
+/** Set only on a refusal because the bucket is locked; plain AccessDenied never carries it. */
+export const BUCKET_LOCKED_HEADER = 'x-aruna-bucket-locked'
+export const BUCKET_LOCKED_MESSAGE = 'This bucket is locked. A key holder must unlock it before its data can be read.'
+
+/** A 403 from a locked bucket: the fetch path marks it, the SDK keeps the response headers. */
+export function isS3BucketLockedError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const error = err as {
+    bucketLocked?: boolean
+    $metadata?: { httpStatusCode?: number }
+    $response?: { headers?: Record<string, string | undefined> }
+  }
+  if (error.bucketLocked === true) return true
+  return error.$metadata?.httpStatusCode === 403 && error.$response?.headers?.[BUCKET_LOCKED_HEADER] === 'true'
+}
+
 /** A readable headline plus the technical line the node sent, when it has one. */
 export interface S3ErrorReport {
   message: string
@@ -52,6 +68,7 @@ function plain(message: string): S3ErrorReport {
  */
 export function s3ErrorReport(err: unknown, bucket?: string): S3ErrorReport {
   if (isS3PurgeInProgressError(err)) return plain(PURGE_IN_PROGRESS_MESSAGE)
+  if (isS3BucketLockedError(err)) return plain(BUCKET_LOCKED_MESSAGE)
   if (err instanceof S3SessionUnavailableError) return plain(err.message)
   if (!err || typeof err !== 'object') return plain(String(err))
   const error = err as {

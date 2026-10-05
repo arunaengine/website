@@ -60,6 +60,7 @@ const STATE_TONE: Record<string, StateTone> = {
   preempted: 'attention',
   // System job states.
   claimed: 'progress',
+  awaiting_key: 'attention',
   preparing: 'progress',
   ready: 'info',
   cancelling: 'attention',
@@ -95,6 +96,24 @@ const STATE_TONE: Record<string, StateTone> = {
   offline: 'attention',
   unreachable: 'attention',
   reachable: 'done',
+  // Bucket encryption.
+  'not encrypted': 'idle',
+  'not encrypted for new writes': 'count',
+  decrypting: 'progress',
+  locked: 'idle',
+  unlocked: 'done',
+  'timed unlock': 'progress',
+  'locked since restart': 'attention',
+  met: 'done',
+  'not met': 'attention',
+  finished: 'done',
+  'cleanup open': 'progress',
+  'some versions failed': 'attention',
+  'removing old copies': 'progress',
+  'waiting for an unlock': 'attention',
+  blocked: 'attention',
+  'no usable key': 'attention',
+  'directory unavailable': 'attention',
 }
 
 /** The tone for a state string; anything unknown reads as a neutral count. */

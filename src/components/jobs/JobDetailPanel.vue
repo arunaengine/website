@@ -12,6 +12,7 @@ import CopyButton from '@/components/ui/CopyButton.vue'
 import JobArtifactButton from '@/components/jobs/JobArtifactButton.vue'
 import JobAuditTrail from '@/components/jobs/JobAuditTrail.vue'
 import JobFamilySection from '@/components/jobs/JobFamilySection.vue'
+import JobKeyWait from '@/components/jobs/JobKeyWait.vue'
 import JobReportPanel from '@/components/jobs/JobReportPanel.vue'
 import JobStateBadge from '@/components/jobs/JobStateBadge.vue'
 import { useJobDetail } from '@/composables/useJobs'
@@ -96,6 +97,7 @@ async function confirmCancel() {
       <ErrorPanel v-else-if="loadState === 'error'" :message="loadError || 'This could not be loaded.'" @retry="load" />
 
       <div v-else-if="job" class="space-y-6">
+        <JobKeyWait v-if="job.state === 'awaiting_key'" :waits="job.awaiting_keys ?? []" />
         <section class="space-y-2">
           <h3 class="font-display text-sm font-semibold text-aruna-navy">Progress</h3>
           <Progress

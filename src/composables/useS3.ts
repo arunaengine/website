@@ -21,6 +21,7 @@ import {
   listObjects,
   listObjectsRecursive,
   listObjectVersions,
+  probeObjectAccess,
   putTextObject,
   resumeUpload,
   uploadObject,
@@ -51,6 +52,7 @@ export {
   S3SessionUnavailableError,
   PURGE_IN_PROGRESS_MESSAGE,
   isS3AuthError,
+  isS3BucketLockedError,
   isS3BucketMissingError,
   isS3BucketNotEmptyError,
   isS3NetworkError,
@@ -149,5 +151,6 @@ function nodeS3() {
     getObjectText,
     getObjectBlob,
     fetchUrlText,
+    probeAccess: probeObjectAccess,
   }
 }

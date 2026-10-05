@@ -18,6 +18,7 @@ import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import SyncBucketDialog from '@/components/data/SyncBucketDialog.vue'
 import BucketBackendTab from '@/components/storage/BucketBackendTab.vue'
 import BucketComplianceSection from '@/components/storage/BucketComplianceSection.vue'
+import BucketEncryptionTab from '@/components/storage/BucketEncryptionTab.vue'
 import BucketPolicySection from '@/components/storage/BucketPolicySection.vue'
 import StorageOverviewTab from '@/components/storage/StorageOverviewTab.vue'
 import SyncsTab from '@/components/storage/SyncsTab.vue'
@@ -61,7 +62,7 @@ const local = computed(() => !nodeId.value)
 const backendVisible = computed(() => local.value && canAdminGroup.value)
 const placementVisible = computed(() => local.value && (canAdminGroup.value || isRealmAdmin.value))
 
-const TAB_IDS = ['overview', 'backend', 'placement', 'syncs']
+const TAB_IDS = ['overview', 'backend', 'placement', 'encryption', 'syncs']
 const routeTab = useRouteTab(TAB_IDS, 'overview')
 const tab = computed({
   get() {
@@ -122,6 +123,7 @@ const browserLink = computed(() => ({
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger v-if="backendVisible" value="backend">Storage backend</TabsTrigger>
           <TabsTrigger v-if="placementVisible" value="placement">Placement</TabsTrigger>
+          <TabsTrigger value="encryption">Encryption</TabsTrigger>
           <TabsTrigger value="syncs">Syncs</TabsTrigger>
         </TabsList>
       </div>
@@ -147,6 +149,10 @@ const browserLink = computed(() => ({
           :can-apply="canAdminGroup || isRealmAdmin"
           blocked-reason="Only group admins of this bucket and realm admins may apply the rules."
         />
+      </TabsContent>
+
+      <TabsContent value="encryption" class="mt-0">
+        <BucketEncryptionTab :bucket="bucket" :node-id="nodeId" :group-id="groupId" />
       </TabsContent>
 
       <TabsContent value="syncs" class="mt-0">

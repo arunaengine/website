@@ -795,6 +795,71 @@ export const docsTopics: DocsTopic[] = [
     ],
   },
   {
+    slug: 'encrypted-buckets',
+    kind: 'Guide',
+    title: 'Encrypt a bucket',
+    summary: 'Keep the stored data of a bucket readable only while a key holder unlocks it.',
+    sections: [
+      {
+        title: 'Encryption modes',
+        icon: 'Shield',
+        bullets: [
+          'Off: the node stores the bytes as they are, or compressed when the bucket compresses.',
+          'Node-managed: the node keeps its own copy of the bucket key and unlocks the bucket at startup. This protects against the storage provider only, not against the node.',
+          'Vault-locked: only key holders unlock the bucket, and a node restart locks it again.',
+        ],
+        paragraphs: [
+          'Writes, listing and HEAD work while a bucket is locked. Downloads, previews and jobs that need its content wait for an unlock; a preview links to the Encryption tab, and its Check again button loads it once the node reports the bucket unlocked. The content hash stays visible in metadata, so equal files are still recognisable.',
+          'S3 clients see an encrypted bucket like SSE-S3 (`x-amz-server-side-encryption: AES256`) and send no key.',
+        ],
+      },
+      {
+        title: 'Key holders and recovery',
+        icon: 'Users',
+        paragraphs: [
+          'Key holders are the bucket creator, the group admins and users granted explicitly. Each one has a copy of the bucket key, sealed to the key in their vault. A user who loses group-admin rights loses the implicit right to unlock at once; a creator and explicit grants stay valid.',
+          'A vault-locked bucket needs a recovery code or two ready key holders. Removing a key holder that breaks this rule needs a confirmation, and removing a key holder does not erase copies they already made.',
+          'Your vault passphrase needs at least 12 characters, because the vault opens bucket keys. Set it up under [Settings](page:settings), Provider keys.',
+        ],
+      },
+      {
+        title: 'Unlock, extend and lock',
+        icon: 'KeyRound',
+        steps: [
+          'Open the settings of the bucket and switch to the Encryption tab.',
+          'Choose Unlock. Your vault opens in this browser; enter its passphrase when it is locked.',
+          'Pick how long the unlock lasts, within the bucket maximum.',
+          'The browser opens your copy of the bucket key and sends only the bucket key to the node that hosts the bucket.',
+          'Extend a timed unlock, or choose Lock all keys when you are done. It locks every key of the bucket, previous keys included.',
+        ],
+        paragraphs: [
+          'An unlock lets every reader with access on that node read the bucket until it locks. When the node does not confirm an unlock, the portal reads the bucket state first and never sends the key again on its own.',
+          'Jobs that need a locked bucket show Waiting for a key. They neither fail nor retry, and they go on after an unlock.',
+        ],
+      },
+      {
+        title: 'Change the mode or rotate the key',
+        icon: 'RefreshCw',
+        paragraphs: [
+          'Group admins change the mode, the cipher, the block keys and the longest unlock on the same tab. Open uploads must finish first.',
+          'Turning encryption on needs no unlock: stored versions are encrypted in the background. Turning it off, changing the format, switching between modes and rotating the key need the bucket unlocked.',
+          'The tab shows the progress of the rewrite. It is complete only when no version is left or failed and the old copies are removed.',
+          'While stored versions are rewritten, the tab also lists the previous key with its fingerprint. Key holders unlock it the same way, also after encryption was turned off for new writes.',
+          'Rotation grants every stored version to a new key without rewriting the data. It does not invalidate an old backup that still holds the old key.',
+        ],
+      },
+      {
+        title: 'Limits',
+        icon: 'ShieldCheck',
+        bullets: [
+          'Deletion is not secure erasure: old backups and copies a backend keeps still hold their bytes.',
+          'Logs, reports and outputs that user code writes are not rewritten.',
+          'This browser remembers your vault key. On Aruna Desktop the browser and the node share one disk, so that disk can open your bucket keys.',
+        ],
+      },
+    ],
+  },
+  {
     slug: 'invenio-zenodo',
     kind: 'Guide',
     title: 'Import from and publish to Zenodo and other repositories',

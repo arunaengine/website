@@ -2,6 +2,39 @@ import { describe, expect, it } from 'vitest'
 import { describeNotification } from './notifications'
 import type { ApiNotification } from '@/lib/api'
 
+describe('restart lock notifications', () => {
+  it('opens the Encryption tab of the bucket on the node that restarted', () => {
+    const notification: ApiNotification = {
+      id: 'notification-2', category: 'bucket.encryption', kind: 'bucket_locked_by_restart',
+      class: 'direct', created_at_ms: 1, read: false, bucket: 'reef', node_id: 'node-b', group_id: 'group-1',
+    }
+    const display = describeNotification(notification, { groupName: () => undefined })
+    expect(display.title).toBe('A node restart locked reef')
+    expect(display.link).toEqual({
+      name: 'bucket-storage',
+      params: { bucketId: 'reef' },
+      query: { tab: 'encryption', node: 'node-b', group: 'group-1' },
+    })
+  })
+})
+
+describe('recovery notifications', () => {
+  it('says the key recovery is weakened and opens the Encryption tab on the hosting node', () => {
+    const notification: ApiNotification = {
+      id: 'notification-3', category: 'bucket.encryption', kind: 'bucket_recovery_degraded',
+      class: 'direct', created_at_ms: 1, read: false, bucket: 'reef', node_id: 'node-b', group_id: 'group-1',
+    }
+    const display = describeNotification(notification, { groupName: () => undefined })
+    expect(display.title).toBe('The key recovery of reef is weakened')
+    expect(display.detail).toContain('Grant the key to another holder')
+    expect(display.link).toEqual({
+      name: 'bucket-storage',
+      params: { bucketId: 'reef' },
+      query: { tab: 'encryption', node: 'node-b', group: 'group-1' },
+    })
+  })
+})
+
 describe('join request notifications', () => {
   it('names the group and opens its Members tab', () => {
     const notification: ApiNotification = {
