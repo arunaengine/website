@@ -89,6 +89,7 @@ export interface BucketEncryptionResponse {
   mode: EncryptionMode
   /** Stable id the bucket keys bind to; null until encryption was first enabled. */
   bucket_id: string | null
+  /** Grows with every settings change and rotation; a change or rotation names it as expected. */
   storage_generation: number
   /** Generation new writes seal to; zero until the first key exists. */
   key_generation: number
@@ -116,7 +117,7 @@ export interface PutBucketEncryptionRequest {
   block_keys?: BlockKeys
   /** Null removes the maximum; absent keeps it. */
   max_unlock_ms?: number | null
-  /** The key generation the caller saw; another current one is a 409 `stale_generation`. */
+  /** The `storage_generation` the caller saw; another current one is a 409 `stale_generation`. */
   expected_generation: number
 }
 
@@ -321,6 +322,7 @@ export function getMyCopies(
   return apiRequest(`${base(bucket)}/copies/me`, { signal, query: { generation } }, client)
 }
 
+/** `expectedGeneration` is the `storage_generation` the caller saw. */
 export function rotateBucketKey(
   bucket: string,
   expectedGeneration: number,

@@ -102,7 +102,7 @@ function ask(action: Pending['action']) {
   pending.value = {
     action,
     draft: { ...draft.value },
-    generation: props.status.key_generation,
+    generation: props.status.storage_generation,
     notes: action === 'rotate' ? ROTATION_NOTES : notes.value,
     context: contextOf(props.status),
   }

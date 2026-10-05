@@ -104,7 +104,7 @@ describe('bucket encryption settings', () => {
     expect(button(root, 'Rotate key').props.disabled).toBe(true)
   })
 
-  it('confirms a change with its notes and sends the key generation it saw', async () => {
+  it('confirms a change with its notes and sends the storage generation it saw', async () => {
     const root = await render(status({ mode: 'off', unlock: null }))
 
     await choose(root, 'Encryption mode', 'vault_locked')
@@ -118,7 +118,7 @@ describe('bucket encryption settings', () => {
       cipher: 'chacha20_poly1305',
       block_keys: 'content_derived',
       max_unlock_ms: null,
-      expected_generation: 5,
+      expected_generation: 1,
     })
   })
 
@@ -130,8 +130,22 @@ describe('bucket encryption settings', () => {
     expect(content(root)).toContain('does not invalidate an old backup')
     await click(button(dialog(root), 'Rotate'))
 
-    expect(rotate).toHaveBeenCalledWith(5)
+    expect(rotate).toHaveBeenCalledWith(1)
     expect(content(root)).toContain('Uploads to this bucket are still open')
+  })
+
+  it('names the storage generation after a cipher change left the key generation as it was', async () => {
+    const root = await render(status({ unlock: UNLOCKED }))
+    await replace(status({ unlock: UNLOCKED, cipher: 'aes256_gcm', storage_generation: 2 }))
+
+    await choose(root, 'Block keys', 'unique')
+    await click(button(root, 'Save changes'))
+    await click(button(dialog(root), 'Save'))
+    await click(button(root, 'Rotate key'))
+    await click(button(dialog(root), 'Rotate'))
+
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ cipher: 'aes256_gcm', expected_generation: 2 }))
+    expect(rotate).toHaveBeenCalledWith(2)
   })
 
   it('keeps a changed draft when the node answers again, and follows it otherwise', async () => {

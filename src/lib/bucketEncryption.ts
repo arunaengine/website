@@ -241,7 +241,7 @@ export function durationOptions(maxMs: number | null): { value: string; label: s
 const REFUSALS: Record<string, string> = {
   [ENCRYPTION_CODES.wrongKey]: 'The node says this key does not belong to the bucket.',
   [ENCRYPTION_CODES.invalidDuration]: 'The node refused this unlock length.',
-  [ENCRYPTION_CODES.staleGeneration]: 'The bucket key changed meanwhile. Read the state again and retry.',
+  [ENCRYPTION_CODES.staleGeneration]: 'The bucket settings or key changed meanwhile. Read the state again and retry.',
   [ENCRYPTION_CODES.sessionMismatch]: 'The bucket was locked or unlocked again meanwhile. Read the state again.',
   [ENCRYPTION_CODES.capacity]: 'The node holds as many unlocked buckets as it can. Lock another one first.',
   [ENCRYPTION_CODES.openUploads]: 'Uploads to this bucket are still open. Finish or abort them first.',
@@ -264,7 +264,7 @@ export function actionError(error: unknown): string {
     : encryptionError(error)
 }
 
-/** The settings an admin may change with PUT; the key generation is the one shown. */
+/** The settings an admin may change with PUT; the storage generation is the one shown. */
 export interface EncryptionDraft {
   mode: EncryptionMode
   cipher: BlockCipher
