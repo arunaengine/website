@@ -29,6 +29,8 @@ export interface SyncStatusSnapshot {
   last_synced_at?: string | null
   last_error?: string | null
   counters: SyncCounters
+  /** Copy jobs waiting for the source bucket key; absent on an older node. */
+  awaiting_key?: number
 }
 
 export interface SyncRelationship {
@@ -45,6 +47,8 @@ export interface SyncRelationship {
   state: SyncRelationshipState
   failure_reason?: string | null
   status: SyncStatusSnapshot
+  /** Copies of an encrypted source are stored unencrypted. */
+  plaintext?: boolean
 }
 
 export interface SyncRelationshipListResponse {
@@ -73,6 +77,8 @@ export interface CreateSyncRelationshipRequest {
   mode: SyncMode
   reference_handling: SyncReferenceHandling
   replicate_deletes?: boolean
+  /** Store copies of an encrypted source unencrypted; needs a key holder of the source bucket. */
+  plaintext?: boolean
 }
 
 // Both fields are optional in practice; a node that predates pausing refuses

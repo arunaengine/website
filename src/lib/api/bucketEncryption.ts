@@ -203,6 +203,22 @@ export interface BucketAuditResponse {
   next_cursor?: string
 }
 
+/** An S3 key whose session token opens this bucket. The token itself is never listed. */
+export interface BucketTokenEntry {
+  access_key_id: string
+  /** The user who created the key. */
+  user_id: string
+  /** RFC 3339. */
+  created_at: string
+  generation: number
+  /** Made for an older key generation, so the token no longer opens the bucket. */
+  stale: boolean
+}
+
+export interface BucketTokensResponse {
+  tokens: BucketTokenEntry[]
+}
+
 export const BUCKET_KEY_BYTES = 32
 
 /** Machine-readable codes of the encryption routes. */
@@ -224,6 +240,7 @@ export const ENCRYPTION_CODES = {
   unchanged: 'unchanged',
   notSupported: 'not_supported',
   objectTooLarge: 'object_too_large',
+  bucketNotEncrypted: 'bucket_not_encrypted',
 } as const
 
 function base(bucket: string): string {
@@ -349,4 +366,13 @@ export function getBucketAudit(
   signal?: AbortSignal,
 ): Promise<BucketAuditResponse> {
   return apiRequest(`${base(bucket)}/audit`, { signal, query: { ...page } }, client)
+}
+
+/** Holders and group admins only; others get 403. */
+export function listBucketTokens(
+  bucket: string,
+  client: ApiClientOptions,
+  signal?: AbortSignal,
+): Promise<BucketTokensResponse> {
+  return apiRequest(`${base(bucket)}/tokens`, { signal }, client)
 }

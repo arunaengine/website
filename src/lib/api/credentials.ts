@@ -18,11 +18,15 @@ export interface CreateS3CredentialsRequest {
   group_id: string
   expires_in_seconds?: number
   path_restrictions?: Array<{ pattern: string; permission: string }>
+  /** Encrypted buckets on this node the key may read while they are locked. */
+  encrypted_buckets?: string[]
 }
 
 export interface CreateS3CredentialsResponse {
   access_key_id: string
   access_secret: string
+  /** Only when `encrypted_buckets` named a bucket. Shown once; S3 clients send it as `aws_session_token`. */
+  session_token?: string
 }
 
 export interface CreateS3SessionRequest {

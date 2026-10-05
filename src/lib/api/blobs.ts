@@ -66,6 +66,8 @@ export interface ReplicateBlobRequest {
   path?: string
   version_id?: string
   node_id: string
+  /** Store the copy of an encrypted source unencrypted; needs a key holder of the bucket. */
+  plaintext?: boolean
 }
 
 export interface ReplicateBlobResponse {

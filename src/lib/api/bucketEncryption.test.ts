@@ -4,6 +4,7 @@ import {
   bucketLocked,
   extendUnlock,
   getMyCopies,
+  listBucketTokens,
   lockBucket,
   removeBucketHolder,
   unlockBucket,
@@ -101,5 +102,20 @@ describe('bucket encryption client', () => {
     expect(locked).toBeInstanceOf(ApiError)
     expect(bucketLocked(locked)).toBe(true)
     expect(bucketLocked(stale)).toBe(false)
+  })
+
+  it('lists the session tokens of a bucket on its node and passes a refusal on', async () => {
+    const token = { access_key_id: 'AK1', user_id: 'U1', created_at: '2026-10-05T10:00:00Z', generation: 2, stale: true }
+    const calls = stubFetch({ tokens: [token] })
+
+    const listed = await listBucketTokens('reef survey', NODE)
+    stubFetch(null, 403, 'forbidden')
+    const refused = await listBucketTokens('reef', NODE).catch((error: unknown) => error)
+
+    expect(listed.tokens).toEqual([token])
+    expect(calls[0].method).toBe('GET')
+    expect(calls[0].url.pathname).toBe('/api/v1/data/buckets/reef%20survey/storage/encryption/tokens')
+    expect(refused).toBeInstanceOf(ApiError)
+    expect((refused as ApiError).status).toBe(403)
   })
 })
