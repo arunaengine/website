@@ -55,8 +55,10 @@ describe('bucket encryption wording', () => {
     expect(refusal(409, 'not_encrypted')).toContain('not encrypted')
     expect(refusal(409, 'unchanged')).toBe('The bucket already uses these settings.')
     expect(refusal(501, 'not_supported')).toContain('does not support')
-    expect(refusal(409, 'object_too_large')).toBe(
-      'This bucket holds an object larger than encrypted buckets support, so encryption cannot be enabled.',
+    const limit = 'an object is larger than the 1099511627776 byte (1.00 TiB) limit of encrypted objects'
+    expect(encryptionError(new ApiError(409, limit, 'object_too_large'))).toBe(
+      'This bucket holds an object larger than encrypted buckets support, so encryption cannot be enabled. ' +
+        'An object is larger than the 1099511627776 byte (1.00 TiB) limit of encrypted objects.',
     )
     expect(refusal(403, 'Forbidden')).toContain('need group admin rights')
     expect(refusal(409, 'something_new')).toBe('node text')

@@ -264,6 +264,11 @@ const NO_RIGHTS = 'You may not make this change. Settings, key holders and rotat
 /** A node refusal in plain words, by its code; anything else keeps the node's message. */
 export function encryptionError(error: unknown): string {
   const code = error instanceof ApiError ? (error.code ?? '') : ''
+  if (code === ENCRYPTION_CODES.objectTooLarge) {
+    // The node's own message names the size limit, so it follows as a sentence.
+    const limit = apiErrorMessage(error).replace(/^./, (first) => first.toUpperCase()).replace(/[^.]$/, '$&.')
+    return `${REFUSALS[code]} ${limit}`
+  }
   const refused = error instanceof ApiError && error.status === 403
   return REFUSALS[code] ?? (refused ? NO_RIGHTS : apiErrorMessage(error))
 }
