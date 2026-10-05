@@ -10,6 +10,7 @@ import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Select from '@/components/ui/Select.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import GroupSelect from '@/components/groups/GroupSelect.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
@@ -18,9 +19,10 @@ import { computed, ref, watch } from 'vue'
 import { ChevronRight, Code2, KeyRound, Plus, ShieldAlert, X } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useS3 } from '@/composables/useS3'
+import { useTokenBuckets } from '@/composables/useTokenBuckets'
 import { useUserSessions } from '@/composables/useUserSessions'
 import { errorMessage } from '@/lib/utils'
-import type { CreateS3CredentialsResponse, CreateSessionResponse } from '@/lib/api'
+import { ApiError, ENCRYPTION_CODES, type CreateS3CredentialsResponse, type CreateSessionResponse } from '@/lib/api'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{
@@ -70,6 +72,27 @@ interface Restriction {
 }
 const restrictions = ref<Restriction[]>([])
 const showRestrictions = ref(false)
+const showEncrypted = ref(false)
+const encryptedBuckets = ref<string[]>([])
+/** Encrypted buckets were named, so a key without a session token is reported. */
+const tokenAsked = ref(false)
+const {
+  buckets: tokenChoices,
+  state: tokenState,
+  error: tokenError,
+  unchecked,
+  partial,
+} = useTokenBuckets(groupId, computed(() => props.open && showEncrypted.value))
+watch(tokenChoices, (choices) => {
+  encryptedBuckets.value = encryptedBuckets.value.filter((name) => choices.includes(name))
+})
+
+function toggleBucket(name: string) {
+  encryptedBuckets.value = encryptedBuckets.value.includes(name)
+    ? encryptedBuckets.value.filter((entry) => entry !== name)
+    : [...encryptedBuckets.value, name]
+}
+
 const PERMISSION_OPTIONS = [
   { value: 'read', label: 'read' },
   { value: 'write', label: 'write' },
@@ -105,6 +128,7 @@ const cliSnippet = computed(() => {
   return [
     `export AWS_ACCESS_KEY_ID=${created.value.access_key_id}`,
     `export AWS_SECRET_ACCESS_KEY=${created.value.access_secret}`,
+    ...(created.value.session_token ? [`export AWS_SESSION_TOKEN=${created.value.session_token}`] : []),
     `aws s3 ls --endpoint-url ${connectedEndpoint.value ?? '<s3-endpoint>'}`,
     `s5cmd --endpoint-url ${connectedEndpoint.value ?? '<s3-endpoint>'} ls`,
   ].join('\n')
@@ -140,6 +164,9 @@ watch(
     tokenExpiresIn.value = '86400'
     restrictions.value = []
     showRestrictions.value = false
+    showEncrypted.value = false
+    encryptedBuckets.value = []
+    tokenAsked.value = false
   },
 )
 
@@ -151,15 +178,31 @@ async function submit() {
   const active = restrictions.value
     .filter((r) => r.pattern.trim())
     .map((r) => ({ pattern: r.pattern.trim(), permission: r.permission }))
+  const encrypted = encryptedBuckets.value.filter((name) => tokenChoices.value.includes(name))
+  tokenAsked.value = encrypted.length > 0
   try {
     created.value = await createS3Credentials({
       group_id: groupId.value,
       expires_in_seconds: Number(expiresIn.value),
       ...(active.length ? { path_restrictions: active } : {}),
+      ...(encrypted.length ? { encrypted_buckets: encrypted } : {}),
     })
   } catch (err) {
-    submitError.value = errorMessage(err)
+    submitError.value = encrypted.length ? tokenRefusal(err) : errorMessage(err)
   }
+}
+
+function tokenRefusal(err: unknown): string {
+  if (!(err instanceof ApiError)) return errorMessage(err)
+  if (err.status === 409 && err.code === ENCRYPTION_CODES.locked) {
+    return 'A chosen bucket is locked now. Unlock it on its Encryption tab, or leave it out, and try again.'
+  }
+  if (err.status === 403) return 'The node refused the key. You must be a current key holder of every chosen bucket.'
+  if (err.status === 400 && err.code === ENCRYPTION_CODES.bucketNotEncrypted) {
+    return 'A chosen bucket is not encrypted, so it needs no session token. Leave it out and try again.'
+  }
+  if (err.status === 404) return 'A chosen bucket does not exist on this node. Leave it out and try again.'
+  return errorMessage(err)
 }
 
 async function submitToken() {
@@ -261,6 +304,46 @@ async function submitToken() {
               </p>
             </div>
           </div>
+          <div>
+            <button
+              type="button"
+              class="flex items-center gap-1 text-xs font-medium text-foreground/80 hover:text-foreground"
+              @click="showEncrypted = !showEncrypted"
+            >
+              <ChevronRight :class="['h-3.5 w-3.5 transition-transform', showEncrypted && 'rotate-90']" />
+              Encrypted buckets (optional)
+            </button>
+            <div v-if="showEncrypted" class="mt-2 space-y-2">
+              <p class="text-[11px] leading-relaxed text-muted-foreground">
+                The key also gets a session token that reads the chosen buckets while they are locked. Only buckets on
+                this node that are unlocked and that you hold a key for are offered.
+              </p>
+              <p v-if="!groupId" class="text-[11px] text-muted-foreground">Select a group first.</p>
+              <Spinner v-else-if="tokenState === 'loading'" show-label label="Checking the buckets of this group" />
+              <Notice v-else-if="tokenState === 'refused'" tone="info">
+                You may not list the buckets of this group on this node.
+              </Notice>
+              <Notice v-else-if="tokenState === 'failed'" tone="error">
+                The buckets of this group could not be listed: {{ tokenError }}
+              </Notice>
+              <template v-else-if="tokenState === 'ready'">
+                <label v-for="name in tokenChoices" :key="name" class="flex items-center gap-2 text-xs">
+                  <input type="checkbox" :checked="encryptedBuckets.includes(name)" @click="toggleBucket(name)" />
+                  <span class="break-all font-mono">{{ name }}</span>
+                </label>
+                <p v-if="!tokenChoices.length" class="text-[11px] text-muted-foreground">
+                  No bucket of this group on this node is encrypted, unlocked and held by you.
+                </p>
+                <p v-if="unchecked" class="text-[11px] text-muted-foreground">
+                  {{ unchecked }} {{ unchecked === 1 ? 'bucket' : 'buckets' }} could not be checked and
+                  {{ unchecked === 1 ? 'is' : 'are' }} not offered.
+                </p>
+                <p v-if="partial" class="text-[11px] text-muted-foreground">
+                  Only the first 1000 buckets of this group were checked.
+                </p>
+              </template>
+            </div>
+          </div>
         </template>
 
         <Notice v-if="submitError" tone="error">
@@ -271,7 +354,11 @@ async function submitToken() {
       <div v-else-if="created" class="space-y-3">
         <Notice tone="warning" class="flex items-start gap-2">
           <ShieldAlert class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span>The secret is shown once and cannot be retrieved later. The portal never stores or uses this key.</span>
+          <span v-if="created.session_token">
+            The secret and the session token are shown once and cannot be retrieved later. The portal never stores or
+            uses them.
+          </span>
+          <span v-else>The secret is shown once and cannot be retrieved later. The portal never stores or uses this key.</span>
         </Notice>
         <div class="space-y-2 text-sm">
           <div class="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
@@ -288,6 +375,24 @@ async function submitToken() {
             </div>
             <CopyButton :value="created.access_secret" label="Copy secret access key" />
           </div>
+          <template v-if="created.session_token">
+            <div class="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
+              <div class="min-w-0">
+                <div class="text-[10px] uppercase tracking-wider text-muted-foreground">Session token</div>
+                <div class="break-all font-mono text-xs">{{ created.session_token }}</div>
+              </div>
+              <CopyButton :value="created.session_token" label="Copy session token" />
+            </div>
+            <p class="text-[11px] leading-relaxed text-muted-foreground">
+              Set it as <code class="font-mono">aws_session_token</code> in your S3 client, or as
+              <code class="font-mono">AWS_SESSION_TOKEN</code>, next to the key and secret. Without it the key cannot
+              read the chosen buckets while they are locked.
+            </p>
+          </template>
+          <Notice v-else-if="tokenAsked" tone="warning">
+            The node returned no session token, so this key cannot read the chosen buckets while they are locked. The
+            node may run an older Aruna version.
+          </Notice>
           <div class="relative rounded-md border border-border bg-muted/40 px-3 py-2">
             <div class="text-[10px] uppercase tracking-wider text-muted-foreground">CLI usage</div>
             <pre class="mt-1 whitespace-pre-wrap break-all font-mono text-[11px] leading-5">{{ cliSnippet }}</pre>

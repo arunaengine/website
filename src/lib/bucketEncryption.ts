@@ -88,6 +88,11 @@ export function keyGenerations(status: BucketEncryptionResponse): KeyGenerations
   return { list: [active], reported: false }
 }
 
+/** An S3 key may get a session token for an encrypted bucket that is unlocked here and held by the caller. */
+export function tokenEligible(status: BucketEncryptionResponse): boolean {
+  return status.mode !== 'off' && status.unlock?.state === 'unlocked' && status.caller.holder
+}
+
 /** Locked, unlocked, timed unlock or locked since restart; unknown when the node gave no lock state. */
 export function lockView(status: BucketEncryptionResponse): LockView {
   if (status.mode === 'off') {
