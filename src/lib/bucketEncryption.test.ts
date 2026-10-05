@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import type { BucketEncryptionResponse, BucketUnlockStatus, EncryptionTransition } from './api'
+import { ApiError, type BucketEncryptionResponse, type BucketUnlockStatus, type EncryptionTransition } from './api'
 import {
+  encryptionError,
   keyGenerations,
   changeNeedsUnlock,
   changeNotes,
@@ -43,6 +44,20 @@ const TRANSITION: EncryptionTransition = {
 }
 
 describe('bucket encryption wording', () => {
+  it('words every refusal code of the encryption routes and a refused key change', () => {
+    const refusal = (status: number, code: string) => encryptionError(new ApiError(status, 'node text', code))
+
+    expect(refusal(409, 'transition_running')).toContain('still moving to the new encryption')
+    expect(refusal(409, 'bucket_locked')).toContain('A key holder must unlock it first')
+    expect(refusal(409, 'no_copy')).toContain('You have no copy of this bucket key yet')
+    expect(refusal(403, 'not_holder')).toBe('You do not hold a key of this bucket.')
+    expect(refusal(409, 'not_encrypted')).toContain('not encrypted')
+    expect(refusal(409, 'unchanged')).toBe('The bucket already uses these settings.')
+    expect(refusal(501, 'not_supported')).toContain('does not support')
+    expect(refusal(403, 'Forbidden')).toContain('need group admin rights')
+    expect(refusal(409, 'something_new')).toBe('node text')
+  })
+
   it('names the four lock states and an unreported one', () => {
     expect(lockView(bucket(LOCKED)).label).toBe('Locked')
     expect(lockView(bucket({ ...LOCKED, lock_reason: 'restart' })).label).toBe('Locked since restart')

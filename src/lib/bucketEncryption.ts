@@ -248,12 +248,22 @@ const REFUSALS: Record<string, string> = {
   [ENCRYPTION_CODES.locked]: 'The bucket is locked. A key holder must unlock it first.',
   [ENCRYPTION_CODES.recoveryUnmet]:
     'Vault-locked needs two ready key holders, or one with a recovery code.',
+  [ENCRYPTION_CODES.transitionRunning]:
+    'Stored versions are still moving to the new encryption. Try again when that has finished.',
+  [ENCRYPTION_CODES.noCopy]: 'You have no copy of this bucket key yet. Another key holder must unlock the bucket first.',
+  [ENCRYPTION_CODES.notHolder]: 'You do not hold a key of this bucket.',
+  [ENCRYPTION_CODES.notEncrypted]: 'This bucket is not encrypted, so it has no keys.',
+  [ENCRYPTION_CODES.unchanged]: 'The bucket already uses these settings.',
+  [ENCRYPTION_CODES.notSupported]: 'This node does not support this for the bucket.',
 }
+
+const NO_RIGHTS = 'You may not make this change. Settings, key holders and rotation need group admin rights.'
 
 /** A node refusal in plain words, by its code; anything else keeps the node's message. */
 export function encryptionError(error: unknown): string {
   const code = error instanceof ApiError ? (error.code ?? '') : ''
-  return REFUSALS[code] ?? apiErrorMessage(error)
+  const refused = error instanceof ApiError && error.status === 403
+  return REFUSALS[code] ?? (refused ? NO_RIGHTS : apiErrorMessage(error))
 }
 
 /** Only a 4xx says a change was not applied; a 5xx or a lost answer leaves it open. */

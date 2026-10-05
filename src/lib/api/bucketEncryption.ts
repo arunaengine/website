@@ -217,6 +217,12 @@ export const ENCRYPTION_CODES = {
   confirmRecovery: 'recovery_confirmation_required',
   recoveryUnmet: 'recovery_unmet',
   capacity: 'unlock_capacity',
+  transitionRunning: 'transition_running',
+  noCopy: 'no_copy',
+  notHolder: 'not_holder',
+  notEncrypted: 'not_encrypted',
+  unchanged: 'unchanged',
+  notSupported: 'not_supported',
 } as const
 
 function base(bucket: string): string {
