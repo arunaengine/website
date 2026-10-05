@@ -1,6 +1,18 @@
 import type { Component } from 'vue'
 import type { RouteLocationRaw } from 'vue-router'
-import { AlertTriangle, ArrowLeftRight, Bell, FileJson2, HardDrive, Lock, Upload, UserMinus, UserPlus, Users } from '@lucide/vue'
+import {
+  AlertTriangle,
+  ArrowLeftRight,
+  Bell,
+  FileJson2,
+  HardDrive,
+  Lock,
+  ShieldAlert,
+  Upload,
+  UserMinus,
+  UserPlus,
+  Users,
+} from '@lucide/vue'
 import type { ApiNotification } from '@/lib/api'
 import { bucketUnlockLink } from '@/lib/bucketEncryption'
 import { formatBytes, truncateMiddle } from '@/lib/utils'
@@ -110,6 +122,14 @@ export const NOTIFICATION_KINDS: Record<string, NotificationKindDescriptor> = {
     icon: Lock,
     title: (n) => (n.bucket ? `A node restart locked ${n.bucket}` : 'A node restart locked a bucket'),
     detail: () => 'A key holder must unlock it again before its data can be read.',
+    link: (n) => (n.bucket ? bucketUnlockLink(n.bucket, n.node_id, n.group_id) : null),
+  },
+  // Sent once to each key holder when a vault-locked bucket no longer meets the recovery rule,
+  // for example after an admin lost the role; opens its Encryption tab on the hosting node.
+  bucket_recovery_degraded: {
+    icon: ShieldAlert,
+    title: (n) => (n.bucket ? `The key recovery of ${n.bucket} is weakened` : "A bucket's key recovery is weakened"),
+    detail: () => 'Grant the key to another holder, or unlock the bucket so pending holders get their copies.',
     link: (n) => (n.bucket ? bucketUnlockLink(n.bucket, n.node_id, n.group_id) : null),
   },
   sync_failed: {
