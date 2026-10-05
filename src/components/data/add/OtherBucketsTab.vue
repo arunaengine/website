@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import Notice from '@/components/ui/Notice.vue'
 import Select from '@/components/ui/Select.vue'
 import Spinner from '@/components/ui/Spinner.vue'
+import Switch from '@/components/ui/Switch.vue'
 import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
 import ObjectBrowserPanel from '@/components/data/ObjectBrowserPanel.vue'
 import { stateVariant } from '@/lib/stateBadge'
@@ -27,6 +29,9 @@ const {
   addOtherSelection,
   removeOtherRow,
   otherTargetPrefix,
+  offerPlaintext,
+  plaintextOffered,
+  plaintextChosen,
 } = props.imports
 
 async function createOtherRelationships() {
@@ -123,9 +128,28 @@ async function createOtherRelationships() {
         <p class="truncate text-[10px] text-muted-foreground" :title="`${bucket}/${otherTargetPrefix(row)}`">
           into {{ bucket }}/{{ otherTargetPrefix(row) }}
         </p>
+        <label
+          v-if="offerPlaintext(row) && (row.state === 'ready' || row.state === 'error')"
+          class="flex items-center gap-2 text-[11px] text-foreground"
+        >
+          <Switch
+            :checked="row.plaintext"
+            aria-label="Store the copy unencrypted"
+            @update:checked="(v: boolean) => (row.plaintext = v)"
+          />
+          Store the copy unencrypted
+        </label>
         <p v-if="row.error" class="text-[10px] text-destructive">{{ row.error }}</p>
       </li>
     </ul>
+    <p v-if="plaintextOffered" class="border-t border-border px-3 py-1.5 text-[10px] text-muted-foreground">
+      Some sources are encrypted. Storing a copy unencrypted is needed when this bucket is not encrypted, and only key
+      holders of the source bucket may choose it.
+    </p>
+    <Notice v-if="plaintextChosen" tone="warning" class="m-3">
+      The copies marked to be stored unencrypted are written into {{ bucket }} without encryption. Anyone who may read
+      this bucket can read them without a key.
+    </Notice>
     <p class="border-t border-border px-3 py-1.5 text-[10px] text-muted-foreground">
       Each import becomes a sync relationship; created ones appear under the bucket's sync status.
     </p>

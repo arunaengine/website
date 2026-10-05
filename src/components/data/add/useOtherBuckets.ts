@@ -1,8 +1,10 @@
 import { computed, ref, watch, type Ref } from 'vue'
 import { useAruna } from '@/composables/useAruna'
+import { useEncryptedSource } from '@/composables/useEncryptedSource'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import type { FolderEntry, ObjectEntry } from '@/composables/useS3'
 import { ApiError, type BucketSearchHit } from '@/lib/api'
+import { copyRefusal } from '@/lib/bucketEncryption'
 import { errorMessage } from '@/lib/utils'
 
 // Import from any bucket in the realm: search local and remote buckets, browse
@@ -21,6 +23,8 @@ export interface OtherBucketRow {
   sourcePrefix: string
   isPrefix: boolean
   mode: OtherMode
+  /** Store the copy unencrypted; sent only for a copy of an encrypted source. */
+  plaintext: boolean
   state: 'ready' | 'creating' | 'done' | 'error'
   error: string | null
 }
@@ -37,7 +41,7 @@ export function useOtherBuckets(options: {
   bucket: Ref<string>
   prefix: Ref<string>
 }) {
-  const { createSyncRelationship } = useAruna()
+  const { apiBaseUrl, createSyncRelationship } = useAruna()
   const realmNodes = useRealmNodes()
 
   const sourceBucket = ref('')
@@ -47,6 +51,31 @@ export function useOtherBuckets(options: {
   const otherRows = ref<OtherBucketRow[]>([])
   let otherCounter = 0
   const otherBusy = ref(false)
+
+  // Encryption of every browsed source by node and bucket, so a row keeps it after the source changes.
+  const encryptedSources = ref<Record<string, boolean>>({})
+  const sourceEncrypted = useEncryptedSource(
+    sourceBucket,
+    computed(() => (sourceNodeId.value ? (realmNodes.nodeById(sourceNodeId.value)?.apiBase ?? null) : apiBaseUrl.value)),
+    options.open,
+  )
+  watch(sourceEncrypted, (encrypted) => {
+    if (encrypted === null || !sourceBucket.value) return
+    const key = sourceKey(sourceBucket.value, sourceNodeId.value)
+    encryptedSources.value = { ...encryptedSources.value, [key]: encrypted }
+  })
+
+  function sourceKey(bucket: string, nodeId: string | null): string {
+    return `${nodeId ?? ''}/${bucket}`
+  }
+
+  /** A copy of an encrypted source may be stored unencrypted; a reference copies nothing. */
+  function offerPlaintext(row: OtherBucketRow): boolean {
+    return row.mode === 'once' && encryptedSources.value[sourceKey(row.bucket, row.nodeId)] === true
+  }
+
+  const plaintextOffered = computed(() => otherRows.value.some(offerPlaintext))
+  const plaintextChosen = computed(() => otherRows.value.some((row) => row.plaintext && offerPlaintext(row)))
 
   function pickSearchHit(hit: BucketSearchHit) {
     sourceBucket.value = hit.bucket
@@ -74,6 +103,7 @@ export function useOtherBuckets(options: {
         nodeId: sourceNodeId.value,
         ...seed,
         mode: otherDefaultMode.value,
+        plaintext: false,
         state: 'ready',
         error: null,
       })
@@ -97,7 +127,9 @@ export function useOtherBuckets(options: {
       if (err.status === 409) return 'This sync relationship already exists.'
       if (err.status === 501) return 'Reference mode is not supported by the source node yet.'
       if (err.status === 502) return 'The source node could not reach this node right now.'
-      if (err.status === 401 || err.status === 403) return 'You need read access on the source bucket to import from it.'
+      if (err.status === 401 || err.status === 403) {
+        return copyRefusal(err) ?? 'You need read access on the source bucket to import from it.'
+      }
       return err.message
     }
     return errorMessage(err)
@@ -131,6 +163,7 @@ export function useOtherBuckets(options: {
               target: { node_id: targetNode, bucket: options.bucket.value, prefix: otherTargetPrefix(row) },
               mode: row.mode,
               reference_handling: row.mode === 'reference' ? 'preserve' : 'materialize',
+              ...(row.plaintext && offerPlaintext(row) ? { plaintext: true } : {}),
             },
             sourceApiBase ? { baseUrl: sourceApiBase } : {},
           )
@@ -156,6 +189,7 @@ export function useOtherBuckets(options: {
       sourceNodeId.value = null
       sourceSearch.value = ''
       otherRows.value = []
+      encryptedSources.value = {}
     },
     { immediate: true },
   )
@@ -173,6 +207,9 @@ export function useOtherBuckets(options: {
     addOtherSelection,
     removeOtherRow,
     otherTargetPrefix,
+    offerPlaintext,
+    plaintextOffered,
+    plaintextChosen,
     createOtherRelationships,
   }
 }
