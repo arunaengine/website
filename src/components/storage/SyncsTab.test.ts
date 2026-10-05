@@ -17,7 +17,7 @@ import {
   moduleDefault,
 } from '@/test/clientRender'
 
-function relationship(state: string): SyncRelationship {
+function relationship(state: string, extra: Partial<SyncRelationship> = {}): SyncRelationship {
   return {
     id: 's-1',
     source: 'arn:aruna:r-1:node-a:s3/reef-survey',
@@ -29,6 +29,7 @@ function relationship(state: string): SyncRelationship {
     created_at: '2026-01-01T00:00:00Z',
     state,
     status: { counters: { versions_synced: 2, bytes_synced: 10, failures: 0, consecutive_failures: 0 } },
+    ...extra,
   }
 }
 
@@ -90,8 +91,8 @@ const tab = compileClientComponent(new URL('./SyncsTab.vue', import.meta.url), {
   '@/lib/utils': Utils,
 })
 
-async function render(state = 'enabled') {
-  rows.value = [{ relationship: relationship(state), direction: 'outgoing' as const }]
+async function render(state = 'enabled', extra: Partial<SyncRelationship> = {}) {
+  rows.value = [{ relationship: relationship(state, extra), direction: 'outgoing' as const }]
   updateSyncRelationship.mockReset()
   updateSyncRelationship.mockResolvedValue(relationship(state))
   getSyncRelationship.mockResolvedValue({ relationship: relationship(state), pending_jobs: 0 })
@@ -132,5 +133,21 @@ describe('bucket syncs tab', () => {
 
     expect(content(root)).toContain('does not serve pausing a sync')
     expect(() => pauseButton(root, 'Pause this sync')).toThrow()
+  })
+
+  it('shows copies that wait for the source bucket key and an unencrypted target', async () => {
+    const counters = { versions_synced: 0, bytes_synced: 0, failures: 0, consecutive_failures: 0 }
+    const waiting = content(await render('enabled', { plaintext: true, status: { counters, awaiting_key: 3 } }))
+    expect(waiting).toContain('3 copies are waiting for the source bucket to be unlocked.')
+    expect(waiting).toContain('stores copies unencrypted')
+
+    const one = content(await render('enabled', { status: { counters, awaiting_key: 1 } }))
+    expect(one).toContain('1 copy is waiting for the source bucket to be unlocked.')
+
+    for (const status of [{ counters, awaiting_key: 0 }, { counters }]) {
+      const quiet = content(await render('enabled', { status }))
+      expect(quiet).not.toContain('waiting for the source bucket')
+      expect(quiet).not.toContain('stores copies unencrypted')
+    }
   })
 })

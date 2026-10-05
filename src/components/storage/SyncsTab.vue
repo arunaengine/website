@@ -118,6 +118,11 @@ function counterpart(row: SyncRow): { nodeId: string | null; label: string } {
   return { nodeId: parseArunaArn(arn)?.nodeId ?? null, label: arnLocationLabel(arn) }
 }
 
+/** Copy jobs that wait for the source bucket key; an older node does not report them. */
+function awaitingKey(row: SyncRow): number {
+  return row.relationship.status.awaiting_key ?? 0
+}
+
 function lastError(row: SyncRow): string | null {
   return (
     details.value[row.relationship.id]?.last_error ??
@@ -253,6 +258,7 @@ function remove(row: SyncRow) {
                 on {{ realmNodes.displayName(hostedOn[row.relationship.id]) }}
               </Badge>
               <span v-if="row.relationship.replicate_deletes">replicates deletions</span>
+              <span v-if="row.relationship.plaintext">stores copies unencrypted</span>
             </span>
 
             <template v-if="confirmingId === row.relationship.id">
@@ -323,6 +329,10 @@ function remove(row: SyncRow) {
           >
             Data the source only points at is fetched before it is sent, so a large source can stay
             queued for a while.
+          </p>
+          <p v-if="awaitingKey(row)" class="mt-1 text-[11px] text-amber-700 dark:text-amber-300">
+            {{ awaitingKey(row) }} {{ awaitingKey(row) === 1 ? 'copy is' : 'copies are' }} waiting for the source
+            bucket to be unlocked.
           </p>
           <p v-if="lastError(row)" class="mt-1 break-all text-[11px] text-destructive">{{ lastError(row) }}</p>
           <p v-if="rowError[row.relationship.id]" class="mt-1 break-all text-[11px] text-destructive">
