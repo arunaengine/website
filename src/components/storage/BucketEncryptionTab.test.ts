@@ -40,6 +40,7 @@ const tab = compileClientComponent(new URL('./BucketEncryptionTab.vue', import.m
   ),
   '@/components/storage/BucketHoldersSection.vue': moduleDefault(defineComponent(() => () => h('section', 'holder list'))),
   '@/components/storage/BucketKeyAccess.vue': moduleDefault(KeyAccessStub),
+  '@/components/storage/BucketTokensSection.vue': moduleDefault(defineComponent(() => () => h('section', 'token list'))),
   '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
   '@/components/ui/DetailList.vue': moduleDefault(DetailStub),
   '@/components/ui/DocsLink.vue': moduleDefault(Slotted('a')),
@@ -203,8 +204,12 @@ describe('bucket encryption tab', () => {
     const text = await render('ready', encrypted({ caller: reader }))
 
     expect(text).not.toContain('holder list')
+    expect(text).not.toContain('token list')
     expect(text).not.toContain('mode settings')
     expect(await render('ready', encrypted())).toContain('holder list')
+    expect(await render('ready', encrypted())).toContain('token list')
+    const groupAdmin = { holder: false, ready_copy: false, admin: true }
+    expect(await render('ready', encrypted({ caller: groupAdmin }))).toContain('token list')
     const admin = { holder: false, ready_copy: false, admin: true }
     expect(await render('ready', encrypted({ mode: 'off', caller: admin }))).toContain('mode settings')
   })
