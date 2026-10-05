@@ -223,6 +223,7 @@ export const ENCRYPTION_CODES = {
   notEncrypted: 'not_encrypted',
   unchanged: 'unchanged',
   notSupported: 'not_supported',
+  objectTooLarge: 'object_too_large',
 } as const
 
 function base(bucket: string): string {

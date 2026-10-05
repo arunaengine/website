@@ -255,6 +255,8 @@ const REFUSALS: Record<string, string> = {
   [ENCRYPTION_CODES.notEncrypted]: 'This bucket is not encrypted, so it has no keys.',
   [ENCRYPTION_CODES.unchanged]: 'The bucket already uses these settings.',
   [ENCRYPTION_CODES.notSupported]: 'This node does not support this for the bucket.',
+  [ENCRYPTION_CODES.objectTooLarge]:
+    'This bucket holds an object larger than encrypted buckets support, so encryption cannot be enabled.',
 }
 
 const NO_RIGHTS = 'You may not make this change. Settings, key holders and rotation need group admin rights.'

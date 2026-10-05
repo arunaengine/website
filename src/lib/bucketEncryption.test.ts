@@ -55,6 +55,9 @@ describe('bucket encryption wording', () => {
     expect(refusal(409, 'not_encrypted')).toContain('not encrypted')
     expect(refusal(409, 'unchanged')).toBe('The bucket already uses these settings.')
     expect(refusal(501, 'not_supported')).toContain('does not support')
+    expect(refusal(409, 'object_too_large')).toBe(
+      'This bucket holds an object larger than encrypted buckets support, so encryption cannot be enabled.',
+    )
     expect(refusal(403, 'Forbidden')).toContain('need group admin rights')
     expect(refusal(409, 'something_new')).toBe('node text')
   })
