@@ -131,6 +131,63 @@ describe('buckets for a session token', () => {
     expect(choices.state.value).toBe('loading')
   })
 
+  it('keeps loaded choices when collapsed and reopened', async () => {
+    const open = ref(true)
+    const choices = scope.run(() => useTokenBuckets(ref('G1'), open))!
+    await settle()
+
+    open.value = false
+    await settle()
+    expect(choices.buckets.value).toEqual(['held'])
+    expect(choices.state.value).toBe('ready')
+    expect(choices.unchecked.value).toBe(1)
+
+    open.value = true
+    await settle()
+    expect(choices.buckets.value).toEqual(['held'])
+    expect(listGroupDataPaths).toHaveBeenCalledTimes(1)
+  })
+
+  it.each(['group', 'session', 'API'])('clears collapsed choices after a %s change', async (context) => {
+    const group = ref('G1')
+    const open = ref(true)
+    const choices = scope.run(() => useTokenBuckets(group, open))!
+    await settle()
+    open.value = false
+    await settle()
+
+    if (context === 'group') group.value = 'G2'
+    else if (context === 'session') sessionEpoch.value += 1
+    else apiBaseUrl.value = 'https://b.test/api/v1'
+    await settle()
+
+    expect(choices.buckets.value).toEqual([])
+    expect(choices.state.value).toBe('idle')
+    expect(listGroupDataPaths).toHaveBeenCalledTimes(1)
+    open.value = true
+    await settle()
+    expect(listGroupDataPaths).toHaveBeenCalledTimes(2)
+    expect(listGroupDataPaths.mock.calls[1][0]).toBe(group.value)
+    expect(listGroupDataPaths.mock.calls[1][2].baseUrl).toBe(apiBaseUrl.value)
+  })
+
+  it('discards an unfinished listing after collapse', async () => {
+    let answer: (value: unknown) => void = () => undefined
+    listGroupDataPaths.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+    const open = ref(true)
+    const choices = scope.run(() => useTokenBuckets(ref('G1'), open))!
+    open.value = false
+    await settle()
+    answer({ entries: folders('held') })
+    await settle()
+
+    expect(choices.buckets.value).toEqual([])
+    expect(getBucketEncryption).not.toHaveBeenCalled()
+    open.value = true
+    await settle()
+    expect(choices.buckets.value).toEqual(['held'])
+  })
+
   it('tells a refused listing from a failed one', async () => {
     listGroupDataPaths.mockRejectedValueOnce(new Api.ApiError(403, 'forbidden'))
     const refused = scope.run(() => useTokenBuckets(ref('G1'), ref(true)))!

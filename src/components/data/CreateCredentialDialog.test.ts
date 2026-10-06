@@ -2,7 +2,7 @@ import * as VueRuntime from 'vue'
 import { defineComponent, h, ref, type Ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as Api from '@/lib/api'
-import type { TokenBucketsState } from '@/composables/useTokenBuckets'
+import { useTokenBuckets, type TokenBucketsState } from '@/composables/useTokenBuckets'
 import {
   button,
   click,
@@ -20,6 +20,16 @@ import { errorMessage } from '@/lib/utils'
 const createS3Credentials = vi.fn<(input: Api.CreateS3CredentialsRequest) => Promise<Api.CreateS3CredentialsResponse>>(
   async () => ({ access_key_id: 'AK1', access_secret: 'S3CR3T' }),
 )
+const listGroupDataPaths = vi.fn()
+const getBucketEncryption = vi.fn()
+let loadTokenBuckets = false
+
+vi.mock('@/lib/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof Api>()),
+  listGroupDataPaths: (...args: unknown[]) => listGroupDataPaths(...args),
+  getBucketEncryption: (...args: unknown[]) => getBucketEncryption(...args),
+}))
+
 const TOKEN = 'canary-session-token'
 const tokenChoices = ref<string[]>([])
 const tokenState = ref<TokenBucketsState>('idle')
@@ -90,8 +100,9 @@ const CreateCredentialDialog = compileClientComponent(
     '@/composables/useS3': { useS3: () => ({ connectedEndpoint: ref('https://s3.test') }) },
     '@/composables/useUserSessions': { useUserSessions: () => ({ create: createUserSession }) },
     '@/composables/useTokenBuckets': {
-      useTokenBuckets: (_group: Ref<string>, active: Ref<boolean>) => {
+      useTokenBuckets: (group: Ref<string>, active: Ref<boolean>) => {
         tokenActive = active
+        if (loadTokenBuckets) return useTokenBuckets(group, active)
         return { buckets: tokenChoices, state: tokenState, error: ref(null), unchecked: ref(0), partial: ref(false) }
       },
     },
@@ -101,6 +112,13 @@ const CreateCredentialDialog = compileClientComponent(
 )
 
 beforeEach(() => {
+  loadTokenBuckets = false
+  listGroupDataPaths.mockReset().mockResolvedValue({
+    entries: [{ permission_path: '/realm/g/g1/data/node-a/reef/', kind: 'folder' }],
+  })
+  getBucketEncryption.mockReset().mockResolvedValue({
+    mode: 'vault_locked', unlock: { state: 'unlocked' }, caller: { holder: true },
+  })
   createS3Credentials.mockClear()
   createUserSession.mockClear()
   tokenChoices.value = ['reef', 'kelp']
@@ -182,6 +200,18 @@ describe('CreateCredentialDialog', () => {
 
     expect(tokenActive?.value).toBe(true)
     expect(content(root)).toContain('reef')
+  })
+
+  it('keeps a selected bucket when the section collapses before submit', async () => {
+    loadTokenBuckets = true
+    const { root } = await openDialog()
+    await chooseBucket(root, 'reef')
+
+    await click(button(root, 'Encrypted buckets (optional)'))
+    expect(tokenActive?.value).toBe(false)
+    await click(button(root, 'Create'))
+
+    expect(createS3Credentials).toHaveBeenCalledWith(expect.objectContaining({ encrypted_buckets: ['reef'] }))
   })
 
   it('sends no encrypted buckets unless one is chosen', async () => {

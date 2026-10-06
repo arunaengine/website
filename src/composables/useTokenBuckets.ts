@@ -5,7 +5,7 @@ import { ref, watch, type Ref } from 'vue'
 import { ApiError, getBucketEncryption, listGroupDataPaths } from '@/lib/api'
 import { tokenEligible } from '@/lib/bucketEncryption'
 import { errorMessage } from '@/lib/utils'
-import { refreshContext, sessionEpoch } from './aruna/state'
+import { apiBaseUrl, refreshContext, sessionEpoch } from './aruna/state'
 
 export type TokenBucketsState = 'idle' | 'loading' | 'ready' | 'refused' | 'failed'
 
@@ -60,9 +60,11 @@ export function useTokenBuckets(groupId: Ref<string>, active: Ref<boolean>) {
   }
 
   watch(
-    [groupId, active, sessionEpoch],
-    ([group, on]) => {
+    [groupId, active, sessionEpoch, apiBaseUrl],
+    ([group, on, epoch, base], previous) => {
       run += 1
+      const sameContext = group === previous[0] && epoch === previous[2] && base === previous[3]
+      if (sameContext && (!on || state.value === 'ready')) return
       buckets.value = []
       unchecked.value = 0
       partial.value = false
