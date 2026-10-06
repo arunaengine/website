@@ -132,6 +132,20 @@ export const NOTIFICATION_KINDS: Record<string, NotificationKindDescriptor> = {
     detail: () => 'Grant the key to another holder, or unlock the bucket so pending holders get their copies.',
     link: (n) => (n.bucket ? bucketUnlockLink(n.bucket, n.node_id, n.group_id) : null),
   },
+  // Sent to key holders when a member got a role in an encrypted bucket and waits for its keys;
+  // opens the bucket, and opening the vault then issues the keys.
+  bucket_key_pending: {
+    icon: Lock,
+    title: (n) => {
+      const member = n.member_user_id ? truncateMiddle(n.member_user_id) : 'A member'
+      return `${member} is waiting for encryption keys for ${n.bucket ?? 'a bucket'}`
+    },
+    detail: () => 'Open your personal vault to issue the keys.',
+    link: (n) =>
+      n.bucket
+        ? { name: 'bucket', params: { bucketId: n.bucket }, query: n.node_id ? { node: n.node_id } : {} }
+        : null,
+  },
   sync_failed: {
     icon: AlertTriangle,
     title: (n) => (n.bucket ? `Bucket sync failed for ${n.bucket}` : 'Bucket sync failed'),

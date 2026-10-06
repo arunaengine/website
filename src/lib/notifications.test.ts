@@ -35,6 +35,18 @@ describe('recovery notifications', () => {
   })
 })
 
+describe('key pending notifications', () => {
+  it('names the waiting member and opens the bucket on its node', () => {
+    const notification: ApiNotification = {
+      id: 'notification-4', category: 'bucket.encryption', kind: 'bucket_key_pending', class: 'direct',
+      created_at_ms: 1, read: false, bucket: 'reef', node_id: 'node-b', group_id: 'group-1', member_user_id: 'ada',
+    }
+    const display = describeNotification(notification, { groupName: () => undefined })
+    expect(display.title).toBe('ada is waiting for encryption keys for reef')
+    expect(display.link).toEqual({ name: 'bucket', params: { bucketId: 'reef' }, query: { node: 'node-b' } })
+  })
+})
+
 describe('join request notifications', () => {
   it('names the group and opens its Members tab', () => {
     const notification: ApiNotification = {
