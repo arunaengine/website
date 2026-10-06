@@ -25,8 +25,9 @@ async function answer(request: KeyWorkerRequest): Promise<[unknown, Transferable
   await ready
   if (request.op === 'import') {
     handles += 1
-    keys.set(handles, await importGrant(request.input))
-    return [handles, []]
+    const handle = handles
+    keys.set(handle, await importGrant(request.input))
+    return [handle, []]
   }
   if (request.op === 'issue') return [await issueGrant(request.input), []]
   const key = keys.get(request.handle)
