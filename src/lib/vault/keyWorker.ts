@@ -146,6 +146,7 @@ export async function issueGrant(
     issuer: fields.issuer,
     parameters: parameterBytes(fields.parameters),
     aad: fromBase64Url(proposal.aad),
+    record: fromBase64Url(proposal.record),
   }
   const sealed = await call<SealedSecret>({ op: 'issue', input })
   return { context: proposal.record, enc: toBase64(sealed.enc), ciphertext: toBase64(sealed.ciphertext) }

@@ -53,6 +53,8 @@ export interface IssueInput {
   issuer: KeyIssuer
   parameters: ParameterBytes
   aad: Uint8Array<ArrayBuffer>
+  /** The postcard grant context echoed on submission; it must encode exactly `request` and `issuer`. */
+  record: Uint8Array
 }
 
 /** Splits framed context fields: a field count, then big-endian u32 lengths and bytes. */
@@ -103,6 +105,13 @@ function ulidBytes(text: string): Uint8Array {
   return Uint8Array.from({ length: 16 }, (_, index) => Number((value >> BigInt(120 - 8 * index)) & 0xffn))
 }
 
+function ulidText(bytes: Uint8Array): string {
+  let value = bytes.reduce((sum, byte) => (sum << 8n) | BigInt(byte), 0n)
+  let text = ''
+  for (let index = 0; index < 26; index += 1, value >>= 5n) text = CROCKFORD[Number(value & 31n)] + text
+  return text
+}
+
 /** A user storage key: the realm bytes, then the user ULID bytes. */
 function userBytes(text: string): Uint8Array {
   const [user, realm, ...rest] = text.split('@')
@@ -110,8 +119,12 @@ function userBytes(text: string): Uint8Array {
   return Uint8Array.of(...fromBase64Url(realm), ...ulidBytes(user))
 }
 
+function hexBytes(text: string): Uint8Array {
+  return Uint8Array.from(text.match(/../g) ?? [], (pair) => parseInt(pair, 16))
+}
+
 /** A postcard unsigned varint. */
-function varint(value: number): number[] {
+function varint(value: number | bigint): number[] {
   const out: number[] = []
   let rest = BigInt(value)
   do {
@@ -149,7 +162,65 @@ export function grantAad(request: KeyRequestFields, issuer: KeyIssuer): Uint8Arr
     Uint8Array.from(request.revisions.flatMap((revision) => [...fromBase64Url(revision)])),
     created,
     ENCODER.encode(issuer.kind),
-    issuer.kind === 'user' ? userBytes(issuer.id) : Uint8Array.from(issuer.id.match(/../g) ?? [], (pair) => parseInt(pair, 16)),
+    issuer.kind === 'user' ? userBytes(issuer.id) : hexBytes(issuer.id),
+  ])
+}
+
+/** A postcard string. */
+function text(value: string): number[] {
+  const bytes = ENCODER.encode(value)
+  return [...varint(bytes.length), ...bytes]
+}
+
+/** A canonical postcard ULID. */
+function ulid(value: string): number[] {
+  return text(ulidText(ulidBytes(value)))
+}
+
+/** A postcard UserId: the ULID text, then the realm bytes. */
+function user(value: string): number[] {
+  const bytes = userBytes(value)
+  return [...text(ulidText(bytes.subarray(-16))), ...bytes.subarray(0, -16)]
+}
+
+/** Encodes the postcard grant context record from named fields like aruna GrantContext. */
+export function grantRecord(request: KeyRequestFields, issuer: KeyIssuer): Uint8Array {
+  const { recipient_record: record, recipient_public: recipient, recipient_fingerprint: fingerprint } = request
+  const setup = unframe(fromBase64Url(request.parameters.context))
+  if (!record || !recipient || !fingerprint || request.restrictions !== null || setup.length !== 5) {
+    throw new Error('This key grant cannot be opened in the browser.')
+  }
+  const generation = new DataView(setup[4].buffer, setup[4].byteOffset, setup[4].byteLength).getBigUint64(0)
+  const parameters = fromBase64Url(request.parameters.parameters)
+  const credential = request.credential_id === null ? [0] : [1, ...text(request.credential_id)]
+  return Uint8Array.from([
+    ...ulid(request.request_id),
+    ...user(request.requesting_user),
+    ...user(request.recipient_user),
+    1,
+    ...ulid(record),
+    1,
+    ...fromBase64Url(recipient),
+    1,
+    ...fromBase64Url(fingerprint),
+    ...text(request.bucket),
+    ...setup[1],
+    ...setup[2],
+    ...text(ulidText(setup[3])),
+    ...varint(generation),
+    ...fromBase64Url(request.parameters.fingerprint),
+    ...varint(parameters.length),
+    ...parameters,
+    request.scope.kind === 'exact' ? 0 : 1,
+    ...text(request.scope.value),
+    ...varint(request.epochs.length),
+    ...request.epochs.flatMap(varint),
+    ...credential,
+    0,
+    ...varint(request.revisions.length),
+    ...request.revisions.flatMap((revision) => [...fromBase64Url(revision)]),
+    ...varint(request.created_at_ms),
+    ...(issuer.kind === 'user' ? [0, ...user(issuer.id)] : [1, ...hexBytes(issuer.id)]),
   ])
 }
 
@@ -233,6 +304,9 @@ export async function issueGrant(input: IssueInput): Promise<SealedSecret> {
   let recipient: Uint8Array<ArrayBuffer>
   try {
     checkGrant(input.aad, input)
+    if (!same(input.record, grantRecord(request, input.issuer))) {
+      throw new Error('The key request record does not match its fields.')
+    }
     recipient = fromBase64Url(request.recipient_public ?? '')
   } catch (cause) {
     input.bucketKey.fill(0)

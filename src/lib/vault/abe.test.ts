@@ -2,10 +2,11 @@ import { readFileSync } from 'node:fs'
 import { beforeAll, describe, expect, it } from 'vitest'
 import vectors from './__fixtures__/kpabe-vectors.json'
 import fixture from './__fixtures__/kpabe-issue.json'
+import grants from './__fixtures__/abe-grant.json'
 import type { KeyIssuer, KeyRequestFields } from '@/lib/api'
-import { GRANT_PURPOSE, grantAad, importGrant, issueGrant, openObject, unframe, type ParameterBytes } from './abe'
+import { GRANT_PURPOSE, grantAad, grantRecord, importGrant, issueGrant, openObject, unframe, type ParameterBytes } from './abe'
 import { toBase64 } from './crypto'
-import { importPrivateKey, sealTo, type X25519Pair } from './hpke'
+import { fromBase64Url, importPrivateKey, sealTo, type X25519Pair } from './hpke'
 import { import_key, initSync, issue_key, type InitOutput } from './kpabe/kpabe'
 
 function hex(text: string): Uint8Array<ArrayBuffer> {
@@ -57,7 +58,7 @@ async function issueAndImport(scope: KeyRequestFields['scope']) {
   const fields = request(pair, scope)
   const aad = grantAad(fields, HOLDER)
   const issue = { request: fields, issuer: HOLDER, parameters, aad }
-  const sealed = await issueGrant({ ...issue, bucketKey: hex(fixture.bucket_key) })
+  const sealed = await issueGrant({ ...issue, bucketKey: hex(fixture.bucket_key), record: grantRecord(fields, HOLDER) })
   return importGrant({ ...issue, sealed, pair })
 }
 
@@ -136,8 +137,21 @@ describe('KP-ABE WASM build', () => {
   it('refuses a bucket key that does not derive the admitted parameters', async () => {
     const pair = await recipientPair()
     const fields = request(pair, { kind: 'subtree', value: '' })
-    const issue = { request: fields, issuer: HOLDER, parameters, aad: grantAad(fields, HOLDER) }
+    const issue = { request: fields, issuer: HOLDER, parameters, aad: grantAad(fields, HOLDER), record: grantRecord(fields, HOLDER) }
     await expect(issueGrant({ ...issue, bucketKey: new Uint8Array(32).fill(4) })).rejects.toThrow('refused')
+  })
+
+  it('refuses a proposal whose fields and associated data differ from its record', async () => {
+    const pair = await recipientPair()
+    const fields = request(pair, { kind: 'subtree', value: 'foo/' })
+    const record = grantRecord(fields, HOLDER)
+    for (const change of [{ scope: { kind: 'subtree' as const, value: '' } }, { epochs: [1, 2] }]) {
+      const wide = { ...fields, ...change }
+      const bucketKey = hex(fixture.bucket_key)
+      const issue = { bucketKey, request: wide, issuer: HOLDER, parameters, aad: grantAad(wide, HOLDER), record }
+      await expect(issueGrant(issue)).rejects.toThrow('does not match')
+      expect(bucketKey.every((byte) => byte === 0)).toBe(true)
+    }
   })
 
   it('refuses a proposal whose associated data names another scope, recipient or issuer', async () => {
@@ -151,7 +165,8 @@ describe('KP-ABE WASM build', () => {
       grantAad(fields, { kind: 'user', id: fields.recipient_user }),
     ]) {
       const bucketKey = hex(fixture.bucket_key)
-      await expect(issueGrant({ bucketKey, request: fields, issuer: HOLDER, parameters, aad })).rejects.toThrow(
+      const record = grantRecord(fields, HOLDER)
+      await expect(issueGrant({ bucketKey, request: fields, issuer: HOLDER, parameters, aad, record })).rejects.toThrow(
         'does not belong',
       )
       expect(bucketKey.every((byte) => byte === 0)).toBe(true)
@@ -163,7 +178,8 @@ describe('KP-ABE WASM build', () => {
     const other = await recipientPair()
     const fields = request(pair, { kind: 'subtree', value: 'foo/' })
     const aad = grantAad(fields, HOLDER)
-    const sealed = await issueGrant({ bucketKey: hex(fixture.bucket_key), request: fields, issuer: HOLDER, parameters, aad })
+    const record = grantRecord(fields, HOLDER)
+    const sealed = await issueGrant({ bucketKey: hex(fixture.bucket_key), request: fields, issuer: HOLDER, parameters, aad, record })
     const cases: [KeyRequestFields, X25519Pair][] = [
       [{ ...fields, request_id: '01BX5ZZKBKACTAV9WEVGEMMVS2' }, pair],
       [{ ...fields, scope: { kind: 'subtree', value: '' } }, pair],
@@ -185,6 +201,14 @@ describe('KP-ABE WASM build', () => {
     const wide = issue_key(hex(fixture.bucket_key), bytes, context, fingerprint, 'subtree', '', BigUint64Array.of(1n))
     const sealed = await sealTo(pair.publicKey, GRANT_PURPOSE, aad, wide as Uint8Array<ArrayBuffer>)
     await expect(importGrant({ sealed, aad, pair, request: fields, issuer: HOLDER, parameters })).rejects.toThrow('refused')
+  })
+
+  it('encodes grant records and associated data like the node', () => {
+    for (const grant of grants) {
+      const { issuer, ...fields } = grant.fields as KeyRequestFields & { issuer: KeyIssuer }
+      expect(grantAad(fields, issuer)).toEqual(fromBase64Url(grant.aad))
+      expect(grantRecord(fields, issuer)).toEqual(Uint8Array.from(fromBase64Url(grant.record)))
+    }
   })
 
   it('frames user ids, epochs, scope and node issuer like the node', () => {

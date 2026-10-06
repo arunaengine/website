@@ -146,7 +146,8 @@ describe('key worker client', () => {
     const issued = issueGrant(proposal, bucketKey, ISSUE)
     const message = latest().posted[0]
     expect(message.op).toBe('issue')
-    expect(message.input).toMatchObject({ request: proposal.fields, issuer: { kind: 'user', id: 'H' }, bucketKey })
+    const record = new TextEncoder().encode('rec')
+    expect(message.input).toMatchObject({ request: proposal.fields, issuer: { kind: 'user', id: 'H' }, bucketKey, record })
     latest().reply({ id: message.id, value: { enc: Uint8Array.of(1), ciphertext: Uint8Array.of(2, 3) } })
     await expect(issued).resolves.toEqual({ context: 'cmVj', enc: 'AQ==', ciphertext: 'AgM=' })
   })
