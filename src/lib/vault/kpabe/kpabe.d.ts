@@ -16,8 +16,9 @@ export class ScopedKey {
 
 /**
  * Imports an opened grant key under the admitted parameters and clears `plain`.
+ * Refuses a key whose policy is not exactly the expected scope and epochs.
  */
-export function import_key(parameters: Uint8Array, context: Uint8Array, fingerprint: Uint8Array, plain: Uint8Array): ScopedKey;
+export function import_key(parameters: Uint8Array, context: Uint8Array, fingerprint: Uint8Array, kind: string, scope: string, epochs: BigUint64Array, plain: Uint8Array): ScopedKey;
 
 /**
  * Issues the encoded key for a scope from the bucket private key and clears `bucket_key`.
@@ -30,16 +31,15 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly __wbg_scopedkey_free: (a: number, b: number) => void;
-    readonly import_key: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: any) => [number, number, number];
-    readonly issue_key: (a: number, b: number, c: any, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number) => [number, number, number, number];
-    readonly scopedkey_open_object: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
+    readonly import_key: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: any) => [number, number, number];
+    readonly issue_key: (a: number, b: number, c: any, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number) => [number, number, number];
+    readonly scopedkey_open_object: (a: number, b: number, c: number, d: number, e: number) => [number, number, number];
     readonly __wbindgen_exn_store: (a: number) => void;
     readonly __externref_table_alloc: () => number;
     readonly __wbindgen_externrefs: WebAssembly.Table;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
-    readonly __externref_table_dealloc: (a: number) => void;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
-    readonly __wbindgen_free: (a: number, b: number, c: number) => void;
+    readonly __externref_table_dealloc: (a: number) => void;
     readonly __wbindgen_start: () => void;
 }
 

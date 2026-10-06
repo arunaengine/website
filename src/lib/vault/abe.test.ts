@@ -2,25 +2,21 @@ import { readFileSync } from 'node:fs'
 import { beforeAll, describe, expect, it } from 'vitest'
 import vectors from './__fixtures__/kpabe-vectors.json'
 import fixture from './__fixtures__/kpabe-issue.json'
-import { GRANT_PURPOSE, importGrant, issueGrant, openObject, type ParameterBytes } from './abe'
-import { importPrivateKey } from './hpke'
-import { import_key, initSync } from './kpabe/kpabe'
+import type { KeyIssuer, KeyRequestFields } from '@/lib/api'
+import { GRANT_PURPOSE, grantAad, importGrant, issueGrant, openObject, unframe, type ParameterBytes } from './abe'
+import { toBase64 } from './crypto'
+import { importPrivateKey, sealTo, type X25519Pair } from './hpke'
+import { import_key, initSync, issue_key, type InitOutput } from './kpabe/kpabe'
 
 function hex(text: string): Uint8Array<ArrayBuffer> {
   return Uint8Array.from(text.match(/../g) ?? [], (pair) => parseInt(pair, 16))
 }
 
-function frame(fields: Uint8Array[]): Uint8Array<ArrayBuffer> {
-  const out = new Uint8Array(4 + fields.reduce((sum, field) => sum + 4 + field.length, 0))
-  const view = new DataView(out.buffer)
-  view.setUint32(0, fields.length)
-  let at = 4
-  for (const field of fields) {
-    view.setUint32(at, field.length)
-    out.set(field, at + 4)
-    at += 4 + field.length
+function contains(haystack: Uint8Array, needle: Uint8Array): boolean {
+  for (let at = haystack.indexOf(needle[0]); at >= 0; at = haystack.indexOf(needle[0], at + 1)) {
+    if (needle.every((byte, index) => haystack[at + index] === byte)) return true
   }
-  return out
+  return false
 }
 
 const parameters: ParameterBytes = {
@@ -29,91 +25,178 @@ const parameters: ParameterBytes = {
   fingerprint: hex(fixture.fingerprint),
 }
 
-/** Grant associated data with the fields the browser checks; the rest are placeholders. */
-function grantAad(recipient: Uint8Array): Uint8Array<ArrayBuffer> {
-  const fields: Uint8Array[] = Array.from({ length: 18 }, () => new Uint8Array(1))
-  fields[0] = GRANT_PURPOSE
-  fields[5] = recipient
-  fields[8] = parameters.context
-  fields[9] = parameters.fingerprint
-  return frame(fields)
+const REALM = toBase64(new Uint8Array(32).fill(1)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_')
+const HOLDER: KeyIssuer = { kind: 'user', id: `01ARZ3NDEKTSV4RRFFQ69G5FAV@${REALM}` }
+
+/** A request for `pair` on the fixture bucket, framed into the grant associated data. */
+function request(pair: X25519Pair, scope: KeyRequestFields['scope'], epochs = [1]): KeyRequestFields {
+  return {
+    request_id: '01BX5ZZKBKACTAV9WEVGEMMVRZ',
+    requesting_user: `01BX5ZZKBKACTAV9WEVGEMMVS0@${REALM}`,
+    recipient_user: `01BX5ZZKBKACTAV9WEVGEMMVS0@${REALM}`,
+    recipient_record: '01BX5ZZKBKACTAV9WEVGEMMVS1',
+    recipient_public: toBase64(pair.publicKey),
+    recipient_fingerprint: toBase64(new Uint8Array(32).fill(7)),
+    bucket: 'reef',
+    parameters: {
+      realm_id: REALM, node_id: '02'.repeat(32), bucket_id: '04', generation: 1, epoch: 1,
+      fingerprint: toBase64(parameters.fingerprint), parameters: '', context: toBase64(parameters.context),
+    },
+    scope,
+    epochs,
+    credential_id: null,
+    restrictions: null,
+    revisions: [toBase64(new Uint8Array(32).fill(8))],
+    created_at_ms: 1_700_000_000_000,
+  }
+}
+
+/** Issues and imports a key for `scope`, the way a holder and the recipient do. */
+async function issueAndImport(scope: KeyRequestFields['scope']) {
+  const pair = await recipientPair()
+  const fields = request(pair, scope)
+  const aad = grantAad(fields, HOLDER)
+  const issue = { request: fields, issuer: HOLDER, parameters, aad }
+  const sealed = await issueGrant({ ...issue, bucketKey: hex(fixture.bucket_key) })
+  return importGrant({ ...issue, sealed, pair })
+}
+
+const pinned = {
+  objectKey: fixture.object,
+  epoch: 1,
+  writeId: '09144GJ289144GJ289144GJ289',
+  publicKey: hex(fixture.envelope_context).slice(-32),
 }
 
 const envelope = {
   envelope: hex(fixture.envelope),
   context: hex(fixture.envelope_context),
   parameters,
-  objectKey: fixture.object,
+  expected: pinned,
 }
 
 async function recipientPair() {
   return importPrivateKey(crypto.getRandomValues(new Uint8Array(32)))
 }
 
+let wasm: InitOutput
+
 beforeAll(() => {
-  initSync({ module: readFileSync(new URL('./kpabe/kpabe_bg.wasm', import.meta.url)) })
+  wasm = initSync({ module: readFileSync(new URL('./kpabe/kpabe_bg.wasm', import.meta.url)) })
 })
 
 describe('KP-ABE WASM build', () => {
-  it('opens every crate vector envelope with its user key', () => {
+  it('refuses crate vector keys whose policy is not the expected scope', () => {
     for (const vector of vectors.cases) {
       const plain = hex(vector.user_key)
-      const key = import_key(hex(vectors.parameters), hex(vectors.setup_context), hex(vectors.fingerprint), plain)
+      const epochs = BigUint64Array.from(vector.epochs, (epoch) => BigInt(epoch))
+      const imported = () =>
+        import_key(hex(vectors.parameters), hex(vectors.setup_context), hex(vectors.fingerprint), 'subtree', '', epochs, plain)
+      expect(imported).toThrow()
       expect(plain.every((byte) => byte === 0)).toBe(true)
-      expect(key.open_object(hex(vector.envelope), hex(vector.context))).toEqual(hex(vectors.object_key))
-      expect(() => key.open_object(hex(vector.envelope), hex('00'))).toThrow()
     }
   })
 
-  it('issues a sealed grant that opens the object key, and clears the bucket key', async () => {
-    const pair = await recipientPair()
-    const aad = grantAad(pair.publicKey)
+  it('issues a sealed grant that opens the object key', async () => {
     for (const [kind, value] of [['subtree', ''], ['subtree', 'foo/'], ['exact', 'foo/file']] as const) {
-      const bucketKey = hex(fixture.bucket_key)
-      const scope = { kind, value }
-      const sealed = await issueGrant({ bucketKey, parameters, scope, epochs: [1], recipient: pair.publicKey, aad })
-      expect(bucketKey.every((byte) => byte === 0)).toBe(true)
-      const key = await importGrant({ sealed, aad, pair, parameters })
+      const key = await issueAndImport({ kind, value })
       expect(await openObject(key, envelope)).toEqual(hex(fixture.object_key))
     }
   })
 
+  it('leaves no secret output copy in WASM memory', async () => {
+    const key = await issueAndImport({ kind: 'subtree', value: '' })
+    const objectKey = key.open_object(envelope.envelope, envelope.context)
+    expect(objectKey).toEqual(hex(fixture.object_key))
+    expect(contains(new Uint8Array(wasm.memory.buffer), objectKey)).toBe(false)
+    const bucketKey = hex(fixture.bucket_key)
+    const { parameters: bytes, context, fingerprint } = parameters
+    const plain = issue_key(bucketKey, bytes, context, fingerprint, 'subtree', '', BigUint64Array.of(1n))
+    expect(bucketKey.every((byte) => byte === 0)).toBe(true)
+    expect(contains(new Uint8Array(wasm.memory.buffer), plain.slice(-64))).toBe(false)
+  })
+
   it('does not open an object outside the issued scope', async () => {
-    const pair = await recipientPair()
-    const aad = grantAad(pair.publicKey)
-    const scope = { kind: 'subtree' as const, value: 'bar/' }
-    const sealed = await issueGrant({ bucketKey: hex(fixture.bucket_key), parameters, scope, epochs: [1], recipient: pair.publicKey, aad })
-    const key = await importGrant({ sealed, aad, pair, parameters })
+    const key = await issueAndImport({ kind: 'subtree', value: 'bar/' })
     await expect(openObject(key, envelope)).rejects.toThrow('refused')
   })
 
-  it('refuses an envelope context for another object before opening', async () => {
-    const pair = await recipientPair()
-    const aad = grantAad(pair.publicKey)
-    const scope = { kind: 'subtree' as const, value: '' }
-    const sealed = await issueGrant({ bucketKey: hex(fixture.bucket_key), parameters, scope, epochs: [1], recipient: pair.publicKey, aad })
-    const key = await importGrant({ sealed, aad, pair, parameters })
-    await expect(openObject(key, { ...envelope, objectKey: 'foo/other' })).rejects.toThrow('does not belong')
+  it('refuses an envelope for another object or version before opening', async () => {
+    const key = await issueAndImport({ kind: 'subtree', value: '' })
+    for (const change of [
+      { objectKey: 'foo/other' },
+      { epoch: 2 },
+      { writeId: '01BX5ZZKBKACTAV9WEVGEMMVRZ' },
+      { publicKey: new Uint8Array(32) },
+    ]) {
+      await expect(openObject(key, { ...envelope, expected: { ...pinned, ...change } })).rejects.toThrow('does not belong')
+    }
   })
 
   it('refuses a bucket key that does not derive the admitted parameters', async () => {
     const pair = await recipientPair()
-    const scope = { kind: 'subtree' as const, value: '' }
-    const issue = { parameters, scope, epochs: [1], recipient: pair.publicKey, aad: grantAad(pair.publicKey) }
+    const fields = request(pair, { kind: 'subtree', value: '' })
+    const issue = { request: fields, issuer: HOLDER, parameters, aad: grantAad(fields, HOLDER) }
     await expect(issueGrant({ ...issue, bucketKey: new Uint8Array(32).fill(4) })).rejects.toThrow('refused')
   })
 
-  it('refuses a grant whose associated data names another recipient', async () => {
+  it('refuses a proposal whose associated data names another scope, recipient or issuer', async () => {
     const pair = await recipientPair()
     const other = await recipientPair()
-    const scope = { kind: 'subtree' as const, value: '' }
-    const bucketKey = hex(fixture.bucket_key)
-    const aad = grantAad(other.publicKey)
-    await expect(issueGrant({ bucketKey, parameters, scope, epochs: [1], recipient: pair.publicKey, aad })).rejects.toThrow(
-      'does not belong',
-    )
-    expect(bucketKey.every((byte) => byte === 0)).toBe(true)
-    const sealed = await issueGrant({ bucketKey: hex(fixture.bucket_key), parameters, scope, epochs: [1], recipient: other.publicKey, aad })
-    await expect(importGrant({ sealed, aad, pair, parameters })).rejects.toThrow('does not belong')
+    const fields = request(pair, { kind: 'subtree', value: 'foo/' })
+    for (const aad of [
+      grantAad({ ...fields, scope: { kind: 'subtree', value: '' } }, HOLDER),
+      grantAad({ ...fields, epochs: [1, 2] }, HOLDER),
+      grantAad(request(other, fields.scope), HOLDER),
+      grantAad(fields, { kind: 'user', id: fields.recipient_user }),
+    ]) {
+      const bucketKey = hex(fixture.bucket_key)
+      await expect(issueGrant({ bucketKey, request: fields, issuer: HOLDER, parameters, aad })).rejects.toThrow(
+        'does not belong',
+      )
+      expect(bucketKey.every((byte) => byte === 0)).toBe(true)
+    }
+  })
+
+  it('refuses a grant for another request or another recipient key', async () => {
+    const pair = await recipientPair()
+    const other = await recipientPair()
+    const fields = request(pair, { kind: 'subtree', value: 'foo/' })
+    const aad = grantAad(fields, HOLDER)
+    const sealed = await issueGrant({ bucketKey: hex(fixture.bucket_key), request: fields, issuer: HOLDER, parameters, aad })
+    const cases: [KeyRequestFields, X25519Pair][] = [
+      [{ ...fields, request_id: '01BX5ZZKBKACTAV9WEVGEMMVS2' }, pair],
+      [{ ...fields, scope: { kind: 'subtree', value: '' } }, pair],
+      [{ ...fields, revisions: [] }, pair],
+      [fields, other],
+    ]
+    for (const [expected, opener] of cases) {
+      await expect(importGrant({ sealed, aad, pair: opener, request: expected, issuer: HOLDER, parameters })).rejects.toThrow(
+        'does not belong',
+      )
+    }
+  })
+
+  it('refuses a grant whose key policy differs from its request', async () => {
+    const pair = await recipientPair()
+    const fields = request(pair, { kind: 'subtree', value: 'foo/' })
+    const aad = grantAad(fields, HOLDER)
+    const { parameters: bytes, context, fingerprint } = parameters
+    const wide = issue_key(hex(fixture.bucket_key), bytes, context, fingerprint, 'subtree', '', BigUint64Array.of(1n))
+    const sealed = await sealTo(pair.publicKey, GRANT_PURPOSE, aad, wide as Uint8Array<ArrayBuffer>)
+    await expect(importGrant({ sealed, aad, pair, request: fields, issuer: HOLDER, parameters })).rejects.toThrow('refused')
+  })
+
+  it('frames user ids, epochs, scope and node issuer like the node', () => {
+    const fields = request({ publicKey: new Uint8Array(32).fill(3) } as X25519Pair, { kind: 'exact', value: 'a' }, [1, 300])
+    const framed = unframe(grantAad({ ...fields, requesting_user: HOLDER.id }, { kind: 'node', id: '02'.repeat(32) }))
+    expect(framed).toHaveLength(18)
+    expect(framed[2]).toEqual(Uint8Array.of(...new Uint8Array(32).fill(1), ...hex('01563e3ab5d3d6764c61efb99302bd5b')))
+    expect(framed[10]).toEqual(hex('0201ac02'))
+    expect(framed[11]).toEqual(Uint8Array.of(0, 1, 97))
+    expect(framed[13]).toEqual(Uint8Array.of(0))
+    expect(framed[15]).toEqual(hex('0000018bcfe56800'))
+    expect(framed[16]).toEqual(new TextEncoder().encode('node'))
+    expect(framed[17]).toEqual(new Uint8Array(32).fill(2))
   })
 })

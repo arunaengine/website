@@ -32,34 +32,42 @@ export class ScopedKey {
         const ptr1 = passArray8ToWasm0(context, wasm.__wbindgen_malloc);
         const len1 = WASM_VECTOR_LEN;
         const ret = wasm.scopedkey_open_object(this.__wbg_ptr, ptr0, len0, ptr1, len1);
-        if (ret[3]) {
-            throw takeFromExternrefTable0(ret[2]);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
         }
-        var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-        wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-        return v3;
+        return takeFromExternrefTable0(ret[0]);
     }
 }
 if (Symbol.dispose) ScopedKey.prototype[Symbol.dispose] = ScopedKey.prototype.free;
 
 /**
  * Imports an opened grant key under the admitted parameters and clears `plain`.
+ * Refuses a key whose policy is not exactly the expected scope and epochs.
  * @param {Uint8Array} parameters
  * @param {Uint8Array} context
  * @param {Uint8Array} fingerprint
+ * @param {string} kind
+ * @param {string} scope
+ * @param {BigUint64Array} epochs
  * @param {Uint8Array} plain
  * @returns {ScopedKey}
  */
-export function import_key(parameters, context, fingerprint, plain) {
+export function import_key(parameters, context, fingerprint, kind, scope, epochs, plain) {
     const ptr0 = passArray8ToWasm0(parameters, wasm.__wbindgen_malloc);
     const len0 = WASM_VECTOR_LEN;
     const ptr1 = passArray8ToWasm0(context, wasm.__wbindgen_malloc);
     const len1 = WASM_VECTOR_LEN;
     const ptr2 = passArray8ToWasm0(fingerprint, wasm.__wbindgen_malloc);
     const len2 = WASM_VECTOR_LEN;
-    var ptr3 = passArray8ToWasm0(plain, wasm.__wbindgen_malloc);
-    var len3 = WASM_VECTOR_LEN;
-    const ret = wasm.import_key(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, plain);
+    const ptr3 = passStringToWasm0(kind, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len3 = WASM_VECTOR_LEN;
+    const ptr4 = passStringToWasm0(scope, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len4 = WASM_VECTOR_LEN;
+    const ptr5 = passArray64ToWasm0(epochs, wasm.__wbindgen_malloc);
+    const len5 = WASM_VECTOR_LEN;
+    var ptr6 = passArray8ToWasm0(plain, wasm.__wbindgen_malloc);
+    var len6 = WASM_VECTOR_LEN;
+    const ret = wasm.import_key(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4, ptr5, len5, ptr6, len6, plain);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
@@ -94,12 +102,10 @@ export function issue_key(bucket_key, parameters, context, fingerprint, kind, sc
     const ptr6 = passArray64ToWasm0(epochs, wasm.__wbindgen_malloc);
     const len6 = WASM_VECTOR_LEN;
     const ret = wasm.issue_key(ptr0, len0, bucket_key, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4, ptr5, len5, ptr6, len6);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
     }
-    var v8 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v8;
+    return takeFromExternrefTable0(ret[0]);
 }
 function __wbg_get_imports() {
     const import0 = {
@@ -109,6 +115,10 @@ function __wbg_get_imports() {
         },
         __wbg___wbindgen_throw_bb96b2010945f0bc: function(arg0, arg1) {
             throw new Error(getStringFromWasm0(arg0, arg1));
+        },
+        __wbg_from_c6a749f2da6aa9cf: function(arg0, arg1) {
+            const ret = Uint8Array.from(getArrayU8FromWasm0(arg0, arg1));
+            return ret;
         },
         __wbg_getRandomValues_436a51d0629d84e1: function() { return handleError(function (arg0, arg1) {
             globalThis.crypto.getRandomValues(getArrayU8FromWasm0(arg0, arg1));

@@ -19,6 +19,18 @@ export class KeyWorkerClosedError extends Error {
 export interface KeyHandle {
   run: number
   id: number
+  /** The admitted parameters the key was imported under. */
+  parameters: AbeParametersView
+}
+
+/** The pinned version an envelope must belong to, from its version metadata. */
+export interface PinnedVersion {
+  versionId: string
+  objectKey: string
+  epoch: number
+  writeId: string
+  /** Standard base64 of the object public key. */
+  publicKey: string
 }
 
 type Pending = { resolve: (value: unknown) => void; reject: (cause: Error) => void }
@@ -71,43 +83,68 @@ function parameterBytes(view: AbeParametersView): ParameterBytes {
   }
 }
 
-/** Opens one of the caller's grants with the vault key it is sealed to. */
-export async function importGrant(grant: AbeRecord<KeyGrantFields>, pair: X25519Pair): Promise<KeyHandle> {
+/** Opens one of the caller's grants for `expected`, the caller's request with admitted parameters. */
+export async function importGrant(
+  grant: AbeRecord<KeyGrantFields>,
+  pair: X25519Pair,
+  expected: KeyRequestFields,
+): Promise<KeyHandle> {
   if (!grant.aad) throw new Error('The key grant has no associated data.')
   const input = {
     sealed: { enc: fromBase64Url(grant.fields.enc), ciphertext: fromBase64Url(grant.fields.ciphertext) },
     aad: fromBase64Url(grant.aad),
     pair,
-    parameters: parameterBytes(grant.fields.request.parameters),
+    request: expected,
+    issuer: grant.fields.issuer,
+    parameters: parameterBytes(expected.parameters),
   }
   const id = await call<number>({ op: 'import', input })
-  return { run, id }
+  return { run, id, parameters: expected.parameters }
 }
 
-/** The 32-byte object key of one version; the caller clears it after the download. */
-export function openObject(handle: KeyHandle, envelope: ObjectEnvelopeView, objectKey: string): Promise<Uint8Array> {
+/** The 32-byte object key of the pinned version; the caller clears it after the download. */
+export function openObject(handle: KeyHandle, envelope: ObjectEnvelopeView, pinned: PinnedVersion): Promise<Uint8Array> {
   if (!worker || handle.run !== run) return Promise.reject(new KeyWorkerClosedError())
+  if (envelope.version_id !== pinned.versionId) return Promise.reject(new Error('The envelope does not belong to this object.'))
   const input = {
     envelope: fromBase64Url(envelope.envelope.abe),
     context: fromBase64Url(envelope.context.bytes),
-    parameters: parameterBytes(envelope.parameters),
-    objectKey,
+    parameters: parameterBytes(handle.parameters),
+    expected: { ...pinned, publicKey: fromBase64Url(pinned.publicKey) },
   }
   return call({ op: 'open', handle: handle.id, input })
 }
 
+/** The bucket, recipient and signed-in holder a proposal must name. */
+export interface IssueExpected {
+  bucket: string
+  recipient: string
+  holder: string
+}
+
 /** Issues a holder proposal from the bucket private key; the caller clears its copy. */
-export async function issueGrant(proposal: AbeRecord<KeyRequestFields>, bucketKey: Uint8Array): Promise<GrantSubmission> {
+export async function issueGrant(
+  proposal: AbeRecord<KeyRequestFields>,
+  bucketKey: Uint8Array,
+  expected: IssueExpected,
+): Promise<GrantSubmission> {
   const fields = proposal.fields
   if (!proposal.aad || !fields.recipient_public || fields.credential_id !== null || fields.restrictions !== null) {
     throw new Error('This key request cannot be issued from the browser.')
   }
+  if (
+    fields.bucket !== expected.bucket ||
+    fields.recipient_user !== expected.recipient ||
+    fields.issuer?.kind !== 'user' ||
+    fields.issuer.id !== expected.holder
+  ) {
+    throw new Error('This key request does not belong to this bucket or holder.')
+  }
   const input = {
     bucketKey,
+    request: fields,
+    issuer: fields.issuer,
     parameters: parameterBytes(fields.parameters),
-    scope: fields.scope,
-    epochs: fields.epochs,
-    recipient: fromBase64Url(fields.recipient_public),
     aad: fromBase64Url(proposal.aad),
   }
   const sealed = await call<SealedSecret>({ op: 'issue', input })

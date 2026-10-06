@@ -1,8 +1,9 @@
 // KP-ABE work inside the key worker. Grants open with HPKE and import into the
 // WASM build of aruna-kpabe; envelopes and holder issuance run there too. Byte
 // layouts follow aruna core/src/structs/storage/abe.rs and abe_access.rs.
+import type { KeyIssuer, KeyRequestFields } from '@/lib/api'
 import { import_key, issue_key, type ScopedKey } from './kpabe/kpabe'
-import { importPrivateKey, openSealed, sealTo, type SealedSecret, type X25519Pair } from './hpke'
+import { fromBase64Url, importPrivateKey, openSealed, sealTo, type SealedSecret, type X25519Pair } from './hpke'
 
 const ENCODER = new TextEncoder()
 export const GRANT_PURPOSE = ENCODER.encode('aruna ABE grant v1')
@@ -18,28 +19,39 @@ export interface ParameterBytes {
 
 export interface GrantInput {
   sealed: SealedSecret
-  /** The grant associated data, which names the recipient key and the parameters. */
+  /** The grant associated data; it must frame exactly `request` and `issuer`. */
   aad: Uint8Array<ArrayBuffer>
   pair: X25519Pair
+  /** The caller's own request, with the admitted parameters. */
+  request: KeyRequestFields
+  issuer: KeyIssuer
   parameters: ParameterBytes
+}
+
+/** The pinned version metadata an envelope context must name. */
+export interface EnvelopeExpected {
+  objectKey: string
+  epoch: number
+  writeId: string
+  publicKey: Uint8Array
 }
 
 export interface EnvelopeInput {
   envelope: Uint8Array
   /** The framed envelope context bytes. */
   context: Uint8Array
+  /** The parameters admitted when the key was imported. */
   parameters: ParameterBytes
-  /** The object key the caller asked for. */
-  objectKey: string
+  expected: EnvelopeExpected
 }
 
 export interface IssueInput {
   /** The bucket private key; cleared here. */
   bucketKey: Uint8Array
+  /** The holder proposal; the key is issued for exactly its scope and epochs. */
+  request: KeyRequestFields
+  issuer: KeyIssuer
   parameters: ParameterBytes
-  scope: { kind: 'exact' | 'subtree'; value: string }
-  epochs: number[]
-  recipient: Uint8Array<ArrayBuffer>
   aad: Uint8Array<ArrayBuffer>
 }
 
@@ -60,8 +72,85 @@ export function unframe(bytes: Uint8Array): Uint8Array[] {
   return fields
 }
 
+/** Frames context fields like aruna_kpabe::frame_context. */
+function frame(fields: Uint8Array[]): Uint8Array<ArrayBuffer> {
+  const out = new Uint8Array(4 + fields.reduce((sum, field) => sum + 4 + field.length, 0))
+  const view = new DataView(out.buffer)
+  view.setUint32(0, fields.length)
+  let at = 4
+  for (const field of fields) {
+    view.setUint32(at, field.length)
+    out.set(field, at + 4)
+    at += 4 + field.length
+  }
+  return out
+}
+
 function same(left: Uint8Array, right: Uint8Array): boolean {
   return left.length === right.length && left.every((byte, index) => byte === right[index])
+}
+
+const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
+
+function ulidBytes(text: string): Uint8Array {
+  let value = 0n
+  for (const char of text.toUpperCase()) {
+    const digit = CROCKFORD.indexOf(char)
+    if (digit < 0) throw new Error('The key grant is not readable.')
+    value = value * 32n + BigInt(digit)
+  }
+  if (text.length !== 26 || value >> 128n) throw new Error('The key grant is not readable.')
+  return Uint8Array.from({ length: 16 }, (_, index) => Number((value >> BigInt(120 - 8 * index)) & 0xffn))
+}
+
+/** A user storage key: the realm bytes, then the user ULID bytes. */
+function userBytes(text: string): Uint8Array {
+  const [user, realm, ...rest] = text.split('@')
+  if (rest.length || realm === undefined) throw new Error('The key grant is not readable.')
+  return Uint8Array.of(...fromBase64Url(realm), ...ulidBytes(user))
+}
+
+/** A postcard unsigned varint. */
+function varint(value: number): number[] {
+  const out: number[] = []
+  let rest = BigInt(value)
+  do {
+    const byte = Number(rest & 0x7fn)
+    rest >>= 7n
+    out.push(rest ? byte | 0x80 : byte)
+  } while (rest)
+  return out
+}
+
+/** Frames the grant associated data from named fields like aruna GrantContext::bytes. */
+export function grantAad(request: KeyRequestFields, issuer: KeyIssuer): Uint8Array<ArrayBuffer> {
+  const { recipient_record: record, recipient_public: recipient, recipient_fingerprint: fingerprint } = request
+  if (!record || !recipient || !fingerprint || request.restrictions !== null) {
+    throw new Error('This key grant cannot be opened in the browser.')
+  }
+  const scope = ENCODER.encode(request.scope.value)
+  const created = new Uint8Array(8)
+  new DataView(created.buffer).setBigUint64(0, BigInt(request.created_at_ms))
+  return frame([
+    GRANT_PURPOSE,
+    ulidBytes(request.request_id),
+    userBytes(request.requesting_user),
+    userBytes(request.recipient_user),
+    ulidBytes(record),
+    fromBase64Url(recipient),
+    fromBase64Url(fingerprint),
+    ENCODER.encode(request.bucket),
+    fromBase64Url(request.parameters.context),
+    fromBase64Url(request.parameters.fingerprint),
+    Uint8Array.from([...varint(request.epochs.length), ...request.epochs.flatMap(varint)]),
+    Uint8Array.of(request.scope.kind === 'exact' ? 0 : 1, ...varint(scope.length), ...scope),
+    ENCODER.encode(request.credential_id ?? ''),
+    Uint8Array.of(0),
+    Uint8Array.from(request.revisions.flatMap((revision) => [...fromBase64Url(revision)])),
+    created,
+    ENCODER.encode(issuer.kind),
+    issuer.kind === 'user' ? userBytes(issuer.id) : Uint8Array.from(issuer.id.match(/../g) ?? [], (pair) => parseInt(pair, 16)),
+  ])
 }
 
 /** WASM refusals arrive as strings. */
@@ -69,14 +158,13 @@ function refused(cause: unknown): Error {
   return cause instanceof Error ? cause : new Error('The encryption key or record was refused.')
 }
 
-function checkGrant(aad: Uint8Array, parameters: ParameterBytes, recipient: Uint8Array) {
-  const fields = unframe(aad)
+/** Checks that the associated data frames exactly the named fields and admitted parameters. */
+function checkGrant(aad: Uint8Array, input: { request: KeyRequestFields; issuer: KeyIssuer; parameters: ParameterBytes }) {
+  const { request, parameters } = input
   if (
-    fields.length !== 18 ||
-    !same(fields[0], GRANT_PURPOSE) ||
-    !same(fields[5], recipient) ||
-    !same(fields[8], parameters.context) ||
-    !same(fields[9], parameters.fingerprint)
+    !same(aad, grantAad(request, input.issuer)) ||
+    !same(fromBase64Url(request.parameters.context), parameters.context) ||
+    !same(fromBase64Url(request.parameters.fingerprint), parameters.fingerprint)
   ) {
     throw new Error('The key grant does not belong to this key or bucket.')
   }
@@ -84,11 +172,17 @@ function checkGrant(aad: Uint8Array, parameters: ParameterBytes, recipient: Uint
 
 /** Opens a grant sealed to `pair` and imports its key; the opened bytes are cleared. */
 export async function importGrant(input: GrantInput): Promise<ScopedKey> {
-  const { parameters } = input
-  checkGrant(input.aad, parameters, input.pair.publicKey)
+  const { parameters, request } = input
+  checkGrant(input.aad, input)
+  if (!same(fromBase64Url(request.recipient_public ?? ''), input.pair.publicKey)) {
+    throw new Error('The key grant does not belong to this key or bucket.')
+  }
   const plain = await openSealed(input.pair, input.sealed, GRANT_PURPOSE, input.aad)
   try {
-    return import_key(parameters.parameters, parameters.context, parameters.fingerprint, plain)
+    const epochs = BigUint64Array.from(request.epochs, (epoch) => BigInt(epoch))
+    const { kind, value } = request.scope
+    const { parameters: bytes, context, fingerprint } = parameters
+    return import_key(bytes, context, fingerprint, kind, value, epochs, plain)
   } catch (cause) {
     throw refused(cause)
   } finally {
@@ -96,10 +190,13 @@ export async function importGrant(input: GrantInput): Promise<ScopedKey> {
   }
 }
 
-/** Opens the 32-byte object key after checking the context names this bucket and object. */
+/** Opens the 32-byte object key after checking the context names this bucket and pinned version. */
 export async function openObject(key: ScopedKey, input: EnvelopeInput): Promise<Uint8Array<ArrayBuffer>> {
+  const { expected } = input
   const fields = unframe(input.context)
   const setup = unframe(input.parameters.context)
+  const epoch = new Uint8Array(8)
+  new DataView(epoch.buffer).setBigUint64(0, BigInt(expected.epoch))
   if (
     fields.length !== 10 ||
     setup.length !== 5 ||
@@ -107,7 +204,10 @@ export async function openObject(key: ScopedKey, input: EnvelopeInput): Promise<
     !same(setup[0], SETUP_PURPOSE) ||
     [1, 2, 3, 4].some((index) => !same(fields[index], setup[index])) ||
     !same(fields[5], input.parameters.fingerprint) ||
-    !same(fields[7], ENCODER.encode(input.objectKey))
+    !same(fields[6], epoch) ||
+    !same(fields[7], ENCODER.encode(expected.objectKey)) ||
+    !same(fields[8], ulidBytes(expected.writeId)) ||
+    !same(fields[9], expected.publicKey)
   ) {
     throw new Error('The envelope does not belong to this object.')
   }
@@ -129,17 +229,19 @@ export async function openObject(key: ScopedKey, input: EnvelopeInput): Promise<
 
 /** Issues the scope's key from the bucket key and seals it to the recipient. */
 export async function issueGrant(input: IssueInput): Promise<SealedSecret> {
-  const { parameters } = input
+  const { parameters, request } = input
+  let recipient: Uint8Array<ArrayBuffer>
   try {
-    checkGrant(input.aad, parameters, input.recipient)
+    checkGrant(input.aad, input)
+    recipient = fromBase64Url(request.recipient_public ?? '')
   } catch (cause) {
     input.bucketKey.fill(0)
     throw cause
   }
   let plain: Uint8Array<ArrayBuffer>
   try {
-    const epochs = BigUint64Array.from(input.epochs, (epoch) => BigInt(epoch))
-    const { kind, value } = input.scope
+    const epochs = BigUint64Array.from(request.epochs, (epoch) => BigInt(epoch))
+    const { kind, value } = request.scope
     const { parameters: bytes, context, fingerprint } = parameters
     plain = issue_key(input.bucketKey, bytes, context, fingerprint, kind, value, epochs) as Uint8Array<ArrayBuffer>
   } catch (cause) {
@@ -148,7 +250,7 @@ export async function issueGrant(input: IssueInput): Promise<SealedSecret> {
     input.bucketKey.fill(0)
   }
   try {
-    return await sealTo(input.recipient, GRANT_PURPOSE, input.aad, plain)
+    return await sealTo(recipient, GRANT_PURPOSE, input.aad, plain)
   } finally {
     plain.fill(0)
   }
