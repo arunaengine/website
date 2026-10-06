@@ -5,11 +5,13 @@ import type { ObjectEntry } from '@/composables/useS3'
 import { useOtherBuckets } from './useOtherBuckets'
 
 const createSyncRelationship = vi.fn()
+const apiBaseUrl = ref('https://a.test/api/v1')
+const sessionEpoch = ref(0)
 const sourceEncrypted = ref<boolean | null>(null)
 const sourceArgs: unknown[][] = []
 
 vi.mock('@/composables/useAruna', () => ({
-  useAruna: () => ({ apiBaseUrl: ref('https://a.test/api/v1'), createSyncRelationship }),
+  useAruna: () => ({ apiBaseUrl, sessionEpoch, createSyncRelationship }),
 }))
 vi.mock('@/composables/useRealmNodes', () => ({
   useRealmNodes: () => ({
@@ -41,6 +43,8 @@ function imports() {
 }
 
 beforeEach(() => {
+  apiBaseUrl.value = 'https://a.test/api/v1'
+  sessionEpoch.value = 0
   sourceEncrypted.value = null
   sourceArgs.length = 0
   createSyncRelationship.mockReset().mockResolvedValue({ id: 's-1' })
@@ -104,6 +108,55 @@ describe('imports from other buckets', () => {
 
     expect(state.otherRows.value.map(state.offerPlaintext)).toEqual([true, false, false])
     expect(state.plaintextOffered.value).toBe(true)
+  })
+
+  it.each(['session', 'API'])('clears plaintext consent and observations on a %s change', async (context) => {
+    const state = imports()
+    state.pickSearchHit(hit('sealed', 'node-a'))
+    sourceEncrypted.value = true
+    await nextTick()
+    state.addOtherSelection(objects('a.txt'))
+    const row = state.otherRows.value[0]
+    row.plaintext = true
+
+    if (context === 'session') sessionEpoch.value += 1
+    else apiBaseUrl.value = 'https://c.test/api/v1'
+
+    expect(row.plaintext).toBe(false)
+    expect(state.offerPlaintext(row)).toBe(false)
+    expect(state.otherRows.value).toEqual([row])
+    expect(state.sourceBucket.value).toBe('sealed')
+    sourceEncrypted.value = null
+    await nextTick()
+    sourceEncrypted.value = true
+    await nextTick()
+    await state.createOtherRelationships()
+
+    expect(state.offerPlaintext(row)).toBe(true)
+    expect(createSyncRelationship.mock.calls[0][0]).not.toHaveProperty('plaintext')
+  })
+
+  it.each(['session', 'API'])('stops a deferred batch after a %s change', async (context) => {
+    const state = imports()
+    state.pickSearchHit(hit('sealed', 'node-a'))
+    sourceEncrypted.value = true
+    await nextTick()
+    state.addOtherSelection(objects('a.txt', 'b.txt'))
+    state.otherRows.value.forEach((row) => (row.plaintext = true))
+    let refuse: (cause: unknown) => void = () => undefined
+    createSyncRelationship.mockReturnValueOnce(new Promise((_, reject) => (refuse = reject)))
+    const pending = state.createOtherRelationships()
+    expect(createSyncRelationship.mock.calls[0][0]).toHaveProperty('plaintext', true)
+
+    if (context === 'session') sessionEpoch.value += 1
+    else apiBaseUrl.value = 'https://c.test/api/v1'
+    refuse(new DOMException('The API session changed.', 'AbortError'))
+    await pending
+
+    expect(createSyncRelationship).toHaveBeenCalledTimes(1)
+    expect(state.otherRows.value.map((row) => row.plaintext)).toEqual([false, false])
+    expect(state.otherRows.value.map((row) => row.state)).toEqual(['error', 'ready'])
+    expect(state.otherBusy.value).toBe(false)
   })
 
   it('names a refused copy of an encrypted source by its code', async () => {

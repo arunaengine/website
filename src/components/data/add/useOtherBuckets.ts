@@ -41,7 +41,7 @@ export function useOtherBuckets(options: {
   bucket: Ref<string>
   prefix: Ref<string>
 }) {
-  const { apiBaseUrl, createSyncRelationship } = useAruna()
+  const { apiBaseUrl, sessionEpoch, createSyncRelationship } = useAruna()
   const realmNodes = useRealmNodes()
 
   const sourceBucket = ref('')
@@ -64,6 +64,15 @@ export function useOtherBuckets(options: {
     const key = sourceKey(sourceBucket.value, sourceNodeId.value)
     encryptedSources.value = { ...encryptedSources.value, [key]: encrypted }
   })
+
+  watch(
+    [sessionEpoch, apiBaseUrl],
+    () => {
+      encryptedSources.value = {}
+      otherRows.value.forEach((row) => (row.plaintext = false))
+    },
+    { flush: 'sync' },
+  )
 
   function sourceKey(bucket: string, nodeId: string | null): string {
     return `${nodeId ?? ''}/${bucket}`
@@ -143,10 +152,13 @@ export function useOtherBuckets(options: {
   async function createOtherRelationships(): Promise<boolean> {
     const targetNode = realmNodes.localNodeId.value
     if (!targetNode || !options.bucket.value || otherBusy.value) return false
+    const epoch = sessionEpoch.value
+    const apiBase = apiBaseUrl.value
     otherBusy.value = true
     let created = false
     try {
       for (const row of otherRows.value) {
+        if (epoch !== sessionEpoch.value || apiBase !== apiBaseUrl.value) break
         if (row.state === 'done' || row.state === 'creating') continue
         const sourceApiBase = row.nodeId ? (realmNodes.nodeById(row.nodeId)?.apiBase ?? null) : null
         if (row.nodeId && !sourceApiBase) {
