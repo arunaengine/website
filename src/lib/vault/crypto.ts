@@ -93,7 +93,7 @@ export class VaultFormatError extends Error {
 export const WRONG_PASSPHRASE = 'Wrong passphrase.'
 export const WRONG_RECOVERY_CODE = 'The recovery code is wrong.'
 
-function toBase64(bytes: Uint8Array): string {
+export function toBase64(bytes: Uint8Array): string {
   let binary = ''
   for (const byte of bytes) binary += String.fromCharCode(byte)
   return btoa(binary)

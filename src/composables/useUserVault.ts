@@ -38,6 +38,7 @@ import {
 } from '@/lib/vault/crypto'
 import type { X25519Pair } from '@/lib/vault/hpke'
 import { browserKeyStore } from '@/lib/vault/keyStore'
+import { closeKeyWorker } from '@/lib/vault/keyWorker'
 import { apiBaseUrl, authToken, realmInfo, sessionEpoch, userInfo } from './aruna/state'
 
 export type VaultState = 'absent' | 'locked' | 'unlocked' | 'unsupported'
@@ -210,6 +211,7 @@ async function openProviders(current: VaultPayload, key: CryptoKey): Promise<Bro
 }
 
 function clearLocal() {
+  closeKeyWorker()
   generation += 1
   sessionGeneration += 1
   inFlight = null
@@ -531,6 +533,7 @@ export function reapplyChange(
 function lock() {
   const scope = scopeKey
   locks += 1
+  closeKeyWorker()
   // Work started before the lock belongs to the unlocked vault: none of it may open it again.
   generation += 1
   inFlight = null
