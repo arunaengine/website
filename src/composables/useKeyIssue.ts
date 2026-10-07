@@ -24,6 +24,8 @@ interface Waiting {
   bucket: string
   nodeId: string
 }
+/** Waiting buckets per scope that local storage could not keep. */
+const unsaved = new Map<string, Waiting[]>()
 let watching = false
 /** One issuance at a time, so a later one finds the earlier one's requests already issued. */
 let queue: Promise<unknown> = Promise.resolve()
@@ -44,6 +46,8 @@ function waitingScope(): string {
 }
 
 function loadWaiting(scope: string): Waiting[] {
+  const kept = unsaved.get(scope)
+  if (kept) return kept
   try {
     const list: unknown = JSON.parse(globalThis.localStorage?.getItem(WAITING_PREFIX + scope) ?? '[]')
     return Array.isArray(list)
@@ -59,11 +63,13 @@ function markWaiting(scope: string, target: IssueTarget, open: boolean) {
   if (!scope) return
   const list = loadWaiting(scope).filter((entry) => entry.bucket !== target.bucket || entry.nodeId !== target.nodeId)
   if (open) list.push({ bucket: target.bucket, nodeId: target.nodeId })
+  unsaved.delete(scope)
   try {
-    if (list.length) globalThis.localStorage?.setItem(WAITING_PREFIX + scope, JSON.stringify(list))
-    else globalThis.localStorage?.removeItem(WAITING_PREFIX + scope)
+    if (list.length) globalThis.localStorage.setItem(WAITING_PREFIX + scope, JSON.stringify(list))
+    else globalThis.localStorage.removeItem(WAITING_PREFIX + scope)
   } catch {
     // Without storage the buckets wait until the page closes.
+    if (list.length) unsaved.set(scope, list)
   }
 }
 

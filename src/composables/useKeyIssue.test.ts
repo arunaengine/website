@@ -87,6 +87,23 @@ describe('key issuance recovery', () => {
     expect(store.get(KEY)).toBe(JSON.stringify([{ bucket: 'reef', nodeId: 'n1' }]))
   })
 
+  it('keeps the buckets of a closed-vault role grant in the page when storage fails', async () => {
+    const fail = () => {
+      throw new Error('storage unavailable')
+    }
+    vi.stubGlobal('localStorage', { getItem: fail, setItem: fail, removeItem: fail })
+    vault.state.value = 'locked'
+    listGroupDataPaths.mockResolvedValueOnce({ entries: [{ permission_path: '/R/g/G/data/n1/reef' }] })
+    await useKeyIssue().issueAfterGrant('G', ['Q1'])
+
+    vault.state.value = 'unlocked'
+    await useKeyIssue().issueWaiting()
+    await useKeyIssue().issueWaiting()
+
+    expect(issueBucket).toHaveBeenCalledTimes(1)
+    expect(issueBucket.mock.calls[0]![0]).toMatchObject({ bucket: 'reef', nodeId: 'n1' })
+  })
+
   it('reads every notice page, read ones too, and marks notices read only once issued', async () => {
     notifications.items.value = [notice('N1', 'reef', true), notice('N2', 'kelp', false)]
     notifications.nextCursor.value = 'next'
