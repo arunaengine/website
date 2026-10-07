@@ -15,6 +15,8 @@ const vault = vi.hoisted(() => ({
   loaded: { value: true },
   load: vi.fn(),
   whileUnlocked: () => () => true,
+  checkKey: vi.fn(),
+  recoveryCode: { value: null as string | null },
 }))
 const closeKeyWorker = vi.hoisted(() => vi.fn())
 
@@ -45,6 +47,7 @@ beforeEach(() => {
   read.readWithGrant.mockResolvedValue(new Blob(['ok']))
   const state = ref('unlocked')
   vault.state = state
+  vault.recoveryCode = ref(null)
 })
 
 afterEach(() => vi.useRealTimers())
@@ -67,6 +70,27 @@ describe('keyed read waits', () => {
     expect(read.ownGrants).toHaveBeenCalledTimes(3)
     expect(keyed.pending.value.size).toBe(0)
     expect(keyed.wait.value).toBeNull()
+  })
+
+  it('asks a member without a vault to set one up, then requests the key', async () => {
+    read.ownGrants.mockResolvedValueOnce([])
+    read.requestKey.mockResolvedValueOnce(GRANT)
+    vault.state.value = 'absent'
+    const keyed = useKeyedRead()
+    const done = keyed.read(TARGET)
+    await settle()
+    expect(keyed.wait.value).toBe('setup')
+    expect(read.requestKey).not.toHaveBeenCalled()
+
+    vault.recoveryCode.value = 'code'
+    vault.state.value = 'unlocked'
+    await settle()
+    expect(keyed.wait.value).toBe('setup')
+
+    vault.recoveryCode.value = null
+    expect(await (await done).text()).toBe('ok')
+    expect(vault.checkKey).toHaveBeenCalledTimes(1)
+    expect(read.requestKey).toHaveBeenCalledTimes(1)
   })
 
   it('asks for the vault and resumes once it opens', async () => {

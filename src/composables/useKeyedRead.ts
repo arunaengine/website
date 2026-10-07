@@ -37,8 +37,8 @@ export interface KeyedObject {
 
 export function useKeyedRead() {
   const vault = useUserVault()
-  /** What the current read waits for; `vault` asks the user to open their personal vault. */
-  const wait = ref<ReadWait | 'vault' | null>(null)
+  /** What the current read waits for; `vault` and `setup` ask the user to open or create their vault. */
+  const wait = ref<ReadWait | 'vault' | 'setup' | null>(null)
   /** Files of this view whose read waits for a key, as `bucket` and `key` joined by a zero byte. */
   const pending = ref(new Set<string>())
   let run = 0
@@ -105,6 +105,16 @@ export function useKeyedRead() {
       let grant = usableGrant(await ownGrants(target), envelope, target.key)
       check()
       if (!grant) {
+        if (!vault.loaded.value) await vault.load()
+        check()
+        if (vault.state.value === 'absent') {
+          // A grant is sealed to a published vault key; the request is made once one exists.
+          wait.value = 'setup'
+          await until(() => ended() || (vault.state.value === 'unlocked' && !vault.recoveryCode.value))
+          check()
+          await vault.checkKey()
+          check()
+        }
         grant = await requestKey(target)
         check()
       }

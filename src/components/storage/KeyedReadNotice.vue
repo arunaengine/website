@@ -7,7 +7,7 @@ import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
 import { useUserVault } from '@/composables/useUserVault'
 
-const props = defineProps<{ wait: 'vault' | 'pending' | 'preparing' | null; action: 'download' | 'preview' }>()
+const props = defineProps<{ wait: 'vault' | 'setup' | 'pending' | 'preparing' | null; action: 'download' | 'preview' }>()
 const emit = defineEmits<{ (e: 'cancel'): void }>()
 const { state } = useUserVault()
 
@@ -15,7 +15,12 @@ const result = computed(() => (props.action === 'download' ? 'download starts' :
 </script>
 
 <template>
-  <Notice v-if="wait === 'vault'" title="Open your personal vault to read this file" class="space-y-2">
+  <Notice v-if="wait === 'setup'" title="Set up your personal vault" class="space-y-2">
+    <p>Your keys for encrypted files are sealed to your vault. The {{ result }} once a key holder issues yours.</p>
+    <VaultGate />
+    <Button variant="outline" size="sm" @click="emit('cancel')">Cancel</Button>
+  </Notice>
+  <Notice v-else-if="wait === 'vault'" title="Open your personal vault to read this file" class="space-y-2">
     <p>Your keys for encrypted files are in your vault. The {{ result }} right after.</p>
     <VaultUnlockForm v-if="state === 'locked'" />
     <VaultGate v-else />
