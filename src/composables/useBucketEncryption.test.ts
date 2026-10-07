@@ -115,6 +115,20 @@ describe('bucket encryption state', () => {
     expect(encryption.status.value?.bucket_id).toBe('B1')
   })
 
+  it('asks nothing while no bucket is chosen', async () => {
+    const { encryption, bucket } = setup()
+    await vi.waitFor(() => expect(encryption.state.value).toBe('ready'))
+    getBucketEncryption.mockClear()
+    getBucketCompression.mockClear()
+
+    bucket.value = ''
+    await encryption.load()
+
+    expect(getBucketEncryption).not.toHaveBeenCalled()
+    expect(getBucketCompression).not.toHaveBeenCalled()
+    expect(encryption.status.value).toBeNull()
+  })
+
   it('tells a node without the report and a refusal apart from encryption off', async () => {
     getBucketEncryption.mockRejectedValueOnce(new Api.ApiError(404, 'Not found'))
     const missing = setup()

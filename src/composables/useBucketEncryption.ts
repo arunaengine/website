@@ -84,6 +84,11 @@ export function useBucketEncryption(bucket: Ref<string>, nodeId: Ref<string | nu
       state.value = node || nodeInfo.value ? 'unresolved' : 'loading'
       return
     }
+    // No bucket chosen yet: nothing to ask the node about.
+    if (!scope.value.bucket) {
+      status.value = null
+      return
+    }
     refreshing.value = true
     const [encryption, compressed] = await Promise.allSettled([
       getBucketEncryption(scope.value.bucket, client()),
