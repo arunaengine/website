@@ -174,11 +174,12 @@ async function issueWaiting(extra: IssueTarget[] = [], history = false): Promise
     return
   }
   const tried = new Set(found.map((target) => `${target.nodeId}\u0000${target.bucket}`))
-  const rest = [...notices].filter(([key]) => !tried.has(key)).map(([, notice]) => notice.target)
-  if (rest.length) (await issueFor(rest, epoch, scope))?.forEach((key) => finished.add(key))
+  // A bucket finished before the fetch may have a newer request, so only a later check settles it.
+  const rest = [...notices].filter(([key]) => !tried.has(key) || finished.has(key)).map(([, notice]) => notice.target)
+  const checked = rest.length ? (await issueFor(rest, epoch, scope)) ?? new Set<string>() : new Set<string>()
   if (epoch !== sessionEpoch.value) return
   // Marked by id, since the bell may not have loaded these notices yet.
-  const ids = [...notices].flatMap(([key, notice]) => (finished.has(key) ? notice.ids : []))
+  const ids = [...notices].flatMap(([key, notice]) => (checked.has(key) ? notice.ids : []))
   if (ids.length) void useNotifications().markRead(ids)
 }
 

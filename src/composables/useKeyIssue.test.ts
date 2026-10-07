@@ -141,6 +141,25 @@ describe('key issuance recovery', () => {
     expect(notifications.loadNotifications).not.toHaveBeenCalled()
     expect(notifications.markRead).toHaveBeenCalledWith(['N1'])
   })
+
+  it('keeps a notice fetched after its bucket finished unread until a later check', async () => {
+    store.set(KEY, JSON.stringify([{ bucket: 'reef', nodeId: 'n1' }]))
+    let release = () => {}
+    issueBucket
+      .mockResolvedValueOnce({ users: new Set(), done: true })
+      .mockImplementationOnce(() => new Promise((resolve) => {
+        release = () => resolve({ users: new Set(), done: true })
+      }))
+    apiRequest.mockResolvedValueOnce({ notifications: [notice('N1', 'reef', false)] })
+
+    const running = useKeyIssue().issueWaiting()
+    await vi.waitFor(() => expect(issueBucket).toHaveBeenCalledTimes(2))
+    expect(notifications.markRead).not.toHaveBeenCalled()
+    release()
+    await running
+
+    expect(notifications.markRead).toHaveBeenCalledWith(['N1'])
+  })
 })
 
 describe('key issuance lifecycle', () => {
