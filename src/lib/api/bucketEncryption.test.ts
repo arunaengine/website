@@ -105,7 +105,16 @@ describe('bucket encryption client', () => {
   })
 
   it('lists the session tokens of a bucket on its node and passes a refusal on', async () => {
-    const token = { access_key_id: 'AK1', user_id: 'U1', created_at: '2026-10-05T10:00:00Z', generation: 2, stale: true }
+    const token = {
+      request_id: 'R1',
+      access_key_id: 'AK1',
+      user_id: 'U1',
+      created_at: '2026-10-05T10:00:00Z',
+      generation: 2,
+      scope: { kind: 'subtree', value: 'raw/' },
+      epochs: [1],
+      stale: true,
+    }
     const calls = stubFetch({ tokens: [token] })
 
     const listed = await listBucketTokens('reef survey', NODE)

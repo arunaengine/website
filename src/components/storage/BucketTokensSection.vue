@@ -6,7 +6,7 @@ import Badge from '@/components/ui/Badge.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import type { HolderSource } from '@/composables/useBucketHolders'
-import { ApiError, listBucketTokens, type BucketTokenEntry } from '@/lib/api'
+import { ApiError, listBucketTokens, type BucketTokenEntry, type KeyScope } from '@/lib/api'
 import { encryptionError } from '@/lib/bucketEncryption'
 import { toneVariant } from '@/lib/stateBadge'
 import { shortUserId } from '@/lib/utils'
@@ -36,6 +36,11 @@ async function load() {
     else state.value = status === 404 || status === 405 ? 'missing' : 'failed'
     error.value = encryptionError(cause)
   }
+}
+
+function scopeText(scope: KeyScope): string {
+  if (scope.kind === 'exact') return scope.value
+  return scope.value ? `${scope.value}…` : 'Whole bucket'
 }
 
 function createdLabel(at: string): string {
@@ -76,13 +81,15 @@ watch(props.source.revision, () => void load())
         <ul v-if="tokens.length" class="divide-y divide-border text-sm">
           <li
             v-for="entry in tokens"
-            :key="`${entry.access_key_id}/${entry.generation}`"
+            :key="entry.request_id"
             class="flex flex-wrap items-center gap-x-3 gap-y-1 py-2"
           >
             <span class="min-w-0 flex-1 truncate font-mono text-xs">{{ entry.access_key_id }}</span>
             <span class="text-xs text-muted-foreground" :title="entry.user_id">{{ shortUserId(entry.user_id) }}</span>
             <span class="text-xs text-muted-foreground" :title="entry.created_at">{{ createdLabel(entry.created_at) }}</span>
+            <span class="font-mono text-xs" :title="entry.scope.kind">{{ scopeText(entry.scope) }}</span>
             <span class="text-xs text-muted-foreground">Key generation {{ entry.generation }}</span>
+            <span class="text-xs text-muted-foreground">Epochs {{ entry.epochs.join(', ') }}</span>
             <Badge v-if="entry.stale" :variant="toneVariant('attention')">Stale</Badge>
           </li>
         </ul>

@@ -42,10 +42,13 @@ const source = {
 
 function token(accessKey: string, overrides: Partial<BucketTokenEntry> = {}): BucketTokenEntry {
   return {
+    request_id: `${accessKey}-request`,
     access_key_id: accessKey,
     user_id: '01JUSERAAAAAAAAAAAAAAAAAAA@realm',
     created_at: '2026-10-05T10:00:00Z',
     generation: 3,
+    scope: { kind: 'subtree', value: '' },
+    epochs: [1],
     stale: false,
     ...overrides,
   }
@@ -87,6 +90,24 @@ describe('bucket session tokens', () => {
     expect(text).toContain('Key generation 2')
     expect(text).toContain('1 stale')
     expect(text.match(/Stale/g)).toHaveLength(1)
+  })
+
+  it('shows one row per scoped grant of a key with its scope and epochs', async () => {
+    listBucketTokens.mockResolvedValue({
+      tokens: [
+        token('AKSCOPED', { request_id: 'R1', scope: { kind: 'subtree', value: 'raw/' }, epochs: [1, 2] }),
+        token('AKSCOPED', { request_id: 'R2', scope: { kind: 'exact', value: 'docs/readme.md' } }),
+        token('AKWHOLE'),
+      ],
+    })
+
+    const text = await render()
+
+    expect(text.match(/AKSCOPED/g)).toHaveLength(2)
+    expect(text).toContain('raw/…')
+    expect(text).toContain('docs/readme.md')
+    expect(text).toContain('Whole bucket')
+    expect(text).toContain('Epochs 1, 2')
   })
 
   it('says why the list is missing instead of showing it empty', async () => {

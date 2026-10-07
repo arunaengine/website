@@ -2,6 +2,7 @@
 // hosts the bucket, never through S3. An older node answers 404: "not reported
 // here", never "off".
 import { ApiError, apiRequest, type ApiClientOptions } from './client'
+import type { KeyScope } from './scopedKeys'
 
 export type EncryptionMode = 'off' | 'node_managed' | 'vault_locked'
 export type BlockCipher = 'chacha20_poly1305' | 'aes256_gcm'
@@ -203,14 +204,19 @@ export interface BucketAuditResponse {
   next_cursor?: string
 }
 
-/** An S3 key whose session token opens this bucket. The token itself is never listed. */
+/** One scoped key grant of an S3 key's session token. The token itself is never listed. */
 export interface BucketTokenEntry {
+  /** The key request the grant answers; unique per entry. */
+  request_id: string
   access_key_id: string
   /** The user who created the key. */
   user_id: string
   /** RFC 3339. */
   created_at: string
   generation: number
+  /** The object key or prefix the grant opens. */
+  scope: KeyScope
+  epochs: number[]
   /** Made for an older key generation, so the token no longer opens the bucket. */
   stale: boolean
 }
