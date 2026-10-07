@@ -20,7 +20,11 @@ const notifications = vi.hoisted(() => ({
 }))
 
 vi.mock('@/lib/vault/keyIssue', () => ({ issueBucket }))
-vi.mock('@/lib/api', () => ({ apiRequest, listGroupDataPaths }))
+vi.mock('@/lib/api', async (importOriginal) => ({ ...(await importOriginal<object>()), apiRequest, listGroupDataPaths }))
+vi.mock('@/composables/useAruna', () => ({
+  useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('T'), currentUser: ref(null) }),
+}))
+vi.mock('@/composables/useGlobalErrors', () => ({ reportGlobalError: vi.fn() }))
 vi.mock('./useUserVault', () => ({ useUserVault: () => vault }))
 vi.mock('./useNotifications', () => ({ useNotifications: () => notifications }))
 vi.mock('./s3/endpoints', () => ({ localNodeId: () => 'n0', nodeApiBase: (node: string) => `https://${node}.test/api/v1` }))
@@ -195,6 +199,28 @@ describe('key issuance recovery', () => {
     const sent = notifications.markRead.mock.calls.map((call) => call[0] as string[])
     expect(sent.every((batch) => batch.length <= 512)).toBe(true)
     expect(sent.flat().sort()).toEqual([...ids].sort())
+  })
+
+  it('marks 513 loaded notices of one bucket read in batches while each request is pending', async () => {
+    const actual = await vi.importActual<typeof import('./useNotifications')>('./useNotifications')
+    const real = actual.useNotifications()
+    const ids = Array.from({ length: 513 }, (_, i) => `N${i}`)
+    real.items.value = ids.map((id) => notice(id, 'reef', false)) as never
+    notifications.items = real.items as never
+    notifications.markRead.mockImplementation(real.markRead)
+    const sent: string[][] = []
+    apiRequest.mockImplementation((path: string, options: { body?: string }) => {
+      if (path !== '/system/notifications/read') return Promise.resolve({ notifications: ids.map((id) => notice(id, 'reef', false)) })
+      sent.push(JSON.parse(options.body!).ids)
+      return new Promise(() => {})
+    })
+    const keyIssue = useKeyIssue()
+
+    await keyIssue.issueWaiting([keyIssue.targetOf('reef', 'n1')!])
+
+    expect(sent.every((batch) => batch.length <= 512)).toBe(true)
+    expect(sent.flat().sort()).toEqual([...ids].sort())
+    notifications.markRead.mockReset()
   })
 })
 

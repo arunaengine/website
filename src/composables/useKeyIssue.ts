@@ -104,6 +104,11 @@ function loadedNotices(target: IssueTarget): string[] {
     .map((entry) => entry.id)
 }
 
+/** Marks `ids` read in requests of at most 512 ids, the server limit. */
+function markBatches(ids: string[]) {
+  for (let i = 0; i < ids.length; i += 512) void useNotifications().markRead(ids.slice(i, i + 512))
+}
+
 function show(count: IssuedCount) {
   issued.value = count
   clearTimeout(noticeTimer)
@@ -144,7 +149,7 @@ async function issueNow(targets: IssueTarget[], epoch: number, scope: string): P
       const { users, done } = await issueBucket(target, { realmId, userId }, vault, guard)
       guard()
       markWaiting(scope, target, !done)
-      if (done && ids.length) void useNotifications().markRead(ids)
+      if (done) markBatches(ids)
       if (done) finished.add(key)
       if (users.size) buckets += 1
       users.forEach((user) => people.add(user))
@@ -180,8 +185,7 @@ async function issueWaiting(extra: IssueTarget[] = [], history = false): Promise
   if (epoch !== sessionEpoch.value) return
   // Marked by id, since the bell may not have loaded these notices yet.
   const ids = [...notices].flatMap(([key, notice]) => (checked.has(key) ? notice.ids : []))
-  // The server accepts at most 512 ids per request.
-  for (let i = 0; i < ids.length; i += 512) void useNotifications().markRead(ids.slice(i, i + 512))
+  markBatches(ids)
 }
 
 /** After a role grant listed `requests`: issues the group's buckets now or at the next vault opening. */
