@@ -215,9 +215,9 @@ function watchVault() {
   watch(useUserVault().state, (state, before) => {
     if (state === 'unlocked' && before !== 'unlocked') void issueWaiting()
   }, { immediate: true })
-  // A key notice can arrive after its bucket was issued, so a new unread notice settles again.
-  watch(useNotifications().unreadCount, (count, before) => {
-    if (count > before && useUserVault().state.value === 'unlocked') void issueWaiting()
+  // A key notice can arrive after its bucket was issued, so each server notification change settles again.
+  watch(useNotifications().dashboardRevision, () => {
+    if (useUserVault().state.value === 'unlocked') void issueWaiting()
   })
   watch(sessionEpoch, () => {
     issued.value = null

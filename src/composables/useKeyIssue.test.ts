@@ -12,6 +12,7 @@ const notifications = vi.hoisted(() => ({
   items: { value: [] as Record<string, unknown>[] },
   listLoaded: { value: false },
   unreadCount: { value: 0 },
+  dashboardRevision: { value: 0 },
   nextCursor: { value: null as string | null },
   loadNotifications: vi.fn(),
   loadMore: vi.fn(),
@@ -57,6 +58,7 @@ beforeEach(() => {
   notifications.items = ref([])
   notifications.listLoaded = ref(true)
   notifications.unreadCount = ref(0)
+  notifications.dashboardRevision = ref(0)
   notifications.nextCursor = ref(null)
   issueBucket.mockResolvedValue({ users: new Set(['ada']), done: true })
   apiRequest.mockResolvedValue({ notifications: [] })
@@ -169,9 +171,44 @@ describe('key issuance lifecycle', () => {
 
     notifications.items.value = [notice('N1', 'reef', false)]
     apiRequest.mockResolvedValue({ notifications: [notice('N1', 'reef', false)] })
-    notifications.unreadCount.value = 1
+    notifications.dashboardRevision.value += 1
     await vi.waitFor(() => expect(notifications.markRead).toHaveBeenCalledWith(['N1']))
     expect(issueBucket.mock.calls[0]![0]).toMatchObject({ bucket: 'reef', nodeId: 'n1' })
+    scope.stop()
+  })
+
+  it('does not repeat a pass when marking a notice read fails and restores the count', async () => {
+    const scope = effectScope()
+    scope.run(() => useKeyIssue().watchVault())
+    await settle()
+    notifications.items.value = [notice('N1', 'reef', false)]
+    apiRequest.mockResolvedValue({ notifications: [notice('N1', 'reef', false)] })
+    notifications.markRead.mockImplementation(async () => {
+      notifications.unreadCount.value -= 1
+      await nextTick()
+      notifications.unreadCount.value += 1
+    })
+    notifications.unreadCount.value = 1
+    notifications.dashboardRevision.value += 1
+    await vi.waitFor(() => expect(notifications.markRead).toHaveBeenCalledTimes(1))
+    await settle()
+    await settle()
+
+    expect(issueBucket).toHaveBeenCalledTimes(1)
+    notifications.markRead.mockReset()
+    scope.stop()
+  })
+
+  it('settles a key notice that arrives while the unread count is capped', async () => {
+    notifications.unreadCount.value = 100
+    const scope = effectScope()
+    scope.run(() => useKeyIssue().watchVault())
+    await settle()
+
+    notifications.items.value = [notice('N1', 'reef', false)]
+    apiRequest.mockResolvedValue({ notifications: [notice('N1', 'reef', false)] })
+    notifications.dashboardRevision.value += 1
+    await vi.waitFor(() => expect(notifications.markRead).toHaveBeenCalledWith(['N1']))
     scope.stop()
   })
 
