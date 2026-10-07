@@ -1,5 +1,6 @@
 import { nextTick, ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { sessionEpoch } from './aruna/state'
 import { POLL_MS, ReadEndedError, useKeyedRead } from './useKeyedRead'
 
 const read = vi.hoisted(() => ({
@@ -21,10 +22,11 @@ vi.mock('@/lib/vault/keyedRead', async (original) => ({ ...(await original<objec
 vi.mock('@/lib/vault/keyWorker', async (original) => ({ ...(await original<object>()), closeKeyWorker }))
 vi.mock('./useUserVault', () => ({ useUserVault: () => vault }))
 vi.mock('./s3/endpoints', () => ({ localNodeId: () => 'n', nodeApiBase: () => 'https://node.test/api/v1' }))
-vi.mock('./useS3', () => ({ useS3: () => ({}) }))
+const headObject = vi.hoisted(() => vi.fn())
+vi.mock('./useS3', () => ({ useS3: () => ({ headObject }) }))
 vi.mock('./aruna/state', async () => {
   const { ref } = await import('vue')
-  return { sessionEpoch: ref(0), userInfo: ref({ user: { user_id: 'U' } }) }
+  return { sessionEpoch: ref(0), userInfo: ref({ user: { user_id: 'U' } }), authToken: ref('T1') }
 })
 
 const TARGET = { bucket: 'reef', key: 'raw/a.csv', versionId: 'V1', client: {} }
@@ -113,5 +115,44 @@ describe('keyed read waits', () => {
     await expect(Promise.race([done, Promise.resolve('open')])).resolves.toBe('open')
     expect(closeKeyWorker).toHaveBeenCalledTimes(1)
     expect(signal?.aborted).toBe(true)
+  })
+})
+
+describe('version lookup', () => {
+  function heads() {
+    const answers: ((value: { versionId: string }) => void)[] = []
+    headObject.mockImplementation(() => new Promise((resolve) => answers.push(resolve)))
+    return answers
+  }
+
+  it('lets a late lookup of a first click neither read nor end the second click', async () => {
+    const answers = heads()
+    read.ownGrants.mockResolvedValue([GRANT])
+    const keyed = useKeyedRead()
+    const first = keyed.readObject({ bucket: 'reef', key: 'a.csv' })
+    const second = keyed.readObject({ bucket: 'reef', key: 'b.csv' })
+    answers[1]!({ versionId: 'V2' })
+    expect(await (await second).text()).toBe('ok')
+
+    answers[0]!({ versionId: 'V1' })
+
+    await expect(first).rejects.toBeInstanceOf(ReadEndedError)
+    expect(read.fetchEnvelope).toHaveBeenCalledTimes(1)
+    expect(read.fetchEnvelope.mock.calls[0]![0]).toMatchObject({ key: 'b.csv', versionId: 'V2' })
+  })
+
+  it('ends a read whose lookup outlived a cancel or a session change', async () => {
+    const answers = heads()
+    const keyed = useKeyedRead()
+    const cancelled = keyed.readObject({ bucket: 'reef', key: 'a.csv' })
+    keyed.cancel()
+    answers[0]!({ versionId: 'V1' })
+    await expect(cancelled).rejects.toBeInstanceOf(ReadEndedError)
+
+    const switched = keyed.readObject({ bucket: 'reef', key: 'a.csv' })
+    sessionEpoch.value += 1
+    answers[1]!({ versionId: 'V1' })
+    await expect(switched).rejects.toBeInstanceOf(ReadEndedError)
+    expect(read.fetchEnvelope).not.toHaveBeenCalled()
   })
 })

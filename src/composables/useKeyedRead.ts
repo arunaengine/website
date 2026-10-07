@@ -74,12 +74,20 @@ export function useKeyedRead() {
     })
   }
 
-  /** The pinned version's bytes; throws `ReadEndedError` once a newer read or a cancel took over. */
-  async function read(target: KeyedTarget): Promise<Blob> {
+  /** Starts a read; a newer read, a cancel or a session change ends it. */
+  function begin() {
     cancel()
     const mine = run
     const epoch = sessionEpoch.value
-    const ended = () => mine !== run || epoch !== sessionEpoch.value
+    return { mine, ended: () => mine !== run || epoch !== sessionEpoch.value }
+  }
+
+  /** The pinned version's bytes; throws `ReadEndedError` once a newer read or a cancel took over. */
+  function read(target: KeyedTarget): Promise<Blob> {
+    return readFor(begin(), target)
+  }
+
+  async function readFor({ mine, ended }: ReturnType<typeof begin>, target: KeyedTarget): Promise<Blob> {
     const check = () => {
       if (ended()) throw new ReadEndedError()
     }
@@ -140,12 +148,20 @@ export function useKeyedRead() {
 
   /** Reads `object` after resolving its node API and pinned version. */
   async function readObject(object: KeyedObject): Promise<Blob> {
+    const action = begin()
     const node = object.nodeId || localNodeId()
     const baseUrl = node ? nodeApiBase(node) : null
     if (!baseUrl) throw new Error('The node publishes no API address.')
-    const versionId = object.versionId || (await useS3().headObject(object.bucket, object.key, object.nodeId)).versionId
+    const client = { baseUrl, token: authToken.value }
+    let versionId = object.versionId
+    try {
+      versionId ||= (await useS3().headObject(object.bucket, object.key, object.nodeId)).versionId
+    } catch (cause) {
+      throw action.ended() ? new ReadEndedError() : cause
+    }
+    if (action.ended()) throw new ReadEndedError()
     if (!versionId) throw new Error('The node named no version for this file.')
-    return read({ bucket: object.bucket, key: object.key, versionId, client: { baseUrl, token: authToken.value } })
+    return readFor(action, { bucket: object.bucket, key: object.key, versionId, client })
   }
 
   /** Saves `object` as `name`; false when the read waits or ended. Other failures are thrown. */
