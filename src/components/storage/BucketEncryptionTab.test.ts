@@ -40,6 +40,7 @@ const tab = compileClientComponent(new URL('./BucketEncryptionTab.vue', import.m
   ),
   '@/components/storage/BucketHoldersSection.vue': moduleDefault(defineComponent(() => () => h('section', 'holder list'))),
   '@/components/storage/BucketKeyAccess.vue': moduleDefault(KeyAccessStub),
+  '@/components/storage/BucketRekeySection.vue': moduleDefault(defineComponent(() => () => h('section', 'key replace'))),
   '@/components/storage/BucketTokensSection.vue': moduleDefault(defineComponent(() => () => h('section', 'token list'))),
   '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
   '@/components/ui/DetailList.vue': moduleDefault(DetailStub),
@@ -212,5 +213,14 @@ describe('bucket encryption tab', () => {
     expect(await render('ready', encrypted({ caller: groupAdmin }))).toContain('token list')
     const admin = { holder: false, ready_copy: false, admin: true }
     expect(await render('ready', encrypted({ mode: 'off', caller: admin }))).toContain('mode settings')
+  })
+
+  it('offers key replacement only on ABE buckets to holders and admins', async () => {
+    const abe = { epoch: 2, raise_due: false, rekey: null }
+    const reader = { holder: false, ready_copy: false, admin: false }
+
+    expect(await render('ready', encrypted())).not.toContain('key replace')
+    expect(await render('ready', encrypted({ abe }))).toContain('key replace')
+    expect(await render('ready', encrypted({ abe, caller: reader }))).not.toContain('key replace')
   })
 })

@@ -110,6 +110,23 @@ export interface BucketEncryptionResponse {
   recovery: RecoveryStatus | null
   transition: EncryptionTransition | null
   caller: EncryptionCaller
+  /** Null for a bucket without ABE; absent on an older node. */
+  abe?: BucketAbeStatus | null
+}
+
+/** The ABE epoch, whether a raise waits after a removal, and a re-key that runs. */
+export interface BucketAbeStatus {
+  epoch: number
+  raise_due: boolean
+  rekey: { prefix: string; rekeyed: number } | null
+}
+
+/** One page of a re-key; `rekeyed` counts the whole pass so far. */
+export interface RekeyPage {
+  prefix: string
+  epoch: number
+  rekeyed: number
+  done: boolean
 }
 
 export interface PutBucketEncryptionRequest {
@@ -373,6 +390,17 @@ export function getBucketAudit(
   signal?: AbortSignal,
 ): Promise<BucketAuditResponse> {
   return apiRequest(`${base(bucket)}/audit`, { signal, query: { ...page } }, client)
+}
+
+/** Key holders only: new uploads use a new epoch. */
+export function raiseBucketEpoch(bucket: string, client: ApiClientOptions): Promise<{ epoch: number }> {
+  return apiRequest(`/data/buckets/${encodeURIComponent(bucket)}/abe/epoch`, { method: 'POST' }, client)
+}
+
+/** Key holders only: re-keys one page under the prefix; 409 while another prefix runs or locked here. */
+export function rekeyBucketPrefix(bucket: string, prefix: string, client: ApiClientOptions): Promise<RekeyPage> {
+  const path = `/data/buckets/${encodeURIComponent(bucket)}/abe/rekey`
+  return apiRequest(path, { method: 'POST', body: JSON.stringify({ prefix }) }, client)
 }
 
 /** Holders and group admins only; others get 403. */

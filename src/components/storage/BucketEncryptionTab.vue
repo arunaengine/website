@@ -5,6 +5,7 @@ import { computed, toRef } from 'vue'
 import BucketEncryptionSettings from '@/components/storage/BucketEncryptionSettings.vue'
 import BucketHoldersSection from '@/components/storage/BucketHoldersSection.vue'
 import BucketKeyAccess from '@/components/storage/BucketKeyAccess.vue'
+import BucketRekeySection from '@/components/storage/BucketRekeySection.vue'
 import BucketTokensSection from '@/components/storage/BucketTokensSection.vue'
 import Badge from '@/components/ui/Badge.vue'
 import DetailList, { type Detail } from '@/components/ui/DetailList.vue'
@@ -162,6 +163,13 @@ const WARNINGS = [
         :can-manage="Boolean(caller?.admin)"
         :frozen="stale"
         :source="encryption"
+      />
+
+      <BucketRekeySection
+        v-if="status.abe && (caller?.holder || caller?.admin)"
+        :bucket="bucket"
+        :source="encryption"
+        :frozen="stale"
       />
 
       <BucketTokensSection
