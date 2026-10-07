@@ -36,7 +36,7 @@ async function openRequests(target: IssueTarget): Promise<AbeRecord<KeyRequestFi
   return records
 }
 
-/** The users who got a key; a bucket the user holds no key for gives none. `guard` throws once stale. */
+/** The users who got a key; none for a bucket the user holds no key for. `guard` throws once stale. */
 export async function issueBucket(
   target: IssueTarget,
   holder: IssueHolder,

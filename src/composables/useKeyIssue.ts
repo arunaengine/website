@@ -98,7 +98,7 @@ async function issueWaiting(extra: IssueTarget[] = []): Promise<void> {
   await issueFor([...extra, ...known.filter((target): target is IssueTarget => target !== null), ...notices])
 }
 
-/** After a role grant listed `requests`: issues the group's buckets now, or at the next vault opening. */
+/** After a role grant listed `requests`: issues the group's buckets now or at the next vault opening. */
 async function issueAfterGrant(groupId: string, requests: string[] | undefined): Promise<void> {
   if (!requests?.length) return
   const targets: IssueTarget[] = []

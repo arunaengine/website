@@ -54,7 +54,7 @@ function covers(scope: KeyScope, key: string): boolean {
   return scope.kind === 'exact' ? scope.value === key : key.startsWith(scope.value)
 }
 
-/** A grant of the caller that opens `envelope`: same generation, parameters, epoch and a scope over the key. */
+/** A caller's grant that opens `envelope`: same generation, parameters and epoch; scope covers the key. */
 export function usableGrant(
   grants: AbeRecord<KeyGrantFields>[],
   envelope: ObjectEnvelopeView,
