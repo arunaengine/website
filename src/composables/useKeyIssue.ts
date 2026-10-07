@@ -129,6 +129,7 @@ async function issueNow(targets: IssueTarget[], epoch: number, scope: string): P
     seen.add(key)
     try {
       const { users, done } = await issueBucket(target, { realmId, userId }, vault, guard)
+      guard()
       markWaiting(scope, target, !done)
       if (done) settleNotices(target)
       if (users.size) buckets += 1

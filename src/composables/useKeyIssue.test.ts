@@ -152,4 +152,24 @@ describe('key issuance lifecycle', () => {
 
     expect(issueBucket).toHaveBeenCalledTimes(1)
   })
+
+  it('changes no notice or count when the session ends before issuance returns', async () => {
+    notifications.items.value = [notice('N1', 'reef', false)]
+    let release = () => {}
+    issueBucket.mockImplementationOnce(() => new Promise((resolve) => {
+      release = () => resolve({ users: new Set(['ada']), done: true })
+    }))
+    const keyIssue = useKeyIssue()
+    keyIssue.issued.value = null
+    const running = keyIssue.issueWaiting()
+    await settle()
+
+    sessionEpoch.value += 1
+    await nextTick()
+    release()
+
+    expect(await running).toBeUndefined()
+    expect(notifications.markRead).not.toHaveBeenCalled()
+    expect(keyIssue.issued.value).toBeNull()
+  })
 })
