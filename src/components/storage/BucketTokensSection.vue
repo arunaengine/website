@@ -39,6 +39,7 @@ async function load() {
 }
 
 function scopeText(scope: KeyScope): string {
+  if (scope.kind === 'writes') return 'Listed files'
   if (scope.kind === 'exact') return scope.value
   return scope.value ? `${scope.value}…` : 'Whole bucket'
 }

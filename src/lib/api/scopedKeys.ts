@@ -16,11 +16,17 @@ export interface AbeParametersView {
   context: string
 }
 
-/** A subtree value is empty for the bucket root or ends with `/`; values are literal. */
-export interface KeyScope {
-  kind: 'exact' | 'subtree'
-  value: string
+/** One file of an enumerated scope: its key and the id of the version written there. */
+export interface ScopeWrite {
+  key: string
+  write_id: string
 }
+
+/**
+ * A subtree value is empty for the bucket root or ends with `/`; values are literal. A `writes`
+ * scope names exact files of one epoch and never covers later ones.
+ */
+export type KeyScope = { kind: 'exact' | 'subtree'; value: string } | { kind: 'writes'; value: ScopeWrite[] }
 
 export interface KeyIssuer {
   kind: 'user' | 'node'
@@ -116,6 +122,16 @@ export async function requestScopedKey(
   return record.aad === null
     ? { kind: 'pending', request: record as AbeRecord<KeyRequestFields> }
     : { kind: 'grant', grant: record as AbeRecord<KeyGrantFields> }
+}
+
+/** Asks for keys of the readable files under `prefix`, one per file; true while some wait. */
+export async function requestWriteKeys(bucket: string, prefix: string, client?: ApiClientOptions): Promise<boolean> {
+  const record = await apiRequest<AbeRecord<{ request_ids: string[] }>>(
+    `${keysPath(bucket)}/requests`,
+    { method: 'POST', body: JSON.stringify({ scope: { kind: 'writes', value: prefix } }) },
+    client,
+  )
+  return record.fields.request_ids.length > 0
 }
 
 /** Open requests a current key holder can issue; needs an unrestricted token. */

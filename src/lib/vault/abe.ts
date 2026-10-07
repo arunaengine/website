@@ -1,7 +1,7 @@
 // KP-ABE work inside the key worker. Grants open with HPKE and import into the
 // WASM build of aruna-kpabe; envelopes and holder issuance run there too. Byte
 // layouts follow aruna core/src/structs/storage/abe.rs and abe_access.rs.
-import type { KeyIssuer, KeyRequestFields } from '@/lib/api'
+import type { KeyIssuer, KeyRequestFields, KeyScope } from '@/lib/api'
 import { import_key, issue_key, type ScopedKey } from './kpabe/kpabe'
 import { fromBase64Url, importPrivateKey, openSealed, sealTo, type SealedSecret, type X25519Pair } from './hpke'
 
@@ -141,7 +141,6 @@ export function grantAad(request: KeyRequestFields, issuer: KeyIssuer): Uint8Arr
   if (!record || !recipient || !fingerprint || request.restrictions !== null) {
     throw new Error('This key grant cannot be opened in the browser.')
   }
-  const scope = ENCODER.encode(request.scope.value)
   const created = new Uint8Array(8)
   new DataView(created.buffer).setBigUint64(0, BigInt(request.created_at_ms))
   return frame([
@@ -156,7 +155,7 @@ export function grantAad(request: KeyRequestFields, issuer: KeyIssuer): Uint8Arr
     fromBase64Url(request.parameters.context),
     fromBase64Url(request.parameters.fingerprint),
     Uint8Array.from([...varint(request.epochs.length), ...request.epochs.flatMap(varint)]),
-    Uint8Array.of(request.scope.kind === 'exact' ? 0 : 1, ...varint(scope.length), ...scope),
+    Uint8Array.from(scopeBytes(request.scope)),
     ENCODER.encode(request.credential_id ?? ''),
     Uint8Array.of(0),
     Uint8Array.from(request.revisions.flatMap((revision) => [...fromBase64Url(revision)])),
@@ -181,6 +180,19 @@ function ulid(value: string): number[] {
 function user(value: string): number[] {
   const bytes = userBytes(value)
   return [...text(ulidText(bytes.subarray(-16))), ...bytes.subarray(0, -16)]
+}
+
+/** A postcard KeyScope: the variant, then its literal or its files with their write ids. */
+function scopeBytes(scope: KeyScope): number[] {
+  if (scope.kind !== 'writes') return [scope.kind === 'exact' ? 0 : 1, ...text(scope.value)]
+  return [2, ...varint(scope.value.length), ...scope.value.flatMap((write) => [...text(write.key), ...ulid(write.write_id)])]
+}
+
+/** The scope as the WASM build takes it; write ids in hex, comma separated. */
+function wasmScope(scope: KeyScope): [string, string] {
+  if (scope.kind !== 'writes') return [scope.kind, scope.value]
+  const hex = (id: string) => Array.from(ulidBytes(id), (byte) => byte.toString(16).padStart(2, '0')).join('')
+  return ['writes', scope.value.map((write) => hex(write.write_id)).join(',')]
 }
 
 /** Encodes the postcard grant context record from named fields like aruna GrantContext. */
@@ -211,8 +223,7 @@ export function grantRecord(request: KeyRequestFields, issuer: KeyIssuer): Uint8
     ...fromBase64Url(request.parameters.fingerprint),
     ...varint(parameters.length),
     ...parameters,
-    request.scope.kind === 'exact' ? 0 : 1,
-    ...text(request.scope.value),
+    ...scopeBytes(request.scope),
     ...varint(request.epochs.length),
     ...request.epochs.flatMap(varint),
     ...credential,
@@ -251,7 +262,7 @@ export async function importGrant(input: GrantInput): Promise<ScopedKey> {
   const plain = await openSealed(input.pair, input.sealed, GRANT_PURPOSE, input.aad)
   try {
     const epochs = BigUint64Array.from(request.epochs, (epoch) => BigInt(epoch))
-    const { kind, value } = request.scope
+    const [kind, value] = wasmScope(request.scope)
     const { parameters: bytes, context, fingerprint } = parameters
     return import_key(bytes, context, fingerprint, kind, value, epochs, plain)
   } catch (cause) {
@@ -315,7 +326,7 @@ export async function issueGrant(input: IssueInput): Promise<SealedSecret> {
   let plain: Uint8Array<ArrayBuffer>
   try {
     const epochs = BigUint64Array.from(request.epochs, (epoch) => BigInt(epoch))
-    const { kind, value } = request.scope
+    const [kind, value] = wasmScope(request.scope)
     const { parameters: bytes, context, fingerprint } = parameters
     plain = issue_key(input.bucketKey, bytes, context, fingerprint, kind, value, epochs) as Uint8Array<ArrayBuffer>
   } catch (cause) {

@@ -105,6 +105,14 @@ describe('KP-ABE WASM build', () => {
     }
   })
 
+  it('issues an enumerated grant that opens only its listed write', async () => {
+    const write = { key: 'foo/file', write_id: pinned.writeId }
+    const key = await issueAndImport({ kind: 'writes', value: [write] })
+    expect(await openObject(key, envelope)).toEqual(hex(fixture.object_key))
+    const other = await issueAndImport({ kind: 'writes', value: [{ ...write, write_id: '01BX5ZZKBKACTAV9WEVGEMMVRZ' }] })
+    await expect(openObject(other, envelope)).rejects.toThrow('refused')
+  })
+
   it('leaves no secret output copy in WASM memory', async () => {
     const key = await issueAndImport({ kind: 'subtree', value: '' })
     const objectKey = key.open_object(envelope.envelope, envelope.context)
