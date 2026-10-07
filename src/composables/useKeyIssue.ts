@@ -1,6 +1,6 @@
 // Issues waiting key requests for buckets where the signed-in user holds the bucket key: when the
 // vault opens, after a role grant, and for the bucket being browsed. Counts show for a few seconds.
-import { ref, watch } from 'vue'
+import { getCurrentScope, onScopeDispose, ref, watch } from 'vue'
 import { listGroupDataPaths } from '@/lib/api'
 import { assistantChatScopeKey } from '@/lib/assistant/chatHistory'
 import { issueBucket, type IssueTarget } from '@/lib/vault/keyIssue'
@@ -103,20 +103,20 @@ function show(count: IssuedCount) {
 }
 
 /** Issues every open request of `targets` while the vault stays open; null when it is closed. */
-function issueFor(targets: IssueTarget[]): Promise<IssuedCount | null> {
-  const next = queue.then(() => issueNow(targets))
+function issueFor(targets: IssueTarget[], epoch = sessionEpoch.value, scope = waitingScope()): Promise<IssuedCount | null> {
+  const next = queue.then(() => issueNow(targets, epoch, scope))
   queue = next.catch(() => null)
   return next
 }
 
-async function issueNow(targets: IssueTarget[]): Promise<IssuedCount | null> {
+/** Work queued under another session or account ends without a request. */
+async function issueNow(targets: IssueTarget[], epoch: number, scope: string): Promise<IssuedCount | null> {
   const vault = useUserVault()
   const userId = userInfo.value?.user.user_id
   const realmId = userInfo.value?.realm.realm_id ?? realmInfo.value?.realm_id
-  const scope = waitingScope()
+  if (epoch !== sessionEpoch.value || scope !== waitingScope()) return null
   if (vault.state.value !== 'unlocked' || !userId || !realmId) return null
   const open = vault.whileUnlocked()
-  const epoch = sessionEpoch.value
   const guard = () => {
     if (!open() || epoch !== sessionEpoch.value) throw new Error('The vault or the session changed.')
   }
@@ -146,19 +146,24 @@ async function issueNow(targets: IssueTarget[]): Promise<IssuedCount | null> {
 
 /** Every bucket with waiting requests this browser knows of, plus `extra`. */
 async function issueWaiting(extra: IssueTarget[] = []): Promise<void> {
-  const known = loadWaiting(waitingScope()).map((entry) => targetOf(entry.bucket, entry.nodeId))
+  const epoch = sessionEpoch.value
+  const scope = waitingScope()
+  const known = loadWaiting(scope).map((entry) => targetOf(entry.bucket, entry.nodeId))
   let notices: IssueTarget[] = []
   try {
     notices = await pendingNotices()
   } catch {
     // Without the inbox the known buckets are still issued.
   }
-  await issueFor([...extra, ...known.filter((target): target is IssueTarget => target !== null), ...notices])
+  const found = known.filter((target): target is IssueTarget => target !== null)
+  await issueFor([...extra, ...found, ...notices], epoch, scope)
 }
 
 /** After a role grant listed `requests`: issues the group's buckets now or at the next vault opening. */
 async function issueAfterGrant(groupId: string, requests: string[] | undefined): Promise<void> {
   if (!requests?.length) return
+  const epoch = sessionEpoch.value
+  const scope = waitingScope()
   const targets: IssueTarget[] = []
   const client = { baseUrl: apiBaseUrl.value, token: authToken.value }
   try {
@@ -176,19 +181,24 @@ async function issueAfterGrant(groupId: string, requests: string[] | undefined):
   } catch {
     return
   }
+  if (epoch !== sessionEpoch.value) return
   // Holders get no notice for these, so they wait here until issued, across reloads too.
-  const scope = waitingScope()
   for (const target of targets) markWaiting(scope, target, true)
-  if (useUserVault().state.value === 'unlocked') await issueFor(targets)
+  if (useUserVault().state.value === 'unlocked') await issueFor(targets, epoch, scope)
 }
 
-/** Starts issuing at every vault opening; safe to call from several places. */
+/** Starts issuing at every vault opening, and now if it is open; ends with the calling scope. */
 function watchVault() {
   if (watching) return
   watching = true
+  if (getCurrentScope()) {
+    onScopeDispose(() => {
+      watching = false
+    })
+  }
   watch(useUserVault().state, (state, before) => {
     if (state === 'unlocked' && before !== 'unlocked') void issueWaiting()
-  })
+  }, { immediate: true })
   watch(sessionEpoch, () => {
     issued.value = null
   })

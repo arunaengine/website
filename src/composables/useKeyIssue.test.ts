@@ -1,6 +1,7 @@
-import { ref } from 'vue'
+import { effectScope, nextTick, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { assistantChatScopeKey } from '@/lib/assistant/chatHistory'
+import { sessionEpoch } from './aruna/state'
 import { useKeyIssue } from './useKeyIssue'
 
 const issueBucket = vi.hoisted(() => vi.fn())
@@ -102,5 +103,53 @@ describe('key issuance recovery', () => {
     expect(notifications.markRead).toHaveBeenCalledTimes(1)
     expect(notifications.markRead).toHaveBeenCalledWith(['N3'])
     expect(stored()).toEqual([{ bucket: 'kelp', nodeId: 'n1' }])
+  })
+})
+
+describe('key issuance lifecycle', () => {
+  async function settle() {
+    for (let i = 0; i < 10; i += 1) await Promise.resolve()
+    await nextTick()
+  }
+
+  it('installs the vault watcher again when the notice mounts again', async () => {
+    store.set(KEY, JSON.stringify([{ bucket: 'reef', nodeId: 'n1' }]))
+    issueBucket.mockResolvedValue({ users: new Set(), done: false })
+    vault.state.value = 'locked'
+    const first = effectScope()
+    first.run(() => useKeyIssue().watchVault())
+    first.stop()
+
+    vault.state.value = 'unlocked'
+    const second = effectScope()
+    second.run(() => useKeyIssue().watchVault())
+    await settle()
+    expect(issueBucket).toHaveBeenCalledTimes(1)
+
+    vault.state.value = 'locked'
+    await settle()
+    vault.state.value = 'unlocked'
+    await settle()
+    expect(issueBucket).toHaveBeenCalledTimes(2)
+    second.stop()
+  })
+
+  it('drops work queued under a session that ended before it ran', async () => {
+    let release = () => {}
+    issueBucket.mockImplementationOnce(() => new Promise((resolve) => {
+      release = () => resolve({ users: new Set(), done: true })
+    }))
+    const keyIssue = useKeyIssue()
+    const target = keyIssue.targetOf('reef', 'n1')!
+    const first = keyIssue.issueWaiting([target])
+    await settle()
+    const queued = keyIssue.issueWaiting([keyIssue.targetOf('kelp', 'n1')!])
+    await settle()
+
+    sessionEpoch.value += 1
+    release()
+    await Promise.all([first, queued])
+
+    expect(issueBucket).toHaveBeenCalledTimes(1)
   })
 })
