@@ -54,8 +54,8 @@ export async function issueBucket(
   try {
     proposals = await openRequests(target)
   } catch (cause) {
-    // Not a key holder, or a bucket without scoped keys.
-    if (cause instanceof ApiError && cause.status < 500) return { users: issued, done: true }
+    // Not a key holder, or no such bucket; rate limits and expired sign-ins are tried again later.
+    if (cause instanceof ApiError && (cause.status === 403 || cause.status === 404)) return { users: issued, done: true }
     throw cause
   }
   guard()

@@ -57,10 +57,17 @@ describe('holder issuance', () => {
   it('gives nothing for a bucket the user does not hold or without a usable copy', async () => {
     api.listKeyRequests.mockRejectedValueOnce(new ApiError(403, 'not a key holder'))
     expect(await issueBucket(TARGET, HOLDER, VAULT, () => {})).toEqual({ users: new Set(), done: true })
+    api.listKeyRequests.mockRejectedValueOnce(new ApiError(404, 'no such bucket'))
+    expect(await issueBucket(TARGET, HOLDER, VAULT, () => {})).toEqual({ users: new Set(), done: true })
     api.listKeyRequests.mockResolvedValueOnce({ records: [proposal('Q1', 'ada')], next_cursor: null })
     openBucketKey.mockRejectedValueOnce(new NoUsableCopyError('none'))
     expect(await issueBucket(TARGET, HOLDER, VAULT, () => {})).toEqual({ users: new Set(), done: false })
     expect(api.submitKeyGrant).not.toHaveBeenCalled()
+  })
+
+  it('keeps the bucket waiting when rate limited', async () => {
+    api.listKeyRequests.mockRejectedValueOnce(new ApiError(429, 'too many requests'))
+    await expect(issueBucket(TARGET, HOLDER, VAULT, () => {})).rejects.toMatchObject({ status: 429 })
   })
 
   it('leaves a refused request open and still issues the others', async () => {
