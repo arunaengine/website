@@ -11,7 +11,9 @@ import {
   type KeyedTarget,
   type ReadWait,
 } from '@/lib/vault/keyedRead'
-import { sessionEpoch, userInfo } from './aruna/state'
+import { authToken, sessionEpoch, userInfo } from './aruna/state'
+import { localNodeId, nodeApiBase } from './s3/endpoints'
+import { useS3 } from './useS3'
 import { useUserVault } from './useUserVault'
 
 export const POLL_MS = 15_000
@@ -22,6 +24,14 @@ export class ReadEndedError extends Error {
     super('The read was cancelled.')
     this.name = 'ReadEndedError'
   }
+}
+
+/** A file to read; an absent node is the connected one, an absent version the current one. */
+export interface KeyedObject {
+  bucket: string
+  key: string
+  nodeId?: string | null
+  versionId?: string | null
 }
 
 export function useKeyedRead() {
@@ -104,7 +114,28 @@ export function useKeyedRead() {
     }
   }
 
-  return { wait, pending, read, cancel }
+  /** Reads `object` after resolving its node API and pinned version. */
+  async function readObject(object: KeyedObject): Promise<Blob> {
+    const node = object.nodeId || localNodeId()
+    const baseUrl = node ? nodeApiBase(node) : null
+    if (!baseUrl) throw new Error('The node publishes no API address.')
+    const versionId = object.versionId || (await useS3().headObject(object.bucket, object.key, object.nodeId)).versionId
+    if (!versionId) throw new Error('The node named no version for this file.')
+    return read({ bucket: object.bucket, key: object.key, versionId, client: { baseUrl, token: authToken.value } })
+  }
+
+  /** Saves `object` as `name`; false when the read waits or ended. Other failures are thrown. */
+  async function save(object: KeyedObject, name: string): Promise<boolean> {
+    try {
+      saveBlob(await readObject(object), name)
+      return true
+    } catch (cause) {
+      if (cause instanceof ReadEndedError || cause instanceof ReadWaitError) return false
+      throw cause
+    }
+  }
+
+  return { wait, pending, read, readObject, save, cancel }
 }
 
 /** Saves a read file under `name` through a short-lived blob URL. */

@@ -3,12 +3,10 @@
 import { computed, ref, watch, type Ref } from 'vue'
 import { listKeyGrants } from '@/lib/api'
 import { keyGenerations } from '@/lib/bucketEncryption'
-import { ReadWaitError } from '@/lib/vault/keyedRead'
 import type { ObjectEntry } from './s3/objects'
 import { useBucketEncryption } from './useBucketEncryption'
-import { ReadEndedError, saveBlob, useKeyedRead } from './useKeyedRead'
+import { useKeyedRead } from './useKeyedRead'
 import { useKeyIssue } from './useKeyIssue'
-import { useS3 } from './useS3'
 import { useUserVault } from './useUserVault'
 
 export function useLockedBucket(
@@ -17,7 +15,6 @@ export function useLockedBucket(
   groupId: Ref<string | null>,
   plainDownload: (object: ObjectEntry) => unknown,
 ) {
-  const s3 = useS3()
   const encryption = useBucketEncryption(bucket, nodeId, groupId)
   const keyed = useKeyedRead()
   const keyIssue = useKeyIssue()
@@ -49,13 +46,9 @@ export function useLockedBucket(
   /** Unknown failures fall back to the plain download. */
   async function download(object: ObjectEntry) {
     if (!lockedOnNode.value) return plainDownload(object)
-    const name = bucket.value
     try {
-      const { versionId } = await s3.headObject(name, object.key, nodeId.value)
-      if (!versionId) throw new Error('The node named no version for this file.')
-      saveBlob(await keyed.read({ bucket: name, key: object.key, versionId, client: encryption.client() }), object.name)
-    } catch (cause) {
-      if (cause instanceof ReadEndedError || cause instanceof ReadWaitError) return
+      await keyed.save({ bucket: bucket.value, key: object.key, nodeId: nodeId.value }, object.name)
+    } catch {
       void plainDownload(object)
     }
   }

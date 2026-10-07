@@ -13,6 +13,8 @@ const vault = vi.hoisted(() => ({ state: { value: 'unlocked' }, loaded: { value:
 
 vi.mock('@/lib/vault/keyedRead', async (original) => ({ ...(await original<object>()), ...read }))
 vi.mock('./useUserVault', () => ({ useUserVault: () => vault }))
+vi.mock('./s3/endpoints', () => ({ localNodeId: () => 'n', nodeApiBase: () => 'https://node.test/api/v1' }))
+vi.mock('./useS3', () => ({ useS3: () => ({}) }))
 vi.mock('./aruna/state', async () => {
   const { ref } = await import('vue')
   return { sessionEpoch: ref(0), userInfo: ref({ user: { user_id: 'U' } }) }
