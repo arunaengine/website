@@ -88,6 +88,12 @@ export async function listGroupMembers(groupId: string): Promise<GroupMembersRes
   return request<GroupMembersResponse>(`/access/groups/${groupId}/members`)
 }
 
+// Loaded on demand: the key issue module reaches back into this one through the session state.
+export function issueKeys(groupId: string, requests: string[] | undefined) {
+  if (!requests?.length) return
+  void import('../useKeyIssue').then(({ useKeyIssue }) => useKeyIssue().issueAfterGrant(groupId, requests))
+}
+
 export async function addGroupMember(groupId: string, input: AddGroupMemberRequest): Promise<GroupRolesResponse> {
   saving.value = true
   try {
@@ -95,6 +101,7 @@ export async function addGroupMember(groupId: string, input: AddGroupMemberReque
       method: 'POST',
       body: JSON.stringify(input),
     })
+    issueKeys(groupId, response.key_requests)
     await loadAuthenticated().catch(() => undefined)
     return response
   } finally {
@@ -128,10 +135,11 @@ export async function leaveGroup(groupId: string): Promise<void> {
 export async function createGroupRole(groupId: string, input: CreateGroupRoleRequest): Promise<ApiRole> {
   saving.value = true
   try {
-    const role = await request<ApiRole>(`/access/groups/${groupId}/roles`, {
+    const role = await request<ApiRole & { key_requests?: string[] }>(`/access/groups/${groupId}/roles`, {
       method: 'POST',
       body: JSON.stringify(input),
     })
+    issueKeys(groupId, role.key_requests)
     await loadAuthenticated().catch(() => undefined)
     return role
   } finally {

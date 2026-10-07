@@ -70,6 +70,8 @@ export interface AddGroupMemberRequest {
 
 export interface GroupRolesResponse {
   roles: ApiRole[]
+  /** Open scoped key requests for the member in encrypted buckets on this node. */
+  key_requests?: string[]
 }
 
 export type GroupPermissionLevel = 'read' | 'write' | 'deny'

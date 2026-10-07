@@ -2,6 +2,7 @@
 import SideNav from '@/components/layout/SideNav.vue'
 import TopBar from '@/components/dashboard/TopBar.vue'
 import GlobalErrorBanner from '@/components/layout/GlobalErrorBanner.vue'
+import KeyIssueNotice from '@/components/storage/KeyIssueNotice.vue'
 import MobileNav from '@/components/dashboard/MobileNav.vue'
 import RealmUnreachable from '@/components/layout/RealmUnreachable.vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
@@ -117,6 +118,7 @@ watch(
     <!-- Uploads run through the shared queue and survive navigation, so the
          floating transfers panel lives at the layout, bottom-right. -->
     <TransfersPanel v-if="uploadQueueItems.length" />
+    <KeyIssueNotice />
     <AssistantPanel v-if="assistantOpen" />
     <AssistantLauncher />
     <TourOverlay v-if="tourActive" />

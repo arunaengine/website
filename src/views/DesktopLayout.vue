@@ -5,6 +5,7 @@
 import SideNav from '@/components/layout/SideNav.vue'
 import TopBar from '@/components/dashboard/TopBar.vue'
 import GlobalErrorBanner from '@/components/layout/GlobalErrorBanner.vue'
+import KeyIssueNotice from '@/components/storage/KeyIssueNotice.vue'
 import RealmUnreachable from '@/components/layout/RealmUnreachable.vue'
 import NodeDown from '@/components/layout/NodeDown.vue'
 import Notice from '@/components/ui/Notice.vue'
@@ -138,6 +139,7 @@ watch(
       </main>
     </div>
     <TransfersPanel v-if="uploadQueueItems.length" />
+    <KeyIssueNotice />
     <AssistantPanel v-if="assistantOpen" />
     <AssistantLauncher />
     <TourOverlay v-if="tourActive" />

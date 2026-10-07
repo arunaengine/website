@@ -9,6 +9,7 @@ import {
 import { featureEnabled } from '@/lib/config'
 import { useAruna } from '@/composables/useAruna'
 import { assertCurrentSession, request, sessionEpoch } from '@/composables/aruna/state'
+import { issueKeys } from '@/composables/aruna/groups'
 import { errorMessage } from '@/lib/utils'
 
 const ownRequests = ref<JoinRequest[]>([])
@@ -154,6 +155,7 @@ async function decideJoinRequest(
     )
     assertCurrentSession(epoch)
     ownRequests.value = ownRequests.value.filter((r) => r.request_id !== requestId)
+    issueKeys(groupId, response.key_requests)
     return response
   } finally {
     if (epoch === sessionEpoch.value) busy.value = false

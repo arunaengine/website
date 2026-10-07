@@ -37,4 +37,6 @@ export interface DecideJoinRequestRequest {
 
 export interface DecideJoinRequestResponse {
   request: JoinRequest
+  /** Open scoped key requests for an approved member in encrypted buckets on this node. */
+  key_requests?: string[]
 }

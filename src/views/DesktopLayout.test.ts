@@ -63,6 +63,7 @@ const DesktopLayoutClient = compileClientComponent(new URL('./DesktopLayout.vue'
   '@/components/layout/RealmUnreachable.vue': moduleDefault(RealmUnreachableStub),
   '@/components/layout/NodeDown.vue': moduleDefault(NodeDownStub),
   '@/components/data/TransfersPanel.vue': moduleDefault(EmptyStub),
+  '@/components/storage/KeyIssueNotice.vue': moduleDefault(EmptyStub),
   '@/components/assistant/AssistantLauncher.vue': moduleDefault(EmptyStub),
   '@/components/assistant/AssistantPanel.vue': moduleDefault(EmptyStub),
   '@/components/docs/TourOverlay.vue': moduleDefault(EmptyStub),
@@ -132,6 +133,7 @@ beforeAll(async () => {
   vi.doMock('@/components/layout/RealmUnreachable.vue', () => ({ default: RealmUnreachableStub }))
   vi.doMock('@/components/layout/NodeDown.vue', () => ({ default: NodeDownStub }))
   vi.doMock('@/components/data/TransfersPanel.vue', () => ({ default: EmptyStub }))
+  vi.doMock('@/components/storage/KeyIssueNotice.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/components/assistant/AssistantPanel.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/components/docs/TourOverlay.vue', () => ({ default: EmptyStub }))
   DesktopLayout = (await import('./DesktopLayout.vue')).default
