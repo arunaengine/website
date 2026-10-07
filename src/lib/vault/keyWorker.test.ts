@@ -152,8 +152,8 @@ describe('key worker client', () => {
     await expect(issued).resolves.toEqual({ context: 'cmVj', enc: 'AQ==', ciphertext: 'AgM=' })
   })
 
-  it('does not issue restricted, credential or keyless requests', async () => {
-    for (const change of [{ restrictions: [] }, { credential_id: 'C' }, { recipient_public: null }]) {
+  it('does not issue restricted or keyless requests', async () => {
+    for (const change of [{ restrictions: [] }, { recipient_public: null }]) {
       const proposal = { fields: { ...REQUEST, ...change }, record: 'cmVj', aad: 'EBES' }
       await expect(issueGrant(proposal, new Uint8Array(32), ISSUE)).rejects.toThrow('cannot be issued')
     }

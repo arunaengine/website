@@ -129,7 +129,7 @@ export async function issueGrant(
   expected: IssueExpected,
 ): Promise<GrantSubmission> {
   const fields = proposal.fields
-  if (!proposal.aad || !fields.recipient_public || fields.credential_id !== null || fields.restrictions !== null) {
+  if (!proposal.aad || !fields.recipient_public || fields.restrictions !== null) {
     throw new Error('This key request cannot be issued from the browser.')
   }
   if (
