@@ -96,14 +96,12 @@ async function pendingNotices(history: boolean): Promise<Map<string, { target: I
   return notices
 }
 
-/** Marks the notices about `target` read once nothing is left to issue there. */
-function settleNotices(target: IssueTarget) {
-  const notifications = useNotifications()
-  const ids = notifications.items.value
+/** Ids of the unread notices about `target` the bell has loaded. */
+function loadedNotices(target: IssueTarget): string[] {
+  return useNotifications().items.value
     .filter((entry) => isPending(entry) && !entry.read && entry.bucket === target.bucket)
     .filter((entry) => (entry.node_id || localNodeId()) === target.nodeId)
     .map((entry) => entry.id)
-  if (ids.length) void notifications.markRead(ids)
 }
 
 function show(count: IssuedCount) {
@@ -140,11 +138,13 @@ async function issueNow(targets: IssueTarget[], epoch: number, scope: string): P
     const key = `${target.nodeId}\u0000${target.bucket}`
     if (seen.has(key)) continue
     seen.add(key)
+    // Notices loaded during the check stay unread for a later check.
+    const ids = loadedNotices(target)
     try {
       const { users, done } = await issueBucket(target, { realmId, userId }, vault, guard)
       guard()
       markWaiting(scope, target, !done)
-      if (done) settleNotices(target)
+      if (done && ids.length) void useNotifications().markRead(ids)
       if (done) finished.add(key)
       if (users.size) buckets += 1
       users.forEach((user) => people.add(user))

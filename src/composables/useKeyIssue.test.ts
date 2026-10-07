@@ -161,6 +161,27 @@ describe('key issuance recovery', () => {
     expect(notifications.markRead).toHaveBeenCalledWith(['N1'])
   })
 
+  it('keeps a notice loaded during issuance unread until a later check', async () => {
+    notifications.items.value = [notice('N1', 'reef', false)]
+    let release = () => {}
+    issueBucket.mockImplementationOnce(() => new Promise((resolve) => {
+      release = () => resolve({ users: new Set(), done: true })
+    }))
+    apiRequest.mockResolvedValue({ notifications: [notice('N2', 'reef', false)] })
+    const keyIssue = useKeyIssue()
+
+    const running = keyIssue.issueWaiting([keyIssue.targetOf('reef', 'n1')!])
+    await vi.waitFor(() => expect(issueBucket).toHaveBeenCalledTimes(1))
+    notifications.items.value = [notice('N2', 'reef', false), notice('N1', 'reef', false)]
+    const arrival = keyIssue.issueWaiting()
+    release()
+    await Promise.all([running, arrival])
+
+    expect(notifications.markRead.mock.calls[0]).toEqual([['N1']])
+    const later = notifications.markRead.mock.calls.findIndex((call) => call[0].includes('N2'))
+    expect(notifications.markRead.mock.invocationCallOrder[later]).toBeGreaterThan(issueBucket.mock.invocationCallOrder[1]!)
+  })
+
   it('marks more than 512 notices read in requests of at most 512 ids', async () => {
     notifications.listLoaded.value = false
     const ids = Array.from({ length: 513 }, (_, i) => `N${i}`)
