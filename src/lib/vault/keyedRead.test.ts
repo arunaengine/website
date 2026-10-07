@@ -110,4 +110,50 @@ describe('reading with a grant', () => {
 
     expect(worker.importGrant).toHaveBeenCalledTimes(2)
   })
+
+  it('stops before the import when the vault closes during key opening', async () => {
+    api.listUserKeys.mockResolvedValue({ keys: [{ record_id: 'R', key_id: 'K' }] })
+    let open = true
+    const vault = {
+      openUserKey: vi.fn(async () => {
+        open = false
+        return { publicKey: new Uint8Array(32), privateKey: {} } as never
+      }),
+    }
+    const guard = () => {
+      if (!open) throw new Error('closed')
+    }
+    const fresh = grant({ kind: 'subtree', value: '' }, { request_id: 'Q7' })
+
+    await expect(readWithGrant(TARGET, ENVELOPE, fresh, 'U', vault, guard)).rejects.toThrow('closed')
+
+    expect(worker.importGrant).not.toHaveBeenCalled()
+    expect(api.downloadWithKey).not.toHaveBeenCalled()
+  })
+
+  it('sends no key once the read ended after opening and passes the abort signal', async () => {
+    api.listUserKeys.mockResolvedValue({ keys: [{ record_id: 'R', key_id: 'K' }] })
+    worker.importGrant.mockResolvedValue({ run: 3, id: 1 })
+    const objectKey = new Uint8Array(32).fill(5)
+    let open = true
+    worker.openObject.mockImplementationOnce(async () => {
+      open = false
+      return objectKey
+    })
+    const vault = { openUserKey: vi.fn(async () => ({ publicKey: new Uint8Array(32), privateKey: {} }) as never) }
+    const guard = () => {
+      if (!open) throw new Error('ended')
+    }
+    const fresh = grant({ kind: 'subtree', value: '' }, { request_id: 'Q8' })
+
+    await expect(readWithGrant(TARGET, ENVELOPE, fresh, 'U', vault, guard)).rejects.toThrow('ended')
+    expect(api.downloadWithKey).not.toHaveBeenCalled()
+    expect(objectKey.every((byte) => byte === 0)).toBe(true)
+
+    const signal = new AbortController().signal
+    worker.openObject.mockResolvedValueOnce(new Uint8Array(32))
+    api.downloadWithKey.mockResolvedValueOnce(new Blob(['ok']))
+    await readWithGrant(TARGET, ENVELOPE, fresh, 'U', vault, () => {}, signal)
+    expect(api.downloadWithKey.mock.calls[0]![0].signal).toBe(signal)
+  })
 })

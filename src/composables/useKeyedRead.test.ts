@@ -9,9 +9,16 @@ const read = vi.hoisted(() => ({
   readWithGrant: vi.fn(),
   usableGrant: vi.fn(),
 }))
-const vault = vi.hoisted(() => ({ state: { value: 'unlocked' }, loaded: { value: true }, load: vi.fn() }))
+const vault = vi.hoisted(() => ({
+  state: { value: 'unlocked' },
+  loaded: { value: true },
+  load: vi.fn(),
+  whileUnlocked: () => () => true,
+}))
+const closeKeyWorker = vi.hoisted(() => vi.fn())
 
 vi.mock('@/lib/vault/keyedRead', async (original) => ({ ...(await original<object>()), ...read }))
+vi.mock('@/lib/vault/keyWorker', async (original) => ({ ...(await original<object>()), closeKeyWorker }))
 vi.mock('./useUserVault', () => ({ useUserVault: () => vault }))
 vi.mock('./s3/endpoints', () => ({ localNodeId: () => 'n', nodeApiBase: () => 'https://node.test/api/v1' }))
 vi.mock('./useS3', () => ({ useS3: () => ({}) }))
@@ -88,5 +95,23 @@ describe('keyed read waits', () => {
     await expect(done).rejects.toBeInstanceOf(ReadEndedError)
     expect(keyed.wait.value).toBeNull()
     expect(read.readWithGrant).not.toHaveBeenCalled()
+  })
+
+  it('closes the key worker and aborts the download on cancel while opening the key', async () => {
+    read.ownGrants.mockResolvedValueOnce([GRANT])
+    let signal: AbortSignal | undefined
+    read.readWithGrant.mockImplementationOnce((...args: unknown[]) => {
+      signal = args[6] as AbortSignal
+      return new Promise(() => {})
+    })
+    const keyed = useKeyedRead()
+    const done = keyed.read(TARGET)
+    await settle()
+
+    keyed.cancel()
+
+    await expect(Promise.race([done, Promise.resolve('open')])).resolves.toBe('open')
+    expect(closeKeyWorker).toHaveBeenCalledTimes(1)
+    expect(signal?.aborted).toBe(true)
   })
 })

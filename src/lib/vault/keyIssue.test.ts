@@ -82,4 +82,19 @@ describe('holder issuance', () => {
     expect(issueGrant).toHaveBeenCalledTimes(1)
     expect(bucketKey.every((byte) => byte === 0)).toBe(true)
   })
+
+  it('calls no worker once the vault closed while the bucket key opened', async () => {
+    api.listKeyRequests.mockResolvedValueOnce({ records: [proposal('Q1', 'ada')], next_cursor: null })
+    let open = true
+    openBucketKey.mockImplementationOnce(async () => {
+      open = false
+      return bucketKey
+    })
+    const guard = () => {
+      if (!open) throw new VaultClosedError()
+    }
+    await expect(issueBucket(TARGET, HOLDER, VAULT, guard)).rejects.toBeInstanceOf(VaultClosedError)
+    expect(issueGrant).not.toHaveBeenCalled()
+    expect(bucketKey.every((byte) => byte === 0)).toBe(true)
+  })
 })

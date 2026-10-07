@@ -111,13 +111,18 @@ async function grantPair(grant: AbeRecord<KeyGrantFields>, userId: string, vault
   return pair
 }
 
-/** Opens the object key with `grant` and reads the pinned version; the key is cleared afterwards. */
+/**
+ * Opens the object key with `grant` and reads the pinned version; the key is cleared afterwards.
+ * `guard` throws once the read, session or vault ended; `signal` aborts the download.
+ */
 export async function readWithGrant(
   target: KeyedTarget,
   envelope: ObjectEnvelopeView,
   grant: AbeRecord<KeyGrantFields>,
   userId: string,
   vault: ReadVault,
+  guard: () => void = () => {},
+  signal?: AbortSignal,
 ): Promise<Blob> {
   const id = `${target.client.baseUrl ?? ''}\u0000${grant.fields.request.request_id}`
   const { context } = envelope
@@ -132,9 +137,12 @@ export async function readWithGrant(
   for (let attempt = 0; ; attempt += 1) {
     let handle = handles.get(id)
     if (!handle) {
-      handle = await importGrant(grant, await grantPair(grant, userId, vault, target.client), grant.fields.request)
+      const pair = await grantPair(grant, userId, vault, target.client)
+      guard()
+      handle = await importGrant(grant, pair, grant.fields.request)
       handles.set(id, handle)
     }
+    guard()
     try {
       objectKey = await openObject(handle, envelope, pinned)
       break
@@ -145,7 +153,9 @@ export async function readWithGrant(
     }
   }
   try {
-    return await downloadWithKey({ bucket: target.bucket, key: target.key, versionId: target.versionId, objectKey }, target.client)
+    guard()
+    const request = { bucket: target.bucket, key: target.key, versionId: target.versionId, objectKey, signal }
+    return await downloadWithKey(request, target.client)
   } finally {
     objectKey.fill(0)
   }

@@ -75,6 +75,7 @@ export async function issueBucket(
         if (proposal.fields.parameters.generation !== generation) continue
         const recipient = proposal.fields.recipient_user
         try {
+          guard()
           const grant = await issueGrant(proposal, key, { bucket: target.bucket, recipient, holder: holder.userId })
           guard()
           await submitKeyGrant(target.bucket, proposal.fields.request_id, grant, target.client)

@@ -11,6 +11,7 @@ import {
   type KeyedTarget,
   type ReadWait,
 } from '@/lib/vault/keyedRead'
+import { closeKeyWorker } from '@/lib/vault/keyWorker'
 import { authToken, sessionEpoch, userInfo } from './aruna/state'
 import { localNodeId, nodeApiBase } from './s3/endpoints'
 import { useS3 } from './useS3'
@@ -42,10 +43,18 @@ export function useKeyedRead() {
   const pending = ref(new Set<string>())
   let run = 0
   let wake: (() => void) | null = null
+  let abort: AbortController | null = null
+  /** The current read opens an object key or downloads with it. */
+  let opening = false
 
   function cancel() {
     run += 1
     wait.value = null
+    abort?.abort()
+    abort = null
+    // An object key the ended read still opens ends with the worker.
+    if (opening) closeKeyWorker()
+    opening = false
     wake?.()
   }
 
@@ -104,9 +113,24 @@ export function useKeyedRead() {
       wait.value = null
       const userId = userInfo.value?.user.user_id
       if (!userId) throw new ReadEndedError()
-      const blob = await readWithGrant(target, envelope, grant, userId, vault)
-      check()
-      return blob
+      const open = vault.whileUnlocked()
+      const guard = () => {
+        check()
+        if (!open()) throw new Error('Your personal vault closed during the read.')
+      }
+      const controller = new AbortController()
+      abort = controller
+      opening = true
+      try {
+        const blob = await readWithGrant(target, envelope, grant, userId, vault, guard, controller.signal)
+        check()
+        return blob
+      } finally {
+        if (mine === run) {
+          opening = false
+          abort = null
+        }
+      }
     } catch (cause) {
       if (!ended() && cause instanceof ReadWaitError) wait.value = cause.wait
       else if (!ended()) wait.value = null
