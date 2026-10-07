@@ -129,8 +129,10 @@ function restore(s: MarkSnapshot) {
 // Optimistic: flip read flags and decrement the badge immediately, roll back on
 // failure, and reconcile with a background fetchUnread on success (the server count
 // is a capped lower bound, so local arithmetic drifts once capped was true).
+// Ids outside the loaded pages are sent too.
 async function markRead(ids: string[]): Promise<void> {
-  const targets = items.value.filter((n) => !n.read && ids.includes(n.id)).map((n) => n.id)
+  const read = new Set(items.value.filter((n) => n.read).map((n) => n.id))
+  const targets = [...new Set(ids)].filter((id) => !read.has(id))
   if (!targets.length) return
   const before = snapshot()
   const targetSet = new Set(targets)

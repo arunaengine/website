@@ -128,9 +128,18 @@ describe('key issuance recovery', () => {
     expect(issueBucket.mock.invocationCallOrder[0]).toBeLessThan(apiRequest.mock.invocationCallOrder[0]!)
     expect(apiRequest.mock.calls[1]![1]).toEqual({ query: { limit: 200, cursor: 'next' } })
     expect(notifications.loadMore).not.toHaveBeenCalled()
-    expect(notifications.markRead).toHaveBeenCalledTimes(1)
-    expect(notifications.markRead).toHaveBeenCalledWith(['N3'])
+    expect(notifications.markRead).toHaveBeenLastCalledWith(['N4', 'N3'])
     expect(stored()).toEqual([{ bucket: 'kelp', nodeId: 'n1' }])
+  })
+
+  it('marks notices read by id while the inbox refresh is still running', async () => {
+    notifications.items.value = []
+    apiRequest.mockResolvedValueOnce({ notifications: [notice('N1', 'reef', false)] })
+
+    await useKeyIssue().issueWaiting()
+
+    expect(notifications.loadNotifications).not.toHaveBeenCalled()
+    expect(notifications.markRead).toHaveBeenCalledWith(['N1'])
   })
 })
 
@@ -163,13 +172,10 @@ describe('key issuance lifecycle', () => {
   })
 
   it('settles a key notice that arrives after its bucket was issued', async () => {
-    notifications.listLoaded.value = false
     const scope = effectScope()
     scope.run(() => useKeyIssue().watchVault())
     await settle()
-    expect(notifications.loadNotifications).toHaveBeenCalledTimes(1)
 
-    notifications.items.value = [notice('N1', 'reef', false)]
     apiRequest.mockResolvedValue({ notifications: [notice('N1', 'reef', false)] })
     notifications.dashboardRevision.value += 1
     await vi.waitFor(() => expect(notifications.markRead).toHaveBeenCalledWith(['N1']))
@@ -181,7 +187,6 @@ describe('key issuance lifecycle', () => {
     const scope = effectScope()
     scope.run(() => useKeyIssue().watchVault())
     await settle()
-    notifications.items.value = [notice('N1', 'reef', false)]
     apiRequest.mockResolvedValue({ notifications: [notice('N1', 'reef', false)] })
     notifications.markRead.mockImplementation(async () => {
       notifications.unreadCount.value -= 1
@@ -205,7 +210,6 @@ describe('key issuance lifecycle', () => {
     scope.run(() => useKeyIssue().watchVault())
     await settle()
 
-    notifications.items.value = [notice('N1', 'reef', false)]
     apiRequest.mockResolvedValue({ notifications: [notice('N1', 'reef', false)] })
     notifications.dashboardRevision.value += 1
     await vi.waitFor(() => expect(notifications.markRead).toHaveBeenCalledWith(['N1']))

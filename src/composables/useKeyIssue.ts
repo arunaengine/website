@@ -75,21 +75,25 @@ function markWaiting(scope: string, target: IssueTarget, open: boolean) {
 
 const isPending = (entry: { kind: string; bucket?: string | null }) => entry.kind === 'bucket_key_pending' && !!entry.bucket
 
-/** Buckets of every pending key notice; reading a notice does not mean its keys were issued. */
-async function pendingNotices(): Promise<IssueTarget[]> {
+/** Buckets of every pending key notice with their unread notice ids; reading one issues nothing. */
+async function pendingNotices(): Promise<Map<string, { target: IssueTarget; ids: string[] }>> {
   const client = { baseUrl: apiBaseUrl.value, token: authToken.value }
-  const targets = new Map<string, IssueTarget>()
+  const notices = new Map<string, { target: IssueTarget; ids: string[] }>()
   let cursor: string | undefined
   do {
     const query = { limit: 200, cursor }
     const page = await apiRequest<NotificationListResponse>('/system/notifications', { query }, client)
     for (const entry of page.notifications.filter(isPending)) {
       const target = targetOf(entry.bucket!, entry.node_id)
-      if (target) targets.set(`${target.nodeId}\u0000${target.bucket}`, target)
+      if (!target) continue
+      const key = `${target.nodeId}\u0000${target.bucket}`
+      const notice = notices.get(key) ?? { target, ids: [] }
+      if (!entry.read) notice.ids.push(entry.id)
+      notices.set(key, notice)
     }
     cursor = page.next_cursor
   } while (cursor)
-  return [...targets.values()]
+  return notices
 }
 
 /** Marks the notices about `target` read once nothing is left to issue there. */
@@ -110,15 +114,15 @@ function show(count: IssuedCount) {
   }, NOTICE_MS)
 }
 
-/** Issues every open request of `targets` while the vault stays open; null when it is closed. */
-function issueFor(targets: IssueTarget[], epoch = sessionEpoch.value, scope = waitingScope()): Promise<IssuedCount | null> {
+/** Issues every open request of `targets` while the vault stays open; returns the finished buckets. */
+function issueFor(targets: IssueTarget[], epoch = sessionEpoch.value, scope = waitingScope()): Promise<Set<string> | null> {
   const next = queue.then(() => issueNow(targets, epoch, scope))
   queue = next.catch(() => null)
   return next
 }
 
 /** Work queued under another session or account ends without a request. */
-async function issueNow(targets: IssueTarget[], epoch: number, scope: string): Promise<IssuedCount | null> {
+async function issueNow(targets: IssueTarget[], epoch: number, scope: string): Promise<Set<string> | null> {
   const vault = useUserVault()
   const userId = userInfo.value?.user.user_id
   const realmId = userInfo.value?.realm.realm_id ?? realmInfo.value?.realm_id
@@ -131,6 +135,7 @@ async function issueNow(targets: IssueTarget[], epoch: number, scope: string): P
   const people = new Set<string>()
   let buckets = 0
   const seen = new Set<string>()
+  const finished = new Set<string>()
   for (const target of targets) {
     const key = `${target.nodeId}\u0000${target.bucket}`
     if (seen.has(key)) continue
@@ -140,6 +145,7 @@ async function issueNow(targets: IssueTarget[], epoch: number, scope: string): P
       guard()
       markWaiting(scope, target, !done)
       if (done) settleNotices(target)
+      if (done) finished.add(key)
       if (users.size) buckets += 1
       users.forEach((user) => people.add(user))
     } catch {
@@ -150,29 +156,30 @@ async function issueNow(targets: IssueTarget[], epoch: number, scope: string): P
   }
   const count = { people: people.size, buckets }
   if (count.people) show(count)
-  return count
+  return finished
 }
 
 /** Every bucket with waiting requests this browser knows of, plus `extra`, then those of notices. */
 async function issueWaiting(extra: IssueTarget[] = []): Promise<void> {
   const epoch = sessionEpoch.value
   const scope = waitingScope()
-  // Settling marks loaded notices only, so a closed inbox loads its first page.
-  const notifications = useNotifications()
-  if (!notifications.listLoaded.value) await notifications.loadNotifications()
   const known = loadWaiting(scope).map((entry) => targetOf(entry.bucket, entry.nodeId))
   const found = [...extra, ...known.filter((target): target is IssueTarget => target !== null)]
-  await issueFor(found, epoch, scope)
-  let notices: IssueTarget[]
+  const finished = (await issueFor(found, epoch, scope)) ?? new Set<string>()
+  let notices: Awaited<ReturnType<typeof pendingNotices>>
   try {
     notices = await pendingNotices()
   } catch {
     // Without the inbox the known buckets were still issued.
     return
   }
-  const done = new Set(found.map((target) => `${target.nodeId}\u0000${target.bucket}`))
-  const rest = notices.filter((target) => !done.has(`${target.nodeId}\u0000${target.bucket}`))
-  if (rest.length) await issueFor(rest, epoch, scope)
+  const tried = new Set(found.map((target) => `${target.nodeId}\u0000${target.bucket}`))
+  const rest = [...notices].filter(([key]) => !tried.has(key)).map(([, notice]) => notice.target)
+  if (rest.length) (await issueFor(rest, epoch, scope))?.forEach((key) => finished.add(key))
+  if (epoch !== sessionEpoch.value) return
+  // Marked by id, since the bell may not have loaded these notices yet.
+  const ids = [...notices].flatMap(([key, notice]) => (finished.has(key) ? notice.ids : []))
+  if (ids.length) void useNotifications().markRead(ids)
 }
 
 /** After a role grant listed `requests`: issues the group's buckets now or at the next vault opening. */
