@@ -15,6 +15,8 @@ import {
   fakeManager,
   listedFolder,
   listedObject,
+  lockedDownload,
+  lockedState,
   objectBrowser,
   resetS3Access,
   s3Access,
@@ -81,6 +83,26 @@ describe('object browser row actions', () => {
     await bubbleClick(action(root, 'Download'))
 
     expect(download).toHaveBeenCalledWith(listedObject)
+  })
+
+  it('reads a file of a bucket locked on the node with the scoped key and marks a waiting key', async () => {
+    download.mockClear()
+    lockedDownload.mockClear()
+    Object.assign(lockedState, { locked: true, available: true, pending: new Set([listedObject.key]) })
+    try {
+      const root = await render()
+      expect(content(root)).toContain('Locked on the node')
+      expect(content(root)).toContain('Available to you')
+      const row = element(root, (node) => node.tag === 'tr' && content(node).includes('reads.fastq'))
+      expect(content(row)).toContain('Key pending')
+
+      await bubbleClick(action(root, 'Download'))
+
+      expect(lockedDownload).toHaveBeenCalledWith(listedObject)
+      expect(download).not.toHaveBeenCalled()
+    } finally {
+      Object.assign(lockedState, { locked: false, available: false, pending: new Set() })
+    }
   })
 
   it('asks the delete dialog for this object', async () => {

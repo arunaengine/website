@@ -48,6 +48,22 @@ export function resetS3Access() {
   s3Access.canDeletePrefix = () => true
 }
 
+/** The locked-bucket state the compiled browser sees: a plain bucket unless a test changes it. */
+export const lockedState = { locked: false, available: false, pending: new Set<string>() }
+export const lockedDownload = vi.fn()
+
+function lockedBucket(...args: unknown[]) {
+  const plain = args[3] as (object: unknown) => unknown
+  return {
+    lockedOnNode: ref(lockedState.locked),
+    availableToYou: ref(lockedState.available),
+    wait: ref(null),
+    cancel: vi.fn(),
+    keyPending: (key: string) => lockedState.pending.has(key),
+    download: (object: unknown) => (lockedState.locked ? lockedDownload(object) : plain(object)),
+  }
+}
+
 let compiled: Component | null = null
 
 export function objectBrowser(): Component {
@@ -78,7 +94,9 @@ export function objectBrowser(): Component {
       '@/components/data/Breadcrumbs.vue': moduleDefault(Slotted('nav')),
       '@/components/data/ObjectIcon.vue': moduleDefault(Slotted('i')),
       '@/components/watches/WatchButton.vue': moduleDefault(Slotted('button')),
+      '@/components/storage/KeyedReadNotice.vue': moduleDefault(Slotted('aside')),
       '@/composables/useAruna': { useAruna: () => ({ isRealmAdmin: ref(false) }) },
+      '@/composables/useLockedBucket': { useLockedBucket: (...args: unknown[]) => lockedBucket(...args) },
       '@/composables/usePlacementPolicies': {
         usePlacementPolicies: () => ({ getBucketPlacement: vi.fn(async () => null) }),
       },

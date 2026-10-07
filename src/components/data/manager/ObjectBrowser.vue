@@ -12,7 +12,9 @@ import Tooltip from '@/components/ui/Tooltip.vue'
 import Breadcrumbs from '@/components/data/Breadcrumbs.vue'
 import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import WatchButton from '@/components/watches/WatchButton.vue'
+import KeyedReadNotice from '@/components/storage/KeyedReadNotice.vue'
 import { useAruna } from '@/composables/useAruna'
+import { useLockedBucket } from '@/composables/useLockedBucket'
 import type { DataManager } from '@/composables/useDataManager'
 import {
   useS3,
@@ -39,6 +41,7 @@ import {
   Globe,
   KeyRound,
   Link2,
+  Lock,
   MoreHorizontal,
   NotebookPen,
   Plus,
@@ -118,6 +121,9 @@ const {
   requestDelete,
   publicAccess,
 } = props.manager
+
+const locked = useLockedBucket(bucket, remoteNodeId, activeGroupId, download)
+const { lockedOnNode, availableToYou } = locked
 
 // The ticked files and folders, or the open folder when nothing is ticked.
 function publicTargets(): PublicTarget[] {
@@ -276,6 +282,10 @@ async function onDrop(event: DragEvent) {
           >
             on {{ realmNodes.displayName(remoteNodeId) }}
           </Badge>
+          <Badge v-if="lockedOnNode" :variant="stateVariant('locked')" size="sm" class="shrink-0">
+            <Lock class="mr-0.5 h-3 w-3" aria-hidden="true" /> Locked on the node
+          </Badge>
+          <Badge v-if="availableToYou" variant="success" size="sm" class="shrink-0">Available to you</Badge>
           <Spinner v-if="listLoading" label="Loading objects" class="shrink-0" />
         </div>
         <div class="flex items-center gap-2">
@@ -537,6 +547,9 @@ async function onDrop(event: DragEvent) {
                   <ObjectIcon :name="object.name" class="h-4 w-4" />
                   <span class="truncate" :class="isNotebook(object) ? 'font-medium text-primary' : ''">{{ object.name }}</span>
                   <Badge v-if="isNotebook(object)" variant="royal" size="sm" class="shrink-0">Notebook</Badge>
+                  <Badge v-if="locked.keyPending(object.key)" variant="warn" size="sm" class="shrink-0">
+                    Key pending
+                  </Badge>
                   <Badge v-if="filePublic(object.key)" variant="success" size="sm" class="shrink-0 uppercase" title="Everyone can read this file">
                     <Globe class="mr-0.5 h-3 w-3" aria-hidden="true" /> public
                   </Badge>
@@ -558,7 +571,7 @@ async function onDrop(event: DragEvent) {
               <td class="px-4 py-2.5">
                 <div class="flex items-center justify-end gap-1">
                   <IconButton label="Preview" @click.stop="openDetails(object, 'preview')"><Eye class="size-3.5" /></IconButton>
-                  <IconButton label="Download" @click.stop="download(object)"><Download class="size-3.5" /></IconButton>
+                  <IconButton label="Download" @click.stop="locked.download(object)"><Download class="size-3.5" /></IconButton>
                   <IconButton
                     label="Delete…"
                     class="text-destructive hover:text-destructive"
@@ -616,6 +629,7 @@ async function onDrop(event: DragEvent) {
           </Button>
         </div>
       </div>
+      <KeyedReadNotice :wait="locked.wait.value" action="download" class="max-w-xl" @cancel="locked.cancel()" />
 
       <slot />
       </template>

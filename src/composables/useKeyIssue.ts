@@ -20,6 +20,8 @@ const issued = ref<IssuedCount | null>(null)
 /** Buckets with requests left open while the vault was closed, keyed by node and bucket. */
 const waiting = new Map<string, { bucket: string; nodeId: string }>()
 let watching = false
+/** One issuance at a time, so a later one finds the earlier one's requests already issued. */
+let queue: Promise<unknown> = Promise.resolve()
 let noticeTimer: ReturnType<typeof setTimeout> | undefined
 
 function targetOf(bucket: string, nodeId: string | null | undefined): IssueTarget | null {
@@ -46,7 +48,13 @@ function show(count: IssuedCount) {
 }
 
 /** Issues every open request of `targets` while the vault stays open; null when it is closed. */
-async function issueFor(targets: IssueTarget[]): Promise<IssuedCount | null> {
+function issueFor(targets: IssueTarget[]): Promise<IssuedCount | null> {
+  const next = queue.then(() => issueNow(targets))
+  queue = next.catch(() => null)
+  return next
+}
+
+async function issueNow(targets: IssueTarget[]): Promise<IssuedCount | null> {
   const vault = useUserVault()
   const userId = userInfo.value?.user.user_id
   const realmId = userInfo.value?.realm.realm_id ?? realmInfo.value?.realm_id
