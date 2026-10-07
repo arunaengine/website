@@ -36,28 +36,35 @@ async function openRequests(target: IssueTarget): Promise<AbeRecord<KeyRequestFi
   return records
 }
 
-/** The users who got a key; none for a bucket the user holds no key for. `guard` throws once stale. */
+/** The users who got a key, and whether no open request is left that this holder could issue. */
+export interface IssueResult {
+  users: Set<string>
+  done: boolean
+}
+
+/** Issues the open requests of `target`; none for a bucket the user holds no key for. */
 export async function issueBucket(
   target: IssueTarget,
   holder: IssueHolder,
   vault: UnlockVault,
   guard: () => void,
-): Promise<Set<string>> {
+): Promise<IssueResult> {
   const issued = new Set<string>()
   let proposals: AbeRecord<KeyRequestFields>[]
   try {
     proposals = await openRequests(target)
   } catch (cause) {
     // Not a key holder, or a bucket without scoped keys.
-    if (cause instanceof ApiError && cause.status < 500) return issued
+    if (cause instanceof ApiError && cause.status < 500) return { users: issued, done: true }
     throw cause
   }
   guard()
-  if (!proposals.length) return issued
+  if (!proposals.length) return { users: issued, done: true }
   const status = await getBucketEncryption(target.bucket, target.client)
   guard()
   const bucketId = status.bucket_id
-  if (!bucketId) return issued
+  if (!bucketId) return { users: issued, done: false }
+  let left = proposals.length
   const { list } = keyGenerations(status)
   for (const generation of new Set(proposals.map((proposal) => proposal.fields.parameters.generation))) {
     const publicKey = list.find((entry) => entry.generation === generation)?.public_key
@@ -80,6 +87,7 @@ export async function issueBucket(
           guard()
           await submitKeyGrant(target.bucket, proposal.fields.request_id, grant, target.client)
           issued.add(recipient)
+          left -= 1
         } catch {
           // A request that went stale or cannot be issued here stays open for another holder.
           guard()
@@ -89,5 +97,5 @@ export async function issueBucket(
       key.fill(0)
     }
   }
-  return issued
+  return { users: issued, done: left === 0 }
 }

@@ -43,8 +43,9 @@ describe('holder issuance', () => {
     api.listKeyRequests
       .mockResolvedValueOnce({ records: [proposal('Q1', 'ada')], next_cursor: 'next' })
       .mockResolvedValueOnce({ records: [proposal('Q2', 'bob')], next_cursor: null })
-    const users = await issueBucket(TARGET, HOLDER, VAULT, () => {})
+    const { users, done } = await issueBucket(TARGET, HOLDER, VAULT, () => {})
     expect([...users]).toEqual(['ada', 'bob'])
+    expect(done).toBe(true)
     expect(api.listKeyRequests).toHaveBeenLastCalledWith('reef', 'next', TARGET.client)
     expect(openBucketKey).toHaveBeenCalledTimes(1)
     expect(openBucketKey.mock.calls[0]![0]).toMatchObject({ context: { bucketId: 'B', generation: 2, userId: 'H' }, publicKey: 'pk' })
@@ -55,17 +56,19 @@ describe('holder issuance', () => {
 
   it('gives nothing for a bucket the user does not hold or without a usable copy', async () => {
     api.listKeyRequests.mockRejectedValueOnce(new ApiError(403, 'not a key holder'))
-    expect((await issueBucket(TARGET, HOLDER, VAULT, () => {})).size).toBe(0)
+    expect(await issueBucket(TARGET, HOLDER, VAULT, () => {})).toEqual({ users: new Set(), done: true })
     api.listKeyRequests.mockResolvedValueOnce({ records: [proposal('Q1', 'ada')], next_cursor: null })
     openBucketKey.mockRejectedValueOnce(new NoUsableCopyError('none'))
-    expect((await issueBucket(TARGET, HOLDER, VAULT, () => {})).size).toBe(0)
+    expect(await issueBucket(TARGET, HOLDER, VAULT, () => {})).toEqual({ users: new Set(), done: false })
     expect(api.submitKeyGrant).not.toHaveBeenCalled()
   })
 
   it('leaves a refused request open and still issues the others', async () => {
     api.listKeyRequests.mockResolvedValueOnce({ records: [proposal('Q1', 'ada'), proposal('Q2', 'bob')], next_cursor: null })
     api.submitKeyGrant.mockRejectedValueOnce(new ApiError(409, 'stale', 'stale_request'))
-    expect([...(await issueBucket(TARGET, HOLDER, VAULT, () => {}))]).toEqual(['bob'])
+    const { users, done } = await issueBucket(TARGET, HOLDER, VAULT, () => {})
+    expect([...users]).toEqual(['bob'])
+    expect(done).toBe(false)
   })
 
   it('stops at once when the vault closes and still clears the key', async () => {
