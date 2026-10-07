@@ -69,7 +69,7 @@ function bytes(text: string): Uint8Array<ArrayBuffer> {
 
 async function openFirst(
   copies: SealedCopyEntry[],
-  target: UnlockTarget,
+  target: Omit<UnlockTarget, 'durationMs'>,
   vault: UnlockVault,
   guard: () => void,
 ): Promise<Uint8Array<ArrayBuffer>> {
@@ -99,6 +99,21 @@ async function openFirst(
   )
 }
 
+/** Opens the caller's newest usable copy of the target generation; the caller clears the key. */
+export async function openBucketKey(
+  target: Omit<UnlockTarget, 'durationMs'>,
+  vault: UnlockVault,
+  guard: () => void,
+): Promise<Uint8Array<ArrayBuffer>> {
+  const { bucketId, generation } = target.context
+  const response = await getMyCopies(target.bucket, generation, target.client)
+  guard()
+  const copies = response.copies
+    .filter((copy) => copy.bucket_id === bucketId && copy.generation === generation)
+    .sort((a, b) => b.created_at_ms - a.created_at_ms)
+  return openFirst(copies, target, vault, guard)
+}
+
 // `current` must stay true for the account, session, realm, API base, node, group,
 // bucket id, key generation and request that started the unlock.
 export async function unlockWithVault(
@@ -116,12 +131,7 @@ export async function unlockWithVault(
   const ownKey = await vault.checkKey()
   guard()
   const { bucketId, generation } = target.context
-  const response = await getMyCopies(target.bucket, generation, target.client)
-  guard()
-  const copies = response.copies
-    .filter((copy) => copy.bucket_id === bucketId && copy.generation === generation)
-    .sort((a, b) => b.created_at_ms - a.created_at_ms)
-  const key = await openFirst(copies, target, vault, guard)
+  const key = await openBucketKey(target, vault, guard)
   try {
     guard()
     const request = { bucket_id: bucketId, generation, duration_ms: target.durationMs }
