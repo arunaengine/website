@@ -1,5 +1,6 @@
 import { effectScope, nextTick, ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ApiError } from '@/lib/api'
 import { sessionEpoch } from './aruna/state'
 import { POLL_MS, ReadEndedError, useKeyedRead } from './useKeyedRead'
 
@@ -70,6 +71,46 @@ describe('keyed read waits', () => {
     expect(read.ownGrants).toHaveBeenCalledTimes(3)
     expect(keyed.pending.value.size).toBe(0)
     expect(keyed.wait.value).toBeNull()
+  })
+
+  it('repeats the request at each interval and keeps waiting through a network failure', async () => {
+    read.ownGrants
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    read.requestKey
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockRejectedValueOnce(new ApiError(503, 'unavailable'))
+      .mockResolvedValueOnce(GRANT)
+    const keyed = useKeyedRead()
+    const done = keyed.read(TARGET)
+    await settle()
+
+    await vi.advanceTimersByTimeAsync(POLL_MS)
+    expect(keyed.wait.value).toBe('pending')
+    await vi.advanceTimersByTimeAsync(POLL_MS)
+    expect(keyed.wait.value).toBe('pending')
+    expect(keyed.pending.value.size).toBe(1)
+    read.ownGrants.mockResolvedValue([])
+    await vi.advanceTimersByTimeAsync(POLL_MS)
+
+    expect(await (await done).text()).toBe('ok')
+    expect(read.requestKey).toHaveBeenCalledTimes(4)
+  })
+
+  it('ends the wait with the error once the request is refused', async () => {
+    read.ownGrants.mockResolvedValue([])
+    read.requestKey.mockResolvedValueOnce(null).mockRejectedValueOnce(new ApiError(403, 'no access'))
+    const keyed = useKeyedRead()
+    const done = keyed.read(TARGET)
+    const failed = expect(done).rejects.toMatchObject({ status: 403 })
+    await settle()
+
+    await vi.advanceTimersByTimeAsync(POLL_MS)
+
+    await failed
+    expect(keyed.wait.value).toBeNull()
+    expect(keyed.pending.value.size).toBe(0)
   })
 
   it('asks a member without a vault to set one up, then requests the key', async () => {

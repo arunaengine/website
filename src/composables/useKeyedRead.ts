@@ -1,6 +1,7 @@
 // One read of a locked bucket with the caller's scoped key, and what it waits for: the personal
 // vault, a key from a key holder, or a copy still being prepared. Waits resume on their own.
 import { getCurrentScope, onScopeDispose, ref, watch } from 'vue'
+import { ApiError } from '@/lib/api'
 import {
   ReadWaitError,
   fetchEnvelope,
@@ -123,8 +124,17 @@ export function useKeyedRead() {
         pending.value = new Set(pending.value).add(file)
         await until(ended, POLL_MS)
         check()
-        grant = usableGrant(await ownGrants(target), envelope, target.key)
-        check()
+        try {
+          // Repeating the request lets an unlocked node issue it and renews a stale one.
+          const issued = await requestKey(target)
+          check()
+          grant = usableGrant([...(issued ? [issued] : []), ...(await ownGrants(target))], envelope, target.key)
+          check()
+        } catch (cause) {
+          check()
+          // A refusal is final; a network or server failure waits for the next interval.
+          if (cause instanceof ApiError && cause.status < 500 && cause.status !== 429) throw cause
+        }
       }
       unmark(file)
       if (!vault.loaded.value) await vault.load()
