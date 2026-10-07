@@ -21,7 +21,10 @@ import { useAruna } from '@/composables/useAruna'
 import { useS3 } from '@/composables/useS3'
 import { useTokenBuckets } from '@/composables/useTokenBuckets'
 import { useUserSessions } from '@/composables/useUserSessions'
+import { issueKeys } from '@/composables/aruna/groups'
 import { errorMessage } from '@/lib/utils'
+import { toBase64 } from '@/lib/vault/crypto'
+import { importPrivateKey } from '@/lib/vault/hpke'
 import { ApiError, ENCRYPTION_CODES, type CreateS3CredentialsResponse, type CreateSessionResponse } from '@/lib/api'
 
 const props = defineProps<{ open: boolean }>()
@@ -74,8 +77,8 @@ const restrictions = ref<Restriction[]>([])
 const showRestrictions = ref(false)
 const showEncrypted = ref(false)
 const encryptedBuckets = ref<string[]>([])
-/** Encrypted buckets were named, so a key without a session token is reported. */
-const tokenAsked = ref(false)
+/** The hex token key made in this browser, shown once; the node gets only its public key. */
+const sessionToken = ref<string | null>(null)
 const {
   buckets: tokenChoices,
   state: tokenState,
@@ -128,7 +131,7 @@ const cliSnippet = computed(() => {
   return [
     `export AWS_ACCESS_KEY_ID=${created.value.access_key_id}`,
     `export AWS_SECRET_ACCESS_KEY=${created.value.access_secret}`,
-    ...(created.value.session_token ? [`export AWS_SESSION_TOKEN=${created.value.session_token}`] : []),
+    ...(sessionToken.value ? [`export AWS_SESSION_TOKEN=${sessionToken.value}`] : []),
     `aws s3 ls --endpoint-url ${connectedEndpoint.value ?? '<s3-endpoint>'}`,
     `s5cmd --endpoint-url ${connectedEndpoint.value ?? '<s3-endpoint>'} ls`,
   ].join('\n')
@@ -152,6 +155,7 @@ watch(
     if (!open) {
       created.value = null
       createdToken.value = null
+      sessionToken.value = null
       return
     }
     kind.value = 's3'
@@ -166,9 +170,21 @@ watch(
     showRestrictions.value = false
     showEncrypted.value = false
     encryptedBuckets.value = []
-    tokenAsked.value = false
+    sessionToken.value = null
   },
 )
+
+/** A fresh X25519 token key: its lowercase hex and the padded base64 of its public key. */
+async function tokenKey(): Promise<{ token: string; publicKey: string }> {
+  const raw = crypto.getRandomValues(new Uint8Array(32))
+  try {
+    const { publicKey } = await importPrivateKey(raw)
+    const token = Array.from(raw, (byte) => byte.toString(16).padStart(2, '0')).join('')
+    return { token, publicKey: toBase64(publicKey) }
+  } finally {
+    raw.fill(0)
+  }
+}
 
 async function submit() {
   if (!groupId.value) return
@@ -179,14 +195,18 @@ async function submit() {
     .filter((r) => r.pattern.trim())
     .map((r) => ({ pattern: r.pattern.trim(), permission: r.permission }))
   const encrypted = encryptedBuckets.value.filter((name) => tokenChoices.value.includes(name))
-  tokenAsked.value = encrypted.length > 0
   try {
-    created.value = await createS3Credentials({
+    const key = encrypted.length ? await tokenKey() : null
+    const response = await createS3Credentials({
       group_id: groupId.value,
       expires_in_seconds: Number(expiresIn.value),
       ...(active.length ? { path_restrictions: active } : {}),
-      ...(encrypted.length ? { encrypted_buckets: encrypted } : {}),
+      ...(key ? { encrypted_buckets: encrypted, token_public_key: key.publicKey } : {}),
     })
+    sessionToken.value = key?.token ?? null
+    created.value = response
+    // A key holder with the vault open issues the token's keys now, otherwise at the next opening.
+    issueKeys(groupId.value, response.key_requests)
   } catch (err) {
     submitError.value = encrypted.length ? tokenRefusal(err) : errorMessage(err)
   }
@@ -194,12 +214,6 @@ async function submit() {
 
 function tokenRefusal(err: unknown): string {
   if (!(err instanceof ApiError)) return errorMessage(err)
-  if (err.status === 409 && err.code === ENCRYPTION_CODES.locked) {
-    return 'A chosen bucket is locked now. Unlock it on its Encryption tab, or leave it out, and try again.'
-  }
-  if (err.status === 403 && err.code === ENCRYPTION_CODES.notHolder) {
-    return 'You are not a current key holder of every chosen bucket, so the key was not created.'
-  }
   if (err.status === 400 && err.code === ENCRYPTION_CODES.bucketNotEncrypted) {
     return 'A chosen bucket is not encrypted, so it needs no session token. Leave it out and try again.'
   }
@@ -317,8 +331,8 @@ async function submitToken() {
             </button>
             <div v-if="showEncrypted" class="mt-2 space-y-2">
               <p class="text-[11px] leading-relaxed text-muted-foreground">
-                The key also gets a session token that reads the chosen buckets while they are locked. Only buckets on
-                this node that are unlocked and that you hold a key for are offered.
+                The key also gets a session token that reads your part of the chosen buckets while they are locked.
+                Key holders issue its keys; while a bucket is unlocked, the node issues them at once.
               </p>
               <p v-if="!groupId" class="text-[11px] text-muted-foreground">Select a group first.</p>
               <Spinner v-else-if="tokenState === 'loading'" show-label label="Checking the buckets of this group" />
@@ -334,7 +348,7 @@ async function submitToken() {
                   <span class="break-all font-mono">{{ name }}</span>
                 </label>
                 <p v-if="!tokenChoices.length" class="text-[11px] text-muted-foreground">
-                  No bucket of this group on this node is encrypted, unlocked and held by you.
+                  No bucket of this group on this node is encrypted.
                 </p>
                 <p v-if="unchecked" class="text-[11px] text-muted-foreground">
                   {{ unchecked }} {{ unchecked === 1 ? 'bucket' : 'buckets' }} could not be checked and
@@ -356,7 +370,7 @@ async function submitToken() {
       <div v-else-if="created" class="space-y-3">
         <Notice tone="warning" class="flex items-start gap-2">
           <ShieldAlert class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span v-if="created.session_token">
+          <span v-if="sessionToken">
             The secret and the session token are shown once and cannot be retrieved later. The portal never stores or
             uses them.
           </span>
@@ -377,13 +391,13 @@ async function submitToken() {
             </div>
             <CopyButton :value="created.access_secret" label="Copy secret access key" />
           </div>
-          <template v-if="created.session_token">
+          <template v-if="sessionToken">
             <div class="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
               <div class="min-w-0">
                 <div class="text-[10px] uppercase tracking-wider text-muted-foreground">Session token</div>
-                <div class="break-all font-mono text-xs">{{ created.session_token }}</div>
+                <div class="break-all font-mono text-xs">{{ sessionToken }}</div>
               </div>
-              <CopyButton :value="created.session_token" label="Copy session token" />
+              <CopyButton :value="sessionToken" label="Copy session token" />
             </div>
             <p class="text-[11px] leading-relaxed text-muted-foreground">
               Set it as <code class="font-mono">aws_session_token</code> in your S3 client, or as
@@ -391,10 +405,10 @@ async function submitToken() {
               read the chosen buckets while they are locked.
             </p>
           </template>
-          <Notice v-else-if="tokenAsked" tone="warning">
-            The node returned no session token, so this key cannot read the chosen buckets while they are locked. The
-            node may run an older Aruna version.
-          </Notice>
+          <p v-if="sessionToken && created.key_requests?.length" class="text-[11px] leading-relaxed text-muted-foreground">
+            Some keys of the token wait for a key holder. Until they are issued, it cannot read those parts while the
+            bucket is locked.
+          </p>
           <div class="relative rounded-md border border-border bg-muted/40 px-3 py-2">
             <div class="text-[10px] uppercase tracking-wider text-muted-foreground">CLI usage</div>
             <pre class="mt-1 whitespace-pre-wrap break-all font-mono text-[11px] leading-5">{{ cliSnippet }}</pre>

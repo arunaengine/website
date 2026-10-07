@@ -16,10 +16,13 @@ import {
   type HostNode,
 } from '@/test/clientRender'
 import { errorMessage } from '@/lib/utils'
+import * as VaultCrypto from '@/lib/vault/crypto'
+import * as Hpke from '@/lib/vault/hpke'
 
 const createS3Credentials = vi.fn<(input: Api.CreateS3CredentialsRequest) => Promise<Api.CreateS3CredentialsResponse>>(
   async () => ({ access_key_id: 'AK1', access_secret: 'S3CR3T' }),
 )
+const issueKeys = vi.fn()
 const listGroupDataPaths = vi.fn()
 const getBucketEncryption = vi.fn()
 let loadTokenBuckets = false
@@ -30,7 +33,6 @@ vi.mock('@/lib/api', async (importOriginal) => ({
   getBucketEncryption: (...args: unknown[]) => getBucketEncryption(...args),
 }))
 
-const TOKEN = 'canary-session-token'
 const tokenChoices = ref<string[]>([])
 const tokenState = ref<TokenBucketsState>('idle')
 let tokenActive: Ref<boolean> | null = null
@@ -106,8 +108,11 @@ const CreateCredentialDialog = compileClientComponent(
         return { buckets: tokenChoices, state: tokenState, error: ref(null), unchecked: ref(0), partial: ref(false) }
       },
     },
+    '@/composables/aruna/groups': { issueKeys },
     '@/lib/api': Api,
     '@/lib/utils': { errorMessage },
+    '@/lib/vault/crypto': VaultCrypto,
+    '@/lib/vault/hpke': Hpke,
   },
 )
 
@@ -121,6 +126,7 @@ beforeEach(() => {
   })
   createS3Credentials.mockClear()
   createUserSession.mockClear()
+  issueKeys.mockClear()
   tokenChoices.value = ['reef', 'kelp']
   tokenState.value = 'ready'
 })
@@ -229,15 +235,21 @@ describe('CreateCredentialDialog', () => {
     vi.stubGlobal('sessionStorage', storage)
     vi.stubGlobal('indexedDB', indexedDB)
     const logs = (['log', 'info', 'warn', 'error', 'debug'] as const).map((level) => vi.spyOn(console, level))
-    createS3Credentials.mockResolvedValueOnce({ access_key_id: 'AK2', access_secret: 'SECRET2', session_token: TOKEN })
+    createS3Credentials.mockResolvedValueOnce({ access_key_id: 'AK2', access_secret: 'SECRET2' })
     const { root, open } = await openDialog()
 
     await chooseBucket(root, 'kelp')
     await click(button(root, 'Create'))
 
-    expect(createS3Credentials).toHaveBeenCalledWith(expect.objectContaining({ group_id: 'g1', encrypted_buckets: ['kelp'] }))
+    // The browser makes the token key and sends only its public key.
+    const sent = createS3Credentials.mock.calls[0][0]
+    expect(sent).toMatchObject({ group_id: 'g1', encrypted_buckets: ['kelp'] })
+    expect(sent.token_public_key).toMatch(/^[A-Za-z0-9+/]{43}=$/)
     const shown = content(root)
-    expect(shown).toContain(TOKEN)
+    const TOKEN = shown.match(/[0-9a-f]{64}/)?.[0] ?? ''
+    const { publicKey } = await Hpke.importPrivateKey(Uint8Array.from(TOKEN.match(/../g) ?? [], (pair) => parseInt(pair, 16)))
+    expect(VaultCrypto.toBase64(publicKey)).toBe(sent.token_public_key)
+    expect(JSON.stringify(sent)).not.toContain(TOKEN)
     expect(shown).toContain('aws_session_token')
     expect(shown).toContain(`export AWS_SESSION_TOKEN=${TOKEN}`)
 
@@ -253,21 +265,20 @@ describe('CreateCredentialDialog', () => {
     for (const log of logs) expect(JSON.stringify(log.mock.calls)).not.toContain(TOKEN)
   })
 
-  it('warns when the node answers without the asked session token', async () => {
-    createS3Credentials.mockResolvedValueOnce({ access_key_id: 'AK3', access_secret: 'SECRET3' })
+  it('hands the open key requests of the token to key issuance', async () => {
+    createS3Credentials.mockResolvedValueOnce({ access_key_id: 'AK3', access_secret: 'SECRET3', key_requests: ['R1'] })
     const { root } = await openDialog()
 
     await chooseBucket(root, 'reef')
     await click(button(root, 'Create'))
 
-    expect(content(root)).toContain('The node returned no session token')
-    expect(content(root)).not.toContain('AWS_SESSION_TOKEN')
+    expect(issueKeys).toHaveBeenCalledWith('g1', ['R1'])
+    expect(content(root)).toContain('Some keys of the token wait for a key holder')
+    expect(content(root)).toContain('AWS_SESSION_TOKEN')
   })
 
   it('says why the node refused a key with encrypted buckets', async () => {
     const refusals: Array<[Api.ApiError, string]> = [
-      [new Api.ApiError(409, 'locked', 'bucket_locked'), 'A chosen bucket is locked now.'],
-      [new Api.ApiError(403, 'forbidden', 'not_holder'), 'You are not a current key holder of every chosen bucket'],
       [new Api.ApiError(403, 'Group access denied'), 'Group access denied'],
       [new Api.ApiError(400, 'plain', 'bucket_not_encrypted'), 'A chosen bucket is not encrypted'],
     ]
