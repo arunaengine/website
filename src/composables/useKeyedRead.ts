@@ -1,6 +1,6 @@
 // One read of a locked bucket with the caller's scoped key, and what it waits for: the personal
 // vault, a key from a key holder, or a copy still being prepared. Waits resume on their own.
-import { ref, watch } from 'vue'
+import { getCurrentScope, onScopeDispose, ref, watch } from 'vue'
 import {
   ReadWaitError,
   fetchEnvelope,
@@ -57,6 +57,7 @@ export function useKeyedRead() {
     opening = false
     wake?.()
   }
+  if (getCurrentScope()) onScopeDispose(cancel)
 
   /** Waits until `ready` holds or `ms` pass; a cancel ends the wait at once. */
   function until(ready: () => boolean, ms?: number): Promise<void> {
@@ -72,6 +73,12 @@ export function useKeyedRead() {
       wake = finish
       if (ready()) finish()
     })
+  }
+
+  function unmark(file: string) {
+    if (!pending.value.has(file)) return
+    pending.value.delete(file)
+    pending.value = new Set(pending.value)
   }
 
   /** Starts a read; a newer read, a cancel or a session change ends it. */
@@ -109,8 +116,7 @@ export function useKeyedRead() {
         grant = usableGrant(await ownGrants(target), envelope, target.key)
         check()
       }
-      pending.value.delete(file)
-      pending.value = new Set(pending.value)
+      unmark(file)
       if (!vault.loaded.value) await vault.load()
       check()
       if (vault.state.value !== 'unlocked') {
@@ -140,6 +146,7 @@ export function useKeyedRead() {
         }
       }
     } catch (cause) {
+      unmark(file)
       if (!ended() && cause instanceof ReadWaitError) wait.value = cause.wait
       else if (!ended()) wait.value = null
       throw ended() ? new ReadEndedError() : cause

@@ -26,6 +26,7 @@ const result = computed(() => (props.action === 'download' ? 'download starts' :
       You have access, but your key is not ready yet. It is issued when a key holder opens their vault or the
       bucket is unlocked. Your {{ result }} on its own when it arrives.
     </p>
+    <Button variant="outline" size="sm" class="mt-2" @click="emit('cancel')">Cancel</Button>
   </Notice>
   <Notice v-else-if="wait === 'preparing'" title="This copy is waiting for a key holder to finish preparing it">
     <p>It can be read once the bucket is unlocked next. The original file stays readable.</p>

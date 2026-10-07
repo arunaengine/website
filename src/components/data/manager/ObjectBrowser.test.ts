@@ -15,6 +15,7 @@ import {
   fakeManager,
   listedFolder,
   listedObject,
+  lockedCancel,
   lockedDownload,
   lockedState,
   objectBrowser,
@@ -103,6 +104,17 @@ describe('object browser row actions', () => {
     } finally {
       Object.assign(lockedState, { locked: false, available: false, pending: new Set() })
     }
+  })
+
+  it('ends a waiting scoped key read when the folder changes', async () => {
+    const prefix = ref('raw')
+    await render({ prefix })
+    lockedCancel.mockClear()
+
+    prefix.value = 'raw/genomes/'
+    await flush()
+
+    expect(lockedCancel).toHaveBeenCalledTimes(1)
   })
 
   it('asks the delete dialog for this object', async () => {

@@ -1,4 +1,4 @@
-import { nextTick, ref } from 'vue'
+import { effectScope, nextTick, ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sessionEpoch } from './aruna/state'
 import { POLL_MS, ReadEndedError, useKeyedRead } from './useKeyedRead'
@@ -97,6 +97,24 @@ describe('keyed read waits', () => {
     await expect(done).rejects.toBeInstanceOf(ReadEndedError)
     expect(keyed.wait.value).toBeNull()
     expect(read.readWithGrant).not.toHaveBeenCalled()
+  })
+
+  it('ends a waiting read and its pending mark when its view goes away', async () => {
+    read.ownGrants.mockResolvedValue([])
+    read.requestKey.mockResolvedValue(null)
+    const scope = effectScope()
+    const keyed = scope.run(() => useKeyedRead())!
+    const done = keyed.read(TARGET)
+    await settle()
+    expect(keyed.pending.value.size).toBe(1)
+
+    scope.stop()
+
+    await expect(done).rejects.toBeInstanceOf(ReadEndedError)
+    expect(keyed.pending.value.size).toBe(0)
+    expect(keyed.wait.value).toBeNull()
+    await vi.advanceTimersByTimeAsync(POLL_MS * 2)
+    expect(read.ownGrants).toHaveBeenCalledTimes(1)
   })
 
   it('closes the key worker and aborts the download on cancel while opening the key', async () => {

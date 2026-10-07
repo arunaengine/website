@@ -124,6 +124,8 @@ const {
 
 const locked = useLockedBucket(bucket, remoteNodeId, activeGroupId, download)
 const { lockedOnNode, availableToYou } = locked
+// A read waiting in another folder ends with the folder.
+watch(prefix, () => locked.cancel())
 
 // The ticked files and folders, or the open folder when nothing is ticked.
 function publicTargets(): PublicTarget[] {

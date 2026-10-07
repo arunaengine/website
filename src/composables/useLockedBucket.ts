@@ -41,7 +41,7 @@ export function useLockedBucket(
     const target = holder && state === 'unlocked' ? keyIssue.targetOf(bucket.value, encryption.nodeId.value) : null
     if (target) void keyIssue.issueWaiting([target])
   })
-  watch(bucket, () => keyed.cancel())
+  watch([bucket, nodeId, groupId], () => keyed.cancel())
 
   /** Unknown failures fall back to the plain download. */
   async function download(object: ObjectEntry) {

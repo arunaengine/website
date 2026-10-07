@@ -51,6 +51,7 @@ export function resetS3Access() {
 /** The locked-bucket state the compiled browser sees: a plain bucket unless a test changes it. */
 export const lockedState = { locked: false, available: false, pending: new Set<string>() }
 export const lockedDownload = vi.fn()
+export const lockedCancel = vi.fn()
 
 function lockedBucket(...args: unknown[]) {
   const plain = args[3] as (object: unknown) => unknown
@@ -58,7 +59,7 @@ function lockedBucket(...args: unknown[]) {
     lockedOnNode: ref(lockedState.locked),
     availableToYou: ref(lockedState.available),
     wait: ref(null),
-    cancel: vi.fn(),
+    cancel: lockedCancel,
     keyPending: (key: string) => lockedState.pending.has(key),
     download: (object: unknown) => (lockedState.locked ? lockedDownload(object) : plain(object)),
   }
