@@ -122,7 +122,7 @@ describe('key issuance recovery', () => {
     issueBucket.mockImplementation(async (target: { bucket: string }) =>
       ({ users: new Set(), done: target.bucket !== 'kelp' }))
 
-    await useKeyIssue().issueWaiting()
+    await useKeyIssue().issueWaiting([], true)
 
     expect(issueBucket.mock.calls.map((call) => call[0].bucket)).toEqual(['wave', 'reef', 'kelp', 'coral'])
     expect(issueBucket.mock.invocationCallOrder[0]).toBeLessThan(apiRequest.mock.invocationCallOrder[0]!)
@@ -213,6 +213,20 @@ describe('key issuance lifecycle', () => {
     apiRequest.mockResolvedValue({ notifications: [notice('N1', 'reef', false)] })
     notifications.dashboardRevision.value += 1
     await vi.waitFor(() => expect(notifications.markRead).toHaveBeenCalledWith(['N1']))
+    scope.stop()
+  })
+
+  it('checks read key notices at vault opening only', async () => {
+    apiRequest.mockResolvedValue({ notifications: [notice('N1', 'reef', true)] })
+    const scope = effectScope()
+    scope.run(() => useKeyIssue().watchVault())
+    await vi.waitFor(() => expect(issueBucket).toHaveBeenCalledTimes(1))
+
+    notifications.dashboardRevision.value += 1
+    await vi.waitFor(() => expect(apiRequest).toHaveBeenCalledTimes(2))
+    await settle()
+
+    expect(issueBucket).toHaveBeenCalledTimes(1)
     scope.stop()
   })
 

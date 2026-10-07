@@ -75,8 +75,8 @@ function markWaiting(scope: string, target: IssueTarget, open: boolean) {
 
 const isPending = (entry: { kind: string; bucket?: string | null }) => entry.kind === 'bucket_key_pending' && !!entry.bucket
 
-/** Buckets of every pending key notice with their unread notice ids; reading one issues nothing. */
-async function pendingNotices(): Promise<Map<string, { target: IssueTarget; ids: string[] }>> {
+/** Buckets of unread pending key notices, read ones too with `history`, and their unread ids. */
+async function pendingNotices(history: boolean): Promise<Map<string, { target: IssueTarget; ids: string[] }>> {
   const client = { baseUrl: apiBaseUrl.value, token: authToken.value }
   const notices = new Map<string, { target: IssueTarget; ids: string[] }>()
   let cursor: string | undefined
@@ -85,7 +85,7 @@ async function pendingNotices(): Promise<Map<string, { target: IssueTarget; ids:
     const page = await apiRequest<NotificationListResponse>('/system/notifications', { query }, client)
     for (const entry of page.notifications.filter(isPending)) {
       const target = targetOf(entry.bucket!, entry.node_id)
-      if (!target) continue
+      if (!target || (entry.read && !history)) continue
       const key = `${target.nodeId}\u0000${target.bucket}`
       const notice = notices.get(key) ?? { target, ids: [] }
       if (!entry.read) notice.ids.push(entry.id)
@@ -160,7 +160,7 @@ async function issueNow(targets: IssueTarget[], epoch: number, scope: string): P
 }
 
 /** Every bucket with waiting requests this browser knows of, plus `extra`, then those of notices. */
-async function issueWaiting(extra: IssueTarget[] = []): Promise<void> {
+async function issueWaiting(extra: IssueTarget[] = [], history = false): Promise<void> {
   const epoch = sessionEpoch.value
   const scope = waitingScope()
   const known = loadWaiting(scope).map((entry) => targetOf(entry.bucket, entry.nodeId))
@@ -168,7 +168,7 @@ async function issueWaiting(extra: IssueTarget[] = []): Promise<void> {
   const finished = (await issueFor(found, epoch, scope)) ?? new Set<string>()
   let notices: Awaited<ReturnType<typeof pendingNotices>>
   try {
-    notices = await pendingNotices()
+    notices = await pendingNotices(history)
   } catch {
     // Without the inbox the known buckets were still issued.
     return
@@ -220,7 +220,8 @@ function watchVault() {
     })
   }
   watch(useUserVault().state, (state, before) => {
-    if (state === 'unlocked' && before !== 'unlocked') void issueWaiting()
+    // Reading a notice issues nothing, so vault opening also checks read ones.
+    if (state === 'unlocked' && before !== 'unlocked') void issueWaiting([], true)
   }, { immediate: true })
   // A key notice can arrive after its bucket was issued, so each server notification change settles again.
   watch(useNotifications().dashboardRevision, () => {
