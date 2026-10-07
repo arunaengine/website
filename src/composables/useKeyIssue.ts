@@ -180,7 +180,8 @@ async function issueWaiting(extra: IssueTarget[] = [], history = false): Promise
   if (epoch !== sessionEpoch.value) return
   // Marked by id, since the bell may not have loaded these notices yet.
   const ids = [...notices].flatMap(([key, notice]) => (checked.has(key) ? notice.ids : []))
-  if (ids.length) void useNotifications().markRead(ids)
+  // The server accepts at most 512 ids per request.
+  for (let i = 0; i < ids.length; i += 512) void useNotifications().markRead(ids.slice(i, i + 512))
 }
 
 /** After a role grant listed `requests`: issues the group's buckets now or at the next vault opening. */

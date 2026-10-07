@@ -160,6 +160,21 @@ describe('key issuance recovery', () => {
 
     expect(notifications.markRead).toHaveBeenCalledWith(['N1'])
   })
+
+  it('marks more than 512 notices read in requests of at most 512 ids', async () => {
+    notifications.listLoaded.value = false
+    const ids = Array.from({ length: 513 }, (_, i) => `N${i}`)
+    apiRequest
+      .mockResolvedValueOnce({ notifications: ids.slice(0, 200).map((id) => notice(id, 'reef', false)), next_cursor: 'a' })
+      .mockResolvedValueOnce({ notifications: ids.slice(200, 400).map((id) => notice(id, 'reef', false)), next_cursor: 'b' })
+      .mockResolvedValueOnce({ notifications: ids.slice(400).map((id) => notice(id, 'kelp', false)) })
+
+    await useKeyIssue().issueWaiting()
+
+    const sent = notifications.markRead.mock.calls.map((call) => call[0] as string[])
+    expect(sent.every((batch) => batch.length <= 512)).toBe(true)
+    expect(sent.flat().sort()).toEqual([...ids].sort())
+  })
 })
 
 describe('key issuance lifecycle', () => {
