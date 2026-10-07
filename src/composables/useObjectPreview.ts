@@ -3,6 +3,7 @@ import { getBucketEncryption } from '@/lib/api'
 import { bucketUnlockLink, keyGenerations } from '@/lib/bucketEncryption'
 import { formatBytes } from '@/lib/utils'
 import { hasReferenceMetadata } from '@/lib/references'
+import { readFailure } from '@/lib/vault/keyedRead'
 import { authToken, sessionEpoch, userInfo } from './aruna/state'
 import { isS3BucketLockedError } from './s3/errors'
 import { localNodeId, nodeApiBase } from './s3/endpoints'
@@ -334,7 +335,7 @@ export function useObjectPreview() {
     }
   }
 
-  /** Shows a locked object from bytes `read` returns; any failure goes back to the lock notice. */
+  /** Shows a locked object from bytes `read` returns; a wait or an unknown failure shows the lock. */
   async function loadKeyed(target: PreviewTarget, read: () => Promise<Blob>) {
     reset()
     const id = loadId
@@ -372,11 +373,14 @@ export function useObjectPreview() {
         directUrl.value = objectUrl.value
       }
       status.value = 'ready'
-    } catch {
+    } catch (cause) {
       if (id !== loadId) return
       keyed.value = false
       keyedFailed.value = true
-      markLocked(target)
+      const failure = readFailure(cause)
+      if (failure === null) return markLocked(target)
+      errorMessage.value = failure
+      status.value = 'error'
     }
   }
 

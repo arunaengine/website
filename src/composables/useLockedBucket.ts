@@ -3,8 +3,10 @@
 import { computed, ref, watch, type Ref } from 'vue'
 import { listKeyGrants } from '@/lib/api'
 import { keyGenerations } from '@/lib/bucketEncryption'
+import { readFailure } from '@/lib/vault/keyedRead'
 import type { ObjectEntry } from './s3/objects'
 import { useBucketEncryption } from './useBucketEncryption'
+import { reportGlobalError } from './useGlobalErrors'
 import { useKeyedRead } from './useKeyedRead'
 import { useKeyIssue } from './useKeyIssue'
 import { useUserVault } from './useUserVault'
@@ -43,13 +45,15 @@ export function useLockedBucket(
   })
   watch([bucket, nodeId, groupId], () => keyed.cancel())
 
-  /** Unknown failures fall back to the plain download. */
+  /** Recognized failures are reported; unknown ones fall back to the plain download. */
   async function download(object: ObjectEntry) {
     if (!lockedOnNode.value) return plainDownload(object)
     try {
       await keyed.save({ bucket: bucket.value, key: object.key, nodeId: nodeId.value }, object.name)
-    } catch {
-      void plainDownload(object)
+    } catch (cause) {
+      const failure = readFailure(cause)
+      if (failure === null) void plainDownload(object)
+      else reportGlobalError(`Could not download ${object.name}: ${failure}`)
     }
   }
 

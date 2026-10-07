@@ -353,6 +353,18 @@ describe('preview read with a scoped key', () => {
     expect(preview.sizeNote.value).toContain('above the')
   })
 
+  it('shows a refused key read as an error, not as a wait for an unlock', async () => {
+    const preview = useObjectPreview()
+
+    await preview.loadKeyed(TARGET, async () => {
+      throw new Api.ApiError(403, 'Forbidden')
+    })
+
+    expect(preview.status.value).toBe('error')
+    expect(preview.errorMessage.value).toBe('You do not have permission to read this file.')
+    expect(preview.keyedFailed.value).toBe(true)
+  })
+
   it('goes back to the lock notice for good when the key read fails', async () => {
     const preview = useObjectPreview()
 

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, type AbeRecord, type KeyGrantFields, type ObjectEnvelopeView } from '@/lib/api'
-import { ReadWaitError, fetchEnvelope, readWithGrant, requestKey, requestScopes, usableGrant } from './keyedRead'
+import { ReadWaitError, fetchEnvelope, readFailure, readWithGrant, requestKey, requestScopes, usableGrant } from './keyedRead'
 import { KeyWorkerClosedError } from './keyWorker'
 
 const api = vi.hoisted(() => ({
@@ -71,6 +71,15 @@ describe('key requests', () => {
     expect(await requestKey(TARGET)).toBe(issued)
     api.requestScopedKey.mockRejectedValueOnce(new ApiError(422, 'policies', 'scope_unsupported'))
     await expect(requestKey(TARGET)).rejects.toMatchObject({ code: 'scope_unsupported' })
+  })
+
+  it('names recognized failures and leaves a bucket lock and unknown ones to the fallback', () => {
+    expect(readFailure(new ApiError(403, 'Forbidden'))).toBe('You do not have permission to read this file.')
+    expect(readFailure(new ApiError(409, 'version moved', 'stale_version'))).toBe('version moved')
+    expect(readFailure(new ApiError(409, 'other parameters', 'parameter_mismatch'))).toBe('other parameters')
+    expect(readFailure(new TypeError('Failed to fetch'))).toBe('Failed to fetch')
+    expect(readFailure(new ApiError(423, 'locked', 'object_key_required'))).toBeNull()
+    expect(readFailure(new Error('worker failed'))).toBeNull()
   })
 
   it('maps a version without an envelope to the prepared copy wait', async () => {

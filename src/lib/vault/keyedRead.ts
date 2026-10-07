@@ -13,6 +13,7 @@ import {
   type KeyScope,
   type ObjectEnvelopeView,
 } from '@/lib/api'
+import { errorMessage } from '@/lib/utils'
 import type { X25519Pair } from './hpke'
 import { KeyWorkerClosedError, importGrant, openObject, type KeyHandle } from './keyWorker'
 
@@ -31,6 +32,13 @@ export class ReadWaitError extends Error {
     super(wait === 'pending' ? 'Waiting for an encryption key.' : 'This copy is still being prepared.')
     this.name = 'ReadWaitError'
   }
+}
+
+/** The message of a recognized read failure; null for an unknown one or a bucket lock. */
+export function readFailure(cause: unknown): string | null {
+  if (!(cause instanceof ApiError)) return cause instanceof TypeError ? errorMessage(cause) : null
+  if (cause.code === 'object_key_required') return null
+  return cause.status === 403 ? 'You do not have permission to read this file.' : errorMessage(cause)
 }
 
 /** The vault operations a read needs. */
