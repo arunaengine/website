@@ -157,6 +157,9 @@ async function issueNow(targets: IssueTarget[], epoch: number, scope: string): P
 async function issueWaiting(extra: IssueTarget[] = []): Promise<void> {
   const epoch = sessionEpoch.value
   const scope = waitingScope()
+  // Settling marks loaded notices only, so a closed inbox loads its first page.
+  const notifications = useNotifications()
+  if (!notifications.listLoaded.value) await notifications.loadNotifications()
   const known = loadWaiting(scope).map((entry) => targetOf(entry.bucket, entry.nodeId))
   const found = [...extra, ...known.filter((target): target is IssueTarget => target !== null)]
   await issueFor(found, epoch, scope)
@@ -195,7 +198,7 @@ async function issueAfterGrant(groupId: string, requests: string[] | undefined):
     return
   }
   if (epoch !== sessionEpoch.value) return
-  // Holders get no notice for these, so they wait here until issued, across reloads too.
+  // Their notices may come later, so these wait here until issued, across reloads too.
   for (const target of targets) markWaiting(scope, target, true)
   if (useUserVault().state.value === 'unlocked') await issueFor(targets, epoch, scope)
 }
@@ -212,6 +215,10 @@ function watchVault() {
   watch(useUserVault().state, (state, before) => {
     if (state === 'unlocked' && before !== 'unlocked') void issueWaiting()
   }, { immediate: true })
+  // A key notice can arrive after its bucket was issued, so a new unread notice settles again.
+  watch(useNotifications().unreadCount, (count, before) => {
+    if (count > before && useUserVault().state.value === 'unlocked') void issueWaiting()
+  })
   watch(sessionEpoch, () => {
     issued.value = null
   })

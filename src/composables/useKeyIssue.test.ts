@@ -11,6 +11,7 @@ const vault = vi.hoisted(() => ({ state: { value: 'unlocked' }, whileUnlocked: (
 const notifications = vi.hoisted(() => ({
   items: { value: [] as Record<string, unknown>[] },
   listLoaded: { value: false },
+  unreadCount: { value: 0 },
   nextCursor: { value: null as string | null },
   loadNotifications: vi.fn(),
   loadMore: vi.fn(),
@@ -55,6 +56,7 @@ beforeEach(() => {
   vault.state = ref('unlocked')
   notifications.items = ref([])
   notifications.listLoaded = ref(true)
+  notifications.unreadCount = ref(0)
   notifications.nextCursor = ref(null)
   issueBucket.mockResolvedValue({ users: new Set(['ada']), done: true })
   apiRequest.mockResolvedValue({ notifications: [] })
@@ -156,6 +158,21 @@ describe('key issuance lifecycle', () => {
     await settle()
     expect(issueBucket).toHaveBeenCalledTimes(2)
     second.stop()
+  })
+
+  it('settles a key notice that arrives after its bucket was issued', async () => {
+    notifications.listLoaded.value = false
+    const scope = effectScope()
+    scope.run(() => useKeyIssue().watchVault())
+    await settle()
+    expect(notifications.loadNotifications).toHaveBeenCalledTimes(1)
+
+    notifications.items.value = [notice('N1', 'reef', false)]
+    apiRequest.mockResolvedValue({ notifications: [notice('N1', 'reef', false)] })
+    notifications.unreadCount.value = 1
+    await vi.waitFor(() => expect(notifications.markRead).toHaveBeenCalledWith(['N1']))
+    expect(issueBucket.mock.calls[0]![0]).toMatchObject({ bucket: 'reef', nodeId: 'n1' })
+    scope.stop()
   })
 
   it('drops work queued under a session that ended before it ran', async () => {
