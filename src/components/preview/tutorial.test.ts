@@ -49,6 +49,8 @@ beforeAll(() => {
     '@/components/ui/Spinner.vue': moduleDefault(GenericStub),
     '@/composables/useObjectPreview': ObjectPreview,
     '@/composables/useS3': S3,
+    '@/composables/useKeyedRead': { useKeyedRead: () => ({ wait: VueRuntime.ref(null), cancel: () => {} }) },
+    '@/components/storage/KeyedReadNotice.vue': moduleDefault(GenericStub),
     './TextPreview.vue': moduleDefault(TextStub),
     './MarkdownPreview.vue': moduleDefault(GenericStub),
     './CsvPreview.vue': moduleDefault(GenericStub),

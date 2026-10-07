@@ -2,13 +2,15 @@
 // The preview itself: origin line, download, and the viewer for the object's
 // kind. Both the standalone preview dialog and the file details view mount it,
 // so an object is previewed the same way wherever it is opened.
-import { computed, defineAsyncComponent, watch } from 'vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { asyncChunkError } from '@/lib/chunk-recovery'
 import Button from '@/components/ui/Button.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
+import KeyedReadNotice from '@/components/storage/KeyedReadNotice.vue'
+import { useKeyedRead } from '@/composables/useKeyedRead'
 import { useObjectPreview } from '@/composables/useObjectPreview'
 import { useS3, s3ErrorMessage } from '@/composables/useS3'
 import { Download, Link2, ShieldAlert } from '@lucide/vue'
@@ -52,6 +54,9 @@ const DownloadCard = defineAsyncComponent(() => import('./DownloadCard.vue'))
 
 const s3 = useS3()
 const preview = useObjectPreview()
+const keyed = useKeyedRead()
+/** What the scoped key read in progress is for, so its notice names the right result. */
+const keyedAction = ref<'download' | 'preview'>('preview')
 
 // An HTML file reads as a page, not as markup; the viewer keeps the source one
 // click away.
@@ -91,10 +96,25 @@ watch(
       preview.sessionKey.value,
     ] as const,
   ([active]) => {
+    keyed.cancel()
     if (active && props.objectKey) reload()
     else preview.reset()
   },
   { immediate: true },
+)
+
+function keyedObject() {
+  return { bucket: props.bucket, key: props.objectKey, nodeId: props.nodeId, versionId: props.versionId }
+}
+
+// A locked object is read once more with the caller's scoped key before the lock notice stays.
+watch(
+  () => preview.status.value === 'locked' && !preview.keyedFailed.value,
+  (start) => {
+    if (!start) return
+    keyedAction.value = 'preview'
+    void preview.loadKeyed(shownTarget(), () => keyed.readObject(keyedObject()))
+  },
 )
 
 // A download belongs to the preview it was started from; a newer one drops its result.
@@ -103,6 +123,15 @@ async function download() {
   preview.downloadError.value = null
   const id = preview.loadToken()
   const target = shownTarget()
+  if (preview.keyed.value) {
+    keyedAction.value = 'download'
+    try {
+      await keyed.save(keyedObject(), props.name)
+    } catch (err) {
+      if (preview.isCurrent(id)) preview.downloadError.value = s3ErrorMessage(err)
+    }
+    return
+  }
   try {
     const url =
       preview.urlFor(target)
@@ -133,10 +162,12 @@ async function download() {
 // A player that cannot read its URL is waiting for a key only when a probe confirms the lock.
 // Reports about a URL the preview no longer shows are ignored.
 async function mediaFailed(url: string) {
+  if (preview.keyed.value) return
   if (url === preview.directUrl.value) await preview.checkAccess(url, preview.loadToken())
 }
 
 function pdfLocked(url: string) {
+  if (preview.keyed.value) return
   if (url === preview.directUrl.value) preview.markLocked()
 }
 </script>
@@ -181,9 +212,10 @@ function pdfLocked(url: string) {
     </div>
 
     <Notice v-if="preview.downloadError.value" tone="error">{{ preview.downloadError.value }}</Notice>
+    <KeyedReadNotice :wait="keyed.wait.value" :action="keyedAction" @cancel="keyed.cancel()" />
 
     <Spinner
-      v-if="preview.status.value === 'loading'"
+      v-if="preview.status.value === 'loading' && !keyed.wait.value"
       show-label
       label="Loading preview…"
       class="flex py-10 text-sm"
@@ -204,7 +236,7 @@ function pdfLocked(url: string) {
     </Notice>
 
     <Notice
-      v-else-if="preview.status.value === 'locked'"
+      v-else-if="preview.status.value === 'locked' && keyed.wait.value !== 'preparing'"
       tone="warning"
       title="Waiting for a bucket unlock"
       class="space-y-2 px-5 py-6"

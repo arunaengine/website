@@ -135,6 +135,10 @@ export function useObjectPreview() {
   const corsBlocked = ref(false)
   const sizeNote = ref<string | null>(null)
   const referenced = ref(false)
+  /** The bytes came through the caller's scoped key, not a signed URL. */
+  const keyed = ref(false)
+  /** A scoped key read of the locked object ended without content; the lock notice stays. */
+  const keyedFailed = ref(false)
   let referenceProbeId = 0
   // Account, session and the S3 session a URL is signed under: issuer node, group, access key
   // and expiry, which a credential refresh moves. A change means reading again.
@@ -169,6 +173,7 @@ export function useObjectPreview() {
     corsBlocked.value = false
     sizeNote.value = null
     referenced.value = false
+    keyed.value = false
     lockCheck.value = 'idle'
     lockedTarget.value = null
     currentTarget = null
@@ -255,6 +260,7 @@ export function useObjectPreview() {
   // Every await below is followed by a check of `id`: a newer load owns the state.
   async function load(target: PreviewTarget) {
     reset()
+    keyedFailed.value = false
     issuerNode = s3.activeSession?.value?.issuerNodeId ?? null
     const id = loadId
     currentTarget = target
@@ -328,6 +334,52 @@ export function useObjectPreview() {
     }
   }
 
+  /** Shows a locked object from bytes `read` returns; any failure goes back to the lock notice. */
+  async function loadKeyed(target: PreviewTarget, read: () => Promise<Blob>) {
+    reset()
+    const id = loadId
+    currentTarget = target
+    keyed.value = true
+    status.value = 'loading'
+    const classified = classifyObject(target)
+    kind.value = classified.kind
+    language.value = classified.language
+    if (classified.kind === 'media') mediaKind.value = mediaSubtype(target)
+    const textual = classified.kind === 'text' || classified.kind === 'markdown' || classified.kind === 'table'
+    const cap = classified.kind === 'table' ? TABLE_CAP : textual ? TEXT_CAP : IMAGE_CAP
+    // Without a size the bytes are read and checked after.
+    if (classified.kind === 'download' || (target.size ?? 0) > cap) {
+      kind.value = 'download'
+      if (classified.kind !== 'download') {
+        sizeNote.value = `This file is ${formatBytes(target.size ?? 0)}, above the ${formatBytes(cap)} preview limit.`
+      }
+      status.value = 'ready'
+      return
+    }
+    try {
+      const blob = await read()
+      if (id !== loadId) return
+      if (blob.size > cap) {
+        kind.value = 'download'
+        sizeNote.value = `This file is ${formatBytes(blob.size)}, above the ${formatBytes(cap)} preview limit.`
+      } else if (textual) {
+        const content = await blob.text()
+        if (id !== loadId) return
+        text.value = classified.language === 'json' ? prettyJson(content) : content
+        if (classified.kind === 'table') delimiter.value = extensionOf(target.key) === 'tsv' ? '\t' : ','
+      } else {
+        objectUrl.value = URL.createObjectURL(blob)
+        directUrl.value = objectUrl.value
+      }
+      status.value = 'ready'
+    } catch {
+      if (id !== loadId) return
+      keyed.value = false
+      keyedFailed.value = true
+      markLocked(target)
+    }
+  }
+
   // The node a locked bucket was read from: an omitted node is the S3 issuer, null the connected node.
   const nodeOf = (target: PreviewTarget) => (target.nodeId === undefined ? issuerNode : target.nodeId)
 
@@ -385,7 +437,10 @@ export function useObjectPreview() {
     corsBlocked,
     sizeNote,
     referenced,
+    keyed,
+    keyedFailed,
     load,
+    loadKeyed,
     probeReferenced,
     reset,
   }

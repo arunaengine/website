@@ -25,6 +25,9 @@ const preview = {
   corsBlocked: ref(false),
   sizeNote: ref(null),
   referenced: ref(false),
+  keyed: ref(false),
+  keyedFailed: ref(false),
+  loadKeyed: vi.fn(),
   lockCheck: ref('idle'),
   lockedLink: ref(null),
   sessionKey: ref('session-1'),
@@ -39,6 +42,8 @@ const preview = {
   isCurrent: (id: number) => id === token,
 }
 
+const keyed = { wait: ref(null), cancel: vi.fn(), readObject: vi.fn(), save: vi.fn() }
+
 const body = compileClientComponent(new URL('./PreviewBody.vue', import.meta.url), {
   vue: VueRuntime,
   'vue-router': { RouterLink: Slotted('a') },
@@ -50,6 +55,8 @@ const body = compileClientComponent(new URL('./PreviewBody.vue', import.meta.url
   '@/components/ui/Spinner.vue': moduleDefault(Slotted('span')),
   '@/composables/useObjectPreview': { useObjectPreview: () => preview },
   '@/composables/useS3': { useS3: () => ({ downloadUrl }), s3ErrorMessage: (error: unknown) => String(error) },
+  '@/composables/useKeyedRead': { useKeyedRead: () => keyed },
+  '@/components/storage/KeyedReadNotice.vue': moduleDefault(Slotted('aside')),
   './TextPreview.vue': moduleDefault(Slotted('div')),
   './HtmlPreview.vue': moduleDefault(Slotted('div')),
   './MarkdownPreview.vue': moduleDefault(Slotted('div')),
@@ -72,6 +79,11 @@ beforeEach(() => {
   preview.directUrl.value = null
   preview.downloadError.value = null
   preview.markLocked.mockReset()
+  preview.keyed.value = false
+  preview.keyedFailed.value = false
+  preview.loadKeyed.mockReset()
+  keyed.save.mockReset().mockResolvedValue(true)
+  keyed.readObject.mockReset()
   token = 1
   load.mockReset()
   urlFor.mockReset().mockReturnValue(null)
@@ -174,5 +186,30 @@ describe('preview body', () => {
     expect(preview.markLocked).not.toHaveBeenCalled()
     ;(pdf.props.onLocked as (url: string) => void)('https://signed/current')
     expect(preview.markLocked).toHaveBeenCalledOnce()
+  })
+
+  it('reads a locked object once with the scoped key and downloads it the same way', async () => {
+    const { root } = await mountApp(Host)
+    preview.status.value = 'locked'
+    await flush()
+
+    // Earlier hosts share the preview double, so only this host's last call counts.
+    const calls = preview.loadKeyed.mock.calls.length
+    const [target, read] = preview.loadKeyed.mock.calls.at(-1)!
+    expect(target).toMatchObject({ bucket: 'reef', key: 'a.txt' })
+    read()
+    expect(keyed.readObject).toHaveBeenCalledWith({ bucket: 'reef', key: 'a.txt', nodeId: null, versionId: undefined })
+
+    preview.keyedFailed.value = true
+    preview.status.value = 'loading'
+    await flush()
+    preview.status.value = 'locked'
+    await flush()
+    expect(preview.loadKeyed).toHaveBeenCalledTimes(calls)
+
+    preview.keyed.value = true
+    await click(button(root, 'Download'))
+    expect(keyed.save).toHaveBeenCalledWith(expect.objectContaining({ bucket: 'reef', key: 'a.txt' }), 'a.txt')
+    expect(downloadUrl).not.toHaveBeenCalled()
   })
 })

@@ -329,3 +329,39 @@ describe('preview of a locked bucket', () => {
     expect(await check).toBe(false)
   })
 })
+
+describe('preview read with a scoped key', () => {
+  it('shows the bytes of the key read and never signs a URL for them', async () => {
+    const preview = useObjectPreview()
+
+    await preview.loadKeyed({ ...TARGET, key: 'data.json' }, async () => new Blob(['{"a":1}']))
+
+    expect(preview.status.value).toBe('ready')
+    expect(preview.keyed.value).toBe(true)
+    expect(preview.text.value).toBe('{\n  "a": 1\n}\n')
+    expect(downloadUrl).not.toHaveBeenCalled()
+  })
+
+  it('offers an oversized file as a download without reading it', async () => {
+    const preview = useObjectPreview()
+    const read = vi.fn()
+
+    await preview.loadKeyed({ ...TARGET, size: 3 * 1024 * 1024 }, read)
+
+    expect(read).not.toHaveBeenCalled()
+    expect(preview.kind.value).toBe('download')
+    expect(preview.sizeNote.value).toContain('above the')
+  })
+
+  it('goes back to the lock notice for good when the key read fails', async () => {
+    const preview = useObjectPreview()
+
+    await preview.loadKeyed(TARGET, async () => {
+      throw new Error('no key')
+    })
+
+    expect(preview.status.value).toBe('locked')
+    expect(preview.keyed.value).toBe(false)
+    expect(preview.keyedFailed.value).toBe(true)
+  })
+})
