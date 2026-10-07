@@ -1,6 +1,6 @@
 // Buckets of one group on the connected node that a new S3 key may get a session
-// token for: encrypted, unlocked and held by the caller. An answer for another
-// group, session or later request is dropped.
+// token for: every encrypted one. An answer for another group, session or later
+// request is dropped.
 import { ref, watch, type Ref } from 'vue'
 import { ApiError, getBucketEncryption, listGroupDataPaths } from '@/lib/api'
 import { tokenEligible } from '@/lib/bucketEncryption'

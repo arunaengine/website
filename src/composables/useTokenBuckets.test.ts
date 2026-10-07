@@ -77,7 +77,7 @@ afterEach(() => {
 })
 
 describe('buckets for a session token', () => {
-  it('offers only encrypted, unlocked buckets the caller holds and counts the unchecked ones', async () => {
+  it('offers every encrypted bucket and counts the unchecked ones', async () => {
     const choices = scope.run(() => useTokenBuckets(ref('G1'), ref(true)))!
     await settle()
 
@@ -87,7 +87,7 @@ describe('buckets for a session token', () => {
       { baseUrl: 'https://a.test/api/v1', token: 'bearer-a' },
     )
     expect(choices.state.value).toBe('ready')
-    expect(choices.buckets.value).toEqual(['held'])
+    expect(choices.buckets.value).toEqual(['held', 'locked', 'foreign'])
     expect(choices.unchecked.value).toBe(1)
     expect(choices.partial.value).toBe(false)
   })
@@ -138,13 +138,13 @@ describe('buckets for a session token', () => {
 
     open.value = false
     await settle()
-    expect(choices.buckets.value).toEqual(['held'])
+    expect(choices.buckets.value).toEqual(['held', 'locked', 'foreign'])
     expect(choices.state.value).toBe('ready')
     expect(choices.unchecked.value).toBe(1)
 
     open.value = true
     await settle()
-    expect(choices.buckets.value).toEqual(['held'])
+    expect(choices.buckets.value).toEqual(['held', 'locked', 'foreign'])
     expect(listGroupDataPaths).toHaveBeenCalledTimes(1)
   })
 
@@ -185,7 +185,7 @@ describe('buckets for a session token', () => {
     expect(getBucketEncryption).not.toHaveBeenCalled()
     open.value = true
     await settle()
-    expect(choices.buckets.value).toEqual(['held'])
+    expect(choices.buckets.value).toEqual(['held', 'locked', 'foreign'])
   })
 
   it('tells a refused listing from a failed one', async () => {

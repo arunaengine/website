@@ -94,9 +94,9 @@ export function holdsEncrypted(status: BucketEncryptionResponse): boolean {
   return status.mode !== 'off' || keyGenerations(status).list.length > 0
 }
 
-/** An S3 key may get a session token for an encrypted bucket that is unlocked here and held by the caller. */
+/** An S3 key may get a session token for any encrypted bucket; key holders issue its keys. */
 export function tokenEligible(status: BucketEncryptionResponse): boolean {
-  return status.mode !== 'off' && status.unlock?.state === 'unlocked' && status.caller.holder
+  return status.mode !== 'off'
 }
 
 /** Locked, unlocked, timed unlock or locked since restart; unknown when the node gave no lock state. */
