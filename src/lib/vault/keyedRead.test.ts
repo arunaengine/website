@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, type AbeRecord, type KeyGrantFields, type ObjectEnvelopeView } from '@/lib/api'
+import { ApiError, type AbeRecord, type KeyGrantFields, type KeyScope, type ObjectEnvelopeView } from '@/lib/api'
 import { ReadWaitError, fetchEnvelope, readFailure, readWithGrant, requestKey, requestScopes, usableGrant } from './keyedRead'
 import { KeyWorkerClosedError } from './keyWorker'
 
 const api = vi.hoisted(() => ({
   getObjectEnvelope: vi.fn(),
   requestScopedKey: vi.fn(),
+  requestWriteKeys: vi.fn(),
+  listKeyGrants: vi.fn(),
   listUserKeys: vi.fn(),
   downloadWithKey: vi.fn(),
 }))
@@ -21,7 +23,7 @@ const ENVELOPE = {
   context: { epoch: 0, write_id: 'W', public_key: 'P' },
 } as unknown as ObjectEnvelopeView
 
-function grant(scope: { kind: 'exact' | 'subtree'; value: string }, changes: Record<string, unknown> = {}) {
+function grant(scope: KeyScope, changes: Record<string, unknown> = {}) {
   const request = { request_id: 'Q1', recipient_record: 'R', parameters: { generation: 2, fingerprint: 'F' }, epochs: [0], scope, ...changes }
   return { fields: { request }, record: '', aad: 'AA==' } as unknown as AbeRecord<KeyGrantFields>
 }
@@ -41,6 +43,14 @@ describe('grant choice', () => {
     ]) {
       expect(usableGrant([other], ENVELOPE, 'raw/a.csv')).toBeNull()
     }
+  })
+
+  it('takes a listed file only for the version written there', () => {
+    const listed = grant({ kind: 'writes', value: [{ key: 'raw/a.csv', write_id: 'W' }] })
+    expect(usableGrant([listed], ENVELOPE, 'raw/a.csv')).not.toBeNull()
+    expect(usableGrant([listed], ENVELOPE, 'raw/b.csv')).toBeNull()
+    const older = grant({ kind: 'writes', value: [{ key: 'raw/a.csv', write_id: 'X' }] })
+    expect(usableGrant([older], ENVELOPE, 'raw/a.csv')).toBeNull()
   })
 
   it('asks for the bucket, then the folder, then the file', () => {
@@ -69,12 +79,29 @@ describe('key requests', () => {
     const issued = grant({ kind: 'subtree', value: '' })
     api.requestScopedKey.mockResolvedValueOnce({ kind: 'grant', grant: issued })
     expect(await requestKey(TARGET)).toBe(issued)
-    api.requestScopedKey.mockRejectedValueOnce(new ApiError(422, 'policies', 'scope_unsupported'))
-    await expect(requestKey(TARGET)).rejects.toMatchObject({ code: 'scope_unsupported' })
+    api.requestScopedKey.mockRejectedValueOnce(new ApiError(409, 'stale', 'stale_request'))
+    await expect(requestKey(TARGET)).rejects.toMatchObject({ code: 'stale_request' })
+    api.requestScopedKey.mockRejectedValue(new ApiError(403, 'denied'))
+    await expect(requestKey(TARGET)).rejects.toMatchObject({ status: 403 })
+    expect(api.requestWriteKeys).not.toHaveBeenCalled()
+  })
+
+  it('asks for keys of the folder files when no folder or file key fits', async () => {
+    api.requestScopedKey.mockRejectedValue(new ApiError(422, 'policies', 'scope_unsupported'))
+    api.requestWriteKeys.mockResolvedValueOnce(true)
+    expect(await requestKey(TARGET)).toBeNull()
+    expect(api.requestWriteKeys).toHaveBeenCalledWith('reef', 'raw/', TARGET.client)
+    const listed = grant({ kind: 'writes', value: [{ key: 'raw/a.csv', write_id: 'W' }] })
+    api.requestWriteKeys.mockResolvedValueOnce(false)
+    api.listKeyGrants.mockResolvedValueOnce({ records: [grant({ kind: 'exact', value: 'raw/b.csv' }), listed], next_cursor: null })
+    expect(await requestKey(TARGET)).toBe(listed)
   })
 
   it('names recognized failures and leaves a bucket lock and unknown ones to the fallback', () => {
     expect(readFailure(new ApiError(403, 'Forbidden'))).toBe('You do not have permission to read this file.')
+    expect(readFailure(new ApiError(413, 'at least 3 more', 'enumeration_limit'))).toBe(
+      'This folder has too many files to get a key for each one.',
+    )
     expect(readFailure(new ApiError(409, 'version moved', 'stale_version'))).toBe('version moved')
     expect(readFailure(new ApiError(409, 'other parameters', 'parameter_mismatch'))).toBe('other parameters')
     expect(readFailure(new TypeError('Failed to fetch'))).toBe('Failed to fetch')

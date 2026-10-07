@@ -7,6 +7,7 @@ import {
   listKeyGrants,
   listUserKeys,
   requestScopedKey,
+  requestWriteKeys,
   type AbeRecord,
   type ApiClientOptions,
   type KeyGrantFields,
@@ -38,6 +39,7 @@ export class ReadWaitError extends Error {
 export function readFailure(cause: unknown): string | null {
   if (!(cause instanceof ApiError)) return cause instanceof TypeError ? errorMessage(cause) : null
   if (cause.code === 'object_key_required') return null
+  if (cause.code === 'enumeration_limit') return 'This folder has too many files to get a key for each one.'
   return cause.status === 403 ? 'You do not have permission to read this file.' : errorMessage(cause)
 }
 
@@ -58,7 +60,9 @@ export async function fetchEnvelope(target: KeyedTarget): Promise<ObjectEnvelope
   }
 }
 
-function covers(scope: KeyScope, key: string): boolean {
+/** Whether `scope` opens `key`; a listed file also needs its write id when one is given. */
+function covers(scope: KeyScope, key: string, writeId?: string): boolean {
+  if (scope.kind === 'writes') return scope.value.some((write) => write.key === key && (writeId ?? write.write_id) === write.write_id)
   return scope.kind === 'exact' ? scope.value === key : key.startsWith(scope.value)
 }
 
@@ -73,7 +77,7 @@ export function usableGrant(
     request.parameters.generation === admitted.generation &&
     request.parameters.fingerprint === admitted.fingerprint &&
     request.epochs.includes(envelope.context.epoch) &&
-    covers(request.scope, key)) ?? null
+    covers(request.scope, key, envelope.context.write_id)) ?? null
 }
 
 export async function ownGrants(target: KeyedTarget): Promise<AbeRecord<KeyGrantFields>[]> {
@@ -96,19 +100,29 @@ export function requestScopes(key: string): KeyScope[] {
   return scopes
 }
 
-/** Creates or repeats the caller's request; a grant from an unlocked bucket comes back at once. */
+/**
+ * Creates or repeats the caller's request; a grant from an unlocked bucket comes back at once.
+ * Without a fitting folder or file key, the folder's files get keys of their own.
+ */
 export async function requestKey(target: KeyedTarget): Promise<AbeRecord<KeyGrantFields> | null> {
-  const scopes = requestScopes(target.key)
-  for (const [index, scope] of scopes.entries()) {
+  let refusal: unknown
+  let listable = false
+  for (const scope of requestScopes(target.key)) {
     try {
       const result = await requestScopedKey(target.bucket, scope, target.client)
       return result.kind === 'grant' ? result.grant : null
     } catch (cause) {
       // A scope wider than the caller's access is refused; a narrower one may still be admitted.
-      if (!(cause instanceof ApiError && cause.status === 403) || index === scopes.length - 1) throw cause
+      const unsupported = cause instanceof ApiError && cause.code === 'scope_unsupported'
+      if (!unsupported && !(cause instanceof ApiError && cause.status === 403)) throw cause
+      listable ||= unsupported
+      refusal = cause
     }
   }
-  return null
+  if (!listable) throw refusal
+  const folder = target.key.slice(0, target.key.lastIndexOf('/') + 1)
+  if (await requestWriteKeys(target.bucket, folder, target.client)) return null
+  return (await ownGrants(target)).find(({ fields }) => covers(fields.request.scope, target.key)) ?? null
 }
 
 async function grantPair(grant: AbeRecord<KeyGrantFields>, userId: string, vault: ReadVault, client: ApiClientOptions) {
