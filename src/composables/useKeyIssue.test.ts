@@ -6,6 +6,7 @@ import { useKeyIssue } from './useKeyIssue'
 
 const issueBucket = vi.hoisted(() => vi.fn())
 const listGroupDataPaths = vi.hoisted(() => vi.fn())
+const apiRequest = vi.hoisted(() => vi.fn())
 const vault = vi.hoisted(() => ({ state: { value: 'unlocked' }, whileUnlocked: () => () => true }))
 const notifications = vi.hoisted(() => ({
   items: { value: [] as Record<string, unknown>[] },
@@ -17,7 +18,7 @@ const notifications = vi.hoisted(() => ({
 }))
 
 vi.mock('@/lib/vault/keyIssue', () => ({ issueBucket }))
-vi.mock('@/lib/api', () => ({ listGroupDataPaths }))
+vi.mock('@/lib/api', () => ({ apiRequest, listGroupDataPaths }))
 vi.mock('./useUserVault', () => ({ useUserVault: () => vault }))
 vi.mock('./useNotifications', () => ({ useNotifications: () => notifications }))
 vi.mock('./s3/endpoints', () => ({ localNodeId: () => 'n0', nodeApiBase: (node: string) => `https://${node}.test/api/v1` }))
@@ -56,6 +57,7 @@ beforeEach(() => {
   notifications.listLoaded = ref(true)
   notifications.nextCursor = ref(null)
   issueBucket.mockResolvedValue({ users: new Set(['ada']), done: true })
+  apiRequest.mockResolvedValue({ notifications: [] })
 })
 
 describe('key issuance recovery', () => {
@@ -104,19 +106,24 @@ describe('key issuance recovery', () => {
     expect(issueBucket.mock.calls[0]![0]).toMatchObject({ bucket: 'reef', nodeId: 'n1' })
   })
 
-  it('reads every notice page, read ones too, and marks notices read only once issued', async () => {
-    notifications.items.value = [notice('N1', 'reef', true), notice('N2', 'kelp', false)]
-    notifications.nextCursor.value = 'next'
-    notifications.loadMore.mockImplementationOnce(async () => {
-      notifications.items.value = [...notifications.items.value, notice('N3', 'coral', false)]
-      notifications.nextCursor.value = null
-    })
+  it('issues known buckets first, then those of every notice page, read ones too', async () => {
+    store.set(KEY, JSON.stringify([{ bucket: 'wave', nodeId: 'n1' }]))
+    notifications.items.value = [notice('N2', 'kelp', false), notice('N3', 'coral', false)]
+    apiRequest
+      .mockResolvedValueOnce({
+        notifications: [notice('N1', 'reef', true), { id: 'X', kind: 'other' }, notice('N2', 'kelp', false)],
+        next_cursor: 'next',
+      })
+      .mockResolvedValueOnce({ notifications: [notice('N3', 'coral', false), notice('N4', 'reef', false)] })
     issueBucket.mockImplementation(async (target: { bucket: string }) =>
       ({ users: new Set(), done: target.bucket !== 'kelp' }))
 
     await useKeyIssue().issueWaiting()
 
-    expect(issueBucket.mock.calls.map((call) => call[0].bucket)).toEqual(['reef', 'kelp', 'coral'])
+    expect(issueBucket.mock.calls.map((call) => call[0].bucket)).toEqual(['wave', 'reef', 'kelp', 'coral'])
+    expect(issueBucket.mock.invocationCallOrder[0]).toBeLessThan(apiRequest.mock.invocationCallOrder[0]!)
+    expect(apiRequest.mock.calls[1]![1]).toEqual({ query: { limit: 200, cursor: 'next' } })
+    expect(notifications.loadMore).not.toHaveBeenCalled()
     expect(notifications.markRead).toHaveBeenCalledTimes(1)
     expect(notifications.markRead).toHaveBeenCalledWith(['N3'])
     expect(stored()).toEqual([{ bucket: 'kelp', nodeId: 'n1' }])
@@ -178,8 +185,9 @@ describe('key issuance lifecycle', () => {
     }))
     const keyIssue = useKeyIssue()
     keyIssue.issued.value = null
-    const running = keyIssue.issueWaiting()
+    const running = keyIssue.issueWaiting([keyIssue.targetOf('reef', 'n1')!])
     await settle()
+    expect(issueBucket).toHaveBeenCalledTimes(1)
 
     sessionEpoch.value += 1
     await nextTick()

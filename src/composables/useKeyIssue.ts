@@ -1,7 +1,7 @@
 // Issues waiting key requests for buckets where the signed-in user holds the bucket key: when the
 // vault opens, after a role grant, and for the bucket being browsed. Counts show for a few seconds.
 import { getCurrentScope, onScopeDispose, ref, watch } from 'vue'
-import { listGroupDataPaths } from '@/lib/api'
+import { apiRequest, listGroupDataPaths, type NotificationListResponse } from '@/lib/api'
 import { assistantChatScopeKey } from '@/lib/assistant/chatHistory'
 import { issueBucket, type IssueTarget } from '@/lib/vault/keyIssue'
 import { apiBaseUrl, authToken, realmInfo, sessionEpoch, userInfo } from './aruna/state'
@@ -77,17 +77,19 @@ const isPending = (entry: { kind: string; bucket?: string | null }) => entry.kin
 
 /** Buckets of every pending key notice; reading a notice does not mean its keys were issued. */
 async function pendingNotices(): Promise<IssueTarget[]> {
-  const notifications = useNotifications()
-  if (!notifications.listLoaded.value) await notifications.loadNotifications()
-  let cursor: string | null = null
-  while (notifications.nextCursor.value && notifications.nextCursor.value !== cursor) {
-    cursor = notifications.nextCursor.value
-    await notifications.loadMore()
-  }
-  return notifications.items.value
-    .filter(isPending)
-    .map((entry) => targetOf(entry.bucket!, entry.node_id))
-    .filter((target): target is IssueTarget => target !== null)
+  const client = { baseUrl: apiBaseUrl.value, token: authToken.value }
+  const targets = new Map<string, IssueTarget>()
+  let cursor: string | undefined
+  do {
+    const query = { limit: 200, cursor }
+    const page = await apiRequest<NotificationListResponse>('/system/notifications', { query }, client)
+    for (const entry of page.notifications.filter(isPending)) {
+      const target = targetOf(entry.bucket!, entry.node_id)
+      if (target) targets.set(`${target.nodeId}\u0000${target.bucket}`, target)
+    }
+    cursor = page.next_cursor
+  } while (cursor)
+  return [...targets.values()]
 }
 
 /** Marks the notices about `target` read once nothing is left to issue there. */
@@ -151,19 +153,23 @@ async function issueNow(targets: IssueTarget[], epoch: number, scope: string): P
   return count
 }
 
-/** Every bucket with waiting requests this browser knows of, plus `extra`. */
+/** Every bucket with waiting requests this browser knows of, plus `extra`, then those of notices. */
 async function issueWaiting(extra: IssueTarget[] = []): Promise<void> {
   const epoch = sessionEpoch.value
   const scope = waitingScope()
   const known = loadWaiting(scope).map((entry) => targetOf(entry.bucket, entry.nodeId))
-  let notices: IssueTarget[] = []
+  const found = [...extra, ...known.filter((target): target is IssueTarget => target !== null)]
+  await issueFor(found, epoch, scope)
+  let notices: IssueTarget[]
   try {
     notices = await pendingNotices()
   } catch {
-    // Without the inbox the known buckets are still issued.
+    // Without the inbox the known buckets were still issued.
+    return
   }
-  const found = known.filter((target): target is IssueTarget => target !== null)
-  await issueFor([...extra, ...found, ...notices], epoch, scope)
+  const done = new Set(found.map((target) => `${target.nodeId}\u0000${target.bucket}`))
+  const rest = notices.filter((target) => !done.has(`${target.nodeId}\u0000${target.bucket}`))
+  if (rest.length) await issueFor(rest, epoch, scope)
 }
 
 /** After a role grant listed `requests`: issues the group's buckets now or at the next vault opening. */
