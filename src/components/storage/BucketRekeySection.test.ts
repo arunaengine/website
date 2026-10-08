@@ -149,6 +149,58 @@ describe('replace keys card', () => {
     expect(content(root)).toContain('90 files done.')
   })
 
+  it('waits and tries again while a file is still pending', async () => {
+    vi.useFakeTimers()
+    try {
+      const waiting = new ApiError(409, 'A file is still pending.', 'rekey_pending')
+      rekeyBucketPrefix
+        .mockResolvedValueOnce(page(64, false, ''))
+        .mockRejectedValueOnce(waiting)
+        .mockRejectedValueOnce(waiting)
+        .mockResolvedValueOnce(page(70, true, ''))
+      const root = await render(bucket({}))
+
+      const run = click(button(root, 'Replace keys'))
+      await flush()
+      expect(rekeyBucketPrefix).toHaveBeenCalledTimes(2)
+      expect(content(root)).toContain('Some files are still uploading. Trying again shortly.')
+      expect(content(root)).toContain('64 files done.')
+      await vi.advanceTimersByTimeAsync(4999)
+      expect(rekeyBucketPrefix).toHaveBeenCalledTimes(2)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(rekeyBucketPrefix).toHaveBeenCalledTimes(3)
+      await vi.advanceTimersByTimeAsync(5000)
+      await run
+      expect(rekeyBucketPrefix).toHaveBeenCalledTimes(4)
+      expect(content(root)).toContain('70 files done.')
+      expect(content(root)).not.toContain('Trying again shortly.')
+      expect(content(root)).not.toContain('Running')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('stops waiting when the page is left', async () => {
+    vi.useFakeTimers()
+    try {
+      let open = true
+      const leaving = { ...source, binder: () => () => open }
+      rekeyBucketPrefix.mockRejectedValue(new ApiError(409, 'A file is still pending.', 'rekey_pending'))
+      status.value = bucket({})
+      const { root } = await mountApp(section, { props: { bucket: 'reef', source: leaving } })
+
+      const run = click(button(root, 'Replace keys'))
+      await flush()
+      open = false
+      await vi.advanceTimersByTimeAsync(20000)
+      await run
+      expect(rekeyBucketPrefix).toHaveBeenCalledTimes(1)
+      expect(load).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('shows the node message when another folder runs', async () => {
     const busy = new ApiError(409, 'Another prefix is being re-keyed.', 'conflict')
     rekeyBucketPrefix.mockRejectedValueOnce(busy)

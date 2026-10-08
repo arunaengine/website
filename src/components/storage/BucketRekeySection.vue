@@ -26,6 +26,9 @@ const folder = ref('')
 const running = ref(false)
 const count = ref<number | null>(null)
 const rekeyError = ref<string | null>(null)
+const pending = ref(false)
+/** Wait before asking again while a file in the folder is still pending. */
+const RETRY_MS = 5000
 const reported = computed(() => abe.value?.rekey ?? null)
 const shownCount = computed(() => count.value ?? reported.value?.rekeyed ?? null)
 
@@ -68,8 +71,18 @@ async function replaceKeys() {
   count.value = reported.value?.prefix === prefix ? reported.value.rekeyed : null
   try {
     for (;;) {
-      const page = await rekeyBucketPrefix(props.bucket, prefix, props.source.client())
+      let page
+      try {
+        page = await rekeyBucketPrefix(props.bucket, prefix, props.source.client())
+      } catch (cause) {
+        if (!(cause instanceof ApiError && cause.code === 'rekey_pending')) throw cause
+        pending.value = true
+        await new Promise((resolve) => setTimeout(resolve, RETRY_MS))
+        if (!bound()) return
+        continue
+      }
       if (!bound()) return
+      pending.value = false
       count.value = page.rekeyed
       if (page.done) break
     }
@@ -77,6 +90,7 @@ async function replaceKeys() {
     if (bound()) rekeyError.value = keyError(cause)
   } finally {
     running.value = false
+    pending.value = false
     if (bound()) void props.source.load()
   }
 }
@@ -120,6 +134,7 @@ async function replaceKeys() {
         <p data-rekey-count>{{ shownCount }} files done.</p>
         <p v-if="running || reported">You can leave this page. Start again with the same folder to continue.</p>
       </template>
+      <Notice v-if="pending" tone="info">Some files are still uploading. Trying again shortly.</Notice>
       <Notice v-if="rekeyError" tone="error">{{ rekeyError }}</Notice>
     </div>
   </section>
