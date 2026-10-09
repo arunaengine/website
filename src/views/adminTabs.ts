@@ -17,5 +17,6 @@ export function adminTabs(features: { placement: boolean; policies: boolean }): 
         ]
       : []),
     ...(features.policies ? [{ id: 'policies', label: 'Policies' }] : []),
+    { id: 'federation', label: 'Federation' },
   ]
 }

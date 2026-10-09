@@ -11,6 +11,7 @@ describe('realm administration tabs', () => {
       'placement',
       'data-placement',
       'policies',
+      'federation',
     ])
     expect(tabs.map((tab) => tab.label)).toContain('Record placement')
     expect(tabs.map((tab) => tab.label)).toContain('Data placement')
@@ -21,6 +22,6 @@ describe('realm administration tabs', () => {
   it('drops both placement tabs when the feature is off', () => {
     const tabs = adminTabs({ placement: false, policies: false })
 
-    expect(tabs.map((tab) => tab.id)).toEqual(['realm', 'compute'])
+    expect(tabs.map((tab) => tab.id)).toEqual(['realm', 'compute', 'federation'])
   })
 })
