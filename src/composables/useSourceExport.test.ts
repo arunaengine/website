@@ -5,23 +5,27 @@ import { GRANT_HEADER, transferHeader } from '@/lib/api/federation'
 const createExport = vi.fn()
 const createGrant = vi.fn()
 const getJob = vi.fn()
+const pushExport = vi.fn()
 
 vi.mock('@/lib/api', async (original) => ({
   ...(await original<typeof import('@/lib/api')>()),
   createExport: (...args: unknown[]) => createExport(...args),
   createGrant: (...args: unknown[]) => createGrant(...args),
+  pushExport: (...args: unknown[]) => pushExport(...args),
 }))
 vi.mock('@/lib/jobs', async (original) => ({
   ...(await original<typeof import('@/lib/jobs')>()),
   getJob: (...args: unknown[]) => getJob(...args),
 }))
 
-const { artifactBytes, exportFailure, exportForIntent, waitForJob } = await import('./useSourceExport')
+const { SESSION_CHANGED, artifactBytes, exportFailure, exportForIntent, serveFollowUps, waitForJob } = await import(
+  './useSourceExport'
+)
 
 const source = { descriptor: { payload: {} }, intent: { payload: {} }, client: { baseUrl: '/api/v1', token: 'A' } } as never
 
 beforeEach(() => {
-  for (const mock of [createExport, createGrant, getJob]) mock.mockReset()
+  for (const mock of [createExport, createGrant, getJob, pushExport]) mock.mockReset()
 })
 
 describe('exportForIntent', () => {
@@ -65,6 +69,50 @@ describe('artifactBytes', () => {
     expect(headers.has('Authorization')).toBe(false)
     expect(headers.get(GRANT_HEADER)).toBe(transferHeader(grant))
     vi.unstubAllGlobals()
+  })
+})
+
+describe('serveFollowUps', () => {
+  // Hands out the given requests, then ends like a closed opener.
+  function opener(...bodies: unknown[]) {
+    const queue = bodies.map((body, index) => ({ id: index + 1, body, origin: 'https://b.example' }))
+    return {
+      next: vi.fn(async () => {
+        const request = queue.shift()
+        if (!request) throw new Error('closed')
+        return request
+      }),
+      reply: vi.fn(),
+      refuse: vi.fn(),
+    }
+  }
+  const granted = (alive: () => boolean) => ({ jobId: 'J', grant: { payload: {} } as never, files: 1, alive })
+
+  it('pushes while the login is the same and refuses after it changed', async () => {
+    let alive = true
+    pushExport.mockImplementation(async () => {
+      alive = false
+      return { upload_id: 'U' }
+    })
+    const link = opener({ kind: 'push' }, { kind: 'push' })
+    await serveFollowUps(link, source, granted(() => alive), 'Giessen Data')
+    expect(pushExport).toHaveBeenCalledOnce()
+    expect(link.reply).not.toHaveBeenCalled()
+    expect(link.refuse.mock.calls.map(([request, message]) => [request.id, message])).toEqual([
+      [1, SESSION_CHANGED],
+      [2, SESSION_CHANGED],
+    ])
+  })
+
+  it('passes the node error code with a refusal', async () => {
+    pushExport.mockRejectedValue(new ApiError(502, 'unreachable', 'push_unreachable'))
+    const link = opener({ kind: 'push' })
+    await serveFollowUps(link, source, granted(() => true), 'Giessen Data')
+    expect(link.refuse).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 1 }),
+      'This realm cannot reach the other realm.',
+      'push_unreachable',
+    )
   })
 })
 

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { nextTick } from 'vue'
 import { ApiError } from '@/lib/api/client'
 import { HandshakeError } from '@/lib/federation/handshake'
 
@@ -182,8 +183,37 @@ describe('useRealmImport', () => {
     })
     const flow = useRealmImport()
     await flow.start(form)
+    await nextTick()
     expect(api.createImport).not.toHaveBeenCalled()
-    expect(flow.phase.value).toBe('choosing')
+    expect(flow.phase.value).toBe('idle')
+    expect(close).toHaveBeenCalled()
+  })
+
+  it('retries only with the login the import started with', async () => {
+    script({ export: { grant, files: 2 }, push: unreachable })
+    api.createImport.mockRejectedValue(pullUnreachable)
+    const flow = useRealmImport()
+    await flow.start(form)
+    expect(flow.canRetry.value).toBe(true)
+    authToken.value = 'OTHER-TOKEN'
+    sessionEpoch.value++
+    await nextTick()
+    await flow.retry()
+    expect(api.createImport).toHaveBeenCalledOnce()
+    expect(flow.phase.value).toBe('idle')
+    expect(flow.canRetry.value).toBe(false)
+  })
+
+  it('forgets the started job when the login changes', async () => {
+    script({ export: { grant, files: 1 } })
+    api.createImport.mockResolvedValue({ job_id: 'J1' })
+    const flow = useRealmImport()
+    await flow.start(form)
+    expect(flow.jobClient.value).toEqual({ baseUrl: 'https://b.example/api/v1', token: 'B-TOKEN' })
+    sessionEpoch.value++
+    await nextTick()
+    expect(flow.submitted.value).toBeNull()
+    expect(flow.jobClient.value).toBeNull()
   })
 
   it('names a destination this user cannot write', async () => {

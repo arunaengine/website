@@ -158,17 +158,29 @@ export interface OpenerRequest {
 
 /**
  * The popup side. Requests are taken only from `window.opener`; after `lock` only from the
- * locked origin, and every answer goes to exactly that origin.
+ * locked origin, and every answer goes to exactly that origin. Waiting for a request ends
+ * when the opener closes or after `timeoutMs`.
  */
 export class OpenerLink {
   private listener: MessageListener
   private locked: string | null = null
   private queue: OpenerRequest[] = []
-  private waiter: ((request: OpenerRequest) => void) | null = null
+  private waiter: { resolve: (request: OpenerRequest) => void; reject: (error: Error) => void } | null = null
+  private closedTimer: ReturnType<typeof setInterval>
+  private deadline: ReturnType<typeof setTimeout>
+  private ended: HandshakeError | null = null
 
-  constructor(private host: HandshakeWindow) {
+  constructor(
+    private host: HandshakeWindow,
+    timeoutMs: number,
+  ) {
     this.listener = (event) => this.receive(event)
     host.addEventListener('message', this.listener)
+    this.closedTimer = setInterval(() => {
+      const opener = this.host.opener as { closed?: boolean } | null | undefined
+      if (!opener || opener.closed) this.end(new HandshakeError('closed', 'The other window was closed.'))
+    }, CLOSED_POLL_MS)
+    this.deadline = setTimeout(() => this.end(new HandshakeError('timeout', 'No request in time.')), timeoutMs)
   }
 
   get hasOpener(): boolean {
@@ -190,16 +202,29 @@ export class OpenerLink {
     if (this.waiter) {
       const wake = this.waiter
       this.waiter = null
-      wake(request)
+      wake.resolve(request)
     } else this.queue.push(request)
   }
 
+  /** The next request; rejects with a `HandshakeError` once the link ended. */
   next(): Promise<OpenerRequest> {
     const queued = this.queue.shift()
     if (queued) return Promise.resolve(queued)
-    return new Promise((resolve) => {
-      this.waiter = resolve
+    if (this.ended) return Promise.reject(this.ended)
+    return new Promise((resolve, reject) => {
+      this.waiter = { resolve, reject }
     })
+  }
+
+  private end(error: HandshakeError) {
+    if (this.ended) return
+    this.ended = error
+    clearInterval(this.closedTimer)
+    clearTimeout(this.deadline)
+    this.host.removeEventListener('message', this.listener)
+    this.queue = []
+    this.waiter?.reject(error)
+    this.waiter = null
   }
 
   /** Accepts later requests only from `origin`, the verified opener portal. */
@@ -223,8 +248,6 @@ export class OpenerLink {
   }
 
   dispose() {
-    this.host.removeEventListener('message', this.listener)
-    this.waiter = null
-    this.queue = []
+    this.end(new HandshakeError('closed', 'The flow ended.'))
   }
 }

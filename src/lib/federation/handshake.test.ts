@@ -110,8 +110,24 @@ describe('OpenerLink', () => {
   function link() {
     const opener = fakePopup()
     const { host, deliver } = fakeWindow({ opener })
-    return { opener, deliver, link: new OpenerLink(host) }
+    return { opener, deliver, link: new OpenerLink(host, 60_000) }
   }
+
+  it('stops waiting when the opener closes', async () => {
+    const { opener, link: popup } = link()
+    const waiting = popup.next()
+    opener.closed = true
+    vi.advanceTimersByTime(600)
+    await expect(waiting).rejects.toMatchObject({ reason: 'closed' })
+    await expect(popup.next()).rejects.toMatchObject({ reason: 'closed' })
+  })
+
+  it('stops waiting after the deadline', async () => {
+    const { link: popup } = link()
+    const waiting = popup.next()
+    vi.advanceTimersByTime(60_001)
+    await expect(waiting).rejects.toMatchObject({ reason: 'timeout' })
+  })
 
   it('announces readiness without a payload', () => {
     const { opener, link: popup } = link()

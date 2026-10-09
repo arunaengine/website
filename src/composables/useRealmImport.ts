@@ -2,7 +2,7 @@
 // realm's popup exports and signs a grant, then this realm pulls the artifact. When it
 // cannot reach the source, the source pushes; when neither server reaches the other, a
 // metadata only artifact comes through the popup. The browser never carries file bytes.
-import { ref, shallowRef } from 'vue'
+import { ref, shallowRef, watch } from 'vue'
 import {
   ApiError,
   apiErrorMessage,
@@ -21,7 +21,7 @@ import { recheckRealm } from '@/lib/federation/realms'
 import { newSecret } from '@/lib/federation/secret'
 import { checkOwnerNode, importKey, OwnerNodeError } from '@/lib/federation/transfer'
 import { submitImport, type SubmitImportResponse } from '@/lib/rocrateArchive'
-import { assertCurrentSession, refreshContext } from './aruna/state'
+import { assertCurrentSession, refreshContext, sessionEpoch } from './aruna/state'
 
 export interface RealmImportForm {
   home: VerifiedRealm
@@ -68,6 +68,8 @@ export function useRealmImport() {
     descriptor: Signed<RealmDescriptor>
     answer: ExportAnswer
     secret: string
+    /** The login and API base the import started with; a retry uses the same. */
+    context: ReturnType<typeof refreshContext>
   } | null = null
 
   function closeChannel() {
@@ -89,10 +91,10 @@ export function useRealmImport() {
   }
 
   async function transfer(run: number) {
-    const context = refreshContext()
     const state = pending
     if (!state || !channel) throw new ImportStop('Start the import again.')
-    const { form, intent, answer, secret, descriptor } = state
+    const { form, intent, answer, secret, descriptor, context } = state
+    current(run, context.epoch)
     phase.value = 'copying'
     try {
       const result = await createImport({ intent, grant: answer.grant, secret }, context.client)
@@ -171,7 +173,7 @@ export function useRealmImport() {
       const answer = await channel.ask<ExportAnswer>({ kind: 'export', descriptor, intent })
       current(run, context.epoch)
       files.value = answer.files
-      pending = { form, intent, descriptor, answer, secret }
+      pending = { form, intent, descriptor, answer, secret, context }
       await transfer(run)
     })
   }
@@ -193,8 +195,13 @@ export function useRealmImport() {
     phase.value = 'idle'
     failure.value = null
     submitted.value = null
+    jobClient.value = null
+    files.value = null
     canRetry.value = false
   }
+
+  // Another login or API base drops the import, its source window and its job view.
+  watch(sessionEpoch, reset)
 
   return { phase, failure, submitted, jobClient, files, canRetry, start, retry, reset }
 }

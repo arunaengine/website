@@ -15,9 +15,12 @@ import {
   type PushAnswer,
 } from '@/lib/api'
 import type { RealmDescriptor, Signed } from '@/lib/federation/descriptor'
+import type { OpenerLink, OpenerRequest } from '@/lib/federation/handshake'
+import type { PopupRequest } from '@/lib/federation/popup'
 import { getJob, isTerminalJobState } from '@/lib/jobs'
 
 const POLL_MS = 2_000
+export const SESSION_CHANGED = 'The login here changed. Start again.'
 
 export interface SourceExport {
   descriptor: Signed<RealmDescriptor>
@@ -77,4 +80,39 @@ export async function artifactBytes(grant: Signed<ExportGrant>): Promise<ArrayBu
   const response = await fetch(grant.payload.artifact_url, { headers: { [GRANT_HEADER]: transferHeader(grant) } })
   if (!response.ok) throw new ApiError(response.status, 'The export file is not available.')
   return response.arrayBuffer()
+}
+
+/**
+ * After the grant the other realm may ask for a push, or for the metadata file itself. Each
+ * request is served only while `alive` holds, checked before and after the work.
+ */
+export async function serveFollowUps(
+  opener: Pick<OpenerLink, 'next' | 'reply' | 'refuse'>,
+  source: SourceExport,
+  granted: { jobId: string; grant: Signed<ExportGrant>; files: number; alive: () => boolean },
+  homeName: string,
+) {
+  for (;;) {
+    let next: OpenerRequest
+    try {
+      next = await opener.next()
+    } catch {
+      return
+    }
+    const asked = next.body as PopupRequest | undefined
+    try {
+      if (!granted.alive()) throw new ExportStop(SESSION_CHANGED)
+      let answer: unknown
+      if (asked?.kind === 'push') answer = await pushToDestination(source, granted.jobId)
+      else if (asked?.kind === 'artifact' && granted.files === 0) answer = await artifactBytes(granted.grant)
+      else {
+        opener.refuse(next, 'This request is not supported.')
+        continue
+      }
+      if (!granted.alive()) throw new ExportStop(SESSION_CHANGED)
+      opener.reply(next, answer)
+    } catch (error) {
+      opener.refuse(next, exportFailure(error, homeName), error instanceof ApiError ? error.code : undefined)
+    }
+  }
 }

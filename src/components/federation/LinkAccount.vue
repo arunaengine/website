@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // The link step after the local login: a fresh popup at the home realm, then an explicit
 // confirmation that shows both accounts before anything is linked.
-import { computed, ref, shallowRef } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
 import Avatar from '@/components/ui/Avatar.vue'
 import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
@@ -16,7 +16,7 @@ import { userIdText, type Signed } from '@/lib/federation/descriptor'
 import { knownRealm } from '@/lib/federation/realms'
 import { Link2 } from '@lucide/vue'
 
-const { currentUser, realm, apiBaseUrl } = useAruna()
+const { currentUser, realm, apiBaseUrl, sessionEpoch } = useAruna()
 const { signIn } = useAuth()
 
 const home = computed(() => {
@@ -68,7 +68,16 @@ async function link() {
   }
 }
 
+// A confirmation belongs to the login that asked for it; another login starts over.
+watch(sessionEpoch, () => {
+  confirmation.value = null
+  foreignName.value = null
+  failure.value = null
+  relogin.value = false
+})
+
 function fail(error: unknown) {
+  if (error instanceof DOMException && error.name === 'AbortError') return
   failure.value = linkFailure(error)
   relogin.value = error instanceof ApiError && error.code === 'link_refused'
 }

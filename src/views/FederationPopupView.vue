@@ -10,22 +10,23 @@ import LoginConsent from '@/components/federation/LoginConsent.vue'
 import ExportChoice from '@/components/federation/ExportChoice.vue'
 import { useAruna } from '@/composables/useAruna'
 import { TOKEN_KEY } from '@/composables/aruna/state'
-import { ApiError, apiErrorMessage, createLoginHandoff, getRealmDescriptor, type ExportGrant } from '@/lib/api'
-import { realmIdText, type Signed } from '@/lib/federation/descriptor'
+import { ApiError, apiErrorMessage, createLoginHandoff, getRealmDescriptor } from '@/lib/api'
+import { realmIdText } from '@/lib/federation/descriptor'
 import { OpenerLink, type OpenerRequest } from '@/lib/federation/handshake'
-import { RequestError, acceptOpener, type PopupRequest } from '@/lib/federation/popup'
+import { IMPORT_TIMEOUT_MS, RequestError, acceptOpener, type PopupRequest } from '@/lib/federation/popup'
 import type { VerifiedRealm } from '@/lib/federation/descriptor'
 import {
-  artifactBytes,
+  ExportStop,
+  SESSION_CHANGED,
   exportFailure,
   exportForIntent,
-  pushToDestination,
+  serveFollowUps,
   type SourceExport,
 } from '@/composables/useSourceExport'
 import { Globe2, LogIn, ExternalLink } from '@lucide/vue'
 
 const aruna = useAruna()
-const { currentUser, realm, authToken, setAuthToken, refresh, bootstrapped } = aruna
+const { currentUser, realm, setAuthToken, refresh, bootstrapped, sessionEpoch } = aruna
 
 const link = shallowRef<OpenerLink | null>(null)
 const request = shallowRef<OpenerRequest | null>(null)
@@ -37,6 +38,13 @@ const homeName = ref('')
 const sent = ref(false)
 let ended = false
 const homeId = computed(() => realm.value.id)
+
+// Work for the other realm stays bound to the login and API it started with.
+function boundToSession() {
+  const epoch = sessionEpoch.value
+  const base = aruna.apiBaseUrl.value
+  return () => !ended && sessionEpoch.value === epoch && aruna.apiBaseUrl.value === base
+}
 
 // Only a local account of this realm can log in elsewhere; a session from another realm cannot.
 const localUser = computed(() => {
@@ -62,7 +70,7 @@ async function loadHome() {
 
 onMounted(async () => {
   window.addEventListener('storage', onStorage)
-  const opener = new OpenerLink(window)
+  const opener = new OpenerLink(window, IMPORT_TIMEOUT_MS)
   if (!opener.hasOpener) {
     failure.value = 'Open this page from the portal of another realm.'
     opener.dispose()
@@ -71,7 +79,13 @@ onMounted(async () => {
   link.value = opener
   await loadHome()
   opener.announce()
-  const first = await opener.next()
+  let first: OpenerRequest
+  try {
+    first = await opener.next()
+  } catch (error) {
+    if (!ended) failure.value = error instanceof Error ? error.message : 'This request cannot be used.'
+    return
+  }
   try {
     const accepted = await acceptOpener(first, homeId.value)
     opener.lock(first.origin)
@@ -104,19 +118,19 @@ async function sendExport(choice: { documentId: string; files: string[] }) {
   if (!opener || !current || asked?.kind !== 'export') return
   busy.value = true
   failure.value = null
-  const token = authToken.value
   const source: SourceExport = {
     descriptor: asked.descriptor,
     intent: asked.intent,
-    client: { baseUrl: aruna.apiBaseUrl.value, token },
+    client: { baseUrl: aruna.apiBaseUrl.value, token: aruna.authToken.value },
   }
-  const alive = () => !ended && authToken.value === token
+  const alive = boundToSession()
   try {
     const { jobId, grant } = await exportForIntent(source, choice.documentId, choice.files, alive)
-    if (!alive()) return
+    if (!alive()) throw new ExportStop(SESSION_CHANGED)
     opener.reply(current, { grant, files: choice.files.length })
     sent.value = true
-    await serveFollowUps(opener, source, { jobId, grant }, choice.files.length)
+    const granted = { jobId, grant, files: choice.files.length, alive }
+    await serveFollowUps(opener, source, granted, homeName.value || realm.value.name)
   } catch (error) {
     failure.value = exportFailure(error, homeName.value || realm.value.name)
     opener.refuse(current, failure.value, errorCode(error))
@@ -127,26 +141,6 @@ async function sendExport(choice: { documentId: string; files: string[] }) {
 
 function errorCode(error: unknown): string | undefined {
   return error instanceof ApiError ? error.code : undefined
-}
-
-// After the grant the other realm may ask for a push, or for the metadata file itself.
-async function serveFollowUps(
-  opener: OpenerLink,
-  source: SourceExport,
-  granted: { jobId: string; grant: Signed<ExportGrant> },
-  files: number,
-) {
-  while (!ended) {
-    const next = await opener.next()
-    const asked = next.body as PopupRequest | undefined
-    try {
-      if (asked?.kind === 'push') opener.reply(next, await pushToDestination(source, granted.jobId))
-      else if (asked?.kind === 'artifact' && files === 0) opener.reply(next, await artifactBytes(granted.grant))
-      else opener.refuse(next, 'This request is not supported.')
-    } catch (error) {
-      opener.refuse(next, exportFailure(error, homeName.value || realm.value.name), errorCode(error))
-    }
-  }
 }
 
 function cancel() {
@@ -160,10 +154,11 @@ async function allowLogin() {
   if (!link.value || !current || asked?.kind !== 'login') return
   busy.value = true
   failure.value = null
-  const token = authToken.value
+  const alive = boundToSession()
   try {
-    const handoff = await createLoginHandoff(asked.descriptor, asked.nonce, { baseUrl: aruna.apiBaseUrl.value, token })
-    if (token !== authToken.value) return
+    const client = { baseUrl: aruna.apiBaseUrl.value, token: aruna.authToken.value }
+    const handoff = await createLoginHandoff(asked.descriptor, asked.nonce, client)
+    if (!alive()) return
     link.value.reply(current, handoff)
     window.close()
   } catch (error) {
