@@ -5,7 +5,7 @@ import type { Bucket, Invitation, ActivityEvent, User } from '@/data/types'
 export function useRealm() {
   const aruna = useAruna()
   const activeRealmId = computed(() => aruna.realm.value.id)
-  // Display name comes from the realm description (id prefix as fallback);
+  // Display name is the federation name, then the description, then the id prefix;
   // the raw realm id is exposed separately for tooltips and copy affordances.
   const realmDisplayName = computed(() => aruna.realm.value.name)
   const realmId = computed(() => aruna.realm.value.id)

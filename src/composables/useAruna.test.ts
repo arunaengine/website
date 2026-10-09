@@ -821,7 +821,7 @@ describe('initial refresh coordination', () => {
     const second = aruna.refresh()
 
     expect(second).toBe(first)
-    expect(vi.mocked(apiRequest)).toHaveBeenCalledTimes(5)
+    expect(vi.mocked(apiRequest)).toHaveBeenCalledTimes(6)
     release()
     await first
   })

@@ -7,8 +7,10 @@ import {
   type RealmQuotaConfig,
   type UsageResponse,
 } from '@/lib/api'
+import { realmIdText, type RealmDescriptor, type Signed } from '@/lib/federation/descriptor'
 import { colorFor, shortId, truncateLabel } from './format'
 import {
+  federationName,
   metadataItems,
   nodeInfo,
   realmInfo,
@@ -24,15 +26,20 @@ export async function loadInfo(context = refreshContext()) {
   // discovery with offline nodes) must not blank the others' data; keep the
   // last-known values and only fail when both core calls are down.
   // /system/usage is not deployed everywhere yet; hide the stats on failure.
-  const [info, realm, usage] = await Promise.allSettled([
+  const [info, realm, usage, descriptor] = await Promise.allSettled([
     apiRequest<InfoResponse>('/system/info', {}, context.client),
     apiRequest<RealmInfoResponse>('/system/realm', {}, context.client),
     apiRequest<UsageResponse>('/system/usage', {}, context.client),
+    // The federation name; a realm without federation settings answers 404.
+    apiRequest<Signed<RealmDescriptor>>('/system/realm/descriptor', {}, context.client),
   ])
   if (context.epoch !== sessionEpoch.value) return
   if (info.status === 'fulfilled') nodeInfo.value = info.value
   if (realm.status === 'fulfilled') realmInfo.value = realm.value
   usageInfo.value = usage.status === 'fulfilled' ? usage.value : null
+  const signed = descriptor.status === 'fulfilled' ? descriptor.value?.payload : undefined
+  const own = signed && realmIdText(signed.realm_id) === realmInfo.value?.realm_id
+  federationName.value = own ? (signed.name?.trim() ?? '') : ''
   if (info.status === 'rejected' && realm.status === 'rejected') throw info.reason
 }
 
@@ -53,8 +60,8 @@ export async function setRealmQuota(config: RealmQuotaConfig): Promise<RealmQuot
 export const realm = computed<Realm>(() => {
   const id = realmInfo.value?.realm_id ?? nodeInfo.value?.node.realm_id ?? 'unknown'
   const description = realmInfo.value?.description?.trim() ?? ''
-  // Derived from the realm description until the backend exposes a short_name.
-  const displayName = description || shortId(id)
+  // The federation name, then the realm description, then the short id.
+  const displayName = federationName.value || description || shortId(id)
   return {
     id,
     name: displayName,

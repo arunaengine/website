@@ -36,6 +36,8 @@ export const authRejected = ref(false)
 
 export const nodeInfo = ref<InfoResponse | null>(null)
 export const realmInfo = ref<RealmInfoResponse | null>(null)
+// The realm's name in its signed descriptor; empty until read or when none is set.
+export const federationName = ref('')
 export const usageInfo = ref<UsageResponse | null>(null)
 export const userInfo = ref<UserInfoResponse | null>(null)
 export const apiGroups = ref<ApiGroup[]>([])
@@ -160,6 +162,7 @@ export function clearIdentityState(clearPublic = false) {
   if (clearPublic) {
     nodeInfo.value = null
     realmInfo.value = null
+    federationName.value = ''
     usageInfo.value = null
   }
 }
