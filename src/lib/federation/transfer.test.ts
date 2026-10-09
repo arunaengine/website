@@ -27,6 +27,17 @@ describe('ownerNodeAllowed', () => {
     expect(ownerNodeAllowed('https://b1.example', realm)).toBe(false)
   })
 
+  it('refuses an address that two configured nodes publish', () => {
+    const realm = realmWith([{ api: 'https://b1.example/api/v1' }, { api: 'https://b1.example' }, { api: 'https://b2.example/api/v1' }])
+    expect(ownerNodeAllowed('https://b1.example/api/v1', realm)).toBe(false)
+    expect(ownerNodeAllowed('https://b2.example/api/v1', realm)).toBe(true)
+  })
+
+  it('counts only configured nodes, so an old twin does not make an address ambiguous', () => {
+    const realm = realmWith([{ api: 'https://b1.example/api/v1' }, { api: 'https://b1.example/api/v1', configured: false }])
+    expect(ownerNodeAllowed('https://b1.example/api/v1', realm)).toBe(true)
+  })
+
   it('refuses a node the other realm made up, or one no longer configured', () => {
     const realm = realmWith([{ api: 'https://b1.example/api/v1' }, { api: 'https://old.example/api/v1', configured: false }])
     expect(ownerNodeAllowed('https://evil.example/api/v1', realm)).toBe(false)
@@ -36,6 +47,14 @@ describe('ownerNodeAllowed', () => {
 })
 
 describe('checkOwnerNode', () => {
+  it('names an address shared by two nodes as ambiguous', async () => {
+    const twins = realmWith([{ api: 'https://b1.example/api/v1' }, { api: 'https://b1.example/api/v1' }])
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(twins))))
+    vi.stubGlobal('window', { location: { origin: 'https://b.example' } })
+    const error = await checkOwnerNode('https://b1.example/api/v1', 'https://b.example/api/v1', 'TOKEN').catch((e) => e)
+    expect(error).toMatchObject({ name: 'OwnerNodeError', ambiguous: true, message: expect.stringContaining('More than one node') })
+  })
+
   it('reads the node list from this realm and sends the token only there', async () => {
     const fetch = vi.fn(async () => new Response(JSON.stringify(realmWith([{ api: 'https://b1.example/api/v1' }]))))
     vi.stubGlobal('fetch', fetch)

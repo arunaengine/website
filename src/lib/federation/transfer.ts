@@ -17,17 +17,23 @@ function apiBase(url: string): string {
   return !base || base.endsWith('/api/v1') ? base : `${base}/api/v1`
 }
 
-/** Whether `ownerUrl` is the API of a configured node of this realm, by its published address. */
-export function ownerNodeAllowed(ownerUrl: string, realm: RealmInfoResponse): boolean {
+/** How many configured nodes of this realm publish `ownerUrl` as their API address. */
+function ownerNodeCount(ownerUrl: string, realm: RealmInfoResponse): number {
   const owner = normalized(ownerUrl)
-  if (!owner) return false
-  return realm.nodes.some(
+  if (!owner) return 0
+  return realm.nodes.filter(
     (node) => node.configured && node.info?.urls.api && apiBase(node.info.urls.api) === owner,
-  )
+  ).length
+}
+
+/** Whether exactly one configured node of this realm publishes `ownerUrl` as its API. */
+export function ownerNodeAllowed(ownerUrl: string, realm: RealmInfoResponse): boolean {
+  return ownerNodeCount(ownerUrl, realm) === 1
 }
 
 export class OwnerNodeError extends Error {
   name = 'OwnerNodeError'
+  ambiguous = false
 }
 
 /**
@@ -36,6 +42,11 @@ export class OwnerNodeError extends Error {
  */
 export async function checkOwnerNode(ownerUrl: string, ownApiUrl: string, token: string): Promise<string> {
   const realm = await apiRequest<RealmInfoResponse>('/system/realm', {}, { baseUrl: ownApiUrl, token })
+  if (ownerNodeCount(ownerUrl, realm) > 1) {
+    const error = new OwnerNodeError('More than one node of this realm has that address.')
+    error.ambiguous = true
+    throw error
+  }
   if (!ownerNodeAllowed(ownerUrl, realm)) {
     throw new OwnerNodeError('The other realm named a node that is not part of this realm.')
   }

@@ -41,7 +41,11 @@ async function stop() {
     step.value = unshared ? 'unshared' : 'idle'
     if (unshared) return
     failure.value =
-      error instanceof OwnerNodeError ? 'The export is kept on a node this realm does not list.' : apiErrorMessage(error)
+      error instanceof OwnerNodeError
+        ? error.ambiguous
+          ? 'More than one node of this realm has the address of the node that keeps the export.'
+          : 'The export is kept on a node this realm does not list.'
+        : apiErrorMessage(error)
   }
 }
 </script>

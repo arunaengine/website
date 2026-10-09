@@ -6,7 +6,9 @@ import { ApiError } from '@/lib/api/client'
 
 const revokeGrant = vi.fn()
 const checkOwnerNode = vi.fn()
-class OwnerNodeError extends Error {}
+class OwnerNodeError extends Error {
+  ambiguous = false
+}
 const OWNER = 'https://a2.example/api/v1'
 const sessionEpoch = ref(1)
 const JOB_CLIENT = Symbol('jobClient')
@@ -57,6 +59,7 @@ describe('StopSharing', () => {
   it.each([
     ['no owner node is named', { jobId: 'J1' }, null, 'does not say which node'],
     ['the owner is not a node of this realm', undefined, new OwnerNodeError('x'), 'this realm does not list'],
+    ['two nodes have the owner address', undefined, Object.assign(new OwnerNodeError('x'), { ambiguous: true }), 'More than one node'],
     ['the node list cannot be read', undefined, new ApiError(404, 'No realm here'), 'No realm here'],
   ])('sends nothing and claims nothing when %s', async (_, props, refusal, message) => {
     if (refusal) checkOwnerNode.mockRejectedValue(refusal)
