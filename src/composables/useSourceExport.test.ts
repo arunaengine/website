@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/lib/api/client'
+import { GRANT_HEADER, transferHeader } from '@/lib/api/federation'
 
 const createExport = vi.fn()
 const createGrant = vi.fn()
@@ -15,7 +16,7 @@ vi.mock('@/lib/jobs', async (original) => ({
   getJob: (...args: unknown[]) => getJob(...args),
 }))
 
-const { exportFailure, exportForIntent, waitForJob } = await import('./useSourceExport')
+const { artifactBytes, exportFailure, exportForIntent, waitForJob } = await import('./useSourceExport')
 
 const source = { descriptor: { payload: {} }, intent: { payload: {} }, client: { baseUrl: '/api/v1', token: 'A' } } as never
 
@@ -49,6 +50,21 @@ describe('waitForJob', () => {
   it('stops waiting when the popup flow ended', async () => {
     await expect(waitForJob('J', {}, () => false)).rejects.toThrow('left')
     expect(getJob).not.toHaveBeenCalled()
+  })
+})
+
+describe('artifactBytes', () => {
+  it('reads the artifact with the grant and no bearer', async () => {
+    const fetch = vi.fn(async (_url: string, _init: RequestInit) => new Response(new Uint8Array([1, 2])))
+    vi.stubGlobal('fetch', fetch)
+    const grant = { payload: { artifact_url: 'https://api.a.example/api/v1/compute/jobs/J/artifacts/rocrate' } } as never
+    expect(new Uint8Array(await artifactBytes(grant))).toEqual(new Uint8Array([1, 2]))
+    const [url, init] = fetch.mock.calls[0]
+    expect(url).toBe('https://api.a.example/api/v1/compute/jobs/J/artifacts/rocrate')
+    const headers = new Headers(init.headers)
+    expect(headers.has('Authorization')).toBe(false)
+    expect(headers.get(GRANT_HEADER)).toBe(transferHeader(grant))
+    vi.unstubAllGlobals()
   })
 })
 

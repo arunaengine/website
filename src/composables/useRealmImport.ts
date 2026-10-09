@@ -9,6 +9,7 @@ import {
   createImport,
   createImportIntent,
   getRealmDescriptor,
+  uploadTransfer,
   type ApiClientOptions,
   type ImportIntent,
   type PushAnswer,
@@ -19,7 +20,7 @@ import { IMPORT_TIMEOUT_MS, openPopup, popupFailure, type ExportAnswer } from '@
 import { recheckRealm } from '@/lib/federation/realms'
 import { newSecret } from '@/lib/federation/secret'
 import { checkOwnerNode, importKey, OwnerNodeError } from '@/lib/federation/transfer'
-import { submitImport, uploadArchive, type SubmitImportResponse } from '@/lib/rocrateArchive'
+import { submitImport, type SubmitImportResponse } from '@/lib/rocrateArchive'
 import { assertCurrentSession, refreshContext } from './aruna/state'
 
 export interface RealmImportForm {
@@ -108,8 +109,8 @@ export function useRealmImport() {
     try {
       pushed = await channel.ask<PushAnswer>({ kind: 'push' })
     } catch (error) {
-      if (!(error instanceof HandshakeError && error.reason === 'refused')) throw error
-      // Metadata only may still come through this window when the source cannot push.
+      // Only an unreachable destination leaves the metadata to come through this window.
+      if (!(error instanceof HandshakeError && error.code === 'push_unreachable')) throw error
       if (answer.files > 0) {
         canRetry.value = true
         throw new ImportStop(NO_COPY)
@@ -127,8 +128,7 @@ export function useRealmImport() {
     }
     const bytes = await channel.ask<ArrayBuffer>({ kind: 'artifact' })
     current(run, context.epoch)
-    const archive = new File([bytes], 'ro-crate.zip', { type: 'application/zip' })
-    const upload = await uploadArchive(archive, context.client)
+    const upload = await uploadTransfer(bytes, { intent, grant: answer.grant }, context.client)
     current(run, context.epoch)
     const source = { kind: 'upload' as const, upload_id: upload.upload_id }
     const result = await submitImport({ source, target, metadata, idempotency_key: key }, context.client)

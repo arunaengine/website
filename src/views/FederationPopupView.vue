@@ -10,8 +10,8 @@ import LoginConsent from '@/components/federation/LoginConsent.vue'
 import ExportChoice from '@/components/federation/ExportChoice.vue'
 import { useAruna } from '@/composables/useAruna'
 import { TOKEN_KEY } from '@/composables/aruna/state'
-import { apiErrorMessage, createLoginHandoff, getRealmDescriptor } from '@/lib/api'
-import { realmIdText } from '@/lib/federation/descriptor'
+import { ApiError, apiErrorMessage, createLoginHandoff, getRealmDescriptor, type ExportGrant } from '@/lib/api'
+import { realmIdText, type Signed } from '@/lib/federation/descriptor'
 import { OpenerLink, type OpenerRequest } from '@/lib/federation/handshake'
 import { RequestError, acceptOpener, type PopupRequest } from '@/lib/federation/popup'
 import type { VerifiedRealm } from '@/lib/federation/descriptor'
@@ -116,26 +116,35 @@ async function sendExport(choice: { documentId: string; files: string[] }) {
     if (!alive()) return
     opener.reply(current, { grant, files: choice.files.length })
     sent.value = true
-    await serveFollowUps(opener, source, jobId, choice.files.length)
+    await serveFollowUps(opener, source, { jobId, grant }, choice.files.length)
   } catch (error) {
     failure.value = exportFailure(error, homeName.value || realm.value.name)
-    opener.refuse(current, failure.value)
+    opener.refuse(current, failure.value, errorCode(error))
   } finally {
     busy.value = false
   }
 }
 
+function errorCode(error: unknown): string | undefined {
+  return error instanceof ApiError ? error.code : undefined
+}
+
 // After the grant the other realm may ask for a push, or for the metadata file itself.
-async function serveFollowUps(opener: OpenerLink, source: SourceExport, jobId: string, files: number) {
+async function serveFollowUps(
+  opener: OpenerLink,
+  source: SourceExport,
+  granted: { jobId: string; grant: Signed<ExportGrant> },
+  files: number,
+) {
   while (!ended) {
     const next = await opener.next()
     const asked = next.body as PopupRequest | undefined
     try {
-      if (asked?.kind === 'push') opener.reply(next, await pushToDestination(source, jobId))
-      else if (asked?.kind === 'artifact' && files === 0) opener.reply(next, await artifactBytes(jobId, source.client))
+      if (asked?.kind === 'push') opener.reply(next, await pushToDestination(source, granted.jobId))
+      else if (asked?.kind === 'artifact' && files === 0) opener.reply(next, await artifactBytes(granted.grant))
       else opener.refuse(next, 'This request is not supported.')
     } catch (error) {
-      opener.refuse(next, exportFailure(error, homeName.value || realm.value.name))
+      opener.refuse(next, exportFailure(error, homeName.value || realm.value.name), errorCode(error))
     }
   }
 }

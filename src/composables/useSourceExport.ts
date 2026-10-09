@@ -4,10 +4,11 @@
 import {
   ApiError,
   apiErrorMessage,
-  apiUrl,
   createExport,
   createGrant,
+  GRANT_HEADER,
   pushExport,
+  transferHeader,
   type ApiClientOptions,
   type ExportGrant,
   type ImportIntent,
@@ -68,10 +69,12 @@ export function pushToDestination(source: SourceExport, jobId: string): Promise<
   return pushExport(jobId, { descriptor: source.descriptor, intent: source.intent }, source.client)
 }
 
-/** The metadata only artifact, for a destination neither server of which reaches the other. */
-export async function artifactBytes(jobId: string, client: ApiClientOptions): Promise<ArrayBuffer> {
-  const url = apiUrl(`/compute/jobs/${encodeURIComponent(jobId)}/artifacts/rocrate`, {}, client)
-  const response = await fetch(url, { headers: client.token ? { Authorization: `Bearer ${client.token}` } : {} })
+/**
+ * The metadata only artifact, for a destination neither server of which reaches the other.
+ * It is read with the grant, as the destination would read it, never with a bearer.
+ */
+export async function artifactBytes(grant: Signed<ExportGrant>): Promise<ArrayBuffer> {
+  const response = await fetch(grant.payload.artifact_url, { headers: { [GRANT_HEADER]: transferHeader(grant) } })
   if (!response.ok) throw new ApiError(response.status, 'The export file is not available.')
   return response.arrayBuffer()
 }

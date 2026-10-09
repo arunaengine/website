@@ -1,8 +1,8 @@
 // --- Federation (/federation/*, /system/realm/federation, /system/realm/descriptor) ---
 // Signed payloads travel as the node wrote them; the portal reads a few fields for display
 // and passes the rest through unchanged.
-import type { RealmDescriptor, RealmIdValue, Signed } from '@/lib/federation/descriptor'
-import type { SubmitExportResponse, SubmitImportResponse } from '@/lib/rocrateArchive'
+import { toBase64Url, type RealmDescriptor, type RealmIdValue, type Signed } from '@/lib/federation/descriptor'
+import type { SubmitExportResponse, SubmitImportResponse, UploadArchiveResponse } from '@/lib/rocrateArchive'
 import { apiRequest, type ApiClientOptions } from './client'
 import type { CreateSessionResponse } from './sessions'
 
@@ -104,6 +104,15 @@ export interface RealmFederationSettings {
   descriptor?: Signed<RealmDescriptor>
 }
 
+/** Headers that carry a signed transfer value instead of a bearer token. */
+export const GRANT_HEADER = 'x-aruna-export-grant'
+export const INTENT_HEADER = 'x-aruna-import-intent'
+
+/** A signed value as such a header carries it: unpadded base64url JSON. */
+export function transferHeader(value: unknown): string {
+  return toBase64Url(new TextEncoder().encode(JSON.stringify(value)))
+}
+
 function post<T>(path: string, body: unknown, client: ApiClientOptions): Promise<T> {
   return apiRequest<T>(path, { method: 'POST', body: JSON.stringify(body) }, client)
 }
@@ -185,4 +194,25 @@ export function pushExport(
   client: ApiClientOptions = {},
 ) {
   return post<PushAnswer>(`/federation/exports/${encodeURIComponent(jobId)}/push`, request, client)
+}
+
+/**
+ * At the destination: stores an export artifact for the intent's user with the intent and
+ * grant, never a bearer, so the node checks and binds it to the import like a push.
+ */
+export function uploadTransfer(
+  artifact: ArrayBuffer,
+  transfer: { intent: Signed<ImportIntent>; grant: Signed<ExportGrant> },
+  client: ApiClientOptions = {},
+) {
+  const headers = {
+    'Content-Type': 'application/zip',
+    [INTENT_HEADER]: transferHeader(transfer.intent),
+    [GRANT_HEADER]: transferHeader(transfer.grant),
+  }
+  return apiRequest<UploadArchiveResponse>(
+    '/metadata/rocrate/uploads',
+    { method: 'POST', headers, body: artifact },
+    { baseUrl: client.baseUrl },
+  )
 }

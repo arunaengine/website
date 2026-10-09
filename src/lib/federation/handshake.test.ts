@@ -89,6 +89,17 @@ describe('PopupChannel', () => {
     await expect(answer).rejects.toThrow('Not allowed.')
   })
 
+  it('keeps the error code of a refusal', async () => {
+    const { popup, deliver, channel } = open()
+    const answer = channel.ask({ kind: 'push' })
+    deliver(popup, HOME, { protocol: PROTOCOL, type: 'ready' })
+    await vi.waitFor(() => expect(popup.postMessage).toHaveBeenCalledOnce())
+    const id = popup.postMessage.mock.calls[0][0].id
+    const body = { message: 'Cannot reach it.', code: 'push_unreachable' }
+    deliver(popup, HOME, { protocol: PROTOCOL, type: 'error', id, body })
+    await expect(answer).rejects.toMatchObject({ reason: 'refused', message: 'Cannot reach it.', code: 'push_unreachable' })
+  })
+
   it('reports a blocked popup', () => {
     const { host } = fakeWindow({ open: () => null })
     expect(() => new PopupChannel(host, HOME, HOME, 1000)).toThrow(HandshakeError)
@@ -118,6 +129,9 @@ describe('OpenerLink', () => {
     popup.lock(SERVING)
     popup.reply(request, 'answer')
     expect(opener.postMessage).toHaveBeenCalledWith({ protocol: PROTOCOL, type: 'result', id: 2, body: 'answer' }, SERVING)
+    popup.refuse(request, 'No.', 'push_refused')
+    const body = { message: 'No.', code: 'push_refused' }
+    expect(opener.postMessage).toHaveBeenLastCalledWith({ protocol: PROTOCOL, type: 'error', id: 2, body }, SERVING)
   })
 
   it('drops requests from another origin after locking', async () => {

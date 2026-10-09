@@ -6,8 +6,9 @@ const api = {
   createImportIntent: vi.fn(),
   getRealmDescriptor: vi.fn(),
   createImport: vi.fn(),
+  uploadTransfer: vi.fn(),
 }
-const archive = { submitImport: vi.fn(), uploadArchive: vi.fn() }
+const archive = { submitImport: vi.fn() }
 const checkOwnerNode = vi.fn()
 const ask = vi.fn()
 const close = vi.fn()
@@ -18,10 +19,10 @@ vi.mock('@/lib/api', async (original) => ({
   createImportIntent: (...args: unknown[]) => api.createImportIntent(...args),
   getRealmDescriptor: (...args: unknown[]) => api.getRealmDescriptor(...args),
   createImport: (...args: unknown[]) => api.createImport(...args),
+  uploadTransfer: (...args: unknown[]) => api.uploadTransfer(...args),
 }))
 vi.mock('@/lib/rocrateArchive', () => ({
   submitImport: (...args: unknown[]) => archive.submitImport(...args),
-  uploadArchive: (...args: unknown[]) => archive.uploadArchive(...args),
 }))
 vi.mock('@/lib/federation/transfer', async (original) => ({
   ...(await original<typeof import('@/lib/federation/transfer')>()),
@@ -61,6 +62,7 @@ const grant = {
 // core::transfer::import_key for this grant and destination, computed by the Rust code.
 const KEY = 'federation-04a2c404ebc44733d4c5b288e20659a1a76f2d7c6ab914422cecef8132c83a09'
 const pullUnreachable = new ApiError(502, 'unreachable', 'pull_unreachable')
+const unreachable = new HandshakeError('refused', 'This realm cannot reach the other realm.', 'push_unreachable')
 
 function script(answers: Record<string, unknown>) {
   ask.mockImplementation(async (body: { kind: string }) => {
@@ -132,18 +134,36 @@ describe('useRealmImport', () => {
   })
 
   it('takes metadata only through the window when neither server reaches the other', async () => {
-    script({ export: { grant, files: 0 }, push: new HandshakeError('refused', 'push_unreachable'), artifact: new ArrayBuffer(4) })
+    const artifact = new ArrayBuffer(4)
+    script({ export: { grant, files: 0 }, push: unreachable, artifact })
     api.createImport.mockRejectedValue(pullUnreachable)
-    archive.uploadArchive.mockResolvedValue({ upload_id: 'U3' })
+    api.uploadTransfer.mockResolvedValue({ upload_id: 'U3' })
     const flow = useRealmImport()
     await flow.start(form)
-    expect(archive.uploadArchive).toHaveBeenCalledOnce()
+    // Stored with the intent and grant, so the node binds it to this import.
+    expect(api.uploadTransfer).toHaveBeenCalledWith(
+      artifact,
+      { intent: { payload: { intent_id: 'I', destination } }, grant },
+      { baseUrl: 'https://b.example/api/v1', token: 'B-TOKEN' },
+    )
     expect(archive.submitImport.mock.calls[0][0]).toMatchObject({ source: { kind: 'upload', upload_id: 'U3' }, idempotency_key: KEY })
     expect(flow.phase.value).toBe('started')
   })
 
+  it('does not fall back when the source refused the copy', async () => {
+    const refused = new HandshakeError('refused', 'The other realm refused the copy.', 'push_refused')
+    script({ export: { grant, files: 0 }, push: refused, artifact: new ArrayBuffer(4) })
+    api.createImport.mockRejectedValue(pullUnreachable)
+    const flow = useRealmImport()
+    await flow.start(form)
+    expect(flow.phase.value).toBe('failed')
+    expect(flow.failure.value).toBe('The other realm refused the copy.')
+    expect(ask.mock.calls.map(([body]) => body.kind)).toEqual(['export', 'push'])
+    expect(api.uploadTransfer).not.toHaveBeenCalled()
+  })
+
   it('fails clearly for files and keeps the window for a retry', async () => {
-    script({ export: { grant, files: 2 }, push: new HandshakeError('refused', 'push_unreachable') })
+    script({ export: { grant, files: 2 }, push: unreachable })
     api.createImport.mockRejectedValue(pullUnreachable)
     const flow = useRealmImport()
     await flow.start(form)

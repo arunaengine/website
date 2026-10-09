@@ -12,6 +12,8 @@ export class HandshakeError extends Error {
   constructor(
     public reason: HandshakeFailure,
     message: string,
+    /** The node's error code behind a refusal, when the other side named one. */
+    public code?: string,
   ) {
     super(message)
     this.name = 'HandshakeError'
@@ -30,6 +32,14 @@ function envelope(data: unknown): Envelope | null {
   const message = data as Partial<Envelope>
   if (message.protocol !== PROTOCOL || typeof message.type !== 'string') return null
   return message as Envelope
+}
+
+/** A refusal body: the message, or the message with the node's error code. */
+function refusal(body: unknown): HandshakeError {
+  if (typeof body === 'string') return new HandshakeError('refused', body)
+  const { message, code } = (body ?? {}) as { message?: unknown; code?: unknown }
+  const text = typeof message === 'string' ? message : 'The other realm refused.'
+  return new HandshakeError('refused', text, typeof code === 'string' ? code : undefined)
 }
 
 type MessageListener = (event: MessageEvent) => void
@@ -94,9 +104,7 @@ export class PopupChannel {
     if (!pending || message.id !== pending.id) return
     this.pending = null
     if (message.type === 'result') pending.resolve(message.body)
-    else if (message.type === 'error') {
-      pending.reject(new HandshakeError('refused', typeof message.body === 'string' ? message.body : 'The other realm refused.'))
-    }
+    else if (message.type === 'error') pending.reject(refusal(message.body))
   }
 
   private waitReady(): Promise<void> {
@@ -210,8 +218,8 @@ export class OpenerLink {
     this.send('result', request.id, body)
   }
 
-  refuse(request: OpenerRequest, message: string) {
-    this.send('error', request.id, message)
+  refuse(request: OpenerRequest, message: string, code?: string) {
+    this.send('error', request.id, code ? { message, code } : message)
   }
 
   dispose() {
