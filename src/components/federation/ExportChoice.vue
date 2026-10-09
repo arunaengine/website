@@ -8,7 +8,7 @@ import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { useAruna } from '@/composables/useAruna'
 import { fetchRoCrateRaw } from '@/composables/aruna/crates'
-import { isLinkedFile } from '@/lib/crate/dataIdentity'
+import { hasLocalIdentity } from '@/lib/crate/dataIdentity'
 import { dataEntitiesOf, isLeafFile, type DataEntity } from '@/lib/dataEntities'
 import type { VerifiedRealm } from '@/lib/federation/descriptor'
 import { errorMessage, formatBytes } from '@/lib/utils'
@@ -20,7 +20,7 @@ const emit = defineEmits<{
   (e: 'cancel'): void
 }>()
 
-const { metadata } = useAruna()
+const { metadata, realm } = useAruna()
 const query = ref('')
 const documentId = ref('')
 const withFiles = ref(false)
@@ -49,7 +49,7 @@ watch(documentId, async (id) => {
     const crate = await fetchRoCrateRaw(id)
     if (generation !== loadGeneration) return
     const all = dataEntitiesOf(crate).filter((entity) => isLeafFile(entity.types))
-    files.value = all.filter((entity) => !isLinkedFile(entity))
+    files.value = all.filter((entity) => hasLocalIdentity(entity, realm.value.id))
     linked.value = all.length - files.value.length
   } catch (error) {
     if (generation === loadGeneration) filesError.value = errorMessage(error)

@@ -45,6 +45,7 @@ export interface ParsedDataIdentity {
 
 const CONTENT_ID = /^https:\/\/w3id\.org\/aruna\/data\/[0-9a-f]{64}$/i
 const ARN_ID = /^arn:aruna:([^:]+):([^:]+):s3\/([^/]+)\/(.+)@([^@/]+)$/
+const HASH_ARN = /^arn:aruna:([^:]+):[^:]+:ch\/(?:blake3\/)?[0-9a-f]{64}$/
 
 export function isContentId(value: string | null | undefined): value is string {
   return Boolean(value && CONTENT_ID.test(value))
@@ -74,8 +75,11 @@ export function parseObjectUrl(url: string, endpoint?: string | null): { bucket:
 }
 
 function parseArnId(id: string) {
-  if (!id.startsWith(ARUNA_CONTENT_W3ID_PREFIX)) return null
-  const match = ARN_ID.exec(id.slice(ARUNA_CONTENT_W3ID_PREFIX.length))
+  return id.startsWith(ARUNA_CONTENT_W3ID_PREFIX) ? parseArn(id.slice(ARUNA_CONTENT_W3ID_PREFIX.length)) : null
+}
+
+function parseArn(value: string) {
+  const match = ARN_ID.exec(value)
   if (!match) return null
   const [, realmId, nodeId, bucket, key, version] = match as unknown as string[]
   return { arn: { realmId, nodeId, version }, s3: { bucket, key: decodeKey(key) } }
@@ -99,10 +103,13 @@ export function parseDataIdentity(
   }
 }
 
-/** A web link the realm does not hold: an absolute id with no content id, s3 location or ARN. */
-export function isLinkedFile(entity: { id: string; contentUrl?: string | null }): boolean {
-  const { contentId, s3, arn } = parseDataIdentity(entity)
-  return isAbsoluteUri(entity.id) && !contentId && !s3 && !arn
+/** Whether the node can copy the bytes, by its rule: a content id, an s3 location, or a versioned
+ * ARN (bare or as a web id) or bare content hash ARN of `realmId`, the export's source realm. */
+export function hasLocalIdentity(entity: { id: string; contentUrl?: string | null }, realmId: string): boolean {
+  return [entity.id, entity.contentUrl ?? ''].some((value) => {
+    const arnRealm = (parseArnId(value) ?? parseArn(value))?.arn.realmId ?? HASH_ARN.exec(value)?.[1]
+    return isContentId(value) || Boolean(parseObjectUrl(value)) || arnRealm === realmId
+  })
 }
 
 /** The data browser opened at a folder; `prefix` may end in a slash. */

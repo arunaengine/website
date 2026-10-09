@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { dataEntityIdentity, folderRoute, isLinkedFile, objectLocation, objectRoute, parseDataIdentity } from './dataIdentity'
+import { dataEntityIdentity, folderRoute, hasLocalIdentity, objectLocation, objectRoute, parseDataIdentity } from './dataIdentity'
 
 const BLAKE3 = 'a'.repeat(64)
 
@@ -109,16 +109,30 @@ describe('bucket browser routes', () => {
   })
 })
 
-describe('isLinkedFile', () => {
-  it('is true only for a web link the realm does not hold', () => {
-    expect(isLinkedFile({ id: 'https://example.org/one.csv' })).toBe(true)
-    expect(isLinkedFile({ id: 'https://example.org/one.csv', contentUrl: 'https://example.org/one.csv' })).toBe(true)
+describe('hasLocalIdentity', () => {
+  const OWN = 'arn:aruna:own:n:s3/reads/one.csv@01V'
+  const FOREIGN = 'arn:aruna:other:n:s3/reads/one.csv@01V'
+
+  it('accepts every form the source node can copy', () => {
+    expect(hasLocalIdentity({ id: `https://w3id.org/aruna/data/${BLAKE3}` }, 'own')).toBe(true)
+    expect(hasLocalIdentity({ id: 'https://example.org/a', contentUrl: 's3://reads/one.csv' }, 'own')).toBe(true)
+    expect(hasLocalIdentity({ id: OWN }, 'own')).toBe(true)
+    expect(hasLocalIdentity({ id: `https://w3id.org/aruna/data/${OWN}` }, 'own')).toBe(true)
+    expect(hasLocalIdentity({ id: `arn:aruna:own:n:ch/blake3/${BLAKE3}` }, 'own')).toBe(true)
   })
 
-  it('is false for a stored file in any written form', () => {
-    expect(isLinkedFile({ id: `https://w3id.org/aruna/data/${BLAKE3}` })).toBe(false)
-    expect(isLinkedFile({ id: 'https://example.org/a', contentUrl: 's3://reads/one.csv' })).toBe(false)
-    expect(isLinkedFile({ id: 'https://w3id.org/aruna/data/arn:aruna:r:n:s3/reads/one.csv@01V' })).toBe(false)
-    expect(isLinkedFile({ id: 'data/one.csv' })).toBe(false)
+  it('accepts a foreign ARN only with a usable local identity', () => {
+    const id = `https://w3id.org/aruna/data/${FOREIGN}`
+    expect(hasLocalIdentity({ id }, 'own')).toBe(false)
+    expect(hasLocalIdentity({ id: FOREIGN }, 'own')).toBe(false)
+    expect(hasLocalIdentity({ id: `arn:aruna:other:n:ch/${BLAKE3}` }, 'own')).toBe(false)
+    expect(hasLocalIdentity({ id, contentUrl: 's3://reads/one.csv' }, 'own')).toBe(true)
+    expect(hasLocalIdentity({ id, contentUrl: `https://w3id.org/aruna/data/${BLAKE3}` }, 'own')).toBe(true)
+  })
+
+  it('rejects a web link and a crate path without a location', () => {
+    expect(hasLocalIdentity({ id: 'https://example.org/one.csv' }, 'own')).toBe(false)
+    expect(hasLocalIdentity({ id: 'https://example.org/one.csv', contentUrl: 'https://example.org/one.csv' }, 'own')).toBe(false)
+    expect(hasLocalIdentity({ id: 'data/one.csv' }, 'own')).toBe(false)
   })
 })
