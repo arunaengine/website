@@ -61,10 +61,11 @@ function roleOf(id: string) {
         <!-- The realm name and short id stay visible next to the group, also on a narrow bar. -->
         <span class="flex min-w-0 flex-col leading-none">
           <span
-            class="max-w-28 truncate text-[9px] font-semibold uppercase leading-none tracking-wider text-muted-foreground sm:max-w-40"
+            class="flex max-w-28 gap-1 text-[9px] font-semibold uppercase leading-none tracking-wider text-muted-foreground sm:max-w-40"
             :title="realmId"
           >
-            {{ hasGroups ? `${realmDisplayName} · ${realmId.slice(0, 8)}` : `Realm ${realmId.slice(0, 8)}` }}
+            <span class="min-w-0 truncate">{{ hasGroups ? realmDisplayName : 'Realm' }}</span>
+            <span class="shrink-0">{{ hasGroups ? `· ${realmId.slice(0, 8)}` : realmId.slice(0, 8) }}</span>
           </span>
           <span
             class="mt-0.5 max-w-28 truncate text-[13px] font-semibold leading-none text-foreground sm:max-w-40"
