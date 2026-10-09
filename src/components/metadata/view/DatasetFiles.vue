@@ -19,6 +19,7 @@ import type { CrateObjectReference } from '@/lib/crateReferences'
 import { objectLocation, objectRoute, parseDataIdentity } from '@/lib/crate/dataIdentity'
 import { dataEntityTreeOf, formatContentSize, type DataEntity, type DataEntityNode } from '@/lib/dataEntities'
 import { termNameFromUri } from '@/lib/profiles/uri'
+import { isHttpUrl } from '@/lib/utils'
 import { Eye, ExternalLink as ExternalLinkIcon, FileJson2, Folder, Info, Link2 } from '@lucide/vue'
 
 interface PreviewTarget {
@@ -115,6 +116,12 @@ function entityLink(row: DataEntity): string | undefined {
   return target.startsWith('http') ? target : undefined
 }
 
+// A file kept at its source, such as another realm: its identity is a web address there.
+function externalHost(row: DataEntityNode): string | null {
+  if (row.directory || !isHttpUrl(row.id) || identityOf(row).s3 || contentW3id(row)) return null
+  return new URL(row.id).host
+}
+
 // Where the bytes are: the S3 path when any form names one, else the written contentUrl.
 function locationText(row: DataEntity): string {
   const s3 = identityOf(row).s3
@@ -190,6 +197,7 @@ function openPreview(row: DataEntity) {
                 <span class="flex min-w-0 items-center gap-1.5" :style="row.depth ? { paddingLeft: `${row.depth * 1.25}rem` } : undefined">
                   <Folder v-if="row.directory" class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   <span class="truncate">{{ row.name }}</span>
+                  <Badge v-if="externalHost(row)" variant="outline" size="sm" :title="`Kept at ${externalHost(row)}`">External</Badge>
                 </span>
                 <span v-if="contentW3id(row)" class="mt-0.5 block break-all font-mono text-[10px] font-normal text-muted-foreground">
                   Content identity: {{ contentW3id(row) }}

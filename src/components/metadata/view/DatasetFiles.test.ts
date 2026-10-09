@@ -5,6 +5,7 @@ import { compileClientComponent, content, element, mountApp, moduleDefault, node
 import * as DataIdentity from '@/lib/crate/dataIdentity'
 import * as DataEntities from '@/lib/dataEntities'
 import * as Uri from '@/lib/profiles/uri'
+import * as Utils from '@/lib/utils'
 
 const load = vi.fn()
 const Slot = defineComponent((_, { slots }) => () => h('span', slots.default?.()))
@@ -36,6 +37,7 @@ const DatasetFiles = compileClientComponent(new URL('./DatasetFiles.vue', import
   '@/lib/crate/dataIdentity': DataIdentity,
   '@/lib/dataEntities': DataEntities,
   '@/lib/profiles/uri': Uri,
+  '@/lib/utils': Utils,
   '@lucide/vue': new Proxy({}, { get: () => Slot }),
 })
 
@@ -111,6 +113,15 @@ describe('DatasetFiles', () => {
     expect(anchors.some((node) => node.props.to)).toBe(false)
     expect(anchors.some((node) => node.props.href === 'https://example.org/one.csv')).toBe(true)
     mounted.app.unmount()
+  })
+
+  it('marks a file kept at another realm as external', async () => {
+    const mounted = await render({ '@id': 'https://data.giessen.example/api/v1/objects/one.csv' })
+    expect(content(mounted.root)).toContain('External')
+    mounted.app.unmount()
+    const local = await render({ '@id': 's3://reads/raw/one.csv' })
+    expect(content(local.root)).not.toContain('External')
+    local.app.unmount()
   })
 
   it('shows no location for a relative id', async () => {
