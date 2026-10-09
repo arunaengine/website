@@ -88,7 +88,7 @@ describe('DatasetFiles', () => {
   })
 
   it('reads an older versioned ARN id without taking it for the content address', async () => {
-    const id = 'https://w3id.org/aruna/data/arn:aruna:r1:n1:s3/reads/raw/one.csv@01V'
+    const id = 'https://w3id.org/aruna/data/arn:aruna:r1:n1:s3/reads/raw/one.csv@01JABCDEF0123456789ABCDEFG'
     const mounted = await render({ '@id': id, contentUrl: CONTENT })
     const text = content(mounted.root)
 

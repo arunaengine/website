@@ -8,8 +8,8 @@ import * as DataIdentity from '@/lib/crate/dataIdentity'
 
 const HELD = `https://w3id.org/aruna/data/${'a'.repeat(64)}`
 const LINK = 'https://example.org/remote.csv'
-const LOCAL_ARN = 'arn:aruna:R:N:s3/reads/one.csv@01V'
-const FOREIGN_ARN = 'https://w3id.org/aruna/data/arn:aruna:F:N:s3/reads/two.csv@01V'
+const LOCAL_ARN = 'arn:aruna:R:N:s3/reads/one.csv@01JABCDEF0123456789ABCDEFG'
+const FOREIGN_ARN = 'https://w3id.org/aruna/data/arn:aruna:F:N:s3/reads/two.csv@01JABCDEF0123456789ABCDEFG'
 const fetchRoCrateRaw = vi.fn()
 const Empty = defineComponent(() => () => null)
 const Plain = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))

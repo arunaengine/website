@@ -46,7 +46,7 @@ async function linkOf(output: { id: string; contentUrl?: string }) {
 
 describe('RunProvenancePanel', () => {
   it('opens a versioned ARN output in the bucket browser', async () => {
-    const id = 'https://w3id.org/aruna/data/arn:aruna:r1:n1:s3/results/runs/out.csv@01V'
+    const id = 'https://w3id.org/aruna/data/arn:aruna:r1:n1:s3/results/runs/out.csv@01JABCDEF0123456789ABCDEFG'
     expect((await linkOf({ id, contentUrl: CONTENT }))?.to).toEqual({
       name: 'bucket',
       params: { bucketId: 'results' },

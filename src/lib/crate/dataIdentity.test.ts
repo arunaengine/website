@@ -10,13 +10,13 @@ describe('dataEntityIdentity', () => {
     expect(await dataEntityIdentity('reads', 'raw/one.csv', {
       realmId: 'realm-1',
       nodeId: 'node-1',
-      getVersionId: async () => '01VERSION',
+      getVersionId: async () => '01JABCDEF0123456789ABCDEFG',
       getDrsObject,
     })).toEqual({
       id: `https://w3id.org/aruna/data/${BLAKE3}`,
       contentUrl: 's3://reads/raw/one.csv',
     })
-    expect(getDrsObject).toHaveBeenCalledWith('arn:aruna:realm-1:node-1:s3/reads/raw/one.csv@01VERSION')
+    expect(getDrsObject).toHaveBeenCalledWith('arn:aruna:realm-1:node-1:s3/reads/raw/one.csv@01JABCDEF0123456789ABCDEFG')
   })
 
   it('falls back to the location when the node cannot answer', async () => {
@@ -52,17 +52,17 @@ describe('parseDataIdentity', () => {
   })
 
   it('reads an older versioned ARN id with the content address in contentUrl', () => {
-    const id = 'https://w3id.org/aruna/data/arn:aruna:realm-1:node-1:s3/reads/raw/two%20words.csv@01VERSION'
+    const id = 'https://w3id.org/aruna/data/arn:aruna:realm-1:node-1:s3/reads/raw/two%20words.csv@01JABCDEF0123456789ABCDEFG'
     expect(parseDataIdentity({ id, contentUrl: CONTENT })).toEqual({
       contentId: CONTENT,
       s3: { bucket: 'reads', key: 'raw/two words.csv' },
-      arn: { realmId: 'realm-1', nodeId: 'node-1', version: '01VERSION' },
+      arn: { realmId: 'realm-1', nodeId: 'node-1', version: '01JABCDEF0123456789ABCDEFG' },
       localPath: null,
     })
   })
 
   it('never takes a versioned ARN id for a content address', () => {
-    const id = 'https://w3id.org/aruna/data/arn:aruna:realm-1:node-1:s3/reads/raw/one.csv@01VERSION'
+    const id = 'https://w3id.org/aruna/data/arn:aruna:realm-1:node-1:s3/reads/raw/one.csv@01JABCDEF0123456789ABCDEFG'
     expect(parseDataIdentity({ id }).contentId).toBeNull()
   })
 
@@ -109,9 +109,27 @@ describe('bucket browser routes', () => {
   })
 })
 
+describe('node-strict identifiers', () => {
+  const VERSION = '01JABCDEF0123456789ABCDEFG'
+  const ARN = 'arn:aruna:own:n:s3/reads/one.csv@'
+
+  it('takes only a lowercase hex content id', () => {
+    expect(parseDataIdentity({ id: `https://w3id.org/aruna/data/${'A'.repeat(64)}` }).contentId).toBeNull()
+    expect(parseDataIdentity({ id: `https://w3id.org/aruna/data/${'a'.repeat(63)}` }).contentId).toBeNull()
+  })
+
+  it('takes only a 26 character uppercase ULID as the ARN version', () => {
+    expect(hasLocalIdentity({ id: ARN + VERSION }, 'own')).toBe(true)
+    for (const bad of ['01V', VERSION.toLowerCase(), `${VERSION}A`, VERSION.slice(0, 25), `I${VERSION.slice(1)}`]) {
+      expect(parseDataIdentity({ id: ARN + bad }).arn).toBeNull()
+      expect(hasLocalIdentity({ id: ARN + bad }, 'own')).toBe(false)
+    }
+  })
+})
+
 describe('hasLocalIdentity', () => {
-  const OWN = 'arn:aruna:own:n:s3/reads/one.csv@01V'
-  const FOREIGN = 'arn:aruna:other:n:s3/reads/one.csv@01V'
+  const OWN = 'arn:aruna:own:n:s3/reads/one.csv@01JABCDEF0123456789ABCDEFG'
+  const FOREIGN = 'arn:aruna:other:n:s3/reads/one.csv@01JABCDEF0123456789ABCDEFG'
 
   it('accepts every form the source node can copy', () => {
     expect(hasLocalIdentity({ id: `https://w3id.org/aruna/data/${BLAKE3}` }, 'own')).toBe(true)

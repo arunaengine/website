@@ -43,8 +43,8 @@ export interface ParsedDataIdentity {
   localPath: string | null
 }
 
-const CONTENT_ID = /^https:\/\/w3id\.org\/aruna\/data\/[0-9a-f]{64}$/i
-const ARN_ID = /^arn:aruna:([^:]+):([^:]+):s3\/([^/]+)\/(.+)@([^@/]+)$/
+const CONTENT_ID = /^https:\/\/w3id\.org\/aruna\/data\/[0-9a-f]{64}$/
+const ARN_ID = /^arn:aruna:([^:]+):([^:]+):s3\/([^/]+)\/(.+)@([0-9A-HJKMNP-TV-Z]{26})$/
 const HASH_ARN = /^arn:aruna:([^:]+):[^:]+:ch\/(?:blake3\/)?[0-9a-f]{64}$/
 
 export function isContentId(value: string | null | undefined): value is string {
