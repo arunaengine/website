@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import {
   ApiError,
+  apiOrigin,
   apiRequest,
   defaultApiBaseUrl,
   type ApiGroup,
@@ -19,7 +20,10 @@ export const TOKEN_KEY = 'aruna.authToken'
 export const API_BASE_KEY = 'aruna.apiBaseUrl'
 
 export const apiBaseUrl = ref(readStored(API_BASE_KEY) || defaultApiBaseUrl())
-export const authToken = ref(readStored(TOKEN_KEY))
+// Restored only once `/system/realm` named the realm at this API base; see `restoreToken`.
+export const authToken = ref('')
+// A token stored for this API origin waits for its realm; the session counts as pending.
+export const restoring = ref(hasStoredToken())
 export const loading = ref(false)
 export const saving = ref(false)
 export const error = ref<string | null>(null)
@@ -61,6 +65,27 @@ export const bootstrapped = ref(false)
 // Monotonic identity counter: bumped whenever the token or API base changes,
 // so in-flight work and module-singleton caches can tell sessions apart.
 export const sessionEpoch = ref(0)
+
+/** The stored token of one realm at one API origin; realm portals may share a browser origin. */
+export function tokenKey(realmId: string, baseUrl = apiBaseUrl.value): string {
+  return `${TOKEN_KEY}:${realmId}@${apiOrigin(baseUrl)}`
+}
+
+/** The token key of the realm the current API base serves, once it is known. */
+export function currentTokenKey(): string | null {
+  return typeof window !== 'undefined' && realmInfo.value ? tokenKey(realmInfo.value.realm_id) : null
+}
+
+/** Whether a token of any realm is stored for the API origin of `baseUrl`. */
+export function hasStoredToken(baseUrl?: string): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    const suffix = `@${apiOrigin(baseUrl ?? apiBaseUrl.value)}`
+    return Object.keys(window.localStorage).some((key) => key.startsWith(`${TOKEN_KEY}:`) && key.endsWith(suffix))
+  } catch {
+    return false
+  }
+}
 
 export function readStored(key: string): string {
   if (typeof window === 'undefined') return ''

@@ -1,11 +1,10 @@
-import { defaultApiBaseUrl } from '@/lib/api'
+import { apiRequest, defaultApiBaseUrl, type RealmInfoResponse } from '@/lib/api'
 import { errorMessage } from '@/lib/utils'
 import { loadMetadata, resetRecentOrderProbe } from './catalog'
 import { loadAuthenticated } from './identity'
 import { loadInfo } from './realm'
 import {
   API_BASE_KEY,
-  TOKEN_KEY,
   apiBaseUrl,
   apiGroups,
   authError,
@@ -14,12 +13,18 @@ import {
   bootstrapped,
   clearIdentityState,
   credentials,
+  currentTokenKey,
   error,
+  hasStoredToken,
   loading,
+  readStored,
+  realmInfo,
   refreshContext,
   refusedToken,
+  restoring,
   sessionEpoch,
   storeValue,
+  tokenKey,
   userInfo,
 } from './state'
 
@@ -41,8 +46,8 @@ async function refreshForContext(context: ReturnType<typeof refreshContext>): Pr
       if (context.client.token && refusedToken(authResult.reason)) {
         // The realm rejected the token (expired or revoked): drop the local
         // session so the portal shows its signed-out state, not a stale banner.
+        forgetToken()
         authToken.value = ''
-        storeValue(TOKEN_KEY, '')
         clearIdentityState()
       } else if (context.client.token) {
         authError.value = errorMessage(authResult.reason)
@@ -56,6 +61,10 @@ async function refreshForContext(context: ReturnType<typeof refreshContext>): Pr
     } else if (!context.client.token) {
       userInfo.value = null
       credentials.value = []
+    } else {
+      // A login made before the realm was known is stored once it is.
+      const key = currentTokenKey()
+      if (key) storeValue(key, context.client.token)
     }
   } catch (err) {
     if (context.epoch === sessionEpoch.value) error.value = errorMessage(err)
@@ -67,11 +76,39 @@ async function refreshForContext(context: ReturnType<typeof refreshContext>): Pr
   }
 }
 
+function forgetToken() {
+  const key = currentTokenKey()
+  if (key) storeValue(key, '')
+}
+
+/**
+ * Restores a stored token only after `/system/realm`, asked without a token, named the realm
+ * at this API base, so no request carries a token stored for another realm or API origin.
+ */
+async function restoreToken(context: ReturnType<typeof refreshContext>): Promise<void> {
+  try {
+    const realm = await apiRequest<RealmInfoResponse>('/system/realm', {}, { baseUrl: context.client.baseUrl })
+    if (context.epoch !== sessionEpoch.value) return
+    realmInfo.value = realm
+    const stored = readStored(tokenKey(realm.realm_id, context.client.baseUrl))
+    if (stored) setAuthToken(stored)
+  } catch {
+    // The realm is unknown, so the session stays signed out until a later refresh.
+  }
+}
+
 export function refresh(): Promise<void> {
   const context = refreshContext()
   if (refreshInFlight?.epoch === context.epoch) return refreshInFlight.promise
 
-  const promise = refreshForContext(context)
+  restoring.value = !context.client.token && hasStoredToken(context.client.baseUrl)
+  const promise = restoring.value
+    ? restoreToken(context)
+        .then(() => refreshForContext(refreshContext()))
+        .finally(() => {
+          restoring.value = false
+        })
+    : refreshForContext(context)
   refreshInFlight = { epoch: context.epoch, promise }
   void promise.finally(() => {
     if (refreshInFlight?.promise === promise) refreshInFlight = null
@@ -82,9 +119,11 @@ export function refresh(): Promise<void> {
 export function setAuthToken(token: string) {
   const next = token.trim()
   if (next === authToken.value) return
+  if (!next) forgetToken()
   sessionEpoch.value++
   authToken.value = next
-  storeValue(TOKEN_KEY, authToken.value)
+  const key = currentTokenKey()
+  if (key && next) storeValue(key, next)
   clearIdentityState()
   loading.value = false
   bootstrapped.value = false
@@ -99,10 +138,8 @@ export function setApiBaseUrl(url: string, options: { keepToken?: boolean } = {}
   sessionEpoch.value++
   apiBaseUrl.value = next
   storeValue(API_BASE_KEY, apiBaseUrl.value === defaultApiBaseUrl() ? '' : apiBaseUrl.value)
-  if (!options.keepToken) {
-    authToken.value = ''
-    storeValue(TOKEN_KEY, '')
-  }
+  // The token stays stored for its own realm and API origin; it is not sent to this one.
+  if (!options.keepToken) authToken.value = ''
   clearIdentityState(true)
   loading.value = false
   bootstrapped.value = false

@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
 import { useAruna } from '@/composables/useAruna'
+import { restoring } from '@/composables/aruna/state'
 import { apiRequest } from '@/lib/api'
 import type { RealmInfoResponse } from '@/lib/api'
 import { featureEnabled, portalConfig } from '@/lib/config'
@@ -261,6 +262,6 @@ export function useAuth() {
      * signed-out branch (no stored session = never pending, signed-out content
      * shows immediately).
      */
-    authPending: computed(() => Boolean(aruna.authToken.value) && !aruna.bootstrapped.value),
+    authPending: computed(() => (Boolean(aruna.authToken.value) || restoring.value) && !aruna.bootstrapped.value),
   }
 }

@@ -9,7 +9,7 @@ import Spinner from '@/components/ui/Spinner.vue'
 import LoginConsent from '@/components/federation/LoginConsent.vue'
 import ExportChoice from '@/components/federation/ExportChoice.vue'
 import { useAruna } from '@/composables/useAruna'
-import { TOKEN_KEY } from '@/composables/aruna/state'
+import { currentTokenKey } from '@/composables/aruna/state'
 import { ApiError, apiErrorMessage, createLoginHandoff, getRealmDescriptor } from '@/lib/api'
 import { realmIdText } from '@/lib/federation/descriptor'
 import { OpenerLink, type OpenerRequest } from '@/lib/federation/handshake'
@@ -53,7 +53,7 @@ const localUser = computed(() => {
 })
 
 function onStorage(event: StorageEvent) {
-  if (event.key !== TOKEN_KEY) return
+  if (!event.key || event.key !== currentTokenKey()) return
   setAuthToken(event.newValue ?? '')
   void refresh()
 }

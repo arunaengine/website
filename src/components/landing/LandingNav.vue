@@ -11,7 +11,8 @@ const { isDark, toggleTheme } = useTheme()
 const signingIn = ref(false)
 let hasSession = false
 try {
-  hasSession = Boolean(window.localStorage.getItem('aruna.authToken'))
+  // Tokens are stored per realm and API origin as `aruna.authToken:<realm>@<origin>`.
+  hasSession = Object.keys(window.localStorage).some((key) => key.startsWith('aruna.authToken:'))
 } catch {
   // Storage can be unavailable; the portal will resolve the session on entry.
 }
