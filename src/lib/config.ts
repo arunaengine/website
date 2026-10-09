@@ -18,6 +18,8 @@ export interface PortalRuntimeConfig {
   authCallbackOrigin: string
   features: Record<string, boolean>
   terminology: TerminologyConfig
+  // Realm registry the realm picker lists; empty means no registry list.
+  registryUrl: string
 }
 
 export const DEFAULT_PORTAL_CONFIG: PortalRuntimeConfig = {
@@ -25,6 +27,7 @@ export const DEFAULT_PORTAL_CONFIG: PortalRuntimeConfig = {
   authCallbackOrigin: '',
   features: {},
   terminology: { gatewayUrl: 'https://terminology.services.base4nfdi.de/api-gateway' },
+  registryUrl: '',
 }
 
 // Per-flag defaults are layered under the served `features` map, so deployments
@@ -90,6 +93,7 @@ function mergeConfig(raw: Record<string, unknown>): PortalRuntimeConfig {
   if (typeof raw.authCallbackOrigin === 'string' && raw.authCallbackOrigin.trim()) {
     merged.authCallbackOrigin = raw.authCallbackOrigin.trim().replace(/\/+$/, '')
   }
+  if (typeof raw.registryUrl === 'string') merged.registryUrl = raw.registryUrl.trim()
   if (raw.features && typeof raw.features === 'object' && !Array.isArray(raw.features)) {
     for (const [key, value] of Object.entries(raw.features as Record<string, unknown>)) {
       if (typeof value === 'boolean') merged.features[key] = value
