@@ -113,8 +113,9 @@ export function hasLocalIdentity(
 ): boolean {
   const values = [entity.id, entity.contentUrl ?? '']
   if (values.some((value) => isContentId(value) || HASH_ARN.exec(value)?.[1] === realmId)) return true
-  const exact = values.map((value) => (parseArnId(value) ?? parseArn(value))?.arn).find((arn) => arn?.realmId === realmId)
-  return exact ? exact.nodeId === nodeId : values.some((value) => Boolean(parseObjectUrl(value)))
+  // Like the node, the last versioned ARN read counts, before its realm and node are checked.
+  const exact = values.flatMap((value) => (parseArnId(value) ?? parseArn(value))?.arn ?? []).at(-1)
+  return exact?.realmId === realmId ? exact.nodeId === nodeId : values.some((value) => Boolean(parseObjectUrl(value)))
 }
 
 /** The data browser opened at a folder; `prefix` may end in a slash. */

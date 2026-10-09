@@ -156,6 +156,13 @@ describe('hasLocalIdentity', () => {
     expect(hasLocalIdentity({ id: web, contentUrl: `https://w3id.org/aruna/data/${BLAKE3}` }, 'own', 'm')).toBe(true)
   })
 
+  it('follows the last versioned ARN as the node does', () => {
+    const remote = OWN.replace(':n:', ':m:')
+    expect(hasLocalIdentity({ id: OWN, contentUrl: remote }, 'own', 'n')).toBe(false)
+    expect(hasLocalIdentity({ id: remote, contentUrl: OWN }, 'own', 'n')).toBe(true)
+    expect(hasLocalIdentity({ id: OWN, contentUrl: FOREIGN }, 'own', 'n')).toBe(false)
+  })
+
   it('rejects a web link and a crate path without a location', () => {
     expect(hasLocalIdentity({ id: 'https://example.org/one.csv' }, 'own', 'n')).toBe(false)
     expect(hasLocalIdentity({ id: 'https://example.org/one.csv', contentUrl: 'https://example.org/one.csv' }, 'own', 'n')).toBe(false)
