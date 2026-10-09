@@ -4,7 +4,7 @@
 // chat panel gets a child session of kind `assistant`.
 import { apiRequest, type ApiClientOptions } from './client'
 
-export type SessionKind = 'portal' | 'assistant' | 'api'
+export type SessionKind = 'portal' | 'assistant' | 'api' | 'federated'
 
 export interface UserSession {
   session_id: string
@@ -72,4 +72,5 @@ export const SESSION_KIND_LABELS: Readonly<Record<SessionKind, string>> = {
   portal: 'Portal',
   assistant: 'Assistant',
   api: 'API',
+  federated: 'Other realm',
 }
