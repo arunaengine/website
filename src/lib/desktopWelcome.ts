@@ -12,7 +12,7 @@ const SKIPPED_KEY = 'aruna.desktop.setupSkipped'
 
 // A shell command that never answers must not hold the window: navigation
 // continues, and the app's own realm probe surfaces a realm that is not there.
-const STATUS_TIMEOUT_MS = 5_000
+export const STATUS_TIMEOUT_MS = 5_000
 
 // The shell reports the realm it switched to; the poll only covers an event
 // that never arrived, and neither may hold the form for long.

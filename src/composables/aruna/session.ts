@@ -1,4 +1,5 @@
 import { apiRequest, defaultApiBaseUrl, type RealmInfoResponse } from '@/lib/api'
+import { ownerNodeAllowed } from '@/lib/federation/transfer'
 import { errorMessage } from '@/lib/utils'
 import { loadMetadata, resetRecentOrderProbe } from './catalog'
 import { loadAuthenticated } from './identity'
@@ -29,8 +30,8 @@ import {
 } from './state'
 
 let refreshInFlight: { epoch: number; promise: Promise<void> } | null = null
-// The live token the desktop shell moved to `baseUrl`; sent there only once it named `realmId`.
-let carried: { token: string; realmId: string; baseUrl: string } | null = null
+// The live token the desktop shell moved to `baseUrl`, with the realm info trusted while it was live.
+let carried: { token: string; realm: RealmInfoResponse; baseUrl: string } | null = null
 
 async function refreshForContext(context: ReturnType<typeof refreshContext>): Promise<void> {
   loading.value = true
@@ -84,6 +85,24 @@ function forgetToken() {
 }
 
 /**
+ * Whether the trusted `realm` lists `baseUrl` as a node API or the desktop shell names it as
+ * its enrolled local node. What `baseUrl` itself answers never decides this.
+ */
+async function trustedBase(baseUrl: string, realm: RealmInfoResponse): Promise<boolean> {
+  try {
+    if (ownerNodeAllowed(baseUrl, realm)) return true
+    const [{ nodeStatus }, { bounded, STATUS_TIMEOUT_MS }] = await Promise.all([
+      import('@/lib/desktopBridge'),
+      import('@/lib/desktopWelcome'),
+    ])
+    const local = await bounded(nodeStatus(), STATUS_TIMEOUT_MS)
+    return local.enrolled && local.apiBaseUrl === baseUrl
+  } catch {
+    return false
+  }
+}
+
+/**
  * Restores a carried or stored token only after `/system/realm`, asked without a token,
  * named its realm at this API base, so no request carries a token stored for another realm
  * or API origin.
@@ -93,7 +112,9 @@ async function restoreToken(context: ReturnType<typeof refreshContext>): Promise
     const realm = await apiRequest<RealmInfoResponse>('/system/realm', {}, { baseUrl: context.client.baseUrl })
     if (context.epoch !== sessionEpoch.value) return
     realmInfo.value = realm
-    const held = carried?.baseUrl === context.client.baseUrl && carried.realmId === realm.realm_id ? carried.token : ''
+    const moved = carried?.baseUrl === context.client.baseUrl && carried.realm.realm_id === realm.realm_id ? carried : null
+    const held = moved && (await trustedBase(moved.baseUrl, moved.realm)) ? moved.token : ''
+    if (context.epoch !== sessionEpoch.value) return
     carried = null
     const stored = held || readStored(tokenKey(realm.realm_id, context.client.baseUrl))
     if (stored) setAuthToken(stored)
@@ -136,15 +157,15 @@ export function setAuthToken(token: string) {
   bootstrapped.value = false
 }
 
-// `keepToken` is the desktop shell moving this window between its own bases: the
-// realm-issued token is valid on the local node too, so it returns once the new
-// base names the same realm. Any other caller is addressing a foreign node.
+// `keepToken` is the desktop shell moving this window between its own bases. The token returns
+// once the new base names the same realm, and only if that realm lists the base as a node or
+// the shell names it as its enrolled node. Any other caller is addressing a foreign node.
 export function setApiBaseUrl(url: string, options: { keepToken?: boolean } = {}) {
   const next = url.trim() || defaultApiBaseUrl()
   if (next === apiBaseUrl.value) return
-  const realmId = realmInfo.value?.realm_id
-  const live = authToken.value ? (realmId ? { token: authToken.value, realmId } : null) : carried
-  carried = options.keepToken && live ? { token: live.token, realmId: live.realmId, baseUrl: next } : null
+  const realm = realmInfo.value
+  const live = authToken.value ? (realm ? { token: authToken.value, realm } : null) : carried
+  carried = options.keepToken && live ? { token: live.token, realm: live.realm, baseUrl: next } : null
   sessionEpoch.value++
   // The token stays stored for its own realm and API origin; it is not sent to this one.
   // It goes first, so no watcher sees the new base together with the old token.

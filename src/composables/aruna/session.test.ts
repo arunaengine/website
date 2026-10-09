@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { watch } from 'vue'
 import { apiRequest } from '@/lib/api'
+import { nodeStatus } from '@/lib/desktopBridge'
 
 vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/lib/api')>()), apiRequest: vi.fn() }))
+vi.mock('@/lib/desktopBridge', () => ({ nodeStatus: vi.fn() }))
 
 const A = 'https://api.a.example'
 const B = 'https://api.b.example'
@@ -31,6 +33,7 @@ let storage: Record<string, string>
 
 beforeEach(() => {
   vi.mocked(apiRequest).mockReset()
+  vi.mocked(nodeStatus).mockReset().mockRejectedValue(new Error('No desktop shell.'))
   storage = memoryStorage({
     [`aruna.authToken:REALM-A@${A}`]: 'TOKEN-A',
     [`aruna.authToken:REALM-OLD@${A}`]: 'TOKEN-OLD',
@@ -91,12 +94,16 @@ describe('token restore', () => {
 describe('desktop base switch', () => {
   const LOCAL = 'http://127.0.0.1:47713/api/v1'
 
+  const NODE = 'https://node.a.example/api/v1'
+
   beforeEach(() => {
-    state.realmInfo.value = { realm_id: 'REALM-A' } as never
+    const nodes = [{ configured: true, info: { urls: { api: 'https://node.a.example' } } }]
+    state.realmInfo.value = { realm_id: 'REALM-A', nodes } as never
     state.authToken.value = 'TOKEN-LIVE'
   })
 
   it('sends the token to the new base only after it named the same realm', async () => {
+    vi.mocked(nodeStatus).mockResolvedValue({ enrolled: true, apiBaseUrl: LOCAL } as never)
     const seen: string[][] = []
     const stop = watch([state.apiBaseUrl, state.authToken], (pair) => void seen.push(pair), { flush: 'sync' })
     setApiBaseUrl(LOCAL, { keepToken: true })
@@ -106,6 +113,30 @@ describe('desktop base switch', () => {
     await refresh()
     expect(vi.mocked(apiRequest).mock.calls[0]).toEqual(['/system/realm', {}, { baseUrl: LOCAL }])
     expect(state.authToken.value).toBe('TOKEN-LIVE')
+  })
+
+  it('sends the token to a node API the realm listed before the switch', async () => {
+    setApiBaseUrl(NODE, { keepToken: true })
+    serveRealm('REALM-A')
+    await refresh()
+    expect(state.authToken.value).toBe('TOKEN-LIVE')
+  })
+
+  it('drops the token at a base that only claims the realm', async () => {
+    vi.mocked(nodeStatus).mockResolvedValue({ enrolled: true, apiBaseUrl: LOCAL } as never)
+    setApiBaseUrl('https://evil.example/api/v1', { keepToken: true })
+    serveRealm('REALM-A')
+    await refresh()
+    expect(state.authToken.value).toBe('')
+    expect(vi.mocked(apiRequest).mock.calls.every(([, , client]) => !client?.token)).toBe(true)
+  })
+
+  it('drops the token at a local node the shell has not enrolled', async () => {
+    vi.mocked(nodeStatus).mockResolvedValue({ enrolled: false, apiBaseUrl: LOCAL } as never)
+    setApiBaseUrl(LOCAL, { keepToken: true })
+    serveRealm('REALM-A')
+    await refresh()
+    expect(state.authToken.value).toBe('')
   })
 
   it('drops the token when another realm on the same origin answers', async () => {
