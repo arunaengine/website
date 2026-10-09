@@ -41,7 +41,7 @@ const deleteVault = vi.fn(async () => {
 // The key directory, newest record first.
 const directory: { key_id: string; public_key: string; has_recovery: boolean }[] = []
 const listUserKeys = vi.fn(async (userId: string) => {
-  if (userId !== 'u-1') throw refused(400, 'wrong user')
+  if (!userId.startsWith('u-1')) throw refused(400, 'wrong user')
   return { keys: [...directory] }
 })
 const publishUserKey = vi.fn(async (request: { key_id: string; public_key: string; has_recovery: boolean }) => {
@@ -120,12 +120,12 @@ const local = validateBrowserProvider({
 })
 
 /** A fresh portal start: new module state against the same node and browser store. */
-async function boot(options: { load?: boolean } = {}) {
+async function boot(options: { load?: boolean; user?: string } = {}) {
   vi.resetModules()
   const state = await import('@/composables/aruna/state')
   state.apiBaseUrl.value = 'https://node.test/api/v1'
   state.authToken.value = 'token'
-  state.userInfo.value = { user: { user_id: 'u-1' }, realm: { realm_id: 'r-1' } } as never
+  state.userInfo.value = { user: { user_id: options.user ?? 'u-1' }, realm: { realm_id: 'r-1' } } as never
   const { useUserVault } = await import('./useUserVault')
   const vault = useUserVault()
   if (options.load !== false) await vault.load()
@@ -763,6 +763,24 @@ describe('useUserVault', () => {
     expect(vault.state.value).toBe('unsupported')
     expect(vault.loaded.value).toBe(true)
     await expect(vault.create('x', false)).rejects.toThrow('cannot keep provider keys')
+  })
+
+  it('keeps vaults of foreign users with the same ULID apart by their full user id', async () => {
+    const scopeOf = (userId: string) =>
+      assistantChatScopeKey({ apiBaseUrl: 'https://node.test/api/v1', realmId: 'r-1', userId })
+    const foreign = await boot({ user: 'u-1@home-a' })
+    await foreign.vault.create('correct horse', false)
+
+    // The serving realm and the full foreign id name the scope, not the home realm alone.
+    expect([...remembered.keys()]).toEqual([scopeOf('u-1@home-a')])
+    expect(listUserKeys).toHaveBeenCalledWith('u-1@home-a', expect.anything())
+
+    for (const user of ['u-1@home-c', 'u-1']) {
+      const other = await boot({ user })
+      expect(other.vault.state.value).toBe('locked')
+      expect(remembered.has(scopeOf(user))).toBe(false)
+    }
+    expect((await boot({ user: 'u-1@home-a' })).vault.state.value).toBe('unlocked')
   })
 
   it('a session change forgets the key and starts over', async () => {

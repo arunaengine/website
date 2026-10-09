@@ -1,7 +1,7 @@
 import { effectScope, nextTick, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { assistantChatScopeKey } from '@/lib/assistant/chatHistory'
-import { sessionEpoch } from './aruna/state'
+import { sessionEpoch, userInfo } from './aruna/state'
 import { useKeyIssue } from './useKeyIssue'
 
 const issueBucket = vi.hoisted(() => vi.fn())
@@ -53,6 +53,7 @@ function notice(id: string, bucket: string, read: boolean) {
 beforeEach(() => {
   vi.clearAllMocks()
   store.clear()
+  userInfo.value = { user: { user_id: 'H' }, realm: { realm_id: 'R' } } as never
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => store.get(key) ?? null,
     setItem: (key: string, value: string) => store.set(key, value),
@@ -76,6 +77,21 @@ describe('key issuance recovery', () => {
 
     expect(issueBucket.mock.calls[0]![0]).toMatchObject({ bucket: 'reef', nodeId: 'n1', client: { token: 'T' } })
     expect(store.has(KEY)).toBe(false)
+  })
+
+  it('keeps waiting buckets and the issuing user apart for foreign users with the same ULID', async () => {
+    const scoped = (userId: string) =>
+      `aruna.keyIssue.waiting:${assistantChatScopeKey({ apiBaseUrl: 'https://api.test', realmId: 'R', userId })}`
+    store.set(scoped('U1@home-a'), JSON.stringify([{ bucket: 'reef', nodeId: 'n1' }]))
+    userInfo.value = { user: { user_id: 'U1@home-c' }, realm: { realm_id: 'R' } } as never
+
+    await useKeyIssue().issueWaiting()
+    expect(issueBucket).not.toHaveBeenCalled()
+
+    userInfo.value = { user: { user_id: 'U1@home-a' }, realm: { realm_id: 'R' } } as never
+    await useKeyIssue().issueWaiting()
+    expect(issueBucket.mock.calls[0]![1]).toEqual({ realmId: 'R', userId: 'U1@home-a' })
+    expect(store.has(scoped('U1@home-a'))).toBe(false)
   })
 
   it('keeps buckets whose issuance failed or stayed incomplete', async () => {
