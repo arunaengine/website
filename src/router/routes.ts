@@ -56,6 +56,12 @@ export function portalRoutes(): RouteRecordRaw[] {
       name: 'auth-callback',
       component: () => import('@/views/AuthCallbackView.vue'),
     },
+    // Opened by another realm's portal; the node keeps its opener link under /federation/.
+    {
+      path: '/federation/popup',
+      name: 'federation-popup',
+      component: () => import('@/views/FederationPopupView.vue'),
+    },
     // Desktop first run: outside the app shell, because with no realm behind it
     // the shell's navigation has nothing to link to.
     ...(isDesktop()
