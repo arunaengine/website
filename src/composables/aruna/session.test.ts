@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { watch } from 'vue'
 import { apiRequest } from '@/lib/api'
 
 vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/lib/api')>()), apiRequest: vi.fn() }))
@@ -84,6 +85,35 @@ describe('token restore', () => {
     setAuthToken('')
     expect(storage[`aruna.authToken:REALM-A@${A}`]).toBeUndefined()
     expect(storage[`aruna.authToken:REALM-OLD@${A}`]).toBe('TOKEN-OLD')
+  })
+})
+
+describe('desktop base switch', () => {
+  const LOCAL = 'http://127.0.0.1:47713/api/v1'
+
+  beforeEach(() => {
+    state.realmInfo.value = { realm_id: 'REALM-A' } as never
+    state.authToken.value = 'TOKEN-LIVE'
+  })
+
+  it('sends the token to the new base only after it named the same realm', async () => {
+    const seen: string[][] = []
+    const stop = watch([state.apiBaseUrl, state.authToken], (pair) => void seen.push(pair), { flush: 'sync' })
+    setApiBaseUrl(LOCAL, { keepToken: true })
+    stop()
+    expect(seen).not.toContainEqual([LOCAL, 'TOKEN-LIVE'])
+    serveRealm('REALM-A')
+    await refresh()
+    expect(vi.mocked(apiRequest).mock.calls[0]).toEqual(['/system/realm', {}, { baseUrl: LOCAL }])
+    expect(state.authToken.value).toBe('TOKEN-LIVE')
+  })
+
+  it('drops the token when another realm on the same origin answers', async () => {
+    setApiBaseUrl(`${A}/other/api/v1`, { keepToken: true })
+    serveRealm('REALM-B')
+    await refresh()
+    expect(state.authToken.value).toBe('')
+    expect(vi.mocked(apiRequest).mock.calls.every(([, , client]) => !client?.token)).toBe(true)
   })
 })
 

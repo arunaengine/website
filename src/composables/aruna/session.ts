@@ -29,6 +29,8 @@ import {
 } from './state'
 
 let refreshInFlight: { epoch: number; promise: Promise<void> } | null = null
+// The live token the desktop shell moved to `baseUrl`; sent there only once it named `realmId`.
+let carried: { token: string; realmId: string; baseUrl: string } | null = null
 
 async function refreshForContext(context: ReturnType<typeof refreshContext>): Promise<void> {
   loading.value = true
@@ -82,15 +84,18 @@ function forgetToken() {
 }
 
 /**
- * Restores a stored token only after `/system/realm`, asked without a token, named the realm
- * at this API base, so no request carries a token stored for another realm or API origin.
+ * Restores a carried or stored token only after `/system/realm`, asked without a token,
+ * named its realm at this API base, so no request carries a token stored for another realm
+ * or API origin.
  */
 async function restoreToken(context: ReturnType<typeof refreshContext>): Promise<void> {
   try {
     const realm = await apiRequest<RealmInfoResponse>('/system/realm', {}, { baseUrl: context.client.baseUrl })
     if (context.epoch !== sessionEpoch.value) return
     realmInfo.value = realm
-    const stored = readStored(tokenKey(realm.realm_id, context.client.baseUrl))
+    const held = carried?.baseUrl === context.client.baseUrl && carried.realmId === realm.realm_id ? carried.token : ''
+    carried = null
+    const stored = held || readStored(tokenKey(realm.realm_id, context.client.baseUrl))
     if (stored) setAuthToken(stored)
   } catch {
     // The realm is unknown, so the session stays signed out until a later refresh.
@@ -101,7 +106,8 @@ export function refresh(): Promise<void> {
   const context = refreshContext()
   if (refreshInFlight?.epoch === context.epoch) return refreshInFlight.promise
 
-  restoring.value = !context.client.token && hasStoredToken(context.client.baseUrl)
+  restoring.value = !context.client.token
+    && (carried?.baseUrl === context.client.baseUrl || hasStoredToken(context.client.baseUrl))
   const promise = restoring.value
     ? restoreToken(context)
         .then(() => refreshForContext(refreshContext()))
@@ -117,6 +123,7 @@ export function refresh(): Promise<void> {
 }
 
 export function setAuthToken(token: string) {
+  carried = null
   const next = token.trim()
   if (next === authToken.value) return
   if (!next) forgetToken()
@@ -129,16 +136,19 @@ export function setAuthToken(token: string) {
   bootstrapped.value = false
 }
 
-// `keepToken` is the desktop shell moving this window between its own bases:
-// the realm-issued token is valid on the local node too, so the session
-// survives the switch. Any other caller is addressing a foreign node.
+// `keepToken` is the desktop shell moving this window between its own bases: the
+// realm-issued token is valid on the local node too, so it returns once the new
+// base names the same realm. Any other caller is addressing a foreign node.
 export function setApiBaseUrl(url: string, options: { keepToken?: boolean } = {}) {
   const next = url.trim() || defaultApiBaseUrl()
   if (next === apiBaseUrl.value) return
+  const realmId = realmInfo.value?.realm_id
+  const live = authToken.value ? (realmId ? { token: authToken.value, realmId } : null) : carried
+  carried = options.keepToken && live ? { token: live.token, realmId: live.realmId, baseUrl: next } : null
   sessionEpoch.value++
   // The token stays stored for its own realm and API origin; it is not sent to this one.
   // It goes first, so no watcher sees the new base together with the old token.
-  if (!options.keepToken) authToken.value = ''
+  authToken.value = ''
   apiBaseUrl.value = next
   storeValue(apiBaseKey(), apiBaseUrl.value === defaultApiBaseUrl() ? '' : apiBaseUrl.value)
   clearIdentityState(true)
