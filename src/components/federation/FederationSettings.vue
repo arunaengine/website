@@ -1,7 +1,6 @@
 <script setup lang="ts">
 // Realm federation settings: who can find this realm and who may log in from other realms.
-// The node only serves the public descriptor, so the registry and login choices are known
-// here only after a save in this page.
+// A save replaces all settings, so the form saves only after it loaded the stored ones.
 import { computed, onMounted, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
@@ -14,11 +13,12 @@ import {
   ApiError,
   apiErrorMessage,
   getRealmDescriptor,
+  getRealmFederation,
   setRealmFederation,
   type RealmFederationSettings,
 } from '@/lib/api'
 import { checkRealm, knownRealm } from '@/lib/federation/realms'
-import { assertCurrentSession, refreshContext } from '@/composables/aruna/state'
+import { assertCurrentSession, refreshContext, sessionEpoch } from '@/composables/aruna/state'
 import { Plus, Save, X } from '@lucide/vue'
 
 const { realm } = useAruna()
@@ -32,8 +32,9 @@ const mode = ref<'none' | 'only' | 'any'>('none')
 const realms = ref<string[]>([])
 const address = ref('')
 const loading = ref(true)
-// Registry and login choices are unknown until this page saved them once.
-const choicesKnown = ref(false)
+// Saving is allowed once the stored settings loaded, or the realm has none yet.
+const editable = ref(false)
+const unreadable = ref(false)
 const saving = ref(false)
 const adding = ref(false)
 const failure = ref<string | null>(null)
@@ -41,16 +42,29 @@ const saved = ref(false)
 
 const ready = computed(() => Boolean(name.value.trim() && apiUrl.value.trim() && portalUrl.value.trim()))
 
+const notFound = (error: unknown) => error instanceof ApiError && error.status === 404
+
 onMounted(async () => {
   const context = refreshContext()
+  const current = () => context.epoch === sessionEpoch.value
   try {
-    const descriptor = await getRealmDescriptor(context.client)
-    assertCurrentSession(context.epoch)
-    name.value = descriptor.payload.name
-    apiUrl.value = descriptor.payload.api_url
-    portalUrl.value = descriptor.payload.portal_url
+    const stored = await getRealmFederation(context.client)
+    if (current()) apply(stored)
   } catch (error) {
-    if (!(error instanceof ApiError && error.status === 404)) failure.value = apiErrorMessage(error)
+    if (!current()) return
+    if (!notFound(error)) {
+      failure.value = apiErrorMessage(error)
+      return
+    }
+    // A 404 means no settings yet, unless a descriptor exists: then this node cannot read them.
+    try {
+      await getRealmDescriptor(context.client)
+      if (current()) unreadable.value = true
+    } catch (missing) {
+      if (!current()) return
+      if (notFound(missing)) editable.value = true
+      else failure.value = apiErrorMessage(missing)
+    }
   } finally {
     loading.value = false
   }
@@ -64,7 +78,7 @@ function apply(stored: RealmFederationSettings) {
   listed.value = stored.registration === 'enabled'
   mode.value = stored.accepted_realms.mode
   realms.value = stored.accepted_realms.mode === 'only' ? [...stored.accepted_realms.realms] : []
-  choicesKnown.value = true
+  editable.value = true
 }
 
 async function addRealm() {
@@ -118,10 +132,8 @@ async function save() {
       <p class="text-xs text-muted-foreground">Let people from other realms find and use this realm.</p>
     </header>
     <Spinner v-if="loading" show-label label="Loading…" class="p-5 text-sm" />
-    <div v-else class="space-y-5 p-5">
-      <Notice v-if="!choicesKnown">
-        The current registry and login choices cannot be read here. Saving sets them as shown.
-      </Notice>
+    <fieldset v-else :disabled="!editable" class="min-w-0 space-y-5 p-5">
+      <Notice v-if="unreadable">This node cannot read the current settings, so they cannot be changed here.</Notice>
       <div class="grid gap-4 sm:grid-cols-2">
         <div>
           <label for="federation-name" class="text-xs font-medium text-foreground">Name</label>
@@ -186,9 +198,9 @@ async function save() {
       </fieldset>
       <Notice v-if="failure" tone="error">{{ failure }}</Notice>
       <Notice v-else-if="saved" tone="success">Saved.</Notice>
-    </div>
+    </fieldset>
     <footer class="flex justify-end border-t border-border bg-muted/30 px-5 py-3">
-      <Button :disabled="!ready || saving || loading" @click="save">
+      <Button :disabled="!editable || !ready || saving || loading" @click="save">
         <Spinner v-if="saving" class="text-current" aria-hidden="true" /><Save v-else class="h-4 w-4" /> Save
       </Button>
     </footer>

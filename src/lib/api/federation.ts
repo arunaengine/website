@@ -121,6 +121,11 @@ export function getRealmDescriptor(client: ApiClientOptions = {}) {
   return apiRequest<Signed<RealmDescriptor>>('/system/realm/descriptor', {}, client)
 }
 
+/** The stored settings, for realm admins; a save replaces all of them. */
+export function getRealmFederation(client: ApiClientOptions = {}) {
+  return apiRequest<RealmFederationSettings>('/system/realm/federation', {}, client)
+}
+
 export function setRealmFederation(settings: RealmFederationSettings, client: ApiClientOptions = {}) {
   return apiRequest<RealmFederationSettings>(
     '/system/realm/federation',
