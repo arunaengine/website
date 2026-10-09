@@ -1,0 +1,146 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ApiError } from '@/lib/api/client'
+import { HandshakeError } from '@/lib/federation/handshake'
+
+const api = {
+  createImportIntent: vi.fn(),
+  getRealmDescriptor: vi.fn(),
+  createImport: vi.fn(),
+}
+const archive = { submitImport: vi.fn(), uploadArchive: vi.fn() }
+const checkOwnerNode = vi.fn()
+const ask = vi.fn()
+const close = vi.fn()
+
+vi.mock('@/lib/api', async (original) => ({
+  ...(await original<typeof import('@/lib/api')>()),
+  createImportIntent: (...args: unknown[]) => api.createImportIntent(...args),
+  getRealmDescriptor: (...args: unknown[]) => api.getRealmDescriptor(...args),
+  createImport: (...args: unknown[]) => api.createImport(...args),
+}))
+vi.mock('@/lib/rocrateArchive', () => ({
+  submitImport: (...args: unknown[]) => archive.submitImport(...args),
+  uploadArchive: (...args: unknown[]) => archive.uploadArchive(...args),
+}))
+vi.mock('@/lib/federation/transfer', async (original) => ({
+  ...(await original<typeof import('@/lib/federation/transfer')>()),
+  checkOwnerNode: (...args: unknown[]) => checkOwnerNode(...args),
+}))
+vi.mock('@/lib/federation/popup', async (original) => ({
+  ...(await original<typeof import('@/lib/federation/popup')>()),
+  openPopup: () => ({ ask, close }),
+}))
+
+const { apiBaseUrl, authToken, sessionEpoch } = await import('./aruna/state')
+const { OwnerNodeError } = await import('@/lib/federation/transfer')
+const { useRealmImport } = await import('./useRealmImport')
+
+const form = {
+  home: { realmId: 'A', name: 'Giessen Data' },
+  groupId: 'G',
+  groupName: 'Field notes',
+  bucket: 'imports',
+  prefix: 'giessen',
+  metadataPath: 'datasets/river',
+} as never
+const descriptor = { payload: { api_url: 'https://b.example/api/v1' } }
+const pullUnreachable = new ApiError(502, 'unreachable', 'pull_unreachable')
+
+function script(answers: Record<string, unknown>) {
+  ask.mockImplementation(async (body: { kind: string }) => {
+    const answer = answers[body.kind]
+    if (answer instanceof Error) throw answer
+    return answer
+  })
+}
+
+beforeEach(() => {
+  vi.stubGlobal('window', {})
+  for (const mock of [...Object.values(api), ...Object.values(archive), checkOwnerNode, ask, close]) mock.mockReset()
+  apiBaseUrl.value = 'https://b.example/api/v1'
+  authToken.value = 'B-TOKEN'
+  api.createImportIntent.mockResolvedValue({ payload: { intent_id: 'I' } })
+  api.getRealmDescriptor.mockResolvedValue(descriptor)
+  archive.submitImport.mockResolvedValue({ job_id: 'J2' })
+})
+
+describe('useRealmImport', () => {
+  it('pulls from the source with the grant and the kept secret', async () => {
+    script({ export: { grant: { payload: {} }, files: 1 } })
+    api.createImport.mockResolvedValue({ job_id: 'J1' })
+    const flow = useRealmImport()
+    await flow.start(form)
+    expect(flow.phase.value).toBe('started')
+    expect(flow.submitted.value).toEqual({ job_id: 'J1' })
+    const [request] = api.createImport.mock.calls[0]
+    expect(request.secret).toMatch(/^[0-9a-f]{64}$/)
+    expect(JSON.stringify(ask.mock.calls)).not.toContain(request.secret)
+    expect(close).toHaveBeenCalled()
+  })
+
+  it('lets the source push when the pull is unreachable, then imports on the checked node', async () => {
+    script({ export: { grant: {}, files: 1 }, push: { upload_id: 'U', owner_node_url: 'https://b2.example/api/v1' } })
+    api.createImport.mockRejectedValue(pullUnreachable)
+    checkOwnerNode.mockResolvedValue('https://b2.example/api/v1')
+    const flow = useRealmImport()
+    await flow.start(form)
+    expect(checkOwnerNode).toHaveBeenCalledWith('https://b2.example/api/v1', 'https://b.example/api/v1', 'B-TOKEN')
+    const [request, client] = archive.submitImport.mock.calls[0]
+    expect(request.source).toEqual({ kind: 'upload', upload_id: 'U' })
+    expect(client).toEqual({ baseUrl: 'https://b2.example/api/v1', token: 'B-TOKEN' })
+    expect(flow.jobClient.value).toEqual(client)
+  })
+
+  it('stops before any bearer goes to a node the source made up', async () => {
+    script({ export: { grant: {}, files: 1 }, push: { upload_id: 'U', owner_node_url: 'https://evil.example' } })
+    api.createImport.mockRejectedValue(pullUnreachable)
+    checkOwnerNode.mockRejectedValue(new OwnerNodeError('The other realm named a node that is not part of this realm.'))
+    const flow = useRealmImport()
+    await flow.start(form)
+    expect(flow.phase.value).toBe('failed')
+    expect(flow.failure.value).toContain('not part of this realm')
+    expect(archive.submitImport).not.toHaveBeenCalled()
+  })
+
+  it('takes metadata only through the window when neither server reaches the other', async () => {
+    script({ export: { grant: {}, files: 0 }, push: new HandshakeError('refused', 'push_unreachable'), artifact: new ArrayBuffer(4) })
+    api.createImport.mockRejectedValue(pullUnreachable)
+    archive.uploadArchive.mockResolvedValue({ upload_id: 'U3' })
+    const flow = useRealmImport()
+    await flow.start(form)
+    expect(archive.uploadArchive).toHaveBeenCalledOnce()
+    expect(archive.submitImport.mock.calls[0][0].source).toEqual({ kind: 'upload', upload_id: 'U3' })
+    expect(flow.phase.value).toBe('started')
+  })
+
+  it('fails clearly for files and keeps the window for a retry', async () => {
+    script({ export: { grant: {}, files: 2 }, push: new HandshakeError('refused', 'push_unreachable') })
+    api.createImport.mockRejectedValue(pullUnreachable)
+    const flow = useRealmImport()
+    await flow.start(form)
+    expect(flow.failure.value).toBe('The realms cannot copy files to each other.')
+    expect(flow.canRetry.value).toBe(true)
+    expect(close).not.toHaveBeenCalled()
+    api.createImport.mockResolvedValue({ job_id: 'J9' })
+    await flow.retry()
+    expect(flow.submitted.value).toEqual({ job_id: 'J9' })
+  })
+
+  it('drops the answer when the session changed while the window was open', async () => {
+    ask.mockImplementation(async () => {
+      sessionEpoch.value++
+      return { grant: {}, files: 0 }
+    })
+    const flow = useRealmImport()
+    await flow.start(form)
+    expect(api.createImport).not.toHaveBeenCalled()
+    expect(flow.phase.value).toBe('choosing')
+  })
+
+  it('names a destination this user cannot write', async () => {
+    api.createImportIntent.mockRejectedValue(new ApiError(403, 'denied', 'import_denied'))
+    const flow = useRealmImport()
+    await flow.start(form)
+    expect(flow.failure.value).toBe('You cannot import into Field notes.')
+  })
+})

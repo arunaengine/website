@@ -1,25 +1,34 @@
 // Requests a realm portal sends to the popup page of the user's home realm, and the checks
 // both sides make before they use one.
-import type { ImportIntent, LoginHandoff } from '@/lib/api/federation'
+import type { ExportGrant, ImportIntent, LoginHandoff } from '@/lib/api/federation'
 import { realmIdText, userIdText, verifyDescriptor, type RealmDescriptor, type Signed, type VerifiedRealm } from './descriptor'
 import { HandshakeError, PopupChannel, type HandshakeWindow, type OpenerRequest } from './handshake'
 
 /** Long enough to log in at the home realm in another tab first. */
 export const POPUP_TIMEOUT_MS = 10 * 60_000
+/** An import keeps its popup while the source exports and, when needed, pushes. */
+export const IMPORT_TIMEOUT_MS = 60 * 60_000
 
 export type PopupRequest =
   | { kind: 'login'; descriptor: Signed<RealmDescriptor>; nonce: string; link?: boolean }
   | { kind: 'export'; descriptor: Signed<RealmDescriptor>; intent: Signed<ImportIntent> }
-  | { kind: 'push'; jobId: string }
-  | { kind: 'done' }
+  | { kind: 'push' }
+  | { kind: 'artifact' }
+
+/** The source realm's answer to an export request. */
+export interface ExportAnswer {
+  grant: Signed<ExportGrant>
+  /** How many files travel; zero means metadata only. */
+  files: number
+}
 
 /** The popup page of a realm's portal; it sends the opener policy that keeps the link. */
 export function popupUrl(realm: VerifiedRealm): string {
   return new URL('/federation/popup', realm.portalUrl).href
 }
 
-export function openPopup(host: HandshakeWindow, realm: VerifiedRealm): PopupChannel {
-  return new PopupChannel(host, popupUrl(realm), realm.portalOrigin, POPUP_TIMEOUT_MS)
+export function openPopup(host: HandshakeWindow, realm: VerifiedRealm, timeoutMs = POPUP_TIMEOUT_MS): PopupChannel {
+  return new PopupChannel(host, popupUrl(realm), realm.portalOrigin, timeoutMs)
 }
 
 export class RequestError extends Error {

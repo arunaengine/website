@@ -34,7 +34,7 @@ describe('acceptOpener', () => {
     await expect(
       acceptOpener({ id: 1, origin: SERVING, body: { kind: 'login', descriptor: signed, nonce: 'n' } }, own),
     ).rejects.toThrow('same realm')
-    await expect(acceptOpener({ id: 1, origin: SERVING, body: { kind: 'push', jobId: 'j' } }, 'home')).rejects.toThrow('not supported')
+    await expect(acceptOpener({ id: 1, origin: SERVING, body: { kind: 'push' } }, 'home')).rejects.toThrow('not supported')
   })
 })
 
