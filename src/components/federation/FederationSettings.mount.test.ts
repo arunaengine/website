@@ -5,7 +5,6 @@ import { button, click, compileClientComponent, content, element, flush, moduleD
 import { ApiError } from '@/lib/api/client'
 
 const getRealmFederation = vi.fn()
-const getRealmDescriptor = vi.fn()
 const setRealmFederation = vi.fn()
 const sessionEpoch = ref(1)
 const Empty = defineComponent(() => () => null)
@@ -33,7 +32,6 @@ const Settings = compileClientComponent(new URL('./FederationSettings.vue', impo
   '@/lib/api': {
     ApiError,
     apiErrorMessage: (error: Error) => error.message,
-    getRealmDescriptor,
     getRealmFederation,
     setRealmFederation,
   },
@@ -48,7 +46,7 @@ const stored = {
   registration: 'disabled',
   accepted_realms: { mode: 'only', realms: ['GIESSEN'] },
 }
-const notFound = new ApiError(404, 'Not found')
+const unset = new ApiError(404, 'no federation settings', 'federation_unset')
 
 function fieldset(root: Parameters<typeof content>[0]) {
   return element(root, (node) => node.tag === 'fieldset')
@@ -56,41 +54,71 @@ function fieldset(root: Parameters<typeof content>[0]) {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  setRealmFederation.mockImplementation(async (settings) => settings)
+  setRealmFederation.mockImplementation(async (settings) => ({ settings, etag: '"next"' }))
 })
 
 describe('FederationSettings', () => {
-  it('saves the loaded settings it did not change', async () => {
-    getRealmFederation.mockResolvedValue(stored)
+  it('saves the loaded settings it did not change, naming their ETag', async () => {
+    getRealmFederation.mockResolvedValue({ settings: stored, etag: '"v1"' })
     const mounted = await mountApp(Settings)
     await flush()
     expect(fieldset(mounted.root).props.disabled).toBe(false)
     await click(button(mounted.root, 'Save'))
     expect(setRealmFederation).toHaveBeenCalledWith(
       expect.objectContaining({ registry_url: 'https://registry.example/', registration: 'disabled', accepted_realms: stored.accepted_realms }),
+      '"v1"',
       { baseUrl: '/api/v1', token: 'T' },
     )
+    await click(button(mounted.root, 'Save'))
+    expect(setRealmFederation.mock.calls[1][1]).toBe('"next"')
     mounted.app.unmount()
   })
 
-  it('stays read-only when this node cannot read the stored settings', async () => {
-    getRealmFederation.mockRejectedValue(notFound)
-    getRealmDescriptor.mockResolvedValue({ payload: { name: 'Marburg Archive' } })
+  it('sets up a realm without settings as a first setup', async () => {
+    getRealmFederation.mockRejectedValue(unset)
     const mounted = await mountApp(Settings)
     await flush()
-    expect(content(mounted.root)).toContain('This node cannot read the current settings')
+    expect(fieldset(mounted.root).props.disabled).toBe(false)
+    await click(button(mounted.root, 'Save'))
+    expect(setRealmFederation.mock.calls[0][1]).toBeNull()
+    mounted.app.unmount()
+  })
+
+  it.each([
+    ['a node without realm configuration', new ApiError(503, 'no config', 'realm_config_missing'), 'no realm configuration'],
+    ['a 404 without its code', new ApiError(404, 'Not found'), 'Not found'],
+  ])('stays read-only for %s', async (_, error, note) => {
+    getRealmFederation.mockRejectedValue(error)
+    const mounted = await mountApp(Settings)
+    await flush()
+    expect(content(mounted.root)).toContain(note)
     expect(fieldset(mounted.root).props.disabled).toBe(true)
     expect(button(mounted.root, 'Save').props.disabled).toBe(true)
     mounted.app.unmount()
   })
 
-  it('lets a realm without settings set them up', async () => {
-    getRealmFederation.mockRejectedValue(notFound)
-    getRealmDescriptor.mockRejectedValue(notFound)
+  it('stays read-only when the settings come without a version', async () => {
+    getRealmFederation.mockResolvedValue({ settings: stored, etag: null })
     const mounted = await mountApp(Settings)
     await flush()
-    expect(fieldset(mounted.root).props.disabled).toBe(false)
-    expect(content(mounted.root)).not.toContain('cannot read')
+    expect(content(mounted.root)).toContain('no settings version')
+    expect(fieldset(mounted.root).props.disabled).toBe(true)
+    mounted.app.unmount()
+  })
+
+  it('shows the current settings after they changed elsewhere', async () => {
+    getRealmFederation
+      .mockResolvedValueOnce({ settings: stored, etag: '"v1"' })
+      .mockResolvedValueOnce({ settings: { ...stored, name: 'Marburg Data' }, etag: '"v2"' })
+    setRealmFederation.mockRejectedValueOnce(new ApiError(412, 'changed', 'settings_changed'))
+    const mounted = await mountApp(Settings)
+    await flush()
+    await click(button(mounted.root, 'Save'))
+    await flush()
+    expect(content(mounted.root)).toContain('changed elsewhere')
+    expect(element(mounted.root, (node) => node.props.id === 'federation-name').props.value).toBe('Marburg Data')
+    await click(button(mounted.root, 'Save'))
+    expect(setRealmFederation.mock.calls[1][1]).toBe('"v2"')
     mounted.app.unmount()
   })
 })

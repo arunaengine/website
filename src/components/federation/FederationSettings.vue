@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Realm federation settings: who can find this realm and who may log in from other realms.
-// A save replaces all settings, so the form saves only after it loaded the stored ones.
+// A save replaces all settings, so it names the loaded ones by their ETag; the node refuses
+// it when they changed meanwhile.
 import { computed, onMounted, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
@@ -12,10 +13,9 @@ import { useAruna } from '@/composables/useAruna'
 import {
   ApiError,
   apiErrorMessage,
-  getRealmDescriptor,
   getRealmFederation,
   setRealmFederation,
-  type RealmFederationSettings,
+  type StoredFederation,
 } from '@/lib/api'
 import { checkRealm, knownRealm } from '@/lib/federation/realms'
 import { assertCurrentSession, refreshContext, sessionEpoch } from '@/composables/aruna/state'
@@ -32,9 +32,10 @@ const mode = ref<'none' | 'only' | 'any'>('none')
 const realms = ref<string[]>([])
 const address = ref('')
 const loading = ref(true)
-// Saving is allowed once the stored settings loaded, or the realm has none yet.
-const editable = ref(false)
-const unreadable = ref(false)
+// Saving needs the loaded settings' ETag, or a realm without settings (the first setup).
+const etag = ref<string | null>(null)
+const firstSetup = ref(false)
+const editable = computed(() => Boolean(etag.value) || firstSetup.value)
 const saving = ref(false)
 const adding = ref(false)
 const failure = ref<string | null>(null)
@@ -42,35 +43,26 @@ const saved = ref(false)
 
 const ready = computed(() => Boolean(name.value.trim() && apiUrl.value.trim() && portalUrl.value.trim()))
 
-const notFound = (error: unknown) => error instanceof ApiError && error.status === 404
+const codeOf = (error: unknown) => (error instanceof ApiError ? error.code : undefined)
 
-onMounted(async () => {
-  const context = refreshContext()
+async function load(context = refreshContext()) {
   const current = () => context.epoch === sessionEpoch.value
   try {
     const stored = await getRealmFederation(context.client)
     if (current()) apply(stored)
   } catch (error) {
     if (!current()) return
-    if (!notFound(error)) {
-      failure.value = apiErrorMessage(error)
-      return
-    }
-    // A 404 means no settings yet, unless a descriptor exists: then this node cannot read them.
-    try {
-      await getRealmDescriptor(context.client)
-      if (current()) unreadable.value = true
-    } catch (missing) {
-      if (!current()) return
-      if (notFound(missing)) editable.value = true
-      else failure.value = apiErrorMessage(missing)
-    }
+    if (codeOf(error) === 'federation_unset') firstSetup.value = true
+    else if (codeOf(error) === 'realm_config_missing') failure.value = 'This node has no realm configuration yet.'
+    else failure.value = apiErrorMessage(error)
   } finally {
     loading.value = false
   }
-})
+}
 
-function apply(stored: RealmFederationSettings) {
+onMounted(() => load())
+
+function apply({ settings: stored, etag: version }: StoredFederation) {
   name.value = stored.name
   apiUrl.value = stored.api_url
   portalUrl.value = stored.portal_url
@@ -78,7 +70,9 @@ function apply(stored: RealmFederationSettings) {
   listed.value = stored.registration === 'enabled'
   mode.value = stored.accepted_realms.mode
   realms.value = stored.accepted_realms.mode === 'only' ? [...stored.accepted_realms.realms] : []
-  editable.value = true
+  etag.value = version
+  firstSetup.value = false
+  if (!version) failure.value = 'This node sent no settings version, so they cannot be changed here.'
 }
 
 async function addRealm() {
@@ -98,6 +92,7 @@ async function addRealm() {
 }
 
 async function save() {
+  if (!editable.value) return
   saving.value = true
   failure.value = null
   saved.value = false
@@ -112,13 +107,21 @@ async function save() {
         registration: listed.value ? 'enabled' : 'disabled',
         accepted_realms: mode.value === 'only' ? { mode: 'only', realms: realms.value } : { mode: mode.value },
       },
+      etag.value,
       context.client,
     )
     assertCurrentSession(context.epoch)
     apply(stored)
     saved.value = true
   } catch (error) {
-    failure.value = apiErrorMessage(error)
+    if (codeOf(error) !== 'settings_changed') {
+      failure.value = apiErrorMessage(error)
+      return
+    }
+    etag.value = null
+    firstSetup.value = false
+    await load(context)
+    failure.value ??= 'These settings were changed elsewhere. The current ones are shown now.'
   } finally {
     saving.value = false
   }
@@ -133,7 +136,6 @@ async function save() {
     </header>
     <Spinner v-if="loading" show-label label="Loading…" class="p-5 text-sm" />
     <fieldset v-else :disabled="!editable" class="min-w-0 space-y-5 p-5">
-      <Notice v-if="unreadable">This node cannot read the current settings, so they cannot be changed here.</Notice>
       <div class="grid gap-4 sm:grid-cols-2">
         <div>
           <label for="federation-name" class="text-xs font-medium text-foreground">Name</label>

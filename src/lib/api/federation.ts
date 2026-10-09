@@ -122,16 +122,44 @@ export function getRealmDescriptor(client: ApiClientOptions = {}) {
 }
 
 /** The stored settings, for realm admins; a save replaces all of them. */
-export function getRealmFederation(client: ApiClientOptions = {}) {
-  return apiRequest<RealmFederationSettings>('/system/realm/federation', {}, client)
+/** Stored settings with their quoted `ETag`, which the next change sends back. */
+export interface StoredFederation {
+  settings: RealmFederationSettings
+  etag: string | null
 }
 
-export function setRealmFederation(settings: RealmFederationSettings, client: ApiClientOptions = {}) {
-  return apiRequest<RealmFederationSettings>(
+/** 404 `federation_unset` means no settings yet; 503 `realm_config_missing`, no realm config. */
+export async function getRealmFederation(client: ApiClientOptions = {}): Promise<StoredFederation> {
+  let etag: string | null = null
+  const settings = await apiRequest<RealmFederationSettings>(
     '/system/realm/federation',
-    { method: 'PUT', body: JSON.stringify(settings) },
+    { onHeaders: (headers) => (etag = headers.get('ETag')) },
     client,
   )
+  return { settings, etag }
+}
+
+/**
+ * Replaces the settings whose `ETag` is `etag`; null is the first setup. Settings changed
+ * meanwhile answer 412 `settings_changed`.
+ */
+export async function setRealmFederation(
+  settings: RealmFederationSettings,
+  etag: string | null,
+  client: ApiClientOptions = {},
+): Promise<StoredFederation> {
+  let next: string | null = null
+  const stored = await apiRequest<RealmFederationSettings>(
+    '/system/realm/federation',
+    {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+      headers: etag ? { 'If-Match': etag } : { 'If-None-Match': '*' },
+      onHeaders: (headers) => (next = headers.get('ETag')),
+    },
+    client,
+  )
+  return { settings: stored, etag: next }
 }
 
 /** At the home realm: a handoff for the realm of `descriptor`, bound to `nonce`. */

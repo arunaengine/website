@@ -60,6 +60,8 @@ export interface ApiClientOptions {
 export interface ApiRequestOptions extends RequestInit {
   token?: string
   query?: Record<string, string | number | boolean | null | undefined>
+  /** Gets the headers of a successful answer, for example to read its `ETag`. */
+  onHeaders?: (headers: Headers) => void
 }
 
 export function defaultApiBaseUrl(): string {
@@ -150,6 +152,7 @@ export async function apiRequest<T>(
     throw new ApiError(response.status, message, code, details, retryAfter)
   }
 
+  options.onHeaders?.(response.headers)
   if (response.status === 204 || response.status === 205) return undefined as T
   const body = await response.text()
   if (!body) return undefined as T
