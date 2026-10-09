@@ -110,6 +110,17 @@ export async function checkRealm(
   return { status: 'ok', realm }
 }
 
+/**
+ * Checks `realm` again right before a window of it opens: the same realm id, and details
+ * no older than the ones the caller holds. Throws a `DescriptorError` otherwise.
+ */
+export async function recheckRealm(realm: VerifiedRealm): Promise<VerifiedRealm> {
+  const result = await checkRealm(realm.portalUrl, { realmId: realm.realmId, label: realm.name })
+  if (result.status === 'ok' && result.realm.issuedAt >= realm.issuedAt) return result.realm
+  if (result.status === 'unreachable') throw new DescriptorError('unreachable', result.message)
+  throw new DescriptorError('mismatch', result.status === 'ok' ? `${realm.name} sent older details.` : result.message)
+}
+
 export interface RealmKpis {
   live_datasets: number | null
   groups: number | null

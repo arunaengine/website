@@ -11,7 +11,7 @@ import {
 } from '@/lib/api'
 import type { VerifiedRealm, Signed } from '@/lib/federation/descriptor'
 import { checkHandoff, openPopup, popupFailure } from '@/lib/federation/popup'
-import { rememberRealm, knownRealm } from '@/lib/federation/realms'
+import { rememberRealm, knownRealm, recheckRealm } from '@/lib/federation/realms'
 import { newSecret } from '@/lib/federation/secret'
 import { shortId } from './aruna/format'
 import { apiBaseUrl, assertCurrentSession, authToken, readStored, refreshContext, storeValue } from './aruna/state'
@@ -61,14 +61,15 @@ export class FederationError extends Error {
 }
 
 /**
- * Opens the home realm's popup and returns its handoff for this realm, bound to `nonce`.
- * `link` only changes the words the home realm shows.
+ * Checks the home realm again, opens its popup and returns its handoff for this realm, bound
+ * to `nonce`. `link` only changes the words the home realm shows.
  */
 export async function requestHandoff(home: VerifiedRealm, nonce: string, link = false): Promise<Signed<LoginHandoff>> {
   const context = refreshContext()
   let descriptor
+  let checked: VerifiedRealm
   try {
-    descriptor = await getRealmDescriptor(context.client)
+    ;[descriptor, checked] = await Promise.all([getRealmDescriptor(context.client), recheckRealm(home)])
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
       throw new FederationError('This realm does not take logins from other realms.')
@@ -76,11 +77,11 @@ export async function requestHandoff(home: VerifiedRealm, nonce: string, link = 
     throw error
   }
   assertCurrentSession(context.epoch)
-  const channel = openPopup(window, home)
+  const channel = openPopup(window, checked)
   try {
     const handoff = await channel.ask<Signed<LoginHandoff>>({ kind: 'login', descriptor, nonce, link })
     assertCurrentSession(context.epoch)
-    checkHandoff(handoff, home, nonce)
+    checkHandoff(handoff, checked, nonce)
     return handoff
   } finally {
     channel.close()

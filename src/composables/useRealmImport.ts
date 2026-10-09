@@ -16,6 +16,7 @@ import {
 import type { Signed, RealmDescriptor, VerifiedRealm } from '@/lib/federation/descriptor'
 import { HandshakeError, type PopupChannel } from '@/lib/federation/handshake'
 import { IMPORT_TIMEOUT_MS, openPopup, popupFailure, type ExportAnswer } from '@/lib/federation/popup'
+import { recheckRealm } from '@/lib/federation/realms'
 import { newSecret } from '@/lib/federation/secret'
 import { checkOwnerNode, OwnerNodeError } from '@/lib/federation/transfer'
 import { submitImport, uploadArchive, type SubmitImportResponse } from '@/lib/rocrateArchive'
@@ -155,11 +156,14 @@ export function useRealmImport() {
       const context = refreshContext()
       const { secret, nonce } = await newSecret()
       const destination = { group_id: form.groupId, bucket: form.bucket, prefix: form.prefix, metadata_path: form.metadataPath }
-      const intent = await createImportIntent({ ...destination, nonce }, context.client)
-      const descriptor = await getRealmDescriptor(context.client)
+      const [intent, descriptor, source] = await Promise.all([
+        createImportIntent({ ...destination, nonce }, context.client),
+        getRealmDescriptor(context.client),
+        recheckRealm(form.home),
+      ])
       current(run, context.epoch)
       phase.value = 'choosing'
-      channel = openPopup(window, form.home, IMPORT_TIMEOUT_MS)
+      channel = openPopup(window, source, IMPORT_TIMEOUT_MS)
       const answer = await channel.ask<ExportAnswer>({ kind: 'export', descriptor, intent })
       current(run, context.epoch)
       files.value = answer.files

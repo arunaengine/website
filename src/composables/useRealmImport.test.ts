@@ -11,6 +11,7 @@ const archive = { submitImport: vi.fn(), uploadArchive: vi.fn() }
 const checkOwnerNode = vi.fn()
 const ask = vi.fn()
 const close = vi.fn()
+const recheckRealm = vi.fn()
 
 vi.mock('@/lib/api', async (original) => ({
   ...(await original<typeof import('@/lib/api')>()),
@@ -29,6 +30,10 @@ vi.mock('@/lib/federation/transfer', async (original) => ({
 vi.mock('@/lib/federation/popup', async (original) => ({
   ...(await original<typeof import('@/lib/federation/popup')>()),
   openPopup: () => ({ ask, close }),
+}))
+vi.mock('@/lib/federation/realms', async (original) => ({
+  ...(await original<typeof import('@/lib/federation/realms')>()),
+  recheckRealm: (...args: unknown[]) => recheckRealm(...args),
 }))
 
 const { apiBaseUrl, authToken, sessionEpoch } = await import('./aruna/state')
@@ -56,7 +61,10 @@ function script(answers: Record<string, unknown>) {
 
 beforeEach(() => {
   vi.stubGlobal('window', {})
-  for (const mock of [...Object.values(api), ...Object.values(archive), checkOwnerNode, ask, close]) mock.mockReset()
+  for (const mock of [...Object.values(api), ...Object.values(archive), checkOwnerNode, ask, close, recheckRealm]) {
+    mock.mockReset()
+  }
+  recheckRealm.mockImplementation(async (realm: unknown) => realm)
   apiBaseUrl.value = 'https://b.example/api/v1'
   authToken.value = 'B-TOKEN'
   api.createImportIntent.mockResolvedValue({ payload: { intent_id: 'I' } })
@@ -65,6 +73,15 @@ beforeEach(() => {
 })
 
 describe('useRealmImport', () => {
+  it('opens no source window when the source realm does not check out', async () => {
+    recheckRealm.mockRejectedValue(new Error('Cannot reach Giessen Data.'))
+    const flow = useRealmImport()
+    await flow.start(form)
+    expect(flow.phase.value).toBe('failed')
+    expect(flow.failure.value).toBe('Cannot reach Giessen Data.')
+    expect(ask).not.toHaveBeenCalled()
+  })
+
   it('pulls from the source with the grant and the kept secret', async () => {
     script({ export: { grant: { payload: {} }, files: 1 } })
     api.createImport.mockResolvedValue({ job_id: 'J1' })

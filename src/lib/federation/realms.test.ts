@@ -1,7 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { signedRealm } from '@/test/federation'
-import { verifyDescriptor } from './descriptor'
-import { checkRealm, knownRealm, listRegistry, rememberRealm, reloadRealms, savedRealms, setRealmSaved } from './realms'
+import { sign, signedRealm } from '@/test/federation'
+import { descriptorSigningBytes, verifyDescriptor } from './descriptor'
+import {
+  checkRealm,
+  knownRealm,
+  listRegistry,
+  recheckRealm,
+  rememberRealm,
+  reloadRealms,
+  savedRealms,
+  setRealmSaved,
+} from './realms'
 
 function memoryStorage() {
   const values = new Map<string, string>()
@@ -114,5 +123,37 @@ describe('checkRealm', () => {
     serve({})
     const result = await checkRealm('https://data.giessen.example', { label: 'Fulda Campus' })
     expect(result).toEqual({ status: 'unreachable', message: 'Cannot reach Fulda Campus.' })
+  })
+})
+
+describe('recheckRealm', () => {
+  const portal = 'https://data.giessen.example/.well-known/aruna-realm'
+  const api = 'https://api.giessen.example/api/v1/system/realm/descriptor'
+  function serve(body: unknown) {
+    vi.stubGlobal('fetch', vi.fn(async (input: URL | string) =>
+      [portal, api].includes(String(input)) ? new Response(JSON.stringify(body)) : new Response('', { status: 404 }),
+    ))
+  }
+
+  it('returns the details the realm serves now', async () => {
+    const first = await signedRealm({ issued_at: 5 })
+    const held = await verifyDescriptor(first.signed)
+    const payload = { ...first.signed.payload, issued_at: 6, name: 'Giessen Data Hub' }
+    serve({ payload, signer: 'Realm', signature: await sign(first.pair.privateKey, descriptorSigningBytes(payload)) })
+    expect((await recheckRealm(held)).name).toBe('Giessen Data Hub')
+  })
+
+  it('refuses details older than the held ones', async () => {
+    const { signed } = await signedRealm({ issued_at: 5 })
+    const served = await verifyDescriptor(signed)
+    serve(signed)
+    await expect(recheckRealm({ ...served, issuedAt: 9 })).rejects.toThrow('Giessen Data sent older details.')
+  })
+
+  it('refuses another realm at the same address', async () => {
+    const { signed } = await signedRealm()
+    const other = await verifyDescriptor((await signedRealm()).signed)
+    serve(signed)
+    await expect(recheckRealm(other)).rejects.toThrow('Realm details do not match.')
   })
 })
