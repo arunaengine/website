@@ -86,3 +86,26 @@ describe('token restore', () => {
     expect(storage[`aruna.authToken:REALM-OLD@${A}`]).toBe('TOKEN-OLD')
   })
 })
+
+describe('saved API base', () => {
+  it('ignores the override another realm portal on this origin saved', async () => {
+    storage[`aruna.apiBaseUrl:${A}/api/v1`] = `${A}/api/v1`
+    storage['aruna.apiBaseUrl'] = `${A}/api/v1`
+    vi.resetModules()
+    const fresh = await import('./state')
+    const freshSession = await import('./session')
+    expect(fresh.apiBaseUrl.value).toBe('/api/v1')
+    serveRealm('REALM-A')
+    await freshSession.refresh()
+    expect(fresh.authToken.value).toBe('')
+    expect(vi.mocked(apiRequest).mock.calls.every(([, , client]) => client?.baseUrl === '/api/v1' && !client.token)).toBe(true)
+  })
+
+  it('keeps the override this portal saved', async () => {
+    setApiBaseUrl(`${B}/api/v1`)
+    expect(storage['aruna.apiBaseUrl:/api/v1']).toBe(`${B}/api/v1`)
+    expect(storage['aruna.apiBaseUrl']).toBeUndefined()
+    vi.resetModules()
+    expect((await import('./state')).apiBaseUrl.value).toBe(`${B}/api/v1`)
+  })
+})

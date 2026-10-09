@@ -19,7 +19,9 @@ import type { ProfileValidationPresentation } from './validation'
 export const TOKEN_KEY = 'aruna.authToken'
 export const API_BASE_KEY = 'aruna.apiBaseUrl'
 
-export const apiBaseUrl = ref(readStored(API_BASE_KEY) || defaultApiBaseUrl())
+// A saved override belongs to the portal whose served config saved it, so the portal of another
+// realm on this browser origin ignores it before any token is restored.
+export const apiBaseUrl = ref(readStored(apiBaseKey()) || defaultApiBaseUrl())
 // Restored only once `/system/realm` named the realm at this API base; see `restoreToken`.
 export const authToken = ref('')
 // A token stored for this API origin waits for its realm; the session counts as pending.
@@ -65,6 +67,11 @@ export const bootstrapped = ref(false)
 // Monotonic identity counter: bumped whenever the token or API base changes,
 // so in-flight work and module-singleton caches can tell sessions apart.
 export const sessionEpoch = ref(0)
+
+/** The saved API override of the portal whose served config names `servedBase`. */
+export function apiBaseKey(servedBase = defaultApiBaseUrl()): string {
+  return `${API_BASE_KEY}:${servedBase}`
+}
 
 /** The stored token of one realm at one API origin; realm portals may share a browser origin. */
 export function tokenKey(realmId: string, baseUrl = apiBaseUrl.value): string {

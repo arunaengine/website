@@ -4,7 +4,7 @@ import { loadMetadata, resetRecentOrderProbe } from './catalog'
 import { loadAuthenticated } from './identity'
 import { loadInfo } from './realm'
 import {
-  API_BASE_KEY,
+  apiBaseKey,
   apiBaseUrl,
   apiGroups,
   authError,
@@ -137,7 +137,7 @@ export function setApiBaseUrl(url: string, options: { keepToken?: boolean } = {}
   if (next === apiBaseUrl.value) return
   sessionEpoch.value++
   apiBaseUrl.value = next
-  storeValue(API_BASE_KEY, apiBaseUrl.value === defaultApiBaseUrl() ? '' : apiBaseUrl.value)
+  storeValue(apiBaseKey(), apiBaseUrl.value === defaultApiBaseUrl() ? '' : apiBaseUrl.value)
   // The token stays stored for its own realm and API origin; it is not sent to this one.
   if (!options.keepToken) authToken.value = ''
   clearIdentityState(true)
