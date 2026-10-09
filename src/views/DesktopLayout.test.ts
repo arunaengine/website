@@ -131,6 +131,7 @@ beforeAll(async () => {
   vi.doMock('@/components/layout/AppLogo.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/components/layout/GlobalErrorBanner.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/components/layout/RealmUnreachable.vue', () => ({ default: RealmUnreachableStub }))
+  vi.doMock('@/components/federation/LinkOffer.vue', () => ({ default: defineComponent(() => () => null) }))
   vi.doMock('@/components/layout/NodeDown.vue', () => ({ default: NodeDownStub }))
   vi.doMock('@/components/data/TransfersPanel.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/components/storage/KeyIssueNotice.vue', () => ({ default: EmptyStub }))

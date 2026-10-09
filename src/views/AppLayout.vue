@@ -5,6 +5,7 @@ import GlobalErrorBanner from '@/components/layout/GlobalErrorBanner.vue'
 import KeyIssueNotice from '@/components/storage/KeyIssueNotice.vue'
 import MobileNav from '@/components/dashboard/MobileNav.vue'
 import RealmUnreachable from '@/components/layout/RealmUnreachable.vue'
+import LinkOffer from '@/components/federation/LinkOffer.vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import { computed, defineAsyncComponent, nextTick, onMounted, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
@@ -111,7 +112,10 @@ watch(
       <GlobalErrorBanner />
       <main id="main-content" ref="mainEl" tabindex="-1" class="flex-1 overflow-x-hidden pb-20 outline-none md:pb-0">
         <RealmUnreachable v-if="unreachable" />
-        <RouterView v-else />
+        <template v-else>
+          <LinkOffer />
+          <RouterView />
+        </template>
       </main>
     </div>
     <MobileNav />

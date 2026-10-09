@@ -16,6 +16,8 @@ import S3SessionsPanel from '@/components/settings/S3SessionsPanel.vue'
 import AssistantProviders from '@/components/settings/AssistantProviders.vue'
 import VaultSettings from '@/components/settings/VaultSettings.vue'
 import McpConnect from '@/components/settings/McpConnect.vue'
+import LinkAccount from '@/components/federation/LinkAccount.vue'
+import LinkedLogins from '@/components/federation/LinkedLogins.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import { isAssignableProfile, PROFILE_SCOPE_REASON } from '@/lib/profiles/assignable'
 import SectionSkeleton from '@/components/ui/SectionSkeleton.vue'
@@ -453,6 +455,7 @@ async function revoke(accessKeyId: string) {
       </TabsContent>
 
       <TabsContent value="profile" class="container mt-0 min-w-0 space-y-5 py-6">
+        <LinkAccount />
         <section class="surface">
           <header class="border-b border-border px-5 py-4">
             <h3 class="font-display text-sm font-semibold text-aruna-navy">Profile</h3>
@@ -509,6 +512,7 @@ async function revoke(accessKeyId: string) {
           </p>
           <div v-if="preferredProfile" class="border-t border-border bg-muted/20 px-5 py-3 text-[11px] text-muted-foreground">Selected: <span class="font-medium text-foreground">{{ preferredProfile.name }}</span><span v-if="profileDirty">, apply with "Save profile" above.</span></div>
         </section>
+        <LinkedLogins />
       </TabsContent>
 
       <TabsContent value="groups" class="container mt-0 min-w-0 space-y-5 py-6">

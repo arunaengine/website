@@ -1,5 +1,7 @@
 export interface UserInfoResponse {
   user: ApiUser
+  /** Logins of other realms that open sessions of this account. */
+  linked_logins?: string[]
   realm: { realm_id: string; roles: ApiRole[] }
   groups: ApiUserGroup[]
   preferences: {

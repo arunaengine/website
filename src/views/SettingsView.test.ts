@@ -276,6 +276,8 @@ const SettingsView = compileClientComponent(new URL('./SettingsView.vue', import
   '@/components/settings/AssistantProviders.vue': moduleDefault(Empty),
   '@/components/settings/VaultSettings.vue': moduleDefault(Empty),
   '@/components/settings/McpConnect.vue': moduleDefault(Empty),
+  '@/components/federation/LinkAccount.vue': moduleDefault(Empty),
+  '@/components/federation/LinkedLogins.vue': moduleDefault(Empty),
 })
 
 async function mount(query: string) {
