@@ -54,6 +54,7 @@ function fieldset(root: Parameters<typeof content>[0]) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  sessionEpoch.value = 1
   setRealmFederation.mockImplementation(async (settings) => ({ settings, etag: '"next"' }))
 })
 
@@ -119,6 +120,36 @@ describe('FederationSettings', () => {
     expect(element(mounted.root, (node) => node.props.id === 'federation-name').props.value).toBe('Marburg Data')
     await click(button(mounted.root, 'Save'))
     expect(setRealmFederation.mock.calls[1][1]).toBe('"v2"')
+    mounted.app.unmount()
+  })
+
+  it('ignores a rejected save that arrives after the login changed', async () => {
+    getRealmFederation.mockResolvedValue({ settings: stored, etag: '"v1"' })
+    setRealmFederation.mockImplementationOnce(async () => {
+      sessionEpoch.value++
+      throw new ApiError(412, 'changed', 'settings_changed')
+    })
+    const mounted = await mountApp(Settings)
+    await flush()
+    await click(button(mounted.root, 'Save'))
+    await flush()
+    expect(getRealmFederation).toHaveBeenCalledTimes(1)
+    expect(content(mounted.root)).not.toContain('changed elsewhere')
+    mounted.app.unmount()
+  })
+
+  it('shows no notice when the login changed during the reload', async () => {
+    getRealmFederation.mockResolvedValueOnce({ settings: stored, etag: '"v1"' }).mockImplementationOnce(async () => {
+      sessionEpoch.value++
+      return { settings: { ...stored, name: 'Other' }, etag: '"v9"' }
+    })
+    setRealmFederation.mockRejectedValueOnce(new ApiError(412, 'changed', 'settings_changed'))
+    const mounted = await mountApp(Settings)
+    await flush()
+    await click(button(mounted.root, 'Save'))
+    await flush()
+    expect(content(mounted.root)).not.toContain('changed elsewhere')
+    expect(element(mounted.root, (node) => node.props.id === 'federation-name').props.value).toBe('Marburg Archive')
     mounted.app.unmount()
   })
 })

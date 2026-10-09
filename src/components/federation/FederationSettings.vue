@@ -114,6 +114,7 @@ async function save() {
     apply(stored)
     saved.value = true
   } catch (error) {
+    if (context.epoch !== sessionEpoch.value) return
     if (codeOf(error) !== 'settings_changed') {
       failure.value = apiErrorMessage(error)
       return
@@ -121,6 +122,7 @@ async function save() {
     etag.value = null
     firstSetup.value = false
     await load(context)
+    if (context.epoch !== sessionEpoch.value) return
     failure.value ??= 'These settings were changed elsewhere. The current ones are shown now.'
   } finally {
     saving.value = false
