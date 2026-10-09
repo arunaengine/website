@@ -18,7 +18,7 @@ import { HandshakeError, type PopupChannel } from '@/lib/federation/handshake'
 import { IMPORT_TIMEOUT_MS, openPopup, popupFailure, type ExportAnswer } from '@/lib/federation/popup'
 import { recheckRealm } from '@/lib/federation/realms'
 import { newSecret } from '@/lib/federation/secret'
-import { checkOwnerNode, OwnerNodeError } from '@/lib/federation/transfer'
+import { checkOwnerNode, importKey, OwnerNodeError } from '@/lib/federation/transfer'
 import { submitImport, uploadArchive, type SubmitImportResponse } from '@/lib/rocrateArchive'
 import { assertCurrentSession, refreshContext } from './aruna/state'
 
@@ -99,6 +99,8 @@ export function useRealmImport() {
     } catch (error) {
       if (!(error instanceof ApiError && error.code === 'pull_unreachable')) throw error
     }
+    // The same key as a pull would use, so a retry or a new consent finds the same job.
+    const key = await importKey(answer.grant.payload, intent.payload.destination)
     current(run, context.epoch)
     const target = { bucket: form.bucket, prefix: form.prefix }
     const metadata = { group_id: form.groupId, path: form.metadataPath, public: false }
@@ -119,7 +121,8 @@ export function useRealmImport() {
       const owner = await checkOwnerNode(pushed.owner_node_url, descriptor.payload.api_url, context.client.token ?? '')
       current(run, context.epoch)
       const client = { baseUrl: owner, token: context.client.token }
-      const result = await submitImport({ source: { kind: 'upload', upload_id: pushed.upload_id }, target, metadata }, client)
+      const source = { kind: 'upload' as const, upload_id: pushed.upload_id }
+      const result = await submitImport({ source, target, metadata, idempotency_key: key }, client)
       return finish(run, context.epoch, result, client)
     }
     const bytes = await channel.ask<ArrayBuffer>({ kind: 'artifact' })
@@ -127,7 +130,8 @@ export function useRealmImport() {
     const archive = new File([bytes], 'ro-crate.zip', { type: 'application/zip' })
     const upload = await uploadArchive(archive, context.client)
     current(run, context.epoch)
-    const result = await submitImport({ source: { kind: 'upload', upload_id: upload.upload_id }, target, metadata }, context.client)
+    const source = { kind: 'upload' as const, upload_id: upload.upload_id }
+    const result = await submitImport({ source, target, metadata, idempotency_key: key }, context.client)
     return finish(run, context.epoch, result, context.client)
   }
 

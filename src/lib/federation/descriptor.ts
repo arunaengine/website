@@ -110,7 +110,7 @@ function varint(value: number): number[] {
   return out
 }
 
-function postcardString(value: string): number[] {
+export function postcardString(value: string): number[] {
   const bytes = encoder.encode(value)
   return [...varint(bytes.length), ...bytes]
 }

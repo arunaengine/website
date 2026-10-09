@@ -49,6 +49,17 @@ const form = {
   metadataPath: 'datasets/river',
 } as never
 const descriptor = { payload: { api_url: 'https://b.example/api/v1' } }
+const destination = { group_id: 'G', bucket: 'imports', prefix: 'giessen/river', metadata_path: 'datasets/river' }
+const grant = {
+  payload: {
+    source: Array.from({ length: 32 }, (_, index) => index),
+    document_id: '01JJ0B0123456789ABCDEFGHJK',
+    dataset_digest: 'aa'.repeat(32),
+    selection_digest: 'bb'.repeat(32),
+  },
+}
+// core::transfer::import_key for this grant and destination, computed by the Rust code.
+const KEY = 'federation-04a2c404ebc44733d4c5b288e20659a1a76f2d7c6ab914422cecef8132c83a09'
 const pullUnreachable = new ApiError(502, 'unreachable', 'pull_unreachable')
 
 function script(answers: Record<string, unknown>) {
@@ -67,7 +78,7 @@ beforeEach(() => {
   recheckRealm.mockImplementation(async (realm: unknown) => realm)
   apiBaseUrl.value = 'https://b.example/api/v1'
   authToken.value = 'B-TOKEN'
-  api.createImportIntent.mockResolvedValue({ payload: { intent_id: 'I' } })
+  api.createImportIntent.mockResolvedValue({ payload: { intent_id: 'I', destination } })
   api.getRealmDescriptor.mockResolvedValue(descriptor)
   archive.submitImport.mockResolvedValue({ job_id: 'J2' })
 })
@@ -83,7 +94,7 @@ describe('useRealmImport', () => {
   })
 
   it('pulls from the source with the grant and the kept secret', async () => {
-    script({ export: { grant: { payload: {} }, files: 1 } })
+    script({ export: { grant, files: 1 } })
     api.createImport.mockResolvedValue({ job_id: 'J1' })
     const flow = useRealmImport()
     await flow.start(form)
@@ -96,7 +107,7 @@ describe('useRealmImport', () => {
   })
 
   it('lets the source push when the pull is unreachable, then imports on the checked node', async () => {
-    script({ export: { grant: {}, files: 1 }, push: { upload_id: 'U', owner_node_url: 'https://b2.example/api/v1' } })
+    script({ export: { grant, files: 1 }, push: { upload_id: 'U', owner_node_url: 'https://b2.example/api/v1' } })
     api.createImport.mockRejectedValue(pullUnreachable)
     checkOwnerNode.mockResolvedValue('https://b2.example/api/v1')
     const flow = useRealmImport()
@@ -104,12 +115,13 @@ describe('useRealmImport', () => {
     expect(checkOwnerNode).toHaveBeenCalledWith('https://b2.example/api/v1', 'https://b.example/api/v1', 'B-TOKEN')
     const [request, client] = archive.submitImport.mock.calls[0]
     expect(request.source).toEqual({ kind: 'upload', upload_id: 'U' })
+    expect(request.idempotency_key).toBe(KEY)
     expect(client).toEqual({ baseUrl: 'https://b2.example/api/v1', token: 'B-TOKEN' })
     expect(flow.jobClient.value).toEqual(client)
   })
 
   it('stops before any bearer goes to a node the source made up', async () => {
-    script({ export: { grant: {}, files: 1 }, push: { upload_id: 'U', owner_node_url: 'https://evil.example' } })
+    script({ export: { grant, files: 1 }, push: { upload_id: 'U', owner_node_url: 'https://evil.example' } })
     api.createImport.mockRejectedValue(pullUnreachable)
     checkOwnerNode.mockRejectedValue(new OwnerNodeError('The other realm named a node that is not part of this realm.'))
     const flow = useRealmImport()
@@ -120,18 +132,18 @@ describe('useRealmImport', () => {
   })
 
   it('takes metadata only through the window when neither server reaches the other', async () => {
-    script({ export: { grant: {}, files: 0 }, push: new HandshakeError('refused', 'push_unreachable'), artifact: new ArrayBuffer(4) })
+    script({ export: { grant, files: 0 }, push: new HandshakeError('refused', 'push_unreachable'), artifact: new ArrayBuffer(4) })
     api.createImport.mockRejectedValue(pullUnreachable)
     archive.uploadArchive.mockResolvedValue({ upload_id: 'U3' })
     const flow = useRealmImport()
     await flow.start(form)
     expect(archive.uploadArchive).toHaveBeenCalledOnce()
-    expect(archive.submitImport.mock.calls[0][0].source).toEqual({ kind: 'upload', upload_id: 'U3' })
+    expect(archive.submitImport.mock.calls[0][0]).toMatchObject({ source: { kind: 'upload', upload_id: 'U3' }, idempotency_key: KEY })
     expect(flow.phase.value).toBe('started')
   })
 
   it('fails clearly for files and keeps the window for a retry', async () => {
-    script({ export: { grant: {}, files: 2 }, push: new HandshakeError('refused', 'push_unreachable') })
+    script({ export: { grant, files: 2 }, push: new HandshakeError('refused', 'push_unreachable') })
     api.createImport.mockRejectedValue(pullUnreachable)
     const flow = useRealmImport()
     await flow.start(form)
@@ -146,7 +158,7 @@ describe('useRealmImport', () => {
   it('drops the answer when the session changed while the window was open', async () => {
     ask.mockImplementation(async () => {
       sessionEpoch.value++
-      return { grant: {}, files: 0 }
+      return { grant, files: 0 }
     })
     const flow = useRealmImport()
     await flow.start(form)

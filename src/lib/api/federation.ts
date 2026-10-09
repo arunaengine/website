@@ -69,9 +69,14 @@ export interface ImportIntent {
 export interface ExportGrant {
   source: RealmIdValue
   audience: RealmIdValue
+  intent_digest: string
   export_job_id: string
   document_id: string
+  source_revision: string
+  dataset_digest: string
+  selection_digest: string
   artifact_url: string
+  artifact_blake3: string
   artifact_size: number
   issued_at: number
   expires_at: number
