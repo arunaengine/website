@@ -24,8 +24,9 @@ const GroupMembers = compileClientComponent(new URL('./GroupMembers.vue', import
   '@vueuse/core': { useDebounceFn: (fn: unknown) => fn },
   '@/lib/utils': Utils,
   '@/composables/useAruna': {
-    useAruna: () => ({ searchUsers: search, addGroupMember, saving: ref(false), sessionEpoch: ref(1), currentUser: ref({ id: 'owner' }) }),
+    useAruna: () => ({ searchUsers: search, addGroupMember, saving: ref(false), sessionEpoch: ref(1), currentUser: ref({ id: 'owner' }), realm: ref({ id: 'own' }) }),
   },
+  '@/composables/useFederation': { homeRealmLabel: (id: string) => (id.endsWith('@other') ? 'Giessen Data' : null) },
   '@/composables/useUserDirectory': {
     useUserDirectory: () => ({ resolveUsers: vi.fn(), cachedUser: () => undefined }),
   },

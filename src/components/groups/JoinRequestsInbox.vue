@@ -6,6 +6,7 @@ import { ref, watch } from 'vue'
 import { Check, X } from '@lucide/vue'
 import { useJoinRequests } from '@/composables/useJoinRequests'
 import { useAruna } from '@/composables/useAruna'
+import { homeRealmLabel } from '@/composables/useFederation'
 import { errorMessage, relativeTime } from '@/lib/utils'
 import type { ApiRole, JoinRequest } from '@/lib/api'
 
@@ -14,7 +15,12 @@ const emit = defineEmits<{ (e: 'changed'): void; (e: 'count', n: number | null):
 
 const { listGroupJoinRequests, decideJoinRequest, busy } = useJoinRequests()
 
-const { sessionEpoch } = useAruna()
+const { sessionEpoch, realm } = useAruna()
+
+function requesterName(req: JoinRequest): string {
+  const home = homeRealmLabel(req.user_id, realm.value.id)
+  return home ? `${req.user_name ?? req.user_id} (${home})` : req.user_name ?? req.user_id
+}
 let loadGeneration = 0
 const requests = ref<JoinRequest[]>([])
 const loading = ref(false)
@@ -116,7 +122,7 @@ async function confirm(req: JoinRequest) {
       <li v-for="req in requests" :key="req.request_id" class="rounded-md border border-border">
         <div class="flex flex-wrap items-center gap-3 px-3 py-2">
           <div class="min-w-0 flex-1">
-            <div class="truncate text-sm font-medium text-foreground">{{ req.user_name ?? req.user_id }}</div>
+            <div class="truncate text-sm font-medium text-foreground">{{ requesterName(req) }}</div>
             <div v-if="req.user_name" class="truncate font-mono text-[10px] text-muted-foreground">
               {{ req.user_id.slice(0, 8) }}
             </div>

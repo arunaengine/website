@@ -10,6 +10,7 @@ import { ShieldCheck, UserMinus, UserPlus, X } from '@lucide/vue'
 import { useDebounceFn } from '@vueuse/core'
 import { useAruna } from '@/composables/useAruna'
 import { useUserDirectory } from '@/composables/useUserDirectory'
+import { homeRealmLabel } from '@/composables/useFederation'
 import { errorMessage, shortUserId } from '@/lib/utils'
 import type { ApiRole, GroupMember, UserSearchHit } from '@/lib/api'
 
@@ -22,7 +23,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{ (e: 'changed'): void }>()
 
-const { addGroupMember, removeGroupMember, searchUsers, saving, currentUser, sessionEpoch } = useAruna()
+const { addGroupMember, removeGroupMember, searchUsers, saving, currentUser, sessionEpoch, realm } = useAruna()
 const { resolveUsers, cachedUser } = useUserDirectory()
 
 // The members endpoint only carries ids; names come from GET /users/{id}
@@ -35,8 +36,11 @@ watch(
 
 const memberIdList = computed(() => props.members.map((member) => member.user_id))
 
+// A member of another realm reads `name (realm name)`.
 function displayName(member: GroupMember): string {
-  return member.name ?? cachedUser(member.user_id)?.name ?? shortUserId(member.user_id, memberIdList.value)
+  const name = member.name ?? cachedUser(member.user_id)?.name ?? shortUserId(member.user_id, memberIdList.value)
+  const home = homeRealmLabel(member.user_id, realm.value.id)
+  return home ? `${name} (${home})` : name
 }
 
 function shortId(userId: string): string {
