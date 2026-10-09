@@ -334,6 +334,7 @@ function jobPanel(job: JobStatusResponse): Component {
     '@/components/jobs/JobKeyWait.vue': moduleDefault(defineComponent(() => () => h('aside', 'waits for an unlock'))),
     '@/components/jobs/JobReportPanel.vue': moduleDefault(PassThroughStub),
     '@/components/jobs/JobStateBadge.vue': moduleDefault(JobStateBadgeStub),
+    '@/components/federation/StopSharing.vue': moduleDefault(PassThroughStub),
     '@/composables/useJobs': {
       useJobDetail: () => ({
         job: ref(job),

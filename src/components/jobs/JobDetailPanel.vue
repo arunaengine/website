@@ -15,6 +15,7 @@ import JobFamilySection from '@/components/jobs/JobFamilySection.vue'
 import JobKeyWait from '@/components/jobs/JobKeyWait.vue'
 import JobReportPanel from '@/components/jobs/JobReportPanel.vue'
 import JobStateBadge from '@/components/jobs/JobStateBadge.vue'
+import StopSharing from '@/components/federation/StopSharing.vue'
 import { useJobDetail } from '@/composables/useJobs'
 import { formatJobProgress, isTerminalJobState, jobLabel, jobProgressPercent } from '@/lib/jobs'
 import { relativeTime, truncateMiddle } from '@/lib/utils'
@@ -154,6 +155,12 @@ async function confirmCancel() {
         <JobArtifactButton :job-id="job.job_id" />
 
         <JobReportPanel v-if="reportKind" :job-id="job.job_id" />
+
+        <StopSharing
+          v-if="job.kind === 'export_rocrate' && job.state === 'succeeded'"
+          :key="job.job_id"
+          :job-id="job.job_id"
+        />
 
         <section v-if="!terminal" class="border-t border-border pt-4">
           <div class="flex items-center gap-2">
