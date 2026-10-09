@@ -7,6 +7,7 @@ import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import LoginConsent from '@/components/federation/LoginConsent.vue'
+import ExportChoice from '@/components/federation/ExportChoice.vue'
 import { useAruna } from '@/composables/useAruna'
 import { TOKEN_KEY } from '@/composables/aruna/state'
 import { apiErrorMessage, createLoginHandoff, getRealmDescriptor } from '@/lib/api'
@@ -14,6 +15,13 @@ import { realmIdText } from '@/lib/federation/descriptor'
 import { OpenerLink, type OpenerRequest } from '@/lib/federation/handshake'
 import { RequestError, acceptOpener, type PopupRequest } from '@/lib/federation/popup'
 import type { VerifiedRealm } from '@/lib/federation/descriptor'
+import {
+  artifactBytes,
+  exportFailure,
+  exportForIntent,
+  pushToDestination,
+  type SourceExport,
+} from '@/composables/useSourceExport'
 import { Globe2, LogIn, ExternalLink } from '@lucide/vue'
 
 const aruna = useAruna()
@@ -26,6 +34,8 @@ const serving = shallowRef<VerifiedRealm | null>(null)
 const failure = ref<string | null>(null)
 const busy = ref(false)
 const homeName = ref('')
+const sent = ref(false)
+let ended = false
 const homeId = computed(() => realm.value.id)
 
 // Only a local account of this realm can log in elsewhere; a session from another realm cannot.
@@ -65,6 +75,10 @@ onMounted(async () => {
   try {
     const accepted = await acceptOpener(first, homeId.value)
     opener.lock(first.origin)
+    if (accepted.body.kind === 'export' && realmIdText(accepted.body.intent?.payload?.realm_id ?? '') !== accepted.realm.realmId) {
+      opener.refuse(first, 'The import request does not match its realm.')
+      throw new RequestError('The import request does not match its realm.')
+    }
     request.value = first
     body.value = accepted.body
     serving.value = accepted.realm
@@ -74,12 +88,56 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  ended = true
   window.removeEventListener('storage', onStorage)
   link.value?.dispose()
 })
 
 function openLogin() {
   window.open('/app', '_blank', 'noopener')
+}
+
+async function sendExport(choice: { documentId: string; files: string[] }) {
+  const current = request.value
+  const asked = body.value
+  const opener = link.value
+  if (!opener || !current || asked?.kind !== 'export') return
+  busy.value = true
+  failure.value = null
+  const token = authToken.value
+  const source: SourceExport = {
+    descriptor: asked.descriptor,
+    intent: asked.intent,
+    client: { baseUrl: aruna.apiBaseUrl.value, token },
+  }
+  const alive = () => !ended && authToken.value === token
+  try {
+    const { jobId, grant } = await exportForIntent(source, choice.documentId, choice.files, alive)
+    if (!alive()) return
+    opener.reply(current, { grant, files: choice.files.length })
+    sent.value = true
+    await serveFollowUps(opener, source, jobId, choice.files.length)
+  } catch (error) {
+    failure.value = exportFailure(error, homeName.value || realm.value.name)
+    opener.refuse(current, failure.value)
+  } finally {
+    busy.value = false
+  }
+}
+
+// After the grant the other realm may ask for a push, or for the metadata file itself.
+async function serveFollowUps(opener: OpenerLink, source: SourceExport, jobId: string, files: number) {
+  while (!ended) {
+    const next = await opener.next()
+    const asked = next.body as PopupRequest | undefined
+    try {
+      if (asked?.kind === 'push') opener.reply(next, await pushToDestination(source, jobId))
+      else if (asked?.kind === 'artifact' && files === 0) opener.reply(next, await artifactBytes(jobId, source.client))
+      else opener.refuse(next, 'This request is not supported.')
+    } catch (error) {
+      opener.refuse(next, exportFailure(error, homeName.value || realm.value.name))
+    }
+  }
 }
 
 function cancel() {
@@ -137,6 +195,17 @@ async function allowLogin() {
           :busy="busy"
           :linking="body.link"
           @allow="allowLogin"
+          @cancel="cancel"
+        />
+        <Notice v-else-if="sent" tone="success">
+          Sent to {{ serving.name }}. Keep this window open until the import has started.
+        </Notice>
+        <ExportChoice
+          v-else-if="body?.kind === 'export'"
+          :serving="serving"
+          :home-name="homeName || realm.name"
+          :busy="busy"
+          @send="sendExport"
           @cancel="cancel"
         />
       </div>

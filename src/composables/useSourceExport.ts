@@ -1,0 +1,77 @@
+// The source realm's side of an import into another realm, run from its popup page: start
+// the export for the verified intent, wait for it, sign the grant, and push or hand over the
+// metadata artifact when the destination asks for it.
+import {
+  ApiError,
+  apiErrorMessage,
+  apiUrl,
+  createExport,
+  createGrant,
+  pushExport,
+  type ApiClientOptions,
+  type ExportGrant,
+  type ImportIntent,
+  type PushAnswer,
+} from '@/lib/api'
+import type { RealmDescriptor, Signed } from '@/lib/federation/descriptor'
+import { getJob, isTerminalJobState } from '@/lib/jobs'
+
+const POLL_MS = 2_000
+
+export interface SourceExport {
+  descriptor: Signed<RealmDescriptor>
+  intent: Signed<ImportIntent>
+  client: ApiClientOptions
+}
+
+export class ExportStop extends Error {
+  name = 'ExportStop'
+}
+
+export function exportFailure(error: unknown, homeName: string): string {
+  if (error instanceof ApiError && error.code === 'export_denied') return `${homeName} does not allow this export.`
+  if (error instanceof ApiError && error.code === 'push_unreachable') return 'This realm cannot reach the other realm.'
+  if (error instanceof ApiError && error.code === 'push_refused') return 'The other realm refused the copy.'
+  if (error instanceof ApiError && error.code === 'grant_revoked') return 'This export was stopped.'
+  if (error instanceof ExportStop) return error.message
+  return apiErrorMessage(error)
+}
+
+/** Waits for the export job; `alive` ends the wait when the popup flow ended. */
+export async function waitForJob(jobId: string, client: ApiClientOptions, alive: () => boolean, pollMs = POLL_MS) {
+  for (;;) {
+    if (!alive()) throw new ExportStop('The export was left.')
+    const job = await getJob(jobId, client)
+    if (isTerminalJobState(job.state)) {
+      if (job.state !== 'succeeded') throw new ExportStop('The export did not finish.')
+      return
+    }
+    await new Promise((resolve) => setTimeout(resolve, pollMs))
+  }
+}
+
+/** Starts the export of the chosen dataset and files and returns its signed grant. */
+export async function exportForIntent(
+  source: SourceExport,
+  documentId: string,
+  files: string[],
+  alive: () => boolean,
+): Promise<{ jobId: string; grant: Signed<ExportGrant> }> {
+  const { descriptor, intent, client } = source
+  const submitted = await createExport({ descriptor, intent, document_id: documentId, files }, client)
+  await waitForJob(submitted.job_id, client, alive)
+  const grant = await createGrant(submitted.job_id, client)
+  return { jobId: submitted.job_id, grant }
+}
+
+export function pushToDestination(source: SourceExport, jobId: string): Promise<PushAnswer> {
+  return pushExport(jobId, { descriptor: source.descriptor, intent: source.intent }, source.client)
+}
+
+/** The metadata only artifact, for a destination neither server of which reaches the other. */
+export async function artifactBytes(jobId: string, client: ApiClientOptions): Promise<ArrayBuffer> {
+  const url = apiUrl(`/compute/jobs/${encodeURIComponent(jobId)}/artifacts/rocrate`, {}, client)
+  const response = await fetch(url, { headers: client.token ? { Authorization: `Bearer ${client.token}` } : {} })
+  if (!response.ok) throw new ApiError(response.status, 'The export file is not available.')
+  return response.arrayBuffer()
+}
