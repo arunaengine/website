@@ -55,6 +55,17 @@ describe('waitForJob', () => {
     await expect(waitForJob('J', {}, () => false)).rejects.toThrow('left')
     expect(getJob).not.toHaveBeenCalled()
   })
+
+  it('signs nothing when the login changed during the last job read', async () => {
+    let alive = true
+    createExport.mockResolvedValue({ job_id: 'J' })
+    getJob.mockImplementation(async () => {
+      alive = false
+      return { state: 'succeeded' }
+    })
+    await expect(exportForIntent(source, 'DOC', [], () => alive)).rejects.toThrow('left')
+    expect(createGrant).not.toHaveBeenCalled()
+  })
 })
 
 describe('artifactBytes', () => {

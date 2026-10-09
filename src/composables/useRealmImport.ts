@@ -161,6 +161,7 @@ export function useRealmImport() {
     await guarded(run, form, async () => {
       const context = refreshContext()
       const { secret, nonce } = await newSecret()
+      current(run, context.epoch)
       const destination = { group_id: form.groupId, bucket: form.bucket, prefix: form.prefix, metadata_path: form.metadataPath }
       const [intent, descriptor, source] = await Promise.all([
         createImportIntent({ ...destination, nonce }, context.client),

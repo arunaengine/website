@@ -14,6 +14,7 @@ const checkOwnerNode = vi.fn()
 const ask = vi.fn()
 const close = vi.fn()
 const recheckRealm = vi.fn()
+const secretMade = vi.fn()
 
 vi.mock('@/lib/api', async (original) => ({
   ...(await original<typeof import('@/lib/api')>()),
@@ -33,6 +34,10 @@ vi.mock('@/lib/federation/popup', async (original) => ({
   ...(await original<typeof import('@/lib/federation/popup')>()),
   openPopup: () => ({ ask, close }),
 }))
+vi.mock('@/lib/federation/secret', async (original) => {
+  const actual = await original<typeof import('@/lib/federation/secret')>()
+  return { ...actual, newSecret: async () => (secretMade(), actual.newSecret()) }
+})
 vi.mock('@/lib/federation/realms', async (original) => ({
   ...(await original<typeof import('@/lib/federation/realms')>()),
   recheckRealm: (...args: unknown[]) => recheckRealm(...args),
@@ -75,7 +80,7 @@ function script(answers: Record<string, unknown>) {
 
 beforeEach(() => {
   vi.stubGlobal('window', {})
-  for (const mock of [...Object.values(api), ...Object.values(archive), checkOwnerNode, ask, close, recheckRealm]) {
+  for (const mock of [...Object.values(api), ...Object.values(archive), checkOwnerNode, ask, close, recheckRealm, secretMade]) {
     mock.mockReset()
   }
   recheckRealm.mockImplementation(async (realm: unknown) => realm)
@@ -174,6 +179,14 @@ describe('useRealmImport', () => {
     api.createImport.mockResolvedValue({ job_id: 'J9' })
     await flow.retry()
     expect(flow.submitted.value).toEqual({ job_id: 'J9' })
+  })
+
+  it('asks for nothing when the login changed while preparing', async () => {
+    secretMade.mockImplementation(() => sessionEpoch.value++)
+    const flow = useRealmImport()
+    await flow.start(form)
+    expect(api.createImportIntent).not.toHaveBeenCalled()
+    expect(ask).not.toHaveBeenCalled()
   })
 
   it('drops the answer when the session changed while the window was open', async () => {

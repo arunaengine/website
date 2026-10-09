@@ -46,6 +46,7 @@ export async function waitForJob(jobId: string, client: ApiClientOptions, alive:
   for (;;) {
     if (!alive()) throw new ExportStop('The export was left.')
     const job = await getJob(jobId, client)
+    if (!alive()) throw new ExportStop('The export was left.')
     if (isTerminalJobState(job.state)) {
       if (job.state !== 'succeeded') throw new ExportStop('The export did not finish.')
       return
