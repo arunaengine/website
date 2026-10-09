@@ -19,7 +19,7 @@ function fakeWindow(extra: Partial<HandshakeWindow> = {}) {
 }
 
 function fakePopup() {
-  return { closed: false, postMessage: vi.fn(), close: vi.fn() }
+  return { closed: false, postMessage: vi.fn(), close: vi.fn(), location: { replace: vi.fn() } }
 }
 
 beforeEach(() => vi.useFakeTimers())
@@ -28,13 +28,38 @@ afterEach(() => vi.useRealTimers())
 describe('PopupChannel', () => {
   function open() {
     const popup = fakePopup()
-    const { host, deliver, listeners } = fakeWindow({ open: vi.fn(() => popup as unknown as Window) })
-    const channel = new PopupChannel(host, `${HOME}/federation/popup`, HOME, 60_000)
-    return { popup, deliver, listeners, channel }
+    const openWindow = vi.fn((_url: string, _target: string, _features: string) => popup as unknown as Window)
+    const { host, deliver, listeners } = fakeWindow({ open: openWindow })
+    const channel = new PopupChannel(host, 60_000)
+    return { popup, deliver, listeners, channel, openWindow }
   }
+
+  it('opens an empty window and listens only once it was sent to the realm', async () => {
+    const { popup, deliver, channel, openWindow } = open()
+    expect(openWindow.mock.calls[0][0]).toBe('about:blank')
+    const answer = channel.ask<string>({ kind: 'login' })
+    deliver(popup, HOME, { protocol: PROTOCOL, type: 'ready' })
+    await Promise.resolve()
+    channel.navigate(`${HOME}/federation/popup`, HOME)
+    expect(popup.location.replace).toHaveBeenCalledWith(`${HOME}/federation/popup`)
+    expect(popup.postMessage).not.toHaveBeenCalled()
+    deliver(popup, HOME, { protocol: PROTOCOL, type: 'ready' })
+    await vi.waitFor(() => expect(popup.postMessage).toHaveBeenCalledOnce())
+    deliver(popup, HOME, { protocol: PROTOCOL, type: 'result', id: popup.postMessage.mock.calls[0][0].id, body: 'ok' })
+    await expect(answer).resolves.toBe('ok')
+  })
+
+  it('sends a window closed during the checks nowhere', () => {
+    const { popup, channel } = open()
+    popup.closed = true
+    vi.advanceTimersByTime(600)
+    expect(() => channel.navigate(`${HOME}/federation/popup`, HOME)).toThrow(HandshakeError)
+    expect(popup.location.replace).not.toHaveBeenCalled()
+  })
 
   it('sends the request only after the popup is ready, to its exact origin', async () => {
     const { popup, deliver, channel } = open()
+    channel.navigate(`${HOME}/federation/popup`, HOME)
     const answer = channel.ask<string>({ kind: 'login' })
     await Promise.resolve()
     expect(popup.postMessage).not.toHaveBeenCalled()
@@ -48,6 +73,7 @@ describe('PopupChannel', () => {
 
   it('ignores messages from another origin or window and stale answers', async () => {
     const { popup, deliver, channel } = open()
+    channel.navigate(`${HOME}/federation/popup`, HOME)
     const answer = channel.ask<string>({ kind: 'login' })
     deliver(popup, 'https://evil.example', { protocol: PROTOCOL, type: 'ready' })
     deliver({}, HOME, { protocol: PROTOCOL, type: 'ready' })
@@ -81,6 +107,7 @@ describe('PopupChannel', () => {
 
   it('reports a refusal from the popup', async () => {
     const { popup, deliver, channel } = open()
+    channel.navigate(`${HOME}/federation/popup`, HOME)
     const answer = channel.ask({ kind: 'login' })
     deliver(popup, HOME, { protocol: PROTOCOL, type: 'ready' })
     await vi.waitFor(() => expect(popup.postMessage).toHaveBeenCalledOnce())
@@ -91,6 +118,7 @@ describe('PopupChannel', () => {
 
   it('keeps the error code of a refusal', async () => {
     const { popup, deliver, channel } = open()
+    channel.navigate(`${HOME}/federation/popup`, HOME)
     const answer = channel.ask({ kind: 'push' })
     deliver(popup, HOME, { protocol: PROTOCOL, type: 'ready' })
     await vi.waitFor(() => expect(popup.postMessage).toHaveBeenCalledOnce())
@@ -102,7 +130,7 @@ describe('PopupChannel', () => {
 
   it('reports a blocked popup', () => {
     const { host } = fakeWindow({ open: () => null })
-    expect(() => new PopupChannel(host, HOME, HOME, 1000)).toThrow(HandshakeError)
+    expect(() => new PopupChannel(host, 1000)).toThrow(HandshakeError)
   })
 })
 

@@ -1,14 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/lib/api/client'
 import { DescriptorError } from '@/lib/federation/descriptor'
+import { HandshakeError } from '@/lib/federation/handshake'
 
 const ask = vi.fn()
 const close = vi.fn()
+const navigate = vi.fn()
 const createFederatedSession = vi.fn()
 const getRealmDescriptor = vi.fn()
 const setAuthToken = vi.fn()
 const refresh = vi.fn(async () => undefined)
-const openPopup = vi.fn(() => ({ ask, close }))
+const openPopup = vi.fn(() => ({ ask, close, navigate }))
 const recheckRealm = vi.fn()
 
 vi.mock('@/lib/federation/popup', async (original) => ({
@@ -43,10 +45,10 @@ const home = {
 
 beforeEach(() => {
   vi.stubGlobal('window', {})
-  for (const mock of [ask, close, createFederatedSession, getRealmDescriptor, setAuthToken, openPopup, recheckRealm]) {
+  for (const mock of [ask, close, navigate, createFederatedSession, getRealmDescriptor, setAuthToken, openPopup, recheckRealm]) {
     mock.mockReset()
   }
-  openPopup.mockImplementation(() => ({ ask, close }))
+  openPopup.mockImplementation(() => ({ ask, close, navigate }))
   recheckRealm.mockImplementation(async (realm: unknown) => realm)
   getRealmDescriptor.mockResolvedValue({ payload: { name: 'Marburg Archive' } })
   ask.mockResolvedValue({ payload: { issuer: [] } })
@@ -85,21 +87,37 @@ describe('loginWithRealm', () => {
     expect(await loginWithRealm(home, 'Marburg Archive')).toBe('Marburg Archive does not allow logins from Giessen Data.')
   })
 
-  it('opens the popup only after the home realm checks out again', async () => {
+  it('opens the window at the click, before any await', () => {
+    void loginWithRealm(home, 'Marburg Archive')
+    expect(openPopup).toHaveBeenCalledOnce()
+    expect(navigate).not.toHaveBeenCalled()
+  })
+
+  it('sends the popup to the home realm only after it checks out again', async () => {
     recheckRealm.mockRejectedValue(new DescriptorError('mismatch', 'Giessen Data sent older details.'))
     expect(await loginWithRealm(home, 'Marburg Archive')).toBe('Giessen Data sent older details.')
-    expect(openPopup).not.toHaveBeenCalled()
-    const moved = { ...(home as object), portalUrl: 'https://new.giessen.example/', issuedAt: 2 }
+    expect(navigate).not.toHaveBeenCalled()
+    expect(close).toHaveBeenCalled()
+    const moved = { ...(home as object), portalUrl: 'https://new.giessen.example/', portalOrigin: 'https://new.giessen.example', issuedAt: 2 }
     recheckRealm.mockResolvedValue(moved)
     createFederatedSession.mockResolvedValue({ token: 'T', linked: false, account_hint: false })
     expect(await loginWithRealm(home, 'Marburg Archive')).toBeNull()
-    expect(openPopup).toHaveBeenCalledWith({}, moved)
+    expect(navigate).toHaveBeenCalledWith('https://new.giessen.example/federation/popup', 'https://new.giessen.example')
   })
 
   it('says when this realm takes no logins from other realms', async () => {
     getRealmDescriptor.mockRejectedValue(new ApiError(404, 'Not found'))
     expect(await loginWithRealm(home, 'Marburg Archive')).toBe('This realm does not take logins from other realms.')
     expect(ask).not.toHaveBeenCalled()
+    expect(close).toHaveBeenCalled()
+  })
+
+  it('reports a blocked popup', async () => {
+    openPopup.mockImplementation(() => {
+      throw new HandshakeError('blocked', 'The browser blocked the popup. Allow popups for this site.')
+    })
+    expect(await loginWithRealm(home, 'Marburg Archive')).toBe('The browser blocked the popup. Allow popups for this site.')
+    expect(getRealmDescriptor).not.toHaveBeenCalled()
   })
 })
 

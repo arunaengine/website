@@ -11,7 +11,7 @@ import {
   type LinkConfirmation,
 } from '@/lib/api'
 import type { Signed, VerifiedRealm } from '@/lib/federation/descriptor'
-import { popupFailure } from '@/lib/federation/popup'
+import { openPopup, popupFailure } from '@/lib/federation/popup'
 import { linkNonce, newSecret, tokenSessionId } from '@/lib/federation/secret'
 import { assertCurrentSession, refreshContext } from './aruna/state'
 import { refresh } from './aruna/session'
@@ -61,7 +61,8 @@ export function linkFailure(error: unknown): string {
 
 /**
  * Asks the home realm for a handoff bound to this local session and has this realm confirm
- * it. The confirmation names both accounts; nothing is linked yet.
+ * it. The confirmation names both accounts; nothing is linked yet. Call it in the click
+ * handler: the popup opens before the first await.
  */
 export async function confirmLink(
   home: VerifiedRealm,
@@ -69,13 +70,18 @@ export async function confirmLink(
   const context = refreshContext()
   const sessionId = tokenSessionId(context.client.token ?? '')
   if (!sessionId) throw new Error('Log in here first.')
-  const { secret } = await newSecret()
-  const nonce = await linkNonce(sessionId, secret)
-  const handoff = await requestHandoff(home, nonce, true)
-  assertCurrentSession(context.epoch)
-  const confirmation = await createLinkConfirmation(handoff, secret, context.client)
-  assertCurrentSession(context.epoch)
-  return { confirmation, name: handoff.payload.name }
+  const channel = openPopup(window)
+  try {
+    const { secret } = await newSecret()
+    const nonce = await linkNonce(sessionId, secret)
+    const handoff = await requestHandoff(channel, home, nonce, true)
+    assertCurrentSession(context.epoch)
+    const confirmation = await createLinkConfirmation(handoff, secret, context.client)
+    assertCurrentSession(context.epoch)
+    return { confirmation, name: handoff.payload.name }
+  } finally {
+    channel.close()
+  }
 }
 
 export async function finishLink(confirmation: Signed<LinkConfirmation>) {

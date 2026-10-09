@@ -13,6 +13,8 @@ const archive = { submitImport: vi.fn() }
 const checkOwnerNode = vi.fn()
 const ask = vi.fn()
 const close = vi.fn()
+const navigate = vi.fn()
+const openPopup = vi.fn()
 const recheckRealm = vi.fn()
 const secretMade = vi.fn()
 
@@ -32,7 +34,7 @@ vi.mock('@/lib/federation/transfer', async (original) => ({
 }))
 vi.mock('@/lib/federation/popup', async (original) => ({
   ...(await original<typeof import('@/lib/federation/popup')>()),
-  openPopup: () => ({ ask, close }),
+  openPopup: () => openPopup(),
 }))
 vi.mock('@/lib/federation/secret', async (original) => {
   const actual = await original<typeof import('@/lib/federation/secret')>()
@@ -48,7 +50,7 @@ const { OwnerNodeError } = await import('@/lib/federation/transfer')
 const { useRealmImport } = await import('./useRealmImport')
 
 const form = {
-  home: { realmId: 'A', name: 'Giessen Data' },
+  home: { realmId: 'A', name: 'Giessen Data', portalUrl: 'https://a.example/', portalOrigin: 'https://a.example' },
   groupId: 'G',
   groupName: 'Field notes',
   bucket: 'imports',
@@ -80,9 +82,10 @@ function script(answers: Record<string, unknown>) {
 
 beforeEach(() => {
   vi.stubGlobal('window', {})
-  for (const mock of [...Object.values(api), ...Object.values(archive), checkOwnerNode, ask, close, recheckRealm, secretMade]) {
+  for (const mock of [...Object.values(api), ...Object.values(archive), checkOwnerNode, ask, close, navigate, openPopup, recheckRealm, secretMade]) {
     mock.mockReset()
   }
+  openPopup.mockImplementation(() => ({ ask, close, navigate }))
   recheckRealm.mockImplementation(async (realm: unknown) => realm)
   apiBaseUrl.value = 'https://b.example/api/v1'
   authToken.value = 'B-TOKEN'
@@ -92,13 +95,17 @@ beforeEach(() => {
 })
 
 describe('useRealmImport', () => {
-  it('opens no source window when the source realm does not check out', async () => {
+  it('opens the window at the click and sends it nowhere when the source realm fails its check', async () => {
     recheckRealm.mockRejectedValue(new Error('Cannot reach Giessen Data.'))
     const flow = useRealmImport()
-    await flow.start(form)
+    const done = flow.start(form)
+    expect(openPopup).toHaveBeenCalledOnce()
+    await done
     expect(flow.phase.value).toBe('failed')
     expect(flow.failure.value).toBe('Cannot reach Giessen Data.')
+    expect(navigate).not.toHaveBeenCalled()
     expect(ask).not.toHaveBeenCalled()
+    expect(close).toHaveBeenCalled()
   })
 
   it('pulls from the source with the grant and the kept secret', async () => {

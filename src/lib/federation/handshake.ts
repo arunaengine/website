@@ -59,9 +59,14 @@ interface Pending {
   reject: (error: Error) => void
 }
 
-/** The opener side: one popup at one expected origin, asked one request at a time. */
+/**
+ * The opener side: one popup at one expected origin, asked one request at a time. It opens
+ * empty, in the click handler before any await, so the browser lets it through; `navigate`
+ * sends it to the checked realm later.
+ */
 export class PopupChannel {
   private popup: Window
+  private origin = ''
   private listener: MessageListener
   private closedTimer: ReturnType<typeof setInterval>
   private deadline: ReturnType<typeof setTimeout>
@@ -73,11 +78,9 @@ export class PopupChannel {
 
   constructor(
     private host: HandshakeWindow,
-    url: string,
-    private origin: string,
     timeoutMs: number,
   ) {
-    const popup = host.open?.(url, '_blank', 'popup,width=560,height=760') ?? null
+    const popup = host.open?.('about:blank', '_blank', 'popup,width=560,height=760') ?? null
     if (!popup) throw new HandshakeError('blocked', 'The browser blocked the popup. Allow popups for this site.')
     this.popup = popup
     this.listener = (event) => this.receive(event)
@@ -91,8 +94,15 @@ export class PopupChannel {
     )
   }
 
+  /** Sends the popup to `url`; from then on only messages from `origin` count. */
+  navigate(url: string, origin: string) {
+    if (this.ended) throw this.ended
+    this.origin = origin
+    this.popup.location.replace(url)
+  }
+
   private receive(event: MessageEvent) {
-    if (event.source !== this.popup || event.origin !== this.origin) return
+    if (!this.origin || event.source !== this.popup || event.origin !== this.origin) return
     const message = envelope(event.data)
     if (!message) return
     if (message.type === 'ready') {

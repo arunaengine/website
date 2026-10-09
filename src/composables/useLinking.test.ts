@@ -6,9 +6,15 @@ import { linkNonce } from '@/lib/federation/secret'
 
 const requestHandoff = vi.fn()
 const createLinkConfirmation = vi.fn()
+const close = vi.fn()
+const openPopup = vi.fn(() => ({ close }))
 
 vi.mock('./useFederation', () => ({ requestHandoff: (...args: unknown[]) => requestHandoff(...args) }))
 vi.mock('./aruna/session', () => ({ refresh: vi.fn(), setAuthToken: vi.fn() }))
+vi.mock('@/lib/federation/popup', async (original) => ({
+  ...(await original<typeof import('@/lib/federation/popup')>()),
+  openPopup: () => openPopup(),
+}))
 vi.mock('@/lib/api', async (original) => ({
   ...(await original<typeof import('@/lib/api')>()),
   createLinkConfirmation: (...args: unknown[]) => createLinkConfirmation(...args),
@@ -22,8 +28,11 @@ function tokenWith(sid: string) {
 }
 
 beforeEach(() => {
+  vi.stubGlobal('window', {})
   requestHandoff.mockReset()
   createLinkConfirmation.mockReset()
+  close.mockReset()
+  openPopup.mockClear()
 })
 
 describe('confirmLink', () => {
@@ -32,7 +41,8 @@ describe('confirmLink', () => {
     requestHandoff.mockResolvedValue({ payload: { name: 'Anna' } })
     createLinkConfirmation.mockResolvedValue({ payload: {} })
     const result = await confirmLink({ realmId: 'HOME' } as never)
-    const [, nonce, link] = requestHandoff.mock.calls[0]
+    const [channel, , nonce, link] = requestHandoff.mock.calls[0]
+    expect(channel).toEqual({ close })
     const [, secret] = createLinkConfirmation.mock.calls[0]
     expect(link).toBe(true)
     expect(nonce).toBe(await linkNonce('SID-1', secret))
@@ -49,9 +59,20 @@ describe('confirmLink', () => {
     expect(createLinkConfirmation).not.toHaveBeenCalled()
   })
 
+  it('opens the window at the click and closes it when confirming fails', async () => {
+    authToken.value = tokenWith('SID-1')
+    requestHandoff.mockResolvedValue({ payload: { name: 'Anna' } })
+    createLinkConfirmation.mockRejectedValue(new ApiError(403, 'x', 'link_refused'))
+    const done = confirmLink({ realmId: 'HOME' } as never)
+    expect(openPopup).toHaveBeenCalledOnce()
+    await expect(done).rejects.toThrow('x')
+    expect(close).toHaveBeenCalled()
+  })
+
   it('needs a local session first', async () => {
     authToken.value = ''
     await expect(confirmLink({ realmId: 'HOME' } as never)).rejects.toThrow('Log in here first.')
+    expect(openPopup).not.toHaveBeenCalled()
   })
 })
 

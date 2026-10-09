@@ -10,7 +10,8 @@ import {
   type LoginHandoff,
 } from '@/lib/api'
 import type { VerifiedRealm, Signed } from '@/lib/federation/descriptor'
-import { checkHandoff, openPopup, popupFailure } from '@/lib/federation/popup'
+import type { PopupChannel } from '@/lib/federation/handshake'
+import { checkHandoff, openPopup, popupFailure, showRealm } from '@/lib/federation/popup'
 import { rememberRealm, knownRealm, recheckRealm } from '@/lib/federation/realms'
 import { newSecret } from '@/lib/federation/secret'
 import { shortId } from './aruna/format'
@@ -61,24 +62,30 @@ export class FederationError extends Error {
 }
 
 /**
- * Checks the home realm again, opens its popup and returns its handoff for this realm, bound
- * to `nonce`. `link` only changes the words the home realm shows.
+ * Checks the home realm again, sends the empty popup `channel` there and returns its handoff
+ * for this realm, bound to `nonce`. The popup closes in any case. `link` only changes the
+ * words the home realm shows.
  */
-export async function requestHandoff(home: VerifiedRealm, nonce: string, link = false): Promise<Signed<LoginHandoff>> {
+export async function requestHandoff(
+  channel: PopupChannel,
+  home: VerifiedRealm,
+  nonce: string,
+  link = false,
+): Promise<Signed<LoginHandoff>> {
   const context = refreshContext()
-  let descriptor
-  let checked: VerifiedRealm
   try {
-    ;[descriptor, checked] = await Promise.all([getRealmDescriptor(context.client), recheckRealm(home)])
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 404) {
-      throw new FederationError('This realm does not take logins from other realms.')
+    let descriptor
+    let checked: VerifiedRealm
+    try {
+      ;[descriptor, checked] = await Promise.all([getRealmDescriptor(context.client), recheckRealm(home)])
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        throw new FederationError('This realm does not take logins from other realms.')
+      }
+      throw error
     }
-    throw error
-  }
-  assertCurrentSession(context.epoch)
-  const channel = openPopup(window, checked)
-  try {
+    assertCurrentSession(context.epoch)
+    showRealm(channel, checked)
     const handoff = await channel.ask<Signed<LoginHandoff>>({ kind: 'login', descriptor, nonce, link })
     assertCurrentSession(context.epoch)
     checkHandoff(handoff, checked, nonce)
@@ -98,13 +105,18 @@ function sessionFailure(error: unknown, home: VerifiedRealm, servingName: string
   return popupFailure(error, 'login') ?? apiErrorMessage(error)
 }
 
-/** Logs in here with an account of `home`; returns an error message or null on success. */
+/**
+ * Logs in here with an account of `home`; returns an error message or null on success. Call
+ * it in the click handler: the popup opens before the first await.
+ */
 export async function loginWithRealm(home: VerifiedRealm, servingName: string): Promise<string | null> {
   const startedFor = apiBaseUrl.value
   const startToken = authToken.value
+  let channel: PopupChannel | null = null
   try {
+    channel = openPopup(window)
     const { secret, nonce } = await newSecret()
-    const handoff = await requestHandoff(home, nonce)
+    const handoff = await requestHandoff(channel, home, nonce)
     const session = await createFederatedSession(handoff, secret, { baseUrl: startedFor })
     if (apiBaseUrl.value !== startedFor || authToken.value !== startToken) {
       throw new FederationError('The session changed during the login.')
@@ -123,5 +135,7 @@ export async function loginWithRealm(home: VerifiedRealm, servingName: string): 
     return null
   } catch (error) {
     return sessionFailure(error, home, servingName)
+  } finally {
+    channel?.close()
   }
 }

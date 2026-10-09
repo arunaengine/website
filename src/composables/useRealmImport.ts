@@ -16,7 +16,7 @@ import {
 } from '@/lib/api'
 import type { Signed, RealmDescriptor, VerifiedRealm } from '@/lib/federation/descriptor'
 import { HandshakeError, type PopupChannel } from '@/lib/federation/handshake'
-import { IMPORT_TIMEOUT_MS, openPopup, popupFailure, type ExportAnswer } from '@/lib/federation/popup'
+import { IMPORT_TIMEOUT_MS, openPopup, popupFailure, showRealm, type ExportAnswer } from '@/lib/federation/popup'
 import { recheckRealm } from '@/lib/federation/realms'
 import { newSecret } from '@/lib/federation/secret'
 import { checkOwnerNode, importKey, OwnerNodeError } from '@/lib/federation/transfer'
@@ -148,7 +148,10 @@ export function useRealmImport() {
     }
   }
 
-  /** Signs the intent here, then opens the source realm to choose and send the dataset. */
+  /**
+   * Signs the intent here, then opens the source realm to choose and send the dataset. Call it
+   * in the click handler: the popup opens before the first await.
+   */
   async function start(form: RealmImportForm) {
     const run = ++attempt
     closeChannel()
@@ -160,6 +163,8 @@ export function useRealmImport() {
     phase.value = 'preparing'
     await guarded(run, form, async () => {
       const context = refreshContext()
+      const popup = openPopup(window, IMPORT_TIMEOUT_MS)
+      channel = popup
       const { secret, nonce } = await newSecret()
       current(run, context.epoch)
       const destination = { group_id: form.groupId, bucket: form.bucket, prefix: form.prefix, metadata_path: form.metadataPath }
@@ -170,8 +175,8 @@ export function useRealmImport() {
       ])
       current(run, context.epoch)
       phase.value = 'choosing'
-      channel = openPopup(window, source, IMPORT_TIMEOUT_MS)
-      const answer = await channel.ask<ExportAnswer>({ kind: 'export', descriptor, intent })
+      showRealm(popup, source)
+      const answer = await popup.ask<ExportAnswer>({ kind: 'export', descriptor, intent })
       current(run, context.epoch)
       files.value = answer.files
       pending = { form, intent, descriptor, answer, secret, context }

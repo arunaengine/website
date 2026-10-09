@@ -117,7 +117,7 @@ function startSignIn() {
           Log in with another realm
         </Button>
         <div v-if="pickerOpen && !federating" class="rounded-lg border border-border bg-muted/30 p-1">
-          <RealmPicker action-label="Choose" :exclude-realm-id="realm.id" @pick="loginElsewhere" />
+          <RealmPicker action-label="Choose" :exclude-realm-id="realm.id" :check-pick="false" @pick="loginElsewhere" />
         </div>
         <Spinner v-if="federating && homeRealm" show-label :label="`Waiting for ${homeRealm.name}…`" class="text-xs" />
         <Notice v-if="federationError" tone="error" class="flex items-center justify-between gap-3">

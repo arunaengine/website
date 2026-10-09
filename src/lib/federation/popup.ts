@@ -27,8 +27,13 @@ export function popupUrl(realm: VerifiedRealm): string {
   return new URL('/federation/popup', realm.portalUrl).href
 }
 
-export function openPopup(host: HandshakeWindow, realm: VerifiedRealm, timeoutMs = POPUP_TIMEOUT_MS): PopupChannel {
-  return new PopupChannel(host, popupUrl(realm), realm.portalOrigin, timeoutMs)
+/** An empty popup for a realm checked later; call it in the click handler, before any await. */
+export function openPopup(host: HandshakeWindow, timeoutMs = POPUP_TIMEOUT_MS): PopupChannel {
+  return new PopupChannel(host, timeoutMs)
+}
+
+export function showRealm(channel: PopupChannel, realm: VerifiedRealm) {
+  channel.navigate(popupUrl(realm), realm.portalOrigin)
 }
 
 export class RequestError extends Error {

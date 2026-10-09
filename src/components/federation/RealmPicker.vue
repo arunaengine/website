@@ -23,9 +23,12 @@ import {
 import { errorMessage, relativeTime } from '@/lib/utils'
 import { ChevronRight, Plus, RefreshCw, Search, ShieldCheck, ShieldQuestion, Star } from '@lucide/vue'
 
-const props = withDefaults(defineProps<{ actionLabel?: string; excludeRealmId?: string }>(), {
+// `checkPick: false` hands a chosen realm on at the click, so a popup can open at once; the
+// consumer then checks the realm itself before it uses it.
+const props = withDefaults(defineProps<{ actionLabel?: string; excludeRealmId?: string; checkPick?: boolean }>(), {
   actionLabel: 'Open',
   excludeRealmId: '',
+  checkPick: true,
 })
 const emit = defineEmits<{ (e: 'pick', realm: VerifiedRealm): void }>()
 
@@ -101,6 +104,7 @@ async function run(key: string, task: () => Promise<RealmCheck>, onOk: (realm: V
 }
 
 function choose(realm: VerifiedRealm) {
+  if (!props.checkPick) return emit('pick', realm)
   const check = () => checkRealm(realm.portalUrl, { realmId: realm.realmId, label: realm.name })
   void run(`pick:${realm.realmId}`, check, (checked) => emit('pick', checked), () => choose(realm))
 }
