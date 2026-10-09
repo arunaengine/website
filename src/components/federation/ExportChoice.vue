@@ -20,7 +20,7 @@ const emit = defineEmits<{
   (e: 'cancel'): void
 }>()
 
-const { metadata, realm } = useAruna()
+const { metadata, realm, nodeInfo } = useAruna()
 const query = ref('')
 const documentId = ref('')
 const withFiles = ref(false)
@@ -49,7 +49,9 @@ watch(documentId, async (id) => {
     const crate = await fetchRoCrateRaw(id)
     if (generation !== loadGeneration) return
     const all = dataEntitiesOf(crate).filter((entity) => isLeafFile(entity.types))
-    files.value = all.filter((entity) => hasLocalIdentity(entity, realm.value.id))
+    // The export runs on the node behind this API base; only its own versions can be copied.
+    const nodeId = nodeInfo.value?.node.peer_id ?? ''
+    files.value = all.filter((entity) => hasLocalIdentity(entity, realm.value.id, nodeId))
     linked.value = all.length - files.value.length
   } catch (error) {
     if (generation === loadGeneration) filesError.value = errorMessage(error)

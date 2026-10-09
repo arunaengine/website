@@ -103,13 +103,18 @@ export function parseDataIdentity(
   }
 }
 
-/** Whether the node can copy the bytes, by its rule: a content id, an s3 location, or a versioned
- * ARN (bare or as a web id) or bare content hash ARN of `realmId`, the export's source realm. */
-export function hasLocalIdentity(entity: { id: string; contentUrl?: string | null }, realmId: string): boolean {
-  return [entity.id, entity.contentUrl ?? ''].some((value) => {
-    const arnRealm = (parseArnId(value) ?? parseArn(value))?.arn.realmId ?? HASH_ARN.exec(value)?.[1]
-    return isContentId(value) || Boolean(parseObjectUrl(value)) || arnRealm === realmId
-  })
+/** Whether node `nodeId` of `realmId`, the export's source, can copy the bytes by its rule: a
+ * content id or bare content hash ARN of the realm, else a versioned ARN of the realm (bare or as
+ * a web id) on that node, else an s3 location. */
+export function hasLocalIdentity(
+  entity: { id: string; contentUrl?: string | null },
+  realmId: string,
+  nodeId: string,
+): boolean {
+  const values = [entity.id, entity.contentUrl ?? '']
+  if (values.some((value) => isContentId(value) || HASH_ARN.exec(value)?.[1] === realmId)) return true
+  const exact = values.map((value) => (parseArnId(value) ?? parseArn(value))?.arn).find((arn) => arn?.realmId === realmId)
+  return exact ? exact.nodeId === nodeId : values.some((value) => Boolean(parseObjectUrl(value)))
 }
 
 /** The data browser opened at a folder; `prefix` may end in a slash. */

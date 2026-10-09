@@ -10,6 +10,7 @@ const HELD = `https://w3id.org/aruna/data/${'a'.repeat(64)}`
 const LINK = 'https://example.org/remote.csv'
 const LOCAL_ARN = 'arn:aruna:R:N:s3/reads/one.csv@01JABCDEF0123456789ABCDEFG'
 const FOREIGN_ARN = 'https://w3id.org/aruna/data/arn:aruna:F:N:s3/reads/two.csv@01JABCDEF0123456789ABCDEFG'
+const REMOTE_ARN = 'arn:aruna:R:M:s3/reads/three.csv@01JABCDEF0123456789ABCDEFG'
 const fetchRoCrateRaw = vi.fn()
 const Empty = defineComponent(() => () => null)
 const Plain = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
@@ -21,7 +22,7 @@ const ExportChoice = compileClientComponent(new URL('./ExportChoice.vue', import
   '@/components/ui/Input.vue': moduleDefault(Empty),
   '@/components/ui/Notice.vue': moduleDefault(Plain),
   '@/components/ui/Spinner.vue': moduleDefault(Plain),
-  '@/composables/useAruna': { useAruna: () => ({ metadata: ref([{ ulid: 'D1', title: 'Reads' }]), realm: ref({ id: 'R' }) }) },
+  '@/composables/useAruna': { useAruna: () => ({ metadata: ref([{ ulid: 'D1', title: 'Reads' }]), realm: ref({ id: 'R' }), nodeInfo: ref({ node: { peer_id: 'N' } }) }) },
   '@/composables/aruna/crates': { fetchRoCrateRaw },
   '@/lib/crate/dataIdentity': DataIdentity,
   '@/lib/dataEntities': DataEntities,
@@ -66,6 +67,16 @@ describe('ExportChoice', () => {
     await click(button(mounted.root, 'Send to B'))
     expect(onSend).toHaveBeenCalledWith({ documentId: 'D1', title: 'Reads', files: [LOCAL_ARN] })
     expect(() => input(mounted.root, 'value', FOREIGN_ARN)).toThrow()
+    expect(content(mounted.root)).toContain('1 linked file stays a link.')
+    mounted.app.unmount()
+  })
+
+  it('leaves out a version that only another node of this realm holds', async () => {
+    const onSend = vi.fn()
+    const mounted = await choose([LOCAL_ARN, REMOTE_ARN], onSend)
+    await click(button(mounted.root, 'Send to B'))
+    expect(onSend).toHaveBeenCalledWith({ documentId: 'D1', title: 'Reads', files: [LOCAL_ARN] })
+    expect(() => input(mounted.root, 'value', REMOTE_ARN)).toThrow()
     expect(content(mounted.root)).toContain('1 linked file stays a link.')
     mounted.app.unmount()
   })
