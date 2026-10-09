@@ -25,7 +25,8 @@ function linkHere() {
   if (!login) return
   setPendingLink({ apiBaseUrl: login.apiBaseUrl, homeRealmId: login.homeRealmId })
   dismissLinkOffer()
-  void signIn({ redirectTo: '/app/settings' })
+  // Linking needs a login made just now, not an older one the provider remembers.
+  void signIn({ redirectTo: '/app/settings', freshLogin: true })
 }
 </script>
 

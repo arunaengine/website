@@ -8,14 +8,16 @@ import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import RealmTag from '@/components/federation/RealmTag.vue'
 import { useAruna } from '@/composables/useAruna'
+import { useAuth } from '@/composables/useAuth'
 import { homeRealmLabel } from '@/composables/useFederation'
 import { confirmLink, finishLink, linkFailure, pendingLink, setPendingLink } from '@/composables/useLinking'
-import type { LinkConfirmation } from '@/lib/api'
+import { ApiError, type LinkConfirmation } from '@/lib/api'
 import { userIdText, type Signed } from '@/lib/federation/descriptor'
 import { knownRealm } from '@/lib/federation/realms'
 import { Link2 } from '@lucide/vue'
 
 const { currentUser, realm, apiBaseUrl } = useAruna()
+const { signIn } = useAuth()
 
 const home = computed(() => {
   const pending = pendingLink.value
@@ -30,6 +32,8 @@ const confirmation = shallowRef<Signed<LinkConfirmation> | null>(null)
 const foreignName = ref<string | null>(null)
 const busy = ref<'' | 'asking' | 'linking'>('')
 const failure = ref<string | null>(null)
+// The node refused a login as too old or of the wrong kind; a new login here may help.
+const relogin = ref(false)
 const done = ref(false)
 const foreignUser = computed(() => (confirmation.value ? userIdText(confirmation.value.payload.foreign_user) : ''))
 
@@ -43,7 +47,7 @@ async function ask() {
     confirmation.value = confirmed.confirmation
     foreignName.value = confirmed.name
   } catch (error) {
-    failure.value = linkFailure(error)
+    fail(error)
   } finally {
     busy.value = ''
   }
@@ -58,10 +62,19 @@ async function link() {
     confirmation.value = null
     done.value = true
   } catch (error) {
-    failure.value = linkFailure(error)
+    fail(error)
   } finally {
     busy.value = ''
   }
+}
+
+function fail(error: unknown) {
+  failure.value = linkFailure(error)
+  relogin.value = error instanceof ApiError && error.code === 'link_refused'
+}
+
+function loginAgain() {
+  void signIn({ redirectTo: '/app/settings', freshLogin: true })
 }
 
 function cancel() {
@@ -101,7 +114,10 @@ function cancel() {
           <li>{{ home.name }} can then log you in to this account.</li>
         </ul>
       </template>
-      <Notice v-if="failure" tone="error">{{ failure }}</Notice>
+      <Notice v-if="failure" tone="error" class="flex items-center justify-between gap-3">
+        <span>{{ failure }}</span>
+        <Button v-if="relogin" size="sm" variant="outline" @click="loginAgain">Log in again</Button>
+      </Notice>
     </div>
     <footer class="flex justify-end gap-2 border-t border-border bg-muted/30 px-5 py-3">
       <Button variant="outline" :disabled="Boolean(busy)" @click="cancel">Cancel</Button>

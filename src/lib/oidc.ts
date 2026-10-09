@@ -54,6 +54,8 @@ export function buildAuthorizationUrl(input: {
   state: string
   codeChallenge: string
   scope?: string
+  /** Asks the provider to log the user in again, so its `auth_time` is now. */
+  freshLogin?: boolean
 }): string {
   const url = new URL(input.authorizationEndpoint)
   url.searchParams.set('response_type', 'code')
@@ -63,6 +65,10 @@ export function buildAuthorizationUrl(input: {
   url.searchParams.set('state', input.state)
   url.searchParams.set('code_challenge', input.codeChallenge)
   url.searchParams.set('code_challenge_method', 'S256')
+  if (input.freshLogin) {
+    url.searchParams.set('prompt', 'login')
+    url.searchParams.set('max_age', '0')
+  }
   return url.toString()
 }
 

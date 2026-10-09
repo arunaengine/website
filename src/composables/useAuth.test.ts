@@ -94,3 +94,42 @@ describe('cancelSignIn', () => {
     expect(stage.value).toBe('exchanging')
   })
 })
+
+describe('signIn', () => {
+  // The realm names its provider; the provider's discovery names the login page.
+  async function redirectFor(options: { freshLogin?: boolean }): Promise<URL> {
+    await configure({})
+    const storage = new Map<string, string>()
+    vi.stubGlobal('window', {
+      location: { origin: PAGE_ORIGIN, assign },
+      sessionStorage: {
+        getItem: (key: string) => storage.get(key) ?? null,
+        setItem: (key: string, value: string) => storage.set(key, value),
+        removeItem: (key: string) => storage.delete(key),
+      },
+    })
+    const discoveryUrl = `https://idp.test/${Math.random()}/.well-known/openid-configuration`
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      const body = url.endsWith('/system/realm')
+        ? { oidc_providers: [{ audience: 'portal', discovery_url: discoveryUrl }] }
+        : { issuer: 'https://idp.test', authorization_endpoint: 'https://idp.test/authorize', token_endpoint: 'https://idp.test/token' }
+      return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }))
+    await useAuth().signIn(options)
+    expect(assign).toHaveBeenCalledTimes(1)
+    return new URL(assign.mock.calls[0][0] as string)
+  }
+
+  it('asks the provider for a new login when fresh', async () => {
+    const url = await redirectFor({ freshLogin: true })
+    expect(url.searchParams.get('prompt')).toBe('login')
+    expect(url.searchParams.get('max_age')).toBe('0')
+  })
+
+  it('keeps the provider session by default', async () => {
+    const url = await redirectFor({})
+    expect(url.searchParams.has('prompt')).toBe(false)
+    expect(url.searchParams.has('max_age')).toBe(false)
+  })
+})

@@ -90,7 +90,7 @@ async function resolveProvider() {
 }
 
 /** Redirects the browser to the realm's Keycloak login page (code + PKCE). */
-async function signIn(options: { onboardingSecret?: string; redirectTo?: string } = {}) {
+async function signIn(options: { onboardingSecret?: string; redirectTo?: string; freshLogin?: boolean } = {}) {
   stage.value = 'redirecting'
   stageError.value = null
   try {
@@ -114,6 +114,7 @@ async function signIn(options: { onboardingSecret?: string; redirectTo?: string 
         redirectUri: callbackUri(),
         state,
         codeChallenge: await pkceChallengeS256(verifier),
+        freshLogin: options.freshLogin,
       }),
     )
   } catch (err) {
