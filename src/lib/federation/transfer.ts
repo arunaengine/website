@@ -11,12 +11,18 @@ function normalized(url: string): string {
   }
 }
 
-/** Whether `ownerUrl` is the published API address of a configured node of this realm. */
+/** A published API address as the node serves its API: under `/api/v1`. */
+function apiBase(url: string): string {
+  const base = normalized(url)
+  return !base || base.endsWith('/api/v1') ? base : `${base}/api/v1`
+}
+
+/** Whether `ownerUrl` is the API of a configured node of this realm, by its published address. */
 export function ownerNodeAllowed(ownerUrl: string, realm: RealmInfoResponse): boolean {
   const owner = normalized(ownerUrl)
   if (!owner) return false
   return realm.nodes.some(
-    (node) => node.configured && node.info?.urls.api && normalized(node.info.urls.api) === owner,
+    (node) => node.configured && node.info?.urls.api && apiBase(node.info.urls.api) === owner,
   )
 }
 

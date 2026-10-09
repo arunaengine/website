@@ -20,6 +20,13 @@ describe('ownerNodeAllowed', () => {
     expect(ownerNodeAllowed('https://b1.example/api/v1', realm)).toBe(true)
   })
 
+  it('accepts the API of a node that publishes only its address', () => {
+    const realm = realmWith([{ api: 'https://b1.example' }, { api: 'https://b2.example/aruna/' }])
+    expect(ownerNodeAllowed('https://b1.example/api/v1', realm)).toBe(true)
+    expect(ownerNodeAllowed('https://b2.example/aruna/api/v1', realm)).toBe(true)
+    expect(ownerNodeAllowed('https://b1.example', realm)).toBe(false)
+  })
+
   it('refuses a node the other realm made up, or one no longer configured', () => {
     const realm = realmWith([{ api: 'https://b1.example/api/v1' }, { api: 'https://old.example/api/v1', configured: false }])
     expect(ownerNodeAllowed('https://evil.example/api/v1', realm)).toBe(false)
