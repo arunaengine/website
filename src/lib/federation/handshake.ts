@@ -187,6 +187,11 @@ export class OpenerLink {
     return Boolean(this.host.opener)
   }
 
+  /** False once the opener closed, the deadline passed or the link was disposed. */
+  get active(): boolean {
+    return !this.ended
+  }
+
   /** The empty ready message; it carries nothing, so any origin may see it. */
   announce() {
     const opener = this.host.opener as Window | null | undefined
@@ -234,6 +239,7 @@ export class OpenerLink {
   }
 
   private send(type: 'result' | 'error', id: number, body: unknown) {
+    if (this.ended) return
     if (!this.locked) throw new Error('The opener origin is not verified.')
     const opener = this.host.opener as Window | null | undefined
     opener?.postMessage({ protocol: PROTOCOL, type, id, body } satisfies Envelope, this.locked)

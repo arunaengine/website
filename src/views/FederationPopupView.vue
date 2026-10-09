@@ -39,11 +39,12 @@ const sent = ref(false)
 let ended = false
 const homeId = computed(() => realm.value.id)
 
-// Work for the other realm stays bound to the login and API it started with.
+// Work for the other realm ends with the opener link or a change of login or API.
 function boundToSession() {
   const epoch = sessionEpoch.value
   const base = aruna.apiBaseUrl.value
-  return () => !ended && sessionEpoch.value === epoch && aruna.apiBaseUrl.value === base
+  const opener = link.value
+  return () => !ended && Boolean(opener?.active) && sessionEpoch.value === epoch && aruna.apiBaseUrl.value === base
 }
 
 // Only a local account of this realm can log in elsewhere; a session from another realm cannot.

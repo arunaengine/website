@@ -150,6 +150,19 @@ describe('OpenerLink', () => {
     expect(opener.postMessage).toHaveBeenLastCalledWith({ protocol: PROTOCOL, type: 'error', id: 2, body }, SERVING)
   })
 
+  it('sends nothing once the link ended', async () => {
+    const { opener, deliver, link: popup } = link()
+    deliver(opener, SERVING, { protocol: PROTOCOL, type: 'request', id: 5, body: 'export' })
+    const request = await popup.next()
+    popup.lock(SERVING)
+    expect(popup.active).toBe(true)
+    vi.advanceTimersByTime(60_001)
+    expect(popup.active).toBe(false)
+    popup.reply(request, 'late grant')
+    popup.refuse(request, 'Too late.')
+    expect(opener.postMessage).not.toHaveBeenCalled()
+  })
+
   it('drops requests from another origin after locking', async () => {
     const { opener, deliver, link: popup } = link()
     popup.lock(SERVING)
