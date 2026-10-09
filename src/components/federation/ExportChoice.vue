@@ -8,6 +8,7 @@ import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { useAruna } from '@/composables/useAruna'
 import { fetchRoCrateRaw } from '@/composables/aruna/crates'
+import { isLinkedFile } from '@/lib/crate/dataIdentity'
 import { dataEntitiesOf, isLeafFile, type DataEntity } from '@/lib/dataEntities'
 import type { VerifiedRealm } from '@/lib/federation/descriptor'
 import { errorMessage, formatBytes } from '@/lib/utils'
@@ -25,6 +26,7 @@ const documentId = ref('')
 const withFiles = ref(false)
 const files = ref<DataEntity[] | null>(null)
 const checked = ref<string[]>([])
+const linked = ref(0)
 const filesError = ref<string | null>(null)
 let loadGeneration = 0
 
@@ -40,12 +42,15 @@ watch(documentId, async (id) => {
   const generation = ++loadGeneration
   files.value = null
   checked.value = []
+  linked.value = 0
   filesError.value = null
   if (!id) return
   try {
     const crate = await fetchRoCrateRaw(id)
     if (generation !== loadGeneration) return
-    files.value = dataEntitiesOf(crate).filter((entity) => isLeafFile(entity.types))
+    const all = dataEntitiesOf(crate).filter((entity) => isLeafFile(entity.types))
+    files.value = all.filter((entity) => !isLinkedFile(entity))
+    linked.value = all.length - files.value.length
   } catch (error) {
     if (generation === loadGeneration) filesError.value = errorMessage(error)
   }
@@ -121,7 +126,7 @@ function send() {
         <legend class="mb-1.5 text-xs font-medium text-foreground">Files</legend>
         <Notice v-if="filesError" tone="error">{{ filesError }}</Notice>
         <Spinner v-else-if="!files" show-label label="Loading files…" class="text-xs" />
-        <p v-else-if="!files.length" class="text-sm text-muted-foreground">This dataset has no files.</p>
+        <p v-else-if="!files.length" class="text-sm text-muted-foreground">This dataset has no files to copy.</p>
         <div v-else class="divide-y divide-border rounded-md border border-border">
           <label v-for="file in files" :key="file.id" class="flex items-center gap-2.5 px-3 py-2 text-sm">
             <input v-model="checked" type="checkbox" :value="file.id" />
@@ -130,6 +135,9 @@ function send() {
             <span class="text-xs text-muted-foreground">{{ size(file) }}</span>
           </label>
         </div>
+        <p v-if="files && linked" class="mt-1.5 text-[11px] text-muted-foreground">
+          {{ linked }} linked {{ linked === 1 ? 'file stays a link' : 'files stay links' }}.
+        </p>
       </fieldset>
     </template>
 
@@ -137,7 +145,7 @@ function send() {
       <Button variant="outline" :disabled="busy" @click="chosen ? (documentId = '') : emit('cancel')">
         {{ chosen ? 'Back' : 'Cancel' }}
       </Button>
-      <Button v-if="chosen" :disabled="busy || (withFiles && !checked.length)" @click="send">
+      <Button v-if="chosen" :disabled="busy || (withFiles && !checked.length && files?.length !== 0)" @click="send">
         <Spinner v-if="busy" class="text-current" aria-hidden="true" /> Send to {{ serving.name }}
       </Button>
     </div>

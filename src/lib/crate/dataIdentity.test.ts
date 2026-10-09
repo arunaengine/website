@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { dataEntityIdentity, folderRoute, objectLocation, objectRoute, parseDataIdentity } from './dataIdentity'
+import { dataEntityIdentity, folderRoute, isLinkedFile, objectLocation, objectRoute, parseDataIdentity } from './dataIdentity'
 
 const BLAKE3 = 'a'.repeat(64)
 
@@ -106,5 +106,19 @@ describe('bucket browser routes', () => {
       params: { bucketId: 'datasets-g1' },
       query: { prefix: 'D1', group: 'G1' },
     })
+  })
+})
+
+describe('isLinkedFile', () => {
+  it('is true only for a web link the realm does not hold', () => {
+    expect(isLinkedFile({ id: 'https://example.org/one.csv' })).toBe(true)
+    expect(isLinkedFile({ id: 'https://example.org/one.csv', contentUrl: 'https://example.org/one.csv' })).toBe(true)
+  })
+
+  it('is false for a stored file in any written form', () => {
+    expect(isLinkedFile({ id: `https://w3id.org/aruna/data/${BLAKE3}` })).toBe(false)
+    expect(isLinkedFile({ id: 'https://example.org/a', contentUrl: 's3://reads/one.csv' })).toBe(false)
+    expect(isLinkedFile({ id: 'https://w3id.org/aruna/data/arn:aruna:r:n:s3/reads/one.csv@01V' })).toBe(false)
+    expect(isLinkedFile({ id: 'data/one.csv' })).toBe(false)
   })
 })

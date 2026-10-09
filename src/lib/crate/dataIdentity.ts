@@ -99,6 +99,12 @@ export function parseDataIdentity(
   }
 }
 
+/** A web link the realm does not hold: an absolute id with no content id, s3 location or ARN. */
+export function isLinkedFile(entity: { id: string; contentUrl?: string | null }): boolean {
+  const { contentId, s3, arn } = parseDataIdentity(entity)
+  return isAbsoluteUri(entity.id) && !contentId && !s3 && !arn
+}
+
 /** The data browser opened at a folder; `prefix` may end in a slash. */
 export function folderRoute(bucket: string, prefix: string, groupId?: string | null) {
   const folder = prefix.replace(/^\/+|\/+$/g, '')
