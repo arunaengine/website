@@ -78,6 +78,10 @@ onMounted(async () => {
     return
   }
   link.value = opener
+  // Once the link ended nothing can be answered, so the consent controls give way to the reason.
+  opener.onEnd = (error) => {
+    if (!ended && !sent.value) failure.value = error.message
+  }
   await loadHome()
   opener.announce()
   let first: OpenerRequest
@@ -157,13 +161,14 @@ async function allowLogin() {
   failure.value = null
   const alive = boundToSession()
   try {
+    if (!alive()) throw new ExportStop('The other window was closed.')
     const client = { baseUrl: aruna.apiBaseUrl.value, token: aruna.authToken.value }
     const handoff = await createLoginHandoff(asked.descriptor, asked.nonce, client)
     if (!alive()) return
     link.value.reply(current, handoff)
     window.close()
   } catch (error) {
-    failure.value = apiErrorMessage(error)
+    failure.value = error instanceof ExportStop ? error.message : apiErrorMessage(error)
   } finally {
     busy.value = false
   }

@@ -63,6 +63,7 @@ export async function exportForIntent(
   alive: () => boolean,
 ): Promise<{ jobId: string; grant: Signed<ExportGrant> }> {
   const { descriptor, intent, client } = source
+  if (!alive()) throw new ExportStop('The export was left.')
   const submitted = await createExport({ descriptor, intent, document_id: documentId, files }, client)
   await waitForJob(submitted.job_id, client, alive)
   const grant = await createGrant(submitted.job_id, client)

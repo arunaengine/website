@@ -56,6 +56,11 @@ describe('waitForJob', () => {
     expect(getJob).not.toHaveBeenCalled()
   })
 
+  it('submits nothing when the popup flow ended before the export', async () => {
+    await expect(exportForIntent(source, 'DOC', [], () => false)).rejects.toThrow('left')
+    expect(createExport).not.toHaveBeenCalled()
+  })
+
   it('signs nothing when the login changed during the last job read', async () => {
     let alive = true
     createExport.mockResolvedValue({ job_id: 'J' })

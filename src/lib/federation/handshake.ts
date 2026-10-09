@@ -179,6 +179,8 @@ export class OpenerLink {
   private closedTimer: ReturnType<typeof setInterval>
   private deadline: ReturnType<typeof setTimeout>
   private ended: HandshakeError | null = null
+  /** Called once with the reason when the link ends. */
+  onEnd: ((error: HandshakeError) => void) | null = null
 
   constructor(
     private host: HandshakeWindow,
@@ -240,6 +242,7 @@ export class OpenerLink {
     this.queue = []
     this.waiter?.reject(error)
     this.waiter = null
+    this.onEnd?.(error)
   }
 
   /** Accepts later requests only from `origin`, the verified opener portal. */

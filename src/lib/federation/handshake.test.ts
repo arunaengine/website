@@ -150,6 +150,17 @@ describe('OpenerLink', () => {
     await expect(popup.next()).rejects.toMatchObject({ reason: 'closed' })
   })
 
+  it('tells its end hook once why the link ended', () => {
+    const { opener, link: popup } = link()
+    const onEnd = vi.fn()
+    popup.onEnd = onEnd
+    opener.closed = true
+    vi.advanceTimersByTime(600)
+    popup.dispose()
+    expect(onEnd).toHaveBeenCalledTimes(1)
+    expect(onEnd).toHaveBeenCalledWith(expect.objectContaining({ reason: 'closed', message: 'The other window was closed.' }))
+  })
+
   it('stops waiting after the deadline', async () => {
     const { link: popup } = link()
     const waiting = popup.next()
