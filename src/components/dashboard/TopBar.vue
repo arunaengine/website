@@ -22,6 +22,7 @@ import { useAuth } from '@/composables/useAuth'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { assistantAvailable, assistantUnread, assistantWarning } from '@/composables/assistantState'
 import { statusTone } from '@/components/nodes/node-display'
+import { homeRealmLabel } from '@/composables/useFederation'
 
 // 'desktop' is the Aruna Desktop chrome: no realm switcher and no dataset
 // shortcut, and this computer's own node takes the leading slot instead.
@@ -36,6 +37,8 @@ const route = useRoute()
 const router = useRouter()
 
 const desktop = computed(() => props.variant === 'desktop')
+// A user of another realm shows that home realm next to the name.
+const homeRealm = computed(() => (currentUser.value ? homeRealmLabel(currentUser.value.id, realm.value.id) : null))
 
 // A token is stored but the API rejected it (expired/revoked session).
 const sessionBroken = computed(() => hasSession.value && !currentUser.value && Boolean(authError.value))
@@ -160,7 +163,7 @@ async function handleSignOut() {
             <div class="hidden min-w-0 max-w-40 flex-col text-left leading-none sm:flex">
               <div class="truncate text-[13px] font-medium leading-none text-foreground">{{ currentUser.name }}</div>
               <div class="mt-0.5 truncate text-[11px] leading-none text-muted-foreground">
-                {{ realm.shortName }} · {{ role.replace('realm-', '') }}
+                {{ homeRealm ?? `${realm.shortName} · ${role.replace('realm-', '')}` }}
               </div>
             </div>
             <ChevronDown class="hidden h-3.5 w-3.5 shrink-0 text-muted-foreground sm:block" />
@@ -169,7 +172,7 @@ async function handleSignOut() {
         <DropdownMenuContent align="end" class="w-60">
           <DropdownMenuLabel>Signed in as</DropdownMenuLabel>
           <div class="px-2 pb-2 text-sm">
-            <div class="font-medium">{{ currentUser.name }}</div>
+            <div class="font-medium">{{ currentUser.name }}<span v-if="homeRealm" class="font-normal text-muted-foreground"> ({{ homeRealm }})</span></div>
             <div class="truncate text-xs text-muted-foreground">{{ currentUser.email || currentUser.id }}</div>
           </div>
           <DropdownMenuSeparator />

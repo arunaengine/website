@@ -53,6 +53,7 @@ const TopBar = compileClientComponent(new URL('./TopBar.vue', import.meta.url), 
   '@/components/dashboard/SearchOverlay.vue': moduleDefault(Marker('datasets')),
   '@/components/ui/StatusDot.vue': moduleDefault(StatusDotStub),
   '@/components/nodes/node-display': NodeDisplay,
+  '@/composables/useFederation': { homeRealmLabel: (id: string, own: string) => (id.endsWith(`@${own}`) ? null : 'Giessen Data') },
   '@/composables/useRealm': { useRealm: () => ({ realm: ref({ shortName: 'Testrealm' }), role: ref('realm-member') }) },
   '@/composables/useTheme': { useTheme: () => ({ isDark: ref(false), toggleTheme: vi.fn() }) },
   '@/composables/useAruna': {
