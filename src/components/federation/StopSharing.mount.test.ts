@@ -5,6 +5,9 @@ import { button, click, compileClientComponent, content, flush, moduleDefault, m
 import { ApiError } from '@/lib/api/client'
 
 const revokeGrant = vi.fn()
+const checkOwnerNode = vi.fn()
+class OwnerNodeError extends Error {}
+const OWNER = 'https://a2.example/api/v1'
 const sessionEpoch = ref(1)
 const JOB_CLIENT = Symbol('jobClient')
 const Empty = defineComponent(() => () => null)
@@ -18,23 +21,28 @@ const StopSharing = compileClientComponent(new URL('./StopSharing.vue', import.m
   },
   '@/composables/useJobs': { JOB_CLIENT },
   '@/lib/api': { ApiError, apiErrorMessage: (error: Error) => error.message, revokeGrant },
+  '@/lib/federation/transfer': { checkOwnerNode, OwnerNodeError },
 })
 
-async function stopSharing() {
-  const mounted = await mountApp(StopSharing, { props: { jobId: 'J1' } })
+async function stopSharing(props: Record<string, unknown> = { jobId: 'J1', ownerNodeUrl: OWNER }) {
+  const mounted = await mountApp(StopSharing, { props })
   await click(button(mounted.root, 'Stop sharing'))
   await click(button(mounted.root, 'Confirm stop sharing'))
   await flush()
   return mounted
 }
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  checkOwnerNode.mockImplementation(async (url: string) => url)
+})
 
 describe('StopSharing', () => {
-  it('revokes the grant of the export at its node after a confirmation', async () => {
+  it('revokes the grant at the owner node of the export after a confirmation', async () => {
     revokeGrant.mockResolvedValue(undefined)
     const mounted = await stopSharing()
-    expect(revokeGrant).toHaveBeenCalledWith('J1', { baseUrl: '/api/v1', token: 'A-TOKEN' })
+    expect(checkOwnerNode).toHaveBeenCalledWith(OWNER, '/api/v1', 'A-TOKEN')
+    expect(revokeGrant).toHaveBeenCalledWith('J1', { baseUrl: OWNER, token: 'A-TOKEN' })
     expect(content(mounted.root)).toContain('Sharing stopped.')
     mounted.app.unmount()
   })
@@ -43,6 +51,19 @@ describe('StopSharing', () => {
     revokeGrant.mockRejectedValue(new ApiError(404, 'Not found'))
     const mounted = await stopSharing()
     expect(content(mounted.root)).toContain('This export is not shared with another realm.')
+    mounted.app.unmount()
+  })
+
+  it.each([
+    ['no owner node is named', { jobId: 'J1' }, null, 'does not say which node'],
+    ['the owner is not a node of this realm', undefined, new OwnerNodeError('x'), 'this realm does not list'],
+    ['the node list cannot be read', undefined, new ApiError(404, 'No realm here'), 'No realm here'],
+  ])('sends nothing and claims nothing when %s', async (_, props, refusal, message) => {
+    if (refusal) checkOwnerNode.mockRejectedValue(refusal)
+    const mounted = await stopSharing(props)
+    expect(revokeGrant).not.toHaveBeenCalled()
+    expect(content(mounted.root)).toContain(message)
+    expect(content(mounted.root)).not.toContain('not shared')
     mounted.app.unmount()
   })
 

@@ -1,16 +1,17 @@
 <script setup lang="ts">
-// A finished export another realm may read: stop that at the node that holds the export.
-// Copies the other realm already made stay there.
+// A finished export another realm may read: stop that at the node that owns the export, named
+// in the job details. Copies the other realm already made stay there.
 import { inject, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import { useAruna } from '@/composables/useAruna'
 import { JOB_CLIENT } from '@/composables/useJobs'
 import { ApiError, apiErrorMessage, revokeGrant } from '@/lib/api'
+import { checkOwnerNode, OwnerNodeError } from '@/lib/federation/transfer'
 import { Ban } from '@lucide/vue'
 
-const props = defineProps<{ jobId: string }>()
+const props = defineProps<{ jobId: string; ownerNodeUrl?: string }>()
 const { apiBaseUrl, authToken, sessionEpoch } = useAruna()
-// The client that loaded this job, so the request goes to the node that holds the export.
+// The client that loaded this job; its node lists the nodes of this realm.
 const jobClient = inject(JOB_CLIENT, null)
 
 const step = ref<'idle' | 'confirm' | 'busy' | 'stopped' | 'unshared'>('idle')
@@ -19,15 +20,28 @@ const failure = ref<string | null>(null)
 async function stop() {
   const epoch = sessionEpoch.value
   const client = jobClient?.() ?? { baseUrl: apiBaseUrl.value, token: authToken.value }
-  step.value = 'busy'
   failure.value = null
+  if (!props.ownerNodeUrl) {
+    step.value = 'idle'
+    failure.value = 'This node does not say which node keeps the export.'
+    return
+  }
+  step.value = 'busy'
+  let owner: string | null = null
   try {
-    await revokeGrant(props.jobId, client)
+    // The bearer goes to the owner only once it is a configured node of this realm.
+    owner = await checkOwnerNode(props.ownerNodeUrl, client.baseUrl ?? '', client.token ?? '')
+    if (epoch !== sessionEpoch.value) return
+    await revokeGrant(props.jobId, { baseUrl: owner, token: client.token })
     if (epoch === sessionEpoch.value) step.value = 'stopped'
   } catch (error) {
     if (epoch !== sessionEpoch.value) return
-    step.value = error instanceof ApiError && error.status === 404 ? 'unshared' : 'idle'
-    if (step.value === 'idle') failure.value = apiErrorMessage(error)
+    // Only the owner's 404 means the export is not shared.
+    const unshared = owner !== null && error instanceof ApiError && error.status === 404
+    step.value = unshared ? 'unshared' : 'idle'
+    if (unshared) return
+    failure.value =
+      error instanceof OwnerNodeError ? 'The export is kept on a node this realm does not list.' : apiErrorMessage(error)
   }
 }
 </script>

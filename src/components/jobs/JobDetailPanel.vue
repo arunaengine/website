@@ -160,6 +160,7 @@ async function confirmCancel() {
           v-if="job.kind === 'export_rocrate' && job.state === 'succeeded'"
           :key="job.job_id"
           :job-id="job.job_id"
+          :owner-node-url="job.owner_node_url"
         />
 
         <section v-if="!terminal" class="border-t border-border pt-4">

@@ -157,6 +157,8 @@ export interface JobStatusResponse {
   // Set only on the node-local path; a job answered from the family omits it.
   run_crate?: unknown
   family?: JobFamilyResponse
+  /** API URL of the node that owns an owner-routed job; absent when not known. */
+  owner_node_url?: string
 }
 
 /** A locked bucket a job needs; an unlock of it lets the job go on. */
