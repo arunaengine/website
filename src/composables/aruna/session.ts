@@ -136,10 +136,11 @@ export function setApiBaseUrl(url: string, options: { keepToken?: boolean } = {}
   const next = url.trim() || defaultApiBaseUrl()
   if (next === apiBaseUrl.value) return
   sessionEpoch.value++
+  // The token stays stored for its own realm and API origin; it is not sent to this one.
+  // It goes first, so no watcher sees the new base together with the old token.
+  if (!options.keepToken) authToken.value = ''
   apiBaseUrl.value = next
   storeValue(apiBaseKey(), apiBaseUrl.value === defaultApiBaseUrl() ? '' : apiBaseUrl.value)
-  // The token stays stored for its own realm and API origin; it is not sent to this one.
-  if (!options.keepToken) authToken.value = ''
   clearIdentityState(true)
   loading.value = false
   bootstrapped.value = false

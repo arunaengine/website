@@ -57,6 +57,7 @@ interface NodeChat {
 const node = vi.hoisted(() => ({
   chats: new Map<string, NodeChat>(),
   log: [] as string[],
+  clients: [] as Array<{ baseUrl?: string; token?: string }>,
   listStatus: 200,
   maxTurnChars: Infinity,
   fail: (status: number, message: string): Error => new Error(`${status} ${message}`),
@@ -95,8 +96,9 @@ vi.mock('@/lib/api', async (importOriginal) => {
   node.fail = (status, message) => new original.ApiError(status, message)
   return {
     ...original,
-    listChats: async () => {
+    listChats: async (client?: { baseUrl?: string; token?: string }) => {
       node.log.push('GET chats')
+      node.clients.push({ baseUrl: client?.baseUrl, token: client?.token })
       if (node.listStatus !== 200) throw node.fail(node.listStatus, 'no such route')
       return { chats: [...node.chats.values()].filter((chat) => !chat.deleted).map((chat) => chat.head) }
     },
@@ -160,6 +162,7 @@ vi.stubGlobal('window', {
 const { createAssistantChatStore, newAssistantChat } = await import('@/lib/assistant/chatHistory')
 const { decodeTurn, encodeTurn } = await import('@/lib/assistant/chatTurns')
 const { apiBaseUrl, authToken, userInfo } = await import('./aruna/state')
+const { setApiBaseUrl } = await import('./aruna/session')
 
 let useAssistantChat: typeof import('./useAssistantChat').useAssistantChat
 let REMOTE_SAVE_DELAY_MS: number
@@ -371,6 +374,18 @@ describe('logging in', () => {
 
     expect(node.log).toEqual(['GET chats'])
     expect(texts(chat.activeChatId.value)).toEqual(['local only', 'local only answered'])
+  })
+})
+
+describe('switching the API base', () => {
+  it('sends no request with the old token to the new base', async () => {
+    await login()
+    node.clients.length = 0
+
+    setApiBaseUrl('https://other.test/api/v1')
+    await settle()
+
+    expect(node.clients.filter((client) => client.baseUrl === 'https://other.test/api/v1' && client.token)).toEqual([])
   })
 })
 
