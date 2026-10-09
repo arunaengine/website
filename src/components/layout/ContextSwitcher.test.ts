@@ -33,6 +33,17 @@ const RouterLinkStub = defineComponent({
   props: { to: { type: [String, Object], default: '' } },
   setup: (props, { slots }) => () => h('a', { 'data-to': JSON.stringify(props.to) }, slots.default?.()),
 })
+const DialogStub = defineComponent({
+  props: { open: { type: Boolean, default: false } },
+  setup: (props, { slots }) => () => (props.open ? h('div', { 'data-dialog': 'open' }, slots.default?.()) : null),
+})
+const pickedRealm = { realmId: 'realm-2', name: 'Archive realm', portalUrl: 'https://archive.example/' }
+const PickerStub = defineComponent({
+  props: { excludeRealmId: { type: String, default: '' } },
+  emits: ['pick'],
+  setup: (props, { emit }) => () =>
+    h('button', { 'data-picker': props.excludeRealmId, onClick: () => emit('pick', pickedRealm) }, 'Pick archive'),
+})
 const icons = new Proxy({}, { get: () => defineComponent(() => () => h('i')) })
 
 const ContextSwitcher = compileClientComponent(new URL('./ContextSwitcher.vue', import.meta.url), {
@@ -49,6 +60,12 @@ const ContextSwitcher = compileClientComponent(new URL('./ContextSwitcher.vue', 
   '@/components/ui/DropdownMenuSubTrigger.vue': moduleDefault(ButtonStub),
   '@/components/ui/DropdownMenuSubContent.vue': moduleDefault(Passthrough),
   '@/components/ui/CopyButton.vue': moduleDefault(CopyStub),
+  '@/components/ui/Dialog.vue': moduleDefault(DialogStub),
+  '@/components/ui/DialogContent.vue': moduleDefault(Passthrough),
+  '@/components/ui/DialogDescription.vue': moduleDefault(Passthrough),
+  '@/components/ui/DialogHeader.vue': moduleDefault(Passthrough),
+  '@/components/ui/DialogTitle.vue': moduleDefault(Passthrough),
+  '@/components/federation/RealmPicker.vue': moduleDefault(PickerStub),
   '@/composables/useAruna': { useAruna: () => ({ currentUser, myGroups }) },
   '@/composables/useRealm': {
     useRealm: () => ({
@@ -101,6 +118,18 @@ describe('ContextSwitcher', () => {
     expect(setRealm).toHaveBeenCalledWith('realm-2')
     expect(element(root, (node) => node.props['aria-label'] === 'Copy realm id').props['data-value'])
       .toBe('realm-1')
+  })
+
+  it('opens another realm in its own portal', async () => {
+    const assign = vi.fn()
+    vi.stubGlobal('window', { location: { assign } })
+    const { root } = await mountApp(ContextSwitcher)
+    await click(element(root, (node) => content(node).includes('Other realms') && node.tag === 'button'))
+    const picker = element(root, (node) => node.props['data-picker'] !== undefined)
+    expect(picker.props['data-picker']).toBe('realm-1')
+    await click(picker)
+    expect(assign).toHaveBeenCalledWith('https://archive.example/')
+    vi.unstubAllGlobals()
   })
 
   it('offers the group id and the groups page', async () => {

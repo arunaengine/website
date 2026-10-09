@@ -3,7 +3,14 @@
 // A stored descriptor is identity data, not proof that the realm is reachable now.
 import { computed, ref } from 'vue'
 import { fetchWithTimeout } from '@/lib/fetch'
-import { verifyDescriptor, type RealmDescriptor, type Signed, type VerifiedRealm } from './descriptor'
+import {
+  DescriptorError,
+  loadRealm,
+  verifyDescriptor,
+  type RealmDescriptor,
+  type Signed,
+  type VerifiedRealm,
+} from './descriptor'
 
 const STORAGE_KEY = 'aruna.federation.realms'
 const REGISTRY_TIMEOUT_MS = 10_000
@@ -69,6 +76,38 @@ export function setRealmSaved(realmId: string, saved: boolean) {
 /** Reloads the store, for another tab's change or a test. */
 export function reloadRealms() {
   store.value = readStore()
+}
+
+export type RealmCheck =
+  | { status: 'ok'; realm: VerifiedRealm }
+  | { status: 'older' | 'unreachable'; message: string }
+  | { status: 'mismatch'; message: string }
+
+/**
+ * Fetches a realm's descriptor from both routes before it is opened or saved. A stored realm
+ * stays stored when it cannot be reached; an older or mismatching answer is never used.
+ */
+export async function checkRealm(
+  address: string,
+  options: { realmId?: string; save?: boolean; label?: string } = {},
+): Promise<RealmCheck> {
+  const label = options.label ?? address
+  let realm: VerifiedRealm
+  try {
+    realm = await loadRealm(address)
+  } catch (error) {
+    if (error instanceof DescriptorError && error.reason === 'unreachable') {
+      return { status: 'unreachable', message: `Cannot reach ${label}.` }
+    }
+    return { status: 'mismatch', message: 'Realm details do not match.' }
+  }
+  if (options.realmId && realm.realmId !== options.realmId) {
+    return { status: 'mismatch', message: 'Realm details do not match.' }
+  }
+  if (rememberRealm(realm, { save: options.save }) === 'older') {
+    return { status: 'older', message: `${realm.name} sent older details. Your saved details were kept.` }
+  }
+  return { status: 'ok', realm }
 }
 
 export interface RealmKpis {

@@ -9,13 +9,20 @@ import DropdownMenuSub from '@/components/ui/DropdownMenuSub.vue'
 import DropdownMenuSubTrigger from '@/components/ui/DropdownMenuSubTrigger.vue'
 import DropdownMenuSubContent from '@/components/ui/DropdownMenuSubContent.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
+import Dialog from '@/components/ui/Dialog.vue'
+import DialogContent from '@/components/ui/DialogContent.vue'
+import DialogDescription from '@/components/ui/DialogDescription.vue'
+import DialogHeader from '@/components/ui/DialogHeader.vue'
+import DialogTitle from '@/components/ui/DialogTitle.vue'
+import RealmPicker from '@/components/federation/RealmPicker.vue'
+import type { VerifiedRealm } from '@/lib/federation/descriptor'
 import { useAruna } from '@/composables/useAruna'
 import { useRealm } from '@/composables/useRealm'
 import { activeGroupId, setActiveGroup } from '@/composables/useGroupSelection'
 import { truncateMiddle } from '@/lib/utils'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { Check, ChevronsUpDown, Globe2, Users } from '@lucide/vue'
+import { ArrowLeftRight, Check, ChevronsUpDown, Globe2, Users } from '@lucide/vue'
 
 const { currentUser, myGroups } = useAruna()
 const { realm, realmDisplayName, realmId, activeRealmId, accessibleRealms, myMemberships, setRealm } = useRealm()
@@ -24,6 +31,13 @@ const activeGroup = computed(() => myGroups.value.find((group) => group.id === a
 
 // Without a membership the chip is the realm alone, so the bar keeps a context.
 const hasGroups = computed(() => Boolean(currentUser.value) && myGroups.value.length > 0)
+
+// Another realm is another portal: opening it leaves this one, and its session stays there.
+const pickerOpen = ref(false)
+function openRealm(target: VerifiedRealm) {
+  pickerOpen.value = false
+  window.location.assign(target.portalUrl)
+}
 
 function roleOf(id: string) {
   return myMemberships.value.find((m) => m.realmId === id)?.role
@@ -49,7 +63,7 @@ function roleOf(id: string) {
           <span
             class="max-w-40 truncate text-[9px] font-semibold uppercase leading-none tracking-wider text-muted-foreground"
           >
-            {{ hasGroups ? `Group · ${realm.shortName}` : 'Active realm' }}
+            {{ hasGroups ? `Group · ${realm.shortName}` : `Realm ${realmId.slice(0, 8)}` }}
           </span>
           <span
             class="mt-0.5 max-w-40 truncate text-[13px] font-semibold leading-none text-foreground"
@@ -123,6 +137,9 @@ function roleOf(id: string) {
             </div>
             <Check v-if="r.id === activeRealmId" class="mt-1 h-3.5 w-3.5 shrink-0 text-primary" />
           </DropdownMenuItem>
+          <DropdownMenuItem class="flex items-center gap-2" @click="pickerOpen = true">
+            <ArrowLeftRight class="h-3.5 w-3.5 text-muted-foreground" /> Other realms
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <div class="flex items-center gap-1.5 px-2 py-1.5">
             <span class="text-[10px] uppercase tracking-wider text-muted-foreground">Realm id</span>
@@ -164,4 +181,13 @@ function roleOf(id: string) {
       </template>
     </DropdownMenuContent>
   </DropdownMenu>
+  <Dialog v-model:open="pickerOpen">
+    <DialogContent class="max-h-[85vh] max-w-xl overflow-y-auto">
+      <DialogHeader>
+        <DialogTitle>Switch realm</DialogTitle>
+        <DialogDescription>Each realm opens in its own portal.</DialogDescription>
+      </DialogHeader>
+      <RealmPicker v-if="pickerOpen" :exclude-realm-id="realmId" @pick="openRealm" />
+    </DialogContent>
+  </Dialog>
 </template>

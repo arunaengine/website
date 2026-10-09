@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { signedRealm } from '@/test/federation'
 import { verifyDescriptor } from './descriptor'
-import { knownRealm, listRegistry, rememberRealm, reloadRealms, savedRealms, setRealmSaved } from './realms'
+import { checkRealm, knownRealm, listRegistry, rememberRealm, reloadRealms, savedRealms, setRealmSaved } from './realms'
 
 function memoryStorage() {
   const values = new Map<string, string>()
@@ -71,5 +71,48 @@ describe('listRegistry', () => {
     const listed = await listRegistry('https://registry.example')
     expect(listed).toHaveLength(1)
     expect(listed[0]).toMatchObject({ verified: true, kpis: { groups: null } })
+  })
+})
+
+describe('checkRealm', () => {
+  function serve(routes: Record<string, unknown>) {
+    vi.stubGlobal('fetch', vi.fn(async (input: URL | string) => {
+      const body = routes[String(input)]
+      return body ? new Response(JSON.stringify(body)) : new Response('', { status: 404 })
+    }))
+  }
+  const portal = 'https://data.giessen.example/.well-known/aruna-realm'
+  const api = 'https://api.giessen.example/api/v1/system/realm/descriptor'
+
+  it('saves a realm only after both routes agree', async () => {
+    const { signed } = await signedRealm()
+    serve({ [portal]: signed, [api]: signed })
+    const result = await checkRealm('https://data.giessen.example', { save: true })
+    expect(result.status).toBe('ok')
+    expect(savedRealms.value).toHaveLength(1)
+  })
+
+  it('keeps the stored realm when an older descriptor comes back', async () => {
+    const { signed } = await signedRealm({ issued_at: 5 })
+    const stored = await verifyDescriptor(signed)
+    rememberRealm({ ...stored, issuedAt: 9, name: 'Newer' }, { save: true })
+    serve({ [portal]: signed, [api]: signed })
+    const result = await checkRealm('https://data.giessen.example')
+    expect(result.status).toBe('older')
+    expect(knownRealm(stored.realmId)?.name).toBe('Newer')
+  })
+
+  it('refuses another realm than expected', async () => {
+    const { signed } = await signedRealm()
+    serve({ [portal]: signed, [api]: signed })
+    const result = await checkRealm('https://data.giessen.example', { realmId: 'other', save: true })
+    expect(result.status).toBe('mismatch')
+    expect(savedRealms.value).toEqual([])
+  })
+
+  it('reports an unreachable realm by its name', async () => {
+    serve({})
+    const result = await checkRealm('https://data.giessen.example', { label: 'Fulda Campus' })
+    expect(result).toEqual({ status: 'unreachable', message: 'Cannot reach Fulda Campus.' })
   })
 })
