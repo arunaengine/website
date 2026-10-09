@@ -10,10 +10,11 @@ import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import CrateImportPanel from '@/components/metadata/CrateImportPanel.vue'
 import RepositoryImportPanel from '@/components/metadata/RepositoryImportPanel.vue'
+import RealmImportPanel from '@/components/federation/RealmImportPanel.vue'
 import { useRepositoryKinds } from '@/composables/useRepository'
 import { Import } from '@lucide/vue'
 
-type Source = 'archive' | 'repository'
+type Source = 'archive' | 'repository' | 'realm'
 
 const open = defineModel<boolean>('open', { required: true })
 
@@ -26,6 +27,7 @@ const sources = computed(() => [
   ...(repositoryAvailable.value
     ? [{ value: 'repository' as const, title: 'From a repository', text: 'Find a record in Zenodo or another linked repository, optionally keep it updated.' }]
     : []),
+  { value: 'realm' as const, title: 'From another realm', text: 'Bring a dataset here from a realm you can log in to.' },
 ])
 const source = ref<Source>('archive')
 // The dialog content unmounts when closed; the panels wait in a hidden holder.
@@ -69,6 +71,7 @@ watch(repositoryAvailable, (available) => {
         :active="open && source === 'repository'"
         @close="open = false"
       />
+      <RealmImportPanel v-show="source === 'realm'" :active="open && source === 'realm'" @close="open = false" />
     </Teleport>
   </div>
 </template>

@@ -26,6 +26,7 @@ const ImportDatasetDialog = compileClientComponent(new URL('./ImportDatasetDialo
   '@/components/ui/DialogTitle.vue': moduleDefault(Slot),
   '@/components/metadata/CrateImportPanel.vue': moduleDefault(panel('Archive')),
   '@/components/metadata/RepositoryImportPanel.vue': moduleDefault(panel('Repository')),
+  '@/components/federation/RealmImportPanel.vue': moduleDefault(panel('Realm')),
   '@/composables/useRepository': { useRepositoryKinds: () => ({ kinds }) },
 })
 
@@ -50,6 +51,8 @@ describe('ImportDatasetDialog', () => {
     expect(card(mounted.root, 'From a repository').props['aria-checked']).toBe(true)
     expect(content(mounted.root)).toContain('Archive waiting')
     expect(content(mounted.root)).toContain('Repository active')
+    await click(card(mounted.root, 'From another realm'))
+    expect(content(mounted.root)).toContain('Realm active')
     mounted.app.unmount()
   })
 
