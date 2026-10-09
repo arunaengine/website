@@ -101,7 +101,7 @@ describe('ContextSwitcher', () => {
   it('names the active group and switches to another', async () => {
     const { root } = await mountApp(ContextSwitcher)
     expect(content(root)).toContain('Water quality')
-    expect(content(root)).toContain('Group · Demo')
+    expect(content(root)).toContain('Demo realm · realm-1')
 
     await click(element(root, (node) => content(node).includes('Soil archive') && node.tag === 'button'))
 
@@ -141,12 +141,15 @@ describe('ContextSwitcher', () => {
       .toEqual({ name: 'groups' })
   })
 
-  it('hides the label on a narrow bar', async () => {
+  it('keeps the realm name and short id next to the group on a narrow bar', async () => {
+    realm.value = { ...realm.value, id: 'AbCdEfGh-full-realm-id' }
     const { root } = await mountApp(ContextSwitcher)
 
-    const label = element(root, (node) => String(node.props.class ?? '').includes('sm:flex'))
-    expect(String(label.props.class)).toContain('hidden')
-    expect(content(label)).toContain('Water quality')
+    const label = element(root, (node) => content(node).includes('Water quality') && node.tag === 'span'
+      && String(node.props.class ?? '').includes('flex-col'))
+    expect(String(label.props.class)).not.toContain('hidden')
+    expect(content(label)).toContain('Demo realm · AbCdEfGh')
+    expect(content(label)).not.toContain('full-realm-id')
   })
 
   it('falls back to the realm without a membership', async () => {

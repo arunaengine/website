@@ -58,15 +58,16 @@ function roleOf(id: string) {
         >
           <Globe2 class="h-3.5 w-3.5" />
         </span>
-        <!-- Below sm the crowded bar keeps the realm tile only. -->
-        <span class="hidden min-w-0 flex-col leading-none sm:flex">
+        <!-- The realm name and short id stay visible next to the group, also on a narrow bar. -->
+        <span class="flex min-w-0 flex-col leading-none">
           <span
-            class="max-w-40 truncate text-[9px] font-semibold uppercase leading-none tracking-wider text-muted-foreground"
+            class="max-w-28 truncate text-[9px] font-semibold uppercase leading-none tracking-wider text-muted-foreground sm:max-w-40"
+            :title="realmId"
           >
-            {{ hasGroups ? `Group · ${realm.shortName}` : `Realm ${realmId.slice(0, 8)}` }}
+            {{ hasGroups ? `${realmDisplayName} · ${realmId.slice(0, 8)}` : `Realm ${realmId.slice(0, 8)}` }}
           </span>
           <span
-            class="mt-0.5 max-w-40 truncate text-[13px] font-semibold leading-none text-foreground"
+            class="mt-0.5 max-w-28 truncate text-[13px] font-semibold leading-none text-foreground sm:max-w-40"
             :title="hasGroups ? activeGroupId : realmId"
           >
             {{ hasGroups ? activeGroup?.name || activeGroupId : realmDisplayName }}
