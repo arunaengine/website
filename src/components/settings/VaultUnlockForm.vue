@@ -6,6 +6,7 @@ import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import { useUserVault } from '@/composables/useUserVault'
+import VaultRealmNote from './VaultRealmNote.vue'
 import { errorMessage } from '@/lib/utils'
 
 const emit = defineEmits<{ (e: 'done'): void }>()
@@ -42,6 +43,7 @@ async function submit() {
 
 <template>
   <div class="space-y-3">
+    <VaultRealmNote action="unlock" />
     <div>
       <label class="text-xs font-medium text-foreground" for="vault-secret">
         {{ useRecovery ? 'Recovery code' : 'Passphrase' }}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { toBase64Url, toHex } from './descriptor'
-import { linkNonce, newSecret, tokenSessionId } from './secret'
+import { linkNonce, newSecret, tokenSessionId, tokenVia } from './secret'
 
 async function sha256(bytes: Uint8Array<ArrayBuffer>) {
   return toHex(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)))
@@ -31,5 +31,14 @@ describe('federation secrets', () => {
     const body = toBase64Url(new TextEncoder().encode(JSON.stringify({ sid: 'S1' })))
     expect(tokenSessionId(`h.${body}.s`)).toBe('S1')
     expect(tokenSessionId('opaque')).toBeNull()
+  })
+
+  it('reads the via claim of a linked session only', () => {
+    const body = (claims: object) => `h.${toBase64Url(new TextEncoder().encode(JSON.stringify(claims)))}.s`
+    expect(tokenVia(body({ sid: 'S1', via: '01JFOREIGN@realm-a' }))).toBe('01JFOREIGN@realm-a')
+    expect(tokenVia(body({ sid: 'S1' }))).toBeNull()
+    expect(tokenVia(body({ via: 7 }))).toBeNull()
+    expect(tokenVia(`h.${toBase64Url(new TextEncoder().encode('null'))}.s`)).toBeNull()
+    expect(tokenVia('opaque')).toBeNull()
   })
 })

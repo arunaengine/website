@@ -6,6 +6,7 @@ import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import { useUserVault } from '@/composables/useUserVault'
+import VaultRealmNote from './VaultRealmNote.vue'
 import { MIN_KEY_HOLDER_PASSPHRASE_LENGTH } from '@/lib/vault/crypto'
 import { errorMessage } from '@/lib/utils'
 
@@ -42,6 +43,7 @@ async function submit() {
 
 <template>
   <div class="space-y-3">
+    <VaultRealmNote action="create" />
     <div class="grid gap-3 sm:grid-cols-2">
       <div>
         <label class="text-xs font-medium text-foreground" for="vault-passphrase">Passphrase</label>

@@ -34,10 +34,12 @@ const InputStub = defineComponent({
 })
 const NoticeStub = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
 
+const NoteStub = defineComponent({ props: { action: String }, setup: (props) => () => h('p', `realm note ${props.action}`) })
 const VaultUnlockForm = compileClientComponent(new URL('./VaultUnlockForm.vue', import.meta.url), {
   vue: VueRuntime,
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
+  './VaultRealmNote.vue': moduleDefault(NoteStub),
   '@/components/ui/Notice.vue': moduleDefault(NoticeStub),
   '@/composables/useUserVault': { useUserVault: () => ({ unlock, unlockWithRecovery }) },
   '@/lib/utils': { errorMessage },
@@ -56,6 +58,11 @@ beforeEach(() => {
 })
 
 describe('VaultUnlockForm', () => {
+  it('shows the realm note above the field', async () => {
+    const { root } = await mountApp(Host)
+    expect(content(root)).toContain('realm note unlock')
+  })
+
   it('unlocks with the passphrase and reports a wrong one', async () => {
     unlock.mockRejectedValueOnce(new Error('Wrong passphrase.'))
     const { root } = await mountApp(Host)

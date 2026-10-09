@@ -55,6 +55,7 @@ const VaultRecoveryCode = compileClientComponent(new URL('./VaultRecoveryCode.vu
   '@/composables/useUserVault': { useUserVault: () => ({ recoveryCode, dismissRecovery }) },
 })
 
+const NoteStub = defineComponent({ props: { action: String }, setup: (props) => () => h('p', `realm note ${props.action}`) })
 const VaultSettings = compileClientComponent(new URL('./VaultSettings.vue', import.meta.url), {
   vue: VueRuntime,
   '@/components/ui/Badge.vue': moduleDefault(Passthrough),
@@ -67,6 +68,7 @@ const VaultSettings = compileClientComponent(new URL('./VaultSettings.vue', impo
   '@/components/ui/DialogTitle.vue': moduleDefault(Passthrough),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Notice.vue': moduleDefault(Passthrough),
+  './VaultRealmNote.vue': moduleDefault(NoteStub),
   './VaultUnlockForm.vue': moduleDefault(UnlockStub),
   './VaultCreateForm.vue': moduleDefault(CreateStub),
   './VaultRecoveryCode.vue': moduleDefault(VaultRecoveryCode),
@@ -147,6 +149,7 @@ describe('VaultSettings', () => {
     const { root } = await mountApp(VaultSettings)
     await click(button(root, 'Change passphrase'))
     const box = dialog(root)
+    expect(content(box)).toContain('realm note change')
 
     await typeValue(field(box, 'vault-current'), 'old horse')
     await typeValue(field(box, 'vault-next'), 'new horse battery')

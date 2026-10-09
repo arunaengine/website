@@ -26,14 +26,22 @@ export async function linkNonce(sessionId: string, secret: string): Promise<stri
   return sha256Hex(Uint8Array.from(parts.flatMap((part) => Array.from(part))))
 }
 
+function tokenClaims(token: string): { sid?: unknown; via?: unknown } {
+  try {
+    return JSON.parse(new TextDecoder().decode(fromBase64Url(token.split('.')[1] ?? ''))) ?? {}
+  } catch {
+    return {}
+  }
+}
+
 /** The `sid` claim of a bearer token, read without checking it; the node checks it. */
 export function tokenSessionId(token: string): string | null {
-  try {
-    const claims = JSON.parse(new TextDecoder().decode(fromBase64Url(token.split('.')[1] ?? ''))) as {
-      sid?: unknown
-    }
-    return typeof claims.sid === 'string' ? claims.sid : null
-  } catch {
-    return null
-  }
+  const { sid } = tokenClaims(token)
+  return typeof sid === 'string' ? sid : null
+}
+
+/** The `via` claim: the foreign login a linked session came from. For display only. */
+export function tokenVia(token: string): string | null {
+  const { via } = tokenClaims(token)
+  return typeof via === 'string' ? via : null
 }

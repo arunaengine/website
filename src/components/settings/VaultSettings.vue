@@ -13,6 +13,7 @@ import DialogTitle from '@/components/ui/DialogTitle.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import VaultCreateForm from './VaultCreateForm.vue'
+import VaultRealmNote from './VaultRealmNote.vue'
 import VaultRecoveryCode from './VaultRecoveryCode.vue'
 import VaultUnlockForm from './VaultUnlockForm.vue'
 import { useUserVault } from '@/composables/useUserVault'
@@ -134,6 +135,7 @@ async function confirmReset() {
           </DialogDescription>
         </DialogHeader>
         <div class="space-y-3">
+          <VaultRealmNote action="change" />
           <div>
             <label class="text-xs font-medium text-foreground" for="vault-current">
               {{ useRecovery ? 'Recovery code' : 'Current passphrase' }}

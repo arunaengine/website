@@ -32,10 +32,12 @@ const InputStub = defineComponent({
 })
 const NoticeStub = defineComponent((_, { attrs, slots }) => () => h('div', attrs, [attrs.title as string, slots.default?.()]))
 
+const NoteStub = defineComponent({ props: { action: String }, setup: (props) => () => h('p', `realm note ${props.action}`) })
 const VaultCreateForm = compileClientComponent(new URL('./VaultCreateForm.vue', import.meta.url), {
   vue: VueRuntime,
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
+  './VaultRealmNote.vue': moduleDefault(NoteStub),
   '@/components/ui/Notice.vue': moduleDefault(NoticeStub),
   '@/composables/useUserVault': { useUserVault: () => ({ create }) },
   '@/lib/vault/crypto': { MIN_KEY_HOLDER_PASSPHRASE_LENGTH: 12 },
@@ -60,6 +62,11 @@ beforeEach(() => {
 })
 
 describe('VaultCreateForm', () => {
+  it('shows the realm note above the fields', async () => {
+    const { root } = await mountApp(Host)
+    expect(content(root)).toContain('realm note create')
+  })
+
   it('needs a long enough passphrase typed twice', async () => {
     const { root } = await mountApp(Host)
     await fill(root, 'short', 'short')
