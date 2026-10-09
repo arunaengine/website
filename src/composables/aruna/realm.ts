@@ -1,6 +1,7 @@
 import { computed } from 'vue'
 import type { Node, Realm } from '@/data/types'
 import {
+  ApiError,
   apiRequest,
   type InfoResponse,
   type RealmInfoResponse,
@@ -34,12 +35,16 @@ export async function loadInfo(context = refreshContext()) {
     apiRequest<Signed<RealmDescriptor>>('/system/realm/descriptor', {}, context.client),
   ])
   if (context.epoch !== sessionEpoch.value) return
+  const known = realmInfo.value?.realm_id
   if (info.status === 'fulfilled') nodeInfo.value = info.value
   if (realm.status === 'fulfilled') realmInfo.value = realm.value
   usageInfo.value = usage.status === 'fulfilled' ? usage.value : null
   const signed = descriptor.status === 'fulfilled' ? descriptor.value?.payload : undefined
   const own = signed && realmIdText(signed.realm_id) === realmInfo.value?.realm_id
-  federationName.value = own ? (signed.name?.trim() ?? '') : ''
+  // Only this realm's descriptor or a 404 decides the name; other failures keep a known one.
+  const absent = descriptor.status === 'rejected' && descriptor.reason instanceof ApiError && descriptor.reason.status === 404
+  if (own) federationName.value = signed.name?.trim() ?? ''
+  else if (absent || realmInfo.value?.realm_id !== known) federationName.value = ''
   if (info.status === 'rejected' && realm.status === 'rejected') throw info.reason
 }
 
