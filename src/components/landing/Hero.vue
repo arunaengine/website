@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import Badge from "@/components/ui/Badge.vue";
 import Button from "@/components/ui/Button.vue";
 import { ArrowRight, BookOpen } from "@lucide/vue";
 import { computed } from "vue";
@@ -81,12 +80,6 @@ const wordmark = computed(() =>
         >
           <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" />
           Open source, Apache 2.0 and MIT
-        </div>
-        <div
-          class="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/5 px-3 py-1 text-[11px] font-medium text-muted-foreground"
-        >
-          <Badge size="sm" class="uppercase tracking-wide">Upcoming</Badge>
-          Realm federation
         </div>
       </div>
     </div>

@@ -9,7 +9,6 @@ import {
   Share2,
 } from '@lucide/vue'
 import type { FunctionalComponent } from 'vue'
-import Badge from '@/components/ui/Badge.vue'
 import Card from '@/components/ui/Card.vue'
 
 interface Feature {
@@ -17,8 +16,6 @@ interface Feature {
   desc: string
   icon: FunctionalComponent
   tone: string
-  /** Blue preview treatment: announced, not shipped yet. */
-  upcoming?: boolean
 }
 
 const features: Feature[] = [
@@ -60,10 +57,9 @@ const features: Feature[] = [
   },
   {
     title: 'Realm federation',
-    desc: 'A realm is self-contained today. Federation will connect realms to one another, so data and metadata can be discovered and shared across organizational borders.',
+    desc: 'Realms connect to one another. Sign in to another realm with your home account, and discover and share data and metadata across organizational borders.',
     icon: Globe,
     tone: 'bg-primary/10 text-primary',
-    upcoming: true,
   },
 ]
 </script>
@@ -89,12 +85,11 @@ const features: Feature[] = [
           v-for="f in features"
           :key="f.title"
           class="flex h-full flex-col gap-3 p-5"
-          :class="f.upcoming ? 'border-primary/30 bg-primary/[0.03] lg:col-span-3 lg:flex-row lg:items-center lg:gap-5' : ''"
         >
           <div :class="['grid h-9 w-9 shrink-0 place-items-center rounded-lg', f.tone]">
             <component :is="f.icon" class="h-4 w-4" />
           </div>
-          <div class="flex flex-col gap-3" :class="f.upcoming ? 'lg:gap-1' : ''">
+          <div class="flex flex-col gap-3">
             <h3 class="font-display text-base font-semibold text-aruna-navy">
               {{ f.title }}
             </h3>
@@ -102,7 +97,6 @@ const features: Feature[] = [
               {{ f.desc }}
             </p>
           </div>
-          <Badge v-if="f.upcoming" size="sm" class="uppercase tracking-wide lg:ml-auto lg:self-start">Upcoming</Badge>
         </Card>
       </div>
     </div>
