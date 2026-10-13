@@ -151,9 +151,20 @@ const tokenExpiresAt = computed(() => {
   return Number.isFinite(at) ? Math.floor(at / 1000) : null
 })
 
+// Bumped on every open and close, so an answer for an earlier dialog is dropped.
+let openGeneration = 0
+let opener: HTMLElement | null = null
+
+function restoreFocus(event: Event) {
+  event.preventDefault()
+  opener?.focus()
+}
+
 watch(
   () => props.open,
   (open) => {
+    openGeneration++
+    if (open) opener = document.activeElement as HTMLElement | null
     if (!open) {
       created.value = null
       createdToken.value = null
@@ -197,6 +208,7 @@ async function submit() {
     .filter((r) => r.pattern.trim())
     .map((r) => ({ pattern: r.pattern.trim(), permission: r.permission }))
   const encrypted = encryptedBuckets.value.filter((name) => tokenChoices.value.includes(name))
+  const generation = openGeneration
   try {
     const key = encrypted.length ? await tokenKey() : null
     const response = await createS3Credentials({
@@ -205,11 +217,13 @@ async function submit() {
       ...(active.length ? { path_restrictions: active } : {}),
       ...(key ? { encrypted_buckets: encrypted, token_public_key: key.publicKey } : {}),
     })
+    if (generation !== openGeneration) return
     sessionToken.value = key?.token ?? null
     created.value = response
     // A key holder with the vault open issues the token's keys now, otherwise at the next opening.
     issueKeys(groupId.value, response.key_requests)
   } catch (err) {
+    if (generation !== openGeneration) return
     submitError.value = encrypted.length ? tokenRefusal(err) : errorMessage(err)
   }
 }
@@ -228,14 +242,16 @@ async function submitToken() {
   if (!label || tokenBusy.value) return
   submitError.value = null
   tokenBusy.value = true
+  const generation = openGeneration
   try {
-    createdToken.value = await createUserSession({
+    const response = await createUserSession({
       kind: 'api',
       label,
       expires_in_seconds: Number(tokenExpiresIn.value),
     })
+    if (generation === openGeneration) createdToken.value = response
   } catch (err) {
-    submitError.value = errorMessage(err)
+    if (generation === openGeneration) submitError.value = errorMessage(err)
   } finally {
     tokenBusy.value = false
   }
@@ -244,7 +260,7 @@ async function submitToken() {
 
 <template>
   <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-    <DialogContent class="max-w-md">
+    <DialogContent class="max-w-md" @close-auto-focus="restoreFocus">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <component :is="kind === 's3' ? KeyRound : Code2" class="h-4 w-4 text-primary" /> {{ dialogTitle }}

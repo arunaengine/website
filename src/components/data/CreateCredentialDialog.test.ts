@@ -121,6 +121,7 @@ const CreateCredentialDialog = compileClientComponent(
 
 beforeEach(() => {
   loadTokenBuckets = false
+  vi.stubGlobal('document', { activeElement: null })
   connectedEndpoint.value = 'https://s3.test'
   listGroupDataPaths.mockReset().mockResolvedValue({
     entries: [{ permission_path: '/realm/g/g1/data/node-a/reef/', kind: 'folder' }],
@@ -267,6 +268,81 @@ describe('CreateCredentialDialog', () => {
     expect(storage.setItem).not.toHaveBeenCalled()
     expect(indexedDB.open).not.toHaveBeenCalled()
     for (const log of logs) expect(JSON.stringify(log.mock.calls)).not.toContain(TOKEN)
+  })
+
+  it('drops a key that arrives after the dialog was closed and reopened', async () => {
+    let answer: (value: Api.CreateS3CredentialsResponse) => void = () => undefined
+    createS3Credentials.mockImplementationOnce(() => new Promise((resolve) => { answer = resolve }))
+    const { root, open } = await openDialog()
+    await click(button(root, 'Pick Genomics'))
+    void click(button(root, 'Create'))
+    await flush()
+
+    open.value = false
+    await flush()
+    answer({ access_key_id: 'LATEKEY', access_secret: 'LATESECRET' })
+    await flush()
+    open.value = true
+    await flush()
+
+    expect(content(root)).not.toContain('LATESECRET')
+    expect(content(root)).toContain('Create an S3 access key')
+  })
+
+  it('drops a key that arrives in a reopened dialog', async () => {
+    let answer: (value: Api.CreateS3CredentialsResponse) => void = () => undefined
+    createS3Credentials.mockImplementationOnce(() => new Promise((resolve) => { answer = resolve }))
+    const { root, open } = await openDialog()
+    await click(button(root, 'Pick Genomics'))
+    void click(button(root, 'Create'))
+    await flush()
+
+    open.value = false
+    await flush()
+    open.value = true
+    await flush()
+    answer({ access_key_id: 'LATEKEY', access_secret: 'LATESECRET' })
+    await flush()
+
+    expect(content(root)).not.toContain('LATESECRET')
+    expect(issueKeys).not.toHaveBeenCalled()
+  })
+
+  it('drops a bearer token that arrives in a reopened dialog', async () => {
+    let answer: (value: Awaited<ReturnType<typeof createUserSession>>) => void = () => undefined
+    createUserSession.mockImplementationOnce(() => new Promise((resolve) => { answer = resolve }))
+    const { root, open } = await openDialog()
+    await click(button(root, 'Bearer token'))
+    await typeValue(element(root, (node) => node.tag === 'input'), 'CI runner')
+    void click(button(root, 'Create'))
+    await flush()
+
+    open.value = false
+    await flush()
+    open.value = true
+    await flush()
+    answer({ session_id: 's2', kind: 'api', label: 'CI runner', token: 'late-bearer', expires_at: new Date(0).toISOString() })
+    await flush()
+
+    expect(content(root)).not.toContain('late-bearer')
+  })
+
+  it('gives the focus back to the control that opened it', async () => {
+    const opener = { focus: vi.fn() }
+    const { root, open } = await openDialog()
+    open.value = false
+    await flush()
+    vi.stubGlobal('document', { activeElement: opener })
+    open.value = true
+    await flush()
+    vi.stubGlobal('document', { activeElement: null })
+
+    const event = { preventDefault: vi.fn() }
+    const dialog = element(root, (node) => typeof node.props.onCloseAutoFocus === 'function')
+    ;(dialog.props.onCloseAutoFocus as (event: unknown) => void)(event)
+
+    expect(event.preventDefault).toHaveBeenCalled()
+    expect(opener.focus).toHaveBeenCalledTimes(1)
   })
 
   it('quotes the endpoint in the commands', async () => {
