@@ -132,6 +132,11 @@ export async function fetchAndCacheCrate(documentId: string): Promise<unknown> {
 // Uncached, unresolved crate for editing (loadRoCrate caches and resolves
 // profile artifacts, which must never be written back).
 export async function fetchRoCrateRaw(documentId: string, signal?: AbortSignal): Promise<unknown> {
+  return (await fetchRevisedCrate(documentId, signal)).rocrate
+}
+
+// The full crate together with the revision it reflects, for a guarded save.
+export async function fetchRevisedCrate(documentId: string, signal?: AbortSignal): Promise<MetadataRoCrateResponse> {
   const context = refreshContext()
   const response = await apiRequest<MetadataRoCrateResponse>(
     `/metadata/${encodeURIComponent(documentId)}/rocrate`,
@@ -139,7 +144,7 @@ export async function fetchRoCrateRaw(documentId: string, signal?: AbortSignal):
     context.client,
   )
   assertCurrentSession(context.epoch)
-  return response.rocrate
+  return response
 }
 
 export function invalidateCrate(documentId: string) {

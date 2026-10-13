@@ -70,7 +70,7 @@ const {
   currentUser,
   createMetadata,
   getMetadataItem,
-  fetchRoCrateRaw,
+  fetchRevisedCrate,
   loadProfileCrate,
   replaceMetadataRoCrate,
   saving,
@@ -222,11 +222,13 @@ async function load() {
   loading.value = true
   loadError.value = null
   try {
-    // The summary comes first so its revision is never newer than the crate.
-    const summary = await getMetadataItem(id)
-    const crate = await fetchRoCrateRaw(id)
+    // The revision comes with the crate, so both describe the same state.
+    const [summary, { rocrate: crate, revision }] = await Promise.all([
+      getMetadataItem(id),
+      fetchRevisedCrate(id),
+    ])
     if (generation !== loadGeneration || mode.value !== 'edit' || documentId.value !== id) return
-    loadedRevision = summary.revision ?? null
+    loadedRevision = revision ?? null
     staleSave.value = false
     draft.value = {
       ...fromRoCrate(crate, {
@@ -701,10 +703,11 @@ async function save(anyway = false) {
     await leaveTo({ name: 'dataset', params: { id: result.document_id } })
   } catch (error) {
     // A refused write states its own findings; only anything else needs a line.
-    staleSave.value = error instanceof ApiError && error.status === 412
-    const refused = staleSave.value ? [] : rejectionIssues(error)
+    const stale = error instanceof ApiError && error.status === 412
+    if (stale) staleSave.value = true
+    const refused = stale ? [] : rejectionIssues(error)
     saveIssues.value = refused
-    submitError.value = refused.length || staleSave.value ? null : apiErrorMessage(error)
+    submitError.value = refused.length || stale ? null : apiErrorMessage(error)
   } finally {
     submitting.value = false
   }

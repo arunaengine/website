@@ -26,6 +26,7 @@ import {
 } from './aruna/connectors'
 import {
   fetchRoCrateRaw,
+  fetchRevisedCrate,
   invalidateCrate,
   loadProfileCrate,
   loadRoCrate,
@@ -214,6 +215,7 @@ export function useAruna() {
     getMetadataItem,
     metadataAtPath,
     fetchRoCrateRaw,
+  fetchRevisedCrate,
     invalidateCrate,
     replaceMetadataRoCrate,
     deleteMetadataDocument,

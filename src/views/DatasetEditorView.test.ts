@@ -40,6 +40,7 @@ const authToken = ref('token')
 const createMetadata = vi.fn()
 const getMetadataItem = vi.fn()
 const fetchRoCrateRaw = vi.fn()
+let crateRevision: string | undefined
 const replaceMetadataRoCrate = vi.fn()
 const getGroup = vi.fn()
 const grantPublicRead = vi.fn()
@@ -335,7 +336,7 @@ const DatasetEditorView = compileClientComponent(new URL('./DatasetEditorView.vu
       currentUser,
       createMetadata,
       getMetadataItem,
-      fetchRoCrateRaw,
+      fetchRevisedCrate: async (id: string) => ({ rocrate: await fetchRoCrateRaw(id), revision: crateRevision }),
       loadProfileCrate,
       replaceMetadataRoCrate,
       saving,
@@ -450,6 +451,7 @@ beforeEach(() => {
     public: false,
   })
   fetchRoCrateRaw.mockReset().mockResolvedValue(Editor.toRoCrate(seeded(Editor.newDraft())))
+  crateRevision = undefined
   verify.mockReset().mockResolvedValue(true)
   getGroup.mockReset().mockResolvedValue({ group_id: 'group-1', realm_id: 'realm-1', display_name: 'Research group', roles: [] })
   grantPublicRead.mockReset().mockResolvedValue({ granted: [], unresolved: [] })
@@ -1020,13 +1022,7 @@ describe('DatasetEditorView', () => {
   it('sends the loaded revision with saved changes', async () => {
     route.name = 'dataset-edit'
     route.params = { id: 'dataset-1' }
-    getMetadataItem.mockResolvedValue({
-      document_id: 'dataset-1',
-      group_id: 'group-1',
-      document_path: 'datasets/existing',
-      public: false,
-      revision: '01JABCDEFGHJKMNPQRSTVWXYZ0',
-    })
+    crateRevision = '01JABCDEFGHJKMNPQRSTVWXYZ0'
     const mounted = await mountApp(DatasetEditorView)
     await flush()
     await click(button(mounted.root, 'Save changes'))
@@ -1039,13 +1035,7 @@ describe('DatasetEditorView', () => {
   it('keeps the draft and the warning after a stale save', async () => {
     route.name = 'dataset-edit'
     route.params = { id: 'dataset-1' }
-    getMetadataItem.mockResolvedValue({
-      document_id: 'dataset-1',
-      group_id: 'group-1',
-      document_path: 'datasets/existing',
-      public: false,
-      revision: '01JABCDEFGHJKMNPQRSTVWXYZ0',
-    })
+    crateRevision = '01JABCDEFGHJKMNPQRSTVWXYZ0'
     replaceMetadataRoCrate.mockRejectedValue(new Api.ApiError(412, 'Precondition failed', 'Precondition failed', { error: 'Precondition failed' }))
     const mounted = await mountApp(DatasetEditorView)
     await flush()
@@ -1063,7 +1053,9 @@ describe('DatasetEditorView', () => {
     expect(JSON.stringify(first.rocrate)).toContain('Ada Lovelace')
     expect(second.expected_revision).toBe('01JABCDEFGHJKMNPQRSTVWXYZ0')
 
-    // An edit cannot repair the old base, so the warning stays.
+    // Neither a later failure nor an edit repairs the old base, so the warning stays.
+    replaceMetadataRoCrate.mockRejectedValue(new Api.ApiError(500, 'Internal server error', 'Internal server error', { error: 'Internal server error' }))
+    await click(button(mounted.root, 'Save changes'))
     await click(button(mounted.root, 'Seed dataset'))
     await flush()
     expect(content(mounted.root)).toContain('Save error This dataset changed after you opened it.')

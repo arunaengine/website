@@ -9,8 +9,6 @@ export interface MetadataDocumentListItem {
   replicas: number
   created_at: string
   updated_at: string
-  /** The newest accepted event; absent on older nodes. */
-  revision?: string | null
   rocrate_summary?: unknown
 }
 
@@ -29,6 +27,8 @@ export interface MetadataRoCrateResponse {
   returned_data_entities?: number | null
   next_offset?: number | null
   next_cursor?: string | null
+  /** The event the full view reflects; absent for other views and on older nodes. */
+  revision?: string | null
 }
 
 // GET /metadata/{id} and the response body of PUT /metadata/{id}/rocrate,
