@@ -646,6 +646,7 @@ async function makePublic() {
 async function save(anyway = false) {
   if (!canSave.value || saving.value || submitting.value) return
   const generation = publicationGeneration
+  const base = loadGeneration
   const source = crate.value
   const targetId = documentId.value
   const sourceMode = mode.value
@@ -702,6 +703,8 @@ async function save(anyway = false) {
     versionMessage.value = ''
     await leaveTo({ name: 'dataset', params: { id: result.document_id } })
   } catch (error) {
+    // An answer for a draft that was replaced by another load says nothing about this one.
+    if (base !== loadGeneration) return
     // A refused write states its own findings; only anything else needs a line.
     const stale = error instanceof ApiError && error.status === 412
     if (stale) staleSave.value = true

@@ -122,8 +122,9 @@ function seeded(draft: Editor.CrateDraft): Editor.CrateDraft {
 
 function deferred<T>() {
   let resolve!: (value: T) => void
-  const promise = new Promise<T>((done) => { resolve = done })
-  return { promise, resolve }
+  let reject!: (error: unknown) => void
+  const promise = new Promise<T>((done, fail) => { resolve = done; reject = fail })
+  return { promise, resolve, reject }
 }
 
 function namedCrate(name: string) {
@@ -1154,6 +1155,25 @@ describe('DatasetEditorView', () => {
     await flush()
     expect(content(mounted.root)).toContain('Dataset B')
     expect(content(mounted.root)).not.toContain('Dataset A')
+    mounted.app.unmount()
+  })
+
+  it('ignores a stale save answer for a dataset that is no longer open', async () => {
+    const answer = deferred<never>()
+    replaceMetadataRoCrate.mockReturnValue(answer.promise)
+    route.name = 'dataset-edit'
+    route.params = { id: 'dataset-a' }
+    const mounted = await mountApp(DatasetEditorView)
+    await flush()
+    void click(button(mounted.root, 'Save changes'))
+    await flush()
+
+    route.params = { id: 'dataset-b' }
+    await flush()
+    answer.reject(new Api.ApiError(412, 'Precondition failed', 'Precondition failed', { error: 'Precondition failed' }))
+    await flush()
+
+    expect(content(mounted.root)).toContain('Save error none')
     mounted.app.unmount()
   })
 
