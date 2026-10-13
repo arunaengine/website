@@ -105,7 +105,7 @@ export function buildComposeSnippet(input: NodeConfigInput): string {
 // Values a POSIX shell passes through untouched; anything else is single-quoted.
 const SHELL_SAFE = /^[A-Za-z0-9_@%+=:,./-]+$/
 
-function shellQuote(value: string, force = false): string {
+export function shellQuote(value: string, force = false): string {
   if (!force && value !== '' && SHELL_SAFE.test(value)) return value
   return `'${value.replace(/'/g, "'\\''")}'`
 }

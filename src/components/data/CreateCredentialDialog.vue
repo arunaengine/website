@@ -19,6 +19,7 @@ import { computed, ref, watch } from 'vue'
 import { ChevronRight, Code2, KeyRound, Plus, ShieldAlert, X } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useS3 } from '@/composables/useS3'
+import { shellQuote } from '@/lib/onboarding-config'
 import { useTokenBuckets } from '@/composables/useTokenBuckets'
 import { useUserSessions } from '@/composables/useUserSessions'
 import { issueKeys } from '@/composables/aruna/groups'
@@ -128,12 +129,13 @@ const groupOptions = computed(() =>
 
 const cliSnippet = computed(() => {
   if (!created.value) return ''
+  const endpoint = shellQuote(connectedEndpoint.value ?? '<s3-endpoint>')
   return [
     `export AWS_ACCESS_KEY_ID=${created.value.access_key_id}`,
     `export AWS_SECRET_ACCESS_KEY=${created.value.access_secret}`,
     ...(sessionToken.value ? [`export AWS_SESSION_TOKEN=${sessionToken.value}`] : []),
-    `aws s3 ls --endpoint-url ${connectedEndpoint.value ?? '<s3-endpoint>'}`,
-    `s5cmd --endpoint-url ${connectedEndpoint.value ?? '<s3-endpoint>'} ls`,
+    `aws s3 ls --endpoint-url ${endpoint}`,
+    `s5cmd --endpoint-url ${endpoint} ls`,
   ].join('\n')
 })
 

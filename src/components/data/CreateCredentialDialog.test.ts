@@ -15,6 +15,7 @@ import {
   typeValue,
   type HostNode,
 } from '@/test/clientRender'
+import { shellQuote } from '@/lib/onboarding-config'
 import { errorMessage } from '@/lib/utils'
 import * as VaultCrypto from '@/lib/vault/crypto'
 import * as Hpke from '@/lib/vault/hpke'
@@ -22,6 +23,7 @@ import * as Hpke from '@/lib/vault/hpke'
 const createS3Credentials = vi.fn<(input: Api.CreateS3CredentialsRequest) => Promise<Api.CreateS3CredentialsResponse>>(
   async () => ({ access_key_id: 'AK1', access_secret: 'S3CR3T' }),
 )
+const connectedEndpoint = ref<string | null>('https://s3.test')
 const issueKeys = vi.fn()
 const listGroupDataPaths = vi.fn()
 const getBucketEncryption = vi.fn()
@@ -99,7 +101,7 @@ const CreateCredentialDialog = compileClientComponent(
         createS3Credentials,
       }),
     },
-    '@/composables/useS3': { useS3: () => ({ connectedEndpoint: ref('https://s3.test') }) },
+    '@/composables/useS3': { useS3: () => ({ connectedEndpoint }) },
     '@/composables/useUserSessions': { useUserSessions: () => ({ create: createUserSession }) },
     '@/composables/useTokenBuckets': {
       useTokenBuckets: (group: Ref<string>, active: Ref<boolean>) => {
@@ -110,6 +112,7 @@ const CreateCredentialDialog = compileClientComponent(
     },
     '@/composables/aruna/groups': { issueKeys },
     '@/lib/api': Api,
+    '@/lib/onboarding-config': { shellQuote },
     '@/lib/utils': { errorMessage },
     '@/lib/vault/crypto': VaultCrypto,
     '@/lib/vault/hpke': Hpke,
@@ -118,6 +121,7 @@ const CreateCredentialDialog = compileClientComponent(
 
 beforeEach(() => {
   loadTokenBuckets = false
+  connectedEndpoint.value = 'https://s3.test'
   listGroupDataPaths.mockReset().mockResolvedValue({
     entries: [{ permission_path: '/realm/g/g1/data/node-a/reef/', kind: 'folder' }],
   })
@@ -263,6 +267,26 @@ describe('CreateCredentialDialog', () => {
     expect(storage.setItem).not.toHaveBeenCalled()
     expect(indexedDB.open).not.toHaveBeenCalled()
     for (const log of logs) expect(JSON.stringify(log.mock.calls)).not.toContain(TOKEN)
+  })
+
+  it('quotes the endpoint in the commands', async () => {
+    connectedEndpoint.value = "https://s3.test/a b'; rm -rf ~"
+    const { root } = await openDialog()
+    await click(button(root, 'Pick Genomics'))
+    await click(button(root, 'Create'))
+
+    expect(content(root)).toContain(`aws s3 ls --endpoint-url 'https://s3.test/a b'\\''; rm -rf ~'`)
+    expect(content(root)).toContain(`s5cmd --endpoint-url 'https://s3.test/a b'\\''; rm -rf ~' ls`)
+  })
+
+  it('quotes the placeholder when no endpoint is connected', async () => {
+    connectedEndpoint.value = null
+    const { root } = await openDialog()
+    await click(button(root, 'Pick Genomics'))
+    await click(button(root, 'Create'))
+
+    expect(content(root)).toContain("aws s3 ls --endpoint-url '<s3-endpoint>'")
+    expect(content(root)).toContain("s5cmd --endpoint-url '<s3-endpoint>' ls")
   })
 
   it('hands the open key requests of the token to key issuance', async () => {
