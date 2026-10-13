@@ -98,6 +98,8 @@ const profileRulesLoading = ref(false)
 const profileRulesError = ref<string | null>(null)
 const submitError = ref<string | null>(null)
 const STALE_SAVE = 'This dataset changed after you opened it. Nothing was saved. Reload to see the newer version.'
+// Stays until a load gives the draft a new base; editing cannot repair it.
+const staleSave = ref(false)
 const saveIssues = ref<WriteIssue[]>([])
 const submitting = ref(false)
 const versionMessage = ref('')
@@ -212,6 +214,7 @@ async function load() {
     loading.value = false
     loadError.value = null
     submitError.value = null
+    staleSave.value = false
     saveIssues.value = []
     markSettled()
     return
@@ -224,6 +227,7 @@ async function load() {
     const crate = await fetchRoCrateRaw(id)
     if (generation !== loadGeneration || mode.value !== 'edit' || documentId.value !== id) return
     loadedRevision = summary.revision ?? null
+    staleSave.value = false
     draft.value = {
       ...fromRoCrate(crate, {
         groupId: summary.group_id,
@@ -697,10 +701,10 @@ async function save(anyway = false) {
     await leaveTo({ name: 'dataset', params: { id: result.document_id } })
   } catch (error) {
     // A refused write states its own findings; only anything else needs a line.
-    const stale = error instanceof ApiError && error.status === 412
-    const refused = stale ? [] : rejectionIssues(error)
+    staleSave.value = error instanceof ApiError && error.status === 412
+    const refused = staleSave.value ? [] : rejectionIssues(error)
     saveIssues.value = refused
-    submitError.value = stale ? STALE_SAVE : refused.length ? null : apiErrorMessage(error)
+    submitError.value = refused.length || staleSave.value ? null : apiErrorMessage(error)
   } finally {
     submitting.value = false
   }
@@ -812,7 +816,7 @@ async function save(anyway = false) {
                 :preview-error="preview.error.value"
                 :preview-unavailable="preview.unavailable.value"
                 :write-issues="writeIssues"
-                :submit-error="submitError"
+                :submit-error="staleSave ? STALE_SAVE : submitError"
                 :saving="saving || submitting"
                 :can-save="canSave"
                 :action-label="mode === 'edit' ? 'Save changes' : 'Create dataset'"

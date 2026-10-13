@@ -1036,22 +1036,59 @@ describe('DatasetEditorView', () => {
     mounted.app.unmount()
   })
 
-  it('keeps the draft and says why after a stale save', async () => {
+  it('keeps the draft and the warning after a stale save', async () => {
     route.name = 'dataset-edit'
     route.params = { id: 'dataset-1' }
+    getMetadataItem.mockResolvedValue({
+      document_id: 'dataset-1',
+      group_id: 'group-1',
+      document_path: 'datasets/existing',
+      public: false,
+      revision: '01JABCDEFGHJKMNPQRSTVWXYZ0',
+    })
     replaceMetadataRoCrate.mockRejectedValue(new Api.ApiError(412, 'Precondition failed', 'Precondition failed', { error: 'Precondition failed' }))
     const mounted = await mountApp(DatasetEditorView)
     await flush()
-    await typeValue(element(mounted.root, (node) => node.tag === 'input' && String(node.props.placeholder ?? '').startsWith('Describe this change')), 'Fix the license')
     await click(button(mounted.root, 'Save changes'))
     await flush()
 
     expect(content(mounted.root)).toContain('Save error This dataset changed after you opened it.')
-    expect(content(mounted.root)).toContain('Node issues ')
     expect(content(mounted.root)).not.toContain('Precondition failed')
     expect(routerPush).not.toHaveBeenCalled()
-    const message = element(mounted.root, (node) => node.tag === 'input' && String(node.props.placeholder ?? '').startsWith('Describe this change'))
-    expect(message.props.modelValue ?? message.props.value).toBe('Fix the license')
+
+    await click(button(mounted.root, 'Save changes'))
+    await flush()
+    const [first, second] = replaceMetadataRoCrate.mock.calls.map((call) => call[1])
+    expect(second.rocrate).toEqual(first.rocrate)
+    expect(JSON.stringify(first.rocrate)).toContain('Ada Lovelace')
+    expect(second.expected_revision).toBe('01JABCDEFGHJKMNPQRSTVWXYZ0')
+
+    // An edit cannot repair the old base, so the warning stays.
+    await click(button(mounted.root, 'Seed dataset'))
+    await flush()
+    expect(content(mounted.root)).toContain('Save error This dataset changed after you opened it.')
+    mounted.app.unmount()
+  })
+
+  it.each([
+    [403, 'Forbidden'],
+    [500, 'Internal server error'],
+  ])('keeps the draft after a save answered with %i', async (status, text) => {
+    route.name = 'dataset-edit'
+    route.params = { id: 'dataset-1' }
+    replaceMetadataRoCrate.mockRejectedValue(new Api.ApiError(status, text, text, { error: text }))
+    const mounted = await mountApp(DatasetEditorView)
+    await flush()
+    await click(button(mounted.root, 'Save changes'))
+    await flush()
+
+    expect(content(mounted.root)).toContain(text)
+    expect(routerPush).not.toHaveBeenCalled()
+    await click(button(mounted.root, 'Save changes'))
+    await flush()
+    const [first, second] = replaceMetadataRoCrate.mock.calls.map((call) => call[1])
+    expect(second.rocrate).toEqual(first.rocrate)
+    expect(JSON.stringify(first.rocrate)).toContain('Ada Lovelace')
     mounted.app.unmount()
   })
 
