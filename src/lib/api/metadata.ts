@@ -9,6 +9,8 @@ export interface MetadataDocumentListItem {
   replicas: number
   created_at: string
   updated_at: string
+  /** The newest accepted event; absent on older nodes. */
+  revision?: string | null
   rocrate_summary?: unknown
 }
 
@@ -37,6 +39,8 @@ export interface ReplaceMetadataRoCrateRequest {
   rocrate: unknown
   // Omitted keeps the document's current visibility.
   public?: boolean
+  // The revision the crate was based on; a newer edit answers 412.
+  expected_revision?: string
   // Shown in the dataset history; omitted lets the node choose one.
   message?: string
 }

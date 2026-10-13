@@ -29,7 +29,7 @@ import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { provideEditorBridge } from '@/composables/useAssistantEditor'
 import { isDesktop } from '@/lib/desktop'
 import { previewDeviceDraft, requireDevice } from '@/lib/deviceApi'
-import { apiErrorMessage, type RestrictedFile } from '@/lib/api'
+import { ApiError, apiErrorMessage, type RestrictedFile } from '@/lib/api'
 import { errorMessage } from '@/lib/utils'
 import { slugify } from '@/lib/profiles/emit'
 import { isAssignableProfile } from '@/lib/profiles/assignable'
@@ -97,6 +97,7 @@ const pendingSeed = ref('')
 const profileRulesLoading = ref(false)
 const profileRulesError = ref<string | null>(null)
 const submitError = ref<string | null>(null)
+const STALE_SAVE = 'This dataset changed after you opened it. Nothing was saved. Reload to see the newer version.'
 const saveIssues = ref<WriteIssue[]>([])
 const submitting = ref(false)
 const versionMessage = ref('')
@@ -195,6 +196,7 @@ const { taken: pathTaken, checking: pathChecking } = usePathTaken(
 const locationPath = computed(() => joinPath(location.value.prefix, location.value.slug || '…'))
 
 let loadGeneration = 0
+let loadedRevision: string | null = null
 async function load() {
   const generation = ++loadGeneration
   const id = documentId.value
@@ -217,11 +219,11 @@ async function load() {
   loading.value = true
   loadError.value = null
   try {
-    const [summary, crate] = await Promise.all([
-      getMetadataItem(id),
-      fetchRoCrateRaw(id),
-    ])
+    // The summary comes first so its revision is never newer than the crate.
+    const summary = await getMetadataItem(id)
+    const crate = await fetchRoCrateRaw(id)
     if (generation !== loadGeneration || mode.value !== 'edit' || documentId.value !== id) return
+    loadedRevision = summary.revision ?? null
     draft.value = {
       ...fromRoCrate(crate, {
         groupId: summary.group_id,
@@ -677,7 +679,8 @@ async function save(anyway = false) {
   try {
     const optional = message ? { message } : {}
     if (sourceMode === 'edit') {
-      await replaceMetadataRoCrate(targetId, { rocrate: source, public: isPublic, ...optional })
+      const expected = loadedRevision ? { expected_revision: loadedRevision } : {}
+      await replaceMetadataRoCrate(targetId, { rocrate: source, public: isPublic, ...expected, ...optional })
       versionMessage.value = ''
       await leaveTo({ name: 'dataset', params: { id: targetId } })
       return
@@ -694,9 +697,10 @@ async function save(anyway = false) {
     await leaveTo({ name: 'dataset', params: { id: result.document_id } })
   } catch (error) {
     // A refused write states its own findings; only anything else needs a line.
-    const refused = rejectionIssues(error)
+    const stale = error instanceof ApiError && error.status === 412
+    const refused = stale ? [] : rejectionIssues(error)
     saveIssues.value = refused
-    submitError.value = refused.length ? null : apiErrorMessage(error)
+    submitError.value = stale ? STALE_SAVE : refused.length ? null : apiErrorMessage(error)
   } finally {
     submitting.value = false
   }

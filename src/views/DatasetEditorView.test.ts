@@ -251,12 +251,14 @@ const NodeCheckStub = defineComponent({
     profileLoading: Boolean,
     profileError: { type: String, default: '' },
     blocked: { type: String, default: '' },
+    submitError: { type: String, default: '' },
   },
   emits: ['save', 'retry-profile'],
   setup: (props, { emit, slots }) => () => h('div', [
     h('p', `Checking ${props.profileName || 'no profile'}${props.profileLoading ? ', loading its rules' : ''}`),
     h('p', `Rules ${props.profileError || 'fine'}`),
     h('p', `Blocked ${props.blocked || 'not'}`),
+    h('p', `Save error ${props.submitError || 'none'}`),
     slots.default?.(),
     h('button', { onClick: () => emit('retry-profile') }, 'Retry profile rules'),
     h('button', { disabled: !props.canSave, onClick: () => emit('save') }, props.actionLabel),
@@ -1012,6 +1014,44 @@ describe('DatasetEditorView', () => {
     const saved = replaceMetadataRoCrate.mock.calls[0][1].rocrate as Record<string, unknown>
     expect((saved['@graph'] as Array<Record<string, unknown>>).some((entity) => entity['@id'] === '#ada-lovelace')).toBe(true)
     expect(routerPush).toHaveBeenCalledWith({ name: 'dataset', params: { id: 'dataset-1' } })
+    mounted.app.unmount()
+  })
+
+  it('sends the loaded revision with saved changes', async () => {
+    route.name = 'dataset-edit'
+    route.params = { id: 'dataset-1' }
+    getMetadataItem.mockResolvedValue({
+      document_id: 'dataset-1',
+      group_id: 'group-1',
+      document_path: 'datasets/existing',
+      public: false,
+      revision: '01JABCDEFGHJKMNPQRSTVWXYZ0',
+    })
+    const mounted = await mountApp(DatasetEditorView)
+    await flush()
+    await click(button(mounted.root, 'Save changes'))
+    await flush()
+
+    expect(replaceMetadataRoCrate.mock.calls[0][1]).toMatchObject({ expected_revision: '01JABCDEFGHJKMNPQRSTVWXYZ0' })
+    mounted.app.unmount()
+  })
+
+  it('keeps the draft and says why after a stale save', async () => {
+    route.name = 'dataset-edit'
+    route.params = { id: 'dataset-1' }
+    replaceMetadataRoCrate.mockRejectedValue(new Api.ApiError(412, 'Precondition failed', 'Precondition failed', { error: 'Precondition failed' }))
+    const mounted = await mountApp(DatasetEditorView)
+    await flush()
+    await typeValue(element(mounted.root, (node) => node.tag === 'input' && String(node.props.placeholder ?? '').startsWith('Describe this change')), 'Fix the license')
+    await click(button(mounted.root, 'Save changes'))
+    await flush()
+
+    expect(content(mounted.root)).toContain('Save error This dataset changed after you opened it.')
+    expect(content(mounted.root)).toContain('Node issues ')
+    expect(content(mounted.root)).not.toContain('Precondition failed')
+    expect(routerPush).not.toHaveBeenCalled()
+    const message = element(mounted.root, (node) => node.tag === 'input' && String(node.props.placeholder ?? '').startsWith('Describe this change'))
+    expect(message.props.modelValue ?? message.props.value).toBe('Fix the license')
     mounted.app.unmount()
   })
 
