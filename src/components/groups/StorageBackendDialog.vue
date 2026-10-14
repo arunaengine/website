@@ -152,7 +152,7 @@ async function submit() {
 
 <template>
   <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
-    <DialogContent class="max-w-md">
+    <DialogContent class="max-w-2xl">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <Database class="h-4 w-4 text-primary" />
@@ -207,19 +207,21 @@ async function submit() {
             <span>The type and the address cannot change. Add a second backend instead.</span>
           </p>
 
-          <div v-for="field in schema.public" :key="field.key">
-            <label :for="`${uid}-pub-${field.key}`" class="text-xs font-medium text-foreground">
-              {{ field.label }}<span v-if="!field.required" class="text-muted-foreground"> (optional)</span>
-            </label>
-            <Input
-              :id="`${uid}-pub-${field.key}`"
-              :model-value="publicValues[field.key] ?? ''"
-              class="mt-1 font-mono text-xs"
-              :placeholder="field.placeholder"
-              :required="field.required"
-              :disabled="fixed.has(field.key) || settingsLocked"
-              @update:model-value="(v: string | number) => (publicValues[field.key] = String(v))"
-            />
+          <div class="grid gap-3 sm:grid-cols-2">
+            <div v-for="field in schema.public" :key="field.key">
+              <label :for="`${uid}-pub-${field.key}`" class="text-xs font-medium text-foreground">
+                {{ field.label }}<span v-if="!field.required" class="text-muted-foreground"> (optional)</span>
+              </label>
+              <Input
+                :id="`${uid}-pub-${field.key}`"
+                :model-value="publicValues[field.key] ?? ''"
+                class="mt-1 font-mono text-xs"
+                :placeholder="field.placeholder"
+                :required="field.required"
+                :disabled="fixed.has(field.key) || settingsLocked"
+                @update:model-value="(v: string | number) => (publicValues[field.key] = String(v))"
+              />
+            </div>
           </div>
 
           <label v-if="schema.toggle" class="flex items-center justify-between gap-3 text-xs">
