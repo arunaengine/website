@@ -1,7 +1,7 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h, reactive, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { button, compileClientComponent, content, element, flush, input, moduleDefault, mountApp, typeValue } from '@/test/clientRender'
+import { button, compileClientComponent, content, element, flush, moduleDefault, mountApp, typeValue } from '@/test/clientRender'
 import * as Api from '@/lib/api'
 import * as LinkedFolders from '@/lib/linkedFolders'
 import * as Utils from '@/lib/utils'
@@ -58,7 +58,9 @@ const LinkedFolderDialog = compileClientComponent(new URL('./LinkedFolderDialog.
   '@/lib/utils': Utils,
 })
 
-const BACKENDS = [{ backend_id: 'b1', group_id: 'g1', kind: 's3', name: 'lab-store', public_config: {} }]
+const BACKENDS = [
+  { backend_id: 'b1', group_id: 'g1', kind: 's3', name: 'lab-store', public_config: { bucket: 'lab', endpoint: 'https://s3.lab.example' } },
+]
 const STORED = {
   import_id: 'i1', backend_id: 'b1', backend_prefix: 'raw/2024/', bucket: 'sequencing', key_prefix: 'seq/',
   write_pattern: '{dir}{id}_{name}', schedule: null, created_at: '',
@@ -81,8 +83,8 @@ async function choose(root: Root, label: string, value: string) {
   await flush()
 }
 
-function patternInput(root: Root) {
-  return element(root, (node) => node.tag === 'input' && String(node.props.id).endsWith('-pattern'))
+function inputById(root: Root, suffix: string) {
+  return element(root, (node) => node.tag === 'input' && String(node.props.id).endsWith(suffix))
 }
 
 async function submit(root: Root) {
@@ -99,19 +101,22 @@ beforeEach(() => {
 })
 
 describe('LinkedFolderDialog', () => {
-  it('links, starts the first run and shows the example paths', async () => {
+  it('links, starts the first run and shows both directions', async () => {
     createBackendImport.mockResolvedValue({ ...STORED, import_id: 'new' })
     runBackendImport.mockRejectedValue(new Api.ApiError(409, 'already running'))
     const mounted = await mount()
-    await choose(mounted.root, 'Bucket', 'sequencing')
-    await typeValue(input(mounted.root, 'aria-label', 'Folder in your storage'), '/raw/2024')
-    await typeValue(input(mounted.root, 'aria-label', 'Folder in the bucket'), 'seq')
+    expect(content(mounted.root)).toContain('S3 bucket lab at https://s3.lab.example')
+    await choose(mounted.root, 'To Aruna bucket', 'sequencing')
+    await typeValue(inputById(mounted.root, '-source-folder'), '/raw/2024')
+    await typeValue(inputById(mounted.root, '-bucket-folder'), 'seq')
     await choose(mounted.root, 'Look for new files', '0 3 * * *')
 
     const text = content(mounted.root)
-    expect(text).toContain('raw/2024/run1/a.fastq')
-    expect(text).toContain('sequencing/seq/run1/a.fastq')
-    expect(text).toContain('raw/2024/run2/01JA7Q3K_b.fastq')
+    expect(text).toContain('lab / raw/2024/run1/a.fastq')
+    expect(text).toContain('sequencing / seq/run1/a.fastq')
+    expect(text).toContain('Uploads to sequencing / seq')
+    expect(text).toContain('(lab / raw/2024)')
+    expect(text).toContain('lab / raw/2024/run2/01JA7Q3K_b.fastq')
     await submit(mounted.root)
 
     expect(createBackendImport).toHaveBeenCalledWith(
@@ -127,17 +132,36 @@ describe('LinkedFolderDialog', () => {
     mounted.app.unmount()
   })
 
+  it('links whole stores when both folders stay empty', async () => {
+    createBackendImport.mockResolvedValue({ ...STORED, import_id: 'new' })
+    runBackendImport.mockResolvedValue({ job_id: 'j1' })
+    const mounted = await mount()
+    await choose(mounted.root, 'To Aruna bucket', 'sequencing')
+
+    const text = content(mounted.root)
+    expect(text).toContain('Leave empty to use all files in S3 bucket lab.')
+    expect(text).toContain('Leave empty to place files at the top of sequencing.')
+    expect(text).toContain('appears in Aruna as sequencing / run1/a.fastq')
+    await submit(mounted.root)
+
+    expect(createBackendImport).toHaveBeenCalledWith(
+      'g1',
+      { backend_id: 'b1', backend_prefix: '', bucket: 'sequencing', key_prefix: '', write_pattern: '{dir}{id}_{name}' },
+      expect.anything(),
+    )
+    mounted.app.unmount()
+  })
+
   it('refuses a file name without {name} or with an unknown placeholder', async () => {
     const mounted = await mount()
-    await choose(mounted.root, 'Bucket', 'sequencing')
-    await typeValue(input(mounted.root, 'aria-label', 'Folder in your storage'), 'raw')
-    await typeValue(input(mounted.root, 'aria-label', 'Folder in the bucket'), 'seq')
+    expect(button(mounted.root, 'Link and run').props.disabled).toBe(true)
+    await choose(mounted.root, 'To Aruna bucket', 'sequencing')
     expect(button(mounted.root, 'Link and run').props.disabled).toBe(false)
 
-    await typeValue(patternInput(mounted.root), '{dir}{id}')
+    await typeValue(inputById(mounted.root, '-pattern'), '{dir}{id}')
     expect(content(mounted.root)).toContain('The file name needs {name}.')
     expect(button(mounted.root, 'Link and run').props.disabled).toBe(true)
-    await typeValue(patternInput(mounted.root), '{dir}{date}_{name}')
+    await typeValue(inputById(mounted.root, '-pattern'), '{dir}{date}_{name}')
     expect(content(mounted.root)).toContain('Unknown placeholder {date}')
     expect(button(mounted.root, 'Link and run').props.disabled).toBe(true)
     mounted.app.unmount()
@@ -158,9 +182,7 @@ describe('LinkedFolderDialog', () => {
   it('shows a refusal of the node in the dialog', async () => {
     createBackendImport.mockRejectedValue(new Api.ApiError(409, 'Another link already uses this folder.'))
     const mounted = await mount()
-    await choose(mounted.root, 'Bucket', 'sequencing')
-    await typeValue(input(mounted.root, 'aria-label', 'Folder in your storage'), 'raw')
-    await typeValue(input(mounted.root, 'aria-label', 'Folder in the bucket'), 'seq')
+    await choose(mounted.root, 'To Aruna bucket', 'sequencing')
     await submit(mounted.root)
 
     expect(content(mounted.root)).toContain('Another link already uses this folder.')
