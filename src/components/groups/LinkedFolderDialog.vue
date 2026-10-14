@@ -116,6 +116,9 @@ const submitDisabled = computed(() => {
   )
 })
 
+// Each opening is a new draft; a save from an earlier opening must not touch it.
+let opening = 0
+
 function pickPattern(value: string) {
   if (value !== 'custom') pattern.value = value
 }
@@ -129,6 +132,8 @@ watch(
   () => props.open,
   (open) => {
     if (!open) return
+    opening += 1
+    saving.value = false
     const stored = props.link
     backendId.value = stored?.backend_id ?? (backendOptions.value.length === 1 ? backendOptions.value[0].value : '')
     backendFolder.value = stored?.backend_prefix ?? ''
@@ -174,6 +179,8 @@ async function submit() {
   saving.value = true
   const client = { baseUrl: apiBaseUrl.value, token: authToken.value }
   const epoch = sessionEpoch.value
+  const generation = opening
+  const current = () => generation === opening
   try {
     let runError: string | undefined
     if (props.link) {
@@ -189,12 +196,12 @@ async function submit() {
     }
     if (epoch !== sessionEpoch.value) return
     emit('saved', runError)
-    emit('update:open', false)
+    if (current()) emit('update:open', false)
   } catch (err) {
-    if (epoch !== sessionEpoch.value) return
+    if (epoch !== sessionEpoch.value || !current()) return
     submitError.value = errorMessage(err)
   } finally {
-    saving.value = false
+    if (current()) saving.value = false
   }
 }
 </script>

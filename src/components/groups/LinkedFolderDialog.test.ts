@@ -10,6 +10,7 @@ const createBackendImport = vi.fn()
 const updateBackendImport = vi.fn()
 const runBackendImport = vi.fn()
 const onSaved = vi.fn()
+const onOpen = vi.fn()
 
 const Empty = defineComponent(() => () => null)
 const Slot = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
@@ -69,12 +70,12 @@ const STORED = {
 type Root = Parameters<typeof content>[0]
 
 async function mount(link: unknown = null) {
-  const state = reactive({ open: false, groupId: 'g1', backends: BACKENDS, link, onSaved })
+  const state = reactive({ open: false, groupId: 'g1', backends: BACKENDS, link, onSaved, 'onUpdate:open': onOpen })
   const mounted = await mountApp(defineComponent(() => () => h(LinkedFolderDialog, state)))
   state.open = true
   await flush()
   if (mounted.errors.length) throw mounted.errors[0]
-  return mounted
+  return { ...mounted, state }
 }
 
 async function choose(root: Root, label: string, value: string) {
@@ -98,6 +99,7 @@ beforeEach(() => {
   updateBackendImport.mockReset()
   runBackendImport.mockReset()
   onSaved.mockReset()
+  onOpen.mockReset()
 })
 
 describe('LinkedFolderDialog', () => {
@@ -176,6 +178,44 @@ describe('LinkedFolderDialog', () => {
 
     expect(updateBackendImport).toHaveBeenCalledWith('g1', 'i1', '0 * * * *', expect.anything())
     expect(createBackendImport).not.toHaveBeenCalled()
+    mounted.app.unmount()
+  })
+
+  it('keeps a reopened form when a save of an earlier opening answers late', async () => {
+    let failFirst: (err: unknown) => void = () => {}
+    let answerSecond: (value: unknown) => void = () => {}
+    createBackendImport
+      .mockReturnValueOnce(new Promise((_, reject) => (failFirst = reject)))
+      .mockReturnValueOnce(new Promise((resolve) => (answerSecond = resolve)))
+    runBackendImport.mockResolvedValue({ job_id: 'j1' })
+    const mounted = await mount()
+    const reopen = async () => {
+      mounted.state.open = false
+      await flush()
+      mounted.state.open = true
+      await flush()
+    }
+    const startSave = async () => {
+      await choose(mounted.root, 'To Aruna bucket', 'sequencing')
+      const form = element(mounted.root, (node) => node.tag === 'form')
+      void (form.props.onSubmit as (event: unknown) => Promise<void>)({ preventDefault() {} })
+      await flush()
+    }
+
+    await startSave()
+    await reopen()
+    failFirst(new Api.ApiError(409, 'Another link already uses this folder.'))
+    await flush()
+    expect(content(mounted.root)).not.toContain('Another link already uses this folder.')
+
+    await startSave()
+    await reopen()
+    await typeValue(inputById(mounted.root, '-source-folder'), 'draft/')
+    answerSecond({ ...STORED, import_id: 'new' })
+    await flush()
+    expect(onSaved).toHaveBeenCalledWith(undefined)
+    expect(onOpen).not.toHaveBeenCalledWith(false)
+    expect(inputById(mounted.root, '-source-folder').props.value).toBe('draft/')
     mounted.app.unmount()
   })
 
