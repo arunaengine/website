@@ -216,3 +216,12 @@ export function copyHeldBack(compliance: string | null | undefined): string | nu
   return compliance === 'quarantined' ? 'Held back: no longer matches its rules' : null
 }
 
+
+const SHORT_ERROR_LIMIT = 160
+
+/** The first sentence of a save error, or a fixed text when that is still too long. */
+export function shortError(message: string): string {
+  const text = message.trim()
+  const sentence = /^(.+?[.!?])(\s|$)/s.exec(text)?.[1] ?? text
+  return sentence.length <= SHORT_ERROR_LIMIT ? sentence : 'The node could not save the backend.'
+}

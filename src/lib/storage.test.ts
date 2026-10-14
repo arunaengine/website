@@ -5,6 +5,7 @@ import {
   copyHeldBack,
   copyOrigin,
   copyState,
+  shortError,
   targetLabel,
   tenantClasses,
 } from './storage'
@@ -134,5 +135,21 @@ describe('wording fallbacks', () => {
     expect(copyHeldBack('quarantined')).toBe('Held back: no longer matches its rules')
     expect(copyHeldBack('allowed')).toBeNull()
     expect(copyHeldBack(undefined)).toBeNull()
+  })
+})
+
+describe('shortError', () => {
+  it('keeps a short message as it is', () => {
+    expect(shortError('Access denied')).toBe('Access denied')
+  })
+
+  it('keeps only the first sentence', () => {
+    expect(shortError('Test write failed. Response: <Error>...</Error> at https://s3.example.org/x')).toBe(
+      'Test write failed.',
+    )
+  })
+
+  it('replaces a very long text with a fixed message', () => {
+    expect(shortError(`backend error ${'x'.repeat(400)}`)).toBe('The node could not save the backend.')
   })
 })

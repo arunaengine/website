@@ -14,7 +14,7 @@ import { computed, ref, useId, watch } from 'vue'
 import { Database, Lock } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
-import { BACKEND_KINDS, BACKEND_KIND_SCHEMAS, backendSchema } from '@/lib/storage'
+import { BACKEND_KINDS, BACKEND_KIND_SCHEMAS, backendSchema, shortError } from '@/lib/storage'
 import type { GroupBackendKind, GroupBackendResponse } from '@/lib/api'
 import { errorMessage } from '@/lib/utils'
 import Notice from '@/components/ui/Notice.vue'
@@ -41,6 +41,8 @@ const publicValues = ref<Record<string, string>>({})
 const secretValues = ref<Record<string, string>>({})
 const toggleOn = ref(false)
 const submitError = ref<string | null>(null)
+
+const submitSummary = computed(() => (submitError.value ? shortError(submitError.value) : ''))
 
 const isEdit = computed(() => Boolean(props.backend))
 const schema = computed(() => BACKEND_KIND_SCHEMAS[kind.value])
@@ -254,7 +256,13 @@ async function submit() {
             </div>
           </fieldset>
 
-          <Notice v-if="submitError" tone="error">{{ submitError }}</Notice>
+          <Notice v-if="submitError" tone="error">
+            {{ submitSummary }}
+            <details v-if="submitSummary !== submitError.trim()" class="mt-1">
+              <summary class="cursor-pointer text-[11px]">Details</summary>
+              <p class="mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap break-words font-mono text-[11px]">{{ submitError }}</p>
+            </details>
+          </Notice>
           <p class="text-[11px] text-muted-foreground">
             The node tries the credentials against the backend before it saves them.
           </p>
