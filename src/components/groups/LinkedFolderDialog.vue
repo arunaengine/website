@@ -335,18 +335,20 @@ async function submit() {
               />
             </div>
             <p v-if="scheduleError" class="mt-1 text-[11px] text-destructive">{{ scheduleError }}</p>
-            <p v-else class="mt-1 text-[11px] text-muted-foreground">{{ scheduleWords(schedule) }}</p>
+            <p v-else class="mt-1 text-[11px] text-muted-foreground">
+              {{ schedule ? scheduleWords(schedule) : 'Runs when you choose Run now.' }}
+            </p>
           </div>
 
           <div v-if="!isEdit" class="space-y-1 rounded-md border border-border bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground">
             <p class="font-medium text-foreground">Example</p>
             <p>
-              In your storage: <span class="break-all font-mono">{{ storageRoot }}run1/a.fastq</span>,
-              in the bucket: <span class="break-all font-mono">{{ bucketRoot }}run1/a.fastq</span>
+              <span class="block">In your storage: <span class="break-all font-mono">{{ storageRoot }}run1/a.fastq</span></span>
+              <span class="block">In the bucket: <span class="break-all font-mono">{{ bucketRoot }}run1/a.fastq</span></span>
             </p>
             <p>
-              New upload in the bucket: <span class="break-all font-mono">{{ bucketRoot }}run2/b.fastq</span>,
-              in your storage: <span class="break-all font-mono">{{ exampleUpload }}</span>
+              <span class="block">New upload in the bucket: <span class="break-all font-mono">{{ bucketRoot }}run2/b.fastq</span></span>
+              <span class="block">Saved in your storage: <span class="break-all font-mono">{{ exampleUpload }}</span></span>
             </p>
           </div>
 
