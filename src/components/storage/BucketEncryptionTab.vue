@@ -82,6 +82,7 @@ const keyCount = computed(() => (status.value ? keyGenerations(status.value).lis
 
 const WARNINGS = [
   'An unlock lets every reader with access on this node read the bucket until it locks.',
+  'While locked, people with a key for a folder or file can still read it. They cannot unlock the bucket.',
   'A node restart locks vault-locked buckets.',
   'Recovery needs a usable recovery code or another ready key holder.',
 ]
