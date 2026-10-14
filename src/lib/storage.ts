@@ -39,7 +39,7 @@ export const BACKEND_KIND_SCHEMAS: Record<GroupBackendKind, BackendKindSchema> =
     public: [
       { key: 'endpoint', label: 'Endpoint', required: true, placeholder: 'https://s3.example.org' },
       { key: 'bucket', label: 'Bucket', required: true, placeholder: 'my-bucket' },
-      { key: 'region', label: 'Region', placeholder: 'eu-central-1' },
+      { key: 'region', label: 'Region', placeholder: 'Leave empty for us-east-1' },
       { key: 'root', label: 'Root prefix', placeholder: 'aruna/' },
     ],
     secret: [
