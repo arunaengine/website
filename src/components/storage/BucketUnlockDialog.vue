@@ -42,7 +42,7 @@ const WARNINGS = [
   'This browser remembers your vault key. On Aruna Desktop the browser and the node share one disk, so that disk can open your bucket keys.',
 ]
 const KEY_NOTES: Record<string, string> = {
-  mismatch: 'Your key directory names a key that is not in this vault. Check Settings, Provider keys.',
+  mismatch: 'Your key directory names a key that is not in this vault. Check Settings, Vault.',
   unavailable: 'Your key could not be checked in the key directory, so new copies for you may wait.',
 }
 

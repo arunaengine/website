@@ -405,7 +405,7 @@ async function save() {
               <span v-if="option.value === 'node' && !nodeReady" class="mt-1 block text-xs text-muted-foreground">
                 {{ nodeNote }}
                 <RouterLink :to="{ name: 'settings', query: { tab: 'keys' } }" class="text-primary hover:underline">
-                  Open Settings, Provider keys
+                  Open Settings, Vault
                 </RouterLink>
               </span>
             </span>

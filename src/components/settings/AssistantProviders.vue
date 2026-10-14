@@ -171,7 +171,7 @@ async function confirmRemove() {
             v-if="nodeKeeps"
             :to="{ name: 'settings', query: { tab: 'keys' } }"
             class="text-primary hover:underline"
-          >Manage the passphrase under Provider keys.</RouterLink>
+          >Manage the passphrase under Vault.</RouterLink>
         </p>
       </div>
       <div class="flex shrink-0 items-center gap-2">

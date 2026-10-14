@@ -167,7 +167,7 @@ function onKeydown(event: KeyboardEvent) {
       <span>
         Your provider keys are locked.
         <RouterLink :to="{ name: 'settings', query: { tab: 'keys' } }" class="text-primary hover:underline">
-          Manage them under Provider keys.
+          Manage them in Settings, Vault.
         </RouterLink>
       </span>
       <Button variant="outline" size="sm" @click="unlockOpen = true">Unlock</Button>

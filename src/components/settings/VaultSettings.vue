@@ -83,7 +83,8 @@ async function confirmReset() {
 <template>
   <section data-tour="vault-settings" class="surface overflow-hidden">
     <header class="border-b border-border px-5 py-4">
-      <h3 class="font-display text-sm font-semibold text-aruna-navy">Provider keys on this node</h3>
+      <h3 class="font-display text-sm font-semibold text-aruna-navy">Your vault on this node</h3>
+      <p class="text-xs text-muted-foreground">Holds your provider keys and bucket keys. Lock it when you are done.</p>
       <p class="text-xs text-muted-foreground">
         A provider key kept on this node is sealed with a passphrase only you know. The node stores what it
         cannot read, and the key follows you to other browsers.

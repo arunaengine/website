@@ -819,7 +819,7 @@ export const docsTopics: DocsTopic[] = [
         paragraphs: [
           'Key holders are the bucket creator, the group admins and users granted explicitly. Each one has a copy of the bucket key, sealed to the key in their vault. A user who loses group-admin rights loses the implicit right to unlock at once; a creator and explicit grants stay valid.',
           'A vault-locked bucket needs a recovery code or two ready key holders. Removing a key holder that breaks this rule needs a confirmation, and removing a key holder does not erase copies they already made.',
-          'Your vault passphrase needs at least 12 characters, because the vault opens bucket keys. Set it up under [Settings](page:settings), Provider keys.',
+          'Your vault passphrase needs at least 12 characters, because the vault opens bucket keys. Set it up under [Settings](page:settings), Vault.',
         ],
       },
       {
@@ -1060,8 +1060,8 @@ export const docsTopics: DocsTopic[] = [
       {
         route: '/app/settings?tab=keys',
         anchor: 'settings-keys',
-        title: 'Provider keys',
-        body: 'The passphrase that seals provider keys on this node lives here: create it, unlock the keys once per browser, change it, lock, or reset.',
+        title: 'Vault',
+        body: 'The passphrase that seals your provider keys and bucket keys on this node lives here: create it, unlock the keys once per browser, change it, lock, or reset.',
       },
       {
         route: '/app/settings?tab=assistant',
@@ -1113,9 +1113,9 @@ export const docsTopics: DocsTopic[] = [
           'What the node can see: never a key you keep in the browser or sealed on the node. The assistant talks to such a provider straight from your browser. A ChatGPT sign-in is different: the node holds that sign-in and proxies every turn, so it sees those requests while it proxies them.',
         ],
         steps: [
-          'Open [Settings](page:settings), then Provider keys, and choose a passphrase. Save the recovery code.',
+          'Open [Settings](page:settings), then Vault, and choose a passphrase. Save the recovery code.',
           'Add a provider, or edit one, and pick "On this node, sealed with my passphrase" under Keep the key.',
-          'In another browser, unlock the keys once under Provider keys, or from the notice in the chat.',
+          'In another browser, unlock the keys once under Vault, or from the notice in the chat.',
         ],
       },
       {

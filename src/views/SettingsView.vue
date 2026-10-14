@@ -76,7 +76,7 @@ const settingsTabs = [
   { id: 'groups', label: 'Groups' },
   { id: 'access', label: 'Access & connection' },
   { id: 'assistant', label: 'Assistant' },
-  { id: 'keys', label: 'Provider keys' },
+  { id: 'keys', label: 'Vault' },
   { id: 'appearance', label: 'Appearance' },
 ] as const
 // Links and bookmarks still carry the ids of the tabs merged into `access`.
