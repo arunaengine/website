@@ -156,6 +156,14 @@ describe('bucket encryption tab', () => {
     expect(text).toContain('A node restart locks vault-locked buckets.')
   })
 
+  it('shows no longest unlock for an Aruna-managed bucket', async () => {
+    expect(await render('ready', encrypted({ max_unlock_ms: 3_600_000 }))).toContain('Longest unlock')
+    const text = await render('ready', encrypted({ mode: 'node_managed', max_unlock_ms: 3_600_000 }))
+
+    expect(text).toContain('Key holders')
+    expect(text).not.toContain('Longest unlock')
+  })
+
   it('keeps a rewrite open until its old copies are removed', async () => {
     const transition = {
       kind: 'encrypt' as const,

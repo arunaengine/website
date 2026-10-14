@@ -5,7 +5,7 @@ import * as Api from '@/lib/api'
 import type { BucketEncryptionResponse, BucketKeyGeneration, BucketUnlockStatus } from '@/lib/api'
 import * as Wording from '@/lib/bucketEncryption'
 import * as StateBadge from '@/lib/stateBadge'
-import { button, click, compileClientComponent, content, element, mountApp, moduleDefault } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, element, mountApp, moduleDefault, nodes } from '@/test/clientRender'
 
 const unlock = vi.fn()
 const extend = vi.fn()
@@ -18,8 +18,9 @@ const NoticeStub = defineComponent({
   setup: (props, { slots }) => () => h('aside', [props.title, slots.default?.()]),
 })
 const DialogStub = defineComponent({
-  props: { open: Boolean, generation: Number, role: String },
-  setup: (props) => () => h('div', props.open ? `unlock dialog for ${props.role} ${props.generation}` : ''),
+  props: { open: Boolean, generation: Number, role: String, nodeManaged: Boolean },
+  setup: (props) => () =>
+    h('div', props.open ? `unlock dialog for ${props.role} ${props.generation}${props.nodeManaged ? ' managed' : ''}` : ''),
 })
 
 const access = compileClientComponent(new URL('./BucketKeyAccess.vue', import.meta.url), {
@@ -128,6 +129,14 @@ describe('bucket key access', () => {
     expect(extend).toHaveBeenCalledWith(2, undefined)
     expect(lock).toHaveBeenCalledOnce()
     expect(content(root)).toContain('locked or unlocked again meanwhile')
+  })
+
+  it('offers no unlock length on an Aruna-managed bucket', async () => {
+    const root = await render(status({ mode: 'node_managed', generations: [key(3, 'active', OPEN), key(2, 'source')] }))
+
+    expect(nodes(root).some((node) => node.props['aria-label'] === 'Extend the unlock by')).toBe(false)
+    await click(button(row(root, 2), 'Unlock'))
+    expect(content(root)).toContain('unlock dialog for source 2 managed')
   })
 
   it('holds back a second unlock while the last one is unconfirmed', async () => {

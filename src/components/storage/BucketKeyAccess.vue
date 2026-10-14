@@ -35,7 +35,9 @@ function canUnlock(key: BucketKeyGeneration): boolean {
 }
 
 function canExtend(key: BucketKeyGeneration): boolean {
-  return key.unlock.state === 'unlocked' && caller.value.holder && Boolean(key.unlock.session_id)
+  return (
+    !nodeManaged.value && key.unlock.state === 'unlocked' && caller.value.holder && Boolean(key.unlock.session_id)
+  )
 }
 
 const canLock = computed(
@@ -116,6 +118,7 @@ function extendKey(key: BucketKeyGeneration) {
       :generation="unlockTarget?.generation ?? 0"
       :role="unlockTarget?.role ?? 'active'"
       :max-unlock-ms="status.max_unlock_ms"
+      :node-managed="nodeManaged"
       :unlock="unlock"
       @update:open="(open: boolean) => !open && (unlockTarget = null)"
     />

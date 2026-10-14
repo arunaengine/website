@@ -25,6 +25,7 @@ const props = defineProps<{
   generation: number
   role: KeyRole
   maxUnlockMs: number | null
+  nodeManaged?: boolean
   unlock: (generation: number, durationMs?: number) => Promise<UnlockOutcome | null>
 }>()
 const emit = defineEmits<{ (e: 'update:open', open: boolean): void }>()
@@ -108,7 +109,7 @@ async function submit() {
         </Notice>
         <VaultUnlockForm v-else-if="vaultState === 'locked'" />
         <template v-else>
-          <div>
+          <div v-if="!nodeManaged">
             <label class="text-xs font-medium text-foreground" for="unlock-length">How long</label>
             <Select id="unlock-length" v-model="duration" class="mt-1.5" :options="options" aria-label="Unlock length" />
           </div>

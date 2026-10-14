@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as Api from '@/lib/api'
 import type { BucketEncryptionResponse } from '@/lib/api'
 import * as Wording from '@/lib/bucketEncryption'
-import { button, click, compileClientComponent, content, element, flush, mountApp, moduleDefault } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, element, flush, mountApp, moduleDefault, nodes } from '@/test/clientRender'
 
 const save = vi.fn()
 const rotate = vi.fn()
@@ -120,6 +120,18 @@ describe('bucket encryption settings', () => {
       max_unlock_ms: null,
       expected_generation: 1,
     })
+  })
+
+  it('drops the longest unlock when the bucket becomes Aruna-managed', async () => {
+    const root = await render(status({ mode: 'vault_locked', unlock: UNLOCKED, max_unlock_ms: 3_600_000 }))
+    expect(selected(root, 'Longest unlock')).toBe('3600000')
+
+    await choose(root, 'Encryption mode', 'node_managed')
+    expect(nodes(root).some((node) => node.props['aria-label'] === 'Longest unlock')).toBe(false)
+    await click(button(root, 'Save changes'))
+    await click(button(dialog(root), 'Save'))
+
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ mode: 'node_managed', max_unlock_ms: null }))
   })
 
   it('rotates an unlocked bucket after the backup warning and words a refusal', async () => {

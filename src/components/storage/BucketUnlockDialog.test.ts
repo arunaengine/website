@@ -13,6 +13,7 @@ import {
   flush,
   mountApp,
   moduleDefault,
+  nodes,
 } from '@/test/clientRender'
 
 const vaultState = ref<VaultState>('unlocked')
@@ -54,8 +55,8 @@ const dialog = compileClientComponent(new URL('./BucketUnlockDialog.vue', import
   '@/lib/bucketEncryption': Wording,
 })
 
-async function render(maxUnlockMs: number | null = null, role = 'active') {
-  const props = { open: true, bucket: 'reef', generation: 2, role, maxUnlockMs, unlock }
+async function render(maxUnlockMs: number | null = null, role = 'active', nodeManaged = false) {
+  const props = { open: true, bucket: 'reef', generation: 2, role, maxUnlockMs, nodeManaged, unlock }
   const { root } = await mountApp(dialog, { props })
   return root
 }
@@ -87,6 +88,14 @@ describe('bucket unlock dialog', () => {
     expect(content(root)).toContain('share one disk')
     await click(button(root, 'Unlock'))
 
+    expect(unlock).toHaveBeenCalledWith(2, undefined)
+  })
+
+  it('asks for no length on an Aruna-managed bucket', async () => {
+    const root = await render(8 * 3_600_000, 'active', true)
+
+    expect(nodes(root).some((node) => node.tag === 'select')).toBe(false)
+    await click(button(root, 'Unlock'))
     expect(unlock).toHaveBeenCalledWith(2, undefined)
   })
 

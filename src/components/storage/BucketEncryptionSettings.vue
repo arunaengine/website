@@ -38,7 +38,9 @@ const maxUnlock = ref('')
 const failure = ref<string | null>(null)
 
 function settingsOf(status: BucketEncryptionResponse): EncryptionDraft {
-  return { mode: status.mode, cipher: status.cipher, block_keys: status.block_keys, max_unlock_ms: status.max_unlock_ms }
+  // Aruna-managed keys stay unlocked, so they have no longest unlock.
+  const maxUnlockMs = status.mode === 'node_managed' ? null : status.max_unlock_ms
+  return { mode: status.mode, cipher: status.cipher, block_keys: status.block_keys, max_unlock_ms: maxUnlockMs }
 }
 
 function same(a: EncryptionDraft, b: EncryptionDraft): boolean {
@@ -66,7 +68,7 @@ const draft = computed<EncryptionDraft>(() => ({
   mode: mode.value,
   cipher: cipher.value,
   block_keys: blockKeys.value,
-  max_unlock_ms: maxUnlock.value ? Number(maxUnlock.value) : null,
+  max_unlock_ms: mode.value !== 'node_managed' && maxUnlock.value ? Number(maxUnlock.value) : null,
 }))
 const changed = computed(() => !same(draft.value, base.value))
 watch(
@@ -133,7 +135,7 @@ async function confirm() {
           Mode
           <Select v-model="mode" class="mt-1.5" :options="options(MODE_LABEL)" aria-label="Encryption mode" />
         </label>
-        <label class="text-xs font-medium text-foreground">
+        <label v-if="mode !== 'node_managed'" class="text-xs font-medium text-foreground">
           Longest unlock
           <Select v-model="maxUnlock" class="mt-1.5" :options="maxUnlockOptions(status.max_unlock_ms)" aria-label="Longest unlock" />
         </label>

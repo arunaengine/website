@@ -56,9 +56,11 @@ const details = computed<Detail[]>(() => {
       { label: 'Key generation', value: String(current.key_generation) },
       { label: 'Cipher', value: cipherLabel(current.cipher) },
       { label: 'Block keys', value: blockKeysLabel(current.block_keys) },
-      { label: 'Longest unlock', value: maxUnlockLabel(current.max_unlock_ms) },
-      { label: 'Key holders', value: holderSummary(current.holders) },
     )
+    if (current.mode !== 'node_managed') {
+      items.push({ label: 'Longest unlock', value: maxUnlockLabel(current.max_unlock_ms) })
+    }
+    items.push({ label: 'Key holders', value: holderSummary(current.holders) })
   }
   items.push({ label: 'Compression', value: compressionSummary(compression.value, encrypted.value) })
   return items
