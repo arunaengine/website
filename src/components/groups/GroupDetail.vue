@@ -9,6 +9,7 @@ import ConnectorsSection from '@/components/groups/ConnectorsSection.vue'
 import RepositoriesSection from '@/components/groups/RepositoriesSection.vue'
 import StorageBackendsSection from '@/components/groups/StorageBackendsSection.vue'
 import GroupRoutingSection from '@/components/groups/GroupRoutingSection.vue'
+import LinkedFoldersSection from '@/components/groups/LinkedFoldersSection.vue'
 import GroupLocationSection from '@/components/groups/GroupLocationSection.vue'
 import PoliciesSection from '@/components/policies/PoliciesSection.vue'
 import EffectivePolicies from '@/components/policies/EffectivePolicies.vue'
@@ -588,6 +589,11 @@ async function leave() {
               @backends="groupBackends = $event"
             />
           </div>
+          <LinkedFoldersSection
+            :group-id="group.group_id"
+            :backends="groupBackends"
+            :can-admin="canAdminStorage"
+          />
           <div>
             <div class="flex items-center gap-2 px-5 pb-1 pt-4">
               <Route class="h-3.5 w-3.5 text-primary" />
