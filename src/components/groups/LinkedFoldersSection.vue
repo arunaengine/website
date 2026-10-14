@@ -6,7 +6,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import LinkedFolderDialog from '@/components/groups/LinkedFolderDialog.vue'
-import { ref, watch } from 'vue'
+import { onBeforeUnmount, ref, watch } from 'vue'
 import { FolderSync, Pencil, Play, Plus, Trash2 } from '@lucide/vue'
 import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
@@ -43,6 +43,22 @@ const busyId = ref<string | null>(null)
 const expandedId = ref<string | null>(null)
 const actionError = ref<string | null>(null)
 
+// Runs that have not finished yet; the list reloads until none is left.
+const ACTIVE_STATES = new Set(['queued', 'claimed', 'preparing', 'running'])
+let pollTimer: ReturnType<typeof setTimeout> | undefined
+let disposed = false
+
+function clearPoll() {
+  if (pollTimer !== undefined) clearTimeout(pollTimer)
+  pollTimer = undefined
+}
+
+function schedulePoll() {
+  clearPoll()
+  if (disposed || !links.value?.some((link) => link.last_run && ACTIVE_STATES.has(link.last_run.state))) return
+  pollTimer = setTimeout(() => void load(), 3_000)
+}
+
 // Only the latest load for the current group and session writes state.
 let loadSeq = 0
 async function load() {
@@ -53,7 +69,9 @@ async function load() {
   loadError.value = null
   try {
     const list = await listBackendImports(props.groupId, client())
-    if (current()) links.value = list
+    if (!current()) return
+    links.value = list
+    schedulePoll()
   } catch (err) {
     if (!current()) return
     links.value = null
@@ -75,10 +93,15 @@ watch(
     busyId.value = null
     expandedId.value = null
     actionError.value = null
+    clearPoll()
     void load()
   },
   { immediate: true },
 )
+onBeforeUnmount(() => {
+  disposed = true
+  clearPoll()
+})
 
 // A backend folder as "name (bucket / folder)", or the folder alone for an unknown backend.
 function backendPlace(backendId: string, prefix: string): string {
@@ -134,8 +157,9 @@ async function run(link: BackendImport) {
     if (same()) await load()
   } catch (err) {
     if (!same()) return
-    actionError.value =
-      err instanceof ApiError && err.status === 409 ? 'This link is already running.' : errorMessage(err)
+    const running = err instanceof ApiError && err.status === 409
+    actionError.value = running ? 'This link is already running.' : errorMessage(err)
+    if (running) await load()
   } finally {
     if (same()) busyId.value = null
   }

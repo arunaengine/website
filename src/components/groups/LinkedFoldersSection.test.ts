@@ -61,6 +61,7 @@ function iconButton(root: Parameters<typeof content>[0], label: string) {
 }
 
 beforeEach(() => {
+  vi.useRealTimers()
   listBackendImports.mockReset()
   runBackendImport.mockReset()
   deleteBackendImport.mockReset()
@@ -142,6 +143,26 @@ describe('LinkedFoldersSection', () => {
 
     expect(runBackendImport).toHaveBeenCalledWith('g1', 'i1', expect.anything())
     expect(content(mounted.root)).toContain('This link is already running.')
+    expect(listBackendImports).toHaveBeenCalledTimes(2)
+    mounted.app.unmount()
+  })
+
+  it('reloads while a run is going and stops once it ends', async () => {
+    vi.useFakeTimers()
+    const run = (state: string, imported: number) => ({
+      job_id: 'j1', state, started_at: new Date().toISOString(), imported, skipped: 0, failed: 0, errors: [],
+    })
+    listBackendImports
+      .mockResolvedValueOnce([link('i1', { last_run: run('running', 10) })])
+      .mockResolvedValueOnce([link('i1', { last_run: run('succeeded', 42) })])
+    const mounted = await render()
+    expect(content(mounted.root)).toContain('10 added')
+
+    await vi.advanceTimersByTimeAsync(3_000)
+    await flush()
+    expect(content(mounted.root)).toContain('42 added')
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(listBackendImports).toHaveBeenCalledTimes(2)
     mounted.app.unmount()
   })
 
