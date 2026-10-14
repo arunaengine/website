@@ -74,7 +74,7 @@ describe('LinkedFoldersSection', () => {
         write_prefix: 'uploads/',
         last_run: {
           job_id: 'j1', state: 'failed', started_at: new Date().toISOString(), imported: 1284, skipped: 0, failed: 3,
-          errors: [{ key: 'raw/2024/x.bin', message: 'checksum mismatch' }],
+          errors: [{ key: 'raw/2024/x.bin', error: 'checksum mismatch' }],
         },
       }),
     ])

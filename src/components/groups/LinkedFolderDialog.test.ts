@@ -63,7 +63,7 @@ const BACKENDS = [
 ]
 const STORED = {
   import_id: 'i1', backend_id: 'b1', backend_prefix: 'raw/2024/', bucket: 'sequencing', key_prefix: 'seq/',
-  write_pattern: '{dir}{id}_{name}', schedule: null, created_at: '',
+  write_pattern: '{dir}{id}_{name}', created_at: '',
 }
 
 type Root = Parameters<typeof content>[0]

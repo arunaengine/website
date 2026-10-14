@@ -271,7 +271,7 @@ function onSaved(runError?: string) {
               class="mt-1 space-y-0.5 pl-5.5 text-[11px] text-muted-foreground"
             >
               <li v-for="failure in link.last_run.errors" :key="failure.key" class="truncate">
-                <span class="font-mono">{{ failure.key }}</span>: {{ failure.message ?? failure.error }}
+                <span class="font-mono">{{ failure.key }}</span>: {{ failure.error }}
               </li>
             </ul>
           </li>

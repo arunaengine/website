@@ -6,8 +6,7 @@ import { apiRequest, type ApiClientOptions } from './client'
 
 export interface BackendImportFailure {
   key: string
-  message?: string
-  error?: string
+  error: string
 }
 
 export interface BackendImportRun {
@@ -29,8 +28,8 @@ export interface BackendImport {
   write_backend_id?: string | null
   write_prefix?: string | null
   write_pattern?: string | null
-  /** Five-field cron expression in UTC; `null` runs only on request. */
-  schedule: string | null
+  /** Five-field cron expression in UTC; omitted when it runs only on request. */
+  schedule?: string
   created_at: string
   last_run?: BackendImportRun | null
 }
@@ -52,9 +51,8 @@ function importsPath(groupId: string, importId?: string): string {
 }
 
 export async function listBackendImports(groupId: string, client: ApiClientOptions): Promise<BackendImport[]> {
-  const body = await apiRequest<BackendImport[] | { imports: BackendImport[] }>(importsPath(groupId), {}, client)
-  if (Array.isArray(body)) return body
-  return body?.imports ?? []
+  const body = await apiRequest<{ imports: BackendImport[] }>(importsPath(groupId), {}, client)
+  return body.imports
 }
 
 export function createBackendImport(
