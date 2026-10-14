@@ -113,7 +113,8 @@ describe('LinkedFoldersSection', () => {
     let failDelete: (err: unknown) => void = () => {}
     runBackendImport.mockReturnValue(new Promise((resolve) => (answerRun = resolve)))
     deleteBackendImport.mockReturnValue(new Promise((_, reject) => (failDelete = reject)))
-    listBackendImports.mockResolvedValueOnce([link('i1', { bucket: 'one' }), link('i2', { bucket: 'two' })])
+    listBackendImports.mockResolvedValueOnce([link('i1', { bucket: 'one' })])
+    listBackendImports.mockResolvedValueOnce([link('i2', { bucket: 'two' })])
     listBackendImports.mockResolvedValueOnce([link('i3', { bucket: 'current' })])
     const mounted = await render('g1')
     const press = async (node: ReturnType<typeof button>) => {
@@ -121,17 +122,41 @@ describe('LinkedFoldersSection', () => {
       await flush()
     }
     await press(iconButton(mounted.root, 'Run one now'))
+    mounted.state.groupId = 'g2'
+    await flush()
     await click(iconButton(mounted.root, 'Delete two'))
     await press(button(mounted.root, 'Delete'))
-    mounted.state.groupId = 'g2'
+    mounted.state.groupId = 'g3'
     await flush()
 
     answerRun({ job_id: 'j1' })
     failDelete(new Api.ApiError(500, 'stale failure'))
     await flush()
-    expect(listBackendImports).toHaveBeenCalledTimes(2)
+    expect(deleteBackendImport).toHaveBeenCalledWith('g2', 'i2', expect.anything())
+    expect(listBackendImports).toHaveBeenCalledTimes(3)
     expect(content(mounted.root)).toContain('to current')
     expect(content(mounted.root)).not.toContain('stale failure')
+    mounted.app.unmount()
+  })
+
+  it('blocks other runs and deletes while one action is pending', async () => {
+    let answerRun: (value: unknown) => void = () => {}
+    runBackendImport.mockReturnValueOnce(new Promise((resolve) => (answerRun = resolve)))
+    listBackendImports.mockResolvedValue([link('i1', { bucket: 'one' }), link('i2', { bucket: 'two' })])
+    const mounted = await render()
+    void (iconButton(mounted.root, 'Run one now').props.onClick as (event: unknown) => unknown)({})
+    await flush()
+    expect(iconButton(mounted.root, 'Run two now').props.disabled).toBe(true)
+    await click(iconButton(mounted.root, 'Run two now'))
+    await click(iconButton(mounted.root, 'Delete two'))
+    expect(button(mounted.root, 'Delete').props.disabled).toBe(true)
+    await click(button(mounted.root, 'Delete'))
+    expect(runBackendImport).toHaveBeenCalledTimes(1)
+    expect(deleteBackendImport).not.toHaveBeenCalled()
+
+    answerRun({ job_id: 'j1' })
+    await flush()
+    expect(button(mounted.root, 'Delete').props.disabled).toBe(false)
     mounted.app.unmount()
   })
 

@@ -149,6 +149,7 @@ function sameContext() {
 }
 
 async function run(link: BackendImport) {
+  if (busyId.value) return
   const same = sameContext()
   actionError.value = null
   busyId.value = link.import_id
@@ -166,6 +167,7 @@ async function run(link: BackendImport) {
 }
 
 async function confirmDelete(link: BackendImport) {
+  if (busyId.value) return
   const same = sameContext()
   actionError.value = null
   busyId.value = link.import_id
@@ -233,7 +235,7 @@ function onSaved(runError?: string) {
                   <Button
                     variant="destructive"
                     size="sm"
-                    :disabled="busyId === link.import_id"
+                    :disabled="busyId !== null"
                     @click="confirmDelete(link)"
                   >
                     Delete
@@ -248,7 +250,7 @@ function onSaved(runError?: string) {
                     size="sm"
                     class="h-6 whitespace-nowrap px-2 text-xs text-muted-foreground"
                     :aria-label="`Run ${bucketSide(link)} now`"
-                    :disabled="writesDisabled || busyId === link.import_id"
+                    :disabled="writesDisabled || busyId !== null"
                     :title="writesDisabled ? OFFLINE_WRITE_HINT : 'Look for new files now'"
                     @click="run(link)"
                   >
