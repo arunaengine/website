@@ -66,7 +66,7 @@ async function save() {
 <template>
   <div class="space-y-2">
     <p class="text-[11px] text-muted-foreground">
-      Where new uploads go when no bucket rule says otherwise.
+      New uploads of this group go here, in every bucket without its own rule, including buckets created later. Existing files stay where they are.
       <DocsLink icon topic="where-data-lives" section="Storage backend" class="ml-0.5" />
     </p>
     <div v-if="hidden" class="text-xs text-muted-foreground">
