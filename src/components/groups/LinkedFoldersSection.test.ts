@@ -10,6 +10,7 @@ import * as Utils from '@/lib/utils'
 const listBackendImports = vi.fn()
 const runBackendImport = vi.fn()
 const deleteBackendImport = vi.fn()
+const offline = ref(false)
 
 const Empty = defineComponent(() => () => null)
 const Slot = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
@@ -31,7 +32,7 @@ const LinkedFoldersSection = compileClientComponent(new URL('./LinkedFoldersSect
     isUnsupportedEndpoint: (err: unknown) => err instanceof Api.ApiError && err.status === 404,
     useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('bearer'), sessionEpoch: ref(0) }),
   },
-  '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled: ref(false) }) },
+  '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled: offline }) },
   '@/lib/stateBadge': StateBadge,
   '@/lib/linkedFolders': LinkedFolders,
   '@/lib/api': { ...Api, listBackendImports, runBackendImport, deleteBackendImport },
@@ -65,6 +66,7 @@ beforeEach(() => {
   listBackendImports.mockReset()
   runBackendImport.mockReset()
   deleteBackendImport.mockReset()
+  offline.value = false
 })
 
 describe('LinkedFoldersSection', () => {
@@ -203,6 +205,17 @@ describe('LinkedFoldersSection', () => {
     await click(button(mounted.root, 'Delete'))
     expect(deleteBackendImport).toHaveBeenCalledWith('g1', 'i1', expect.anything())
     expect(content(mounted.root)).not.toContain('sequencing')
+    mounted.app.unmount()
+  })
+
+  it('blocks a confirmed delete after going offline', async () => {
+    listBackendImports.mockResolvedValue([link('i1')])
+    const mounted = await render()
+    await click(iconButton(mounted.root, 'Delete sequencing'))
+    offline.value = true
+    await flush()
+
+    expect(button(mounted.root, 'Delete').props.disabled).toBe(true)
     mounted.app.unmount()
   })
 

@@ -235,7 +235,7 @@ function onSaved(runError?: string) {
                   <Button
                     variant="destructive"
                     size="sm"
-                    :disabled="busyId !== null"
+                    :disabled="writesDisabled || busyId !== null"
                     @click="confirmDelete(link)"
                   >
                     Delete
