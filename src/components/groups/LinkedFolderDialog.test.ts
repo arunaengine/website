@@ -11,6 +11,7 @@ const updateBackendImport = vi.fn()
 const runBackendImport = vi.fn()
 const onSaved = vi.fn()
 const onOpen = vi.fn()
+const activeContext = ref({ nodeId: 'n1', groupId: 'g1' })
 
 const Empty = defineComponent(() => () => null)
 const Slot = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
@@ -53,6 +54,7 @@ const LinkedFolderDialog = compileClientComponent(new URL('./LinkedFolderDialog.
   '@/composables/useBuckets': {
     useBuckets: () => ({ buckets: ref([{ name: 'sequencing' }]), ensure: vi.fn() }),
   },
+  '@/composables/useS3': { useS3: () => ({ activeContext, nodeIdFor: () => 'n1' }) },
   '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled: ref(false) }) },
   '@/lib/api': { ...Api, createBackendImport, updateBackendImport, runBackendImport },
   '@/lib/linkedFolders': LinkedFolders,
@@ -100,6 +102,7 @@ beforeEach(() => {
   runBackendImport.mockReset()
   onSaved.mockReset()
   onOpen.mockReset()
+  activeContext.value = { nodeId: 'n1', groupId: 'g1' }
 })
 
 describe('LinkedFolderDialog', () => {
@@ -166,6 +169,18 @@ describe('LinkedFolderDialog', () => {
     await typeValue(inputById(mounted.root, '-pattern'), '{dir}{date}_{name}')
     expect(content(mounted.root)).toContain('Unknown placeholder {date}')
     expect(button(mounted.root, 'Link and run').props.disabled).toBe(true)
+    mounted.app.unmount()
+  })
+
+  it('keeps manual bucket entry when the cached buckets belong to another group', async () => {
+    createBackendImport.mockResolvedValue({ ...STORED, import_id: 'new' })
+    runBackendImport.mockResolvedValue({ job_id: 'j1' })
+    activeContext.value = { nodeId: 'n1', groupId: 'g2' }
+    const mounted = await mount()
+    await typeValue(inputById(mounted.root, '-bucket'), 'other-bucket')
+    await submit(mounted.root)
+
+    expect(createBackendImport).toHaveBeenCalledWith('g1', expect.objectContaining({ bucket: 'other-bucket' }), expect.anything())
     mounted.app.unmount()
   })
 

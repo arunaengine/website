@@ -16,6 +16,7 @@ import { computed, ref, useId, watch } from 'vue'
 import { FolderSync } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useBuckets } from '@/composables/useBuckets'
+import { useS3 } from '@/composables/useS3'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import {
   ApiError,
@@ -56,6 +57,7 @@ const emit = defineEmits<{
 const { apiBaseUrl, authToken, sessionEpoch } = useAruna()
 const { writesDisabled } = useConnectivity()
 const bucketList = useBuckets()
+const s3 = useS3()
 const uid = useId()
 
 const SAMPLE_ID = '01JA7Q3K'
@@ -81,7 +83,12 @@ const backendOptions = computed(() =>
     .filter((backend) => isEdit.value || !backend.disabled)
     .map((backend) => ({ value: backend.backend_id, label: backend.name })),
 )
-const bucketOptions = computed(() => bucketList.buckets.value.map((entry) => ({ value: entry.name, label: entry.name })))
+// The cached buckets belong to the active S3 context; another group or node keeps manual entry.
+const bucketOptions = computed(() => {
+  const context = s3.activeContext.value
+  if (context?.groupId !== props.groupId || context.nodeId !== s3.nodeIdFor(null)) return []
+  return bucketList.buckets.value.map((entry) => ({ value: entry.name, label: entry.name }))
+})
 const patternChoice = computed(
   () => NAME_PATTERNS.find((preset) => preset.value === pattern.value.trim())?.value ?? 'custom',
 )
