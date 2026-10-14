@@ -107,6 +107,33 @@ describe('LinkedFoldersSection', () => {
     mounted.app.unmount()
   })
 
+  it('drops run and delete answers that arrive after a group change', async () => {
+    let answerRun: (value: unknown) => void = () => {}
+    let failDelete: (err: unknown) => void = () => {}
+    runBackendImport.mockReturnValue(new Promise((resolve) => (answerRun = resolve)))
+    deleteBackendImport.mockReturnValue(new Promise((_, reject) => (failDelete = reject)))
+    listBackendImports.mockResolvedValueOnce([link('i1', { bucket: 'one' }), link('i2', { bucket: 'two' })])
+    listBackendImports.mockResolvedValueOnce([link('i3', { bucket: 'current' })])
+    const mounted = await render('g1')
+    const press = async (node: ReturnType<typeof button>) => {
+      void (node.props.onClick as (event: unknown) => unknown)({})
+      await flush()
+    }
+    await press(iconButton(mounted.root, 'Run one now'))
+    await click(iconButton(mounted.root, 'Delete two'))
+    await press(button(mounted.root, 'Delete'))
+    mounted.state.groupId = 'g2'
+    await flush()
+
+    answerRun({ job_id: 'j1' })
+    failDelete(new Api.ApiError(500, 'stale failure'))
+    await flush()
+    expect(listBackendImports).toHaveBeenCalledTimes(2)
+    expect(content(mounted.root)).toContain('to current')
+    expect(content(mounted.root)).not.toContain('stale failure')
+    mounted.app.unmount()
+  })
+
   it('says so when a run is already going', async () => {
     listBackendImports.mockResolvedValue([link('i1')])
     runBackendImport.mockRejectedValue(new Api.ApiError(409, 'conflict'))

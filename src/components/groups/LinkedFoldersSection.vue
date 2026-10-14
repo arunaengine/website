@@ -72,6 +72,7 @@ watch(
     hidden.value = false
     unsupported.value = false
     confirmingId.value = null
+    busyId.value = null
     expandedId.value = null
     actionError.value = null
     void load()
@@ -117,31 +118,42 @@ function openEdit(link: BackendImport) {
   dialogOpen.value = true
 }
 
+// A run or delete answer only counts for the group and session it was sent for.
+function sameContext() {
+  const groupId = props.groupId
+  const epoch = sessionEpoch.value
+  return () => groupId === props.groupId && epoch === sessionEpoch.value
+}
+
 async function run(link: BackendImport) {
+  const same = sameContext()
   actionError.value = null
   busyId.value = link.import_id
   try {
     await runBackendImport(props.groupId, link.import_id, client())
-    await load()
+    if (same()) await load()
   } catch (err) {
+    if (!same()) return
     actionError.value =
       err instanceof ApiError && err.status === 409 ? 'This link is already running.' : errorMessage(err)
   } finally {
-    busyId.value = null
+    if (same()) busyId.value = null
   }
 }
 
 async function confirmDelete(link: BackendImport) {
+  const same = sameContext()
   actionError.value = null
   busyId.value = link.import_id
   try {
     await deleteBackendImport(props.groupId, link.import_id, client())
+    if (!same()) return
     confirmingId.value = null
     await load()
   } catch (err) {
-    actionError.value = errorMessage(err)
+    if (same()) actionError.value = errorMessage(err)
   } finally {
-    busyId.value = null
+    if (same()) busyId.value = null
   }
 }
 
