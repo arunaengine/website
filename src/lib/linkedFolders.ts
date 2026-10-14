@@ -1,4 +1,6 @@
 // Wording and checks shared by the linked folders section and its dialog.
+import type { GroupBackendResponse } from './api'
+import { backendSchema } from './storage'
 
 export const NAME_PATTERNS = [
   { value: '{dir}{id}_{name}', label: 'Unique ID before the name' },
@@ -34,8 +36,31 @@ export function folderPath(value: string): string {
   return trimmed ? `${trimmed}/` : ''
 }
 
-export function folderLabel(prefix: string | null | undefined, whole: string): string {
-  return prefix ? prefix.replace(/\/+$/, '') : whole
+/** A place as `store / folder`, or the store alone when the folder is empty. */
+export function placeLabel(store: string, folder?: string | null): string {
+  const path = folder?.replace(/\/+$/, '')
+  return path ? `${store} / ${path}` : store
+}
+
+const STORE_KEYS = ['bucket', 'container', 'filesystem']
+
+/** The bucket, container or filesystem a backend points at. */
+export function storeName(backend: GroupBackendResponse): string {
+  const key = STORE_KEYS.find((name) => backend.public_config[name])
+  return key ? backend.public_config[key] : backend.name
+}
+
+/** What a backend points at, such as "S3 bucket lab". */
+export function storeLabel(backend: GroupBackendResponse): string {
+  const kind = backendSchema(backend.kind)?.label ?? backend.kind
+  const key = STORE_KEYS.find((name) => backend.public_config[name])
+  return key ? `${kind} ${key} ${backend.public_config[key]}` : kind
+}
+
+/** The store label with the endpoint, when the backend has one. */
+export function storeLine(backend: GroupBackendResponse): string {
+  const endpoint = backend.public_config.endpoint
+  return endpoint ? `${storeLabel(backend)} at ${endpoint}` : storeLabel(backend)
 }
 
 /** True when new uploads go somewhere other than the linked folder itself. */

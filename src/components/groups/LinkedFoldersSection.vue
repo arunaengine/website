@@ -11,7 +11,7 @@ import { FolderSync, Pencil, Play, Plus, Trash2 } from '@lucide/vue'
 import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { stateVariant } from '@/lib/stateBadge'
-import { folderLabel, scheduleWords, writesElsewhere } from '@/lib/linkedFolders'
+import { placeLabel, scheduleWords, storeName, writesElsewhere } from '@/lib/linkedFolders'
 import {
   ApiError,
   deleteBackendImport,
@@ -79,23 +79,24 @@ watch(
   { immediate: true },
 )
 
-function backendName(backendId: string): string {
-  return props.backends.find((backend) => backend.backend_id === backendId)?.name ?? backendId
+// A backend folder as "name (bucket / folder)", or the folder alone for an unknown backend.
+function backendPlace(backendId: string, prefix: string): string {
+  const backend = props.backends.find((entry) => entry.backend_id === backendId)
+  return backend ? `${backend.name} (${placeLabel(storeName(backend), prefix)})` : placeLabel(backendId, prefix)
 }
 
 function storageSide(link: BackendImport): string {
-  return `${backendName(link.backend_id)} / ${folderLabel(link.backend_prefix, 'everything')}`
+  return backendPlace(link.backend_id, link.backend_prefix)
 }
 
 function bucketSide(link: BackendImport): string {
-  return `${link.bucket} / ${folderLabel(link.key_prefix, 'whole bucket')}`
+  return placeLabel(link.bucket, link.key_prefix)
 }
 
 // New uploads go back to the linked folder unless another place was chosen.
 function writeSide(link: BackendImport): string | null {
   if (!writesElsewhere(link)) return null
-  const prefix = link.write_prefix ?? link.backend_prefix
-  return `${backendName(link.write_backend_id || link.backend_id)} / ${folderLabel(prefix, 'everything')}`
+  return backendPlace(link.write_backend_id || link.backend_id, link.write_prefix ?? link.backend_prefix)
 }
 
 function runCounts(link: BackendImport): string {
@@ -158,7 +159,7 @@ function onSaved(runError?: string) {
     </div>
     <div class="px-5 py-3">
       <p class="mb-2 text-[11px] text-muted-foreground">
-        Show files from your storage in a bucket, and save new uploads back there. Nothing is copied.
+        Files in your storage backend appear in Aruna, and new uploads are saved back there. Nothing is copied.
       </p>
       <div v-if="hidden" class="text-xs text-muted-foreground">
         Linked folders are only visible to group admins.
@@ -181,17 +182,17 @@ function onSaved(runError?: string) {
           <li v-for="link in links" :key="link.import_id" class="rounded-md px-2 py-1.5 hover:bg-muted/50">
             <div class="flex flex-wrap items-center gap-2">
               <FolderSync class="h-3.5 w-3.5 shrink-0 text-primary" />
-              <span class="truncate font-mono text-xs text-muted-foreground" :title="storageSide(link)">
-                {{ storageSide(link) }}
-              </span>
-              <span class="text-xs text-muted-foreground">in</span>
-              <span class="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground" :title="bucketSide(link)">
-                {{ bucketSide(link) }}
+              <span
+                class="min-w-0 flex-1 truncate text-xs text-muted-foreground"
+                :title="`From ${storageSide(link)} to ${bucketSide(link)}`"
+              >
+                From <span class="font-mono">{{ storageSide(link) }}</span>
+                to <span class="font-mono">{{ bucketSide(link) }}</span>
               </span>
               <template v-if="canAdmin">
                 <template v-if="confirmingId === link.import_id">
                   <span class="w-full text-xs text-foreground sm:w-auto">
-                    Delete this link? Aruna never deletes files from your storage.
+                    Delete this link? Aruna never deletes files from your storage backend.
                   </span>
                   <Button
                     variant="destructive"
@@ -242,6 +243,9 @@ function onSaved(runError?: string) {
                 </template>
               </template>
             </div>
+            <p v-if="writeSide(link)" class="mt-0.5 truncate pl-5.5 text-xs text-muted-foreground">
+              New uploads saved to <span class="font-mono">{{ writeSide(link) }}</span>
+            </p>
             <div class="mt-0.5 flex flex-wrap items-center gap-2 pl-5.5 text-[11px] text-muted-foreground">
               <span>{{ scheduleWords(link.schedule) }}</span>
               <template v-if="link.last_run">
@@ -262,9 +266,6 @@ function onSaved(runError?: string) {
               </template>
               <span v-else>Not run yet</span>
             </div>
-            <p v-if="writeSide(link)" class="mt-0.5 truncate pl-5.5 text-[11px] text-muted-foreground">
-              New files go to <span class="font-mono">{{ writeSide(link) }}</span>
-            </p>
             <ul
               v-if="expandedId === link.import_id && link.last_run"
               class="mt-1 space-y-0.5 pl-5.5 text-[11px] text-muted-foreground"

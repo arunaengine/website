@@ -39,8 +39,8 @@ const LinkedFoldersSection = compileClientComponent(new URL('./LinkedFoldersSect
 })
 
 const BACKENDS = [
-  { backend_id: 'b1', group_id: 'g1', kind: 's3', name: 'lab-store', public_config: {} },
-  { backend_id: 'b2', group_id: 'g1', kind: 's3', name: 'archive', public_config: {} },
+  { backend_id: 'b1', group_id: 'g1', kind: 's3', name: 'lab-store', public_config: { bucket: 'lab' } },
+  { backend_id: 'b2', group_id: 'g1', kind: 's3', name: 'archive', public_config: { bucket: 'archive' } },
 ]
 
 function link(id: string, overrides: Record<string, unknown> = {}) {
@@ -67,7 +67,7 @@ beforeEach(() => {
 })
 
 describe('LinkedFoldersSection', () => {
-  it('shows both sides, the schedule and the last run', async () => {
+  it('shows both directions, the schedule and the last run', async () => {
     listBackendImports.mockResolvedValue([
       link('i1', {
         write_backend_id: 'b2',
@@ -81,11 +81,10 @@ describe('LinkedFoldersSection', () => {
     const mounted = await render()
     const text = content(mounted.root)
 
-    expect(text).toContain('lab-store / raw/2024')
-    expect(text).toContain('sequencing / whole bucket')
+    expect(text).toContain('From lab-store (lab / raw/2024) to sequencing')
+    expect(text).toContain('New uploads saved to archive (archive / uploads)')
     expect(text).toContain('Every day at 03:00 UTC')
     expect(text).toContain('1,284 added, 3 failed')
-    expect(text).toContain('archive / uploads')
     expect(text).not.toContain('checksum mismatch')
     await click(button(mounted.root, 'Show failures'))
     expect(content(mounted.root)).toContain('raw/2024/x.bin: checksum mismatch')
@@ -102,7 +101,8 @@ describe('LinkedFoldersSection', () => {
     answerOld([link('i1', { bucket: 'stale' })])
     await flush()
 
-    expect(content(mounted.root)).toContain('current / whole bucket')
+    expect(content(mounted.root)).toContain('to current')
+    expect(content(mounted.root)).not.toContain('New uploads saved')
     expect(content(mounted.root)).not.toContain('stale')
     mounted.app.unmount()
   })
@@ -122,10 +122,10 @@ describe('LinkedFoldersSection', () => {
     listBackendImports.mockResolvedValue([link('i1')])
     deleteBackendImport.mockResolvedValue(undefined)
     const mounted = await render()
-    await click(iconButton(mounted.root, 'Delete sequencing / whole bucket'))
+    await click(iconButton(mounted.root, 'Delete sequencing'))
 
     expect(deleteBackendImport).not.toHaveBeenCalled()
-    expect(content(mounted.root)).toContain('Aruna never deletes files from your storage.')
+    expect(content(mounted.root)).toContain('Aruna never deletes files from your storage backend.')
     listBackendImports.mockResolvedValue([])
     await click(button(mounted.root, 'Delete'))
     expect(deleteBackendImport).toHaveBeenCalledWith('g1', 'i1', expect.anything())
