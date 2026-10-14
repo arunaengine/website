@@ -27,12 +27,13 @@ import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { Cable, ChartArea, Database, FileJson2, HardDrive, Inbox, LogOut, Pencil, Route, ShieldAlert, ShieldCheck, Users } from '@lucide/vue'
+import { Cable, ChartArea, Database, FileJson2, HardDrive, Inbox, LogOut, Pencil, Route, ShieldAlert, ShieldCheck, Trash2, Users } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useJoinRequests } from '@/composables/useJoinRequests'
 import { hasGroupWrite } from '@/lib/groupAdmin'
 import { assessQuota, quotaCountedBytes, referencedBytes, QUOTA_STATE_BADGES } from '@/lib/quota'
 import { featureEnabled } from '@/lib/config'
+import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { errorMessage, formatBytes, formatNumber, relativeTime } from '@/lib/utils'
 import { useRouteTab } from '@/composables/useRouteTab'
 import {
@@ -46,7 +47,7 @@ import {
 } from '@/lib/api'
 
 const props = defineProps<{ groupId: string }>()
-const emit = defineEmits<{ (e: 'left'): void }>()
+const emit = defineEmits<{ (e: 'left'): void; (e: 'deleted'): void }>()
 
 const {
   getGroup,
@@ -57,9 +58,11 @@ const {
   listGroupConnectors,
   listGroupBackends,
   leaveGroup,
+  deleteGroup,
   saving,
   currentUser,
 } = useAruna()
+const { writesDisabled } = useConnectivity()
 const { joinRequestsEnabled } = useJoinRequests()
 const route = useRoute()
 
@@ -78,6 +81,8 @@ const members = ref<GroupMember[]>([])
 const membersHidden = ref(false)
 const loadError = ref<string | null>(null)
 const leaveError = ref<string | null>(null)
+const confirmingDelete = ref(false)
+const deleteError = ref<string | null>(null)
 const loadingDetail = ref(false)
 const usage = ref<UsageResponse | null>(null)
 const docs = ref<MetadataDocumentListItem[] | null>(null)
@@ -304,6 +309,8 @@ watch(
   () => props.groupId,
   () => {
     leaveError.value = null
+    confirmingDelete.value = false
+    deleteError.value = null
     // The placeholder, not the previous group, covers the switch.
     group.value = null
     connectorCount.value = null
@@ -322,6 +329,27 @@ const askPrompt = computed(() => {
   if (!detail) return 'Summarize this group: its datasets, members, and usage.'
   return `Summarize the group "${detail.display_name}" (${detail.group_id}): its datasets, members, and usage.`
 })
+
+// The node names what the group still owns, e.g. "group is not empty: node 01X: S3 buckets".
+function deleteMessage(err: unknown): string {
+  if (err instanceof ApiError && err.status === 409 && err.message.startsWith('group is not empty:')) {
+    const reason = err.message.slice('group is not empty:'.length).replace(/^\s*node \S+:/, '').trim()
+    return `This group still has: ${reason}.`
+  }
+  if (err instanceof ApiError && err.status === 503) return 'A node of this realm is not reachable. Try again later.'
+  return errorMessage(err)
+}
+
+async function removeGroup() {
+  deleteError.value = null
+  try {
+    await deleteGroup(props.groupId)
+    confirmingDelete.value = false
+    emit('deleted')
+  } catch (err) {
+    deleteError.value = deleteMessage(err)
+  }
+}
 
 async function leave() {
   leaveError.value = null
@@ -374,10 +402,36 @@ async function leave() {
           <Button v-if="isMember" variant="outline" size="sm" :disabled="saving" @click="leave">
             <LogOut class="h-3.5 w-3.5" /> Leave group
           </Button>
+          <template v-if="canAdminGroup">
+            <template v-if="confirmingDelete">
+              <span class="text-xs text-foreground">Delete this group? This only works when it is empty.</span>
+              <Button
+                variant="destructive"
+                size="sm"
+                :disabled="saving || writesDisabled"
+                :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
+                @click="removeGroup"
+              >
+                Delete
+              </Button>
+              <Button variant="ghost" size="sm" :disabled="saving" @click="confirmingDelete = false">Cancel</Button>
+            </template>
+            <Button
+              v-else
+              variant="outline"
+              size="sm"
+              :disabled="saving || writesDisabled"
+              :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
+              @click="((confirmingDelete = true), (deleteError = null))"
+            >
+              <Trash2 class="h-3.5 w-3.5" /> Delete group
+            </Button>
+          </template>
           <JoinRequestButton v-if="group" :group-id="group.group_id" :group-name="group.display_name" />
         </div>
       </header>
       <div v-if="leaveError" class="border-b border-border px-5 py-2 text-xs text-destructive">{{ leaveError }}</div>
+      <div v-if="deleteError" class="border-b border-border px-5 py-2 text-xs text-destructive">{{ deleteError }}</div>
       <RenameGroupDialog
         v-model:open="renameOpen"
         :group-id="group.group_id"

@@ -132,6 +132,17 @@ export async function leaveGroup(groupId: string): Promise<void> {
   }
 }
 
+/** Deletes an empty group; the node answers 409 while the group still owns anything. */
+export async function deleteGroup(groupId: string): Promise<void> {
+  saving.value = true
+  try {
+    await request<void>(`/access/groups/${groupId}`, { method: 'DELETE' })
+    await loadAuthenticated().catch(() => undefined)
+  } finally {
+    saving.value = false
+  }
+}
+
 export async function createGroupRole(groupId: string, input: CreateGroupRoleRequest): Promise<ApiRole> {
   saving.value = true
   try {

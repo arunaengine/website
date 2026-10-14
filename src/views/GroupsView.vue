@@ -60,6 +60,10 @@ async function refreshGroups() {
   ])
 }
 const { busy: refreshBusy, refresh: onRefresh } = useRefresh(refreshGroups)
+function onDeleted() {
+  void router.push({ name: 'groups' })
+  void refreshGroups()
+}
 const spinning = computed(() => refreshBusy.value || loading.value)
 
 async function loadOwnJoinRequests() {
@@ -197,7 +201,7 @@ const shellState = computed<'loading' | 'empty' | 'ready'>(() => {
               </div>
             </button>
             <div v-if="selectedGroupId === group.id" class="border-t border-border bg-muted/10 p-4">
-              <GroupDetail :group-id="group.id" @left="router.push({ name: 'groups' })" />
+              <GroupDetail :group-id="group.id" @left="router.push({ name: 'groups' })" @deleted="onDeleted" />
             </div>
           </li>
         </ul>
@@ -277,7 +281,7 @@ const shellState = computed<'loading' | 'empty' | 'ready'>(() => {
               </div>
             </div>
             <div v-if="selectedGroupId === group.id" class="border-t border-border bg-muted/10 p-4">
-              <GroupDetail :group-id="group.id" />
+              <GroupDetail :group-id="group.id" @deleted="onDeleted" />
             </div>
           </li>
         </ul>

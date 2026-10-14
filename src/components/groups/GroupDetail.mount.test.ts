@@ -35,6 +35,8 @@ const group = ref({ display_name: 'Genomics lab', group_id: 'g1', realm_id: REAL
 
 const listGroupConnectors = vi.fn(async () => ({ connectors: [{}, {}] }))
 const listGroupBackends = vi.fn(async () => ({ backends: [{}, {}, {}] }))
+const deleteGroup = vi.fn(async () => undefined)
+const writesDisabled = ref(false)
 const joinRequestsEnabled = ref(false)
 const inboxCount = ref<number | null>(null)
 const inboxError = ref<string | null>(null)
@@ -80,6 +82,7 @@ const GroupDetail = compileClientComponent(new URL('./GroupDetail.vue', import.m
   '@/lib/quota': Quota,
   '@/lib/utils': Utils,
   '@/lib/config': { featureEnabled: () => true },
+  '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled }) },
   '@/composables/useRouteTab': RouteTab,
   '@/composables/useJoinRequests': { useJoinRequests: () => ({ joinRequestsEnabled }) },
   '@/composables/useAruna': {
@@ -92,6 +95,7 @@ const GroupDetail = compileClientComponent(new URL('./GroupDetail.vue', import.m
       listGroupConnectors,
       listGroupBackends,
       leaveGroup: vi.fn(async () => undefined),
+      deleteGroup,
       saving: ref(false),
       currentUser: ref({ id: 'user-1' }),
     }),
@@ -124,7 +128,7 @@ const GroupDetail = compileClientComponent(new URL('./GroupDetail.vue', import.m
   '@/components/assistant/AskAiButton.vue': moduleDefault(Empty),
 })
 
-async function mount(initial: string) {
+async function mount(initial: string, onDeleted?: () => void) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -136,7 +140,7 @@ async function mount(initial: string) {
   })
   await router.push(initial)
   await router.isReady()
-  const mounted = await mountApp(GroupDetail, { router, props: { groupId: 'g1' } })
+  const mounted = await mountApp(GroupDetail, { router, props: { groupId: 'g1', onDeleted } })
   await flush()
   await flush()
   return { ...mounted, router }
@@ -210,6 +214,61 @@ describe('Group tab counts', () => {
     const { root, errors } = await mount('/app/groups/g1')
     expect(errors).toEqual([])
     expect(tabText(root, 'storage').trim()).toBe('Storage')
+  })
+})
+
+describe('Group delete control', () => {
+  function deleteButton(root: Parameters<typeof nodes>[0]) {
+    return nodes(root).find((node) => content(node).trim() === 'Delete group' && node.props.variant === 'outline')
+  }
+  function confirmButton(root: Parameters<typeof nodes>[0]) {
+    return element(root, (node) => node.props.variant === 'destructive')
+  }
+
+  beforeEach(() => {
+    group.value = { display_name: 'Genomics lab', group_id: 'g1', realm_id: REALM, roles: [ADMIN_ROLE] }
+    deleteGroup.mockReset().mockResolvedValue(undefined)
+    writesDisabled.value = false
+  })
+
+  it('offers the delete only to a group admin', async () => {
+    expect(deleteButton((await mount('/app/groups/g1')).root)).toBeDefined()
+
+    group.value = { display_name: 'Genomics lab', group_id: 'g1', realm_id: REALM, roles: [MEMBER_ROLE] }
+    expect(deleteButton((await mount('/app/groups/g1')).root)).toBeUndefined()
+  })
+
+  it('deletes after the confirm and tells the page', async () => {
+    const onDeleted = vi.fn()
+    const { root } = await mount('/app/groups/g1', onDeleted)
+
+    await click(deleteButton(root)!)
+    expect(content(root)).toContain('Delete this group?')
+    expect(deleteGroup).not.toHaveBeenCalled()
+    await click(confirmButton(root))
+
+    expect(deleteGroup).toHaveBeenCalledWith('g1')
+    expect(onDeleted).toHaveBeenCalledOnce()
+  })
+
+  it('names what a group that is not empty still has', async () => {
+    deleteGroup.mockRejectedValueOnce(new Api.ApiError(409, 'group is not empty: node 01NODE: S3 buckets'))
+    const onDeleted = vi.fn()
+    const { root } = await mount('/app/groups/g1', onDeleted)
+
+    await click(deleteButton(root)!)
+    await click(confirmButton(root))
+
+    expect(content(root)).toContain('This group still has: S3 buckets.')
+    expect(onDeleted).not.toHaveBeenCalled()
+  })
+
+  it('holds the delete back without a connection', async () => {
+    writesDisabled.value = true
+    const { root } = await mount('/app/groups/g1')
+
+    expect(deleteButton(root)!.props.disabled).toBe(true)
+    expect(deleteButton(root)!.props.title).toBe('offline')
   })
 })
 
