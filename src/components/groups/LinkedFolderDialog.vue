@@ -1,0 +1,371 @@
+<script setup lang="ts">
+// Link a backend folder with a bucket folder. A stored link only changes its schedule.
+import Dialog from '@/components/ui/Dialog.vue'
+import DialogContent from '@/components/ui/DialogContent.vue'
+import DialogHeader from '@/components/ui/DialogHeader.vue'
+import DialogTitle from '@/components/ui/DialogTitle.vue'
+import DialogDescription from '@/components/ui/DialogDescription.vue'
+import DialogFooter from '@/components/ui/DialogFooter.vue'
+import DialogClose from '@/components/ui/DialogClose.vue'
+import Button from '@/components/ui/Button.vue'
+import Input from '@/components/ui/Input.vue'
+import Notice from '@/components/ui/Notice.vue'
+import Select from '@/components/ui/Select.vue'
+import Switch from '@/components/ui/Switch.vue'
+import { computed, ref, useId, watch } from 'vue'
+import { FolderSync } from '@lucide/vue'
+import { useAruna } from '@/composables/useAruna'
+import { useBuckets } from '@/composables/useBuckets'
+import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
+import {
+  ApiError,
+  createBackendImport,
+  runBackendImport,
+  updateBackendImport,
+  type BackendImport,
+  type BackendImportRequest,
+  type GroupBackendResponse,
+} from '@/lib/api'
+import { cronProblem, fillPattern, folderPath, NAME_PATTERNS, patternProblem, SCHEDULES, scheduleWords, writesElsewhere } from '@/lib/linkedFolders'
+import { errorMessage } from '@/lib/utils'
+
+const props = defineProps<{
+  open: boolean
+  groupId: string
+  backends: GroupBackendResponse[]
+  link?: BackendImport | null
+}>()
+const emit = defineEmits<{
+  (e: 'update:open', v: boolean): void
+  (e: 'saved', runError?: string): void
+}>()
+
+const { apiBaseUrl, authToken, sessionEpoch } = useAruna()
+const { writesDisabled } = useConnectivity()
+const bucketList = useBuckets()
+const uid = useId()
+
+const SAMPLE_ID = '01JA7Q3K'
+const PATTERN_OPTIONS = [...NAME_PATTERNS, { value: 'custom', label: 'Custom' }]
+const SCHEDULE_OPTIONS = [...SCHEDULES, { value: 'custom', label: 'Custom' }]
+
+const backendId = ref('')
+const backendWhole = ref(false)
+const backendFolder = ref('')
+const bucket = ref('')
+const bucketWhole = ref(false)
+const bucketFolder = ref('')
+const pattern = ref(NAME_PATTERNS[0].value)
+const writeElsewhere = ref(false)
+const writeBackendId = ref('')
+const writeFolder = ref('')
+const scheduleChoice = ref('')
+const cron = ref('')
+const saving = ref(false)
+const submitError = ref<string | null>(null)
+
+const isEdit = computed(() => Boolean(props.link))
+const backendOptions = computed(() =>
+  props.backends
+    .filter((backend) => isEdit.value || !backend.disabled)
+    .map((backend) => ({ value: backend.backend_id, label: backend.name })),
+)
+const bucketOptions = computed(() => bucketList.buckets.value.map((entry) => ({ value: entry.name, label: entry.name })))
+const patternChoice = computed(
+  () => NAME_PATTERNS.find((preset) => preset.value === pattern.value.trim())?.value ?? 'custom',
+)
+const patternError = computed(() => patternProblem(pattern.value.trim()))
+const schedule = computed(() => (scheduleChoice.value === 'custom' ? cron.value.trim() : scheduleChoice.value))
+const scheduleError = computed(() => (scheduleChoice.value === 'custom' ? cronProblem(cron.value) : null))
+
+const storageRoot = computed(() => (backendWhole.value ? '' : folderPath(backendFolder.value)))
+const bucketRoot = computed(() => `${bucket.value.trim() || 'bucket'}/${bucketWhole.value ? '' : folderPath(bucketFolder.value)}`)
+const writeRoot = computed(() => (writeElsewhere.value ? folderPath(writeFolder.value) : storageRoot.value))
+const exampleUpload = computed(() => `${writeRoot.value}${fillPattern(pattern.value.trim(), 'run2/', 'b.fastq', SAMPLE_ID)}`)
+
+const submitDisabled = computed(() => {
+  if (saving.value || writesDisabled.value || scheduleError.value) return true
+  if (isEdit.value) return schedule.value === (props.link?.schedule ?? '')
+  return (
+    !backendId.value ||
+    !bucket.value.trim() ||
+    (!backendWhole.value && !folderPath(backendFolder.value)) ||
+    (!bucketWhole.value && !folderPath(bucketFolder.value)) ||
+    Boolean(patternError.value) ||
+    (writeElsewhere.value && !writeBackendId.value)
+  )
+})
+
+function pickPattern(value: string) {
+  if (value !== 'custom') pattern.value = value
+}
+
+function pickSchedule(value: string) {
+  scheduleChoice.value = value
+  if (value === 'custom' && !cron.value) cron.value = '0 3 * * *'
+}
+
+watch(
+  () => props.open,
+  (open) => {
+    if (!open) return
+    const source = props.link
+    backendId.value = source?.backend_id ?? (backendOptions.value.length === 1 ? backendOptions.value[0].value : '')
+    backendWhole.value = Boolean(source && !source.backend_prefix)
+    backendFolder.value = source?.backend_prefix ?? ''
+    bucket.value = source?.bucket ?? ''
+    bucketWhole.value = Boolean(source && !source.key_prefix)
+    bucketFolder.value = source?.key_prefix ?? ''
+    pattern.value = source?.write_pattern ?? NAME_PATTERNS[0].value
+    writeElsewhere.value = Boolean(source && writesElsewhere(source))
+    writeBackendId.value = source?.write_backend_id ?? ''
+    writeFolder.value = source?.write_prefix ?? ''
+    const stored = source?.schedule ?? ''
+    const preset = SCHEDULES.some((option) => option.value === stored)
+    scheduleChoice.value = preset ? stored : 'custom'
+    cron.value = preset ? '' : stored
+    submitError.value = null
+    if (!source) void bucketList.ensure()
+  },
+)
+
+// Another account or realm must never inherit an open form.
+watch(sessionEpoch, () => {
+  if (props.open) emit('update:open', false)
+})
+
+function body(): BackendImportRequest {
+  const request: BackendImportRequest = {
+    backend_id: backendId.value,
+    backend_prefix: storageRoot.value,
+    bucket: bucket.value.trim(),
+    key_prefix: bucketWhole.value ? '' : folderPath(bucketFolder.value),
+    write_pattern: pattern.value.trim(),
+  }
+  if (writeElsewhere.value) {
+    request.write_backend_id = writeBackendId.value
+    request.write_prefix = folderPath(writeFolder.value)
+  }
+  if (schedule.value) request.schedule = schedule.value
+  return request
+}
+
+async function submit() {
+  if (submitDisabled.value) return
+  submitError.value = null
+  saving.value = true
+  const client = { baseUrl: apiBaseUrl.value, token: authToken.value }
+  const epoch = sessionEpoch.value
+  try {
+    let runError: string | undefined
+    if (props.link) {
+      await updateBackendImport(props.groupId, props.link.import_id, schedule.value || null, client)
+    } else {
+      const created = await createBackendImport(props.groupId, body(), client)
+      try {
+        await runBackendImport(props.groupId, created.import_id, client)
+      } catch (err) {
+        // A run the node already started is what was asked for.
+        if (!(err instanceof ApiError && err.status === 409)) runError = `Linked, but the first run did not start: ${errorMessage(err)}`
+      }
+    }
+    if (epoch !== sessionEpoch.value) return
+    emit('saved', runError)
+    emit('update:open', false)
+  } catch (err) {
+    if (epoch !== sessionEpoch.value) return
+    submitError.value = errorMessage(err)
+  } finally {
+    saving.value = false
+  }
+}
+</script>
+
+<template>
+  <Dialog :open="props.open" @update:open="(v: boolean) => emit('update:open', v)">
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle class="flex items-center gap-2">
+          <FolderSync class="h-4 w-4 text-primary" />
+          {{ isEdit ? 'Edit linked folder' : 'Link a folder' }}
+        </DialogTitle>
+        <DialogDescription>
+          Files in your storage show up in the bucket. New uploads to the bucket are saved in your storage.
+        </DialogDescription>
+      </DialogHeader>
+
+      <form class="space-y-3" @submit.prevent="submit">
+        <div class="max-h-[65vh] space-y-3 overflow-y-auto px-1 scrollbar-thin">
+          <div class="grid gap-3 sm:grid-cols-2">
+            <div class="space-y-2">
+              <label class="text-xs font-medium text-foreground">Storage backend</label>
+              <Select
+                :model-value="backendId"
+                :options="backendOptions"
+                :disabled="isEdit"
+                placeholder="Choose a backend"
+                aria-label="Storage backend"
+                @update:model-value="(v: string) => (backendId = v)"
+              />
+              <label class="flex items-center gap-2 text-xs text-foreground">
+                <Switch
+                  :checked="backendWhole"
+                  :disabled="isEdit"
+                  aria-label="Whole storage"
+                  @update:checked="(v: boolean) => (backendWhole = v)"
+                />
+                Whole storage
+              </label>
+              <Input
+                v-if="!backendWhole"
+                v-model="backendFolder"
+                :disabled="isEdit"
+                aria-label="Folder in your storage"
+                class="font-mono text-xs"
+                placeholder="raw/2024/"
+              />
+            </div>
+            <div class="space-y-2">
+              <label :for="`${uid}-bucket`" class="text-xs font-medium text-foreground">Bucket</label>
+              <Select
+                v-if="bucketOptions.length && !isEdit"
+                :model-value="bucket"
+                :options="bucketOptions"
+                placeholder="Choose a bucket"
+                aria-label="Bucket"
+                @update:model-value="(v: string) => (bucket = v)"
+              />
+              <Input
+                v-else
+                :id="`${uid}-bucket`"
+                v-model="bucket"
+                :disabled="isEdit"
+                class="font-mono text-xs"
+                placeholder="sequencing"
+              />
+              <label class="flex items-center gap-2 text-xs text-foreground">
+                <Switch
+                  :checked="bucketWhole"
+                  :disabled="isEdit"
+                  aria-label="Whole bucket"
+                  @update:checked="(v: boolean) => (bucketWhole = v)"
+                />
+                Whole bucket
+              </label>
+              <Input
+                v-if="!bucketWhole"
+                v-model="bucketFolder"
+                :disabled="isEdit"
+                aria-label="Folder in the bucket"
+                class="font-mono text-xs"
+                placeholder="run1/"
+              />
+            </div>
+          </div>
+
+          <fieldset class="space-y-3 rounded-md border border-border p-3">
+            <legend class="px-1 text-xs font-semibold text-foreground">New uploads</legend>
+            <div>
+              <label :for="`${uid}-pattern`" class="text-xs font-medium text-foreground">File name in your storage</label>
+              <div class="mt-1 grid gap-2 sm:grid-cols-2">
+                <Select
+                  :model-value="patternChoice"
+                  :options="PATTERN_OPTIONS"
+                  :disabled="isEdit"
+                  aria-label="File name preset"
+                  @update:model-value="pickPattern"
+                />
+                <Input
+                  :id="`${uid}-pattern`"
+                  v-model="pattern"
+                  :disabled="isEdit"
+                  :invalid="patternError ? 'error' : undefined"
+                  class="font-mono text-xs"
+                />
+              </div>
+              <p v-if="patternError && !isEdit" class="mt-1 text-[11px] text-destructive">{{ patternError }}</p>
+              <p v-else class="mt-1 text-[11px] text-muted-foreground">
+                {dir} is the folder below the linked folder, {name} the file name, {id} a unique version ID.
+              </p>
+            </div>
+            <label class="flex items-center gap-2 text-xs text-foreground">
+              <Switch
+                :checked="writeElsewhere"
+                :disabled="isEdit"
+                aria-label="Save new uploads in a different place"
+                @update:checked="(v: boolean) => (writeElsewhere = v)"
+              />
+              Save new uploads in a different place
+            </label>
+            <div v-if="writeElsewhere" class="grid gap-2 sm:grid-cols-2">
+              <Select
+                :model-value="writeBackendId"
+                :options="backendOptions"
+                :disabled="isEdit"
+                placeholder="Choose a backend"
+                aria-label="Backend for new uploads"
+                @update:model-value="(v: string) => (writeBackendId = v)"
+              />
+              <Input
+                v-model="writeFolder"
+                :disabled="isEdit"
+                aria-label="Folder for new uploads"
+                class="font-mono text-xs"
+                placeholder="uploads/"
+              />
+            </div>
+          </fieldset>
+
+          <div>
+            <label class="text-xs font-medium text-foreground">Look for new files</label>
+            <div class="mt-1 grid gap-2 sm:grid-cols-2">
+              <Select
+                :model-value="scheduleChoice"
+                :options="SCHEDULE_OPTIONS"
+                aria-label="Look for new files"
+                @update:model-value="pickSchedule"
+              />
+              <Input
+                v-if="scheduleChoice === 'custom'"
+                v-model="cron"
+                aria-label="Cron schedule"
+                :invalid="scheduleError ? 'error' : undefined"
+                class="font-mono text-xs"
+                placeholder="0 3 * * *"
+              />
+            </div>
+            <p v-if="scheduleError" class="mt-1 text-[11px] text-destructive">{{ scheduleError }}</p>
+            <p v-else class="mt-1 text-[11px] text-muted-foreground">{{ scheduleWords(schedule) }}</p>
+          </div>
+
+          <div v-if="!isEdit" class="space-y-1 rounded-md border border-border bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground">
+            <p class="font-medium text-foreground">Example</p>
+            <p>
+              In your storage: <span class="break-all font-mono">{{ storageRoot }}run1/a.fastq</span>,
+              in the bucket: <span class="break-all font-mono">{{ bucketRoot }}run1/a.fastq</span>
+            </p>
+            <p>
+              New upload in the bucket: <span class="break-all font-mono">{{ bucketRoot }}run2/b.fastq</span>,
+              in your storage: <span class="break-all font-mono">{{ exampleUpload }}</span>
+            </p>
+          </div>
+
+          <Notice>Aruna never deletes files from your storage.</Notice>
+          <Notice v-if="submitError" tone="error">{{ submitError }}</Notice>
+        </div>
+
+        <DialogFooter>
+          <DialogClose as-child><Button type="button" variant="outline">Cancel</Button></DialogClose>
+          <Button
+            type="submit"
+            class="whitespace-nowrap"
+            :disabled="submitDisabled"
+            :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
+          >
+            {{ saving ? 'Saving…' : isEdit ? 'Save changes' : 'Link and run' }}
+          </Button>
+        </DialogFooter>
+      </form>
+    </DialogContent>
+  </Dialog>
+</template>
