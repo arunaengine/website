@@ -33,6 +33,8 @@ const MEMBER_ROLE: Role = {
 }
 const group = ref({ display_name: 'Genomics lab', group_id: 'g1', realm_id: REALM, roles: [ADMIN_ROLE] })
 
+const listGroupConnectors = vi.fn(async () => ({ connectors: [{}, {}] }))
+const listGroupBackends = vi.fn(async () => ({ backends: [{}, {}, {}] }))
 const joinRequestsEnabled = ref(false)
 const inboxCount = ref<number | null>(null)
 const inboxError = ref<string | null>(null)
@@ -87,6 +89,8 @@ const GroupDetail = compileClientComponent(new URL('./GroupDetail.vue', import.m
       getGroupUsageHistory: vi.fn(async () => ({ points: [] })),
       listGroupMembers: vi.fn(async () => ({ members: [] })),
       listGroupMetadata: vi.fn(async () => ({ documents: [] })),
+      listGroupConnectors,
+      listGroupBackends,
       leaveGroup: vi.fn(async () => undefined),
       saving: ref(false),
       currentUser: ref({ id: 'user-1' }),
@@ -170,6 +174,42 @@ describe('Group detail tabs', () => {
   it('opens the tab a deep link names', async () => {
     const { root } = await mount('/app/groups/g1?tab=roles')
     expect(element(root, (node) => node.props['data-active'] !== undefined).props['data-active']).toBe('roles')
+  })
+})
+
+describe('Group tab counts', () => {
+  function tabText(root: Parameters<typeof nodes>[0], name: string) {
+    return content(element(root, (node) => node.props['data-tab'] === name))
+  }
+
+  beforeEach(() => {
+    listGroupConnectors.mockClear()
+    listGroupBackends.mockClear()
+  })
+
+  it('loads the source and storage counts before a tab is opened', async () => {
+    group.value = { display_name: 'Genomics lab', group_id: 'g1', realm_id: REALM, roles: [ADMIN_ROLE] }
+    const { root, errors } = await mount('/app/groups/g1')
+    expect(errors).toEqual([])
+    expect(listGroupConnectors).toHaveBeenCalledWith('g1')
+    expect(listGroupBackends).toHaveBeenCalledWith('g1')
+    expect(tabText(root, 'sources')).toContain('2')
+    expect(tabText(root, 'storage')).toContain('3')
+  })
+
+  it('skips the storage count for a member who is not an admin', async () => {
+    group.value = { display_name: 'Genomics lab', group_id: 'g1', realm_id: REALM, roles: [MEMBER_ROLE] }
+    const { root } = await mount('/app/groups/g1')
+    expect(listGroupBackends).not.toHaveBeenCalled()
+    expect(tabText(root, 'sources')).toContain('2')
+  })
+
+  it('keeps the count unknown when the node refuses it', async () => {
+    group.value = { display_name: 'Genomics lab', group_id: 'g1', realm_id: REALM, roles: [ADMIN_ROLE] }
+    listGroupBackends.mockRejectedValueOnce(new Api.ApiError(403, 'forbidden'))
+    const { root, errors } = await mount('/app/groups/g1')
+    expect(errors).toEqual([])
+    expect(tabText(root, 'storage').trim()).toBe('Storage')
   })
 })
 

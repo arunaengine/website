@@ -48,7 +48,18 @@ import {
 const props = defineProps<{ groupId: string }>()
 const emit = defineEmits<{ (e: 'left'): void }>()
 
-const { getGroup, getGroupUsage, getGroupUsageHistory, listGroupMembers, listGroupMetadata, leaveGroup, saving, currentUser } = useAruna()
+const {
+  getGroup,
+  getGroupUsage,
+  getGroupUsageHistory,
+  listGroupMembers,
+  listGroupMetadata,
+  listGroupConnectors,
+  listGroupBackends,
+  leaveGroup,
+  saving,
+  currentUser,
+} = useAruna()
 const { joinRequestsEnabled } = useJoinRequests()
 const route = useRoute()
 
@@ -254,6 +265,7 @@ async function reload() {
     docsError.value = errorMessage(metadata.reason)
   }
   loadingDetail.value = false
+  void loadTabCounts()
   // Independent usage-history endpoint, gated; no-op when off.
   void loadHistory()
   // The storage section renders only after getGroup + getGroupUsage resolve, so
@@ -263,6 +275,28 @@ async function reload() {
     storageAnchorPending = false
     await nextTick()
     document.getElementById('storage-use')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+}
+
+// The tab badges load with the group; the sections refresh them once opened.
+// A failed count stays unknown, the section shows its own error.
+function loadTabCounts() {
+  const groupId = props.groupId
+  if (isMember.value && connectorCount.value === null) {
+    listGroupConnectors(groupId)
+      .then((response) => {
+        if (props.groupId === groupId) connectorCount.value = response.connectors.length
+      })
+      .catch(() => undefined)
+  }
+  if (canAdminStorage.value && backendCount.value === null) {
+    listGroupBackends(groupId)
+      .then((response) => {
+        if (props.groupId !== groupId) return
+        backendCount.value = response.backends.length
+        groupBackends.value = response.backends
+      })
+      .catch(() => undefined)
   }
 }
 
