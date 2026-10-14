@@ -5,7 +5,7 @@ import { backendSchema } from './storage'
 export const NAME_PATTERNS = [
   { value: '{dir}{id}_{name}', label: 'Unique ID before the name' },
   { value: '{dir}{id}/{name}', label: 'Unique ID as folder' },
-  { value: '{dir}{name}', label: 'Same name; older versions kept in a hidden folder' },
+  { value: '{dir}{name}', label: 'Same name; if taken, a version tag is added (b.fastq~ID)' },
 ]
 
 export const SCHEDULES = [
