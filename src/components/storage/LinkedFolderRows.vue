@@ -10,6 +10,7 @@ import IconButton from '@/components/ui/IconButton.vue'
 import ListSkeleton from '@/components/ui/ListSkeleton.vue'
 import StatusDot from '@/components/ui/StatusDot.vue'
 import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
+import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import {
   ApiError,
   listBackendImports,
@@ -26,6 +27,7 @@ const props = defineProps<{ bucket: string; groupId: string | null; quiet?: bool
 const emit = defineEmits<{ (e: 'count', count: number): void; (e: 'available', value: boolean): void }>()
 
 const { apiBaseUrl, authToken, sessionEpoch, listGroupBackends } = useAruna()
+const { writesDisabled } = useConnectivity()
 
 const links = ref<BackendImport[]>([])
 const backends = ref<GroupBackendResponse[]>([])
@@ -103,7 +105,7 @@ function storageName(link: BackendImport): string {
 }
 
 async function run(link: BackendImport) {
-  if (!props.groupId || runningId.value) return
+  if (!props.groupId || runningId.value || writesDisabled.value) return
   const epoch = sessionEpoch.value
   runningId.value = link.import_id
   rowError.value = { ...rowError.value, [link.import_id]: '' }
@@ -164,7 +166,12 @@ defineExpose({ open })
               Keeps a folder of your own storage and
               <span class="font-mono">{{ bucket }}/{{ link.key_prefix }}</span> the same.
             </span>
-            <IconButton label="Run now" :disabled="runningId !== null" @click="run(link)">
+            <IconButton
+              label="Run now"
+              :disabled="runningId !== null"
+              :disabled-reason="writesDisabled ? OFFLINE_WRITE_HINT : null"
+              @click="run(link)"
+            >
               <Play class="size-3.5" />
             </IconButton>
             <IconButton label="Change the link" @click="open(link)">

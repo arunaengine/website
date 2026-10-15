@@ -11,6 +11,7 @@ import DialogTitle from '@/components/ui/DialogTitle.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import { s3ErrorMessage, useS3 } from '@/composables/useS3'
+import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { selectionNoun } from '@/lib/deletion/request'
 import {
   baseName,
@@ -35,6 +36,7 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: 'update:open', value: boolean): void; (e: 'done', moved: string[]): void }>()
 
 const s3 = useS3()
+const { writesDisabled } = useConnectivity()
 const text = ref('')
 const busy = ref(false)
 const error = ref<string | null>(null)
@@ -80,7 +82,7 @@ watch(
 )
 
 async function confirm() {
-  if (problem.value || busy.value || !target.value) return
+  if (problem.value || busy.value || !target.value || writesDisabled.value) return
   busy.value = true
   error.value = null
   const moved: string[] = []
@@ -123,7 +125,11 @@ async function confirm() {
       <Notice v-if="error" tone="error">{{ error }}</Notice>
       <DialogFooter>
         <DialogClose as-child><Button variant="outline">Cancel</Button></DialogClose>
-        <Button :disabled="Boolean(problem) || busy" @click="confirm">{{ busy ? 'Working…' : action }}</Button>
+        <Button
+          :disabled="Boolean(problem) || busy || writesDisabled"
+          :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
+          @click="confirm"
+        >{{ busy ? 'Working…' : action }}</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

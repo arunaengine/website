@@ -5,7 +5,7 @@ import * as Api from '@/lib/api'
 import * as LinkedFolders from '@/lib/linkedFolders'
 import * as StateBadge from '@/lib/stateBadge'
 import * as Utils from '@/lib/utils'
-import { compileClientComponent, content, flush, mountApp, moduleDefault } from '@/test/clientRender'
+import { compileClientComponent, content, element, flush, mountApp, moduleDefault } from '@/test/clientRender'
 
 const IconStub = defineComponent((_, { attrs }) => () => h('i', attrs))
 const Slotted = (tag: string) =>
@@ -18,6 +18,7 @@ const TitledStub = (tag: string) =>
   })
 
 const sessionEpoch = ref(0)
+const writesDisabled = ref(false)
 const listBackendImports = vi.fn()
 const listGroupBackends = vi.fn()
 const listStagingJobs = vi.fn()
@@ -28,7 +29,14 @@ const common = {
   '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
   '@/components/ui/EmptyState.vue': moduleDefault(TitledStub('p')),
   '@/components/ui/ErrorPanel.vue': moduleDefault(TitledStub('aside')),
-  '@/components/ui/IconButton.vue': moduleDefault(Slotted('button')),
+  '@/components/ui/IconButton.vue': moduleDefault(
+    defineComponent({
+      inheritAttrs: false,
+      props: { label: String, disabled: Boolean, disabledReason: { type: String, default: null } },
+      setup: (props, { attrs, slots }) => () =>
+        h('button', { ...attrs, 'aria-label': props.label, disabled: props.disabled || Boolean(props.disabledReason) }, slots.default?.()),
+    }),
+  ),
   '@/components/ui/ListSkeleton.vue': moduleDefault(Slotted('div')),
   '@/components/ui/Progress.vue': moduleDefault(Slotted('div')),
   '@/components/ui/StatusDot.vue': moduleDefault(Slotted('i')),
@@ -45,6 +53,7 @@ const linkedRows = compileClientComponent(new URL('./LinkedFolderRows.vue', impo
   },
   '@/lib/api': { ...Api, listBackendImports, runBackendImport: vi.fn() },
   '@/lib/linkedFolders': LinkedFolders,
+  '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled }) },
 })
 
 const stagingRows = compileClientComponent(new URL('./StagingJobRows.vue', import.meta.url), {
@@ -83,6 +92,19 @@ describe('linked folder rows', () => {
     answer([link('new-share/')])
     await flush()
     expect(content(root)).toContain('new-share/')
+  })
+
+  it('blocks a run while offline', async () => {
+    listGroupBackends.mockResolvedValue({ backends: [] })
+    listBackendImports.mockResolvedValue([link('share/')])
+    writesDisabled.value = true
+    try {
+      const { root } = await mountApp(linkedRows, { props: { bucket: 'reef', groupId: 'g-1' } })
+      await flush()
+      expect(element(root, (node) => node.props['aria-label'] === 'Run now').props.disabled).toBe(true)
+    } finally {
+      writesDisabled.value = false
+    }
   })
 })
 
