@@ -83,6 +83,15 @@ export function runActive(run: BackendImportRun | null | undefined): boolean {
   return Boolean(run && ACTIVE_STATES.has(run.state))
 }
 
+/**
+ * The error of a run that failed as a whole, for the red cross; null otherwise. The node
+ * reports no run error, so a failed run that processed nothing but kept an error counts.
+ */
+export function bucketError(run: BackendImportRun | null | undefined): string | null {
+  if (!run || run.state !== 'failed' || run.imported > 0 || run.skipped > 0) return null
+  return run.errors[0]?.error ?? null
+}
+
 /** Buckets that hold or held the default rule; Aruna's own files may be there. */
 export function layoutBuckets(backend: GroupBackendResponse): string[] {
   const former = Object.keys(backend.public_config)

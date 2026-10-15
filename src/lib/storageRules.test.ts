@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bucketTitle, defaultBucket, runActive, linkConflict, runText, splitPath, suggestBucket } from './storageRules'
+import { bucketError, bucketTitle, defaultBucket, runActive, linkConflict, runText, splitPath, suggestBucket } from './storageRules'
 
 const split = { backend_id: 's1', group_id: 'g1', kind: 's3', name: 'lab', public_config: { endpoint: 'https://s3' } }
 const fixed = { ...split, backend_id: 's2', public_config: { endpoint: 'https://s3', bucket: 'data' } }
@@ -27,6 +27,15 @@ describe('storageRules', () => {
     expect(bucketTitle(checked, 'lab-raw')).toBe('Bucket created')
     expect(bucketTitle(split, 'lab-raw')).toBeNull()
     expect(bucketTitle(fixed, 'data')).toBe('Bucket found')
+  })
+
+  it('shows a cross only when a failed run used nothing', () => {
+    const run = { job_id: 'j', started_at: '', imported: 0, skipped: 0, failed: 1, state: 'failed' }
+    const denied = [{ key: 'lab-raw/a.csv', error: 'Access denied' }]
+    expect(bucketError({ ...run, errors: denied })).toBe('Access denied')
+    expect(bucketError({ ...run, imported: 4, errors: denied })).toBeNull()
+    expect(bucketError({ ...run, state: 'succeeded', errors: denied })).toBeNull()
+    expect(bucketError({ ...run, errors: [] })).toBeNull()
   })
 
   it('counts the root and refuses Aruna folders and former default buckets', () => {

@@ -29,6 +29,7 @@ import {
 } from '@/lib/api'
 import {
   arunaPlace,
+  bucketError,
   bucketTitle,
   defaultBucket,
   runActive,
@@ -421,7 +422,12 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
                 {{ storagePlace(backend, link.backend_prefix) }}
               </span>
               <span
-                v-if="bucketTitle(backend, splitPath(backend, link.backend_prefix).bucket)"
+                v-if="bucketError(link.last_run)"
+                class="font-bold text-destructive"
+                :title="bucketError(link.last_run) ?? undefined"
+              >✗</span>
+              <span
+                v-else-if="bucketTitle(backend, splitPath(backend, link.backend_prefix).bucket)"
                 class="font-bold text-emerald-700 dark:text-emerald-400"
                 :title="bucketTitle(backend, splitPath(backend, link.backend_prefix).bucket) ?? undefined"
               >✓</span>
