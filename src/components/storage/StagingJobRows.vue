@@ -19,7 +19,7 @@ import { ArrowLeft } from '@lucide/vue'
 const props = defineProps<{ bucket: string; quiet?: boolean }>()
 const emit = defineEmits<{ (e: 'count', count: number): void }>()
 
-const { listStagingJobs, getStagingJob, listGroupConnectors } = useAruna()
+const { sessionEpoch, listStagingJobs, getStagingJob, listGroupConnectors } = useAruna()
 
 const jobs = ref<StagingJob[]>([])
 const truncated = ref(false)
@@ -45,9 +45,10 @@ function schedulePoll() {
 }
 
 async function loadNames(groupIds: string[]) {
+  const id = requestId
   for (const groupId of new Set(groupIds)) {
     const response = await listGroupConnectors(groupId).catch(() => null)
-    if (disposed || !response) continue
+    if (disposed || id !== requestId || !response) continue
     const names = { ...connectorNames.value }
     for (const connector of response.connectors) names[connector.connector_id] = connector.name
     connectorNames.value = names
@@ -94,7 +95,17 @@ async function refreshActive() {
   schedulePoll()
 }
 
-watch(() => props.bucket, () => void load(), { immediate: true })
+// Another account or API base lists other jobs, so the rows start over.
+watch(
+  () => [props.bucket, sessionEpoch.value],
+  () => {
+    jobs.value = []
+    connectorNames.value = {}
+    truncated.value = false
+    void load()
+  },
+  { immediate: true },
+)
 onBeforeUnmount(() => {
   disposed = true
   ++requestId

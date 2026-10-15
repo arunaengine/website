@@ -25,7 +25,7 @@ import { ArrowLeftRight, Play, SlidersHorizontal } from '@lucide/vue'
 const props = defineProps<{ bucket: string; groupId: string | null; quiet?: boolean }>()
 const emit = defineEmits<{ (e: 'count', count: number): void; (e: 'available', value: boolean): void }>()
 
-const { apiBaseUrl, authToken, listGroupBackends } = useAruna()
+const { apiBaseUrl, authToken, sessionEpoch, listGroupBackends } = useAruna()
 
 const links = ref<BackendImport[]>([])
 const backends = ref<GroupBackendResponse[]>([])
@@ -46,6 +46,8 @@ async function load() {
   const id = ++requestId
   const groupId = props.groupId
   links.value = []
+  backends.value = []
+  rowError.value = {}
   error.value = null
   refused.value = !groupId
   if (!groupId) {
@@ -85,7 +87,16 @@ const state = computed(() => {
   return rows.value.length ? 'ready' : 'empty'
 })
 
-watch(() => [props.bucket, props.groupId], () => void load(), { immediate: true })
+// Another account or API base answers for other storage, so the rows start over.
+watch(
+  () => [props.bucket, props.groupId, sessionEpoch.value],
+  () => {
+    dialogOpen.value = false
+    editing.value = null
+    void load()
+  },
+  { immediate: true },
+)
 
 function storageName(link: BackendImport): string {
   return backends.value.find((backend) => backend.backend_id === link.backend_id)?.name ?? 'Storage'
@@ -93,12 +104,14 @@ function storageName(link: BackendImport): string {
 
 async function run(link: BackendImport) {
   if (!props.groupId || runningId.value) return
+  const epoch = sessionEpoch.value
   runningId.value = link.import_id
   rowError.value = { ...rowError.value, [link.import_id]: '' }
   try {
     await runBackendImport(props.groupId, link.import_id, client())
     await load()
   } catch (err) {
+    if (epoch !== sessionEpoch.value) return
     const message = err instanceof ApiError && err.status === 409 ? 'A run is still going.' : errorMessage(err)
     rowError.value = { ...rowError.value, [link.import_id]: message }
   } finally {
