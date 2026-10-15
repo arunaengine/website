@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // The bar on top of the object list: the name filter and the filter menu on
 // the left, the actions for the ticked rows on the right. Its height is fixed,
-// so ticking a row never moves the list.
+// so ticking a row never moves the list; narrow screens scroll it sideways.
 import Button from '@/components/ui/Button.vue'
 import DropdownMenu from '@/components/ui/DropdownMenu.vue'
 import DropdownMenuContent from '@/components/ui/DropdownMenuContent.vue'
@@ -84,8 +84,8 @@ function clearText() {
 </script>
 
 <template>
-  <div class="flex h-12 items-center gap-2 border-b border-border bg-muted/50 px-4 text-xs">
-    <div class="relative w-52 shrink-0">
+  <div class="flex h-12 items-center gap-2 overflow-x-auto border-b border-border bg-muted/50 px-4 text-xs md:overflow-visible">
+    <div class="relative w-52 min-w-32 shrink">
       <Search class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
       <Input
         v-model="text"

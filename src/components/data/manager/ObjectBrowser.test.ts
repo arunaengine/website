@@ -327,6 +327,16 @@ describe('object browser selection', () => {
     expect(action(root, 'Delete').props.disabled).toBe(true)
   })
 
+  it('lets the list bar fit a narrow screen', async () => {
+    const root = await render()
+    const bar = element(root, (node) => String(node.props.class ?? '').includes('h-12'))
+    const filter = element(root, (node) => String(node.props.class ?? '').includes('w-52'))
+
+    expect(String(bar.props.class)).toContain('overflow-x-auto')
+    expect(String(filter.props.class)).toContain('shrink')
+    expect(String(filter.props.class)).not.toContain('shrink-0')
+  })
+
   it('marks the filter button and offers the reset once a filter is set', async () => {
     const resetFilters = vi.fn()
     const plain = await render({ resetFilters })
