@@ -57,8 +57,27 @@ const createWatch = vi.fn(async (_pathPrefix: string, _events: string[]) => ({
   events: [] as string[],
   created_at_ms: 0,
 }))
-const deleteWatch = vi.fn(async () => undefined)
+const deleteWatch = vi.fn(async (_id: string) => undefined)
 const watchList = ref<Api.ApiWatch[]>([])
+// Stands in for the session storage of useWatches: it outlives a remount.
+const pending = new Map<string, string[]>()
+
+async function removePending(pathPrefix: string, add: string[] = []) {
+  const ids = [...new Set([...(pending.get(pathPrefix) ?? []), ...add])]
+  const left: string[] = []
+  let failure: unknown = null
+  for (const id of ids) {
+    try {
+      await deleteWatch(id)
+      watchList.value = watchList.value.filter((watch) => watch.id !== id)
+    } catch (err) {
+      left.push(id)
+      failure ??= err
+    }
+  }
+  pending.set(pathPrefix, left)
+  if (failure) throw failure
+}
 
 const watches = {
   available: ref(true),
@@ -68,6 +87,7 @@ const watches = {
   createWatch,
   deleteWatch,
   findWatch: (pathPrefix: string) => watchList.value.find((w) => w.path_prefix === pathPrefix),
+  removePending,
 }
 
 const WatchButton = compileClientComponent(new URL('./WatchButton.vue', import.meta.url), {
@@ -130,11 +150,12 @@ function submit(root: HostNode, label: string): HostNode {
 }
 
 beforeEach(() => {
+  pending.clear()
   outgoing.value = []
   watchList.value = []
   watches.available.value = true
   createWatch.mockClear()
-  deleteWatch.mockClear()
+  deleteWatch.mockReset()
   createWatch.mockResolvedValue({ id: 'w1', path_prefix: '', events: [], created_at_ms: 0 })
   listSyncRelationships.mockClear()
 })
@@ -284,26 +305,54 @@ describe('watch bell on a bucket folder', () => {
     expect(createWatch.mock.invocationCallOrder[0]).toBeLessThan(deleteWatch.mock.invocationCallOrder[0])
   })
 
-  it('deletes the old watch on the next Save after its delete failed', async () => {
+  it('finishes the old watch before a second edit creates another one', async () => {
     outgoing.value = [{ id: 'rel-1' }]
-    watchList.value = [{ id: 'old', path_prefix: 's3/g1/n1/reef/raw/', events: ['data_uploaded'], created_at_ms: 0 }]
-    createWatch.mockImplementationOnce(async (pathPrefix: string, events: string[]) => {
-      const created = { id: 'new', path_prefix: pathPrefix, events, created_at_ms: 1 }
+    watchList.value = [{ id: 'a', path_prefix: 's3/g1/n1/reef/raw/', events: ['data_uploaded'], created_at_ms: 0 }]
+    let made = 0
+    createWatch.mockImplementation(async (pathPrefix: string, events: string[]) => {
+      const created = { id: made++ ? 'c' : 'b', path_prefix: pathPrefix, events, created_at_ms: made }
       watchList.value = [created, ...watchList.value]
       return created
     })
     deleteWatch.mockRejectedValueOnce(new Error('inbox holder unavailable'))
+    const toggle = async (root: HostNode, kind: string, checked: boolean) => {
+      const box = Object.assign(input(root, 'value', kind), { checked, _value: kind })
+      for (const listener of box.listeners.get('change') ?? []) listener({ target: box })
+    }
+
+    // A to B: B is created, deleting A fails and A stays pending.
+    const first = await mountApp(WatchButton, { props: bucketProps({ bell: true }) })
+    await toggle(first.root, 'sync_failed', true)
+    await click(submit(first.root, 'Save'))
+    expect(content(first.root)).toContain('inbox holder unavailable')
+    first.app.unmount()
+
+    // Mounted again, B to C: A goes first, then C replaces B.
+    const second = await mountApp(WatchButton, { props: bucketProps({ bell: true }) })
+    await toggle(second.root, 'sync_completed', true)
+    await click(submit(second.root, 'Save'))
+
+    expect(deleteWatch.mock.calls.map(([id]) => id)).toEqual(['a', 'a', 'b'])
+    expect(createWatch).toHaveBeenCalledTimes(2)
+    expect(watchList.value.map((watch) => watch.id)).toEqual(['c'])
+  })
+
+  it('stops the current watch and every pending old one, keeping a failed one', async () => {
+    watchList.value = [
+      { id: 'b', path_prefix: 's3/g1/n1/reef/raw/', events: ['data_uploaded'], created_at_ms: 1 },
+      { id: 'a', path_prefix: 's3/g1/n1/reef/raw/', events: ['data_uploaded'], created_at_ms: 0 },
+    ]
+    pending.set('s3/g1/n1/reef/raw/', ['a'])
+    deleteWatch.mockImplementation(async (id: string) => {
+      if (id === 'a') throw new Error('inbox holder unavailable')
+    })
     const { root } = await mountApp(WatchButton, { props: bucketProps({ bell: true }) })
 
-    const sync = Object.assign(input(root, 'value', 'sync_failed'), { checked: true, _value: 'sync_failed' })
-    for (const listener of sync.listeners.get('change') ?? []) listener({ target: sync })
-    await click(submit(root, 'Save'))
-    expect(content(root)).toContain('inbox holder unavailable')
+    await click(submit(root, 'Stop watching'))
 
-    await click(submit(root, 'Save'))
-    expect(createWatch).toHaveBeenCalledTimes(1)
-    expect(deleteWatch).toHaveBeenCalledTimes(2)
-    expect(deleteWatch).toHaveBeenLastCalledWith('old')
+    expect(deleteWatch.mock.calls.map(([id]) => id)).toEqual(['b', 'a'])
+    expect(pending.get('s3/g1/n1/reef/raw/')).toEqual(['a'])
+    expect(content(root)).toContain('inbox holder unavailable')
   })
 
   it('stops watching from the popover', async () => {

@@ -86,6 +86,50 @@ async function deleteWatch(id: string): Promise<void> {
   }
 }
 
+// Old watches an edit replaced but could not delete yet, per account, API base
+// and prefix. They live in sessionStorage, so a remount still finishes them.
+function pendingKey(pathPrefix: string): string {
+  return `aruna.watch.pending:${apiBaseUrl.value}|${currentUser.value?.id ?? ''}|${pathPrefix}`
+}
+
+function pendingRemovals(pathPrefix: string): string[] {
+  try {
+    const stored = JSON.parse(window.sessionStorage.getItem(pendingKey(pathPrefix)) ?? '[]') as unknown
+    return Array.isArray(stored) ? stored.filter((id): id is string => typeof id === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function setPendingRemovals(pathPrefix: string, ids: string[]) {
+  try {
+    if (ids.length) window.sessionStorage.setItem(pendingKey(pathPrefix), JSON.stringify(ids))
+    else window.sessionStorage.removeItem(pendingKey(pathPrefix))
+  } catch {
+    // Without storage the ids stay unknown after a reload; the watches list still shows them.
+  }
+}
+
+/** Deletes every pending old watch of a prefix; failed ones stay pending, and the first error is thrown. */
+async function removePending(pathPrefix: string, add: string[] = []): Promise<void> {
+  const ids = [...new Set([...pendingRemovals(pathPrefix), ...add])]
+  setPendingRemovals(pathPrefix, ids)
+  const left: string[] = []
+  let failure: unknown = null
+  for (const id of ids) {
+    try {
+      await deleteWatch(id)
+    } catch (err) {
+      // An already deleted watch is done.
+      if (err instanceof ApiError && err.status === 404) continue
+      left.push(id)
+      failure ??= err
+    }
+  }
+  setPendingRemovals(pathPrefix, left)
+  if (failure) throw failure
+}
+
 // A watch is identified by its prefix; the event set is what the dialog edits.
 function findWatch(pathPrefix: string): ApiWatch | undefined {
   return watches.value.find((w) => w.path_prefix === pathPrefix)
@@ -120,5 +164,7 @@ export function useWatches() {
     createWatch,
     deleteWatch,
     findWatch,
+    pendingRemovals,
+    removePending,
   }
 }

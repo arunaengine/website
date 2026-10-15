@@ -45,8 +45,16 @@ const props = defineProps<{
 
 const NO_SYNC_REASON = 'This folder is not the source of a sync'
 
-const { available, creating, deletingIds, ensureLoaded, createWatch, deleteWatch, findWatch } =
-  useWatches()
+const {
+  available,
+  creating,
+  deletingIds,
+  ensureLoaded,
+  createWatch,
+  deleteWatch,
+  findWatch,
+  removePending,
+} = useWatches()
 const { myGroups, discoverableGroups, listSyncRelationships } = useAruna()
 const { writesDisabled } = useConnectivity()
 
@@ -144,21 +152,16 @@ const unchanged = computed(() => {
 })
 
 // The node has no edit call: the new watch is created before the old one goes.
-// An old watch whose delete failed stays here, and the next Save deletes it.
-const staleWatchId = ref<string | null>(null)
-
+// Old watches still waiting for their delete go first, before another replacement.
 async function onSave() {
   const current = existing.value
   if (!current || !selected.value.length) return
   dialogError.value = null
   try {
+    await removePending(props.pathPrefix)
     if (!unchanged.value) {
       await createWatch(props.pathPrefix, selected.value)
-      staleWatchId.value = current.id
-    }
-    if (staleWatchId.value) {
-      await deleteWatch(staleWatchId.value)
-      staleWatchId.value = null
+      await removePending(props.pathPrefix, [current.id])
     }
     open.value = false
   } catch (err) {
@@ -180,16 +183,16 @@ async function onCreate() {
   }
 }
 
+// Stopping removes the current watch and every old one still pending; failures stay.
 async function onDelete() {
   const id = existing.value?.id
   if (!id) return
   dialogError.value = null
-  try {
-    await deleteWatch(id)
-    open.value = false
-  } catch (err) {
-    dialogError.value = errorMessage(err)
-  }
+  const failures: unknown[] = []
+  await deleteWatch(id).catch((err) => failures.push(err))
+  await removePending(props.pathPrefix).catch((err) => failures.push(err))
+  if (failures.length) dialogError.value = errorMessage(failures[0])
+  else open.value = false
 }
 </script>
 

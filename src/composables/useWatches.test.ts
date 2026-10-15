@@ -108,3 +108,41 @@ describe('watch feature availability', () => {
     expect(watches.findWatch('s3/g1/n1/other/')).toBeUndefined()
   })
 })
+
+describe('old watches an edit could not delete', () => {
+  function sessionStore() {
+    const values = new Map<string, string>()
+    return {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => void values.set(key, value),
+      removeItem: (key: string) => void values.delete(key),
+    }
+  }
+
+  it('keeps a failed one across a remount and deletes it on the next try', async () => {
+    const storage = sessionStore()
+    stubFetch([{ status: 503 }, { status: 204 }])
+    vi.stubGlobal('window', { location: { origin: 'https://portal.test' }, sessionStorage: storage })
+    const first = await freshWatches()
+
+    await expect(first.removePending('s3/g1/n1/reef/', ['old'])).rejects.toMatchObject({ status: 503 })
+    expect(first.pendingRemovals('s3/g1/n1/reef/')).toEqual(['old'])
+
+    // A fresh module stands for the view mounted again in the same browser session.
+    const again = await freshWatches()
+    expect(again.pendingRemovals('s3/g1/n1/reef/')).toEqual(['old'])
+    await again.removePending('s3/g1/n1/reef/')
+    expect(again.pendingRemovals('s3/g1/n1/reef/')).toEqual([])
+  })
+
+  it('counts an already deleted watch as done', async () => {
+    const storage = sessionStore()
+    stubFetch([{ status: 404 }])
+    vi.stubGlobal('window', { location: { origin: 'https://portal.test' }, sessionStorage: storage })
+    const watches = await freshWatches()
+
+    await watches.removePending('s3/g1/n1/reef/', ['gone'])
+
+    expect(watches.pendingRemovals('s3/g1/n1/reef/')).toEqual([])
+  })
+})
