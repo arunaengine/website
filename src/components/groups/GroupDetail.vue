@@ -7,9 +7,7 @@ import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ConnectorsSection from '@/components/groups/ConnectorsSection.vue'
 import RepositoriesSection from '@/components/groups/RepositoriesSection.vue'
-import StorageBackendsSection from '@/components/groups/StorageBackendsSection.vue'
-import GroupRoutingSection from '@/components/groups/GroupRoutingSection.vue'
-import LinkedFoldersSection from '@/components/groups/LinkedFoldersSection.vue'
+import StorageSection from '@/components/groups/StorageSection.vue'
 import GroupLocationSection from '@/components/groups/GroupLocationSection.vue'
 import PoliciesSection from '@/components/policies/PoliciesSection.vue'
 import EffectivePolicies from '@/components/policies/EffectivePolicies.vue'
@@ -27,7 +25,7 @@ import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { Cable, ChartArea, Database, FileJson2, HardDrive, Inbox, LogOut, Pencil, Route, ShieldAlert, ShieldCheck, Trash2, Users } from '@lucide/vue'
+import { Cable, ChartArea, Database, FileJson2, HardDrive, Inbox, LogOut, Pencil, ShieldAlert, ShieldCheck, Trash2, Users } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useJoinRequests } from '@/composables/useJoinRequests'
 import { hasGroupWrite } from '@/lib/groupAdmin'
@@ -665,39 +663,14 @@ async function leave() {
         </TabsContent>
 
         <TabsContent v-if="canAdminStorage" value="storage" class="mt-0">
-          <div class="border-b border-border">
-            <div class="flex items-center gap-2 px-5 pb-1 pt-4">
-              <Database class="h-3.5 w-3.5 text-primary" />
-              <h2 class="font-display text-sm font-semibold text-aruna-navy">Storage backends</h2>
-            </div>
-            <StorageBackendsSection
-              :group-id="group.group_id"
-              :can-admin="canAdminStorage"
-              @count="backendCount = $event"
-              @backends="groupBackends = $event"
-            />
-          </div>
-          <LinkedFoldersSection
+          <StorageSection
+            class="border-b border-border"
             :group-id="group.group_id"
-            :backends="groupBackends"
+            :group-name="group.display_name"
             :can-admin="canAdminStorage"
+            @count="backendCount = $event"
+            @backends="groupBackends = $event"
           />
-          <div>
-            <div class="flex items-center gap-2 px-5 pb-1 pt-4">
-              <Route class="h-3.5 w-3.5 text-primary" />
-              <h2 class="font-display text-sm font-semibold text-aruna-navy">Default storage backend</h2>
-            </div>
-            <div class="px-5 py-3">
-              <GroupRoutingSection
-                :group-id="group.group_id"
-                :backends="groupBackends"
-                :can-admin="canAdminStorage"
-              />
-              <p class="mt-2 text-[11px] text-muted-foreground">
-                Rules for a single bucket live with that bucket: open it in Data and choose Storage.
-              </p>
-            </div>
-          </div>
           <GroupLocationSection :group="group" can-admin class="border-t border-border" @changed="group = $event" />
         </TabsContent>
       </Tabs>

@@ -1,0 +1,513 @@
+<script setup lang="ts">
+// The group's storage in one list: Aruna storage, then each storage the group added with
+// its rules. The default rule sends all buckets to one bucket; linked rules work both ways.
+import Button from '@/components/ui/Button.vue'
+import Badge from '@/components/ui/Badge.vue'
+import Dialog from '@/components/ui/Dialog.vue'
+import DialogContent from '@/components/ui/DialogContent.vue'
+import DialogHeader from '@/components/ui/DialogHeader.vue'
+import DialogTitle from '@/components/ui/DialogTitle.vue'
+import DialogDescription from '@/components/ui/DialogDescription.vue'
+import DialogFooter from '@/components/ui/DialogFooter.vue'
+import DialogClose from '@/components/ui/DialogClose.vue'
+import ErrorPanel from '@/components/ui/ErrorPanel.vue'
+import Skeleton from '@/components/ui/Skeleton.vue'
+import StorageBackendDialog from '@/components/groups/StorageBackendDialog.vue'
+import LinkedFolderDialog from '@/components/groups/LinkedFolderDialog.vue'
+import DefaultRuleDialog from '@/components/groups/DefaultRuleDialog.vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { Plus } from '@lucide/vue'
+import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
+import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
+import {
+  ApiError,
+  listBackendImports,
+  runBackendImport,
+  type BackendImport,
+  type GroupBackendResponse,
+  type RoutingTarget,
+} from '@/lib/api'
+import {
+  arunaPlace,
+  bucketTitle,
+  defaultBucket,
+  runActive,
+  runProblem,
+  runText,
+  splitPath,
+  storageLine,
+  storagePlace,
+} from '@/lib/storageRules'
+import { errorMessage } from '@/lib/utils'
+
+const props = defineProps<{ groupId: string; groupName: string; canAdmin: boolean }>()
+const emit = defineEmits<{
+  (e: 'count', count: number): void
+  (e: 'backends', backends: GroupBackendResponse[]): void
+}>()
+
+const {
+  apiBaseUrl,
+  authToken,
+  sessionEpoch,
+  listGroupBackends,
+  getGroupRouting,
+  putGroupRouting,
+  disableGroupBackend,
+  enableGroupBackend,
+  saving,
+} = useAruna()
+const { writesDisabled } = useConnectivity()
+
+const backends = ref<GroupBackendResponse[] | null>(null)
+const links = ref<BackendImport[]>([])
+const target = ref<RoutingTarget | null>(null)
+const loading = ref(false)
+const loadError = ref<string | null>(null)
+const hidden = ref(false)
+const actionError = ref<string | null>(null)
+const busyId = ref<string | null>(null)
+const expandedId = ref<string | null>(null)
+
+const storageDialog = ref(false)
+const editingStorage = ref<GroupBackendResponse | null>(null)
+const linkDialog = ref(false)
+const editingLink = ref<BackendImport | null>(null)
+const linkStorage = ref<string | null>(null)
+const defaultDialog = ref(false)
+const defaultStorage = ref<GroupBackendResponse | null>(null)
+const arunaConfirm = ref(false)
+const removingId = ref<string | null>(null)
+
+const defaultId = computed(() => target.value?.backend_id ?? null)
+const defaultName = computed(
+  () => backends.value?.find((backend) => backend.backend_id === defaultId.value)?.name ?? '',
+)
+
+function client() {
+  return { baseUrl: apiBaseUrl.value, token: authToken.value }
+}
+
+let pollTimer: ReturnType<typeof setTimeout> | undefined
+let disposed = false
+function clearPoll() {
+  if (pollTimer !== undefined) clearTimeout(pollTimer)
+  pollTimer = undefined
+}
+
+// Only the latest load for the current group and session writes state.
+let loadSeq = 0
+async function load() {
+  const seq = ++loadSeq
+  const epoch = sessionEpoch.value
+  const current = () => seq === loadSeq && epoch === sessionEpoch.value
+  loading.value = true
+  loadError.value = null
+  try {
+    const [list, routing, imports] = await Promise.all([
+      listGroupBackends(props.groupId),
+      getGroupRouting(props.groupId),
+      // A node without linked rules still shows its storages.
+      listBackendImports(props.groupId, client()).catch((err) => {
+        if (isUnsupportedEndpoint(err)) return []
+        throw err
+      }),
+    ])
+    if (!current()) return
+    backends.value = list.backends
+    target.value = routing.default_target ?? null
+    links.value = imports
+    emit('count', list.backends.length)
+    emit('backends', list.backends)
+    clearPoll()
+    if (!disposed && imports.some((link) => runActive(link.last_run))) {
+      pollTimer = setTimeout(() => void load(), 3_000)
+    }
+  } catch (err) {
+    if (!current()) return
+    if (err instanceof ApiError && (err.status === 403 || err.status === 401)) hidden.value = true
+    else loadError.value = errorMessage(err)
+  } finally {
+    if (current()) loading.value = false
+  }
+}
+
+watch(
+  [() => props.groupId, sessionEpoch],
+  () => {
+    backends.value = null
+    links.value = []
+    target.value = null
+    hidden.value = false
+    actionError.value = null
+    expandedId.value = null
+    clearPoll()
+    void load()
+  },
+  { immediate: true },
+)
+onBeforeUnmount(() => {
+  disposed = true
+  clearPoll()
+})
+
+function linksOf(backend: GroupBackendResponse): BackendImport[] {
+  return links.value.filter((link) => link.backend_id === backend.backend_id)
+}
+
+function openStorage(backend: GroupBackendResponse | null) {
+  editingStorage.value = backend
+  storageDialog.value = true
+}
+
+function openLink(backend: GroupBackendResponse, link: BackendImport | null) {
+  linkStorage.value = backend.backend_id
+  editingLink.value = link
+  linkDialog.value = true
+}
+
+function openDefault(backend: GroupBackendResponse) {
+  defaultStorage.value = backend
+  defaultDialog.value = true
+}
+
+async function useArunaStorage() {
+  actionError.value = null
+  try {
+    await putGroupRouting(props.groupId, null)
+    arunaConfirm.value = false
+    await load()
+  } catch (err) {
+    actionError.value = errorMessage(err)
+  }
+}
+
+async function run(link: BackendImport) {
+  if (busyId.value) return
+  actionError.value = null
+  busyId.value = link.import_id
+  try {
+    await runBackendImport(props.groupId, link.import_id, client())
+  } catch (err) {
+    const running = err instanceof ApiError && err.status === 409
+    if (!running) actionError.value = errorMessage(err)
+  } finally {
+    busyId.value = null
+    await load()
+  }
+}
+
+async function remove(backend: GroupBackendResponse) {
+  actionError.value = null
+  try {
+    await disableGroupBackend(props.groupId, backend.backend_id)
+    removingId.value = null
+    await load()
+  } catch (err) {
+    actionError.value = errorMessage(err)
+  }
+}
+
+async function enable(backend: GroupBackendResponse) {
+  actionError.value = null
+  try {
+    await enableGroupBackend(props.groupId, backend.backend_id)
+    await load()
+  } catch (err) {
+    actionError.value = errorMessage(err)
+  }
+}
+
+function onLinkSaved(runError?: string) {
+  actionError.value = runError ?? null
+  void load()
+}
+
+const offline = computed(() => (writesDisabled.value ? OFFLINE_WRITE_HINT : undefined))
+// Fixed columns: kind, in Aruna, arrow, in storage, icon, last run, actions.
+const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.25rem_minmax(0,1fr)_8.5rem] items-center gap-2'
+</script>
+
+<template>
+  <div class="px-5 py-4">
+    <div class="flex items-center gap-2">
+      <h2 class="font-display text-sm font-semibold text-aruna-navy">Storage</h2>
+      <span class="flex-1" />
+      <Button
+        v-if="canAdmin && !hidden"
+        variant="outline"
+        size="sm"
+        :disabled="writesDisabled"
+        :title="offline"
+        @click="openStorage(null)"
+      >
+        <Plus class="h-3.5 w-3.5" /> Add your storage
+      </Button>
+    </div>
+    <p class="mt-1 text-xs text-muted-foreground">
+      Files are kept in Aruna's own storage or in storage you add, like your own S3. New uploads follow
+      the default rule unless a linked rule covers them.
+    </p>
+
+    <div v-if="hidden" class="mt-3 text-xs text-muted-foreground">Storage is only visible to group admins.</div>
+    <Skeleton v-else-if="loading && !backends" class="mt-3 h-24" />
+    <ErrorPanel v-else-if="loadError" class="mt-3" :message="loadError" @retry="load" />
+    <template v-else-if="backends">
+      <section class="mt-3 rounded-lg border border-border" data-testid="aruna-storage">
+        <div class="flex items-center gap-2 px-3 py-2.5">
+          <div class="min-w-0">
+            <span class="text-sm font-semibold text-foreground">Aruna storage</span>
+            <Badge size="sm" variant="secondary" class="ml-1.5 uppercase">built in</Badge>
+            <p class="mt-0.5 text-xs text-muted-foreground">
+              Managed by Aruna on this node. No setup needed. Gets new uploads when your storage has no default rule.
+            </p>
+          </div>
+          <span class="flex-1" />
+          <Button
+            v-if="canAdmin && target"
+            variant="outline"
+            size="sm"
+            :disabled="writesDisabled"
+            :title="offline"
+            @click="arunaConfirm = true"
+          >
+            Use as default
+          </Button>
+          <Badge v-else-if="!target" size="sm" variant="default" class="uppercase">default</Badge>
+        </div>
+      </section>
+
+      <section
+        v-for="backend in backends"
+        :key="backend.backend_id"
+        class="mt-3 rounded-lg border border-border"
+        :data-testid="`storage-${backend.backend_id}`"
+      >
+        <div class="flex items-center gap-2 px-3 py-2.5">
+          <div class="min-w-0">
+            <span class="text-sm font-semibold text-foreground">{{ backend.name }}</span>
+            <Badge size="sm" variant="secondary" class="ml-1.5 uppercase">your storage</Badge>
+            <Badge v-if="backend.disabled" size="sm" variant="warn" class="ml-1 uppercase">removed</Badge>
+            <p class="mt-0.5 truncate text-xs text-muted-foreground">{{ storageLine(backend) }}</p>
+          </div>
+          <span class="flex-1" />
+          <template v-if="canAdmin">
+            <template v-if="removingId === backend.backend_id">
+              <span class="text-xs text-foreground">Remove? New uploads stop going here. Files stay readable.</span>
+              <Button variant="destructive" size="sm" :disabled="saving" @click="remove(backend)">Remove</Button>
+              <Button variant="ghost" size="sm" @click="removingId = null">Cancel</Button>
+            </template>
+            <template v-else>
+              <Button
+                v-if="!backend.disabled && defaultId !== backend.backend_id"
+                variant="ghost"
+                size="sm"
+                class="text-aruna-navy dark:text-foreground"
+                :disabled="writesDisabled"
+                :title="offline"
+                @click="openDefault(backend)"
+              >
+                Use as default
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                class="text-aruna-navy dark:text-foreground"
+                :disabled="writesDisabled"
+                :title="offline"
+                @click="openStorage(backend)"
+              >
+                Edit
+              </Button>
+              <Button
+                v-if="backend.disabled"
+                variant="ghost"
+                size="sm"
+                class="text-aruna-navy dark:text-foreground"
+                :disabled="writesDisabled"
+                :title="offline"
+                @click="enable(backend)"
+              >
+                Enable
+              </Button>
+              <Button
+                v-else
+                variant="ghost"
+                size="sm"
+                class="text-aruna-navy dark:text-foreground"
+                :disabled="writesDisabled"
+                :title="offline"
+                @click="removingId = backend.backend_id"
+              >
+                Remove
+              </Button>
+            </template>
+          </template>
+        </div>
+
+        <div class="rounded-b-lg border-t border-border bg-muted/30 px-3 pb-2.5 pt-1.5 text-xs">
+          <div
+            v-if="defaultId === backend.backend_id || linksOf(backend).length"
+            :class="[GRID, 'border-b border-border py-1 text-[11px] uppercase tracking-wide text-muted-foreground']"
+          >
+            <span />
+            <span class="truncate">In Aruna</span>
+            <span />
+            <span class="truncate">In {{ backend.name }}</span>
+            <span />
+            <span class="truncate">Last run</span>
+            <span />
+          </div>
+
+          <div
+            v-if="defaultId === backend.backend_id"
+            :class="[GRID, 'border-b border-dashed border-border py-1.5']"
+            data-testid="default-row"
+          >
+            <Badge size="sm" class="justify-self-start bg-aruna-navy uppercase text-white ring-0">default</Badge>
+            <span class="truncate">All buckets</span>
+            <span class="text-muted-foreground">→</span>
+            <span class="truncate font-mono">{{ defaultBucket(backend) }}</span>
+            <span class="font-bold text-emerald-700 dark:text-emerald-400" :title="bucketTitle(backend, defaultBucket(backend) ?? '')">✓</span>
+            <span />
+            <span class="flex justify-end">
+              <Button
+                v-if="canAdmin"
+                variant="ghost"
+                size="sm"
+                class="h-6 px-2 text-aruna-navy dark:text-foreground"
+                :disabled="writesDisabled"
+                :title="offline"
+                @click="openDefault(backend)"
+              >
+                Edit
+              </Button>
+            </span>
+          </div>
+
+          <template v-for="link in linksOf(backend)" :key="link.import_id">
+            <div :class="[GRID, 'border-b border-dashed border-border py-1.5']" data-testid="linked-row">
+              <Badge size="sm" variant="secondary" class="justify-self-start uppercase">linked</Badge>
+              <span class="truncate font-mono" :title="arunaPlace(link)">{{ arunaPlace(link) }}</span>
+              <span class="text-muted-foreground">⇆</span>
+              <span class="truncate font-mono" :title="storagePlace(backend, link.backend_prefix)">
+                {{ storagePlace(backend, link.backend_prefix) }}
+              </span>
+              <span
+                v-if="runProblem(link.last_run)"
+                class="font-bold text-destructive"
+                :title="runProblem(link.last_run) ?? undefined"
+              >✗</span>
+              <span
+                v-else
+                class="font-bold text-emerald-700 dark:text-emerald-400"
+                :title="bucketTitle(backend, splitPath(backend, link.backend_prefix).bucket)"
+              >✓</span>
+              <span
+                class="truncate"
+                :class="{
+                  'text-muted-foreground': runText(link.last_run).tone === 'muted',
+                  'text-destructive': runText(link.last_run).tone === 'failed',
+                  'text-primary': runText(link.last_run).tone === 'active',
+                }"
+              >
+                <button
+                  v-if="runText(link.last_run).failures"
+                  type="button"
+                  class="underline"
+                  @click="expandedId = expandedId === link.import_id ? null : link.import_id"
+                >
+                  {{ runText(link.last_run).text }}
+                </button>
+                <template v-else>{{ runText(link.last_run).text }}</template>
+              </span>
+              <span v-if="canAdmin" class="flex justify-end gap-0.5">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  class="h-6 px-2 text-aruna-navy dark:text-foreground"
+                  :disabled="writesDisabled || busyId !== null || runActive(link.last_run)"
+                  :title="offline"
+                  @click="run(link)"
+                >
+                  Run now
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  class="h-6 px-2 text-aruna-navy dark:text-foreground"
+                  :disabled="writesDisabled"
+                  :title="offline"
+                  @click="openLink(backend, link)"
+                >
+                  Edit
+                </Button>
+              </span>
+              <span v-else />
+            </div>
+            <ul
+              v-if="expandedId === link.import_id && link.last_run"
+              class="space-y-0.5 py-1 pl-[5rem] text-[11px] text-muted-foreground"
+            >
+              <li v-for="failure in link.last_run.errors" :key="failure.key" class="truncate">
+                <span class="font-mono">{{ failure.key }}</span>: {{ failure.error }}
+              </li>
+            </ul>
+          </template>
+
+          <Button
+            v-if="canAdmin && !backend.disabled"
+            variant="outline"
+            size="sm"
+            class="mt-2"
+            :disabled="writesDisabled"
+            :title="offline"
+            @click="openLink(backend, null)"
+          >
+            <Plus class="h-3.5 w-3.5" /> Link a bucket
+          </Button>
+        </div>
+      </section>
+      <p v-if="actionError" class="mt-2 text-xs text-destructive">{{ actionError }}</p>
+    </template>
+
+    <StorageBackendDialog
+      v-model:open="storageDialog"
+      :group-id="props.groupId"
+      :backend="editingStorage"
+      @saved="load"
+    />
+    <LinkedFolderDialog
+      v-model:open="linkDialog"
+      :group-id="props.groupId"
+      :backends="backends ?? []"
+      :link="editingLink"
+      :links="links"
+      :storage-id="linkStorage"
+      @saved="onLinkSaved"
+    />
+    <DefaultRuleDialog
+      v-model:open="defaultDialog"
+      :group-id="props.groupId"
+      :group-name="props.groupName"
+      :backend="defaultStorage"
+      :links="links"
+      @saved="load"
+    />
+    <Dialog :open="arunaConfirm" @update:open="(v: boolean) => (arunaConfirm = v)">
+      <DialogContent class="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Use Aruna storage as default?</DialogTitle>
+          <DialogDescription>
+            New uploads then go to Aruna storage again. The default rule of {{ defaultName }} is removed.
+            Files already in {{ defaultName }} stay there.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <DialogClose as-child><Button type="button" variant="outline">Cancel</Button></DialogClose>
+          <Button :disabled="saving || writesDisabled" @click="useArunaStorage">Use as default</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </div>
+</template>
