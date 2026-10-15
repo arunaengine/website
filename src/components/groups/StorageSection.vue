@@ -17,7 +17,7 @@ import StorageBackendDialog from '@/components/groups/StorageBackendDialog.vue'
 import LinkedFolderDialog from '@/components/groups/LinkedFolderDialog.vue'
 import DefaultRuleDialog from '@/components/groups/DefaultRuleDialog.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { MoveRight, Play, Plus } from '@lucide/vue'
+import { FolderInput, Play, Plus } from '@lucide/vue'
 import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import {
@@ -496,7 +496,7 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
                 aria-label="Move files"
                 @click="moveAsk = { pairs: defaultPairs, place: 'all buckets' }"
               >
-                <MoveRight class="h-3.5 w-3.5" />
+                <FolderInput class="h-3.5 w-3.5" />
               </Button>
               <Button
                 v-if="canAdmin"
@@ -518,6 +518,7 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
               :max="defaultMove.done + defaultMove.misplaced"
               :warn="101"
               :critical="101"
+              bar-class="bg-primary"
               class="mt-0.5 h-1"
             />
           </div>
@@ -586,7 +587,7 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
                   aria-label="Move files"
                   @click="moveAsk = { pairs: [[link.bucket, link.key_prefix]], place: arunaPlace(link) }"
                 >
-                  <MoveRight class="h-3.5 w-3.5" />
+                  <FolderInput class="h-3.5 w-3.5" />
                 </Button>
                 <Button
                   variant="ghost"
@@ -615,6 +616,7 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
                 :max="linkMove(link).done + linkMove(link).misplaced"
                 :warn="101"
                 :critical="101"
+                bar-class="bg-primary"
                 class="mt-0.5 h-1"
               />
             </div>

@@ -141,7 +141,7 @@ function cleanUp() {
           <span v-if="broken > 0" class="text-destructive">{{ formatNumber(broken) }} broken.</span>
           <template v-else>None broken.</template>
         </p>
-        <Progress v-if="running" indeterminate :warn="101" :critical="101" class="h-1" />
+        <Progress v-if="running" indeterminate :warn="101" :critical="101" bar-class="bg-primary" class="h-1" />
       </template>
       <p v-if="note" class="text-foreground">{{ note }}</p>
       <p v-if="error" class="text-destructive">{{ error }}</p>
