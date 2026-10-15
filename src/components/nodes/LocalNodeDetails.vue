@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
+import CopyButton from '@/components/ui/CopyButton.vue'
 import QuotaBar from '@/components/ui/QuotaBar.vue'
 import { statusVariant } from './node-display'
 import { backendQuota } from '@/lib/storage'
@@ -51,9 +52,16 @@ const connectionCount = computed(() => {
   return undefined
 })
 
+// The node serves OAI-PMH under its REST base (aruna api/src/routes/oai.rs).
+const oaiUrl = computed(() => {
+  const rest = props.info.services.interfaces.rest.url
+  return rest ? `${rest.replace(/\/+$/, '')}/oai` : ''
+})
+
 const interfaces = computed(() => [
   { label: 'REST', ...props.info.services.interfaces.rest },
   { label: 'S3', ...props.info.services.interfaces.s3 },
+  { label: 'OAI-PMH', status: props.info.services.interfaces.rest.status, url: oaiUrl.value, bind: '', oai: true },
 ])
 
 const services = computed(() =>
@@ -89,13 +97,18 @@ const backends = computed(() =>
           :key="iface.label"
           class="flex items-center gap-2 rounded-md border border-border/70 bg-background/60 px-2.5 py-1.5"
         >
-          <span class="w-10 shrink-0 text-xs font-medium text-foreground">{{ iface.label }}</span>
+          <span class="min-w-16 shrink-0 whitespace-nowrap text-xs font-medium text-foreground">{{ iface.label }}</span>
           <Badge size="sm" :variant="statusVariant(iface.status)" class="shrink-0 uppercase">{{ iface.status || 'unknown' }}</Badge>
           <span class="min-w-0 flex-1 truncate text-right font-mono text-[11px] text-muted-foreground" :title="iface.url || iface.bind || ''">
             {{ iface.url || iface.bind || '-' }}
           </span>
+          <template v-if="'oai' in iface && iface.url">
+            <CopyButton :value="iface.url" label="Copy OAI-PMH base URL" />
+            <a :href="`${iface.url}?verb=Identify`" target="_blank" rel="noopener" class="shrink-0 text-xs text-primary hover:underline">Identify</a>
+          </template>
         </li>
       </ul>
+      <p class="mt-1.5 text-[11px] text-muted-foreground">OAI-PMH lets other services collect the metadata of public datasets.</p>
     </div>
 
     <div v-if="services.length">

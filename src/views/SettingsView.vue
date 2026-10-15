@@ -7,7 +7,6 @@ import Input from '@/components/ui/Input.vue'
 import Avatar from '@/components/ui/Avatar.vue'
 import AccessBadge from '@/components/ui/AccessBadge.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
-import Separator from '@/components/ui/Separator.vue'
 import CreateGroupDialog from '@/components/groups/CreateGroupDialog.vue'
 import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue'
 import DevicesPanel from '@/components/onboarding/DevicesPanel.vue'
@@ -36,7 +35,7 @@ import { RouterLink, useRouter } from 'vue-router'
 import { apiOrigin } from '@/lib/api'
 import { errorMessage, relativeTime } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
-import { ChevronRight, ExternalLink, Eye, KeyRound, Palette, Rss, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, Plus, Save } from '@lucide/vue'
+import { ChevronRight, ExternalLink, Eye, KeyRound, Palette, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, Plus, Save } from '@lucide/vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { SETTINGS_TAB_ANCHORS } from '@/components/layout/nav'
 
@@ -159,22 +158,6 @@ const preferredProfile = computed(() => profiles.value.find((profile) => profile
 const defaultProfiles = computed(() => profiles.value.filter((profile) =>
   isAssignableProfile(profile) || myGroups.value.some((group) => isAssignableProfile(profile, group.id))))
 const hiddenProfiles = computed(() => profiles.value.length - defaultProfiles.value.length)
-
-// The backend advertises {api_base_url}/oai as its OAI-PMH base (aruna
-// api/src/routes/oai.rs base_url): prefer the node's own configured REST base
-// and fall back to resolving this session's API base against the window origin.
-const oaiBaseUrl = computed(() => {
-  let base = nodeInfo.value?.services.interfaces.rest.url ?? ''
-  if (!base) {
-    try {
-      base = new URL(apiBaseUrl.value, window.location.origin).toString()
-    } catch {
-      return ''
-    }
-  }
-  return `${base.replace(/\/+$/, '')}/oai`
-})
-const oaiIdentifyUrl = computed(() => (oaiBaseUrl.value ? `${oaiBaseUrl.value}?verb=Identify` : ''))
 
 // Swagger UI is served from the API root, not under /api/v1, and not from the
 // portal origin, which is a separate listener when the node splits the two.
@@ -421,36 +404,6 @@ async function revoke(accessKeyId: string) {
 
         <section class="surface overflow-hidden">
           <DevicesPanel />
-        </section>
-
-        <section class="surface">
-          <header class="border-b border-border px-5 py-4">
-            <div class="flex items-center gap-2"><Rss class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">Interoperability</h3></div>
-            <p class="text-xs text-muted-foreground">Open protocols external services can consume from this node.</p>
-          </header>
-          <div class="space-y-3 p-5">
-            <div>
-              <div class="text-sm font-medium text-foreground">OAI-PMH data provider</div>
-              <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
-                Standard OAI-PMH 2.0 endpoint for metadata harvesters: publicly visible datasets are
-                exposed as Dublin Core (<span class="font-mono">oai_dc</span>) records. All six protocol verbs are
-                answered over GET or form-encoded POST; the repository has no set hierarchy. Point a harvester at
-                the base URL below.
-              </p>
-              <div class="mt-2 flex flex-wrap items-center gap-1.5 rounded-md border border-border bg-muted/30 px-3 py-2">
-                <code class="min-w-0 break-all font-mono text-[11px] text-foreground">{{ oaiBaseUrl }}</code>
-                <CopyButton :value="oaiBaseUrl" label="Copy OAI-PMH base URL" />
-                <a v-if="oaiIdentifyUrl" :href="oaiIdentifyUrl" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs text-primary hover:underline">
-                  <ExternalLink class="h-3 w-3" /> Identify
-                </a>
-              </div>
-            </div>
-            <Separator />
-            <div class="flex items-center gap-2 text-xs text-muted-foreground">
-              <span>Harvesting external OAI-PMH sources into this node</span>
-              <Badge size="sm" variant="outline" class="uppercase">Coming soon</Badge>
-            </div>
-          </div>
         </section>
       </TabsContent>
 

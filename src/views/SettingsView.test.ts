@@ -324,11 +324,12 @@ describe('SettingsView access tab', () => {
     userInfo.value = { user: { user_id: 'user-1' } }
   })
 
-  it('stacks connection, sessions, keys, devices and interop', async () => {
+  it('stacks connection, sessions, keys and devices', async () => {
     const { root, errors } = await mount('?tab=access')
 
     const text = panelText(root, 'access')
-    const markers = ['API connection', 'Sessions panel', 'S3 access keys', 'Devices panel', 'Interoperability']
+    expect(text).not.toContain('Interoperability')
+    const markers = ['API connection', 'Sessions panel', 'S3 access keys', 'Devices panel']
     const positions = markers.map((marker) => text.indexOf(marker))
     expect(errors).toEqual([])
     expect(positions.every((position) => position >= 0)).toBe(true)
