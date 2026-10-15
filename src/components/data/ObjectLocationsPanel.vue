@@ -252,7 +252,7 @@ Only the node that holds a file can say where its copies are; open the bucket on
               <span>{{ originLine(copy) }}</span>
               <RouterLink
                 v-if="copy.origin === 'sync' && copy.sync_relationship_id"
-                :to="{ name: 'bucket-storage', params: { bucketId: props.bucket }, query: { tab: 'syncs' } }"
+                :to="{ name: 'bucket-storage', params: { bucketId: props.bucket }, query: { tab: 'transfers' } }"
                 class="font-medium text-primary hover:underline"
               >
                 Open the syncs of this bucket

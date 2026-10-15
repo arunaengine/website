@@ -2,7 +2,6 @@
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Button from '@/components/ui/Button.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
-import Badge from '@/components/ui/Badge.vue'
 import Input from '@/components/ui/Input.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
@@ -14,7 +13,6 @@ import DialogClose from '@/components/ui/DialogClose.vue'
 import Notice from '@/components/ui/Notice.vue'
 import AddDataDialog from '@/components/data/AddDataDialog.vue'
 import DataViewSkeleton from '@/components/data/DataViewSkeleton.vue'
-import StagingJobsPanel from '@/components/data/StagingJobsPanel.vue'
 import SyncBucketDialog from '@/components/data/SyncBucketDialog.vue'
 import BucketSidebar from '@/components/data/manager/BucketSidebar.vue'
 import DeleteDialog from '@/components/data/DeleteDialog.vue'
@@ -26,16 +24,14 @@ import NewNotebookDialog from '@/components/notebook/NewNotebookDialog.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDataManager } from '@/composables/useDataManager'
 import { providePageContext } from '@/composables/usePageContext'
-import { useStaging } from '@/composables/useStaging'
 import { useS3, s3ErrorMessage } from '@/composables/useS3'
 import { folderNameProblem } from '@/lib/bucketName'
-import { featureEnabled } from '@/lib/config'
 import { isDesktop } from '@/lib/desktop'
 import type { BucketSearchHit } from '@/lib/api'
 import type { PublicTarget } from '@/lib/publicAccess'
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { HardDriveDownload, KeyRound, LogIn, ShieldAlert } from '@lucide/vue'
+import { KeyRound, LogIn, ShieldAlert } from '@lucide/vue'
 
 const { bootstrapped, currentUser } = useAruna()
 const s3 = useS3()
@@ -153,11 +149,6 @@ const notebooksView = computed(() => route.name === 'notebooks' || route.query.n
 watch(addDataOpen, (open) => {
   contextHold.value = open
 })
-const staging = useStaging()
-// Staging jobs side panel: config-gated (no job-listing endpoint on today's
-// backend). The dialog's connector tab covers registered connectors regardless.
-const stagingJobsEnabled = featureEnabled('stagingJobs')
-const stagingPanelOpen = ref(false)
 
 // The retired bucket-builder route redirects here with ?addData=1 so old links
 // land in the consolidated dialog; strip the marker once consumed.
@@ -244,11 +235,6 @@ async function createFolder() {
             <KeyRound class="h-3 w-3" /> …{{ keyTail }}
           </span>
           <RefreshButton :busy="refreshSpinning" @click="onRefresh" />
-          <!-- Staging jobs are connected-node global, not per bucket. -->
-          <Button v-if="stagingJobsEnabled" variant="outline" size="sm" @click="stagingPanelOpen = true">
-            <HardDriveDownload class="h-4 w-4" /> Staging
-            <Badge v-if="staging.runningCount.value" variant="secondary" size="count" class="ml-1">{{ staging.runningCount.value }}</Badge>
-          </Button>
         </template>
       </template>
     </PageHeader>
@@ -348,8 +334,6 @@ async function createFolder() {
       :prefix="s3Prefix"
       :group-id="activeGroupId ?? ''"
     />
-
-    <StagingJobsPanel v-if="stagingJobsEnabled" v-model:open="stagingPanelOpen" />
 
     <SyncBucketDialog
       v-model:open="syncDialogOpen"

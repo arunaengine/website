@@ -27,6 +27,8 @@ const props = defineProps<{
   /** Keys visible in the parent's current listing, for overwrite warnings. */
   existingKeys?: ReadonlySet<string>
   existingReferences?: readonly StagingReferenceEntry[]
+  /** The tab the dialog opens on. */
+  tab?: string
 }>()
 const emit = defineEmits<{
   (e: 'update:open', v: boolean): void
@@ -59,7 +61,7 @@ const otherBuckets = useOtherBuckets({
 
 const { groupSel, registerOpen, onConnectorSaved } = connectorSource
 
-const tab = ref('local')
+const tab = ref(props.tab ?? 'local')
 
 function addConnectorRows(rows: ConnectorStagingRow[]) {
   basket.addStaging('connector', rows)

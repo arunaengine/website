@@ -72,13 +72,12 @@ const view = compileClientComponent(new URL('./BucketStorageView.vue', import.me
   '@/components/ui/TabsContent.vue': moduleDefault(TabsContentStub),
   '@/components/ui/TabsList.vue': moduleDefault(Slotted('div')),
   '@/components/ui/TabsTrigger.vue': moduleDefault(TabsTriggerStub),
-  '@/components/data/SyncBucketDialog.vue': moduleDefault(Marker('')),
   '@/components/storage/BucketBackendTab.vue': moduleDefault(Marker('backend rules')),
   '@/components/storage/BucketComplianceSection.vue': moduleDefault(Marker('compliance on this node')),
   '@/components/storage/BucketEncryptionTab.vue': moduleDefault(Marker('encryption state')),
   '@/components/storage/BucketPolicySection.vue': moduleDefault(Marker('where copies may be stored')),
   '@/components/storage/StorageOverviewTab.vue': moduleDefault(Marker('overview details')),
-  '@/components/storage/SyncsTab.vue': moduleDefault(Marker('sync rows')),
+  '@/components/storage/TransfersTab.vue': moduleDefault(Marker('transfer rows')),
   '@/composables/useAruna': {
     useAruna: () => ({
       currentUser: ref({ id: 'u-1' }),
@@ -127,16 +126,16 @@ function tabLabels(root: Awaited<ReturnType<typeof render>>): string[] {
 }
 
 describe('bucket storage page', () => {
-  it('shows a reader the overview and the syncs only', async () => {
+  it('shows a reader the overview and the transfers only', async () => {
     const root = await render()
 
     expect(content(root)).toContain('Settings for reef-survey')
-    expect(tabs(root)).toEqual(['overview', 'encryption', 'syncs'])
+    expect(tabs(root)).toEqual(['overview', 'encryption', 'transfers'])
     expect(content(root)).toContain('overview details')
   })
 
   it('opens the tab named in the query', async () => {
-    expect(content(await render({ query: { tab: 'syncs' } }))).toContain('sync rows')
+    expect(content(await render({ query: { tab: 'transfers' } }))).toContain('transfer rows')
     expect(content(await render({ query: { tab: 'encryption' } }))).toContain('encryption state')
     expect(content(await render({ admin: true, query: { tab: 'backend' } }))).toContain('backend rules')
   })
@@ -151,7 +150,7 @@ describe('bucket storage page', () => {
   it('offers the backend and placement tabs to a group admin', async () => {
     const root = await render({ admin: true, query: { tab: 'placement' } })
 
-    expect(tabs(root)).toEqual(['overview', 'backend', 'placement', 'encryption', 'syncs'])
+    expect(tabs(root)).toEqual(['overview', 'backend', 'placement', 'encryption', 'transfers'])
     expect(content(root)).toContain('where copies may be stored')
     expect(content(root)).toContain('compliance on this node')
   })
@@ -159,14 +158,14 @@ describe('bucket storage page', () => {
   it('offers a realm admin placement but not the group routing rules', async () => {
     const root = await render({ realmAdmin: true, query: { tab: 'placement' } })
 
-    expect(tabs(root)).toEqual(['overview', 'placement', 'encryption', 'syncs'])
+    expect(tabs(root)).toEqual(['overview', 'placement', 'encryption', 'transfers'])
     expect(content(root)).toContain('where copies may be stored')
   })
 
   it('names every section the way the settings page calls it', async () => {
     const root = await render({ admin: true })
 
-    expect(tabLabels(root)).toEqual(['Overview', 'Storage backend', 'Placement', 'Encryption', 'Syncs'])
+    expect(tabLabels(root)).toEqual(['Overview', 'Storage backend', 'Placement', 'Encryption', 'Transfers'])
   })
 
   it('offers no bucket deletion under the settings tabs', async () => {
@@ -174,9 +173,9 @@ describe('bucket storage page', () => {
   })
 
   it('hides the node-local tabs for a bucket hosted elsewhere', async () => {
-    const root = await render({ admin: true, realmAdmin: true, query: { node: 'node-far', tab: 'syncs' } })
+    const root = await render({ admin: true, realmAdmin: true, query: { node: 'node-far', tab: 'transfers' } })
 
-    expect(tabs(root)).toEqual(['overview', 'encryption', 'syncs'])
-    expect(content(root)).toContain('this node can only show')
+    expect(tabs(root)).toEqual(['overview', 'encryption', 'transfers'])
+    expect(content(root)).toContain('transfer rows')
   })
 })

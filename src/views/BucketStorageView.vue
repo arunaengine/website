@@ -10,18 +10,16 @@ import PageHeader from '@/components/dashboard/PageHeader.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import DocsLink from '@/components/ui/DocsLink.vue'
-import Notice from '@/components/ui/Notice.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
-import SyncBucketDialog from '@/components/data/SyncBucketDialog.vue'
 import BucketBackendTab from '@/components/storage/BucketBackendTab.vue'
 import BucketComplianceSection from '@/components/storage/BucketComplianceSection.vue'
 import BucketEncryptionTab from '@/components/storage/BucketEncryptionTab.vue'
 import BucketPolicySection from '@/components/storage/BucketPolicySection.vue'
 import StorageOverviewTab from '@/components/storage/StorageOverviewTab.vue'
-import SyncsTab from '@/components/storage/SyncsTab.vue'
+import TransfersTab from '@/components/storage/TransfersTab.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useRouteTab } from '@/composables/useRouteTab'
@@ -62,7 +60,7 @@ const local = computed(() => !nodeId.value)
 const backendVisible = computed(() => local.value && canAdminGroup.value)
 const placementVisible = computed(() => local.value && (canAdminGroup.value || isRealmAdmin.value))
 
-const TAB_IDS = ['overview', 'backend', 'placement', 'encryption', 'syncs']
+const TAB_IDS = ['overview', 'backend', 'placement', 'encryption', 'transfers']
 const routeTab = useRouteTab(TAB_IDS, 'overview')
 const tab = computed({
   get() {
@@ -75,14 +73,6 @@ const tab = computed({
     routeTab.value = next
   },
 })
-
-const syncDialogOpen = ref(false)
-const syncReloadKey = ref(0)
-
-function onSyncCreated() {
-  syncDialogOpen.value = false
-  syncReloadKey.value += 1
-}
 
 const browserLink = computed(() => ({
   name: 'bucket',
@@ -124,7 +114,7 @@ const browserLink = computed(() => ({
           <TabsTrigger v-if="backendVisible" value="backend">Storage backend</TabsTrigger>
           <TabsTrigger v-if="placementVisible" value="placement">Placement</TabsTrigger>
           <TabsTrigger value="encryption">Encryption</TabsTrigger>
-          <TabsTrigger value="syncs">Syncs</TabsTrigger>
+          <TabsTrigger value="transfers">Transfers</TabsTrigger>
         </TabsList>
       </div>
 
@@ -155,26 +145,9 @@ const browserLink = computed(() => ({
         <BucketEncryptionTab :bucket="bucket" :node-id="nodeId" :group-id="groupId" />
       </TabsContent>
 
-      <TabsContent value="syncs" class="mt-0">
-        <Notice v-if="nodeId" tone="info" class="mb-3">
-          This bucket is hosted on {{ realmNodes.displayName(nodeId) }}, so this node can only show
-          the syncs you created for it.
-        </Notice>
-        <SyncsTab
-          :key="syncReloadKey"
-          :bucket="bucket"
-          :node-id="nodeId"
-          @new-sync="syncDialogOpen = true"
-        />
+      <TabsContent value="transfers" class="mt-0">
+        <TransfersTab :bucket="bucket" :node-id="nodeId" :group-id="groupId" />
       </TabsContent>
     </Tabs>
-
-    <SyncBucketDialog
-      v-model:open="syncDialogOpen"
-      :source-bucket="bucket"
-      source-prefix=""
-      :source-node-id="nodeId"
-      @created="onSyncCreated"
-    />
   </div>
 </template>

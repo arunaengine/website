@@ -338,7 +338,7 @@ describe('file details shared state and syncs', () => {
     expect(JSON.parse(String(link.props['data-to']))).toEqual({
       name: 'bucket-storage',
       params: { bucketId: 'reef-survey' },
-      query: { tab: 'syncs', group: 'g-1' },
+      query: { tab: 'transfers', group: 'g-1' },
     })
   })
 

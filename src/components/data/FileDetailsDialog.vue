@@ -150,7 +150,7 @@ const syncsLink = computed(() => ({
   name: 'bucket-storage',
   params: { bucketId: props.bucket },
   query: {
-    tab: 'syncs',
+    tab: 'transfers',
     ...(props.nodeId ? { node: props.nodeId } : {}),
     ...(props.groupId ? { group: props.groupId } : {}),
   },

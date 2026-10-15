@@ -22,8 +22,13 @@ import { arnLocationLabel, parseArunaArn, syncModeLabel } from '@/lib/sync'
 import { errorMessage, formatBytes, formatDuration, relativeTime } from '@/lib/utils'
 import { ArrowLeft, ArrowRight, Pause, Play, Plus, Trash2 } from '@lucide/vue'
 
-const props = defineProps<{ bucket: string; nodeId: string | null }>()
-const emit = defineEmits<{ (event: 'new-sync'): void; (event: 'changed'): void }>()
+// Inside the Transfers tab the tab owns the header, and `quiet` drops the empty state.
+const props = defineProps<{ bucket: string; nodeId: string | null; embedded?: boolean; quiet?: boolean }>()
+const emit = defineEmits<{
+  (event: 'new-sync'): void
+  (event: 'changed'): void
+  (event: 'count', count: number): void
+}>()
 
 const { getSyncRelationship, runSyncRelationship, updateSyncRelationship, deleteSyncRelationship } =
   useAruna()
@@ -61,6 +66,10 @@ const listState = computed<'loading' | 'error' | 'empty' | 'ready'>(() => {
   if (loading.value && !rows.value.length) return 'loading'
   if (listError.value) return 'error'
   return rows.value.length ? 'ready' : 'empty'
+})
+
+watch(listState, (state) => {
+  if (state === 'ready' || state === 'empty') emit('count', rows.value.length)
 })
 
 function clearPoll() {
@@ -191,7 +200,7 @@ function remove(row: SyncRow) {
 
 <template>
   <div class="space-y-3">
-    <div class="flex flex-wrap items-center justify-between gap-2">
+    <div v-if="!embedded" class="flex flex-wrap items-center justify-between gap-2">
       <p class="text-xs text-muted-foreground">
         Only syncs you created are listed.
         <DocsLink icon topic="where-data-lives" section="Syncs" class="ml-0.5" />
@@ -210,6 +219,7 @@ function remove(row: SyncRow) {
     </Notice>
 
     <ListShell
+      v-if="!(quiet && listState === 'empty')"
       :state="listState"
       :error="listError ?? undefined"
       empty-title="No sync you created touches this bucket."
@@ -220,6 +230,7 @@ function remove(row: SyncRow) {
         <li v-for="row in rows" :key="row.relationship.id" class="px-5 py-3.5">
           <div class="flex items-center gap-2 text-xs">
             <StatusDot :tone="stateTone(row.relationship.state)" :label="row.relationship.state" />
+            <Badge v-if="embedded" variant="secondary" size="sm" class="shrink-0">Sync</Badge>
             <Badge variant="outline" size="sm" class="shrink-0">{{ syncModeLabel(row.relationship.mode) }}</Badge>
             <component
               :is="row.direction === 'outgoing' ? ArrowRight : ArrowLeft"
