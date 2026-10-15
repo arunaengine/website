@@ -30,7 +30,7 @@ import { bucketNameProblem } from '@/lib/bucketName'
 import { readStored, storeValue } from './aruna/state'
 import { requestScope, type DeleteRequest, type DeletionResult } from '@/lib/deletion/request'
 import type { DeletedObjectEntry } from '@/lib/objectVersions'
-import { deletedOnPage, shownDeleted, shownEntries, type ListingShow } from '@/lib/objectListing'
+import { deletedOnPage, lastListedKey, shownDeleted, shownEntries, type ListingShow } from '@/lib/objectListing'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import type { BucketSearchHit, SourceConnectorSummary, SyncRelationship, UsageResponse } from '@/lib/api'
@@ -603,9 +603,9 @@ export function useDataManager() {
 
   const deletedRows = computed(() => {
     if (!showDeleted.value) return []
-    const keys = [...folders.value.map((folder) => folder.prefix), ...objects.value.map((object) => object.key)]
     const shown = shownDeleted(deletedObjects.value, nameFilter.value, listShow.value)
-    return deletedOnPage(shown, keys, pages.page.value > 1, Boolean(nextToken.value))
+    const through = nextToken.value ? lastListedKey(listedKeyList()) : undefined
+    return deletedOnPage(shown, pages.previousLastKey.value, through)
   })
 
   // Hidden rows leave the selection, so no action reaches what is not shown.
@@ -742,7 +742,10 @@ export function useDataManager() {
     void loadObjects()
   }
 
-  const nextPage = () => turnPage(pages.next())
+  function listedKeyList(): string[] {
+    return [...folders.value.map((folder) => folder.prefix), ...objects.value.map((object) => object.key)]
+  }
+  const nextPage = () => turnPage(pages.next(lastListedKey(listedKeyList())))
   const previousPage = () => turnPage(pages.previous())
   function setPageSize(size: number) {
     pages.setPageSize(size)

@@ -17,18 +17,23 @@ export function useListPages() {
   const pageSize = ref(storedPageSize())
   // The token that lists each page; the first page needs none.
   const tokens = ref<(string | undefined)[]>([undefined])
+  // The last key of every page before the shown one.
+  const lastKeys = ref<string[]>([])
   const nextToken = ref<string | undefined>(undefined)
   const page = computed(() => tokens.value.length)
   const token = computed(() => tokens.value[tokens.value.length - 1])
+  const previousLastKey = computed(() => lastKeys.value[lastKeys.value.length - 1])
 
   function reset() {
     tokens.value = [undefined]
+    lastKeys.value = []
     nextToken.value = undefined
   }
 
-  function next(): boolean {
+  function next(lastKey = ''): boolean {
     if (!nextToken.value) return false
     tokens.value = [...tokens.value, nextToken.value]
+    lastKeys.value = [...lastKeys.value, lastKey]
     nextToken.value = undefined
     return true
   }
@@ -36,6 +41,7 @@ export function useListPages() {
   function previous(): boolean {
     if (tokens.value.length < 2) return false
     tokens.value = tokens.value.slice(0, -1)
+    lastKeys.value = lastKeys.value.slice(0, -1)
     nextToken.value = undefined
     return true
   }
@@ -47,5 +53,5 @@ export function useListPages() {
     reset()
   }
 
-  return { pageSize, nextToken, page, token, reset, next, previous, setPageSize }
+  return { pageSize, nextToken, page, token, previousLastKey, reset, next, previous, setPageSize }
 }

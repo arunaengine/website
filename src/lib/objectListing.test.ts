@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { actionBlocker, deletedOnPage, fileRows, filtersChanged, shownDeleted, shownEntries } from './objectListing'
+import { actionBlocker, deletedOnPage, fileRows, filtersChanged, lastListedKey, shownDeleted, shownEntries } from './objectListing'
 
 const folder = { prefix: 'raw/genomes/', name: 'genomes' }
 const file = { key: 'raw/reads.fastq', name: 'reads.fastq' }
@@ -27,18 +27,21 @@ describe('object list filters', () => {
     expect(filtersChanged({ show: 'all', includeDeleted: true })).toBe(true)
   })
 
-  it('keeps deleted files inside the key range of the listed page', () => {
-    const listed = ['raw/m.txt', 'raw/genomes/']
-    expect(deletedOnPage(deleted, listed, false, false)).toHaveLength(2)
-    expect(deletedOnPage(deleted, listed, false, true).map((entry) => entry.key)).toEqual([])
-    expect(deletedOnPage(deleted, listed, true, false).map((entry) => entry.key)).toEqual([
-      'raw/old.fastq',
-      'raw/notes.txt',
-    ])
-    expect(deletedOnPage(deleted, ['raw/a.txt', 'raw/p.txt'], true, true).map((entry) => entry.key)).toEqual([
-      'raw/old.fastq',
-      'raw/notes.txt',
-    ])
+  it('gives every deleted file to exactly one page', () => {
+    const gaps = [
+      { key: 'raw/b.txt', name: 'b.txt', markerVersionId: 'm1' },
+      { key: 'raw/e.txt', name: 'e.txt', markerVersionId: 'm2' },
+      { key: 'raw/z.txt', name: 'z.txt', markerVersionId: 'm3' },
+    ]
+    // Page one lists a..c, page two d..f, page three the rest.
+    const first = lastListedKey(['raw/a.txt', 'raw/c.txt'])
+    const second = lastListedKey(['raw/f.txt', 'raw/d.txt'])
+    const pages = [
+      deletedOnPage(gaps, undefined, first),
+      deletedOnPage(gaps, first, second),
+      deletedOnPage(gaps, second, undefined),
+    ]
+    expect(pages.map((page) => page.map((entry) => entry.name))).toEqual([['b.txt'], ['e.txt'], ['z.txt']])
   })
 
   it('orders live and deleted files by key', () => {

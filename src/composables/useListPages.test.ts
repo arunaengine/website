@@ -43,6 +43,20 @@ describe('listing pages', () => {
     expect(pages.previous()).toBe(false)
   })
 
+  it('remembers the last key of every page before the shown one', () => {
+    const pages = useListPages()
+    pages.nextToken.value = 't2'
+    pages.next('raw/c.txt')
+    pages.nextToken.value = 't3'
+    pages.next('raw/f.txt')
+    expect(pages.previousLastKey.value).toBe('raw/f.txt')
+
+    pages.previous()
+    expect(pages.previousLastKey.value).toBe('raw/c.txt')
+    pages.reset()
+    expect(pages.previousLastKey.value).toBeUndefined()
+  })
+
   it('starts again at the first page when the size changes', () => {
     const pages = useListPages()
     pages.nextToken.value = 't2'
