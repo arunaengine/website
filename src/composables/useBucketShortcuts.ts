@@ -9,6 +9,8 @@ export interface BucketShortcut {
   bucket: string
   /** Owning node id; null = the connected node. */
   nodeId: string | null
+  /** Group the bucket was browsed with; recents of other groups stay hidden. */
+  groupId?: string | null
 }
 
 interface ShortcutScope {
@@ -29,7 +31,12 @@ function sanitizeList(value: unknown): BucketShortcut[] {
     const bucket = (entry as { bucket?: unknown }).bucket
     if (typeof bucket !== 'string' || !bucket) continue
     const nodeId = (entry as { nodeId?: unknown }).nodeId
-    list.push({ bucket, nodeId: typeof nodeId === 'string' && nodeId ? nodeId : null })
+    const groupId = (entry as { groupId?: unknown }).groupId
+    list.push({
+      bucket,
+      nodeId: typeof nodeId === 'string' && nodeId ? nodeId : null,
+      groupId: typeof groupId === 'string' && groupId ? groupId : null,
+    })
   }
   return list
 }
@@ -107,9 +114,9 @@ export function useBucketShortcuts() {
 
   // Newest first, deduplicated, capped. Per-run ws- scratch buckets are
   // plumbing and never become shortcuts.
-  function recordRecent(bucket: string, nodeId: string | null = null) {
+  function recordRecent(bucket: string, nodeId: string | null = null, groupId: string | null = null) {
     if (!bucket || isWorkspaceBucket(bucket)) return
-    const entry: BucketShortcut = { bucket, nodeId }
+    const entry: BucketShortcut = { bucket, nodeId, groupId }
     update((current) => ({
       ...current,
       recent: [entry, ...current.recent.filter((item) => !sameShortcut(item, entry))].slice(

@@ -456,6 +456,11 @@ export function useDataManager() {
     return [...pinned, ...locals]
   })
 
+  // Buckets of another group are not reachable with this group's S3 session.
+  const groupRecents = computed(() =>
+    shortcuts.recent.value.filter((entry) => (entry.groupId ?? '') === selectedGroupId.value),
+  )
+
   // "Recently browsed" only surfaces targets the list above does not already
   // show (pins are filtered in the store, listed local buckets here), so the
   // section stays non-redundant; in practice it holds remote buckets opened
@@ -464,7 +469,7 @@ export function useDataManager() {
     const visible = new Set(
       sidebarBuckets.value.map((entry) => `${entry.nodeId ?? ''}/${entry.bucket}`),
     )
-    return shortcuts.recent.value.filter(
+    return groupRecents.value.filter(
       (entry) => !visible.has(`${entry.nodeId ?? ''}/${entry.bucket}`),
     )
   })
@@ -476,7 +481,7 @@ export function useDataManager() {
   watch([bucketsLoaded, buckets], async ([loaded]) => {
     if (!loaded) return
     const id = ++recentCheckId
-    for (const entry of unlistedRecents(shortcuts.recent.value, buckets.value.map((item) => item.name))) {
+    for (const entry of unlistedRecents(groupRecents.value, buckets.value.map((item) => item.name))) {
       try {
         await s3.headBucket(entry.bucket)
       } catch (err) {
@@ -737,7 +742,7 @@ export function useDataManager() {
     [bucket, remoteNodeId, stickyScope],
     ([name, nodeId]) => {
       if (!name) return
-      shortcuts.recordRecent(name, nodeId)
+      shortcuts.recordRecent(name, nodeId, selectedGroupId.value || null)
       const scope = stickyScope.value
       if (isWorkspaceBucket(name) || !scope) return
       writeLastBucket(scope, {
