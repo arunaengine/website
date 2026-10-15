@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Link a backend folder with a bucket folder. A stored link only changes its schedule.
+// Link a bucket of your storage with an Aruna bucket. A stored link only changes its schedule.
 import Dialog from '@/components/ui/Dialog.vue'
 import DialogContent from '@/components/ui/DialogContent.vue'
 import DialogHeader from '@/components/ui/DialogHeader.vue'
@@ -21,6 +21,7 @@ import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import {
   ApiError,
   createBackendImport,
+  deleteBackendImport,
   runBackendImport,
   updateBackendImport,
   type BackendImport,
@@ -41,6 +42,7 @@ import {
   storeName,
   writesElsewhere,
 } from '@/lib/linkedFolders'
+import { linkConflict, splitPath, splitsBuckets } from '@/lib/storageRules'
 import { errorMessage } from '@/lib/utils'
 
 const props = defineProps<{
@@ -48,6 +50,10 @@ const props = defineProps<{
   groupId: string
   backends: GroupBackendResponse[]
   link?: BackendImport | null
+  /** The other links of the group, for the overlap check. */
+  links?: BackendImport[]
+  /** The storage a new link starts on. */
+  storageId?: string | null
 }>()
 const emit = defineEmits<{
   (e: 'update:open', v: boolean): void
@@ -65,6 +71,7 @@ const PATTERN_OPTIONS = [...NAME_PATTERNS, { value: 'custom', label: 'Custom' }]
 const SCHEDULE_OPTIONS = [...SCHEDULES, { value: 'custom', label: 'Custom' }]
 
 const backendId = ref('')
+const storageBucket = ref('')
 const backendFolder = ref('')
 const bucket = ref('')
 const bucketFolder = ref('')
@@ -75,6 +82,7 @@ const writeFolder = ref('')
 const scheduleChoice = ref('')
 const cron = ref('')
 const saving = ref(false)
+const confirmingDelete = ref(false)
 const submitError = ref<string | null>(null)
 
 const isEdit = computed(() => Boolean(props.link))
@@ -99,13 +107,30 @@ const scheduleError = computed(() => (scheduleChoice.value === 'custom' ? cronPr
 const findBackend = (id: string) => props.backends.find((backend) => backend.backend_id === id)
 const source = computed(() => findBackend(backendId.value))
 const target = computed(() => findBackend(writeBackendId.value))
-const sourceStore = computed(() => (source.value ? storeName(source.value) : 'storage backend'))
+const sourceStore = computed(() => {
+  if (!source.value) return 'your storage'
+  return splits.value ? source.value.name : storeName(source.value)
+})
 const bucketName = computed(() => bucket.value.trim() || 'Aruna bucket')
-const storageRoot = computed(() => folderPath(backendFolder.value))
+const splits = computed(() => Boolean(source.value && splitsBuckets(source.value)))
+// On a storage without a fixed bucket the path starts with the bucket.
+const storageRoot = computed(() =>
+  splits.value
+    ? `${storageBucket.value.trim()}/${folderPath(backendFolder.value)}`
+    : folderPath(backendFolder.value),
+)
 const bucketRoot = computed(() => folderPath(bucketFolder.value))
 const writeStore = computed(() => {
   if (!writeElsewhere.value) return sourceStore.value
-  return target.value ? storeName(target.value) : 'storage backend'
+  return target.value ? storeName(target.value) : 'your storage'
+})
+const conflict = computed(() => {
+  if (isEdit.value || !source.value) return null
+  if (splits.value && !storageBucket.value.trim()) return null
+  const others = props.links ?? []
+  const read = linkConflict(source.value, others, storageRoot.value)
+  if (read || !writeElsewhere.value || !target.value) return read
+  return linkConflict(target.value, others, folderPath(writeFolder.value))
 })
 const writeRoot = computed(() => (writeElsewhere.value ? folderPath(writeFolder.value) : storageRoot.value))
 const exampleUpload = computed(() =>
@@ -118,6 +143,8 @@ const submitDisabled = computed(() => {
   return (
     !backendId.value ||
     !bucket.value.trim() ||
+    (splits.value && !storageBucket.value.trim()) ||
+    Boolean(conflict.value) ||
     Boolean(patternError.value) ||
     (writeElsewhere.value && !writeBackendId.value)
   )
@@ -142,8 +169,13 @@ watch(
     opening += 1
     saving.value = false
     const stored = props.link
-    backendId.value = stored?.backend_id ?? (backendOptions.value.length === 1 ? backendOptions.value[0].value : '')
-    backendFolder.value = stored?.backend_prefix ?? ''
+    const fallback = backendOptions.value.length === 1 ? backendOptions.value[0].value : ''
+    backendId.value = stored?.backend_id ?? props.storageId ?? fallback
+    const chosen = findBackend(backendId.value)
+    const place = chosen && stored ? splitPath(chosen, stored.backend_prefix) : null
+    storageBucket.value = chosen && splitsBuckets(chosen) ? (place?.bucket ?? '') : ''
+    backendFolder.value = chosen && splitsBuckets(chosen) ? (place?.folder ?? '') : (stored?.backend_prefix ?? '')
+    confirmingDelete.value = false
     bucket.value = stored?.bucket ?? ''
     bucketFolder.value = stored?.key_prefix ?? ''
     pattern.value = stored?.write_pattern ?? NAME_PATTERNS[0].value
@@ -178,6 +210,25 @@ function body(): BackendImportRequest {
   }
   if (schedule.value) request.schedule = schedule.value
   return request
+}
+
+async function remove() {
+  if (!props.link || saving.value) return
+  submitError.value = null
+  saving.value = true
+  const generation = opening
+  try {
+    await deleteBackendImport(props.groupId, props.link.import_id, {
+      baseUrl: apiBaseUrl.value,
+      token: authToken.value,
+    })
+    emit('saved')
+    if (generation === opening) emit('update:open', false)
+  } catch (err) {
+    if (generation === opening) submitError.value = errorMessage(err)
+  } finally {
+    if (generation === opening) saving.value = false
+  }
 }
 
 async function submit() {
@@ -219,36 +270,49 @@ async function submit() {
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <FolderSync class="h-4 w-4 text-primary" />
-          {{ isEdit ? 'Edit linked folder' : 'Link a folder' }}
+          {{ isEdit ? 'Edit linked bucket' : 'Link a bucket' }}
         </DialogTitle>
         <DialogDescription>
-          Connect a folder in your storage backend with a folder in Aruna.
+          Show the same files in Aruna and in your storage, both ways.
         </DialogDescription>
       </DialogHeader>
 
       <form class="space-y-3" @submit.prevent="submit">
         <div class="max-h-[65vh] space-y-3 overflow-y-auto px-1 scrollbar-thin">
           <fieldset class="space-y-3 rounded-md border border-border p-3">
-            <legend class="mb-0 px-1 text-xs font-semibold text-foreground">Storage backend → Aruna</legend>
+            <legend class="mb-0 px-1 text-xs font-semibold text-foreground">Your storage → Aruna</legend>
             <p class="text-[11px] text-muted-foreground">
-              Files already in your storage backend appear in Aruna. Nothing is copied.
+              Files already in your storage appear in Aruna. Nothing is copied.
             </p>
             <div class="grid gap-3 sm:grid-cols-2">
               <div class="space-y-1">
-                <label class="text-xs font-medium text-foreground">From storage backend</label>
+                <label class="text-xs font-medium text-foreground">From your storage</label>
                 <Select
                   :model-value="backendId"
                   :options="backendOptions"
                   :disabled="isEdit"
-                  placeholder="Choose a backend"
-                  aria-label="From storage backend"
+                  placeholder="Choose a storage"
+                  aria-label="From your storage"
                   @update:model-value="(v: string) => (backendId = v)"
                 />
                 <p v-if="source" class="break-all text-[11px] text-muted-foreground">{{ storeLine(source) }}</p>
               </div>
+              <div v-if="splits" class="space-y-1">
+                <label :for="`${uid}-source-bucket`" class="text-xs font-medium text-foreground">
+                  Bucket in {{ source?.name }}
+                </label>
+                <Input
+                  :id="`${uid}-source-bucket`"
+                  v-model="storageBucket"
+                  :disabled="isEdit"
+                  class="font-mono text-xs"
+                  placeholder="lab-raw"
+                />
+                <p class="text-[11px] text-muted-foreground">Aruna creates the bucket if it is missing.</p>
+              </div>
               <div class="space-y-1">
                 <label :for="`${uid}-source-folder`" class="text-xs font-medium text-foreground">
-                  Folder in the storage backend
+                  {{ splits ? 'Folder in the bucket' : 'Folder in your storage' }}
                 </label>
                 <Input
                   :id="`${uid}-source-folder`"
@@ -258,7 +322,7 @@ async function submit() {
                   placeholder="raw/2024/"
                 />
                 <p class="text-[11px] text-muted-foreground">
-                  Leave empty to use all files in {{ source ? storeLabel(source) : 'the storage backend' }}.
+                  Leave empty to use {{ splits ? 'the whole bucket' : `all files in ${source ? storeLabel(source) : 'your storage'}` }}.
                 </p>
               </div>
               <div class="space-y-1">
@@ -335,9 +399,9 @@ async function submit() {
           </fieldset>
 
           <fieldset class="space-y-3 rounded-md border border-border p-3">
-            <legend class="mb-0 px-1 text-xs font-semibold text-foreground">Aruna → Storage backend</legend>
+            <legend class="mb-0 px-1 text-xs font-semibold text-foreground">Aruna → your storage</legend>
             <p class="text-[11px] text-muted-foreground">
-              New uploads to that Aruna folder are saved in your storage backend.
+              New uploads to that Aruna folder are saved in your storage.
             </p>
             <p class="text-xs text-foreground">
               Uploads to <span class="break-all font-mono">{{ placeLabel(bucketName, bucketRoot) }}</span>
@@ -345,7 +409,7 @@ async function submit() {
             <div class="space-y-2">
               <p class="text-xs font-medium text-foreground">Save to</p>
               <p v-if="!writeElsewhere" class="text-[11px] text-muted-foreground">
-                The same storage backend and folder
+                The same storage and folder
                 (<span class="break-all font-mono">{{ placeLabel(sourceStore, storageRoot) }}</span>)
               </p>
               <label class="flex items-center gap-2 text-xs text-foreground">
@@ -363,8 +427,8 @@ async function submit() {
                     :model-value="writeBackendId"
                     :options="backendOptions"
                     :disabled="isEdit"
-                    placeholder="Choose a backend"
-                    aria-label="Storage backend for new uploads"
+                    placeholder="Choose a storage"
+                    aria-label="Storage for new uploads"
                     @update:model-value="(v: string) => (writeBackendId = v)"
                   />
                   <p v-if="target" class="break-all text-[11px] text-muted-foreground">{{ storeLine(target) }}</p>
@@ -378,7 +442,7 @@ async function submit() {
                     placeholder="uploads/"
                   />
                   <p class="text-[11px] text-muted-foreground">
-                    Leave empty to save at the top of {{ target ? storeLabel(target) : 'the storage backend' }}.
+                    {{ target && splitsBuckets(target) ? 'Start with the bucket, like lab-new/uploads/.' : `Leave empty to save at the top of ${target ? storeLabel(target) : 'your storage'}.` }}
                   </p>
                 </div>
               </div>
@@ -419,12 +483,37 @@ async function submit() {
               </p>
             </div>
 
-            <Notice>Aruna never deletes files from your storage backend.</Notice>
+            <Notice>Aruna never deletes files from your storage.</Notice>
           </fieldset>
+          <p v-if="conflict" class="text-xs text-destructive">{{ conflict }}</p>
           <Notice v-if="submitError" tone="error">{{ submitError }}</Notice>
         </div>
 
         <DialogFooter>
+          <template v-if="isEdit">
+            <span v-if="confirmingDelete" class="mr-auto self-center text-xs text-foreground">
+              Delete this link? Files stay in your storage.
+            </span>
+            <Button
+              v-if="confirmingDelete"
+              type="button"
+              variant="destructive"
+              :disabled="saving || writesDisabled"
+              @click="remove"
+            >
+              Delete
+            </Button>
+            <Button
+              v-else
+              type="button"
+              variant="ghost"
+              class="mr-auto text-destructive"
+              :disabled="saving || writesDisabled"
+              @click="confirmingDelete = true"
+            >
+              Delete link
+            </Button>
+          </template>
           <DialogClose as-child><Button type="button" variant="outline">Cancel</Button></DialogClose>
           <Button
             type="submit"

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { button, compileClientComponent, content, element, flush, moduleDefault, mountApp, typeValue } from '@/test/clientRender'
 import * as Api from '@/lib/api'
 import * as LinkedFolders from '@/lib/linkedFolders'
+import * as StorageRules from '@/lib/storageRules'
 import * as Utils from '@/lib/utils'
 
 const createBackendImport = vi.fn()
@@ -58,11 +59,18 @@ const LinkedFolderDialog = compileClientComponent(new URL('./LinkedFolderDialog.
   '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled: ref(false) }) },
   '@/lib/api': { ...Api, createBackendImport, updateBackendImport, runBackendImport },
   '@/lib/linkedFolders': LinkedFolders,
+  '@/lib/storageRules': StorageRules,
   '@/lib/utils': Utils,
 })
 
 const BACKENDS = [
   { backend_id: 'b1', group_id: 'g1', kind: 's3', name: 'lab-store', public_config: { bucket: 'lab', endpoint: 'https://s3.lab.example' } },
+]
+const SPLIT = [
+  {
+    backend_id: 's1', group_id: 'g1', kind: 's3', name: 'lab-object-store',
+    public_config: { endpoint: 'https://s3.lab.example', default_bucket: 'lab-default' },
+  },
 ]
 const STORED = {
   import_id: 'i1', backend_id: 'b1', backend_prefix: 'raw/2024/', bucket: 'sequencing', key_prefix: 'seq/',
@@ -71,8 +79,10 @@ const STORED = {
 
 type Root = Parameters<typeof content>[0]
 
-async function mount(link: unknown = null) {
-  const state = reactive({ open: false, groupId: 'g1', backends: BACKENDS, link, onSaved, 'onUpdate:open': onOpen })
+async function mount(link: unknown = null, extra: Record<string, unknown> = {}) {
+  const state = reactive({
+    open: false, groupId: 'g1', backends: BACKENDS, link, onSaved, 'onUpdate:open': onOpen, ...extra,
+  })
   const mounted = await mountApp(defineComponent(() => () => h(LinkedFolderDialog, state)))
   state.open = true
   await flush()
@@ -242,6 +252,40 @@ describe('LinkedFolderDialog', () => {
 
     expect(content(mounted.root)).toContain('Another link already uses this folder.')
     expect(onSaved).not.toHaveBeenCalled()
+    mounted.app.unmount()
+  })
+
+  it('names the bucket on a storage without a fixed bucket', async () => {
+    createBackendImport.mockResolvedValue({ ...STORED, import_id: 'new' })
+    runBackendImport.mockResolvedValue({ job_id: 'j1' })
+    const mounted = await mount(null, { backends: SPLIT, storageId: 's1' })
+    await choose(mounted.root, 'To Aruna bucket', 'sequencing')
+    expect(button(mounted.root, 'Link and run').props.disabled).toBe(true)
+    await typeValue(inputById(mounted.root, '-source-bucket'), 'lab-raw')
+    await typeValue(inputById(mounted.root, '-source-folder'), '2024')
+    await submit(mounted.root)
+
+    expect(createBackendImport).toHaveBeenCalledWith(
+      'g1',
+      expect.objectContaining({ backend_id: 's1', backend_prefix: 'lab-raw/2024/' }),
+      expect.anything(),
+    )
+    mounted.app.unmount()
+  })
+
+  it('shows overlaps and the default bucket before saving', async () => {
+    const other = { ...STORED, import_id: 'i2', backend_id: 's1', backend_prefix: 'lab-raw/2024/', bucket: 'results', key_prefix: '' }
+    const mounted = await mount(null, { backends: SPLIT, storageId: 's1', links: [other] })
+    await choose(mounted.root, 'To Aruna bucket', 'sequencing')
+    await typeValue(inputById(mounted.root, '-source-bucket'), 'lab-raw')
+    await typeValue(inputById(mounted.root, '-source-folder'), '2024/old')
+    expect(content(mounted.root)).toContain('This folder overlaps the link of results (whole bucket).')
+    expect(button(mounted.root, 'Link and run').props.disabled).toBe(true)
+
+    await typeValue(inputById(mounted.root, '-source-bucket'), 'lab-default')
+    expect(content(mounted.root)).toContain('Bucket lab-default holds the default rule.')
+    await typeValue(inputById(mounted.root, '-source-bucket'), 'lab-new')
+    expect(button(mounted.root, 'Link and run').props.disabled).toBe(false)
     mounted.app.unmount()
   })
 })

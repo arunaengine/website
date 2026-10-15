@@ -46,6 +46,12 @@ const submitSummary = computed(() => (submitError.value ? shortError(submitError
 
 const isEdit = computed(() => Boolean(props.backend))
 const schema = computed(() => BACKEND_KIND_SCHEMAS[kind.value])
+// A new S3 storage has no fixed bucket: each rule names its own.
+const fields = computed(() =>
+  schema.value.public.filter(
+    (field) => !(kind.value === 's3' && field.key === 'bucket' && !props.backend?.public_config.bucket),
+  ),
+)
 // The keys naming the store cannot change: every stored object is stamped with
 // this backend, so repointing it would make that data unreadable.
 const fixed = computed(() => (isEdit.value ? new Set(schema.value.identity) : new Set<string>()))
@@ -156,11 +162,10 @@ async function submit() {
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <Database class="h-4 w-4 text-primary" />
-          {{ isEdit ? 'Edit storage backend' : 'Add storage backend' }}
+          {{ isEdit ? 'Edit your storage' : 'Add your storage' }}
         </DialogTitle>
         <DialogDescription>
-          New uploads that pick this backend are written to storage your group runs, not to this
-          node's own storage.
+          Storage your group runs, like your own S3. Rules decide which buckets Aruna uses there.
         </DialogDescription>
       </DialogHeader>
 
@@ -170,8 +175,8 @@ async function submit() {
             v-if="settingsLocked"
             class="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
           >
-            This backend is disabled. You can still change its credentials; other settings can only
-            change after you enable it again.
+            This storage is removed. You can still change its keys; other settings change only after
+            you enable it again.
           </p>
 
           <div class="grid gap-3 sm:grid-cols-2">
@@ -204,11 +209,11 @@ async function submit() {
               aria-label="Locked"
               title="Files already stored here are recorded against this type and address; pointing the entry elsewhere would make them unreadable."
             />
-            <span>The type and the address cannot change. Add a second backend instead.</span>
+            <span>The type and the address cannot change. Add another storage instead.</span>
           </p>
 
           <div class="grid gap-3 sm:grid-cols-2">
-            <div v-for="field in schema.public" :key="field.key">
+            <div v-for="field in fields" :key="field.key">
               <label :for="`${uid}-pub-${field.key}`" class="text-xs font-medium text-foreground">
                 {{ field.label }}<span v-if="!field.required" class="text-muted-foreground"> (optional)</span>
               </label>
@@ -266,14 +271,14 @@ async function submit() {
             </details>
           </Notice>
           <p class="text-[11px] text-muted-foreground">
-            The node tries the credentials against the backend before it saves them.
+            Aruna checks the keys before it saves them.
           </p>
         </div>
 
         <DialogFooter>
           <DialogClose as-child><Button type="button" variant="outline">Cancel</Button></DialogClose>
           <Button type="submit" :disabled="submitDisabled" :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined">
-            {{ saving ? 'Saving…' : isEdit ? 'Save changes' : 'Add backend' }}
+            {{ saving ? 'Saving…' : isEdit ? 'Save changes' : 'Add storage' }}
           </Button>
         </DialogFooter>
       </form>
