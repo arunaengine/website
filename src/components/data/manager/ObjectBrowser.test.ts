@@ -54,6 +54,12 @@ function action(root: HostNode, label: string): HostNode {
   return element(root, (node) => node.props['aria-label'] === label)
 }
 
+// The list bar carries a Download too, so row actions are found inside the row.
+function rowAction(root: HostNode, label: string): HostNode {
+  const row = element(root, (node) => node.tag === 'tr' && content(node).includes('reads.fastq'))
+  return action(row, label)
+}
+
 describe('object browser row actions', () => {
   it('shows a broken file in red with the reason', async () => {
     brokenFiles.reasons = { [listedObject.key]: 'File missing on storage' }
@@ -91,7 +97,7 @@ describe('object browser row actions', () => {
     download.mockClear()
     const root = await render()
 
-    await bubbleClick(action(root, 'Download'))
+    await bubbleClick(rowAction(root, 'Download'))
 
     expect(download).toHaveBeenCalledWith(listedObject)
   })
@@ -107,7 +113,7 @@ describe('object browser row actions', () => {
       const row = element(root, (node) => node.tag === 'tr' && content(node).includes('reads.fastq'))
       expect(content(row)).toContain('Key pending')
 
-      await bubbleClick(action(root, 'Download'))
+      await bubbleClick(rowAction(root, 'Download'))
 
       expect(lockedDownload).toHaveBeenCalledWith(listedObject)
       expect(download).not.toHaveBeenCalled()
@@ -189,9 +195,9 @@ describe('object browser selection', () => {
 
     await tick(checkbox(root, 'Select genomes'), true)
     await tick(checkbox(root, `Select ${listedObject.name}`), true)
-    const trigger = button(root, 'Delete selected')
+    const trigger = action(root, 'Delete')
 
-    expect(content(trigger)).toContain('Delete selected (2)')
+    expect(content(root)).toContain('2 selected')
     expect(trigger.props.disabled).toBe(false)
     await click(trigger)
 
@@ -213,12 +219,93 @@ describe('object browser selection', () => {
     expect(box.props.title).toContain('cannot delete this entire folder')
   })
 
-  it('keeps the selection button disabled while nothing is ticked', async () => {
+  it('keeps every list bar action disabled while nothing is ticked', async () => {
     const root = await render({ folders: ref([listedFolder]) })
-    const trigger = button(root, 'Delete selected')
 
-    expect(content(trigger)).toContain('Delete selected (0)')
-    expect(trigger.props.disabled).toBe(true)
+    for (const label of ['Download', 'Move to', 'Copy to', 'Rename', 'Access', 'Delete']) {
+      expect(action(root, label).props.disabled).toBe(true)
+    }
+  })
+
+  it('renames only one ticked entry and downloads only ticked files', async () => {
+    const root = await render({ folders: ref([listedFolder]) })
+
+    await tick(checkbox(root, 'Select genomes'), true)
+    expect(action(root, 'Rename').props.disabled).toBe(false)
+    expect(action(root, 'Download').props.disabled).toBe(true)
+
+    await tick(checkbox(root, `Select ${listedObject.name}`), true)
+    expect(action(root, 'Rename').props.disabled).toBe(true)
+    expect(action(root, 'Download').props.disabled).toBe(false)
+  })
+
+  it('downloads the ticked files from the list bar', async () => {
+    download.mockClear()
+    const root = await render()
+
+    await tick(checkbox(root, `Select ${listedObject.name}`), true)
+    await click(action(root, 'Download'))
+
+    expect(download).toHaveBeenCalledWith(listedObject)
+  })
+
+  it('asks public access for the ticked entries', async () => {
+    const publicAccess = vi.fn()
+    const manager = fakeManager({ openDetails, download, requestDelete, router: { push }, folders: ref([listedFolder]) })
+    const host = defineComponent({ setup: () => () => h(browser, { manager, onPublicAccess: publicAccess }) })
+    const { root } = await mountApp(host)
+
+    await tick(checkbox(root, `Select ${listedObject.name}`), true)
+    await tick(checkbox(root, `Select ${listedFolder.name}`), true)
+    await click(action(root, 'Access'))
+    expect(publicAccess).toHaveBeenLastCalledWith([
+      { kind: 'folder', bucket: 'reef', key: listedFolder.prefix },
+      { kind: 'file', bucket: 'reef', key: listedObject.key },
+    ])
+  })
+
+  it('clears the ticks from the list bar', async () => {
+    const root = await render()
+
+    await tick(checkbox(root, `Select ${listedObject.name}`), true)
+    await click(action(root, 'Clear selection'))
+
+    expect(content(root)).toContain('0 selected')
+    expect(action(root, 'Delete').props.disabled).toBe(true)
+  })
+
+  it('marks the filter button and offers the reset once a filter is set', async () => {
+    const resetFilters = vi.fn()
+    const plain = await render({ resetFilters })
+    expect(button(plain, 'Reset filters').props.disabled).toBe(true)
+
+    const filtered = await render({ resetFilters, showDeleted: ref(true) })
+    const reset = button(filtered, 'Reset filters')
+    expect(reset.props.disabled).toBe(false)
+    await click(reset)
+    expect(resetFilters).toHaveBeenCalled()
+  })
+
+  it('sets the shown kind from the filter menu', async () => {
+    const listShow = ref('all')
+    const root = await render({ listShow })
+
+    await click(button(root, 'Folders only'))
+
+    expect(listShow.value).toBe('folders')
+  })
+
+  it('lists deleted files between the live ones in key order', async () => {
+    const deletedRows = ref([{ key: 'raw/a.txt', name: 'a.txt', markerVersionId: 'm1' }])
+    const objects = ref([listedObject, { ...listedObject, key: 'raw/0.txt', name: '0.txt' }])
+    const root = await render({ deletedRows, objects, visibleObjects: objects })
+
+    const names = nodes(root)
+      .filter((node) => node.tag === 'tr')
+      .map((node) => content(node))
+      .filter((text) => text.includes('.txt') || text.includes('.fastq'))
+      .map((text) => (text.includes('Deleted') ? 'deleted a.txt' : text.includes('0.txt') ? '0.txt' : 'reads.fastq'))
+    expect(names).toEqual(['0.txt', 'deleted a.txt', 'reads.fastq'])
   })
 })
 

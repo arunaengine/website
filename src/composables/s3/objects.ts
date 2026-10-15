@@ -99,16 +99,19 @@ export async function putTextObject(
   return { versionId: response.VersionId ?? null }
 }
 
+// `nameStart` narrows the folder to names that start with it; names stay
+// relative to the folder.
 export async function listObjects(
   bucket: string,
   prefix: string,
   token?: string,
   nodeId?: string | null,
+  options: { nameStart?: string } = {},
 ): Promise<ObjectPage> {
   const response = await client(nodeId).send(
     new ListObjectsV2Command({
       Bucket: bucket,
-      Prefix: prefix || undefined,
+      Prefix: `${prefix}${options.nameStart ?? ''}` || undefined,
       Delimiter: '/',
       ContinuationToken: token,
       MaxKeys: 200,

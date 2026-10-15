@@ -105,8 +105,8 @@ function deleteOption(target: DeletionTarget): DeletionOption {
     id: 'delete',
     label: 'Delete',
     description: many
-      ? 'Writes a delete marker for every current object in this scope. Earlier versions stay, and Show deleted brings each object back.'
-      : 'Writes a delete marker. The object leaves the listing, every earlier version stays, and Show deleted brings it back.',
+      ? 'Writes a delete marker for every current object in this scope. Earlier versions stay, and Include deleted brings each object back.'
+      : 'Writes a delete marker. The object leaves the listing, every earlier version stays, and Include deleted brings it back.',
     tier: many ? 'confirm' : 'one-click',
     call: { operation: many ? 'write-markers' : 'write-marker' },
     irreversible: false,

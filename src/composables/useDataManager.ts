@@ -29,6 +29,7 @@ import { bucketNameProblem } from '@/lib/bucketName'
 import { readStored, storeValue } from './aruna/state'
 import { requestScope, type DeleteRequest, type DeletionResult } from '@/lib/deletion/request'
 import type { DeletedObjectEntry } from '@/lib/objectVersions'
+import { shownDeleted, shownEntries, type ListingShow } from '@/lib/objectListing'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import type { BucketSearchHit, SourceConnectorSummary, SyncRelationship, UsageResponse } from '@/lib/api'
@@ -513,9 +514,16 @@ export function useDataManager() {
   const listLoading = ref(false)
   const listError = ref<string | null>(null)
   const listAuthError = ref(false)
+  // The name filter is an S3 prefix inside the open folder; the kind filter
+  // only hides rows of the page already listed.
+  const nameFilter = ref('')
+  const listShow = ref<ListingShow>('all')
+  const shown = computed(() => shownEntries(folders.value, objects.value, listShow.value))
+  const visibleFolders = computed(() => shown.value.folders)
+  const visibleObjects = computed(() => shown.value.objects)
   const selection = useBrowserSelection({
-    folders,
-    objects,
+    folders: visibleFolders,
+    objects: visibleObjects,
     canSelectObject: (key) => s3.canWrite(bucket.value, key, remoteNodeId.value),
     canSelectFolder: (prefix) => s3.canDeletePrefix(bucket.value, prefix, remoteNodeId.value),
   })
@@ -578,6 +586,18 @@ export function useDataManager() {
     },
     { immediate: true },
   )
+
+  const deletedRows = computed(() =>
+    showDeleted.value ? shownDeleted(deletedObjects.value, nameFilter.value, listShow.value) : [],
+  )
+
+  // Hidden rows leave the selection, so no action reaches what is not shown.
+  watch(listShow, () => selection.clearSelection())
+
+  function resetFilters() {
+    listShow.value = 'all'
+    setShowDeleted(false)
+  }
 
   // Deleting the delete marker moves the head back to the newest stored
   // version: the restore is one call and needs no confirmation.
@@ -668,12 +688,13 @@ export function useDataManager() {
     const targetPrefix = s3Prefix.value
     const targetNode = remoteNodeId.value
     const continuation = more ? nextToken.value : undefined
+    const nameStart = nameFilter.value
     listLoading.value = true
     listError.value = null
     listAuthError.value = false
     remoteBrowseBlocked.value = false
     try {
-      const page = await s3.listObjects(targetBucket, targetPrefix, continuation, targetNode)
+      const page = await s3.listObjects(targetBucket, targetPrefix, continuation, targetNode, { nameStart })
       if (requestId !== listRequestId) return
       folders.value = more ? [...folders.value, ...page.folders] : page.folders
       objects.value = more ? [...objects.value, ...page.objects] : page.objects
@@ -730,7 +751,9 @@ export function useDataManager() {
 
   // effectiveEndpoint is included so a remote deep link starts listing once the
   // realm document (with the remote node's published S3 URL) arrives.
-  watch([bucket, prefix, remoteNodeId, effectiveEndpoint], () => {
+  // A new folder starts unfiltered; the sync flush lets one listing cover both changes.
+  watch([bucket, prefix], () => (nameFilter.value = ''), { flush: 'sync' })
+  watch([bucket, prefix, remoteNodeId, effectiveEndpoint, nameFilter], () => {
     clearObjectListing()
     if (bucket.value && contextReady.value) void loadObjects()
   })
@@ -1226,9 +1249,9 @@ export function useDataManager() {
     () =>
       !listLoading.value &&
       !listError.value &&
-      !folders.value.length &&
-      !objects.value.length &&
-      !deletedObjects.value.length,
+      !visibleFolders.value.length &&
+      !visibleObjects.value.length &&
+      !deletedRows.value.length,
   )
 
   const viewReady = computed(() =>
@@ -1309,6 +1332,11 @@ export function useDataManager() {
     createBucket,
     folders,
     objects,
+    visibleFolders,
+    visibleObjects,
+    nameFilter,
+    listShow,
+    resetFilters,
     nextToken,
     listLoading,
     listError,
@@ -1326,6 +1354,7 @@ export function useDataManager() {
     setObjectSelected,
     setFolderSelected,
     setAllListedSelected,
+    clearSelection: selection.clearSelection,
     openBucketOn,
     openBucket,
     openSearchHit,
@@ -1351,6 +1380,7 @@ export function useDataManager() {
     showDeleted,
     setShowDeleted,
     deletedObjects,
+    deletedRows,
     deletedLoading,
     deletedTruncated,
     deletedError,

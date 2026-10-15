@@ -7,10 +7,11 @@ import Notice from '@/components/ui/Notice.vue'
 import Popover from '@/components/ui/Popover.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Spinner from '@/components/ui/Spinner.vue'
-import Switch from '@/components/ui/Switch.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
 import Breadcrumbs from '@/components/data/Breadcrumbs.vue'
 import ObjectIcon from '@/components/data/ObjectIcon.vue'
+import ObjectListBar from '@/components/data/manager/ObjectListBar.vue'
+import TransferDialog from '@/components/data/manager/TransferDialog.vue'
 import WatchButton from '@/components/watches/WatchButton.vue'
 import KeyedReadNotice from '@/components/storage/KeyedReadNotice.vue'
 import { useAruna } from '@/composables/useAruna'
@@ -29,7 +30,8 @@ import { featureEnabled } from '@/lib/config'
 import { isNotebookKey } from '@/lib/notebook/document'
 import { collectDropFiles } from '@/lib/upload/dropEntries'
 import { stateVariant } from '@/lib/stateBadge'
-import { selectionNoun } from '@/lib/deletion/request'
+import { fileRows, type SelectionAction } from '@/lib/objectListing'
+import type { TransferMode, TransferSource } from '@/lib/objectMove'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
@@ -79,8 +81,10 @@ const {
   referencedFrom,
   prefixReferenceSummary,
   activeGroupId,
-  folders,
   objects,
+  visibleFolders,
+  visibleObjects,
+  nameFilter,
   nextToken,
   listLoading,
   listError,
@@ -103,6 +107,7 @@ const {
   setObjectSelected,
   setFolderSelected,
   setAllListedSelected,
+  clearSelection,
   canWriteCurrentPrefix,
   writeRestrictionMessage,
   watchPathPrefix,
@@ -112,8 +117,8 @@ const {
   onRetryObjects,
   requestUpload,
   showDeleted,
-  setShowDeleted,
-  deletedObjects,
+  deletedRows,
+  loadDeleted,
   deletedLoading,
   deletedTruncated,
   deletedError,
@@ -151,13 +156,6 @@ function folderPublic(prefix: string): boolean {
   return publicAccess.isPublic(remoteNodeId.value, { kind: 'folder', bucket: bucket.value, key: prefix })
 }
 
-// One entry for everything this bucket stores: its settings page. The dot says
-// the bucket carries syncs or placement policies, which only a viewer the node
-// lets read bucket placement pays a request for.
-const selectionSummary = computed(() =>
-  selectionNoun(selectedObjectKeys.value.size, selectedPrefixes.value.size),
-)
-
 // With the notebooks flag a notebook row stands out and opens the notebook
 // itself; everything else keeps the ordinary file details.
 function isNotebook(object: ObjectEntry): boolean {
@@ -175,6 +173,9 @@ function openObject(object: ObjectEntry) {
   })
 }
 
+// One entry for everything this bucket stores: its settings page. The dot says
+// the bucket carries syncs or placement policies, which only a viewer the node
+// lets read bucket placement pays a request for.
 const showStorageButton = computed(() => Boolean(bucket.value))
 const bucketPolicyCount = ref(0)
 const storageCount = computed(() => bucketSyncCount.value + bucketPolicyCount.value)
@@ -247,6 +248,39 @@ function deleteSelection() {
   })
 }
 
+const transferOpen = ref(false)
+const transferMode = ref<TransferMode>('copy')
+const transferSources = ref<TransferSource[]>([])
+
+function openTransfer(mode: TransferMode, sources: TransferSource[]) {
+  transferMode.value = mode
+  transferSources.value = sources
+  transferOpen.value = true
+}
+
+function selectedSources(): TransferSource[] {
+  return [
+    ...[...selectedPrefixes.value].map((key) => ({ key, folder: true })),
+    ...[...selectedObjectKeys.value].map((key) => ({ key, folder: false })),
+  ]
+}
+
+function onTransferDone() {
+  if (transferMode.value !== 'copy') clearSelection()
+  void loadObjects()
+  void loadDeleted()
+}
+
+function onBarAction(action: SelectionAction) {
+  if (action === 'download') {
+    for (const object of visibleObjects.value) {
+      if (selectedObjectKeys.value.has(object.key)) void locked.download(object)
+    }
+  } else if (action === 'access') emit('public-access', publicTargets())
+  else if (action === 'delete') deleteSelection()
+  else openTransfer(action, selectedSources())
+}
+
 // The marker version travels with the request: choosing Restore in the dialog
 // deletes exactly that marker.
 function deleteRestorable(entry: DeletedObjectEntry) {
@@ -293,16 +327,6 @@ async function onDrop(event: DragEvent) {
           <Spinner v-if="listLoading" label="Loading objects" class="shrink-0" />
         </div>
         <div class="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            class="text-destructive hover:text-destructive"
-            :disabled="selectedCount === 0"
-            :title="selectedCount === 0 ? 'Tick files and folders in the list to delete them.' : `Delete ${selectionSummary}`"
-            @click="deleteSelection"
-          >
-            <Trash2 class="h-4 w-4" /> Delete selected ({{ selectedCount }})
-          </Button>
           <WatchButton
             surface="bucket"
             :path-prefix="watchPathPrefix"
@@ -389,16 +413,7 @@ async function onDrop(event: DragEvent) {
           <Button v-if="!remoteNodeId" data-tour="bucket-add-data" size="sm" :disabled="!canWriteCurrentPrefix" :title="writeRestrictionMessage ?? 'Add data'" @click="emit('add-data')"><Plus class="h-4 w-4" /> Add data</Button>
         </div>
       </div>
-      <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <!-- Deleted keys are listed by the node that holds the bucket, so the
-             toggle only applies to a bucket on the connected node. -->
-        <label v-if="!remoteNodeId && !remoteBlocked" class="flex items-center gap-2 text-xs text-muted-foreground">
-          <Switch :checked="showDeleted" @update:checked="setShowDeleted" />
-          Show deleted
-        </label>
-        <p v-else-if="!remoteBlocked" class="text-xs text-muted-foreground">
-          Deleted objects are listed by the node that holds this bucket, so they are unavailable here.
-        </p>
+      <div v-if="deletedLoading || (showDeleted && deletedTruncated)" class="flex flex-wrap items-center gap-x-3 gap-y-1">
         <Spinner v-if="deletedLoading" label="Loading deleted objects" />
         <p v-if="showDeleted && deletedTruncated" class="text-xs text-muted-foreground">
           Only the first deleted objects of this folder are listed.
@@ -440,6 +455,7 @@ async function onDrop(event: DragEvent) {
         @dragleave="dragActive = false"
         @drop.prevent="onDrop"
       >
+        <ObjectListBar :manager="manager" @action="onBarAction" />
         <Notice v-if="listError && listAuthError" tone="warning" class="rounded-none border-x-0 border-t-0">
           <p>The temporary S3 session was rejected. Close it, then explicitly open this node and group again.</p>
           <p class="mt-1 break-all font-mono text-[10px]">{{ listError }}</p>
@@ -468,7 +484,7 @@ async function onDrop(event: DragEvent) {
           </thead>
           <tbody>
             <tr
-              v-for="folder in folders"
+              v-for="folder in visibleFolders"
               :key="folder.prefix"
               class="cursor-pointer border-t border-border hover:bg-muted/50"
               @click="openFolder(folder)"
@@ -520,9 +536,12 @@ async function onDrop(event: DragEvent) {
             </tr>
             <!-- Row click opens the file details; the action buttons stop
                  propagation and open the tab they name. -->
+            <template
+              v-for="{ deleted, entry: object } in fileRows(visibleObjects, deletedRows)"
+              :key="`${deleted ? 'deleted:' : ''}${object.key}`"
+            >
             <tr
-              v-for="object in objects"
-              :key="object.key"
+              v-if="!deleted"
               class="cursor-pointer border-t border-border hover:bg-muted/30"
               :class="isNotebook(object) ? 'bg-primary/5' : ''"
               @click="openObject(object)"
@@ -585,40 +604,41 @@ async function onDrop(event: DragEvent) {
             <!-- Marker-headed keys: hidden by an ordinary listing, offered back
                  here so a restore never leaves the browser. -->
             <tr
-              v-for="entry in showDeleted ? deletedObjects : []"
-              :key="`deleted:${entry.key}`"
+              v-else
               class="border-t border-border bg-muted/20 text-muted-foreground"
             >
               <td class="w-10 px-4 py-2.5"></td>
               <td class="px-4 py-2.5">
                 <span class="flex items-center gap-2">
-                  <ObjectIcon :name="entry.name" class="h-4 w-4 opacity-60" />
-                  <span class="truncate line-through">{{ entry.name }}</span>
+                  <ObjectIcon :name="object.name" class="h-4 w-4 opacity-60" />
+                  <span class="truncate line-through">{{ object.name }}</span>
                   <Badge :variant="stateVariant('deleted')" size="sm">Deleted</Badge>
                 </span>
               </td>
               <td class="px-4 py-2.5 text-right font-mono text-xs">-</td>
-              <td class="px-4 py-2.5 text-xs">{{ entry.lastModified ? relativeTime(entry.lastModified.toISOString()) : '-' }}</td>
+              <td class="px-4 py-2.5 text-xs">{{ object.lastModified ? relativeTime(object.lastModified.toISOString()) : '-' }}</td>
               <td class="px-4 py-2.5">
                 <div class="flex items-center justify-end gap-1">
-                  <Spinner v-if="restoringKey === entry.key" label="Restoring the object" />
+                  <Spinner v-if="restoringKey === object.key" label="Restoring the object" />
                   <IconButton
                     label="Restore"
-                    :disabled-reason="objectReason(entry.key)"
-                    @click.stop="restoreObject(entry)"
+                    :disabled-reason="objectReason(object.key)"
+                    @click.stop="restoreObject(object)"
                   ><Undo2 class="size-3.5" /></IconButton>
                   <IconButton
                     label="Delete permanently…"
                     class="text-destructive hover:text-destructive"
-                    :disabled-reason="objectReason(entry.key)"
-                    @click.stop="deleteRestorable(entry)"
+                    :disabled-reason="objectReason(object.key)"
+                    @click.stop="deleteRestorable(object)"
                   ><Trash2 class="size-3.5" /></IconButton>
                 </div>
               </td>
             </tr>
+            </template>
             <tr v-if="isEmpty">
               <td colspan="5" class="px-4 py-10 text-center text-xs text-muted-foreground">
-                {{ canWriteCurrentPrefix ? 'This prefix is empty. Drop files here or use Add data.' : 'This prefix is empty. This session is read-only here.' }}
+                <template v-if="nameFilter">No names here start with "{{ nameFilter }}".</template>
+                <template v-else>{{ canWriteCurrentPrefix ? 'This prefix is empty. Drop files here or use Add data.' : 'This prefix is empty. This session is read-only here.' }}</template>
               </td>
             </tr>
           </tbody>
@@ -629,6 +649,15 @@ async function onDrop(event: DragEvent) {
           </Button>
         </div>
       </div>
+      <TransferDialog
+        v-model:open="transferOpen"
+        :mode="transferMode"
+        :bucket="bucket"
+        :prefix="s3Prefix"
+        :node-id="remoteNodeId"
+        :sources="transferSources"
+        @done="onTransferDone"
+      />
       <KeyedReadNotice :wait="locked.wait.value" action="download" class="max-w-xl" @cancel="locked.cancel()" />
 
       <slot />

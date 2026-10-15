@@ -8,6 +8,7 @@ import * as DeletionRequest from '@/lib/deletion/request'
 import * as StateBadge from '@/lib/stateBadge'
 import * as DropEntries from '@/lib/upload/dropEntries'
 import * as NotebookDocument from '@/lib/notebook/document'
+import * as ObjectListing from '@/lib/objectListing'
 import * as Utils from '@/lib/utils'
 import { compileClientComponent, moduleDefault } from '@/test/clientRender'
 
@@ -35,6 +36,13 @@ export const IconButtonStub = defineComponent({
       { ...attrs, 'aria-label': props.label, disabled: Boolean(props.disabledReason) },
       slots.default?.(),
     ),
+})
+
+export const MenuItemStub = defineComponent({
+  inheritAttrs: false,
+  props: { disabled: Boolean },
+  setup: (props, { attrs, slots }) => () =>
+    h('button', { ...attrs, role: attrs.role ?? 'menuitem', disabled: props.disabled }, slots.default?.()),
 })
 
 /** The write answers the compiled browser sees; a test may narrow them. */
@@ -69,6 +77,30 @@ function lockedBucket(...args: unknown[]) {
 }
 
 let compiled: Component | null = null
+let compiledBar: Component | null = null
+
+/** The list bar above the object table, compiled so the browser tests can tick and act. */
+export function objectListBar(): Component {
+  compiledBar ??= compileClientComponent(
+    new URL('../components/data/manager/ObjectListBar.vue', import.meta.url),
+    {
+      vue: VueRuntime,
+      '@lucide/vue': new Proxy({}, { get: () => IconStub }),
+      '@vueuse/core': { useDebounceFn: (fn: (...args: unknown[]) => unknown) => fn },
+      '@/lib/objectListing': ObjectListing,
+      '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+      '@/components/ui/DropdownMenu.vue': moduleDefault(Slotted('div')),
+      '@/components/ui/DropdownMenuContent.vue': moduleDefault(Slotted('div')),
+      '@/components/ui/DropdownMenuItem.vue': moduleDefault(MenuItemStub),
+      '@/components/ui/DropdownMenuLabel.vue': moduleDefault(Slotted('p')),
+      '@/components/ui/DropdownMenuSeparator.vue': moduleDefault(Slotted('hr')),
+      '@/components/ui/DropdownMenuTrigger.vue': moduleDefault(Slotted('span')),
+      '@/components/ui/IconButton.vue': moduleDefault(IconButtonStub),
+      '@/components/ui/Input.vue': moduleDefault(Slotted('input')),
+    },
+  )
+  return compiledBar
+}
 
 export function objectBrowser(): Component {
   compiled ??= compileClientComponent(
@@ -82,6 +114,7 @@ export function objectBrowser(): Component {
       '@/lib/stateBadge': StateBadge,
       '@/lib/upload/dropEntries': DropEntries,
       '@/lib/notebook/document': NotebookDocument,
+      '@/lib/objectListing': ObjectListing,
       '@/lib/utils': Utils,
       '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
       '@/components/ui/Button.vue': moduleDefault(ButtonStub),
@@ -97,6 +130,8 @@ export function objectBrowser(): Component {
       '@/components/ui/Tooltip.vue': moduleDefault(Slotted('span')),
       '@/components/data/Breadcrumbs.vue': moduleDefault(Slotted('nav')),
       '@/components/data/ObjectIcon.vue': moduleDefault(Slotted('i')),
+      '@/components/data/manager/ObjectListBar.vue': moduleDefault(objectListBar()),
+      '@/components/data/manager/TransferDialog.vue': moduleDefault(Slotted('aside')),
       '@/components/watches/WatchButton.vue': moduleDefault(Slotted('button')),
       '@/components/storage/KeyedReadNotice.vue': moduleDefault(Slotted('aside')),
       '@/composables/useAruna': { useAruna: () => ({ isRealmAdmin: ref(false) }) },
@@ -161,6 +196,11 @@ export function fakeManager(overrides: Record<string, unknown> = {}) {
     selectedGroupId: ref('g-1'),
     folders,
     objects,
+    visibleFolders: folders,
+    visibleObjects: objects,
+    nameFilter: ref(''),
+    listShow: ref('all'),
+    resetFilters: vi.fn(),
     nextToken: ref(undefined),
     listLoading: ref(false),
     listError: ref(null),
@@ -185,6 +225,10 @@ export function fakeManager(overrides: Record<string, unknown> = {}) {
     setFolderSelected: (prefix: string, selected: boolean) =>
       toggle(selectedPrefixes, prefix, selected),
     setAllListedSelected: vi.fn(),
+    clearSelection: () => {
+      selectedObjectKeys.value = new Set()
+      selectedPrefixes.value = new Set()
+    },
     canWriteCurrentPrefix: computed(() => true),
     writeRestrictionMessage: computed(() => null),
     watchPathPrefix: computed(() => 'reef/raw/'),
@@ -196,6 +240,8 @@ export function fakeManager(overrides: Record<string, unknown> = {}) {
     showDeleted: ref(false),
     setShowDeleted: vi.fn(),
     deletedObjects: ref([]),
+    deletedRows: ref([]),
+    loadDeleted: vi.fn(),
     deletedLoading: ref(false),
     deletedTruncated: ref(false),
     deletedError: ref(null),

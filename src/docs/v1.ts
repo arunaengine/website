@@ -1447,7 +1447,7 @@ export const docsTopics: DocsTopic[] = [
         icon: 'Trash2',
         bullets: [
           'Delete writes a [delete marker](concept:glossary#delete-marker): the file leaves the listing and every earlier version stays.',
-          'Show deleted in the object browser lists the files whose newest version is a delete marker.',
+          'Include deleted in the filter menu of the object browser lists the files whose newest version is a delete marker.',
           'Restore removes that marker, so the newest earlier version is the current one again.',
           'A delete marker frees no storage: the data keeps using your quota until it is deleted permanently.',
           'Deleting a dataset removes its description, never the stored objects it references.',

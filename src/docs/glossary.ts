@@ -224,14 +224,14 @@ export const glossaryTopic: DocsTopic = {
       title: 'Delete marker',
       icon: 'Trash2',
       paragraphs: [
-        'The version a plain Delete writes: the file leaves the listing while [every earlier version stays](concept:data-and-deletion#delete-is-recoverable). Show deleted lists such files, and Restore removes the marker.',
+        'The version a plain Delete writes: the file leaves the listing while [every earlier version stays](concept:data-and-deletion#delete-is-recoverable). Include deleted lists such files, and Restore removes the marker.',
       ],
     },
     {
-      title: 'Show deleted',
+      title: 'Include deleted',
       icon: 'Eye',
       paragraphs: [
-        'The object browser toggle that lists the files whose newest version is a [delete marker](concept:glossary#delete-marker), each with a Restore action.',
+        'The object browser filter that lists the files whose newest version is a [delete marker](concept:glossary#delete-marker), each with a Restore action.',
       ],
     },
     {
