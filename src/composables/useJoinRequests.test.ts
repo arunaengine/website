@@ -96,4 +96,27 @@ describe('membership requests', () => {
       vi.useRealTimers()
     }
   })
+
+  it('drops a decided request when its week ends while the list stays the same', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-20T00:00:00Z'))
+    vi.stubGlobal('fetch', vi.fn(async () => json({
+      requests: [
+        { ...entry('pending'), created_at: '2026-08-01T00:00:00Z' },
+        { ...entry('ending'), status: 'approved', decided_at: '2026-09-13T00:01:00Z' },
+      ],
+      next_start_after: null,
+    })))
+    try {
+      const api = useJoinRequests()
+      await api.loadOwnRequests()
+      expect(api.visibleOwnRequests.value.map((r) => r.request_id)).toEqual(['pending', 'ending'])
+
+      vi.advanceTimersByTime(2 * 60 * 1000)
+
+      expect(api.visibleOwnRequests.value.map((r) => r.request_id)).toEqual(['pending'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

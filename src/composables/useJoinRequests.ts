@@ -43,15 +43,44 @@ const pendingByGroup = computed<Map<string, JoinRequest>>(
 // Decided requests stay listed for this long, counted from the decision.
 const DECIDED_VISIBLE_MS = 7 * 24 * 60 * 60 * 1000
 
+// The time the week is counted against. It moves on when the list changes, at the
+// next expiry, and when the tab comes back, so decided rows leave on time.
+const clock = ref(Date.now())
+let expiryTimer: ReturnType<typeof setTimeout> | null = null
+
+function decidedAt(r: JoinRequest): number {
+  return Date.parse(r.decided_at ?? r.created_at)
+}
+
 // Own requests worth showing: pending ones always, decided ones for a week.
-const visibleOwnRequests = computed<JoinRequest[]>(() => {
-  const now = Date.now()
-  return ownRequests.value.filter((r) => {
+const visibleOwnRequests = computed<JoinRequest[]>(() =>
+  ownRequests.value.filter((r) => {
     if (r.status === 'pending') return true
-    const at = Date.parse(r.decided_at ?? r.created_at)
-    return Number.isNaN(at) || now - at < DECIDED_VISIBLE_MS
-  })
-})
+    const at = decidedAt(r)
+    return Number.isNaN(at) || clock.value - at < DECIDED_VISIBLE_MS
+  }),
+)
+
+function scheduleExpiry() {
+  if (expiryTimer !== null) clearTimeout(expiryTimer)
+  expiryTimer = null
+  const ends = visibleOwnRequests.value
+    .filter((r) => r.status !== 'pending' && !Number.isNaN(decidedAt(r)))
+    .map((r) => decidedAt(r) + DECIDED_VISIBLE_MS)
+  if (!ends.length) return
+  expiryTimer = setTimeout(tick, Math.max(0, Math.min(...ends) - Date.now()) + 1)
+}
+
+function tick() {
+  clock.value = Date.now()
+  scheduleExpiry()
+}
+
+watch(ownRequests, tick, { flush: 'sync' })
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('focus', tick)
+}
+if (typeof document !== 'undefined') document.addEventListener('visibilitychange', tick)
 
 function assertEnabled() {
   if (!featureEnabled('joinRequests')) {
