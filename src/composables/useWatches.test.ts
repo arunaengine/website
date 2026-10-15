@@ -205,4 +205,18 @@ describe('old watches an edit could not delete', () => {
     await expect(cleanup).rejects.toMatchObject({ name: 'AbortError', message: 'The API session changed.' })
     expect(watches.pendingRemovals(prefix)).toEqual([])
   })
+
+  it('stops when the caller scope moved on', async () => {
+    const storage = sessionStore()
+    stubFetch([{ status: 204 }])
+    vi.stubGlobal('window', { location: { origin: 'https://portal.test' }, sessionStorage: storage })
+    const watches = await freshWatches()
+    let here = true
+    const action = watches.startAction('s3/g1/n1/reef/', () => here)
+
+    here = false
+
+    await expect(watches.removePending(action, ['old'])).rejects.toThrow('The folder changed. Nothing was saved.')
+    expect(storage.getItem(action.key)).toBe(JSON.stringify(['old']))
+  })
 })

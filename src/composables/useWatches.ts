@@ -123,7 +123,7 @@ function writePending(key: string, ids: string[]) {
 
 /**
  * One Watch, Save or Stop: the session, prefix and pending key it started with. `check`
- * runs after every await and throws once the session moved on.
+ * runs after every await and throws once the session or the caller's scope moved on.
  */
 export interface WatchAction {
   pathPrefix: string
@@ -132,7 +132,7 @@ export interface WatchAction {
   check(): void
 }
 
-function startAction(pathPrefix: string): WatchAction {
+function startAction(pathPrefix: string, scopeHolds: () => boolean = () => true): WatchAction {
   const epoch = sessionEpoch.value
   return {
     pathPrefix,
@@ -140,6 +140,7 @@ function startAction(pathPrefix: string): WatchAction {
     key: pendingKey(pathPrefix),
     check() {
       if (epoch !== sessionEpoch.value) throw new DOMException('The API session changed.', 'AbortError')
+      if (!scopeHolds()) throw new DOMException('The folder changed. Nothing was saved.', 'AbortError')
     },
   }
 }

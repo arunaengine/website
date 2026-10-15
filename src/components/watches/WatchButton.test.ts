@@ -70,14 +70,15 @@ interface FakeAction {
   check(): void
 }
 
-// Mirrors useWatches: an action stops after any await once its session moved on.
-function startAction(pathPrefix: string): FakeAction {
+// Mirrors useWatches: an action stops after any await once its session or scope moved on.
+function startAction(pathPrefix: string, scopeHolds: () => boolean = () => true): FakeAction {
   const started = epoch.value
   return {
     pathPrefix,
     client: {},
     check() {
       if (started !== epoch.value) throw new DOMException('The API session changed.', 'AbortError')
+      if (!scopeHolds()) throw new DOMException('The folder changed. Nothing was saved.', 'AbortError')
     },
   }
 }
@@ -412,6 +413,35 @@ describe('watch bell on a bucket folder', () => {
     expect(createWatch).not.toHaveBeenCalled()
     expect(deleteWatch.mock.calls.map(([id]) => id)).toEqual(['a'])
     expect(content(root)).toContain('The API session changed.')
+  })
+
+  it('saves nothing in a folder opened during the cleanup', async () => {
+    outgoing.value = [{ id: 'rel-1' }]
+    watchList.value = [
+      { id: 'b', path_prefix: 's3/g1/n1/reef/raw/', events: ['data_uploaded'], created_at_ms: 1 },
+      { id: 'n', path_prefix: 's3/g1/n1/reef/next/', events: ['data_uploaded'], created_at_ms: 2 },
+    ]
+    pending.set('s3/g1/n1/reef/raw/', ['a'])
+    let finishA: () => void = () => undefined
+    deleteWatch.mockImplementation((id: string) =>
+      id === 'a' ? new Promise<undefined>((resolve) => (finishA = () => resolve(undefined))) : Promise.resolve(undefined),
+    )
+    const pathPrefix = ref('s3/g1/n1/reef/raw/')
+    const host = defineComponent({ setup: () => () => h(WatchButton, bucketProps({ bell: true, pathPrefix: pathPrefix.value })) })
+    const { root } = await mountApp(host)
+    const box = Object.assign(input(root, 'value', 'sync_failed'), { checked: true, _value: 'sync_failed' })
+    for (const listener of box.listeners.get('change') ?? []) listener({ target: box })
+
+    const saving = click(submit(root, 'Save'))
+    await flush()
+    pathPrefix.value = 's3/g1/n1/reef/next/'
+    await flush()
+    finishA()
+    await saving
+
+    expect(createWatch).not.toHaveBeenCalled()
+    expect(deleteWatch.mock.calls.map(([id]) => id)).toEqual(['a'])
+    expect(content(root)).toContain('The folder changed. Nothing was saved.')
   })
 
   it('stops a Stop when the session changes during its delete', async () => {

@@ -166,9 +166,10 @@ async function exclusive(work: () => Promise<void>) {
 }
 
 // Every action keeps the session, folder and events it started with, and stops
-// after any await once the session no longer holds.
+// after any await once they no longer hold.
 function begin() {
-  return { action: startAction(props.pathPrefix), events: [...selected.value] }
+  const prefix = props.pathPrefix
+  return { action: startAction(prefix, () => props.pathPrefix === prefix), events: [...selected.value] }
 }
 
 // Old watches still waiting for their delete go first, before another replacement.
