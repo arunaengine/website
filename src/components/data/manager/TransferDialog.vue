@@ -21,6 +21,7 @@ import {
   targetProblem,
   type TransferMode,
   type TransferSource,
+  type TransferStore,
 } from '@/lib/objectMove'
 import { computed, ref, watch } from 'vue'
 
@@ -81,6 +82,31 @@ watch(
   { immediate: true },
 )
 
+// The account, node, group and key the transfer starts with serve every request;
+// once the browser switches to another session, the transfer stops.
+function startTransfer(): { store: TransferStore; check: () => void } {
+  const identity = () => {
+    const context = s3.activeContext.value
+    return context ? `${context.userId}|${context.nodeId}|${context.groupId}|${context.session.accessKeyId}` : ''
+  }
+  const started = identity()
+  const groupId = s3.activeContext.value?.groupId
+  const reference = groupId ? s3.referenceForContext(props.nodeId, groupId) : null
+  if (!reference) throw new Error('No S3 session is open for this bucket.')
+  return {
+    store: {
+      listObjectsRecursive: (bucket, prefix, max, nodeId, options) =>
+        s3.listObjectsRecursive(bucket, prefix, max, nodeId, { ...options, reference }),
+      copyObject: (source, bucket, key, nodeId) => s3.copyObject(source, bucket, key, nodeId, reference),
+      deleteObject: (bucket, key, nodeId) => s3.deleteObject(bucket, key, nodeId, reference),
+      headObject: (bucket, key, nodeId) => s3.headObject(bucket, key, nodeId, undefined, reference),
+    },
+    check() {
+      if (identity() !== started) throw new DOMException('The session changed. The move stopped.', 'AbortError')
+    },
+  }
+}
+
 async function confirm() {
   if (problem.value || busy.value || !target.value || writesDisabled.value) return
   busy.value = true
@@ -88,13 +114,14 @@ async function confirm() {
   const moved: string[] = []
   try {
     const name = renaming.value ? text.value : undefined
-    await runTransfer(s3, props.mode, props.bucket, props.sources, target.value, props.nodeId, name, (key) =>
-      moved.push(key),
-    )
+    const { store, check } = startTransfer()
+    const onMoved = (key: string) => moved.push(key)
+    await runTransfer(store, props.mode, props.bucket, props.sources, target.value, props.nodeId, name, onMoved, check)
     emit('update:open', false)
     emit('done', moved)
   } catch (err) {
-    error.value = s3ErrorMessage(err)
+    const message = err instanceof DOMException ? err.message : s3ErrorMessage(err)
+    error.value = moved.length ? `${message} Already moved: ${moved.map((key) => baseName(key)).join(', ')}.` : message
     emit('done', moved)
   } finally {
     busy.value = false

@@ -83,6 +83,7 @@ export async function plannedCopies(
   target: TransferTarget,
   nodeId: string | null,
   name?: string,
+  check: () => void = () => undefined,
 ): Promise<{ from: string; to: string; source: string }[]> {
   const copies: { from: string; to: string; source: string }[] = []
   for (const source of sources) {
@@ -93,6 +94,7 @@ export async function plannedCopies(
     }
     // Folder markers come along, so empty folders inside are moved too.
     const listing = await store.listObjectsRecursive(bucket, source.key, FOLDER_LIMIT, nodeId, { markers: true })
+    check()
     if (listing.truncated) {
       throw new Error(`${baseName(source.key)}/ holds more than ${FOLDER_LIMIT} files. Pick a smaller folder.`)
     }
@@ -118,13 +120,21 @@ export async function runTransfer(
   nodeId: string | null,
   name?: string,
   onMoved: (key: string) => void = () => undefined,
+  // Throws once the session the transfer started in is gone; it runs after every await.
+  check: () => void = () => undefined,
 ): Promise<void> {
-  const copies = await plannedCopies(store, bucket, sources, target, nodeId, name)
+  const step = async <T>(work: Promise<T>): Promise<T> => {
+    const result = await work
+    check()
+    return result
+  }
+  check()
+  const copies = await step(plannedCopies(store, bucket, sources, target, nodeId, name, check))
   const copied = new Map<string, { etag?: string; versionId?: string }>()
   for (const copy of copies) {
     // A move remembers the revision it copies; a newer one is never deleted.
-    if (mode !== 'copy') copied.set(copy.from, await store.headObject(bucket, copy.from, nodeId))
-    await store.copyObject({ bucket, key: copy.from }, target.bucket, copy.to, nodeId)
+    if (mode !== 'copy') copied.set(copy.from, await step(store.headObject(bucket, copy.from, nodeId)))
+    await step(store.copyObject({ bucket, key: copy.from }, target.bucket, copy.to, nodeId))
   }
   if (mode === 'copy') return
   const changed: string[] = []
@@ -132,7 +142,7 @@ export async function runTransfer(
     let kept = false
     for (const copy of copies) {
       if (copy.source !== source.key) continue
-      const now = await store.headObject(bucket, copy.from, nodeId)
+      const now = await step(store.headObject(bucket, copy.from, nodeId))
       if (!sameRevision(now, copied.get(copy.from) ?? {})) {
         changed.push(baseName(copy.from))
         kept = true
@@ -140,7 +150,7 @@ export async function runTransfer(
       }
       // Soft delete without a version. The node has no If-Match on delete, so a write
       // between this check and the delete can still be hidden behind the marker.
-      await store.deleteObject(bucket, copy.from, nodeId)
+      await step(store.deleteObject(bucket, copy.from, nodeId))
     }
     if (kept) continue
     onMoved(source.key)

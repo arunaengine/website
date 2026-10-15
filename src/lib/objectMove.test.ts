@@ -193,4 +193,22 @@ describe('transfer run', () => {
     expect(calls).toEqual(['delete reef/raw/genomes/a.fa'])
     expect(moved).toEqual([])
   })
+
+  it('stops as soon as the session it started in is gone', async () => {
+    const { fake, calls } = store()
+    let switched = false
+    fake.copyObject = vi.fn(async (source, bucket, key) => {
+      calls.push(`copy ${source.bucket}/${source.key} -> ${bucket}/${key}`)
+      switched = true
+    })
+    const check = () => {
+      if (switched) throw new DOMException('The session changed. The move stopped.', 'AbortError')
+    }
+    const sources = ['raw/a.txt', 'raw/b.txt'].map((key) => ({ key, folder: false }))
+
+    await expect(
+      runTransfer(fake, 'move', 'reef', sources, { bucket: 'reef', prefix: 'x/' }, null, undefined, undefined, check),
+    ).rejects.toThrow('The session changed. The move stopped.')
+    expect(calls).toEqual(['copy reef/raw/a.txt -> reef/x/a.txt'])
+  })
 })

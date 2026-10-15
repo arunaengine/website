@@ -148,12 +148,12 @@ export async function listObjectsRecursive(
   prefix: string,
   max: number,
   nodeId?: string | null,
-  options: { markers?: boolean } = {},
+  options: { markers?: boolean; reference?: S3SessionReference } = {},
 ): Promise<{ objects: ObjectEntry[]; truncated: boolean }> {
   const objects: ObjectEntry[] = []
   let token: string | undefined
   for (;;) {
-    const response = await client(nodeId).send(
+    const response = await client(nodeId, options.reference).send(
       new ListObjectsV2Command({
         Bucket: bucket,
         Prefix: prefix || undefined,
@@ -579,8 +579,13 @@ export async function createFolder(
   )
 }
 
-export async function deleteObject(bucket: string, key: string, nodeId?: string | null): Promise<void> {
-  await client(nodeId).send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))
+export async function deleteObject(
+  bucket: string,
+  key: string,
+  nodeId?: string | null,
+  reference?: S3SessionReference,
+): Promise<void> {
+  await client(nodeId, reference).send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))
 }
 
 // One page holds 1000 rows and one key rarely has more; the cap keeps a
@@ -708,8 +713,9 @@ export async function copyObject(
   bucket: string,
   key: string,
   nodeId?: string | null,
+  reference?: S3SessionReference,
 ): Promise<void> {
-  await client(nodeId).send(
+  await client(nodeId, reference).send(
     new CopyObjectCommand({
       Bucket: bucket,
       Key: key,
