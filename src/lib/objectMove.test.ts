@@ -1,8 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import { parseTarget, runTransfer, targetProblem, type TransferStore } from './objectMove'
 
+const missing = Object.assign(new Error('Not Found'), { name: 'NotFound', $metadata: { httpStatusCode: 404 } })
+
 function store(listed: string[] = [], truncated = false, markers: string[] = []) {
   const calls: string[] = []
+  // The current ETag per key; a test changes one to overwrite the file.
+  const revisions = new Map<string, string>()
   const fake: TransferStore = {
     listObjectsRecursive: vi.fn(async () => ({ objects: listed.map((key) => ({ key })), truncated })),
     copyObject: vi.fn(async (source, bucket, key) => {
@@ -12,10 +16,11 @@ function store(listed: string[] = [], truncated = false, markers: string[] = [])
       calls.push(`delete ${bucket}/${key}`)
     }),
     headObject: vi.fn(async (_bucket: string, key: string) => {
-      if (!markers.includes(key)) throw new Error('NotFound')
+      if (key.endsWith('/') && !markers.includes(key)) throw missing
+      return { etag: revisions.get(key) ?? 'v1' }
     }),
   }
-  return { fake, calls }
+  return { fake, calls, revisions }
 }
 
 describe('transfer target', () => {
@@ -126,5 +131,37 @@ describe('transfer run', () => {
     const empty = store([])
     await expect(runTransfer(empty.fake, 'move', 'reef', [{ key: 'raw/genomes/', folder: true }], { bucket: 'reef', prefix: '' }, null)).rejects.toThrow('holds no files')
     expect(empty.calls).toEqual([])
+  })
+
+  it('keeps a file overwritten between its copy and the delete', async () => {
+    const { fake, calls, revisions } = store()
+    // The copy took v1; the file is then overwritten with v2 before the cleanup.
+    fake.copyObject = vi.fn(async (source, bucket, key) => {
+      calls.push(`copy ${source.bucket}/${source.key} -> ${bucket}/${key}`)
+      if (source.key === 'raw/b.txt') revisions.set('raw/b.txt', 'v2')
+    })
+    const moved: string[] = []
+    const sources = ['raw/a.txt', 'raw/b.txt'].map((key) => ({ key, folder: false }))
+
+    await expect(
+      runTransfer(fake, 'move', 'reef', sources, { bucket: 'reef', prefix: 'x/' }, null, undefined, (key) => moved.push(key)),
+    ).rejects.toThrow('Changed during the move, kept: b.txt.')
+    expect(calls).toContain('delete reef/raw/a.txt')
+    expect(calls).not.toContain('delete reef/raw/b.txt')
+    expect(moved).toEqual(['raw/a.txt'])
+  })
+
+  it('keeps a folder whose file changed during the move', async () => {
+    const { fake, calls, revisions } = store(['raw/genomes/a.fa', 'raw/genomes/b.fa'], false, ['raw/genomes/'])
+    fake.copyObject = vi.fn(async (source) => {
+      if (source.key === 'raw/genomes/b.fa') revisions.set('raw/genomes/b.fa', 'v2')
+    })
+    const moved: string[] = []
+
+    await expect(
+      runTransfer(fake, 'move', 'reef', [{ key: 'raw/genomes/', folder: true }], { bucket: 'reef', prefix: 'x/' }, null, undefined, (key) => moved.push(key)),
+    ).rejects.toThrow('kept: b.fa')
+    expect(calls).toEqual(['delete reef/raw/genomes/a.fa'])
+    expect(moved).toEqual([])
   })
 })
