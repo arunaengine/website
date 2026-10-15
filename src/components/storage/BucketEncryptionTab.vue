@@ -2,6 +2,7 @@
 // The encryption of one bucket as the node that hosts it reports it: mode, lock
 // state, key fingerprint, format, holders, recovery and any rewrite that runs.
 import { computed, toRef } from 'vue'
+import BucketCheckSection from '@/components/storage/BucketCheckSection.vue'
 import BucketEncryptionSettings from '@/components/storage/BucketEncryptionSettings.vue'
 import BucketHoldersSection from '@/components/storage/BucketHoldersSection.vue'
 import BucketKeyAccess from '@/components/storage/BucketKeyAccess.vue'
@@ -138,6 +139,8 @@ const WARNINGS = [
           <Notice tone="info" :lines="permitted" />
         </div>
       </section>
+
+      <BucketCheckSection v-if="caller?.admin" :bucket="bucket" :node-id="encryption.nodeId.value" />
 
       <section v-if="transition" class="surface" data-transition>
         <header class="flex flex-wrap items-center gap-2 border-b border-border px-5 py-4">

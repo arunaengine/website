@@ -35,6 +35,7 @@ const load = vi.fn()
 const tab = compileClientComponent(new URL('./BucketEncryptionTab.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => Slotted('i') }),
+  '@/components/storage/BucketCheckSection.vue': moduleDefault(defineComponent(() => () => h('section', 'check files'))),
   '@/components/storage/BucketEncryptionSettings.vue': moduleDefault(
     defineComponent({ props: { busy: Boolean }, setup: (props) => () => h('section', `mode settings, busy ${props.busy}`) }),
   ),
