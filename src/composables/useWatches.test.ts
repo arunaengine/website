@@ -227,8 +227,10 @@ describe('old watches an edit could not delete', () => {
     const { arunaState } = (await import('@/composables/useAruna')) as unknown as {
       arunaState: { currentUser: { value: { id: string } | null }; sessionEpoch: { value: number } }
     }
+    // The mocked account state is shared by every case, so this one sets its own start.
+    arunaState.currentUser.value = { id: 'u1' }
     const action = watches.startAction('s3/g1/n1/reef/')
-    arunaState.currentUser.value = { id: 'u2' }
+    arunaState.currentUser.value = { id: 'u3' }
     arunaState.sessionEpoch.value += 1
 
     watches.notePending(action, ['old'])
