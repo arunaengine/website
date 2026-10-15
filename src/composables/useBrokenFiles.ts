@@ -4,7 +4,6 @@ import { apiBaseUrl, authToken } from './aruna/state'
 import { nodeApiBase } from './s3/endpoints'
 
 const PAGE = 500
-const MAX_PAGES = 10
 
 const WORDS: Record<BrokenReason, string> = {
   missing_blob: 'File missing on storage',
@@ -25,13 +24,12 @@ export function useBrokenFiles(bucket: Ref<string>, nodeId: Ref<string | null>) 
     const found: Record<string, BrokenReason> = {}
     try {
       let after: string | undefined
-      for (let page = 0; page < MAX_PAGES; page += 1) {
+      do {
         const answer = await getBucketCheck(bucket.value, { after, limit: PAGE }, { baseUrl, token: authToken.value })
         if (run !== seq) return
         for (const file of answer.broken) found[file.key] ??= file.reason
         after = answer.next ?? undefined
-        if (!after) break
-      }
+      } while (after)
     } catch {
       // A node without the check, or a reader it refuses, shows nothing.
     }

@@ -33,8 +33,11 @@ const confirming = ref(false)
 const note = ref<string | null>(null)
 const error = ref<string | null>(null)
 
+// The first page of recorded broken files; a move can record some without a check.
+const broken = ref(0)
+const brokenMore = ref(false)
 const running = computed(() => Boolean(progress.value && progress.value.finished_at_ms == null))
-const broken = computed(() => progress.value?.broken ?? 0)
+const failed = computed(() => progress.value?.failed ?? 0)
 
 let timer: ReturnType<typeof setTimeout> | undefined
 let generation = 0
@@ -52,14 +55,19 @@ async function load() {
   const current = generation
   stopPoll()
   try {
-    const answer = await getBucketCheck(props.bucket, { limit: 1 }, client())
+    const answer = await getBucketCheck(props.bucket, { limit: 1000 }, client())
     if (current !== generation) return
     progress.value = answer.progress ?? null
+    broken.value = answer.broken.length
+    brokenMore.value = Boolean(answer.next)
+    error.value = null
     if (running.value) timer = setTimeout(() => void load(), 3_000)
   } catch (err) {
     if (current !== generation) return
     if (isUnsupportedEndpoint(err)) supported.value = false
     else error.value = errorMessage(err)
+    // One failed read must not end the polling of a running check.
+    if (running.value && supported.value) timer = setTimeout(() => void load(), 3_000)
   }
 }
 
@@ -68,6 +76,8 @@ watch(
   () => {
     generation += 1
     progress.value = null
+    broken.value = 0
+    brokenMore.value = false
     supported.value = true
     note.value = null
     error.value = null
@@ -80,19 +90,23 @@ onBeforeUnmount(() => {
   stopPoll()
 })
 
-async function act(work: () => Promise<void>) {
+async function act(work: (alive: () => boolean) => Promise<void>) {
   if (busy.value) return
+  const origin = generation
+  const alive = () => origin === generation
   busy.value = true
   note.value = null
   error.value = null
   try {
-    await work()
+    await work(alive)
   } catch (err) {
     const going = err instanceof ApiError && err.status === 409
-    if (!going) error.value = errorMessage(err)
+    if (alive() && !going) error.value = errorMessage(err)
   } finally {
-    busy.value = false
-    await load()
+    if (alive()) {
+      busy.value = false
+      await load()
+    }
   }
 }
 
@@ -100,9 +114,22 @@ const check = () => act(async () => void (await startBucketCheck(props.bucket, c
 
 function cleanUp() {
   confirming.value = false
-  return act(async () => {
-    const done = await cleanBucketCheck(props.bucket, client())
-    note.value = `Removed ${formatNumber(done.deleted)} files.${done.more ? ' More are left. Clean up again.' : ''}`
+  return act(async (alive) => {
+    const total = { deleted: 0, kept: 0, denied: 0 }
+    let after: string | undefined
+    do {
+      const done = await cleanBucketCheck(props.bucket, after, client())
+      if (!alive()) return
+      total.deleted += done.deleted
+      total.kept += done.kept
+      total.denied += done.denied
+      after = done.next ?? undefined
+    } while (after)
+    const left = [
+      total.kept ? `${formatNumber(total.kept)} changed or not removable` : '',
+      total.denied ? `${formatNumber(total.denied)} not allowed` : '',
+    ].filter(Boolean)
+    note.value = `Removed ${formatNumber(total.deleted)} files.${left.length ? ` Left: ${left.join(', ')}.` : ''}`
   })
 }
 </script>
@@ -134,14 +161,21 @@ function cleanUp() {
     </header>
     <div class="space-y-2 px-5 py-4 text-xs text-muted-foreground">
       <p>Finds files whose stored copy is gone. They show in red in the file list.</p>
-      <template v-if="progress">
-        <p v-if="running">Checking files: {{ formatNumber(progress.checked) }} checked</p>
-        <p v-else>
-          Checked {{ formatNumber(progress.checked) }} files.
-          <span v-if="broken > 0" class="text-destructive">{{ formatNumber(broken) }} broken.</span>
-          <template v-else>None broken.</template>
-        </p>
-        <Progress v-if="running" indeterminate :warn="101" :critical="101" bar-class="bg-primary" class="h-1" />
+      <p v-if="running && progress">Checking files: {{ formatNumber(progress.checked) }} checked</p>
+      <Progress
+        v-if="running"
+        indeterminate
+        :warn="101"
+        :critical="101"
+        label="Checking files"
+        bar-class="bg-primary"
+        class="h-1"
+      />
+      <template v-else>
+        <p v-if="progress">Checked {{ formatNumber(progress.checked) }} files.</p>
+        <p v-if="failed > 0">Could not check {{ formatNumber(failed) }} files. Check again later.</p>
+        <p v-if="broken > 0" class="text-destructive">{{ formatNumber(broken) }}{{ brokenMore ? '+' : '' }} broken.</p>
+        <p v-else-if="progress && failed === 0">None broken.</p>
       </template>
       <p v-if="note" class="text-foreground">{{ note }}</p>
       <p v-if="error" class="text-destructive">{{ error }}</p>
@@ -152,7 +186,7 @@ function cleanUp() {
         <DialogHeader>
           <DialogTitle>Clean up broken files?</DialogTitle>
           <DialogDescription>
-            The {{ formatNumber(broken) }} broken files are removed from this bucket. Their stored copy is already gone.
+            The {{ formatNumber(broken) }}{{ brokenMore ? '+' : '' }} broken files are removed from this bucket. Their stored copy is already gone.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

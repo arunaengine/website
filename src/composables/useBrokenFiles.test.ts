@@ -14,7 +14,7 @@ vi.mock('./s3/endpoints', () => ({ nodeApiBase: () => 'https://b.test/api/v1' })
 
 const file = (key: string, reason: string) => ({ key, version_id: 'v', reason, found_at_ms: 1 })
 const settle = async () => {
-  for (let i = 0; i < 5; i += 1) await nextTick()
+  for (let i = 0; i < 50; i += 1) await nextTick()
 }
 
 beforeEach(() => {
@@ -34,6 +34,18 @@ describe('useBrokenFiles', () => {
     expect(broken.reasonOf('a.txt')).toBe('File missing on storage')
     expect(broken.reasonOf('b.txt')).toBe('Storage removed')
     expect(broken.reasonOf('c.txt')).toBeNull()
+    scope.stop()
+  })
+
+  it('follows the pages to the end', async () => {
+    getBucketCheck.mockImplementation(async (_b: string, query: { after?: string }) => {
+      const page = Number(query.after ?? 0)
+      return { bucket: 'reef', broken: [file(`k${page}`, 'missing_blob')], next: page < 14 ? String(page + 1) : undefined }
+    })
+    const scope = effectScope()
+    const broken = scope.run(() => useBrokenFiles(ref('reef'), ref(null)))!
+    await settle()
+    expect(broken.reasonOf('k14')).toBe('File missing on storage')
     scope.stop()
   })
 

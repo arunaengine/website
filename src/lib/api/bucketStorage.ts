@@ -46,8 +46,12 @@ export interface BucketCheckResponse {
 export interface BucketCleanupResponse {
   bucket: string
   deleted: number
+  /** Records that changed since the check or could not be deleted; they stay listed. */
   kept: number
-  more: boolean
+  /** Records the caller may not delete; they stay listed. */
+  denied: number
+  /** Pass as `after` to clean the next page; absent after the last page. */
+  next?: string | null
 }
 
 function storagePath(bucket: string, tail: string): string {
@@ -78,6 +82,10 @@ export function startBucketCheck(bucket: string, client: ApiClientOptions): Prom
   return apiRequest(storagePath(bucket, 'check'), { method: 'POST' }, client)
 }
 
-export function cleanBucketCheck(bucket: string, client: ApiClientOptions): Promise<BucketCleanupResponse> {
-  return apiRequest(storagePath(bucket, 'check/cleanup'), { method: 'POST' }, client)
+export function cleanBucketCheck(
+  bucket: string,
+  after: string | undefined,
+  client: ApiClientOptions,
+): Promise<BucketCleanupResponse> {
+  return apiRequest(storagePath(bucket, 'check/cleanup'), { method: 'POST', query: { after } }, client)
 }

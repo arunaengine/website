@@ -39,10 +39,15 @@ const Section = compileClientComponent(new URL('./BucketCheckSection.vue', impor
   '@/lib/utils': Utils,
 })
 
-const done = (broken: number) => ({
+const done = (broken: number, failed = 0) => ({
   bucket: 'reef',
-  broken: [],
-  progress: { checked: 1200, broken, failed: 0, started_at_ms: 1, finished_at_ms: 2 },
+  broken: Array.from({ length: broken }, (_, index) => ({
+    key: `k${index}`,
+    version_id: 'v',
+    reason: 'missing_blob',
+    found_at_ms: 1,
+  })),
+  progress: { checked: 1200, broken, failed, started_at_ms: 1, finished_at_ms: 2 },
 })
 
 async function mount() {
@@ -55,7 +60,7 @@ async function mount() {
 beforeEach(() => {
   vi.clearAllMocks()
   startBucketCheck.mockResolvedValue({})
-  cleanBucketCheck.mockResolvedValue({ bucket: 'reef', deleted: 3, kept: 0, more: false })
+  cleanBucketCheck.mockResolvedValue({ bucket: 'reef', deleted: 3, kept: 0, denied: 0 })
 })
 
 describe('BucketCheckSection', () => {
@@ -74,8 +79,36 @@ describe('BucketCheckSection', () => {
     await click(button(mounted.root, 'Clean up'))
     expect(cleanBucketCheck).not.toHaveBeenCalled()
     await click(button(element(mounted.root, (node) => node.props.role === 'dialog'), 'Clean up'))
-    expect(cleanBucketCheck).toHaveBeenCalledWith('reef', expect.anything())
+    expect(cleanBucketCheck).toHaveBeenCalledWith('reef', undefined, expect.anything())
     expect(content(mounted.root)).toContain('Removed 3 files.')
+    mounted.app.unmount()
+  })
+
+  it('follows the cleanup cursor and names what stayed', async () => {
+    getBucketCheck.mockResolvedValue(done(3))
+    cleanBucketCheck
+      .mockResolvedValueOnce({ bucket: 'reef', deleted: 2, kept: 1, denied: 0, next: 'ab' })
+      .mockResolvedValueOnce({ bucket: 'reef', deleted: 1, kept: 0, denied: 2 })
+    const mounted = await mount()
+    await click(button(mounted.root, 'Clean up'))
+    await click(button(element(mounted.root, (node) => node.props.role === 'dialog'), 'Clean up'))
+    expect(cleanBucketCheck).toHaveBeenLastCalledWith('reef', 'ab', expect.anything())
+    expect(content(mounted.root)).toContain('Removed 3 files. Left: 1 changed or not removable, 2 not allowed.')
+    mounted.app.unmount()
+  })
+
+  it('offers clean up for files a move recorded without a check', async () => {
+    getBucketCheck.mockResolvedValue({ ...done(2), progress: null })
+    const mounted = await mount()
+    expect(button(mounted.root, 'Clean up')).toBeTruthy()
+    mounted.app.unmount()
+  })
+
+  it('does not call a check with failures clean', async () => {
+    getBucketCheck.mockResolvedValue(done(0, 100))
+    const mounted = await mount()
+    expect(content(mounted.root)).toContain('Could not check 100 files.')
+    expect(content(mounted.root)).not.toContain('None broken.')
     mounted.app.unmount()
   })
 
