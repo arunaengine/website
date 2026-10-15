@@ -45,6 +45,8 @@ export interface BackendImportRequest {
   write_prefix?: string
   write_pattern?: string
   schedule?: string
+  /** Also moves the files already stored under `key_prefix` to the write folder. */
+  move_existing?: boolean
 }
 
 function importsPath(groupId: string, importId?: string): string {

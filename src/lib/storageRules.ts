@@ -1,5 +1,5 @@
 // Wording and checks for the rules of a group's storage: the default rule and linked buckets.
-import type { BackendImport, BackendImportRun, GroupBackendResponse } from './api'
+import type { BackendImport, BackendImportRun, BucketMoveResponse, GroupBackendResponse } from './api'
 import { backendSchema } from './storage'
 import { storeName } from './linkedFolders'
 import { formatNumber, relativeTime } from './utils'
@@ -189,4 +189,28 @@ export function defaultConflict(
     linkPaths(link).some((used) => used.backendId === backend.backend_id && used.path.split('/')[0] === bucket),
   )
   return linked ? `Bucket ${bucket} is linked to ${arunaPlace(linked)}. Pick another bucket.` : null
+}
+
+/** The files of a bucket found not where the rules put them, and any move now running. */
+export interface MoveView {
+  misplaced: number
+  running: boolean
+  done: number
+}
+
+export function moveView(moves: BucketMoveResponse[]): MoveView {
+  const view: MoveView = { misplaced: 0, running: false, done: 0 }
+  for (const move of moves) {
+    const progress = move.progress
+    view.misplaced += move.misplaced
+    if (!progress || progress.finished_at_ms != null) continue
+    view.running = true
+    view.done += progress.migrated + progress.skipped + progress.failed
+  }
+  return view
+}
+
+/** "Moving files: 1,240 of 3,500". */
+export function moveText(view: MoveView): string {
+  return `Moving files: ${formatNumber(view.done)} of ${formatNumber(view.done + view.misplaced)}`
 }
