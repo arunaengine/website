@@ -347,10 +347,10 @@ describe('StorageSection', () => {
   })
 
   it('opens no confirmation when it goes offline during the recount', async () => {
+    listGroupDataPaths.mockResolvedValue({ entries: [{ permission_path: '/r/g/g1/data/n/alpha/', kind: 'folder' }] })
     const mounted = await mount()
     let release: (value: unknown) => void = () => {}
     const gate = new Promise((resolve) => (release = resolve))
-    listGroupDataPaths.mockResolvedValue({ entries: [{ permission_path: '/r/g/g1/data/n/alpha/', kind: 'folder' }] })
     getBucketMove.mockImplementation(async () => {
       await gate
       return { bucket: 'alpha', misplaced: 3, complete: true }
