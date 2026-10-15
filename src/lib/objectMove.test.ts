@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { parseTarget, runTransfer, targetProblem, type TransferStore } from './objectMove'
+import { isMissingKey, parseTarget, runTransfer, targetProblem, type TransferStore } from './objectMove'
 
 const missing = Object.assign(new Error('Not Found'), { name: 'NotFound', $metadata: { httpStatusCode: 404 } })
 
@@ -163,5 +163,28 @@ describe('transfer run', () => {
     ).rejects.toThrow('kept: b.fa')
     expect(calls).toEqual(['delete reef/raw/genomes/a.fa'])
     expect(moved).toEqual([])
+  })
+})
+
+describe('folder marker check', () => {
+  it('fails the move on a marker check that did not confirm absence', async () => {
+    const { fake } = store(['raw/genomes/a.fa'])
+    const refused = Object.assign(new Error('Forbidden'), { name: 'AccessDenied', $metadata: { httpStatusCode: 403 } })
+    fake.headObject = vi.fn(async (_bucket: string, key: string) => {
+      if (key === 'raw/genomes/') throw refused
+      return { etag: 'v1' }
+    })
+    const moved: string[] = []
+
+    await expect(
+      runTransfer(fake, 'move', 'reef', [{ key: 'raw/genomes/', folder: true }], { bucket: 'reef', prefix: 'x/' }, null, undefined, (key) => moved.push(key)),
+    ).rejects.toThrow('Forbidden')
+    expect(moved).toEqual([])
+  })
+
+  it('counts only a 404 or NoSuchKey as a missing key', () => {
+    expect(isMissingKey(missing)).toBe(true)
+    expect(isMissingKey(Object.assign(new Error('x'), { name: 'NoSuchKey' }))).toBe(true)
+    expect(isMissingKey(new Error('network'))).toBe(false)
   })
 })
