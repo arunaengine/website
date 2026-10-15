@@ -144,17 +144,22 @@ const unchanged = computed(() => {
 })
 
 // The node has no edit call: the new watch is created before the old one goes.
+// An old watch whose delete failed stays here, and the next Save deletes it.
+const staleWatchId = ref<string | null>(null)
+
 async function onSave() {
-  const old = existing.value
-  if (!old || !selected.value.length) return
-  if (unchanged.value) {
-    open.value = false
-    return
-  }
+  const current = existing.value
+  if (!current || !selected.value.length) return
   dialogError.value = null
   try {
-    await createWatch(props.pathPrefix, selected.value)
-    await deleteWatch(old.id)
+    if (!unchanged.value) {
+      await createWatch(props.pathPrefix, selected.value)
+      staleWatchId.value = current.id
+    }
+    if (staleWatchId.value) {
+      await deleteWatch(staleWatchId.value)
+      staleWatchId.value = null
+    }
     open.value = false
   } catch (err) {
     dialogError.value = errorMessage(err)

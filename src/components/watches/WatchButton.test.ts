@@ -51,7 +51,12 @@ const PopoverStub = defineComponent({
 
 const outgoing = ref<unknown[]>([])
 const listSyncRelationships = vi.fn(async () => ({ outgoing: outgoing.value, incoming: [] }))
-const createWatch = vi.fn(async () => ({ id: 'w1', path_prefix: '', events: [], created_at_ms: 0 }))
+const createWatch = vi.fn(async (_pathPrefix: string, _events: string[]) => ({
+  id: 'w1',
+  path_prefix: '',
+  events: [] as string[],
+  created_at_ms: 0,
+}))
 const deleteWatch = vi.fn(async () => undefined)
 const watchList = ref<Api.ApiWatch[]>([])
 
@@ -277,6 +282,28 @@ describe('watch bell on a bucket folder', () => {
     expect(createWatch).toHaveBeenCalledWith('s3/g1/n1/reef/raw/', ['data_uploaded', 'sync_failed'])
     expect(deleteWatch).toHaveBeenCalledWith('old')
     expect(createWatch.mock.invocationCallOrder[0]).toBeLessThan(deleteWatch.mock.invocationCallOrder[0])
+  })
+
+  it('deletes the old watch on the next Save after its delete failed', async () => {
+    outgoing.value = [{ id: 'rel-1' }]
+    watchList.value = [{ id: 'old', path_prefix: 's3/g1/n1/reef/raw/', events: ['data_uploaded'], created_at_ms: 0 }]
+    createWatch.mockImplementationOnce(async (pathPrefix: string, events: string[]) => {
+      const created = { id: 'new', path_prefix: pathPrefix, events, created_at_ms: 1 }
+      watchList.value = [created, ...watchList.value]
+      return created
+    })
+    deleteWatch.mockRejectedValueOnce(new Error('inbox holder unavailable'))
+    const { root } = await mountApp(WatchButton, { props: bucketProps({ bell: true }) })
+
+    const sync = Object.assign(input(root, 'value', 'sync_failed'), { checked: true, _value: 'sync_failed' })
+    for (const listener of sync.listeners.get('change') ?? []) listener({ target: sync })
+    await click(submit(root, 'Save'))
+    expect(content(root)).toContain('inbox holder unavailable')
+
+    await click(submit(root, 'Save'))
+    expect(createWatch).toHaveBeenCalledTimes(1)
+    expect(deleteWatch).toHaveBeenCalledTimes(2)
+    expect(deleteWatch).toHaveBeenLastCalledWith('old')
   })
 
   it('stops watching from the popover', async () => {
