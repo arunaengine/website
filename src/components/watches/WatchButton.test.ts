@@ -40,6 +40,15 @@ const DialogStub = defineComponent({
   },
 })
 
+const PopoverStub = defineComponent({
+  props: { open: { type: Boolean, default: undefined } },
+  emits: ['update:open'],
+  setup: (_, { emit, slots }) => {
+    onMounted(() => emit('update:open', true))
+    return () => h('div', [slots.default?.(), slots.content?.()])
+  },
+})
+
 const outgoing = ref<unknown[]>([])
 const listSyncRelationships = vi.fn(async () => ({ outgoing: outgoing.value, incoming: [] }))
 const createWatch = vi.fn(async () => ({ id: 'w1', path_prefix: '', events: [], created_at_ms: 0 }))
@@ -70,6 +79,7 @@ const WatchButton = compileClientComponent(new URL('./WatchButton.vue', import.m
   '@/components/ui/DialogTrigger.vue': moduleDefault(Passthrough),
   '@/components/ui/Notice.vue': moduleDefault(Passthrough),
   '@/components/ui/NodeLabel.vue': moduleDefault(NodeLabelStub),
+  '@/components/ui/Popover.vue': moduleDefault(PopoverStub),
   '@/components/ui/Tooltip.vue': moduleDefault(TooltipStub),
   '@/composables/useAruna': {
     useAruna: () => ({
@@ -119,6 +129,7 @@ beforeEach(() => {
   watchList.value = []
   watches.available.value = true
   createWatch.mockClear()
+  deleteWatch.mockClear()
   createWatch.mockResolvedValue({ id: 'w1', path_prefix: '', events: [], created_at_ms: 0 })
   listSyncRelationships.mockClear()
 })
@@ -234,5 +245,47 @@ describe('watch button without a usable prefix', () => {
     const { root } = await mountApp(WatchButton, { props: datasetProps({ pathPrefix: '' }) })
 
     expect(content(root)).toContain('This dataset has no catalog path to watch yet')
+  })
+})
+
+describe('watch bell on a bucket folder', () => {
+  it('offers the events in a popover with Cancel and Watch', async () => {
+    const { root } = await mountApp(WatchButton, { props: bucketProps({ bell: true }) })
+    const text = content(root)
+
+    expect(text).toContain('Watch this folder')
+    expect(text).toContain('Notify me about')
+    expect(text).toContain('Data uploaded')
+    expect(text).toContain('Cancel')
+    expect(text).not.toContain('Stop watching')
+
+    await click(submit(root, 'Watch'))
+    expect(createWatch).toHaveBeenCalledWith('s3/g1/n1/reef/raw/', ['data_uploaded'])
+  })
+
+  it('edits the events of a watch by creating the new one before removing the old', async () => {
+    outgoing.value = [{ id: 'rel-1' }]
+    watchList.value = [{ id: 'old', path_prefix: 's3/g1/n1/reef/raw/', events: ['data_uploaded'], created_at_ms: 0 }]
+    const { root } = await mountApp(WatchButton, { props: bucketProps({ bell: true }) })
+
+    expect(content(root)).toContain('Watching this folder')
+    // The box carries v-model, which listens for change on the element itself.
+    const sync = Object.assign(input(root, 'value', 'sync_failed'), { checked: true, _value: 'sync_failed' })
+    for (const listener of sync.listeners.get('change') ?? []) listener({ target: sync })
+    await click(submit(root, 'Save'))
+
+    expect(createWatch).toHaveBeenCalledWith('s3/g1/n1/reef/raw/', ['data_uploaded', 'sync_failed'])
+    expect(deleteWatch).toHaveBeenCalledWith('old')
+    expect(createWatch.mock.invocationCallOrder[0]).toBeLessThan(deleteWatch.mock.invocationCallOrder[0])
+  })
+
+  it('stops watching from the popover', async () => {
+    watchList.value = [{ id: 'old', path_prefix: 's3/g1/n1/reef/raw/', events: ['data_uploaded'], created_at_ms: 0 }]
+    const { root } = await mountApp(WatchButton, { props: bucketProps({ bell: true }) })
+
+    await click(submit(root, 'Stop watching'))
+
+    expect(deleteWatch).toHaveBeenCalledWith('old')
+    expect(createWatch).not.toHaveBeenCalled()
   })
 })

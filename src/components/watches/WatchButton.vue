@@ -11,8 +11,9 @@ import DialogClose from '@/components/ui/DialogClose.vue'
 import DialogTrigger from '@/components/ui/DialogTrigger.vue'
 import Notice from '@/components/ui/Notice.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
+import Popover from '@/components/ui/Popover.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
-import { Eye, EyeOff } from '@lucide/vue'
+import { Bell, BellRing, Eye, EyeOff } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useWatches } from '@/composables/useWatches'
 import { ApiError } from '@/lib/api'
@@ -38,6 +39,8 @@ const props = defineProps<{
   // can be built and the button says why instead of disappearing.
   groupId?: string | null
   size?: 'sm' | 'default'
+  // A small bell that opens a popover, where a watch can also change its events.
+  bell?: boolean
 }>()
 
 const NO_SYNC_REASON = 'This folder is not the source of a sync'
@@ -131,8 +134,31 @@ function onOpenChange(value: boolean) {
   open.value = value
   if (!value) return
   dialogError.value = null
-  selected.value = [primaryKind.value]
-  if (isData.value && !watching.value) void checkSyncSource()
+  selected.value = props.bell && existing.value ? [...existing.value.events] as WatchEventKind[] : [primaryKind.value]
+  if (isData.value && (props.bell || !watching.value)) void checkSyncSource()
+}
+
+const unchanged = computed(() => {
+  const events = existing.value?.events ?? []
+  return events.length === selected.value.length && selected.value.every((kind) => events.includes(kind))
+})
+
+// The node has no edit call: the new watch is created before the old one goes.
+async function onSave() {
+  const old = existing.value
+  if (!old || !selected.value.length) return
+  if (unchanged.value) {
+    open.value = false
+    return
+  }
+  dialogError.value = null
+  try {
+    await createWatch(props.pathPrefix, selected.value)
+    await deleteWatch(old.id)
+    open.value = false
+  } catch (err) {
+    dialogError.value = errorMessage(err)
+  }
 }
 
 async function onCreate() {
@@ -165,11 +191,94 @@ async function onDelete() {
 <template>
   <Tooltip v-if="available && unavailableReason" :label="unavailableReason">
     <span class="inline-flex">
-      <Button variant="outline" :size="size ?? 'default'" disabled :title="unavailableReason">
-        <Eye class="h-4 w-4" /> Watch
+      <Button
+        variant="outline"
+        :size="bell ? 'icon' : size ?? 'default'"
+        :class="bell ? 'h-8 w-8' : undefined"
+        disabled
+        :title="unavailableReason"
+        :aria-label="bell ? title : undefined"
+      >
+        <Bell v-if="bell" class="h-4 w-4" />
+        <template v-else><Eye class="h-4 w-4" /> Watch</template>
       </Button>
     </span>
   </Tooltip>
+
+  <Popover v-else-if="available && bell" :open="open" align="end" @update:open="onOpenChange">
+    <Button
+      variant="outline"
+      size="icon"
+      class="h-8 w-8"
+      :aria-pressed="watching"
+      :aria-label="title"
+      :title="watching ? `You are watching this ${isData ? 'folder' : 'path'}` : title"
+    >
+      <BellRing v-if="watching" class="h-4 w-4 text-primary" />
+      <Bell v-else class="h-4 w-4" />
+    </Button>
+    <template #content>
+      <p class="text-sm font-semibold text-foreground">{{ title }}</p>
+      <p class="mt-0.5 truncate font-mono text-[11px] text-muted-foreground" :title="resourceLabel">{{ resourceLabel }}</p>
+      <fieldset class="mt-3 space-y-2">
+        <legend class="text-xs font-medium text-foreground">Notify me about</legend>
+        <label
+          v-for="info in offered"
+          :key="info.kind"
+          class="mt-2 flex items-start gap-2 text-sm"
+          :class="reasonFor(info.kind) ? 'opacity-60' : ''"
+        >
+          <input
+            v-model="selected"
+            type="checkbox"
+            :value="info.kind"
+            :disabled="Boolean(reasonFor(info.kind))"
+            class="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-border accent-primary"
+          />
+          <span>
+            <span class="font-medium text-foreground">{{ info.label }}</span>
+            <span class="block text-xs text-muted-foreground">{{ info.description }}</span>
+            <span v-if="reasonFor(info.kind)" class="block text-xs text-muted-foreground">{{ reasonFor(info.kind) }}</span>
+          </span>
+        </label>
+      </fieldset>
+      <p class="mt-3 text-[11px] text-muted-foreground">Shown under the bell in the top bar.</p>
+      <Notice v-if="dialogError" tone="error" class="mt-3">{{ dialogError }}</Notice>
+      <div class="mt-3 flex justify-end gap-2">
+        <template v-if="watching">
+          <Button
+            variant="outline"
+            size="sm"
+            class="text-destructive hover:text-destructive"
+            :disabled="busy || writesDisabled"
+            :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
+            @click="onDelete"
+          >
+            {{ busy ? 'Stopping…' : 'Stop watching' }}
+          </Button>
+          <Button
+            size="sm"
+            :disabled="busy || !selected.length || writesDisabled"
+            :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
+            @click="onSave"
+          >
+            Save
+          </Button>
+        </template>
+        <template v-else>
+          <Button variant="outline" size="sm" @click="open = false">Cancel</Button>
+          <Button
+            size="sm"
+            :disabled="busy || !selected.length || writesDisabled"
+            :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
+            @click="onCreate"
+          >
+            {{ busy ? 'Creating…' : 'Watch' }}
+          </Button>
+        </template>
+      </div>
+    </template>
+  </Popover>
 
   <Dialog v-else-if="available" :open="open" @update:open="onOpenChange">
     <DialogTrigger as-child>

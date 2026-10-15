@@ -360,7 +360,7 @@ async function onDrop(event: DragEvent) {
             :path-prefix="watchPathPrefix"
             :group-id="activeGroupId"
             :resource-label="`${bucket}/${s3Prefix}`"
-            size="sm"
+            bell
           />
           <!-- A dot instead of a count: the settings page names what it holds. -->
           <span v-if="showStorageButton" data-tour="bucket-settings" class="relative inline-flex">

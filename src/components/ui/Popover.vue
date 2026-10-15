@@ -2,12 +2,18 @@
 import { PopoverArrow, PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'radix-vue'
 import { insideFloatingLayer } from '@/components/ui/layers'
 
-const props = defineProps<{
-  side?: 'top' | 'right' | 'bottom' | 'left'
-  align?: 'start' | 'center' | 'end'
-  /** Set inside the assistant panel, which floats above the modal layer. */
-  raised?: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    side?: 'top' | 'right' | 'bottom' | 'left'
+    align?: 'start' | 'center' | 'end'
+    /** Set inside the assistant panel, which floats above the modal layer. */
+    raised?: boolean
+    /** Set to control the popover; left out, it opens and closes on its own. */
+    open?: boolean
+  }>(),
+  { open: undefined },
+)
+const emit = defineEmits<{ (e: 'update:open', value: boolean): void }>()
 
 function keepOpen(event: Event) {
   if (insideFloatingLayer(event)) event.preventDefault()
@@ -15,7 +21,7 @@ function keepOpen(event: Event) {
 </script>
 
 <template>
-  <PopoverRoot>
+  <PopoverRoot :open="props.open" @update:open="(value: boolean) => emit('update:open', value)">
     <PopoverTrigger as-child>
       <slot />
     </PopoverTrigger>
