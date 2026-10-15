@@ -43,7 +43,7 @@ import {
   storeName,
   writesElsewhere,
 } from '@/lib/linkedFolders'
-import { arunaConflict, linkConflict, splitPath, splitsBuckets } from '@/lib/storageRules'
+import { arunaConflict, linkConflict, MOVE_BUSY, splitPath, splitsBuckets } from '@/lib/storageRules'
 import { errorMessage } from '@/lib/utils'
 
 const props = defineProps<{
@@ -268,7 +268,8 @@ async function submit() {
     if (current()) emit('update:open', false)
   } catch (err) {
     if (epoch !== sessionEpoch.value || !current()) return
-    submitError.value = errorMessage(err)
+    const busy = err instanceof ApiError && err.status === 409 && moveFiles.value
+    submitError.value = busy ? MOVE_BUSY : errorMessage(err)
   } finally {
     if (current()) saving.value = false
   }

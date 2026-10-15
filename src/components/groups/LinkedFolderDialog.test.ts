@@ -239,6 +239,16 @@ describe('LinkedFolderDialog', () => {
     mounted.app.unmount()
   })
 
+  it('says so when a move for the new link is refused', async () => {
+    createBackendImport.mockRejectedValue(new Api.ApiError(409, 'conflict'))
+    const mounted = await mount()
+    await choose(mounted.root, 'To Aruna bucket', 'sequencing')
+    await click(element(mounted.root, (node) => node.props['aria-label'] === 'Move files already in this folder'))
+    await submit(mounted.root)
+    expect(content(mounted.root)).toContain('Another move is still running in this bucket.')
+    mounted.app.unmount()
+  })
+
   it('keeps a reopened form when a save of an earlier opening answers late', async () => {
     let failFirst: (err: unknown) => void = () => {}
     let answerSecond: (value: unknown) => void = () => {}

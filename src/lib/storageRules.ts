@@ -198,12 +198,16 @@ export interface MoveView {
   done: number
 }
 
-export function moveView(moves: BucketMoveResponse[]): MoveView {
+export const MOVE_BUSY = 'Another move is still running in this bucket.'
+
+/** `prefix` limits progress to moves started for that prefix; counts stay whole. */
+export function moveView(moves: BucketMoveResponse[], prefix?: string): MoveView {
   const view: MoveView = { misplaced: 0, running: false, done: 0 }
   for (const move of moves) {
     const progress = move.progress
     view.misplaced += move.misplaced
     if (!progress || progress.finished_at_ms != null) continue
+    if (prefix !== undefined && (move.move_prefix ?? '') !== prefix) continue
     view.running = true
     view.done += progress.migrated + progress.skipped + progress.failed
   }

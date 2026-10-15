@@ -1,7 +1,7 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { button, click, compileClientComponent, content, element, flush, moduleDefault, mountApp } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, element, flush, moduleDefault, mountApp, nodes } from '@/test/clientRender'
 import * as Api from '@/lib/api'
 import * as LinkedFolders from '@/lib/linkedFolders'
 import * as StorageRules from '@/lib/storageRules'
@@ -260,6 +260,33 @@ describe('StorageSection', () => {
     await click(button(element(mounted.root, (node) => node.props.role === 'dialog'), 'Move files'))
     expect(startBucketMove).toHaveBeenCalledTimes(1)
     expect(startBucketMove).toHaveBeenCalledWith('alpha', '', expect.anything())
+    mounted.app.unmount()
+  })
+
+  it('keeps the default row free of moves started for a linked folder', async () => {
+    listGroupDataPaths.mockResolvedValue({ entries: [{ permission_path: '/r/g/g1/data/n/imaging/', kind: 'folder' }] })
+    getBucketMove.mockResolvedValue({
+      bucket: 'imaging',
+      misplaced: 10,
+      complete: true,
+      move_prefix: 'raw/',
+      progress: { migrated: 5, skipped: 0, failed: 0, started_at_ms: 1, finished_at_ms: null },
+    })
+    const mounted = await mount()
+    const lines = nodes(mounted.root).filter((node) => node.props['data-testid'] === 'move-line')
+    const defaultRow = element(mounted.root, (node) => node.props['data-testid'] === 'default-row')
+    expect(labelled(defaultRow, 'Move files').props.disabled).toBe(false)
+    expect(lines).toHaveLength(LINKS.length)
+    mounted.app.unmount()
+  })
+
+  it('says so when another move is still running in the bucket', async () => {
+    getBucketMove.mockResolvedValue({ bucket: 'x', misplaced: 7, complete: true })
+    startBucketMove.mockRejectedValue(new Api.ApiError(409, 'conflict'))
+    const mounted = await mount()
+    await click(labelled(row(mounted.root, 'sequencing'), 'Move files'))
+    await click(button(element(mounted.root, (node) => node.props.role === 'dialog'), 'Move files'))
+    expect(content(mounted.root)).toContain('Another move is still running in this bucket.')
     mounted.app.unmount()
   })
 

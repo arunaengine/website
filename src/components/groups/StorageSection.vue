@@ -37,6 +37,7 @@ import {
   bucketError,
   bucketTitle,
   defaultBucket,
+  MOVE_BUSY,
   moveText,
   moveView,
   runActive,
@@ -259,7 +260,10 @@ function found(bucket: string, prefix: string): BucketMoveResponse[] {
   return move ? [move] : []
 }
 const defaultMove = computed(() =>
-  moveView(groupBuckets.value.flatMap((bucket) => found(bucket, ''))),
+  moveView(
+    groupBuckets.value.flatMap((bucket) => found(bucket, '')),
+    '',
+  ),
 )
 function linkMove(link: BackendImport) {
   return moveView(found(link.bucket, link.key_prefix))
@@ -279,7 +283,7 @@ async function startMove() {
   try {
     for (const [bucket, prefix] of ask.pairs) {
       await startBucketMove(bucket, prefix, client()).catch((err) => {
-        if (!(err instanceof ApiError && err.status === 409)) throw err
+        throw err instanceof ApiError && err.status === 409 ? new Error(MOVE_BUSY) : err
       })
     }
     moveAsk.value = null
@@ -486,6 +490,7 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
             <span v-else />
             <span />
             <span class="flex justify-end gap-0.5">
+              <span v-if="canAdmin" class="inline-block h-6 w-[1.875rem]" aria-hidden="true" />
               <Button
                 v-if="canAdmin && (defaultMove.misplaced > 0 || defaultMove.running)"
                 variant="ghost"
@@ -498,6 +503,7 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
               >
                 <FolderInput class="h-3.5 w-3.5" />
               </Button>
+              <span v-else-if="canAdmin" class="inline-block h-6 w-[1.875rem]" aria-hidden="true" />
               <Button
                 v-if="canAdmin"
                 variant="ghost"
@@ -589,6 +595,7 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
                 >
                   <FolderInput class="h-3.5 w-3.5" />
                 </Button>
+                <span v-else class="inline-block h-6 w-[1.875rem]" aria-hidden="true" />
                 <Button
                   variant="ghost"
                   size="sm"
