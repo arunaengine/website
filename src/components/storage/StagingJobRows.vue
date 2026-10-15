@@ -17,7 +17,8 @@ import { errorMessage, formatBytes, relativeTime } from '@/lib/utils'
 import { ArrowLeft } from '@lucide/vue'
 
 const props = defineProps<{ bucket: string; quiet?: boolean }>()
-const emit = defineEmits<{ (e: 'count', count: number): void }>()
+// A count of null: the scan stopped early, so no match does not mean none.
+const emit = defineEmits<{ (e: 'count', count: number | null): void }>()
 
 const { sessionEpoch, listStagingJobs, getStagingJob, listGroupConnectors } = useAruna()
 
@@ -79,7 +80,7 @@ async function load() {
   } finally {
     if (id === requestId && !disposed) {
       loading.value = false
-      emit('count', jobs.value.length)
+      emit('count', truncated.value && !jobs.value.length ? null : jobs.value.length)
       schedulePoll()
     }
   }
@@ -135,6 +136,9 @@ function percent(job: StagingJob): number {
 
 <template>
   <ErrorPanel v-if="state === 'error'" :message="error ?? ''" @retry="load" />
+  <p v-else-if="state === 'empty' && truncated" class="surface px-5 py-3.5 text-xs text-muted-foreground">
+    None of the newest staging jobs of this node writes into this bucket. Older ones were not checked.
+  </p>
   <template v-else-if="state === 'empty'">
     <EmptyState
       v-if="!quiet"

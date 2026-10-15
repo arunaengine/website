@@ -120,4 +120,17 @@ describe('staging job rows', () => {
 
     expect(listStagingJobs.mock.calls.length).toBeGreaterThan(calls)
   })
+
+  it('says the scan stopped early instead of claiming none', async () => {
+    listStagingJobs.mockResolvedValue({ jobs: [], next_cursor: 'more' })
+    const counts: Array<number | null> = []
+    const { root } = await mountApp(stagingRows, {
+      props: { bucket: 'reef', onCount: (count: number | null) => counts.push(count) },
+    })
+    await flush()
+
+    expect(content(root)).toContain('Older ones were not checked.')
+    expect(content(root)).not.toContain('No staging job writes into this bucket.')
+    expect(counts.at(-1)).toBeNull()
+  })
 })

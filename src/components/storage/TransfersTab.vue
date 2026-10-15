@@ -38,14 +38,14 @@ const shows = (value: string) => kind.value === 'all' || kind.value === value
 
 // Remounting the lists reloads them all at once.
 const reloadKey = ref(0)
-const counts = ref<Record<string, number>>({})
+const counts = ref<Record<string, number | null>>({})
 const linkAvailable = ref(false)
 const allEmpty = computed(() => {
   const known = ['syncs', ...(props.nodeId ? [] : ['linked', ...(stagingEnabled ? ['staging'] : [])])]
   return known.every((key) => counts.value[key] === 0)
 })
 
-function setCount(key: string, count: number) {
+function setCount(key: string, count: number | null) {
   counts.value = { ...counts.value, [key]: count }
 }
 
@@ -143,7 +143,7 @@ function addLink() {
       :key="`staging-${reloadKey}`"
       :bucket="bucket"
       :quiet="kind === 'all'"
-      @count="(count: number) => setCount('staging', count)"
+      @count="(count: number | null) => setCount('staging', count)"
     />
 
     <SyncBucketDialog
