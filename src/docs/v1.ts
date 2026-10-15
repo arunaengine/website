@@ -398,7 +398,7 @@ export const docsTopics: DocsTopic[] = [
         bullets: [
           'A second copy at a partner institute: publish a policy that allows both institutes and attach it to the bucket, then add a copy on the partner node or set up a sync. The policy alone creates nothing.',
           'A mirror the partner owns: create a bucket sync in "Keep in sync" mode to their node. They serve their bucket under their own name and keep it if the sync is deleted.',
-          'Storage your group pays for: register a backend on the group Storage tab, set it as the default storage backend there, and override it per prefix with a bucket rule.',
+          'Storage your group pays for: add your storage on the group Storage tab, then give it a default rule for all buckets or link single buckets.',
           'Compute next to the data: a run goes to a node that already holds the inputs, so an extra copy on an executor node makes that possible. See [data to compute](concept:data-to-compute).',
         ],
       },
@@ -707,20 +707,20 @@ export const docsTopics: DocsTopic[] = [
   {
     slug: 'storage-backend',
     kind: 'Guide',
-    title: 'Configure a storage backend',
-    summary: 'Send a group’s uploads to your own S3-compatible storage.',
+    title: 'Use your own storage',
+    summary: 'Keep a group’s files in your own S3-compatible storage.',
     tour: [
       {
         route: '/app',
         anchor: 'nav-groups',
         title: 'Open Groups',
-        body: 'Backends are group configuration; open the group that should own the backend.',
+        body: 'Storage is group configuration; open the group that should use it.',
       },
       {
         route: '/app/groups',
         anchor: 'group-tabs',
         title: 'The Storage tab',
-        body: 'The Storage tab of a group registers backends and sets the default storage backend.',
+        body: 'The Storage tab lists Aruna storage and the storage your group added, with their rules.',
       },
     ],
     sections: [
@@ -736,14 +736,16 @@ export const docsTopics: DocsTopic[] = [
         icon: 'HardDrive',
         steps: [
           'Open the group from [Groups](page:groups) and switch to its Storage tab.',
-          'Add the endpoint and [backend](concept:storage-access#external-storage-backend) credentials; verify endpoint and certificate first.',
-          'Enable the backend and make it the default storage backend only after the connection check succeeds.',
-          'Writers inherit the backend but can never reveal or replace the secret.',
+          'Choose Add your storage and enter the endpoint and [keys](concept:storage-access#external-storage-backend). No bucket is needed; Aruna checks the keys before it saves them.',
+          'Use as default sends new uploads of all buckets to one bucket of your storage, such as aruna-lab-default. Aruna creates the bucket if it is missing and keeps its own layout there.',
+          'Link a bucket shows the same files in an Aruna bucket and a bucket of your storage, both ways. Aruna never deletes files there.',
+          'Rules may not overlap, and a linked bucket may not be the default bucket. Use as default on Aruna storage sends new uploads back to the node; files already in your storage stay there.',
+          'Writers use the storage but can never see or change the keys.',
         ],
         image: {
           src: '/docs/v1/group-storage.jpg',
-          alt: 'Group storage tab with the storage backends section and add backend button',
-          caption: 'Backends live on the group: uploads land in your own object storage.',
+          alt: 'Group storage tab with Aruna storage and your own storage with its rules',
+          caption: 'Storage lives on the group: rules decide which buckets go to your storage.',
         },
       },
     ],
