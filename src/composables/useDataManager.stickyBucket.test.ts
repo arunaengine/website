@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
+  groupSwitchRoute,
   readLastBucket,
   stickyBucketStep,
   stickyScopeFor,
@@ -124,5 +125,34 @@ describe('sticky bucket restore', () => {
   it('forgets a bucket another node serves', () => {
     // Only the connected node's list can confirm a bucket still exists.
     expect(step({ memory: memory({ nodeId: 'node-far' }) })).toEqual({ action: 'forget' })
+  })
+})
+
+describe('group switch', () => {
+  const state = (overrides: Record<string, unknown> = {}) =>
+    groupSwitchRoute({
+      previous: 'g-1',
+      next: 'g-2',
+      bucket: 'reef-survey',
+      remoteNodeId: null,
+      queryGroup: 'g-1',
+      notebooks: false,
+      ...overrides,
+    })
+
+  it('opens the bucket picker for the new group', () => {
+    expect(state()).toEqual({ name: 'buckets', query: { group: 'g-2' } })
+    expect(state({ notebooks: true })).toEqual({ name: 'buckets', query: { group: 'g-2', notebooks: '1' } })
+  })
+
+  it('keeps the route when no bucket is open or the route already names the group', () => {
+    expect(state({ bucket: '' })).toBeNull()
+    expect(state({ queryGroup: 'g-2' })).toBeNull()
+  })
+
+  it('keeps the route for a first group, the same group and remote buckets', () => {
+    expect(state({ previous: '' })).toBeNull()
+    expect(state({ next: 'g-1' })).toBeNull()
+    expect(state({ remoteNodeId: 'node-far' })).toBeNull()
   })
 })

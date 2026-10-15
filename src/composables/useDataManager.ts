@@ -165,6 +165,23 @@ export function stickyBucketStep(state: {
   }
 }
 
+/**
+ * Where a group switch must go: the open bucket belongs to the old group, so
+ * the bucket-less route (the picker) opens for the new one. Null keeps the route.
+ */
+export function groupSwitchRoute(state: {
+  previous: string
+  next: string
+  bucket: string
+  remoteNodeId: string | null
+  queryGroup: string
+  notebooks: boolean
+}): { name: string; query: LocationQueryRaw } | null {
+  const { previous, next, bucket, remoteNodeId, queryGroup } = state
+  if (!previous || !next || previous === next || !bucket || remoteNodeId || queryGroup === next) return null
+  return { name: 'buckets', query: { group: next, ...(state.notebooks ? { notebooks: '1' } : {}) } }
+}
+
 // The local "Recently browsed" rows the loaded list does not confirm: each is
 // deleted or owned by another group, and only the node can tell them apart.
 export function unlistedRecents(recent: BucketShortcut[], buckets: string[]): BucketShortcut[] {
@@ -726,6 +743,22 @@ export function useDataManager() {
     },
   )
 
+  // A search hit sets the group and opens its own bucket, so it is not a switch.
+  let hitGroupId = ''
+  // The open bucket belongs to the old group: show the picker for the new one.
+  watch(selectedGroupId, (next, previous) => {
+    if (next === hitGroupId) return
+    const target = groupSwitchRoute({
+      previous,
+      next,
+      bucket: bucket.value,
+      remoteNodeId: remoteNodeId.value,
+      queryGroup: routeString(route.query.group),
+      notebooks: route.name === 'notebooks' || route.query.notebooks === '1',
+    })
+    if (target) void router.replace(target)
+  })
+
   watch(
     bucket,
     (name) => {
@@ -801,6 +834,7 @@ export function useDataManager() {
   }
 
   function openSearchHit(hit: BucketSearchHit) {
+    hitGroupId = hit.group_id
     selectedGroupId.value = hit.group_id
     selectedGroupLabel.value = hit.group_name ?? hit.group_id
     openBucketOn(hit.bucket, realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id, hit.group_id)
