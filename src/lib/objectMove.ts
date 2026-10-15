@@ -142,6 +142,7 @@ export async function runTransfer(
     let kept = false
     for (const copy of copies) {
       if (copy.source !== source.key) continue
+      check()
       const now = await step(store.headObject(bucket, copy.from, nodeId))
       if (!sameRevision(now, copied.get(copy.from) ?? {})) {
         changed.push(baseName(copy.from))
@@ -150,10 +151,11 @@ export async function runTransfer(
       }
       // Soft delete without a version. The node has no If-Match on delete, so a write
       // between this check and the delete can still be hidden behind the marker.
-      await step(store.deleteObject(bucket, copy.from, nodeId))
+      await store.deleteObject(bucket, copy.from, nodeId)
     }
-    if (kept) continue
-    onMoved(source.key)
+    // A source whose deletes all went through is recorded before the session check.
+    if (!kept) onMoved(source.key)
+    check()
   }
   if (changed.length) throw new Error(`Changed during the move, kept: ${changed.join(', ')}.`)
 }
