@@ -43,7 +43,7 @@ import {
   storeName,
   writesElsewhere,
 } from '@/lib/linkedFolders'
-import { arunaConflict, linkConflict, MOVE_BUSY, splitPath, splitsBuckets } from '@/lib/storageRules'
+import { arunaConflict, linkConflict, moveRefusal, splitPath, splitsBuckets } from '@/lib/storageRules'
 import { errorMessage } from '@/lib/utils'
 
 const props = defineProps<{
@@ -55,8 +55,8 @@ const props = defineProps<{
   links?: BackendImport[]
   /** The storage a new link starts on. */
   storageId?: string | null
-  /** Files of a stored link that are not where the rules put them. */
-  misplaced?: number
+  /** Files of a stored link may need a move. */
+  movable?: boolean
 }>()
 const emit = defineEmits<{
   (e: 'update:open', v: boolean): void
@@ -247,13 +247,17 @@ async function submit() {
   const epoch = sessionEpoch.value
   const generation = opening
   const current = () => generation === opening
+  // The draft may be reopened while this runs; keep what was asked.
+  const stored = props.link
+  const move = moveFiles.value
+  const wanted = schedule.value
   try {
     let runError: string | undefined
-    if (props.link) {
-      if (schedule.value !== (props.link.schedule ?? '')) {
-        await updateBackendImport(props.groupId, props.link.import_id, schedule.value || null, client)
+    if (stored) {
+      if (wanted !== (stored.schedule ?? '')) {
+        await updateBackendImport(props.groupId, stored.import_id, wanted || null, client)
       }
-      if (moveFiles.value) await startBucketMove(props.link.bucket, props.link.key_prefix, client)
+      if (move) await startBucketMove(stored.bucket, stored.key_prefix, client)
     } else {
       const created = await createBackendImport(props.groupId, body(), client)
       try {
@@ -268,8 +272,7 @@ async function submit() {
     if (current()) emit('update:open', false)
   } catch (err) {
     if (epoch !== sessionEpoch.value || !current()) return
-    const busy = err instanceof ApiError && err.status === 409 && moveFiles.value
-    submitError.value = busy ? MOVE_BUSY : errorMessage(err)
+    submitError.value = moveRefusal(err) ?? errorMessage(err)
   } finally {
     if (current()) saving.value = false
   }
@@ -495,7 +498,7 @@ async function submit() {
               </p>
             </div>
 
-            <label v-if="!isEdit || (misplaced ?? 0) > 0" class="flex items-center gap-2 text-xs text-foreground">
+            <label v-if="!isEdit || movable" class="flex items-center gap-2 text-xs text-foreground">
               <Switch
                 :checked="moveFiles"
                 aria-label="Move files already in this folder"

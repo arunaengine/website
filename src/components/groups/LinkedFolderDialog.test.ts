@@ -219,7 +219,7 @@ describe('LinkedFolderDialog', () => {
     expect(content(none.root)).not.toContain('Move files already in this folder')
     none.app.unmount()
 
-    const mounted = await mount(STORED, { misplaced: 12 })
+    const mounted = await mount(STORED, { movable: true })
     expect(button(mounted.root, 'Save changes').props.disabled).toBe(true)
     await click(element(mounted.root, (node) => node.props['aria-label'] === 'Move files already in this folder'))
     await submit(mounted.root)
@@ -240,7 +240,7 @@ describe('LinkedFolderDialog', () => {
   })
 
   it('says so when a move for the new link is refused', async () => {
-    createBackendImport.mockRejectedValue(new Api.ApiError(409, 'conflict'))
+    createBackendImport.mockRejectedValue(new Api.ApiError(409, 'conflict', 'move_running'))
     const mounted = await mount()
     await choose(mounted.root, 'To Aruna bucket', 'sequencing')
     await click(element(mounted.root, (node) => node.props['aria-label'] === 'Move files already in this folder'))

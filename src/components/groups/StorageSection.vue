@@ -37,7 +37,8 @@ import {
   bucketError,
   bucketTitle,
   defaultBucket,
-  MOVE_BUSY,
+  moveOffer,
+  moveRefusal,
   moveText,
   moveView,
   runActive,
@@ -129,7 +130,7 @@ async function listGroupBuckets(): Promise<string[]> {
 
 async function loadMoves() {
   const seq = loadSeq
-  const buckets = target.value ? await listGroupBuckets() : []
+  const buckets = await listGroupBuckets()
   const pairs: [string, string][] = [
     ...links.value.map((link): [string, string] => [link.bucket, link.key_prefix]),
     ...buckets.map((bucket): [string, string] => [bucket, '']),
@@ -271,7 +272,7 @@ function linkMove(link: BackendImport) {
 // Only buckets that have something to move are asked.
 const defaultPairs = computed(() =>
   groupBuckets.value
-    .filter((bucket) => found(bucket, '').some((move) => move.misplaced > 0))
+    .filter((bucket) => moveOffer(moveView(found(bucket, ''))))
     .map((bucket): [string, string] => [bucket, '']),
 )
 
@@ -280,15 +281,17 @@ async function startMove() {
   if (!ask || busyId.value) return
   actionError.value = null
   busyId.value = 'move'
+  // A later switch of account or node must not receive the rest of the batch.
+  const asked = client()
+  const epoch = sessionEpoch.value
   try {
     for (const [bucket, prefix] of ask.pairs) {
-      await startBucketMove(bucket, prefix, client()).catch((err) => {
-        throw err instanceof ApiError && err.status === 409 ? new Error(MOVE_BUSY) : err
-      })
+      if (disposed || epoch !== sessionEpoch.value) break
+      await startBucketMove(bucket, prefix, asked)
     }
     moveAsk.value = null
   } catch (err) {
-    actionError.value = errorMessage(err)
+    actionError.value = moveRefusal(err) ?? errorMessage(err)
     moveAsk.value = null
   } finally {
     busyId.value = null
@@ -320,7 +323,16 @@ async function enable(backend: GroupBackendResponse) {
 
 async function onDefaultSaved(move?: boolean) {
   if (!move) return load()
-  moveAsk.value = { pairs: groupBuckets.value.map((bucket): [string, string] => [bucket, '']), place: 'all buckets' }
+  await load()
+  // The new rules decide what is misplaced now, so ask again before moving.
+  const asked = client()
+  const buckets = groupBuckets.value
+  const answers = await Promise.allSettled(buckets.map((bucket) => getBucketMove(bucket, '', asked)))
+  const pairs = answers.flatMap((answer, index): [string, string][] =>
+    answer.status === 'fulfilled' && moveOffer(moveView([answer.value])) ? [[buckets[index], '']] : [],
+  )
+  if (!pairs.length) return
+  moveAsk.value = { pairs, place: 'all buckets' }
   await startMove()
 }
 
@@ -492,7 +504,7 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
             <span class="flex justify-end gap-0.5">
               <span v-if="canAdmin" class="inline-block h-6 w-[1.875rem]" aria-hidden="true" />
               <Button
-                v-if="canAdmin && (defaultMove.misplaced > 0 || defaultMove.running)"
+                v-if="canAdmin && moveOffer(defaultMove)"
                 variant="ghost"
                 size="sm"
                 class="h-6 px-2 text-aruna-navy dark:text-foreground"
@@ -524,6 +536,7 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
               :max="defaultMove.done + defaultMove.misplaced"
               :warn="101"
               :critical="101"
+              label="Moving files"
               bar-class="bg-primary"
               class="mt-0.5 h-1"
             />
@@ -584,7 +597,7 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
                   <Play class="h-3.5 w-3.5" />
                 </Button>
                 <Button
-                  v-if="linkMove(link).misplaced > 0 || linkMove(link).running"
+                  v-if="moveOffer(linkMove(link))"
                   variant="ghost"
                   size="sm"
                   class="h-6 px-2 text-aruna-navy dark:text-foreground"
@@ -623,6 +636,7 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
                 :max="linkMove(link).done + linkMove(link).misplaced"
                 :warn="101"
                 :critical="101"
+                label="Moving files"
                 bar-class="bg-primary"
                 class="mt-0.5 h-1"
               />
@@ -666,7 +680,7 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
       :link="editingLink"
       :links="links"
       :storage-id="linkStorage"
-      :misplaced="editingLink ? linkMove(editingLink).misplaced : 0"
+      :movable="editingLink ? moveOffer(linkMove(editingLink)) : false"
       @saved="onLinkSaved"
     />
     <DefaultRuleDialog
@@ -675,7 +689,7 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
       :group-name="props.groupName"
       :backend="defaultStorage"
       :links="links"
-      :misplaced="defaultMove.misplaced"
+      :has-buckets="groupBuckets.length > 0"
       @saved="onDefaultSaved"
     />
     <Dialog :open="moveAsk !== null" @update:open="(v: boolean) => { if (!v) moveAsk = null }">

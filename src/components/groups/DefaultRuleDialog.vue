@@ -24,8 +24,8 @@ const props = defineProps<{
   groupName: string
   backend: GroupBackendResponse | null
   links: BackendImport[]
-  /** Files of all buckets that are not where the rules put them. */
-  misplaced?: number
+  /** The group has buckets whose files a move may place. */
+  hasBuckets?: boolean
 }>()
 const emit = defineEmits<{
   (e: 'update:open', v: boolean): void
@@ -71,11 +71,12 @@ async function submit() {
   const generation = opening
   const epoch = sessionEpoch.value
   const current = () => generation === opening && epoch === sessionEpoch.value
+  const move = moveFiles.value
   try {
     const name = splits.value ? bucket.value.trim() : undefined
     await putGroupRouting(props.groupId, { backend_id: props.backend.backend_id }, name)
     if (epoch !== sessionEpoch.value) return
-    emit('saved', moveFiles.value)
+    emit('saved', move)
     if (current()) emit('update:open', false)
   } catch (err) {
     if (current()) submitError.value = errorMessage(err)
@@ -112,7 +113,7 @@ async function submit() {
         <p v-else class="text-xs text-foreground">
           New uploads go to bucket <span class="font-mono">{{ backend ? defaultBucket(backend) : '' }}</span>.
         </p>
-        <label v-if="(misplaced ?? 0) > 0" class="flex items-center gap-2 text-xs text-foreground">
+        <label v-if="hasBuckets" class="flex items-center gap-2 text-xs text-foreground">
           <Switch
             :checked="moveFiles"
             aria-label="Move files already stored"

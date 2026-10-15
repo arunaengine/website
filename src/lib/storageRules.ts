@@ -1,5 +1,5 @@
 // Wording and checks for the rules of a group's storage: the default rule and linked buckets.
-import type { BackendImport, BackendImportRun, BucketMoveResponse, GroupBackendResponse } from './api'
+import { ApiError, type BackendImport, type BackendImportRun, type BucketMoveResponse, type GroupBackendResponse } from './api'
 import { backendSchema } from './storage'
 import { storeName } from './linkedFolders'
 import { formatNumber, relativeTime } from './utils'
@@ -194,18 +194,33 @@ export function defaultConflict(
 /** The files of a bucket found not where the rules put them, and any move now running. */
 export interface MoveView {
   misplaced: number
+  /** A count stopped early, so more files may need a move. */
+  partial: boolean
   running: boolean
   done: number
 }
 
+/** Whether Move files makes sense: files to move, maybe more, or a move that runs. */
+export function moveOffer(view: MoveView): boolean {
+  return view.misplaced > 0 || view.partial || view.running
+}
+
 export const MOVE_BUSY = 'Another move is still running in this bucket.'
+
+/** A short message for a refused move, or null for any other error. */
+export function moveRefusal(err: unknown): string | null {
+  if (!(err instanceof ApiError) || err.status !== 409) return null
+  if (err.code === 'move_running') return MOVE_BUSY
+  return err.code === 'bucket_encrypted' ? 'This bucket is encrypted, so its files cannot be moved.' : null
+}
 
 /** `prefix` limits progress to moves started for that prefix; counts stay whole. */
 export function moveView(moves: BucketMoveResponse[], prefix?: string): MoveView {
-  const view: MoveView = { misplaced: 0, running: false, done: 0 }
+  const view: MoveView = { misplaced: 0, partial: false, running: false, done: 0 }
   for (const move of moves) {
     const progress = move.progress
     view.misplaced += move.misplaced
+    if (!move.complete) view.partial = true
     if (!progress || progress.finished_at_ms != null) continue
     if (prefix !== undefined && (move.move_prefix ?? '') !== prefix) continue
     view.running = true
@@ -216,5 +231,5 @@ export function moveView(moves: BucketMoveResponse[], prefix?: string): MoveView
 
 /** "Moving files: 1,240 of 3,500". */
 export function moveText(view: MoveView): string {
-  return `Moving files: ${formatNumber(view.done)} of ${formatNumber(view.done + view.misplaced)}`
+  return `Moving files: ${formatNumber(view.done)} of ${formatNumber(view.done + view.misplaced)}${view.partial ? '+' : ''}`
 }

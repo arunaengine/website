@@ -96,13 +96,13 @@ describe('DefaultRuleDialog', () => {
     mounted.app.unmount()
   })
 
-  it('offers to move files only when some are misplaced', async () => {
+  it('offers to move files only when the group has buckets', async () => {
     putGroupRouting.mockResolvedValue({ group_id: 'g1', warnings: [] })
     const none = await mount()
     expect(content(none.root)).not.toContain('Move files already stored')
     none.app.unmount()
 
-    const mounted = await mount({ misplaced: 4 })
+    const mounted = await mount({ hasBuckets: true })
     await click(element(mounted.root, (node) => node.props['aria-label'] === 'Move files already stored'))
     const form = element(mounted.root, (node) => node.tag === 'form')
     await (form.props.onSubmit as (event: unknown) => Promise<void>)({ preventDefault() {} })

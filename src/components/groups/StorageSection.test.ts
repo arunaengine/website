@@ -228,6 +228,13 @@ describe('StorageSection', () => {
     mounted.app.unmount()
   })
 
+  it('keeps Move files for a count that stopped early', async () => {
+    getBucketMove.mockResolvedValue({ bucket: 'x', misplaced: 0, complete: false })
+    const mounted = await mount()
+    expect(hasLabel(row(mounted.root, 'sequencing'), 'Move files')).toBe(true)
+    mounted.app.unmount()
+  })
+
   it('shows the progress of a running move and keeps the action off', async () => {
     getBucketMove.mockResolvedValue({
       bucket: 'x',
@@ -282,7 +289,7 @@ describe('StorageSection', () => {
 
   it('says so when another move is still running in the bucket', async () => {
     getBucketMove.mockResolvedValue({ bucket: 'x', misplaced: 7, complete: true })
-    startBucketMove.mockRejectedValue(new Api.ApiError(409, 'conflict'))
+    startBucketMove.mockRejectedValue(new Api.ApiError(409, 'conflict', 'move_running'))
     const mounted = await mount()
     await click(labelled(row(mounted.root, 'sequencing'), 'Move files'))
     await click(button(element(mounted.root, (node) => node.props.role === 'dialog'), 'Move files'))
