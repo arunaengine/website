@@ -48,6 +48,9 @@ export function resetS3Access() {
   s3Access.canDeletePrefix = () => true
 }
 
+/** The broken-file reasons by key that the compiled browser shows in red. */
+export const brokenFiles = { reasons: {} as Record<string, string> }
+
 /** The locked-bucket state the compiled browser sees: a plain bucket unless a test changes it. */
 export const lockedState = { locked: false, available: false, pending: new Set<string>() }
 export const lockedDownload = vi.fn()
@@ -97,6 +100,9 @@ export function objectBrowser(): Component {
       '@/components/watches/WatchButton.vue': moduleDefault(Slotted('button')),
       '@/components/storage/KeyedReadNotice.vue': moduleDefault(Slotted('aside')),
       '@/composables/useAruna': { useAruna: () => ({ isRealmAdmin: ref(false) }) },
+      '@/composables/useBrokenFiles': {
+        useBrokenFiles: () => ({ reasonOf: (key: string) => brokenFiles.reasons[key] ?? null }),
+      },
       '@/composables/useLockedBucket': { useLockedBucket: (...args: unknown[]) => lockedBucket(...args) },
       '@/composables/usePlacementPolicies': {
         usePlacementPolicies: () => ({ getBucketPlacement: vi.fn(async () => null) }),

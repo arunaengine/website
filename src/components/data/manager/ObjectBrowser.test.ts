@@ -12,6 +12,7 @@ import {
   type HostNode,
 } from '@/test/clientRender'
 import {
+  brokenFiles,
   fakeManager,
   listedFolder,
   listedObject,
@@ -54,6 +55,15 @@ function action(root: HostNode, label: string): HostNode {
 }
 
 describe('object browser row actions', () => {
+  it('shows a broken file in red with the reason', async () => {
+    brokenFiles.reasons = { [listedObject.key]: 'File missing on storage' }
+    const root = await render()
+    const name = element(root, (node) => node.tag === 'span' && node.props.title === 'File missing on storage')
+    expect(JSON.stringify(name.props.class)).toContain('text-destructive')
+    expect(content(name)).toContain('reads.fastq')
+    brokenFiles.reasons = {}
+  })
+
   it('offers exactly preview, download, delete and more', async () => {
     const root = await render()
     const row = element(root, (node) => node.tag === 'tr' && content(node).includes('reads.fastq'))

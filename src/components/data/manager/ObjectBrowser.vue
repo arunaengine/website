@@ -14,6 +14,7 @@ import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import WatchButton from '@/components/watches/WatchButton.vue'
 import KeyedReadNotice from '@/components/storage/KeyedReadNotice.vue'
 import { useAruna } from '@/composables/useAruna'
+import { useBrokenFiles } from '@/composables/useBrokenFiles'
 import { useLockedBucket } from '@/composables/useLockedBucket'
 import type { DataManager } from '@/composables/useDataManager'
 import {
@@ -123,6 +124,7 @@ const {
 } = props.manager
 
 const locked = useLockedBucket(bucket, remoteNodeId, activeGroupId, download)
+const { reasonOf: brokenReason } = useBrokenFiles(bucket, remoteNodeId)
 const { lockedOnNode, availableToYou } = locked
 // A read waiting in another folder ends with the folder.
 watch(prefix, () => locked.cancel())
@@ -547,7 +549,11 @@ async function onDrop(event: DragEvent) {
               <td class="px-4 py-2.5">
                 <span class="flex items-center gap-2">
                   <ObjectIcon :name="object.name" class="h-4 w-4" />
-                  <span class="truncate" :class="isNotebook(object) ? 'font-medium text-primary' : ''">{{ object.name }}</span>
+                  <span
+                    class="truncate"
+                    :class="brokenReason(object.key) ? 'text-destructive' : isNotebook(object) ? 'font-medium text-primary' : ''"
+                    :title="brokenReason(object.key) ?? undefined"
+                  >{{ object.name }}</span>
                   <Badge v-if="isNotebook(object)" variant="royal" size="sm" class="shrink-0">Notebook</Badge>
                   <Badge v-if="locked.keyPending(object.key)" variant="warn" size="sm" class="shrink-0">
                     Key pending
