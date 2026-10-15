@@ -39,7 +39,7 @@ describe('Data view session affordances', () => {
     expect(managerBrowser).toContain(':disabled="!canWriteCurrentPrefix"')
     // The row's one destructive entry carries the reason, not just a state.
     expect(managerBrowser).toContain(':disabled-reason="objectReason(object.key)"')
-    expect(managerBrowser).toContain(':disabled-reason="folderReason(folder.prefix)"')
+    expect(managerBrowser).toContain(':change-reason="folderReason(folder.prefix)"')
     expect(managerBrowser).toContain('This session cannot delete this object.')
     expect(managerBrowser).toContain('This session cannot delete this entire folder.')
     expect(uploadPanel).toContain(':disabled="!canWriteCurrentPrefix"')
