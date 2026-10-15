@@ -6,6 +6,7 @@ import IconButton from '@/components/ui/IconButton.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Popover from '@/components/ui/Popover.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
+import Select from '@/components/ui/Select.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
 import Breadcrumbs from '@/components/data/Breadcrumbs.vue'
@@ -26,6 +27,7 @@ import {
   type ObjectEntry,
 } from '@/composables/useS3'
 import { usePlacementPolicies } from '@/composables/usePlacementPolicies'
+import { PAGE_SIZES } from '@/composables/useListPages'
 import type { PublicTarget } from '@/lib/publicAccess'
 import { featureEnabled } from '@/lib/config'
 import { isNotebookKey } from '@/lib/notebook/document'
@@ -38,6 +40,8 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
   ArrowLeftRight,
+  ChevronLeft,
+  ChevronRight,
   CloudOff,
   Download,
   Eye,
@@ -86,6 +90,11 @@ const {
   visibleObjects,
   nameFilter,
   nextToken,
+  page,
+  pageSize,
+  nextPage,
+  previousPage,
+  setPageSize,
   listLoading,
   listError,
   listAuthError,
@@ -205,6 +214,7 @@ function openBucketSettings() {
 }
 
 const dragActive = ref(false)
+const PAGE_SIZE_OPTIONS = PAGE_SIZES.map((size) => ({ value: String(size), label: String(size) }))
 
 function objectReason(key: string): string | null {
   return s3.canWrite(bucket.value, key, remoteNodeId.value)
@@ -660,10 +670,26 @@ async function onDrop(event: DragEvent) {
             </tr>
           </tbody>
         </table>
-        <div v-if="nextToken" class="border-t border-border px-4 py-2">
-          <Button variant="ghost" size="sm" :disabled="listLoading" :aria-busy="listLoading" @click="loadObjects(true)">
-            <Spinner v-if="listLoading" label="Loading more objects" class="text-current" /> Load more
-          </Button>
+        <div v-if="!isEmpty || page > 1" class="flex items-center justify-between gap-3 border-t border-border px-4 py-2">
+          <label class="flex items-center gap-2 text-xs text-muted-foreground">
+            Per page
+            <Select
+              :model-value="String(pageSize)"
+              :options="PAGE_SIZE_OPTIONS"
+              aria-label="Files per page"
+              class="h-8 w-20 text-xs text-foreground"
+              @update:model-value="(value: string) => setPageSize(Number(value))"
+            />
+          </label>
+          <div class="flex items-center gap-2">
+            <Button variant="outline" size="sm" :disabled="page <= 1 || listLoading" @click="previousPage">
+              <ChevronLeft class="size-3.5" /> Prev
+            </Button>
+            <span class="px-1 text-center text-xs tabular-nums text-muted-foreground">Page {{ page }}</span>
+            <Button variant="outline" size="sm" :disabled="!nextToken || listLoading" @click="nextPage">
+              Next <ChevronRight class="size-3.5" />
+            </Button>
+          </div>
         </div>
       </div>
       <TransferDialog

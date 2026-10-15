@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { actionBlocker, fileRows, filtersChanged, shownDeleted, shownEntries } from './objectListing'
+import { actionBlocker, deletedOnPage, fileRows, filtersChanged, shownDeleted, shownEntries } from './objectListing'
 
 const folder = { prefix: 'raw/genomes/', name: 'genomes' }
 const file = { key: 'raw/reads.fastq', name: 'reads.fastq' }
@@ -25,6 +25,20 @@ describe('object list filters', () => {
     expect(filtersChanged({ show: 'all', includeDeleted: false })).toBe(false)
     expect(filtersChanged({ show: 'files', includeDeleted: false })).toBe(true)
     expect(filtersChanged({ show: 'all', includeDeleted: true })).toBe(true)
+  })
+
+  it('keeps deleted files inside the key range of the listed page', () => {
+    const listed = ['raw/m.txt', 'raw/genomes/']
+    expect(deletedOnPage(deleted, listed, false, false)).toHaveLength(2)
+    expect(deletedOnPage(deleted, listed, false, true).map((entry) => entry.key)).toEqual([])
+    expect(deletedOnPage(deleted, listed, true, false).map((entry) => entry.key)).toEqual([
+      'raw/old.fastq',
+      'raw/notes.txt',
+    ])
+    expect(deletedOnPage(deleted, ['raw/a.txt', 'raw/p.txt'], true, true).map((entry) => entry.key)).toEqual([
+      'raw/old.fastq',
+      'raw/notes.txt',
+    ])
   })
 
   it('orders live and deleted files by key', () => {

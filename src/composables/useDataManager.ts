@@ -10,6 +10,7 @@ import { useBrowserSelection } from './useBrowserSelection'
 import { useBuckets } from './useBuckets'
 import { useBucketShortcuts, type BucketShortcut } from './useBucketShortcuts'
 import { useGroupContext } from './useGroupSelection'
+import { useListPages } from './useListPages'
 import type { SyncRow } from './useBucketSyncs'
 import { usePublicAccess } from './usePublicAccess'
 import { useRealmNodes } from './useRealmNodes'
@@ -29,7 +30,7 @@ import { bucketNameProblem } from '@/lib/bucketName'
 import { readStored, storeValue } from './aruna/state'
 import { requestScope, type DeleteRequest, type DeletionResult } from '@/lib/deletion/request'
 import type { DeletedObjectEntry } from '@/lib/objectVersions'
-import { shownDeleted, shownEntries, type ListingShow } from '@/lib/objectListing'
+import { deletedOnPage, shownDeleted, shownEntries, type ListingShow } from '@/lib/objectListing'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import type { BucketSearchHit, SourceConnectorSummary, SyncRelationship, UsageResponse } from '@/lib/api'
@@ -510,7 +511,8 @@ export function useDataManager() {
 
   const folders = ref<FolderEntry[]>([])
   const objects = ref<ObjectEntry[]>([])
-  const nextToken = ref<string | undefined>(undefined)
+  const pages = useListPages()
+  const nextToken = pages.nextToken
   const listLoading = ref(false)
   const listError = ref<string | null>(null)
   const listAuthError = ref(false)
@@ -587,9 +589,12 @@ export function useDataManager() {
     { immediate: true },
   )
 
-  const deletedRows = computed(() =>
-    showDeleted.value ? shownDeleted(deletedObjects.value, nameFilter.value, listShow.value) : [],
-  )
+  const deletedRows = computed(() => {
+    if (!showDeleted.value) return []
+    const keys = [...folders.value.map((folder) => folder.prefix), ...objects.value.map((object) => object.key)]
+    const shown = shownDeleted(deletedObjects.value, nameFilter.value, listShow.value)
+    return deletedOnPage(shown, keys, pages.page.value > 1, Boolean(nextToken.value))
+  })
 
   // Hidden rows leave the selection, so no action reaches what is not shown.
   watch(listShow, () => selection.clearSelection())
@@ -667,7 +672,7 @@ export function useDataManager() {
     ++listRequestId
     folders.value = []
     objects.value = []
-    nextToken.value = undefined
+    pages.reset()
     listLoading.value = false
     listError.value = null
     listAuthError.value = false
@@ -677,7 +682,8 @@ export function useDataManager() {
   }
 
 
-  async function loadObjects(more = false) {
+  // One page at a time: the page replaces the list, and Prev or Next pick it.
+  async function loadObjects() {
     if (!contextReady.value || !effectiveEndpoint.value || !bucket.value) return
     if (!s3.canRead(bucket.value, s3Prefix.value, remoteNodeId.value)) {
       listError.value = 'This session does not allow reading the selected bucket and prefix.'
@@ -687,17 +693,18 @@ export function useDataManager() {
     const targetBucket = bucket.value
     const targetPrefix = s3Prefix.value
     const targetNode = remoteNodeId.value
-    const continuation = more ? nextToken.value : undefined
+    const continuation = pages.token.value
     const nameStart = nameFilter.value
+    const maxKeys = pages.pageSize.value
     listLoading.value = true
     listError.value = null
     listAuthError.value = false
     remoteBrowseBlocked.value = false
     try {
-      const page = await s3.listObjects(targetBucket, targetPrefix, continuation, targetNode, { nameStart })
+      const page = await s3.listObjects(targetBucket, targetPrefix, continuation, targetNode, { nameStart, maxKeys })
       if (requestId !== listRequestId) return
-      folders.value = more ? [...folders.value, ...page.folders] : page.folders
-      objects.value = more ? [...objects.value, ...page.objects] : page.objects
+      folders.value = page.folders
+      objects.value = page.objects
       nextToken.value = page.nextToken
     } catch (err) {
       if (requestId === listRequestId) {
@@ -714,6 +721,19 @@ export function useDataManager() {
     } finally {
       if (requestId === listRequestId) listLoading.value = false
     }
+  }
+
+  function turnPage(moved: boolean) {
+    if (!moved) return
+    selection.clearSelection()
+    void loadObjects()
+  }
+
+  const nextPage = () => turnPage(pages.next())
+  const previousPage = () => turnPage(pages.previous())
+  function setPageSize(size: number) {
+    pages.setPageSize(size)
+    turnPage(true)
   }
 
   // Everything except the bucket list, which has its own cache-aware entry points.
@@ -1338,6 +1358,11 @@ export function useDataManager() {
     listShow,
     resetFilters,
     nextToken,
+    page: pages.page,
+    pageSize: pages.pageSize,
+    nextPage,
+    previousPage,
+    setPageSize,
     listLoading,
     listError,
     listAuthError,

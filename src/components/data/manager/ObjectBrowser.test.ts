@@ -333,6 +333,30 @@ describe('object browser selection', () => {
   })
 })
 
+describe('object browser pages', () => {
+  it('turns pages with Prev and Next and sets the page size', async () => {
+    const nextPage = vi.fn()
+    const previousPage = vi.fn()
+    const setPageSize = vi.fn()
+    const first = await render({ nextPage, previousPage, setPageSize, nextToken: ref('t2') })
+
+    expect(content(first)).toContain('Page 1')
+    expect(button(first, 'Prev').props.disabled).toBe(true)
+    await click(button(first, 'Next'))
+    expect(nextPage).toHaveBeenCalled()
+
+    const size = element(first, (node) => node.tag === 'select')
+    await (size.props.onChange as (event: unknown) => unknown)({ target: { value: '100' } })
+    expect(setPageSize).toHaveBeenCalledWith(100)
+
+    const last = await render({ nextPage, previousPage, page: ref(3) })
+    expect(content(last)).toContain('Page 3')
+    expect(button(last, 'Next').props.disabled).toBe(true)
+    await click(button(last, 'Prev'))
+    expect(previousPage).toHaveBeenCalled()
+  })
+})
+
 describe('notebooks in the bucket', () => {
   const notebookObject = {
     key: 'notebooks/counts.ipynb',

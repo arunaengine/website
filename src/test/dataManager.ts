@@ -38,6 +38,18 @@ export const IconButtonStub = defineComponent({
     ),
 })
 
+export const SelectStub = defineComponent({
+  inheritAttrs: false,
+  props: { modelValue: String, options: Array },
+  emits: ['update:modelValue'],
+  setup: (props, { attrs, emit }) => () =>
+    h('select', {
+      ...attrs,
+      value: props.modelValue,
+      onChange: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value),
+    }),
+})
+
 export const MenuItemStub = defineComponent({
   inheritAttrs: false,
   props: { disabled: Boolean },
@@ -145,6 +157,7 @@ export function objectBrowser(): Component {
       '@/components/ui/Notice.vue': moduleDefault(Slotted('aside')),
       '@/components/ui/Popover.vue': moduleDefault(Slotted('div')),
       '@/components/ui/RefreshButton.vue': moduleDefault(Slotted('button')),
+      '@/components/ui/Select.vue': moduleDefault(SelectStub),
       '@/components/ui/Spinner.vue': moduleDefault(Slotted('i')),
       '@/components/ui/Switch.vue': moduleDefault(Slotted('span')),
       '@/components/ui/Tooltip.vue': moduleDefault(Slotted('span')),
@@ -160,6 +173,7 @@ export function objectBrowser(): Component {
         useBrokenFiles: () => ({ reasonOf: (key: string) => brokenFiles.reasons[key] ?? null }),
       },
       '@/composables/useLockedBucket': { useLockedBucket: (...args: unknown[]) => lockedBucket(...args) },
+      '@/composables/useListPages': { PAGE_SIZES: [10, 25, 50, 100, 200, 500] },
       '@/composables/usePlacementPolicies': {
         usePlacementPolicies: () => ({ getBucketPlacement: vi.fn(async () => null) }),
       },
@@ -223,6 +237,11 @@ export function fakeManager(overrides: Record<string, unknown> = {}) {
     listShow: ref('all'),
     resetFilters: vi.fn(),
     nextToken: ref(undefined),
+    page: ref(1),
+    pageSize: ref(25),
+    nextPage: vi.fn(),
+    previousPage: vi.fn(),
+    setPageSize: vi.fn(),
     listLoading: ref(false),
     listError: ref(null),
     listAuthError: ref(false),

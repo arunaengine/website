@@ -100,13 +100,13 @@ export async function putTextObject(
 }
 
 // `nameStart` narrows the folder to names that start with it; names stay
-// relative to the folder.
+// relative to the folder. `maxKeys` counts folders and files together.
 export async function listObjects(
   bucket: string,
   prefix: string,
   token?: string,
   nodeId?: string | null,
-  options: { nameStart?: string } = {},
+  options: { nameStart?: string; maxKeys?: number } = {},
 ): Promise<ObjectPage> {
   const response = await client(nodeId).send(
     new ListObjectsV2Command({
@@ -114,7 +114,7 @@ export async function listObjects(
       Prefix: `${prefix}${options.nameStart ?? ''}` || undefined,
       Delimiter: '/',
       ContinuationToken: token,
-      MaxKeys: 200,
+      MaxKeys: options.maxKeys ?? 200,
     }),
   )
   const folders = (response.CommonPrefixes ?? [])

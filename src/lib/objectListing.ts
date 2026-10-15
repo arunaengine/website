@@ -30,6 +30,22 @@ export function shownDeleted(
   return deleted.filter((entry) => entry.name.startsWith(nameStart))
 }
 
+/**
+ * Deleted keys are listed per folder, so a page keeps those inside its own key
+ * range: from its first listed key when a page comes before, to its last when one follows.
+ */
+export function deletedOnPage(
+  deleted: DeletedObjectEntry[],
+  listedKeys: string[],
+  hasPrevious: boolean,
+  hasNext: boolean,
+): DeletedObjectEntry[] {
+  const keys = [...listedKeys].sort()
+  const first = hasPrevious ? keys[0] : undefined
+  const last = hasNext ? keys[keys.length - 1] : undefined
+  return deleted.filter((entry) => (!first || entry.key >= first) && (!last || entry.key <= last))
+}
+
 export type FileRow<O> = { deleted: false; entry: O } | { deleted: true; entry: DeletedObjectEntry }
 
 /** Live and deleted files in one list, ordered by key like the S3 listing. */
