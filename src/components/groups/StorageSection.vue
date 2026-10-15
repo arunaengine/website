@@ -91,7 +91,15 @@ const removingId = ref<string | null>(null)
 // Move counts by "bucket\nprefix"; a node without the routes leaves them empty.
 const moves = ref<Record<string, BucketMoveResponse>>({})
 const groupBuckets = ref<string[]>([])
-const moveAsk = ref<{ pairs: [string, string][]; place: string } | null>(null)
+// A confirmation keeps the group, client and session it was made for.
+interface MoveAsk {
+  pairs: [string, string][]
+  place: string
+  groupId: string
+  epoch: number
+  asked: ReturnType<typeof client>
+}
+const moveAsk = ref<MoveAsk | null>(null)
 
 const defaultId = computed(() => target.value?.backend_id ?? null)
 const defaultName = computed(
@@ -122,24 +130,42 @@ function moveKey(bucket: string, prefix: string): string {
 }
 
 // Buckets of the group on this node, from the permission paths ".../{bucket}/".
-async function listGroupBuckets(): Promise<string[]> {
-  const page = await listGroupDataPaths(props.groupId, { limit: 100 }, client()).catch(() => null)
-  const names = page?.entries.map((entry) => entry.permission_path.split('/').filter(Boolean).pop())
-  return [...new Set(names?.filter((name): name is string => Boolean(name)))]
+async function listGroupBuckets(groupId: string, asked: ReturnType<typeof client>): Promise<string[]> {
+  const names = new Set<string>()
+  let continuationToken: string | undefined
+  do {
+    const page = await listGroupDataPaths(groupId, { limit: 100, continuationToken }, asked)
+    for (const entry of page.entries) {
+      const name = entry.permission_path.split('/').filter(Boolean).pop()
+      if (name) names.add(name)
+    }
+    continuationToken = page.continuation_token
+  } while (continuationToken)
+  return [...names]
 }
 
 async function loadMoves() {
   const seq = loadSeq
-  const buckets = await listGroupBuckets()
+  const asked = client()
+  // A failed read keeps what was known, so a running move stays in view.
+  let buckets = groupBuckets.value
+  try {
+    buckets = await listGroupBuckets(props.groupId, asked)
+  } catch {
+    // Keep the last known buckets.
+  }
+  if (seq !== loadSeq) return
   const pairs: [string, string][] = [
     ...links.value.map((link): [string, string] => [link.bucket, link.key_prefix]),
     ...buckets.map((bucket): [string, string] => [bucket, '']),
   ]
-  const answers = await Promise.allSettled(pairs.map(([bucket, prefix]) => getBucketMove(bucket, prefix, client())))
+  const answers = await Promise.allSettled(pairs.map(([bucket, prefix]) => getBucketMove(bucket, prefix, asked)))
   if (seq !== loadSeq) return
   const next: Record<string, BucketMoveResponse> = {}
   answers.forEach((answer, index) => {
-    if (answer.status === 'fulfilled') next[moveKey(...pairs[index])] = answer.value
+    const key = moveKey(...pairs[index])
+    const known = answer.status === 'fulfilled' ? answer.value : moves.value[key]
+    if (known) next[key] = known
   })
   groupBuckets.value = buckets
   moves.value = next
@@ -186,6 +212,7 @@ watch(
   () => {
     backends.value = null
     links.value = []
+    moveAsk.value = null
     moves.value = {}
     groupBuckets.value = []
     target.value = null
@@ -281,17 +308,15 @@ async function startMove() {
   if (!ask || busyId.value) return
   actionError.value = null
   busyId.value = 'move'
-  // A later switch of account or node must not receive the rest of the batch.
-  const asked = client()
-  const epoch = sessionEpoch.value
+  const stale = () => disposed || ask.epoch !== sessionEpoch.value || ask.groupId !== props.groupId
   try {
     for (const [bucket, prefix] of ask.pairs) {
-      if (disposed || epoch !== sessionEpoch.value) break
-      await startBucketMove(bucket, prefix, asked)
+      if (stale()) break
+      await startBucketMove(bucket, prefix, ask.asked)
     }
     moveAsk.value = null
   } catch (err) {
-    actionError.value = moveRefusal(err) ?? errorMessage(err)
+    if (!stale()) actionError.value = moveRefusal(err) ?? errorMessage(err)
     moveAsk.value = null
   } finally {
     busyId.value = null
@@ -321,18 +346,27 @@ async function enable(backend: GroupBackendResponse) {
   }
 }
 
+function askMove(pairs: [string, string][], place: string) {
+  moveAsk.value = { pairs, place, groupId: props.groupId, epoch: sessionEpoch.value, asked: client() }
+}
+
 async function onDefaultSaved(move?: boolean) {
   if (!move) return load()
-  await load()
-  // The new rules decide what is misplaced now, so ask again before moving.
+  const groupId = props.groupId
+  const epoch = sessionEpoch.value
   const asked = client()
+  const same = () => !disposed && groupId === props.groupId && epoch === sessionEpoch.value
+  await load()
+  if (!same()) return
+  // The new rules decide what is misplaced now, so ask again before moving.
   const buckets = groupBuckets.value
   const answers = await Promise.allSettled(buckets.map((bucket) => getBucketMove(bucket, '', asked)))
+  if (!same()) return
   const pairs = answers.flatMap((answer, index): [string, string][] =>
     answer.status === 'fulfilled' && moveOffer(moveView([answer.value])) ? [[buckets[index], '']] : [],
   )
   if (!pairs.length) return
-  moveAsk.value = { pairs, place: 'all buckets' }
+  moveAsk.value = { pairs, place: 'all buckets', groupId, epoch, asked }
   await startMove()
 }
 
@@ -391,7 +425,33 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
           >
             Use as default
           </Button>
-          <Badge v-else-if="!target" size="sm" variant="default" class="uppercase">default</Badge>
+          <template v-else-if="!target">
+            <Button
+              v-if="canAdmin && moveOffer(defaultMove)"
+              variant="ghost"
+              size="sm"
+              class="h-6 px-2 text-aruna-navy dark:text-foreground"
+              :disabled="writesDisabled || busyId !== null || defaultMove.running"
+              :title="offline ?? 'Move files'"
+              aria-label="Move files"
+              @click="askMove(defaultPairs, 'all buckets')"
+            >
+              <FolderInput class="h-3.5 w-3.5" />
+            </Button>
+            <Badge size="sm" variant="default" class="uppercase">default</Badge>
+          </template>
+        </div>
+        <div v-if="!target && defaultMove.running" class="px-3 pb-2.5 text-[11px] text-muted-foreground" data-testid="move-line">
+          {{ moveText(defaultMove) }}
+          <Progress
+            :value="defaultMove.done"
+            :max="defaultMove.done + defaultMove.misplaced"
+            :warn="101"
+            :critical="101"
+            label="Moving files"
+            bar-class="bg-primary"
+            class="mt-0.5 h-1"
+          />
         </div>
       </section>
 
@@ -511,7 +571,7 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
                 :disabled="writesDisabled || busyId !== null || defaultMove.running"
                 :title="offline ?? 'Move files'"
                 aria-label="Move files"
-                @click="moveAsk = { pairs: defaultPairs, place: 'all buckets' }"
+                @click="askMove(defaultPairs, 'all buckets')"
               >
                 <FolderInput class="h-3.5 w-3.5" />
               </Button>
@@ -604,7 +664,7 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
                   :disabled="writesDisabled || busyId !== null || linkMove(link).running"
                   :title="offline ?? 'Move files'"
                   aria-label="Move files"
-                  @click="moveAsk = { pairs: [[link.bucket, link.key_prefix]], place: arunaPlace(link) }"
+                  @click="askMove([[link.bucket, link.key_prefix]], arunaPlace(link))"
                 >
                   <FolderInput class="h-3.5 w-3.5" />
                 </Button>

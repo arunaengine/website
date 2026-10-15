@@ -287,6 +287,38 @@ describe('StorageSection', () => {
     mounted.app.unmount()
   })
 
+  it('offers Move files on the Aruna card when Aruna is the default', async () => {
+    getGroupRouting.mockResolvedValue({ group_id: 'g1', warnings: [] })
+    listGroupDataPaths.mockResolvedValue({ entries: [{ permission_path: '/r/g/g1/data/n/alpha/', kind: 'folder' }] })
+    getBucketMove.mockImplementation(async (bucket: string) => ({ bucket, misplaced: bucket === 'alpha' ? 2 : 0, complete: true }))
+    const mounted = await mount()
+    const aruna = element(mounted.root, (node) => node.props['data-testid'] === 'aruna-storage')
+    await click(labelled(aruna, 'Move files'))
+    await click(button(element(mounted.root, (node) => node.props.role === 'dialog'), 'Move files'))
+    expect(startBucketMove).toHaveBeenCalledWith('alpha', '', expect.anything())
+    mounted.app.unmount()
+  })
+
+  it('reads every page of group buckets', async () => {
+    listGroupDataPaths
+      .mockResolvedValueOnce({ entries: [{ permission_path: '/r/g/g1/data/n/alpha/', kind: 'folder' }], continuation_token: 't2' })
+      .mockResolvedValueOnce({ entries: [{ permission_path: '/r/g/g1/data/n/beta/', kind: 'folder' }] })
+    const mounted = await mount()
+    expect(getBucketMove).toHaveBeenCalledWith('beta', '', expect.anything())
+    mounted.app.unmount()
+  })
+
+  it('keeps a running move in view when the status read fails', async () => {
+    getBucketMove.mockResolvedValueOnce({
+      bucket: 'x', misplaced: 5, complete: true,
+      progress: { migrated: 1, skipped: 0, failed: 0, started_at_ms: 1, finished_at_ms: null },
+    })
+    getBucketMove.mockRejectedValue(new Error('down'))
+    const mounted = await mount()
+    expect(content(mounted.root)).toContain('Moving files')
+    mounted.app.unmount()
+  })
+
   it('says so when another move is still running in the bucket', async () => {
     getBucketMove.mockResolvedValue({ bucket: 'x', misplaced: 7, complete: true })
     startBucketMove.mockRejectedValue(new Api.ApiError(409, 'conflict', 'move_running'))
