@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defaultBucket, linkConflict, runProblem, splitPath, suggestBucket } from './storageRules'
+import { defaultBucket, linkConflict, runProblem, runText, splitPath, suggestBucket } from './storageRules'
 
 const split = { backend_id: 's1', group_id: 'g1', kind: 's3', name: 'lab', public_config: { endpoint: 'https://s3' } }
 const fixed = { ...split, backend_id: 's2', public_config: { endpoint: 'https://s3', bucket: 'data' } }
@@ -27,5 +27,12 @@ describe('storageRules', () => {
     expect(runProblem({ ...run, state: 'succeeded' })).toBeNull()
     expect(runProblem({ ...run, state: 'running', failed: 2 })).toBeNull()
     expect(runProblem({ ...run, state: 'failed' })).toBe('The last run failed.')
+  })
+
+  it('says Synced only after a run that succeeded', () => {
+    const run = { job_id: 'j', started_at: new Date().toISOString(), imported: 0, skipped: 0, failed: 0, errors: [] }
+    expect(runText({ ...run, state: 'succeeded' }).text).toMatch(/^Synced/)
+    expect(runText({ ...run, state: 'cancelled' }).text).toMatch(/^Stopped/)
+    expect(runText({ ...run, state: 'indeterminate' }).text).toMatch(/^Unknown/)
   })
 })

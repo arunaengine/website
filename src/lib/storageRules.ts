@@ -68,7 +68,12 @@ export function runText(run: BackendImportRun | null | undefined): RunText {
   }
   if (run.failed > 0) return { text: `${formatNumber(run.failed)} failed · ${ago}`, tone: 'failed', failures: true }
   if (run.state === 'failed' || run.state === 'error') return { text: `Failed · ${ago}`, tone: 'failed', failures: false }
-  return { text: `Synced ${ago}`, tone: 'muted', failures: false }
+  if (run.state === 'succeeded') return { text: `Synced ${ago}`, tone: 'muted', failures: false }
+  if (run.state === 'cancelling') return { text: 'Stopping…', tone: 'muted', failures: false }
+  if (run.state === 'cancelled' || run.state === 'canceled') {
+    return { text: `Stopped · ${ago}`, tone: 'muted', failures: false }
+  }
+  return { text: `Unknown · ${ago}`, tone: 'muted', failures: false }
 }
 
 export function runActive(run: BackendImportRun | null | undefined): boolean {
