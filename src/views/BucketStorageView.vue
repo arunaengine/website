@@ -2,8 +2,7 @@
 // One settings page per bucket: what it holds, where its data goes and where
 // it already is. Policy tabs are gated by what the node will let this viewer
 // write; the overview and the sync list are readable by anyone who reads the
-// bucket, and every observed line names the node it came from. Deleting a
-// bucket is not offered here: that lives on the bucket row in the Data view.
+// bucket, and every observed line names the node it came from.
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
@@ -14,8 +13,10 @@ import Tabs from '@/components/ui/Tabs.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
+import BucketAccessTab from '@/components/storage/BucketAccessTab.vue'
 import BucketBackendTab from '@/components/storage/BucketBackendTab.vue'
 import BucketComplianceSection from '@/components/storage/BucketComplianceSection.vue'
+import BucketDeleteSection from '@/components/storage/BucketDeleteSection.vue'
 import BucketEncryptionTab from '@/components/storage/BucketEncryptionTab.vue'
 import BucketPolicySection from '@/components/storage/BucketPolicySection.vue'
 import StorageOverviewTab from '@/components/storage/StorageOverviewTab.vue'
@@ -60,13 +61,14 @@ const local = computed(() => !nodeId.value)
 const backendVisible = computed(() => local.value && canAdminGroup.value)
 const placementVisible = computed(() => local.value && (canAdminGroup.value || isRealmAdmin.value))
 
-const TAB_IDS = ['overview', 'backend', 'placement', 'encryption', 'transfers']
+const TAB_IDS = ['overview', 'backend', 'placement', 'access', 'encryption', 'transfers']
 const routeTab = useRouteTab(TAB_IDS, 'overview')
 const tab = computed({
   get() {
     const value = routeTab.value
     if (value === 'backend' && !backendVisible.value) return 'overview'
     if (value === 'placement' && !placementVisible.value) return 'overview'
+    if (value === 'access' && !groupId.value) return 'overview'
     return value
   },
   set(next: string) {
@@ -113,13 +115,15 @@ const browserLink = computed(() => ({
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger v-if="backendVisible" value="backend">Storage backend</TabsTrigger>
           <TabsTrigger v-if="placementVisible" value="placement">Placement</TabsTrigger>
+          <TabsTrigger v-if="groupId" value="access">Access</TabsTrigger>
           <TabsTrigger value="encryption">Encryption</TabsTrigger>
           <TabsTrigger value="transfers">Transfers</TabsTrigger>
         </TabsList>
       </div>
 
-      <TabsContent value="overview" class="mt-0">
+      <TabsContent value="overview" class="mt-0 space-y-5">
         <StorageOverviewTab :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
+        <BucketDeleteSection :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
       </TabsContent>
 
       <TabsContent v-if="backendVisible" value="backend" class="mt-0">
@@ -139,6 +143,10 @@ const browserLink = computed(() => ({
           :can-apply="canAdminGroup || isRealmAdmin"
           blocked-reason="Only group admins of this bucket and realm admins may apply the rules."
         />
+      </TabsContent>
+
+      <TabsContent v-if="groupId" value="access" class="mt-0">
+        <BucketAccessTab :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
       </TabsContent>
 
       <TabsContent value="encryption" class="mt-0">
