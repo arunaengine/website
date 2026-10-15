@@ -83,6 +83,10 @@ function startAction(pathPrefix: string, scopeHolds: () => boolean = () => true)
   }
 }
 
+function notePending(action: FakeAction, ids: string[]) {
+  pending.set(action.pathPrefix, [...new Set([...(pending.get(action.pathPrefix) ?? []), ...ids])])
+}
+
 async function removePending(action: FakeAction, add: string[] = []) {
   const ids = [...new Set([...(pending.get(action.pathPrefix) ?? []), ...add])]
   const left: string[] = []
@@ -115,6 +119,7 @@ const watches = {
   deleteWatch,
   findWatch: (pathPrefix: string) => watchList.value.find((w) => w.path_prefix === pathPrefix),
   removePending,
+  notePending,
   startAction,
 }
 
@@ -412,6 +417,24 @@ describe('watch bell on a bucket folder', () => {
 
     expect(createWatch).not.toHaveBeenCalled()
     expect(deleteWatch.mock.calls.map(([id]) => id)).toEqual(['a'])
+    expect(content(root)).toContain('The API session changed.')
+  })
+
+  it('keeps the replaced watch pending when the session changes during the create', async () => {
+    outgoing.value = [{ id: 'rel-1' }]
+    watchList.value = [{ id: 'b', path_prefix: 's3/g1/n1/reef/raw/', events: ['data_uploaded'], created_at_ms: 1 }]
+    createWatch.mockImplementationOnce(async (pathPrefix: string, events: string[]) => {
+      epoch.value += 1
+      return { id: 'c', path_prefix: pathPrefix, events, created_at_ms: 2 }
+    })
+    const { root } = await mountApp(WatchButton, { props: bucketProps({ bell: true }) })
+    const box = Object.assign(input(root, 'value', 'sync_failed'), { checked: true, _value: 'sync_failed' })
+    for (const listener of box.listeners.get('change') ?? []) listener({ target: box })
+
+    await click(submit(root, 'Save'))
+
+    expect(deleteWatch).not.toHaveBeenCalled()
+    expect(pending.get('s3/g1/n1/reef/raw/')).toEqual(['b'])
     expect(content(root)).toContain('The API session changed.')
   })
 

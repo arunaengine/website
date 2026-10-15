@@ -219,4 +219,21 @@ describe('old watches an edit could not delete', () => {
     await expect(watches.removePending(action, ['old'])).rejects.toThrow('The folder changed. Nothing was saved.')
     expect(storage.getItem(action.key)).toBe(JSON.stringify(['old']))
   })
+
+  it('records a replaced watch under the key the action started with', async () => {
+    const storage = sessionStore()
+    vi.stubGlobal('window', { location: { origin: 'https://portal.test' }, sessionStorage: storage })
+    const watches = await freshWatches()
+    const { arunaState } = (await import('@/composables/useAruna')) as unknown as {
+      arunaState: { currentUser: { value: { id: string } | null }; sessionEpoch: { value: number } }
+    }
+    const action = watches.startAction('s3/g1/n1/reef/')
+    arunaState.currentUser.value = { id: 'u2' }
+    arunaState.sessionEpoch.value += 1
+
+    watches.notePending(action, ['old'])
+
+    expect(storage.getItem(action.key)).toBe(JSON.stringify(['old']))
+    expect(action.key).toContain('|u1|')
+  })
 })

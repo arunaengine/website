@@ -54,6 +54,7 @@ const {
   deleteWatch,
   findWatch,
   removePending,
+  notePending,
   startAction,
 } = useWatches()
 const { myGroups, discoverableGroups, listSyncRelationships } = useAruna()
@@ -183,8 +184,10 @@ const onSave = () => exclusive(async () => {
     await removePending(action)
     if (changed) {
       await createWatch(action.pathPrefix, events, action.client)
+      // The replaced watch is recorded first, so a stop right here still cleans it up later.
+      notePending(action, [current.id])
       action.check()
-      await removePending(action, [current.id])
+      await removePending(action)
     }
     open.value = false
   } catch (err) {

@@ -145,6 +145,11 @@ function startAction(pathPrefix: string, scopeHolds: () => boolean = () => true)
   }
 }
 
+/** Records old watches for cleanup under the action's own key, before anything can stop it. */
+function notePending(action: WatchAction, ids: string[]) {
+  writePending(action.key, [...new Set([...readPending(action.key), ...ids])])
+}
+
 /** Deletes the pending old watches of the action's prefix; failures stay pending, the first is thrown. */
 async function removePending(action: WatchAction, add: string[] = []): Promise<void> {
   const ids = [...new Set([...readPending(action.key), ...add])]
@@ -208,6 +213,7 @@ export function useWatches() {
     findWatch,
     pendingRemovals,
     removePending,
+    notePending,
     startAction,
   }
 }
