@@ -97,15 +97,18 @@ async function act(work: (alive: () => boolean) => Promise<void>) {
   busy.value = true
   note.value = null
   error.value = null
+  let failure: string | null = null
   try {
     await work(alive)
   } catch (err) {
     const going = err instanceof ApiError && err.status === 409
-    if (alive() && !going) error.value = errorMessage(err)
+    if (!going) failure = errorMessage(err)
   } finally {
     if (alive()) {
       busy.value = false
       await load()
+      // A successful refresh must not hide why the action failed.
+      if (alive() && failure) error.value = failure
     }
   }
 }

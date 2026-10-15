@@ -97,6 +97,18 @@ describe('BucketCheckSection', () => {
     mounted.app.unmount()
   })
 
+  it('keeps a cleanup refusal after the refresh', async () => {
+    getBucketCheck.mockResolvedValue(done(3))
+    cleanBucketCheck.mockRejectedValue(new Api.ApiError(503, 'scan limit reached'))
+    const mounted = await mount()
+    await click(button(mounted.root, 'Clean up'))
+    await click(button(element(mounted.root, (node) => node.props.role === 'dialog'), 'Clean up'))
+    await flush()
+    expect(getBucketCheck).toHaveBeenCalledTimes(2)
+    expect(content(mounted.root)).toContain('scan limit reached')
+    mounted.app.unmount()
+  })
+
   it('offers clean up for files a move recorded without a check', async () => {
     getBucketCheck.mockResolvedValue({ ...done(2), progress: null })
     const mounted = await mount()
