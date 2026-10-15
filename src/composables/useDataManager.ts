@@ -880,15 +880,13 @@ export function useDataManager() {
       void loadObjects()
       return
     }
-    void router.push({
-      name: 'bucket',
-      params: { bucketId: name },
-      query: {
-        ...(nodeId ? { node: nodeId } : {}),
-        ...(groupId ? { group: groupId } : {}),
-        ...notebooksQuery.value,
-      },
-    })
+    // Queued: the session's group query for a new group must follow, not cancel, this.
+    const query = {
+      ...(nodeId ? { node: nodeId } : {}),
+      ...(groupId ? { group: groupId } : {}),
+      ...notebooksQuery.value,
+    }
+    void navigate(() => router.push({ name: 'bucket', params: { bucketId: name }, query }))
   }
 
   function openBucket(name: string) {
