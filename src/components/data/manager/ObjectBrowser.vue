@@ -85,6 +85,7 @@ const {
   referencedFrom,
   prefixReferenceSummary,
   activeGroupId,
+  folders,
   objects,
   visibleFolders,
   visibleObjects,
@@ -665,12 +666,13 @@ async function onDrop(event: DragEvent) {
             <tr v-if="isEmpty">
               <td colspan="5" class="px-4 py-10 text-center text-xs text-muted-foreground">
                 <template v-if="nameFilter">No names here start with "{{ nameFilter }}".</template>
+                <template v-else-if="nextToken || folders.length || objects.length">No matches on this page.</template>
                 <template v-else>{{ canWriteCurrentPrefix ? 'This prefix is empty. Drop files here or use Add data.' : 'This prefix is empty. This session is read-only here.' }}</template>
               </td>
             </tr>
           </tbody>
         </table>
-        <div v-if="!isEmpty || page > 1" class="flex items-center justify-between gap-3 border-t border-border px-4 py-2">
+        <div v-if="!isEmpty || page > 1 || nextToken" class="flex items-center justify-between gap-3 border-t border-border px-4 py-2">
           <label class="flex items-center gap-2 text-xs text-muted-foreground">
             Per page
             <Select

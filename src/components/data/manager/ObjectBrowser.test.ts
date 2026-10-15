@@ -1,4 +1,4 @@
-import { defineComponent, h, ref } from 'vue'
+import { computed, defineComponent, h, ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   bubbleClick,
@@ -362,6 +362,23 @@ describe('object browser pages', () => {
     expect(button(last, 'Next').props.disabled).toBe(true)
     await click(button(last, 'Prev'))
     expect(previousPage).toHaveBeenCalled()
+  })
+})
+
+describe('object browser filtered pages', () => {
+  it('keeps Next when the kind filter hides the whole page', async () => {
+    const nextPage = vi.fn()
+    const root = await render({
+      nextPage,
+      nextToken: ref('t2'),
+      visibleObjects: ref([]),
+      isEmpty: computed(() => true),
+    })
+
+    expect(content(root)).toContain('No matches on this page.')
+    expect(button(root, 'Next').props.disabled).toBe(false)
+    await click(button(root, 'Next'))
+    expect(nextPage).toHaveBeenCalled()
   })
 })
 
