@@ -84,11 +84,13 @@ export function runActive(run: BackendImportRun | null | undefined): boolean {
 }
 
 /**
- * The error of a run that failed as a whole, for the red cross; null otherwise. The node
- * reports no run error, so a failed run that processed nothing but kept an error counts.
+ * The error of a run that stopped as a whole, for the red cross; null otherwise. Nodes
+ * without the run error count a failed run that processed nothing but kept an item error.
  */
 export function bucketError(run: BackendImportRun | null | undefined): string | null {
-  if (!run || run.state !== 'failed' || run.imported > 0 || run.skipped > 0) return null
+  if (!run || ACTIVE_STATES.has(run.state) || run.state === 'succeeded') return null
+  if (run.error) return run.error
+  if (run.state !== 'failed' || run.imported > 0 || run.skipped > 0) return null
   return run.errors[0]?.error ?? null
 }
 

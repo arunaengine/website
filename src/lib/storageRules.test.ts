@@ -36,6 +36,11 @@ describe('storageRules', () => {
     expect(bucketError({ ...run, imported: 4, errors: denied })).toBeNull()
     expect(bucketError({ ...run, state: 'succeeded', errors: denied })).toBeNull()
     expect(bucketError({ ...run, errors: [] })).toBeNull()
+    // A node that names the run error shows it, even after some items went through.
+    const listed = { ...run, imported: 2, errors: [], error: 'List error: access denied' }
+    expect(bucketError(listed)).toBe('List error: access denied')
+    expect(bucketError({ ...listed, state: 'indeterminate' })).toBe('List error: access denied')
+    expect(bucketError({ ...listed, state: 'succeeded' })).toBeNull()
   })
 
   it('counts the root and refuses Aruna folders and former default buckets', () => {

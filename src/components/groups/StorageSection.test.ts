@@ -103,6 +103,7 @@ const LINKS = [
   link('i3', 'imaging', 'raw/', 'lab-imaging/', run('ready', 312)),
   link('i4', 'archive', 'old/', 'lab-archive/', null),
   link('i6', 'denied', '', 'lab-denied/', run('failed', 0, 1)),
+  link('i7', 'unlisted', '', 'lab-unlisted/', { ...run('failed', 0), error: 'Bucket lab-unlisted not found' }),
 ]
 
 async function mount() {
@@ -150,6 +151,8 @@ describe('StorageSection', () => {
     expect(element(row(mounted.root, 'results'), (node) => node.props.title === 'Bucket found')).toBeTruthy()
     expect(content(row(mounted.root, 'results'))).not.toContain('✗')
     expect(content(row(mounted.root, 'denied'))).toContain('✗')
+    const unlisted = row(mounted.root, 'unlisted')
+    expect(element(unlisted, (node) => node.props.title === 'Bucket lab-unlisted not found')).toBeTruthy()
     expect(element(row(mounted.root, 'denied'), (node) => node.props.title === 'No access to bucket lab-results')).toBeTruthy()
     expect(content(row(mounted.root, 'imaging'))).toContain('imaging / raw/')
     expect(content(row(mounted.root, 'imaging'))).toContain('Running… 312 added')

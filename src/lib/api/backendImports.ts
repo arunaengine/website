@@ -17,6 +17,8 @@ export interface BackendImportRun {
   skipped: number
   failed: number
   errors: BackendImportFailure[]
+  /** Why a failed or indeterminate run stopped as a whole; older nodes omit it. */
+  error?: string | null
 }
 
 export interface BackendImport {
