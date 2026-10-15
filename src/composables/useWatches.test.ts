@@ -2,13 +2,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/composables/useAruna', async () => {
   const { ref } = await import('vue')
-  return {
-    useAruna: () => ({
-      apiBaseUrl: ref('https://api.test/api/v1'),
-      authToken: ref('token-1'),
-      currentUser: ref({ id: 'u1' }),
-    }),
+  const arunaState = {
+    apiBaseUrl: ref('https://api.test/api/v1'),
+    authToken: ref('token-1'),
+    currentUser: ref<{ id: string } | null>({ id: 'u1' }),
+    sessionEpoch: ref(0),
   }
+  return { useAruna: () => arunaState, arunaState }
 })
 
 interface Reply {
@@ -144,5 +144,41 @@ describe('old watches an edit could not delete', () => {
     await watches.removePending('s3/g1/n1/reef/', ['gone'])
 
     expect(watches.pendingRemovals('s3/g1/n1/reef/')).toEqual([])
+  })
+
+  it('leaves the rest of a cleanup with its account when the session switches', async () => {
+    const storage = sessionStore()
+    let answer: () => void = () => undefined
+    const fetch = vi.fn(
+      () => new Promise<Response>((resolve) => (answer = () => resolve(new Response(null, { status: 204 })))),
+    )
+    vi.stubGlobal('fetch', fetch)
+    vi.stubGlobal('window', { location: { origin: 'https://portal.test' }, sessionStorage: storage })
+    const watches = await freshWatches()
+    const { arunaState } = (await import('@/composables/useAruna')) as unknown as {
+      arunaState: {
+        authToken: { value: string }
+        currentUser: { value: { id: string } | null }
+        sessionEpoch: { value: number }
+      }
+    }
+    const prefix = 's3/g1/n1/reef/'
+    const userKey = (id: string) => `aruna.watch.pending:https://api.test/api/v1|${id}|${prefix}`
+    storage.setItem(userKey('u1'), JSON.stringify(['a', 'b']))
+    storage.setItem(userKey('u2'), JSON.stringify(['y1']))
+
+    const cleanup = watches.removePending(prefix)
+    // Another account signs in while the first delete is on its way.
+    arunaState.currentUser.value = { id: 'u2' }
+    arunaState.authToken.value = 'token-2'
+    arunaState.sessionEpoch.value += 1
+    answer()
+
+    await expect(cleanup).rejects.toMatchObject({ name: 'AbortError' })
+    expect(fetch).toHaveBeenCalledTimes(1)
+    const init = (fetch.mock.calls[0] as unknown as [string, RequestInit])[1]
+    expect(new Headers(init.headers).get('Authorization')).toBe('Bearer token-1')
+    expect(JSON.parse(storage.getItem(userKey('u1')) ?? '[]')).toEqual(['b'])
+    expect(JSON.parse(storage.getItem(userKey('u2')) ?? '[]')).toEqual(['y1'])
   })
 })

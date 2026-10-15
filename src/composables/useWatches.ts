@@ -14,7 +14,7 @@ import { errorMessage } from '@/lib/utils'
 // list). Only 404/405 on the list hides the feature: a refused create is one
 // resource saying no, not the endpoint being absent.
 
-const { apiBaseUrl, authToken, currentUser } = useAruna()
+const { apiBaseUrl, authToken, currentUser, sessionEpoch } = useAruna()
 
 const supported = ref(true)
 const watches = ref<ApiWatch[]>([])
@@ -26,8 +26,12 @@ const deletingIds = ref<string[]>([])
 
 const available = computed(() => supported.value && Boolean(currentUser.value))
 
-function request<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
-  return apiRequest<T>(path, options, { baseUrl: apiBaseUrl.value, token: authToken.value })
+function session() {
+  return { baseUrl: apiBaseUrl.value, token: authToken.value }
+}
+
+function request<T>(path: string, options: ApiRequestOptions = {}, client = session()): Promise<T> {
+  return apiRequest<T>(path, options, client)
 }
 
 function noteUnsupported(err: unknown): boolean {
@@ -76,10 +80,10 @@ async function createWatch(pathPrefix: string, events: string[]): Promise<ApiWat
   }
 }
 
-async function deleteWatch(id: string): Promise<void> {
+async function deleteWatch(id: string, client = session()): Promise<void> {
   deletingIds.value = [...deletingIds.value, id]
   try {
-    await request<void>(`/system/notifications/watches/${encodeURIComponent(id)}`, { method: 'DELETE' })
+    await request<void>(`/system/notifications/watches/${encodeURIComponent(id)}`, { method: 'DELETE' }, client)
     watches.value = watches.value.filter((w) => w.id !== id)
   } finally {
     deletingIds.value = deletingIds.value.filter((d) => d !== id)
@@ -93,18 +97,22 @@ function pendingKey(pathPrefix: string): string {
 }
 
 function pendingRemovals(pathPrefix: string): string[] {
+  return readPending(pendingKey(pathPrefix))
+}
+
+function readPending(key: string): string[] {
   try {
-    const stored = JSON.parse(window.sessionStorage.getItem(pendingKey(pathPrefix)) ?? '[]') as unknown
+    const stored = JSON.parse(window.sessionStorage.getItem(key) ?? '[]') as unknown
     return Array.isArray(stored) ? stored.filter((id): id is string => typeof id === 'string') : []
   } catch {
     return []
   }
 }
 
-function setPendingRemovals(pathPrefix: string, ids: string[]) {
+function writePending(key: string, ids: string[]) {
   try {
-    if (ids.length) window.sessionStorage.setItem(pendingKey(pathPrefix), JSON.stringify(ids))
-    else window.sessionStorage.removeItem(pendingKey(pathPrefix))
+    if (ids.length) window.sessionStorage.setItem(key, JSON.stringify(ids))
+    else window.sessionStorage.removeItem(key)
   } catch {
     // Without storage the ids stay unknown after a reload; the watches list still shows them.
   }
@@ -112,13 +120,22 @@ function setPendingRemovals(pathPrefix: string, ids: string[]) {
 
 /** Deletes every pending old watch of a prefix; failed ones stay pending, and the first error is thrown. */
 async function removePending(pathPrefix: string, add: string[] = []): Promise<void> {
-  const ids = [...new Set([...pendingRemovals(pathPrefix), ...add])]
-  setPendingRemovals(pathPrefix, ids)
+  // The account that started the cleanup owns it to the end, key and credentials alike.
+  const key = pendingKey(pathPrefix)
+  const client = session()
+  const epoch = sessionEpoch.value
+  const ids = [...new Set([...readPending(key), ...add])]
+  writePending(key, ids)
   const left: string[] = []
   let failure: unknown = null
-  for (const id of ids) {
+  for (const [index, id] of ids.entries()) {
+    if (epoch !== sessionEpoch.value) {
+      left.push(...ids.slice(index))
+      failure ??= new DOMException('The API session changed.', 'AbortError')
+      break
+    }
     try {
-      await deleteWatch(id)
+      await deleteWatch(id, client)
     } catch (err) {
       // An already deleted watch is done.
       if (err instanceof ApiError && err.status === 404) continue
@@ -126,7 +143,7 @@ async function removePending(pathPrefix: string, add: string[] = []): Promise<vo
       failure ??= err
     }
   }
-  setPendingRemovals(pathPrefix, left)
+  writePending(key, left)
   if (failure) throw failure
 }
 
