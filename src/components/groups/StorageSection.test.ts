@@ -30,6 +30,11 @@ const DialogStub = defineComponent({
   setup: (props, { slots }) => () => (props.open ? h('div', { role: 'dialog' }, slots.default?.()) : null),
 })
 
+const SaveStub = defineComponent({
+  emits: ['saved'],
+  setup: (_, { emit }) => () => h('i', { 'data-testid': 'save-default', onClick: () => emit('saved', true) }),
+})
+
 const StorageSection = compileClientComponent(new URL('./StorageSection.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': new Proxy({}, { get: () => Empty }),
@@ -47,7 +52,7 @@ const StorageSection = compileClientComponent(new URL('./StorageSection.vue', im
   '@/components/ui/Progress.vue': moduleDefault(Empty),
   '@/components/groups/StorageBackendDialog.vue': moduleDefault(Empty),
   '@/components/groups/LinkedFolderDialog.vue': moduleDefault(Empty),
-  '@/components/groups/DefaultRuleDialog.vue': moduleDefault(Empty),
+  '@/components/groups/DefaultRuleDialog.vue': moduleDefault(SaveStub),
   '@/composables/useAruna': {
     isUnsupportedEndpoint: () => false,
     useAruna: () => ({
@@ -339,6 +344,26 @@ describe('StorageSection', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('opens no confirmation when it goes offline during the recount', async () => {
+    const mounted = await mount()
+    let release: (value: unknown) => void = () => {}
+    const gate = new Promise((resolve) => (release = resolve))
+    listGroupDataPaths.mockResolvedValue({ entries: [{ permission_path: '/r/g/g1/data/n/alpha/', kind: 'folder' }] })
+    getBucketMove.mockImplementation(async () => {
+      await gate
+      return { bucket: 'alpha', misplaced: 3, complete: true }
+    })
+    await click(element(mounted.root, (node) => node.props['data-testid'] === 'save-default'))
+    await flush()
+    writesDisabled.value = true
+    release(null)
+    await flush()
+    await flush()
+    expect(() => element(mounted.root, (node) => node.props.role === 'dialog')).toThrow()
+    expect(startBucketMove).not.toHaveBeenCalled()
+    mounted.app.unmount()
   })
 
   it('sends no move while offline', async () => {

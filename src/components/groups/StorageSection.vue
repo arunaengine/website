@@ -362,7 +362,7 @@ async function onDefaultSaved(move?: boolean) {
   // The new rules decide what is misplaced now, so ask again before moving.
   const buckets = groupBuckets.value
   const answers = await Promise.allSettled(buckets.map((bucket) => getBucketMove(bucket, '', asked)))
-  if (!same()) return
+  if (!same() || writesDisabled.value) return
   const pairs = answers.flatMap((answer, index): [string, string][] =>
     answer.status === 'fulfilled' && moveOffer(moveView([answer.value])) ? [[buckets[index], '']] : [],
   )
