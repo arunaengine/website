@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Everything that copies data into or out of this bucket: syncs, linked folders
 // and staging jobs, each listed by its own source, with one Add menu.
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import AddDataDialog from '@/components/data/AddDataDialog.vue'
 import SyncBucketDialog from '@/components/data/SyncBucketDialog.vue'
 import LinkedFolderRows from '@/components/storage/LinkedFolderRows.vue'
@@ -44,6 +44,12 @@ const allEmpty = computed(() => {
   const known = ['syncs', ...(props.nodeId ? [] : ['linked', ...(stagingEnabled ? ['staging'] : [])])]
   return known.every((key) => counts.value[key] === 0)
 })
+
+// Another bucket or scope starts with every count unknown again.
+watch(
+  () => [props.bucket, props.nodeId, props.groupId],
+  () => (counts.value = {}),
+)
 
 function setCount(key: string, count: number | null) {
   counts.value = { ...counts.value, [key]: count }
@@ -126,7 +132,7 @@ function addLink() {
       embedded
       :quiet="kind === 'all'"
       @new-sync="syncOpen = true"
-      @count="(count: number) => setCount('syncs', count)"
+      @count="(count: number | null) => setCount('syncs', count)"
     />
     <!-- Kept mounted while hidden: its dialog serves the Add menu. -->
     <div v-if="!nodeId" v-show="shows('linked')">

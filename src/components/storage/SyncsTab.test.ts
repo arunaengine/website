@@ -36,6 +36,8 @@ function relationship(state: string, extra: Partial<SyncRelationship> = {}): Syn
 const rows = ref([{ relationship: relationship('enabled'), direction: 'outgoing' as const }])
 const updateSyncRelationship = vi.fn()
 const getSyncRelationship = vi.fn()
+const syncsLoading = ref(false)
+const remoteError = ref<string | null>(null)
 
 const IconStub = defineComponent((_, { attrs }) => () => h('i', attrs))
 const Slotted = (tag: string) =>
@@ -75,9 +77,9 @@ const tab = compileClientComponent(new URL('./SyncsTab.vue', import.meta.url), {
     useBucketSyncs: () => ({
       rows,
       hostedOn: ref({}),
-      loading: ref(false),
+      loading: syncsLoading,
       error: ref(null),
-      remoteError: ref(null),
+      remoteError,
       hostOpts: () => ({}),
       load: () => Promise.resolve(0),
       cancel: () => undefined,
@@ -149,5 +151,24 @@ describe('bucket syncs tab', () => {
       expect(quiet).not.toContain('waiting for the source bucket')
       expect(quiet).not.toContain('stores copies unencrypted')
     }
+  })
+})
+
+describe('sync count for the transfers tab', () => {
+  it('reports an unknown count when the other node could not be asked', async () => {
+    rows.value = []
+    syncsLoading.value = true
+    const counts: Array<number | null> = []
+    await mountApp(tab, {
+      props: { bucket: 'reef-survey', nodeId: null, onCount: (count: number | null) => counts.push(count) },
+    })
+
+    remoteError.value = 'node-b did not answer'
+    syncsLoading.value = false
+    await flush()
+
+    expect(counts.at(-1)).toBeNull()
+    remoteError.value = null
+    syncsLoading.value = false
   })
 })

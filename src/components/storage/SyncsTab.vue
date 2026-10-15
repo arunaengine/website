@@ -27,7 +27,7 @@ const props = defineProps<{ bucket: string; nodeId: string | null; embedded?: bo
 const emit = defineEmits<{
   (event: 'new-sync'): void
   (event: 'changed'): void
-  (event: 'count', count: number): void
+  (event: 'count', count: number | null): void
 }>()
 
 const { getSyncRelationship, runSyncRelationship, updateSyncRelationship, deleteSyncRelationship } =
@@ -68,8 +68,10 @@ const listState = computed<'loading' | 'error' | 'empty' | 'ready'>(() => {
   return rows.value.length ? 'ready' : 'empty'
 })
 
-watch(listState, (state) => {
-  if (state === 'ready' || state === 'empty') emit('count', rows.value.length)
+// A failed list, or one another node could not complete, says nothing about the count.
+watch([listState, remoteError], ([state]) => {
+  if (state === 'loading') return
+  emit('count', state === 'error' || remoteError.value ? null : rows.value.length)
 })
 
 function clearPoll() {
