@@ -31,7 +31,8 @@ const props = defineProps<{
   nodeId: string | null
   sources: TransferSource[]
 }>()
-const emit = defineEmits<{ (e: 'update:open', value: boolean): void; (e: 'done'): void }>()
+// `done` names the sources a move or rename took away; the rest stay ticked.
+const emit = defineEmits<{ (e: 'update:open', value: boolean): void; (e: 'done', moved: string[]): void }>()
 
 const s3 = useS3()
 const text = ref('')
@@ -82,14 +83,17 @@ async function confirm() {
   if (problem.value || busy.value || !target.value) return
   busy.value = true
   error.value = null
+  const moved: string[] = []
   try {
     const name = renaming.value ? text.value : undefined
-    await runTransfer(s3, props.mode, props.bucket, props.sources, target.value, props.nodeId, name)
+    await runTransfer(s3, props.mode, props.bucket, props.sources, target.value, props.nodeId, name, (key) =>
+      moved.push(key),
+    )
     emit('update:open', false)
-    emit('done')
+    emit('done', moved)
   } catch (err) {
     error.value = s3ErrorMessage(err)
-    emit('done')
+    emit('done', moved)
   } finally {
     busy.value = false
   }

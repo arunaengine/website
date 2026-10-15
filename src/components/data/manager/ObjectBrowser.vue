@@ -117,7 +117,6 @@ const {
   setObjectSelected,
   setFolderSelected,
   setAllListedSelected,
-  clearSelection,
   canWriteCurrentPrefix,
   writeRestrictionMessage,
   watchPathPrefix,
@@ -276,8 +275,11 @@ function selectedSources(): TransferSource[] {
   ]
 }
 
-function onTransferDone() {
-  if (transferMode.value !== 'copy') clearSelection()
+function onTransferDone(moved: string[]) {
+  for (const key of moved) {
+    if (key.endsWith('/')) setFolderSelected(key, false)
+    else setObjectSelected(key, false)
+  }
   void loadObjects()
   void loadDeleted()
 }

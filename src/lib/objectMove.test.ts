@@ -76,6 +76,30 @@ describe('transfer run', () => {
     expect(rename.calls).toEqual(['copy reef/raw/reads.fastq -> reef/raw/r2.fastq', 'delete reef/raw/reads.fastq'])
   })
 
+  it('names only the sources a move took away', async () => {
+    const { fake } = store()
+    fake.deleteObject = vi.fn(async (_bucket: string, key: string) => {
+      if (key === 'raw/b.txt') throw new Error('refused')
+    })
+    const moved: string[] = []
+    const sources = ['raw/a.txt', 'raw/b.txt', 'raw/c.txt'].map((key) => ({ key, folder: false }))
+
+    await expect(
+      runTransfer(fake, 'move', 'reef', sources, { bucket: 'reef', prefix: 'x/' }, null, undefined, (key) => moved.push(key)),
+    ).rejects.toThrow('refused')
+    expect(moved).toEqual(['raw/a.txt'])
+
+    const failedCopy = store()
+    failedCopy.fake.copyObject = vi.fn(async () => {
+      throw new Error('no space')
+    })
+    const none: string[] = []
+    await expect(
+      runTransfer(failedCopy.fake, 'move', 'reef', sources, { bucket: 'reef', prefix: 'x/' }, null, undefined, (key) => none.push(key)),
+    ).rejects.toThrow('no space')
+    expect(none).toEqual([])
+  })
+
   it('stops before any copy when a folder is too large or empty', async () => {
     const large = store(['raw/genomes/a.fa'], true)
     await expect(runTransfer(large.fake, 'move', 'reef', [{ key: 'raw/genomes/', folder: true }], { bucket: 'reef', prefix: '' }, null)).rejects.toThrow('more than')

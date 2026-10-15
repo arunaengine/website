@@ -102,7 +102,10 @@ export async function plannedCopies(
   return copies
 }
 
-/** Copies everything first; a move or rename deletes the sources only after that. */
+/**
+ * Copies everything first; a move or rename deletes the sources only after that.
+ * `onMoved` names each source that is fully gone from its old place.
+ */
 export async function runTransfer(
   store: TransferStore,
   mode: TransferMode,
@@ -111,6 +114,7 @@ export async function runTransfer(
   target: TransferTarget,
   nodeId: string | null,
   name?: string,
+  onMoved: (key: string) => void = () => undefined,
 ): Promise<void> {
   const copies = await plannedCopies(store, bucket, sources, target, nodeId, name)
   for (const copy of copies) {
@@ -120,11 +124,13 @@ export async function runTransfer(
   for (const source of sources) {
     if (!source.folder) {
       await store.deleteObject(bucket, source.key, nodeId)
+      onMoved(source.key)
       continue
     }
     const result = await store.deletePrefix(bucket, source.key, nodeId)
     if (result.errors.length) {
       throw new Error(`Copied, but ${result.errors.length} old files of ${baseName(source.key)}/ were not deleted.`)
     }
+    onMoved(source.key)
   }
 }
