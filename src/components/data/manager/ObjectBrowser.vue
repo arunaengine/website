@@ -277,6 +277,8 @@ function selectedSources(): TransferSource[] {
 }
 
 function onTransferDone(moved: string[]) {
+  // A retry after a partial move only tries what is still in its old place.
+  transferSources.value = transferSources.value.filter((source) => !moved.includes(source.key))
   for (const key of moved) {
     if (key.endsWith('/')) setFolderSelected(key, false)
     else setObjectSelected(key, false)

@@ -325,6 +325,22 @@ describe('object browser selection', () => {
     expect(asked).toEqual(['reef/raw/reads.fastq'])
   })
 
+  it('retries a partial move with only the items still in place', async () => {
+    const root = await render({ folders: ref([listedFolder]) })
+    await tick(checkbox(root, 'Select genomes'), true)
+    await tick(checkbox(root, `Select ${listedObject.name}`), true)
+    await click(action(root, 'Move to'))
+    const dialog = element(root, (node) => node.tag === 'aside' && typeof node.props.onDone === 'function')
+    expect(dialog.props.sources).toHaveLength(2)
+
+    await (dialog.props.onDone as (moved: string[]) => unknown)([listedObject.key])
+    await flush()
+
+    const retry = element(root, (node) => node.tag === 'aside' && typeof node.props.onDone === 'function')
+    expect(retry.props.sources).toEqual([{ key: listedFolder.prefix, folder: true }])
+    expect(content(root)).toContain('1 selected')
+  })
+
   it('asks public access for the ticked entries', async () => {
     const publicAccess = vi.fn()
     const manager = fakeManager({ openDetails, download, requestDelete, router: { push }, folders: ref([listedFolder]) })
