@@ -171,6 +171,12 @@ export function linkConflict(
   return null
 }
 
+/** Why an Aruna bucket folder cannot take another link: another link shares its folders. */
+export function arunaConflict(links: BackendImport[], bucket: string, folder: string): string | null {
+  const linked = links.find((link) => link.bucket === bucket && overlaps(link.key_prefix, folder))
+  return linked ? `This Aruna folder overlaps the link of ${arunaPlace(linked)}. Pick another folder.` : null
+}
+
 /** Why a bucket cannot take the default rule of a storage; null when it can. */
 export function defaultConflict(
   backend: GroupBackendResponse,

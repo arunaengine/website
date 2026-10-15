@@ -273,6 +273,19 @@ describe('LinkedFolderDialog', () => {
     mounted.app.unmount()
   })
 
+  it('shows an overlap with the Aruna folder of another link', async () => {
+    const other = { ...STORED, import_id: 'i2', bucket: 'sequencing', key_prefix: 'raw/' }
+    const mounted = await mount(null, { backends: SPLIT, storageId: 's1', links: [other] })
+    await choose(mounted.root, 'To Aruna bucket', 'sequencing')
+    await typeValue(inputById(mounted.root, '-source-bucket'), 'lab-new')
+    await typeValue(inputById(mounted.root, '-bucket-folder'), 'raw/sub')
+    expect(content(mounted.root)).toContain('This Aruna folder overlaps the link of sequencing / raw/.')
+    expect(button(mounted.root, 'Link and run').props.disabled).toBe(true)
+    await typeValue(inputById(mounted.root, '-bucket-folder'), 'other')
+    expect(button(mounted.root, 'Link and run').props.disabled).toBe(false)
+    mounted.app.unmount()
+  })
+
   it('shows overlaps and the default bucket before saving', async () => {
     const other = { ...STORED, import_id: 'i2', backend_id: 's1', backend_prefix: 'lab-raw/2024/', bucket: 'results', key_prefix: '' }
     const mounted = await mount(null, { backends: SPLIT, storageId: 's1', links: [other] })

@@ -42,7 +42,7 @@ import {
   storeName,
   writesElsewhere,
 } from '@/lib/linkedFolders'
-import { linkConflict, splitPath, splitsBuckets } from '@/lib/storageRules'
+import { arunaConflict, linkConflict, splitPath, splitsBuckets } from '@/lib/storageRules'
 import { errorMessage } from '@/lib/utils'
 
 const props = defineProps<{
@@ -125,9 +125,11 @@ const writeStore = computed(() => {
   return target.value ? storeName(target.value) : 'your storage'
 })
 const conflict = computed(() => {
-  if (isEdit.value || !source.value) return null
-  if (splits.value && !storageBucket.value.trim()) return null
+  if (isEdit.value) return null
   const others = props.links ?? []
+  const aruna = bucket.value.trim() ? arunaConflict(others, bucket.value.trim(), bucketRoot.value) : null
+  if (aruna || !source.value) return aruna
+  if (splits.value && !storageBucket.value.trim()) return null
   const read = linkConflict(source.value, others, storageRoot.value)
   if (read || !writeElsewhere.value || !target.value) return read
   return linkConflict(target.value, others, folderPath(writeFolder.value))
