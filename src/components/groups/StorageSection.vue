@@ -11,19 +11,24 @@ import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
+import Progress from '@/components/ui/Progress.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import StorageBackendDialog from '@/components/groups/StorageBackendDialog.vue'
 import LinkedFolderDialog from '@/components/groups/LinkedFolderDialog.vue'
 import DefaultRuleDialog from '@/components/groups/DefaultRuleDialog.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { Plus } from '@lucide/vue'
+import { MoveRight, Play, Plus } from '@lucide/vue'
 import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import {
   ApiError,
+  getBucketMove,
   listBackendImports,
+  listGroupDataPaths,
   runBackendImport,
+  startBucketMove,
   type BackendImport,
+  type BucketMoveResponse,
   type GroupBackendResponse,
   type RoutingTarget,
 } from '@/lib/api'
@@ -32,6 +37,8 @@ import {
   bucketError,
   bucketTitle,
   defaultBucket,
+  moveText,
+  moveView,
   runActive,
   runText,
   splitPath,
@@ -79,6 +86,10 @@ const defaultDialog = ref(false)
 const defaultStorage = ref<GroupBackendResponse | null>(null)
 const arunaConfirm = ref(false)
 const removingId = ref<string | null>(null)
+// Move counts by "bucket\nprefix"; a node without the routes leaves them empty.
+const moves = ref<Record<string, BucketMoveResponse>>({})
+const groupBuckets = ref<string[]>([])
+const moveAsk = ref<{ pairs: [string, string][]; place: string } | null>(null)
 
 const defaultId = computed(() => target.value?.backend_id ?? null)
 const defaultName = computed(
@@ -94,6 +105,42 @@ let disposed = false
 function clearPoll() {
   if (pollTimer !== undefined) clearTimeout(pollTimer)
   pollTimer = undefined
+}
+
+function schedulePoll() {
+  clearPoll()
+  const importing = links.value.some((link) => runActive(link.last_run))
+  if (!disposed && (importing || moveView(Object.values(moves.value)).running)) {
+    pollTimer = setTimeout(() => void load(), 3_000)
+  }
+}
+
+function moveKey(bucket: string, prefix: string): string {
+  return `${bucket}\n${prefix}`
+}
+
+// Buckets of the group on this node, from the permission paths ".../{bucket}/".
+async function listGroupBuckets(): Promise<string[]> {
+  const page = await listGroupDataPaths(props.groupId, { limit: 100 }, client()).catch(() => null)
+  const names = page?.entries.map((entry) => entry.permission_path.split('/').filter(Boolean).pop())
+  return [...new Set(names?.filter((name): name is string => Boolean(name)))]
+}
+
+async function loadMoves() {
+  const seq = loadSeq
+  const buckets = target.value ? await listGroupBuckets() : []
+  const pairs: [string, string][] = [
+    ...links.value.map((link): [string, string] => [link.bucket, link.key_prefix]),
+    ...buckets.map((bucket): [string, string] => [bucket, '']),
+  ]
+  const answers = await Promise.allSettled(pairs.map(([bucket, prefix]) => getBucketMove(bucket, prefix, client())))
+  if (seq !== loadSeq) return
+  const next: Record<string, BucketMoveResponse> = {}
+  answers.forEach((answer, index) => {
+    if (answer.status === 'fulfilled') next[moveKey(...pairs[index])] = answer.value
+  })
+  groupBuckets.value = buckets
+  moves.value = next
 }
 
 // Only the latest load for the current group and session writes state.
@@ -120,10 +167,9 @@ async function load() {
     links.value = imports
     emit('count', list.backends.length)
     emit('backends', list.backends)
-    clearPoll()
-    if (!disposed && imports.some((link) => runActive(link.last_run))) {
-      pollTimer = setTimeout(() => void load(), 3_000)
-    }
+    void loadMoves().then(() => {
+      if (current()) schedulePoll()
+    })
   } catch (err) {
     if (!current()) return
     if (err instanceof ApiError && (err.status === 403 || err.status === 401)) hidden.value = true
@@ -138,6 +184,8 @@ watch(
   () => {
     backends.value = null
     links.value = []
+    moves.value = {}
+    groupBuckets.value = []
     target.value = null
     hidden.value = false
     actionError.value = null
@@ -206,6 +254,44 @@ async function run(link: BackendImport) {
   }
 }
 
+function found(bucket: string, prefix: string): BucketMoveResponse[] {
+  const move = moves.value[moveKey(bucket, prefix)]
+  return move ? [move] : []
+}
+const defaultMove = computed(() =>
+  moveView(groupBuckets.value.flatMap((bucket) => found(bucket, ''))),
+)
+function linkMove(link: BackendImport) {
+  return moveView(found(link.bucket, link.key_prefix))
+}
+// Only buckets that have something to move are asked.
+const defaultPairs = computed(() =>
+  groupBuckets.value
+    .filter((bucket) => found(bucket, '').some((move) => move.misplaced > 0))
+    .map((bucket): [string, string] => [bucket, '']),
+)
+
+async function startMove() {
+  const ask = moveAsk.value
+  if (!ask || busyId.value) return
+  actionError.value = null
+  busyId.value = 'move'
+  try {
+    for (const [bucket, prefix] of ask.pairs) {
+      await startBucketMove(bucket, prefix, client()).catch((err) => {
+        if (!(err instanceof ApiError && err.status === 409)) throw err
+      })
+    }
+    moveAsk.value = null
+  } catch (err) {
+    actionError.value = errorMessage(err)
+    moveAsk.value = null
+  } finally {
+    busyId.value = null
+    await load()
+  }
+}
+
 async function remove(backend: GroupBackendResponse) {
   if (writesDisabled.value) return
   actionError.value = null
@@ -226,6 +312,12 @@ async function enable(backend: GroupBackendResponse) {
   } catch (err) {
     actionError.value = errorMessage(err)
   }
+}
+
+async function onDefaultSaved(move?: boolean) {
+  if (!move) return load()
+  moveAsk.value = { pairs: groupBuckets.value.map((bucket): [string, string] => [bucket, '']), place: 'all buckets' }
+  await startMove()
 }
 
 function onLinkSaved(runError?: string) {
@@ -393,7 +485,19 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
             >✓</span>
             <span v-else />
             <span />
-            <span class="flex justify-end">
+            <span class="flex justify-end gap-0.5">
+              <Button
+                v-if="canAdmin && (defaultMove.misplaced > 0 || defaultMove.running)"
+                variant="ghost"
+                size="sm"
+                class="h-6 px-2 text-aruna-navy dark:text-foreground"
+                :disabled="writesDisabled || busyId !== null || defaultMove.running"
+                :title="offline ?? 'Move files'"
+                aria-label="Move files"
+                @click="moveAsk = { pairs: defaultPairs, place: 'all buckets' }"
+              >
+                <MoveRight class="h-3.5 w-3.5" />
+              </Button>
               <Button
                 v-if="canAdmin"
                 variant="ghost"
@@ -406,6 +510,16 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
                 Edit
               </Button>
             </span>
+          </div>
+          <div v-if="defaultMove.running" class="py-0.5 pl-[5rem] text-[11px] text-muted-foreground" data-testid="move-line">
+            {{ moveText(defaultMove) }}
+            <Progress
+              :value="defaultMove.done"
+              :max="defaultMove.done + defaultMove.misplaced"
+              :warn="101"
+              :critical="101"
+              class="mt-0.5 h-1"
+            />
           </div>
 
           <template v-for="link in linksOf(backend)" :key="link.import_id">
@@ -456,10 +570,23 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
                   size="sm"
                   class="h-6 px-2 text-aruna-navy dark:text-foreground"
                   :disabled="writesDisabled || busyId !== null || runActive(link.last_run)"
-                  :title="offline"
+                  :title="offline ?? 'Run now'"
+                  aria-label="Run now"
                   @click="run(link)"
                 >
-                  Run now
+                  <Play class="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  v-if="linkMove(link).misplaced > 0 || linkMove(link).running"
+                  variant="ghost"
+                  size="sm"
+                  class="h-6 px-2 text-aruna-navy dark:text-foreground"
+                  :disabled="writesDisabled || busyId !== null || linkMove(link).running"
+                  :title="offline ?? 'Move files'"
+                  aria-label="Move files"
+                  @click="moveAsk = { pairs: [[link.bucket, link.key_prefix]], place: arunaPlace(link) }"
+                >
+                  <MoveRight class="h-3.5 w-3.5" />
                 </Button>
                 <Button
                   variant="ghost"
@@ -481,6 +608,16 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
             >
               New uploads go to <span class="font-mono">{{ writePlace(link) }}</span>
             </p>
+            <div v-if="linkMove(link).running" class="py-0.5 pl-[5rem] text-[11px] text-muted-foreground" data-testid="move-line">
+              {{ moveText(linkMove(link)) }}
+              <Progress
+                :value="linkMove(link).done"
+                :max="linkMove(link).done + linkMove(link).misplaced"
+                :warn="101"
+                :critical="101"
+                class="mt-0.5 h-1"
+              />
+            </div>
             <ul
               v-if="expandedId === link.import_id && link.last_run"
               class="space-y-0.5 py-1 pl-[5rem] text-[11px] text-muted-foreground"
@@ -520,6 +657,7 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
       :link="editingLink"
       :links="links"
       :storage-id="linkStorage"
+      :misplaced="editingLink ? linkMove(editingLink).misplaced : 0"
       @saved="onLinkSaved"
     />
     <DefaultRuleDialog
@@ -528,8 +666,23 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
       :group-name="props.groupName"
       :backend="defaultStorage"
       :links="links"
-      @saved="load"
+      :misplaced="defaultMove.misplaced"
+      @saved="onDefaultSaved"
     />
+    <Dialog :open="moveAsk !== null" @update:open="(v: boolean) => { if (!v) moveAsk = null }">
+      <DialogContent class="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Move files?</DialogTitle>
+          <DialogDescription>
+            Files in {{ moveAsk?.place }} move to the storage the rules choose now. This runs in the background.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <DialogClose as-child><Button type="button" variant="outline">Cancel</Button></DialogClose>
+          <Button :disabled="busyId !== null || writesDisabled" @click="startMove">Move files</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     <Dialog :open="arunaConfirm" @update:open="(v: boolean) => (arunaConfirm = v)">
       <DialogContent class="max-w-md">
         <DialogHeader>

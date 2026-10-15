@@ -10,6 +10,7 @@ import DialogClose from '@/components/ui/DialogClose.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
+import Switch from '@/components/ui/Switch.vue'
 import { computed, ref, useId, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
@@ -23,10 +24,12 @@ const props = defineProps<{
   groupName: string
   backend: GroupBackendResponse | null
   links: BackendImport[]
+  /** Files of all buckets that are not where the rules put them. */
+  misplaced?: number
 }>()
 const emit = defineEmits<{
   (e: 'update:open', v: boolean): void
-  (e: 'saved'): void
+  (e: 'saved', move?: boolean): void
 }>()
 
 const { putGroupRouting, saving, sessionEpoch } = useAruna()
@@ -34,6 +37,7 @@ const { writesDisabled } = useConnectivity()
 const uid = useId()
 
 const bucket = ref('')
+const moveFiles = ref(false)
 const submitError = ref<string | null>(null)
 
 const splits = computed(() => (props.backend ? splitsBuckets(props.backend) : false))
@@ -51,6 +55,7 @@ watch(
     if (!open || !props.backend) return
     opening += 1
     bucket.value = defaultBucket(props.backend) ?? suggestBucket(props.groupName)
+    moveFiles.value = false
     submitError.value = null
   },
 )
@@ -70,7 +75,7 @@ async function submit() {
     const name = splits.value ? bucket.value.trim() : undefined
     await putGroupRouting(props.groupId, { backend_id: props.backend.backend_id }, name)
     if (epoch !== sessionEpoch.value) return
-    emit('saved')
+    emit('saved', moveFiles.value)
     if (current()) emit('update:open', false)
   } catch (err) {
     if (current()) submitError.value = errorMessage(err)
@@ -107,6 +112,14 @@ async function submit() {
         <p v-else class="text-xs text-foreground">
           New uploads go to bucket <span class="font-mono">{{ backend ? defaultBucket(backend) : '' }}</span>.
         </p>
+        <label v-if="(misplaced ?? 0) > 0" class="flex items-center gap-2 text-xs text-foreground">
+          <Switch
+            :checked="moveFiles"
+            aria-label="Move files already stored"
+            @update:checked="(v: boolean) => (moveFiles = v)"
+          />
+          Move files already stored
+        </label>
         <Notice v-if="submitError" tone="error">{{ submitError }}</Notice>
         <DialogFooter>
           <DialogClose as-child><Button type="button" variant="outline">Cancel</Button></DialogClose>

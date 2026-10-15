@@ -1,7 +1,7 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h, reactive, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { button, compileClientComponent, content, element, flush, moduleDefault, mountApp, typeValue } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, element, flush, moduleDefault, mountApp, typeValue } from '@/test/clientRender'
 import * as StorageRules from '@/lib/storageRules'
 import * as Utils from '@/lib/utils'
 
@@ -12,6 +12,11 @@ const Slot = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slot
 const ButtonStub = defineComponent({
   inheritAttrs: false,
   setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()),
+})
+const SwitchStub = defineComponent({
+  props: { checked: Boolean },
+  emits: ['update:checked'],
+  setup: (props, { attrs, emit }) => () => h('button', { ...attrs, onClick: () => emit('update:checked', !props.checked) }),
 })
 const InputStub = defineComponent({
   props: { modelValue: String },
@@ -36,6 +41,7 @@ const DefaultRuleDialog = compileClientComponent(new URL('./DefaultRuleDialog.vu
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Notice.vue': moduleDefault(Slot),
+  '@/components/ui/Switch.vue': moduleDefault(SwitchStub),
   '@/composables/useAruna': { useAruna: () => ({ putGroupRouting, saving: ref(false), sessionEpoch: ref(0) }) },
   '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled: ref(false) }) },
   '@/lib/storageRules': StorageRules,
@@ -55,10 +61,10 @@ const LINK = {
 
 const onOpen = vi.fn()
 
-async function mount() {
+async function mount(extra: Record<string, unknown> = {}) {
   const state = reactive({
     open: false, groupId: 'g1', groupName: 'Lab Group', backend: STORAGE, links: [LINK], onSaved,
-    'onUpdate:open': onOpen,
+    'onUpdate:open': onOpen, ...extra,
   })
   const mounted = await mountApp(defineComponent(() => () => h(DefaultRuleDialog, state)))
   state.open = true
@@ -87,6 +93,21 @@ describe('DefaultRuleDialog', () => {
 
     expect(putGroupRouting).toHaveBeenCalledWith('g1', { backend_id: 's1' }, 'aruna-lab-group-default')
     expect(onSaved).toHaveBeenCalled()
+    mounted.app.unmount()
+  })
+
+  it('offers to move files only when some are misplaced', async () => {
+    putGroupRouting.mockResolvedValue({ group_id: 'g1', warnings: [] })
+    const none = await mount()
+    expect(content(none.root)).not.toContain('Move files already stored')
+    none.app.unmount()
+
+    const mounted = await mount({ misplaced: 4 })
+    await click(element(mounted.root, (node) => node.props['aria-label'] === 'Move files already stored'))
+    const form = element(mounted.root, (node) => node.tag === 'form')
+    await (form.props.onSubmit as (event: unknown) => Promise<void>)({ preventDefault() {} })
+    await flush()
+    expect(onSaved).toHaveBeenCalledWith(true)
     mounted.app.unmount()
   })
 

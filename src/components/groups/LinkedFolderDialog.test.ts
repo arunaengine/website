@@ -1,7 +1,7 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h, reactive, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { button, compileClientComponent, content, element, flush, moduleDefault, mountApp, typeValue } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, element, flush, moduleDefault, mountApp, typeValue } from '@/test/clientRender'
 import * as Api from '@/lib/api'
 import * as LinkedFolders from '@/lib/linkedFolders'
 import * as StorageRules from '@/lib/storageRules'
@@ -9,6 +9,7 @@ import * as Utils from '@/lib/utils'
 
 const createBackendImport = vi.fn()
 const updateBackendImport = vi.fn()
+const startBucketMove = vi.fn()
 const runBackendImport = vi.fn()
 const onSaved = vi.fn()
 const onOpen = vi.fn()
@@ -19,6 +20,11 @@ const Slot = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slot
 const ButtonStub = defineComponent({
   inheritAttrs: false,
   setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()),
+})
+const SwitchStub = defineComponent({
+  props: { checked: Boolean },
+  emits: ['update:checked'],
+  setup: (props, { attrs, emit }) => () => h('button', { ...attrs, onClick: () => emit('update:checked', !props.checked) }),
 })
 const InputStub = defineComponent({
   props: { modelValue: String },
@@ -48,7 +54,7 @@ const LinkedFolderDialog = compileClientComponent(new URL('./LinkedFolderDialog.
     inheritAttrs: false,
     setup: (_, { attrs }) => () => h('select', attrs),
   })),
-  '@/components/ui/Switch.vue': moduleDefault(Empty),
+  '@/components/ui/Switch.vue': moduleDefault(SwitchStub),
   '@/composables/useAruna': {
     useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('bearer'), sessionEpoch: ref(0) }),
   },
@@ -57,7 +63,7 @@ const LinkedFolderDialog = compileClientComponent(new URL('./LinkedFolderDialog.
   },
   '@/composables/useS3': { useS3: () => ({ activeContext, nodeIdFor: () => 'n1' }) },
   '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled: ref(false) }) },
-  '@/lib/api': { ...Api, createBackendImport, updateBackendImport, runBackendImport },
+  '@/lib/api': { ...Api, createBackendImport, updateBackendImport, runBackendImport, startBucketMove },
   '@/lib/linkedFolders': LinkedFolders,
   '@/lib/storageRules': StorageRules,
   '@/lib/utils': Utils,
@@ -109,6 +115,7 @@ async function submit(root: Root) {
 beforeEach(() => {
   createBackendImport.mockReset()
   updateBackendImport.mockReset()
+  startBucketMove.mockReset()
   runBackendImport.mockReset()
   onSaved.mockReset()
   onOpen.mockReset()
@@ -203,6 +210,32 @@ describe('LinkedFolderDialog', () => {
 
     expect(updateBackendImport).toHaveBeenCalledWith('g1', 'i1', '0 * * * *', expect.anything())
     expect(createBackendImport).not.toHaveBeenCalled()
+    mounted.app.unmount()
+  })
+
+  it('moves the files of a stored link only when there are some', async () => {
+    startBucketMove.mockResolvedValue({})
+    const none = await mount(STORED)
+    expect(content(none.root)).not.toContain('Move files already in this folder')
+    none.app.unmount()
+
+    const mounted = await mount(STORED, { misplaced: 12 })
+    expect(button(mounted.root, 'Save changes').props.disabled).toBe(true)
+    await click(element(mounted.root, (node) => node.props['aria-label'] === 'Move files already in this folder'))
+    await submit(mounted.root)
+    expect(startBucketMove).toHaveBeenCalledWith('sequencing', 'seq/', expect.anything())
+    expect(updateBackendImport).not.toHaveBeenCalled()
+    mounted.app.unmount()
+  })
+
+  it('asks the node to move existing files of a new link', async () => {
+    createBackendImport.mockResolvedValue({ ...STORED, import_id: 'new' })
+    runBackendImport.mockResolvedValue({ job_id: 'j' })
+    const mounted = await mount()
+    await choose(mounted.root, 'To Aruna bucket', 'sequencing')
+    await click(element(mounted.root, (node) => node.props['aria-label'] === 'Move files already in this folder'))
+    await submit(mounted.root)
+    expect(createBackendImport).toHaveBeenCalledWith('g1', expect.objectContaining({ move_existing: true }), expect.anything())
     mounted.app.unmount()
   })
 

@@ -23,6 +23,7 @@ import {
   createBackendImport,
   deleteBackendImport,
   runBackendImport,
+  startBucketMove,
   updateBackendImport,
   type BackendImport,
   type BackendImportRequest,
@@ -54,6 +55,8 @@ const props = defineProps<{
   links?: BackendImport[]
   /** The storage a new link starts on. */
   storageId?: string | null
+  /** Files of a stored link that are not where the rules put them. */
+  misplaced?: number
 }>()
 const emit = defineEmits<{
   (e: 'update:open', v: boolean): void
@@ -77,6 +80,7 @@ const bucket = ref('')
 const bucketFolder = ref('')
 const pattern = ref(NAME_PATTERNS[0].value)
 const writeElsewhere = ref(false)
+const moveFiles = ref(false)
 const writeBackendId = ref('')
 const writeFolder = ref('')
 const scheduleChoice = ref('')
@@ -141,7 +145,7 @@ const exampleUpload = computed(() =>
 
 const submitDisabled = computed(() => {
   if (saving.value || writesDisabled.value || scheduleError.value) return true
-  if (isEdit.value) return schedule.value === (props.link?.schedule ?? '')
+  if (isEdit.value) return schedule.value === (props.link?.schedule ?? '') && !moveFiles.value
   return (
     !backendId.value ||
     !bucket.value.trim() ||
@@ -182,6 +186,7 @@ watch(
     bucketFolder.value = stored?.key_prefix ?? ''
     pattern.value = stored?.write_pattern ?? NAME_PATTERNS[0].value
     writeElsewhere.value = Boolean(stored && writesElsewhere(stored))
+    moveFiles.value = false
     writeBackendId.value = stored?.write_backend_id ?? ''
     writeFolder.value = stored?.write_prefix ?? ''
     const savedSchedule = stored?.schedule ?? ''
@@ -211,6 +216,7 @@ function body(): BackendImportRequest {
     request.write_prefix = folderPath(writeFolder.value)
   }
   if (schedule.value) request.schedule = schedule.value
+  if (moveFiles.value) request.move_existing = true
   return request
 }
 
@@ -244,7 +250,10 @@ async function submit() {
   try {
     let runError: string | undefined
     if (props.link) {
-      await updateBackendImport(props.groupId, props.link.import_id, schedule.value || null, client)
+      if (schedule.value !== (props.link.schedule ?? '')) {
+        await updateBackendImport(props.groupId, props.link.import_id, schedule.value || null, client)
+      }
+      if (moveFiles.value) await startBucketMove(props.link.bucket, props.link.key_prefix, client)
     } else {
       const created = await createBackendImport(props.groupId, body(), client)
       try {
@@ -484,6 +493,15 @@ async function submit() {
                 <span class="block">is saved as <span class="break-all font-mono">{{ exampleUpload }}</span></span>
               </p>
             </div>
+
+            <label v-if="!isEdit || (misplaced ?? 0) > 0" class="flex items-center gap-2 text-xs text-foreground">
+              <Switch
+                :checked="moveFiles"
+                aria-label="Move files already in this folder"
+                @update:checked="(v: boolean) => (moveFiles = v)"
+              />
+              Move files already in this folder
+            </label>
 
             <Notice>Aruna never deletes files from your storage.</Notice>
           </fieldset>

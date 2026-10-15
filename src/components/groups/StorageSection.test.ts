@@ -12,6 +12,9 @@ const getGroupRouting = vi.fn()
 const putGroupRouting = vi.fn()
 const listBackendImports = vi.fn()
 const runBackendImport = vi.fn()
+const getBucketMove = vi.fn()
+const startBucketMove = vi.fn()
+const listGroupDataPaths = vi.fn()
 const disableGroupBackend = vi.fn()
 const writesDisabled = ref(false)
 
@@ -41,6 +44,7 @@ const StorageSection = compileClientComponent(new URL('./StorageSection.vue', im
   '@/components/ui/DialogClose.vue': moduleDefault(Slot),
   '@/components/ui/ErrorPanel.vue': moduleDefault(Empty),
   '@/components/ui/Skeleton.vue': moduleDefault(Empty),
+  '@/components/ui/Progress.vue': moduleDefault(Empty),
   '@/components/groups/StorageBackendDialog.vue': moduleDefault(Empty),
   '@/components/groups/LinkedFolderDialog.vue': moduleDefault(Empty),
   '@/components/groups/DefaultRuleDialog.vue': moduleDefault(Empty),
@@ -59,7 +63,7 @@ const StorageSection = compileClientComponent(new URL('./StorageSection.vue', im
     }),
   },
   '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled }) },
-  '@/lib/api': { ...Api, listBackendImports, runBackendImport },
+  '@/lib/api': { ...Api, listBackendImports, runBackendImport, getBucketMove, startBucketMove, listGroupDataPaths },
   '@/lib/storageRules': StorageRules,
   '@/lib/linkedFolders': LinkedFolders,
   '@/lib/utils': Utils,
@@ -127,7 +131,22 @@ beforeEach(() => {
   listBackendImports.mockResolvedValue(LINKS)
   putGroupRouting.mockResolvedValue({ group_id: 'g1', warnings: [] })
   runBackendImport.mockResolvedValue({ job_id: 'j2' })
+  listGroupDataPaths.mockResolvedValue({ entries: [] })
+  getBucketMove.mockResolvedValue({ bucket: 'x', misplaced: 0, complete: true })
+  startBucketMove.mockResolvedValue({})
 })
+
+function labelled(root: Parameters<typeof content>[0], label: string) {
+  return element(root, (node) => node.tag === 'button' && node.props['aria-label'] === label)
+}
+function hasLabel(root: Parameters<typeof content>[0], label: string) {
+  try {
+    labelled(root, label)
+    return true
+  } catch {
+    return false
+  }
+}
 
 describe('StorageSection', () => {
   it('lists Aruna storage and the rules of each storage', async () => {
@@ -156,7 +175,7 @@ describe('StorageSection', () => {
     expect(element(row(mounted.root, 'denied'), (node) => node.props.title === 'No access to bucket lab-results')).toBeTruthy()
     expect(content(row(mounted.root, 'imaging'))).toContain('imaging / raw/')
     expect(content(row(mounted.root, 'imaging'))).toContain('Running… 312 added')
-    expect(button(row(mounted.root, 'imaging'), 'Run now').props.disabled).toBe(true)
+    expect(labelled(row(mounted.root, 'imaging'), 'Run now').props.disabled).toBe(true)
     expect(content(row(mounted.root, 'archive'))).toContain('Never run')
     mounted.app.unmount()
   })
@@ -184,8 +203,63 @@ describe('StorageSection', () => {
 
   it('starts a run of a linked rule', async () => {
     const mounted = await mount()
-    await click(button(row(mounted.root, 'sequencing'), 'Run now'))
+    await click(labelled(row(mounted.root, 'sequencing'), 'Run now'))
     expect(runBackendImport).toHaveBeenCalledWith('g1', 'i1', expect.anything())
+    mounted.app.unmount()
+  })
+
+  it('hides Move files when nothing is misplaced and offers it otherwise', async () => {
+    getBucketMove.mockImplementation(async (bucket: string) => ({
+      bucket,
+      misplaced: bucket === 'sequencing' ? 7 : 0,
+      complete: true,
+    }))
+    const mounted = await mount()
+    expect(hasLabel(row(mounted.root, 'sequencing'), 'Move files')).toBe(true)
+    expect(hasLabel(row(mounted.root, 'results'), 'Move files')).toBe(false)
+    expect(getBucketMove).toHaveBeenCalledWith('sequencing', '', expect.anything())
+    expect(getBucketMove).toHaveBeenCalledWith('imaging', 'raw/', expect.anything())
+
+    await click(labelled(row(mounted.root, 'sequencing'), 'Move files'))
+    expect(startBucketMove).not.toHaveBeenCalled()
+    const dialog = element(mounted.root, (node) => node.props.role === 'dialog')
+    await click(button(dialog, 'Move files'))
+    expect(startBucketMove).toHaveBeenCalledWith('sequencing', '', expect.anything())
+    mounted.app.unmount()
+  })
+
+  it('shows the progress of a running move and keeps the action off', async () => {
+    getBucketMove.mockResolvedValue({
+      bucket: 'x',
+      misplaced: 2260,
+      complete: true,
+      progress: { migrated: 1200, skipped: 30, failed: 10, started_at_ms: 1, finished_at_ms: null },
+    })
+    const mounted = await mount()
+    expect(content(row(mounted.root, 'sequencing'))).not.toContain('Moving files')
+    expect(content(mounted.root)).toContain('Moving files: 1,240 of 3,500')
+    expect(labelled(row(mounted.root, 'sequencing'), 'Move files').props.disabled).toBe(true)
+    mounted.app.unmount()
+  })
+
+  it('moves all buckets of the group from the default row', async () => {
+    listGroupDataPaths.mockResolvedValue({
+      entries: [
+        { permission_path: '/r/g/g1/data/n1/alpha/', kind: 'folder' },
+        { permission_path: '/r/g/g1/data/n1/beta/', kind: 'folder' },
+      ],
+    })
+    getBucketMove.mockImplementation(async (bucket: string) => ({
+      bucket,
+      misplaced: bucket === 'alpha' ? 3 : 0,
+      complete: true,
+    }))
+    const mounted = await mount()
+    const defaultRow = element(mounted.root, (node) => node.props['data-testid'] === 'default-row')
+    await click(labelled(defaultRow, 'Move files'))
+    await click(button(element(mounted.root, (node) => node.props.role === 'dialog'), 'Move files'))
+    expect(startBucketMove).toHaveBeenCalledTimes(1)
+    expect(startBucketMove).toHaveBeenCalledWith('alpha', '', expect.anything())
     mounted.app.unmount()
   })
 
