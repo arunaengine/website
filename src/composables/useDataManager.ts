@@ -184,6 +184,18 @@ export function groupSwitchRoute(state: {
   return { name: 'buckets', query: { group: next, ...(state.notebooks ? { notebooks: '1' } : {}) } }
 }
 
+/**
+ * Runs route changes one after another, so a later step reads the route an
+ * earlier one produced instead of cancelling it.
+ */
+export function navigationQueue() {
+  let last: Promise<unknown> = Promise.resolve()
+  return (step: () => unknown): Promise<unknown> => {
+    last = last.then(step, step)
+    return last
+  }
+}
+
 // The local "Recently browsed" rows the loaded list does not confirm: each is
 // deleted or owned by another group, and only the node can tell them apart.
 export function unlistedRecents(recent: BucketShortcut[], buckets: string[]): BucketShortcut[] {
@@ -278,6 +290,8 @@ export function useDataManager() {
   let failedContextKey: string | null = null
   // An open dialog browsing another node or group drives the session meanwhile.
   const contextHold = ref(false)
+  // A group switch and the session's group query must not cancel each other.
+  const navigate = navigationQueue()
 
   async function openSelectedContext() {
     if (!selectedGroupId.value || !requiredNodeId.value || contextBusy.value) return
@@ -286,11 +300,9 @@ export function useDataManager() {
     contextError.value = null
     try {
       await s3.activateContext(remoteNodeId.value, selectedGroupId.value)
-      await router.replace({
-        query: {
-          ...route.query,
-          group: selectedGroupId.value,
-        },
+      await navigate(() => {
+        if (routeString(route.query.group) === selectedGroupId.value) return
+        return router.replace({ query: { ...route.query, group: selectedGroupId.value } })
       })
     } catch (err) {
       contextError.value = s3ErrorMessage(err)
@@ -802,7 +814,7 @@ export function useDataManager() {
       queryGroup: routeString(route.query.group),
       notebooks: route.name === 'notebooks' || route.query.notebooks === '1',
     })
-    if (target) void router.replace(target)
+    if (target) void navigate(() => router.replace(target))
   })
 
   watch(
