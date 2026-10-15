@@ -41,6 +41,8 @@ export function fileRows<O extends { key: string }>(objects: O[], deleted: Delet
   return rows.sort((a, b) => (a.entry.key < b.entry.key ? -1 : a.entry.key > b.entry.key ? 1 : 0))
 }
 
+export type RowAction = 'open' | 'details' | 'download' | 'rename' | 'move' | 'copy' | 'access' | 'delete'
+
 export type SelectionAction = 'download' | 'move' | 'copy' | 'rename' | 'access' | 'delete'
 
 /** Why a list bar action is unavailable for the ticked files and folders, or null. */

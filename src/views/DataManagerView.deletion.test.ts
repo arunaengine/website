@@ -9,7 +9,6 @@ import * as DeletionRequest from '@/lib/deletion/request'
 import * as ObjectVersions from '@/lib/objectVersions'
 import * as Utils from '@/lib/utils'
 import {
-  bubbleClick,
   click,
   compileClientComponent,
   content,
@@ -17,6 +16,7 @@ import {
   mountApp,
   nodes,
   moduleDefault,
+  type HostNode,
 } from '@/test/clientRender'
 import { ButtonStub, Slotted, fakeManager, objectBrowser as compiledBrowser } from '@/test/dataManager'
 import { exactFileBacklinkPreflight, type BacklinkPreflightResponse } from '@/lib/backlinks'
@@ -319,8 +319,8 @@ describe('Data Manager explicit multi-file deletion', () => {
     expect(functionSource(objectBrowser.script, 'deleteFolder')).not.toContain('selectedObjectKeys')
     // One destructive entry per row: the Bomb icon and its twin are gone.
     expect(objectBrowserSource).not.toContain('Bomb')
-    expect(objectBrowser.template.match(/label="Delete…"/g)).toHaveLength(1)
-    expect(objectBrowser.template.match(/label="Delete folder…"/g)).toHaveLength(1)
+    expect(objectBrowser.template.match(/<RowMenu/g)).toHaveLength(2)
+    expect(objectBrowser.script).toContain('deleteFolder(folder)')
   })
 
   it('keeps new UI copy free of em dashes and the retired label namespace', () => {
@@ -562,12 +562,13 @@ describe('Data Manager deletion from the object row', () => {
     })
     const { root } = await mountApp(host)
 
-    await bubbleClick(element(root, (node) => node.props['aria-label'] === 'Delete…'))
+    const deleteItem = (node: HostNode) => node.props.role === 'menuitem' && content(node).trim() === 'Delete'
+    await click(element(root, deleteItem))
     expect(content(root)).toContain('reef/raw/reads.fastq')
 
     const confirm = element(
       root,
-      (node) => node.tag === 'button' && content(node).trim() === 'Delete',
+      (node) => node.tag === 'button' && content(node).trim() === 'Delete' && !deleteItem(node),
     )
     await click(confirm)
 

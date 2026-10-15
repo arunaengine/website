@@ -55,9 +55,20 @@ function action(root: HostNode, label: string): HostNode {
 }
 
 // The list bar carries a Download too, so row actions are found inside the row.
-function rowAction(root: HostNode, label: string): HostNode {
-  const row = element(root, (node) => node.tag === 'tr' && content(node).includes('reads.fastq'))
+function rowAction(root: HostNode, label: string, name = 'reads.fastq'): HostNode {
+  const row = element(root, (node) => node.tag === 'tr' && content(node).includes(name))
   return action(row, label)
+}
+
+function menuItem(root: HostNode, label: string, name = 'reads.fastq'): HostNode {
+  const row = element(root, (node) => node.tag === 'tr' && content(node).includes(name))
+  return element(row, (node) => node.props.role === 'menuitem' && content(node).trim() === label)
+}
+
+function menuLabels(row: HostNode): string[] {
+  return nodes(row)
+    .filter((node) => node.props.role === 'menuitem')
+    .map((node) => content(node).trim())
 }
 
 describe('object browser row actions', () => {
@@ -70,15 +81,16 @@ describe('object browser row actions', () => {
     brokenFiles.reasons = {}
   })
 
-  it('offers exactly preview, download, delete and more', async () => {
+  it('offers preview, download and a menu with every file action', async () => {
     const root = await render()
     const row = element(root, (node) => node.tag === 'tr' && content(node).includes('reads.fastq'))
 
     expect(
       nodes(row)
-        .filter((node) => node.tag === 'button')
+        .filter((node) => node.tag === 'button' && node.props['aria-label'])
         .map((node) => String(node.props['aria-label'])),
-    ).toEqual(['Preview', 'Download', 'Delete…', 'More about this file'])
+    ).toEqual(['Preview', 'Download', 'More actions'])
+    expect(menuLabels(row)).toEqual(['Details', 'Download', 'Rename', 'Move to', 'Copy to', 'Change access', 'Delete'])
     // Icon only: the label is the accessible name, not visible text.
     expect(content(action(root, 'Preview')).trim()).toBe('')
   })
@@ -138,7 +150,7 @@ describe('object browser row actions', () => {
     openDetails.mockClear()
     const root = await render()
 
-    await bubbleClick(action(root, 'Delete…'))
+    await click(menuItem(root, 'Delete'))
 
     expect(openDetails).not.toHaveBeenCalled()
     expect(requestDelete).toHaveBeenCalledWith(
@@ -151,13 +163,25 @@ describe('object browser row actions', () => {
     )
   })
 
-  it('opens the details on the general tab from more', async () => {
+  it('opens the details on the general tab from the menu', async () => {
     openDetails.mockClear()
     const root = await render()
 
-    await bubbleClick(action(root, 'More about this file'))
+    await click(menuItem(root, 'Details'))
 
     expect(openDetails).toHaveBeenCalledWith(listedObject)
+  })
+
+  it('blocks rename, move and delete in the menu of a row this session cannot change', async () => {
+    s3Access.canWrite = () => false
+    try {
+      const root = await render()
+      expect(menuItem(root, 'Rename').props.disabled).toBe(true)
+      expect(menuItem(root, 'Delete').props.disabled).toBe(true)
+      expect(menuItem(root, 'Copy to').props.disabled).toBe(false)
+    } finally {
+      resetS3Access()
+    }
   })
 })
 
@@ -387,13 +411,9 @@ describe('object browser public access', () => {
     const root = await render({ folders: ref([listedFolder]) })
     const row = element(root, (node) => node.tag === 'tr' && content(node).includes(`${listedFolder.name}/`))
 
-    expect(
-      nodes(row)
-        .filter((node) => node.tag === 'button')
-        .map((node) => String(node.props['aria-label'])),
-    ).toEqual(['Delete folder…', 'More about this folder'])
+    expect(menuLabels(row)).toEqual(['Open', 'Details', 'Move to', 'Copy to', 'Change access', 'Delete folder'])
 
-    await bubbleClick(action(root, 'More about this folder'))
+    await click(menuItem(root, 'Details', `${listedFolder.name}/`))
 
     expect(openDetails).toHaveBeenCalledWith({ key: listedFolder.prefix, name: `${listedFolder.name}/` })
   })

@@ -11,6 +11,7 @@ import Tooltip from '@/components/ui/Tooltip.vue'
 import Breadcrumbs from '@/components/data/Breadcrumbs.vue'
 import ObjectIcon from '@/components/data/ObjectIcon.vue'
 import ObjectListBar from '@/components/data/manager/ObjectListBar.vue'
+import RowMenu from '@/components/data/manager/RowMenu.vue'
 import TransferDialog from '@/components/data/manager/TransferDialog.vue'
 import WatchButton from '@/components/watches/WatchButton.vue'
 import KeyedReadNotice from '@/components/storage/KeyedReadNotice.vue'
@@ -30,7 +31,7 @@ import { featureEnabled } from '@/lib/config'
 import { isNotebookKey } from '@/lib/notebook/document'
 import { collectDropFiles } from '@/lib/upload/dropEntries'
 import { stateVariant } from '@/lib/stateBadge'
-import { fileRows, type SelectionAction } from '@/lib/objectListing'
+import { fileRows, type RowAction, type SelectionAction } from '@/lib/objectListing'
 import type { TransferMode, TransferSource } from '@/lib/objectMove'
 import { formatBytes, relativeTime } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
@@ -45,7 +46,6 @@ import {
   KeyRound,
   Link2,
   Lock,
-  MoreHorizontal,
   NotebookPen,
   Plus,
   Settings,
@@ -279,6 +279,24 @@ function onBarAction(action: SelectionAction) {
   } else if (action === 'access') emit('public-access', publicTargets())
   else if (action === 'delete') deleteSelection()
   else openTransfer(action, selectedSources())
+}
+
+function onObjectAction(object: ObjectEntry, action: RowAction) {
+  const key = object.key
+  if (action === 'details') openDetails(object)
+  else if (action === 'download') void locked.download(object)
+  else if (action === 'access') emit('public-access', [{ kind: 'file', bucket: bucket.value, key }])
+  else if (action === 'delete') deleteObject(object)
+  else if (action !== 'open') openTransfer(action, [{ key, folder: false }])
+}
+
+function onFolderAction(folder: FolderEntry, action: RowAction) {
+  const key = folder.prefix
+  if (action === 'open') openFolder(folder)
+  else if (action === 'details') openDetails({ key, name: `${folder.name}/` })
+  else if (action === 'access') emit('public-access', [{ kind: 'folder', bucket: bucket.value, key }])
+  else if (action === 'delete') deleteFolder(folder)
+  else if (action !== 'download') openTransfer(action, [{ key, folder: true }])
 }
 
 // The marker version travels with the request: choosing Restore in the dialog
@@ -524,13 +542,13 @@ async function onDrop(event: DragEvent) {
               <td class="px-4 py-2.5 text-muted-foreground">-</td>
               <td class="px-4 py-2.5">
                 <div class="flex items-center justify-end gap-1">
-                  <IconButton
-                    label="Delete folder…"
-                    class="text-destructive hover:text-destructive"
-                    :disabled-reason="folderReason(folder.prefix)"
-                    @click.stop="deleteFolder(folder)"
-                  ><Trash2 class="size-3.5" /></IconButton>
-                  <IconButton label="More about this folder" @click.stop="openDetails({ key: folder.prefix, name: `${folder.name}/` })"><MoreHorizontal class="size-3.5" /></IconButton>
+                  <RowMenu
+                    :name="`${folder.name}/`"
+                    folder
+                    :change-reason="folderReason(folder.prefix)"
+                    :access="Boolean(activeGroupId)"
+                    @pick="(action: RowAction) => onFolderAction(folder, action)"
+                  />
                 </div>
               </td>
             </tr>
@@ -591,13 +609,12 @@ async function onDrop(event: DragEvent) {
                 <div class="flex items-center justify-end gap-1">
                   <IconButton label="Preview" @click.stop="openDetails(object, 'preview')"><Eye class="size-3.5" /></IconButton>
                   <IconButton label="Download" @click.stop="locked.download(object)"><Download class="size-3.5" /></IconButton>
-                  <IconButton
-                    label="Delete…"
-                    class="text-destructive hover:text-destructive"
-                    :disabled-reason="objectReason(object.key)"
-                    @click.stop="deleteObject(object)"
-                  ><Trash2 class="size-3.5" /></IconButton>
-                  <IconButton label="More about this file" @click.stop="openDetails(object)"><MoreHorizontal class="size-3.5" /></IconButton>
+                  <RowMenu
+                    :name="object.name"
+                    :change-reason="objectReason(object.key)"
+                    :access="Boolean(activeGroupId)"
+                    @pick="(action: RowAction) => onObjectAction(object, action)"
+                  />
                 </div>
               </td>
             </tr>

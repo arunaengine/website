@@ -78,6 +78,26 @@ function lockedBucket(...args: unknown[]) {
 
 let compiled: Component | null = null
 let compiledBar: Component | null = null
+let compiledMenu: Component | null = null
+
+/** The row menu with its items rendered inline, so a test can pick one. */
+export function rowMenu(): Component {
+  compiledMenu ??= compileClientComponent(
+    new URL('../components/data/manager/RowMenu.vue', import.meta.url),
+    {
+      vue: VueRuntime,
+      '@lucide/vue': new Proxy({}, { get: () => IconStub }),
+      '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+      '@/components/ui/DropdownMenu.vue': moduleDefault(Slotted('div')),
+      '@/components/ui/DropdownMenuContent.vue': moduleDefault(Slotted('div')),
+      '@/components/ui/DropdownMenuItem.vue': moduleDefault(MenuItemStub),
+      '@/components/ui/DropdownMenuLabel.vue': moduleDefault(Slotted('p')),
+      '@/components/ui/DropdownMenuSeparator.vue': moduleDefault(Slotted('hr')),
+      '@/components/ui/DropdownMenuTrigger.vue': moduleDefault(Slotted('span')),
+    },
+  )
+  return compiledMenu
+}
 
 /** The list bar above the object table, compiled so the browser tests can tick and act. */
 export function objectListBar(): Component {
@@ -131,6 +151,7 @@ export function objectBrowser(): Component {
       '@/components/data/Breadcrumbs.vue': moduleDefault(Slotted('nav')),
       '@/components/data/ObjectIcon.vue': moduleDefault(Slotted('i')),
       '@/components/data/manager/ObjectListBar.vue': moduleDefault(objectListBar()),
+      '@/components/data/manager/RowMenu.vue': moduleDefault(rowMenu()),
       '@/components/data/manager/TransferDialog.vue': moduleDefault(Slotted('aside')),
       '@/components/watches/WatchButton.vue': moduleDefault(Slotted('button')),
       '@/components/storage/KeyedReadNotice.vue': moduleDefault(Slotted('aside')),
