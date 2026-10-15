@@ -38,7 +38,8 @@ export const BACKEND_KIND_SCHEMAS: Record<GroupBackendKind, BackendKindSchema> =
     identity: ['endpoint', 'bucket'],
     public: [
       { key: 'endpoint', label: 'Endpoint', required: true, placeholder: 'https://s3.example.org' },
-      { key: 'bucket', label: 'Bucket', required: true, placeholder: 'my-bucket' },
+      // Only older storages have a fixed bucket; new ones name a bucket per rule.
+      { key: 'bucket', label: 'Bucket', placeholder: 'my-bucket' },
       { key: 'region', label: 'Region', placeholder: 'Leave empty for us-east-1' },
       { key: 'root', label: 'Root prefix', placeholder: 'aruna/' },
     ],

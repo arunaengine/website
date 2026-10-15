@@ -17,16 +17,19 @@ export async function getGroupRouting(groupId: string): Promise<GroupRoutingResp
   return request<GroupRoutingResponse>(`/data/groups/${groupId}/storage/routing`)
 }
 
-// An omitted target clears the group default, falling back to node routing.
+// An omitted target clears the group default, falling back to node routing. `bucket` names
+// the default bucket on a storage without a fixed bucket; the node finds or creates it.
 export async function putGroupRouting(
   groupId: string,
   target: RoutingTarget | null,
+  bucket?: string,
 ): Promise<GroupRoutingResponse> {
   saving.value = true
   try {
+    const body = target ? { default_target: target, ...(bucket ? { bucket } : {}) } : {}
     return await request<GroupRoutingResponse>(`/data/groups/${groupId}/storage/routing`, {
       method: 'PUT',
-      body: JSON.stringify(target ? { default_target: target } : {}),
+      body: JSON.stringify(body),
     })
   } finally {
     saving.value = false
