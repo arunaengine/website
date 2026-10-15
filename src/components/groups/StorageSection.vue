@@ -201,6 +201,7 @@ async function load() {
   } catch (err) {
     if (!current()) return
     if (err instanceof ApiError && (err.status === 403 || err.status === 401)) hidden.value = true
+    else if (backends.value && moveView(Object.values(moves.value)).running) schedulePoll()
     else loadError.value = errorMessage(err)
   } finally {
     if (current()) loading.value = false
@@ -305,13 +306,13 @@ const defaultPairs = computed(() =>
 
 async function startMove() {
   const ask = moveAsk.value
-  if (!ask || busyId.value) return
+  if (!ask || busyId.value || writesDisabled.value) return
   actionError.value = null
   busyId.value = 'move'
   const stale = () => disposed || ask.epoch !== sessionEpoch.value || ask.groupId !== props.groupId
   try {
     for (const [bucket, prefix] of ask.pairs) {
-      if (stale()) break
+      if (stale() || writesDisabled.value) break
       await startBucketMove(bucket, prefix, ask.asked)
     }
     moveAsk.value = null
@@ -357,7 +358,7 @@ async function onDefaultSaved(move?: boolean) {
   const asked = client()
   const same = () => !disposed && groupId === props.groupId && epoch === sessionEpoch.value
   await load()
-  if (!same()) return
+  if (!same() || writesDisabled.value) return
   // The new rules decide what is misplaced now, so ask again before moving.
   const buckets = groupBuckets.value
   const answers = await Promise.allSettled(buckets.map((bucket) => getBucketMove(bucket, '', asked)))

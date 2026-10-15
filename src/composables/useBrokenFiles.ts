@@ -12,15 +12,18 @@ const WORDS: Record<BrokenReason, string> = {
 }
 
 /** The broken files the last check found in the open bucket; empty if the node cannot say. */
-export function useBrokenFiles(bucket: Ref<string>, nodeId: Ref<string | null>) {
+/** `listed` changes whenever the file list is read again, so the marks follow it. */
+export function useBrokenFiles(bucket: Ref<string>, nodeId: Ref<string | null>, listed?: Ref<unknown>) {
   const reasons = ref<Record<string, BrokenReason>>({})
   let seq = 0
 
   async function load() {
     const run = ++seq
-    reasons.value = {}
     const baseUrl = nodeId.value ? nodeApiBase(nodeId.value) : apiBaseUrl.value
-    if (!bucket.value || !baseUrl || !authToken.value) return
+    if (!bucket.value || !baseUrl || !authToken.value) {
+      reasons.value = {}
+      return
+    }
     const found: Record<string, BrokenReason> = {}
     try {
       let after: string | undefined
@@ -36,7 +39,9 @@ export function useBrokenFiles(bucket: Ref<string>, nodeId: Ref<string | null>) 
     if (run === seq) reasons.value = found
   }
 
-  watch([bucket, nodeId, authToken], load, { immediate: true })
+  // Another bucket or node never keeps the marks of the previous one.
+  watch([bucket, nodeId], () => (reasons.value = {}), { flush: 'sync' })
+  watch([bucket, nodeId, authToken, () => listed?.value], load, { immediate: true })
 
   return { reasonOf: (key: string): string | null => (reasons.value[key] ? WORDS[reasons.value[key]] : null) }
 }

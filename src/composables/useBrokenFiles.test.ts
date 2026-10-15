@@ -49,6 +49,20 @@ describe('useBrokenFiles', () => {
     scope.stop()
   })
 
+  it('reads the marks again when the file list is read again', async () => {
+    getBucketCheck.mockResolvedValueOnce({ bucket: 'reef', broken: [file('a.txt', 'missing_blob')] })
+    getBucketCheck.mockResolvedValueOnce({ bucket: 'reef', broken: [] })
+    const listed = ref<unknown[]>([])
+    const scope = effectScope()
+    const broken = scope.run(() => useBrokenFiles(ref('reef'), ref(null), listed))!
+    await settle()
+    expect(broken.reasonOf('a.txt')).toBe('File missing on storage')
+    listed.value = []
+    await settle()
+    expect(broken.reasonOf('a.txt')).toBeNull()
+    scope.stop()
+  })
+
   it('marks nothing when the node has no check', async () => {
     getBucketCheck.mockRejectedValue(new ApiError(404, 'not found'))
     const scope = effectScope()

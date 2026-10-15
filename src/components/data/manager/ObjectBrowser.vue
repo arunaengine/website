@@ -124,7 +124,7 @@ const {
 } = props.manager
 
 const locked = useLockedBucket(bucket, remoteNodeId, activeGroupId, download)
-const { reasonOf: brokenReason } = useBrokenFiles(bucket, remoteNodeId)
+const { reasonOf: brokenReason } = useBrokenFiles(bucket, remoteNodeId, objects)
 const { lockedOnNode, availableToYou } = locked
 // A read waiting in another folder ends with the folder.
 watch(prefix, () => locked.cancel())

@@ -319,6 +319,39 @@ describe('StorageSection', () => {
     mounted.app.unmount()
   })
 
+  it('keeps progress and polls again after a failed later poll', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      getBucketMove.mockResolvedValue({
+        bucket: 'x', misplaced: 5, complete: true,
+        progress: { migrated: 1, skipped: 0, failed: 0, started_at_ms: 1, finished_at_ms: null },
+      })
+      const mounted = await mount()
+      listBackendImports.mockRejectedValueOnce(new Error('down'))
+      await vi.advanceTimersByTimeAsync(3_000)
+      await flush()
+      expect(content(mounted.root)).toContain('Moving files')
+      expect(content(mounted.root)).toContain('lab-object-store')
+      const calls = listBackendImports.mock.calls.length
+      await vi.advanceTimersByTimeAsync(3_000)
+      expect(listBackendImports.mock.calls.length).toBeGreaterThan(calls)
+      mounted.app.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('sends no move while offline', async () => {
+    getBucketMove.mockResolvedValue({ bucket: 'x', misplaced: 7, complete: true })
+    const mounted = await mount()
+    await click(labelled(row(mounted.root, 'sequencing'), 'Move files'))
+    writesDisabled.value = true
+    await flush()
+    await click(button(element(mounted.root, (node) => node.props.role === 'dialog'), 'Move files'))
+    expect(startBucketMove).not.toHaveBeenCalled()
+    mounted.app.unmount()
+  })
+
   it('says so when another move is still running in the bucket', async () => {
     getBucketMove.mockResolvedValue({ bucket: 'x', misplaced: 7, complete: true })
     startBucketMove.mockRejectedValue(new Api.ApiError(409, 'conflict', 'move_running'))
