@@ -78,6 +78,7 @@ watch(
     progress.value = null
     broken.value = 0
     brokenMore.value = false
+    busy.value = false
     supported.value = true
     note.value = null
     error.value = null
@@ -105,10 +106,12 @@ async function act(work: (alive: () => boolean) => Promise<void>) {
     if (!going) failure = errorMessage(err)
   } finally {
     if (alive()) {
-      busy.value = false
       await load()
       // A successful refresh must not hide why the action failed.
-      if (alive() && failure) error.value = failure
+      if (alive()) {
+        if (failure) error.value = failure
+        busy.value = false
+      }
     }
   }
 }
