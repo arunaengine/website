@@ -282,12 +282,15 @@ function onTransferDone() {
   void loadDeleted()
 }
 
+// One file after another: a locked bucket reads them through one keyed reader.
+async function downloadSelected() {
+  const picked = visibleObjects.value.filter((object) => selectedObjectKeys.value.has(object.key))
+  for (const object of picked) await locked.download(object)
+}
+
 function onBarAction(action: SelectionAction) {
-  if (action === 'download') {
-    for (const object of visibleObjects.value) {
-      if (selectedObjectKeys.value.has(object.key)) void locked.download(object)
-    }
-  } else if (action === 'access') emit('public-access', publicTargets())
+  if (action === 'download') void downloadSelected()
+  else if (action === 'access') emit('public-access', publicTargets())
   else if (action === 'delete') deleteSelection()
   else openTransfer(action, selectedSources())
 }

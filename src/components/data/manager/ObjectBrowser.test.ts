@@ -281,6 +281,27 @@ describe('object browser selection', () => {
     expect(download).toHaveBeenCalledWith(listedObject)
   })
 
+  it('downloads the ticked files one after another', async () => {
+    const second = { ...listedObject, key: 'raw/second.fastq', name: 'second.fastq' }
+    const objects = ref([listedObject, second])
+    let finish: () => void = () => undefined
+    const order: string[] = []
+    const slowDownload = vi.fn((object: typeof listedObject) => {
+      order.push(object.name)
+      return object.key === listedObject.key ? new Promise<void>((resolve) => (finish = resolve)) : Promise.resolve()
+    })
+    const root = await render({ objects, visibleObjects: objects, download: slowDownload })
+
+    await tick(checkbox(root, `Select ${listedObject.name}`), true)
+    await tick(checkbox(root, 'Select second.fastq'), true)
+    await click(action(root, 'Download'))
+    expect(order).toEqual(['reads.fastq'])
+
+    finish()
+    await flush()
+    expect(order).toEqual(['reads.fastq', 'second.fastq'])
+  })
+
   it('asks public access for the ticked entries', async () => {
     const publicAccess = vi.fn()
     const manager = fakeManager({ openDetails, download, requestDelete, router: { push }, folders: ref([listedFolder]) })
