@@ -20,3 +20,16 @@ describe('object listing', () => {
     expect(page.objects.map((object) => object.name)).toEqual(['sample_2.fastq'])
   })
 })
+
+describe('object copy', () => {
+  it('encodes a key that holds a version query so the copy reads that key', async () => {
+    const { copyObject } = await import('./objects')
+    send.mockResolvedValueOnce({})
+
+    await copyObject({ bucket: 'reef', key: 'raw/a?versionId=x#b c.txt' }, 'reef', 'raw/copy.txt', null)
+
+    const source = send.mock.calls.at(-1)?.[0].input.CopySource
+    expect(source).toBe('reef/raw/a%3FversionId%3Dx%23b%20c.txt')
+    expect(source).not.toContain('?')
+  })
+})

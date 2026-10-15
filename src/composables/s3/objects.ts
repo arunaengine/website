@@ -674,6 +674,12 @@ export async function deleteObjectVersion(
   )
 }
 
+// A key in a copy source: every segment encoded, so '?' or '#' in a name can
+// never read as a version query, while '/' keeps the folders.
+export function copySourceKey(key: string): string {
+  return key.split('/').map(encodeURIComponent).join('/')
+}
+
 // Makes an older version current by copying it onto the key, which mints a new
 // version. The source version keeps its bytes until it is deleted.
 export async function copyObjectVersion(
@@ -686,7 +692,7 @@ export async function copyObjectVersion(
     new CopyObjectCommand({
       Bucket: bucket,
       Key: key,
-      CopySource: `${encodeURIComponent(bucket)}/${encodeURI(key)}?versionId=${encodeURIComponent(versionId)}`,
+      CopySource: `${encodeURIComponent(bucket)}/${copySourceKey(key)}?versionId=${encodeURIComponent(versionId)}`,
       MetadataDirective: 'COPY',
     }),
   )
@@ -705,7 +711,7 @@ export async function copyObject(
     new CopyObjectCommand({
       Bucket: bucket,
       Key: key,
-      CopySource: `${encodeURIComponent(source.bucket)}/${encodeURI(source.key)}`,
+      CopySource: `${encodeURIComponent(source.bucket)}/${copySourceKey(source.key)}`,
       MetadataDirective: 'COPY',
     }),
   )
