@@ -89,6 +89,15 @@ export function useBrowserSelection(sources: SelectionSources) {
     keep((id) => (scope.kind === 'file' ? id !== scope.key : !id.startsWith(scope.prefix)))
   }
 
+  /** Drops ticks of rows the listing no longer shows, so no action reaches a hidden key. */
+  function keepListed() {
+    const listed = new Set([
+      ...sources.objects.value.map((object) => object.key),
+      ...sources.folders.value.map((folder) => folder.prefix),
+    ])
+    keep((id) => listed.has(id))
+  }
+
   /** Only confirmed successes leave the selection; the rest stay for a retry. */
   function dropCommitted(committed: Iterable<string>) {
     const done = new Set(committed)
@@ -108,5 +117,6 @@ export function useBrowserSelection(sources: SelectionSources) {
     clearSelection,
     pruneSelection,
     dropCommitted,
+    keepListed,
   }
 }

@@ -91,3 +91,21 @@ describe('object browser selection', () => {
     expect([...state.selectedPrefixes.value]).toEqual([archive.prefix])
   })
 })
+
+describe('selection across listings', () => {
+  it('keeps only the ticks of rows the new listing shows', () => {
+    const folders = ref([genomes, archive])
+    const objects = ref([reads, notes])
+    const state = useBrowserSelection({ folders, objects, canSelectObject: () => true, canSelectFolder: () => true })
+    state.setObjectSelected(reads.key, true)
+    state.setObjectSelected(notes.key, true)
+    state.setFolderSelected(archive.prefix, true)
+
+    folders.value = [genomes]
+    objects.value = [notes]
+    state.keepListed()
+
+    expect([...state.selectedObjectKeys.value]).toEqual([notes.key])
+    expect(state.selectedPrefixes.value.size).toBe(0)
+  })
+})

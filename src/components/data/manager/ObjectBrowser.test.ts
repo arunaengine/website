@@ -234,6 +234,14 @@ describe('object browser selection', () => {
     })
   })
 
+  it('refuses ticks while a page loads', async () => {
+    const root = await render({ folders: ref([listedFolder]), listLoading: ref(true) })
+
+    expect(checkbox(root, 'Select genomes').props.disabled).toBe(true)
+    expect(checkbox(root, `Select ${listedObject.name}`).props.disabled).toBe(true)
+    expect(checkbox(root, 'Select all listed folders and files').props.disabled).toBe(true)
+  })
+
   it('refuses to tick a folder this session cannot delete', async () => {
     s3Access.canDeletePrefix = () => false
     const root = await render({ folders: ref([listedFolder]) })

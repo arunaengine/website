@@ -718,6 +718,7 @@ export function useDataManager() {
       folders.value = page.folders
       objects.value = page.objects
       nextToken.value = page.nextToken
+      selection.keepListed()
     } catch (err) {
       if (requestId === listRequestId) {
         // A remote endpoint the browser cannot reach (CORS rejection or the node
