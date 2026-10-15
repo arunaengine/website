@@ -896,7 +896,8 @@ export function useDataManager() {
   }
 
   function openSearchHit(hit: BucketSearchHit) {
-    hitGroupId = hit.group_id
+    // Only a hit that changes the group fires the watcher that consumes this.
+    if (hit.group_id !== selectedGroupId.value) hitGroupId = hit.group_id
     selectedGroupId.value = hit.group_id
     selectedGroupLabel.value = hit.group_name ?? hit.group_id
     openBucketOn(hit.bucket, realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id, hit.group_id)

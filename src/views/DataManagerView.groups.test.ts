@@ -44,6 +44,10 @@ describe('Data view group selection', () => {
     expect(managerSource).toContain('if (next) selectedGroupId.value = next')
   })
 
+  it('lets only a group-changing search hit skip the switch', () => {
+    expect(managerSource).toContain('if (hit.group_id !== selectedGroupId.value) hitGroupId = hit.group_id')
+  })
+
   it('retries a failed session on request', () => {
     const errorBranch = template.indexOf('v-else-if="contextError && !contextReady"')
     expect(errorBranch).toBeGreaterThan(-1)
