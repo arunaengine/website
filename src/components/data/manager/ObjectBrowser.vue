@@ -36,7 +36,7 @@ import { stateVariant } from '@/lib/stateBadge'
 import { fileRows, type RowAction, type SelectionAction } from '@/lib/objectListing'
 import type { TransferMode, TransferSource } from '@/lib/objectMove'
 import { formatBytes, relativeTime } from '@/lib/utils'
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
   ArrowLeftRight,
@@ -85,6 +85,7 @@ const {
   referencedFrom,
   prefixReferenceSummary,
   activeGroupId,
+  contextFingerprint,
   folders,
   objects,
   visibleFolders,
@@ -285,9 +286,18 @@ function onTransferDone(moved: string[]) {
 }
 
 // One file after another: a locked bucket reads them through one keyed reader.
+// Another bucket, node or session ends the batch; its rows belong to the old one.
+let downloadBatch = 0
+watch([bucket, remoteNodeId, contextFingerprint], () => ++downloadBatch)
+onBeforeUnmount(() => ++downloadBatch)
+
 async function downloadSelected() {
+  const batch = ++downloadBatch
   const picked = visibleObjects.value.filter((object) => selectedObjectKeys.value.has(object.key))
-  for (const object of picked) await locked.download(object)
+  for (const object of picked) {
+    if (batch !== downloadBatch) return
+    await locked.download(object)
+  }
 }
 
 function onBarAction(action: SelectionAction) {

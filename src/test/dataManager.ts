@@ -228,6 +228,7 @@ export function fakeManager(overrides: Record<string, unknown> = {}) {
     referencedFrom: () => '',
     prefixReferenceSummary: () => '',
     activeGroupId: ref('g-1'),
+    contextFingerprint: ref('n-1|g-1|k'),
     selectedGroupId: ref('g-1'),
     folders,
     objects,

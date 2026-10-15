@@ -1321,6 +1321,7 @@ export function useDataManager() {
     contextError,
     contextHold,
     contextReady,
+    contextFingerprint,
     viewReady,
     contextMismatch,
     requiredNodeId,

@@ -302,6 +302,29 @@ describe('object browser selection', () => {
     expect(order).toEqual(['reads.fastq', 'second.fastq'])
   })
 
+  it('stops a download batch when the bucket changes', async () => {
+    const second = { ...listedObject, key: 'raw/second.fastq', name: 'second.fastq' }
+    const objects = ref([listedObject, second])
+    const bucket = ref('reef')
+    let finish: () => void = () => undefined
+    const asked: string[] = []
+    const slowDownload = vi.fn((object: typeof listedObject) => {
+      asked.push(`${bucket.value}/${object.key}`)
+      return object.key === listedObject.key ? new Promise<void>((resolve) => (finish = resolve)) : Promise.resolve()
+    })
+    const root = await render({ bucket, objects, visibleObjects: objects, download: slowDownload })
+
+    await tick(checkbox(root, `Select ${listedObject.name}`), true)
+    await tick(checkbox(root, 'Select second.fastq'), true)
+    await click(action(root, 'Download'))
+    bucket.value = 'other'
+    await flush()
+    finish()
+    await flush()
+
+    expect(asked).toEqual(['reef/raw/reads.fastq'])
+  })
+
   it('asks public access for the ticked entries', async () => {
     const publicAccess = vi.fn()
     const manager = fakeManager({ openDetails, download, requestDelete, router: { push }, folders: ref([listedFolder]) })
