@@ -73,8 +73,10 @@ const checkingSync = ref(false)
 
 const existing = computed(() => findWatch(props.pathPrefix))
 const watching = computed(() => Boolean(existing.value))
+// One Watch, Save or Stop at a time: set before the first await, so a second click is ignored.
+const working = ref(false)
 const busy = computed(
-  () => creating.value || Boolean(existing.value && deletingIds.value.includes(existing.value.id)),
+  () => working.value || creating.value || Boolean(existing.value && deletingIds.value.includes(existing.value.id)),
 )
 
 // Missing pieces are named rather than hidden: the folder needs a group and a
@@ -152,8 +154,18 @@ const unchanged = computed(() => {
 })
 
 // The node has no edit call: the new watch is created before the old one goes.
+async function exclusive(work: () => Promise<void>) {
+  if (working.value) return
+  working.value = true
+  try {
+    await work()
+  } finally {
+    working.value = false
+  }
+}
+
 // Old watches still waiting for their delete go first, before another replacement.
-async function onSave() {
+const onSave = () => exclusive(async () => {
   const current = existing.value
   if (!current || !selected.value.length) return
   dialogError.value = null
@@ -167,9 +179,9 @@ async function onSave() {
   } catch (err) {
     dialogError.value = errorMessage(err)
   }
-}
+})
 
-async function onCreate() {
+const onCreate = () => exclusive(async () => {
   if (!selected.value.length) return
   dialogError.value = null
   try {
@@ -181,10 +193,10 @@ async function onCreate() {
         ? 'You need read access to watch this'
         : errorMessage(err)
   }
-}
+})
 
 // Stopping removes the current watch and every old one still pending; failures stay.
-async function onDelete() {
+const onDelete = () => exclusive(async () => {
   const id = existing.value?.id
   if (!id) return
   dialogError.value = null
@@ -193,7 +205,7 @@ async function onDelete() {
   await removePending(props.pathPrefix).catch((err) => failures.push(err))
   if (failures.length) dialogError.value = errorMessage(failures[0])
   else open.value = false
-}
+})
 </script>
 
 <template>

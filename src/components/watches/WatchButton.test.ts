@@ -5,6 +5,7 @@ import {
   click,
   compileClientComponent,
   content,
+  flush,
   input,
   moduleDefault,
   mountApp,
@@ -335,6 +336,32 @@ describe('watch bell on a bucket folder', () => {
     expect(deleteWatch.mock.calls.map(([id]) => id)).toEqual(['a', 'a', 'b'])
     expect(createWatch).toHaveBeenCalledTimes(2)
     expect(watchList.value.map((watch) => watch.id)).toEqual(['c'])
+  })
+
+  it('ignores a second Save while the first one still cleans up', async () => {
+    outgoing.value = [{ id: 'rel-1' }]
+    watchList.value = [
+      { id: 'b', path_prefix: 's3/g1/n1/reef/raw/', events: ['data_uploaded'], created_at_ms: 1 },
+      { id: 'a', path_prefix: 's3/g1/n1/reef/raw/', events: ['data_uploaded'], created_at_ms: 0 },
+    ]
+    pending.set('s3/g1/n1/reef/raw/', ['a'])
+    let finishA: () => void = () => undefined
+    deleteWatch.mockImplementation((id: string) =>
+      id === 'a' ? new Promise<undefined>((resolve) => (finishA = () => resolve(undefined))) : Promise.resolve(undefined),
+    )
+    const { root } = await mountApp(WatchButton, { props: bucketProps({ bell: true }) })
+    const box = Object.assign(input(root, 'value', 'sync_failed'), { checked: true, _value: 'sync_failed' })
+    for (const listener of box.listeners.get('change') ?? []) listener({ target: box })
+
+    const first = click(submit(root, 'Save'))
+    const second = click(submit(root, 'Save'))
+    await flush()
+    expect(submit(root, 'Save').props.disabled).toBe(true)
+    finishA()
+    await Promise.all([first, second])
+
+    expect(createWatch).toHaveBeenCalledTimes(1)
+    expect(deleteWatch.mock.calls.map(([id]) => id)).toEqual(['a', 'b'])
   })
 
   it('stops the current watch and every pending old one, keeping a failed one', async () => {
