@@ -3,6 +3,7 @@ import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { button, click, compileClientComponent, content, element, flush, moduleDefault, mountApp } from '@/test/clientRender'
 import * as Api from '@/lib/api'
+import * as LinkedFolders from '@/lib/linkedFolders'
 import * as StorageRules from '@/lib/storageRules'
 import * as Utils from '@/lib/utils'
 
@@ -11,6 +12,8 @@ const getGroupRouting = vi.fn()
 const putGroupRouting = vi.fn()
 const listBackendImports = vi.fn()
 const runBackendImport = vi.fn()
+const disableGroupBackend = vi.fn()
+const writesDisabled = ref(false)
 
 const Empty = defineComponent(() => () => null)
 const Slot = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
@@ -50,14 +53,15 @@ const StorageSection = compileClientComponent(new URL('./StorageSection.vue', im
       listGroupBackends,
       getGroupRouting,
       putGroupRouting,
-      disableGroupBackend: vi.fn(),
+      disableGroupBackend,
       enableGroupBackend: vi.fn(),
       saving: ref(false),
     }),
   },
-  '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled: ref(false) }) },
+  '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled }) },
   '@/lib/api': { ...Api, listBackendImports, runBackendImport },
   '@/lib/storageRules': StorageRules,
+  '@/lib/linkedFolders': LinkedFolders,
   '@/lib/utils': Utils,
 })
 
@@ -114,6 +118,7 @@ function row(root: Parameters<typeof content>[0], id: string) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  writesDisabled.value = false
   listGroupBackends.mockResolvedValue({ backends: [STORAGE] })
   getGroupRouting.mockResolvedValue({ group_id: 'g1', default_target: { backend_id: 's1' }, warnings: [] })
   listBackendImports.mockResolvedValue(LINKS)
@@ -174,6 +179,29 @@ describe('StorageSection', () => {
     const mounted = await mount()
     await click(button(row(mounted.root, 'sequencing'), 'Run now'))
     expect(runBackendImport).toHaveBeenCalledWith('g1', 'i1', expect.anything())
+    mounted.app.unmount()
+  })
+
+  it('shows where new uploads go when that is elsewhere', async () => {
+    const moved = { ...link('i5', 'uploads', '', 'lab-raw/in/', null), write_prefix: 'lab-new/up/' }
+    listBackendImports.mockResolvedValue([moved])
+    const mounted = await mount()
+    const line = element(mounted.root, (node) => node.props['data-testid'] === 'write-line')
+    expect(content(line)).toContain('New uploads go to lab-object-store: lab-new / up/')
+    expect(content(row(mounted.root, 'uploads'))).toContain('←')
+    mounted.app.unmount()
+  })
+
+  it('keeps the remove confirmation closed for writes while offline', async () => {
+    const mounted = await mount()
+    const card = element(mounted.root, (node) => node.props['data-testid'] === 'storage-s1')
+    await click(button(card, 'Remove'))
+    writesDisabled.value = true
+    await flush()
+    const confirm = button(card, 'Remove')
+    expect(confirm.props.disabled).toBe(true)
+    await click(confirm)
+    expect(disableGroupBackend).not.toHaveBeenCalled()
     mounted.app.unmount()
   })
 })

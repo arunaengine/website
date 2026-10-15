@@ -38,6 +38,7 @@ import {
   storageLine,
   storagePlace,
 } from '@/lib/storageRules'
+import { writesElsewhere } from '@/lib/linkedFolders'
 import { errorMessage } from '@/lib/utils'
 
 const props = defineProps<{ groupId: string; groupName: string; canAdmin: boolean }>()
@@ -151,6 +152,14 @@ onBeforeUnmount(() => {
   clearPoll()
 })
 
+// Where new uploads of a link go when that is not its own source folder.
+function writePlace(link: BackendImport): string {
+  const id = link.write_backend_id || link.backend_id
+  const target = backends.value?.find((backend) => backend.backend_id === id)
+  const place = storagePlace(target, link.write_prefix ?? link.backend_prefix)
+  return target ? `${target.name}: ${place}` : place
+}
+
 function linksOf(backend: GroupBackendResponse): BackendImport[] {
   return links.value.filter((link) => link.backend_id === backend.backend_id)
 }
@@ -198,6 +207,7 @@ async function run(link: BackendImport) {
 }
 
 async function remove(backend: GroupBackendResponse) {
+  if (writesDisabled.value) return
   actionError.value = null
   try {
     await disableGroupBackend(props.groupId, backend.backend_id)
@@ -294,7 +304,15 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
           <template v-if="canAdmin">
             <template v-if="removingId === backend.backend_id">
               <span class="text-xs text-foreground">Remove? New uploads stop going here. Files stay readable.</span>
-              <Button variant="destructive" size="sm" :disabled="saving" @click="remove(backend)">Remove</Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                :disabled="saving || writesDisabled"
+                :title="offline"
+                @click="remove(backend)"
+              >
+                Remove
+              </Button>
               <Button variant="ghost" size="sm" @click="removingId = null">Cancel</Button>
             </template>
             <template v-else>
@@ -389,7 +407,12 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
             <div :class="[GRID, 'border-b border-dashed border-border py-1.5']" data-testid="linked-row">
               <Badge size="sm" variant="secondary" class="justify-self-start uppercase">linked</Badge>
               <span class="truncate font-mono" :title="arunaPlace(link)">{{ arunaPlace(link) }}</span>
-              <span class="text-muted-foreground">⇆</span>
+              <span
+                v-if="writesElsewhere(link)"
+                class="text-muted-foreground"
+                title="Files come from here; new uploads go elsewhere"
+              >←</span>
+              <span v-else class="text-muted-foreground">⇆</span>
               <span class="truncate font-mono" :title="storagePlace(backend, link.backend_prefix)">
                 {{ storagePlace(backend, link.backend_prefix) }}
               </span>
@@ -445,6 +468,13 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
               </span>
               <span v-else />
             </div>
+            <p
+              v-if="writesElsewhere(link)"
+              class="truncate py-0.5 pl-[5rem] text-[11px] text-muted-foreground"
+              data-testid="write-line"
+            >
+              New uploads go to <span class="font-mono">{{ writePlace(link) }}</span>
+            </p>
             <ul
               v-if="expandedId === link.import_id && link.last_run"
               class="space-y-0.5 py-1 pl-[5rem] text-[11px] text-muted-foreground"
