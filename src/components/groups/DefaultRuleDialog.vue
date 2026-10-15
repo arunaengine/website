@@ -29,7 +29,7 @@ const emit = defineEmits<{
   (e: 'saved'): void
 }>()
 
-const { putGroupRouting, saving } = useAruna()
+const { putGroupRouting, saving, sessionEpoch } = useAruna()
 const { writesDisabled } = useConnectivity()
 const uid = useId()
 
@@ -42,25 +42,38 @@ const problem = computed(() =>
 )
 const submitDisabled = computed(() => saving.value || writesDisabled.value || Boolean(problem.value))
 
+// Each opening is a new draft; a save from an earlier opening must not touch it.
+let opening = 0
+
 watch(
   () => props.open,
   (open) => {
     if (!open || !props.backend) return
+    opening += 1
     bucket.value = defaultBucket(props.backend) ?? suggestBucket(props.groupName)
     submitError.value = null
   },
 )
 
+// Another account or realm must never inherit an open form.
+watch(sessionEpoch, () => {
+  if (props.open) emit('update:open', false)
+})
+
 async function submit() {
   if (submitDisabled.value || !props.backend) return
   submitError.value = null
+  const generation = opening
+  const epoch = sessionEpoch.value
+  const current = () => generation === opening && epoch === sessionEpoch.value
   try {
     const name = splits.value ? bucket.value.trim() : undefined
     await putGroupRouting(props.groupId, { backend_id: props.backend.backend_id }, name)
+    if (epoch !== sessionEpoch.value) return
     emit('saved')
-    emit('update:open', false)
+    if (current()) emit('update:open', false)
   } catch (err) {
-    submitError.value = errorMessage(err)
+    if (current()) submitError.value = errorMessage(err)
   }
 }
 </script>

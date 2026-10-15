@@ -36,7 +36,7 @@ const DefaultRuleDialog = compileClientComponent(new URL('./DefaultRuleDialog.vu
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Notice.vue': moduleDefault(Slot),
-  '@/composables/useAruna': { useAruna: () => ({ putGroupRouting, saving: ref(false) }) },
+  '@/composables/useAruna': { useAruna: () => ({ putGroupRouting, saving: ref(false), sessionEpoch: ref(0) }) },
   '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled: ref(false) }) },
   '@/lib/storageRules': StorageRules,
   '@/lib/utils': Utils,
@@ -53,14 +53,17 @@ const LINK = {
   import_id: 'i1', backend_id: 's1', backend_prefix: 'lab-raw/', bucket: 'sequencing', key_prefix: '', created_at: '',
 }
 
+const onOpen = vi.fn()
+
 async function mount() {
   const state = reactive({
     open: false, groupId: 'g1', groupName: 'Lab Group', backend: STORAGE, links: [LINK], onSaved,
+    'onUpdate:open': onOpen,
   })
   const mounted = await mountApp(defineComponent(() => () => h(DefaultRuleDialog, state)))
   state.open = true
   await flush()
-  return mounted
+  return { ...mounted, state }
 }
 
 function bucketInput(root: Parameters<typeof content>[0]) {
@@ -70,6 +73,7 @@ function bucketInput(root: Parameters<typeof content>[0]) {
 beforeEach(() => {
   putGroupRouting.mockReset()
   onSaved.mockReset()
+  onOpen.mockReset()
 })
 
 describe('DefaultRuleDialog', () => {
@@ -94,6 +98,27 @@ describe('DefaultRuleDialog', () => {
     await typeValue(bucketInput(mounted.root), 'Lab_Raw')
     expect(content(mounted.root)).toContain('Use lowercase letters')
     expect(button(mounted.root, 'Use as default').props.disabled).toBe(true)
+    mounted.app.unmount()
+  })
+
+  it('keeps a newer draft when an earlier save answers late', async () => {
+    let fail: (err: unknown) => void = () => {}
+    putGroupRouting.mockReturnValueOnce(new Promise((_, reject) => (fail = reject)))
+    const mounted = await mount()
+    const form = element(mounted.root, (node) => node.tag === 'form')
+    void (form.props.onSubmit as (event: unknown) => Promise<void>)({ preventDefault() {} })
+    await flush()
+    mounted.state.open = false
+    await flush()
+    mounted.state.open = true
+    await flush()
+    await typeValue(bucketInput(mounted.root), 'lab-second')
+    fail(new Error('No access to bucket'))
+    await flush()
+
+    expect(content(mounted.root)).not.toContain('No access to bucket')
+    expect(onOpen).not.toHaveBeenCalledWith(false)
+    expect(bucketInput(mounted.root).props.value).toBe('lab-second')
     mounted.app.unmount()
   })
 })
