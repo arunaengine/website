@@ -295,24 +295,6 @@ describe('notebooks in the bucket', () => {
 
 
 describe('object browser public access', () => {
-  it('asks for the open folder when nothing is ticked, else the ticked entries', async () => {
-    const publicAccess = vi.fn()
-    const manager = fakeManager({ openDetails, download, requestDelete, router: { push }, folders: ref([listedFolder]) })
-    const host = defineComponent({ setup: () => () => h(browser, { manager, onPublicAccess: publicAccess }) })
-    const { root } = await mountApp(host)
-
-    await click(button(root, 'Access'))
-    expect(publicAccess).toHaveBeenLastCalledWith([{ kind: 'folder', bucket: 'reef', key: 'raw/' }])
-
-    await tick(checkbox(root, `Select ${listedObject.name}`), true)
-    await tick(checkbox(root, `Select ${listedFolder.name}`), true)
-    await click(button(root, 'Access'))
-    expect(publicAccess).toHaveBeenLastCalledWith([
-      { kind: 'folder', bucket: 'reef', key: listedFolder.prefix },
-      { kind: 'file', bucket: 'reef', key: listedObject.key },
-    ])
-  })
-
   it('opens the same details view for a folder', async () => {
     openDetails.mockClear()
     const root = await render({ folders: ref([listedFolder]) })

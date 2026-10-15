@@ -303,15 +303,6 @@ async function onDrop(event: DragEvent) {
           >
             <Trash2 class="h-4 w-4" /> Delete selected ({{ selectedCount }})
           </Button>
-          <Button
-            v-if="activeGroupId"
-            variant="outline"
-            size="sm"
-            :title="selectedCount === 0 ? `Public access for ${s3Prefix ? `the folder ${s3Prefix}` : `the bucket ${bucket}`}` : `Public access for ${selectionSummary}`"
-            @click="emit('public-access', publicTargets())"
-          >
-            <Globe class="h-4 w-4" /> Access
-          </Button>
           <WatchButton
             surface="bucket"
             :path-prefix="watchPathPrefix"
@@ -325,6 +316,7 @@ async function onDrop(event: DragEvent) {
               label="Bucket settings"
               variant="outline"
               size="icon"
+              class="h-8 w-8"
               @click="openBucketSettings"
             >
               <Settings class="h-4 w-4" />
