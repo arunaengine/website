@@ -747,7 +747,10 @@ export function useDataManager() {
   let hitGroupId = ''
   // The open bucket belongs to the old group: show the picker for the new one.
   watch(selectedGroupId, (next, previous) => {
-    if (next === hitGroupId) return
+    if (next === hitGroupId) {
+      hitGroupId = ''
+      return
+    }
     const target = groupSwitchRoute({
       previous,
       next,
