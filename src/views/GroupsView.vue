@@ -31,6 +31,7 @@ const { authPending } = useAuth()
 const {
   joinRequestsEnabled,
   ownRequests,
+  visibleOwnRequests,
   ownRequestsLoaded,
   ownRequestsError,
   ensureOwnRequestsLoaded,
@@ -208,7 +209,7 @@ const shellState = computed<'loading' | 'empty' | 'ready'>(() => {
       </ListShell>
 
       <section
-        v-if="joinRequestsEnabled && currentUser && (ownRequests.length || ownRequestsError)"
+        v-if="joinRequestsEnabled && currentUser && (visibleOwnRequests.length || ownRequestsError)"
         id="join-requests"
         class="surface overflow-hidden scroll-mt-20"
       >
@@ -220,9 +221,9 @@ const shellState = computed<'loading' | 'empty' | 'ready'>(() => {
           </div>
         </header>
         <p v-if="ownRequestsError" class="px-5 py-3 text-xs text-destructive">{{ ownRequestsError }}</p>
-        <ul v-if="ownRequests.length" class="divide-y divide-border">
+        <ul v-if="visibleOwnRequests.length" class="divide-y divide-border">
           <li
-            v-for="req in ownRequests"
+            v-for="req in visibleOwnRequests"
             :key="req.request_id"
             class="flex flex-wrap items-center gap-3 px-5 py-3"
           >

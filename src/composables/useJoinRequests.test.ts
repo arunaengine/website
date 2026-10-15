@@ -73,4 +73,27 @@ describe('membership requests', () => {
     await expect(useJoinRequests().requestJoin('group-1')).rejects.toThrow('not enabled')
     expect(fetch).not.toHaveBeenCalled()
   })
+
+  it('hides decided requests a week after the decision', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-09-20T00:00:00Z'))
+    const row = (id: string, status: string, created_at: string, decided_at: string | null) =>
+      ({ ...entry(id), status, created_at, decided_at })
+    vi.stubGlobal('fetch', vi.fn(async () => json({
+      requests: [
+        row('pending-old', 'pending', '2026-08-01T00:00:00Z', null),
+        row('approved-new', 'approved', '2026-08-01T00:00:00Z', '2026-09-18T00:00:00Z'),
+        row('denied-old', 'denied', '2026-09-19T00:00:00Z', '2026-09-10T00:00:00Z'),
+        row('denied-undated', 'denied', '2026-09-01T00:00:00Z', null),
+      ],
+      next_start_after: null,
+    })))
+    try {
+      const api = useJoinRequests()
+      await api.loadOwnRequests()
+      expect(api.visibleOwnRequests.value.map((r) => r.request_id)).toEqual(['pending-old', 'approved-new'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

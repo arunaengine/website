@@ -40,6 +40,19 @@ const pendingByGroup = computed<Map<string, JoinRequest>>(
     ),
 )
 
+// Decided requests stay listed for this long, counted from the decision.
+const DECIDED_VISIBLE_MS = 7 * 24 * 60 * 60 * 1000
+
+// Own requests worth showing: pending ones always, decided ones for a week.
+const visibleOwnRequests = computed<JoinRequest[]>(() => {
+  const now = Date.now()
+  return ownRequests.value.filter((r) => {
+    if (r.status === 'pending') return true
+    const at = Date.parse(r.decided_at ?? r.created_at)
+    return Number.isNaN(at) || now - at < DECIDED_VISIBLE_MS
+  })
+})
+
 function assertEnabled() {
   if (!featureEnabled('joinRequests')) {
     throw new Error(
@@ -166,6 +179,7 @@ export function useJoinRequests() {
   return {
     joinRequestsEnabled,
     ownRequests,
+    visibleOwnRequests,
     ownRequestsLoaded,
     ownRequestsError,
     pendingByGroup,
