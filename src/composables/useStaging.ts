@@ -1,6 +1,12 @@
 import { computed, ref } from 'vue'
 import { useAruna } from './useAruna'
-import { ApiError, type StageBlobResponse, type StagingStrategy } from '@/lib/api'
+import {
+  ApiError,
+  type ListStagingJobsResponse,
+  type StageBlobResponse,
+  type StagingJob,
+  type StagingStrategy,
+} from '@/lib/api'
 import { errorMessage } from '@/lib/utils'
 
 export interface StagingSubmission {
@@ -107,6 +113,24 @@ async function submitStaging(input: {
     submissions.value = [...submissions.value]
     throw err
   }
+}
+
+// The node lists the staging jobs of every bucket together; this walks a few
+// pages and keeps the jobs that write into one bucket.
+export async function bucketStagingJobs(
+  list: (cursor?: string) => Promise<ListStagingJobsResponse>,
+  bucket: string,
+  maxPages = 5,
+): Promise<{ jobs: StagingJob[]; truncated: boolean }> {
+  const jobs: StagingJob[] = []
+  let cursor: string | undefined
+  for (let page = 0; page < maxPages; page++) {
+    const response = await list(cursor)
+    jobs.push(...response.jobs.filter((job) => job.bucket === bucket))
+    cursor = response.next_cursor
+    if (!cursor) return { jobs, truncated: false }
+  }
+  return { jobs, truncated: true }
 }
 
 const runningCount = computed(() => submissions.value.filter((submission) => submission.state === 'running').length)
