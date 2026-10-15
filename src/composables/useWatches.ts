@@ -2,6 +2,7 @@ import { computed, ref, watch } from 'vue'
 import {
   ApiError,
   apiRequest,
+  type ApiClientOptions,
   type ApiRequestOptions,
   type ApiWatch,
   type CreateWatchRequest,
@@ -26,7 +27,7 @@ const deletingIds = ref<string[]>([])
 
 const available = computed(() => supported.value && Boolean(currentUser.value))
 
-function session() {
+function session(): ApiClientOptions {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
 }
 
@@ -65,15 +66,17 @@ async function ensureLoaded(): Promise<void> {
 
 // Throws upward so the dialog renders the message (a refused create, the 409
 // cap error) instead of the feature disappearing for the session.
-async function createWatch(pathPrefix: string, events: string[]): Promise<ApiWatch> {
+async function createWatch(pathPrefix: string, events: string[], client = session()): Promise<ApiWatch> {
+  const epoch = sessionEpoch.value
   creating.value = true
   try {
     const body: CreateWatchRequest = { path_prefix: pathPrefix, events }
-    const created = await request<ApiWatch>('/system/notifications/watches', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    })
-    watches.value = [created, ...watches.value.filter((w) => w.id !== created.id)]
+    const created = await request<ApiWatch>(
+      '/system/notifications/watches',
+      { method: 'POST', body: JSON.stringify(body) },
+      client,
+    )
+    if (epoch === sessionEpoch.value) watches.value = [created, ...watches.value.filter((w) => w.id !== created.id)]
     return created
   } finally {
     creating.value = false
@@ -118,32 +121,53 @@ function writePending(key: string, ids: string[]) {
   }
 }
 
-/** Deletes every pending old watch of a prefix; failed ones stay pending, and the first error is thrown. */
-async function removePending(pathPrefix: string, add: string[] = []): Promise<void> {
-  // The account that started the cleanup owns it to the end, key and credentials alike.
-  const key = pendingKey(pathPrefix)
-  const client = session()
+/**
+ * One Watch, Save or Stop: the session, prefix and pending key it started with. `check`
+ * runs after every await and throws once the session moved on.
+ */
+export interface WatchAction {
+  pathPrefix: string
+  client: ApiClientOptions
+  key: string
+  check(): void
+}
+
+function startAction(pathPrefix: string): WatchAction {
   const epoch = sessionEpoch.value
-  const ids = [...new Set([...readPending(key), ...add])]
-  writePending(key, ids)
+  return {
+    pathPrefix,
+    client: session(),
+    key: pendingKey(pathPrefix),
+    check() {
+      if (epoch !== sessionEpoch.value) throw new DOMException('The API session changed.', 'AbortError')
+    },
+  }
+}
+
+/** Deletes the pending old watches of the action's prefix; failures stay pending, the first is thrown. */
+async function removePending(action: WatchAction, add: string[] = []): Promise<void> {
+  const ids = [...new Set([...readPending(action.key), ...add])]
+  writePending(action.key, ids)
   const left: string[] = []
   let failure: unknown = null
-  for (const [index, id] of ids.entries()) {
-    if (epoch !== sessionEpoch.value) {
-      left.push(...ids.slice(index))
-      failure ??= new DOMException('The API session changed.', 'AbortError')
-      break
+  let next = 0
+  try {
+    for (; next < ids.length; next++) {
+      action.check()
+      try {
+        await deleteWatch(ids[next], action.client)
+      } catch (err) {
+        // An already deleted watch is done.
+        if (err instanceof ApiError && err.status === 404) continue
+        left.push(ids[next])
+        failure ??= err
+      }
     }
-    try {
-      await deleteWatch(id, client)
-    } catch (err) {
-      // An already deleted watch is done.
-      if (err instanceof ApiError && err.status === 404) continue
-      left.push(id)
-      failure ??= err
-    }
+    action.check()
+  } finally {
+    // Failed ids and the ones not tried yet stay pending under the action's own key.
+    writePending(action.key, [...left, ...ids.slice(next)])
   }
-  writePending(key, left)
   if (failure) throw failure
 }
 
@@ -183,5 +207,6 @@ export function useWatches() {
     findWatch,
     pendingRemovals,
     removePending,
+    startAction,
   }
 }

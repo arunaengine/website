@@ -125,13 +125,13 @@ describe('old watches an edit could not delete', () => {
     vi.stubGlobal('window', { location: { origin: 'https://portal.test' }, sessionStorage: storage })
     const first = await freshWatches()
 
-    await expect(first.removePending('s3/g1/n1/reef/', ['old'])).rejects.toMatchObject({ status: 503 })
+    await expect(first.removePending(first.startAction('s3/g1/n1/reef/'), ['old'])).rejects.toMatchObject({ status: 503 })
     expect(first.pendingRemovals('s3/g1/n1/reef/')).toEqual(['old'])
 
     // A fresh module stands for the view mounted again in the same browser session.
     const again = await freshWatches()
     expect(again.pendingRemovals('s3/g1/n1/reef/')).toEqual(['old'])
-    await again.removePending('s3/g1/n1/reef/')
+    await again.removePending(again.startAction('s3/g1/n1/reef/'))
     expect(again.pendingRemovals('s3/g1/n1/reef/')).toEqual([])
   })
 
@@ -141,7 +141,7 @@ describe('old watches an edit could not delete', () => {
     vi.stubGlobal('window', { location: { origin: 'https://portal.test' }, sessionStorage: storage })
     const watches = await freshWatches()
 
-    await watches.removePending('s3/g1/n1/reef/', ['gone'])
+    await watches.removePending(watches.startAction('s3/g1/n1/reef/'), ['gone'])
 
     expect(watches.pendingRemovals('s3/g1/n1/reef/')).toEqual([])
   })
@@ -167,7 +167,7 @@ describe('old watches an edit could not delete', () => {
     storage.setItem(userKey('u1'), JSON.stringify(['a', 'b']))
     storage.setItem(userKey('u2'), JSON.stringify(['y1']))
 
-    const cleanup = watches.removePending(prefix)
+    const cleanup = watches.removePending(watches.startAction(prefix))
     // Another account signs in while the first delete is on its way.
     arunaState.currentUser.value = { id: 'u2' }
     arunaState.authToken.value = 'token-2'
@@ -180,5 +180,29 @@ describe('old watches an edit could not delete', () => {
     expect(new Headers(init.headers).get('Authorization')).toBe('Bearer token-1')
     expect(JSON.parse(storage.getItem(userKey('u1')) ?? '[]')).toEqual(['b'])
     expect(JSON.parse(storage.getItem(userKey('u2')) ?? '[]')).toEqual(['y1'])
+  })
+
+  it('stops after the last delete when the session switched during it', async () => {
+    const storage = sessionStore()
+    let answer: () => void = () => undefined
+    const fetch = vi.fn(
+      () => new Promise<Response>((resolve) => (answer = () => resolve(new Response(null, { status: 204 })))),
+    )
+    vi.stubGlobal('fetch', fetch)
+    vi.stubGlobal('window', { location: { origin: 'https://portal.test' }, sessionStorage: storage })
+    const watches = await freshWatches()
+    const { arunaState } = (await import('@/composables/useAruna')) as unknown as {
+      arunaState: { sessionEpoch: { value: number } }
+    }
+    const prefix = 's3/g1/n1/reef/'
+    const action = watches.startAction(prefix)
+
+    const cleanup = watches.removePending(action, ['only'])
+    arunaState.sessionEpoch.value += 1
+    answer()
+
+    // The one delete ran for its own account; whatever followed in the action must not.
+    await expect(cleanup).rejects.toMatchObject({ name: 'AbortError', message: 'The API session changed.' })
+    expect(watches.pendingRemovals(prefix)).toEqual([])
   })
 })

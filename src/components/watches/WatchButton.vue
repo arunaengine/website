@@ -54,6 +54,7 @@ const {
   deleteWatch,
   findWatch,
   removePending,
+  startAction,
 } = useWatches()
 const { myGroups, discoverableGroups, listSyncRelationships } = useAruna()
 const { writesDisabled } = useConnectivity()
@@ -164,16 +165,25 @@ async function exclusive(work: () => Promise<void>) {
   }
 }
 
+// Every action keeps the session, folder and events it started with, and stops
+// after any await once the session no longer holds.
+function begin() {
+  return { action: startAction(props.pathPrefix), events: [...selected.value] }
+}
+
 // Old watches still waiting for their delete go first, before another replacement.
 const onSave = () => exclusive(async () => {
   const current = existing.value
   if (!current || !selected.value.length) return
+  const { action, events } = begin()
+  const changed = !unchanged.value
   dialogError.value = null
   try {
-    await removePending(props.pathPrefix)
-    if (!unchanged.value) {
-      await createWatch(props.pathPrefix, selected.value)
-      await removePending(props.pathPrefix, [current.id])
+    await removePending(action)
+    if (changed) {
+      await createWatch(action.pathPrefix, events, action.client)
+      action.check()
+      await removePending(action, [current.id])
     }
     open.value = false
   } catch (err) {
@@ -183,9 +193,11 @@ const onSave = () => exclusive(async () => {
 
 const onCreate = () => exclusive(async () => {
   if (!selected.value.length) return
+  const { action, events } = begin()
   dialogError.value = null
   try {
-    await createWatch(props.pathPrefix, selected.value)
+    await createWatch(action.pathPrefix, events, action.client)
+    action.check()
     open.value = false
   } catch (err) {
     dialogError.value =
@@ -199,12 +211,21 @@ const onCreate = () => exclusive(async () => {
 const onDelete = () => exclusive(async () => {
   const id = existing.value?.id
   if (!id) return
+  const { action } = begin()
   dialogError.value = null
-  const failures: unknown[] = []
-  await deleteWatch(id).catch((err) => failures.push(err))
-  await removePending(props.pathPrefix).catch((err) => failures.push(err))
-  if (failures.length) dialogError.value = errorMessage(failures[0])
-  else open.value = false
+  let failure: unknown = null
+  try {
+    await deleteWatch(id, action.client).catch((err) => (failure = err))
+    action.check()
+    await removePending(action).catch((err) => {
+      if (err instanceof DOMException) throw err
+      failure ??= err
+    })
+    if (failure) throw failure
+    open.value = false
+  } catch (err) {
+    dialogError.value = errorMessage(err)
+  }
 })
 </script>
 

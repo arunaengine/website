@@ -62,21 +62,46 @@ const deleteWatch = vi.fn(async (_id: string) => undefined)
 const watchList = ref<Api.ApiWatch[]>([])
 // Stands in for the session storage of useWatches: it outlives a remount.
 const pending = new Map<string, string[]>()
+const epoch = ref(0)
 
-async function removePending(pathPrefix: string, add: string[] = []) {
-  const ids = [...new Set([...(pending.get(pathPrefix) ?? []), ...add])]
+interface FakeAction {
+  pathPrefix: string
+  client: object
+  check(): void
+}
+
+// Mirrors useWatches: an action stops after any await once its session moved on.
+function startAction(pathPrefix: string): FakeAction {
+  const started = epoch.value
+  return {
+    pathPrefix,
+    client: {},
+    check() {
+      if (started !== epoch.value) throw new DOMException('The API session changed.', 'AbortError')
+    },
+  }
+}
+
+async function removePending(action: FakeAction, add: string[] = []) {
+  const ids = [...new Set([...(pending.get(action.pathPrefix) ?? []), ...add])]
   const left: string[] = []
   let failure: unknown = null
-  for (const id of ids) {
-    try {
-      await deleteWatch(id)
-      watchList.value = watchList.value.filter((watch) => watch.id !== id)
-    } catch (err) {
-      left.push(id)
-      failure ??= err
+  let next = 0
+  try {
+    for (; next < ids.length; next++) {
+      action.check()
+      try {
+        await deleteWatch(ids[next])
+        watchList.value = watchList.value.filter((watch) => watch.id !== ids[next])
+      } catch (err) {
+        left.push(ids[next])
+        failure ??= err
+      }
     }
+    action.check()
+  } finally {
+    pending.set(action.pathPrefix, [...left, ...ids.slice(next)])
   }
-  pending.set(pathPrefix, left)
   if (failure) throw failure
 }
 
@@ -89,6 +114,7 @@ const watches = {
   deleteWatch,
   findWatch: (pathPrefix: string) => watchList.value.find((w) => w.path_prefix === pathPrefix),
   removePending,
+  startAction,
 }
 
 const WatchButton = compileClientComponent(new URL('./WatchButton.vue', import.meta.url), {
@@ -152,6 +178,7 @@ function submit(root: HostNode, label: string): HostNode {
 
 beforeEach(() => {
   pending.clear()
+  epoch.value = 0
   outgoing.value = []
   watchList.value = []
   watches.available.value = true
@@ -287,7 +314,7 @@ describe('watch bell on a bucket folder', () => {
     expect(text).not.toContain('Stop watching')
 
     await click(submit(root, 'Watch'))
-    expect(createWatch).toHaveBeenCalledWith('s3/g1/n1/reef/raw/', ['data_uploaded'])
+    expect(createWatch).toHaveBeenCalledWith('s3/g1/n1/reef/raw/', ['data_uploaded'], expect.anything())
   })
 
   it('edits the events of a watch by creating the new one before removing the old', async () => {
@@ -301,7 +328,7 @@ describe('watch bell on a bucket folder', () => {
     for (const listener of sync.listeners.get('change') ?? []) listener({ target: sync })
     await click(submit(root, 'Save'))
 
-    expect(createWatch).toHaveBeenCalledWith('s3/g1/n1/reef/raw/', ['data_uploaded', 'sync_failed'])
+    expect(createWatch).toHaveBeenCalledWith('s3/g1/n1/reef/raw/', ['data_uploaded', 'sync_failed'], expect.anything())
     expect(deleteWatch).toHaveBeenCalledWith('old')
     expect(createWatch.mock.invocationCallOrder[0]).toBeLessThan(deleteWatch.mock.invocationCallOrder[0])
   })
@@ -364,6 +391,49 @@ describe('watch bell on a bucket folder', () => {
     expect(deleteWatch.mock.calls.map(([id]) => id)).toEqual(['a', 'b'])
   })
 
+  it('creates nothing when the session changes during the last pending delete', async () => {
+    outgoing.value = [{ id: 'rel-1' }]
+    watchList.value = [{ id: 'b', path_prefix: 's3/g1/n1/reef/raw/', events: ['data_uploaded'], created_at_ms: 1 }]
+    pending.set('s3/g1/n1/reef/raw/', ['a'])
+    let finishA: () => void = () => undefined
+    deleteWatch.mockImplementation((id: string) =>
+      id === 'a' ? new Promise<undefined>((resolve) => (finishA = () => resolve(undefined))) : Promise.resolve(undefined),
+    )
+    const { root } = await mountApp(WatchButton, { props: bucketProps({ bell: true }) })
+    const box = Object.assign(input(root, 'value', 'sync_failed'), { checked: true, _value: 'sync_failed' })
+    for (const listener of box.listeners.get('change') ?? []) listener({ target: box })
+
+    const saving = click(submit(root, 'Save'))
+    await flush()
+    epoch.value += 1
+    finishA()
+    await saving
+
+    expect(createWatch).not.toHaveBeenCalled()
+    expect(deleteWatch.mock.calls.map(([id]) => id)).toEqual(['a'])
+    expect(content(root)).toContain('The API session changed.')
+  })
+
+  it('stops a Stop when the session changes during its delete', async () => {
+    watchList.value = [{ id: 'b', path_prefix: 's3/g1/n1/reef/raw/', events: ['data_uploaded'], created_at_ms: 1 }]
+    pending.set('s3/g1/n1/reef/raw/', ['a'])
+    let finishB: () => void = () => undefined
+    deleteWatch.mockImplementation((id: string) =>
+      id === 'b' ? new Promise<undefined>((resolve) => (finishB = () => resolve(undefined))) : Promise.resolve(undefined),
+    )
+    const { root } = await mountApp(WatchButton, { props: bucketProps({ bell: true }) })
+
+    const stopping = click(submit(root, 'Stop watching'))
+    await flush()
+    epoch.value += 1
+    finishB()
+    await stopping
+
+    expect(deleteWatch.mock.calls.map(([id]) => id)).toEqual(['b'])
+    expect(pending.get('s3/g1/n1/reef/raw/')).toEqual(['a'])
+    expect(content(root)).toContain('The API session changed.')
+  })
+
   it('stops the current watch and every pending old one, keeping a failed one', async () => {
     watchList.value = [
       { id: 'b', path_prefix: 's3/g1/n1/reef/raw/', events: ['data_uploaded'], created_at_ms: 1 },
@@ -388,7 +458,7 @@ describe('watch bell on a bucket folder', () => {
 
     await click(submit(root, 'Stop watching'))
 
-    expect(deleteWatch).toHaveBeenCalledWith('old')
+    expect(deleteWatch).toHaveBeenCalledWith('old', expect.anything())
     expect(createWatch).not.toHaveBeenCalled()
   })
 })
