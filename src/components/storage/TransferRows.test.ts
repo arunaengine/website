@@ -108,6 +108,46 @@ describe('linked folder rows', () => {
   })
 })
 
+describe('unknown transfer counts', () => {
+  it('reports a refused linked folder list as unknown and says why', async () => {
+    listGroupBackends.mockRejectedValueOnce(new Api.ApiError(403, 'Forbidden'))
+    listBackendImports.mockResolvedValueOnce([])
+    const counts: Array<number | null> = []
+    const { root } = await mountApp(linkedRows, {
+      props: { bucket: 'reef', groupId: 'g-1', quiet: true, onCount: (count: number | null) => counts.push(count) },
+    })
+    await flush()
+
+    expect(counts.at(-1)).toBeNull()
+    expect(content(root)).toContain('Only group admins can see the linked folders of this bucket.')
+  })
+
+  it('reports a failed linked folder list as unknown and shows the error', async () => {
+    listGroupBackends.mockRejectedValueOnce(new Api.ApiError(500, 'storage list failed'))
+    listBackendImports.mockResolvedValueOnce([])
+    const counts: Array<number | null> = []
+    const { root } = await mountApp(linkedRows, {
+      props: { bucket: 'reef', groupId: 'g-1', onCount: (count: number | null) => counts.push(count) },
+    })
+    await flush()
+
+    expect(counts.at(-1)).toBeNull()
+    expect(content(root)).toContain('storage list failed')
+  })
+
+  it('reports a failed staging list as unknown and shows the error', async () => {
+    listStagingJobs.mockRejectedValueOnce(new Api.ApiError(500, 'staging list failed'))
+    const counts: Array<number | null> = []
+    const { root } = await mountApp(stagingRows, {
+      props: { bucket: 'reef', onCount: (count: number | null) => counts.push(count) },
+    })
+    await flush()
+
+    expect(counts.at(-1)).toBeNull()
+    expect(content(root)).toContain('staging list failed')
+  })
+})
+
 describe('staging job rows', () => {
   it('reloads the jobs when the session changes', async () => {
     listStagingJobs.mockResolvedValue({ jobs: [] })

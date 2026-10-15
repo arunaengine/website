@@ -80,7 +80,8 @@ async function load() {
   } finally {
     if (id === requestId && !disposed) {
       loading.value = false
-      emit('count', truncated.value && !jobs.value.length ? null : jobs.value.length)
+      const unknown = error.value || noRegistry.value || (truncated.value && !jobs.value.length)
+      emit('count', unknown ? null : jobs.value.length)
       schedulePoll()
     }
   }

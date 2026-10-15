@@ -24,7 +24,11 @@ import { errorMessage, relativeTime } from '@/lib/utils'
 import { ArrowLeftRight, Play, SlidersHorizontal } from '@lucide/vue'
 
 const props = defineProps<{ bucket: string; groupId: string | null; quiet?: boolean }>()
-const emit = defineEmits<{ (e: 'count', count: number): void; (e: 'available', value: boolean): void }>()
+// A count of null: the list was refused or failed, so it says nothing about the bucket.
+const emit = defineEmits<{
+  (e: 'count', count: number | null): void
+  (e: 'available', value: boolean): void
+}>()
 
 const { apiBaseUrl, authToken, sessionEpoch, listGroupBackends } = useAruna()
 const { writesDisabled } = useConnectivity()
@@ -54,7 +58,7 @@ async function load() {
   refused.value = !groupId
   if (!groupId) {
     emit('available', false)
-    emit('count', 0)
+    emit('count', null)
     return
   }
   loading.value = true
@@ -77,7 +81,7 @@ async function load() {
     if (id === requestId) {
       loading.value = false
       emit('available', !refused.value)
-      emit('count', rows.value.length)
+      emit('count', refused.value || error.value ? null : rows.value.length)
     }
   }
 }
@@ -130,7 +134,10 @@ defineExpose({ open })
 </script>
 
 <template>
-  <template v-if="!refused">
+  <p v-if="refused" class="surface px-5 py-3.5 text-xs text-muted-foreground">
+    Only group admins can see the linked folders of this bucket.
+  </p>
+  <template v-else>
     <ErrorPanel v-if="state === 'error'" :message="error ?? ''" @retry="load" />
     <template v-else-if="state === 'empty'">
       <EmptyState

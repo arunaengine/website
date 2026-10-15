@@ -66,7 +66,9 @@ function addLink() {
 <template>
   <div class="space-y-3">
     <div class="flex flex-wrap items-center justify-between gap-2">
-      <p class="text-xs text-muted-foreground">Data copied into or out of this bucket.</p>
+      <p class="text-xs text-muted-foreground">
+        Data copied into or out of this bucket. Only syncs you created are listed.
+      </p>
       <div class="flex flex-wrap items-center gap-2">
         <OptionToggle v-model="kind" :options="kinds" aria-label="Which transfers to show" />
         <DropdownMenu>
@@ -135,7 +137,7 @@ function addLink() {
         :group-id="groupId"
         :quiet="kind === 'all'"
         @available="(value: boolean) => (linkAvailable = value)"
-        @count="(count: number) => setCount('linked', count)"
+        @count="(count: number | null) => setCount('linked', count)"
       />
     </div>
     <StagingJobRows
