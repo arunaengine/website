@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { isMissingKey, parseTarget, runTransfer, targetProblem, type TransferStore } from './objectMove'
+import { parseTarget, runTransfer, targetProblem, type TransferStore } from './objectMove'
 
 const missing = Object.assign(new Error('Not Found'), { name: 'NotFound', $metadata: { httpStatusCode: 404 } })
 
@@ -71,22 +71,51 @@ describe('transfer run', () => {
     ])
   })
 
-  it('keeps a file that arrived in the folder after the copy and drops the folder marker', async () => {
-    const { fake, calls } = store(['raw/genomes/a.fa'], false, ['raw/genomes/'])
-    // The arrival lands between the copy and the delete; a relisting delete would take it.
+  it('keeps a file that arrived in the folder after the copy', async () => {
+    const { fake, calls } = store(['raw/genomes/', 'raw/genomes/a.fa'], false, ['raw/genomes/'])
+    // The arrival lands after the copies; a relisting delete would take it.
     fake.copyObject = vi.fn(async (source, bucket, key) => {
       calls.push(`copy ${source.bucket}/${source.key} -> ${bucket}/${key}`)
-      calls.push('arrived raw/genomes/arrived.txt')
+      if (source.key === 'raw/genomes/a.fa') calls.push('arrived raw/genomes/arrived.txt')
     })
 
     await runTransfer(fake, 'move', 'reef', [{ key: 'raw/genomes/', folder: true }], { bucket: 'reef', prefix: 'old/' }, null)
 
     expect(calls).toEqual([
+      'copy reef/raw/genomes/ -> reef/old/genomes/',
       'copy reef/raw/genomes/a.fa -> reef/old/genomes/a.fa',
       'arrived raw/genomes/arrived.txt',
-      'delete reef/raw/genomes/a.fa',
       'delete reef/raw/genomes/',
+      'delete reef/raw/genomes/a.fa',
     ])
+  })
+
+  it('moves the empty folders inside a folder with it', async () => {
+    const listed = ['raw/genomes/', 'raw/genomes/a.fa', 'raw/genomes/empty/', 'raw/genomes/empty/deeper/']
+    const { fake, calls } = store(listed, false, ['raw/genomes/', 'raw/genomes/empty/', 'raw/genomes/empty/deeper/'])
+
+    await runTransfer(fake, 'move', 'reef', [{ key: 'raw/genomes/', folder: true }], { bucket: 'reef', prefix: 'old/' }, null)
+
+    expect(fake.listObjectsRecursive).toHaveBeenCalledWith('reef', 'raw/genomes/', 1000, null, { markers: true })
+    expect(calls.filter((call) => call.startsWith('copy'))).toEqual([
+      'copy reef/raw/genomes/ -> reef/old/genomes/',
+      'copy reef/raw/genomes/a.fa -> reef/old/genomes/a.fa',
+      'copy reef/raw/genomes/empty/ -> reef/old/genomes/empty/',
+      'copy reef/raw/genomes/empty/deeper/ -> reef/old/genomes/empty/deeper/',
+    ])
+    expect(calls.filter((call) => call.startsWith('delete'))).toEqual(listed.map((key) => `delete reef/${key}`))
+  })
+
+  it('keeps an empty folder that changed during the move', async () => {
+    const { fake, calls, revisions } = store(['raw/genomes/', 'raw/genomes/empty/'], false, ['raw/genomes/', 'raw/genomes/empty/'])
+    fake.copyObject = vi.fn(async (source) => {
+      if (source.key === 'raw/genomes/empty/') revisions.set('raw/genomes/empty/', 'v2')
+    })
+
+    await expect(
+      runTransfer(fake, 'move', 'reef', [{ key: 'raw/genomes/', folder: true }], { bucket: 'reef', prefix: 'x/' }, null),
+    ).rejects.toThrow('kept: empty')
+    expect(calls).toEqual(['delete reef/raw/genomes/'])
   })
 
   it('keeps the sources of a copy and renames in place', async () => {
@@ -163,28 +192,5 @@ describe('transfer run', () => {
     ).rejects.toThrow('kept: b.fa')
     expect(calls).toEqual(['delete reef/raw/genomes/a.fa'])
     expect(moved).toEqual([])
-  })
-})
-
-describe('folder marker check', () => {
-  it('fails the move on a marker check that did not confirm absence', async () => {
-    const { fake } = store(['raw/genomes/a.fa'])
-    const refused = Object.assign(new Error('Forbidden'), { name: 'AccessDenied', $metadata: { httpStatusCode: 403 } })
-    fake.headObject = vi.fn(async (_bucket: string, key: string) => {
-      if (key === 'raw/genomes/') throw refused
-      return { etag: 'v1' }
-    })
-    const moved: string[] = []
-
-    await expect(
-      runTransfer(fake, 'move', 'reef', [{ key: 'raw/genomes/', folder: true }], { bucket: 'reef', prefix: 'x/' }, null, undefined, (key) => moved.push(key)),
-    ).rejects.toThrow('Forbidden')
-    expect(moved).toEqual([])
-  })
-
-  it('counts only a 404 or NoSuchKey as a missing key', () => {
-    expect(isMissingKey(missing)).toBe(true)
-    expect(isMissingKey(Object.assign(new Error('x'), { name: 'NoSuchKey' }))).toBe(true)
-    expect(isMissingKey(new Error('network'))).toBe(false)
   })
 })

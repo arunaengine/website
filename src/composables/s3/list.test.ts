@@ -33,3 +33,17 @@ describe('object copy', () => {
     expect(source).not.toContain('?')
   })
 })
+
+describe('recursive listing', () => {
+  it('skips folder markers unless a caller asks for them', async () => {
+    const { listObjectsRecursive } = await import('./objects')
+    const page = { Contents: [{ Key: 'raw/' }, { Key: 'raw/a.txt' }, { Key: 'raw/empty/' }], IsTruncated: false }
+    send.mockResolvedValueOnce(page).mockResolvedValueOnce(page)
+
+    const plain = await listObjectsRecursive('reef', 'raw/', 10, null)
+    const withMarkers = await listObjectsRecursive('reef', 'raw/', 10, null, { markers: true })
+
+    expect(plain.objects.map((object) => object.key)).toEqual(['raw/a.txt'])
+    expect(withMarkers.objects.map((object) => object.key)).toEqual(['raw/', 'raw/a.txt', 'raw/empty/'])
+  })
+})

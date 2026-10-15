@@ -20,19 +20,11 @@ export interface TransferStore {
     prefix: string,
     max: number,
     nodeId?: string | null,
+    options?: { markers?: boolean },
   ): Promise<{ objects: { key: string }[]; truncated: boolean }>
   copyObject(source: { bucket: string; key: string }, bucket: string, key: string, nodeId?: string | null): Promise<void>
   deleteObject(bucket: string, key: string, nodeId?: string | null): Promise<void>
   headObject(bucket: string, key: string, nodeId?: string | null): Promise<{ etag?: string; versionId?: string }>
-}
-
-/** Only a confirmed missing key counts as absent; any other failure is a real one. */
-export function isMissingKey(err: unknown): boolean {
-  const failure = err as { name?: string; Code?: string; $metadata?: { httpStatusCode?: number } } | null
-  return (
-    failure?.$metadata?.httpStatusCode === 404 ||
-    ['NotFound', 'NoSuchKey'].includes(failure?.name ?? failure?.Code ?? '')
-  )
 }
 
 function sameRevision(a: { etag?: string; versionId?: string }, b: { etag?: string; versionId?: string }): boolean {
@@ -99,7 +91,8 @@ export async function plannedCopies(
       copies.push({ from: source.key, to: `${target.prefix}${nextName}`, source: source.key })
       continue
     }
-    const listing = await store.listObjectsRecursive(bucket, source.key, FOLDER_LIMIT, nodeId)
+    // Folder markers come along, so empty folders inside are moved too.
+    const listing = await store.listObjectsRecursive(bucket, source.key, FOLDER_LIMIT, nodeId, { markers: true })
     if (listing.truncated) {
       throw new Error(`${baseName(source.key)}/ holds more than ${FOLDER_LIMIT} files. Pick a smaller folder.`)
     }
@@ -150,21 +143,7 @@ export async function runTransfer(
       await store.deleteObject(bucket, copy.from, nodeId)
     }
     if (kept) continue
-    // The empty folder marker goes too, when there is one.
-    if (source.folder && (await markerExists(store, bucket, source.key, nodeId))) {
-      await store.deleteObject(bucket, source.key, nodeId)
-    }
     onMoved(source.key)
   }
   if (changed.length) throw new Error(`Changed during the move, kept: ${changed.join(', ')}.`)
-}
-
-async function markerExists(store: TransferStore, bucket: string, key: string, nodeId: string | null) {
-  try {
-    await store.headObject(bucket, key, nodeId)
-    return true
-  } catch (err) {
-    if (isMissingKey(err)) return false
-    throw err
-  }
 }

@@ -141,12 +141,14 @@ export async function listObjects(
 
 // Flat (no-delimiter) walk of everything under a prefix, for folder-level
 // staging. Returns at most `max` objects plus a truncation marker so callers
-// can refuse oversized folders instead of silently dropping files.
+// can refuse oversized folders instead of silently dropping files. A move asks
+// for the folder markers too, so empty folders travel with it.
 export async function listObjectsRecursive(
   bucket: string,
   prefix: string,
   max: number,
   nodeId?: string | null,
+  options: { markers?: boolean } = {},
 ): Promise<{ objects: ObjectEntry[]; truncated: boolean }> {
   const objects: ObjectEntry[] = []
   let token: string | undefined
@@ -161,7 +163,7 @@ export async function listObjectsRecursive(
     )
     for (const entry of response.Contents ?? []) {
       // Zero-byte folder markers are plumbing, not stageable files.
-      if (!entry.Key || entry.Key.endsWith('/')) continue
+      if (!entry.Key || (entry.Key.endsWith('/') && !options.markers)) continue
       if (objects.length === max) return { objects, truncated: true }
       objects.push({
         key: entry.Key,
