@@ -7,7 +7,9 @@ import { formatNumber, relativeTime } from './utils'
 /** Keys on group storages are at most this long; a folder must leave room for a file. */
 export const MAX_KEY_BYTES = 1024
 const NAME_ROOM = 28
-const ACTIVE_STATES = new Set(['queued', 'claimed', 'preparing', 'running'])
+// The node counts a run as going on until it ends, as `is_running` in groups/imports/schedule.rs.
+const ACTIVE_STATES = new Set(['queued', 'claimed', 'preparing', 'ready', 'running', 'cancelling', 'awaiting_key'])
+const OWN_FOLDERS = ['_aruna_parts', '_aruna_backend_probe']
 
 /** An S3 storage without a fixed bucket: each rule names its own bucket. */
 export function splitsBuckets(backend: GroupBackendResponse): boolean {
@@ -45,12 +47,13 @@ export function storageLine(backend: GroupBackendResponse): string {
   return `Your ${kind} storage · ${where}`
 }
 
-/** Hover text of the bucket icon. */
-export function bucketTitle(backend: GroupBackendResponse, bucket: string): string {
+/** Hover text of the bucket check from the state saved with the rule; null when unknown. */
+export function bucketTitle(backend: GroupBackendResponse, bucket: string): string | null {
   const state = backend.public_config[`bucket:${bucket}`]
   if (state === 'created') return 'Bucket created'
   if (state === 'found') return 'Bucket found'
-  return 'Bucket ready'
+  // A fixed bucket was checked when the storage was added.
+  return splitsBuckets(backend) ? null : 'Bucket found'
 }
 
 export interface RunText {
@@ -63,28 +66,30 @@ export interface RunText {
 export function runText(run: BackendImportRun | null | undefined): RunText {
   if (!run) return { text: 'Never run', tone: 'muted', failures: false }
   const ago = relativeTime(run.started_at)
+  const failures = run.failed > 0
+  if (run.state === 'cancelling') return { text: 'Stopping…', tone: 'active', failures }
+  if (run.state === 'awaiting_key') return { text: 'Waiting for an unlock', tone: 'active', failures }
   if (ACTIVE_STATES.has(run.state)) {
-    return { text: `Running… ${formatNumber(run.imported)} added`, tone: 'active', failures: false }
+    return { text: `Running… ${formatNumber(run.imported)} added`, tone: 'active', failures }
   }
-  if (run.failed > 0) return { text: `${formatNumber(run.failed)} failed · ${ago}`, tone: 'failed', failures: true }
-  if (run.state === 'failed' || run.state === 'error') return { text: `Failed · ${ago}`, tone: 'failed', failures: false }
-  if (run.state === 'succeeded') return { text: `Synced ${ago}`, tone: 'muted', failures: false }
-  if (run.state === 'cancelling') return { text: 'Stopping…', tone: 'muted', failures: false }
-  if (run.state === 'cancelled' || run.state === 'canceled') {
-    return { text: `Stopped · ${ago}`, tone: 'muted', failures: false }
-  }
-  return { text: `Unknown · ${ago}`, tone: 'muted', failures: false }
+  if (run.state === 'cancelled') return { text: `Stopped · ${ago}`, tone: 'muted', failures }
+  if (run.state !== 'succeeded' && run.state !== 'failed') return { text: `Unknown · ${ago}`, tone: 'muted', failures }
+  if (failures) return { text: `${formatNumber(run.failed)} failed · ${ago}`, tone: 'failed', failures }
+  if (run.state === 'failed') return { text: `Failed · ${ago}`, tone: 'failed', failures }
+  return { text: `Synced ${ago}`, tone: 'muted', failures }
 }
 
 export function runActive(run: BackendImportRun | null | undefined): boolean {
   return Boolean(run && ACTIVE_STATES.has(run.state))
 }
 
-/** The reason of a red cross, or null when the bucket is fine. */
-export function runProblem(run: BackendImportRun | null | undefined): string | null {
-  if (!run || ACTIVE_STATES.has(run.state)) return null
-  if (run.state !== 'failed' && run.state !== 'error' && !run.failed) return null
-  return run.errors[0]?.error ?? 'The last run failed.'
+/** Buckets that hold or held the default rule; Aruna's own files may be there. */
+export function layoutBuckets(backend: GroupBackendResponse): string[] {
+  const former = Object.keys(backend.public_config)
+    .filter((key) => key.startsWith('layout:'))
+    .map((key) => key.slice('layout:'.length))
+  const current = backend.public_config.default_bucket
+  return current ? [current, ...former] : former
 }
 
 /** S3 bucket naming, in plain words; null when the name is fine. */
@@ -130,11 +135,17 @@ export function linkConflict(
   if (splitsBuckets(backend)) {
     const problem = bucketProblem(bucket)
     if (problem) return problem
-    if (bucket === backend.public_config.default_bucket) {
-      return `Bucket ${bucket} holds the default rule. Pick another bucket.`
+    if (layoutBuckets(backend).includes(bucket)) {
+      return `Bucket ${bucket} holds Aruna's files of a default rule. Pick another bucket.`
     }
   }
-  if (new TextEncoder().encode(folder).length + NAME_ROOM > MAX_KEY_BYTES) {
+  if (OWN_FOLDERS.some((own) => folder === `${own}/` || folder.startsWith(`${own}/`))) {
+    return 'The folder lies inside a folder Aruna uses for its own files.'
+  }
+  // The storage root goes in front of every key, with a separator.
+  const root = (backend.public_config.root ?? '').replace(/^\/+|\/+$/g, '')
+  const rootBytes = root ? new TextEncoder().encode(root).length + 1 : 0
+  if (rootBytes + new TextEncoder().encode(folder).length + NAME_ROOM > MAX_KEY_BYTES) {
     return 'The folder is too long: paths there are at most 1024 bytes.'
   }
   for (const link of links) {

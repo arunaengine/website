@@ -283,7 +283,7 @@ describe('LinkedFolderDialog', () => {
     expect(button(mounted.root, 'Link and run').props.disabled).toBe(true)
 
     await typeValue(inputById(mounted.root, '-source-bucket'), 'lab-default')
-    expect(content(mounted.root)).toContain('Bucket lab-default holds the default rule.')
+    expect(content(mounted.root)).toContain("Bucket lab-default holds Aruna's files of a default rule.")
     await typeValue(inputById(mounted.root, '-source-bucket'), 'lab-new')
     expect(button(mounted.root, 'Link and run').props.disabled).toBe(false)
     mounted.app.unmount()

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defaultBucket, linkConflict, runProblem, runText, splitPath, suggestBucket } from './storageRules'
+import { bucketTitle, defaultBucket, runActive, linkConflict, runText, splitPath, suggestBucket } from './storageRules'
 
 const split = { backend_id: 's1', group_id: 'g1', kind: 's3', name: 'lab', public_config: { endpoint: 'https://s3' } }
 const fixed = { ...split, backend_id: 's2', public_config: { endpoint: 'https://s3', bucket: 'data' } }
@@ -22,11 +22,20 @@ describe('storageRules', () => {
     expect(linkConflict(split, [], 'lab-raw/2024/')).toBeNull()
   })
 
-  it('shows a cross only for a failed run', () => {
-    const run = { job_id: 'j', started_at: '', imported: 0, skipped: 0, failed: 0, errors: [] }
-    expect(runProblem({ ...run, state: 'succeeded' })).toBeNull()
-    expect(runProblem({ ...run, state: 'running', failed: 2 })).toBeNull()
-    expect(runProblem({ ...run, state: 'failed' })).toBe('The last run failed.')
+  it('takes the bucket check from the saved state, not from runs', () => {
+    const checked = { ...split, public_config: { ...split.public_config, 'bucket:lab-raw': 'created' } }
+    expect(bucketTitle(checked, 'lab-raw')).toBe('Bucket created')
+    expect(bucketTitle(split, 'lab-raw')).toBeNull()
+    expect(bucketTitle(fixed, 'data')).toBe('Bucket found')
+  })
+
+  it('counts the root and refuses Aruna folders and former default buckets', () => {
+    const rooted = { ...split, public_config: { ...split.public_config, root: `/${'r'.repeat(900)}/` } }
+    expect(linkConflict(rooted, [], `lab-raw/${'a'.repeat(200)}/`)).toContain('too long')
+    expect(linkConflict(split, [], 'lab-raw/_aruna_parts/')).toContain('Aruna uses')
+    expect(linkConflict(split, [], 'lab-raw/_parts/')).toBeNull()
+    const former = { ...split, public_config: { ...split.public_config, 'layout:lab-old': 'true' } }
+    expect(linkConflict(former, [], 'lab-old/')).toContain('default rule')
   })
 
   it('says Synced only after a run that succeeded', () => {
@@ -34,5 +43,21 @@ describe('storageRules', () => {
     expect(runText({ ...run, state: 'succeeded' }).text).toMatch(/^Synced/)
     expect(runText({ ...run, state: 'cancelled' }).text).toMatch(/^Stopped/)
     expect(runText({ ...run, state: 'indeterminate' }).text).toMatch(/^Unknown/)
+    // Labels come before item failures, which stay open behind the text.
+    const failed = { ...run, failed: 3 }
+    expect(runText({ ...failed, state: 'cancelling' })).toMatchObject({ text: 'Stopping…', failures: true })
+    expect(runText({ ...failed, state: 'cancelled' }).text).toMatch(/^Stopped/)
+    expect(runText({ ...failed, state: 'indeterminate' }).text).toMatch(/^Unknown/)
+    expect(runText({ ...failed, state: 'succeeded' }).text).toMatch(/^3 failed/)
+  })
+
+  it('treats every unfinished state as running', () => {
+    const run = { job_id: 'j', started_at: '', imported: 0, skipped: 0, failed: 0, errors: [] }
+    for (const state of ['queued', 'ready', 'running', 'cancelling', 'awaiting_key']) {
+      expect(runActive({ ...run, state })).toBe(true)
+    }
+    for (const state of ['succeeded', 'failed', 'cancelled', 'indeterminate']) {
+      expect(runActive({ ...run, state })).toBe(false)
+    }
   })
 })
