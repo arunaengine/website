@@ -75,6 +75,7 @@ const STORAGE = {
     default_bucket: 'aruna-lab-default',
     'bucket:aruna-lab-default': 'created',
     'bucket:lab-raw': 'found',
+    'bucket:lab-results': 'found',
   },
 }
 const HOURS_AGO = new Date(Date.now() - 2 * 3600_000).toISOString()
@@ -99,7 +100,7 @@ const link = (id: string, bucket: string, keyPrefix: string, prefix: string, las
 const LINKS = [
   link('i1', 'sequencing', '', 'lab-raw/2024/', run('succeeded', 5)),
   link('i2', 'results', '', 'lab-results/', run('succeeded', 1, 3)),
-  link('i3', 'imaging', 'raw/', 'lab-imaging/', run('running', 312)),
+  link('i3', 'imaging', 'raw/', 'lab-imaging/', run('ready', 312)),
   link('i4', 'archive', 'old/', 'lab-archive/', null),
 ]
 
@@ -144,9 +145,9 @@ describe('StorageSection', () => {
     expect(content(row(mounted.root, 'sequencing'))).toContain('Synced 2h ago')
     expect(element(row(mounted.root, 'sequencing'), (node) => node.props.title === 'Bucket found')).toBeTruthy()
     expect(content(row(mounted.root, 'results'))).toContain('3 failed · 2h ago')
-    expect(
-      element(row(mounted.root, 'results'), (node) => node.props.title === 'No access to bucket lab-results'),
-    ).toBeTruthy()
+    // Item failures stay in Last run; the bucket itself was found.
+    expect(element(row(mounted.root, 'results'), (node) => node.props.title === 'Bucket found')).toBeTruthy()
+    expect(content(row(mounted.root, 'results'))).not.toContain('✗')
     expect(content(row(mounted.root, 'imaging'))).toContain('imaging / raw/')
     expect(content(row(mounted.root, 'imaging'))).toContain('Running… 312 added')
     expect(button(row(mounted.root, 'imaging'), 'Run now').props.disabled).toBe(true)

@@ -32,7 +32,6 @@ import {
   bucketTitle,
   defaultBucket,
   runActive,
-  runProblem,
   runText,
   splitPath,
   storageLine,
@@ -386,7 +385,12 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
             <span class="truncate">All buckets</span>
             <span class="text-muted-foreground">→</span>
             <span class="truncate font-mono">{{ defaultBucket(backend) }}</span>
-            <span class="font-bold text-emerald-700 dark:text-emerald-400" :title="bucketTitle(backend, defaultBucket(backend) ?? '')">✓</span>
+            <span
+              v-if="bucketTitle(backend, defaultBucket(backend) ?? '')"
+              class="font-bold text-emerald-700 dark:text-emerald-400"
+              :title="bucketTitle(backend, defaultBucket(backend) ?? '') ?? undefined"
+            >✓</span>
+            <span v-else />
             <span />
             <span class="flex justify-end">
               <Button
@@ -417,15 +421,11 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
                 {{ storagePlace(backend, link.backend_prefix) }}
               </span>
               <span
-                v-if="runProblem(link.last_run)"
-                class="font-bold text-destructive"
-                :title="runProblem(link.last_run) ?? undefined"
-              >✗</span>
-              <span
-                v-else
+                v-if="bucketTitle(backend, splitPath(backend, link.backend_prefix).bucket)"
                 class="font-bold text-emerald-700 dark:text-emerald-400"
-                :title="bucketTitle(backend, splitPath(backend, link.backend_prefix).bucket)"
+                :title="bucketTitle(backend, splitPath(backend, link.backend_prefix).bucket) ?? undefined"
               >✓</span>
+              <span v-else />
               <span
                 class="truncate"
                 :class="{
