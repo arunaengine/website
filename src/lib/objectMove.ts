@@ -23,11 +23,7 @@ export interface TransferStore {
   ): Promise<{ objects: { key: string }[]; truncated: boolean }>
   copyObject(source: { bucket: string; key: string }, bucket: string, key: string, nodeId?: string | null): Promise<void>
   deleteObject(bucket: string, key: string, nodeId?: string | null): Promise<void>
-  deletePrefix(
-    bucket: string,
-    prefix: string,
-    nodeId?: string | null,
-  ): Promise<{ errors: { key: string; message: string }[] }>
+  headObject(bucket: string, key: string, nodeId?: string | null): Promise<unknown>
 }
 
 export const FOLDER_LIMIT = 1000
@@ -82,12 +78,12 @@ export async function plannedCopies(
   target: TransferTarget,
   nodeId: string | null,
   name?: string,
-): Promise<{ from: string; to: string }[]> {
-  const copies: { from: string; to: string }[] = []
+): Promise<{ from: string; to: string; source: string }[]> {
+  const copies: { from: string; to: string; source: string }[] = []
   for (const source of sources) {
     const nextName = name?.trim() || baseName(source.key)
     if (!source.folder) {
-      copies.push({ from: source.key, to: `${target.prefix}${nextName}` })
+      copies.push({ from: source.key, to: `${target.prefix}${nextName}`, source: source.key })
       continue
     }
     const listing = await store.listObjectsRecursive(bucket, source.key, FOLDER_LIMIT, nodeId)
@@ -96,15 +92,16 @@ export async function plannedCopies(
     }
     if (!listing.objects.length) throw new Error(`${baseName(source.key)}/ holds no files.`)
     for (const object of listing.objects) {
-      copies.push({ from: object.key, to: `${target.prefix}${nextName}/${object.key.slice(source.key.length)}` })
+      const to = `${target.prefix}${nextName}/${object.key.slice(source.key.length)}`
+      copies.push({ from: object.key, to, source: source.key })
     }
   }
   return copies
 }
 
 /**
- * Copies everything first; a move or rename deletes the sources only after that.
- * `onMoved` names each source that is fully gone from its old place.
+ * Copies everything first; a move or rename then deletes exactly the copied keys,
+ * so a file that arrives meanwhile stays. `onMoved` names each source fully moved.
  */
 export async function runTransfer(
   store: TransferStore,
@@ -122,14 +119,12 @@ export async function runTransfer(
   }
   if (mode === 'copy') return
   for (const source of sources) {
-    if (!source.folder) {
-      await store.deleteObject(bucket, source.key, nodeId)
-      onMoved(source.key)
-      continue
+    for (const copy of copies) {
+      if (copy.source === source.key) await store.deleteObject(bucket, copy.from, nodeId)
     }
-    const result = await store.deletePrefix(bucket, source.key, nodeId)
-    if (result.errors.length) {
-      throw new Error(`Copied, but ${result.errors.length} old files of ${baseName(source.key)}/ were not deleted.`)
+    // The empty folder marker goes too, when there is one.
+    if (source.folder && (await store.headObject(bucket, source.key, nodeId).then(() => true, () => false))) {
+      await store.deleteObject(bucket, source.key, nodeId)
     }
     onMoved(source.key)
   }

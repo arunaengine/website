@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { parseTarget, runTransfer, targetProblem, type TransferStore } from './objectMove'
 
-function store(listed: string[] = [], truncated = false) {
+function store(listed: string[] = [], truncated = false, markers: string[] = []) {
   const calls: string[] = []
   const fake: TransferStore = {
     listObjectsRecursive: vi.fn(async () => ({ objects: listed.map((key) => ({ key })), truncated })),
@@ -11,9 +11,8 @@ function store(listed: string[] = [], truncated = false) {
     deleteObject: vi.fn(async (bucket, key) => {
       calls.push(`delete ${bucket}/${key}`)
     }),
-    deletePrefix: vi.fn(async (bucket, prefix) => {
-      calls.push(`delete ${bucket}/${prefix}*`)
-      return { errors: [] }
+    headObject: vi.fn(async (_bucket: string, key: string) => {
+      if (!markers.includes(key)) throw new Error('NotFound')
     }),
   }
   return { fake, calls }
@@ -61,8 +60,27 @@ describe('transfer run', () => {
       'copy reef/raw/genomes/a.fa -> archive/old/genomes/a.fa',
       'copy reef/raw/genomes/b/c.fa -> archive/old/genomes/b/c.fa',
       'copy reef/raw/reads.fastq -> archive/old/reads.fastq',
-      'delete reef/raw/genomes/*',
+      'delete reef/raw/genomes/a.fa',
+      'delete reef/raw/genomes/b/c.fa',
       'delete reef/raw/reads.fastq',
+    ])
+  })
+
+  it('keeps a file that arrived in the folder after the copy and drops the folder marker', async () => {
+    const { fake, calls } = store(['raw/genomes/a.fa'], false, ['raw/genomes/'])
+    // The arrival lands between the copy and the delete; a relisting delete would take it.
+    fake.copyObject = vi.fn(async (source, bucket, key) => {
+      calls.push(`copy ${source.bucket}/${source.key} -> ${bucket}/${key}`)
+      calls.push('arrived raw/genomes/arrived.txt')
+    })
+
+    await runTransfer(fake, 'move', 'reef', [{ key: 'raw/genomes/', folder: true }], { bucket: 'reef', prefix: 'old/' }, null)
+
+    expect(calls).toEqual([
+      'copy reef/raw/genomes/a.fa -> reef/old/genomes/a.fa',
+      'arrived raw/genomes/arrived.txt',
+      'delete reef/raw/genomes/a.fa',
+      'delete reef/raw/genomes/',
     ])
   })
 
