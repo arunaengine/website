@@ -18,7 +18,7 @@ import type { GroupDeletionBlockers } from '@/lib/api'
 
 const getGroupDeletionBlockers = vi.fn<(id: string) => Promise<GroupDeletionBlockers>>()
 const deleteGroup = vi.fn<(id: string) => Promise<void>>()
-const removeBucket = vi.fn<(nodeId: string, groupId: string, bucket: string) => Promise<void>>()
+const removeBucket = vi.fn<(nodeId: string, bucket: string) => Promise<void>>()
 const writesDisabled = ref(false)
 
 const Passthrough = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
@@ -167,7 +167,7 @@ describe('Delete group dialog', () => {
     await click(element(root, (node) => node.props['aria-label'] === 'Confirm delete lab-data'))
     await flush()
 
-    expect(removeBucket).toHaveBeenCalledWith('remote', 'g1', 'lab-data')
+    expect(removeBucket).toHaveBeenCalledWith('remote', 'lab-data')
     expect(getGroupDeletionBlockers).toHaveBeenCalledTimes(2)
     expect(content(root)).toContain('Nothing blocks deletion.')
     expect(deleteButton(root).props.disabled).toBe(false)
@@ -182,9 +182,22 @@ describe('Delete group dialog', () => {
     await click(element(root, (node) => node.props['aria-label'] === 'Confirm delete home'))
     await flush()
 
-    expect(removeBucket).toHaveBeenCalledWith('local', 'g1', 'home')
+    expect(removeBucket).toHaveBeenCalledWith('local', 'home')
     expect(content(root)).toContain('bucket is locked')
     expect(deleteButton(root).props.disabled).toBe(true)
+  })
+
+  it('holds the bucket delete back without a connection', async () => {
+    getGroupDeletionBlockers.mockResolvedValue(BLOCKED)
+    const { root } = await mount()
+    await click(element(root, (node) => node.props['aria-label'] === 'Delete home'))
+    writesDisabled.value = true
+    await flush()
+    const confirm = element(root, (node) => node.props['aria-label'] === 'Confirm delete home')
+
+    expect(confirm.props.disabled).toBe(true)
+    await press(confirm)
+    expect(removeBucket).not.toHaveBeenCalled()
   })
 
   it('counts the buckets the caller cannot see and blocks on them', async () => {

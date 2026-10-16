@@ -121,12 +121,12 @@ function otherKinds(node: NodeDeletionBlockers): string[] {
 }
 
 async function removeOne(nodeId: string, bucket: string) {
-  if (removing.value) return
+  if (removing.value || writesDisabled.value) return
   const key = bucketKey(nodeId, bucket)
   removing.value = key
   removeError.value = null
   try {
-    await removeBucket(nodeId, props.groupId, bucket)
+    await removeBucket(nodeId, bucket)
     confirming.value = null
     await runCheck()
   } catch (err) {
@@ -198,7 +198,7 @@ function bucketRoute(nodeId: string, bucket: string) {
                       size="sm"
                       class="h-6 px-2 text-xs"
                       :aria-label="`Confirm delete ${bucket}`"
-                      :disabled="Boolean(removing)"
+                      :disabled="Boolean(removing) || writesDisabled"
                       @click="removeOne(node.node_id, bucket)"
                     >
                       <Spinner v-if="removing === bucketKey(node.node_id, bucket)" label="Deleting…" /> Delete
