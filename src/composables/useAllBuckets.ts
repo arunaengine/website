@@ -1,6 +1,6 @@
 // The buckets of every node, from the federated bucket search: one request per
 // page, so a realm of many nodes opens no S3 session per node.
-import { onScopeDispose, ref, watch, type Ref } from 'vue'
+import { computed, onScopeDispose, ref, watch, type Ref } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { ApiError, type BucketSearchHit } from '@/lib/api'
 import { isWorkspaceBucket } from '@/lib/workspaces'
@@ -11,7 +11,7 @@ const MIN_CHARS = 2
 const TYPING_MS = 250
 
 export function useAllBuckets(query: Ref<string>, groupId: Ref<string>, enabled: Ref<boolean>) {
-  const { authToken, searchBuckets, sessionEpoch } = useAruna()
+  const { apiBaseUrl, currentUser, searchBuckets, sessionEpoch } = useAruna()
   const hits = ref<BucketSearchHit[]>([])
   const failedNodes = ref(0)
   const loading = ref(false)
@@ -21,6 +21,12 @@ export function useAllBuckets(query: Ref<string>, groupId: Ref<string>, enabled:
   const needsName = ref(false)
   let cursor: string | null = null
   let seq = 0
+  // The kind of request on its way (true: a next page), and one a token change dropped.
+  let inFlight: boolean | null = null
+  let dropped: boolean | null = null
+  // Who asks: a renewed token keeps the account, so the loaded pages stay.
+  const account = computed(() => (currentUser.value ? `${apiBaseUrl.value}|${currentUser.value.id}` : ''))
+  let lastAccount = account.value
   let timer: ReturnType<typeof setTimeout> | undefined
 
   // Drops the list and every answer still on its way.
@@ -39,8 +45,9 @@ export function useAllBuckets(query: Ref<string>, groupId: Ref<string>, enabled:
     const term = query.value.trim()
     if (next && !cursor) return
     if (!next) reset()
-    if (!enabled.value || !groupId.value || !authToken.value || (term && term.length < MIN_CHARS)) return
+    if (!enabled.value || !groupId.value || !account.value || (term && term.length < MIN_CHARS)) return
     const id = ++seq
+    inFlight = next
     const after = next ? cursor : null
     loading.value = true
     error.value = null
@@ -66,19 +73,39 @@ export function useAllBuckets(query: Ref<string>, groupId: Ref<string>, enabled:
       if (!needsName.value) error.value = errorMessage(err)
       more.value = false
     } finally {
-      if (id === seq) loading.value = false
+      if (id === seq) {
+        loading.value = false
+        inFlight = null
+      }
     }
   }
 
-  // Another group, account or sign-in starts over, including the fallback for older nodes.
-  watch(
-    [groupId, enabled, sessionEpoch, () => Boolean(authToken.value)],
-    () => {
-      needsName.value = false
-      void load()
-    },
-    { immediate: true },
-  )
+  // Another group or account starts over, including the fallback for older nodes.
+  function restart() {
+    needsName.value = false
+    void load()
+  }
+  watch([groupId, enabled], restart, { immediate: true })
+  watch(account, (next) => {
+    if (!next) return
+    if (next !== lastAccount) {
+      lastAccount = next
+      restart()
+    } else if (dropped !== null) void load(dropped)
+    dropped = null
+  })
+  // An answer asked with the old token is dropped; the same account asks again.
+  watch(sessionEpoch, () => {
+    if (inFlight === null) return
+    dropped = inFlight
+    inFlight = null
+    ++seq
+    loading.value = false
+    if (account.value === lastAccount && account.value) {
+      void load(dropped)
+      dropped = null
+    }
+  })
   // Every keystroke drops the old answer at once; only the new request waits.
   watch(query, () => {
     clearTimeout(timer)
