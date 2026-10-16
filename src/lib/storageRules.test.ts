@@ -108,4 +108,14 @@ describe('storageRules', () => {
     rememberMoves(totals, [later])
     expect(moveText(moveView([later], 'raw/', totals))).toBe('Moving files: 1 of 10')
   })
+
+  it('forgets the totals of runs that ended', () => {
+    const run = { migrated: 0, skipped: 0, failed: 0, started_at_ms: 1, finished_at_ms: null }
+    const move = { bucket: 'b', misplaced: 5, complete: true, progress: run }
+    const totals = new Map<string, number>()
+    rememberMoves(totals, [move])
+    expect(totals.size).toBe(1)
+    rememberMoves(totals, [{ ...move, progress: { ...run, finished_at_ms: 9 } }])
+    expect(totals.size).toBe(0)
+  })
 })

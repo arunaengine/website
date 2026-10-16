@@ -221,6 +221,7 @@ watch(
     links.value = []
     moveAsk.value = null
     moves.value = {}
+    moveTotals.clear()
     groupBuckets.value = []
     target.value = null
     hidden.value = false

@@ -179,8 +179,9 @@ describe('GroupLocationSection', () => {
       backends: [{ backend_id: 's1', name: 'Alpha', kind: 's3', public_config: {}, disabled: true }],
     })
     const reload = ref(0)
+    const fixed = group({ bucket: 'lab', prefix: '' })
     const host = defineComponent({
-      setup: () => () => h(GroupLocationSection, { group: group({ bucket: 'lab', prefix: '' }), canAdmin: true, reload: reload.value }),
+      setup: () => () => h(GroupLocationSection, { group: fixed, canAdmin: true, reload: reload.value }),
     })
     const mounted = await mountApp(host)
     await flush()
