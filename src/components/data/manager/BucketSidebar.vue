@@ -85,8 +85,9 @@ function onKeydown(event: KeyboardEvent) {
   if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
     event.preventDefault()
     if (!count) return
-    const step = event.key === 'ArrowDown' ? 1 : count - 1
-    activeIndex.value = activeIndex.value < 0 && step !== 1 ? count - 1 : (activeIndex.value + step) % count
+    const down = event.key === 'ArrowDown'
+    if (activeIndex.value < 0) activeIndex.value = down ? 0 : count - 1
+    else activeIndex.value = (activeIndex.value + (down ? 1 : count - 1)) % count
   } else if (event.key === 'Enter') {
     openers.value[activeIndex.value]?.()
   } else if (event.key === 'Escape') {

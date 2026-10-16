@@ -419,4 +419,25 @@ describe('Bucket sidebar search keys', () => {
     expect(content(root)).not.toContain('reef-shared')
     nodeChoice.value = null
   })
+
+  it('starts ArrowUp at the last row and drops the highlight when the list changes', async () => {
+    vi.useFakeTimers()
+    aruna.searchBuckets.mockReset().mockResolvedValue({
+      hits: [{ arn: 'x', bucket: 'reef-shared', node_id: 'home', group_id: 'g2' }],
+      nodes_queried: 1,
+      nodes_failed: 0,
+    })
+    nodeChoice.value = 'home'
+    const { root } = await mountApp(RealSearchSidebar, { props: { manager: withBucket() } })
+    const field = element(root, (node) => node.props['aria-label'] === 'Find a bucket')
+    await typeValue(field, 'reef')
+    await vi.advanceTimersByTimeAsync(300)
+
+    await key(field, 'ArrowUp')
+    expect(selected(root)).toEqual(['reef-shared'])
+
+    await typeValue(field, 'reef-s')
+    expect(selected(root)).toEqual([])
+    nodeChoice.value = null
+  })
 })
