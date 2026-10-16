@@ -135,6 +135,28 @@ describe('Storage dialog provider buckets', () => {
     })
   })
 
+  it('needs a prefix while the toggle is on', async () => {
+    const { root } = await mount()
+    await typeValue(byId(root, '-name'), 'lab')
+    await typeValue(byId(root, '-pub-endpoint'), 'https://s3.test')
+    await typeValue(byId(root, '-sec-access_key_id'), 'key')
+    await typeValue(byId(root, '-sec-secret_access_key'), 'secret')
+    const save = () => element(root, (node) => node.tag === 'button' && node.props.type === 'submit')
+    expect(save().props.disabled).toBe(false)
+
+    await toggle(root)
+    await typeValue(byId(root, '-bucket-prefix'), '  ')
+    expect(content(root)).toContain('Enter a prefix.')
+    expect(byId(root, '-bucket-prefix').props.invalid).toBe('error')
+    expect(save().props.disabled).toBe(true)
+    await submit(root)
+    expect(createGroupBackend).not.toHaveBeenCalled()
+
+    await typeValue(byId(root, '-bucket-prefix'), 'team-a-')
+    expect(content(root)).not.toContain('Enter a prefix.')
+    expect(save().props.disabled).toBe(false)
+  })
+
   it('removes both keys when the toggle goes off', async () => {
     const { root } = await mount({
       ...saved,

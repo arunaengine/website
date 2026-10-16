@@ -104,8 +104,11 @@ const missingRequired = computed(() =>
 // credentials, so they have to be entered again.
 const needsCredentials = computed(() => !isEdit.value || settingsChanged.value)
 
+// The node refuses an empty prefix.
+const prefixMissing = computed(() => showsProviderBuckets.value && perBucket.value && !bucketPrefix.value.trim())
+
 const submitDisabled = computed(() => {
-  if (saving.value || writesDisabled.value) return true
+  if (saving.value || writesDisabled.value || prefixMissing.value) return true
   // Nothing typed and nothing changed: there is nothing to save.
   if (isEdit.value && !settingsChanged.value && !credentialsEntered.value) return true
   if (needsCredentials.value && (missingRequired.value || !name.value.trim())) return true
@@ -284,9 +287,11 @@ async function submit() {
                   v-model="bucketPrefix"
                   class="mt-1 font-mono text-xs"
                   placeholder="team-a-"
+                  :invalid="prefixMissing ? 'error' : undefined"
                   :disabled="settingsLocked"
                 />
-                <p class="mt-1 text-[11px] text-muted-foreground">
+                <p v-if="prefixMissing" class="mt-1 text-[11px] text-destructive">Enter a prefix.</p>
+                <p v-else class="mt-1 text-[11px] text-muted-foreground">
                   New bucket results is stored in {{ bucketPrefix.trim() }}results.
                 </p>
               </div>
