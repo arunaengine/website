@@ -11,7 +11,7 @@ const parts = computed(() => (props.path ? props.path.split('/') : []))
 </script>
 
 <template>
-  <nav class="flex min-w-0 flex-wrap items-center gap-1 text-sm text-muted-foreground">
+  <nav class="flex min-w-0 flex-nowrap items-center gap-1 text-sm text-muted-foreground">
     <button
       class="inline-flex min-w-0 items-center gap-1.5 rounded px-1.5 py-0.5 hover:bg-muted hover:text-foreground"
       :title="bucket"

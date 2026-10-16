@@ -357,15 +357,15 @@ async function onDrop(event: DragEvent) {
     <EmptyState v-if="!bucket" title="Select a bucket to browse its objects." />
 
     <template v-else>
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div class="flex min-w-0 items-center gap-2">
+      <div class="flex flex-nowrap items-center justify-between gap-2">
+        <div class="flex min-w-0 flex-1 items-center gap-2">
           <Breadcrumbs :bucket="bucket" :path="prefix" @navigate="navigateTo" />
           <Badge
             v-if="requiredNodeId"
             variant="outline"
             size="sm"
-            class="min-w-0 max-w-40 shrink-0"
-            :title="requiredNodeId"
+            class="min-w-0 max-w-32 shrink"
+            :title="`${realmNodes.displayName(requiredNodeId)} (${requiredNodeId})`"
           >
             <span class="truncate">{{ realmNodes.displayName(requiredNodeId) }}</span>
           </Badge>
@@ -373,12 +373,12 @@ async function onDrop(event: DragEvent) {
             <Lock class="mr-0.5 h-3 w-3" aria-hidden="true" /> Locked on the node
           </Badge>
           <Badge v-if="availableToYou" variant="success" size="sm" class="shrink-0">Available to you</Badge>
-          <span v-if="providerBucket" class="truncate text-xs text-muted-foreground">
+          <span v-if="providerBucket" class="min-w-0 truncate text-xs text-muted-foreground">
             Stored in provider bucket <span class="font-mono text-foreground">{{ providerBucket }}</span>
           </span>
           <Spinner v-if="listLoading" label="Loading objects" class="shrink-0" />
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex shrink-0 items-center gap-2">
           <WatchButton
             surface="bucket"
             :path-prefix="watchPathPrefix"
@@ -460,9 +460,9 @@ async function onDrop(event: DragEvent) {
             </template>
           </Popover>
           <!-- The Add data pipeline always targets the connected node. -->
-          <Button v-if="!remoteBlocked" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix" :title="writeRestrictionMessage ?? 'Create a folder'" @click="emit('new-folder')"><FolderPlus class="h-4 w-4" /> New folder</Button>
-          <Button v-if="notebooks && !remoteNodeId" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix" :title="writeRestrictionMessage ?? 'Create a notebook here'" @click="emit('new-notebook')"><NotebookPen class="h-4 w-4" /> New notebook</Button>
-          <Button v-if="!remoteNodeId" data-tour="bucket-add-data" size="sm" :disabled="!canWriteCurrentPrefix" :title="writeRestrictionMessage ?? 'Add data'" @click="emit('add-data')"><Plus class="h-4 w-4" /> Add data</Button>
+          <Button v-if="!remoteBlocked" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix"  aria-label="New folder" :title="writeRestrictionMessage ?? 'Create a folder'" @click="emit('new-folder')"><FolderPlus class="h-4 w-4" /><span class="hidden xl:inline">New folder</span></Button>
+          <Button v-if="notebooks && !remoteNodeId" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix"  aria-label="New notebook" :title="writeRestrictionMessage ?? 'Create a notebook here'" @click="emit('new-notebook')"><NotebookPen class="h-4 w-4" /><span class="hidden xl:inline">New notebook</span></Button>
+          <Button v-if="!remoteNodeId" data-tour="bucket-add-data" size="sm" :disabled="!canWriteCurrentPrefix"  aria-label="Add data" :title="writeRestrictionMessage ?? 'Add data'" @click="emit('add-data')"><Plus class="h-4 w-4" /><span class="hidden xl:inline">Add data</span></Button>
         </div>
       </div>
       <div v-if="deletedLoading || (showDeleted && deletedTruncated)" class="flex flex-wrap items-center gap-x-3 gap-y-1">

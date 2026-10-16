@@ -75,7 +75,7 @@ function menuLabels(row: HostNode): string[] {
 describe('object browser row actions', () => {
   it('names the node of the open bucket next to its name', async () => {
     const root = await render()
-    const chip = element(root, (node) => node.props.title === 'home-node')
+    const chip = element(root, (node) => node.props.title === 'node home-node (home-node)')
 
     expect(content(chip)).toContain('node home-node')
   })
