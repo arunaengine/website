@@ -41,6 +41,8 @@ export interface DeletionTarget {
   permissions: DeletionPermissions
   /** The bucket is served by another node, which this browser cannot drive. */
   remote: boolean
+  /** Node named in the description; unset means this node. */
+  nodeName?: string
   selectionCount?: number
 }
 
@@ -170,7 +172,7 @@ function permanentOption(target: DeletionTarget): DeletionOption {
   return {
     id: 'delete-permanently',
     label: 'Delete permanently',
-    description: `Deletes every version and delete marker of ${scope} on this node, and aborts its open uploads. Nothing brings them back.`,
+    description: `Deletes every version and delete marker of ${scope} on ${target.nodeName ?? 'this node'}, and aborts its open uploads. Nothing brings them back.`,
     tier: target.kind === 'folder' || target.kind === 'bucket' ? 'typed-name' : 'confirm',
     call: { operation: 'purge' },
     irreversible: true,

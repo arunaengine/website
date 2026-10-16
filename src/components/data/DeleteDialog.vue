@@ -55,7 +55,7 @@ const emit = defineEmits<{
 }>()
 
 const s3 = useS3()
-const { authToken } = useAruna()
+const { authToken, sessionEpoch } = useAruna()
 const realmNodes = useRealmNodes()
 const preflightState = useDeletionPreflight()
 const purge = usePurgeJob()
@@ -149,9 +149,11 @@ const options = computed<DeletionOption[]>(() => {
     headState: current.headState,
     isCurrent: current.isCurrent,
     bytes: current.bytes,
-    counts: counts.value,
+    // A remote bucket always confirms a full purge; its node does not refuse new data.
+    counts: remoteBucket.value ? null : counts.value,
     permissions: { canWrite: canWrite.value, canPurge: canPurge.value },
     remote: current.nodeId !== null && !remoteBucket.value,
+    nodeName: remoteBucket.value ? nodeName.value : undefined,
     selectionCount: ids.value.length,
   })
 })
@@ -434,7 +436,6 @@ async function runOption(current: DeleteRequest, option: DeletionOption): Promis
     case 'purge':
       return runPurge(current)
     case 'delete-bucket':
-      if (remoteBucket.value) return runPurge(current)
       await s3.deleteBucket(current.bucket, current.nodeId)
       return [current.bucket]
   }
@@ -486,6 +487,13 @@ async function confirm() {
     if (id === requestId) busy.value = false
   }
 }
+
+// Another account or connection drops the dialog and any running result.
+watch(sessionEpoch, () => {
+  if (!request.value) return
+  reset()
+  emit('close')
+})
 
 onUnmounted(() => {
   ++requestId
