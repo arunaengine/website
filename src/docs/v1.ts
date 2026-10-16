@@ -962,8 +962,8 @@ export const docsTopics: DocsTopic[] = [
         title: 'Where pushed files are stored',
         icon: 'HardDrive',
         bullets: [
-          'Files you push are stored in the dataset\'s storage location. By default that is the group\'s default storage location, in a folder named after the dataset id.',
-          'Every group starts with the generated bucket `datasets-<group id>` as its default. Group admins can change it under Default storage location in the Storage tab of the group page. This does not move existing datasets or their files.',
+          'Files you push are stored in the dataset\'s storage location. By default that is the group\'s dataset location, in a folder named after the dataset id.',
+          'Every group starts with the generated bucket `datasets-<group id>` as its default. Group admins can change it under Dataset location in the Storage tab of the group page. This does not move existing datasets or their files.',
           'The location dialog prefills the group default when you create a dataset. Choose another bucket and folder there, or later with Change next to Storage location under Advanced on the dataset page.',
           'Inside Aruna, a data file entry has the file\'s content address `https://w3id.org/aruna/data/<blake3 hex>` as `@id` and its S3 path `s3://<bucket>/<key>` as `contentUrl`.',
           'In Git, the same entry uses the file\'s relative path as `@id`, and the file is a Git LFS file. Clone and push convert between the two forms automatically.',

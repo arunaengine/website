@@ -107,7 +107,7 @@ async function save() {
             Files pushed with Git go to this bucket and prefix. Existing files stay where they are.
             <template v-if="datasetDefault">
               Default: {{ datasetDefault.bucket }}/{{ datasetDefault.prefix }}, a folder named after the dataset id
-              in the group's default storage location.
+              in the group's dataset location.
             </template>
           </DialogDescription>
         </DialogHeader>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Where new datasets of a group store their files. Group admins can change it;
 // members see it read only. Non-members get no location and see nothing.
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { MapPin, Pencil } from '@lucide/vue'
 import Badge from '@/components/ui/Badge.vue'
@@ -18,10 +18,11 @@ import StorageLocationFields from '@/components/metadata/StorageLocationFields.v
 import { useAruna } from '@/composables/useAruna'
 import { apiErrorMessage, type GroupDetailResponse } from '@/lib/api'
 import { defaultStorageBucket, folderRoute } from '@/lib/crate/dataIdentity'
+import { defaultBucket } from '@/lib/storageRules'
 
 const props = defineProps<{ group: GroupDetailResponse; canAdmin: boolean }>()
 const emit = defineEmits<{ (e: 'changed', group: GroupDetailResponse): void }>()
-const { setGroupLocation } = useAruna()
+const { setGroupLocation, getBucketRouting, getGroupRouting, listGroupBackends } = useAruna()
 
 const open = ref(false)
 const choice = ref({ bucket: '', prefix: '' })
@@ -31,6 +32,35 @@ const error = ref<string | null>(null)
 const location = computed(() => props.group.dataset_location ?? null)
 const generated = computed(() => defaultStorageBucket(props.group.group_id))
 const isGenerated = computed(() => location.value?.bucket === generated.value && !location.value.prefix)
+
+// Where the files of the bucket are stored: a rule of the bucket, else the group default.
+const stored = ref('')
+watch(
+  () => [props.group.group_id, location.value?.bucket] as const,
+  async ([groupId, bucket]) => {
+    stored.value = ''
+    if (!bucket) return
+    try {
+      const [bucketRules, group, list] = await Promise.all([
+        getBucketRouting(bucket),
+        getGroupRouting(groupId),
+        listGroupBackends(groupId),
+      ])
+      if (groupId !== props.group.group_id || bucket !== location.value?.bucket) return
+      const whole = bucketRules.rules.find((rule) => !rule.key_prefix && !rule.exact)
+      const target = whole ? whole.target : group.default_target
+      if (!target) stored.value = 'Files are stored on this node.'
+      else if (target.backend_id) {
+        const backend = list.backends.find((entry) => entry.backend_id === target.backend_id)
+        const place = backend && defaultBucket(backend)
+        if (backend) stored.value = `Files are stored in ${backend.name}${place ? `, bucket ${place}` : ''}.`
+      }
+    } catch {
+      // Without the rules the line stays hidden.
+    }
+  },
+  { immediate: true },
+)
 
 function edit() {
   choice.value = { ...(location.value ?? { bucket: generated.value, prefix: '' }) }
@@ -65,7 +95,7 @@ function saveChoice() {
   <div v-if="location">
     <div class="flex items-center gap-2 px-5 pb-1 pt-4">
       <MapPin class="h-3.5 w-3.5 text-primary" />
-      <h2 class="font-display text-sm font-semibold text-aruna-navy">Default storage location</h2>
+      <h2 class="font-display text-sm font-semibold text-aruna-navy">Dataset location</h2>
     </div>
     <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
       <div class="min-w-0 space-y-1">
@@ -85,6 +115,7 @@ function saveChoice() {
           New datasets go to: <span class="font-mono">{{ location.bucket }}/{{ location.prefix }}</span>
           <Badge v-if="isGenerated" size="sm" variant="outline" class="ml-1">Generated group bucket</Badge>
         </p>
+        <p v-if="stored" class="text-[11px] text-muted-foreground">{{ stored }}</p>
         <p v-if="canAdmin" class="text-[11px] text-muted-foreground">Changing it does not move existing datasets or their files.</p>
       </div>
       <Button v-if="canAdmin" variant="outline" size="sm" @click="edit"><Pencil class="h-3.5 w-3.5" /> Edit</Button>
@@ -93,7 +124,7 @@ function saveChoice() {
     <Dialog :open="open" @update:open="(value: boolean) => (open = value)">
       <DialogContent class="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Change the default storage location</DialogTitle>
+          <DialogTitle>Change the dataset location</DialogTitle>
           <DialogDescription>
             New datasets store their files in this bucket and prefix, in a folder named after the dataset id.
             The bucket must exist on this node, belong to this group and allow writing.

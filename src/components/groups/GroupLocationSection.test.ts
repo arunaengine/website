@@ -6,6 +6,9 @@ import * as Api from '@/lib/api'
 import * as DataIdentity from '@/lib/crate/dataIdentity'
 
 const setGroupLocation = vi.fn()
+const getBucketRouting = vi.fn()
+const getGroupRouting = vi.fn()
+const listGroupBackends = vi.fn()
 const Slot = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
 const Empty = defineComponent(() => () => null)
 const ButtonStub = defineComponent({
@@ -44,9 +47,10 @@ const GroupLocationSection = compileClientComponent(new URL('./GroupLocationSect
   '@/components/ui/DocsLink.vue': moduleDefault(Empty),
   '@/components/ui/Notice.vue': moduleDefault(Slot),
   '@/components/metadata/StorageLocationFields.vue': moduleDefault(FieldsStub),
-  '@/composables/useAruna': { useAruna: () => ({ setGroupLocation }) },
+  '@/composables/useAruna': { useAruna: () => ({ setGroupLocation, getBucketRouting, getGroupRouting, listGroupBackends }) },
   '@/lib/api': Api,
   '@/lib/crate/dataIdentity': DataIdentity,
+  '@/lib/storageRules': { defaultBucket: (backend: { public_config: { default_bucket?: string } }) => backend.public_config.default_bucket ?? null },
 })
 
 function group(location: { bucket: string; prefix: string } | null) {
@@ -61,6 +65,11 @@ async function render(location: { bucket: string; prefix: string } | null, canAd
 
 beforeEach(() => {
   setGroupLocation.mockReset()
+  getBucketRouting.mockReset().mockResolvedValue({ bucket: 'b', rules: [], warnings: [] })
+  getGroupRouting.mockReset().mockResolvedValue({ group_id: 'G1', default_target: null, warnings: [] })
+  listGroupBackends.mockReset().mockResolvedValue({
+    backends: [{ backend_id: 's1', name: 'de.NBI-spire', kind: 's3', public_config: { default_bucket: 'aruna-spire-default' } }],
+  })
 })
 
 describe('GroupLocationSection', () => {
@@ -119,6 +128,25 @@ describe('GroupLocationSection', () => {
 
     expect(content(mounted.root)).toContain('Choice')
     expect(content(mounted.root)).toContain('bucket reef-raw belongs to another group')
+    mounted.app.unmount()
+  })
+
+  it('says where the files are stored', async () => {
+    let mounted = await render({ bucket: 'datasets-g1', prefix: '' })
+    expect(content(mounted.root)).toContain('Files are stored on this node.')
+    mounted.app.unmount()
+
+    getGroupRouting.mockResolvedValue({ group_id: 'G1', default_target: { backend_id: 's1' }, warnings: [] })
+    mounted = await render({ bucket: 'datasets-g1', prefix: '' })
+    expect(content(mounted.root)).toContain('Files are stored in de.NBI-spire, bucket aruna-spire-default.')
+    mounted.app.unmount()
+
+    getBucketRouting.mockResolvedValue({
+      bucket: 'datasets-g1', warnings: [],
+      rules: [{ key_prefix: '', exact: false, target: { class: 'cold' } }],
+    })
+    mounted = await render({ bucket: 'datasets-g1', prefix: '' })
+    expect(content(mounted.root)).not.toContain('Files are stored')
     mounted.app.unmount()
   })
 })

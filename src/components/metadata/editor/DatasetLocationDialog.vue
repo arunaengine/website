@@ -203,7 +203,7 @@ const fullPath = computed(() => {
         <section v-if="mode === 'create' && draft.groupId" class="min-w-0">
           <p class="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Storage location</p>
           <p class="mb-2 text-[11px] text-muted-foreground">
-            Where files pushed to this dataset with Git are stored. Prefilled with the group's default storage location.
+            Where files pushed to this dataset with Git are stored. Prefilled with the group's dataset location.
             The folder named after the dataset id is added when the dataset is created.
           </p>
           <StorageLocationFields
