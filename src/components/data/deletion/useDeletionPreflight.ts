@@ -103,10 +103,10 @@ export function useDeletionPreflight() {
     scope: StorageDeletionScope,
     operation: BacklinkPreflightStorageOperation,
     nodeId: string | null,
+    apiBase = permanentDeleteApiBase(nodeId),
   ) {
     resetBacklinkPreflightState()
     const requestId = backlinkPreflightRequestId
-    const apiBase = permanentDeleteApiBase(nodeId)
     if (!apiBase) {
       backlinkPreflightError.value = 'The node API endpoint for the dataset-reference lookup is unavailable.'
       return

@@ -247,12 +247,14 @@ describe('Bucket sidebar deletion', () => {
     })
   })
 
-  it('refuses a bucket another node serves and says why', async () => {
+  it('hands a bucket on another node to the dialog', async () => {
+    canDelete = false
     const { root } = await mountApp(BucketSidebar, { props: { manager: withBucket('node-far') } })
     await pickNode()
 
-    expect(trash(root).props.disabled).toBe(true)
-    expect(trash(root).props.title).toContain('Only the node that serves this bucket')
+    expect(trash(root).props.disabled).toBeFalsy()
+    await click(trash(root))
+    expect(requestDelete).toHaveBeenCalledWith({ kind: 'bucket', bucket: 'reef-survey', nodeId: 'node-far' })
   })
 
   it('refuses a session without write over the whole bucket', async () => {

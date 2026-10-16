@@ -21,6 +21,8 @@ import {
   prefixDeleteFailure,
   useSelectionDelete,
 } from '@/components/data/deletion/useSelectionDelete'
+import { removeBucket } from '@/components/groups/bucketRemoval'
+import { nodeApiBase } from '@/composables/s3/endpoints'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useStagingReferences } from '@/composables/useStagingReferences'
@@ -80,6 +82,8 @@ const prefixes = computed(() => request.value?.prefixes ?? [])
 // Objects first, then folder prefixes: one id list for the whole selection.
 const ids = computed(() => (request.value ? selectionIds(request.value) : []))
 const isSelection = computed(() => request.value?.kind === 'selection')
+// A bucket on another node is deleted through that node's API, which decides.
+const remoteBucket = computed(() => request.value?.kind === 'bucket' && request.value.nodeId !== null)
 
 const sourceBucket = computed(() => request.value?.bucket ?? '')
 const sourceEnabled = computed(() => Boolean(request.value) && request.value?.nodeId === null)
@@ -105,7 +109,7 @@ const canWrite = computed(() => {
   const current = request.value
   if (!current) return false
   if (current.kind === 'folder') return s3.canDeletePrefix(current.bucket, current.key ?? '', current.nodeId)
-  if (current.kind === 'bucket') return s3.canDeletePrefix(current.bucket, '', current.nodeId)
+  if (current.kind === 'bucket') return remoteBucket.value || s3.canDeletePrefix(current.bucket, '', current.nodeId)
   if (current.kind === 'selection') {
     return (
       keys.value.every((key) => s3.canWrite(current.bucket, key, current.nodeId)) &&
@@ -147,7 +151,7 @@ const options = computed<DeletionOption[]>(() => {
     bytes: current.bytes,
     counts: counts.value,
     permissions: { canWrite: canWrite.value, canPurge: canPurge.value },
-    remote: current.nodeId !== null,
+    remote: current.nodeId !== null && !remoteBucket.value,
     selectionCount: ids.value.length,
   })
 })
@@ -226,7 +230,8 @@ const versionConsequence = computed(() => {
 })
 
 function apiClient() {
-  const base = preflightState.permanentDeleteApiBase(request.value?.nodeId ?? null)
+  const nodeId = request.value?.nodeId ?? null
+  const base = remoteBucket.value && nodeId ? nodeApiBase(nodeId) : preflightState.permanentDeleteApiBase(nodeId)
   return base ? { baseUrl: base, token: authToken.value || undefined } : null
 }
 
@@ -290,7 +295,9 @@ function loadBacklinks(operation: 'latest_version_tombstone' | 'all_versions_pur
     return
   }
   const target = scope.value
-  if (target) void preflightState.loadBacklinkPreflight(target, operation, current.nodeId)
+  if (target) {
+    void preflightState.loadBacklinkPreflight(target, operation, current.nodeId, apiClient()?.baseUrl)
+  }
 }
 
 watch(
@@ -370,6 +377,11 @@ async function runPurge(current: DeleteRequest): Promise<string[]> {
     await selection.purgeKeys(pending, client, ids.value)
     return selection.outcome.value?.committed ?? []
   }
+  if (remoteBucket.value && current.nodeId) {
+    await removeBucket(current.nodeId, current.bucket, purge)
+    await refreshRemaining(client)
+    return [current.bucket]
+  }
   const target = scope.value
   if (!target) throw new Error('This target has no permanent deletion scope.')
   const status = await purge.run(createStoragePurgeOperation(target), client)
@@ -422,6 +434,7 @@ async function runOption(current: DeleteRequest, option: DeletionOption): Promis
     case 'purge':
       return runPurge(current)
     case 'delete-bucket':
+      if (remoteBucket.value) return runPurge(current)
       await s3.deleteBucket(current.bucket, current.nodeId)
       return [current.bucket]
   }

@@ -104,7 +104,8 @@ function openHit(hit: BucketSearchHit) {
 
 // Bucket deletion lives on the row it destroys; the shared dialog does the rest.
 function deleteRefusal(name: string, nodeId: string | null): string | null {
-  if (nodeId) return 'Only the node that serves this bucket can delete it.'
+  // The serving node decides in the dialog's preflight.
+  if (nodeId) return null
   if (!s3.canDeletePrefix(name, '', null)) {
     return 'This session cannot delete this bucket: it needs write on the whole bucket.'
   }

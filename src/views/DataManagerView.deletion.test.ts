@@ -145,7 +145,7 @@ describe('Data Manager version-aware deletion', () => {
 
     const load = functionSource(deleteDialog.script, 'loadBacklinks')
     expect(load).toContain("loadBulkBacklinkPreflight(")
-    expect(load).toContain('loadBacklinkPreflight(target, operation, current.nodeId)')
+    expect(load).toContain('loadBacklinkPreflight(target, operation, current.nodeId, apiClient()?.baseUrl)')
     // The chosen outcome decides which question is asked.
     expect(deleteDialog.script).toContain("id === 'delete-permanently' || id === 'delete-bucket'")
     expect(deleteDialog.script).toContain("? 'all_versions_purge'")
@@ -521,6 +521,8 @@ const deleteDialogComponent = compileClientComponent(
         purgeKeys: async () => {},
       }),
     },
+    '@/components/groups/bucketRemoval': { removeBucket: vi.fn() },
+    '@/composables/s3/endpoints': { nodeApiBase: () => null },
     '@/composables/useAruna': { useAruna: () => ({ authToken: ref('token') }) },
     '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => id }) },
     '@/composables/useStagingReferences': {
