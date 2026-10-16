@@ -124,9 +124,6 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
         </div>
       </template>
       <template v-else>
-        <p v-if="allNodes" class="border-b border-border/70 px-3 py-1.5 text-[11px] text-muted-foreground">
-          Type 2 letters to search all nodes.
-        </p>
         <Spinner v-if="bucketsLoading" show-label label="Loading buckets…" class="px-3 py-4" />
         <Notice v-else-if="bucketsError && bucketsAuthError" tone="warning" class="m-3">
           <p>The temporary S3 session was rejected. Close it, then explicitly open this node and group again.</p>

@@ -320,7 +320,7 @@ describe('Bucket sidebar node choice', () => {
     allBuckets.needsName.value = true
     const { root } = await mountApp(BucketSidebar, { props: { manager: withBucket() } })
 
-    expect(content(root)).toContain('Type 2 letters to search all nodes.')
+    expect(content(root)).not.toContain('letters')
     expect(content(root)).toContain('reef-survey')
   })
 })
