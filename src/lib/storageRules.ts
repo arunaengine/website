@@ -227,14 +227,18 @@ export type MoveTotals = Map<string, number>
 
 /** Keeps the largest total of each running move, so the total never shrinks. */
 export function rememberMoves(totals: MoveTotals, moves: AskedMove[]) {
-  const active = new Set<string>()
   for (const move of moves) {
-    if (!move.progress || move.progress.finished_at_ms != null) continue
+    const progress = move.progress
+    if (!progress) continue
+    const scope = `${move.bucket}\n${move.asked ?? ''}\n`
     const key = runKey(move)
-    active.add(key)
-    totals.set(key, Math.max(totals.get(key) ?? 0, move.misplaced + move.progress.migrated))
+    // A finished or superseded run of the same scope is forgotten.
+    for (const old of [...totals.keys()]) {
+      if (old.startsWith(scope) && (old !== key || progress.finished_at_ms != null)) totals.delete(old)
+    }
+    if (progress.finished_at_ms != null) continue
+    totals.set(key, Math.max(totals.get(key) ?? 0, move.misplaced + progress.migrated))
   }
-  for (const key of [...totals.keys()]) if (!active.has(key)) totals.delete(key)
 }
 
 /**
