@@ -7,7 +7,6 @@ import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import BucketRow from '@/components/data/BucketRow.vue'
 import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
-import NodePicker from '@/components/data/NodePicker.vue'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useS3 } from '@/composables/useS3'
 import type { DataManager } from '@/composables/useDataManager'
@@ -27,8 +26,6 @@ const {
   bucketNodeChoice,
   bucketNameFilter,
   allBuckets: all,
-  recentNodes,
-  pickNode,
   syncByBucket,
   syncKeyFor,
   openSearchHit,
@@ -92,8 +89,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
           <Badge variant="outline" size="count">{{ searchList ? all.hits.value.length : nodeBuckets.length }}</Badge>
         </div>
       </header>
-      <div class="space-y-2 border-b border-border px-3 py-2">
-        <NodePicker :model-value="bucketNodeChoice" :recent="recentNodes" @update:model-value="pickNode" />
+      <div class="border-b border-border px-3 py-2">
         <Input v-model="bucketNameFilter" placeholder="Search this group" aria-label="Search this group" class="h-8 text-xs" />
       </div>
       <template v-if="searchList">

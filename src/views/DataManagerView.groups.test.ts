@@ -28,7 +28,8 @@ describe('Data view group selection', () => {
 
   it('shows the group without a second picker', () => {
     expect(template).toContain('Showing buckets of')
-    expect(template).toContain('on {{ requiredNodeName }}')
+    expect(template).toContain('<span class="hidden lg:inline">on</span>')
+    expect(template.indexOf('<NodePicker')).toBeLessThan(template.indexOf('</PageHeader>'))
     expect(template).toContain('Switch the group in the top bar')
     expect(template).not.toContain('groupOptions')
     expect(template).not.toContain('DropdownMenu')

@@ -51,17 +51,16 @@ function choose(nodeId: string | null) {
   <Popover v-model:open="open">
     <button
       type="button"
-      class="flex h-8 w-full min-w-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-input bg-field px-3 text-xs text-foreground shadow-sm hover:bg-muted focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      class="inline-flex min-w-0 max-w-[14rem] items-center gap-1 rounded px-1 py-0.5 text-xs font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       aria-label="Node"
     >
-      <span class="shrink-0 text-muted-foreground">Node:</span>
       <StatusDot
         v-if="selected"
         :tone="selected.reachable ? 'done' : 'idle'"
         :label="selected.reachable ? 'Reachable' : 'Not reachable'"
       />
-      <span class="min-w-0 flex-1 truncate text-left" :title="modelValue ?? undefined">{{ modelValue ? displayName(modelValue) : 'All nodes' }}</span>
-      <ChevronDown class="h-4 w-4 shrink-0 opacity-60" />
+      <span class="min-w-0 truncate" :title="modelValue ?? undefined">{{ modelValue ? displayName(modelValue) : 'All nodes' }}</span>
+      <ChevronDown class="h-3 w-3 shrink-0 opacity-60" />
     </button>
     <template #content>
       <Input

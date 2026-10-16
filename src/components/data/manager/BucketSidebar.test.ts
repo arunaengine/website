@@ -46,12 +46,6 @@ const RowStub = defineComponent({
   setup: (props, { slots, emit }) => () =>
     h('div', [h('button', { 'aria-label': `Open ${props.bucket}`, onClick: () => emit('open') }, props.bucket), slots.actions?.()]),
 })
-const PickerStub = defineComponent({
-  props: { modelValue: { type: String, default: null } },
-  emits: ['update:modelValue'],
-  setup: (_, { emit }) => () =>
-    h('button', { 'aria-label': 'Pick node-2', onClick: () => emit('update:modelValue', 'node-2') }),
-})
 const IconButtonStub = defineComponent({
   inheritAttrs: false,
   props: { label: { type: String, default: '' }, disabledReason: { type: String, default: null } },
@@ -96,7 +90,6 @@ const BucketSidebar = compileClientComponent(new URL('./BucketSidebar.vue', impo
   '@/components/ui/IconButton.vue': moduleDefault(IconButtonStub),
   '@/components/data/BucketRow.vue': moduleDefault(RowStub),
   '@/components/data/BucketSearchBox.vue': moduleDefault(Empty),
-  '@/components/data/NodePicker.vue': moduleDefault(PickerStub),
   '@/composables/useRealmNodes': {
     useRealmNodes: () => ({
       displayName: (id: string | null) => (id ? `name-${id}` : 'this node'),
@@ -158,9 +151,10 @@ function trash(root: Parameters<typeof content>[0]) {
   return element(root, (node) => node.props['aria-label'] === 'Delete bucket…')
 }
 
-// Switches the list from All nodes to one node.
-async function pickNode(root: Parameters<typeof content>[0]) {
-  await click(element(root, (node) => node.props['aria-label'] === 'Pick node-2'))
+// Switches the list from All nodes to one node, as the header picker does.
+async function pickNode() {
+  choose('node-2')
+  await flush()
 }
 
 function field(root: Parameters<typeof content>[0]) {
@@ -208,7 +202,7 @@ describe('Bucket sidebar deletion', () => {
 
   it('hands the row bucket to the shared delete dialog', async () => {
     const { root } = await mountApp(BucketSidebar, { props: { manager: withBucket() } })
-    await pickNode(root)
+    await pickNode()
 
     await click(trash(root))
 
@@ -221,7 +215,7 @@ describe('Bucket sidebar deletion', () => {
 
   it('refuses a bucket another node serves and says why', async () => {
     const { root } = await mountApp(BucketSidebar, { props: { manager: withBucket('node-far') } })
-    await pickNode(root)
+    await pickNode()
 
     expect(trash(root).props.disabled).toBe(true)
     expect(trash(root).props.title).toContain('Only the node that serves this bucket')
@@ -230,7 +224,7 @@ describe('Bucket sidebar deletion', () => {
   it('refuses a session without write over the whole bucket', async () => {
     canDelete = false
     const { root } = await mountApp(BucketSidebar, { props: { manager: withBucket() } })
-    await pickNode(root)
+    await pickNode()
 
     expect(trash(root).props.disabled).toBe(true)
     expect(trash(root).props.title).toContain('write on the whole bucket')
@@ -291,7 +285,7 @@ describe('Bucket sidebar node choice', () => {
     state.requiredNodeId.value = 'node-2'
     const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
 
-    await pickNode(root)
+    await pickNode()
 
     expect(showNode).toHaveBeenCalledWith('node-2')
     expect(content(root)).toContain('reef-survey')

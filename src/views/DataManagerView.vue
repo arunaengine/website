@@ -228,7 +228,8 @@ async function createFolder() {
               {{ selectedGroupName }}
             </RouterLink>
             <span v-else class="text-muted-foreground">No group</span>
-            <span class="hidden max-w-[12rem] truncate lg:inline-block" :title="`${requiredNodeName} (${requiredNodeId ?? ''})`">on {{ requiredNodeName }}</span>
+            <span class="hidden lg:inline">on</span>
+            <NodePicker :model-value="bucketNodeChoice" :recent="recentNodes" @update:model-value="pickNode" />
           </div>
         </template>
         <template v-if="contextReady">
@@ -278,10 +279,8 @@ async function createFolder() {
               <Button variant="outline" size="sm" :disabled="contextBusy" @click="openSelectedContext">
                 <KeyRound class="h-4 w-4" /> Retry
               </Button>
-              <!-- The sidebar is gone while this shows, so the node choice stays here. -->
-              <div class="w-48">
-                <NodePicker :model-value="bucketNodeChoice" :recent="recentNodes" @update:model-value="pickNode" />
-              </div>
+              <span class="text-xs text-muted-foreground">Node</span>
+              <NodePicker :model-value="bucketNodeChoice" :recent="recentNodes" @update:model-value="pickNode" />
             </div>
           </div>
         </div>
