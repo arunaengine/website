@@ -249,7 +249,7 @@ describe('StorageSection', () => {
     })
     const mounted = await mount()
     expect(content(row(mounted.root, 'sequencing'))).not.toContain('Moving files')
-    expect(content(mounted.root)).toContain('Moving files: 1,240 of 3,500')
+    expect(content(mounted.root)).toContain('Moving files: 1,200 of 3,460')
     expect(labelled(row(mounted.root, 'sequencing'), 'Move files').props.disabled).toBe(true)
     mounted.app.unmount()
   })
@@ -322,6 +322,29 @@ describe('StorageSection', () => {
     const mounted = await mount()
     expect(content(mounted.root)).toContain('Moving files')
     mounted.app.unmount()
+  })
+
+  it('counts up with a fixed total while the saved progress stays 0', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      let state = { misplaced: 100, migrated: 0 }
+      getBucketMove.mockImplementation(async () => ({
+        bucket: 'x', misplaced: state.misplaced, complete: true,
+        progress: { migrated: state.migrated, skipped: 5, failed: 0, started_at_ms: 1, finished_at_ms: null },
+      }))
+      const mounted = await mount()
+      expect(content(mounted.root)).toContain('Moving files: 0 of 100')
+      const seen = []
+      for (state of [{ misplaced: 99, migrated: 0 }, { misplaced: 70, migrated: 0 }, { misplaced: 36, migrated: 64 }]) {
+        await vi.advanceTimersByTimeAsync(3_000)
+        await flush()
+        seen.push(/Moving files: [\d,]+ of [\d,]+/.exec(content(mounted.root))?.[0])
+      }
+      expect(seen).toEqual(['Moving files: 1 of 100', 'Moving files: 30 of 100', 'Moving files: 64 of 100'])
+      mounted.app.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('keeps progress and polls again after a failed later poll', async () => {

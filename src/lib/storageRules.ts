@@ -214,8 +214,28 @@ export function moveRefusal(err: unknown): string | null {
   return err.code === 'bucket_encrypted' ? 'This bucket is encrypted, so its files cannot be moved.' : null
 }
 
-/** `prefix` limits progress to moves started for that prefix; counts stay whole. */
-export function moveView(moves: BucketMoveResponse[], prefix?: string): MoveView {
+/** One key per move run, so a new run starts a new total. */
+function runKey(move: BucketMoveResponse): string {
+  return `${move.bucket}\n${move.move_prefix ?? ''}\n${move.progress?.started_at_ms}`
+}
+
+/** Files of a move run seen so far: the largest of left to move plus moved. */
+export type MoveTotals = Map<string, number>
+
+/** Keeps the largest total of each running move, so the total never shrinks. */
+export function rememberMoves(totals: MoveTotals, moves: BucketMoveResponse[]) {
+  for (const move of moves) {
+    if (!move.progress || move.progress.finished_at_ms != null) continue
+    const key = runKey(move)
+    totals.set(key, Math.max(totals.get(key) ?? 0, move.misplaced + move.progress.migrated))
+  }
+}
+
+/**
+ * `prefix` limits progress to moves started for that prefix; counts stay whole.
+ * Done counts down the live left-to-move count, as the node saves progress only per page.
+ */
+export function moveView(moves: BucketMoveResponse[], prefix?: string, totals?: MoveTotals): MoveView {
   const view: MoveView = { misplaced: 0, partial: false, running: false, done: 0 }
   for (const move of moves) {
     const progress = move.progress
@@ -224,7 +244,8 @@ export function moveView(moves: BucketMoveResponse[], prefix?: string): MoveView
     if (!progress || progress.finished_at_ms != null) continue
     if (prefix !== undefined && (move.move_prefix ?? '') !== prefix) continue
     view.running = true
-    view.done += progress.migrated + progress.skipped + progress.failed
+    const total = Math.max(totals?.get(runKey(move)) ?? 0, move.misplaced + progress.migrated)
+    view.done += Math.max(0, total - move.misplaced)
   }
   return view
 }

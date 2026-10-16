@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { bucketError, bucketTitle, defaultBucket, runActive, linkConflict, runText, splitPath, suggestBucket } from './storageRules'
+import type { BucketMoveResponse } from './api'
+import { moveText, moveView, rememberMoves, bucketError, bucketTitle, defaultBucket, runActive, linkConflict, runText, splitPath, suggestBucket } from './storageRules'
 
 const split = { backend_id: 's1', group_id: 'g1', kind: 's3', name: 'lab', public_config: { endpoint: 'https://s3' } }
 const fixed = { ...split, backend_id: 's2', public_config: { endpoint: 'https://s3', bucket: 'data' } }
@@ -73,5 +74,25 @@ describe('storageRules', () => {
     for (const state of ['succeeded', 'failed', 'cancelled', 'indeterminate']) {
       expect(runActive({ ...run, state })).toBe(false)
     }
+  })
+
+  it('counts a move up from a total that never shrinks', () => {
+    const at = (misplaced: number, migrated: number, started = 1): BucketMoveResponse => ({
+      bucket: 'b', misplaced, complete: true,
+      progress: { migrated, skipped: 9, failed: 0, started_at_ms: started, finished_at_ms: null },
+    })
+    const totals = new Map<string, number>()
+    const text = (move: BucketMoveResponse) => {
+      rememberMoves(totals, [move])
+      return moveText(moveView([move], undefined, totals))
+    }
+    expect(text(at(100, 0))).toBe('Moving files: 0 of 100')
+    expect(text(at(99, 0))).toBe('Moving files: 1 of 100')
+    expect(text(at(36, 64))).toBe('Moving files: 64 of 100')
+    // A saved page never moves the number back or past the total.
+    expect(text(at(36, 70))).toBe('Moving files: 70 of 106')
+    expect(text(at(10, 90))).toBe('Moving files: 96 of 106')
+    // A new run has its own total.
+    expect(text(at(20, 0, 2))).toBe('Moving files: 0 of 20')
   })
 })

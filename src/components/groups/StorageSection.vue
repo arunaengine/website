@@ -41,6 +41,8 @@ import {
   moveRefusal,
   moveText,
   moveView,
+  rememberMoves,
+  type MoveTotals,
   runActive,
   runText,
   splitPath,
@@ -144,6 +146,8 @@ async function listGroupBuckets(groupId: string, asked: ReturnType<typeof client
   return [...names]
 }
 
+const moveTotals: MoveTotals = new Map()
+
 async function loadMoves() {
   const seq = loadSeq
   const asked = client()
@@ -168,6 +172,7 @@ async function loadMoves() {
     if (known) next[key] = known
   })
   groupBuckets.value = buckets
+  rememberMoves(moveTotals, Object.values(next))
   moves.value = next
 }
 
@@ -292,10 +297,11 @@ const defaultMove = computed(() =>
   moveView(
     groupBuckets.value.flatMap((bucket) => found(bucket, '')),
     '',
+    moveTotals,
   ),
 )
 function linkMove(link: BackendImport) {
-  return moveView(found(link.bucket, link.key_prefix))
+  return moveView(found(link.bucket, link.key_prefix), undefined, moveTotals)
 }
 // Only buckets that have something to move are asked.
 const defaultPairs = computed(() =>
