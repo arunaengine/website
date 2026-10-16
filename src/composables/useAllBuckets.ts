@@ -11,7 +11,7 @@ const MIN_CHARS = 2
 const TYPING_MS = 250
 
 export function useAllBuckets(query: Ref<string>, groupId: Ref<string>, enabled: Ref<boolean>) {
-  const { searchBuckets } = useAruna()
+  const { authToken, searchBuckets, sessionEpoch } = useAruna()
   const hits = ref<BucketSearchHit[]>([])
   const failedNodes = ref(0)
   const loading = ref(false)
@@ -39,7 +39,7 @@ export function useAllBuckets(query: Ref<string>, groupId: Ref<string>, enabled:
     const term = query.value.trim()
     if (next && !cursor) return
     if (!next) reset()
-    if (!enabled.value || !groupId.value || (term && term.length < MIN_CHARS)) return
+    if (!enabled.value || !groupId.value || !authToken.value || (term && term.length < MIN_CHARS)) return
     const id = ++seq
     const after = next ? cursor : null
     loading.value = true
@@ -70,7 +70,15 @@ export function useAllBuckets(query: Ref<string>, groupId: Ref<string>, enabled:
     }
   }
 
-  watch([groupId, enabled], () => void load(), { immediate: true })
+  // Another group, account or sign-in starts over, including the fallback for older nodes.
+  watch(
+    [groupId, enabled, sessionEpoch, () => Boolean(authToken.value)],
+    () => {
+      needsName.value = false
+      void load()
+    },
+    { immediate: true },
+  )
   // Every keystroke drops the old answer at once; only the new request waits.
   watch(query, () => {
     clearTimeout(timer)

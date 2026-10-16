@@ -5,7 +5,9 @@ import { ApiError, type BucketSearchHit, type BucketSearchResponse } from '@/lib
 const searchBuckets = vi.fn<
   (q: string, options: { limit?: number; groupId?: string; cursor?: string }) => Promise<BucketSearchResponse>
 >()
-vi.mock('@/composables/useAruna', () => ({ useAruna: () => ({ searchBuckets }) }))
+const authToken = ref('t')
+const sessionEpoch = ref(1)
+vi.mock('@/composables/useAruna', () => ({ useAruna: () => ({ authToken, searchBuckets, sessionEpoch }) }))
 
 const { BUCKET_PAGE, useAllBuckets } = await import('./useAllBuckets')
 
@@ -21,16 +23,26 @@ const settle = async () => {
   for (let i = 0; i < 4; i++) await nextTick()
 }
 
+const scopes: ReturnType<typeof effectScope>[] = []
+
 function start(enabled = true) {
   const query = ref('')
   const scope = effectScope()
+  scopes.push(scope)
   const list = scope.run(() => useAllBuckets(query, ref('g1'), ref(enabled)))!
   return { query, list, scope }
 }
 
 describe('all-nodes bucket list', () => {
-  beforeEach(() => searchBuckets.mockReset())
-  afterEach(() => vi.useRealTimers())
+  beforeEach(() => {
+    searchBuckets.mockReset()
+    authToken.value = 't'
+    sessionEpoch.value = 1
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    scopes.splice(0).forEach((scope) => scope.stop())
+  })
 
   it('lists the group buckets of every node and counts nodes that did not answer', async () => {
     searchBuckets.mockResolvedValue(
@@ -109,6 +121,44 @@ describe('all-nodes bucket list', () => {
     answerLate(answer([hit('raw-data')]))
     await settle()
     expect(list.hits.value).toEqual([])
+  })
+
+  it('waits for the sign-in of a deep link, then lists', async () => {
+    authToken.value = ''
+    searchBuckets.mockResolvedValue(answer([hit('results')]))
+    const { list } = start()
+    await settle()
+    expect(searchBuckets).not.toHaveBeenCalled()
+
+    authToken.value = 't'
+    sessionEpoch.value = 2
+    await settle()
+
+    expect(searchBuckets).toHaveBeenCalledTimes(1)
+    expect(list.hits.value.map((entry) => entry.bucket)).toEqual(['results'])
+  })
+
+  it('starts over for another account in the same group', async () => {
+    searchBuckets
+      .mockResolvedValueOnce(answer([hit('mine')], { next_cursor: 'c1' }))
+      .mockRejectedValueOnce(new ApiError(400, 'Bad Request'))
+      .mockResolvedValueOnce(answer([hit('theirs')]))
+    const { list } = start()
+    await settle()
+    expect(list.more.value).toBe(true)
+
+    // The first account reaches an older node, which needs a name.
+    sessionEpoch.value = 2
+    await settle()
+    expect(list.hits.value).toEqual([])
+    expect(list.needsName.value).toBe(true)
+
+    sessionEpoch.value = 3
+    await settle()
+    expect(searchBuckets).toHaveBeenLastCalledWith('', { limit: BUCKET_PAGE, groupId: 'g1', cursor: undefined })
+    expect(list.needsName.value).toBe(false)
+    expect(list.hits.value.map((entry) => entry.bucket)).toEqual(['theirs'])
+    expect(list.more.value).toBe(false)
   })
 
   it('stays quiet while one node is chosen', async () => {
