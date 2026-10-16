@@ -327,6 +327,19 @@ describe('Bucket sidebar node choice', () => {
     otherSearch.value = []
   })
 
+  it('names the browsed node on workspace rows', async () => {
+    const state = {
+      ...manager(),
+      remoteNodeId: ref<string | null>('node-2'),
+      bucketNodeChoice: ref<string | null>('node-2'),
+      workspaceBuckets: ref([{ name: 'ws-run-1' }]),
+      workspacesOpen: ref(true),
+    }
+    const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
+
+    expect(element(root, (node) => node.tag === 'button' && content(node).includes('ws-run-1')).props.title).toBe('On name-node-2')
+  })
+
   it('falls back to the open node list when the node needs a name', async () => {
     allBuckets.needsName.value = true
     const { root } = await mountApp(BucketSidebar, { props: { manager: withBucket() } })

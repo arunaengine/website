@@ -200,7 +200,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
               <li v-for="entry in workspaceBuckets" :key="entry.name">
                 <button
                   class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-muted"
-                  :title="rowNode(null)"
+                  :title="rowNode(remoteNodeId)"
                   :class="entry.name === bucket && !remoteNodeId ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground'"
                   @click="openBucket(entry.name)"
                 >
