@@ -14,9 +14,10 @@ import Spinner from '@/components/ui/Spinner.vue'
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { Trash2 } from '@lucide/vue'
+import { removeBucket } from '@/components/groups/bucketRemoval'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
-import { ApiError, sortDeletionCheck, type DeletionCheck } from '@/lib/api'
+import { ApiError, sortDeletionCheck, type DeletionCheck, type NodeDeletionBlockers } from '@/lib/api'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { errorMessage } from '@/lib/utils'
 
@@ -38,6 +39,10 @@ const unavailable = ref(false)
 const refusal = ref<string | null>(null)
 // Local, so a second click cannot start a second delete before `saving` renders.
 const deleting = ref(false)
+// The bucket waiting for its inline confirmation, the one being deleted, and its failure.
+const confirming = ref<string | null>(null)
+const removing = ref<string | null>(null)
+const removeError = ref<{ key: string; message: string } | null>(null)
 let checkSeq = 0
 
 const canDelete = computed(() => unavailable.value || Boolean(check.value?.clear))
@@ -74,6 +79,8 @@ watch(
     check.value = null
     unavailable.value = false
     refusal.value = null
+    confirming.value = null
+    removeError.value = null
     void runCheck()
   },
   { immediate: true },
@@ -102,6 +109,30 @@ async function remove() {
     if (!unavailable.value) void runCheck()
   } finally {
     deleting.value = false
+  }
+}
+
+const bucketKey = (nodeId: string, bucket: string) => `${nodeId}/${bucket}`
+
+// Bucket names replace the plain "S3 buckets" line; without names it stays.
+function otherKinds(node: NodeDeletionBlockers): string[] {
+  const named = node.buckets.length > 0 || (node.hidden ?? 0) > 0
+  return node.kinds.filter((kind) => !(named && kind === 'S3 buckets'))
+}
+
+async function removeOne(nodeId: string, bucket: string) {
+  if (removing.value) return
+  const key = bucketKey(nodeId, bucket)
+  removing.value = key
+  removeError.value = null
+  try {
+    await removeBucket(nodeId, props.groupId, bucket)
+    confirming.value = null
+    await runCheck()
+  } catch (err) {
+    removeError.value = { key, message: errorMessage(err) }
+  } finally {
+    removing.value = null
   }
 }
 
@@ -135,19 +166,63 @@ function bucketRoute(nodeId: string, bucket: string) {
             class="rounded-md border border-border px-3 py-2 text-xs"
           >
             <NodeLabel :node-id="node.node_id" class="font-semibold text-foreground" />
-            <ul class="mt-1 space-y-0.5 text-foreground">
-              <li v-for="kind in node.kinds" :key="kind">
-                {{ kind }}<template v-if="kind === 'S3 buckets' && node.buckets.length > 0">:
-                  <template v-for="(bucket, index) in node.buckets" :key="bucket">
-                    <RouterLink
-                      :to="bucketRoute(node.node_id, bucket)"
-                      class="font-mono text-primary hover:underline"
-                    >{{ bucket }}</RouterLink><template v-if="index < node.buckets.length - 1">, </template>
-                  </template>
-                  <template v-if="node.more">, and more</template>
-                </template>
+            <ul v-if="otherKinds(node).length > 0" class="mt-1 space-y-0.5 text-foreground">
+              <li v-for="kind in otherKinds(node)" :key="kind">{{ kind }}</li>
+            </ul>
+            <ul v-if="node.buckets.length > 0" class="mt-1 space-y-1">
+              <li v-for="bucket in node.buckets" :key="bucket">
+                <div class="flex items-center gap-2">
+                  <span class="min-w-0 flex-1 truncate font-mono text-foreground">{{ bucket }}</span>
+                  <RouterLink :to="bucketRoute(node.node_id, bucket)" class="text-primary hover:underline">Open</RouterLink>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    class="h-6 px-2 text-xs text-destructive"
+                    :aria-label="`Delete ${bucket}`"
+                    :disabled="Boolean(removing) || writesDisabled"
+                    @click="confirming = bucketKey(node.node_id, bucket)"
+                  >
+                    Delete
+                  </Button>
+                </div>
+                <div
+                  v-if="confirming === bucketKey(node.node_id, bucket)"
+                  class="mt-1 rounded-md border border-destructive/40 bg-destructive/5 p-2"
+                >
+                  <p class="text-foreground">
+                    Delete {{ bucket }} and all its files on {{ displayName(node.node_id) }}? This cannot be undone.
+                  </p>
+                  <div class="mt-2 flex gap-2">
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      class="h-6 px-2 text-xs"
+                      :aria-label="`Confirm delete ${bucket}`"
+                      :disabled="Boolean(removing)"
+                      @click="removeOne(node.node_id, bucket)"
+                    >
+                      <Spinner v-if="removing === bucketKey(node.node_id, bucket)" label="Deleting…" /> Delete
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      class="h-6 px-2 text-xs"
+                      :disabled="Boolean(removing)"
+                      @click="confirming = null"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+                <p v-if="removeError?.key === bucketKey(node.node_id, bucket)" class="mt-1 text-destructive">
+                  {{ removeError.message }}
+                </p>
               </li>
             </ul>
+            <p v-if="node.more" class="mt-1 text-muted-foreground">More buckets are not shown.</p>
+            <p v-if="node.hidden" class="mt-1 text-muted-foreground">
+              {{ node.hidden }} {{ node.hidden === 1 ? 'bucket' : 'buckets' }} you cannot access
+            </p>
           </div>
           <div
             v-for="node in check.unanswered"

@@ -1,13 +1,24 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { button, click, compileClientComponent, content, flush, moduleDefault, mountApp, nodes } from '@/test/clientRender'
+import {
+  button,
+  click,
+  compileClientComponent,
+  content,
+  element,
+  flush,
+  moduleDefault,
+  mountApp,
+  nodes,
+} from '@/test/clientRender'
 import * as Api from '@/lib/api'
 import * as Utils from '@/lib/utils'
 import type { GroupDeletionBlockers } from '@/lib/api'
 
 const getGroupDeletionBlockers = vi.fn<(id: string) => Promise<GroupDeletionBlockers>>()
 const deleteGroup = vi.fn<(id: string) => Promise<void>>()
+const removeBucket = vi.fn<(nodeId: string, groupId: string, bucket: string) => Promise<void>>()
 const writesDisabled = ref(false)
 
 const Passthrough = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
@@ -37,6 +48,7 @@ const DeleteGroupDialog = compileClientComponent(new URL('./DeleteGroupDialog.vu
   '@/lib/api': Api,
   '@/lib/utils': Utils,
   '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled }) },
+  '@/components/groups/bucketRemoval': { removeBucket },
   '@/composables/useAruna': {
     useAruna: () => ({ getGroupDeletionBlockers, deleteGroup, saving: ref(false) }),
   },
@@ -110,6 +122,7 @@ describe('Delete group dialog', () => {
   beforeEach(() => {
     getGroupDeletionBlockers.mockReset().mockResolvedValue(CLEAR)
     deleteGroup.mockReset().mockResolvedValue(undefined)
+    removeBucket.mockReset().mockResolvedValue(undefined)
     writesDisabled.value = false
   })
 
@@ -121,7 +134,9 @@ describe('Delete group dialog', () => {
     expect(getGroupDeletionBlockers).toHaveBeenCalledWith('g1')
     expect(text).toContain('These must be removed before the group can be deleted.')
     expect(text).toContain('metadata documents')
-    expect(text).toContain('lab-data, raw-scans, and more')
+    expect(text).toContain('lab-data')
+    expect(text).toContain('raw-scans')
+    expect(text).toContain('More buckets are not shown.')
     expect(text).toContain('Nothing left on: name-quiet, name-empty')
     expect(deleteButton(root).props.disabled).toBe(true)
     expect(text).toContain('Remove everything above first.')
@@ -139,6 +154,53 @@ describe('Delete group dialog', () => {
       { name: 'bucket', params: { bucketId: 'raw-scans' }, query: { node: 'remote', group: 'g1' } },
       { name: 'bucket', params: { bucketId: 'home' }, query: { group: 'g1' } },
     ])
+  })
+
+  it('deletes a blocking bucket on its node after an inline confirmation', async () => {
+    getGroupDeletionBlockers.mockResolvedValueOnce(BLOCKED).mockResolvedValueOnce(CLEAR)
+    const { root } = await mount()
+
+    await click(element(root, (node) => node.props['aria-label'] === 'Delete lab-data'))
+    expect(content(root)).toContain('Delete lab-data and all its files on name-remote? This cannot be undone.')
+    expect(removeBucket).not.toHaveBeenCalled()
+
+    await click(element(root, (node) => node.props['aria-label'] === 'Confirm delete lab-data'))
+    await flush()
+
+    expect(removeBucket).toHaveBeenCalledWith('remote', 'g1', 'lab-data')
+    expect(getGroupDeletionBlockers).toHaveBeenCalledTimes(2)
+    expect(content(root)).toContain('Nothing blocks deletion.')
+    expect(deleteButton(root).props.disabled).toBe(false)
+  })
+
+  it('names a failed bucket delete and keeps the group delete off', async () => {
+    getGroupDeletionBlockers.mockResolvedValue(BLOCKED)
+    removeBucket.mockRejectedValueOnce(new Error('bucket is locked'))
+    const { root } = await mount()
+
+    await click(element(root, (node) => node.props['aria-label'] === 'Delete home'))
+    await click(element(root, (node) => node.props['aria-label'] === 'Confirm delete home'))
+    await flush()
+
+    expect(removeBucket).toHaveBeenCalledWith('local', 'g1', 'home')
+    expect(content(root)).toContain('bucket is locked')
+    expect(deleteButton(root).props.disabled).toBe(true)
+  })
+
+  it('counts the buckets the caller cannot see and blocks on them', async () => {
+    getGroupDeletionBlockers.mockResolvedValue({
+      nodes: [
+        { node_id: 'remote', kinds: ['S3 buckets'], buckets: ['lab-data'], more: false, hidden: 2 },
+        { node_id: 'dark', kinds: [], buckets: [], more: false, hidden: 1 },
+      ],
+    })
+    const { root } = await mount()
+    const text = content(root)
+
+    expect(text).toContain('2 buckets you cannot access')
+    expect(text).toContain('1 bucket you cannot access')
+    expect(text).not.toContain('Nothing left on')
+    expect(deleteButton(root).props.disabled).toBe(true)
   })
 
   it('deletes when nothing blocks and tells the page', async () => {

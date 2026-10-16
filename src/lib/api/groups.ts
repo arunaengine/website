@@ -51,11 +51,13 @@ export function setGroupLocation(
 // GET /access/groups/{id}/deletion-blockers: what each realm node still holds
 // for the group. `error` means the node did not answer; `buckets` lists at most
 // five readable names and `more` says further blocking buckets exist.
+// `hidden` counts blocking buckets the caller cannot read; older nodes omit it.
 export interface NodeDeletionBlockers {
   node_id: string
   kinds: string[]
   buckets: string[]
   more: boolean
+  hidden?: number
   error?: string
 }
 
@@ -84,9 +86,10 @@ export function getGroupDeletionBlockers(
 // Deletion is only safe when every node answered and none holds anything.
 export function sortDeletionCheck(response: GroupDeletionBlockers): DeletionCheck {
   const answered = response.nodes.filter((node) => !node.error)
-  const blocking = answered.filter((node) => node.kinds.length > 0)
+  const blocks = (node: NodeDeletionBlockers) => node.kinds.length > 0 || (node.hidden ?? 0) > 0
+  const blocking = answered.filter(blocks)
   const unanswered = response.nodes.filter((node) => node.error)
-  const empty = answered.filter((node) => node.kinds.length === 0).map((node) => node.node_id)
+  const empty = answered.filter((node) => !blocks(node)).map((node) => node.node_id)
   return { blocking, unanswered, empty, clear: blocking.length === 0 && unanswered.length === 0 }
 }
 
