@@ -115,3 +115,41 @@ describe('search hit in another group', () => {
     expect(activeContext.value?.groupId).toBe('g-b')
   })
 })
+
+describe('name filter refresh', () => {
+  it('keeps the view ready while a filter reloads after an empty result', async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/buckets', name: 'buckets', component: View },
+        { path: '/buckets/:bucketId', name: 'bucket', component: View },
+      ],
+    })
+    await router.push({ name: 'bucket', params: { bucketId: 'reef' }, query: { group: 'g-b' } })
+    let manager: ReturnType<typeof useDataManager> | null = null
+    const host = defineComponent({
+      setup: () => {
+        manager = useDataManager()
+        return () => null
+      },
+    })
+    await mountApp(host, { router })
+    for (let round = 0; round < 6; round++) await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(manager!.viewReady.value).toBe(true)
+
+    manager!.nameFilter.value = 'nomatch'
+    await flush()
+    await flush()
+    expect(manager!.viewReady.value).toBe(true)
+
+    let finish: (page: { folders: never[]; objects: never[] }) => void = () => undefined
+    s3.listObjects.mockImplementationOnce(() => new Promise((resolve) => (finish = resolve as never)) as never)
+    manager!.nameFilter.value = 'no'
+    await flush()
+    expect(manager!.listLoading.value).toBe(true)
+    expect(manager!.viewReady.value).toBe(true)
+    finish({ folders: [], objects: [] })
+    await flush()
+    expect(manager!.listLoading.value).toBe(false)
+  })
+})

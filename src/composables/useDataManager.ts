@@ -80,12 +80,13 @@ export function dataViewReady(state: {
   bucketsFailed: boolean
   bucket: string
   listLoading: boolean
-  listedCount: number
+  /** A listing of this bucket has finished, even an empty one. */
+  listedOnce: boolean
 }): boolean {
   if (!state.contextReady) return false
   if (state.remoteBlocked) return true
   // Only the first page blocks: paging must not take the listing off screen.
-  const listingPending = Boolean(state.bucket) && state.listLoading && state.listedCount === 0
+  const listingPending = Boolean(state.bucket) && state.listLoading && !state.listedOnce
   return (state.bucketsLoaded || state.bucketsFailed) && !listingPending
 }
 
@@ -672,6 +673,7 @@ export function useDataManager() {
   const listedKeys = computed(() => new Set(objects.value.map((object) => object.key)))
 
   let listRequestId = 0
+  const listedOnce = ref(false)
 
   // Deletion dialogs drop their target and pending preflight when the listing
   // they were opened from is replaced.
@@ -682,6 +684,7 @@ export function useDataManager() {
 
   function clearObjectListing() {
     ++listRequestId
+    listedOnce.value = false
     folders.value = []
     objects.value = []
     pages.reset()
@@ -732,7 +735,10 @@ export function useDataManager() {
         }
       }
     } finally {
-      if (requestId === listRequestId) listLoading.value = false
+      if (requestId === listRequestId) {
+        listLoading.value = false
+        listedOnce.value = true
+      }
     }
   }
 
@@ -1299,7 +1305,7 @@ export function useDataManager() {
       bucketsFailed: Boolean(bucketsError.value),
       bucket: bucket.value,
       listLoading: listLoading.value,
-      listedCount: folders.value.length + objects.value.length,
+      listedOnce: listedOnce.value,
     }),
   )
 

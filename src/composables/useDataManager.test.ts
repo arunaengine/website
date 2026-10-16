@@ -11,7 +11,7 @@ function state(overrides: Partial<ReadyState> = {}): ReadyState {
     bucketsFailed: false,
     bucket: '',
     listLoading: false,
-    listedCount: 0,
+    listedOnce: false,
     ...overrides,
   }
 }
@@ -34,7 +34,7 @@ describe('Data view readiness', () => {
   })
 
   it('keeps a listing on screen while it pages', () => {
-    expect(dataViewReady(state({ bucket: 'data', listLoading: true, listedCount: 40 }))).toBe(true)
+    expect(dataViewReady(state({ bucket: 'data', listLoading: true, listedOnce: true }))).toBe(true)
   })
 
   it('opens when a remote node cannot be browsed', () => {
@@ -42,7 +42,7 @@ describe('Data view readiness', () => {
   })
 
   it('opens once the bucket list and the listing settled', () => {
-    expect(dataViewReady(state({ bucket: 'data', listedCount: 3 }))).toBe(true)
+    expect(dataViewReady(state({ bucket: 'data', listedOnce: true }))).toBe(true)
   })
 })
 
