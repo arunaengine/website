@@ -167,7 +167,7 @@ function field(root: Parameters<typeof content>[0]) {
 }
 
 function createButton(root: Parameters<typeof content>[0]) {
-  return element(root, (node) => node.tag === 'button' && content(node).includes('New bucket'))
+  return element(root, (node) => node.tag === 'button' && node.props['aria-label'] === 'Create bucket')
 }
 
 describe('Bucket sidebar naming', () => {
@@ -285,7 +285,7 @@ describe('Bucket sidebar node choice', () => {
     expect(loadMore).toHaveBeenCalledOnce()
   })
 
-  it('lists one node after picking it and names it on the create button', async () => {
+  it('lists one node after picking it and names it in the create button title', async () => {
     const state = withBucket()
     state.requiredNodeId.value = 'node-2'
     const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
@@ -295,7 +295,6 @@ describe('Bucket sidebar node choice', () => {
     expect(showNode).toHaveBeenCalledWith('node-2')
     expect(content(root)).toContain('reef-survey')
     expect(content(root)).not.toContain('results')
-    expect(content(createButton(root))).not.toContain('name-node-2')
     expect(createButton(root).props.title).toBe('Creates the bucket on name-node-2')
   })
 

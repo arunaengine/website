@@ -232,18 +232,20 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
         </ul>
       </div>
       <footer class="space-y-2 border-t border-border p-3">
-        <Input
-          v-model="newBucketName"
-          data-tour="bucket-create"
-          placeholder="new-bucket-name"
-          class="h-8 font-mono text-xs"
-          :invalid="newBucketProblem ? 'error' : undefined"
-          aria-label="New bucket name"
-          @keyup.enter="createBucket"
-        />
-        <Button variant="outline" size="sm" class="w-full" :title="`Creates the bucket on ${createNode}`" :disabled="creatingBucket || !newBucketName.trim() || Boolean(createBucketBlocker)" @click="createBucket">
-          <FolderPlus class="h-4 w-4" /> New bucket
-        </Button>
+        <div class="flex gap-2">
+          <Input
+            v-model="newBucketName"
+            data-tour="bucket-create"
+            placeholder="new-bucket-name"
+            class="h-8 font-mono text-xs"
+            :invalid="newBucketProblem ? 'error' : undefined"
+            aria-label="New bucket name"
+            @keyup.enter="createBucket"
+          />
+          <Button variant="outline" size="sm" aria-label="Create bucket" :title="`Creates the bucket on ${createNode}`" :disabled="creatingBucket || !newBucketName.trim() || Boolean(createBucketBlocker)" @click="createBucket">
+            <FolderPlus class="h-4 w-4" />
+          </Button>
+        </div>
         <p v-if="createBucketError" class="text-xs text-destructive">{{ createBucketError }}</p>
         <p v-else-if="newBucketProblem" class="text-xs text-destructive">{{ newBucketProblem }}</p>
         <p v-else-if="newBucketRefusal" class="text-xs text-muted-foreground">{{ newBucketRefusal }}</p>
