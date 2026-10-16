@@ -11,7 +11,14 @@ const createBackendImport = vi.fn()
 const updateBackendImport = vi.fn()
 const startBucketMove = vi.fn()
 const runBackendImport = vi.fn()
-const checkProviderBucket = vi.fn()
+// The shared live check runs for real; only its request is a stand-in.
+const { checkProviderBucket } = vi.hoisted(() => ({ checkProviderBucket: vi.fn() }))
+vi.mock('@/lib/api', async (original) => ({ ...(await original<object>()), checkProviderBucket }))
+vi.mock('@/composables/useAruna', async () => {
+  const { ref } = await import('vue')
+  return { useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('bearer') }) }
+})
+const BucketCheck = await import('@/composables/useBucketCheck')
 const onSaved = vi.fn()
 const onOpen = vi.fn()
 const activeContext = ref({ nodeId: 'n1', groupId: 'g1' })
@@ -64,7 +71,8 @@ const LinkedFolderDialog = compileClientComponent(new URL('./LinkedFolderDialog.
   },
   '@/composables/useS3': { useS3: () => ({ activeContext, nodeIdFor: () => 'n1' }) },
   '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled: ref(false) }) },
-  '@/lib/api': { ...Api, checkProviderBucket, createBackendImport, updateBackendImport, runBackendImport, startBucketMove },
+  '@/composables/useBucketCheck': BucketCheck,
+  '@/lib/api': { ...Api, createBackendImport, updateBackendImport, runBackendImport, startBucketMove },
   '@/lib/linkedFolders': LinkedFolders,
   '@/lib/storageRules': StorageRules,
   '@/lib/utils': Utils,
@@ -359,13 +367,35 @@ describe('LinkedFolderDialog', () => {
       return mounted
     }
 
-    it('names an existing bucket', async () => {
-      checkProviderBucket.mockResolvedValue({ bucket: 'lab-raw', exists: true })
+    it('names an existing bucket the keys can write to', async () => {
+      checkProviderBucket.mockResolvedValue({ bucket: 'lab-raw', exists: true, writable: true })
       const mounted = await typed('lab-raw')
 
       expect(checkProviderBucket).toHaveBeenCalledTimes(1)
       expect(checkProviderBucket).toHaveBeenCalledWith('g1', 's1', 'lab-raw', expect.anything())
-      expect(content(mounted.root)).toContain('Existing bucket')
+      expect(content(mounted.root)).toContain('Existing bucket. Aruna can write here.')
+      mounted.app.unmount()
+    })
+
+    it('warns about an existing bucket the keys cannot write to', async () => {
+      checkProviderBucket.mockResolvedValue({ bucket: 'lab-raw', exists: true, writable: false })
+      const mounted = await typed('lab-raw')
+      const note = element(mounted.root, (node) => node.tag === 'p' && content(node).includes('cannot write'))
+
+      expect(content(note)).toContain('Existing bucket. These keys cannot write here.')
+      expect(String(note.props.class)).toContain('text-amber-700')
+      // The warning never blocks saving; the save itself probes the bucket.
+      await choose(mounted.root, 'To Aruna bucket', 'sequencing')
+      expect(button(mounted.root, 'Link and run').props.disabled).toBe(false)
+      mounted.app.unmount()
+    })
+
+    it('names only an existing bucket on an older node', async () => {
+      checkProviderBucket.mockResolvedValue({ bucket: 'lab-raw', exists: true })
+      const mounted = await typed('lab-raw')
+
+      expect(content(mounted.root)).toContain('Existing bucket.')
+      expect(content(mounted.root)).not.toContain('write here')
       mounted.app.unmount()
     })
 
