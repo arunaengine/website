@@ -481,10 +481,12 @@ export function useDataManager() {
       nodeId: entry.nodeId ?? null,
       pinned: true,
     }))
-    const pinnedLocal = new Set(pinned.filter((entry) => !entry.nodeId).map((entry) => entry.bucket))
+    // The listed buckets live on the node of the open session.
+    const nodeId = remoteNodeId.value
+    const pinnedLocal = new Set(pinned.filter((entry) => entry.nodeId === nodeId).map((entry) => entry.bucket))
     const locals = regularBuckets.value
       .filter((entry) => !pinnedLocal.has(entry.name))
-      .map((entry) => ({ bucket: entry.name, nodeId: null, pinned: false }))
+      .map((entry) => ({ bucket: entry.name, nodeId, pinned: false }))
     return [...pinned, ...locals]
   })
 
@@ -867,7 +869,8 @@ export function useDataManager() {
     [bucket, bucketsLoaded, regularBuckets, selectedGroupId, stickyScope],
     () => {
       const scope = stickyScope.value
-      if (bucket.value || !scope) return
+      // Another node's bucket-less route lists that node; it reopens nothing.
+      if (bucket.value || !scope || remoteNodeId.value) return
       const step = stickyBucketStep({
         memory: readLastBucket(scope),
         groupId: selectedGroupId.value,
@@ -899,6 +902,17 @@ export function useDataManager() {
 
   function openBucket(name: string) {
     openBucketOn(name, null)
+  }
+
+  // Lists the buckets of one node: its session opens the way a deep link would.
+  function showNode(nodeId: string) {
+    if (s3.nodeIdFor(nodeId) === requiredNodeId.value) return
+    const query = {
+      ...(realmNodes.isLocalNode(nodeId) ? {} : { node: nodeId }),
+      ...(selectedGroupId.value ? { group: selectedGroupId.value } : {}),
+      ...notebooksQuery.value,
+    }
+    void navigate(() => router.push({ name: 'buckets', query }))
   }
 
   function openSearchHit(hit: BucketSearchHit) {
@@ -939,7 +953,7 @@ export function useDataManager() {
       await s3.createBucket(name)
       newBucketName.value = ''
       await bucketList.refresh()
-      openBucket(name)
+      openBucketOn(name, remoteNodeId.value)
     } catch (err) {
       createBucketError.value = s3ErrorMessage(err, name)
     } finally {
@@ -1405,6 +1419,7 @@ export function useDataManager() {
     setAllListedSelected,
     clearSelection: selection.clearSelection,
     openBucketOn,
+    showNode,
     openBucket,
     openSearchHit,
     navigateTo,

@@ -7,18 +7,26 @@ import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import BucketRow from '@/components/data/BucketRow.vue'
 import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
+import NodePicker from '@/components/data/NodePicker.vue'
+import { useAllBuckets } from '@/composables/useAllBuckets'
+import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useS3 } from '@/composables/useS3'
 import type { DataManager } from '@/composables/useDataManager'
 import type { BucketSearchHit } from '@/lib/api'
 import { Boxes, ChevronRight, FolderPlus, History, KeyRound, Trash2 } from '@lucide/vue'
+import { computed, ref, watch } from 'vue'
 
 const props = defineProps<{ manager: DataManager }>()
 const emit = defineEmits<{ (e: 'sync', hit: BucketSearchHit): void }>()
 
 const s3 = useS3()
+const realmNodes = useRealmNodes()
 const {
   bucket,
   remoteNodeId,
+  requiredNodeId,
+  selectedGroupId,
+  showNode,
   syncByBucket,
   syncKeyFor,
   openSearchHit,
@@ -44,6 +52,36 @@ const {
   requestDelete,
 } = props.manager
 
+// Null lists every node through the bucket search; a node id lists that node's own buckets.
+const nodeChoice = ref<string | null>(null)
+const nameFilter = ref('')
+const allNodes = computed(() => nodeChoice.value === null)
+const all = useAllBuckets(nameFilter, selectedGroupId, allNodes)
+// An older node cannot list without a name; the open node's list stands in.
+const searchList = computed(() => allNodes.value && !all.needsName.value)
+const recentNodes = computed(() => [
+  ...new Set(shortcuts.recent.value.map((entry) => entry.nodeId).filter((id): id is string => Boolean(id))),
+])
+const nodeBuckets = computed(() => {
+  const term = nameFilter.value.trim().toLowerCase()
+  return term ? sidebarBuckets.value.filter((entry) => entry.bucket.toLowerCase().includes(term)) : sidebarBuckets.value
+})
+const createNode = computed(() => realmNodes.displayName(requiredNodeId.value))
+
+function pickNode(nodeId: string | null) {
+  nodeChoice.value = nodeId
+  if (nodeId) showNode(nodeId)
+}
+
+// Opening a bucket on another node moves a one-node list along.
+watch(requiredNodeId, (nodeId) => {
+  if (nodeChoice.value !== null) nodeChoice.value = nodeId
+})
+
+function openHit(hit: BucketSearchHit) {
+  openBucketOn(hit.bucket, realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id)
+}
+
 // Bucket deletion lives on the row it destroys; the shared dialog does the rest.
 function deleteRefusal(name: string, nodeId: string | null): string | null {
   if (nodeId) return 'Only the node that serves this bucket can delete it.'
@@ -66,107 +104,144 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
         <div class="flex items-center gap-2">
           <!-- Background revalidation only: the cached list stays readable behind it. -->
           <Spinner v-if="bucketsRefreshing" label="Refreshing buckets…" />
-          <Badge variant="outline" size="count">{{ sidebarBuckets.length }}</Badge>
+          <Badge variant="outline" size="count">{{ searchList ? all.hits.value.length : nodeBuckets.length }}</Badge>
         </div>
       </header>
-      <Spinner v-if="bucketsLoading" show-label label="Loading buckets…" class="px-4 py-4" />
-      <Notice v-else-if="bucketsError && bucketsAuthError" tone="warning" class="m-3">
-        <p>The temporary S3 session was rejected. Close it, then explicitly open this node and group again.</p>
-        <p class="mt-1 break-all font-mono text-[10px]">{{ bucketsError }}</p>
-        <Button variant="outline" size="sm" class="mt-2" @click="s3.clearSessions()"><KeyRound class="h-3.5 w-3.5" /> Close temporary sessions</Button>
-      </Notice>
-      <p v-else-if="bucketsError && !bucketsLoaded" class="px-4 py-3 text-xs text-destructive">{{ bucketsError }}</p>
-      <template v-else>
-        <!-- A failed revalidation keeps the last good list and reports itself above it. -->
-        <p v-if="bucketsError" class="border-b border-border/70 px-4 py-2 text-xs text-destructive">{{ bucketsError }}</p>
-        <ul v-if="sidebarBuckets.length" class="max-h-[420px] overflow-y-auto py-1">
-          <li
-            v-for="entry in sidebarBuckets"
-            :key="`${entry.nodeId ?? 'local'}/${entry.bucket}`"
-          >
+      <div class="flex gap-2 border-b border-border px-3 py-2">
+        <div class="w-2/5 min-w-0">
+          <NodePicker :model-value="nodeChoice" :recent="recentNodes" @update:model-value="pickNode" />
+        </div>
+        <Input v-model="nameFilter" placeholder="Search by name" aria-label="Search buckets by name" class="h-8 text-xs" />
+      </div>
+      <template v-if="searchList">
+        <Spinner v-if="all.loading.value && !all.hits.value.length" show-label label="Loading buckets…" class="px-4 py-4" />
+        <p v-else-if="all.error.value" class="px-4 py-3 text-xs text-destructive">{{ all.error.value }}</p>
+        <ul v-else-if="all.hits.value.length" class="max-h-[420px] overflow-y-auto py-1">
+          <li v-for="hit in all.hits.value" :key="`${hit.node_id}/${hit.bucket}`">
             <BucketRow
-              :bucket="entry.bucket"
-              :node-id="entry.nodeId"
-              :pinned="entry.pinned"
-              :synced="syncByBucket.has(syncKeyFor(entry.nodeId, entry.bucket))"
-              :active="entry.bucket === bucket && (entry.nodeId ?? null) === remoteNodeId"
-              @open="openBucketOn(entry.bucket, entry.nodeId)"
-              @toggle-pin="shortcuts.togglePin(entry.bucket, entry.nodeId)"
+              :bucket="hit.bucket"
+              :pinnable="false"
+              :active="hit.bucket === bucket && (realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id) === remoteNodeId"
+              @open="openHit(hit)"
             >
               <template #actions>
-                <IconButton
-                  label="Delete bucket…"
-                  class="text-muted-foreground hover:text-destructive"
-                  :disabled-reason="deleteRefusal(entry.bucket, entry.nodeId)"
-                  side="right"
-                  @click="requestDelete({ kind: 'bucket', bucket: entry.bucket, nodeId: entry.nodeId })"
-                >
-                  <Trash2 class="h-3 w-3" />
-                </IconButton>
+                <Badge variant="secondary" size="sm" class="max-w-24 shrink-0 truncate" :title="hit.node_id">
+                  {{ realmNodes.displayName(hit.node_id) }}
+                </Badge>
               </template>
             </BucketRow>
           </li>
         </ul>
-        <p v-else class="px-4 py-4 text-xs text-muted-foreground">No buckets in this group yet.</p>
-        <div v-if="recentBuckets.length" class="border-t border-border/70 py-1">
-          <p class="flex items-center gap-1.5 px-4 pb-1 pt-2 text-xs font-medium text-muted-foreground">
-            <History class="h-3.5 w-3.5 shrink-0" />
-            Recently browsed
-          </p>
-          <ul class="pb-1">
-            <li v-for="entry in recentBuckets" :key="`${entry.nodeId ?? 'local'}/${entry.bucket}`">
+        <p v-else-if="!all.loading.value" class="px-4 py-4 text-xs text-muted-foreground">No buckets found.</p>
+        <p v-if="all.failedNodes.value" class="border-t border-border/70 px-4 py-2 text-xs text-muted-foreground">
+          {{ all.failedNodes.value }} {{ all.failedNodes.value === 1 ? 'node' : 'nodes' }} did not answer.
+          <button type="button" class="text-primary hover:underline" @click="all.reload()">Retry</button>
+        </p>
+        <div v-if="all.more.value" class="border-t border-border/70 p-2 text-center">
+          <Button variant="outline" size="sm" :disabled="all.loading.value" @click="all.loadMore()">Load more</Button>
+        </div>
+      </template>
+      <template v-else>
+        <p v-if="allNodes" class="border-b border-border/70 px-4 py-2 text-xs text-muted-foreground">
+          Type 2 letters to search all nodes.
+        </p>
+        <Spinner v-if="bucketsLoading" show-label label="Loading buckets…" class="px-4 py-4" />
+        <Notice v-else-if="bucketsError && bucketsAuthError" tone="warning" class="m-3">
+          <p>The temporary S3 session was rejected. Close it, then explicitly open this node and group again.</p>
+          <p class="mt-1 break-all font-mono text-[10px]">{{ bucketsError }}</p>
+          <Button variant="outline" size="sm" class="mt-2" @click="s3.clearSessions()"><KeyRound class="h-3.5 w-3.5" /> Close temporary sessions</Button>
+        </Notice>
+        <p v-else-if="bucketsError && !bucketsLoaded" class="px-4 py-3 text-xs text-destructive">{{ bucketsError }}</p>
+        <template v-else>
+          <!-- A failed revalidation keeps the last good list and reports itself above it. -->
+          <p v-if="bucketsError" class="border-b border-border/70 px-4 py-2 text-xs text-destructive">{{ bucketsError }}</p>
+          <ul v-if="nodeBuckets.length" class="max-h-[420px] overflow-y-auto py-1">
+            <li
+              v-for="entry in nodeBuckets"
+              :key="`${entry.nodeId ?? 'local'}/${entry.bucket}`"
+            >
               <BucketRow
                 :bucket="entry.bucket"
                 :node-id="entry.nodeId"
-                :pinned="false"
+                :pinned="entry.pinned"
                 :synced="syncByBucket.has(syncKeyFor(entry.nodeId, entry.bucket))"
                 :active="entry.bucket === bucket && (entry.nodeId ?? null) === remoteNodeId"
                 @open="openBucketOn(entry.bucket, entry.nodeId)"
                 @toggle-pin="shortcuts.togglePin(entry.bucket, entry.nodeId)"
-              />
-            </li>
-          </ul>
-        </div>
-        <div v-if="workspaceBuckets.length" class="border-t border-border/70 py-1">
-          <button
-            type="button"
-            class="flex w-full items-center gap-1 px-4 py-2 text-left text-xs font-medium text-muted-foreground hover:text-foreground"
-            title="Scratch buckets (ws-…) created by runs"
-            @click="workspacesOpen = !workspacesOpen"
-          >
-            <ChevronRight :class="['h-3.5 w-3.5 shrink-0 transition-transform', workspacesOpen && 'rotate-90']" />
-            System workspaces
-            <Badge variant="outline" size="count" class="ml-auto">{{ workspaceBuckets.length }}</Badge>
-          </button>
-          <ul v-if="workspacesOpen" class="max-h-56 overflow-y-auto pb-1">
-            <li v-for="entry in workspaceBuckets" :key="entry.name">
-              <button
-                class="flex w-full items-center gap-2 px-4 py-1.5 text-left text-xs hover:bg-muted"
-                :class="entry.name === bucket && !remoteNodeId ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground'"
-                @click="openBucket(entry.name)"
               >
-                <Boxes class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                <span class="truncate font-mono">{{ entry.name }}</span>
-              </button>
+                <template #actions>
+                  <IconButton
+                    label="Delete bucket…"
+                    class="text-muted-foreground hover:text-destructive"
+                    :disabled-reason="deleteRefusal(entry.bucket, entry.nodeId)"
+                    side="right"
+                    @click="requestDelete({ kind: 'bucket', bucket: entry.bucket, nodeId: entry.nodeId })"
+                  >
+                    <Trash2 class="h-3 w-3" />
+                  </IconButton>
+                </template>
+              </BucketRow>
             </li>
           </ul>
-        </div>
+          <p v-else class="px-4 py-4 text-xs text-muted-foreground">No buckets in this group yet.</p>
+          <div v-if="recentBuckets.length" class="border-t border-border/70 py-1">
+            <p class="flex items-center gap-1.5 px-4 pb-1 pt-2 text-xs font-medium text-muted-foreground">
+              <History class="h-3.5 w-3.5 shrink-0" />
+              Recently browsed
+            </p>
+            <ul class="pb-1">
+              <li v-for="entry in recentBuckets" :key="`${entry.nodeId ?? 'local'}/${entry.bucket}`">
+                <BucketRow
+                  :bucket="entry.bucket"
+                  :node-id="entry.nodeId"
+                  :pinned="false"
+                  :synced="syncByBucket.has(syncKeyFor(entry.nodeId, entry.bucket))"
+                  :active="entry.bucket === bucket && (entry.nodeId ?? null) === remoteNodeId"
+                  @open="openBucketOn(entry.bucket, entry.nodeId)"
+                  @toggle-pin="shortcuts.togglePin(entry.bucket, entry.nodeId)"
+                />
+              </li>
+            </ul>
+          </div>
+          <div v-if="workspaceBuckets.length" class="border-t border-border/70 py-1">
+            <button
+              type="button"
+              class="flex w-full items-center gap-1 px-4 py-2 text-left text-xs font-medium text-muted-foreground hover:text-foreground"
+              title="Scratch buckets (ws-…) created by runs"
+              @click="workspacesOpen = !workspacesOpen"
+            >
+              <ChevronRight :class="['h-3.5 w-3.5 shrink-0 transition-transform', workspacesOpen && 'rotate-90']" />
+              System workspaces
+              <Badge variant="outline" size="count" class="ml-auto">{{ workspaceBuckets.length }}</Badge>
+            </button>
+            <ul v-if="workspacesOpen" class="max-h-56 overflow-y-auto pb-1">
+              <li v-for="entry in workspaceBuckets" :key="entry.name">
+                <button
+                  class="flex w-full items-center gap-2 px-4 py-1.5 text-left text-xs hover:bg-muted"
+                  :class="entry.name === bucket && !remoteNodeId ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground'"
+                  @click="openBucket(entry.name)"
+                >
+                  <Boxes class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <span class="truncate font-mono">{{ entry.name }}</span>
+                </button>
+              </li>
+            </ul>
+          </div>
+        </template>
       </template>
       <footer class="space-y-2 border-t border-border p-3">
-        <div class="flex gap-2">
-          <Input
-            v-model="newBucketName"
-            data-tour="bucket-create"
-            placeholder="new-bucket-name"
-            class="h-8 font-mono text-xs"
-            :invalid="newBucketProblem ? 'error' : undefined"
-            aria-label="New bucket name"
-            @keyup.enter="createBucket"
-          />
-          <Button variant="outline" size="sm" aria-label="Create bucket" :disabled="creatingBucket || !newBucketName.trim() || Boolean(createBucketBlocker)" @click="createBucket">
-            <FolderPlus class="h-4 w-4" />
-          </Button>
-        </div>
+        <Input
+          v-model="newBucketName"
+          data-tour="bucket-create"
+          placeholder="new-bucket-name"
+          class="h-8 font-mono text-xs"
+          :invalid="newBucketProblem ? 'error' : undefined"
+          aria-label="New bucket name"
+          @keyup.enter="createBucket"
+        />
+        <Button variant="outline" size="sm" class="w-full" :disabled="creatingBucket || !newBucketName.trim() || Boolean(createBucketBlocker)" @click="createBucket">
+          <FolderPlus class="h-4 w-4" /> New bucket on {{ createNode }}
+        </Button>
         <p v-if="createBucketError" class="text-xs text-destructive">{{ createBucketError }}</p>
         <p v-else-if="newBucketProblem" class="text-xs text-destructive">{{ newBucketProblem }}</p>
         <p v-else-if="newBucketRefusal" class="text-xs text-muted-foreground">{{ newBucketRefusal }}</p>

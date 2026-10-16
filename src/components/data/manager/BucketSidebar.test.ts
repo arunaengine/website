@@ -2,10 +2,12 @@ import * as VueRuntime from 'vue'
 import { computed, defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  button,
   click,
   compileClientComponent,
   content,
   element,
+  flush,
   moduleDefault,
   mountApp,
   typeValue,
@@ -14,13 +16,37 @@ import { BUCKET_NAME_REQUIREMENT, bucketNameProblem } from '@/lib/bucketName'
 
 const createBucket = vi.fn()
 const requestDelete = vi.fn()
+const showNode = vi.fn()
+const reload = vi.fn()
+const loadMore = vi.fn()
 let canDelete = true
 
+// What the bucket search answered for All nodes.
+const allBuckets = {
+  hits: ref<{ bucket: string; node_id: string; group_id: string }[]>([]),
+  failedNodes: ref(0),
+  loading: ref(false),
+  error: ref<string | null>(null),
+  more: ref(false),
+  needsName: ref(false),
+  reload,
+  loadMore,
+}
+const allEnabled = { value: null as { value: boolean } | null }
+
 const Empty = defineComponent(() => () => null)
-// The row renders its action slot so the sidebar's own controls are visible.
+// The row renders its name and action slot so the sidebar's own controls are visible.
 const RowStub = defineComponent({
   props: { bucket: { type: String, default: '' } },
-  setup: (_, { slots }) => () => h('div', slots.actions?.()),
+  emits: ['open'],
+  setup: (props, { slots, emit }) => () =>
+    h('div', [h('button', { 'aria-label': `Open ${props.bucket}`, onClick: () => emit('open') }, props.bucket), slots.actions?.()]),
+})
+const PickerStub = defineComponent({
+  props: { modelValue: { type: String, default: null } },
+  emits: ['update:modelValue'],
+  setup: (_, { emit }) => () =>
+    h('button', { 'aria-label': 'Pick node-2', onClick: () => emit('update:modelValue', 'node-2') }),
 })
 const IconButtonStub = defineComponent({
   inheritAttrs: false,
@@ -66,6 +92,19 @@ const BucketSidebar = compileClientComponent(new URL('./BucketSidebar.vue', impo
   '@/components/ui/IconButton.vue': moduleDefault(IconButtonStub),
   '@/components/data/BucketRow.vue': moduleDefault(RowStub),
   '@/components/data/BucketSearchBox.vue': moduleDefault(Empty),
+  '@/components/data/NodePicker.vue': moduleDefault(PickerStub),
+  '@/composables/useAllBuckets': {
+    useAllBuckets: (_query: unknown, _group: unknown, enabled: { value: boolean }) => {
+      allEnabled.value = enabled
+      return allBuckets
+    },
+  },
+  '@/composables/useRealmNodes': {
+    useRealmNodes: () => ({
+      displayName: (id: string | null) => (id ? `name-${id}` : 'this node'),
+      isLocalNode: (id: string | null) => !id || id === 'home',
+    }),
+  },
 })
 
 /** The slice of the data manager the sidebar reads, with the real name rule. */
@@ -78,12 +117,15 @@ function manager() {
   return {
     bucket: ref(''),
     remoteNodeId: ref(null),
+    requiredNodeId: ref('home'),
+    selectedGroupId: ref('g1'),
+    showNode,
     syncByBucket: ref(new Map()),
     syncKeyFor: () => '',
     openSearchHit: vi.fn(),
     openBucket: vi.fn(),
     openBucketOn: vi.fn(),
-    shortcuts: { togglePin: vi.fn() },
+    shortcuts: { togglePin: vi.fn(), recent: ref([]) },
     sidebarBuckets: ref([]),
     recentBuckets: ref([]),
     workspaceBuckets: ref([]),
@@ -115,12 +157,17 @@ function trash(root: Parameters<typeof content>[0]) {
   return element(root, (node) => node.props['aria-label'] === 'Delete bucket…')
 }
 
+// Switches the list from All nodes to one node.
+async function pickNode(root: Parameters<typeof content>[0]) {
+  await click(element(root, (node) => node.props['aria-label'] === 'Pick node-2'))
+}
+
 function field(root: Parameters<typeof content>[0]) {
   return element(root, (node) => node.props['aria-label'] === 'New bucket name')
 }
 
 function createButton(root: Parameters<typeof content>[0]) {
-  return element(root, (node) => node.props['aria-label'] === 'Create bucket')
+  return element(root, (node) => node.tag === 'button' && content(node).includes('New bucket on'))
 }
 
 describe('Bucket sidebar naming', () => {
@@ -159,6 +206,7 @@ describe('Bucket sidebar deletion', () => {
 
   it('hands the row bucket to the shared delete dialog', async () => {
     const { root } = await mountApp(BucketSidebar, { props: { manager: withBucket() } })
+    await pickNode(root)
 
     await click(trash(root))
 
@@ -171,6 +219,7 @@ describe('Bucket sidebar deletion', () => {
 
   it('refuses a bucket another node serves and says why', async () => {
     const { root } = await mountApp(BucketSidebar, { props: { manager: withBucket('node-far') } })
+    await pickNode(root)
 
     expect(trash(root).props.disabled).toBe(true)
     expect(trash(root).props.title).toContain('Only the node that serves this bucket')
@@ -179,8 +228,81 @@ describe('Bucket sidebar deletion', () => {
   it('refuses a session without write over the whole bucket', async () => {
     canDelete = false
     const { root } = await mountApp(BucketSidebar, { props: { manager: withBucket() } })
+    await pickNode(root)
 
     expect(trash(root).props.disabled).toBe(true)
     expect(trash(root).props.title).toContain('write on the whole bucket')
+  })
+})
+
+describe('Bucket sidebar node choice', () => {
+  beforeEach(() => {
+    showNode.mockClear()
+    reload.mockClear()
+    loadMore.mockClear()
+    allBuckets.hits.value = [
+      { bucket: 'results', node_id: 'node-2', group_id: 'g1' },
+      { bucket: 'images', node_id: 'home', group_id: 'g1' },
+    ]
+    allBuckets.failedNodes.value = 0
+    allBuckets.more.value = false
+    allBuckets.needsName.value = false
+  })
+
+  it('lists every node with a node badge and opens a bucket on its node', async () => {
+    const state = withBucket()
+    const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
+    const text = content(root)
+
+    expect(allEnabled.value?.value).toBe(true)
+    expect(text).toContain('results')
+    expect(text).toContain('name-node-2')
+    expect(text).not.toContain('reef-survey')
+
+    await click(element(root, (node) => node.props['aria-label'] === 'Open results'))
+    await click(element(root, (node) => node.props['aria-label'] === 'Open images'))
+    expect(state.openBucketOn).toHaveBeenNthCalledWith(1, 'results', 'node-2')
+    expect(state.openBucketOn).toHaveBeenNthCalledWith(2, 'images', null)
+  })
+
+  it('sums up nodes that did not answer in one line with a retry', async () => {
+    allBuckets.failedNodes.value = 2
+    const { root } = await mountApp(BucketSidebar, { props: { manager: manager() } })
+
+    expect(content(root)).toContain('2 nodes did not answer.')
+    await click(button(root, 'Retry'))
+    expect(reload).toHaveBeenCalledOnce()
+  })
+
+  it('pages with Load more', async () => {
+    const { root } = await mountApp(BucketSidebar, { props: { manager: manager() } })
+    expect(content(root)).not.toContain('Load more')
+
+    allBuckets.more.value = true
+    await flush()
+    await click(button(root, 'Load more'))
+    expect(loadMore).toHaveBeenCalledOnce()
+  })
+
+  it('lists one node after picking it and names it on the create button', async () => {
+    const state = withBucket()
+    state.requiredNodeId.value = 'node-2'
+    const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
+
+    await pickNode(root)
+
+    expect(showNode).toHaveBeenCalledWith('node-2')
+    expect(allEnabled.value?.value).toBe(false)
+    expect(content(root)).toContain('reef-survey')
+    expect(content(root)).not.toContain('results')
+    expect(content(createButton(root))).toContain('New bucket on name-node-2')
+  })
+
+  it('falls back to the open node list when the node needs a name', async () => {
+    allBuckets.needsName.value = true
+    const { root } = await mountApp(BucketSidebar, { props: { manager: withBucket() } })
+
+    expect(content(root)).toContain('Type 2 letters to search all nodes.')
+    expect(content(root)).toContain('reef-survey')
   })
 })
