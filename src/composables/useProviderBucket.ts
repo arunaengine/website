@@ -1,27 +1,33 @@
 // The provider bucket that holds a whole Aruna bucket, read from the group's
-// linked buckets. Only group admins may read them; everyone else gets null.
+// linked buckets on the browsed node. Only group admins may read them; everyone else gets null.
 import { computed, ref, watch, type Ref } from 'vue'
 import { useAruna } from '@/composables/useAruna'
-import { listBackendImports, type BackendImport, type GroupBackendResponse } from '@/lib/api'
+import { nodeApiBase } from '@/composables/s3/endpoints'
+import { getGroupBackends, listBackendImports, type BackendImport, type GroupBackendResponse } from '@/lib/api'
 import { splitPath, splitsBuckets } from '@/lib/storageRules'
 
-export function useProviderBucket(bucket: Ref<string>, groupId: Ref<string | null | undefined>) {
-  const { apiBaseUrl, authToken, sessionEpoch, listGroupBackends } = useAruna()
+export function useProviderBucket(
+  bucket: Ref<string>,
+  groupId: Ref<string | null | undefined>,
+  nodeId: Ref<string | null>,
+) {
+  const { apiBaseUrl, authToken, sessionEpoch } = useAruna()
   const links = ref<BackendImport[]>([])
   const backends = ref<GroupBackendResponse[]>([])
   let seq = 0
 
-  // Once per group: the links of every bucket arrive in one list.
+  // Once per group and node: the links of every bucket arrive in one list.
   watch(
-    [groupId, sessionEpoch],
-    async ([id]) => {
+    [groupId, nodeId, sessionEpoch],
+    async ([id, node]) => {
       const current = ++seq
       links.value = []
       backends.value = []
-      if (!id) return
+      const baseUrl = node ? nodeApiBase(node) : apiBaseUrl.value
+      if (!id || !baseUrl) return
       try {
-        const client = { baseUrl: apiBaseUrl.value, token: authToken.value }
-        const [listed, all] = await Promise.all([listGroupBackends(id), listBackendImports(id, client)])
+        const client = { baseUrl, token: authToken.value }
+        const [listed, all] = await Promise.all([getGroupBackends(id, client), listBackendImports(id, client)])
         if (current !== seq) return
         backends.value = listed.backends
         links.value = all

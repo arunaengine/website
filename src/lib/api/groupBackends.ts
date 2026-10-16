@@ -37,6 +37,11 @@ export interface GroupBackendRequest {
   secret_config: Record<string, string>
 }
 
+/** The group's storages as one node answers them; useAruna's list asks the connected node. */
+export function getGroupBackends(groupId: string, client: ApiClientOptions): Promise<ListGroupBackendsResponse> {
+  return apiRequest<ListGroupBackendsResponse>(`/data/groups/${encodeURIComponent(groupId)}/storage/backends`, {}, client)
+}
+
 // GET .../backends/{bid}/buckets/{bucket}: whether the provider bucket exists.
 // Older nodes answer 404.
 export interface ProviderBucketCheck {

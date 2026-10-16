@@ -141,7 +141,7 @@ const {
 
 const locked = useLockedBucket(bucket, remoteNodeId, activeGroupId, download)
 const { reasonOf: brokenReason } = useBrokenFiles(bucket, remoteNodeId, objects)
-const providerBucket = useProviderBucket(bucket, activeGroupId)
+const providerBucket = useProviderBucket(bucket, activeGroupId, remoteNodeId)
 const { lockedOnNode, availableToYou } = locked
 // A read waiting in another folder ends with the folder.
 watch(prefix, () => locked.cancel())
