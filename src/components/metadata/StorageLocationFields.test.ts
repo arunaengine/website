@@ -1,10 +1,11 @@
 import * as VueRuntime from 'vue'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { compileClientComponent, content, element, flush, mountApp, moduleDefault, typeValue } from '@/test/clientRender'
 import * as DataIdentity from '@/lib/crate/dataIdentity'
 
 const listGroupBuckets = vi.fn()
+const sessionEpoch = ref(0)
 const SelectStub = defineComponent({
   props: { options: { type: Array, default: () => [] }, modelValue: String },
   emits: ['update:modelValue'],
@@ -20,7 +21,10 @@ const StorageLocationFields = compileClientComponent(new URL('./StorageLocationF
   vue: VueRuntime,
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
-  '@/composables/aruna/state': { refreshContext: () => ({ epoch: 0, client: { token: 'bearer' } }) },
+  '@/composables/aruna/state': {
+    sessionEpoch,
+    refreshContext: () => ({ epoch: sessionEpoch.value, client: { token: `bearer-${sessionEpoch.value}` } }),
+  },
   '@/lib/api': { listGroupBuckets },
   '@/lib/crate/dataIdentity': DataIdentity,
 })
@@ -42,7 +46,7 @@ describe('StorageLocationFields', () => {
     listGroupBuckets.mockReset().mockResolvedValue(['raw', 'datasets-group-1'])
     const mounted = await render()
 
-    expect(listGroupBuckets).toHaveBeenCalledWith('Group-1', { token: 'bearer' })
+    expect(listGroupBuckets).toHaveBeenCalledWith('Group-1', { token: 'bearer-0' })
 
     expect(options(mounted.root)).toEqual([
       { value: 'datasets-group-1', label: 'datasets-group-1 (default)' },
@@ -74,6 +78,26 @@ describe('StorageLocationFields', () => {
     expect(select.props.value).toBe('lab')
     await typeValue(select, 'datasets-group-1')
     expect(picked).toHaveBeenCalledWith({ bucket: 'datasets-group-1', prefix: '' })
+    mounted.app.unmount()
+  })
+
+  it('asks the new session again and drops the late old answer', async () => {
+    let answerOld: (names: string[]) => void = () => {}
+    listGroupBuckets
+      .mockReset()
+      .mockImplementationOnce(() => new Promise((resolve) => (answerOld = resolve)))
+      .mockResolvedValueOnce(['fresh'])
+    const mounted = await render()
+
+    sessionEpoch.value += 1
+    await flush()
+    answerOld(['stale'])
+    await flush()
+
+    expect(listGroupBuckets).toHaveBeenLastCalledWith('Group-1', { token: 'bearer-1' })
+    const values = (options(mounted.root) as { value: string }[]).map((option) => option.value)
+    expect(values).toContain('fresh')
+    expect(values).not.toContain('stale')
     mounted.app.unmount()
   })
 })

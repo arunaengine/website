@@ -4,7 +4,7 @@
 import { computed, ref, watch } from 'vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
-import { refreshContext } from '@/composables/aruna/state'
+import { refreshContext, sessionEpoch } from '@/composables/aruna/state'
 import { listGroupBuckets } from '@/lib/api'
 import { defaultStorageBucket } from '@/lib/crate/dataIdentity'
 
@@ -23,7 +23,8 @@ const listing = ref<'idle' | 'loading' | 'done' | 'unavailable'>('idle')
 let generation = 0
 
 const defaultBucket = computed(() => defaultStorageBucket(props.groupId))
-watch(() => props.groupId, async (groupId) => {
+// A new API session or node asks again; an answer from an older one is dropped.
+watch([() => props.groupId, sessionEpoch], async ([groupId]) => {
   const current = ++generation
   listed.value = []
   if (!groupId) {
@@ -31,13 +32,15 @@ watch(() => props.groupId, async (groupId) => {
     return
   }
   listing.value = 'loading'
+  const { epoch, client } = refreshContext()
+  const stale = () => current !== generation || epoch !== sessionEpoch.value
   try {
-    const names = await listGroupBuckets(groupId, refreshContext().client)
-    if (current !== generation) return
+    const names = await listGroupBuckets(groupId, client)
+    if (stale()) return
     listed.value = names
     listing.value = 'done'
   } catch {
-    if (current === generation) listing.value = 'unavailable'
+    if (!stale()) listing.value = 'unavailable'
   }
 }, { immediate: true })
 
