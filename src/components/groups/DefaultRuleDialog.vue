@@ -13,6 +13,7 @@ import Notice from '@/components/ui/Notice.vue'
 import Switch from '@/components/ui/Switch.vue'
 import { computed, ref, useId, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
+import { useBucketCheck } from '@/composables/useBucketCheck'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { defaultBucket, defaultConflict, splitsBuckets, suggestBucket } from '@/lib/storageRules'
 import type { BackendImport, GroupBackendResponse } from '@/lib/api'
@@ -43,6 +44,11 @@ const submitError = ref<string | null>(null)
 const splits = computed(() => (props.backend ? splitsBuckets(props.backend) : false))
 const problem = computed(() =>
   props.backend && splits.value ? defaultConflict(props.backend, props.links, bucket.value.trim()) : null,
+)
+const bucketNote = useBucketCheck(() =>
+  props.open && props.backend && splits.value
+    ? { groupId: props.groupId, backendId: props.backend.backend_id, bucket: bucket.value }
+    : null,
 )
 const submitDisabled = computed(() => saving.value || writesDisabled.value || Boolean(problem.value))
 
@@ -107,7 +113,13 @@ async function submit() {
           />
           <p v-if="problem" class="text-[11px] text-destructive">{{ problem }}</p>
           <p v-else class="text-[11px] text-muted-foreground">
-            Aruna creates the bucket if it is missing. Aruna keeps its own layout there and never reads it back.
+            <span
+              v-if="bucketNote"
+              class="font-medium"
+              :class="bucketNote.warning ? 'text-amber-700 dark:text-amber-300' : 'text-foreground'"
+            >{{ bucketNote.text }}</span>
+            <template v-else>Aruna creates the bucket if it is missing.</template>
+            Aruna keeps its own layout there and never reads it back.
           </p>
         </div>
         <p v-else class="text-xs text-foreground">
