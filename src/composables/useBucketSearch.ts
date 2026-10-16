@@ -44,7 +44,22 @@ export function useBucketSearch(query: Ref<string>) {
     }
   }, 250)
 
-  watch(query, (value) => void runSearch(value.trim()), { immediate: true })
+  // Each keystroke drops the answer on its way at once; only the new request waits.
+  watch(
+    query,
+    (value) => {
+      const term = value.trim()
+      ++seq
+      if (term.length < MIN_CHARS) {
+        hits.value = []
+        searching.value = false
+        searched.value = false
+        error.value = null
+      }
+      void runSearch(term)
+    },
+    { immediate: true },
+  )
 
   return { hits, nodesQueried, nodesFailed, searching, searched, error }
 }
