@@ -1,5 +1,5 @@
 import * as VueRuntime from 'vue'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { button, click, compileClientComponent, content, flush, moduleDefault, mountApp } from '@/test/clientRender'
 import * as Api from '@/lib/api'
@@ -50,8 +50,7 @@ const GroupLocationSection = compileClientComponent(new URL('./GroupLocationSect
   '@/composables/useAruna': { useAruna: () => ({ setGroupLocation, getBucketRouting, getGroupRouting, listGroupBackends }) },
   '@/lib/api': Api,
   '@/lib/crate/dataIdentity': DataIdentity,
-  '@/lib/storageRules': { defaultBucket: (backend: { public_config: { default_bucket?: string } }) => backend.public_config.default_bucket ?? null },
-})
+  })
 
 function group(location: { bucket: string; prefix: string } | null) {
   return { group_id: 'G1', realm_id: 'r', display_name: 'Reef lab', roles: [], dataset_location: location }
@@ -138,7 +137,7 @@ describe('GroupLocationSection', () => {
 
     getGroupRouting.mockResolvedValue({ group_id: 'G1', default_target: { backend_id: 's1' }, warnings: [] })
     mounted = await render({ bucket: 'datasets-g1', prefix: '' })
-    expect(content(mounted.root)).toContain('Files are stored in de.NBI-spire, bucket aruna-spire-default.')
+    expect(content(mounted.root)).toContain('Files are stored in de.NBI-spire.')
     mounted.app.unmount()
 
     getBucketRouting.mockResolvedValue({
@@ -147,6 +146,53 @@ describe('GroupLocationSection', () => {
     })
     mounted = await render({ bucket: 'datasets-g1', prefix: '' })
     expect(content(mounted.root)).not.toContain('Files are stored')
+    mounted.app.unmount()
+  })
+
+  it('follows the longest rule that covers the dataset prefix', async () => {
+    getGroupRouting.mockResolvedValue({ group_id: 'G1', default_target: { backend_id: 's1' }, warnings: [] })
+    listGroupBackends.mockResolvedValue({
+      backends: [
+        { backend_id: 's1', name: 'Alpha', kind: 's3', public_config: {} },
+        { backend_id: 's2', name: 'Beta', kind: 's3', public_config: {} },
+      ],
+    })
+    getBucketRouting.mockResolvedValue({
+      bucket: 'lab', warnings: [],
+      rules: [
+        { key_prefix: 'projects/', exact: false, target: { backend_id: 's2' } },
+        { key_prefix: 'projects/', exact: true, target: { backend_id: 's1' } },
+        { key_prefix: 'other/', exact: false, target: { backend_id: 's1' } },
+      ],
+    })
+    const covered = await render({ bucket: 'lab', prefix: 'projects/' })
+    expect(content(covered.root)).toContain('Files are stored in Beta.')
+    covered.app.unmount()
+    const plain = await render({ bucket: 'lab', prefix: '' })
+    expect(content(plain.root)).toContain('Files are stored in Alpha.')
+    plain.app.unmount()
+  })
+
+  it('does not claim a disabled storage and reloads on change', async () => {
+    getGroupRouting.mockResolvedValue({ group_id: 'G1', default_target: { backend_id: 's1' }, warnings: [] })
+    listGroupBackends.mockResolvedValue({
+      backends: [{ backend_id: 's1', name: 'Alpha', kind: 's3', public_config: {}, disabled: true }],
+    })
+    const reload = ref(0)
+    const host = defineComponent({
+      setup: () => () => h(GroupLocationSection, { group: group({ bucket: 'lab', prefix: '' }), canAdmin: true, reload: reload.value }),
+    })
+    const mounted = await mountApp(host)
+    await flush()
+    expect(content(mounted.root)).toContain('Alpha is disabled.')
+    expect(content(mounted.root)).not.toContain('Files are stored in')
+
+    listGroupBackends.mockResolvedValue({
+      backends: [{ backend_id: 's1', name: 'Alpha', kind: 's3', public_config: {} }],
+    })
+    reload.value = 1
+    await flush()
+    expect(content(mounted.root)).toContain('Files are stored in Alpha.')
     mounted.app.unmount()
   })
 })

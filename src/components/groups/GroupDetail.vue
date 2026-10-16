@@ -172,6 +172,7 @@ const canManage = computed(() =>
 )
 const connectorCount = ref<number | null>(null)
 const backendCount = ref<number | null>(null)
+const storageTick = ref(0)
 const groupBackends = ref<GroupBackendResponse[]>([])
 
 // Connector management: WRITE on /{realm}/g/{gid}/data/**.
@@ -631,9 +632,9 @@ async function leave() {
             :group-name="group.display_name"
             :can-admin="canAdminStorage"
             @count="backendCount = $event"
-            @backends="groupBackends = $event"
+            @backends="(groupBackends = $event), storageTick++"
           />
-          <GroupLocationSection :group="group" can-admin class="border-t border-border" @changed="group = $event" />
+          <GroupLocationSection :group="group" can-admin :reload="storageTick" class="border-t border-border" @changed="group = $event" />
         </TabsContent>
       </Tabs>
     </template>

@@ -18,9 +18,9 @@ import StorageLocationFields from '@/components/metadata/StorageLocationFields.v
 import { useAruna } from '@/composables/useAruna'
 import { apiErrorMessage, type GroupDetailResponse } from '@/lib/api'
 import { defaultStorageBucket, folderRoute } from '@/lib/crate/dataIdentity'
-import { defaultBucket } from '@/lib/storageRules'
 
-const props = defineProps<{ group: GroupDetailResponse; canAdmin: boolean }>()
+// `reload` changes after the group storage or its rules changed.
+const props = defineProps<{ group: GroupDetailResponse; canAdmin: boolean; reload?: number }>()
 const emit = defineEmits<{ (e: 'changed', group: GroupDetailResponse): void }>()
 const { setGroupLocation, getBucketRouting, getGroupRouting, listGroupBackends } = useAruna()
 
@@ -33,11 +33,14 @@ const location = computed(() => props.group.dataset_location ?? null)
 const generated = computed(() => defaultStorageBucket(props.group.group_id))
 const isGenerated = computed(() => location.value?.bucket === generated.value && !location.value.prefix)
 
-// Where the files of the bucket are stored: a rule of the bucket, else the group default.
+// Where the files are stored: the longest rule of the bucket that covers the
+// dataset prefix, else the group default. Only the storage name is shown.
 const stored = ref('')
+let loadSeq = 0
 watch(
-  () => [props.group.group_id, location.value?.bucket] as const,
-  async ([groupId, bucket]) => {
+  () => [props.group.group_id, location.value?.bucket, location.value?.prefix, props.reload] as const,
+  async ([groupId, bucket, prefix]) => {
+    const seq = ++loadSeq
     stored.value = ''
     if (!bucket) return
     try {
@@ -46,14 +49,15 @@ watch(
         getGroupRouting(groupId),
         listGroupBackends(groupId),
       ])
-      if (groupId !== props.group.group_id || bucket !== location.value?.bucket) return
-      const whole = bucketRules.rules.find((rule) => !rule.key_prefix && !rule.exact)
-      const target = whole ? whole.target : group.default_target
+      if (seq !== loadSeq) return
+      const covering = bucketRules.rules
+        .filter((rule) => !rule.exact && (prefix ?? '').startsWith(rule.key_prefix))
+        .sort((x, y) => y.key_prefix.length - x.key_prefix.length)
+      const target = covering.length ? covering[0].target : group.default_target
       if (!target) stored.value = 'Files are stored on this node.'
       else if (target.backend_id) {
         const backend = list.backends.find((entry) => entry.backend_id === target.backend_id)
-        const place = backend && defaultBucket(backend)
-        if (backend) stored.value = `Files are stored in ${backend.name}${place ? `, bucket ${place}` : ''}.`
+        if (backend) stored.value = backend.disabled ? `${backend.name} is disabled.` : `Files are stored in ${backend.name}.`
       }
     } catch {
       // Without the rules the line stays hidden.
