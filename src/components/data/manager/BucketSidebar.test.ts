@@ -24,6 +24,8 @@ const loadMore = vi.fn()
 let canDelete = true
 
 // What the cross-group search answered for the typed name.
+const otherError = ref<string | null>(null)
+const otherFailed = ref(0)
 const otherSearch = ref<{ arn: string; bucket: string; node_id: string; group_id: string; group_name?: string }[]>([])
 // What the bucket search answered for All nodes.
 const allBuckets = {
@@ -97,7 +99,9 @@ const BucketSidebar = compileClientComponent(new URL('./BucketSidebar.vue', impo
   '@/components/ui/Spinner.vue': moduleDefault(Empty),
   '@/components/ui/IconButton.vue': moduleDefault(IconButtonStub),
   '@/components/data/BucketRow.vue': moduleDefault(RowStub),
-  '@/composables/useBucketSearch': { useBucketSearch: () => ({ hits: otherSearch }) },
+  '@/composables/useBucketSearch': {
+    useBucketSearch: () => ({ hits: otherSearch, error: otherError, searched: ref(true), nodesFailed: otherFailed }),
+  },
   '@/lib/workspaces': Workspaces,
   '@/composables/useRealmNodes': {
     useRealmNodes: () => ({
@@ -325,6 +329,18 @@ describe('Bucket sidebar node choice', () => {
     await click(element(root, (node) => node.props['aria-label'] === 'Open shared-reads'))
     expect(state.openSearchHit).toHaveBeenCalledWith(otherSearch.value[1])
     otherSearch.value = []
+  })
+
+  it('says when other groups could not be searched or answered in part', async () => {
+    otherError.value = 'search failed'
+    const { root } = await mountApp(BucketSidebar, { props: { manager: manager() } })
+    expect(content(root)).toContain('Other groups could not be searched.')
+
+    otherError.value = null
+    otherFailed.value = 2
+    await flush()
+    expect(content(root)).toContain('Some nodes did not answer.')
+    otherFailed.value = 0
   })
 
   it('names the browsed node on workspace rows', async () => {

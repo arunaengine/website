@@ -69,6 +69,7 @@ const otherHits = computed(() =>
 function rowNode(nodeId: string | null): string {
   return `On ${realmNodes.displayName(nodeId ?? realmNodes.localNodeId.value)}`
 }
+const otherPartial = computed(() => search.searched.value && search.nodesFailed.value > 0)
 const createNode = computed(() => realmNodes.displayName(requiredNodeId.value))
 
 function openHit(hit: BucketSearchHit) {
@@ -212,9 +213,11 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
           </div>
         </template>
       </template>
-      <div v-if="otherHits.length" class="border-t border-border/70 py-1">
+      <div v-if="otherHits.length || search.error.value || otherPartial" class="border-t border-border/70 py-1">
         <p class="px-3 pb-1 pt-2 text-xs font-medium text-muted-foreground">Other groups</p>
-        <ul class="max-h-56 overflow-y-auto pb-1">
+        <p v-if="search.error.value" class="px-3 pb-1 text-xs text-destructive">Other groups could not be searched.</p>
+        <p v-else-if="otherPartial" class="px-3 pb-1 text-xs text-muted-foreground">Some nodes did not answer.</p>
+        <ul v-if="otherHits.length" class="max-h-56 overflow-y-auto pb-1">
           <li v-for="hit in otherHits" :key="hit.arn">
             <BucketRow
               :bucket="hit.bucket"
