@@ -559,11 +559,14 @@ describe('delete dialog for a bucket on another node', () => {
     expect(removeBucket).toHaveBeenCalled()
     sessionEpoch.value++
     await flush()
+    const checks = preflightResponse.mock.calls.length
     finish()
     await flush()
 
     expect(closes).toHaveLength(1)
     expect(completed).toHaveLength(0)
+    // The old client asks nothing more once the dialog was reset.
+    expect(preflightResponse.mock.calls.length).toBe(checks)
   })
 })
 

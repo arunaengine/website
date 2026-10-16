@@ -374,6 +374,8 @@ async function refreshRemaining(client: ReturnType<typeof apiClient>) {
 async function runPurge(current: DeleteRequest): Promise<string[]> {
   const client = apiClient()
   if (!client) throw new Error('The node API endpoint for this storage location is unavailable.')
+  // A reset dialog may already show another target; its inventory stays untouched.
+  const id = requestId
   if (current.kind === 'selection') {
     const pending = selection.pendingKeys(ids.value)
     await selection.purgeKeys(pending, client, ids.value)
@@ -381,12 +383,14 @@ async function runPurge(current: DeleteRequest): Promise<string[]> {
   }
   if (remoteBucket.value && current.nodeId) {
     await removeBucket(current.nodeId, current.bucket, purge)
+    if (id !== requestId) return []
     await refreshRemaining(client)
     return [current.bucket]
   }
   const target = scope.value
   if (!target) throw new Error('This target has no permanent deletion scope.')
   const status = await purge.run(createStoragePurgeOperation(target), client)
+  if (id !== requestId) return []
   await refreshRemaining(client)
   if (status?.state === 'failed') throw new Error(status.error?.message ?? 'The deletion failed.')
   if (status?.state === 'cancelled') throw new Error('The deletion was cancelled.')
