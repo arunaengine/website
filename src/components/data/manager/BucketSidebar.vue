@@ -125,7 +125,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
         </div>
       </template>
       <template v-else>
-        <p v-if="allNodes" class="border-b border-border/70 px-3 py-2 text-xs text-muted-foreground">
+        <p v-if="allNodes" class="border-b border-border/70 px-3 py-1.5 text-[11px] text-muted-foreground">
           Type 2 letters to search all nodes.
         </p>
         <Spinner v-if="bucketsLoading" show-label label="Loading buckets…" class="px-3 py-4" />

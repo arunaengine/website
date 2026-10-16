@@ -228,7 +228,7 @@ async function createFolder() {
               {{ selectedGroupName }}
             </RouterLink>
             <span v-else class="text-muted-foreground">No group</span>
-            <span class="hidden lg:inline" :title="requiredNodeId ?? undefined">on {{ requiredNodeName }}</span>
+            <span class="hidden max-w-[12rem] truncate lg:inline-block" :title="`${requiredNodeName} (${requiredNodeId ?? ''})`">on {{ requiredNodeName }}</span>
           </div>
         </template>
         <template v-if="contextReady">
