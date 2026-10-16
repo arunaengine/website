@@ -181,6 +181,7 @@ export function objectBrowser(): Component {
         useBrokenFiles: () => ({ reasonOf: (key: string) => brokenFiles.reasons[key] ?? null }),
       },
       '@/composables/useLockedBucket': { useLockedBucket: (...args: unknown[]) => lockedBucket(...args) },
+      '@/composables/useProviderBucket': { useProviderBucket: () => VueRuntime.ref(null) },
       '@/composables/useListPages': { PAGE_SIZES: [10, 25, 50, 100, 200, 500] },
       '@/composables/usePlacementPolicies': {
         usePlacementPolicies: () => ({ getBucketPlacement: vi.fn(async () => null) }),

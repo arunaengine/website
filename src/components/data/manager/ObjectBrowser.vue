@@ -19,6 +19,7 @@ import KeyedReadNotice from '@/components/storage/KeyedReadNotice.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useBrokenFiles } from '@/composables/useBrokenFiles'
 import { useLockedBucket } from '@/composables/useLockedBucket'
+import { useProviderBucket } from '@/composables/useProviderBucket'
 import type { DataManager } from '@/composables/useDataManager'
 import {
   useS3,
@@ -140,6 +141,7 @@ const {
 
 const locked = useLockedBucket(bucket, remoteNodeId, activeGroupId, download)
 const { reasonOf: brokenReason } = useBrokenFiles(bucket, remoteNodeId, objects)
+const providerBucket = useProviderBucket(bucket, activeGroupId)
 const { lockedOnNode, availableToYou } = locked
 // A read waiting in another folder ends with the folder.
 watch(prefix, () => locked.cancel())
@@ -370,6 +372,9 @@ async function onDrop(event: DragEvent) {
             <Lock class="mr-0.5 h-3 w-3" aria-hidden="true" /> Locked on the node
           </Badge>
           <Badge v-if="availableToYou" variant="success" size="sm" class="shrink-0">Available to you</Badge>
+          <span v-if="providerBucket" class="truncate text-xs text-muted-foreground">
+            Stored in provider bucket <span class="font-mono text-foreground">{{ providerBucket }}</span>
+          </span>
           <Spinner v-if="listLoading" label="Loading objects" class="shrink-0" />
         </div>
         <div class="flex items-center gap-2">
