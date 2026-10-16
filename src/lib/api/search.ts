@@ -67,6 +67,8 @@ export interface BucketSearchResponse {
   nodes_queried: number
   nodes_failed: number
   failed_nodes: string[]
+  /** Continues the listing; absent on nodes that answer one page only. */
+  next_cursor?: string | null
 }
 
 // GET /search/objects: authenticated live-head inventory search. The backend
