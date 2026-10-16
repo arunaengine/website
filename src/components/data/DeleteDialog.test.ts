@@ -50,6 +50,7 @@ const purgeRun = vi.fn(async () => ({ state: 'succeeded' }))
 const removeBucket = vi.fn(async (_nodeId: string, _bucket: string, _job: unknown) => undefined)
 const preflightResponse = vi.fn()
 const backlinkPreflight = ref<BacklinkPreflightResponse | null>(null)
+const sessionEpoch = ref(1)
 
 function slotted(tag: string) {
   return defineComponent({
@@ -177,7 +178,7 @@ function dialogModules(overrides: Record<string, unknown> = {}) {
   },
   '@/components/groups/bucketRemoval': { removeBucket },
   '@/composables/s3/endpoints': { nodeApiBase: (id: string) => `https://${id}.test/api/v1` },
-  '@/composables/useAruna': { useAruna: () => ({ authToken: ref('token') }) },
+  '@/composables/useAruna': { useAruna: () => ({ authToken: ref('token'), sessionEpoch }) },
   '@/composables/useRealmNodes': {
     useRealmNodes: () => ({ displayName: (id: string) => `node ${id}` }),
   },
@@ -533,6 +534,36 @@ describe('delete dialog for a bucket on another node', () => {
 
     expect(content(root)).toContain('You may not delete this bucket.')
     expect(completed).toEqual([expect.objectContaining({ committed: [] })])
+  })
+
+  it('offers only the full purge for an empty bucket and names the node', async () => {
+    // The first mount installs the default answer; the second sees it empty.
+    await open(request)
+    const empty = { current_heads: 0, noncurrent_versions: 0, delete_markers: 0, open_multipart_uploads: 0, complete: true }
+    preflightResponse.mockResolvedValueOnce({ ...(await preflightResponse()), counts: empty })
+    const { root } = await open(request)
+
+    expect(labels(root)).toEqual(['delete-permanently'])
+    expect(content(root)).toContain('this bucket on node node-far')
+  })
+
+  it('drops a running delete when the session changes', async () => {
+    let finish = () => {}
+    removeBucket.mockImplementationOnce(() => new Promise<undefined>((resolve) => (finish = () => resolve(undefined))))
+    const { root, completed, closes } = await open(request)
+
+    const field = element(root, (node) => node.props.id === 'deletion-typed-name')
+    await typeValue(field, 'reef')
+    void click(button(root, 'Delete permanently'))
+    await flush()
+    expect(removeBucket).toHaveBeenCalled()
+    sessionEpoch.value++
+    await flush()
+    finish()
+    await flush()
+
+    expect(closes).toHaveLength(1)
+    expect(completed).toHaveLength(0)
   })
 })
 
