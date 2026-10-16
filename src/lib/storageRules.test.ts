@@ -64,6 +64,8 @@ describe('storageRules', () => {
     expect(runText({ ...failed, state: 'cancelled' }).text).toMatch(/^Stopped/)
     expect(runText({ ...failed, state: 'indeterminate' }).text).toMatch(/^Unknown/)
     expect(runText({ ...failed, state: 'succeeded' }).text).toMatch(/^3 failed/)
+    const busy = { ...run, imported: 2, skipped: 60, failed: 1, state: 'running' }
+    expect(runText(busy).text).toBe('Running… 2 added, 63 checked')
   })
 
   it('treats every unfinished state as running', () => {

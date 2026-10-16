@@ -62,7 +62,7 @@ export interface RunText {
   failures: boolean
 }
 
-/** The last run in a few words: "Synced 2h ago", "Running… 312 added", "3 failed · 1d ago". */
+/** The last run in a few words: "Synced 2h ago", "Running… 312 added, 400 checked", "3 failed · 1d ago". */
 export function runText(run: BackendImportRun | null | undefined): RunText {
   if (!run) return { text: 'Never run', tone: 'muted', failures: false }
   const ago = relativeTime(run.started_at)
@@ -70,7 +70,9 @@ export function runText(run: BackendImportRun | null | undefined): RunText {
   if (run.state === 'cancelling') return { text: 'Stopping…', tone: 'active', failures }
   if (run.state === 'awaiting_key') return { text: 'Waiting for an unlock', tone: 'active', failures }
   if (ACTIVE_STATES.has(run.state)) {
-    return { text: `Running… ${formatNumber(run.imported)} added`, tone: 'active', failures }
+    const checked = run.imported + run.skipped + run.failed
+    const text = `Running… ${formatNumber(run.imported)} added, ${formatNumber(checked)} checked`
+    return { text, tone: 'active', failures }
   }
   if (run.state === 'cancelled') return { text: `Stopped · ${ago}`, tone: 'muted', failures }
   if (run.state !== 'succeeded' && run.state !== 'failed') return { text: `Unknown · ${ago}`, tone: 'muted', failures }
