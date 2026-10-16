@@ -65,6 +65,10 @@ const search = useBucketSearch(bucketNameFilter)
 const otherHits = computed(() =>
   search.hits.value.filter((hit) => hit.group_id !== selectedGroupId.value && !isWorkspaceBucket(hit.bucket)),
 )
+// Hover text of a row; a row without a node is on this node.
+function rowNode(nodeId: string | null): string {
+  return `On ${realmNodes.displayName(nodeId ?? realmNodes.localNodeId.value)}`
+}
 const createNode = computed(() => realmNodes.displayName(requiredNodeId.value))
 
 function openHit(hit: BucketSearchHit) {
@@ -106,11 +110,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
               :active="hit.bucket === bucket && (realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id) === remoteNodeId"
               @open="openHit(hit)"
             >
-              <template #actions>
-                <Badge variant="secondary" size="sm" class="min-w-0 max-w-24 shrink-0" :title="`${realmNodes.displayName(hit.node_id)} (${hit.node_id})`">
-                  <span class="truncate">{{ realmNodes.displayName(hit.node_id) }}</span>
-                </Badge>
-              </template>
+              <template #tooltip>{{ rowNode(hit.node_id) }}</template>
             </BucketRow>
           </li>
         </ul>
@@ -148,6 +148,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
                 @open="openBucketOn(entry.bucket, entry.nodeId)"
                 @toggle-pin="shortcuts.togglePin(entry.bucket, entry.nodeId)"
               >
+                <template #tooltip>{{ rowNode(entry.nodeId) }}</template>
                 <template #actions>
                   <IconButton
                     label="Delete bucket…"
@@ -178,7 +179,9 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
                   :active="entry.bucket === bucket && (entry.nodeId ?? null) === remoteNodeId"
                   @open="openBucketOn(entry.bucket, entry.nodeId)"
                   @toggle-pin="shortcuts.togglePin(entry.bucket, entry.nodeId)"
-                />
+                >
+                  <template #tooltip>{{ rowNode(entry.nodeId) }}</template>
+                </BucketRow>
               </li>
             </ul>
           </div>
@@ -197,6 +200,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
               <li v-for="entry in workspaceBuckets" :key="entry.name">
                 <button
                   class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-muted"
+                  :title="rowNode(null)"
                   :class="entry.name === bucket && !remoteNodeId ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground'"
                   @click="openBucket(entry.name)"
                 >
@@ -219,6 +223,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
               :pinnable="false"
               @open="openSearchHit(hit)"
             >
+              <template #tooltip>{{ rowNode(hit.node_id) }}</template>
               <template v-if="!realmNodes.isLocalNode(hit.node_id)" #actions>
                 <IconButton :label="`Sync ${hit.bucket} to this node…`" side="right" @click="emit('sync', hit)">
                   <ArrowLeftRight class="h-3 w-3" />

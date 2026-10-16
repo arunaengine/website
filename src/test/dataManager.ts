@@ -229,6 +229,7 @@ export function fakeManager(overrides: Record<string, unknown> = {}) {
     prefix: ref('raw'),
     s3Prefix: ref('raw/'),
     remoteNodeId: ref(null),
+    requiredNodeId: ref('home-node'),
     realmNodes: { displayName: (id: string) => `node ${id}` },
     references: { prefixHasReferences: () => false, keyIsReferenced: () => false },
     referenceStats: computed(() => ({ count: 0, bytes: 0, groups: [] })),

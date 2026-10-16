@@ -10,6 +10,7 @@ import {
   flush,
   moduleDefault,
   mountApp,
+  nodes,
   typeValue,
 } from '@/test/clientRender'
 import { BUCKET_NAME_REQUIREMENT, bucketNameProblem } from '@/lib/bucketName'
@@ -47,7 +48,11 @@ const RowStub = defineComponent({
   props: { bucket: { type: String, default: '' } },
   emits: ['open'],
   setup: (props, { slots, emit }) => () =>
-    h('div', [h('button', { 'aria-label': `Open ${props.bucket}`, onClick: () => emit('open') }, props.bucket), slots.actions?.()]),
+    h('div', [
+      h('button', { 'aria-label': `Open ${props.bucket}`, onClick: () => emit('open') }, props.bucket),
+      h('span', { role: 'tooltip' }, slots.tooltip?.()),
+      slots.actions?.(),
+    ]),
 })
 const IconButtonStub = defineComponent({
   inheritAttrs: false,
@@ -98,6 +103,7 @@ const BucketSidebar = compileClientComponent(new URL('./BucketSidebar.vue', impo
     useRealmNodes: () => ({
       displayName: (id: string | null) => (id ? `name-${id}` : 'this node'),
       isLocalNode: (id: string | null) => !id || id === 'home',
+      localNodeId: ref('home'),
     }),
   },
 })
@@ -160,6 +166,10 @@ function trash(root: Parameters<typeof content>[0]) {
 async function pickNode() {
   choose('node-2')
   await flush()
+}
+
+function hovers(root: Parameters<typeof content>[0]) {
+  return nodes(root).filter((node) => node.props.role === 'tooltip').map((node) => content(node).trim())
 }
 
 function field(root: Parameters<typeof content>[0]) {
@@ -251,13 +261,13 @@ describe('Bucket sidebar node choice', () => {
     allBuckets.needsName.value = false
   })
 
-  it('lists every node with a node badge and opens a bucket on its node', async () => {
+  it('lists every node with its node on hover and opens a bucket on its node', async () => {
     const state = withBucket()
     const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
     const text = content(root)
 
     expect(text).toContain('results')
-    expect(text).toContain('name-node-2')
+    expect(hovers(root)).toEqual(['On name-node-2', 'On name-home'])
     expect(text).not.toContain('reef-survey')
 
     await click(element(root, (node) => node.props['aria-label'] === 'Open results'))
@@ -294,6 +304,7 @@ describe('Bucket sidebar node choice', () => {
 
     expect(showNode).toHaveBeenCalledWith('node-2')
     expect(content(root)).toContain('reef-survey')
+    expect(hovers(root)).toEqual(['On name-home'])
     expect(content(root)).not.toContain('results')
     expect(createButton(root).props.title).toBe('Creates the bucket on name-node-2')
   })
