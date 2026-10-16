@@ -48,7 +48,7 @@ const { realm } = useRealm()
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div class="min-w-0">
           <h1 class="font-display text-2xl font-semibold tracking-tight text-aruna-navy md:text-[28px]">
-            {{ title }}
+            <slot name="title">{{ title }}</slot>
           </h1>
           <p v-if="description || $slots.description" class="mt-1 max-w-2xl text-sm text-muted-foreground">
             <slot name="description">{{ description }}</slot>

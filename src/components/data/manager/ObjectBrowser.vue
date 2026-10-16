@@ -78,7 +78,6 @@ const {
   selectedGroupId,
   s3Prefix,
   remoteNodeId,
-  requiredNodeId,
   realmNodes,
   references,
   referenceStats,
@@ -360,15 +359,6 @@ async function onDrop(event: DragEvent) {
       <div class="flex flex-nowrap items-center justify-between gap-2">
         <div class="flex min-w-0 flex-1 items-center gap-2">
           <Breadcrumbs :bucket="bucket" :path="prefix" @navigate="navigateTo" />
-          <Badge
-            v-if="requiredNodeId"
-            variant="outline"
-            size="sm"
-            class="min-w-0 max-w-32 shrink"
-            :title="`${realmNodes.displayName(requiredNodeId)} (${requiredNodeId})`"
-          >
-            <span class="truncate">{{ realmNodes.displayName(requiredNodeId) }}</span>
-          </Badge>
           <Badge v-if="lockedOnNode" :variant="stateVariant('locked')" size="sm" class="shrink-0">
             <Lock class="mr-0.5 h-3 w-3" aria-hidden="true" /> Locked on the node
           </Badge>

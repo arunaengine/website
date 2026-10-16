@@ -148,6 +148,12 @@ const addDataOpen = ref(false)
 const newNotebookOpen = ref(false)
 // The notebooks entry is this same view with notebooks highlighted.
 const notebooksView = computed(() => route.name === 'notebooks' || route.query.notebooks === '1')
+const headerTitle = computed(() => (notebooksView.value ? 'Notebooks' : route.name === 'bucket' ? bucket.value : 'Data'))
+const headerDescription = computed(() =>
+  notebooksView.value
+    ? 'Pick a notebook to open, or create one in the folder you are browsing.'
+    : `Browse buckets and objects through the node's S3 interface, signed in your browser.`,
+)
 // The Add data browser may open another node or group; the view takes its
 // own session back once the dialog closes.
 watch(addDataOpen, (open) => {
@@ -208,41 +214,52 @@ async function createFolder() {
 <template>
   <div>
     <PageHeader
-      :title="notebooksView ? 'Notebooks' : route.name === 'bucket' ? bucket : 'Data'"
-      :description="notebooksView
-        ? 'Pick a notebook to open, or create one in the folder you are browsing.'
-        : `Browse buckets and objects through the node's S3 interface, signed in your browser.`"
+      :title="headerTitle"
+      :description="headerDescription"
       :docs="{ topic: 'upload-data', section: 'Create a bucket and upload' }"
     >
+      <template #title>
+        <span class="flex min-w-0 items-baseline gap-2">
+          <span class="truncate" :title="headerTitle">{{ headerTitle }}</span>
+          <span
+            v-if="route.name === 'bucket' && !notebooksView && requiredNodeId"
+            class="min-w-0 truncate text-sm font-normal text-muted-foreground"
+            :title="`${requiredNodeName} (${requiredNodeId})`"
+          >
+            on {{ requiredNodeName }}
+          </span>
+        </span>
+      </template>
+      <template #description>
+        {{ headerDescription }}
+        <span
+          v-if="currentUser && s3.connectedEndpoint.value"
+          class="mt-2 flex min-w-0 items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground"
+        >
+          <!-- The group is the top bar's context; here it only stays visible. -->
+          <span class="hidden lg:inline">Showing buckets of</span>
+          <RouterLink
+            v-if="selectedGroupId"
+            :to="{ name: 'group', params: { id: selectedGroupId } }"
+            class="max-w-[12rem] truncate font-medium text-foreground hover:underline"
+            :title="`${selectedGroupName} (${selectedGroupId}) · Switch the group in the top bar`"
+          >
+            {{ selectedGroupName }}
+          </RouterLink>
+          <span v-else class="text-muted-foreground">No group</span>
+          <span class="hidden lg:inline">on</span>
+          <NodePicker :model-value="bucketNodeChoice" :recent="recentNodes" @update:model-value="pickNode" />
+          <span
+            v-if="contextReady"
+            class="flex shrink-0 items-center gap-1 font-mono text-[11px]"
+            :title="`Temporary session ${s3.activeKey.value?.accessKeyId} for group ${activeGroupId} on node ${requiredNodeId}`"
+          >
+            <KeyRound class="h-3 w-3" /> …{{ keyTail }}
+          </span>
+        </span>
+      </template>
       <template #actions>
-        <div class="flex max-w-full min-w-0 flex-nowrap items-center gap-2">
-          <template v-if="currentUser && s3.connectedEndpoint.value">
-            <!-- The group is the top bar's context; here it only stays visible. -->
-            <div class="flex min-w-0 items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground">
-              <span class="hidden lg:inline">Showing buckets of</span>
-              <RouterLink
-                v-if="selectedGroupId"
-                :to="{ name: 'group', params: { id: selectedGroupId } }"
-                class="max-w-[12rem] truncate font-medium text-foreground hover:underline"
-                :title="`${selectedGroupName} (${selectedGroupId}) · Switch the group in the top bar`"
-              >
-                {{ selectedGroupName }}
-              </RouterLink>
-              <span v-else class="text-muted-foreground">No group</span>
-              <span class="hidden lg:inline">on</span>
-              <NodePicker :model-value="bucketNodeChoice" :recent="recentNodes" @update:model-value="pickNode" />
-            </div>
-          </template>
-          <template v-if="contextReady">
-            <span
-              class="flex shrink-0 items-center gap-1 whitespace-nowrap font-mono text-[11px] text-muted-foreground"
-              :title="`Temporary session ${s3.activeKey.value?.accessKeyId} for group ${activeGroupId} on node ${requiredNodeId}`"
-            >
-              <KeyRound class="h-3 w-3" /> …{{ keyTail }}
-            </span>
-            <RefreshButton :busy="refreshSpinning" class="shrink-0" @click="onRefresh" />
-          </template>
-        </div>
+        <RefreshButton v-if="contextReady" :busy="refreshSpinning" @click="onRefresh" />
       </template>
     </PageHeader>
 
