@@ -166,13 +166,37 @@ describe('bucket list node choice', () => {
     expect(router.currentRoute.value.params.bucketId).toBeUndefined()
   })
 
-  it('opens a new bucket on the node it was created on', async () => {
+  it('opens a new bucket on the remote node it was created on', async () => {
     const { router, manager } = await start()
+    manager.pickNode('n-far')
+    await settle()
+    expect(manager.contextReady.value).toBe(true)
     manager.newBucketName.value = 'fresh-bucket'
 
     await manager.createBucket()
     await settle()
 
     expect(router.currentRoute.value.params.bucketId).toBe('fresh-bucket')
+    expect(router.currentRoute.value.query.node).toBe('n-far')
+  })
+
+  it('opens nothing when the node changed while the bucket was created', async () => {
+    const { router, manager } = await start()
+    manager.pickNode('n-far')
+    await settle()
+    let finish!: () => void
+    s3.createBucket.mockReturnValueOnce(new Promise<void>((resolve) => (finish = resolve)))
+    manager.newBucketName.value = 'fresh-bucket'
+    const creating = manager.createBucket()
+
+    manager.pickNode('n-other')
+    await settle()
+    finish()
+    await creating
+    await settle()
+
+    expect(s3.createBucket).toHaveBeenCalledWith('fresh-bucket')
+    expect(router.currentRoute.value.name).toBe('buckets')
+    expect(router.currentRoute.value.query.node).toBe('n-other')
   })
 })
