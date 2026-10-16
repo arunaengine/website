@@ -358,7 +358,7 @@ async function onDrop(event: DragEvent) {
     <template v-else>
       <div class="flex flex-nowrap items-center justify-between gap-2">
         <div class="flex min-w-0 flex-1 items-center gap-2">
-          <Breadcrumbs :bucket="bucket" :path="prefix" @navigate="navigateTo" />
+          <Breadcrumbs :bucket="bucket" :path="prefix" single-line @navigate="navigateTo" />
           <Badge v-if="lockedOnNode" :variant="stateVariant('locked')" size="sm" class="shrink-0">
             <Lock class="mr-0.5 h-3 w-3" aria-hidden="true" /> Locked on the node
           </Badge>

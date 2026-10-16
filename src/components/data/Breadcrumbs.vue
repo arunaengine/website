@@ -2,7 +2,8 @@
 import { computed } from 'vue'
 import { ChevronRight, Home } from '@lucide/vue'
 
-const props = defineProps<{ path: string; bucket: string }>()
+// Single line: long names truncate instead of wrapping.
+const props = defineProps<{ path: string; bucket: string; singleLine?: boolean }>()
 const emit = defineEmits<{
   (e: 'navigate', path: string): void
 }>()
@@ -11,7 +12,7 @@ const parts = computed(() => (props.path ? props.path.split('/') : []))
 </script>
 
 <template>
-  <nav class="flex min-w-0 flex-nowrap items-center gap-1 text-sm text-muted-foreground">
+  <nav class="flex min-w-0 items-center gap-1 text-sm text-muted-foreground" :class="singleLine ? 'flex-nowrap' : 'flex-wrap'">
     <button
       class="inline-flex min-w-0 items-center gap-1.5 rounded px-1.5 py-0.5 hover:bg-muted hover:text-foreground"
       :title="bucket"
