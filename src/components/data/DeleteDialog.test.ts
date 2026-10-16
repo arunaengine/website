@@ -47,6 +47,7 @@ const deleteObjectVersion = vi.fn(async () => undefined)
 const copyObjectVersion = vi.fn(async () => ({ versionId: 'new' }))
 const deleteBucket = vi.fn(async () => undefined)
 const purgeRun = vi.fn(async () => ({ state: 'succeeded' }))
+const removeBucket = vi.fn(async (_nodeId: string, _bucket: string, _job: unknown) => undefined)
 const preflightResponse = vi.fn()
 const backlinkPreflight = ref<BacklinkPreflightResponse | null>(null)
 
@@ -174,6 +175,8 @@ function dialogModules(overrides: Record<string, unknown> = {}) {
       purgeKeys: async () => {},
     }),
   },
+  '@/components/groups/bucketRemoval': { removeBucket },
+  '@/composables/s3/endpoints': { nodeApiBase: (id: string) => `https://${id}.test/api/v1` },
   '@/composables/useAruna': { useAruna: () => ({ authToken: ref('token') }) },
   '@/composables/useRealmNodes': {
     useRealmNodes: () => ({ displayName: (id: string) => `node ${id}` }),
@@ -495,6 +498,41 @@ describe('delete dialog', () => {
     expect(purgeRun).toHaveBeenCalledTimes(1)
     expect(completed).toHaveLength(1)
     backlinkPreflight.value = null
+  })
+})
+
+describe('delete dialog for a bucket on another node', () => {
+  const request = { kind: 'bucket' as const, bucket: 'reef', nodeId: 'node-far' }
+
+  it('checks and purges the bucket on its own node', async () => {
+    removeBucket.mockClear()
+    purgeRun.mockClear()
+    const { root, completed } = await open(request)
+
+    expect(preflightResponse).toHaveBeenLastCalledWith(
+      { kind: 'bucket', bucket: 'reef' },
+      { baseUrl: 'https://node-far.test/api/v1', token: 'token' },
+    )
+    expect(content(root)).not.toContain('Open the bucket on that node')
+    const field = element(root, (node) => node.props.id === 'deletion-typed-name')
+    await typeValue(field, 'reef')
+    await click(button(root, 'Delete permanently'))
+
+    expect(removeBucket).toHaveBeenCalledWith('node-far', 'reef', expect.anything())
+    expect(purgeRun).not.toHaveBeenCalled()
+    expect(completed).toEqual([expect.objectContaining({ committed: ['reef'] })])
+  })
+
+  it('shows the error when the node refuses', async () => {
+    removeBucket.mockRejectedValueOnce(new Error('You may not delete this bucket.'))
+    const { root, completed } = await open(request)
+
+    const field = element(root, (node) => node.props.id === 'deletion-typed-name')
+    await typeValue(field, 'reef')
+    await click(button(root, 'Delete permanently'))
+
+    expect(content(root)).toContain('You may not delete this bucket.')
+    expect(completed).toEqual([expect.objectContaining({ committed: [] })])
   })
 })
 

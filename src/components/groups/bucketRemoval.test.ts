@@ -54,6 +54,15 @@ describe('bucket removal', () => {
     ])
   })
 
+  it('reports progress through the purge job it was given', async () => {
+    serve()
+    const { usePurgeJob } = await import('@/components/data/deletion/usePurgeJob')
+    const job = usePurgeJob()
+    await removeBucket('node-2', 'raw-data', job)
+
+    expect(job.status.value?.state).toBe('succeeded')
+  })
+
   it('names a failed purge job', async () => {
     serve(() => {}, { ...DONE, state: 'failed', error: { message: 'bucket is locked', kind: 'x' } })
     await expect(removeBucket('node-2', 'raw-data')).rejects.toThrow('bucket is locked')
