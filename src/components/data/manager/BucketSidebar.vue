@@ -84,7 +84,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
     </div>
 
     <div class="surface overflow-hidden" :aria-busy="bucketsRefreshing">
-      <header class="flex items-center justify-between border-b border-border px-4 py-3">
+      <header class="flex items-center justify-between border-b border-border px-3 py-3">
         <h2 class="text-sm font-semibold text-foreground">Buckets</h2>
         <div class="flex items-center gap-2">
           <!-- Background revalidation only: the cached list stays readable behind it. -->
@@ -92,15 +92,13 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
           <Badge variant="outline" size="count">{{ searchList ? all.hits.value.length : nodeBuckets.length }}</Badge>
         </div>
       </header>
-      <div class="flex gap-2 border-b border-border px-3 py-2">
-        <div class="w-2/5 min-w-0">
-          <NodePicker :model-value="bucketNodeChoice" :recent="recentNodes" @update:model-value="pickNode" />
-        </div>
+      <div class="space-y-2 border-b border-border px-3 py-2">
+        <NodePicker :model-value="bucketNodeChoice" :recent="recentNodes" @update:model-value="pickNode" />
         <Input v-model="bucketNameFilter" placeholder="Search this group" aria-label="Search this group" class="h-8 text-xs" />
       </div>
       <template v-if="searchList">
-        <Spinner v-if="all.loading.value && !all.hits.value.length" show-label label="Loading buckets…" class="px-4 py-4" />
-        <p v-else-if="all.error.value" class="px-4 py-3 text-xs text-destructive">{{ all.error.value }}</p>
+        <Spinner v-if="all.loading.value && !all.hits.value.length" show-label label="Loading buckets…" class="px-3 py-4" />
+        <p v-else-if="all.error.value" class="px-3 py-3 text-xs text-destructive">{{ all.error.value }}</p>
         <ul v-else-if="all.hits.value.length" class="max-h-[420px] overflow-y-auto py-1">
           <li v-for="hit in all.hits.value" :key="`${hit.node_id}/${hit.bucket}`">
             <BucketRow
@@ -110,15 +108,15 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
               @open="openHit(hit)"
             >
               <template #actions>
-                <Badge variant="secondary" size="sm" class="max-w-24 shrink-0 truncate" :title="hit.node_id">
-                  {{ realmNodes.displayName(hit.node_id) }}
+                <Badge variant="secondary" size="sm" class="min-w-0 max-w-24 shrink-0" :title="`${realmNodes.displayName(hit.node_id)} (${hit.node_id})`">
+                  <span class="truncate">{{ realmNodes.displayName(hit.node_id) }}</span>
                 </Badge>
               </template>
             </BucketRow>
           </li>
         </ul>
-        <p v-else-if="!all.loading.value" class="px-4 py-4 text-xs text-muted-foreground">No buckets found.</p>
-        <p v-if="all.failedNodes.value" class="border-t border-border/70 px-4 py-2 text-xs text-muted-foreground">
+        <p v-else-if="!all.loading.value" class="px-3 py-4 text-xs text-muted-foreground">No buckets found.</p>
+        <p v-if="all.failedNodes.value" class="border-t border-border/70 px-3 py-2 text-xs text-muted-foreground">
           {{ all.failedNodes.value }} {{ all.failedNodes.value === 1 ? 'node' : 'nodes' }} did not answer.
           <button type="button" class="text-primary hover:underline" @click="all.reload()">Retry</button>
         </p>
@@ -127,19 +125,19 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
         </div>
       </template>
       <template v-else>
-        <p v-if="allNodes" class="border-b border-border/70 px-4 py-2 text-xs text-muted-foreground">
+        <p v-if="allNodes" class="border-b border-border/70 px-3 py-2 text-xs text-muted-foreground">
           Type 2 letters to search all nodes.
         </p>
-        <Spinner v-if="bucketsLoading" show-label label="Loading buckets…" class="px-4 py-4" />
+        <Spinner v-if="bucketsLoading" show-label label="Loading buckets…" class="px-3 py-4" />
         <Notice v-else-if="bucketsError && bucketsAuthError" tone="warning" class="m-3">
           <p>The temporary S3 session was rejected. Close it, then explicitly open this node and group again.</p>
           <p class="mt-1 break-all font-mono text-[10px]">{{ bucketsError }}</p>
           <Button variant="outline" size="sm" class="mt-2" @click="s3.clearSessions()"><KeyRound class="h-3.5 w-3.5" /> Close temporary sessions</Button>
         </Notice>
-        <p v-else-if="bucketsError && !bucketsLoaded" class="px-4 py-3 text-xs text-destructive">{{ bucketsError }}</p>
+        <p v-else-if="bucketsError && !bucketsLoaded" class="px-3 py-3 text-xs text-destructive">{{ bucketsError }}</p>
         <template v-else>
           <!-- A failed revalidation keeps the last good list and reports itself above it. -->
-          <p v-if="bucketsError" class="border-b border-border/70 px-4 py-2 text-xs text-destructive">{{ bucketsError }}</p>
+          <p v-if="bucketsError" class="border-b border-border/70 px-3 py-2 text-xs text-destructive">{{ bucketsError }}</p>
           <ul v-if="nodeBuckets.length" class="max-h-[420px] overflow-y-auto py-1">
             <li
               v-for="entry in nodeBuckets"
@@ -168,9 +166,9 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
               </BucketRow>
             </li>
           </ul>
-          <p v-else class="px-4 py-4 text-xs text-muted-foreground">No buckets in this group yet.</p>
+          <p v-else class="px-3 py-4 text-xs text-muted-foreground">No buckets in this group yet.</p>
           <div v-if="recentBuckets.length" class="border-t border-border/70 py-1">
-            <p class="flex items-center gap-1.5 px-4 pb-1 pt-2 text-xs font-medium text-muted-foreground">
+            <p class="flex items-center gap-1.5 px-3 pb-1 pt-2 text-xs font-medium text-muted-foreground">
               <History class="h-3.5 w-3.5 shrink-0" />
               Recently browsed
             </p>
@@ -191,7 +189,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
           <div v-if="workspaceBuckets.length" class="border-t border-border/70 py-1">
             <button
               type="button"
-              class="flex w-full items-center gap-1 px-4 py-2 text-left text-xs font-medium text-muted-foreground hover:text-foreground"
+              class="flex w-full items-center gap-1 px-3 py-2 text-left text-xs font-medium text-muted-foreground hover:text-foreground"
               title="Scratch buckets (ws-…) created by runs"
               @click="workspacesOpen = !workspacesOpen"
             >
@@ -202,7 +200,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
             <ul v-if="workspacesOpen" class="max-h-56 overflow-y-auto pb-1">
               <li v-for="entry in workspaceBuckets" :key="entry.name">
                 <button
-                  class="flex w-full items-center gap-2 px-4 py-1.5 text-left text-xs hover:bg-muted"
+                  class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-muted"
                   :class="entry.name === bucket && !remoteNodeId ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground'"
                   @click="openBucket(entry.name)"
                 >
@@ -224,8 +222,8 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
           aria-label="New bucket name"
           @keyup.enter="createBucket"
         />
-        <Button variant="outline" size="sm" class="w-full" :disabled="creatingBucket || !newBucketName.trim() || Boolean(createBucketBlocker)" @click="createBucket">
-          <FolderPlus class="h-4 w-4" /> New bucket on {{ createNode }}
+        <Button variant="outline" size="sm" class="w-full" :title="`Creates the bucket on ${createNode}`" :disabled="creatingBucket || !newBucketName.trim() || Boolean(createBucketBlocker)" @click="createBucket">
+          <FolderPlus class="h-4 w-4" /> New bucket
         </Button>
         <p v-if="createBucketError" class="text-xs text-destructive">{{ createBucketError }}</p>
         <p v-else-if="newBucketProblem" class="text-xs text-destructive">{{ newBucketProblem }}</p>

@@ -168,7 +168,7 @@ function field(root: Parameters<typeof content>[0]) {
 }
 
 function createButton(root: Parameters<typeof content>[0]) {
-  return element(root, (node) => node.tag === 'button' && content(node).includes('New bucket on'))
+  return element(root, (node) => node.tag === 'button' && content(node).includes('New bucket'))
 }
 
 describe('Bucket sidebar naming', () => {
@@ -296,7 +296,8 @@ describe('Bucket sidebar node choice', () => {
     expect(showNode).toHaveBeenCalledWith('node-2')
     expect(content(root)).toContain('reef-survey')
     expect(content(root)).not.toContain('results')
-    expect(content(createButton(root))).toContain('New bucket on name-node-2')
+    expect(content(createButton(root))).not.toContain('name-node-2')
+    expect(createButton(root).props.title).toBe('Creates the bucket on name-node-2')
   })
 
   it('falls back to the open node list when the node needs a name', async () => {
