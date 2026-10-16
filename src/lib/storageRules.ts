@@ -214,16 +214,19 @@ export function moveRefusal(err: unknown): string | null {
   return err.code === 'bucket_encrypted' ? 'This bucket is encrypted, so its files cannot be moved.' : null
 }
 
-/** One key per move run, so a new run starts a new total. */
-function runKey(move: BucketMoveResponse): string {
-  return `${move.bucket}\n${move.move_prefix ?? ''}\n${move.progress?.started_at_ms}`
+/** A move answer that remembers the folder it was asked for, as counts differ per folder. */
+export type AskedMove = BucketMoveResponse & { asked?: string }
+
+/** One key per move run and asked folder, so a new run starts a new total. */
+function runKey(move: AskedMove): string {
+  return `${move.bucket}\n${move.asked ?? ''}\n${move.move_prefix ?? ''}\n${move.progress?.started_at_ms}`
 }
 
 /** Files of a move run seen so far: the largest of left to move plus moved. */
 export type MoveTotals = Map<string, number>
 
 /** Keeps the largest total of each running move, so the total never shrinks. */
-export function rememberMoves(totals: MoveTotals, moves: BucketMoveResponse[]) {
+export function rememberMoves(totals: MoveTotals, moves: AskedMove[]) {
   for (const move of moves) {
     if (!move.progress || move.progress.finished_at_ms != null) continue
     const key = runKey(move)
@@ -235,7 +238,7 @@ export function rememberMoves(totals: MoveTotals, moves: BucketMoveResponse[]) {
  * `prefix` limits progress to moves started for that prefix; counts stay whole.
  * Done counts down the live left-to-move count, as the node saves progress only per page.
  */
-export function moveView(moves: BucketMoveResponse[], prefix?: string, totals?: MoveTotals): MoveView {
+export function moveView(moves: AskedMove[], prefix?: string, totals?: MoveTotals): MoveView {
   const view: MoveView = { misplaced: 0, partial: false, running: false, done: 0 }
   for (const move of moves) {
     const progress = move.progress

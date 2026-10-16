@@ -95,4 +95,17 @@ describe('storageRules', () => {
     // A new run has its own total.
     expect(text(at(20, 0, 2))).toBe('Moving files: 0 of 20')
   })
+
+  it('keeps separate totals for the bucket and a folder of it', () => {
+    const run = { migrated: 0, skipped: 0, failed: 0, started_at_ms: 1, finished_at_ms: null }
+    const whole = { bucket: 'b', misplaced: 100, complete: true, progress: run, move_prefix: 'raw/', asked: '' }
+    const folder = { ...whole, misplaced: 10, asked: 'raw/' }
+    const totals = new Map<string, number>()
+    rememberMoves(totals, [whole, folder])
+    expect(moveText(moveView([whole], '', totals))).toBe('Moving files: 0 of 100')
+    expect(moveText(moveView([folder], 'raw/', totals))).toBe('Moving files: 0 of 10')
+    const later = { ...folder, misplaced: 9 }
+    rememberMoves(totals, [later])
+    expect(moveText(moveView([later], 'raw/', totals))).toBe('Moving files: 1 of 10')
+  })
 })

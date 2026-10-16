@@ -42,6 +42,7 @@ import {
   moveText,
   moveView,
   rememberMoves,
+  type AskedMove,
   type MoveTotals,
   runActive,
   runText,
@@ -91,7 +92,7 @@ const defaultStorage = ref<GroupBackendResponse | null>(null)
 const arunaConfirm = ref(false)
 const removingId = ref<string | null>(null)
 // Move counts by "bucket\nprefix"; a node without the routes leaves them empty.
-const moves = ref<Record<string, BucketMoveResponse>>({})
+const moves = ref<Record<string, AskedMove>>({})
 const groupBuckets = ref<string[]>([])
 // A confirmation keeps the group, client and session it was made for.
 interface MoveAsk {
@@ -165,10 +166,10 @@ async function loadMoves() {
   ]
   const answers = await Promise.allSettled(pairs.map(([bucket, prefix]) => getBucketMove(bucket, prefix, asked)))
   if (seq !== loadSeq) return
-  const next: Record<string, BucketMoveResponse> = {}
+  const next: Record<string, AskedMove> = {}
   answers.forEach((answer, index) => {
     const key = moveKey(...pairs[index])
-    const known = answer.status === 'fulfilled' ? answer.value : moves.value[key]
+    const known = answer.status === 'fulfilled' ? { ...answer.value, asked: pairs[index][1] } : moves.value[key]
     if (known) next[key] = known
   })
   groupBuckets.value = buckets
