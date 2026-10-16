@@ -6,12 +6,13 @@ import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import BucketRow from '@/components/data/BucketRow.vue'
-import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
+import { useBucketSearch } from '@/composables/useBucketSearch'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useS3 } from '@/composables/useS3'
 import type { DataManager } from '@/composables/useDataManager'
 import type { BucketSearchHit } from '@/lib/api'
-import { Boxes, ChevronRight, FolderPlus, History, KeyRound, Trash2 } from '@lucide/vue'
+import { isWorkspaceBucket } from '@/lib/workspaces'
+import { ArrowLeftRight, Boxes, ChevronRight, FolderPlus, History, KeyRound, Trash2 } from '@lucide/vue'
 import { computed } from 'vue'
 
 const props = defineProps<{ manager: DataManager }>()
@@ -24,6 +25,7 @@ const {
   remoteNodeId,
   requiredNodeId,
   bucketNodeChoice,
+  selectedGroupId,
   bucketNameFilter,
   allBuckets: all,
   syncByBucket,
@@ -58,6 +60,11 @@ const nodeBuckets = computed(() => {
   const term = bucketNameFilter.value.trim().toLowerCase()
   return term ? sidebarBuckets.value.filter((entry) => entry.bucket.toLowerCase().includes(term)) : sidebarBuckets.value
 })
+// Matches in other groups for the same query, below this group's list.
+const search = useBucketSearch(bucketNameFilter)
+const otherHits = computed(() =>
+  search.hits.value.filter((hit) => hit.group_id !== selectedGroupId.value && !isWorkspaceBucket(hit.bucket)),
+)
 const createNode = computed(() => realmNodes.displayName(requiredNodeId.value))
 
 function openHit(hit: BucketSearchHit) {
@@ -76,10 +83,6 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
 
 <template>
   <aside class="space-y-3">
-    <div class="surface p-3">
-      <BucketSearchBox placeholder="Find buckets in all groups" :sync-by-bucket="syncByBucket" @open="openSearchHit" @sync="(hit: BucketSearchHit) => emit('sync', hit)" />
-    </div>
-
     <div class="surface overflow-hidden" :aria-busy="bucketsRefreshing">
       <header class="flex items-center justify-between border-b border-border px-3 py-3">
         <h2 class="text-sm font-semibold text-foreground">Buckets</h2>
@@ -90,7 +93,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
         </div>
       </header>
       <div class="border-b border-border px-3 py-2">
-        <Input v-model="bucketNameFilter" placeholder="Search this group" aria-label="Search this group" class="h-8 text-xs" />
+        <Input v-model="bucketNameFilter" placeholder="Find a bucket" aria-label="Find a bucket" class="h-8 text-xs" />
       </div>
       <template v-if="searchList">
         <Spinner v-if="all.loading.value && !all.hits.value.length" show-label label="Loading buckets…" class="px-3 py-4" />
@@ -208,6 +211,26 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
           </div>
         </template>
       </template>
+      <div v-if="otherHits.length" class="border-t border-border/70 py-1">
+        <p class="px-3 pb-1 pt-2 text-xs font-medium text-muted-foreground">Other groups</p>
+        <ul class="max-h-56 overflow-y-auto pb-1">
+          <li v-for="hit in otherHits" :key="hit.arn">
+            <BucketRow
+              :bucket="hit.bucket"
+              :node-id="realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id"
+              :subtitle="hit.group_name || null"
+              :pinnable="false"
+              @open="openSearchHit(hit)"
+            >
+              <template v-if="!realmNodes.isLocalNode(hit.node_id)" #actions>
+                <IconButton :label="`Sync ${hit.bucket} to this node…`" side="right" @click="emit('sync', hit)">
+                  <ArrowLeftRight class="h-3 w-3" />
+                </IconButton>
+              </template>
+            </BucketRow>
+          </li>
+        </ul>
+      </div>
       <footer class="space-y-2 border-t border-border p-3">
         <Input
           v-model="newBucketName"

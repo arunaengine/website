@@ -13,6 +13,7 @@ import {
   typeValue,
 } from '@/test/clientRender'
 import { BUCKET_NAME_REQUIREMENT, bucketNameProblem } from '@/lib/bucketName'
+import * as Workspaces from '@/lib/workspaces'
 
 const createBucket = vi.fn()
 const requestDelete = vi.fn()
@@ -21,6 +22,8 @@ const reload = vi.fn()
 const loadMore = vi.fn()
 let canDelete = true
 
+// What the cross-group search answered for the typed name.
+const otherSearch = ref<{ arn: string; bucket: string; node_id: string; group_id: string; group_name?: string }[]>([])
 // What the bucket search answered for All nodes.
 const allBuckets = {
   hits: ref<{ bucket: string; node_id: string; group_id: string }[]>([]),
@@ -89,7 +92,8 @@ const BucketSidebar = compileClientComponent(new URL('./BucketSidebar.vue', impo
   '@/components/ui/Spinner.vue': moduleDefault(Empty),
   '@/components/ui/IconButton.vue': moduleDefault(IconButtonStub),
   '@/components/data/BucketRow.vue': moduleDefault(RowStub),
-  '@/components/data/BucketSearchBox.vue': moduleDefault(Empty),
+  '@/composables/useBucketSearch': { useBucketSearch: () => ({ hits: otherSearch }) },
+  '@/lib/workspaces': Workspaces,
   '@/composables/useRealmNodes': {
     useRealmNodes: () => ({
       displayName: (id: string | null) => (id ? `name-${id}` : 'this node'),
@@ -110,6 +114,7 @@ function manager() {
     remoteNodeId: ref(null),
     requiredNodeId: ref('home'),
     bucketNodeChoice: nodeChoice,
+    selectedGroupId: ref('g1'),
     bucketNameFilter: ref(''),
     allBuckets,
     recentNodes: ref([]),
@@ -292,6 +297,24 @@ describe('Bucket sidebar node choice', () => {
     expect(content(root)).not.toContain('results')
     expect(content(createButton(root))).not.toContain('name-node-2')
     expect(createButton(root).props.title).toBe('Creates the bucket on name-node-2')
+  })
+
+  it('lists matches of other groups below the list and opens them', async () => {
+    otherSearch.value = [
+      { arn: 'a', bucket: 'results', node_id: 'node-2', group_id: 'g1' },
+      { arn: 'b', bucket: 'shared-reads', node_id: 'home', group_id: 'g2', group_name: 'Lab' },
+      { arn: 'c', bucket: 'ws-scratch', node_id: 'home', group_id: 'g2' },
+    ]
+    const state = manager()
+    const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
+    const text = content(root)
+
+    expect(text).toContain('Other groups')
+    expect(text).toContain('shared-reads')
+    expect(text).not.toContain('ws-scratch')
+    await click(element(root, (node) => node.props['aria-label'] === 'Open shared-reads'))
+    expect(state.openSearchHit).toHaveBeenCalledWith(otherSearch.value[1])
+    otherSearch.value = []
   })
 
   it('falls back to the open node list when the node needs a name', async () => {

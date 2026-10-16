@@ -4,15 +4,13 @@ import BucketRow from '@/components/data/BucketRow.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
-import { useAruna } from '@/composables/useAruna'
+import { MIN_CHARS, useBucketSearch } from '@/composables/useBucketSearch'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useBucketShortcuts } from '@/composables/useBucketShortcuts'
 import { syncBucketKey } from '@/lib/sync'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import type { BucketSearchHit } from '@/lib/api'
-import { useDebounceFn } from '@vueuse/core'
 import { computed, ref, useId, watch } from 'vue'
-import { errorMessage } from '@/lib/utils'
 import { AlertTriangle, ArrowLeftRight, Search, X } from '@lucide/vue'
 
 // Federated bucket search over GET /search/buckets, rendered as a compact
@@ -22,7 +20,7 @@ import { AlertTriangle, ArrowLeftRight, Search, X } from '@lucide/vue'
 //    "sync to this node" affordance on remote hits.
 //  - picker (dialogs): the input doubles as the bucket-name field (v-model);
 //    rows fill it in and emit `select`.
-// Debounced with request-id staleness; ws-* scratch buckets never surface.
+// ws-* scratch buckets never surface.
 const props = withDefaults(
   defineProps<{
     modelValue?: string
@@ -55,7 +53,6 @@ const emit = defineEmits<{
   (e: 'sync', hit: BucketSearchHit): void
 }>()
 
-const { authToken, searchBuckets } = useAruna()
 const { displayName, isLocalNode, localNodeId } = useRealmNodes()
 
 // Same (node, bucket) key the Data manager builds its overview map with.
@@ -76,15 +73,8 @@ watch(
   },
 )
 
-const hits = ref<BucketSearchHit[]>([])
-const nodesQueried = ref(0)
-const nodesFailed = ref(0)
-const searching = ref(false)
-const searched = ref(false)
-const error = ref<string | null>(null)
-let seq = 0
+const { hits, nodesQueried, nodesFailed, searching, searched, error } = useBucketSearch(query)
 
-const MIN_CHARS = 2
 const active = computed(() => query.value.trim().length >= MIN_CHARS)
 const partial = computed(() => nodesFailed.value > 0)
 
@@ -132,37 +122,10 @@ function onKeydown(event: KeyboardEvent) {
   }
 }
 
-const runSearch = useDebounceFn(async (term: string) => {
-  const mySeq = ++seq
-  if (term.length < MIN_CHARS || !authToken.value) {
-    hits.value = []
-    searching.value = false
-    searched.value = false
-    return
-  }
-  searching.value = true
-  error.value = null
-  try {
-    const response = await searchBuckets(term)
-    if (mySeq !== seq) return
-    hits.value = response.hits
-    nodesQueried.value = response.nodes_queried
-    nodesFailed.value = response.nodes_failed
-    searched.value = true
-  } catch (err) {
-    if (mySeq !== seq) return
-    hits.value = []
-    error.value = errorMessage(err)
-  } finally {
-    if (mySeq === seq) searching.value = false
-  }
-}, 250)
-
 watch(
   query,
   (value) => {
     emit('update:modelValue', value)
-    void runSearch(value.trim())
   },
   { immediate: true },
 )
