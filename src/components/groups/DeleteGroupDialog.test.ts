@@ -82,6 +82,26 @@ async function mount() {
   return { ...mounted, onDeleted, onOpen }
 }
 
+// Mounts behind a host so the test can close and reopen the dialog.
+async function mountToggled() {
+  const open = ref(true)
+  const Host = defineComponent(() => () => h(DeleteGroupDialog, { open: open.value, groupId: 'g1' }))
+  const mounted = await mountApp(Host)
+  await flush()
+  return { ...mounted, open }
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((done) => (resolve = done))
+  return { promise, resolve }
+}
+
+// Calls the click handler directly, without waiting for a render in between.
+function press(node: ReturnType<typeof button>) {
+  return (node.props.onClick as () => Promise<void>)()
+}
+
 function deleteButton(root: Parameters<typeof nodes>[0]) {
   return button(root, 'Delete group')
 }
@@ -185,6 +205,70 @@ describe('Delete group dialog', () => {
 
     expect(content(root)).toContain('run the deletion check on a server node')
     expect(deleteButton(root).props.disabled).toBe(true)
+  })
+
+  it('keeps the delete off while it runs', async () => {
+    const pending = deferred<void>()
+    deleteGroup.mockReturnValueOnce(pending.promise)
+    const { root, onDeleted } = await mount()
+
+    const running = click(deleteButton(root))
+    await flush()
+    expect(deleteButton(root).props.disabled).toBe(true)
+    await press(deleteButton(root))
+    expect(deleteGroup).toHaveBeenCalledTimes(1)
+
+    pending.resolve()
+    await running
+    expect(onDeleted).toHaveBeenCalledOnce()
+  })
+
+  it('starts one delete for a double click', async () => {
+    const pending = deferred<void>()
+    deleteGroup.mockReturnValueOnce(pending.promise)
+    const { root, onDeleted } = await mount()
+    const first = press(deleteButton(root))
+    const second = press(deleteButton(root))
+    pending.resolve()
+    await Promise.all([first, second])
+    await flush()
+
+    expect(deleteGroup).toHaveBeenCalledTimes(1)
+    expect(onDeleted).toHaveBeenCalledOnce()
+  })
+
+  it('drops a check that was in flight when the dialog closed', async () => {
+    const stale = deferred<GroupDeletionBlockers>()
+    getGroupDeletionBlockers.mockReturnValueOnce(stale.promise).mockResolvedValueOnce(BLOCKED)
+    const { root, open } = await mountToggled()
+
+    open.value = false
+    await flush()
+    open.value = true
+    await flush()
+    stale.resolve(CLEAR)
+    await flush()
+
+    expect(getGroupDeletionBlockers).toHaveBeenCalledTimes(2)
+    expect(content(root)).toContain('lab-data')
+    expect(content(root)).not.toContain('Nothing blocks deletion.')
+    expect(deleteButton(root).props.disabled).toBe(true)
+  })
+
+  it('drops an older check answer after Check again', async () => {
+    const stale = deferred<GroupDeletionBlockers>()
+    getGroupDeletionBlockers.mockReturnValueOnce(stale.promise).mockResolvedValueOnce(BLOCKED)
+    const { root } = await mount()
+
+    await press(button(root, 'Check again'))
+    await flush()
+    stale.resolve(CLEAR)
+    await flush()
+
+    expect(content(root)).toContain('lab-data')
+    expect(content(root)).not.toContain('Nothing blocks deletion.')
+    expect(deleteButton(root).props.disabled).toBe(true)
+    expect(button(root, 'Check again').props.disabled).toBe(false)
   })
 
   it('holds the delete back without a connection', async () => {

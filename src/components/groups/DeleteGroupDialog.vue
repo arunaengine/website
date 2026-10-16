@@ -36,6 +36,8 @@ const checkError = ref<string | null>(null)
 // Older nodes answer 404 for the route; deleting then works as before.
 const unavailable = ref(false)
 const refusal = ref<string | null>(null)
+// Local, so a second click cannot start a second delete before `saving` renders.
+const deleting = ref(false)
 let checkSeq = 0
 
 const canDelete = computed(() => unavailable.value || Boolean(check.value?.clear))
@@ -88,6 +90,8 @@ function deleteMessage(err: unknown): string {
 }
 
 async function remove() {
+  if (deleting.value) return
+  deleting.value = true
   refusal.value = null
   try {
     await deleteGroup(props.groupId)
@@ -96,6 +100,8 @@ async function remove() {
   } catch (err) {
     refusal.value = deleteMessage(err)
     if (!unavailable.value) void runCheck()
+  } finally {
+    deleting.value = false
   }
 }
 
@@ -164,11 +170,11 @@ function bucketRoute(nodeId: string, bucket: string) {
         <DialogClose as-child><Button variant="outline">Close</Button></DialogClose>
         <Button
           variant="destructive"
-          :disabled="!canDelete || checking || saving || writesDisabled"
+          :disabled="!canDelete || checking || deleting || saving || writesDisabled"
           :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
           @click="remove"
         >
-          <Spinner v-if="saving" label="Deleting…" /> Delete group
+          <Spinner v-if="deleting" label="Deleting…" /> Delete group
         </Button>
       </DialogFooter>
     </DialogContent>
