@@ -33,6 +33,7 @@ import type { DeletedObjectEntry } from '@/lib/objectVersions'
 import { deletedOnPage, lastListedKey, shownDeleted, shownEntries, type ListingShow } from '@/lib/objectListing'
 import { assessQuota, quotaCountedBytes, type QuotaAssessment } from '@/lib/quota'
 import { isWorkspaceBucket } from '@/lib/workspaces'
+import { useAllBuckets } from './useAllBuckets'
 import type { BucketSearchHit, SourceConnectorSummary, SyncRelationship, UsageResponse } from '@/lib/api'
 import { referenceSourceLabel, referenceSourceName, type ReferenceSourceGroup } from '@/lib/references'
 import { parseArunaArn, prefixesOverlap, syncBucketKey } from '@/lib/sync'
@@ -499,6 +500,23 @@ export function useDataManager() {
   // show (pins are filtered in the store, listed local buckets here), so the
   // section stays non-redundant; in practice it holds remote buckets opened
   // via search without pinning them.
+  // Node choice of the bucket list, kept here so it outlives the sidebar.
+  // Null lists every node through the bucket search.
+  const bucketNodeChoice = ref<string | null>(null)
+  const bucketNameFilter = ref('')
+  const allBuckets = useAllBuckets(
+    bucketNameFilter,
+    selectedGroupId,
+    computed(() => bucketNodeChoice.value === null),
+  )
+  const recentNodes = computed(() => [
+    ...new Set(shortcuts.recent.value.map((entry) => entry.nodeId).filter((id): id is string => Boolean(id))),
+  ])
+  // Opening a bucket on another node moves a one-node list along.
+  watch(requiredNodeId, (nodeId) => {
+    if (bucketNodeChoice.value !== null) bucketNodeChoice.value = nodeId
+  })
+
   const recentBuckets = computed(() => {
     const visible = new Set(
       sidebarBuckets.value.map((entry) => `${entry.nodeId ?? ''}/${entry.bucket}`),
@@ -768,7 +786,9 @@ export function useDataManager() {
   }
 
   function refreshAll(): Promise<unknown> {
-    return Promise.all([bucketList.refresh(), reloadContext()])
+    const work = [bucketList.refresh(), reloadContext()]
+    if (bucketNodeChoice.value === null) work.push(allBuckets.reload())
+    return Promise.all(work)
   }
 
   const { busy: refreshBusy, refresh: onRefresh } = useRefresh(refreshAll)
@@ -915,6 +935,13 @@ export function useDataManager() {
     void navigate(() => router.push({ name: 'buckets', query }))
   }
 
+  function pickNode(nodeId: string | null) {
+    bucketNodeChoice.value = nodeId
+    if (nodeId) showNode(nodeId)
+    // A node whose session failed shows no list, so All nodes goes back home.
+    else if (contextError.value && remoteNodeId.value) showNode(realmNodes.localNodeId.value ?? '')
+  }
+
   function openSearchHit(hit: BucketSearchHit) {
     // Only a hit that changes the group fires the watcher that consumes this.
     if (hit.group_id !== selectedGroupId.value) hitGroupId = hit.group_id
@@ -949,11 +976,15 @@ export function useDataManager() {
     if (!name || !contextReady.value || createBucketBlocker.value) return
     creatingBucket.value = true
     createBucketError.value = null
+    // The bucket lives where the session was when the request started.
+    const nodeId = remoteNodeId.value
+    const groupId = selectedGroupId.value
     try {
       await s3.createBucket(name)
       newBucketName.value = ''
       await bucketList.refresh()
-      openBucketOn(name, remoteNodeId.value)
+      if (remoteNodeId.value !== nodeId || selectedGroupId.value !== groupId) return
+      openBucketOn(name, nodeId)
     } catch (err) {
       createBucketError.value = s3ErrorMessage(err, name)
     } finally {
@@ -1420,6 +1451,11 @@ export function useDataManager() {
     clearSelection: selection.clearSelection,
     openBucketOn,
     showNode,
+    pickNode,
+    bucketNodeChoice,
+    bucketNameFilter,
+    allBuckets,
+    recentNodes,
     openBucket,
     openSearchHit,
     navigateTo,

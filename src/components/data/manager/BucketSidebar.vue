@@ -8,13 +8,12 @@ import Spinner from '@/components/ui/Spinner.vue'
 import BucketRow from '@/components/data/BucketRow.vue'
 import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
 import NodePicker from '@/components/data/NodePicker.vue'
-import { useAllBuckets } from '@/composables/useAllBuckets'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useS3 } from '@/composables/useS3'
 import type { DataManager } from '@/composables/useDataManager'
 import type { BucketSearchHit } from '@/lib/api'
 import { Boxes, ChevronRight, FolderPlus, History, KeyRound, Trash2 } from '@lucide/vue'
-import { computed, ref, watch } from 'vue'
+import { computed } from 'vue'
 
 const props = defineProps<{ manager: DataManager }>()
 const emit = defineEmits<{ (e: 'sync', hit: BucketSearchHit): void }>()
@@ -25,8 +24,11 @@ const {
   bucket,
   remoteNodeId,
   requiredNodeId,
-  selectedGroupId,
-  showNode,
+  bucketNodeChoice,
+  bucketNameFilter,
+  allBuckets: all,
+  recentNodes,
+  pickNode,
   syncByBucket,
   syncKeyFor,
   openSearchHit,
@@ -52,31 +54,14 @@ const {
   requestDelete,
 } = props.manager
 
-// Null lists every node through the bucket search; a node id lists that node's own buckets.
-const nodeChoice = ref<string | null>(null)
-const nameFilter = ref('')
-const allNodes = computed(() => nodeChoice.value === null)
-const all = useAllBuckets(nameFilter, selectedGroupId, allNodes)
+const allNodes = computed(() => bucketNodeChoice.value === null)
 // An older node cannot list without a name; the open node's list stands in.
 const searchList = computed(() => allNodes.value && !all.needsName.value)
-const recentNodes = computed(() => [
-  ...new Set(shortcuts.recent.value.map((entry) => entry.nodeId).filter((id): id is string => Boolean(id))),
-])
 const nodeBuckets = computed(() => {
-  const term = nameFilter.value.trim().toLowerCase()
+  const term = bucketNameFilter.value.trim().toLowerCase()
   return term ? sidebarBuckets.value.filter((entry) => entry.bucket.toLowerCase().includes(term)) : sidebarBuckets.value
 })
 const createNode = computed(() => realmNodes.displayName(requiredNodeId.value))
-
-function pickNode(nodeId: string | null) {
-  nodeChoice.value = nodeId
-  if (nodeId) showNode(nodeId)
-}
-
-// Opening a bucket on another node moves a one-node list along.
-watch(requiredNodeId, (nodeId) => {
-  if (nodeChoice.value !== null) nodeChoice.value = nodeId
-})
 
 function openHit(hit: BucketSearchHit) {
   openBucketOn(hit.bucket, realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id)
@@ -95,7 +80,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
 <template>
   <aside class="space-y-3">
     <div class="surface p-3">
-      <BucketSearchBox :sync-by-bucket="syncByBucket" @open="openSearchHit" @sync="(hit: BucketSearchHit) => emit('sync', hit)" />
+      <BucketSearchBox placeholder="Find buckets in all groups" :sync-by-bucket="syncByBucket" @open="openSearchHit" @sync="(hit: BucketSearchHit) => emit('sync', hit)" />
     </div>
 
     <div class="surface overflow-hidden" :aria-busy="bucketsRefreshing">
@@ -109,9 +94,9 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
       </header>
       <div class="flex gap-2 border-b border-border px-3 py-2">
         <div class="w-2/5 min-w-0">
-          <NodePicker :model-value="nodeChoice" :recent="recentNodes" @update:model-value="pickNode" />
+          <NodePicker :model-value="bucketNodeChoice" :recent="recentNodes" @update:model-value="pickNode" />
         </div>
-        <Input v-model="nameFilter" placeholder="Search by name" aria-label="Search buckets by name" class="h-8 text-xs" />
+        <Input v-model="bucketNameFilter" placeholder="Search this group" aria-label="Search this group" class="h-8 text-xs" />
       </div>
       <template v-if="searchList">
         <Spinner v-if="all.loading.value && !all.hits.value.length" show-label label="Loading buckets…" class="px-4 py-4" />

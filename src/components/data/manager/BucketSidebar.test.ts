@@ -32,7 +32,11 @@ const allBuckets = {
   reload,
   loadMore,
 }
-const allEnabled = { value: null as { value: boolean } | null }
+const nodeChoice = ref<string | null>(null)
+const choose = vi.fn((nodeId: string | null) => {
+  nodeChoice.value = nodeId
+  if (nodeId) showNode(nodeId)
+})
 
 const Empty = defineComponent(() => () => null)
 // The row renders its name and action slot so the sidebar's own controls are visible.
@@ -93,12 +97,6 @@ const BucketSidebar = compileClientComponent(new URL('./BucketSidebar.vue', impo
   '@/components/data/BucketRow.vue': moduleDefault(RowStub),
   '@/components/data/BucketSearchBox.vue': moduleDefault(Empty),
   '@/components/data/NodePicker.vue': moduleDefault(PickerStub),
-  '@/composables/useAllBuckets': {
-    useAllBuckets: (_query: unknown, _group: unknown, enabled: { value: boolean }) => {
-      allEnabled.value = enabled
-      return allBuckets
-    },
-  },
   '@/composables/useRealmNodes': {
     useRealmNodes: () => ({
       displayName: (id: string | null) => (id ? `name-${id}` : 'this node'),
@@ -118,8 +116,11 @@ function manager() {
     bucket: ref(''),
     remoteNodeId: ref(null),
     requiredNodeId: ref('home'),
-    selectedGroupId: ref('g1'),
-    showNode,
+    bucketNodeChoice: nodeChoice,
+    bucketNameFilter: ref(''),
+    allBuckets,
+    recentNodes: ref([]),
+    pickNode: choose,
     syncByBucket: ref(new Map()),
     syncKeyFor: () => '',
     openSearchHit: vi.fn(),
@@ -200,6 +201,7 @@ describe('Bucket sidebar naming', () => {
 
 describe('Bucket sidebar deletion', () => {
   beforeEach(() => {
+    nodeChoice.value = null
     requestDelete.mockClear()
     canDelete = true
   })
@@ -237,6 +239,7 @@ describe('Bucket sidebar deletion', () => {
 
 describe('Bucket sidebar node choice', () => {
   beforeEach(() => {
+    nodeChoice.value = null
     showNode.mockClear()
     reload.mockClear()
     loadMore.mockClear()
@@ -254,7 +257,6 @@ describe('Bucket sidebar node choice', () => {
     const { root } = await mountApp(BucketSidebar, { props: { manager: state } })
     const text = content(root)
 
-    expect(allEnabled.value?.value).toBe(true)
     expect(text).toContain('results')
     expect(text).toContain('name-node-2')
     expect(text).not.toContain('reef-survey')
@@ -292,7 +294,6 @@ describe('Bucket sidebar node choice', () => {
     await pickNode(root)
 
     expect(showNode).toHaveBeenCalledWith('node-2')
-    expect(allEnabled.value?.value).toBe(false)
     expect(content(root)).toContain('reef-survey')
     expect(content(root)).not.toContain('results')
     expect(content(createButton(root))).toContain('New bucket on name-node-2')

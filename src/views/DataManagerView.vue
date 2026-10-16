@@ -15,6 +15,7 @@ import AddDataDialog from '@/components/data/AddDataDialog.vue'
 import DataViewSkeleton from '@/components/data/DataViewSkeleton.vue'
 import SyncBucketDialog from '@/components/data/SyncBucketDialog.vue'
 import BucketSidebar from '@/components/data/manager/BucketSidebar.vue'
+import NodePicker from '@/components/data/NodePicker.vue'
 import DeleteDialog from '@/components/data/DeleteDialog.vue'
 import FileDetailsDialog from '@/components/data/FileDetailsDialog.vue'
 import PublicAccessDialog from '@/components/data/PublicAccessDialog.vue'
@@ -59,6 +60,9 @@ const {
   sessionWarning,
   keyTail,
   openSelectedContext,
+  bucketNodeChoice,
+  recentNodes,
+  pickNode,
   activeGroupId,
   publicAccess,
   syncsForKey,
@@ -270,9 +274,15 @@ async function createFolder() {
               The session for {{ selectedGroupName }} on {{ requiredNodeName }} could not be opened
             </h2>
             <p class="mt-2 text-sm text-destructive">{{ contextError }}</p>
-            <Button variant="outline" size="sm" class="mt-3" :disabled="contextBusy" @click="openSelectedContext">
-              <KeyRound class="h-4 w-4" /> Retry
-            </Button>
+            <div class="mt-3 flex flex-wrap items-center gap-2">
+              <Button variant="outline" size="sm" :disabled="contextBusy" @click="openSelectedContext">
+                <KeyRound class="h-4 w-4" /> Retry
+              </Button>
+              <!-- The sidebar is gone while this shows, so the node choice stays here. -->
+              <div class="w-48">
+                <NodePicker :model-value="bucketNodeChoice" :recent="recentNodes" @update:model-value="pickNode" />
+              </div>
+            </div>
           </div>
         </div>
       </section>
