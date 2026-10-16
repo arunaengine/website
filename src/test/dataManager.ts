@@ -14,6 +14,9 @@ import { compileClientComponent, moduleDefault } from '@/test/clientRender'
 
 export const IconStub = defineComponent((_, { attrs }) => () => h('i', attrs))
 
+/** Lets a test hold the filter debounce and fire it later. */
+export const debounceHold = { on: false, queue: [] as Array<() => unknown> }
+
 export const Slotted = (tag: string) =>
   defineComponent({
     inheritAttrs: false,
@@ -118,7 +121,12 @@ export function objectListBar(): Component {
     {
       vue: VueRuntime,
       '@lucide/vue': new Proxy({}, { get: () => IconStub }),
-      '@vueuse/core': { useDebounceFn: (fn: (...args: unknown[]) => unknown) => fn },
+      '@vueuse/core': {
+        useDebounceFn: (fn: (...args: unknown[]) => unknown) => (...args: unknown[]) => {
+          if (!debounceHold.on) return fn(...args)
+          debounceHold.queue.push(() => fn(...args))
+        },
+      },
       '@/lib/objectListing': ObjectListing,
       '@/components/ui/Button.vue': moduleDefault(ButtonStub),
       '@/components/ui/DropdownMenu.vue': moduleDefault(Slotted('div')),

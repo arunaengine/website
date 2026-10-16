@@ -13,6 +13,7 @@ import {
 } from '@/test/clientRender'
 import {
   brokenFiles,
+  debounceHold,
   fakeManager,
   listedFolder,
   listedObject,
@@ -549,5 +550,42 @@ describe('object browser public access', () => {
     const folderRow = element(root, (node) => node.tag === 'tr' && content(node).includes(`${listedFolder.name}/`))
     expect(content(fileRow)).toContain('public')
     expect(content(folderRow)).not.toContain('public')
+  })
+})
+
+describe('object browser name filter', () => {
+  afterEach(() => {
+    debounceHold.on = false
+    debounceHold.queue.length = 0
+  })
+
+  it('keeps the typed text while an earlier filter is applied', async () => {
+    debounceHold.on = true
+    const nameFilter = ref('')
+    const root = await render({ nameFilter })
+    const field = () => element(root, (node) => node.tag === 'input' && node.props['aria-label'] === 'Filter by name start')
+    const type = async (value: string) => {
+      ;(field().props['onUpdate:modelValue'] as (value: string) => void)(value)
+      await flush()
+    }
+
+    await type('a')
+    await type('ab')
+    const [first] = debounceHold.queue
+    first()
+    await flush()
+
+    expect(nameFilter.value).toBe('a')
+    expect(field().props.modelValue).toBe('ab')
+    expect(content(root)).toContain(listedObject.name)
+
+    debounceHold.queue[1]()
+    await flush()
+    expect(nameFilter.value).toBe('ab')
+    expect(field().props.modelValue).toBe('ab')
+
+    nameFilter.value = ''
+    await flush()
+    expect(field().props.modelValue).toBe('')
   })
 })

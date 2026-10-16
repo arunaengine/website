@@ -789,8 +789,10 @@ export function useDataManager() {
   // realm document (with the remote node's published S3 URL) arrives.
   // A new folder starts unfiltered; the sync flush lets one listing cover both changes.
   watch([bucket, prefix], () => (nameFilter.value = ''), { flush: 'sync' })
-  watch([bucket, prefix, remoteNodeId, effectiveEndpoint, nameFilter], () => {
-    clearObjectListing()
+  // A name filter alone keeps the shown list until the new page arrives.
+  watch([bucket, prefix, remoteNodeId, effectiveEndpoint, nameFilter], (next, previous) => {
+    if (next.slice(0, 4).some((value, index) => value !== previous[index])) clearObjectListing()
+    else pages.reset()
     if (bucket.value && contextReady.value) void loadObjects()
   })
 

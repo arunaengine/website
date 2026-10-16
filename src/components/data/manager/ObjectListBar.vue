@@ -69,12 +69,15 @@ function blocker(action: SelectionAction): string | null {
 
 // Typing waits for a pause before the folder is listed again.
 const text = ref(nameFilter.value)
+let applied = nameFilter.value
 const applyText = useDebounceFn((value: string) => {
+  applied = value
   nameFilter.value = value
 }, 300)
 watch(text, (value) => void applyText(value))
+// Only a change from outside, such as a folder switch, replaces the typed text.
 watch(nameFilter, (value) => {
-  if (value !== text.value) text.value = value
+  if (value !== applied) text.value = applied = value
 })
 
 function clearText() {
