@@ -13,7 +13,9 @@ import {
   type UsageHistoryResponse,
   type UsageResponse,
   type StorageLocation,
+  type GroupDeletionBlockers,
   setGroupLocation as putGroupLocation,
+  getGroupDeletionBlockers as fetchDeletionBlockers,
 } from '@/lib/api'
 import { roleSummary, slugify } from './format'
 import { loadAuthenticated } from './identity'
@@ -141,6 +143,13 @@ export async function deleteGroup(groupId: string): Promise<void> {
   } finally {
     saving.value = false
   }
+}
+
+export async function getGroupDeletionBlockers(groupId: string): Promise<GroupDeletionBlockers> {
+  const context = refreshContext()
+  const response = await fetchDeletionBlockers(groupId, context.client)
+  assertCurrentSession(context.epoch)
+  return response
 }
 
 export async function createGroupRole(groupId: string, input: CreateGroupRoleRequest): Promise<ApiRole> {

@@ -48,6 +48,48 @@ export function setGroupLocation(
   )
 }
 
+// GET /access/groups/{id}/deletion-blockers: what each realm node still holds
+// for the group. `error` means the node did not answer; `buckets` lists at most
+// five readable names and `more` says further blocking buckets exist.
+export interface NodeDeletionBlockers {
+  node_id: string
+  kinds: string[]
+  buckets: string[]
+  more: boolean
+  error?: string
+}
+
+export interface GroupDeletionBlockers {
+  nodes: NodeDeletionBlockers[]
+}
+
+export interface DeletionCheck {
+  blocking: NodeDeletionBlockers[]
+  unanswered: NodeDeletionBlockers[]
+  empty: string[]
+  clear: boolean
+}
+
+export function getGroupDeletionBlockers(
+  groupId: string,
+  client: ApiClientOptions = {},
+): Promise<GroupDeletionBlockers> {
+  return apiRequest<GroupDeletionBlockers>(
+    `/access/groups/${encodeURIComponent(groupId)}/deletion-blockers`,
+    {},
+    client,
+  )
+}
+
+// Deletion is only safe when every node answered and none holds anything.
+export function sortDeletionCheck(response: GroupDeletionBlockers): DeletionCheck {
+  const answered = response.nodes.filter((node) => !node.error)
+  const blocking = answered.filter((node) => node.kinds.length > 0)
+  const unanswered = response.nodes.filter((node) => node.error)
+  const empty = answered.filter((node) => node.kinds.length === 0).map((node) => node.node_id)
+  return { blocking, unanswered, empty, clear: blocking.length === 0 && unanswered.length === 0 }
+}
+
 export interface GroupMemberRole {
   role_id: string
   name: string
