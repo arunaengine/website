@@ -40,11 +40,21 @@ const kind = ref<GroupBackendKind>('s3')
 const publicValues = ref<Record<string, string>>({})
 const secretValues = ref<Record<string, string>>({})
 const toggleOn = ref(false)
+// One provider bucket per Aruna bucket, stored as `bucket_prefix` and `bucket_delete`.
+const perBucket = ref(false)
+const bucketPrefix = ref('')
+const bucketDelete = ref('keep')
 const submitError = ref<string | null>(null)
 
 const submitSummary = computed(() => (submitError.value ? shortError(submitError.value) : ''))
 
 const isEdit = computed(() => Boolean(props.backend))
+const DELETE_OPTIONS = [
+  { value: 'keep', label: 'Keep the provider bucket' },
+  { value: 'delete_empty', label: 'Delete it if empty' },
+]
+// Only an S3 storage without a fixed bucket names a bucket per Aruna bucket.
+const showsProviderBuckets = computed(() => kind.value === 's3' && !props.backend?.public_config.bucket)
 const schema = computed(() => BACKEND_KIND_SCHEMAS[kind.value])
 // A new S3 storage has no fixed bucket: each rule names its own.
 const fields = computed(() =>
@@ -75,6 +85,12 @@ const settingsChanged = computed(() => {
   if (name.value.trim() !== source.name) return true
   const toggle = schema.value.toggle
   if (toggle && (source.public_config[toggle.key] === 'true') !== toggleOn.value) return true
+  const config = source.public_config
+  if ('bucket_prefix' in config !== perBucket.value) return true
+  if (perBucket.value) {
+    if (config.bucket_prefix !== bucketPrefix.value.trim()) return true
+    if ((config.bucket_delete ?? 'keep') !== bucketDelete.value) return true
+  }
   return schema.value.public.some(
     (field) => (publicValues.value[field.key]?.trim() ?? '') !== (source.public_config[field.key] ?? ''),
   )
@@ -108,6 +124,9 @@ watch(
     secretValues.value = {}
     const toggleKey = BACKEND_KIND_SCHEMAS[kind.value].toggle?.key
     toggleOn.value = toggleKey !== undefined && source?.public_config[toggleKey] === 'true'
+    perBucket.value = source ? 'bucket_prefix' in source.public_config : false
+    bucketPrefix.value = source?.public_config.bucket_prefix ?? ''
+    bucketDelete.value = source?.public_config.bucket_delete ?? 'keep'
     submitError.value = null
   },
 )
@@ -129,6 +148,10 @@ function fullBody() {
   }
   const toggle = schema.value.toggle
   if (toggle && toggleOn.value) publicConfig[toggle.key] = 'true'
+  if (showsProviderBuckets.value && perBucket.value) {
+    publicConfig.bucket_prefix = bucketPrefix.value.trim()
+    publicConfig.bucket_delete = bucketDelete.value
+  }
   return {
     name: name.value.trim(),
     kind: kind.value,
@@ -241,6 +264,44 @@ async function submit() {
               @update:checked="(v: boolean) => (toggleOn = v)"
             />
           </label>
+
+          <section v-if="showsProviderBuckets" class="space-y-3 border-t border-border pt-3">
+            <h3 class="text-xs font-semibold text-foreground">Provider buckets</h3>
+            <label class="flex items-center gap-2 text-xs">
+              <Switch
+                :checked="perBucket"
+                :disabled="settingsLocked"
+                aria-label="Create a provider bucket for each new bucket"
+                @update:checked="(v: boolean) => (perBucket = v)"
+              />
+              <span class="text-foreground">Create a provider bucket for each new bucket</span>
+            </label>
+            <template v-if="perBucket">
+              <div>
+                <label :for="`${uid}-bucket-prefix`" class="text-xs font-medium text-foreground">Name prefix</label>
+                <Input
+                  :id="`${uid}-bucket-prefix`"
+                  v-model="bucketPrefix"
+                  class="mt-1 font-mono text-xs"
+                  placeholder="team-a-"
+                  :disabled="settingsLocked"
+                />
+                <p class="mt-1 text-[11px] text-muted-foreground">
+                  New bucket results is stored in {{ bucketPrefix.trim() }}results.
+                </p>
+              </div>
+              <div>
+                <label class="text-xs font-medium text-foreground">When a bucket is deleted</label>
+                <Select
+                  v-model="bucketDelete"
+                  :options="DELETE_OPTIONS"
+                  :disabled="settingsLocked"
+                  aria-label="When a bucket is deleted"
+                  class="mt-1"
+                />
+              </div>
+            </template>
+          </section>
 
           <fieldset class="space-y-3 rounded-md border border-border p-3">
             <legend class="px-1 text-xs font-semibold text-foreground">Credentials</legend>
