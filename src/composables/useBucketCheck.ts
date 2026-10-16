@@ -47,7 +47,11 @@ export function useBucketCheck(target: () => BucketCheckTarget | null) {
     },
     { immediate: true },
   )
-  onScopeDispose(() => clearTimeout(timer))
+  // A closed dialog drops the pending check and any answer still on its way.
+  onScopeDispose(() => {
+    clearTimeout(timer)
+    ++seq
+  })
 
   return computed<BucketCheckNote | null>(() => {
     const result = answer.value
