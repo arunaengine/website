@@ -52,6 +52,7 @@ export interface MetadataSearchOptions {
 // bucket-name substring, trimmed to >= 2 chars (shorter ⇒ 400); `limit` defaults
 // to 10 and is clamped 1..=50. Partiality is signalled via nodes_failed with the
 // failing node ids listed in failed_nodes. Requires an authenticated session.
+// Newer nodes also take an empty `q`, a `group_id` filter and a `cursor`.
 export interface BucketSearchHit {
   /** `arn:aruna:<realm>:<node>:s3/<bucket>`. Parse with parseArunaArn. */
   arn: string
@@ -67,7 +68,7 @@ export interface BucketSearchResponse {
   nodes_queried: number
   nodes_failed: number
   failed_nodes: string[]
-  /** Continues the listing; absent on nodes that answer one page only. */
+  /** Continues the listing; absent on the last page. */
   next_cursor?: string | null
 }
 

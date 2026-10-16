@@ -2,7 +2,9 @@ import { effectScope, nextTick, ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, type BucketSearchHit, type BucketSearchResponse } from '@/lib/api'
 
-const searchBuckets = vi.fn<(q: string, options: { limit?: number; cursor?: string }) => Promise<BucketSearchResponse>>()
+const searchBuckets = vi.fn<
+  (q: string, options: { limit?: number; groupId?: string; cursor?: string }) => Promise<BucketSearchResponse>
+>()
 vi.mock('@/composables/useAruna', () => ({ useAruna: () => ({ searchBuckets }) }))
 
 const { BUCKET_PAGE, useAllBuckets } = await import('./useAllBuckets')
@@ -37,23 +39,20 @@ describe('all-nodes bucket list', () => {
     const { list } = start()
     await settle()
 
-    expect(searchBuckets).toHaveBeenCalledWith('', { limit: BUCKET_PAGE, cursor: undefined })
+    expect(searchBuckets).toHaveBeenCalledWith('', { limit: BUCKET_PAGE, groupId: 'g1', cursor: undefined })
     expect(list.hits.value.map((entry) => entry.bucket)).toEqual(['results'])
     expect(list.failedNodes.value).toBe(2)
   })
 
-  it('asks for more hits when the node pages without a cursor', async () => {
+  it('ends the list when a full page comes without a cursor', async () => {
     const full = Array.from({ length: BUCKET_PAGE }, (_, index) => hit(`b${index}`))
-    searchBuckets.mockResolvedValueOnce(answer(full)).mockResolvedValueOnce(answer([...full, hit('last')]))
+    searchBuckets.mockResolvedValueOnce(answer(full))
     const { list } = start()
     await settle()
-    expect(list.more.value).toBe(true)
 
-    await list.loadMore()
-
-    expect(searchBuckets).toHaveBeenLastCalledWith('', { limit: BUCKET_PAGE * 2, cursor: undefined })
-    expect(list.hits.value).toHaveLength(BUCKET_PAGE + 1)
     expect(list.more.value).toBe(false)
+    await list.loadMore()
+    expect(searchBuckets).toHaveBeenCalledTimes(1)
   })
 
   it('appends the next page when the node returns a cursor', async () => {
@@ -65,7 +64,7 @@ describe('all-nodes bucket list', () => {
 
     await list.loadMore()
 
-    expect(searchBuckets).toHaveBeenLastCalledWith('', { limit: BUCKET_PAGE, cursor: 'c1' })
+    expect(searchBuckets).toHaveBeenLastCalledWith('', { limit: BUCKET_PAGE, groupId: 'g1', cursor: 'c1' })
     expect(list.hits.value.map((entry) => entry.bucket)).toEqual(['a', 'b'])
     expect(list.more.value).toBe(false)
   })
@@ -85,9 +84,31 @@ describe('all-nodes bucket list', () => {
     query.value = 'raw'
     await vi.advanceTimersByTimeAsync(300)
     await settle()
-    expect(searchBuckets).toHaveBeenLastCalledWith('raw', { limit: BUCKET_PAGE, cursor: undefined })
+    expect(searchBuckets).toHaveBeenLastCalledWith('raw', { limit: BUCKET_PAGE, groupId: 'g1', cursor: undefined })
     expect(list.needsName.value).toBe(false)
     expect(list.hits.value.map((entry) => entry.bucket)).toEqual(['raw-data'])
+  })
+
+  it('drops old results and a late answer as soon as the name changes', async () => {
+    vi.useFakeTimers()
+    let answerLate!: (value: BucketSearchResponse) => void
+    searchBuckets
+      .mockResolvedValueOnce(answer([hit('raw-data')]))
+      .mockReturnValueOnce(new Promise((resolve) => (answerLate = resolve)))
+    const { list, query } = start()
+    await settle()
+    expect(list.hits.value).toHaveLength(1)
+
+    query.value = 'ra'
+    await vi.advanceTimersByTimeAsync(300)
+    query.value = 'z'
+    await settle()
+    expect(list.hits.value).toEqual([])
+    expect(list.loading.value).toBe(false)
+
+    answerLate(answer([hit('raw-data')]))
+    await settle()
+    expect(list.hits.value).toEqual([])
   })
 
   it('stays quiet while one node is chosen', async () => {

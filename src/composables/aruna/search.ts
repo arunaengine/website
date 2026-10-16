@@ -191,11 +191,16 @@ export async function searchObjects(
 // An empty `q` asks for every bucket; nodes that require a name answer 400.
 export async function searchBuckets(
   q: string,
-  options: { limit?: number; cursor?: string; signal?: AbortSignal } = {},
+  options: { limit?: number; groupId?: string; cursor?: string; signal?: AbortSignal } = {},
 ): Promise<BucketSearchResponse> {
   return request<BucketSearchResponse>('/search/buckets', {
     // Backend default is 10, clamped 1..=50; mirror the clamp here.
-    query: { q, limit: Math.min(Math.max(options.limit ?? 10, 1), 50), cursor: options.cursor },
+    query: {
+      q,
+      limit: Math.min(Math.max(options.limit ?? 10, 1), 50),
+      group_id: options.groupId,
+      cursor: options.cursor,
+    },
     signal: options.signal,
   })
 }
