@@ -1,10 +1,11 @@
 <script setup lang="ts">
-// Bucket and prefix for a dataset's files. The group's buckets are listed only
-// while an S3 session for that group is active; the generated bucket is always offered.
+// Bucket and prefix for a dataset's files: the group's buckets on this node, and
+// the generated bucket, which is always offered.
 import { computed, ref, watch } from 'vue'
 import Input from '@/components/ui/Input.vue'
 import Select from '@/components/ui/Select.vue'
-import { useS3 } from '@/composables/useS3'
+import { refreshContext } from '@/composables/aruna/state'
+import { listGroupBuckets } from '@/lib/api'
 import { defaultStorageBucket } from '@/lib/crate/dataIdentity'
 
 const props = defineProps<{
@@ -17,24 +18,21 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ (e: 'update:modelValue', value: { bucket: string; prefix: string }): void }>()
 
-const s3 = useS3()
 const listed = ref<string[]>([])
 const listing = ref<'idle' | 'loading' | 'done' | 'unavailable'>('idle')
 let generation = 0
 
 const defaultBucket = computed(() => defaultStorageBucket(props.groupId))
-const sessionGroup = computed(() => (s3.hasActiveKey.value ? s3.activeContext.value?.groupId ?? '' : ''))
-
-watch([() => props.groupId, sessionGroup], async ([groupId, active]) => {
+watch(() => props.groupId, async (groupId) => {
   const current = ++generation
   listed.value = []
-  if (!groupId || active !== groupId) {
+  if (!groupId) {
     listing.value = 'unavailable'
     return
   }
   listing.value = 'loading'
   try {
-    const names = (await s3.listBuckets()).map((entry) => entry.name)
+    const names = await listGroupBuckets(groupId, refreshContext().client)
     if (current !== generation) return
     listed.value = names
     listing.value = 'done'
@@ -83,7 +81,7 @@ function pickBucket(value: string) {
     </div>
     <p v-if="listing === 'loading'" class="text-[11px] text-muted-foreground sm:col-span-2">Loading the group's buckets.</p>
     <p v-else-if="listing === 'unavailable'" class="text-[11px] text-muted-foreground sm:col-span-2">
-      Other buckets are listed once S3 access for this group is active.
+      The group's other buckets could not be listed.
     </p>
   </div>
 </template>

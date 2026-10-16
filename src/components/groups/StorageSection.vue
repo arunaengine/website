@@ -24,7 +24,7 @@ import {
   ApiError,
   getBucketMove,
   listBackendImports,
-  listGroupDataPaths,
+  listGroupBuckets,
   runBackendImport,
   startBucketMove,
   type BackendImport,
@@ -130,21 +130,6 @@ function schedulePoll() {
 
 function moveKey(bucket: string, prefix: string): string {
   return `${bucket}\n${prefix}`
-}
-
-// Buckets of the group on this node, from the permission paths ".../{bucket}/".
-async function listGroupBuckets(groupId: string, asked: ReturnType<typeof client>): Promise<string[]> {
-  const names = new Set<string>()
-  let continuationToken: string | undefined
-  do {
-    const page = await listGroupDataPaths(groupId, { limit: 100, continuationToken }, asked)
-    for (const entry of page.entries) {
-      const name = entry.permission_path.split('/').filter(Boolean).pop()
-      if (name) names.add(name)
-    }
-    continuationToken = page.continuation_token
-  } while (continuationToken)
-  return [...names]
 }
 
 const moveTotals: MoveTotals = new Map()

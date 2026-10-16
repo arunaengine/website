@@ -1,11 +1,10 @@
 import * as VueRuntime from 'vue'
-import { defineComponent, h, ref } from 'vue'
+import { defineComponent, h } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { compileClientComponent, content, element, flush, mountApp, moduleDefault, typeValue } from '@/test/clientRender'
 import * as DataIdentity from '@/lib/crate/dataIdentity'
 
-const activeGroup = ref('group-1')
-const listBuckets = vi.fn()
+const listGroupBuckets = vi.fn()
 const SelectStub = defineComponent({
   props: { options: { type: Array, default: () => [] }, modelValue: String },
   emits: ['update:modelValue'],
@@ -21,13 +20,8 @@ const StorageLocationFields = compileClientComponent(new URL('./StorageLocationF
   vue: VueRuntime,
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Select.vue': moduleDefault(SelectStub),
-  '@/composables/useS3': {
-    useS3: () => ({
-      hasActiveKey: ref(true),
-      activeContext: VueRuntime.computed(() => ({ groupId: activeGroup.value })),
-      listBuckets,
-    }),
-  },
+  '@/composables/aruna/state': { refreshContext: () => ({ epoch: 0, client: { token: 'bearer' } }) },
+  '@/lib/api': { listGroupBuckets },
   '@/lib/crate/dataIdentity': DataIdentity,
 })
 
@@ -44,10 +38,11 @@ function options(root: Parameters<typeof content>[0]) {
 }
 
 describe('StorageLocationFields', () => {
-  it('lists the group buckets after the default one', async () => {
-    activeGroup.value = 'Group-1'
-    listBuckets.mockReset().mockResolvedValue([{ name: 'raw' }, { name: 'datasets-group-1' }])
+  it('lists the group buckets without an S3 session', async () => {
+    listGroupBuckets.mockReset().mockResolvedValue(['raw', 'datasets-group-1'])
     const mounted = await render()
+
+    expect(listGroupBuckets).toHaveBeenCalledWith('Group-1', { token: 'bearer' })
 
     expect(options(mounted.root)).toEqual([
       { value: 'datasets-group-1', label: 'datasets-group-1 (default)' },
@@ -57,19 +52,17 @@ describe('StorageLocationFields', () => {
     mounted.app.unmount()
   })
 
-  it('offers only the default bucket while another group holds the S3 session', async () => {
-    activeGroup.value = 'other'
-    listBuckets.mockReset().mockResolvedValue([{ name: 'raw' }])
+  it('offers only the default bucket when the group buckets cannot be read', async () => {
+    listGroupBuckets.mockReset().mockRejectedValue(new Error('forbidden'))
     const mounted = await render()
 
-    expect(listBuckets).not.toHaveBeenCalled()
     expect(options(mounted.root)).toEqual([{ value: 'datasets-group-1', label: 'datasets-group-1 (default)' }])
-    expect(content(mounted.root)).toContain('Other buckets are listed once S3 access for this group is active.')
+    expect(content(mounted.root)).toContain("The group's other buckets could not be listed.")
     mounted.app.unmount()
   })
 
   it('labels the group default and keeps a picked generated bucket', async () => {
-    activeGroup.value = 'other'
+    listGroupBuckets.mockReset().mockResolvedValue([])
     const picked = vi.fn()
     const mounted = await render({ defaultLocation: { bucket: 'lab', prefix: 'p/' }, 'onUpdate:modelValue': picked })
     const select = element(mounted.root, (node) => node.tag === 'select')

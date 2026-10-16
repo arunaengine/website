@@ -14,7 +14,7 @@ const listBackendImports = vi.fn()
 const runBackendImport = vi.fn()
 const getBucketMove = vi.fn()
 const startBucketMove = vi.fn()
-const listGroupDataPaths = vi.fn()
+const listGroupBuckets = vi.fn()
 const disableGroupBackend = vi.fn()
 const writesDisabled = ref(false)
 
@@ -68,7 +68,7 @@ const StorageSection = compileClientComponent(new URL('./StorageSection.vue', im
     }),
   },
   '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled }) },
-  '@/lib/api': { ...Api, listBackendImports, runBackendImport, getBucketMove, startBucketMove, listGroupDataPaths },
+  '@/lib/api': { ...Api, listBackendImports, runBackendImport, getBucketMove, startBucketMove, listGroupBuckets },
   '@/lib/storageRules': StorageRules,
   '@/lib/linkedFolders': LinkedFolders,
   '@/lib/utils': Utils,
@@ -136,7 +136,7 @@ beforeEach(() => {
   listBackendImports.mockResolvedValue(LINKS)
   putGroupRouting.mockResolvedValue({ group_id: 'g1', warnings: [] })
   runBackendImport.mockResolvedValue({ job_id: 'j2' })
-  listGroupDataPaths.mockResolvedValue({ entries: [] })
+  listGroupBuckets.mockResolvedValue([])
   getBucketMove.mockResolvedValue({ bucket: 'x', misplaced: 0, complete: true })
   startBucketMove.mockResolvedValue({})
 })
@@ -255,12 +255,7 @@ describe('StorageSection', () => {
   })
 
   it('moves all buckets of the group from the default row', async () => {
-    listGroupDataPaths.mockResolvedValue({
-      entries: [
-        { permission_path: '/r/g/g1/data/n1/alpha/', kind: 'folder' },
-        { permission_path: '/r/g/g1/data/n1/beta/', kind: 'folder' },
-      ],
-    })
+    listGroupBuckets.mockResolvedValue(['alpha', 'beta'])
     getBucketMove.mockImplementation(async (bucket: string) => ({
       bucket,
       misplaced: bucket === 'alpha' ? 3 : 0,
@@ -276,7 +271,7 @@ describe('StorageSection', () => {
   })
 
   it('keeps the default row free of moves started for a linked folder', async () => {
-    listGroupDataPaths.mockResolvedValue({ entries: [{ permission_path: '/r/g/g1/data/n/imaging/', kind: 'folder' }] })
+    listGroupBuckets.mockResolvedValue(['imaging'])
     getBucketMove.mockResolvedValue({
       bucket: 'imaging',
       misplaced: 10,
@@ -294,22 +289,13 @@ describe('StorageSection', () => {
 
   it('offers Move files on the Aruna card when Aruna is the default', async () => {
     getGroupRouting.mockResolvedValue({ group_id: 'g1', warnings: [] })
-    listGroupDataPaths.mockResolvedValue({ entries: [{ permission_path: '/r/g/g1/data/n/alpha/', kind: 'folder' }] })
+    listGroupBuckets.mockResolvedValue(['alpha'])
     getBucketMove.mockImplementation(async (bucket: string) => ({ bucket, misplaced: bucket === 'alpha' ? 2 : 0, complete: true }))
     const mounted = await mount()
     const aruna = element(mounted.root, (node) => node.props['data-testid'] === 'aruna-storage')
     await click(labelled(aruna, 'Move files'))
     await click(button(element(mounted.root, (node) => node.props.role === 'dialog'), 'Move files'))
     expect(startBucketMove).toHaveBeenCalledWith('alpha', '', expect.anything())
-    mounted.app.unmount()
-  })
-
-  it('reads every page of group buckets', async () => {
-    listGroupDataPaths
-      .mockResolvedValueOnce({ entries: [{ permission_path: '/r/g/g1/data/n/alpha/', kind: 'folder' }], continuation_token: 't2' })
-      .mockResolvedValueOnce({ entries: [{ permission_path: '/r/g/g1/data/n/beta/', kind: 'folder' }] })
-    const mounted = await mount()
-    expect(getBucketMove).toHaveBeenCalledWith('beta', '', expect.anything())
     mounted.app.unmount()
   })
 
@@ -370,7 +356,7 @@ describe('StorageSection', () => {
   })
 
   it('opens no confirmation when it goes offline during the recount', async () => {
-    listGroupDataPaths.mockResolvedValue({ entries: [{ permission_path: '/r/g/g1/data/n/alpha/', kind: 'folder' }] })
+    listGroupBuckets.mockResolvedValue(['alpha'])
     const mounted = await mount()
     let release: (value: unknown) => void = () => {}
     const gate = new Promise((resolve) => (release = resolve))

@@ -177,3 +177,18 @@ export async function listGroupDataPaths(
     client,
   )
 }
+
+// Buckets of the group on this node, from the permission paths ".../{bucket}/".
+export async function listGroupBuckets(groupId: string, client: ApiClientOptions = {}): Promise<string[]> {
+  const names = new Set<string>()
+  let continuationToken: string | undefined
+  do {
+    const page = await listGroupDataPaths(groupId, { limit: 100, continuationToken }, client)
+    for (const entry of page.entries) {
+      const name = entry.permission_path.split('/').filter(Boolean).pop()
+      if (name) names.add(name)
+    }
+    continuationToken = page.continuation_token
+  } while (continuationToken)
+  return [...names]
+}
