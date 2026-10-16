@@ -1,3 +1,5 @@
+import { apiRequest, type ApiClientOptions } from './client'
+
 // ── Group storage backends ──────────────────────────────────────────────────
 // GET/POST /data/groups/{gid}/storage/backends, GET/PUT/DELETE .../{bid}: verified
 // against aruna api/src/routes/group_backends.rs, with the per-kind key
@@ -33,4 +35,21 @@ export interface GroupBackendRequest {
   kind: GroupBackendKind
   public_config: Record<string, string>
   secret_config: Record<string, string>
+}
+
+// GET .../backends/{bid}/buckets/{bucket}: whether the provider bucket exists.
+// Older nodes answer 404.
+export interface ProviderBucketCheck {
+  bucket: string
+  exists: boolean
+}
+
+export function checkProviderBucket(
+  groupId: string,
+  backendId: string,
+  bucket: string,
+  client: ApiClientOptions,
+): Promise<ProviderBucketCheck> {
+  const path = `/data/groups/${encodeURIComponent(groupId)}/storage/backends/${encodeURIComponent(backendId)}/buckets/${encodeURIComponent(bucket)}`
+  return apiRequest<ProviderBucketCheck>(path, {}, client)
 }

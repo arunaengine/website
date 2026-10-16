@@ -1,6 +1,6 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h, reactive, ref } from 'vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { button, click, compileClientComponent, content, element, flush, moduleDefault, mountApp, typeValue } from '@/test/clientRender'
 import * as Api from '@/lib/api'
 import * as LinkedFolders from '@/lib/linkedFolders'
@@ -11,6 +11,7 @@ const createBackendImport = vi.fn()
 const updateBackendImport = vi.fn()
 const startBucketMove = vi.fn()
 const runBackendImport = vi.fn()
+const checkProviderBucket = vi.fn()
 const onSaved = vi.fn()
 const onOpen = vi.fn()
 const activeContext = ref({ nodeId: 'n1', groupId: 'g1' })
@@ -63,7 +64,7 @@ const LinkedFolderDialog = compileClientComponent(new URL('./LinkedFolderDialog.
   },
   '@/composables/useS3': { useS3: () => ({ activeContext, nodeIdFor: () => 'n1' }) },
   '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled: ref(false) }) },
-  '@/lib/api': { ...Api, createBackendImport, updateBackendImport, runBackendImport, startBucketMove },
+  '@/lib/api': { ...Api, checkProviderBucket, createBackendImport, updateBackendImport, runBackendImport, startBucketMove },
   '@/lib/linkedFolders': LinkedFolders,
   '@/lib/storageRules': StorageRules,
   '@/lib/utils': Utils,
@@ -117,6 +118,7 @@ beforeEach(() => {
   updateBackendImport.mockReset()
   startBucketMove.mockReset()
   runBackendImport.mockReset()
+  checkProviderBucket.mockReset().mockRejectedValue(new Api.ApiError(404, 'Not Found'))
   onSaved.mockReset()
   onOpen.mockReset()
   activeContext.value = { nodeId: 'n1', groupId: 'g1' }
@@ -343,5 +345,45 @@ describe('LinkedFolderDialog', () => {
     await typeValue(inputById(mounted.root, '-source-bucket'), 'lab-new')
     expect(button(mounted.root, 'Link and run').props.disabled).toBe(false)
     mounted.app.unmount()
+  })
+
+  describe('provider bucket check', () => {
+    beforeEach(() => vi.useFakeTimers())
+    afterEach(() => vi.useRealTimers())
+
+    async function typed(name: string) {
+      const mounted = await mount(null, { backends: SPLIT, storageId: 's1' })
+      await typeValue(inputById(mounted.root, '-source-bucket'), name)
+      await vi.advanceTimersByTimeAsync(400)
+      await flush()
+      return mounted
+    }
+
+    it('names an existing bucket', async () => {
+      checkProviderBucket.mockResolvedValue({ bucket: 'lab-raw', exists: true })
+      const mounted = await typed('lab-raw')
+
+      expect(checkProviderBucket).toHaveBeenCalledTimes(1)
+      expect(checkProviderBucket).toHaveBeenCalledWith('g1', 's1', 'lab-raw', expect.anything())
+      expect(content(mounted.root)).toContain('Existing bucket')
+      mounted.app.unmount()
+    })
+
+    it('names a bucket Aruna will create', async () => {
+      checkProviderBucket.mockResolvedValue({ bucket: 'lab-new', exists: false })
+      const mounted = await typed('lab-new')
+
+      expect(content(mounted.root)).toContain('New bucket. Aruna creates it.')
+      mounted.app.unmount()
+    })
+
+    it('keeps the neutral text when the node cannot check', async () => {
+      const mounted = await typed('lab-raw')
+
+      expect(checkProviderBucket).toHaveBeenCalledTimes(1)
+      expect(content(mounted.root)).toContain('Aruna creates the bucket if it is missing.')
+      expect(content(mounted.root)).not.toContain('Existing bucket')
+      mounted.app.unmount()
+    })
   })
 })

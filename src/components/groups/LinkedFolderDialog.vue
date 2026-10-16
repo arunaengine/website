@@ -20,6 +20,7 @@ import { useS3 } from '@/composables/useS3'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import {
   ApiError,
+  checkProviderBucket,
   createBackendImport,
   deleteBackendImport,
   runBackendImport,
@@ -88,6 +89,8 @@ const cron = ref('')
 const saving = ref(false)
 const confirmingDelete = ref(false)
 const submitError = ref<string | null>(null)
+// Whether the provider bucket exists; null while unknown or when the node cannot tell.
+const bucketExists = ref<boolean | null>(null)
 
 const isEdit = computed(() => Boolean(props.link))
 const backendOptions = computed(() =>
@@ -197,6 +200,29 @@ watch(
     if (!stored) void bucketList.ensure()
   },
 )
+
+// A short pause after typing, then one check; a failed check keeps the neutral text.
+let checkTimer: ReturnType<typeof setTimeout> | undefined
+let checkSeq = 0
+watch([() => props.open, backendId, storageBucket], () => {
+  clearTimeout(checkTimer)
+  const seq = ++checkSeq
+  bucketExists.value = null
+  const name = storageBucket.value.trim()
+  if (!props.open || isEdit.value || !splits.value || !name) return
+  const backend = backendId.value
+  checkTimer = setTimeout(async () => {
+    try {
+      const answer = await checkProviderBucket(props.groupId, backend, name, {
+        baseUrl: apiBaseUrl.value,
+        token: authToken.value,
+      })
+      if (seq === checkSeq) bucketExists.value = answer.exists
+    } catch {
+      // Older nodes lack the route; the neutral text stays.
+    }
+  }, 400)
+})
 
 // Another account or realm must never inherit an open form.
 watch(sessionEpoch, () => {
@@ -323,7 +349,11 @@ async function submit() {
                   class="font-mono text-xs"
                   placeholder="lab-raw"
                 />
-                <p class="text-[11px] text-muted-foreground">Aruna creates the bucket if it is missing.</p>
+                <p v-if="bucketExists === true" class="text-[11px] font-medium text-foreground">Existing bucket</p>
+                <p v-else-if="bucketExists === false" class="text-[11px] font-medium text-foreground">
+                  New bucket. Aruna creates it.
+                </p>
+                <p v-else class="text-[11px] text-muted-foreground">Aruna creates the bucket if it is missing.</p>
               </div>
               <div class="space-y-1">
                 <label :for="`${uid}-source-folder`" class="text-xs font-medium text-foreground">
