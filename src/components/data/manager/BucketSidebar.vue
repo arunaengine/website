@@ -13,7 +13,7 @@ import type { DataManager } from '@/composables/useDataManager'
 import type { BucketSearchHit } from '@/lib/api'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import { ArrowLeftRight, Boxes, ChevronRight, FolderPlus, History, KeyRound, Trash2 } from '@lucide/vue'
-import { computed } from 'vue'
+import { computed, ref, useId, watch } from 'vue'
 
 const props = defineProps<{ manager: DataManager }>()
 const emit = defineEmits<{ (e: 'sync', hit: BucketSearchHit): void }>()
@@ -69,6 +69,31 @@ const otherHits = computed(() =>
 function rowNode(nodeId: string | null): string {
   return `On ${realmNodes.displayName(nodeId ?? realmNodes.localNodeId.value)}`
 }
+// Arrow keys move through the shown rows of this group, then of other groups.
+const listId = `bucket-results-${useId()}`
+const groupOpeners = computed<(() => void)[]>(() => {
+  if (searchList.value) return all.error.value ? [] : all.hits.value.map((hit) => () => openHit(hit))
+  if (bucketsLoading.value || (bucketsError.value && (bucketsAuthError.value || !bucketsLoaded.value))) return []
+  return nodeBuckets.value.map((entry) => () => openBucketOn(entry.bucket, entry.nodeId))
+})
+const openers = computed(() => [...groupOpeners.value, ...otherHits.value.map((hit) => () => openSearchHit(hit))])
+const activeIndex = ref(-1)
+watch(openers, () => (activeIndex.value = -1))
+
+function onKeydown(event: KeyboardEvent) {
+  const count = openers.value.length
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault()
+    if (!count) return
+    const step = event.key === 'ArrowDown' ? 1 : count - 1
+    activeIndex.value = activeIndex.value < 0 && step !== 1 ? count - 1 : (activeIndex.value + step) % count
+  } else if (event.key === 'Enter') {
+    openers.value[activeIndex.value]?.()
+  } else if (event.key === 'Escape') {
+    activeIndex.value = -1
+  }
+}
+
 const otherPartial = computed(() => search.searched.value && search.nodesFailed.value > 0)
 const createNode = computed(() => realmNodes.displayName(requiredNodeId.value))
 
@@ -98,16 +123,28 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
         </div>
       </header>
       <div class="border-b border-border px-3 py-2">
-        <Input v-model="bucketNameFilter" placeholder="Find a bucket" aria-label="Find a bucket" class="h-8 text-xs" />
+        <Input
+          v-model="bucketNameFilter"
+          placeholder="Find a bucket"
+          aria-label="Find a bucket"
+          role="combobox"
+          aria-autocomplete="list"
+          :aria-controls="`${listId}-group ${listId}-other`"
+          :aria-expanded="openers.length > 0"
+          class="h-8 text-xs"
+          @keydown="onKeydown"
+        />
       </div>
       <template v-if="searchList">
         <Spinner v-if="all.loading.value && !all.hits.value.length" show-label label="Loading buckets…" class="px-3 py-4" />
         <p v-else-if="all.error.value" class="px-3 py-3 text-xs text-destructive">{{ all.error.value }}</p>
-        <ul v-else-if="all.hits.value.length" class="max-h-[420px] overflow-y-auto py-1">
-          <li v-for="hit in all.hits.value" :key="`${hit.node_id}/${hit.bucket}`">
+        <ul v-else-if="all.hits.value.length" :id="`${listId}-group`" role="listbox" class="max-h-[420px] overflow-y-auto py-1">
+          <li v-for="(hit, index) in all.hits.value" :key="`${hit.node_id}/${hit.bucket}`">
             <BucketRow
               :bucket="hit.bucket"
               :pinnable="false"
+              option
+              :highlighted="index === activeIndex"
               :active="hit.bucket === bucket && (realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id) === remoteNodeId"
               @open="openHit(hit)"
             >
@@ -135,13 +172,15 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
         <template v-else>
           <!-- A failed revalidation keeps the last good list and reports itself above it. -->
           <p v-if="bucketsError" class="border-b border-border/70 px-3 py-2 text-xs text-destructive">{{ bucketsError }}</p>
-          <ul v-if="nodeBuckets.length" class="max-h-[420px] overflow-y-auto py-1">
+          <ul v-if="nodeBuckets.length" :id="`${listId}-group`" role="listbox" class="max-h-[420px] overflow-y-auto py-1">
             <li
-              v-for="entry in nodeBuckets"
+              v-for="(entry, index) in nodeBuckets"
               :key="`${entry.nodeId ?? 'local'}/${entry.bucket}`"
             >
               <BucketRow
                 :bucket="entry.bucket"
+                option
+                :highlighted="index === activeIndex"
                 :node-id="entry.nodeId"
                 :pinned="entry.pinned"
                 :synced="syncByBucket.has(syncKeyFor(entry.nodeId, entry.bucket))"
@@ -217,10 +256,12 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
         <p class="px-3 pb-1 pt-2 text-xs font-medium text-muted-foreground">Other groups</p>
         <p v-if="search.error.value" class="px-3 pb-1 text-xs text-destructive">Other groups could not be searched.</p>
         <p v-else-if="otherPartial" class="px-3 pb-1 text-xs text-muted-foreground">Some nodes did not answer.</p>
-        <ul v-if="otherHits.length" class="max-h-56 overflow-y-auto pb-1">
-          <li v-for="hit in otherHits" :key="hit.arn">
+        <ul v-if="otherHits.length" :id="`${listId}-other`" role="listbox" class="max-h-56 overflow-y-auto pb-1">
+          <li v-for="(hit, index) in otherHits" :key="hit.arn">
             <BucketRow
               :bucket="hit.bucket"
+              option
+              :highlighted="groupOpeners.length + index === activeIndex"
               :node-id="realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id"
               :subtitle="hit.group_name || null"
               :pinnable="false"

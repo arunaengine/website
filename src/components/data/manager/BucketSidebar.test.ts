@@ -1,6 +1,6 @@
 import * as VueRuntime from 'vue'
 import { computed, defineComponent, h, ref } from 'vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   button,
   click,
@@ -15,6 +15,10 @@ import {
 } from '@/test/clientRender'
 import { BUCKET_NAME_REQUIREMENT, bucketNameProblem } from '@/lib/bucketName'
 import * as Workspaces from '@/lib/workspaces'
+
+const aruna = vi.hoisted(() => ({ authToken: { value: 'token' }, searchBuckets: vi.fn() }))
+vi.mock('@/composables/useAruna', () => ({ useAruna: () => aruna }))
+const RealSearch = await import('@/composables/useBucketSearch')
 
 const createBucket = vi.fn()
 const requestDelete = vi.fn()
@@ -47,11 +51,15 @@ const choose = vi.fn((nodeId: string | null) => {
 const Empty = defineComponent(() => () => null)
 // The row renders its name and action slot so the sidebar's own controls are visible.
 const RowStub = defineComponent({
-  props: { bucket: { type: String, default: '' } },
+  props: { bucket: { type: String, default: '' }, highlighted: Boolean },
   emits: ['open'],
   setup: (props, { slots, emit }) => () =>
     h('div', [
-      h('button', { 'aria-label': `Open ${props.bucket}`, onClick: () => emit('open') }, props.bucket),
+      h(
+        'button',
+        { 'aria-label': `Open ${props.bucket}`, 'aria-selected': props.highlighted, onClick: () => emit('open') },
+        props.bucket,
+      ),
       h('span', { role: 'tooltip' }, slots.tooltip?.()),
       slots.actions?.(),
     ]),
@@ -88,7 +96,7 @@ const InputStub = defineComponent({
     }),
 })
 
-const BucketSidebar = compileClientComponent(new URL('./BucketSidebar.vue', import.meta.url), {
+const sidebarModules = {
   vue: VueRuntime,
   '@lucide/vue': icons,
   '@/composables/useS3': { useS3: () => ({ canDeletePrefix: () => canDelete, clearSessions: vi.fn() }) },
@@ -110,6 +118,13 @@ const BucketSidebar = compileClientComponent(new URL('./BucketSidebar.vue', impo
       localNodeId: ref('home'),
     }),
   },
+}
+const BucketSidebar = compileClientComponent(new URL('./BucketSidebar.vue', import.meta.url), sidebarModules)
+
+// The same sidebar on the real cross-group search, for its timing and keys.
+const RealSearchSidebar = compileClientComponent(new URL('./BucketSidebar.vue', import.meta.url), {
+  ...sidebarModules,
+  '@/composables/useBucketSearch': RealSearch,
 })
 
 /** The slice of the data manager the sidebar reads, with the real name rule. */
@@ -362,5 +377,46 @@ describe('Bucket sidebar node choice', () => {
 
     expect(content(root)).not.toContain('letters')
     expect(content(root)).toContain('reef-survey')
+  })
+})
+
+describe('Bucket sidebar search keys', () => {
+  afterEach(() => vi.useRealTimers())
+
+  function key(field: ReturnType<typeof element>, name: string) {
+    ;(field.props.onKeydown as (event: unknown) => void)({ key: name, preventDefault: () => {} })
+    return flush()
+  }
+  function selected(root: Parameters<typeof content>[0]) {
+    return nodes(root).filter((node) => node.props['aria-selected'] === true).map((node) => content(node))
+  }
+
+  it('moves through this group and other groups and opens the chosen row', async () => {
+    vi.useFakeTimers()
+    aruna.searchBuckets.mockReset().mockResolvedValue({
+      hits: [{ arn: 'x', bucket: 'reef-shared', node_id: 'home', group_id: 'g2', group_name: 'Lab' }],
+      nodes_queried: 1,
+      nodes_failed: 0,
+    })
+    nodeChoice.value = 'home'
+    const state = withBucket()
+    const { root } = await mountApp(RealSearchSidebar, { props: { manager: state } })
+    const field = element(root, (node) => node.props['aria-label'] === 'Find a bucket')
+    expect(field.props.role).toBe('combobox')
+
+    await typeValue(field, 'reef')
+    await vi.advanceTimersByTimeAsync(300)
+    expect(content(root)).toContain('reef-shared')
+
+    await key(field, 'ArrowDown')
+    expect(selected(root)).toEqual(['reef-survey'])
+    await key(field, 'ArrowDown')
+    expect(selected(root)).toEqual(['reef-shared'])
+    await key(field, 'Enter')
+    expect(state.openSearchHit).toHaveBeenCalledWith(expect.objectContaining({ bucket: 'reef-shared' }))
+
+    await typeValue(field, 'r')
+    expect(content(root)).not.toContain('reef-shared')
+    nodeChoice.value = null
   })
 })
