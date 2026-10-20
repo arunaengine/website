@@ -41,11 +41,12 @@ import {IconArrowUpRight, IconCheck} from "@tabler/icons-vue";
             <h3 class="font-display text-xl font-semibold">Aruna v3</h3>
             <span class="rounded-full border border-aruna-aqua/40 bg-aruna-aqua/15 px-2 py-0.5 text-[11px] font-medium text-aruna-aqua">Public testing</span>
           </div>
-          <p class="relative mt-2 text-sm text-white/75">Federated data. Sovereign control.</p>
+          <p class="relative mt-2 text-sm text-white/75">A FAIR, federated data orchestration engine.</p>
           <ul class="relative mt-6 space-y-3 text-sm text-white/90">
-            <li class="flex gap-2"><IconCheck class="mt-0.5 size-4 shrink-0 text-aruna-aqua"/>Each organization runs its own node and keeps authority over its data</li>
-            <li class="flex gap-2"><IconCheck class="mt-0.5 size-4 shrink-0 text-aruna-aqua"/>Datasets as linked data, with RO-Crate import and export</li>
-            <li class="flex gap-2"><IconCheck class="mt-0.5 size-4 shrink-0 text-aruna-aqua"/>Compute jobs run on the node that holds the data</li>
+            <li class="flex gap-2"><IconCheck class="mt-0.5 size-4 shrink-0 text-aruna-aqua"/><span><strong class="font-semibold text-white">Data orchestration:</strong> jobs move to the data or data to the jobs, guided by placement policies</span></li>
+            <li class="flex gap-2"><IconCheck class="mt-0.5 size-4 shrink-0 text-aruna-aqua"/><span><strong class="font-semibold text-white">Semantic metadata:</strong> linked data with RO-Crate, a provenance graph, SPARQL and SHACL profiles</span></li>
+            <li class="flex gap-2"><IconCheck class="mt-0.5 size-4 shrink-0 text-aruna-aqua"/><span><strong class="font-semibold text-white">Data virtualization:</strong> buckets combine local files, copies and references to other nodes</span></li>
+            <li class="flex gap-2"><IconCheck class="mt-0.5 size-4 shrink-0 text-aruna-aqua"/><span><strong class="font-semibold text-white">Federated:</strong> each organization runs its own node, with no central server</span></li>
           </ul>
           <p class="relative mt-6 text-xs text-white/60">Expect changes before the stable release.</p>
           <div class="relative mt-auto pt-6">
