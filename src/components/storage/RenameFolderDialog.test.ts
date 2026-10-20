@@ -77,6 +77,7 @@ describe('RenameFolderDialog', () => {
     expect(previewRename).toHaveBeenCalledWith('lab', '', 'archive/', expect.anything())
     expect(content(root)).toContain('archive/x.csv')
     expect(content(root)).toContain('2 versions')
+    expect(content(root)).toContain('Links by path stop working.')
     await click(button(root, 'Rename'))
 
     expect(renameKeys).toHaveBeenCalledWith('lab', '', 'archive/', ['x.csv'], expect.anything())

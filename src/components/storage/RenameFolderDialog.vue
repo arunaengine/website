@@ -104,6 +104,7 @@ async function apply() {
         <DialogTitle>Rename a folder</DialogTitle>
         <DialogDescription>
           Files get new names in Aruna. Your storage and all versions stay as they are.
+          Links by path stop working. DRS links by content keep working.
         </DialogDescription>
       </DialogHeader>
 

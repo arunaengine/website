@@ -766,7 +766,7 @@ export const docsTopics: DocsTopic[] = [
           'Sort new files on a linked bucket puts new files into folders by name, such as `*.faa.gz` into proteins/. `*` stands for any text.',
           'Show where files go lists each file and its place before you save. A file may match only one name; files Aruna already knows never move.',
           'Rename a folder gives files new names in Aruna, such as x into archive/x. Show changes first; only the files shown move.',
-          'Your storage, its files and all versions stay as they are.',
+          'Your storage, its files and all versions stay as they are. Links by path stop working; DRS links by content keep working.',
         ],
       },
     ],
