@@ -116,3 +116,84 @@ export function getImportRenames(
 export function startImportRenames(groupId: string, importId: string, client: ApiClientOptions): Promise<unknown> {
   return apiRequest(`${importsPath(groupId, importId)}/rename`, { method: 'POST' }, client)
 }
+
+// File rules place new files a run finds without a known key. Nodes without the
+// routes answer 404.
+
+export interface FileRule {
+  /** File name pattern: `*` is any text, `?` one character. */
+  pattern: string
+  /** Folder below the link's bucket folder, ending with `/`. */
+  folder: string
+}
+
+export interface FileRulePreview {
+  path: string
+  key?: string | null
+  outcome: 'known' | 'matched' | 'root' | 'conflict'
+  patterns?: string[]
+}
+
+export function getFileRules(groupId: string, importId: string, client: ApiClientOptions): Promise<{ rules: FileRule[] }> {
+  return apiRequest(`${importsPath(groupId, importId)}/discovery`, {}, client)
+}
+
+export function saveFileRules(
+  groupId: string,
+  importId: string,
+  rules: FileRule[],
+  client: ApiClientOptions,
+): Promise<{ rules: FileRule[] }> {
+  const body = JSON.stringify({ rules })
+  return apiRequest(`${importsPath(groupId, importId)}/discovery`, { method: 'PUT', body }, client)
+}
+
+/** Where a run would put one page of the link's files; nothing is stored. */
+export function previewFileRules(
+  groupId: string,
+  importId: string,
+  rules: FileRule[],
+  after: string | null,
+  client: ApiClientOptions,
+): Promise<{ files: FileRulePreview[]; next?: string | null }> {
+  const body = JSON.stringify({ rules, after })
+  return apiRequest(`${importsPath(groupId, importId)}/discovery/preview`, { method: 'POST', body }, client)
+}
+
+export interface RenameItem {
+  from: string
+  to: string
+  versions: string[]
+  current?: string | null
+  deleted: boolean
+  files: string[]
+  conflict?: string | null
+}
+
+export interface RenamePlan {
+  bucket: string
+  items: RenameItem[]
+  truncated: boolean
+}
+
+function renamePath(bucket: string): string {
+  return `/data/buckets/${encodeURIComponent(bucket)}/storage/rename`
+}
+
+/** The keys under `from` and where they would go; nothing changes. */
+export function previewRename(bucket: string, from: string, to: string, client: ApiClientOptions): Promise<RenamePlan> {
+  const body = JSON.stringify({ from, to })
+  return apiRequest(`${renamePath(bucket)}/preview`, { method: 'POST', body }, client)
+}
+
+/** Moves exactly the previewed keys; any conflict changes nothing (409). */
+export function renameKeys(
+  bucket: string,
+  from: string,
+  to: string,
+  keys: string[],
+  client: ApiClientOptions,
+): Promise<RenamePlan> {
+  const body = JSON.stringify({ from, to, keys })
+  return apiRequest(renamePath(bucket), { method: 'POST', body }, client)
+}
