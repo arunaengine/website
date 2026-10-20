@@ -26,10 +26,10 @@ code .line::before {
   <NavigationTop/>
 
   <!-- Blog Article -->
-  <div class="container max-w-5xl px-4 pt-6 lg:pt-10 pb-12 sm:px-6 lg:px-8 mx-auto my-10 bg-aruna-bg/90 rounded-sm border border-aruna-text/50">
+  <div class="container max-w-4xl px-4 pt-6 lg:pt-10 pb-12 sm:px-6 lg:px-10 mx-auto my-10 bg-card rounded-xl border border-border">
     <div class="max-w-5xl">
       <!-- Avatar Media -->
-      <div class="flex justify-between items-center mb-6">
+      <div class="flex justify-between items-center mb-8 pb-6 border-b border-border">
         <div class="flex w-full sm:items-center gap-x-5 sm:gap-x-3">
           <div class="flex-shrink-0">
             <img src="/imgs/aruna_icon.webp"
@@ -68,7 +68,7 @@ code .line::before {
               <div>
                 <button type="button"
                         @click="router.back()"
-                        class="py-1.5 px-2.5 inline-flex items-center gap-x-2 text-sm font-medium rounded-md border border-aruna-text/50 bg-aruna-bg/90 text-aruna-text shadow-sm disabled:opacity-50 disabled:pointer-events-none hover:bg-aruna-muted">
+                        class="h-8 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-md border border-input bg-transparent text-foreground disabled:opacity-50 disabled:pointer-events-none hover:bg-accent">
                   <IconChevronLeft class="size-3.5"/>
                   Back
                 </button>

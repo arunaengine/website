@@ -28,6 +28,15 @@ onBeforeMount(async () => await extendDisplay())
     <div class="md:container sm:mx-1 md:mx-auto mt-8">
       <!-- Card Blog -->
       <div class="max-w-[85rem] p-4 sm:px-6 lg:px-8 mx-auto">
+        <div class="mb-10 max-w-2xl">
+          <div class="eyebrow">News</div>
+          <h1 class="mt-3 font-display text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+            Blog and announcements
+          </h1>
+          <p class="mt-3 text-sm text-muted-foreground">
+            Releases, updates and stories from the Aruna project.
+          </p>
+        </div>
         <!-- Grid -->
         <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           <CardNews v-for="announcement in announcements"
@@ -48,7 +57,7 @@ onBeforeMount(async () => await extendDisplay())
           <ClientOnly>
             <button @click="extendDisplay"
                     :class="{hidden: exhausted}"
-                    class="py-3 px-4 inline-flex items-center gap-x-1 text-sm font-medium rounded-full border border-aruna-highlight bg-aruna-bg/90 hover:bg-aruna-muted text-aruna-highlight hover:text-aruna-highlight/80 shadow-sm disabled:opacity-50 disabled:pointer-events-none">
+                    class="py-3 px-4 inline-flex items-center gap-x-1 text-sm font-medium rounded-md border border-input bg-transparent hover:bg-accent text-foreground disabled:opacity-50 disabled:pointer-events-none">
               Show older news
               <IconChevronDown class="flex-shrink-0 size-4"/>
             </button>

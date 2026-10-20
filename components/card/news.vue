@@ -13,42 +13,46 @@ const props = defineProps<{
   modified_by: string,
   modified_at: string
 }>()
+
+// Show the default picture when the external image cannot be loaded
+const imageFailed = ref(false)
 </script>
 <template>
   <!-- Card -->
   <NuxtLink :to="`/articles/${id}`"
-            class="group flex flex-col h-full p-5 border-2 border-aruna-text/50 rounded-md bg-aruna-bg/90 transition-all delay-50 duration-500 hover:border-aruna-highlight hover:shadow-2xl hover:scale-105 hover:shadow-aruna-highlight/40 focus:outline-none focus:ring-2 focus:ring-aruna-highlight">
+            class="group flex flex-col h-full p-4 border border-border rounded-xl bg-card transition-colors duration-200 hover:border-aruna-aqua/60 hover:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
     <div class="aspect-w-16 aspect-h-11">
-      <img v-if="imageUrl"
+      <img v-if="imageUrl && !imageFailed"
            :src="imageUrl"
+           @error="imageFailed = true"
            alt="Announcement preview image"
-           class="w-full object-cover rounded-md"/>
+           class="w-full object-cover rounded-lg"/>
       <img v-else-if="type === 'ANNOUNCEMENT_TYPE_RELEASE'"
                src="/imgs/blog_release.webp"
-               class="w-full object-cover rounded-md"
+               class="w-full object-cover rounded-lg"
                alt="Default image for release announcements"/>
       <img v-else-if="type === 'ANNOUNCEMENT_TYPE_UPDATE'"
                src="/imgs/blog_update.webp"
                alt="Default image for update announcements"
-               class="w-full object-cover rounded-md"/>
+               class="w-full object-cover rounded-lg"/>
       <img v-else-if="type === 'ANNOUNCEMENT_TYPE_BLOG'"
                src="/imgs/blog_blog.webp"
                alt="Default image for blog articles"
-               class="w-full object-cover rounded-md"/>
+               class="w-full object-cover rounded-lg"/>
       <img v-else-if="type === 'ANNOUNCEMENT_TYPE_MAINTENANCE'"
                src="/imgs/blog_maintenance.webp"
                alt="Default image for maintenance announcements"
-               class="w-full object-cover rounded-md"/>
+               class="w-full object-cover rounded-lg"/>
       <img v-else-if="type === 'ANNOUNCEMENT_TYPE_ORGA'"
                src="/imgs/blog_orga.webp"
                alt="Default image for organizational announcements"
-               class="w-full object-cover rounded-md"/>
+               class="w-full object-cover rounded-lg"/>
     </div>
     <div class="my-6">
-      <h3 class="text-xl font-semibold text-aruna-text-accent">
+      <h3 class="font-display text-lg font-semibold leading-snug text-aruna-text-accent group-hover:text-aruna-aqua">
         {{ title }}
       </h3>
-      <p class="mt-5 text-aruna-text">
+      <p class="mt-3 text-sm leading-relaxed text-aruna-text line-clamp-4">
         {{ teaser }}
       </p>
     </div>
@@ -77,7 +81,7 @@ const props = defineProps<{
         </div>
       </div>
       <div
-          class="flex px-4 py-2 ms-2.5 sm:ms-4 font-bold text-aruna-highlight rounded-md border border-aruna-highlight">
+          class="flex px-2 py-0.5 ms-2.5 sm:ms-4 text-[11px] font-medium text-aruna-aqua rounded-full border border-aruna-aqua/40 bg-aruna-aqua/10">
         {{ toAnnouncementTypeStr(type) }}
       </div>
     </div>
