@@ -95,7 +95,15 @@
     }
 
     .eyebrow {
-        @apply text-[11px] font-semibold uppercase tracking-[0.18em] text-aruna-tagline;
+        @apply font-mono text-[11px] font-medium uppercase tracking-[0.2em] text-aruna-tagline;
+    }
+
+    .section {
+        @apply border-b border-border/70 py-14 md:py-20;
+    }
+
+    .section-title {
+        @apply mt-3 text-balance font-display text-3xl font-semibold tracking-tight text-foreground sm:text-4xl;
     }
 }
 

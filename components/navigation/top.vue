@@ -27,18 +27,18 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="sticky top-0 z-40">
   <a href="https://v3.aruna-engine.org"
      target="_blank"
      rel="noopener"
-     class="group block bg-aruna-navy px-4 py-2 text-center text-xs text-white/85 hover:text-white sm:text-sm">
+     class="group block truncate bg-aruna-navy px-4 py-2 text-center text-xs text-white/85 hover:text-white">
     <span class="me-2 rounded-full bg-aruna-aqua/20 px-2 py-0.5 font-semibold text-aruna-aqua">Public testing</span>
-    Aruna v3 is open for public testing.
-    <span class="font-semibold text-white underline-offset-4 group-hover:underline">Try the v3 test version &rarr;</span>
+    Aruna v3 is open for testing.
+    <span class="font-semibold text-white underline-offset-4 group-hover:underline">Try it &rarr;</span>
   </a>
+  <div class="sticky top-0 z-40">
   <header class="w-full border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/70">
     <nav aria-label="Global"
-         class="max-w-[85rem] w-full mx-auto h-14 px-4 lg:px-8 flex basis-full items-center justify-between gap-6">
+         class="container max-w-6xl h-14 flex items-center justify-between gap-6">
       <div class="flex">
         <NuxtLink href="/"
                   class="flex items-center hover:opacity-90 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring">
@@ -104,10 +104,23 @@ onMounted(() => {
         <a href="https://v3.aruna-engine.org"
            target="_blank"
            rel="noopener"
-           class="hidden md:inline-flex items-center gap-x-1.5 h-8 px-3 rounded-md border border-aruna-aqua/40 bg-aruna-aqua/10 text-sm font-medium text-aruna-aqua transition-colors hover:bg-aruna-aqua/20">
+           class="hidden lg:inline-flex items-center gap-x-1.5 h-8 px-3 rounded-md border border-aruna-aqua/40 bg-aruna-aqua/10 text-sm font-medium text-aruna-aqua transition-colors hover:bg-aruna-aqua/20">
           Test Aruna v3
           <IconArrowUpRight class="size-3.5"/>
         </a>
+        <details class="relative sm:hidden">
+          <summary aria-label="Menu"
+                   class="flex size-8 cursor-pointer list-none items-center justify-center rounded-md border border-input hover:bg-accent [&::-webkit-details-marker]:hidden">
+            <IconMenu2 class="size-4"/>
+          </summary>
+          <div class="absolute end-0 top-10 z-50 w-48 rounded-lg border border-border bg-popover p-1.5 shadow-lg">
+            <NuxtLink to="/explore" class="block rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground">Search</NuxtLink>
+            <NuxtLink to="/news" class="block rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground">News</NuxtLink>
+            <a href="https://docs.aruna-engine.org/latest" target="_blank" rel="noopener" class="block rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground">Documentation</a>
+            <a href="https://github.com/arunaengine" target="_blank" rel="noopener" class="block rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground">GitHub</a>
+            <a href="https://v3.aruna-engine.org" target="_blank" rel="noopener" class="block rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground text-aruna-aqua">Aruna v3 (testing)</a>
+          </div>
+        </details>
         <ClientOnly>
           <div>
             <DropdownMenu v-if="user_state">
