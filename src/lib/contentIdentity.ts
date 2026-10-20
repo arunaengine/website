@@ -8,7 +8,7 @@ export type ContentIdentityResolution =
   | { status: 'resolved'; id: string; blake3: string }
   | { status: 'unavailable' }
 
-interface DrsObjectResponse {
+export interface DrsObjectResponse {
   checksums?: Array<{ type?: string; checksum?: string }>
 }
 
@@ -51,7 +51,7 @@ export async function resolveContentIdentity(
   try {
     const versionId = (await options.getVersionId(bucket, key))?.trim()
     if (!versionId) return { status: 'unavailable' }
-    const objectId = `arn:aruna:${realmId}:${nodeId}:s3/${bucket}/${encodeObjectKey(key)}@${versionId}`
+    const objectId = versionObjectId(realmId, nodeId, bucket, key, versionId)
     const getDrsObject = options.getDrsObject ?? (options.apiBaseUrl
       ? (id: string) => apiRequest<DrsObjectResponse>(
           `/ga4gh/drs/v1/objects/${encodeURIComponent(id)}`,
@@ -80,6 +80,17 @@ export function arunaContentReference(
 
 export function externalContentReference(id: string): AuthoredContentReference {
   return { id, identity: 'external' }
+}
+
+/** The DRS object id of one stored version of a file. */
+export function versionObjectId(
+  realmId: string,
+  nodeId: string,
+  bucket: string,
+  key: string,
+  versionId: string,
+): string {
+  return `arn:aruna:${realmId}:${nodeId}:s3/${bucket}/${encodeObjectKey(key)}@${versionId}`
 }
 
 function encodeObjectKey(key: string): string {
