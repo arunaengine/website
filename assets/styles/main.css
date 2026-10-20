@@ -8,46 +8,47 @@
     }
 
     ::selection {
-        background: #00A0CC;
-        color: black;
+        background: #55C4DE;
+        color: #0B0B0E;
     }
 
+    /* Dark theme of the Aruna v3 portal */
     :root {
-        --aruna-background: 227 59% 8%;
-        --aruna-foreground: 217 50% 25%;
-        --aruna-muted: 232 47% 13%;
-        --aruna-highlight: 193 100% 40%;
-        --aruna-text: 231 5% 72%;
-        --aruna-text-accent: 0 0% 100%;
+        --aruna-background: 240 8% 9%;
+        --aruna-foreground: 221 39% 30%;
+        --aruna-muted: 240 9% 13%;
+        --aruna-highlight: 191 67% 60%;
+        --aruna-text: 223 18% 66%;
+        --aruna-text-accent: 223 33% 96%;
 
-        --background: 222.2 84% 4.9%;
-        --foreground: 210 40% 98%;
+        --background: 240 12% 5%;
+        --foreground: 223 33% 96%;
 
-        --muted: 217.2 32.6% 17.5%;
-        --muted-foreground: 215 20.2% 65.1%;
+        --muted: 240 7% 15%;
+        --muted-foreground: 223 18% 66%;
 
-        --popover: 222.2 84% 4.9%;
-        --popover-foreground: 210 40% 98%;
+        --popover: 240 9% 13%;
+        --popover-foreground: 223 33% 96%;
 
-        --card: 222.2 84% 4.9%;
-        --card-foreground: 210 40% 98%;
+        --card: 240 8% 9%;
+        --card-foreground: 223 33% 96%;
 
-        --border: 217.2 32.6% 17.5%;
-        --input: 217.2 32.6% 17.5%;
+        --border: 240 6% 26%;
+        --input: 240 6% 34%;
 
-        --primary: 210 40% 98%;
-        --primary-foreground: 222.2 47.4% 11.2%;
+        --primary: 223 33% 96%;
+        --primary-foreground: 240 12% 5%;
 
-        --secondary: 217.2 32.6% 17.5%;
-        --secondary-foreground: 210 40% 98%;
+        --secondary: 240 9% 13%;
+        --secondary-foreground: 224 20% 82%;
 
-        --accent: 217.2 32.6% 17.5%;
-        --accent-foreground: 210 40% 98%;
+        --accent: 221 39% 30%;
+        --accent-foreground: 223 33% 96%;
 
-        --destructive: 0 74% 42%;/*0 62.8% 30.6%;*/
-        --destructive-foreground: 210 40% 98%;
+        --destructive: 0 84% 60%;
+        --destructive-foreground: 223 33% 96%;
 
-        --ring: 212.7 26.8% 83.9%;
+        --ring: 191 67% 60%;
 
         --radius: 0.5rem;
 
@@ -70,7 +71,44 @@
         @apply border-border;
     }
     body {
-        @apply bg-background text-foreground;
+        @apply bg-background text-foreground font-sans;
+        font-feature-settings: 'rlig' 1, 'calt' 1, 'ss01' 1;
+        color-scheme: dark;
+    }
+}
+
+@layer components {
+    /* The tagline below the wordmark */
+    .tagline {
+        font-weight: 300;
+        letter-spacing: 0.32em;
+        text-transform: lowercase;
+        color: #4e86d7;
+    }
+
+    /* Hero-only headline gradient */
+    .text-gradient {
+        background: linear-gradient(120deg, #eaf6fc 0%, #55c4de 36%, #24a9e6 66%, #4e86d7 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+    }
+
+    .eyebrow {
+        @apply text-[11px] font-semibold uppercase tracking-[0.18em] text-aruna-tagline;
+    }
+}
+
+@layer utilities {
+    .wash-primary {
+        background-image: radial-gradient(ellipse at 15% -10%, rgba(85, 196, 222, 0.12), transparent 48%),
+        radial-gradient(ellipse at 85% 0%, rgba(54, 62, 201, 0.14), transparent 52%);
+    }
+
+    .grid-faint {
+        background-image: linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+        background-size: 32px 32px;
     }
 }
 

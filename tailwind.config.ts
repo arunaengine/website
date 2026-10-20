@@ -60,8 +60,19 @@ module.exports = {
           highlight: "hsl(var(--aruna-highlight))",
           muted: "hsl(var(--aruna-muted))",
           bg: "hsl(var(--aruna-background))",
-          fg: "hsl(var(--aruna-foreground))"
+          fg: "hsl(var(--aruna-foreground))",
+          navy: '#08216C',
+          tagline: '#4E86D7',
+          aqua: '#55C4DE',
+          sky: '#24A9E6',
+          royal: '#335DC6',
+          indigo: '#363EC9',
         },
+      },
+      fontFamily: {
+        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+        display: ['Space Grotesk', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       borderRadius: {
         xl: "calc(var(--radius) + 4px)",

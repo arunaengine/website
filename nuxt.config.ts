@@ -3,6 +3,14 @@ export default defineNuxtConfig({
   app: {
     head: {
       title: 'Aruna',
+      link: [
+        {rel: 'preconnect', href: 'https://fonts.googleapis.com'},
+        {rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: ''},
+        {
+          rel: 'stylesheet',
+          href: 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap'
+        },
+      ],
     }
   },
   devtools: { enabled: true },
@@ -78,16 +86,16 @@ export default defineNuxtConfig({
       }
     },
     markdownCss: {
-      h1: ['text-3xl', 'font-bold', 'text-center', 'text-aruna-text-accent'],
-      h2: ['mt-6', 'mb-2', 'text-2xl', 'font-bold', 'text-aruna-text-accent'],
-      h3: ['mt-6', 'mb-2', 'text-xl', 'font-bold', 'uppercase', 'text-aruna-text-accent'],
-      p: ['mt-2', 'px-4', 'py-2', 'text-aruna-text'],
-      a: ['text-aruna-highlight', 'hover:text-aruna-highlight/80'],
+      h1: ['font-display', 'text-3xl', 'font-semibold', 'tracking-tight', 'text-aruna-text-accent'],
+      h2: ['mt-8', 'mb-2', 'font-display', 'text-2xl', 'font-semibold', 'tracking-tight', 'text-aruna-text-accent'],
+      h3: ['mt-6', 'mb-2', 'font-display', 'text-xl', 'font-semibold', 'text-aruna-text-accent'],
+      p: ['mt-2', 'py-2', 'leading-relaxed', 'text-aruna-text'],
+      a: ['text-aruna-tagline', 'underline-offset-4', 'hover:underline'],
       hr: ['border-aruna-text/50'],
       ul: ['list-disc', 'list-outside', 'space-y-5', 'ps-4', 'py-2', 'text-lg', 'text-aruna-text'],
       ol: ['list-decimal', 'list-outside', 'space-y-5', 'ps-5', 'text-lg', 'text-aruna-text'],
       li: ['ps-2'],
-      img: ['rounded-md'],
+      img: ['rounded-lg'],
       code: ['p-4'],
       dl: ['p-4'],
       dt: ['pt-4', 'font-medium', 'leading-6', 'text-aruna-text-accent'],
