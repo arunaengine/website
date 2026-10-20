@@ -36,7 +36,7 @@ import {IconArrowRight, IconArrowUpRight} from "@tabler/icons-vue";
 
       <p class="mx-auto mt-5 max-w-xl text-base text-muted-foreground">
         Fast, secure and domain-agnostic data orchestration for complex, sovereign data sources.
-        Build bridges between distributed datasets, scale with ease and stay compliant.
+        Connect distributed datasets and stay compliant as you scale.
       </p>
 
       <div class="mt-9 flex flex-wrap justify-center gap-3">

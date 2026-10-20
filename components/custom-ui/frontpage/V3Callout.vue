@@ -6,9 +6,9 @@ import {IconArrowUpRight, IconCheck} from "@tabler/icons-vue";
     <div class="container max-w-6xl">
       <div class="mx-auto max-w-2xl text-center">
         <div class="eyebrow">Two versions</div>
-        <h2 class="section-title">Where Aruna is heading.</h2>
+        <h2 class="section-title">From Aruna v2 to Aruna v3</h2>
         <p class="mt-3 text-sm text-muted-foreground">
-          This site runs Aruna v2. Aruna v3 is a completely new system, built from the ground up, and is open for public testing.
+          This site runs Aruna v2. Aruna v3 is a new system built from the ground up and is open for public testing.
         </p>
       </div>
 
@@ -21,7 +21,7 @@ import {IconArrowUpRight, IconCheck} from "@tabler/icons-vue";
           <p class="mt-2 text-sm text-muted-foreground">The current service on this site. It will be replaced by v3 after a transition phase.</p>
           <ul class="mt-6 space-y-3 text-sm text-foreground/90">
             <li class="flex gap-2"><IconCheck class="mt-0.5 size-4 shrink-0 text-emerald-400"/>Projects, collections, datasets and objects</li>
-            <li class="flex gap-2"><IconCheck class="mt-0.5 size-4 shrink-0 text-emerald-400"/>S3 compatible data proxies</li>
+            <li class="flex gap-2"><IconCheck class="mt-0.5 size-4 shrink-0 text-emerald-400"/>S3-compatible data proxies</li>
             <li class="flex gap-2"><IconCheck class="mt-0.5 size-4 shrink-0 text-emerald-400"/>Encryption at rest with Crypt4GH</li>
           </ul>
           <div class="mt-auto pt-8">
