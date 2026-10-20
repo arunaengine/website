@@ -70,8 +70,8 @@ code .line::before {
     <img v-if="headerImage"
          :src="headerImage"
          alt=""
-         width="1586"
-         height="992"
+         width="1600"
+         height="1000"
          fetchpriority="high"
          decoding="async"
          class="mb-8 h-auto w-full rounded-xl border border-border"/>

@@ -1,5 +1,13 @@
 <script setup lang="ts">
 import {IconArrowUpRight, IconCheck} from "@tabler/icons-vue";
+
+const docs = 'https://v3.aruna-engine.org/app/docs/v1'
+const highlights = [
+  {label: 'Federated nodes', href: `${docs}/realm-nodes-groups`},
+  {label: 'Data-aware compute', href: `${docs}/data-to-compute`},
+  {label: 'Semantic metadata', href: `${docs}/datasets`},
+  {label: 'Virtual buckets', href: `${docs}/where-data-lives`},
+]
 </script>
 <template>
   <section class="section">
@@ -11,6 +19,27 @@ import {IconArrowUpRight, IconCheck} from "@tabler/icons-vue";
           This site runs Aruna V2. Aruna V3 is a new system built from the ground up and is open for public testing.
         </p>
       </div>
+
+      <figure class="mx-auto mt-10 max-w-4xl">
+        <img src="/imgs/blog/aruna-v2-to-v3-wide.webp"
+             alt="The move from Aruna V2 to Aruna V3 with federated nodes, data-aware compute, semantic metadata and virtual buckets"
+             width="1400"
+             height="703"
+             loading="lazy"
+             decoding="async"
+             class="h-auto w-full select-none"/>
+        <figcaption class="mt-2 flex flex-wrap justify-center gap-2">
+          <a v-for="h in highlights"
+             :key="h.label"
+             :href="h.href"
+             target="_blank"
+             rel="noopener"
+             class="inline-flex items-center gap-1 rounded-full border border-aruna-aqua/40 bg-aruna-aqua/10 px-3 py-1 text-xs font-medium text-aruna-aqua transition-colors hover:bg-aruna-aqua/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            {{ h.label }}
+            <IconArrowUpRight class="size-3"/>
+          </a>
+        </figcaption>
+      </figure>
 
       <div class="mt-12 grid gap-4 md:grid-cols-2">
         <div class="flex flex-col rounded-xl border border-border bg-card p-6 sm:p-8">
