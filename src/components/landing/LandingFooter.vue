@@ -55,6 +55,7 @@ import { RouterLink } from 'vue-router'
         </div>
         <div class="flex items-center gap-3">
           <RouterLink to="/imprint" class="hover:text-foreground">Imprint</RouterLink>
+          <RouterLink to="/terms" class="hover:text-foreground">Terms of service</RouterLink>
           <a
             href="https://github.com/arunaengine/aruna"
             target="_blank"

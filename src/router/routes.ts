@@ -14,6 +14,7 @@ function publicRoutes(): RouteRecordRaw[] {
   if (isDesktop()) return []
   return [
     { path: '/imprint', name: 'imprint', component: () => import('@/views/ImprintView.vue') },
+    { path: '/terms', name: 'terms', component: () => import('@/views/TermsView.vue') },
   ]
 }
 
