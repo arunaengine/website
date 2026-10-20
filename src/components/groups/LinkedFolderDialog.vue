@@ -105,13 +105,23 @@ const bucketOptions = computed(() => {
 const patternChoice = computed(
   () => NAME_PATTERNS.find((preset) => preset.value === pattern.value.trim())?.value ?? 'custom',
 )
-const patternError = computed(() => patternProblem(pattern.value.trim()))
+// Only a storage without a fixed bucket links a whole provider bucket, as `mapped_bucket` on the node.
+const wholeBucket = computed(() => {
+  const stored = props.link
+  return Boolean(stored && splits.value && !folderPath(backendFolder.value) && !stored.key_prefix && !writesElsewhere(stored))
+})
+const patternError = computed(() => {
+  const chosen = pattern.value.trim()
+  if (wholeBucket.value && chosen === '{dir}{name}' && props.link?.write_pattern !== chosen) {
+    return 'A whole linked bucket cannot switch to the same name.'
+  }
+  return patternProblem(chosen)
+})
 // A whole linked provider bucket keeps plain names, and an older node keeps its pattern.
 const patternLocked = computed(() => {
   const stored = props.link
   if (!stored) return false
-  const whole = splits.value && !folderPath(backendFolder.value) && !stored.key_prefix && !writesElsewhere(stored)
-  return !stored.write_pattern || (whole && stored.write_pattern === '{dir}{name}')
+  return !stored.write_pattern || (wholeBucket.value && stored.write_pattern === '{dir}{name}')
 })
 const patternChanged = computed(() => Boolean(props.link) && pattern.value.trim() !== props.link?.write_pattern)
 const schedule = computed(() => (scheduleChoice.value === 'custom' ? cron.value.trim() : scheduleChoice.value))

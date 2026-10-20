@@ -244,6 +244,19 @@ describe('LinkedFolderDialog', () => {
     const preset = element(mounted.root, (node) => node.tag === 'select' && node.props['aria-label'] === 'File name preset')
     expect(preset.props.disabled).toBe(true)
     mounted.app.unmount()
+
+    // No whole linked bucket turns into one with plain names.
+    const tagged = await mount({ ...whole, write_pattern: '{dir}{name}~{id}' }, { backends: SPLIT })
+    await choose(tagged.root, 'File name preset', '{dir}{name}')
+    expect(content(tagged.root)).toContain('A whole linked bucket cannot switch to the same name.')
+    expect(button(tagged.root, 'Save changes').props.disabled).toBe(true)
+    tagged.app.unmount()
+
+    // A storage with a fixed bucket links only folders, so their pattern can change.
+    const folder = await mount({ ...STORED, backend_prefix: 'raw/', key_prefix: '', write_pattern: '{dir}{name}' })
+    const open = element(folder.root, (node) => node.tag === 'select' && node.props['aria-label'] === 'File name preset')
+    expect(open.props.disabled).toBe(false)
+    folder.app.unmount()
   })
 
   it('moves the files of a stored link only when there are some', async () => {
