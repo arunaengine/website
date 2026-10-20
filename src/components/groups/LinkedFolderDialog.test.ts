@@ -218,8 +218,31 @@ describe('LinkedFolderDialog', () => {
     await choose(mounted.root, 'Look for new files', '0 * * * *')
     await submit(mounted.root)
 
-    expect(updateBackendImport).toHaveBeenCalledWith('g1', 'i1', '0 * * * *', expect.anything())
+    expect(updateBackendImport).toHaveBeenCalledWith('g1', 'i1', '0 * * * *', expect.anything(), undefined)
     expect(createBackendImport).not.toHaveBeenCalled()
+    mounted.app.unmount()
+  })
+
+  it('changes the file name of a stored link in place', async () => {
+    updateBackendImport.mockResolvedValue(STORED)
+    const mounted = await mount(STORED)
+    await choose(mounted.root, 'File name preset', '{dir}{name}~{id}')
+    expect(content(mounted.root)).toContain('Only new uploads get the new name.')
+    expect(content(mounted.root)).toContain('lab / raw/2024/run2/b.fastq~01JA7Q3K')
+    await typeValue(inputById(mounted.root, '-pattern'), '{dir}{id}')
+    expect(button(mounted.root, 'Save changes').props.disabled).toBe(true)
+    await typeValue(inputById(mounted.root, '-pattern'), '{dir}{name}~{id}')
+    await submit(mounted.root)
+
+    expect(updateBackendImport).toHaveBeenCalledWith('g1', 'i1', null, expect.anything(), '{dir}{name}~{id}')
+    mounted.app.unmount()
+  })
+
+  it('keeps plain names of a whole linked provider bucket', async () => {
+    const whole = { ...STORED, backend_id: 's1', backend_prefix: 'lab-raw/', key_prefix: '', write_pattern: '{dir}{name}' }
+    const mounted = await mount(whole, { backends: SPLIT })
+    const preset = element(mounted.root, (node) => node.tag === 'select' && node.props['aria-label'] === 'File name preset')
+    expect(preset.props.disabled).toBe(true)
     mounted.app.unmount()
   })
 

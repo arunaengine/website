@@ -67,13 +67,16 @@ export function createBackendImport(
   return apiRequest(importsPath(groupId), { method: 'POST', body: JSON.stringify(input) }, client)
 }
 
+/** Replaces the schedule; a given `writePattern` names later uploads only. */
 export function updateBackendImport(
   groupId: string,
   importId: string,
   schedule: string | null,
   client: ApiClientOptions,
+  writePattern?: string,
 ): Promise<BackendImport> {
-  return apiRequest(importsPath(groupId, importId), { method: 'PUT', body: JSON.stringify({ schedule }) }, client)
+  const body = writePattern === undefined ? { schedule } : { schedule, write_pattern: writePattern }
+  return apiRequest(importsPath(groupId, importId), { method: 'PUT', body: JSON.stringify(body) }, client)
 }
 
 export function deleteBackendImport(groupId: string, importId: string, client: ApiClientOptions): Promise<void> {

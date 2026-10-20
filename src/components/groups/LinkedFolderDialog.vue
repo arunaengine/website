@@ -106,6 +106,14 @@ const patternChoice = computed(
   () => NAME_PATTERNS.find((preset) => preset.value === pattern.value.trim())?.value ?? 'custom',
 )
 const patternError = computed(() => patternProblem(pattern.value.trim()))
+// A whole linked provider bucket keeps plain names, and an older node keeps its pattern.
+const patternLocked = computed(() => {
+  const stored = props.link
+  if (!stored) return false
+  const whole = splits.value && !folderPath(backendFolder.value) && !stored.key_prefix && !writesElsewhere(stored)
+  return !stored.write_pattern || (whole && stored.write_pattern === '{dir}{name}')
+})
+const patternChanged = computed(() => Boolean(props.link) && pattern.value.trim() !== props.link?.write_pattern)
 const schedule = computed(() => (scheduleChoice.value === 'custom' ? cron.value.trim() : scheduleChoice.value))
 const scheduleError = computed(() => (scheduleChoice.value === 'custom' ? cronProblem(cron.value) : null))
 
@@ -146,7 +154,10 @@ const exampleUpload = computed(() =>
 
 const submitDisabled = computed(() => {
   if (saving.value || writesDisabled.value || scheduleError.value) return true
-  if (isEdit.value) return schedule.value === (props.link?.schedule ?? '') && !moveFiles.value
+  if (isEdit.value) {
+    if (patternChanged.value && patternError.value) return true
+    return schedule.value === (props.link?.schedule ?? '') && !moveFiles.value && !patternChanged.value
+  }
   return (
     !backendId.value ||
     !bucket.value.trim() ||
@@ -258,11 +269,12 @@ async function submit() {
   const stored = props.link
   const move = moveFiles.value
   const wanted = schedule.value
+  const newPattern = patternChanged.value ? pattern.value.trim() : undefined
   try {
     let runError: string | undefined
     if (stored) {
-      if (wanted !== (stored.schedule ?? '')) {
-        await updateBackendImport(props.groupId, stored.import_id, wanted || null, client)
+      if (wanted !== (stored.schedule ?? '') || newPattern !== undefined) {
+        await updateBackendImport(props.groupId, stored.import_id, wanted || null, client, newPattern)
       }
       if (move) await startBucketMove(stored.bucket, stored.key_prefix, client)
     } else {
@@ -483,21 +495,24 @@ async function submit() {
                 <Select
                   :model-value="patternChoice"
                   :options="PATTERN_OPTIONS"
-                  :disabled="isEdit"
+                  :disabled="patternLocked"
                   aria-label="File name preset"
                   @update:model-value="pickPattern"
                 />
                 <Input
                   :id="`${uid}-pattern`"
                   v-model="pattern"
-                  :disabled="isEdit"
+                  :disabled="patternLocked"
                   :invalid="patternError ? 'error' : undefined"
                   class="font-mono text-xs"
                 />
               </div>
-              <p v-if="patternError && !isEdit" class="mt-1 text-[11px] text-destructive">{{ patternError }}</p>
+              <p v-if="patternError && !patternLocked" class="mt-1 text-[11px] text-destructive">{{ patternError }}</p>
+              <p v-else-if="patternChanged" class="mt-1 text-[11px] text-muted-foreground">
+                Only new uploads get the new name. Files already saved keep theirs.
+              </p>
               <p v-else class="mt-1 text-[11px] text-muted-foreground">
-                {dir} is the folder below the linked folder, {name} the file name, {id} a unique version ID.
+                {dir} is the folder below the linked folder, {name} the file name, {id} the version ID.
               </p>
             </div>
 
