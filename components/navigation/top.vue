@@ -30,10 +30,10 @@ onMounted(() => {
   <a href="https://v3.aruna-engine.org"
      target="_blank"
      rel="noopener"
-     class="group block truncate bg-aruna-navy px-4 py-2 text-center text-xs text-white/85 hover:text-white">
-    <span class="me-2 rounded-full bg-aruna-aqua/20 px-2 py-0.5 font-semibold text-aruna-aqua">Public testing</span>
+     class="group block truncate border-b border-aruna-aqua/40 bg-aruna-aqua/10 px-4 py-2 text-center text-xs text-aruna-aqua transition-colors hover:bg-aruna-aqua/20">
+    <span class="me-2 rounded-full bg-aruna-aqua/20 px-2 py-0.5 font-semibold">Public testing</span>
     Aruna V3 is open for testing.
-    <span class="font-semibold text-white underline-offset-4 group-hover:underline">Try it &rarr;</span>
+    <span class="font-semibold underline-offset-4 group-hover:underline">Try it &rarr;</span>
   </a>
   <div class="sticky top-0 z-40">
   <header class="w-full border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/70">
