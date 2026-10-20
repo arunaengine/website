@@ -15,8 +15,13 @@ const props = defineProps<{
   featured?: boolean
 }>()
 
-// Show the branded tile when the external image cannot be loaded
+// Show the branded tile when the external image cannot be loaded.
+// A server-rendered image may fail before hydration, so check once mounted.
 const imageFailed = ref(false)
+const image = ref<HTMLImageElement | null>(null)
+onMounted(() => {
+  if (image.value?.complete && image.value.naturalWidth === 0) imageFailed.value = true
+})
 </script>
 <template>
   <!-- Card -->
@@ -25,7 +30,13 @@ const imageFailed = ref(false)
             class="group h-full p-4 border border-border rounded-xl bg-card transition-colors duration-200 hover:border-aruna-aqua/60 hover:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
     <div class="aspect-[16/10] overflow-hidden rounded-lg bg-muted">
       <img v-if="imageUrl && !imageFailed"
+           ref="image"
            :src="imageUrl"
+           width="800"
+           height="500"
+           :loading="featured ? 'eager' : 'lazy'"
+           :fetchpriority="featured ? 'high' : 'auto'"
+           decoding="async"
            @error="imageFailed = true"
            alt="Announcement preview image"
            class="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"/>
@@ -37,6 +48,7 @@ const imageFailed = ref(false)
           <div class="relative mx-auto aspect-[935/537] h-10 overflow-hidden">
             <img src="/brand/icon-mark.avif"
                  alt=""
+                 loading="lazy"
                  class="absolute left-[-19.6%] top-[-62%] w-[134.1%] max-w-none select-none"/>
           </div>
           <p class="mt-3 font-mono text-[11px] uppercase tracking-[0.2em] text-white/70">

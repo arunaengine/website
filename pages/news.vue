@@ -7,11 +7,8 @@ const announcements: Ref<v2Announcement[]> = ref([])
 const exhausted = ref(true)
 const last_id = ref('')
 
-async function extendDisplay(count = 3) {
-  const fetched_announcements = await getAnnouncements(last_id.value, count)
-
-  // Evaluate announcements fetch
-  const fetched_last_id = fetched_announcements[fetched_announcements.length - 1] ? fetched_announcements[fetched_announcements.length - 1].announcementId : undefined
+function applyPage(fetched_announcements: v2Announcement[], count: number) {
+  const fetched_last_id = fetched_announcements[fetched_announcements.length - 1]?.announcementId
 
   exhausted.value = fetched_last_id == undefined || fetched_announcements.length < count
   last_id.value = fetched_last_id ? fetched_last_id : last_id.value
@@ -19,8 +16,13 @@ async function extendDisplay(count = 3) {
   announcements.value.push(...fetched_announcements)
 }
 
-// One wide card plus a full row of three
-onBeforeMount(async () => await extendDisplay(4))
+async function extendDisplay(count = 3) {
+  applyPage(await getAnnouncements(last_id.value, count), count)
+}
+
+// One wide card plus a full row of three, rendered on the server
+const {data: firstPage} = await useAsyncData('news-first-page', () => getAnnouncements('', 4))
+applyPage(firstPage.value || [], 4)
 </script>
 <template>
   <NavigationTop/>
