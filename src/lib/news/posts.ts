@@ -136,6 +136,11 @@ export function formatDate(date: string): string {
 
 // html:false escapes raw HTML in the source; markdown-it also rejects unsafe link protocols.
 const markdown = new MarkdownIt({ html: false })
+const renderImage = markdown.renderer.rules.image!
+markdown.renderer.rules.image = (tokens, index, options, env, self) => {
+  tokens[index].attrSet('loading', 'lazy')
+  return renderImage(tokens, index, options, env, self)
+}
 
 export function renderPost(post: NewsPost): string {
   return markdown.render(post.body)
