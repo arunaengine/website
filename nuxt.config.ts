@@ -96,6 +96,7 @@ export default defineNuxtConfig({
       ol: ['list-decimal', 'list-outside', 'space-y-5', 'ps-5', 'text-lg', 'text-aruna-text'],
       li: ['ps-2'],
       img: ['rounded-lg'],
+      strong: ['font-semibold', 'text-aruna-text-accent'],
       code: ['p-4'],
       dl: ['p-4'],
       dt: ['pt-4', 'font-medium', 'leading-6', 'text-aruna-text-accent'],
