@@ -13,6 +13,8 @@ export default defineNuxtConfig({
     "~/plugins/preline.client.ts",
   ],
   modules: ['@nuxtjs/tailwindcss', "shadcn-nuxt"],
+  // shadcn-nuxt registers the named exports; do not scan the index files as components
+  ignore: ['components/ui/**/index.ts'],
   css: [
     '~/assets/styles/main.css',
   ],
