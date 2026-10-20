@@ -21,7 +21,7 @@ import PublicAccessDialog from '@/components/data/PublicAccessDialog.vue'
 import ObjectRulesEditor from '@/components/storage/ObjectRulesEditor.vue'
 import PolicyColumn from '@/components/storage/PolicyColumn.vue'
 import PreviewBody from '@/components/preview/PreviewBody.vue'
-import { endpointForNode, nodeApiBase } from '@/composables/s3/endpoints'
+import { endpointForNode, localNodeId, nodeApiBase } from '@/composables/s3/endpoints'
 import { useAruna } from '@/composables/useAruna'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { useRealmNodes } from '@/composables/useRealmNodes'
@@ -30,7 +30,10 @@ import type { SyncRow } from '@/composables/useBucketSyncs'
 import { usePublicAccess, type PublicAccess } from '@/composables/usePublicAccess'
 import { useS3, s3ErrorMessage } from '@/composables/useS3'
 import { useAssistantObject } from '@/composables/useAssistantObject'
+import { apiRequest } from '@/lib/api'
 import { exactFileBacklinkPreflight } from '@/lib/backlinks'
+import { fileChecksums, type FileChecksum } from '@/lib/checksums'
+import { versionObjectId, type DrsObjectResponse } from '@/lib/contentIdentity'
 import { publicUrl, type PublicTarget } from '@/lib/publicAccess'
 import { arnLocationLabel, parseArunaArn } from '@/lib/sync'
 import type { DeleteRequest } from '@/lib/deletion/request'
@@ -82,7 +85,7 @@ const emit = defineEmits<{
 }>()
 
 const s3 = useS3()
-const { currentUser, apiBaseUrl } = useAruna()
+const { currentUser, apiBaseUrl, authToken, nodeInfo } = useAruna()
 const { shown } = usePortalFeatures()
 const { displayName: nodeName } = useRealmNodes()
 const { leave } = useAssistantObject()
@@ -121,6 +124,31 @@ async function loadHead() {
     if (seq === headSeq) headBusy.value = false
   }
 }
+
+// The stored checksums of the shown version, from the node that holds the file.
+const checksums = ref<FileChecksum[]>([])
+let checksumSeq = 0
+async function loadChecksums() {
+  const seq = ++checksumSeq
+  checksums.value = []
+  const version = currentVersion.value
+  const realmId = nodeInfo.value?.node.realm_id
+  const nodeId = props.nodeId ?? localNodeId()
+  const baseUrl = nodeId ? nodeApiBase(nodeId) : null
+  if (!props.open || props.folder || !version || !realmId || !nodeId || !baseUrl) return
+  const id = versionObjectId(realmId, nodeId, props.bucket, props.objectKey, version)
+  try {
+    const object = await apiRequest<DrsObjectResponse>(
+      `/ga4gh/drs/v1/objects/${encodeURIComponent(id)}`,
+      {},
+      { baseUrl, token: authToken.value ?? undefined },
+    )
+    if (seq === checksumSeq) checksums.value = fileChecksums(object)
+  } catch {
+    // Checksums are extra details; the dialog stays useful without them.
+  }
+}
+watch(() => [props.open, currentVersion.value], () => void loadChecksums(), { immediate: true })
 
 // Everyone's read access to this key, through the group's "public" role.
 const access = props.access ?? usePublicAccess(computed(() => props.groupId))
@@ -328,6 +356,18 @@ const details = computed(() => props.folder ? [
                 <Badge v-if="pinnedVersion" :variant="stateVariant('older')" size="sm">Pinned</Badge>
               </template>
               <span v-else class="text-muted-foreground">unknown</span>
+            </dd>
+          </div>
+          <div v-if="checksums.length" class="border-t border-border/60 pt-2">
+            <dt class="text-muted-foreground">Checksums</dt>
+            <dd class="mt-1 space-y-1">
+              <div v-for="checksum in checksums" :key="checksum.label" class="flex items-baseline justify-between gap-4">
+                <span class="shrink-0 text-muted-foreground">{{ checksum.label }}</span>
+                <span class="flex min-w-0 items-center justify-end gap-1">
+                  <span class="hash" :title="checksum.value">{{ truncateMiddle(checksum.value, 12, 8) }}</span>
+                  <CopyButton :value="checksum.value" :label="`Copy the ${checksum.label} checksum`" />
+                </span>
+              </div>
             </dd>
           </div>
           <div v-if="props.groupId" class="flex items-center justify-between gap-4">

@@ -7,6 +7,8 @@ import * as NotebookDocument from '@/lib/notebook/document'
 import * as Utils from '@/lib/utils'
 import * as PublicAccessLib from '@/lib/publicAccess'
 import * as SyncLib from '@/lib/sync'
+import * as ChecksumsLib from '@/lib/checksums'
+import * as ContentIdentity from '@/lib/contentIdentity'
 import {
   button,
   click,
@@ -49,6 +51,7 @@ const ButtonStub = defineComponent({
 })
 
 const headObject = vi.fn()
+const apiRequest = vi.fn()
 const hasActiveKey = ref(true)
 const currentUser = ref<{ id: string } | null>({ id: 'u-1' })
 const loadReferences = vi.fn()
@@ -81,14 +84,23 @@ const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.
     s3ErrorMessage: (error: unknown) => String(error),
   },
   '@/composables/s3/endpoints': {
+    localNodeId: () => 'node-1',
     nodeApiBase: (nodeId: string) => `https://${nodeId}/api/v1`,
     endpointForNode: () => 'https://s3.node-1.example',
   },
   '@/lib/publicAccess': PublicAccessLib,
   '@/lib/sync': SyncLib,
+  '@/lib/api': { apiRequest },
+  '@/lib/checksums': ChecksumsLib,
+  '@/lib/contentIdentity': ContentIdentity,
   '@/composables/usePortalFeatures': { usePortalFeatures: () => ({ shown: () => true }) },
   '@/composables/useAruna': {
-    useAruna: () => ({ currentUser, apiBaseUrl: ref('https://local/api/v1') }),
+    useAruna: () => ({
+      currentUser,
+      apiBaseUrl: ref('https://local/api/v1'),
+      authToken: ref('token-1'),
+      nodeInfo: ref({ node: { realm_id: 'realm-1', peer_id: 'node-1' } }),
+    }),
   },
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: () => 'this node' }) },
   '@/composables/usePublicAccess': {
@@ -111,8 +123,14 @@ const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.
   '@/lib/utils': Utils,
 })
 
-async function mount(tab: string, overrides: Record<string, unknown> = {}) {
+async function mount(
+  tab: string,
+  overrides: Record<string, unknown> = {},
+  checksums: Array<{ type: string; checksum: string }> = [],
+) {
   headObject.mockResolvedValue({ contentType: 'text/plain', versionId: '01J000000000000000000HEAD' })
+  apiRequest.mockReset()
+  apiRequest.mockResolvedValue({ checksums })
   loadReferences.mockClear()
   resetReferences.mockClear()
   const tabs: string[] = []
@@ -170,6 +188,29 @@ describe('file details storage tab', () => {
 
     expect(text).not.toContain('rules this file carries')
     expect(text).not.toContain('copies of this version')
+  })
+})
+
+describe('file details checksums', () => {
+  it('lists the stored checksums of the current version', async () => {
+    const { root } = await mount('general', {}, [
+      { type: 'md5', checksum: 'aa'.repeat(16) },
+      { type: 'sha256', checksum: 'bb'.repeat(32) },
+    ])
+    const text = content(root)
+
+    expect(apiRequest).toHaveBeenCalledWith(
+      `/ga4gh/drs/v1/objects/${encodeURIComponent('arn:aruna:realm-1:node-1:s3/reef-survey/raw/reads.fastq@01J000000000000000000HEAD')}`,
+      {},
+      { baseUrl: 'https://node-1/api/v1', token: 'token-1' },
+    )
+    expect(text).toContain('Checksums')
+    expect(text.indexOf('SHA-256')).toBeLessThan(text.indexOf('MD5'))
+    expect(element(root, (node) => node.props['data-copy'] === 'bb'.repeat(32))).toBeTruthy()
+  })
+
+  it('hides the section when the node has no checksums', async () => {
+    expect(await render('general')).not.toContain('Checksums')
   })
 })
 
