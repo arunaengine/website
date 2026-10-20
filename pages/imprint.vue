@@ -6,16 +6,16 @@ import {IconMail} from '@tabler/icons-vue';
 <template>
   <NavigationTop/>
 
-  <div class="container mx-auto mt-4 sm:mt-[5vh] p-4 border border-aruna-text rounded-md bg-aruna-bg/90">
-    <h1 class="text-3xl font-bold text-aruna-text-accent uppercase">
+  <div class="container max-w-3xl py-12">
+    <h1 class="font-display text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
       Imprint
     </h1>
-    <hr class="border-aruna-text my-6">
+    <hr class="border-border my-6">
 
-    <div class="px-4 border-b border-aruna-text/50">
+    <div class="border-b border-border">
       <nav class="flex space-x-2" aria-label="Tabs" role="tablist">
         <button type="button"
-                class="hs-tab-active:font-semibold hs-tab-active:border-aruna-highlight hs-tab-active:text-aruna-highlight py-4 px-1 inline-flex items-center gap-x-2 border-b border-transparent text-sm whitespace-nowrap text-aruna-text disabled:opacity-50 disabled:pointer-events-none :focus:outline-none focus:ring-1 focus:rounded-sm focus:ring-aruna-highlight active"
+                class="hs-tab-active:font-semibold hs-tab-active:border-aruna-aqua hs-tab-active:text-foreground py-4 px-1 inline-flex items-center gap-x-2 border-b border-transparent text-sm whitespace-nowrap text-aruna-text disabled:opacity-50 disabled:pointer-events-none :focus:outline-none focus:ring-1 focus:rounded-sm focus:ring-aruna-highlight active"
                 id="basic-tabs-item-1"
                 data-hs-tab="#basic-tabs-1"
                 aria-controls="basic-tabs-1"
@@ -23,7 +23,7 @@ import {IconMail} from '@tabler/icons-vue';
           Datenschutzerklärung
         </button>
         <button type="button"
-                class="hs-tab-active:font-semibold hs-tab-active:border-aruna-highlight hs-tab-active:text-aruna-highlight py-4 px-1 inline-flex items-center gap-x-2 border-b border-transparent text-sm whitespace-nowrap text-aruna-text disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-1 focus:rounded-sm focus:ring-aruna-highlight"
+                class="hs-tab-active:font-semibold hs-tab-active:border-aruna-aqua hs-tab-active:text-foreground py-4 px-1 inline-flex items-center gap-x-2 border-b border-transparent text-sm whitespace-nowrap text-aruna-text disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-1 focus:rounded-sm focus:ring-aruna-highlight"
                 id="basic-tabs-item-2"
                 data-hs-tab="#basic-tabs-2"
                 aria-controls="basic-tabs-2"
@@ -33,9 +33,9 @@ import {IconMail} from '@tabler/icons-vue';
       </nav>
     </div>
 
-    <div class="mt-3 p-4">
+    <div class="mt-6">
       <div id="basic-tabs-1" role="tabpanel" aria-labelledby="basic-tabs-item-1">
-        <h2 class="text-2xl font-bold text-aruna-text-accent">
+        <h2 class="font-display text-2xl font-semibold tracking-tight text-foreground">
           Datenschutzerklärung
         </h2>
 
@@ -46,10 +46,9 @@ import {IconMail} from '@tabler/icons-vue';
           gespeichert werden.
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-aruna-text-accent">
+        <h3 class="mt-6 mb-2 font-display text-lg font-semibold text-foreground">
           1. Verantwortlicher
         </h3>
-        <hr class="border-aruna-text">
         <div class="mt-2 ps-4 font-bold text-aruna-text">Verantwortlicher für die Datenverarbeitung ist:</div>
         <div class="ps-8 pb-4 text-aruna-text-accent">
           <div>Präsidentin die</div>
@@ -67,11 +66,10 @@ import {IconMail} from '@tabler/icons-vue';
           </div>
         </div>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-aruna-text-accent">
+        <h3 class="mt-6 mb-2 font-display text-lg font-semibold text-foreground">
           2. Erhebung von personenbezogenen Daten
         </h3>
-        <hr class="border-aruna-text">
-        <p class="mt-2 p-4 text-aruna-text">
+        <p class="mt-2 py-2 leading-relaxed text-muted-foreground">
           Wir erheben personenbezogene Daten von Ihnen, wenn Sie sich für einen Account auf unserer Website oder im
           Email-verteiler registrieren. <br/>Folgende personenbezogene Daten werden erhoben:
         </p>
@@ -80,39 +78,35 @@ import {IconMail} from '@tabler/icons-vue';
           <li>Eine E-Mail-Adresse zur Kontaktaufnahme</li>
         </ul>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-aruna-text-accent">
+        <h3 class="mt-6 mb-2 font-display text-lg font-semibold text-foreground">
           3. Zweck der Datenverarbeitung
         </h3>
-        <hr class="border-aruna-text">
-        <p class="mt-2 p-4 text-aruna-text">
+        <p class="mt-2 py-2 leading-relaxed text-muted-foreground">
           Die von Ihnen angegebenen personenbezogenen Daten werden ausschließlich zur Erstellung Ihres Accounts oder der
           Verarbeitung des Email verteilers verwendet. Falls eine Emailadresse hinterlegt wurde, informieren wir Sie
           über Account relevante Ereignisse und allgemeine Ereignisse des Systems (Updates, Status etc.).
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-aruna-text-accent">
+        <h3 class="mt-6 mb-2 font-display text-lg font-semibold text-foreground">
           4. Rechtsgrundlage für die Datenverarbeitung
         </h3>
-        <hr class="border-aruna-text">
-        <p class="mt-2 p-4 text-aruna-text">
+        <p class="mt-2 py-2 leading-relaxed text-muted-foreground">
           Die Rechtsgrundlage für die Verarbeitung Ihrer personenbezogenen Daten zur Erstellung Ihres Accounts ist Art.
           6 Abs. 1 lit. b DSGVO.
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-aruna-text-accent">
+        <h3 class="mt-6 mb-2 font-display text-lg font-semibold text-foreground">
           5. Speicherdauer der Daten
         </h3>
-        <hr class="border-aruna-text">
-        <p class="mt-2 p-4 text-aruna-text">
+        <p class="mt-2 py-2 leading-relaxed text-muted-foreground">
           Ihre personenbezogenen Daten werden für die Dauer Ihres Accounts bei uns gespeichert. Wenn Sie Ihren Account
           löschen, werden Ihre Daten umgehend gelöscht.
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-aruna-text-accent">
+        <h3 class="mt-6 mb-2 font-display text-lg font-semibold text-foreground">
           6. Ihre Rechte als betroffene Person
         </h3>
-        <hr class="border-aruna-text">
-        <p class="mt-2 p-4 text-aruna-text">
+        <p class="mt-2 py-2 leading-relaxed text-muted-foreground">
           Sie haben das Recht, Auskunft über die bei uns gespeicherten personenbezogenen Daten zu erhalten sowie das
           Recht auf Berichtigung, Löschung und Einschränkung der Verarbeitung Ihrer personenbezogenen Daten (Art. 15, 16
           und 18 der Europäischen Datenschutzgrundverordnung). Falls Sie die Datenverarbeitung für rechtswidrig halten,
@@ -124,11 +118,10 @@ import {IconMail} from '@tabler/icons-vue';
           anderen Verantwortlichen übermitteln zu lassen (Art. 20 EU-DSGVO).
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-aruna-text-accent">
+        <h3 class="mt-6 mb-2 font-display text-lg font-semibold text-foreground">
           7. Kontakt
         </h3>
-        <hr class="border-aruna-text">
-        <p class="mt-2 p-4 text-aruna-text">
+        <p class="mt-2 py-2 leading-relaxed text-muted-foreground">
           Wenn Sie Fragen zur Erhebung, Verarbeitung oder Nutzung Ihrer personenbezogenen Daten haben, kontaktieren Sie
           uns bitte per E-Mail unter:
           <NuxtLink to="mailto:datenschutz@aruna-storage.org"
@@ -139,11 +132,10 @@ import {IconMail} from '@tabler/icons-vue';
           </NuxtLink>
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-aruna-text-accent">
+        <h3 class="mt-6 mb-2 font-display text-lg font-semibold text-foreground">
           8. Datenschutzbeauftragte
         </h3>
-        <hr class="border-aruna-text">
-        <p class="mt-2 p-4 text-aruna-text">
+        <p class="mt-2 py-2 leading-relaxed text-muted-foreground">
           <strong>
             Die Kontaktdaten des behördlichen Datenschutzbeauftragten der Justus-Liebig-Universität sind:
           </strong>
@@ -162,7 +154,7 @@ import {IconMail} from '@tabler/icons-vue';
           </NuxtLink>
           <div>Last updated: 20. April 2023</div>
         </div>
-        <hr class="border-2 text-aruna-text my-5">
+        <hr class="border-border my-8">
         <p class="mt-2 text-center font-bold text-aruna-text-accent">
           Bitte beachten Sie, dass diese Datenschutzerklärung jederzeit geändert werden kann. Eine jeweils aktuelle
           Version finden Sie auf dieser Website.
@@ -170,7 +162,7 @@ import {IconMail} from '@tabler/icons-vue';
       </div>
 
       <div id="basic-tabs-2" class="hidden" role="tabpanel" aria-labelledby="basic-tabs-item-2">
-        <h2 class="text-2xl font-bold text-aruna-text-accent">
+        <h2 class="font-display text-2xl font-semibold tracking-tight text-foreground">
           Privacy Policy
         </h2>
 
@@ -181,10 +173,9 @@ import {IconMail} from '@tabler/icons-vue';
           of what kind of personal data is collected, for what purpose and how long it is stored.
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-aruna-text-accent">
+        <h3 class="mt-6 mb-2 font-display text-lg font-semibold text-foreground">
           1. Responsible
         </h3>
-        <hr class="border-aruna-text">
         <div class="mt-2 ps-4 font-bold text-aruna-text">Responsible for data processing is:</div>
         <div class="ps-8 pb-4 text-aruna-text-accent">
           <div>President of the</div>
@@ -202,11 +193,10 @@ import {IconMail} from '@tabler/icons-vue';
           </div>
         </div>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-aruna-text-accent">
+        <h3 class="mt-6 mb-2 font-display text-lg font-semibold text-foreground">
           2. Collection of personal data
         </h3>
-        <hr class="border-aruna-text">
-        <p class="mt-2 p-4 text-aruna-text">
+        <p class="mt-2 py-2 leading-relaxed text-muted-foreground">
           We collect personal data from you when you register for an account or join the mailing-list on our
           website. <br/>The following personal data is collected:
         </p>
@@ -215,40 +205,36 @@ import {IconMail} from '@tabler/icons-vue';
           <li>Email address for contact</li>
         </ul>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-aruna-text-accent">
+        <h3 class="mt-6 mb-2 font-display text-lg font-semibold text-foreground">
           3. Purpose of data processing
         </h3>
-        <hr class="border-aruna-text">
-        <p class="mt-2 p-4 text-aruna-text">
+        <p class="mt-2 py-2 leading-relaxed text-muted-foreground">
           The personal data provided by you is exclusively used for the creation of your account. If an email address is
           provided, we will inform you about account-related events. If you join the mailing-list, we will send you
           information about the project in irregular intervals.
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-aruna-text-accent">
+        <h3 class="mt-6 mb-2 font-display text-lg font-semibold text-foreground">
           4. Legal basis for data processing
         </h3>
-        <hr class="border-aruna-text">
-        <p class="mt-2 p-4 text-aruna-text">
+        <p class="mt-2 py-2 leading-relaxed text-muted-foreground">
           The legal basis for the processing of your personal data for the creation of your account is Art. 6 para. 1
           lit. b
           GDPR.
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-aruna-text-accent">
+        <h3 class="mt-6 mb-2 font-display text-lg font-semibold text-foreground">
           5. Storage period of the data
         </h3>
-        <hr class="border-aruna-text">
-        <p class="mt-2 p-4 text-aruna-text">
+        <p class="mt-2 py-2 leading-relaxed text-muted-foreground">
           Your personal data will be stored for the duration of your account with us. If you delete your account,
           your data will be deleted immediately.
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-aruna-text-accent">
+        <h3 class="mt-6 mb-2 font-display text-lg font-semibold text-foreground">
           6. Your rights as a data subject
         </h3>
-        <hr class="border-aruna-text">
-        <p class="mt-2 p-4 text-aruna-text">
+        <p class="mt-2 py-2 leading-relaxed text-muted-foreground">
           You have the right to request information about the personal data stored by us as well as the right to
           correction,
           deletion and restriction of the processing of your personal data (Art. 15, 16 and 18 of the European General
@@ -264,11 +250,10 @@ import {IconMail} from '@tabler/icons-vue';
           or have it transferred to another controller (Art. 20 EU-GDPR).
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-aruna-text-accent">
+        <h3 class="mt-6 mb-2 font-display text-lg font-semibold text-foreground">
           7. Contact
         </h3>
-        <hr class="border-aruna-text">
-        <p class="mt-2 p-4 text-aruna-text">
+        <p class="mt-2 py-2 leading-relaxed text-muted-foreground">
           If you have any questions about the collection, processing or use of your personal data, please contact us by
           email at
           <NuxtLink to="mailto:datenschutz@aruna-storage.org"
@@ -280,11 +265,10 @@ import {IconMail} from '@tabler/icons-vue';
           .
         </p>
 
-        <h3 class="mt-6 mb-2 text-xl font-bold uppercase text-aruna-text-accent">
+        <h3 class="mt-6 mb-2 font-display text-lg font-semibold text-foreground">
           8. Data Protection Officer
         </h3>
-        <hr class="border-aruna-text">
-        <p class="mt-2 p-4 text-aruna-text">
+        <p class="mt-2 py-2 leading-relaxed text-muted-foreground">
           <strong>
             The contact details of the official data protection officers at Justus Liebig University are:
           </strong>
@@ -303,7 +287,7 @@ import {IconMail} from '@tabler/icons-vue';
           </NuxtLink>
           <div>Last updated: 20. April 2023</div>
         </div>
-        <hr class="border-2 text-aruna-text my-5">
+        <hr class="border-border my-8">
         <p class="mt-2 text-center font-bold text-aruna-text-accent">
           Please note that this privacy policy may be changed at any time. You can find the current version on
           this website.
