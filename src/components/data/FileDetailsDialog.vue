@@ -40,7 +40,7 @@ import type { DeleteRequest } from '@/lib/deletion/request'
 import { featureEnabled } from '@/lib/config'
 import { isNotebookKey } from '@/lib/notebook/document'
 import { stateVariant } from '@/lib/stateBadge'
-import { formatBytes, relativeTime, truncateMiddle } from '@/lib/utils'
+import { formatBytes, relativeTime } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { ArrowLeftRight, Eye, Globe, ListTree, Lock, NotebookPen } from '@lucide/vue'
@@ -305,7 +305,7 @@ const details = computed(() => props.folder ? [
 
     <div v-if="previewMode" class="flex h-full min-h-[60dvh] flex-col gap-3">
       <p v-if="pinnedVersion" class="text-xs text-muted-foreground">
-        Showing version <span class="hash">{{ truncateMiddle(pinnedVersion, 8, 6) }}</span>.
+        Showing version <span class="hash break-all">{{ pinnedVersion }}</span>.
         <button type="button" class="underline" @click="pinnedVersion = null">Show the current version</button>
       </p>
       <PreviewBody
@@ -351,7 +351,10 @@ const details = computed(() => props.folder ? [
             <dd class="flex min-w-0 items-center justify-end gap-1">
               <Spinner v-if="headBusy" label="Loading the file details" />
               <template v-else-if="currentVersion">
-                <span class="hash" :title="currentVersion">{{ truncateMiddle(currentVersion, 8, 6) }}</span>
+                <span class="hash flex min-w-0" :title="currentVersion">
+                  <span class="truncate">{{ currentVersion.slice(0, -8) }}</span>
+                  <span class="shrink-0">{{ currentVersion.slice(-8) }}</span>
+                </span>
                 <CopyButton :value="currentVersion" label="Copy version id" />
                 <Badge v-if="pinnedVersion" :variant="stateVariant('older')" size="sm">Pinned</Badge>
               </template>
@@ -364,7 +367,10 @@ const details = computed(() => props.folder ? [
               <div v-for="checksum in checksums" :key="checksum.label" class="flex items-baseline justify-between gap-4">
                 <span class="shrink-0 text-muted-foreground">{{ checksum.label }}</span>
                 <span class="flex min-w-0 items-center justify-end gap-1">
-                  <span class="hash" :title="checksum.value">{{ truncateMiddle(checksum.value, 12, 8) }}</span>
+                  <span class="hash flex min-w-0" :title="checksum.value">
+                    <span v-if="checksum.value.length > 8" class="truncate">{{ checksum.value.slice(0, -8) }}</span>
+                    <span class="shrink-0">{{ checksum.value.slice(-8) }}</span>
+                  </span>
                   <CopyButton :value="checksum.value" :label="`Copy the ${checksum.label} checksum`" />
                 </span>
               </div>
