@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {IconArrowRight, IconArrowUpRight} from "@tabler/icons-vue";
+import {IconArrowRight} from "@tabler/icons-vue";
 </script>
 <template>
   <section class="relative overflow-hidden border-b border-border bg-background">
@@ -8,17 +8,8 @@ import {IconArrowRight, IconArrowUpRight} from "@tabler/icons-vue";
     <div aria-hidden="true" class="wash-primary pointer-events-none absolute inset-0"/>
 
     <div class="relative mx-auto max-w-3xl px-4 pb-20 pt-16 text-center sm:pb-28 sm:pt-24">
-      <a href="https://v3.aruna-engine.org"
-         target="_blank"
-         rel="noopener"
-         class="inline-flex items-center gap-2 rounded-full border border-aruna-aqua/40 bg-aruna-aqua/10 px-3 py-1 text-xs font-medium text-aruna-aqua transition-colors hover:bg-aruna-aqua/20">
-        <span class="size-1.5 rounded-full bg-aruna-aqua"/>
-        Aruna V3 is in public testing
-        <IconArrowUpRight class="size-3.5"/>
-      </a>
-
       <!-- The icon asset keeps its transparent padding; clip it to the wave. -->
-      <div class="relative mx-auto mt-10 aspect-[935/537] h-16 overflow-hidden sm:h-20">
+      <div class="relative mx-auto aspect-[935/537] h-16 overflow-hidden sm:h-20">
         <img src="/brand/icon-mark.avif"
              alt=""
              class="absolute left-[-19.6%] top-[-62%] w-[134.1%] max-w-none select-none"
