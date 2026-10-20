@@ -34,6 +34,8 @@ const files = ref<FileRulePreview[]>([])
 const next = ref<string | null>(null)
 const previewed = ref(false)
 const loading = ref(false)
+// Saving replaces every rule, so it needs the stored rules first.
+const loaded = ref(false)
 const busy = ref(false)
 const unsupported = ref(false)
 const error = ref<string | null>(null)
@@ -42,6 +44,11 @@ let requestId = 0
 
 function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
+}
+
+// An answer counts only for the rules it was asked for.
+function ruleKey() {
+  return JSON.stringify(cleanRules(rules.value))
 }
 
 async function load() {
@@ -54,12 +61,15 @@ async function load() {
   error.value = null
   saved.value = false
   unsupported.value = false
+  loaded.value = false
+  busy.value = false
   if (!link) return
   loading.value = true
   try {
     const stored = await getFileRules(props.groupId, link.import_id, client())
     if (id !== requestId) return
     rules.value = stored.rules.length ? stored.rules : [{ pattern: '', folder: '' }]
+    loaded.value = true
   } catch (err) {
     if (id !== requestId) return
     if (isUnsupportedEndpoint(err)) unsupported.value = true
@@ -87,8 +97,9 @@ const counts = computed(() => previewCounts(files.value))
 
 async function preview(more = false) {
   const link = props.link
-  if (!link || busy.value) return
+  if (!link || busy.value || !loaded.value) return
   const id = ++requestId
+  const sent = ruleKey()
   busy.value = true
   error.value = null
   try {
@@ -99,7 +110,7 @@ async function preview(more = false) {
       more ? next.value : null,
       client(),
     )
-    if (id !== requestId) return
+    if (id !== requestId || sent !== ruleKey()) return
     files.value = more ? [...files.value, ...page.files] : page.files
     next.value = page.next ?? null
     previewed.value = true
@@ -112,14 +123,15 @@ async function preview(more = false) {
 
 async function save() {
   const link = props.link
-  if (!link || busy.value) return
+  if (!link || busy.value || !loaded.value || !previewed.value) return
   const id = ++requestId
+  const sent = ruleKey()
   busy.value = true
   error.value = null
   try {
     await saveFileRules(props.groupId, link.import_id, cleanRules(rules.value), client())
     if (id !== requestId) return
-    saved.value = true
+    saved.value = sent === ruleKey()
   } catch (err) {
     if (id === requestId) error.value = errorMessage(err)
   } finally {
@@ -140,7 +152,7 @@ async function save() {
 
       <Notice v-if="unsupported">This node cannot sort files yet.</Notice>
       <div v-else-if="loading" class="flex justify-center py-6"><Spinner /></div>
-      <div v-else class="max-h-[60vh] space-y-3 overflow-y-auto px-1 scrollbar-thin">
+      <div v-else-if="loaded" class="max-h-[60vh] space-y-3 overflow-y-auto px-1 scrollbar-thin">
         <div v-for="(rule, index) in rules" :key="index" class="flex items-center gap-2">
           <Input v-model="rule.pattern" placeholder="*.faa.gz" aria-label="File name" class="font-mono" />
           <span class="shrink-0 text-xs text-muted-foreground">goes to</span>
@@ -178,8 +190,9 @@ async function save() {
       <Notice v-if="error" tone="error">{{ error }}</Notice>
       <Notice v-if="saved" tone="success">Saved. The next run uses these names.</Notice>
       <DialogFooter v-if="!unsupported && !loading">
-        <Button variant="outline" :disabled="busy" @click="preview()">Show where files go</Button>
-        <Button :disabled="busy || !previewed" @click="save">Save</Button>
+        <Button v-if="!loaded" variant="outline" @click="load">Try again</Button>
+        <Button variant="outline" :disabled="busy || !loaded" @click="preview()">Show where files go</Button>
+        <Button :disabled="busy || !loaded || !previewed" @click="save">Save</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>
