@@ -76,7 +76,7 @@ const onSubmit = form.handleSubmit(async (values) => {
             [
               h(IconTrophy, {class: 'flex-shrink-0 size-5 text-yellow-200'}),
               h('span',
-                  {class: 'text-fuchsia-50'},
+                  {class: 'text-foreground'},
                   ['Your registration was successful. Please check your mails for more information.'])
             ]),
         duration: 10000

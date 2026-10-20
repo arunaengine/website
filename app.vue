@@ -116,9 +116,9 @@ async function updateUser() {
               description: h('div',
                   {class: 'flex space-x-2 items-center justify-center'},
                   [
-                    h(IconPlant, {class: 'flex-shrink-0 size-5 text-green-400'}),
+                    h(IconPlant, {class: 'flex-shrink-0 size-5 text-emerald-400'}),
                     h('span',
-                        {class: 'text-fuchsia-50'},
+                        {class: 'text-foreground'},
                         ['Please wait until your account gets activated by an administrator.'])
                   ]),
               duration: 10000

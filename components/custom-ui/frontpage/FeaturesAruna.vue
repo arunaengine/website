@@ -53,7 +53,7 @@ const features = [
         <div v-for="f in features"
              :key="f.title"
              class="flex h-full flex-col gap-3 rounded-xl border border-border bg-card p-5">
-          <div class="grid size-9 place-items-center rounded-lg bg-aruna-aqua/10 text-aruna-aqua">
+          <div class="grid size-9 place-items-center rounded-lg bg-aruna-tagline/10 text-aruna-tagline">
             <component :is="f.icon" class="size-5"/>
           </div>
           <h3 class="font-display text-base font-semibold text-foreground">{{ f.title }}</h3>

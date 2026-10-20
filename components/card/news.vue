@@ -27,7 +27,7 @@ onMounted(() => {
   <!-- Card -->
   <NuxtLink :to="`/articles/${id}`"
             :class="featured ? 'sm:col-span-2 lg:col-span-3 lg:grid lg:grid-cols-[1.2fr_1fr] lg:gap-8 lg:p-5' : 'flex flex-col'"
-            class="group h-full p-4 border border-border rounded-xl bg-card transition-colors duration-200 hover:border-aruna-aqua/60 hover:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            class="group h-full p-4 border border-border rounded-xl bg-card transition-colors duration-200 hover:border-aruna-tagline/60 hover:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
     <div class="aspect-[16/10] overflow-hidden rounded-lg bg-muted">
       <img v-if="imageUrl && !imageFailed"
            ref="image"
@@ -60,7 +60,7 @@ onMounted(() => {
     <div class="flex flex-col" :class="featured ? 'lg:justify-center' : 'flex-1'">
       <div class="mt-5 mb-6">
         <h3 :class="featured ? 'text-xl lg:text-2xl' : 'text-lg line-clamp-2'"
-            class="font-display font-semibold leading-snug text-foreground group-hover:text-aruna-aqua">
+            class="font-display font-semibold leading-snug text-foreground group-hover:text-aruna-tagline">
           {{ title }}
         </h3>
         <p :class="featured ? 'line-clamp-5' : 'line-clamp-3'"
@@ -71,7 +71,7 @@ onMounted(() => {
       <div class="mt-auto flex items-center gap-2 text-xs text-muted-foreground">
         <time :datetime="created_at">{{ shortDate(created_at) }}</time>
         <span aria-hidden="true">&middot;</span>
-        <span class="rounded-full border border-aruna-aqua/40 bg-aruna-aqua/10 px-2 py-0.5 text-[11px] font-medium text-aruna-aqua">
+        <span class="rounded-full border border-aruna-tagline/40 bg-aruna-tagline/10 px-2 py-0.5 text-[11px] font-medium text-aruna-tagline">
           {{ toAnnouncementTypeStr(type) }}
         </span>
       </div>

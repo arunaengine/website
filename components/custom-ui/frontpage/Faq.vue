@@ -50,7 +50,7 @@ const questions = [
 
       <div class="mt-10 divide-y divide-border border-y border-border">
         <details v-for="item in questions" :key="item.q" class="group">
-          <summary class="flex cursor-pointer list-none items-center justify-between gap-4 py-4 font-display text-base font-medium text-foreground hover:text-aruna-aqua focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+          <summary class="flex cursor-pointer list-none items-center justify-between gap-4 py-4 font-display text-base font-medium text-foreground hover:text-aruna-tagline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
             {{ item.q }}
             <IconPlus class="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-45"/>
           </summary>

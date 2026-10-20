@@ -15,7 +15,7 @@ import {IconMail} from '@tabler/icons-vue';
     <div class="border-b border-border">
       <nav class="flex space-x-2" aria-label="Tabs" role="tablist">
         <button type="button"
-                class="hs-tab-active:font-semibold hs-tab-active:border-aruna-aqua hs-tab-active:text-foreground py-4 px-1 inline-flex items-center gap-x-2 border-b border-transparent text-sm whitespace-nowrap text-aruna-text disabled:opacity-50 disabled:pointer-events-none :focus:outline-none focus:ring-1 focus:rounded-sm focus:ring-aruna-highlight active"
+                class="hs-tab-active:font-semibold hs-tab-active:border-aruna-tagline hs-tab-active:text-foreground py-4 px-1 inline-flex items-center gap-x-2 border-b border-transparent text-sm whitespace-nowrap text-aruna-text disabled:opacity-50 disabled:pointer-events-none :focus:outline-none focus:ring-1 focus:rounded-sm focus:ring-aruna-highlight active"
                 id="basic-tabs-item-1"
                 data-hs-tab="#basic-tabs-1"
                 aria-controls="basic-tabs-1"
@@ -23,7 +23,7 @@ import {IconMail} from '@tabler/icons-vue';
           Datenschutzerklärung
         </button>
         <button type="button"
-                class="hs-tab-active:font-semibold hs-tab-active:border-aruna-aqua hs-tab-active:text-foreground py-4 px-1 inline-flex items-center gap-x-2 border-b border-transparent text-sm whitespace-nowrap text-aruna-text disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-1 focus:rounded-sm focus:ring-aruna-highlight"
+                class="hs-tab-active:font-semibold hs-tab-active:border-aruna-tagline hs-tab-active:text-foreground py-4 px-1 inline-flex items-center gap-x-2 border-b border-transparent text-sm whitespace-nowrap text-aruna-text disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-1 focus:rounded-sm focus:ring-aruna-highlight"
                 id="basic-tabs-item-2"
                 data-hs-tab="#basic-tabs-2"
                 aria-controls="basic-tabs-2"

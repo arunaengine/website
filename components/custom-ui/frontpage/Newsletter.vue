@@ -85,7 +85,7 @@ async function submit() {
             peer-[:not(:placeholder-shown)]:text-aruna-text/75" for="user-mail-input">Your email address</label>
                   <div :class="{ 'hidden': emailInputInfo === undefined }"
                        class="absolute inset-y-0 end-0 flex items-center pointer-events-none pe-3">
-                    <IconCircleCheck v-if="success" class="flex-shrink-0 size-4 text-green-500"/>
+                    <IconCircleCheck v-if="success" class="flex-shrink-0 size-4 text-emerald-400"/>
                     <IconExclamationCircle v-else class="flex-shrink-0 size-4 text-destructive"/>
                   </div>
                 </div>
