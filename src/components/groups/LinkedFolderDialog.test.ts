@@ -148,14 +148,14 @@ describe('LinkedFolderDialog', () => {
     expect(text).toContain('sequencing / seq/run1/a.fastq')
     expect(text).toContain('Uploads to sequencing / seq')
     expect(text).toContain('(lab / raw/2024)')
-    expect(text).toContain('lab / raw/2024/run2/01JA7Q3K_b.fastq')
+    expect(text).toContain('lab / raw/2024/run2/b.fastq~01JA7Q3K')
     await submit(mounted.root)
 
     expect(createBackendImport).toHaveBeenCalledWith(
       'g1',
       {
         backend_id: 'b1', backend_prefix: 'raw/2024/', bucket: 'sequencing', key_prefix: 'seq/',
-        write_pattern: '{dir}{id}_{name}', schedule: '0 3 * * *',
+        write_pattern: '{dir}{name}~{id}', schedule: '0 3 * * *',
       },
       expect.anything(),
     )
@@ -178,7 +178,7 @@ describe('LinkedFolderDialog', () => {
 
     expect(createBackendImport).toHaveBeenCalledWith(
       'g1',
-      { backend_id: 'b1', backend_prefix: '', bucket: 'sequencing', key_prefix: '', write_pattern: '{dir}{id}_{name}' },
+      { backend_id: 'b1', backend_prefix: '', bucket: 'sequencing', key_prefix: '', write_pattern: '{dir}{name}~{id}' },
       expect.anything(),
     )
     mounted.app.unmount()
