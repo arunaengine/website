@@ -21,38 +21,38 @@ const imageFailed = ref(false)
   <!-- Card -->
   <NuxtLink :to="`/articles/${id}`"
             class="group flex flex-col h-full p-4 border border-border rounded-xl bg-card transition-colors duration-200 hover:border-aruna-aqua/60 hover:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-    <div class="aspect-w-16 aspect-h-11">
+    <div class="aspect-[16/10] overflow-hidden rounded-lg bg-muted">
       <img v-if="imageUrl && !imageFailed"
            :src="imageUrl"
            @error="imageFailed = true"
            alt="Announcement preview image"
-           class="w-full object-cover rounded-lg"/>
+           class="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"/>
       <img v-else-if="type === 'ANNOUNCEMENT_TYPE_RELEASE'"
                src="/imgs/blog_release.webp"
-               class="w-full object-cover rounded-lg"
+               class="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                alt="Default image for release announcements"/>
       <img v-else-if="type === 'ANNOUNCEMENT_TYPE_UPDATE'"
                src="/imgs/blog_update.webp"
                alt="Default image for update announcements"
-               class="w-full object-cover rounded-lg"/>
+               class="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"/>
       <img v-else-if="type === 'ANNOUNCEMENT_TYPE_BLOG'"
                src="/imgs/blog_blog.webp"
                alt="Default image for blog articles"
-               class="w-full object-cover rounded-lg"/>
+               class="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"/>
       <img v-else-if="type === 'ANNOUNCEMENT_TYPE_MAINTENANCE'"
                src="/imgs/blog_maintenance.webp"
                alt="Default image for maintenance announcements"
-               class="w-full object-cover rounded-lg"/>
+               class="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"/>
       <img v-else-if="type === 'ANNOUNCEMENT_TYPE_ORGA'"
                src="/imgs/blog_orga.webp"
                alt="Default image for organizational announcements"
-               class="w-full object-cover rounded-lg"/>
+               class="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"/>
     </div>
-    <div class="my-6">
-      <h3 class="font-display text-lg font-semibold leading-snug text-aruna-text-accent group-hover:text-aruna-aqua">
+    <div class="mt-5 mb-6">
+      <h3 class="font-display text-lg font-semibold leading-snug text-aruna-text-accent line-clamp-2 group-hover:text-aruna-aqua">
         {{ title }}
       </h3>
-      <p class="mt-3 text-sm leading-relaxed text-aruna-text line-clamp-4">
+      <p class="mt-3 text-sm leading-relaxed text-aruna-text line-clamp-3">
         {{ teaser }}
       </p>
     </div>
