@@ -6,6 +6,7 @@ import KeyIssueNotice from '@/components/storage/KeyIssueNotice.vue'
 import MobileNav from '@/components/dashboard/MobileNav.vue'
 import RealmUnreachable from '@/components/layout/RealmUnreachable.vue'
 import LinkOffer from '@/components/federation/LinkOffer.vue'
+import FeatureHidden from '@/components/layout/FeatureHidden.vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import { computed, defineAsyncComponent, nextTick, onMounted, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
@@ -114,6 +115,7 @@ watch(
         <RealmUnreachable v-if="unreachable" />
         <template v-else>
           <LinkOffer />
+          <FeatureHidden />
           <RouterView />
         </template>
       </main>

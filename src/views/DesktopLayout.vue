@@ -8,10 +8,12 @@ import GlobalErrorBanner from '@/components/layout/GlobalErrorBanner.vue'
 import KeyIssueNotice from '@/components/storage/KeyIssueNotice.vue'
 import RealmUnreachable from '@/components/layout/RealmUnreachable.vue'
 import NodeDown from '@/components/layout/NodeDown.vue'
+import FeatureHidden from '@/components/layout/FeatureHidden.vue'
 import Notice from '@/components/ui/Notice.vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
+import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { uploadQueueItems } from '@/composables/uploadQueueState'
 import { assistantAvailable, assistantOpen } from '@/composables/assistantState'
 import { bindTourRouter, tourActive } from '@/composables/useTour'
@@ -56,6 +58,7 @@ const quitting = ref(false)
 const quitError = ref<string | null>(null)
 
 const { bootstrapped, refresh, isRealmAdmin, canInspectUsers } = useAruna()
+const { shown } = usePortalFeatures()
 if (typeof window !== 'undefined' && !bootstrapped.value) void refresh()
 const { status, loaded, state, start: watchNode, stop: unwatchNode } = useDeviceStatus()
 const nodeDown = computed(
@@ -83,6 +86,7 @@ const items = computed<NavEntry[]>(() =>
     isRealmAdmin: isRealmAdmin.value,
     canInspectUsers: canInspectUsers.value,
     assistant: assistantAvailable.value,
+    shown,
   }),
 )
 
@@ -135,7 +139,10 @@ watch(
       <main id="main-content" ref="mainEl" tabindex="-1" class="flex-1 overflow-x-hidden outline-none">
         <RealmUnreachable v-if="unreachable" />
         <NodeDown v-else-if="nodeDown" />
-        <RouterView v-else />
+        <template v-else>
+          <FeatureHidden />
+          <RouterView />
+        </template>
       </main>
     </div>
     <TransfersPanel v-if="uploadQueueItems.length" />

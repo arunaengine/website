@@ -41,8 +41,8 @@ function desktopRoutes(): RouteRecordRaw[] {
     // The old folder and transfer paths stay reachable through Sync.
     { path: 'folders', redirect: { name: 'sync' } },
     { path: 'transfers', redirect: { name: 'sync' } },
-    { path: 'runs', name: 'runs', component: () => import('@/views/desktop/RunsView.vue') },
-    { path: 'runs/:jobId', name: 'run', component: () => import('@/views/desktop/RunsView.vue') },
+    { path: 'runs', name: 'runs', component: () => import('@/views/desktop/RunsView.vue'), meta: { feature: 'compute' } },
+    { path: 'runs/:jobId', name: 'run', component: () => import('@/views/desktop/RunsView.vue'), meta: { feature: 'compute' } },
     { path: 'device', name: 'device', component: () => import('@/views/DeviceView.vue') },
   ]
 }
@@ -117,10 +117,10 @@ export function portalRoutes(): RouteRecordRaw[] {
           redirect: (to) => ({ name: 'dataset', params: { id: to.params.id } }),
         },
         // Profiles for RO-Crate metadata schemas
-        { path: 'profiles', name: 'profiles', component: () => import('@/views/ProfilesView.vue') },
-        { path: 'profiles/new', name: 'profile-new', component: () => import('@/views/ProfileNewView.vue') },
-        { path: 'profiles/:profileId', name: 'profile', component: () => import('@/views/ProfilesView.vue') },
-        { path: 'profiles/:profileId/edit', name: 'profile-edit', component: () => import('@/views/ProfileNewView.vue') },
+        { path: 'profiles', name: 'profiles', component: () => import('@/views/ProfilesView.vue'), meta: { feature: 'profiles' } },
+        { path: 'profiles/new', name: 'profile-new', component: () => import('@/views/ProfileNewView.vue'), meta: { feature: 'profiles' } },
+        { path: 'profiles/:profileId', name: 'profile', component: () => import('@/views/ProfilesView.vue'), meta: { feature: 'profiles' } },
+        { path: 'profiles/:profileId/edit', name: 'profile-edit', component: () => import('@/views/ProfileNewView.vue'), meta: { feature: 'profiles' } },
         // Versioned, repository-owned portal guidance. The static api path wins
         // over the topic param, so the reference never collides with a slug.
         {
@@ -140,7 +140,7 @@ export function portalRoutes(): RouteRecordRaw[] {
         { path: 'settings', name: 'settings', component: () => import('@/views/SettingsView.vue') },
         // Watched resources: served by the merged notifications backend, so no
         // feature flag; the view degrades inline when the endpoints are absent.
-        { path: 'settings/watches', name: 'settings-watches', component: () => import('@/views/WatchesView.vue') },
+        { path: 'settings/watches', name: 'settings-watches', component: () => import('@/views/WatchesView.vue'), meta: { feature: 'watches' } },
         // Realm admin: usage, quota policy and placement (tabs of one view)
         { path: 'admin', name: 'admin', component: () => import('@/views/AdminView.vue') },
         { path: 'admin/placement', redirect: { path: '/app/admin', query: { tab: 'placement' } } },
@@ -171,26 +171,27 @@ export function portalRoutes(): RouteRecordRaw[] {
         },
         // Compute: runs and durable system jobs in one surface
         // (each half is feature-gated in-view)
-        { path: 'compute', name: 'compute', component: () => import('@/views/ComputeView.vue') },
+        { path: 'compute', name: 'compute', component: () => import('@/views/ComputeView.vue'), meta: { feature: 'compute' } },
         // The quick run wizard is gone; its link opens the Python template.
         { path: 'compute/quick', redirect: { name: 'compute-new', query: { template: 'python' } } },
-        { path: 'compute/new', name: 'compute-new', component: () => import('@/views/ComputeSubmitView.vue') },
-        { path: 'notebooks', name: 'notebooks', component: () => import('@/views/NotebooksView.vue') },
+        { path: 'compute/new', name: 'compute-new', component: () => import('@/views/ComputeSubmitView.vue'), meta: { feature: 'compute' } },
+        { path: 'notebooks', name: 'notebooks', component: () => import('@/views/NotebooksView.vue'), meta: { feature: 'notebooks' } },
         // One notebook, named by the bucket it works in and its object key.
         {
           path: 'notebooks/:bucketId/:key(.*)',
           name: 'notebook',
           component: () => import('@/views/NotebookView.vue'),
+          meta: { feature: 'notebooks' },
         },
         { path: 'compute/jobs', redirect: { name: 'compute', query: { tab: 'jobs' } } },
         {
           path: 'compute/jobs/:jobId',
           redirect: (to) => ({ name: 'job', params: { jobId: to.params.jobId } }),
         },
-        { path: 'compute/:taskId', name: 'task', component: () => import('@/views/ComputeView.vue') },
+        { path: 'compute/:taskId', name: 'task', component: () => import('@/views/ComputeView.vue'), meta: { feature: 'compute' } },
         // Compatibility redirects from prior IA
         { path: 'jobs', redirect: { name: 'compute', query: { tab: 'jobs' } } },
-        { path: 'jobs/:jobId', name: 'job', component: () => import('@/views/ComputeView.vue') },
+        { path: 'jobs/:jobId', name: 'job', component: () => import('@/views/ComputeView.vue'), meta: { feature: 'compute' } },
         { path: 'data', redirect: { name: 'buckets' } },
         { path: 'data/:bucketId', redirect: (to) => ({ name: 'bucket', params: { bucketId: to.params.bucketId } }) },
         { path: 'query', redirect: { name: 'datasets' } },

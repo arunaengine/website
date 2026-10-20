@@ -71,6 +71,8 @@ const DesktopLayoutClient = compileClientComponent(new URL('./DesktopLayout.vue'
   '@/lib/chunk-recovery': { asyncChunkError: vi.fn() },
   '@/components/ui/Notice.vue': moduleDefault(Notice),
   '@/composables/useAruna': { useAruna: () => permissions },
+  '@/composables/usePortalFeatures': { usePortalFeatures: () => ({ shown: () => true }) },
+  '@/components/layout/FeatureHidden.vue': moduleDefault(EmptyStub),
   '@/composables/assistantState': {
     assistantAvailable: ref(false),
     assistantOpen: ref(false),
@@ -106,6 +108,8 @@ beforeAll(async () => {
     useRouter: () => ({ resolve: vi.fn(() => ({ fullPath: '/app', matched: [] })) }),
   }))
   vi.doMock('@/composables/useAruna', () => ({ useAruna: () => permissions }))
+  vi.doMock('@/composables/usePortalFeatures', () => ({ usePortalFeatures: () => ({ shown: () => true }) }))
+  vi.doMock('@/components/layout/FeatureHidden.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/composables/assistantState', () => ({
     assistantAvailable: ref(false),
     assistantOpen: ref(false),
