@@ -23,7 +23,7 @@ import {IconArrowUpRight, IconBrandGithub} from "@tabler/icons-vue";
           </li>
           <li>
             <a href="https://v3.aruna-engine.org" target="_blank" rel="noopener"
-               class="inline-flex items-center gap-1 text-aruna-aqua hover:text-foreground">
+               class="inline-flex items-center gap-1 text-aruna-tagline hover:text-foreground">
               Aruna V3 (public testing) <IconArrowUpRight class="size-3.5"/>
             </a>
           </li>

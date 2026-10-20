@@ -39,14 +39,14 @@ import {IconArrowUpRight, IconCheck} from "@tabler/icons-vue";
                class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(85,196,222,0.22),transparent_55%),radial-gradient(circle_at_90%_90%,rgba(54,62,201,0.3),transparent_55%)]"/>
           <div class="relative flex items-center gap-2">
             <h3 class="font-display text-xl font-semibold">Aruna V3</h3>
-            <span class="rounded-full border border-aruna-aqua/40 bg-aruna-aqua/15 px-2 py-0.5 text-[11px] font-medium text-aruna-aqua">Public testing</span>
+            <span class="rounded-full border border-aruna-tagline/60 bg-aruna-tagline/30 px-2 py-0.5 text-[11px] font-medium text-white">Public testing</span>
           </div>
           <p class="relative mt-2 text-sm text-white/75">A FAIR, federated data orchestration engine.</p>
           <ul class="relative mt-6 space-y-3 text-sm text-white/90">
-            <li class="flex gap-2"><IconCheck class="mt-0.5 size-4 shrink-0 text-aruna-aqua"/><span><strong class="font-semibold text-white">Data orchestration:</strong> jobs move to the data or data to the jobs, guided by placement policies</span></li>
-            <li class="flex gap-2"><IconCheck class="mt-0.5 size-4 shrink-0 text-aruna-aqua"/><span><strong class="font-semibold text-white">Semantic metadata:</strong> linked data with RO-Crate, a provenance graph, SPARQL and SHACL profiles</span></li>
-            <li class="flex gap-2"><IconCheck class="mt-0.5 size-4 shrink-0 text-aruna-aqua"/><span><strong class="font-semibold text-white">Data virtualization:</strong> buckets combine local files, copies and references to other nodes</span></li>
-            <li class="flex gap-2"><IconCheck class="mt-0.5 size-4 shrink-0 text-aruna-aqua"/><span><strong class="font-semibold text-white">Federated:</strong> each organization runs its own node, with no central server</span></li>
+            <li class="flex gap-2"><IconCheck class="mt-0.5 size-4 shrink-0 text-aruna-tagline"/><span><strong class="font-semibold text-white">Data orchestration:</strong> jobs move to the data or data to the jobs, guided by placement policies</span></li>
+            <li class="flex gap-2"><IconCheck class="mt-0.5 size-4 shrink-0 text-aruna-tagline"/><span><strong class="font-semibold text-white">Semantic metadata:</strong> linked data with RO-Crate, a provenance graph, SPARQL and SHACL profiles</span></li>
+            <li class="flex gap-2"><IconCheck class="mt-0.5 size-4 shrink-0 text-aruna-tagline"/><span><strong class="font-semibold text-white">Data virtualization:</strong> buckets combine local files, copies and references to other nodes</span></li>
+            <li class="flex gap-2"><IconCheck class="mt-0.5 size-4 shrink-0 text-aruna-tagline"/><span><strong class="font-semibold text-white">Federated:</strong> each organization runs its own node, with no central server</span></li>
           </ul>
           <p class="relative mt-6 text-xs text-white/60">Expect changes before the stable release.</p>
           <div class="relative mt-auto pt-6">
