@@ -739,6 +739,7 @@ export const docsTopics: DocsTopic[] = [
           'Choose Add your storage and enter the endpoint and [keys](concept:storage-access#external-storage-backend). No bucket is needed; Aruna checks the keys before it saves them.',
           'Use as default sends new uploads of all buckets to one bucket of your storage, such as aruna-lab-default. Aruna creates the bucket if it is missing and keeps its own layout there.',
           'Link a bucket shows the same files in an Aruna bucket and a bucket of your storage, both ways. Aruna never deletes files there.',
+          'New uploads to a linked bucket get the version ID after the name, such as b.fastq~01JA7Q3K. You can change the file name later; files already saved keep theirs.',
           'Rules may not overlap, and a linked bucket may not be the default bucket. Use as default on Aruna storage sends new uploads back to the node; files already in your storage stay there.',
           'Writers use the storage but can never see or change the keys.',
         ],
