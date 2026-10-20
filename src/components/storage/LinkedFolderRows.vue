@@ -186,6 +186,14 @@ defineExpose({ open })
             </IconButton>
           </div>
           <p v-if="link.last_run?.error" class="mt-1 break-all text-[11px] text-destructive">{{ link.last_run.error }}</p>
+          <div v-if="link.last_run?.failed" class="mt-1 text-[11px] text-destructive">
+            <p>{{ link.last_run.failed }} {{ link.last_run.failed === 1 ? 'file' : 'files' }} not added</p>
+            <ul class="mt-0.5 space-y-0.5">
+              <li v-for="failure in link.last_run.errors.slice(0, 5)" :key="failure.key" class="break-all">
+                <span class="font-mono">{{ failure.key }}</span>: {{ failure.error }}
+              </li>
+            </ul>
+          </div>
           <p v-if="rowError[link.import_id]" class="mt-1 break-all text-[11px] text-destructive">
             {{ rowError[link.import_id] }}
           </p>
