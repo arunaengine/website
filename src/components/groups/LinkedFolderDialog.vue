@@ -162,7 +162,7 @@ const conflict = computed(() => {
   const aruna = bucket.value.trim() ? arunaConflict(others, bucket.value.trim(), bucketRoot.value) : null
   if (aruna || !source.value) return aruna
   if (splits.value && !storageBucket.value.trim()) return null
-  const read = linkConflict(source.value, others, storageRoot.value)
+  const read = linkConflict(source.value, others, storageRoot.value, null, !writeElsewhere.value)
   if (read || !writeElsewhere.value || !target.value) return read
   return linkConflict(target.value, others, folderPath(writeFolder.value))
 })

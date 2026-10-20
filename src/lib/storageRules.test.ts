@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { BucketMoveResponse } from './api'
+import type { BackendImport, BucketMoveResponse } from './api'
 import { moveText, moveView, rememberMoves, bucketError, bucketTitle, defaultBucket, runActive, linkConflict, runText, splitPath, suggestBucket } from './storageRules'
 
 const split = { backend_id: 's1', group_id: 'g1', kind: 's3', name: 'lab', public_config: { endpoint: 'https://s3' } }
@@ -16,6 +16,14 @@ describe('storageRules', () => {
   it('suggests a valid default bucket', () => {
     expect(suggestBucket('Lab Group')).toBe('aruna-lab-group-default')
     expect(suggestBucket('***')).toBe('aruna-default')
+  })
+
+  it('lets links that write where they read share a folder', () => {
+    const link = { import_id: 'i1', backend_id: 's1', backend_prefix: 'lab-raw/', bucket: 'b', key_prefix: 'foo/' } as BackendImport
+    expect(linkConflict(split, [link], 'lab-raw/', null, true)).toBeNull()
+    expect(linkConflict(split, [link], 'lab-raw/')).toContain('overlaps')
+    const elsewhere = { ...link, write_prefix: 'lab-out/' }
+    expect(linkConflict(split, [elsewhere], 'lab-raw/', null, true)).toContain('overlaps')
   })
 
   it('refuses folders that leave no room for a file', () => {

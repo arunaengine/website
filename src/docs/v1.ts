@@ -767,6 +767,7 @@ export const docsTopics: DocsTopic[] = [
           'Show where files go lists each file and its place before you save. A file may match only one name; files Aruna already knows never move.',
           'Rename a folder gives files new names in Aruna, such as x into archive/x. Show changes first; only the files shown move.',
           'Your storage, its files and all versions stay as they are. Links by path stop working; DRS links by content keep working.',
+          'Several linked folders may share one storage folder. A new file there needs a name rule in exactly one of them.',
         ],
       },
     ],

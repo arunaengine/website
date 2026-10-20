@@ -419,7 +419,8 @@ describe('LinkedFolderDialog', () => {
   })
 
   it('shows overlaps and the default bucket before saving', async () => {
-    const other = { ...STORED, import_id: 'i2', backend_id: 's1', backend_prefix: 'lab-raw/2024/', bucket: 'results', key_prefix: '' }
+    // A link that writes elsewhere cannot share its folder; one that writes in place can.
+    const other = { ...STORED, import_id: 'i2', backend_id: 's1', backend_prefix: 'lab-raw/2024/', bucket: 'results', key_prefix: '', write_prefix: 'lab-out/' }
     const mounted = await mount(null, { backends: SPLIT, storageId: 's1', links: [other] })
     await choose(mounted.root, 'To Aruna bucket', 'sequencing')
     await typeValue(inputById(mounted.root, '-source-bucket'), 'lab-raw')

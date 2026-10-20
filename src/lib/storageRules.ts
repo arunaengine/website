@@ -1,7 +1,7 @@
 // Wording and checks for the rules of a group's storage: the default rule and linked buckets.
 import { ApiError, type BackendImport, type BackendImportRun, type BucketMoveResponse, type GroupBackendResponse } from './api'
 import { backendSchema } from './storage'
-import { storeName } from './linkedFolders'
+import { storeName, writesElsewhere } from './linkedFolders'
 import { formatNumber, relativeTime } from './utils'
 
 /** Keys on group storages are at most this long; a folder must leave room for a file. */
@@ -137,12 +137,14 @@ function linkPaths(link: BackendImport): { backendId: string; path: string }[] {
   ]
 }
 
-/** Why a linked bucket and folder cannot be saved; null when it can. */
+/** Why a linked bucket and folder cannot be saved; null when it can. With `shared`, the new link
+ * writes into the folder it reads, so it may share that folder with links that do the same. */
 export function linkConflict(
   backend: GroupBackendResponse,
   links: BackendImport[],
   path: string,
   importId?: string | null,
+  shared = false,
 ): string | null {
   const { bucket, folder } = splitPath(backend, path)
   if (splitsBuckets(backend)) {
@@ -162,7 +164,7 @@ export function linkConflict(
     return 'The folder is too long: paths there are at most 1024 bytes.'
   }
   for (const link of links) {
-    if (link.import_id === importId) continue
+    if (link.import_id === importId || (shared && !writesElsewhere(link))) continue
     const clash = linkPaths(link).some(
       (used) => used.backendId === backend.backend_id && overlaps(used.path, path),
     )
