@@ -12,6 +12,7 @@ import PlacementAdminPanel from '@/components/placement/PlacementAdminPanel.vue'
 import DataPlacementPanel from '@/components/storage/DataPlacementPanel.vue'
 import PoliciesSection from '@/components/policies/PoliciesSection.vue'
 import FederationSettings from '@/components/federation/FederationSettings.vue'
+import FeatureDefaults from '@/components/settings/FeatureDefaults.vue'
 import EffectivePolicies from '@/components/policies/EffectivePolicies.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsList from '@/components/ui/TabsList.vue'
@@ -386,6 +387,8 @@ async function save() {
       </TabsContent>
 
       <TabsContent value="federation" class="container mt-0 py-8"><FederationSettings /></TabsContent>
+
+      <TabsContent value="portal-features" class="container mt-0 py-8"><FeatureDefaults /></TabsContent>
 
       <TabsContent value="realm" class="container mt-0 grid gap-6 py-8 lg:grid-cols-[260px_1fr]">
       <nav class="flex flex-col gap-1 text-sm lg:sticky lg:top-20 lg:self-start">

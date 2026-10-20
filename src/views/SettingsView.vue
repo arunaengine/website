@@ -12,6 +12,7 @@ import CreateCredentialDialog from '@/components/data/CreateCredentialDialog.vue
 import DevicesPanel from '@/components/onboarding/DevicesPanel.vue'
 import SessionsPanel from '@/components/settings/SessionsPanel.vue'
 import S3SessionsPanel from '@/components/settings/S3SessionsPanel.vue'
+import FeatureSettings from '@/components/settings/FeatureSettings.vue'
 import AssistantProviders from '@/components/settings/AssistantProviders.vue'
 import VaultSettings from '@/components/settings/VaultSettings.vue'
 import McpConnect from '@/components/settings/McpConnect.vue'
@@ -31,6 +32,7 @@ import { useFirstPaint } from '@/composables/useFirstPaint'
 import { useRouteTab } from '@/composables/useRouteTab'
 import { useAuth } from '@/composables/useAuth'
 import { useWatches } from '@/composables/useWatches'
+import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { RouterLink, useRouter } from 'vue-router'
 import { apiOrigin } from '@/lib/api'
 import { errorMessage, relativeTime } from '@/lib/utils'
@@ -69,6 +71,7 @@ const painted = useFirstPaint(
 )
 // Optimistic until a watch request answers 404/403 (mirrors the bell's probe).
 const { available: watchesAvailable } = useWatches()
+const { shown } = usePortalFeatures()
 
 const settingsTabs = [
   { id: 'profile', label: 'Profile' },
@@ -115,14 +118,22 @@ function fieldPublic(key: string): boolean {
   const value = userInfo.value?.user.attributes?.[`profile.visibility.${key}`]
   return value === undefined ? key === 'name' : value === 'public'
 }
-watch(userInfo, () => {
+// Reseed drafts only when the stored values change, not on every profile refresh.
+const storedVisibility = () =>
+  [userInfo.value?.user.user_id, ...profileFields.value.map((key) => `${key}=${fieldPublic(key)}`)].join('\n')
+watch(storedVisibility, () => {
   visibility.value = Object.fromEntries(profileFields.value.map((key) => [key, fieldPublic(key)]))
 }, { immediate: true })
 const preferredProfileId = ref('')
 const profileMessage = ref<string | null>(null)
 const profileError = ref<string | null>(null)
 
-watch(currentUser, (user) => {
+const storedProfile = () => {
+  const user = currentUser.value
+  return [user?.id, user?.name, user?.email, user?.affiliation, user?.orcid, user?.preferredProfileId].join('\n')
+}
+watch(storedProfile, () => {
+  const user = currentUser.value
   name.value = user?.name ?? ''
   email.value = user?.email ?? ''
   affiliation.value = user?.affiliation ?? ''
@@ -254,7 +265,7 @@ async function revoke(accessKeyId: string) {
     <PageHeader title="Settings" description="Your account, groups, access keys and this browser's connection to the realm." :docs="{ topic: 'storage-access' }">
       <template #actions>
         <RefreshButton :busy="refreshBusy" size="default" @click="onRefresh" />
-        <Button v-if="watchesAvailable" variant="outline" size="default" as-child>
+        <Button v-if="watchesAvailable && shown('watches')" variant="outline" size="default" as-child>
           <RouterLink :to="{ name: 'settings-watches' }"><Eye class="h-4 w-4" /> Watched resources</RouterLink>
         </Button>
         <Button v-if="tab === 'profile'" :disabled="!currentUser || saving || !profileDirty" @click="saveProfile"><Save class="h-4 w-4" /> Save profile</Button>
@@ -359,7 +370,7 @@ async function revoke(accessKeyId: string) {
 
         <SessionsPanel />
 
-        <section class="surface overflow-hidden">
+        <section v-if="shown('s3-keys')" class="surface overflow-hidden">
           <header class="flex items-center justify-between border-b border-border px-5 py-4">
             <div class="flex items-center gap-2">
               <KeyRound class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">S3 access keys</h3><Badge size="sm" variant="secondary" class="uppercase">Advanced</Badge><Badge variant="outline" size="count">{{ visibleCredentials.length }}</Badge>
@@ -451,7 +462,7 @@ async function revoke(accessKeyId: string) {
         <section class="surface">
           <header class="flex items-center justify-between border-b border-border px-5 py-4">
             <div class="flex items-center gap-2"><ListChecks class="h-4 w-4 text-primary" /><h3 class="font-display text-sm font-semibold text-aruna-navy">Default profile</h3></div>
-            <Button variant="outline" size="sm" as-child><RouterLink :to="{ name: 'profiles' }">Browse profiles <ArrowRight class="h-3.5 w-3.5" /></RouterLink></Button>
+            <Button v-if="shown('profiles')" variant="outline" size="sm" as-child><RouterLink :to="{ name: 'profiles' }">Browse profiles <ArrowRight class="h-3.5 w-3.5" /></RouterLink></Button>
           </header>
           <div class="grid gap-2 p-5 sm:grid-cols-2">
             <button v-for="profile in defaultProfiles" :key="profile.id" type="button" class="flex items-start gap-3 rounded-lg border border-border bg-background p-3 text-left transition-colors hover:border-primary/40" :class="preferredProfileId === profile.id ? 'border-primary/60 ring-1 ring-primary/30' : ''" @click="preferredProfileId = profile.id">
@@ -524,6 +535,7 @@ async function revoke(accessKeyId: string) {
             <button v-for="option in themeOptions" :key="option.id" class="flex items-center gap-3 rounded-lg border border-border bg-background/70 p-3 text-left transition-colors hover:border-primary/40" :class="appearance === option.id ? 'border-primary/60 ring-1 ring-primary/30' : ''" @click="setTheme(option.id)"><span class="grid h-12 w-16 shrink-0 place-items-center rounded-md border border-border shadow-inner" :style="{ background: option.preview }"><component :is="option.icon" class="h-4 w-4 text-primary" /></span><div><div class="text-sm font-medium text-foreground">{{ option.title }}</div></div></button>
           </div>
         </section>
+        <FeatureSettings />
       </TabsContent>
       </template>
     </Tabs>

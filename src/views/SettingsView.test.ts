@@ -252,6 +252,7 @@ const SettingsView = compileClientComponent(new URL('./SettingsView.vue', import
   '@/composables/useRefresh': { useRefresh: () => ({ busy: ref(false), refresh: vi.fn() }) },
   '@/composables/useFirstPaint': { useFirstPaint: () => ref(true) },
   '@/composables/useWatches': { useWatches: () => ({ available: ref(false) }) },
+  '@/composables/usePortalFeatures': { usePortalFeatures: () => ({ shown: () => true }) },
   '@/components/dashboard/PageHeader.vue': moduleDefault(PageHeaderStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/RefreshButton.vue': moduleDefault(Empty),
@@ -273,6 +274,7 @@ const SettingsView = compileClientComponent(new URL('./SettingsView.vue', import
   '@/components/onboarding/DevicesPanel.vue': moduleDefault(labelled('Devices panel')),
   '@/components/settings/SessionsPanel.vue': moduleDefault(labelled('Sessions panel')),
   '@/components/settings/S3SessionsPanel.vue': moduleDefault(Empty),
+  '@/components/settings/FeatureSettings.vue': moduleDefault(Empty),
   '@/components/settings/AssistantProviders.vue': moduleDefault(Empty),
   '@/components/settings/VaultSettings.vue': moduleDefault(Empty),
   '@/components/settings/McpConnect.vue': moduleDefault(Empty),
@@ -440,5 +442,20 @@ describe('profile field visibility', () => {
       set_attributes: expect.objectContaining({ 'profile.visibility.name': 'private', 'profile.visibility.email': 'public' }),
     }))
     expect(errors).toEqual([])
+  })
+
+  it('keeps unsaved profile edits when another setting refreshes the profile', async () => {
+    currentUser.value = { id: 'user-1', name: 'Ada' }
+    userInfo.value = { user: { user_id: 'user-1', attributes: {} } }
+    const { root } = await mount('?tab=profile')
+    const name = element(root, (node) => node.tag === 'input' && node.props.value === 'Ada')
+    ;(name.props['onUpdate:modelValue'] as (value: string) => void)('Grace')
+    await flush()
+
+    currentUser.value = { id: 'user-1', name: 'Ada' }
+    userInfo.value = { user: { user_id: 'user-1', attributes: { 'ui.feature.watches': 'off' } } }
+    await flush()
+
+    expect(nodes(root).some((node) => node.tag === 'input' && node.props.value === 'Grace')).toBe(true)
   })
 })

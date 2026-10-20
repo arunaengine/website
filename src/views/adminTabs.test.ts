@@ -12,16 +12,18 @@ describe('realm administration tabs', () => {
       'data-placement',
       'policies',
       'federation',
+      'portal-features',
     ])
     expect(tabs.map((tab) => tab.label)).toContain('Record placement')
     expect(tabs.map((tab) => tab.label)).toContain('Data placement')
     expect(tabs.map((tab) => tab.label)).not.toContain('Placement')
     expect(tabs.map((tab) => tab.id)).not.toContain('residency')
+    expect(tabs.at(-1)).toEqual({ id: 'portal-features', label: 'Portal features' })
   })
 
   it('drops both placement tabs when the feature is off', () => {
     const tabs = adminTabs({ placement: false, policies: false })
 
-    expect(tabs.map((tab) => tab.id)).toEqual(['realm', 'compute', 'federation'])
+    expect(tabs.map((tab) => tab.id)).toEqual(['realm', 'compute', 'federation', 'portal-features'])
   })
 })
