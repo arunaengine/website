@@ -1,10 +1,10 @@
 <template>
   <!-- FAQ -->
   <div
-    class="container w-full mt-12 px-2 py-10 sm:px-6 lg:px-8 lg:py-14 mx-auto border border-aruna-text/50 bg-aruna-bg/90 rounded-md">
+    class="container w-full mt-12 px-2 py-10 sm:px-6 lg:px-8 lg:py-14 mx-auto border border-border bg-card rounded-md">
     <!-- Title -->
     <div class="max-w-2xl mx-auto text-center mb-10 lg:mb-14">
-      <h2 class="text-2xl font-bold md:text-3xl md:leading-tight text-aruna-text-accent">
+      <h2 class="font-display text-2xl font-semibold tracking-tight md:text-3xl md:leading-tight text-aruna-text-accent">
         Frequently Asked Questions
       </h2>
     </div>

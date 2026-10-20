@@ -1,40 +1,62 @@
+<script setup lang="ts">
+import {IconArrowRight, IconArrowUpRight} from "@tabler/icons-vue";
+</script>
 <template>
-  <div class="min-h-[calc(100vh-46px)] p-4 sm:p-0">
-    <div class="flex flex-col mx-auto max-w-4xl pt-[5vh] sm:pt-[10vh] md:pt-[15vh] text-center items-center justify-center gap-y-6">
-      <img alt="Aruna logo" src="/imgs/aruna_dark.webp" class="max-w-xs"/>
-      <h1 class="inline font-bold text-5xl sm:text-7xl text-aruna-highlight">Orchestrate your data!</h1>
-    </div>
-    <div class="mx-auto max-w-2xl pb-[25vh] sm:pb-[40vh]">
-      <div class="text-center">
-        <p class="mt-4 text-lg text-aruna-text">
-          <strong class="text-aruna-text-accent text-xl">Experience fast, secure, and domain-agnostic data orchestration</strong>
-          built to handle even the most complex, sovereign data sources. Build bridges between diverse, distributed
-          datasets, scale effortlessly and ensure compliance, all while maximizing the value of your heterogeneous
-          data landscape.
-        </p>
-        <div class="mt-10 flex flex-col sm:flex-row items-center justify-center gap-x-6 gap-y-6">
-          <a class="py-3 px-4 inline-flex justify-center items-center text-lg font-semibold bg-transparent border border-aruna-highlight rounded-sm text-aruna-highlight hover:text-aruna-text-accent hover:bg-aruna-highlight disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-1 focus:ring-aruna-highlight"
-             href="https://docs.aruna-engine.org/latest/get_started/basic_usage/01_Get-Storage-Access/"
-             target="_blank">
-            Get Started
-          </a>
-          <a class="px-4 py-2 text-lg font-semibold leading-6 text-aruna-text-accent focus:outline-none focus:ring-1 focus:ring-aruna-highlight"
-             href="#features">
-            Learn more <span aria-hidden="true">→</span>
-          </a>
-        </div>
+  <section class="relative overflow-hidden border-b border-border bg-background">
+    <div aria-hidden="true"
+         class="grid-faint pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_at_50%_0%,black_30%,transparent_75%)]"/>
+    <div aria-hidden="true" class="wash-primary pointer-events-none absolute inset-0"/>
+
+    <div class="relative mx-auto max-w-3xl px-4 pb-24 pt-16 text-center sm:pt-24">
+      <a href="https://v3.aruna-engine.org"
+         target="_blank"
+         rel="noopener"
+         class="inline-flex items-center gap-2 rounded-full border border-aruna-aqua/40 bg-aruna-aqua/10 px-3 py-1 text-xs font-medium text-aruna-aqua transition-colors hover:bg-aruna-aqua/20">
+        <span class="size-1.5 rounded-full bg-aruna-aqua"/>
+        Aruna v3 is available
+        <IconArrowUpRight class="size-3.5"/>
+      </a>
+
+      <!-- The icon asset keeps its transparent padding; clip it to the wave. -->
+      <div class="relative mx-auto mt-10 aspect-[935/537] h-16 overflow-hidden sm:h-20">
+        <img src="/brand/icon-mark.avif"
+             alt=""
+             class="absolute left-[-19.6%] top-[-62%] w-[134.1%] max-w-none select-none"
+             draggable="false"/>
+      </div>
+      <img src="/brand/wordmark-white.avif"
+           alt="ARUNA"
+           class="mx-auto mt-3 h-8 w-auto select-none sm:h-10"
+           draggable="false"/>
+      <p class="tagline mt-3.5 text-xs sm:text-[13px]">the data orchestration engine</p>
+
+      <h1 class="mt-12 text-balance font-display text-3xl font-semibold leading-[1.12] tracking-tight text-foreground sm:text-4xl md:text-[42px]">
+        Orchestrate your data. <span class="text-gradient">Keep it sovereign.</span>
+      </h1>
+
+      <p class="mx-auto mt-5 max-w-xl text-base text-muted-foreground">
+        Fast, secure and domain-agnostic data orchestration for complex, sovereign data sources.
+        Build bridges between distributed datasets, scale with ease and stay compliant.
+      </p>
+
+      <div class="mt-9 flex flex-wrap justify-center gap-3">
+        <a href="https://docs.aruna-engine.org/latest/get_started/basic_usage/01_Get-Storage-Access/"
+           target="_blank"
+           rel="noopener"
+           class="inline-flex h-10 items-center gap-2 rounded-md bg-aruna-royal px-5 text-sm font-medium text-white transition-colors hover:bg-aruna-royal/90">
+          Get started
+          <IconArrowRight class="size-4"/>
+        </a>
+        <a href="#features"
+           class="inline-flex h-10 items-center gap-2 rounded-md border border-input px-5 text-sm font-medium text-foreground transition-colors hover:bg-accent">
+          Learn more
+        </a>
+      </div>
+
+      <div class="mt-12 inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-[11px] font-medium text-muted-foreground">
+        <span class="size-1.5 rounded-full bg-emerald-500"/>
+        Free and open source
       </div>
     </div>
-  </div>
-
-  <div class="relative">
-    <svg class="absolute -top-4 md:-top-5 xl:-top-12 2xl:-top-14 bg-transparent z-20"
-         fill="none"
-         viewBox="0 0 1440 58"
-         width="100%"
-         xmlns="http://www.w3.org/2000/svg">
-      <path d="M-100 -3.8147e-06C-100 -3.8147e-06 218.416 21.6703 693.5 21.6703C1168.58 21.6703 1487 -3.8147e-06 1487 -3.8147e-06V58H-100V-3.8147e-06Z"
-            fill="#020817"></path>
-    </svg>
-  </div>
+  </section>
 </template>

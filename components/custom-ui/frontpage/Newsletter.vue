@@ -46,10 +46,10 @@ async function submit() {
 </script>
 <template>
   <div id="mailing-list"
-       class="container w-full mt-12 border border-aruna-text/50 bg-aruna-bg/90 rounded-md px-4 py-10 sm:px-6 lg:px-8 lg:py-16 mx-auto">
+       class="container w-full mt-12 border border-border bg-card rounded-md px-4 py-10 sm:px-6 lg:px-8 lg:py-16 mx-auto">
     <div class="grid md:grid-cols-2 gap-8">
       <div class="max-w-md">
-        <h2 class="text-2xl font-bold md:text-3xl md:leading-tight text-aruna-text-accent">
+        <h2 class="font-display text-2xl font-semibold tracking-tight md:text-3xl md:leading-tight text-aruna-text-accent">
           Mailing List
         </h2>
         <p class="mt-3 text-aruna-text">
@@ -68,7 +68,7 @@ async function submit() {
                          id="user-mail-input"
                          v-model="email"
                          placeholder="Your email address"
-                         class="peer p-4 block w-full rounded-md text-sm placeholder:text-transparent focus:border-aruna-highlight focus:ring-aruna-highlight disabled:opacity-50 disabled:pointer-events-none bg-aruna-muted border-aruna-text/50 text-aruna-text
+                         class="peer p-4 block w-full rounded-md text-sm placeholder:text-transparent focus:border-aruna-highlight focus:ring-aruna-highlight disabled:opacity-50 disabled:pointer-events-none bg-aruna-muted border-border text-aruna-text
                    focus:pt-6
                    focus:pb-2
                    [&:not(:placeholder-shown)]:pt-6

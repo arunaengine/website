@@ -11,13 +11,20 @@ import {
 <template>
   <!-- Icon Blocks -->
   <div id="features"
-       class="container mx-auto mt-16 2xl:mt-28 rounded-md border border-aruna-text/50 px-4 py-10 sm:px-6 lg:px-20 lg:py-14 bg-aruna-bg/90">
+       class="container mx-auto mt-16 2xl:mt-28 rounded-xl border border-border px-4 py-10 sm:px-6 lg:px-20 lg:py-14 bg-card">
+    <div class="mx-auto mb-10 max-w-2xl text-center">
+      <div class="eyebrow">Features</div>
+      <h2 class="mt-3 font-display text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+        One engine for your data lifecycle.
+      </h2>
+    </div>
+
     <!-- Grid -->
     <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-12">
       <!-- Icon Block -->
       <div class="flex flex-col p-4 space-y-4">
-        <h3 class="text-lg font-semibold text-aruna-text-accent">
-          <IconTournament class="inline-flex flex-shrink-0 size-8 me-4 text-aruna-highlight"/>
+        <h3 class="flex items-center font-display text-lg font-semibold text-aruna-text-accent">
+          <IconTournament class="flex-shrink-0 size-9 p-2 me-3 rounded-lg bg-aruna-aqua/10 text-aruna-aqua"/>
           Data orchestration
         </h3>
 
@@ -31,8 +38,8 @@ import {
 
       <!-- Icon Block -->
       <div class="flex flex-col p-4 space-y-4">
-        <h3 class="text-lg font-semibold text-aruna-text-accent">
-          <IconFileInfo class="inline-flex flex-shrink-0 size-8 me-4 text-aruna-highlight"/>
+        <h3 class="flex items-center font-display text-lg font-semibold text-aruna-text-accent">
+          <IconFileInfo class="flex-shrink-0 size-9 p-2 me-3 rounded-lg bg-aruna-aqua/10 text-aruna-aqua"/>
           Metadata enrichment
         </h3>
         <p class="mt-1 text-aruna-text">
@@ -45,8 +52,8 @@ import {
 
       <!-- Icon Block -->
       <div class="flex flex-col p-4 space-y-4">
-        <h3 class="text-lg font-semibold text-aruna-text-accent">
-          <IconSearch class="inline-flex flex-shrink-0 size-8 me-4 text-aruna-highlight"/>
+        <h3 class="flex items-center font-display text-lg font-semibold text-aruna-text-accent">
+          <IconSearch class="flex-shrink-0 size-9 p-2 me-3 rounded-lg bg-aruna-aqua/10 text-aruna-aqua"/>
           FAIR
         </h3>
         <p class="mt-1 text-aruna-text">
@@ -60,8 +67,8 @@ import {
 
       <!-- Icon Block -->
       <div class="flex flex-col p-4 space-y-4">
-        <h3 class="text-lg font-semibold text-aruna-text-accent">
-          <IconShare class="inline-flex flex-shrink-0 size-8 me-4 text-aruna-highlight"/>
+        <h3 class="flex items-center font-display text-lg font-semibold text-aruna-text-accent">
+          <IconShare class="flex-shrink-0 size-9 p-2 me-3 rounded-lg bg-aruna-aqua/10 text-aruna-aqua"/>
           Easy sharing
         </h3>
         <p class="mt-1 text-aruna-text">
@@ -74,8 +81,8 @@ import {
 
       <!-- Icon Block -->
       <div class="flex flex-col p-4 space-y-4">
-        <h3 class="text-lg font-semibold text-aruna-text-accent">
-          <IconRocket class="inline-flex flex-shrink-0 size-8 me-4 text-aruna-highlight"/>
+        <h3 class="flex items-center font-display text-lg font-semibold text-aruna-text-accent">
+          <IconRocket class="flex-shrink-0 size-9 p-2 me-3 rounded-lg bg-aruna-aqua/10 text-aruna-aqua"/>
           Effortless migration
         </h3>
         <p class="mt-1 text-aruna-text">
@@ -88,8 +95,8 @@ import {
 
       <!-- Icon Block -->
       <div class="flex flex-col p-4 space-y-4">
-        <h3 class="text-lg font-semibold text-aruna-text-accent">
-          <IconShieldLock class="inline-flex flex-shrink-0 size-8 me-4 text-aruna-highlight"/>
+        <h3 class="flex items-center font-display text-lg font-semibold text-aruna-text-accent">
+          <IconShieldLock class="flex-shrink-0 size-9 p-2 me-3 rounded-lg bg-aruna-aqua/10 text-aruna-aqua"/>
           Secure
         </h3>
         <p class="mt-1 text-aruna-text">

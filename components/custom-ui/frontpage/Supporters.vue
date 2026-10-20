@@ -1,9 +1,9 @@
 <template>
   <!-- Brands -->
   <div class="mt-6 lg:mt-12">
-    <div class="py-4 bg-aruna-bg/90 text-center text-aruna-text font-bold border-y border-aruna-text/50">
-      <p class="text-aruna-text-accent mb-2 text-lg">
-        Supported By
+    <div class="py-8 bg-card text-center text-aruna-text font-bold border-y border-border">
+      <p class="eyebrow mb-4">
+        Supported by
       </p>
 
       <div class="flex flex-col sm:flex-row gap-x-8 gap-y-8 container justify-between items-center">
