@@ -15,6 +15,8 @@ function publicRoutes(): RouteRecordRaw[] {
   return [
     { path: '/imprint', name: 'imprint', component: () => import('@/views/ImprintView.vue') },
     { path: '/terms', name: 'terms', component: () => import('@/views/TermsView.vue') },
+    { path: '/news', name: 'news', component: () => import('@/views/NewsView.vue') },
+    { path: '/news/:slug', name: 'news-post', component: () => import('@/views/NewsPostView.vue') },
   ]
 }
 

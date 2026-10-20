@@ -42,6 +42,7 @@ async function onSignIn() {
       >
         <a href="/#overview" class="whitespace-nowrap transition-colors hover:text-foreground">Overview</a>
         <a href="/#capabilities" class="whitespace-nowrap transition-colors hover:text-foreground">What's inside</a>
+        <RouterLink to="/news" class="whitespace-nowrap transition-colors hover:text-foreground">News</RouterLink>
       </nav>
 
       <div class="flex items-center gap-2">

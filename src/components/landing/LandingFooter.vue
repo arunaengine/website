@@ -43,6 +43,7 @@ import { RouterLink } from 'vue-router'
           </li>
           <li><a href="/app/profiles" class="hover:text-foreground">RO-Crate profiles</a></li>
           <li><a href="/app/docs/v1" class="hover:text-foreground">Documentation</a></li>
+          <li><RouterLink to="/news" class="hover:text-foreground">News</RouterLink></li>
         </ul>
       </div>
     </div>
