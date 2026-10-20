@@ -22,7 +22,7 @@ export const fetchConvertedAnnouncement = defineCachedFunction(async (articleId:
 }, {
   group: 'news',
   name: 'articles-id',
-  maxAge: useRuntimeConfig().cacheMaxAge || 60 * 60 * 24, // Defaults to 1 day
+  maxAge: 5 * 60, // New or edited posts show up within five minutes
   swr: false,
   getKey: (articleId: string) => articleId,
 })

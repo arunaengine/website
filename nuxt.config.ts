@@ -15,7 +15,10 @@ export default defineNuxtConfig({
   },
   devtools: { enabled: true },
   experimental: {
-    clientNodeCompat: true
+    clientNodeCompat: true,
+    // Open tabs notice a new deployment within a minute and reload on the next navigation
+    checkOutdatedBuildInterval: 60 * 1000,
+    emitRouteChunkError: 'automatic-immediate',
   },
   plugins: [
     "~/plugins/preline.client.ts",

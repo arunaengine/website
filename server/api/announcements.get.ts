@@ -1,7 +1,7 @@
 import type {v2GetAnnouncementsResponse} from '~/composables/aruna_api_json'
 
 // The list only needs the card fields, so the full article text is dropped.
-// Responses are cached for a few minutes and refreshed in the background.
+// Responses are cached for one minute so new posts appear quickly.
 export default defineCachedEventHandler(async event => {
   const pagination = getQuery(event)
   const baseUrl = useRuntimeConfig().serverHostUrl
@@ -16,7 +16,7 @@ export default defineCachedEventHandler(async event => {
 }, {
   group: 'news',
   name: 'announcement-list',
-  maxAge: 300,
-  swr: true,
+  maxAge: 60,
+  swr: false,
   getKey: event => JSON.stringify(getQuery(event)),
 })
