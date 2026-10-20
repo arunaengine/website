@@ -18,7 +18,7 @@ import {
   type BackendImport,
   type GroupBackendResponse,
 } from '@/lib/api'
-import { scheduleWords } from '@/lib/linkedFolders'
+import { RUN_HINT, scheduleWords } from '@/lib/linkedFolders'
 import { stateTone } from '@/lib/stateBadge'
 import { errorMessage, relativeTime } from '@/lib/utils'
 import { ArrowLeftRight, Play, SlidersHorizontal } from '@lucide/vue'
@@ -174,7 +174,7 @@ defineExpose({ open })
               <span class="font-mono">{{ bucket }}/{{ link.key_prefix }}</span> the same.
             </span>
             <IconButton
-              label="Run now"
+              :label="RUN_HINT"
               :disabled="runningId !== null"
               :disabled-reason="writesDisabled ? OFFLINE_WRITE_HINT : null"
               @click="run(link)"

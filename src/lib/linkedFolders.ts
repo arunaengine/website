@@ -22,6 +22,8 @@ const SCHEDULE_WORDS: Record<string, string> = {
   '0 3 * * 1': 'Every Monday at 03:00 UTC',
 }
 
+/** Hover text of a linked bucket's run button. */
+export const RUN_HINT = 'Run now: bring in new and changed files from your storage'
 const PLACEHOLDERS = ['{dir}', '{name}', '{id}']
 
 /** Plain words for a stored schedule; the node reads cron in UTC. */

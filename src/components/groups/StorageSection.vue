@@ -50,7 +50,7 @@ import {
   storageLine,
   storagePlace,
 } from '@/lib/storageRules'
-import { writesElsewhere } from '@/lib/linkedFolders'
+import { RUN_HINT, writesElsewhere } from '@/lib/linkedFolders'
 import { errorMessage } from '@/lib/utils'
 
 const props = defineProps<{ groupId: string; groupName: string; canAdmin: boolean }>()
@@ -644,7 +644,7 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
                   size="sm"
                   class="h-6 px-2 text-aruna-navy dark:text-foreground"
                   :disabled="writesDisabled || busyId !== null || runActive(link.last_run)"
-                  :title="offline ?? 'Run now'"
+                  :title="offline ?? RUN_HINT"
                   aria-label="Run now"
                   @click="run(link)"
                 >

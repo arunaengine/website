@@ -101,7 +101,7 @@ describe('linked folder rows', () => {
     try {
       const { root } = await mountApp(linkedRows, { props: { bucket: 'reef', groupId: 'g-1' } })
       await flush()
-      expect(element(root, (node) => node.props['aria-label'] === 'Run now').props.disabled).toBe(true)
+      expect(element(root, (node) => node.props['aria-label'] === LinkedFolders.RUN_HINT).props.disabled).toBe(true)
     } finally {
       writesDisabled.value = false
     }
