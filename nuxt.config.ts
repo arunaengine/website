@@ -99,7 +99,10 @@ export default defineNuxtConfig({
       code: ['p-4'],
       dl: ['p-4'],
       dt: ['pt-4', 'font-medium', 'leading-6', 'text-aruna-text-accent'],
-      dd: ['mt-1', 'ps-4', 'leading-6', 'text-aruna-text', 'sm:col-span-2', 'sm:mt-0']
+      dd: ['mt-1', 'ps-4', 'leading-6', 'text-aruna-text', 'sm:col-span-2', 'sm:mt-0'],
+      table: ['my-6', 'w-full', 'text-sm', 'border-collapse'],
+      th: ['border-b', 'border-border', 'py-2', 'pe-4', 'text-left', 'font-semibold', 'text-aruna-text-accent'],
+      td: ['border-b', 'border-border', 'py-2', 'pe-4', 'align-top', 'text-aruna-text']
     },
     public: {
       maintenanceMode: false,

@@ -1,5 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  // The article markdown classes are set in nuxt.config.ts
+  content: ['./nuxt.config.ts'],
   theme: {
     container: {
       center: true,
