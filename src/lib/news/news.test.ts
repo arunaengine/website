@@ -31,6 +31,49 @@ describe('news', () => {
     expect(markup).toContain('src="/blog/aruna-v2-to-v3-800.webp"')
     expect(markup).toContain('loading="lazy"')
     expect(markup.match(/<li/g)).toHaveLength(newsPosts.length)
+    for (const post of newsPosts) expect(markup).toContain(`src="${post.image.small}"`)
+  })
+
+  it('orders the posts newest first', () => {
+    const dates = newsPosts.map((post) => post.date)
+
+    expect(newsPosts[0].slug).toBe('aruna-v3-public-testing')
+    expect(dates).toEqual([...dates].sort().reverse())
+  })
+
+  it.each(newsPosts.map((post) => post.slug))('renders the article for %s', async (slug) => {
+    const markup = await renderSlug(slug)
+
+    expect(markup).toContain('<article')
+    expect(markup).toContain(`src="/blog/${slug === 'aruna-v3-public-testing' ? 'aruna-v2-to-v3' : `${slug}/header`}.webp"`)
+    expect(markup).not.toContain('Post not found')
+  })
+
+  it('keeps every post image local', () => {
+    for (const post of newsPosts) {
+      const sources = [post.image.src, post.image.small, ...[...renderPost(post).matchAll(/<img src="([^"]*)"/g)].map((m) => m[1])]
+      for (const src of sources) expect(src).toMatch(/^\/blog\//)
+      expect(post.body).not.toMatch(/aruna-storage\.org\/blog_images|nextcloud\./)
+    }
+  })
+
+  it('renders inline images lazily with their alt text', () => {
+    const html = renderPost(newsPosts.find((post) => post.slug === 'making-research-data-more-fair')!)
+
+    expect(html.match(/<img /g)).toHaveLength(4)
+    expect(html).toContain(
+      '<img src="/blog/making-research-data-more-fair/rocrate-explorer.webp" alt="Screenshot of the demonstrator displaying the properties of a subcrate." loading="lazy">',
+    )
+    expect(html).toContain('<em>Screenshot of the demonstrator displaying the properties of a subcrate.</em>')
+  })
+
+  it('renders code blocks, rules and emphasis of the release post', () => {
+    const html = renderPost(newsPosts.find((post) => post.slug === 'release-of-aruna-version-2-0')!)
+
+    expect(html).toContain('<pre><code class="language-bash">curl -L https://demo.aruna-storage.org | docker compose -f - up')
+    expect(html).toContain('<hr>')
+    expect(html).toContain('<strong><em>The Aruna Team</em></strong>')
+    expect(html).toContain('href="mailto:support@aruna-storage.org"')
   })
 
   it('renders a post with its header image, table and links', async () => {
