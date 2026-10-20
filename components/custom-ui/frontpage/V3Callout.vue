@@ -8,7 +8,7 @@ import {IconArrowUpRight, IconCheck} from "@tabler/icons-vue";
         <div class="eyebrow">Two versions</div>
         <h2 class="section-title">Where Aruna is heading.</h2>
         <p class="mt-3 text-sm text-muted-foreground">
-          This site runs Aruna v2. The next version is open for public testing.
+          This site runs Aruna v2. Aruna v3 is a completely new system, built from the ground up, and is open for public testing.
         </p>
       </div>
 
@@ -18,7 +18,7 @@ import {IconArrowUpRight, IconCheck} from "@tabler/icons-vue";
             <h3 class="font-display text-xl font-semibold text-foreground">Aruna v2</h3>
             <span class="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-400">Stable</span>
           </div>
-          <p class="mt-2 text-sm text-muted-foreground">The current service on this site.</p>
+          <p class="mt-2 text-sm text-muted-foreground">The current service on this site. It will be replaced by v3 after a transition phase.</p>
           <ul class="mt-6 space-y-3 text-sm text-foreground/90">
             <li class="flex gap-2"><IconCheck class="mt-0.5 size-4 shrink-0 text-emerald-400"/>Projects, collections, datasets and objects</li>
             <li class="flex gap-2"><IconCheck class="mt-0.5 size-4 shrink-0 text-emerald-400"/>S3 compatible data proxies</li>
