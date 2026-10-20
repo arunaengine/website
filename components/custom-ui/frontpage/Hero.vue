@@ -17,9 +17,20 @@ import {IconArrowRight, IconArrowUpRight} from "@tabler/icons-vue";
         <IconArrowUpRight class="size-3.5"/>
       </a>
 
-      <p class="tagline mt-10 text-xs sm:text-sm">the data orchestration engine</p>
+      <!-- The icon asset keeps its transparent padding; clip it to the wave. -->
+      <div class="relative mx-auto mt-10 aspect-[935/537] h-16 overflow-hidden sm:h-20">
+        <img src="/brand/icon-mark.avif"
+             alt=""
+             class="absolute left-[-19.6%] top-[-62%] w-[134.1%] max-w-none select-none"
+             draggable="false"/>
+      </div>
+      <img src="/brand/wordmark-white.avif"
+           alt="ARUNA"
+           class="mx-auto mt-3 h-8 w-auto select-none sm:h-10"
+           draggable="false"/>
+      <p class="tagline mt-3.5 text-xs sm:text-[13px]">the data orchestration engine</p>
 
-      <h1 class="mt-5 text-balance font-display text-3xl font-semibold leading-[1.12] tracking-tight text-foreground sm:text-5xl md:text-[56px]">
+      <h1 class="mt-10 text-balance font-display text-3xl font-semibold leading-[1.12] tracking-tight text-foreground sm:text-5xl md:text-[52px]">
         Orchestrate your data. <span class="text-gradient">Keep it sovereign.</span>
       </h1>
 
