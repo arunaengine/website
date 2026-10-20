@@ -23,6 +23,8 @@ const { apiBaseUrl, authToken, sessionEpoch } = useAruna()
 const from = ref('')
 const to = ref('')
 const plan = ref<RenamePlan | null>(null)
+// The folders the plan was made for; a rename sends these, never the current fields.
+let planned = { from: '', to: '' }
 const busy = ref(false)
 const error = ref<string | null>(null)
 const done = ref<number | null>(null)
@@ -59,9 +61,14 @@ async function preview() {
   busy.value = true
   error.value = null
   done.value = null
+  const folders = { from: folderValue(from.value), to: folderValue(to.value) }
   try {
-    const result = await previewRename(props.bucket, folderValue(from.value), folderValue(to.value), client())
-    if (id === requestId) plan.value = result
+    const result = await previewRename(props.bucket, folders.from, folders.to, client())
+    const current = folderValue(from.value) === folders.from && folderValue(to.value) === folders.to
+    if (id === requestId && current) {
+      plan.value = result
+      planned = folders
+    }
   } catch (err) {
     if (id === requestId) error.value = errorMessage(err)
   } finally {
@@ -77,7 +84,7 @@ async function apply() {
   error.value = null
   const keys = current.items.map((item) => item.from)
   try {
-    const result = await renameKeys(props.bucket, folderValue(from.value), folderValue(to.value), keys, client())
+    const result = await renameKeys(props.bucket, planned.from, planned.to, keys, client())
     if (id !== requestId) return
     done.value = result.items.length
     plan.value = null

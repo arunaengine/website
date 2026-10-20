@@ -97,6 +97,25 @@ describe('RenameFolderDialog', () => {
     expect(renameKeys).not.toHaveBeenCalled()
   })
 
+  it('drops a preview for folders changed while it ran', async () => {
+    let answer: (plan: unknown) => void = () => {}
+    previewRename.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+    previewRename.mockResolvedValue({ bucket: 'lab', items: [{ ...ITEM, to: 'other/x.csv' }], truncated: false })
+    renameKeys.mockResolvedValue({ bucket: 'lab', items: [ITEM], truncated: false })
+    const { root } = await mount()
+    await typeValue(field(root, 'rename-to'), 'archive/')
+    const pending = click(button(root, 'Show changes'))
+    await typeValue(field(root, 'rename-to'), 'other/')
+    answer({ bucket: 'lab', items: [ITEM], truncated: false })
+    await pending
+
+    expect(content(root)).not.toContain('archive/x.csv')
+    expect(button(root, 'Rename').props.disabled).toBe(true)
+    await click(button(root, 'Show changes'))
+    await click(button(root, 'Rename'))
+    expect(renameKeys).toHaveBeenCalledWith('lab', '', 'other/', ['x.csv'], expect.anything())
+  })
+
   it('needs a new preview after the folders change', async () => {
     previewRename.mockResolvedValue({ bucket: 'lab', items: [ITEM], truncated: false })
     const { root } = await mount()
