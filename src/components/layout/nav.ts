@@ -18,6 +18,7 @@ import {
   Workflow,
 } from '@lucide/vue'
 import { featureEnabled } from '@/lib/config'
+import type { PortalFeature } from '@/lib/features'
 
 export interface NavItem {
   to: string
@@ -45,6 +46,8 @@ export interface NavOptions {
   canInspectUsers: boolean
   /** At least one AI provider is ready, the same gate as the top-bar launcher. */
   assistant?: boolean
+  /** The user's feature switches; without it every feature is shown. */
+  shown?: (feature: PortalFeature) => boolean
 }
 
 /** One Compute entry as soon as either compute plane answers; the view degrades per flag. */
@@ -63,6 +66,7 @@ function adminItems(options: NavOptions): NavItem[] {
 
 export function navEntries(options: NavOptions): NavEntry[] {
   const admin = adminItems(options)
+  const shown = options.shown ?? (() => true)
   return [
     {
       to: '/app',
@@ -73,9 +77,9 @@ export function navEntries(options: NavOptions): NavEntry[] {
     },
     { to: '/app/buckets', icon: Boxes, label: 'Data', primary: true },
     { to: '/app/datasets', icon: FileJson2, label: 'Datasets', match: ['/app/datasets'], primary: true },
-    { to: '/app/profiles', icon: ListChecks, label: 'Profiles' },
-    ...(computeEnabled() ? [{ to: '/app/compute', icon: Workflow, label: 'Compute', primary: true }] : []),
-    ...(featureEnabled('tes') ? [{ to: '/app/notebooks', icon: NotebookPen, label: 'Notebooks' }] : []),
+    ...(shown('profiles') ? [{ to: '/app/profiles', icon: ListChecks, label: 'Profiles' }] : []),
+    ...(computeEnabled() && shown('compute') ? [{ to: '/app/compute', icon: Workflow, label: 'Compute', primary: true }] : []),
+    ...(featureEnabled('tes') && shown('notebooks') ? [{ to: '/app/notebooks', icon: NotebookPen, label: 'Notebooks' }] : []),
     ...(options.assistant ? [{ to: '/app/assistant', icon: MessageSquare, label: 'Assistant' }] : []),
     navSeparator,
     ...(options.desktop
@@ -86,7 +90,7 @@ export function navEntries(options: NavOptions): NavEntry[] {
             label: 'Sync',
             match: ['/app/sync', '/app/folders', '/app/transfers'],
           },
-          { to: '/app/runs', icon: Play, label: 'Runs' },
+          ...(shown('compute') ? [{ to: '/app/runs', icon: Play, label: 'Runs' }] : []),
           { to: '/app/device', icon: Laptop, label: 'This device' },
           navSeparator,
         ]

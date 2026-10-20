@@ -36,6 +36,7 @@ beforeAll(async () => {
     useRoute: () => route,
   }))
   vi.doMock('@/composables/useAruna', () => ({ useAruna: () => permissions }))
+  vi.doMock('@/composables/usePortalFeatures', () => ({ usePortalFeatures: () => ({ shown: () => true }) }))
   vi.doMock('@/lib/config', () => ({
     featureEnabled: (flag: string) => enabledFeatures.has(flag),
     portalConfig,

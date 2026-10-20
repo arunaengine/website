@@ -2,6 +2,7 @@
 import { RouterLink, useRoute } from 'vue-router'
 import { computed, ref } from 'vue'
 import { useAruna } from '@/composables/useAruna'
+import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { assistantAvailable } from '@/composables/assistantState'
 import { isDesktop } from '@/lib/desktop'
 import Sheet from '@/components/ui/Sheet.vue'
@@ -14,6 +15,7 @@ import { MoreHorizontal } from '@lucide/vue'
 const route = useRoute()
 const moreOpen = ref(false)
 const { isRealmAdmin, canInspectUsers } = useAruna()
+const { shown } = usePortalFeatures()
 
 // The same list the sidebar renders, in the same order: the bottom bar takes
 // the primary entries and the More sheet keeps every other one reachable.
@@ -23,6 +25,7 @@ const items = computed<NavItem[]>(() =>
     isRealmAdmin: isRealmAdmin.value,
     canInspectUsers: canInspectUsers.value,
     assistant: assistantAvailable.value,
+    shown,
   }).filter((entry): entry is NavItem => !('separator' in entry)),
 )
 
