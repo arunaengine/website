@@ -32,9 +32,9 @@ onMounted(() => {
      target="_blank"
      rel="noopener"
      class="group block bg-aruna-navy px-4 py-2 text-center text-xs text-white/85 hover:text-white sm:text-sm">
-    <span class="me-2 rounded-full bg-aruna-aqua/20 px-2 py-0.5 font-semibold text-aruna-aqua">New</span>
-    Aruna v3 is here: federated data with sovereign control.
-    <span class="font-semibold text-white underline-offset-4 group-hover:underline">Try v3 &rarr;</span>
+    <span class="me-2 rounded-full bg-aruna-aqua/20 px-2 py-0.5 font-semibold text-aruna-aqua">Public testing</span>
+    Aruna v3 is open for public testing.
+    <span class="font-semibold text-white underline-offset-4 group-hover:underline">Try the v3 test version &rarr;</span>
   </a>
   <header class="w-full border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/70">
     <nav aria-label="Global"
@@ -105,7 +105,7 @@ onMounted(() => {
            target="_blank"
            rel="noopener"
            class="hidden md:inline-flex items-center gap-x-1.5 h-8 px-3 rounded-md border border-aruna-aqua/40 bg-aruna-aqua/10 text-sm font-medium text-aruna-aqua transition-colors hover:bg-aruna-aqua/20">
-          Try Aruna v3
+          Test Aruna v3
           <IconArrowUpRight class="size-3.5"/>
         </a>
         <ClientOnly>

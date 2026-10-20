@@ -13,7 +13,7 @@ import {IconArrowRight, IconArrowUpRight} from "@tabler/icons-vue";
          rel="noopener"
          class="inline-flex items-center gap-2 rounded-full border border-aruna-aqua/40 bg-aruna-aqua/10 px-3 py-1 text-xs font-medium text-aruna-aqua transition-colors hover:bg-aruna-aqua/20">
         <span class="size-1.5 rounded-full bg-aruna-aqua"/>
-        Aruna v3 is available
+        Aruna v3 is in public testing
         <IconArrowUpRight class="size-3.5"/>
       </a>
 
