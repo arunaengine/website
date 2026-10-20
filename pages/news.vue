@@ -7,27 +7,28 @@ const announcements: Ref<v2Announcement[]> = ref([])
 const exhausted = ref(true)
 const last_id = ref('')
 
-async function extendDisplay() {
-  const fetched_announcements = await getAnnouncements(last_id.value, 3)
+async function extendDisplay(count = 3) {
+  const fetched_announcements = await getAnnouncements(last_id.value, count)
 
   // Evaluate announcements fetch
   const fetched_last_id = fetched_announcements[fetched_announcements.length - 1] ? fetched_announcements[fetched_announcements.length - 1].announcementId : undefined
 
-  exhausted.value = fetched_last_id == undefined || fetched_announcements.length < 3
+  exhausted.value = fetched_last_id == undefined || fetched_announcements.length < count
   last_id.value = fetched_last_id ? fetched_last_id : last_id.value
 
   announcements.value.push(...fetched_announcements)
 }
 
-onBeforeMount(async () => await extendDisplay())
+// One wide card plus a full row of three
+onBeforeMount(async () => await extendDisplay(4))
 </script>
 <template>
   <NavigationTop/>
 
   <div class="min-h-[calc(100vh-110px)]">
-    <div class="md:container sm:mx-1 md:mx-auto mt-8">
+    <div>
       <!-- Card Blog -->
-      <div class="max-w-[85rem] p-4 sm:px-6 lg:px-8 mx-auto">
+      <div class="container max-w-6xl py-12">
         <div class="mb-10 max-w-2xl">
           <div class="eyebrow">News</div>
           <h1 class="mt-3 font-display text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
@@ -39,7 +40,8 @@ onBeforeMount(async () => await extendDisplay())
         </div>
         <!-- Grid -->
         <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          <CardNews v-for="announcement in announcements"
+          <CardNews v-for="(announcement, index) in announcements"
+                    :featured="index === 0"
                     :id="announcement.announcementId || ''"
                     :type="announcement.announcementType || v2AnnouncementType.ANNOUNCEMENT_TYPE_UNSPECIFIED"
                     :imageUrl="announcement.imageUrl || ''"
@@ -55,7 +57,7 @@ onBeforeMount(async () => await extendDisplay())
         <!-- Extend Button -->
         <div class="mt-12 text-center">
           <ClientOnly>
-            <button @click="extendDisplay"
+            <button @click="extendDisplay()"
                     :class="{hidden: exhausted}"
                     class="py-3 px-4 inline-flex items-center gap-x-1 text-sm font-medium rounded-md border border-input bg-transparent hover:bg-accent text-foreground disabled:opacity-50 disabled:pointer-events-none">
               Show older news

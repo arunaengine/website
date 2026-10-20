@@ -11,78 +11,57 @@ const props = defineProps<{
   author: string,
   created_at: string,
   modified_by: string,
-  modified_at: string
+  modified_at: string,
+  featured?: boolean
 }>()
 
-// Show the default picture when the external image cannot be loaded
+// Show the branded tile when the external image cannot be loaded
 const imageFailed = ref(false)
 </script>
 <template>
   <!-- Card -->
   <NuxtLink :to="`/articles/${id}`"
-            class="group flex flex-col h-full p-4 border border-border rounded-xl bg-card transition-colors duration-200 hover:border-aruna-aqua/60 hover:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            :class="featured ? 'sm:col-span-2 lg:col-span-3 lg:grid lg:grid-cols-[1.2fr_1fr] lg:gap-8 lg:p-5' : 'flex flex-col'"
+            class="group h-full p-4 border border-border rounded-xl bg-card transition-colors duration-200 hover:border-aruna-aqua/60 hover:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
     <div class="aspect-[16/10] overflow-hidden rounded-lg bg-muted">
       <img v-if="imageUrl && !imageFailed"
            :src="imageUrl"
            @error="imageFailed = true"
            alt="Announcement preview image"
            class="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"/>
-      <img v-else-if="type === 'ANNOUNCEMENT_TYPE_RELEASE'"
-               src="/imgs/blog_release.webp"
-               class="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-               alt="Default image for release announcements"/>
-      <img v-else-if="type === 'ANNOUNCEMENT_TYPE_UPDATE'"
-               src="/imgs/blog_update.webp"
-               alt="Default image for update announcements"
-               class="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"/>
-      <img v-else-if="type === 'ANNOUNCEMENT_TYPE_BLOG'"
-               src="/imgs/blog_blog.webp"
-               alt="Default image for blog articles"
-               class="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"/>
-      <img v-else-if="type === 'ANNOUNCEMENT_TYPE_MAINTENANCE'"
-               src="/imgs/blog_maintenance.webp"
-               alt="Default image for maintenance announcements"
-               class="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"/>
-      <img v-else-if="type === 'ANNOUNCEMENT_TYPE_ORGA'"
-               src="/imgs/blog_orga.webp"
-               alt="Default image for organizational announcements"
-               class="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"/>
-    </div>
-    <div class="mt-5 mb-6">
-      <h3 class="font-display text-lg font-semibold leading-snug text-aruna-text-accent line-clamp-2 group-hover:text-aruna-aqua">
-        {{ title }}
-      </h3>
-      <p class="mt-3 text-sm leading-relaxed text-aruna-text line-clamp-3">
-        {{ teaser }}
-      </p>
-    </div>
-    <div class="mt-auto flex justify-between items-center gap-x-3">
-      <div class="flex">
-        <img src="/imgs/aruna_icon.webp"
-                 alt="Minimalistic Aruna icon in the form of a wave"
-                 class="size-8 rounded-full"/>
-        <div class="ms-2.5 sm:ms-4">
-          <h4 class="text-sm text-aruna-text">
-            {{ author }}
-          </h4>
-          <div v-if="created_at !== modified_at"
-               class="hs-tooltip [--placement:right] inline-block">
-            <button type="button" class="hs-tooltip-toggle text-xs text-aruna-text">
-              {{ displayDate(created_at, modified_at) }}
-            </button>
-            <span role="tooltip"
-                  class="hs-tooltip-content hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible opacity-0 transition-opacity inline-block absolute invisible z-10 py-1 px-2 bg-aruna-muted text-xs font-medium text-white rounded shadow-sm">
-              Originally posted: {{ formatDate(created_at) }}
-            </span>
+      <div v-else
+           class="relative grid size-full place-items-center bg-aruna-navy">
+        <div aria-hidden="true"
+             class="absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,rgba(85,196,222,0.3),transparent_55%),radial-gradient(circle_at_85%_90%,rgba(54,62,201,0.35),transparent_55%)]"/>
+        <div class="relative text-center">
+          <div class="relative mx-auto aspect-[935/537] h-10 overflow-hidden">
+            <img src="/brand/icon-mark.avif"
+                 alt=""
+                 class="absolute left-[-19.6%] top-[-62%] w-[134.1%] max-w-none select-none"/>
           </div>
-          <p v-else class="inline-block text-xs text-aruna-text">
-            {{ formatDate(created_at) }}
+          <p class="mt-3 font-mono text-[11px] uppercase tracking-[0.2em] text-white/70">
+            {{ toAnnouncementTypeStr(type) }}
           </p>
         </div>
       </div>
-      <div
-          class="flex px-2 py-0.5 ms-2.5 sm:ms-4 text-[11px] font-medium text-aruna-aqua rounded-full border border-aruna-aqua/40 bg-aruna-aqua/10">
-        {{ toAnnouncementTypeStr(type) }}
+    </div>
+    <div class="flex flex-col" :class="featured ? 'lg:justify-center' : 'flex-1'">
+      <div class="mt-5 mb-6">
+        <h3 :class="featured ? 'text-xl lg:text-2xl' : 'text-lg line-clamp-2'"
+            class="font-display font-semibold leading-snug text-foreground group-hover:text-aruna-aqua">
+          {{ title }}
+        </h3>
+        <p :class="featured ? 'line-clamp-5' : 'line-clamp-3'"
+           class="mt-3 text-sm leading-relaxed text-muted-foreground">
+          {{ teaser }}
+        </p>
+      </div>
+      <div class="mt-auto flex items-center gap-2 text-xs text-muted-foreground">
+        <time :datetime="created_at">{{ shortDate(created_at) }}</time>
+        <span aria-hidden="true">&middot;</span>
+        <span class="rounded-full border border-aruna-aqua/40 bg-aruna-aqua/10 px-2 py-0.5 text-[11px] font-medium text-aruna-aqua">
+          {{ toAnnouncementTypeStr(type) }}
+        </span>
       </div>
     </div>
   </NuxtLink>

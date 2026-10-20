@@ -47,6 +47,12 @@ export function formatDate(dateStr: string | undefined) {
   })
 }
 
+// Same output on server and browser, so server-rendered pages hydrate cleanly
+export function shortDate(dateStr: string | undefined) {
+  const date = dateStr ? new Date(dateStr) : new Date(0)
+  return new Intl.DateTimeFormat('en-GB', {dateStyle: 'medium', timeZone: 'Europe/Berlin'}).format(date)
+}
+
 export function displayDate(createdAt: string | undefined, modifiedAt: string | undefined) {
   const c_date = createdAt ? new Date(createdAt) : new Date(0)
   const m_date = modifiedAt ? new Date(modifiedAt) : new Date(0)
