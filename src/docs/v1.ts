@@ -748,6 +748,16 @@ export const docsTopics: DocsTopic[] = [
           caption: 'Storage lives on the group: rules decide which buckets go to your storage.',
         },
       },
+      {
+        title: 'Sync a linked bucket',
+        icon: 'RefreshCw',
+        paragraphs: [
+          'A linked bucket checks your storage on its schedule, or when you choose Run now (the play button of the link). Uploads through Aruna reach your storage right away and need no run.',
+          'A run lists the folder in your storage. New files become objects in the bucket. A changed file gets a new version, unless the object got a newer version in Aruna since then.',
+          'Known files are compared by size and ETag, so a run does not read them again. Only new and changed files are read, so the first run of a large folder takes the longest.',
+          'The link shows when the last run started and how many new files it found. If files failed, select the run text to see why.',
+        ],
+      },
     ],
   },
   {
