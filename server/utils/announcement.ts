@@ -27,22 +27,36 @@ export const fetchConvertedAnnouncement = defineCachedFunction(async (articleId:
   getKey: (articleId: string) => articleId,
 })
 
+// The Markdown renderer with its code highlighter is built once and reused
+let markdownRenderer: Promise<MarkdownIt> | undefined
+
+async function buildRenderer(): Promise<MarkdownIt> {
+  const md = MarkdownIt()
+      .use(MarkdownItDefList)
+      .use(await Shiki({
+        theme: 'catppuccin-macchiato',
+        transformers: [
+          {
+            pre(node) {
+              this.addClassToHast(node, 'm-4 p-4 overflow-x-auto rounded-md border border-gray-500')
+            },
+          }
+        ]
+      })).use(MarkdownItClass, useRuntimeConfig().markdownCss)
+
+  const renderImage = md.renderer.rules.image!
+  md.renderer.rules.image = (tokens, idx, options, env, self) => {
+    tokens[idx].attrSet('loading', 'lazy')
+    tokens[idx].attrSet('decoding', 'async')
+    return renderImage(tokens, idx, options, env, self)
+  }
+  return md
+}
+
 async function mdToHtml(mdContent: string | undefined): Promise<string> {
   if (mdContent) {
-    const md = MarkdownIt()
-        .use(MarkdownItDefList)
-        .use(await Shiki({
-          theme: 'catppuccin-macchiato',
-          transformers: [
-            {
-              pre(node) {
-                this.addClassToHast(node, 'm-4 p-4 overflow-x-auto rounded-md border border-gray-500')
-              },
-            }
-          ]
-        })).use(MarkdownItClass, useRuntimeConfig().markdownCss)
-
-    return md.render(mdContent)
+    markdownRenderer ??= buildRenderer()
+    return (await markdownRenderer).render(mdContent)
   }
 
   return ''

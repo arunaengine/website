@@ -4,7 +4,24 @@ import type {v2Announcement} from "~/composables/aruna_api_json";
 
 const route = useRoute()
 const router = useRouter()
-const announcement: Ref<v2Announcement | undefined> = ref(await getAnnouncement(route.params.id as string))
+const articleId = route.params.id as string
+// Loaded once on the server; the browser reuses the result instead of fetching again
+const {data: announcement} = await useAsyncData<v2Announcement | undefined>(`article-${articleId}`, () => getAnnouncement(articleId))
+
+// Show the preview image as a header unless the article already starts with an image
+const headerImage = computed(() => {
+  const content = announcement.value?.content || ''
+  return announcement.value?.imageUrl && !/^\s*<p[^>]*>\s*<img/.test(content) ? announcement.value.imageUrl : ''
+})
+
+useSeoMeta({
+  title: () => announcement.value?.title ? `${announcement.value.title} | Aruna` : 'Aruna news',
+  description: () => announcement.value?.teaser || '',
+  ogTitle: () => announcement.value?.title || 'Aruna news',
+  ogDescription: () => announcement.value?.teaser || '',
+  ogImage: () => announcement.value?.imageUrl || '',
+  ogType: 'article',
+})
 </script>
 <style>
 code {
@@ -49,6 +66,15 @@ code .line::before {
         Back
       </button>
     </div>
+
+    <img v-if="headerImage"
+         :src="headerImage"
+         alt=""
+         width="1586"
+         height="992"
+         fetchpriority="high"
+         decoding="async"
+         class="mb-8 h-auto w-full rounded-xl border border-border"/>
 
     <!-- Content -->
     <div v-html="announcement?.content" :key="announcement?.content" class="text-base"/>
