@@ -759,6 +759,16 @@ export const docsTopics: DocsTopic[] = [
           'The link shows when the last run started and how many new files it found. If files failed, select the run text to see why.',
         ],
       },
+      {
+        title: 'Sort and rename files',
+        icon: 'Route',
+        steps: [
+          'Sort new files on a linked bucket puts new files into folders by name, such as `*.faa.gz` into proteins/. `*` stands for any text.',
+          'Show where files go lists each file and its place before you save. A file may match only one name; files Aruna already knows never move.',
+          'Rename a folder gives files new names in Aruna, such as x into archive/x. Show changes first; only the files shown move.',
+          'Your storage, its files and all versions stay as they are.',
+        ],
+      },
     ],
   },
   {
