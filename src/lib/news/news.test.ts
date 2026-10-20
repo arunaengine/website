@@ -23,15 +23,17 @@ async function renderSlug(slug: string): Promise<string> {
 }
 
 describe('news', () => {
-  it('lists every post with its date and a lazy card image', async () => {
+  it('shows the newest post large and the earlier posts as lazy cards', async () => {
     const markup = await renderToString(createSSRApp(NewsView))
+    const [latest, ...earlier] = newsPosts
 
     expect(markup).toContain('Aruna V3 is open for public testing')
     expect(markup).toContain('<time datetime="2026-10-20">20 Oct 2026</time>')
-    expect(markup).toContain('src="/blog/aruna-v2-to-v3-800.webp"')
-    expect(markup).toContain('loading="lazy"')
-    expect(markup.match(/<li/g)).toHaveLength(newsPosts.length)
-    for (const post of newsPosts) expect(markup).toContain(`src="${post.image.small}"`)
+    expect(markup).toContain(`src="${latest.image.src}"`)
+    expect(markup).not.toContain(`src="${latest.image.small}"`)
+    expect(markup.match(/<li/g)).toHaveLength(earlier.length)
+    expect(markup.match(/loading="lazy"/g)).toHaveLength(earlier.length)
+    for (const post of earlier) expect(markup).toContain(`src="${post.image.small}"`)
   })
 
   it('orders the posts newest first', () => {
