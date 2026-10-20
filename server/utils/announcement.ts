@@ -53,6 +53,11 @@ async function buildRenderer(): Promise<MarkdownIt> {
   return md
 }
 
+// Called at server start so the first visitor does not wait for the highlighter
+export function warmMarkdownRenderer() {
+  markdownRenderer ??= buildRenderer()
+}
+
 async function mdToHtml(mdContent: string | undefined): Promise<string> {
   if (mdContent) {
     markdownRenderer ??= buildRenderer()
