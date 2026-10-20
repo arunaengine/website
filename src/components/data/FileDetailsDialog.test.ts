@@ -86,6 +86,7 @@ const dialog = compileClientComponent(new URL('./FileDetailsDialog.vue', import.
   },
   '@/lib/publicAccess': PublicAccessLib,
   '@/lib/sync': SyncLib,
+  '@/composables/usePortalFeatures': { usePortalFeatures: () => ({ shown: () => true }) },
   '@/composables/useAruna': {
     useAruna: () => ({ currentUser, apiBaseUrl: ref('https://local/api/v1') }),
   },

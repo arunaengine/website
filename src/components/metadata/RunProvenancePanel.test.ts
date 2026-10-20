@@ -21,6 +21,7 @@ const RunProvenancePanel = compileClientComponent(new URL('./RunProvenancePanel.
   '@/components/ui/ExternalLink.vue': moduleDefault(Slot),
   '@/components/ui/Notice.vue': moduleDefault(Slot),
   '@/lib/stateBadge': StateBadge,
+  '@/composables/usePortalFeatures': { usePortalFeatures: () => ({ shown: () => true }) },
   '@/composables/useAruna': { useAruna: () => ({ apiBaseUrl: ref('https://api.test') }) },
   '@/composables/useUserDirectory': {
     useUserDirectory: () => ({ resolveUsers: vi.fn(), cachedUser: () => null }),

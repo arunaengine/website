@@ -29,6 +29,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import { Cable, ChartArea, Database, FileJson2, HardDrive, Inbox, LogOut, Pencil, ShieldAlert, ShieldCheck, Trash2, Users } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useJoinRequests } from '@/composables/useJoinRequests'
+import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { hasGroupWrite } from '@/lib/groupAdmin'
 import { assessQuota, quotaCountedBytes, referencedBytes, QUOTA_STATE_BADGES } from '@/lib/quota'
 import { featureEnabled } from '@/lib/config'
@@ -201,6 +202,11 @@ const canAdminStorage = canAdminGroup
 // Reading a group's policies already needs admin/config, so the tab tracks
 // group admin rather than membership.
 const policiesTabVisible = computed(() => featureEnabled('policies') && canAdminGroup.value)
+
+const { shown } = usePortalFeatures()
+// Hidden features lose their tab trigger and sections; a deep link still opens them.
+const sourcesVisible = computed(() => isMember.value && (shown('connectors') || shown('repositories')))
+const connectorLinked = computed(() => typeof route.query.connector === 'string')
 
 // Route-driven tab state (?tab=…) so sections deep-link like ComputeView.
 const TAB_NAMES = ['stats', 'members', 'roles', 'sources', 'storage', 'policies']
@@ -412,11 +418,13 @@ async function leave() {
               <ShieldCheck class="h-3.5 w-3.5" /> Roles
               <Badge variant="outline" size="count">{{ group.roles.length }}</Badge>
             </TabsTrigger>
-            <TabsTrigger v-if="isMember" value="sources" class="gap-1.5">
+            <TabsTrigger v-if="sourcesVisible" value="sources" class="gap-1.5">
               <Cable class="h-3.5 w-3.5" /> Data sources
               <!-- The pill holds the badge's place, so a late count never moves the tabs. -->
-              <Badge v-if="connectorCount !== null" variant="outline" size="count">{{ connectorCount }}</Badge>
-              <Skeleton v-else class="size-5 rounded-full" />
+              <template v-if="shown('connectors')">
+                <Badge v-if="connectorCount !== null" variant="outline" size="count">{{ connectorCount }}</Badge>
+                <Skeleton v-else class="size-5 rounded-full" />
+              </template>
             </TabsTrigger>
             <TabsTrigger v-if="policiesTabVisible" value="policies" class="gap-1.5">
               <ShieldAlert class="h-3.5 w-3.5" /> Policies
@@ -611,11 +619,16 @@ async function leave() {
 
         <TabsContent v-if="isMember" value="sources" class="mt-0">
           <ConnectorsSection
+            v-if="shown('connectors') || !sourcesVisible || connectorLinked"
             :group-id="group.group_id"
             :can-write="canWriteData"
             @count="connectorCount = $event"
           />
-          <RepositoriesSection :group-id="group.group_id" :can-write="canWriteMeta" />
+          <RepositoriesSection
+            v-if="shown('repositories') || !sourcesVisible"
+            :group-id="group.group_id"
+            :can-write="canWriteMeta"
+          />
         </TabsContent>
 
         <TabsContent v-if="policiesTabVisible" value="policies" class="mt-0">

@@ -14,6 +14,7 @@ import DropdownMenuSeparator from '@/components/ui/DropdownMenuSeparator.vue'
 import WatchButton from '@/components/watches/WatchButton.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useJobs } from '@/composables/useJobs'
+import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import type { DatasetViewState } from '@/composables/useDatasetView'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
 import { downloadCrateJson } from '@/lib/crateImport'
@@ -46,6 +47,7 @@ const {
 const router = useRouter()
 const { currentUser, toggleFavourite } = useAruna()
 const { jobsEnabled } = useJobs()
+const { shown } = usePortalFeatures()
 
 const isFav = computed(() => Boolean(currentUser.value?.favouriteMetadataIds?.includes(detailId.value)))
 const favBusy = ref(false)
@@ -126,7 +128,7 @@ async function toggleFav() {
         </span>
       </DropdownMenuItem>
       <DropdownMenuItem
-        v-if="currentUser && jobsEnabled && canWrite"
+        v-if="currentUser && jobsEnabled && canWrite && shown('repositories')"
         class="cursor-pointer items-start gap-2.5 rounded-md px-2.5 py-2.5"
         @click="emit('publish')"
       >

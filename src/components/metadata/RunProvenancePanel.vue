@@ -6,6 +6,7 @@ import ExternalLink from '@/components/ui/ExternalLink.vue'
 import Notice from '@/components/ui/Notice.vue'
 import { stateVariant } from '@/lib/stateBadge'
 import { useAruna } from '@/composables/useAruna'
+import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { useUserDirectory } from '@/composables/useUserDirectory'
 import { useS3 } from '@/composables/useS3'
 import { featureEnabled } from '@/lib/config'
@@ -22,6 +23,7 @@ const { apiBaseUrl } = useAruna()
 const userDir = useUserDirectory()
 const s3 = useS3()
 const tesEnabled = computed(() => featureEnabled('tes'))
+const { shown } = usePortalFeatures()
 
 const status = computed(() => {
   const s = props.run.actionStatus
@@ -153,7 +155,7 @@ const flow = computed(() => [
       <Play class="h-4 w-4 text-primary" /> {{ run.actionName || run.name || 'Process run' }}
       <Badge v-if="status" :variant="stateVariant(status)" size="sm" class="uppercase">{{ status }}</Badge>
       <RouterLink
-        v-if="tesEnabled && run.runId"
+        v-if="tesEnabled && run.runId && shown('compute')"
         class="ml-auto inline-flex items-center gap-1.5 text-xs font-normal text-primary hover:underline"
         :to="{ name: 'task', params: { taskId: run.runId } }"
       >

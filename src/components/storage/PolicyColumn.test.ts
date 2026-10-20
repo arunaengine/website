@@ -20,6 +20,7 @@ const column = compileClientComponent(new URL('./PolicyColumn.vue', import.meta.
   '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
   '@/components/ui/DocsLink.vue': moduleDefault(Slotted('a')),
   '@/components/ui/Skeleton.vue': moduleDefault(Slotted('div')),
+  '@/composables/usePortalFeatures': { usePortalFeatures: () => ({ shown: () => true }) },
   '@/composables/useAruna': {
     useAruna: () => ({ myGroups: computed(() => [{ id: 'g-1', name: 'Reef survey' }]) }),
   },

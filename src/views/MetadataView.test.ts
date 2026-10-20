@@ -20,9 +20,10 @@ describe('MetadataView', () => {
   })
 
   it('keeps the repository links loaded on every tab for the published badge', () => {
-    expect(source).toContain(':class="{ hidden: tab !== \'overview\' }"')
+    expect(source).toContain(':class="{ hidden: tab !== \'overview\' || !shown(\'repositories\') }"')
     expect(source).toContain(':published="published.length > 0"')
-    expect(source).toContain('<PublishedDialog v-model:open="showPublished" :links="published" @manage="manageRepositories" />')
+    expect(source).toContain(':hide-manage="!shown(\'repositories\')"')
+    expect(source).toContain('@manage="manageRepositories"')
     expect(source).toContain('@publish="showPublish = true"')
   })
 })

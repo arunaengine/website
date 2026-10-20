@@ -15,7 +15,7 @@ import type { RepositoryLink } from '@/lib/api'
 import { endpointLabel, failureText, identifierName, identifierUrl } from '@/lib/repository'
 import { relativeTime } from '@/lib/utils'
 
-const props = defineProps<{ links: RepositoryLink[] }>()
+const props = defineProps<{ links: RepositoryLink[]; hideManage?: boolean }>()
 const emit = defineEmits<{ (e: 'manage'): void }>()
 const open = defineModel<boolean>('open', { required: true })
 
@@ -80,7 +80,7 @@ function host(endpoint: string): string {
         </dl>
       </div>
       <DialogFooter>
-        <Button variant="outline" @click="emit('manage')">Manage in Repositories</Button>
+        <Button v-if="!hideManage" variant="outline" @click="emit('manage')">Manage in Repositories</Button>
         <DialogClose as-child><Button>Close</Button></DialogClose>
       </DialogFooter>
     </DialogContent>

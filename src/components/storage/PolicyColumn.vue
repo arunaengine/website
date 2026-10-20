@@ -8,11 +8,13 @@ import DocsLink from '@/components/ui/DocsLink.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import { useAruna } from '@/composables/useAruna'
 import { usePlacementPolicies } from '@/composables/usePlacementPolicies'
+import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { policyOwnerLabel, sameRefSet } from '@/lib/placementPolicies'
 import type { PolicyRefBody } from '@/lib/placementPolicies'
 import { truncateMiddle } from '@/lib/utils'
 
 const props = defineProps<{ bucket: string; objectKey: string; nodeId: string | null }>()
+const { shown } = usePortalFeatures()
 
 const { myGroups } = useAruna()
 const { getBucketPlacement, getObjectPlacement, policyName } = usePlacementPolicies()
@@ -94,7 +96,7 @@ function label(policy: PolicyRefBody): string {
     <p v-if="ownSet" class="text-[11px] text-muted-foreground">This file carries its own rules.</p>
 
     <RouterLink
-      v-if="!props.nodeId"
+      v-if="!props.nodeId && shown('placement')"
       :to="{ name: 'bucket-storage', params: { bucketId: props.bucket }, query: { tab: 'placement' } }"
       class="inline-block text-xs font-medium text-primary hover:underline"
     >

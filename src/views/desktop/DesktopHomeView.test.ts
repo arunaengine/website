@@ -66,6 +66,7 @@ let DesktopHomeView: Component
 beforeAll(async () => {
   vi.doMock('vue-router', () => ({ RouterLink: RouterLinkStub }))
   vi.doMock('@/composables/useAruna', () => ({ useAruna: () => ({ currentUser: ref({ id: 'u1' }) }) }))
+  vi.doMock('@/composables/usePortalFeatures', () => ({ usePortalFeatures: () => ({ shown: () => true }) }))
   vi.doMock('@/composables/useRealm', () => ({
     useRealm: () => ({ realm: ref({ name: 'Test realm', shortName: 'Testrealm' }) }),
   }))

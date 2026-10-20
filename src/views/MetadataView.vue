@@ -43,6 +43,7 @@ import { useAruna } from '@/composables/useAruna'
 import { useDatasetView } from '@/composables/useDatasetView'
 import { useDatasetHistory } from '@/composables/useDatasetHistory'
 import { useRouteTab } from '@/composables/useRouteTab'
+import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { providePageContext } from '@/composables/usePageContext'
 import { useFirstPaint } from '@/composables/useFirstPaint'
 import { type MetadataDocumentSummary, type RepositoryLink, type StorageLocation } from '@/lib/api'
@@ -52,6 +53,7 @@ import { ArrowLeft, Code2 } from '@lucide/vue'
 
 const router = useRouter()
 const { currentUser, saving, deleteMetadataDocument, fullCrates, sessionEpoch } = useAruna()
+const { shown } = usePortalFeatures()
 
 const state = useDatasetView()
 const {
@@ -247,7 +249,7 @@ function jumpTo(entityId: string) {
         <RepositoryLinksSection
           v-if="fetchedSummary && currentUser"
           ref="repositoryLinks"
-          :class="{ hidden: tab !== 'overview' }"
+          :class="{ hidden: tab !== 'overview' || !shown('repositories') }"
           :document-id="detailId"
           :group-id="fetchedSummary.group_id"
           :can-write="canWrite"
@@ -390,7 +392,12 @@ function jumpTo(entityId: string) {
       :group-id="fetchedSummary.group_id"
       @linked="repositoryLinks?.reload()"
     />
-    <PublishedDialog v-model:open="showPublished" :links="published" @manage="manageRepositories" />
+    <PublishedDialog
+      v-model:open="showPublished"
+      :links="published"
+      :hide-manage="!shown('repositories')"
+      @manage="manageRepositories"
+    />
 
     <Dialog :open="showDelete" @update:open="(v: boolean) => (showDelete = v)">
       <DialogContent class="max-w-md">

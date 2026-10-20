@@ -17,6 +17,7 @@ import Notice from '@/components/ui/Notice.vue'
 import OptionToggle from '@/components/ui/OptionToggle.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import { useRealmNodes } from '@/composables/useRealmNodes'
+import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { featureEnabled } from '@/lib/config'
 import { ArrowLeftRight, ChevronDown, CloudDownload, Link2, Plus } from '@lucide/vue'
 
@@ -24,6 +25,7 @@ const props = defineProps<{ bucket: string; nodeId: string | null; groupId: stri
 
 const realmNodes = useRealmNodes()
 const stagingEnabled = featureEnabled('stagingJobs')
+const { shown } = usePortalFeatures()
 
 const kind = ref('all')
 const KINDS = [
@@ -100,7 +102,11 @@ function addLink() {
                 </span>
               </span>
             </DropdownMenuItem>
-            <DropdownMenuItem v-if="!nodeId && stagingEnabled" class="items-start" @click="stagingOpen = true">
+            <DropdownMenuItem
+              v-if="!nodeId && stagingEnabled && shown('connectors')"
+              class="items-start"
+              @click="stagingOpen = true"
+            >
               <CloudDownload class="mt-0.5 h-3.5 w-3.5" />
               <span>
                 <span class="block">Stage from a connector</span>

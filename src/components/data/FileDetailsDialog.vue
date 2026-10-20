@@ -23,6 +23,7 @@ import PolicyColumn from '@/components/storage/PolicyColumn.vue'
 import PreviewBody from '@/components/preview/PreviewBody.vue'
 import { endpointForNode, nodeApiBase } from '@/composables/s3/endpoints'
 import { useAruna } from '@/composables/useAruna'
+import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useBacklinks } from '@/composables/useBacklinks'
 import type { SyncRow } from '@/composables/useBucketSyncs'
@@ -82,6 +83,7 @@ const emit = defineEmits<{
 
 const s3 = useS3()
 const { currentUser, apiBaseUrl } = useAruna()
+const { shown } = usePortalFeatures()
 const { displayName: nodeName } = useRealmNodes()
 const { leave } = useAssistantObject()
 const head = ref<{ contentType?: string; versionId?: string } | null>(null)
@@ -98,7 +100,7 @@ const currentVersion = computed(() => pinnedVersion.value ?? head.value?.version
 const previewMode = computed(() => props.tab === 'preview' && !props.folder)
 const detailsTab = computed(() => (previewMode.value ? 'general' : props.tab))
 const notebookLink = computed(() => !remote.value && !pinnedVersion.value && props.groupId &&
-  isNotebookKey(props.objectKey) && featureEnabled('tes')
+  isNotebookKey(props.objectKey) && featureEnabled('tes') && shown('notebooks')
   ? { name: 'notebook', params: { bucketId: props.bucket, key: props.objectKey }, query: { group: props.groupId } }
   : null)
 
@@ -401,6 +403,7 @@ const details = computed(() => props.folder ? [
               :node-id="props.nodeId ?? null"
             />
             <ObjectRulesEditor
+              v-if="shown('placement')"
               :bucket="props.bucket"
               :object-key="props.objectKey"
               :version-id="currentVersion"

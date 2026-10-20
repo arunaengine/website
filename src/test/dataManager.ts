@@ -176,6 +176,7 @@ export function objectBrowser(): Component {
       '@/components/data/manager/TransferDialog.vue': moduleDefault(Slotted('aside')),
       '@/components/watches/WatchButton.vue': moduleDefault(Slotted('button')),
       '@/components/storage/KeyedReadNotice.vue': moduleDefault(Slotted('aside')),
+      '@/composables/usePortalFeatures': { usePortalFeatures: () => ({ shown: () => true }) },
       '@/composables/useAruna': { useAruna: () => ({ isRealmAdmin: ref(false) }) },
       '@/composables/useBrokenFiles': {
         useBrokenFiles: () => ({ reasonOf: (key: string) => brokenFiles.reasons[key] ?? null }),

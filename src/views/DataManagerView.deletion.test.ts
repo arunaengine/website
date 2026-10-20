@@ -523,6 +523,7 @@ const deleteDialogComponent = compileClientComponent(
     },
     '@/components/groups/bucketRemoval': { removeBucket: vi.fn() },
     '@/composables/s3/endpoints': { nodeApiBase: () => null },
+    '@/composables/usePortalFeatures': { usePortalFeatures: () => ({ shown: () => true }) },
     '@/composables/useAruna': { useAruna: () => ({ authToken: ref('token'), sessionEpoch: ref(1) }) },
     '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => id }) },
     '@/composables/useStagingReferences': {

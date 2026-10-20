@@ -19,6 +19,7 @@ import DeviceSurfaceState from '@/components/desktop/DeviceSurfaceState.vue'
 import SyncItemRow from '@/components/desktop/SyncItemRow.vue'
 import JobStateBadge from '@/components/jobs/JobStateBadge.vue'
 import { useAruna } from '@/composables/useAruna'
+import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { useDeviceCompute } from '@/composables/useDeviceCompute'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { useDeviceSync } from '@/composables/useDeviceSync'
@@ -37,6 +38,7 @@ import { Boxes, FileText, Play, Plus, RefreshCw } from '@lucide/vue'
 
 const { realm } = useRealm()
 const { currentUser } = useAruna()
+const { shown } = usePortalFeatures()
 const { status, label: nodeLabel, state: nodeState, identity, deviceClient, refresh } = useDeviceStatus()
 const {
   folders,
@@ -166,7 +168,7 @@ onMounted(() => void reload())
       </template>
       <template #actions>
         <RefreshButton :busy="refreshBusy" @click="onRefresh" />
-        <NewRunMenu variant="outline" size="sm" />
+        <NewRunMenu v-if="shown('compute')" variant="outline" size="sm" />
         <Button variant="outline" size="sm" as-child>
           <RouterLink :to="{ name: 'buckets' }"><Boxes class="h-3.5 w-3.5" /> Open buckets</RouterLink>
         </Button>
@@ -247,7 +249,11 @@ onMounted(() => void reload())
               <Play class="h-4 w-4 text-primary" />
               <h2 class="font-display text-sm font-semibold text-aruna-navy">Runs</h2>
             </div>
-            <RouterLink :to="{ name: 'runs' }" class="text-xs font-medium text-primary hover:underline">Open</RouterLink>
+            <RouterLink
+              v-if="shown('compute')"
+              :to="{ name: 'runs' }"
+              class="text-xs font-medium text-primary hover:underline"
+            >Open</RouterLink>
           </header>
           <div class="flex-1 space-y-3 px-5 py-4">
             <div class="flex flex-wrap gap-x-8 gap-y-2">

@@ -14,6 +14,7 @@ import { Bell, Check, Eye, ListChecks } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useNotifications } from '@/composables/useNotifications'
 import { useWatches } from '@/composables/useWatches'
+import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { describeNotification, type NotificationDisplayContext } from '@/lib/notifications'
 import type { ApiNotification } from '@/lib/api'
 import { relativeTime } from '@/lib/utils'
@@ -38,6 +39,7 @@ const {
 } = useNotifications()
 
 const { available: watchesAvailable } = useWatches()
+const { shown } = usePortalFeatures()
 
 const open = ref(false)
 
@@ -183,7 +185,7 @@ function onLoadMore(event: Event) {
           </DropdownMenuItem>
         </template>
       </div>
-      <div v-if="watchesAvailable" class="border-t border-border">
+      <div v-if="watchesAvailable && shown('watches')" class="border-t border-border">
         <DropdownMenuItem
           class="gap-2 px-3 py-2 text-xs text-muted-foreground"
           @select="router.push({ name: 'settings-watches' })"

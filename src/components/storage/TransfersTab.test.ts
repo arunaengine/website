@@ -33,6 +33,7 @@ const tab = compileClientComponent(new URL('./TransfersTab.vue', import.meta.url
   '@/components/ui/Notice.vue': moduleDefault(Slotted('aside')),
   '@/components/ui/OptionToggle.vue': moduleDefault(Slotted('div')),
   '@/components/ui/RefreshButton.vue': moduleDefault(Slotted('button')),
+  '@/composables/usePortalFeatures': { usePortalFeatures: () => ({ shown: () => true }) },
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => id }) },
   '@/lib/config': { featureEnabled: () => true },
 })

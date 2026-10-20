@@ -27,6 +27,7 @@ const ImportDatasetDialog = compileClientComponent(new URL('./ImportDatasetDialo
   '@/components/metadata/CrateImportPanel.vue': moduleDefault(panel('Archive')),
   '@/components/metadata/RepositoryImportPanel.vue': moduleDefault(panel('Repository')),
   '@/components/federation/RealmImportPanel.vue': moduleDefault(panel('Realm')),
+  '@/composables/usePortalFeatures': { usePortalFeatures: () => ({ shown: () => true }) },
   '@/composables/useRepository': { useRepositoryKinds: () => ({ kinds }) },
 })
 

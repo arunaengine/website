@@ -12,6 +12,7 @@ import CrateImportPanel from '@/components/metadata/CrateImportPanel.vue'
 import RepositoryImportPanel from '@/components/metadata/RepositoryImportPanel.vue'
 import RealmImportPanel from '@/components/federation/RealmImportPanel.vue'
 import { useRepositoryKinds } from '@/composables/useRepository'
+import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { Import } from '@lucide/vue'
 
 type Source = 'archive' | 'repository' | 'realm'
@@ -20,7 +21,10 @@ const open = defineModel<boolean>('open', { required: true })
 
 // The repository card hides only once the node said no kind can import.
 const { kinds } = useRepositoryKinds()
-const repositoryAvailable = computed(() => kinds.value === null || kinds.value.some((kind) => kind.capabilities.import))
+const { shown } = usePortalFeatures()
+const repositoryAvailable = computed(
+  () => shown('repositories') && (kinds.value === null || kinds.value.some((kind) => kind.capabilities.import)),
+)
 
 const sources = computed(() => [
   { value: 'archive' as const, title: 'RO-Crate archive', text: 'Upload a .zip or .eln file from your computer.' },

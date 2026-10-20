@@ -17,6 +17,7 @@ import TransferDialog from '@/components/data/manager/TransferDialog.vue'
 import WatchButton from '@/components/watches/WatchButton.vue'
 import KeyedReadNotice from '@/components/storage/KeyedReadNotice.vue'
 import { useAruna } from '@/composables/useAruna'
+import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { useBrokenFiles } from '@/composables/useBrokenFiles'
 import { useLockedBucket } from '@/composables/useLockedBucket'
 import { useProviderBucket } from '@/composables/useProviderBucket'
@@ -70,6 +71,7 @@ const emit = defineEmits<{
 const s3 = useS3()
 const { isRealmAdmin } = useAruna()
 const { getBucketPlacement } = usePlacementPolicies()
+const { shown } = usePortalFeatures()
 const placementPoliciesEnabled = featureEnabled('placementAdmin')
 const {
   router,
@@ -421,7 +423,7 @@ async function onDrop(event: DragEvent) {
                   >
                     <span class="min-w-0 text-foreground">
                       <RouterLink
-                        v-if="group.connectorId && activeGroupId"
+                        v-if="group.connectorId && activeGroupId && shown('connectors')"
                         :to="{ name: 'group', params: { id: activeGroupId }, query: { tab: 'sources', connector: group.connectorId } }"
                         class="block truncate text-primary hover:underline"
                         :title="`${referenceGroupLabel(group)}, open the connector`"

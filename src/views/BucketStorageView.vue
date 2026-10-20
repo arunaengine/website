@@ -24,6 +24,7 @@ import TransfersTab from '@/components/storage/TransfersTab.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useRouteTab } from '@/composables/useRouteTab'
+import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { useS3 } from '@/composables/useS3'
 import { isGroupAdmin } from '@/lib/groupAdmin'
 import type { GroupDetailResponse } from '@/lib/api'
@@ -31,6 +32,7 @@ import { ChevronLeft } from '@lucide/vue'
 
 const route = useRoute()
 const { currentUser, getGroup, isRealmAdmin } = useAruna()
+const { shown } = usePortalFeatures()
 const { activeContext } = useS3()
 const realmNodes = useRealmNodes()
 
@@ -60,6 +62,8 @@ const canAdminGroup = computed(() => isGroupAdmin(group.value, currentUser.value
 const local = computed(() => !nodeId.value)
 const backendVisible = computed(() => local.value && canAdminGroup.value)
 const placementVisible = computed(() => local.value && (canAdminGroup.value || isRealmAdmin.value))
+// A hidden feature loses its tab trigger only; a deep link still opens the tab.
+const placementTrigger = computed(() => placementVisible.value && shown('placement'))
 
 const TAB_IDS = ['overview', 'backend', 'placement', 'access', 'encryption', 'transfers']
 const routeTab = useRouteTab(TAB_IDS, 'overview')
@@ -114,7 +118,7 @@ const browserLink = computed(() => ({
         <TabsList aria-label="Bucket settings sections">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger v-if="backendVisible" value="backend">Storage backend</TabsTrigger>
-          <TabsTrigger v-if="placementVisible" value="placement">Placement</TabsTrigger>
+          <TabsTrigger v-if="placementTrigger" value="placement">Placement</TabsTrigger>
           <TabsTrigger v-if="groupId" value="access">Access</TabsTrigger>
           <TabsTrigger value="encryption">Encryption</TabsTrigger>
           <TabsTrigger value="transfers">Transfers</TabsTrigger>

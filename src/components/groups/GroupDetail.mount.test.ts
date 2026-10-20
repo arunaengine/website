@@ -91,6 +91,7 @@ const GroupDetail = compileClientComponent(new URL('./GroupDetail.vue', import.m
   '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled }) },
   '@/composables/useRouteTab': RouteTab,
   '@/composables/useJoinRequests': { useJoinRequests: () => ({ joinRequestsEnabled }) },
+  '@/composables/usePortalFeatures': { usePortalFeatures: () => ({ shown: (key: string) => !hiddenFeatures.has(key) }) },
   '@/composables/useAruna': {
     useAruna: () => ({
       getGroup: vi.fn(async () => group.value),
@@ -131,6 +132,8 @@ const GroupDetail = compileClientComponent(new URL('./GroupDetail.vue', import.m
   '@/components/policies/EffectivePolicies.vue': moduleDefault(Empty),
   '@/components/assistant/AskAiButton.vue': moduleDefault(Empty),
 })
+
+const hiddenFeatures = new Set<string>()
 
 async function mount(initial: string, onDeleted?: () => void) {
   const router = createRouter({
@@ -182,6 +185,19 @@ describe('Group detail tabs', () => {
   it('opens the tab a deep link names', async () => {
     const { root } = await mount('/app/groups/g1?tab=roles')
     expect(element(root, (node) => node.props['data-active'] !== undefined).props['data-active']).toBe('roles')
+  })
+
+  it('opens deep-linked data sources when both of its features are hidden', async () => {
+    hiddenFeatures.add('connectors').add('repositories')
+    try {
+      for (const link of ['/app/groups/g1?tab=sources', '/app/groups/g1?connector=c1']) {
+        const { root } = await mount(link)
+        expect(element(root, (node) => node.props['data-active'] !== undefined).props['data-active']).toBe('sources')
+        expect(nodes(root).some((node) => node.props['data-tab'] === 'sources')).toBe(false)
+      }
+    } finally {
+      hiddenFeatures.clear()
+    }
   })
 })
 

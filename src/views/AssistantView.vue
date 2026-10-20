@@ -18,6 +18,7 @@ import MessageList from '@/components/assistant/MessageList.vue'
 import { ensureKnownBuckets, useAssistantChat } from '@/composables/useAssistantChat'
 import { useAssistantEditor } from '@/composables/useAssistantEditor'
 import { useAruna } from '@/composables/useAruna'
+import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { assistantPageOpen } from '@/composables/assistantState'
 import { provideLeaveHandler } from '@/composables/useAssistantObject'
 import { readStored, storeValue } from '@/composables/aruna/state'
@@ -28,6 +29,7 @@ const SIDEBAR_KEY = 'aruna.assistant.sidebar'
 const router = useRouter()
 const { currentUser } = useAruna()
 const { bridge } = useAssistantEditor()
+const { shown } = usePortalFeatures()
 const {
   working,
   workingLabel,
@@ -85,7 +87,9 @@ interface Suggestion {
 const prompts = computed<Suggestion[]>(() => [
   ...(bridge.value ? [{ text: 'Explain the draft I have open.' }] : []),
   { text: 'Help me describe a dataset I want to publish.' },
-  { text: 'Build a metadata profile with me.', route: { name: 'profile-new' }, subject: 'the profile form' },
+  ...(shown('profiles')
+    ? [{ text: 'Build a metadata profile with me.', route: { name: 'profile-new' }, subject: 'the profile form' }]
+    : []),
   { text: 'Search my realm for datasets about water quality.' },
   { text: 'Which buckets hold the most data right now?' },
 ])

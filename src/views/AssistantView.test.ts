@@ -93,6 +93,7 @@ const AssistantView = compileClientComponent(new URL('./AssistantView.vue', impo
   '@/composables/useAssistantObject': { provideLeaveHandler: vi.fn() },
   '@/composables/assistantState': { assistantPageOpen: ref(false) },
   '@/components/assistant/AssistantFileDialog.vue': moduleDefault(PassthroughStub),
+  '@/composables/usePortalFeatures': { usePortalFeatures: () => ({ shown: () => true }) },
   '@/composables/useAruna': { useAruna: () => ({ currentUser: ref({ id: 'u-1' }) }) },
   '@/composables/aruna/state': {
     readStored: (key: string) => stored.get(key) ?? '',

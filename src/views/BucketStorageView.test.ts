@@ -80,6 +80,7 @@ const view = compileClientComponent(new URL('./BucketStorageView.vue', import.me
   '@/components/storage/BucketPolicySection.vue': moduleDefault(Marker('where copies may be stored')),
   '@/components/storage/StorageOverviewTab.vue': moduleDefault(Marker('overview details')),
   '@/components/storage/TransfersTab.vue': moduleDefault(Marker('transfer rows')),
+  '@/composables/usePortalFeatures': { usePortalFeatures: () => ({ shown: (key: string) => !hiddenFeatures.has(key) }) },
   '@/composables/useAruna': {
     useAruna: () => ({
       currentUser: ref({ id: 'u-1' }),
@@ -102,6 +103,8 @@ const view = compileClientComponent(new URL('./BucketStorageView.vue', import.me
   '@/composables/useS3': { useS3: () => ({ activeContext: ref({ groupId: 'g-1' }) }) },
   '@/lib/groupAdmin': GroupAdmin,
 })
+
+const hiddenFeatures = new Set<string>()
 
 async function render(options: { admin?: boolean; realmAdmin?: boolean; query?: Record<string, string> } = {}) {
   group.value = groupDetail(options.admin ?? false)
@@ -155,6 +158,15 @@ describe('bucket storage page', () => {
     expect(tabs(root)).toEqual(['overview', 'backend', 'placement', 'access', 'encryption', 'transfers'])
     expect(content(root)).toContain('where copies may be stored')
     expect(content(root)).toContain('compliance on this node')
+  })
+
+  it('opens a deep-linked placement tab whose trigger the user hid', async () => {
+    hiddenFeatures.add('placement')
+    const root = await render({ admin: true, query: { tab: 'placement' } })
+    hiddenFeatures.clear()
+
+    expect(tabs(root)).not.toContain('placement')
+    expect(content(root)).toContain('where copies may be stored')
   })
 
   it('offers a realm admin placement but not the group routing rules', async () => {

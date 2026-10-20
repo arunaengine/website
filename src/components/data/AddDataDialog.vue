@@ -11,6 +11,7 @@ import OtherBucketsTab from '@/components/data/add/OtherBucketsTab.vue'
 import { useConnectorSource, type ConnectorStagingRow } from '@/components/data/add/useConnectorSource'
 import { useOtherBuckets } from '@/components/data/add/useOtherBuckets'
 import { useBuilderBasket } from '@/composables/useBuilderBasket'
+import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import type { StagingReferenceEntry } from '@/lib/api'
 import { computed, ref, toRef } from 'vue'
 import { Boxes, CloudDownload, Upload } from '@lucide/vue'
@@ -61,7 +62,8 @@ const otherBuckets = useOtherBuckets({
 
 const { groupSel, registerOpen, onConnectorSaved } = connectorSource
 
-const tab = ref(props.tab ?? 'local')
+const { shown } = usePortalFeatures()
+const tab = ref(props.tab === 'connector' && !shown('connectors') ? 'local' : props.tab ?? 'local')
 
 function addConnectorRows(rows: ConnectorStagingRow[]) {
   basket.addStaging('connector', rows)
@@ -87,7 +89,7 @@ function onImportsCreated() {
     <Tabs v-model="tab">
       <TabsList>
         <TabsTrigger value="local"><Upload class="mr-1 h-3.5 w-3.5" /> Local files</TabsTrigger>
-        <TabsTrigger value="connector"><CloudDownload class="mr-1 h-3.5 w-3.5" /> From connector</TabsTrigger>
+        <TabsTrigger v-if="shown('connectors')" value="connector"><CloudDownload class="mr-1 h-3.5 w-3.5" /> From connector</TabsTrigger>
         <TabsTrigger value="other"><Boxes class="mr-1 h-3.5 w-3.5" /> Other buckets</TabsTrigger>
       </TabsList>
 
@@ -95,7 +97,7 @@ function onImportsCreated() {
         <UploadTab @add="(files: File[]) => basket.addUploads(files)" />
       </TabsContent>
 
-      <TabsContent value="connector" class="space-y-3">
+      <TabsContent v-if="shown('connectors')" value="connector" class="space-y-3">
         <ConnectorTab
           :source="connectorSource"
           @add="addConnectorRows"

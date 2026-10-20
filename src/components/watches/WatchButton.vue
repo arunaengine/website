@@ -16,6 +16,7 @@ import Tooltip from '@/components/ui/Tooltip.vue'
 import { Bell, BellRing, Eye, EyeOff } from '@lucide/vue'
 import { useAruna } from '@/composables/useAruna'
 import { useWatches } from '@/composables/useWatches'
+import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { ApiError } from '@/lib/api'
 import {
   eventsFor,
@@ -46,7 +47,7 @@ const props = defineProps<{
 const NO_SYNC_REASON = 'This folder is not the source of a sync'
 
 const {
-  available,
+  available: watchesAvailable,
   creating,
   deletingIds,
   ensureLoaded,
@@ -58,6 +59,8 @@ const {
   startAction,
 } = useWatches()
 const { myGroups, discoverableGroups, listSyncRelationships } = useAruna()
+const { shown } = usePortalFeatures()
+const available = computed(() => watchesAvailable.value && shown('watches'))
 const { writesDisabled } = useConnectivity()
 
 const isData = computed(() => props.surface === 'bucket')

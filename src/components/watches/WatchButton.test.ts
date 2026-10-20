@@ -139,6 +139,7 @@ const WatchButton = compileClientComponent(new URL('./WatchButton.vue', import.m
   '@/components/ui/NodeLabel.vue': moduleDefault(NodeLabelStub),
   '@/components/ui/Popover.vue': moduleDefault(PopoverStub),
   '@/components/ui/Tooltip.vue': moduleDefault(TooltipStub),
+  '@/composables/usePortalFeatures': { usePortalFeatures: () => ({ shown: () => true }) },
   '@/composables/useAruna': {
     useAruna: () => ({
       myGroups: ref([{ id: 'g1', name: 'Reef survey' }]),
