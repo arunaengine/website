@@ -16,7 +16,7 @@ const local = computed(() => window.location.hostname.includes('localhost'))
   <Dialog>
     <DialogTrigger as-child>
       <Button variant="outline"
-              class="px-3 py-2 border-aruna-text-accent bg-transparent hover:bg-transparent">
+              class="h-8 px-3 border-input bg-transparent text-sm hover:bg-accent">
         Login
       </Button>
     </DialogTrigger>

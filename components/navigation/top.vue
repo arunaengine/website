@@ -9,7 +9,8 @@ import {
   IconBucket,
   IconSearch,
   IconNews,
-  IconBook
+  IconBook,
+  IconArrowUpRight
 } from "@tabler/icons-vue"
 import type {v2User} from "~/composables/aruna_api_json/models/v2User"
 import LoginDialog from "~/components/custom-ui/dialog/LoginDialog.vue";
@@ -26,55 +27,63 @@ onMounted(() => {
 </script>
 
 <template>
-  <header class="flex flex-wrap sm:justify-start sm:flex-nowrap w-full bg-transparent py-4 md:p-2 max-h-[46px]">
+  <div class="sticky top-0 z-40">
+  <a href="https://v3.aruna-engine.org"
+     target="_blank"
+     rel="noopener"
+     class="group block bg-aruna-navy px-4 py-2 text-center text-xs text-white/85 hover:text-white sm:text-sm">
+    <span class="me-2 rounded-full bg-aruna-aqua/20 px-2 py-0.5 font-semibold text-aruna-aqua">New</span>
+    Aruna v3 is here: federated data with sovereign control.
+    <span class="font-semibold text-white underline-offset-4 group-hover:underline">Try v3 &rarr;</span>
+  </a>
+  <header class="w-full border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/70">
     <nav aria-label="Global"
-         class="max-w-[85rem] w-full mx-auto px-0 md:px-2 lg:px-8 flex flex-wrap basis-full items-center justify-between">
+         class="max-w-[85rem] w-full mx-auto h-14 px-4 lg:px-8 flex basis-full items-center justify-between gap-6">
       <div class="flex">
         <NuxtLink href="/"
-                  class="sm:order-2 font-semibold text-aruna-text-accent focus:outline-none focus:ring-1 focus:ring-aruna-highlight">
-          <img src="/imgs/aruna_dark.webp"
+                  class="flex items-center hover:opacity-90 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+          <img src="/brand/lockup-horizontal-white.avif"
                alt="Aruna logo"
-               class="inline w-24 h-auto align-middle"/>
+               class="h-7 w-auto"/>
         </NuxtLink>
       </div>
 
       <div id="navbar-alignment"
-           class="hidden overflow-hidden transition-all duration-300 basis-full grow sm:grow-0 sm:basis-auto sm:block sm:order-2">
-        <div class="flex flex-col gap-5 mt-5 sm:flex-row sm:items-center sm:mt-0 sm:ps-5">
+           class="hidden grow sm:block">
+        <div class="flex items-center gap-7 text-sm">
           <NuxtLink
-              class="font-medium text-aruna-text-accent focus:outline-none focus:ring-1 focus:ring-aruna-highlight"
+              class="font-medium text-muted-foreground transition-colors hover:text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               to="/explore">
             Search
           </NuxtLink>
 
           <NuxtLink
-              class="font-medium text-aruna-text-accent focus:outline-none focus:ring-1 focus:ring-aruna-highlight"
+              class="font-medium text-muted-foreground transition-colors hover:text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               to="/news">
             News
           </NuxtLink>
-
           <!-- Dropdown Start -->
           <div class="hs-dropdown [--strategy:static] sm:[--strategy:fixed] [--adaptive:none]">
             <button id="hs-mega-menu-basic-dr" type="button"
-                    class="flex items-center w-full text-aruna-text-accent font-medium">
+                    class="flex items-center w-full font-medium text-muted-foreground transition-colors hover:text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-ring">
               Docs
-              <IconChevronDown class="ms-1 flex-shrink-0 w-5 h-auto"/>
+              <IconChevronDown class="ms-1 flex-shrink-0 size-4"/>
             </button>
 
             <div
-                class="hs-dropdown-menu transition-[opacity,margin] duration-[0.1ms] sm:duration-[150ms] hs-dropdown-open:opacity-100 opacity-0 sm:w-48 z-10 sm:shadow-md rounded-md p-2 bg-aruna-bg/90 border-aruna-text/50 divide-aruna-text/50 before:absolute top-full sm:border before:-top-5 before:start-0 before:w-full before:h-5 hidden">
+                class="hs-dropdown-menu transition-[opacity,margin] duration-[0.1ms] sm:duration-[150ms] hs-dropdown-open:opacity-100 opacity-0 sm:w-48 z-10 sm:shadow-md rounded-lg p-1.5 bg-popover border-border divide-aruna-text/50 before:absolute top-full sm:border before:-top-5 before:start-0 before:w-full before:h-5 hidden">
               <NuxtLink :to="devInstance ? 'https://api.dev.aruna-engine.org' : 'https://api.aruna-engine.org'"
-                        class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-aruna-text hover:bg-aruna-fg focus:ring-1 focus:ring-aruna-highlight"
+                        class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-aruna-text hover:bg-accent hover:text-foreground focus:ring-1 focus:ring-ring"
                         target="_blank">
                 API
               </NuxtLink>
               <NuxtLink href="https://docs.aruna-engine.org/latest/get_started/basic_usage/00_index/"
-                        class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-aruna-text hover:bg-aruna-fg focus:ring-1 focus:ring-aruna-highlight"
+                        class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-aruna-text hover:bg-accent hover:text-foreground focus:ring-1 focus:ring-ring"
                         target="_blank">
                 Getting Started
               </NuxtLink>
               <NuxtLink href="https://docs.aruna-engine.org/latest/internal_data_structure/internal_data_structure/"
-                        class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-aruna-text hover:bg-aruna-fg focus:ring-1 focus:ring-aruna-highlight"
+                        class="flex items-center gap-x-3.5 py-2 px-3 rounded-md text-sm text-aruna-text hover:bg-accent hover:text-foreground focus:ring-1 focus:ring-ring"
                         target="_blank">
                 Data Structure
               </NuxtLink>
@@ -83,18 +92,26 @@ onMounted(() => {
           <!-- Dropdown End -->
 
           <NuxtLink href="https://github.com/arunaengine"
-                    class="font-medium text-aruna-text-accent hover:text-aruna-highlight focus:outline-none focus:ring-1 focus:ring-aruna-highlight"
+                    aria-label="GitHub"
+                    class="font-medium text-muted-foreground transition-colors hover:text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     target="_blank">
-            <IconBrandGithub class="flex-shrink-0 align-middle w-5 h-auto me-2 inline-block"/>
+            <IconBrandGithub class="flex-shrink-0 size-4"/>
           </NuxtLink>
         </div>
       </div>
 
-      <div class="sm:order-3 flex items-center gap-x-2">
+      <div class="flex items-center gap-x-2">
+        <a href="https://v3.aruna-engine.org"
+           target="_blank"
+           rel="noopener"
+           class="hidden md:inline-flex items-center gap-x-1.5 h-8 px-3 rounded-md border border-aruna-aqua/40 bg-aruna-aqua/10 text-sm font-medium text-aruna-aqua transition-colors hover:bg-aruna-aqua/20">
+          Try Aruna v3
+          <IconArrowUpRight class="size-3.5"/>
+        </a>
         <ClientOnly>
           <div>
             <DropdownMenu v-if="user_state">
-              <DropdownMenuTrigger class="px-2 py-1 flex items-center justify-center gap-x-2 rounded-sm border border-aruna-text-accent">
+              <DropdownMenuTrigger class="h-8 px-3 flex items-center justify-center gap-x-2 rounded-md border border-input text-sm font-medium hover:bg-accent">
                 {{ user_state?.displayName }}
                 <IconMenu2 class="size-5"/>
               </DropdownMenuTrigger>
@@ -191,4 +208,5 @@ onMounted(() => {
       </div>
     </nav>
   </header>
+  </div>
 </template>
