@@ -28,7 +28,7 @@ _Stay tuned for a series of introductory articles in our news section that will 
 
 ---
 
-Aruna is freely available for all scientific partners. If you haven't done so, head over to the [**login page**](/auth/login) to register your account and start exploring the latest features of Aruna and the available data sets.  
+Aruna is freely available for all scientific partners. If you haven't done so, head over to the [**login page**](https://aruna-engine.org/auth/login) to register your account and start exploring the latest features of Aruna and the available data sets.  
 
 ### Local setup
 
@@ -56,7 +56,7 @@ Aruna version 2.0 marks a significant milestone in building a sophisticated data
 
 ---
 
-[**Subscribe to our mailing list**](/#mailing-list) and we'll keep you in the loop with all the latest innovations, exclusive insights, and exciting updates.
+[**Subscribe to our mailing list**](https://aruna-engine.org/#mailing-list) and we'll keep you in the loop with all the latest innovations, exclusive insights, and exciting updates.
 
 The full changelog can be viewed in the [**release notes of the main Aruna repository**](https://github.com/ArunaStorage/aruna/releases/tag/v2.0.0).
 
