@@ -3,6 +3,8 @@
 // group admins may read them; for everyone else the rows stay away.
 import { computed, ref, watch } from 'vue'
 import LinkedFolderDialog from '@/components/groups/LinkedFolderDialog.vue'
+import FileRulesDialog from '@/components/storage/FileRulesDialog.vue'
+import RenameFolderDialog from '@/components/storage/RenameFolderDialog.vue'
 import Badge from '@/components/ui/Badge.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
@@ -21,7 +23,7 @@ import {
 import { RUN_HINT, scheduleWords } from '@/lib/linkedFolders'
 import { stateTone } from '@/lib/stateBadge'
 import { errorMessage, relativeTime } from '@/lib/utils'
-import { ArrowLeftRight, Play, SlidersHorizontal } from '@lucide/vue'
+import { ArrowLeftRight, FolderInput, ListFilter, Play, SlidersHorizontal } from '@lucide/vue'
 
 const props = defineProps<{ bucket: string; groupId: string | null; quiet?: boolean }>()
 // A count of null: the list was refused or failed, so it says nothing about the bucket.
@@ -42,6 +44,9 @@ const runningId = ref<string | null>(null)
 const rowError = ref<Record<string, string>>({})
 const dialogOpen = ref(false)
 const editing = ref<BackendImport | null>(null)
+const rulesOpen = ref(false)
+const renameOpen = ref(false)
+const picked = ref<BackendImport | null>(null)
 let requestId = 0
 
 function client() {
@@ -98,6 +103,8 @@ watch(
   () => [props.bucket, props.groupId, sessionEpoch.value],
   () => {
     dialogOpen.value = false
+    rulesOpen.value = false
+    renameOpen.value = false
     editing.value = null
     void load()
   },
@@ -123,6 +130,16 @@ async function run(link: BackendImport) {
   } finally {
     runningId.value = null
   }
+}
+
+function openRules(link: BackendImport) {
+  picked.value = link
+  rulesOpen.value = true
+}
+
+function openRename(link: BackendImport) {
+  picked.value = link
+  renameOpen.value = true
 }
 
 function open(link: BackendImport | null) {
@@ -181,6 +198,17 @@ defineExpose({ open })
             >
               <Play class="size-3.5" />
             </IconButton>
+            <IconButton label="Sort new files" @click="openRules(link)">
+              <ListFilter class="size-3.5" />
+            </IconButton>
+            <IconButton
+              label="Rename a folder"
+              :disabled="writesDisabled"
+              :disabled-reason="writesDisabled ? OFFLINE_WRITE_HINT : null"
+              @click="openRename(link)"
+            >
+              <FolderInput class="size-3.5" />
+            </IconButton>
             <IconButton label="Change the link" @click="open(link)">
               <SlidersHorizontal class="size-3.5" />
             </IconButton>
@@ -210,4 +238,6 @@ defineExpose({ open })
     :links="links"
     @saved="load"
   />
+  <FileRulesDialog v-if="groupId" v-model:open="rulesOpen" :group-id="groupId" :link="picked" />
+  <RenameFolderDialog v-model:open="renameOpen" :bucket="bucket" :from="picked?.key_prefix ?? ''" />
 </template>

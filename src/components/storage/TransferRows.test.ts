@@ -47,6 +47,8 @@ const common = {
 const linkedRows = compileClientComponent(new URL('./LinkedFolderRows.vue', import.meta.url), {
   ...common,
   '@/components/groups/LinkedFolderDialog.vue': moduleDefault(Slotted('div')),
+  '@/components/storage/FileRulesDialog.vue': moduleDefault(Slotted('div')),
+  '@/components/storage/RenameFolderDialog.vue': moduleDefault(Slotted('div')),
   '@/composables/useAruna': {
     isUnsupportedEndpoint: () => false,
     useAruna: () => ({ apiBaseUrl: ref('https://a'), authToken: ref('t'), sessionEpoch, listGroupBackends }),
