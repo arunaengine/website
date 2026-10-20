@@ -32,7 +32,7 @@ onMounted(() => {
      rel="noopener"
      class="group block truncate bg-aruna-navy px-4 py-2 text-center text-xs text-white/85 hover:text-white">
     <span class="me-2 rounded-full bg-aruna-aqua/20 px-2 py-0.5 font-semibold text-aruna-aqua">Public testing</span>
-    Aruna v3 is open for testing.
+    Aruna V3 is open for testing.
     <span class="font-semibold text-white underline-offset-4 group-hover:underline">Try it &rarr;</span>
   </a>
   <div class="sticky top-0 z-40">
@@ -105,7 +105,7 @@ onMounted(() => {
            target="_blank"
            rel="noopener"
            class="hidden lg:inline-flex items-center gap-x-1.5 h-8 px-3 rounded-md border border-aruna-aqua/40 bg-aruna-aqua/10 text-sm font-medium text-aruna-aqua transition-colors hover:bg-aruna-aqua/20">
-          Test Aruna v3
+          Test Aruna V3
           <IconArrowUpRight class="size-3.5"/>
         </a>
         <details class="relative sm:hidden">
@@ -118,7 +118,7 @@ onMounted(() => {
             <NuxtLink to="/news" class="block rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground">News</NuxtLink>
             <a href="https://docs.aruna-engine.org/latest" target="_blank" rel="noopener" class="block rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground">Documentation</a>
             <a href="https://github.com/arunaengine" target="_blank" rel="noopener" class="block rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground">GitHub</a>
-            <a href="https://v3.aruna-engine.org" target="_blank" rel="noopener" class="block rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground text-aruna-aqua">Aruna v3 (testing)</a>
+            <a href="https://v3.aruna-engine.org" target="_blank" rel="noopener" class="block rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground text-aruna-aqua">Aruna V3 (testing)</a>
           </div>
         </details>
         <ClientOnly>
