@@ -1,81 +1,49 @@
 <script lang="ts" setup>
-import {IconBook, IconAdjustmentsCog, IconBrandOpenSource, IconChevronRight} from "@tabler/icons-vue";
+import {IconBook, IconAdjustmentsCog, IconBrandOpenSource, IconArrowRight} from "@tabler/icons-vue";
+
+const links = [
+  {
+    title: 'Free and open-source',
+    icon: IconBrandOpenSource,
+    text: 'All components are freely available under a permissive open-source license.',
+    href: 'https://github.com/arunaengine/aruna/tree/main?tab=readme-ov-file#license',
+  },
+  {
+    title: 'Customizable',
+    icon: IconAdjustmentsCog,
+    text: 'Data proxy and server components are easily customizable to your needs.',
+    href: 'https://github.com/arunaengine/aruna?tab=readme-ov-file#getting-started',
+  },
+  {
+    title: 'Documentation',
+    icon: IconBook,
+    text: 'The comprehensive documentation makes getting started in Aruna a breeze.',
+    href: 'https://docs.aruna-engine.org/latest',
+  },
+]
 </script>
 <template>
-  <div class="container mt-12 rounded-xl border border-border px-4 py-6 sm:px-6 lg:px-8 mx-auto bg-card">
-    <div class="grid sm:grid-cols-2 lg:grid-cols-3 items-center gap-4">
-
-      <!-- Icon Block -->
-      <NuxtLink class="group flex flex-col justify-center rounded-md p-4 md:p-7 transition-all ease-in-out delay-50 duration-500 hover:bg-muted focus:outline-none focus:ring-1 focus:ring-aruna-highlight"
-                target="_blank"
-                to="https://github.com/arunaengine/aruna/tree/main?tab=readme-ov-file#license">
-        <div class="flex p-3 justify-center items-center mx-auto text-aruna-aqua rounded-lg bg-aruna-aqua/10">
-          <IconBrandOpenSource class="flex-shrink-0 size-12"/>
-        </div>
-        <div class="mt-5 text-center">
-          <h3 class="font-display text-xl font-semibold text-aruna-text-accent">
-            Free and open-source
-          </h3>
-          <p class="mt-1 text-lg text-aruna-text">
-            All components are freely available under a permissive open-source license.
-          </p>
-          <span
-              class="mt-4 inline-flex items-center gap-x-1.5 font-bold text-lg text-aruna-highlight transition-all ease-in-out delay-50 duration-500 group-hover:text-aruna-highlight group-focus:text-aruna-highlight">
-            Learn more <IconChevronRight class="flex-shrink-0 size-4"/>
-          </span>
-        </div>
-      </NuxtLink>
-      <!-- End Icon Block -->
-
-      <!-- Icon Block -->
-      <NuxtLink class="group flex flex-col justify-center rounded-md p-4 md:p-7 transition-all ease-in-out delay-50 duration-500 hover:bg-muted focus:outline-none focus:ring-1 focus:ring-aruna-highlight"
-                target="_blank"
-                to="https://github.com/arunaengine/aruna?tab=readme-ov-file#getting-started">
-        <div class="flex p-3 justify-center items-center mx-auto text-aruna-aqua rounded-lg bg-aruna-aqua/10">
-          <IconAdjustmentsCog class="flex-shrink-0 size-12"/>
-        </div>
-        <div class="mt-5 text-center">
-          <h3 class="font-display text-xl font-semibold text-aruna-text-accent">
-            Customizable
-          </h3>
-          <p class="mt-1 text-lg text-aruna-text">
-            Data proxy and server components are easily customizable to your needs.
-          </p>
-          <span
-              class="mt-4 inline-flex items-center gap-x-1.5 font-bold text-lg text-aruna-highlight transition-all ease-in-out delay-50 duration-500 group-hover:text-aruna-highlight group-focus:text-aruna-highlight">
-            Learn more <IconChevronRight class="flex-shrink-0 size-4"/>
-          </span>
-        </div>
-      </NuxtLink>
-      <!-- End Icon Block -->
-
-      <!-- Icon Block -->
-      <NuxtLink class="group flex flex-col justify-center rounded-md p-4 md:p-7 transition-all ease-in-out delay-50 duration-500 hover:bg-muted focus:outline-none focus:ring-1 focus:ring-aruna-highlight"
-                href="https://docs.aruna-engine.org/latest"
-                target="_blank">
-        <div class="flex p-3 justify-center items-center mx-auto text-aruna-aqua rounded-lg bg-aruna-aqua/10">
-          <!--<IconBook class="flex-shrink-0 size-12"/>-->
-          <svg class="flex-shrink-0 size-12 fill-aruna-aqua"
-               viewBox="0 -960 960 960" xmlns="http://www.w3.org/2000/svg">
-            <path d="M480-160q-48-38-104-59t-116-21q-42 0-82.5 11T100-198q-21 11-40.5-1T40-234v-482q0-11 5.5-21T62-752q46-24 96-36t102-12q58 0 113.5 15T480-740v484q51-32 107-48t113-16q36 0 70.5 6t69.5 18v-480q15 5 29.5 10.5T898-752q11 5 16.5 15t5.5 21v482q0 23-19.5 35t-40.5 1q-37-20-77.5-31T700-240q-60 0-116 21t-104 59Zm80-200v-380l200-200v400L560-360Zm-160 65v-396q-33-14-68.5-21.5T260-720q-37 0-72 7t-68 21v397q35-13 69.5-19t70.5-6q36 0 70.5 6t69.5 19Zm0 0v-396 396Z"/>
-          </svg>
-        </div>
-        <div class="mt-5 text-center">
-          <h3 class="font-display text-xl font-semibold text-aruna-text-accent">
-            Documentation
-          </h3>
-          <p class="mt-1 text-lg text-aruna-text">
-            The comprehensive documentation makes getting started in Aruna a breeze!
-          </p>
-          <span
-              class="mt-4 inline-flex items-center gap-x-1.5 font-bold text-lg text-aruna-highlight transition-all ease-in-out delay-50 duration-500 group-hover:text-aruna-highlight group-focus:text-aruna-highlight">
-            Learn more <IconChevronRight class="flex-shrink-0 size-4"/>
-          </span>
-        </div>
-      </NuxtLink>
-      <!-- End Icon Block -->
-
-      <!-- End Icon Block -->
+  <section class="section">
+    <div class="container max-w-6xl">
+      <div class="grid gap-4 md:grid-cols-3">
+        <a v-for="l in links"
+           :key="l.title"
+           :href="l.href"
+           target="_blank"
+           rel="noopener"
+           class="group flex gap-4 rounded-xl border border-border bg-card p-5 transition-colors hover:border-aruna-aqua/50 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+          <div class="grid size-9 shrink-0 place-items-center rounded-lg bg-aruna-aqua/10 text-aruna-aqua">
+            <component :is="l.icon" class="size-5"/>
+          </div>
+          <div>
+            <h3 class="flex items-center gap-1.5 font-display text-base font-semibold text-foreground">
+              {{ l.title }}
+              <IconArrowRight class="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-aruna-aqua"/>
+            </h3>
+            <p class="mt-1.5 text-sm leading-relaxed text-muted-foreground">{{ l.text }}</p>
+          </div>
+        </a>
+      </div>
     </div>
-  </div>
+  </section>
 </template>

@@ -1,37 +1,21 @@
 <template>
-  <!-- Brands -->
-  <div class="mt-6 lg:mt-12">
-    <div class="py-8 bg-card text-center text-aruna-text font-bold border-y border-border">
-      <p class="eyebrow mb-4">
-        Supported by
-      </p>
-
-      <div class="flex flex-col sm:flex-row gap-x-8 gap-y-8 container justify-between items-center">
-        <div class="shrink">
-          <img src="/imgs/fairds.webp"
-               alt="Logo of the FAIR Data Spaces project"
-               class="w-60 object-bottom object-contain h-auto"/>
-        </div>
-        <div class="shrink">
-          <img src="/imgs/microbiota.webp"
-               alt="Logo of the NFDI4Microbiota project"
-               class="w-36 object-bottom object-contain h-auto"/>
-        </div>
-        <div class="shrink">
-          <img src="/imgs/biodiv_white.webp"
-               alt="Logo of the NFDI4Biodiversity project"
-               class="w-60 object-bottom object-contain h-auto"/>
-        </div>
-        <div class="shrink">
-          <img src="/imgs/denbi.webp"
-               alt="Logo of the de.NBI project"
-               class="w-48 object-bottom object-contain h-auto"/>
-        </div>
+  <section class="py-14">
+    <div class="container max-w-6xl text-center">
+      <p class="eyebrow">Supported by</p>
+      <div class="mt-8 grid grid-cols-2 items-center justify-items-center gap-10 md:grid-cols-4">
+        <img src="/imgs/fairds.webp"
+             alt="Logo of the FAIR Data Spaces project"
+             class="h-9 w-auto object-contain opacity-70 grayscale transition hover:opacity-100 hover:grayscale-0"/>
+        <img src="/imgs/microbiota.webp"
+             alt="Logo of the NFDI4Microbiota project"
+             class="h-12 w-auto object-contain opacity-70 grayscale transition hover:opacity-100 hover:grayscale-0"/>
+        <img src="/imgs/biodiv_white.webp"
+             alt="Logo of the NFDI4Biodiversity project"
+             class="h-9 w-auto object-contain opacity-70 grayscale transition hover:opacity-100 hover:grayscale-0"/>
+        <img src="/imgs/denbi.webp"
+             alt="Logo of the de.NBI project"
+             class="h-9 w-auto object-contain opacity-70 grayscale transition hover:opacity-100 hover:grayscale-0"/>
       </div>
     </div>
-
-  </div>
-  <!-- End Brands -->
+  </section>
 </template>
-<script setup lang="ts">
-</script>

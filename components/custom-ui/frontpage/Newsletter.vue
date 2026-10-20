@@ -45,14 +45,15 @@ async function submit() {
 
 </script>
 <template>
-  <div id="mailing-list"
-       class="container w-full mt-12 border border-border bg-card rounded-md px-4 py-10 sm:px-6 lg:px-8 lg:py-16 mx-auto">
-    <div class="grid md:grid-cols-2 gap-8">
+  <section id="mailing-list" class="section">
+    <div class="container max-w-6xl">
+    <div class="grid items-center gap-8 rounded-xl border border-border bg-card p-6 sm:p-10 md:grid-cols-2">
       <div class="max-w-md">
-        <h2 class="font-display text-2xl font-semibold tracking-tight md:text-3xl md:leading-tight text-aruna-text-accent">
-          Mailing List
+        <div class="eyebrow">Stay informed</div>
+        <h2 class="mt-3 font-display text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+          Mailing list
         </h2>
-        <p class="mt-3 text-aruna-text">
+        <p class="mt-3 text-muted-foreground">
           Subscribe and get all the latest Aruna updates and news.
         </p>
       </div>
@@ -68,7 +69,7 @@ async function submit() {
                          id="user-mail-input"
                          v-model="email"
                          placeholder="Your email address"
-                         class="peer p-4 block w-full rounded-md text-sm placeholder:text-transparent focus:border-aruna-highlight focus:ring-aruna-highlight disabled:opacity-50 disabled:pointer-events-none bg-aruna-muted border-border text-aruna-text
+                         class="peer p-4 block w-full rounded-md text-sm placeholder:text-transparent focus:border-aruna-highlight focus:ring-aruna-highlight disabled:opacity-50 disabled:pointer-events-none bg-background border-input text-foreground
                    focus:pt-6
                    focus:pb-2
                    [&:not(:placeholder-shown)]:pt-6
@@ -90,7 +91,7 @@ async function submit() {
                 </div>
                 <p id="user-mail-input-helper"
                    class="mt-2 text-sm text-center"
-                   :class="{'hidden': emailInputInfo === undefined, 'text-destructive': !success, 'text-green-700': success}"
+                   :class="{'hidden': emailInputInfo === undefined, 'text-destructive': !success, 'text-emerald-400': success}"
                    v-html="emailInputInfo"/>
               </div>
               <!-- End User Email Address -->
@@ -98,7 +99,7 @@ async function submit() {
             <button type="button"
                     @click="submit"
                     :disabled="processing"
-                    class="w-full sm:w-auto whitespace-nowrap px-4 py-2 h-14 gap-x-2 text-sm font-semibold rounded-md border border-aruna-highlight bg-transparent text-aruna-highlight hover:bg-aruna-highlight hover:text-aruna-text-accent disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-2 focus:ring-aruna-700">
+                    class="w-full sm:w-auto whitespace-nowrap px-5 h-14 text-sm font-medium rounded-md bg-aruna-royal text-white hover:bg-aruna-royal/90 disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
               Subscribe
             </button>
 
@@ -109,5 +110,6 @@ async function submit() {
         </div>
       </form>
     </div>
-  </div>
+    </div>
+  </section>
 </template>

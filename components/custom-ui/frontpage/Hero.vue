@@ -7,7 +7,7 @@ import {IconArrowRight, IconArrowUpRight} from "@tabler/icons-vue";
          class="grid-faint pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_at_50%_0%,black_30%,transparent_75%)]"/>
     <div aria-hidden="true" class="wash-primary pointer-events-none absolute inset-0"/>
 
-    <div class="relative mx-auto max-w-3xl px-4 pb-24 pt-16 text-center sm:pt-24">
+    <div class="relative mx-auto max-w-3xl px-4 pb-20 pt-16 text-center sm:pb-28 sm:pt-24">
       <a href="https://v3.aruna-engine.org"
          target="_blank"
          rel="noopener"
@@ -17,20 +17,9 @@ import {IconArrowRight, IconArrowUpRight} from "@tabler/icons-vue";
         <IconArrowUpRight class="size-3.5"/>
       </a>
 
-      <!-- The icon asset keeps its transparent padding; clip it to the wave. -->
-      <div class="relative mx-auto mt-10 aspect-[935/537] h-16 overflow-hidden sm:h-20">
-        <img src="/brand/icon-mark.avif"
-             alt=""
-             class="absolute left-[-19.6%] top-[-62%] w-[134.1%] max-w-none select-none"
-             draggable="false"/>
-      </div>
-      <img src="/brand/wordmark-white.avif"
-           alt="ARUNA"
-           class="mx-auto mt-3 h-8 w-auto select-none sm:h-10"
-           draggable="false"/>
-      <p class="tagline mt-3.5 text-xs sm:text-[13px]">the data orchestration engine</p>
+      <p class="tagline mt-10 text-xs sm:text-sm">the data orchestration engine</p>
 
-      <h1 class="mt-12 text-balance font-display text-3xl font-semibold leading-[1.12] tracking-tight text-foreground sm:text-4xl md:text-[42px]">
+      <h1 class="mt-5 text-balance font-display text-3xl font-semibold leading-[1.12] tracking-tight text-foreground sm:text-5xl md:text-[56px]">
         Orchestrate your data. <span class="text-gradient">Keep it sovereign.</span>
       </h1>
 
