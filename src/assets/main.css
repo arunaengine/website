@@ -197,6 +197,53 @@
   .eyebrow {
     @apply font-mono text-[11px] font-medium uppercase tracking-[0.2em] text-primary/80;
   }
+  /* Long-form text on the public pages: news posts and legal pages. */
+  .article-body {
+    @apply max-w-[68ch] text-base leading-7 text-foreground/85;
+  }
+  .article-body > * + * {
+    @apply mt-5;
+  }
+  .article-body > :first-child {
+    @apply mt-0;
+  }
+  .article-body h2 {
+    @apply mt-12 font-display text-2xl font-semibold tracking-tight text-foreground;
+  }
+  .article-body h3 {
+    @apply mt-9 font-display text-lg font-semibold text-foreground;
+  }
+  .article-body h2 + *,
+  .article-body h3 + * {
+    @apply mt-3;
+  }
+  .article-body ul {
+    @apply list-disc space-y-2 pl-6;
+  }
+  .article-body ol {
+    @apply list-decimal space-y-2 pl-6;
+  }
+  .article-body li::marker {
+    @apply text-primary;
+  }
+  .article-body strong {
+    @apply font-semibold text-foreground;
+  }
+  .article-body a {
+    @apply font-medium text-primary underline decoration-primary/40 underline-offset-2 transition-colors hover:decoration-primary;
+  }
+  .article-body address {
+    @apply not-italic;
+  }
+  .article-body table {
+    @apply block w-full overflow-x-auto border-collapse text-sm leading-6;
+  }
+  .article-body th {
+    @apply border-b-2 border-border bg-muted/50 px-3 py-2 text-left font-semibold text-foreground;
+  }
+  .article-body td {
+    @apply border-b border-border px-3 py-2 align-top;
+  }
   .chip {
     @apply inline-flex items-center gap-1 rounded-full border border-border bg-card px-2 py-0.5 text-[11px] font-medium text-muted-foreground;
   }

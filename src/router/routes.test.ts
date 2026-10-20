@@ -112,6 +112,18 @@ describe('web routes', () => {
     })
   })
 
+  it('serves the public pages outside the app shell', async () => {
+    const routes = await build()
+    const expected = [
+      ['/imprint', 'imprint'],
+    ]
+
+    for (const [path, name] of expected) {
+      expect(find(routes, path)?.name).toBe(name)
+      expect(typeof find(routes, path)?.component).toBe('function')
+    }
+  })
+
   it('mounts no welcome view', async () => {
     const routes = await build()
     expect(find(routes, '/welcome')).toBeUndefined()
@@ -128,6 +140,12 @@ describe('desktop routes', () => {
     expect(root?.redirect).toEqual({ name: 'dashboard' })
     expect(root?.name).toBeUndefined()
     expect(root?.component).toBeUndefined()
+  })
+
+  it('has no public pages', async () => {
+    const routes = await build({ apiBaseUrl: '/api/v1' })
+
+    for (const path of ['/imprint']) expect(find(routes, path)).toBeUndefined()
   })
 
   it('mounts the device views', async () => {

@@ -40,8 +40,8 @@ async function onSignIn() {
       <nav
         class="hidden items-center gap-7 text-sm font-medium text-muted-foreground md:flex"
       >
-        <a href="#overview" class="whitespace-nowrap transition-colors hover:text-foreground">Overview</a>
-        <a href="#capabilities" class="whitespace-nowrap transition-colors hover:text-foreground">What's inside</a>
+        <a href="/#overview" class="whitespace-nowrap transition-colors hover:text-foreground">Overview</a>
+        <a href="/#capabilities" class="whitespace-nowrap transition-colors hover:text-foreground">What's inside</a>
       </nav>
 
       <div class="flex items-center gap-2">

@@ -2,6 +2,7 @@
 import AppLogo from '@/components/layout/AppLogo.vue'
 import GithubIcon from '@/components/icons/GithubIcon.vue'
 import { BookOpen } from '@lucide/vue'
+import { RouterLink } from 'vue-router'
 </script>
 
 <template>
@@ -53,6 +54,7 @@ import { BookOpen } from '@lucide/vue'
           © 2026 the Aruna project · Apache 2.0 and MIT licensed
         </div>
         <div class="flex items-center gap-3">
+          <RouterLink to="/imprint" class="hover:text-foreground">Imprint</RouterLink>
           <a
             href="https://github.com/arunaengine/aruna"
             target="_blank"

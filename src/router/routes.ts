@@ -9,6 +9,14 @@ function landingRoute(): RouteRecordRaw {
   return { path: '/', name: 'landing', component: () => import('@/views/LandingView.vue') }
 }
 
+// Public pages beside the landing page; the shell has no marketing surface.
+function publicRoutes(): RouteRecordRaw[] {
+  if (isDesktop()) return []
+  return [
+    { path: '/imprint', name: 'imprint', component: () => import('@/views/ImprintView.vue') },
+  ]
+}
+
 // One frontend, two shells: Aruna Desktop mounts a layout built around the
 // machine, the web keeps the portal layout. Both lazy, so neither build carries
 // the other's chunk.
@@ -51,6 +59,7 @@ function desktopRoutes(): RouteRecordRaw[] {
 export function portalRoutes(): RouteRecordRaw[] {
   return [
     landingRoute(),
+    ...publicRoutes(),
     {
       path: '/auth/callback',
       name: 'auth-callback',
