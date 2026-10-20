@@ -23,10 +23,13 @@ import {
   ApiError,
   createBackendImport,
   deleteBackendImport,
+  getImportRenames,
   runBackendImport,
+  startImportRenames,
   startBucketMove,
   updateBackendImport,
   type BackendImport,
+  type BackendImportRenames,
   type BackendImportRequest,
   type GroupBackendResponse,
 } from '@/lib/api'
@@ -89,6 +92,10 @@ const cron = ref('')
 const saving = ref(false)
 const confirmingDelete = ref(false)
 const submitError = ref<string | null>(null)
+// Files of a stored link that still have a name of an earlier pattern.
+const renames = ref<BackendImportRenames | null>(null)
+const renaming = computed(() => Boolean(renames.value?.progress && renames.value.progress.finished_at_ms == null))
+const offerRename = computed(() => Boolean(renames.value?.count) && !patternChanged.value)
 
 const isEdit = computed(() => Boolean(props.link))
 const backendOptions = computed(() =>
@@ -112,7 +119,7 @@ const wholeBucket = computed(() => {
 })
 const patternError = computed(() => {
   const chosen = pattern.value.trim()
-  if (wholeBucket.value && chosen === '{dir}{name}' && props.link?.write_pattern !== chosen) {
+  if (wholeBucket.value && chosen === '{dir}{name}' && savedPattern.value !== chosen) {
     return 'A whole linked bucket cannot switch to the same name.'
   }
   return patternProblem(chosen)
@@ -123,7 +130,9 @@ const patternLocked = computed(() => {
   if (!stored) return false
   return !stored.write_pattern || (wholeBucket.value && stored.write_pattern === '{dir}{name}')
 })
-const patternChanged = computed(() => Boolean(props.link) && pattern.value.trim() !== props.link?.write_pattern)
+// The pattern the node has now; a save in this dialog changes it before the link reloads.
+const savedPattern = ref<string | null>(null)
+const patternChanged = computed(() => Boolean(props.link) && pattern.value.trim() !== savedPattern.value)
 const schedule = computed(() => (scheduleChoice.value === 'custom' ? cron.value.trim() : scheduleChoice.value))
 const scheduleError = computed(() => (scheduleChoice.value === 'custom' ? cronProblem(cron.value) : null))
 
@@ -207,6 +216,7 @@ watch(
     bucket.value = stored?.bucket ?? ''
     bucketFolder.value = stored?.key_prefix ?? ''
     pattern.value = stored?.write_pattern ?? NAME_PATTERNS[0].value
+    savedPattern.value = stored?.write_pattern ?? null
     writeElsewhere.value = Boolean(stored && writesElsewhere(stored))
     moveFiles.value = false
     writeBackendId.value = stored?.write_backend_id ?? ''
@@ -216,9 +226,38 @@ watch(
     scheduleChoice.value = preset ? savedSchedule : 'custom'
     cron.value = preset ? '' : savedSchedule
     submitError.value = null
+    renames.value = null
     if (!stored) void bucketList.ensure()
+    else void loadRenames(stored, opening)
   },
 )
+
+// Older nodes have no rename route; the offer then stays hidden.
+async function loadRenames(stored: BackendImport, generation: number) {
+  try {
+    const found = await getImportRenames(props.groupId, stored.import_id, { baseUrl: apiBaseUrl.value, token: authToken.value })
+    if (generation === opening) renames.value = found
+  } catch {
+    if (generation === opening) renames.value = null
+  }
+}
+
+async function rename() {
+  const stored = props.link
+  if (!stored || saving.value) return
+  submitError.value = null
+  saving.value = true
+  const generation = opening
+  try {
+    await startImportRenames(props.groupId, stored.import_id, { baseUrl: apiBaseUrl.value, token: authToken.value })
+    emit('saved')
+    if (generation === opening) emit('update:open', false)
+  } catch (err) {
+    if (generation === opening) submitError.value = moveRefusal(err) ?? errorMessage(err)
+  } finally {
+    if (generation === opening) saving.value = false
+  }
+}
 
 const bucketNote = useBucketCheck(() =>
   props.open && !isEdit.value && splits.value
@@ -298,6 +337,15 @@ async function submit() {
     }
     if (epoch !== sessionEpoch.value) return
     emit('saved', runError)
+    // After a new pattern, files with the old name are offered for renaming.
+    if (stored && newPattern !== undefined && current()) {
+      await loadRenames({ ...stored, write_pattern: newPattern }, generation)
+      if (current() && renames.value?.count) {
+        pattern.value = newPattern
+        savedPattern.value = newPattern
+        return
+      }
+    }
     if (current()) emit('update:open', false)
   } catch (err) {
     if (epoch !== sessionEpoch.value || !current()) return
@@ -546,7 +594,23 @@ async function submit() {
               Move files already in this folder
             </label>
 
-            <Notice>Aruna never deletes files from your storage.</Notice>
+            <div v-if="offerRename && renames" class="space-y-1.5 rounded-md border border-border px-3 py-2 text-xs" data-testid="rename-offer">
+              <p class="font-medium text-foreground">Rename existing files</p>
+              <p class="text-muted-foreground">
+                {{ renames.count }}{{ renames.complete ? '' : '+' }} {{ renames.count === 1 ? 'file has' : 'files have' }} an older name.
+                Each gets a copy with the new name, then the old file is removed.
+              </p>
+              <ul class="space-y-0.5 font-mono text-[11px] text-muted-foreground">
+                <li v-for="file in renames.files.slice(0, 3)" :key="file.from" class="break-all">{{ file.from }} → {{ file.to }}</li>
+              </ul>
+              <p v-if="renames.count > 3" class="text-[11px] text-muted-foreground">and {{ renames.count - 3 }} more</p>
+              <p v-if="renaming" class="text-[11px] text-muted-foreground">Renaming files…</p>
+              <Button v-else type="button" variant="outline" size="sm" :disabled="saving || writesDisabled" @click="rename">
+                Rename files
+              </Button>
+            </div>
+
+            <Notice>Aruna never deletes files from your storage{{ offerRename ? ', except old names you rename' : '' }}.</Notice>
           </fieldset>
           <p v-if="conflict" class="text-xs text-destructive">{{ conflict }}</p>
           <Notice v-if="submitError" tone="error">{{ submitError }}</Notice>

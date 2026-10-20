@@ -11,6 +11,8 @@ const createBackendImport = vi.fn()
 const updateBackendImport = vi.fn()
 const startBucketMove = vi.fn()
 const runBackendImport = vi.fn()
+const getImportRenames = vi.fn()
+const startImportRenames = vi.fn()
 // The shared live check runs for real; only its request is a stand-in.
 const { checkProviderBucket } = vi.hoisted(() => ({ checkProviderBucket: vi.fn() }))
 vi.mock('@/lib/api', async (original) => ({ ...(await original<object>()), checkProviderBucket }))
@@ -72,7 +74,9 @@ const LinkedFolderDialog = compileClientComponent(new URL('./LinkedFolderDialog.
   '@/composables/useS3': { useS3: () => ({ activeContext, nodeIdFor: () => 'n1' }) },
   '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled: ref(false) }) },
   '@/composables/useBucketCheck': BucketCheck,
-  '@/lib/api': { ...Api, createBackendImport, updateBackendImport, runBackendImport, startBucketMove },
+  '@/lib/api': {
+    ...Api, createBackendImport, updateBackendImport, runBackendImport, startBucketMove, getImportRenames, startImportRenames,
+  },
   '@/lib/linkedFolders': LinkedFolders,
   '@/lib/storageRules': StorageRules,
   '@/lib/utils': Utils,
@@ -126,6 +130,8 @@ beforeEach(() => {
   updateBackendImport.mockReset()
   startBucketMove.mockReset()
   runBackendImport.mockReset()
+  getImportRenames.mockReset().mockResolvedValue({ count: 0, complete: true, files: [] })
+  startImportRenames.mockReset()
   checkProviderBucket.mockReset().mockRejectedValue(new Api.ApiError(404, 'Not Found'))
   onSaved.mockReset()
   onOpen.mockReset()
@@ -235,6 +241,43 @@ describe('LinkedFolderDialog', () => {
     await submit(mounted.root)
 
     expect(updateBackendImport).toHaveBeenCalledWith('g1', 'i1', null, expect.anything(), '{dir}{name}~{id}')
+    mounted.app.unmount()
+  })
+
+  it('offers to rename files of an earlier pattern', async () => {
+    const files = [{ from: 'raw/2024/01JA7Q3K_b.fastq', to: 'raw/2024/b.fastq~01JA7Q3K' }]
+    getImportRenames.mockResolvedValue({ count: 4, complete: true, files })
+    startImportRenames.mockResolvedValue({})
+    const mounted = await mount(STORED)
+    const text = content(mounted.root)
+    expect(text).toContain('4 files have an older name.')
+    expect(text).toContain('raw/2024/01JA7Q3K_b.fastq → raw/2024/b.fastq~01JA7Q3K')
+    expect(text).toContain('and 1 more')
+    await click(button(mounted.root, 'Rename files'))
+
+    expect(startImportRenames).toHaveBeenCalledWith('g1', 'i1', expect.anything())
+    expect(onSaved).toHaveBeenCalled()
+    mounted.app.unmount()
+
+    // A running rename shows instead of a second start.
+    const progress = { migrated: 1, skipped: 0, failed: 0, started_at_ms: 1 }
+    getImportRenames.mockResolvedValue({ count: 3, complete: true, files, progress })
+    const running = await mount(STORED)
+    expect(content(running.root)).toContain('Renaming files…')
+    running.app.unmount()
+  })
+
+  it('offers the rename right after a pattern change', async () => {
+    updateBackendImport.mockResolvedValue(STORED)
+    const files = [{ from: 'raw/2024/01JA7Q3K_b.fastq', to: 'raw/2024/b.fastq~01JA7Q3K' }]
+    const mounted = await mount(STORED)
+    getImportRenames.mockResolvedValue({ count: 1, complete: true, files })
+    await choose(mounted.root, 'File name preset', '{dir}{name}~{id}')
+    await submit(mounted.root)
+
+    expect(getImportRenames).toHaveBeenCalledTimes(2)
+    expect(onOpen).not.toHaveBeenCalledWith(false)
+    expect(content(mounted.root)).toContain('1 file has an older name.')
     mounted.app.unmount()
   })
 

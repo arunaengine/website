@@ -1,4 +1,5 @@
 import { apiRequest, type ApiClientOptions } from './client'
+import type { MoveProgress } from './bucketStorage'
 
 // Linked folders: a folder of a group storage backend shown in a bucket folder,
 // with new uploads written back to the backend. Group ADMIN. Nodes without the
@@ -90,4 +91,28 @@ export function runBackendImport(
   client: ApiClientOptions,
 ): Promise<{ job_id: string }> {
   return apiRequest(`${importsPath(groupId, importId)}/run`, { method: 'POST' }, client)
+}
+
+export interface BackendImportRenames {
+  /** Files an earlier name pattern named; a lower bound unless `complete`. */
+  count: number
+  complete: boolean
+  /** The first files, with the name they get. */
+  files: { from: string; to: string }[]
+  /** The last move of the link's folder, which renames them. */
+  progress?: MoveProgress | null
+}
+
+/** Files of a link that still have a name of an earlier pattern. */
+export function getImportRenames(
+  groupId: string,
+  importId: string,
+  client: ApiClientOptions,
+): Promise<BackendImportRenames> {
+  return apiRequest(`${importsPath(groupId, importId)}/rename`, {}, client)
+}
+
+/** Gives them the current name: a copy first, then the old file is removed. */
+export function startImportRenames(groupId: string, importId: string, client: ApiClientOptions): Promise<unknown> {
+  return apiRequest(`${importsPath(groupId, importId)}/rename`, { method: 'POST' }, client)
 }
