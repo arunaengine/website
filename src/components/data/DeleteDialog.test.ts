@@ -47,6 +47,8 @@ const deletePrefix = vi.fn(async () => ({ deleted: 1, errors: [] as { key: strin
 const deleteObjectVersion = vi.fn(async () => undefined)
 const copyObjectVersion = vi.fn(async () => ({ versionId: 'new' }))
 const deleteBucket = vi.fn(async () => undefined)
+const purgeStatus = ref<unknown>(null)
+const purgeControl = vi.fn(async (..._args: unknown[]) => undefined)
 const purgeRun = vi.fn(async () => ({ state: 'succeeded' }))
 const removeBucket = vi.fn(async (_nodeId: string, _bucket: string, _job: unknown) => undefined)
 const preflightResponse = vi.fn()
@@ -62,6 +64,13 @@ function slotted(tag: string) {
     setup: (_, { attrs, slots }) => () => h(tag, attrs, slots.default?.()),
   })
 }
+
+const jobProgress = defineComponent({
+  props: { job: Object },
+  emits: ['control'],
+  setup: (props, { emit }) => () =>
+    h('button', { onClick: () => emit('control', 'abort') }, `job ${(props.job as { state: string }).state} ${(props.job as { done: number }).done} of ${(props.job as { total: number }).total}`),
+})
 
 const ButtonStub = defineComponent({
   inheritAttrs: false,
@@ -128,7 +137,8 @@ function dialogModules(overrides: Record<string, unknown> = {}) {
     }),
   ),
   '@/lib/storageDeletion': {
-    createStoragePurgeOperation: (scope: unknown) => ({ scope, idempotencyKey: 'key' }),
+    createStoragePurgeOperation: (scope: unknown, _key?: string, storage?: object) => ({ scope, idempotencyKey: 'key', ...storage }),
+    isTerminalStoragePurgeJob: (state: string) => ['succeeded', 'failed', 'cancelled'].includes(state),
     getStorageDeletionPreflight: preflightResponse,
     isStorageDeletionNotFound: () => false,
     storageDeletionErrorMessage: (error: unknown) => String(error),
@@ -146,6 +156,7 @@ function dialogModules(overrides: Record<string, unknown> = {}) {
   '@/components/data/deletion/DeletionImpact.vue': moduleDefault(ImpactStub),
   '@/components/data/deletion/DeletionOutcome.vue': moduleDefault(PanelStub('outcome')),
   '@/components/data/deletion/PurgeProgress.vue': moduleDefault(PanelStub('progress')),
+  '@/components/storage/JobProgress.vue': moduleDefault(jobProgress),
   '@/components/data/deletion/useDeletionPreflight': {
     useDeletionPreflight: () => ({
       backlinkPreflight,
@@ -160,10 +171,11 @@ function dialogModules(overrides: Record<string, unknown> = {}) {
   '@/components/data/deletion/usePurgeJob': {
     usePurgeJob: () => ({
       submission: ref(null),
-      status: ref(null),
-      progress: ref(null),
+      status: purgeStatus,
+      progress: ref({ current: 3, total: 10, unit: 'versions' }),
       reset: () => {},
       run: purgeRun,
+      control: purgeControl,
     }),
   },
   '@/components/data/deletion/useSelectionDelete': {
@@ -488,6 +500,9 @@ describe('delete dialog', () => {
     getDeleteImpact.mockResolvedValueOnce({
       files: 4210,
       versions: 4388,
+      bytes: 1,
+      complete: true,
+      items: [],
       storage_files: 4206,
       storage_bytes: 310e9,
       kept_files: 4,
@@ -513,6 +528,46 @@ describe('delete dialog', () => {
     expect(confirmButton(root).props.disabled).toBe(true)
     await typeValue(element(root, (node) => node.tag === 'input' && node.props.type !== 'radio'), 'old-runs')
     expect(confirmButton(root).props.disabled).toBe(false)
+  })
+
+  it('words kept storage files carefully while the page is not complete', async () => {
+    getDeleteImpact.mockResolvedValueOnce({
+      files: 10,
+      versions: 10,
+      bytes: 1,
+      storage_files: 10,
+      storage_bytes: 1,
+      kept_files: 2,
+      complete: false,
+      items: [],
+    })
+    const { root } = await open({ kind: 'folder', bucket: 'reef', nodeId: null, key: 'a/', option: 'delete-permanently' })
+    const text = content(root)
+    expect(text).toContain('at least 10 files')
+    expect(text).toContain('Some storage files stay because other links or files still use them.')
+  })
+
+  it('also deletes the storage files and names the bucket on a permanent delete', async () => {
+    purgeRun.mockClear()
+    const { root } = await open({ kind: 'bucket', bucket: 'reef', nodeId: null, option: 'delete-permanently' })
+    await typeValue(element(root, (node) => node.tag === 'input' && node.props.type !== 'radio'), 'reef')
+    await click(confirmButton(root))
+    expect(purgeRun).toHaveBeenCalledWith(
+      expect.objectContaining({ scope: { kind: 'bucket', bucket: 'reef' }, deleteStorageFiles: true, confirm: 'reef' }),
+      expect.anything(),
+    )
+  })
+
+  it('shows a running delete with pause and abort', async () => {
+    purgeStatus.value = { state: 'paused' }
+    try {
+      const { root } = await open({ kind: 'folder', bucket: 'reef', nodeId: null, key: 'a/', option: 'delete-permanently' })
+      expect(content(root)).toContain('job paused 3 of 10')
+      await click(button(root, 'job paused'))
+      expect(purgeControl).toHaveBeenCalledWith('abort', expect.anything())
+    } finally {
+      purgeStatus.value = null
+    }
   })
 
   it('leaves the box out when the node cannot size the delete', async () => {

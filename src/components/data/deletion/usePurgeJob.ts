@@ -2,6 +2,7 @@
 // completed batches is retained so a failure still shows what was committed.
 import { ref } from 'vue'
 import {
+  controlStoragePurge,
   getStoragePurgeJob,
   isTerminalStoragePurgeJob,
   retainStoragePurgeProgress,
@@ -52,7 +53,12 @@ export function usePurgeJob() {
     }
   }
 
-  return { submission, status, progress, reset, run }
+  /** Pauses, resumes or aborts the running delete; the poll shows the new state. */
+  async function control(action: 'pause' | 'resume' | 'abort', client: ApiClientOptions) {
+    if (submission.value) await controlStoragePurge(submission.value.job_id, action, client)
+  }
+
+  return { submission, status, progress, reset, run, control }
 }
 
 export type PurgeJob = ReturnType<typeof usePurgeJob>

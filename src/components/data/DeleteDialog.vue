@@ -15,6 +15,7 @@ import DeletionImpact from '@/components/data/deletion/DeletionImpact.vue'
 import DeletionOutcome from '@/components/data/deletion/DeletionOutcome.vue'
 import PermanentDeleteImpact from '@/components/data/deletion/PermanentDeleteImpact.vue'
 import PurgeProgress from '@/components/data/deletion/PurgeProgress.vue'
+import JobProgress from '@/components/storage/JobProgress.vue'
 import VersionPicker from '@/components/data/deletion/VersionPicker.vue'
 import { useDeletionPreflight } from '@/components/data/deletion/useDeletionPreflight'
 import { usePurgeJob } from '@/components/data/deletion/usePurgeJob'
@@ -24,6 +25,7 @@ import {
 } from '@/components/data/deletion/useSelectionDelete'
 import { removeBucket } from '@/components/groups/bucketRemoval'
 import { getDeleteImpact, type DeleteImpact } from '@/lib/api'
+import { organizeError, type ProgressJob } from '@/lib/organize'
 import { nodeApiBase } from '@/composables/s3/endpoints'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
@@ -43,6 +45,7 @@ import {
   createStoragePurgeOperation,
   getStorageDeletionPreflight,
   isStorageDeletionNotFound,
+  isTerminalStoragePurgeJob,
   storageDeletionErrorMessage,
   type StorageDeletionPreflight,
 } from '@/lib/storageDeletion'
@@ -286,6 +289,33 @@ async function loadPreflight() {
   }
 }
 
+// The running delete as the shared progress box shows it, with Pause and Abort.
+const purgeJob = computed<ProgressJob | null>(() => {
+  const status = purge.status.value
+  if (!status || isTerminalStoragePurgeJob(status.state)) return null
+  const total = purge.progress.value?.total
+  return {
+    kind: 'purge',
+    state: status.state === 'paused' ? 'paused' : 'running',
+    done: purge.progress.value?.current ?? 0,
+    total: total ?? 0,
+    counted: total !== undefined,
+    skipped: 0,
+    failed: 0,
+    controls: true,
+  }
+})
+
+async function controlPurge(action: 'pause' | 'resume' | 'abort') {
+  const client = apiClient()
+  if (!client) return
+  try {
+    await purge.control(action, client)
+  } catch (caught) {
+    error.value = organizeError(caught)
+  }
+}
+
 // Older nodes answer 404 or fail; the box is then left out and the delete goes on as before.
 async function loadImpact() {
   const target = scope.value
@@ -411,7 +441,8 @@ async function runPurge(current: DeleteRequest): Promise<string[]> {
   }
   const target = scope.value
   if (!target) throw new Error('This target has no permanent deletion scope.')
-  const status = await purge.run(createStoragePurgeOperation(target), client)
+  const storage = { deleteStorageFiles: true, confirm: target.kind === 'bucket' ? target.bucket : undefined }
+  const status = await purge.run(createStoragePurgeOperation(target, undefined, storage), client)
   if (id !== requestId) return []
   await refreshRemaining(client)
   if (status?.state === 'failed') throw new Error(status.error?.message ?? 'The deletion failed.')
@@ -637,6 +668,8 @@ onUnmounted(() => {
             </ul>
           </div>
         </section>
+
+        <JobProgress v-if="purgeJob" :job="purgeJob" @control="controlPurge" />
 
         <PurgeProgress
           :submission="purge.submission.value"

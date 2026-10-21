@@ -120,7 +120,7 @@ describe('Data Manager version-aware deletion', () => {
     expect(progress.template).toContain('Remaining after refresh')
     expect(progress.template).toContain('Reusing the existing deletion for this retry.')
     expect(deleteDialog.template).toContain('Try again')
-    expect(deleteDialogSource).toContain('createStoragePurgeOperation(target)')
+    expect(deleteDialogSource).toContain('createStoragePurgeOperation(target, undefined, storage)')
   })
 
   it('keeps ordinary file and folder deletion version-less and truthfully worded', () => {
@@ -478,6 +478,8 @@ const deleteDialogComponent = compileClientComponent(
     '@/components/data/deletion/DeletionImpact.vue': moduleDefault(Slotted('section')),
     '@/components/data/deletion/DeletionOutcome.vue': moduleDefault(Slotted('section')),
     '@/components/data/deletion/PermanentDeleteImpact.vue': moduleDefault(Slotted('section')),
+    '@/components/storage/JobProgress.vue': moduleDefault(Slotted('section')),
+    '@/lib/organize': { organizeError: (err: unknown) => String(err) },
     '@/lib/api': { getDeleteImpact: async () => { throw new Error('not found') } },
     '@/components/data/deletion/PurgeProgress.vue': moduleDefault(Slotted('section')),
     '@/components/data/deletion/VersionPicker.vue': moduleDefault(Slotted('section')),

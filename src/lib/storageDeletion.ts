@@ -68,6 +68,10 @@ export interface StorageDeletionPreflight {
 export interface StoragePurgeOperation {
   scope: StorageDeletionScope
   idempotencyKey: string
+  /** Also deletes the files in the group storage that held the data. */
+  deleteStorageFiles?: boolean
+  /** The bucket name, which a bucket scope must repeat. */
+  confirm?: string
 }
 
 export interface StoragePurgeSubmission {
@@ -82,6 +86,7 @@ export type StoragePurgeJobState =
   | 'preparing'
   | 'ready'
   | 'running'
+  | 'paused'
   | 'cancelling'
   | 'indeterminate'
   | 'succeeded'
@@ -129,12 +134,13 @@ export interface StoragePurgeJobStatus {
 export function createStoragePurgeOperation(
   scope: StorageDeletionScope,
   idempotencyKey?: string,
+  storage?: { deleteStorageFiles: boolean; confirm?: string },
 ): StoragePurgeOperation {
-  if (idempotencyKey) return { scope, idempotencyKey }
   const nonce = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`
   return {
     scope,
-    idempotencyKey: `storage-purge-${scope.kind}-${nonce}`,
+    idempotencyKey: idempotencyKey ?? `storage-purge-${scope.kind}-${nonce}`,
+    ...storage,
   }
 }
 
@@ -161,10 +167,21 @@ export function startStoragePurge(
       body: JSON.stringify({
         scope: operation.scope,
         idempotency_key: operation.idempotencyKey,
+        ...(operation.deleteStorageFiles ? { delete_storage_files: true } : {}),
+        ...(operation.confirm ? { confirm: operation.confirm } : {}),
       }),
     },
     client,
   )
+}
+
+/** Pauses, resumes or aborts a permanent delete; the node answers 204. */
+export function controlStoragePurge(
+  jobId: string,
+  action: 'pause' | 'resume' | 'abort',
+  client: ApiClientOptions,
+): Promise<void> {
+  return apiRequest(`/data/storage/purge/jobs/${encodeURIComponent(jobId)}/${action}`, { method: 'POST' }, client)
 }
 
 export function getStoragePurgeJob(
