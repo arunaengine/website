@@ -86,7 +86,6 @@ describe('FileRulesStep', () => {
     await pending
 
     expect(content(root)).not.toContain('proteins/a.faa.gz')
-    expect(button(root, 'Save').props.disabled).toBe(true)
   })
 
   it('reports no save for rules edited while saving', async () => {
@@ -141,15 +140,32 @@ describe('FileRulesStep', () => {
     expect(button(root, 'Save').props.disabled).toBe(true)
   })
 
-  it('calls counts partial while more files wait', async () => {
+  it('shows one page at a time and goes back by the kept cursor', async () => {
     previewFileRules.mockResolvedValueOnce({ ...PAGE, next: 'n1' })
     const { root } = await mount()
     await click(button(root, 'Show where files go'))
-    expect(content(root)).toContain('Shown so far: 1 sorted')
+    expect(content(root)).toContain('On this page: 1 sorted')
+    expect(button(root, 'Previous').props.disabled).toBe(true)
 
-    previewFileRules.mockResolvedValueOnce({ files: [], next: null })
-    await click(button(root, 'Show more'))
-    expect(content(root)).not.toContain('Shown so far')
+    previewFileRules.mockResolvedValueOnce({ files: [{ path: 'raw/b.faa.gz', key: 'proteins/b.faa.gz', outcome: 'matched' }], next: null })
+    await click(button(root, 'Next'))
+    expect(previewFileRules).toHaveBeenLastCalledWith('g1', 'i1', [RULE], 'n1', expect.anything())
+    expect(content(root)).toContain('raw/b.faa.gz')
+    expect(content(root)).not.toContain('raw/a.faa.gz')
+
+    previewFileRules.mockResolvedValueOnce({ ...PAGE, next: 'n1' })
+    await click(button(root, 'Previous'))
+    expect(previewFileRules).toHaveBeenLastCalledWith('g1', 'i1', [RULE], null, expect.anything())
+    expect(content(root)).toContain('raw/a.faa.gz')
+  })
+
+  it('saves valid rules without a preview', async () => {
+    saveFileRules.mockResolvedValue({ rules: [RULE] })
+    const { root } = await mount()
+    expect(button(root, 'Save').props.disabled).toBe(false)
+    await click(button(root, 'Save'))
+    expect(saveFileRules).toHaveBeenCalledWith('g1', 'i1', [RULE], expect.anything())
+    expect(content(root)).toContain('Saved.')
   })
 
   it('does not save while offline', async () => {

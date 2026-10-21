@@ -102,7 +102,9 @@ function show(id: string, action: 'show' | 'organize') {
           </li>
         </ul>
         <ul v-if="details === problem.id && problem.id === 'conflicts'" class="mt-2 space-y-0.5 font-mono text-[11px]">
-          <li v-for="item in status?.conflicts.slice(0, 20)" :key="item.path" class="break-all">{{ item.path }}</li>
+          <li v-for="item in status?.conflicts.slice(0, 20)" :key="item.path" class="break-all">
+            {{ item.path }}<span v-if="item.reason" class="font-sans text-muted-foreground"> · {{ item.reason }}</span>
+          </li>
         </ul>
       </li>
       <li v-if="runError" class="break-all px-5 py-3 text-xs text-destructive">{{ runError }}</li>

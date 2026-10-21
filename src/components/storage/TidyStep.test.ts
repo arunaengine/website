@@ -1,5 +1,5 @@
 import * as VueRuntime from 'vue'
-import { defineComponent, h, ref } from 'vue'
+import { defineComponent, h, reactive, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { button, click, compileClientComponent, content, flush, mountApp, moduleDefault } from '@/test/clientRender'
 import * as Api from '@/lib/api'
@@ -20,7 +20,9 @@ const ButtonStub = defineComponent({
 })
 const ListStub = defineComponent({
   props: { total: Number, shown: Number, offset: Number, filter: String, hasNext: Boolean, hasPrev: Boolean, complete: Boolean, busy: Boolean },
-  setup: (props, { slots }) => () => h('div', [h('ul', slots.default?.()), h('span', `list ${props.shown} of ${props.total}`)]),
+  emits: ['filter'],
+  setup: (props, { slots, emit }) => () =>
+    h('div', [h('ul', slots.default?.()), h('span', `list ${props.shown} of ${props.total}`), h('button', { onClick: () => emit('filter', 'x') }, 'filter x')]),
 })
 
 const TidyStep = compileClientComponent(new URL('./TidyStep.vue', import.meta.url), {
@@ -99,6 +101,43 @@ describe('TidyStep', () => {
     previewDuplicates.mockResolvedValue({ ...COPIES, complete: false })
     const { root } = await mount(null)
     expect(content(root)).toContain('At least 842 files are stored twice')
+  })
+
+  it('does not call a partial count of zero nothing to tidy', async () => {
+    previewDuplicates.mockResolvedValue({ ...COPIES, total: 0, bytes: 0, complete: false, items: [], next: 'c1' })
+    const { root } = await mount({ count: 0, complete: true, files: [] })
+    const text = content(root)
+    expect(text).toContain('Some files may be stored twice')
+    expect(text).not.toContain('Nothing to tidy.')
+    expect(button(root, 'Remove copies')).toBeTruthy()
+  })
+
+  it('says nothing to tidy only once the checks are settled and empty', async () => {
+    previewDuplicates.mockResolvedValue({ ...COPIES, total: 0, bytes: 0, items: [] })
+    const { root } = await mount({ count: 0, complete: true, files: [] })
+    expect(content(root)).toContain('Nothing to tidy.')
+    previewDuplicates.mockReset().mockReturnValue(new Promise(() => {}))
+    const waiting = await mount({ count: 0, complete: true, files: [] })
+    expect(content(waiting.root)).not.toContain('Nothing to tidy.')
+  })
+
+  it('keeps the whole count on the button while a filter is used', async () => {
+    const { root } = await mount(null)
+    previewDuplicates.mockResolvedValue({ ...COPIES, total: 2 })
+    await click(button(root, 'Preview'))
+    await click(button(root, 'filter x'))
+    expect(button(root, 'Remove 842 copies')).toBeTruthy()
+  })
+
+  it('looks again when a running step ends', async () => {
+    const props = reactive({ groupId: 'g1', link: { import_id: 'i1' }, renames: null, blocked: true })
+    const mounted = await mountApp(defineComponent(() => () => h(TidyStep, props)))
+    await flush()
+    expect(previewDuplicates).toHaveBeenCalledTimes(1)
+    props.blocked = false
+    await flush()
+    expect(previewDuplicates).toHaveBeenCalledTimes(2)
+    mounted.app.unmount()
   })
 
   it('hides the copies on an older node and says nothing is left', async () => {

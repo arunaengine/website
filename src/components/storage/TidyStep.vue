@@ -42,20 +42,33 @@ function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
 }
 
-const copies = useCursorPage<DuplicateItem>((query) =>
-  previewDuplicates(props.groupId, props.link.import_id, query, client()),
+const copiesMissing = ref(false)
+const copies = useCursorPage<DuplicateItem>(
+  (query) => previewDuplicates(props.groupId, props.link.import_id, query, client()),
+  () => (copiesMissing.value = true),
 )
+// The action works on every copy, so its count is the one taken without a name filter.
+const copyAll = ref<{ total: number; bytes: number; complete: boolean } | null>(null)
+
+async function loadCopies() {
+  await copies.load('')
+  const page = copies.page.value as { total: number; bytes?: number; complete: boolean } | null
+  if (page) copyAll.value = { total: page.total, bytes: page.bytes ?? 0, complete: page.complete }
+}
 const oldNames = useCursorPage<{ from: string; to: string; writable?: boolean }>(async (query) => {
   const found = await getImportRenames(props.groupId, props.link.import_id, client(), query)
   return { items: found.files, total: found.count, complete: found.complete, next: found.next }
 })
 
-const copyTotal = computed(() => copies.page.value?.total ?? 0)
-const copyBytes = computed(() => (copies.page.value as { bytes?: number } | null)?.bytes ?? 0)
-const copyComplete = computed(() => copies.page.value?.complete ?? true)
+const copyTotal = computed(() => copyAll.value?.total ?? 0)
+const copyBytes = computed(() => copyAll.value?.bytes ?? 0)
+const copyComplete = computed(() => copyAll.value?.complete ?? true)
+// A partial count of zero is not "none": more copies may follow.
+const copyOffered = computed(() => copyTotal.value > 0 || !copyComplete.value)
+const copySettled = computed(() => copyAll.value !== null || copiesMissing.value)
 const renameCount = computed(() => props.renames?.count ?? 0)
 const renameOffered = computed(() => Boolean(props.renames && (props.renames.count > 0 || !props.renames.complete)))
-const idle = computed(() => !renameOffered.value && !copyTotal.value)
+const idle = computed(() => !renameOffered.value && !copyOffered.value && copySettled.value && !copies.error.value)
 
 watch(
   () => [props.link.import_id, sessionEpoch.value],
@@ -65,9 +78,22 @@ watch(
     showCopies.value = false
     showRenames.value = false
     error.value = null
-    void copies.load('')
+    copyAll.value = null
+    copiesMissing.value = false
+    void loadCopies()
   },
   { immediate: true },
+)
+
+// A finished step changes what is left to tidy, so the lists start over.
+watch(
+  () => props.blocked,
+  (now, before) => {
+    if (!before || now) return
+    copies.reset()
+    void loadCopies()
+    if (showRenames.value) void oldNames.load('')
+  },
 )
 
 function toggleRenames() {
@@ -139,19 +165,20 @@ const offlineHint = computed(() => (writesDisabled.value ? OFFLINE_WRITE_HINT : 
       </PagedList>
     </div>
 
-    <div v-if="copyTotal" class="space-y-2" data-testid="copies-row">
+    <div v-if="copyOffered" class="space-y-2" data-testid="copies-row">
       <div class="flex items-center gap-2">
         <div class="min-w-0 flex-1">
-          <p class="text-sm">
+          <p v-if="copyTotal" class="text-sm">
             {{ copyComplete ? '' : 'At least ' }}{{ filesWord(copyTotal) }} {{ copyTotal === 1 ? 'is' : 'are' }} stored twice · {{ formatBytes(copyBytes) }}
           </p>
+          <p v-else class="text-sm">Some files may be stored twice</p>
           <p class="text-xs text-muted-foreground">Same name, same content. One copy stays; all versions keep working.</p>
         </div>
         <Button variant="outline" size="sm" @click="showCopies = !showCopies">
           {{ showCopies ? 'Hide preview' : 'Preview' }}
         </Button>
         <Button size="sm" :disabled="busy || blocked || writesDisabled" :title="offlineHint" @click="removeCopies">
-          Remove {{ copyTotal === 1 ? '1 copy' : `${copyTotal} copies` }}
+          {{ copyTotal ? `Remove ${copyTotal === 1 ? '1 copy' : `${copyTotal} copies`}` : 'Remove copies' }}
         </Button>
       </div>
       <PagedList

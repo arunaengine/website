@@ -35,6 +35,9 @@ const busy = ref(false)
 const unsupported = ref(false)
 const error = ref<string | null>(null)
 const saved = ref(false)
+// A preview shows one page; Previous reopens an earlier cursor, so the list stays bounded.
+const cursors = ref<(string | null)[]>([null])
+const pageIndex = ref(0)
 let requestId = 0
 
 function client() {
@@ -52,6 +55,8 @@ async function load() {
   rules.value = []
   files.value = []
   next.value = null
+  cursors.value = [null]
+  pageIndex.value = 0
   previewed.value = false
   error.value = null
   saved.value = false
@@ -78,6 +83,8 @@ watch(() => [props.link.import_id, sessionEpoch.value], load, { immediate: true 
 // A changed rule makes an old preview wrong.
 watch(rules, () => {
   previewed.value = false
+  cursors.value = [null]
+  pageIndex.value = 0
   saved.value = false
 }, { deep: true })
 
@@ -85,9 +92,12 @@ const counts = computed(() => previewCounts(files.value))
 const problems = computed(() => rules.value.map(ruleProblem))
 const invalid = computed(() => problems.value.some(Boolean))
 
-async function preview(more = false) {
+async function preview(move: 'first' | 'next' | 'prev' = 'first') {
   const link = props.link
   if (busy.value || !loaded.value || invalid.value) return
+  const at = move === 'first' ? 0 : pageIndex.value + (move === 'next' ? 1 : -1)
+  const known = move === 'first' ? [null] : move === 'next' ? [...cursors.value.slice(0, at), next.value] : cursors.value
+  if (at < 0 || (move === 'next' && !next.value)) return
   const id = ++requestId
   const sent = ruleKey()
   busy.value = true
@@ -97,11 +107,13 @@ async function preview(more = false) {
       props.groupId,
       link.import_id,
       cleanRules(rules.value),
-      more ? next.value : null,
+      known[at] ?? null,
       client(),
     )
     if (id !== requestId || sent !== ruleKey()) return
-    files.value = more ? [...files.value, ...page.files] : page.files
+    files.value = page.files
+    cursors.value = known
+    pageIndex.value = at
     next.value = page.next ?? null
     previewed.value = true
   } catch (err) {
@@ -113,7 +125,7 @@ async function preview(more = false) {
 
 async function save() {
   const link = props.link
-  if (busy.value || !loaded.value || !previewed.value || invalid.value || writesDisabled.value) return
+  if (busy.value || !loaded.value || invalid.value || writesDisabled.value) return
   const id = ++requestId
   const sent = ruleKey()
   busy.value = true
@@ -156,7 +168,7 @@ async function save() {
 
       <template v-if="previewed">
         <p class="text-xs text-foreground">
-          <template v-if="next">Shown so far: </template>{{ counts.matched }} sorted, {{ counts.unmatched }} stay<template v-if="counts.conflicts">,
+          <template v-if="next || pageIndex">On this page: </template>{{ counts.matched }} sorted, {{ counts.unmatched }} stay<template v-if="counts.conflicts">,
             {{ counts.conflicts }} conflict and are skipped</template>.
         </p>
         <ul class="max-h-64 divide-y divide-border overflow-y-auto rounded-md border border-border text-xs scrollbar-thin">
@@ -169,7 +181,10 @@ async function save() {
           </li>
           <li v-if="!files.length" class="px-3 py-2 text-muted-foreground">No files in this folder.</li>
         </ul>
-        <Button v-if="next" variant="ghost" size="sm" :disabled="busy" @click="preview(true)">Show more</Button>
+        <div v-if="next || pageIndex" class="flex gap-2">
+          <Button variant="outline" size="sm" :disabled="busy || !pageIndex" @click="preview('prev')">Previous</Button>
+          <Button variant="outline" size="sm" :disabled="busy || !next" @click="preview('next')">Next</Button>
+        </div>
       </template>
     </div>
 
@@ -179,7 +194,7 @@ async function save() {
       <Button v-if="!loaded" variant="outline" @click="load">Try again</Button>
       <Button variant="outline" :disabled="busy || !loaded || invalid" @click="preview()">Show where files go</Button>
       <Button
-        :disabled="busy || !loaded || !previewed || invalid || writesDisabled"
+        :disabled="busy || !loaded || invalid || writesDisabled"
         :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
         @click="save"
       >

@@ -95,7 +95,7 @@ export interface DeleteItem {
   key: string
   version_id: string
   bytes: number
-  storage_file?: { path: string; bytes: number; kept?: boolean } | null
+  storage_file?: { path: string; bytes: number; kept?: string | null } | null
 }
 
 export interface DeleteImpact {

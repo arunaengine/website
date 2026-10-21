@@ -31,9 +31,13 @@ function client() {
 }
 
 const request = computed(() => {
-  const asked = { pattern: pattern.value.trim(), target: target.value.trim() }
-  const folder = from.value.trim()
-  return folder ? { ...asked, from: folder, subfolders: subfolders.value } : asked
+  // An empty folder is the root of the bucket, not the node's default upload folder.
+  return {
+    pattern: pattern.value.trim(),
+    target: target.value.trim(),
+    from: from.value.trim(),
+    subfolders: subfolders.value,
+  }
 })
 const problem = computed(() => (pattern.value || target.value ? moveProblem(request.value) : null))
 const ready = computed(() => !moveProblem(request.value))
@@ -42,16 +46,17 @@ const list = useCursorPage<MoveItem>(
   (query) => previewMove(props.groupId, props.link.import_id, request.value, query, client()),
   () => emit('unsupported'),
 )
-const total = computed(() => list.page.value?.total ?? 0)
-const complete = computed(() => list.page.value?.complete ?? true)
+// The action moves the whole scope, so its count is the one taken without a name filter.
+const scopeTotal = ref<{ total: number; complete: boolean } | null>(null)
+const total = computed(() => scopeTotal.value?.total ?? 0)
+const complete = computed(() => scopeTotal.value?.complete ?? true)
 const isBlocked = computed(() => props.blocked || Boolean((list.page.value as { blocked?: unknown } | null)?.blocked))
 
 // Other files or names make an old preview wrong.
 watch([pattern, target, from, subfolders], () => {
-  requestId++
   list.reset()
   previewed.value = false
-  busy.value = false
+  scopeTotal.value = null
 })
 watch(() => [props.link.import_id, sessionEpoch.value], () => {
   pattern.value = ''
@@ -64,7 +69,9 @@ watch(() => [props.link.import_id, sessionEpoch.value], () => {
 async function preview() {
   if (!ready.value) return
   await list.load('')
-  previewed.value = true
+  const page = list.page.value
+  if (page && list.filter.value === '') scopeTotal.value = { total: page.total, complete: page.complete }
+  previewed.value = Boolean(page)
 }
 
 async function start() {
@@ -92,18 +99,18 @@ async function start() {
   <div class="space-y-2">
     <div class="flex flex-wrap items-center gap-2 text-sm">
       Files
-      <Input v-model="pattern" placeholder="*.faa.gz" aria-label="Files to move" class="h-8 max-w-44 font-mono text-xs" />
+      <Input v-model="pattern" placeholder="*.faa.gz" aria-label="Files to move" :disabled="busy" class="h-8 max-w-44 font-mono text-xs" />
       to
-      <Input v-model="target" placeholder="proteins/{name}" aria-label="New name" class="h-8 max-w-56 font-mono text-xs" />
+      <Input v-model="target" placeholder="proteins/{name}" aria-label="New name" :disabled="busy" class="h-8 max-w-56 font-mono text-xs" />
       <Button variant="outline" size="sm" :disabled="list.busy.value || !ready" @click="preview">Preview</Button>
     </div>
     <p v-if="problem" class="text-[11px] text-destructive">{{ problem }}</p>
 
     <div class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
       Only in folder
-      <Input v-model="from" placeholder="whole bucket" aria-label="Only in folder" class="h-8 max-w-44 font-mono text-xs" />
+      <Input v-model="from" placeholder="whole bucket" aria-label="Only in folder" :disabled="busy" class="h-8 max-w-44 font-mono text-xs" />
       <label class="flex items-center gap-1.5">
-        <input v-model="subfolders" type="checkbox" aria-label="Include subfolders" :disabled="!from.trim()" />
+        <input v-model="subfolders" type="checkbox" aria-label="Include subfolders" :disabled="busy" />
         Include subfolders
       </label>
     </div>
@@ -114,8 +121,8 @@ async function start() {
       </p>
       <Notice v-if="isBlocked">Another step is running.</Notice>
       <PagedList
-        :total="total"
-        :complete="complete"
+        :total="list.page.value?.total ?? 0"
+        :complete="list.page.value?.complete ?? true"
         :offset="list.offset.value"
         :shown="list.items.value.length"
         :filter="list.filter.value"
@@ -137,7 +144,7 @@ async function start() {
     </div>
 
     <p class="text-[11px] text-muted-foreground">
-      Only the names in Aruna change. Your storage stays as it is. Links by path change. DRS links keep working.
+      Only the names in Aruna change. Your storage stays as it is. Links by path change. DRS links by content keep working.
     </p>
     <Notice v-if="error || list.error.value" tone="error">{{ error ?? list.error.value }}</Notice>
     <Button

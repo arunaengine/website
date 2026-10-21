@@ -765,7 +765,7 @@ export const docsTopics: DocsTopic[] = [
         steps: [
           'Organize on the card of a link opens one panel with three steps. All are optional, and nothing changes until you start one.',
           'Step 1, Where new files go: a file rule puts new files into folders by name, such as `*.faa.gz` into proteins/. `*` stands for any text, `?` for one character, `[0-9]` for one of a range, `{4}` for a repeat count and `{fna,fa}` for either. Other files go to the top of the bucket. Show where files go lists each file before you save.',
-          'Step 2, Move existing files: give files already in the bucket a new name, such as `*.faa.gz` to `proteins/{name}`. Preview lists them 100 at a time, and names that are taken stay. Only the names in Aruna change; your storage stays as it is. Links by path change, DRS links keep working.',
+          'Step 2, Move existing files: give files already in the bucket a new name, such as `*.faa.gz` to `proteins/{name}`. Preview lists them 100 at a time, and names that are taken stay. Only the names in Aruna change; your storage stays as it is. Links by path change; DRS links by content keep working.',
           'Step 3, Tidy your storage: Rename files gives files with the old name the new one in your storage (a copy first, then the old file is removed). Remove copies deletes files that are stored twice and keeps one. A file is only removed after its copy is checked and nothing else uses it.',
           'A running step shows its progress on the card and in the panel. Pause it, resume it, or abort it. Work already done stays done, and you can start again later.',
           'Several linked folders may share one storage folder. A new file there needs a file rule in exactly one of them.',

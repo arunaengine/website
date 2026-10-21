@@ -32,7 +32,7 @@ const ListStub = defineComponent({
   setup: (props, { emit, slots }) => () =>
     h('div', [
       h('ul', slots.default?.()),
-      h('span', `range ${props.offset}+${props.shown} of ${props.total}`),
+      h('span', `shown ${props.shown} of ${props.total}`),
       h('button', { onClick: () => emit('next') }, 'next page'),
       h('button', { onClick: () => emit('filter', 'x') }, 'filter x'),
     ]),
@@ -108,11 +108,12 @@ describe('MoveStep', () => {
     expect(previewMove).toHaveBeenCalledWith(
       'g1',
       'i1',
-      { pattern: '*.faa.gz', target: 'proteins/{name}' },
+      { pattern: '*.faa.gz', target: 'proteins/{name}', from: '', subfolders: false },
       { filter: '', limit: 100, after: null },
       expect.anything(),
     )
     expect(content(root)).toContain('214,880 files match.')
+    expect(content(root)).toContain('DRS links by content keep working')
     expect(content(root)).toContain('proteins/X1.faa.gz (taken)')
     expect(button(root, 'Move 214,880 files')).toBeTruthy()
 
@@ -138,6 +139,29 @@ describe('MoveStep', () => {
     )
   })
 
+  it('keeps the whole scope count on the button while a name filter is used', async () => {
+    const { root } = await mount()
+    await fill(root)
+    await click(button(root, 'Preview'))
+    previewMove.mockResolvedValue({ ...PLAN, total: 3 })
+    await click(button(root, 'filter x'))
+    expect(content(root)).toContain('shown 1 of 3')
+    expect(button(root, 'Move 214,880 files')).toBeTruthy()
+  })
+
+  it('locks the fields while the move is being accepted', async () => {
+    let accept: (value: unknown) => void = () => {}
+    startMove.mockReturnValueOnce(new Promise((resolve) => (accept = resolve)))
+    const { root, events } = await mount()
+    await fill(root)
+    const pending = click(button(root, 'Move files'))
+    await flush()
+    expect(field(root, 'Files to move').props.disabled).toBe(true)
+    accept({})
+    await pending
+    expect(events).toEqual(['started'])
+  })
+
   it('does not start while the node reports another step', async () => {
     previewMove.mockResolvedValue({ ...PLAN, blocked: true })
     const { root } = await mount()
@@ -159,7 +183,7 @@ describe('MoveStep', () => {
     const { root, events } = await mount()
     await fill(root)
     await click(button(root, 'Move files'))
-    expect(startMove).toHaveBeenCalledWith('g1', 'i1', { pattern: '*.faa.gz', target: 'proteins/{name}' }, expect.anything())
+    expect(startMove).toHaveBeenCalledWith('g1', 'i1', { pattern: '*.faa.gz', target: 'proteins/{name}', from: '', subfolders: false }, expect.anything())
     expect(previewMove).not.toHaveBeenCalled()
     expect(events).toEqual(['started'])
   })
