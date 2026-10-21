@@ -22,6 +22,8 @@ defineProps<{
   /** False when the node has no routes for moving files and removing copies. */
   supported: boolean
   controlling?: boolean
+  /** Counts steps that ended, so the lists read again. */
+  finished?: number
   error?: string | null
 }>()
 const emit = defineEmits<{
@@ -76,7 +78,7 @@ const emit = defineEmits<{
           <span class="grid size-6 shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">{{ supported ? 3 : 2 }}</span>
           <div class="min-w-0 flex-1 space-y-2">
             <h4 class="text-sm font-medium text-foreground">Tidy your storage</h4>
-            <TidyStep :group-id="groupId" :link="link" :renames="renames" :blocked="job !== null" @started="emit('refresh')" />
+            <TidyStep :group-id="groupId" :link="link" :renames="renames" :blocked="job !== null" :finished="finished" @started="emit('refresh')" />
           </div>
         </section>
       </div>

@@ -109,7 +109,7 @@ export function linkProblems(
   if (conflicts.length) {
     found.push({
       id: 'conflicts',
-      text: `${filesWord(conflicts.length)} ${conflicts.length === 1 ? 'needs' : 'need'} a decision. Add a file rule to choose one.`,
+      text: `${filesWord(conflicts.length)} ${conflicts.length === 1 ? 'needs' : 'need'} a decision. Choose Show to see why.`,
       action: 'show',
     })
   }

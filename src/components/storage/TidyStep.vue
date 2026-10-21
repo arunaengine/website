@@ -27,6 +27,8 @@ const props = defineProps<{
   renames: BackendImportRenames | null
   /** A step is running, so no second one starts. */
   blocked?: boolean
+  /** Counts steps that ended; a change means the lists are out of date. */
+  finished?: number
 }>()
 const emit = defineEmits<{ (e: 'started'): void }>()
 
@@ -85,11 +87,10 @@ watch(
   { immediate: true },
 )
 
-// A finished step changes what is left to tidy, so the lists start over.
+// A finished step changes what is left to tidy, even one that ended before anyone saw it run.
 watch(
-  () => props.blocked,
-  (now, before) => {
-    if (!before || now) return
+  () => props.finished,
+  () => {
     copies.reset()
     void loadCopies()
     if (showRenames.value) void oldNames.load('')
@@ -183,8 +184,8 @@ const offlineHint = computed(() => (writesDisabled.value ? OFFLINE_WRITE_HINT : 
       </div>
       <PagedList
         v-if="showCopies"
-        :total="copyTotal"
-        :complete="copyComplete"
+        :total="copies.page.value?.total ?? 0"
+        :complete="copies.page.value?.complete ?? true"
         :offset="copies.offset.value"
         :shown="copies.items.value.length"
         :filter="copies.filter.value"

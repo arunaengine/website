@@ -109,7 +109,7 @@ describe('linked folder card', () => {
   it('says what to do about a claimed file', async () => {
     status.value = { conflicts: [{ path: 'raw/report.csv', reason: 'two links' }] }
     const { root } = await mount()
-    expect(content(root)).toContain('1 file needs a decision. Add a file rule to choose one.')
+    expect(content(root)).toContain('1 file needs a decision. Choose Show to see why.')
     await click(button(root, 'Show'))
     expect(content(root)).toContain('raw/report.csv')
     expect(content(root)).toContain('two links')

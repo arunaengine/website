@@ -28,6 +28,9 @@ export function useLinkState(groupId: () => string, importId: () => string) {
   const controlError = ref<string | null>(null)
   const error = computed(() => readError.value ?? controlError.value)
   const controlling = ref(false)
+  // Counts steps seen to end, so lists that depend on the result can read again.
+  const finished = ref(0)
+  let lastEnd = ''
   let generation = 0
   let disposed = false
   let timer: ReturnType<typeof setTimeout> | null = null
@@ -62,8 +65,13 @@ export function useLinkState(groupId: () => string, importId: () => string) {
     if (disposed || id !== generation) return
     if (found.state !== 'failed') renames.value = found.state === 'ok' ? found.value : null
     if (counted.state !== 'failed') status.value = counted.state === 'ok' ? counted.value : null
-    if (current.state === 'ok') stored.value = current.value
-    else if (current.state === 'missing') {
+    const wasActive = job.value !== null
+    if (current.state === 'ok') {
+      stored.value = current.value
+      const ended = current.value && !activeJob(current.value) ? `${current.value.started_at_ms}:${current.value.finished_at_ms}` : ''
+      if ((ended && ended !== lastEnd) || (wasActive && !current.value)) finished.value++
+      if (ended) lastEnd = ended
+    } else if (current.state === 'missing') {
       supported.value = false
       stored.value = null
     }
@@ -101,5 +109,5 @@ export function useLinkState(groupId: () => string, importId: () => string) {
     if (timer) clearTimeout(timer)
   })
 
-  return { renames, status, job, supported, error, controlling, refresh, control }
+  return { renames, status, job, supported, error, controlling, finished, refresh, control }
 }

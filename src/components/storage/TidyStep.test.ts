@@ -129,15 +129,24 @@ describe('TidyStep', () => {
     expect(button(root, 'Remove 842 copies')).toBeTruthy()
   })
 
-  it('looks again when a running step ends', async () => {
-    const props = reactive({ groupId: 'g1', link: { import_id: 'i1' }, renames: null, blocked: true })
+  it('looks again when a step ends, even one nobody saw run', async () => {
+    const props = reactive({ groupId: 'g1', link: { import_id: 'i1' }, renames: null, blocked: false, finished: 0 })
     const mounted = await mountApp(defineComponent(() => () => h(TidyStep, props)))
     await flush()
     expect(previewDuplicates).toHaveBeenCalledTimes(1)
-    props.blocked = false
+    props.finished = 1
     await flush()
     expect(previewDuplicates).toHaveBeenCalledTimes(2)
     mounted.app.unmount()
+  })
+
+  it('pages with the filtered totals and keeps the whole count on the action', async () => {
+    const { root } = await mount(null)
+    await click(button(root, 'Preview'))
+    previewDuplicates.mockResolvedValue({ ...COPIES, total: 2 })
+    await click(button(root, 'filter x'))
+    expect(content(root)).toContain('list 1 of 2')
+    expect(button(root, 'Remove 842 copies')).toBeTruthy()
   })
 
   it('hides the copies on an older node and says nothing is left', async () => {

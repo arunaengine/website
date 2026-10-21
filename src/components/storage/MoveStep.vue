@@ -117,7 +117,7 @@ async function start() {
 
     <div v-if="previewed && list.page.value" class="space-y-2 rounded-md border border-border bg-muted/30 p-3">
       <p class="text-sm">
-        <b>{{ complete ? '' : 'At least ' }}{{ filesWord(total) }}</b> match. Files whose new name is taken stay.
+        <b>{{ complete ? '' : 'At least ' }}{{ filesWord(total) }}</b> match. Files that cannot move stay where they are.
       </p>
       <Notice v-if="isBlocked">Another step is running.</Notice>
       <PagedList
@@ -137,7 +137,7 @@ async function start() {
           <span class="min-w-0 flex-1 truncate" :title="item.from">{{ item.from }}</span>
           <span class="shrink-0 font-sans text-muted-foreground">→</span>
           <span class="min-w-0 flex-1 truncate" :class="item.conflict ? 'text-destructive' : ''" :title="item.to">
-            {{ item.to }}<template v-if="item.conflict"> (taken)</template>
+            {{ item.to }}<template v-if="item.conflict"> ({{ item.conflict }})</template>
           </span>
         </li>
       </PagedList>

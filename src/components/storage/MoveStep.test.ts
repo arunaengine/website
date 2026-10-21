@@ -58,7 +58,7 @@ const MoveStep = compileClientComponent(new URL('./MoveStep.vue', import.meta.ur
 const PLAN = {
   total: 214880,
   complete: true,
-  items: [{ from: 'X1.faa.gz', to: 'proteins/X1.faa.gz', conflict: 'taken' }],
+  items: [{ from: 'X1.faa.gz', to: 'proteins/X1.faa.gz', conflict: 'name already used' }],
   next: 'c1',
 }
 
@@ -112,9 +112,9 @@ describe('MoveStep', () => {
       { filter: '', limit: 100, after: null },
       expect.anything(),
     )
-    expect(content(root)).toContain('214,880 files match.')
+    expect(content(root)).toContain('214,880 files match. Files that cannot move stay where they are.')
     expect(content(root)).toContain('DRS links by content keep working')
-    expect(content(root)).toContain('proteins/X1.faa.gz (taken)')
+    expect(content(root)).toContain('proteins/X1.faa.gz (name already used)')
     expect(button(root, 'Move 214,880 files')).toBeTruthy()
 
     await click(button(root, 'next page'))

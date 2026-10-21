@@ -23,7 +23,7 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: 'run'): void; (e: 'edit'): void }>()
 
 const { writesDisabled } = useConnectivity()
-const { renames, status, job, supported, error, controlling, refresh, control } = useLinkState(
+const { renames, status, job, supported, error, controlling, finished, refresh, control } = useLinkState(
   () => props.groupId,
   () => props.link.import_id,
 )
@@ -119,6 +119,7 @@ function show(id: string, action: 'show' | 'organize') {
       :job="job"
       :supported="supported"
       :controlling="controlling"
+      :finished="finished"
       :error="error"
       @control="control"
       @refresh="refresh"

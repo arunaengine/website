@@ -67,7 +67,7 @@ describe('link problems', () => {
     )
     expect(found.map((problem) => problem.id)).toEqual(['stopped', 'failed', 'conflicts', 'renames'])
     expect(found[0].text).toBe('The last run stopped: keys refused. Run it again, or check your storage.')
-    expect(found[2].text).toContain('Add a file rule to choose one.')
+    expect(found[2].text).toContain('Choose Show to see why.')
     expect(found[3]).toMatchObject({ action: 'organize' })
     expect(found[3].text).toContain('At least 3 files still have the old name.')
   })

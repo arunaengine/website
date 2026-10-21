@@ -133,4 +133,27 @@ describe('useLinkState', () => {
       vi.useRealTimers()
     }
   })
+
+  it('counts a step that ended, once, even if it was never seen running', async () => {
+    getOrganizeJob.mockResolvedValue({ ...RUNNING, state: 'done', finished_at_ms: 5 })
+    const { scope, state } = setup()
+    await state.refresh()
+    expect(state.finished.value).toBe(1)
+    await state.refresh()
+    expect(state.finished.value).toBe(1)
+    getOrganizeJob.mockResolvedValue({ ...RUNNING, state: 'done', started_at_ms: 9, finished_at_ms: 12 })
+    await state.refresh()
+    expect(state.finished.value).toBe(2)
+    scope.stop()
+  })
+
+  it('counts a running step that vanished', async () => {
+    getOrganizeJob.mockResolvedValue(RUNNING)
+    const { scope, state } = setup()
+    await state.refresh()
+    getOrganizeJob.mockResolvedValue(null)
+    await state.refresh()
+    expect(state.finished.value).toBe(1)
+    scope.stop()
+  })
 })
