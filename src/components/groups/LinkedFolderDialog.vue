@@ -237,12 +237,16 @@ watch(
 )
 
 // Older nodes have no rename route; the offer then stays hidden.
+// Only the latest load counts; a pattern save bumps it too.
+let renameLoad = 0
 async function loadRenames(stored: BackendImport, generation: number) {
+  const id = ++renameLoad
+  const latest = () => generation === opening && id === renameLoad
   try {
     const found = await getImportRenames(props.groupId, stored.import_id, { baseUrl: apiBaseUrl.value, token: authToken.value })
-    if (generation === opening) renames.value = found
+    if (latest()) renames.value = found
   } catch {
-    if (generation === opening) renames.value = null
+    if (latest()) renames.value = null
   }
 }
 
@@ -327,6 +331,7 @@ async function submit() {
     let runError: string | undefined
     if (stored) {
       if (wanted !== (stored.schedule ?? '') || newPattern !== undefined) {
+        if (newPattern !== undefined) renameLoad++
         await updateBackendImport(props.groupId, stored.import_id, wanted || null, client, newPattern)
       }
       if (move) await startBucketMove(stored.bucket, stored.key_prefix, client)
