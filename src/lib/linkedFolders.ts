@@ -67,6 +67,18 @@ export function storeLine(backend: GroupBackendResponse): string {
 }
 
 /** True when new uploads go somewhere other than the linked folder itself. */
+/** Whether a link writes inside the folder it reads, on the same storage; such links may
+ * share that folder, as the node allows. */
+export function writesInside(link: {
+  backend_id: string
+  backend_prefix: string
+  write_backend_id?: string | null
+  write_prefix?: string | null
+}): boolean {
+  const backendId = link.write_backend_id || link.backend_id
+  return backendId === link.backend_id && (link.write_prefix ?? link.backend_prefix).startsWith(link.backend_prefix)
+}
+
 export function writesElsewhere(link: {
   backend_id: string
   backend_prefix: string

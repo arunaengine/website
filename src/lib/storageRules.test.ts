@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { BackendImport, BucketMoveResponse } from './api'
 import { moveText, moveView, rememberMoves, bucketError, bucketTitle, defaultBucket, runActive, linkConflict, runText, splitPath, suggestBucket } from './storageRules'
+import { writesInside } from './linkedFolders'
 
 const split = { backend_id: 's1', group_id: 'g1', kind: 's3', name: 'lab', public_config: { endpoint: 'https://s3' } }
 const fixed = { ...split, backend_id: 's2', public_config: { endpoint: 'https://s3', bucket: 'data' } }
@@ -24,6 +25,10 @@ describe('storageRules', () => {
     expect(linkConflict(split, [link], 'lab-raw/')).toContain('overlaps')
     const elsewhere = { ...link, write_prefix: 'lab-out/' }
     expect(linkConflict(split, [elsewhere], 'lab-raw/', null, true)).toContain('overlaps')
+    // A write folder inside the read folder still writes where it reads, as the node allows.
+    const inside = { ...link, write_prefix: 'lab-raw/out/' }
+    expect(writesInside(inside)).toBe(true)
+    expect(linkConflict(split, [inside], 'lab-raw/', null, true)).toBeNull()
   })
 
   it('refuses folders that leave no room for a file', () => {

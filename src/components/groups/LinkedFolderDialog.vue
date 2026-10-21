@@ -46,6 +46,7 @@ import {
   storeLine,
   storeName,
   writesElsewhere,
+  writesInside,
 } from '@/lib/linkedFolders'
 import { arunaConflict, linkConflict, moveRefusal, splitPath, splitsBuckets } from '@/lib/storageRules'
 import { errorMessage } from '@/lib/utils'
@@ -166,9 +167,16 @@ const conflict = computed(() => {
   const aruna = bucket.value.trim() ? arunaConflict(others, bucket.value.trim(), bucketRoot.value) : null
   if (aruna || !source.value) return aruna
   if (splits.value && !storageBucket.value.trim()) return null
-  const read = linkConflict(source.value, others, storageRoot.value, null, !writeElsewhere.value)
+  // Links that write inside the folder they read may share it, as the node allows.
+  const shared = writesInside({
+    backend_id: backendId.value,
+    backend_prefix: storageRoot.value,
+    write_backend_id: writeElsewhere.value ? writeBackendId.value : null,
+    write_prefix: writeElsewhere.value ? folderPath(writeFolder.value) : null,
+  })
+  const read = linkConflict(source.value, others, storageRoot.value, null, shared)
   if (read || !writeElsewhere.value || !target.value) return read
-  return linkConflict(target.value, others, folderPath(writeFolder.value))
+  return linkConflict(target.value, others, folderPath(writeFolder.value), null, shared)
 })
 const writeRoot = computed(() => (writeElsewhere.value ? folderPath(writeFolder.value) : storageRoot.value))
 const exampleUpload = computed(() =>
