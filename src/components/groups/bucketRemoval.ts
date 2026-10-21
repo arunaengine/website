@@ -14,6 +14,7 @@ export async function removeBucket(
   nodeId: string,
   bucket: string,
   job: PurgeJob = usePurgeJob(),
+  deleteStorageFiles = false,
 ): Promise<void> {
   const { authToken, sessionEpoch } = useAruna()
   const { writesDisabled } = useConnectivity()
@@ -27,7 +28,10 @@ export async function removeBucket(
   if (sessionEpoch.value !== epoch) throw new Error('Your session changed. Nothing was deleted.')
   if (writesDisabled.value) throw new Error('You are offline. Nothing was deleted.')
   if (!permissions.purge) throw new Error('You may not delete this bucket.')
-  const status = await job.run(createStoragePurgeOperation(scope), client)
+  const status = await job.run(
+    createStoragePurgeOperation(scope, undefined, deleteStorageFiles ? { deleteStorageFiles, confirm: bucket } : undefined),
+    client,
+  )
   if (status?.state === 'failed') throw new Error(status.error?.message ?? 'The deletion failed.')
   if (status?.state === 'cancelled') throw new Error('The deletion was cancelled.')
 }

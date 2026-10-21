@@ -119,6 +119,8 @@ export interface StoragePurgeJobStatus {
   state: StoragePurgeJobState
   attempts: number
   cancel_requested: boolean
+  /** The node's own word that the job is paused; absent on nodes that do not say. */
+  paused?: boolean
   created_at: string
   updated_at: string
   finished_at?: string

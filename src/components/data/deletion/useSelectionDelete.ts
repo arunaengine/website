@@ -8,6 +8,7 @@ import { isS3NetworkError, s3ErrorMessage, useS3 } from '@/composables/useS3'
 import type { DeletePrefixResult } from '@/composables/s3/objects'
 import type { ApiClientOptions } from '@/lib/api'
 import {
+  controlStoragePurge,
   createStoragePurgeOperation,
   getStorageDeletionPreflight,
   getStoragePurgeJob,
@@ -77,6 +78,9 @@ export function useSelectionDelete() {
   const outcome = ref<SelectionOutcome | null>(null)
   const scopes = ref<PurgeScope[]>([])
   const scopesBusy = ref(false)
+  // Jobs that were started and have not ended, by key, so one control reaches all of them.
+  const activeJobs = ref<Record<string, string>>({})
+  const paused = ref(false)
   let runId = 0
 
   function reset() {
@@ -84,6 +88,8 @@ export function useSelectionDelete() {
     outcome.value = null
     scopes.value = []
     scopesBusy.value = false
+    activeJobs.value = {}
+    paused.value = false
   }
 
   const inventory = computed(() => {
@@ -259,8 +265,16 @@ export function useSelectionDelete() {
   }
 
   async function runScope(scope: PurgeScope, client: ApiClientOptions, id: number): Promise<KeyResult> {
+    const result = await trackScope(scope, client, id)
+    const { [scope.key]: _ended, ...rest } = activeJobs.value
+    activeJobs.value = rest
+    return result
+  }
+
+  async function trackScope(scope: PurgeScope, client: ApiClientOptions, id: number): Promise<KeyResult> {
     try {
       const started = await startStoragePurge(scope.operation, client)
+      activeJobs.value = { ...activeJobs.value, [scope.key]: started.job_id }
       for (;;) {
         if (id !== runId) {
           return { key: scope.key, status: 'unknown', message: 'The result of this permanent deletion is no longer being tracked.' }
@@ -290,6 +304,17 @@ export function useSelectionDelete() {
         message: storageDeletionErrorMessage(error),
       }
     }
+  }
+
+  /** Pauses, resumes or aborts every job still running; the first refusal is reported. */
+  async function controlAll(action: 'pause' | 'resume' | 'abort', client: ApiClientOptions) {
+    const settled = await Promise.allSettled(
+      Object.values(activeJobs.value).map((jobId) => controlStoragePurge(jobId, action, client)),
+    )
+    const refused = settled.find((result) => result.status === 'rejected')
+    if (refused?.status === 'rejected') throw refused.reason
+    if (action === 'pause') paused.value = true
+    if (action === 'resume') paused.value = false
   }
 
   async function purgeKeys(ids: string[], client: ApiClientOptions | null, all: string[]) {
@@ -340,6 +365,8 @@ export function useSelectionDelete() {
     deleteMarkers,
     deletePrefixes,
     purgeKeys,
+    paused,
+    controlAll,
   }
 }
 

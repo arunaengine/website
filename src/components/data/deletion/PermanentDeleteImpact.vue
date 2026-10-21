@@ -29,11 +29,11 @@ function toggle() {
     <p class="text-sm text-foreground">
       This deletes <b>{{ impact.complete ? '' : 'at least ' }}{{ filesWord(impact.files) }} with all {{ formatNumber(impact.versions) }} {{ impact.versions === 1 ? 'version' : 'versions' }}</b>
       in Aruna<template v-if="impact.storage_files">
-        and <b>{{ filesWord(impact.storage_files) }} ({{ formatBytes(impact.storage_bytes) }})</b> in your storage</template>.
+        and {{ impact.complete ? 'up to' : 'at least' }} <b>{{ filesWord(impact.storage_files) }} ({{ formatBytes(impact.storage_bytes) }})</b> in your storage</template>.
     </p>
     <p v-if="!impact.storage_files" class="text-xs text-muted-foreground">No files are deleted in your storage.</p>
     <p v-if="impact.kept_files" class="text-xs text-muted-foreground">
-      <template v-if="impact.complete">
+      <template v-if="impact.complete && !impact.next">
         {{ filesWord(impact.kept_files) }} in your storage {{ impact.kept_files === 1 ? 'stays' : 'stay' }} because other links or files
         still use {{ impact.kept_files === 1 ? 'it' : 'them' }}.
       </template>
@@ -61,7 +61,7 @@ function toggle() {
           <span class="shrink-0 tabular-nums text-muted-foreground">{{ formatBytes(item.bytes) }}</span>
         </div>
         <p v-if="item.storage_file" class="truncate font-mono text-[11px] text-muted-foreground" :title="item.storage_file.path">
-          {{ item.storage_file.kept ? 'stays' : 'deleted' }} in your storage: {{ item.storage_file.path }}
+          {{ item.storage_file.kept ? 'stays' : 'deleted' }} in your storage: {{ item.storage_file.path }}<template v-if="item.storage_file.kept"> ({{ item.storage_file.kept }})</template>
         </p>
       </li>
     </PagedList>

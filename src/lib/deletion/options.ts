@@ -173,7 +173,7 @@ function permanentOption(target: DeletionTarget): DeletionOption {
     id: 'delete-permanently',
     label: 'Delete permanently',
     description: `Deletes every version and delete marker of ${scope} on ${target.nodeName ?? 'this node'}, and aborts its open uploads. Nothing brings them back.`,
-    tier: target.kind === 'folder' || target.kind === 'bucket' ? 'typed-name' : 'confirm',
+    tier: 'typed-name',
     call: { operation: 'purge' },
     irreversible: true,
     disabledReason: purgeBlocked(target),

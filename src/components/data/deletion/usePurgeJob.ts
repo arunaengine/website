@@ -20,6 +20,8 @@ export function usePurgeJob() {
   const submission = ref<StoragePurgeSubmission | null>(null)
   const status = ref<StoragePurgeJobStatus | null>(null)
   const progress = ref<StoragePurgeProgress | null>(null)
+  // The node's `paused` field wins; until it says, a pause the node accepted counts.
+  const paused = ref(false)
   let runId = 0
 
   function reset() {
@@ -27,6 +29,7 @@ export function usePurgeJob() {
     submission.value = null
     status.value = null
     progress.value = null
+    paused.value = false
   }
 
   /** Resolves with the terminal status, or null when a newer run took over. */
@@ -46,6 +49,7 @@ export function usePurgeJob() {
         throw new Error(`System job ${started.job_id} is not a permanent deletion.`)
       }
       status.value = next
+      if (typeof next.paused === 'boolean') paused.value = next.paused
       progress.value = retainStoragePurgeProgress(progress.value, next.progress)
       if (isTerminalStoragePurgeJob(next.state)) return next
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
@@ -55,10 +59,13 @@ export function usePurgeJob() {
 
   /** Pauses, resumes or aborts the running delete; the poll shows the new state. */
   async function control(action: 'pause' | 'resume' | 'abort', client: ApiClientOptions) {
-    if (submission.value) await controlStoragePurge(submission.value.job_id, action, client)
+    if (!submission.value) return
+    await controlStoragePurge(submission.value.job_id, action, client)
+    if (action === 'pause') paused.value = true
+    if (action === 'resume') paused.value = false
   }
 
-  return { submission, status, progress, reset, run, control }
+  return { submission, status, progress, paused, reset, run, control }
 }
 
 export type PurgeJob = ReturnType<typeof usePurgeJob>
