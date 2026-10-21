@@ -291,6 +291,19 @@ describe('LinkedFolderDialog', () => {
     mounted.app.unmount()
   })
 
+  it('locks the file name while saving', async () => {
+    let finish: (value: unknown) => void = () => {}
+    updateBackendImport.mockReturnValueOnce(new Promise((resolve) => (finish = resolve)))
+    const mounted = await mount(STORED)
+    await typeValue(inputById(mounted.root, '-pattern'), '{dir}{name}~{id}')
+    const pending = submit(mounted.root)
+    await flush()
+    expect(inputById(mounted.root, '-pattern').props.disabled).toBe(true)
+    finish(STORED)
+    await pending
+    mounted.app.unmount()
+  })
+
   it('offers the rename right after a pattern change', async () => {
     updateBackendImport.mockResolvedValue(STORED)
     const files = [{ from: 'raw/2024/01JA7Q3K_b.fastq', to: 'raw/2024/b.fastq~01JA7Q3K' }]

@@ -562,14 +562,14 @@ async function submit() {
                 <Select
                   :model-value="patternChoice"
                   :options="PATTERN_OPTIONS"
-                  :disabled="patternLocked"
+                  :disabled="patternLocked || saving"
                   aria-label="File name preset"
                   @update:model-value="pickPattern"
                 />
                 <Input
                   :id="`${uid}-pattern`"
                   v-model="pattern"
-                  :disabled="patternLocked"
+                  :disabled="patternLocked || saving"
                   :invalid="patternError ? 'error' : undefined"
                   class="font-mono text-xs"
                 />
