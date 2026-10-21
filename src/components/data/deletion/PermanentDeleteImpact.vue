@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // The red box of a permanent delete: what goes in Aruna, what goes in your storage, what stays.
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import PagedList from '@/components/storage/PagedList.vue'
 import Button from '@/components/ui/Button.vue'
 import { useCursorPage } from '@/composables/useCursorPage'
@@ -34,6 +34,13 @@ const list = useCursorPage<DeleteItem>(async (query) => {
   }
   return { items: page.items, total: page.versions, complete: page.complete, next: page.next }
 })
+
+// A filtered page has no count of its own: the totals above stay for the whole scope.
+const summary = computed(() =>
+  list.filter.value && list.page.value
+    ? `${list.items.value.length} on this page match "${list.filter.value}"`
+    : undefined,
+)
 
 function toggle() {
   listed.value = !listed.value
@@ -76,6 +83,7 @@ function toggle() {
       :has-next="list.hasNext.value"
       :has-prev="list.hasPrev.value"
       :filterable="filterable"
+      :summary="summary"
       @next="list.next()"
       @prev="list.prev()"
       @filter="(value: string) => list.load(value)"

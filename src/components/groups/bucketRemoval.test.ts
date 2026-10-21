@@ -51,6 +51,7 @@ describe('bucket removal', () => {
       'POST https://node-2.test/api/v1/data/storage/deletion/preflight',
       'POST https://node-2.test/api/v1/data/storage/purge/jobs',
       'GET https://node-2.test/api/v1/compute/jobs/j1',
+      'GET https://node-2.test/api/v1/data/storage/purge/jobs/j1',
     ])
   })
 

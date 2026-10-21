@@ -69,12 +69,12 @@ function slotted(tag: string) {
 }
 
 const pagedStub = defineComponent({
-  props: { total: Number, shown: Number, hasNext: Boolean, filterable: { type: Boolean, default: true } },
+  props: { total: Number, shown: Number, hasNext: Boolean, summary: String, filterable: { type: Boolean, default: true } },
   emits: ['filter'],
   setup: (props, { slots, emit }) => () =>
     h('div', [
       h('ul', slots.default?.()),
-      h('span', `shown ${props.shown} of ${props.total}`),
+      h('span', props.summary ?? `shown ${props.shown} of ${props.total}`),
       props.filterable ? h('button', { onClick: () => emit('filter', 'x') }, 'filter x') : null,
     ]),
 })
@@ -621,6 +621,9 @@ describe('delete dialog', () => {
     getDeleteImpact.mockResolvedValueOnce(page)
     await click(button(root, 'filter x'))
     expect(getDeleteImpact).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), { filter: 'x', limit: 100, after: null })
+    // The whole-scope totals are not the count of the filtered page.
+    expect(content(root)).toContain('1 on this page match "x"')
+    expect(content(root)).not.toContain('shown 1 of')
 
     getDeleteImpact.mockRejectedValueOnce(Object.assign(new Error('bad field'), { status: 400 })).mockResolvedValueOnce(page)
     await click(button(root, 'filter x'))

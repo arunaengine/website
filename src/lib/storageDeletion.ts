@@ -177,13 +177,39 @@ export function startStoragePurge(
   )
 }
 
-/** Pauses, resumes or aborts a permanent delete; the node answers 204. */
-export function controlStoragePurge(
+/** What the node says about a permanent delete. Older nodes answer 204 with no body. */
+export interface PurgeJobResponse {
+  job_id: string
+  /** `paused` while paused. */
+  state: string
+  paused: boolean
+  delete_storage_files: boolean
+}
+
+/** Pauses, resumes or aborts a permanent delete; null from a node that answers without a body. */
+export async function controlStoragePurge(
   jobId: string,
   action: 'pause' | 'resume' | 'abort',
   client: ApiClientOptions,
-): Promise<void> {
-  return apiRequest(`/data/storage/purge/jobs/${encodeURIComponent(jobId)}/${action}`, { method: 'POST' }, client)
+): Promise<PurgeJobResponse | null> {
+  const body = await apiRequest<PurgeJobResponse | undefined>(
+    `/data/storage/purge/jobs/${encodeURIComponent(jobId)}/${action}`,
+    { method: 'POST' },
+    client,
+  )
+  return body ?? null
+}
+
+/** The node's own word on state and pause of a permanent delete. */
+export function getStoragePurgeState(jobId: string, client: ApiClientOptions): Promise<PurgeJobResponse> {
+  return apiRequest(`/data/storage/purge/jobs/${encodeURIComponent(jobId)}`, {}, client)
+}
+
+/** True when the node says paused, false when it says not, null when it says nothing. */
+export function purgePauseOf(response: Partial<PurgeJobResponse> | null | undefined): boolean | null {
+  if (!response) return null
+  if (typeof response.paused === 'boolean') return response.paused
+  return response.state === 'paused' ? true : null
 }
 
 export function getStoragePurgeJob(

@@ -10,6 +10,7 @@ import type { ApiClientOptions } from '@/lib/api'
 import {
   controlStoragePurge,
   createStoragePurgeOperation,
+  purgePauseOf,
   getStorageDeletionPreflight,
   getStoragePurgeJob,
   isTerminalStoragePurgeJob,
@@ -370,8 +371,11 @@ export function useSelectionDelete() {
     settled.forEach((result, index) => {
       if (result.status !== 'fulfilled') return
       const [key, jobId] = targets[index]
+      // The node's word on pause wins; a node without one keeps the local reading of the action.
+      const word = purgePauseOf(result.value)
+      const nowPaused = word ?? action === 'pause'
       // A pause answered after the job ended must not leave a Resume for a finished job.
-      if (action === 'pause') {
+      if (nowPaused && action !== 'abort') {
         if (activeJobs.value[key] === jobId) next[key] = jobId
       } else delete next[key]
     })

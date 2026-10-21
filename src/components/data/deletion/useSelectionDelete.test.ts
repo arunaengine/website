@@ -345,4 +345,24 @@ describe('selection purge', () => {
     await pausing
     expect(selection.paused.value).toBe(false)
   })
+
+  it('keeps only the jobs the node says are paused', async () => {
+    getStorageDeletionPreflight.mockResolvedValue(OPEN)
+    startStoragePurge.mockReset().mockImplementation(jobFor)
+    getStoragePurgeJob.mockReset().mockReturnValue(new Promise(() => {}))
+    controlStoragePurge.mockReset().mockImplementation(async (jobId: string) => ({
+      job_id: jobId,
+      state: jobId === 'a' ? 'paused' : 'running',
+      paused: jobId === 'a',
+      delete_storage_files: true,
+    }))
+    const selection = useSelectionDelete()
+    await selection.loadScopes('reef', { keys: ['a', 'b'], prefixes: [] }, CLIENT)
+    void selection.purgeKeys(['a', 'b'], CLIENT, ['a', 'b'])
+    await later()
+    await selection.controlAll('pause', CLIENT)
+    controlStoragePurge.mockClear()
+    await selection.controlAll('resume', CLIENT)
+    expect(controlStoragePurge.mock.calls.map((call) => call[0])).toEqual(['a'])
+  })
 })
