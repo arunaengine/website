@@ -281,6 +281,18 @@ export function useSelectionDelete() {
     }
   }
 
+  function stale(scope: PurgeScope): KeyResult {
+    return { key: scope.key, status: 'unknown', message: 'The result of this permanent deletion is no longer being tracked.' }
+  }
+
+  // A new key for a deletion that ended; an uncertain submission keeps its key so it is not doubled.
+  function freshOperation(operation: StoragePurgeOperation): StoragePurgeOperation {
+    const storage = operation.deleteStorageFiles
+      ? { deleteStorageFiles: true, confirm: operation.confirm }
+      : undefined
+    return createStoragePurgeOperation(operation.scope, undefined, storage)
+  }
+
   async function runScope(scope: PurgeScope, client: ApiClientOptions, id: number): Promise<KeyResult> {
     const result = await trackScope(scope, client, id)
     if (id !== runId) return result
@@ -296,25 +308,26 @@ export function useSelectionDelete() {
     try {
       jobId = (await startStoragePurge(scope.operation, client)).job_id
     } catch (error) {
-      if (id !== runId) return { key: scope.key, status: 'unknown', message: 'The result of this permanent deletion is no longer being tracked.' }
+      if (id !== runId) return stale(scope)
       startsPending.value--
       return { key: scope.key, status: failureStatus(error), message: storageDeletionErrorMessage(error) }
     }
-    if (id !== runId) return { key: scope.key, status: 'unknown', message: 'The result of this permanent deletion is no longer being tracked.' }
+    if (id !== runId) return stale(scope)
     activeJobs.value = { ...activeJobs.value, [scope.key]: jobId }
     startsPending.value--
     for (;;) {
-      if (id !== runId) {
-        return { key: scope.key, status: 'unknown', message: 'The result of this permanent deletion is no longer being tracked.' }
-      }
+      if (id !== runId) return stale(scope)
       try {
         const status = await getStoragePurgeJob(jobId, client)
+        if (id !== runId) return stale(scope)
         pollError.value = null
         if (status.kind !== 'storage_purge') {
           return { key: scope.key, status: 'failed', message: `System job ${jobId} is not a permanent deletion.` }
         }
         if (isTerminalStoragePurgeJob(status.state)) {
           if (status.state === 'succeeded') return { key: scope.key, status: 'committed' }
+          // The job ended for good, so a retry is a new deletion and not the old job again.
+          scope.operation = freshOperation(scope.operation)
           return {
             key: scope.key,
             status: 'failed',
@@ -322,6 +335,7 @@ export function useSelectionDelete() {
           }
         }
       } catch (error) {
+        if (id !== runId) return stale(scope)
         // The job runs on the node whether or not this read worked: keep its controls and try again.
         pollError.value = storageDeletionErrorMessage(error)
       }
@@ -336,11 +350,14 @@ export function useSelectionDelete() {
    */
   async function controlAll(action: 'pause' | 'resume' | 'abort', client: ApiClientOptions) {
     if (starting.value) return
+    const id = runId
     controlError.value = null
     const targets = Object.entries(action === 'resume' ? pausedJobs.value : activeJobs.value)
     const settled = await Promise.allSettled(
       targets.map(([, jobId]) => controlStoragePurge(jobId, action, client)),
     )
+    // The run may have been replaced meanwhile; its answers say nothing about the new one.
+    if (id !== runId) return
     const next = { ...pausedJobs.value }
     settled.forEach((result, index) => {
       if (result.status !== 'fulfilled') return

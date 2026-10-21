@@ -20,10 +20,10 @@ const ButtonStub = defineComponent({
   setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()),
 })
 const ListStub = defineComponent({
-  props: { total: Number, shown: Number, offset: Number, filter: String, hasNext: Boolean, hasPrev: Boolean, complete: Boolean, busy: Boolean },
+  props: { total: Number, shown: Number, offset: Number, filter: String, hasNext: Boolean, hasPrev: Boolean, complete: Boolean, busy: Boolean, summary: String },
   emits: ['filter'],
   setup: (props, { slots, emit }) => () =>
-    h('div', [h('ul', slots.default?.()), h('span', `list ${props.shown} of ${props.total}`), h('button', { onClick: () => emit('filter', 'x') }, 'filter x')]),
+    h('div', [h('ul', slots.default?.()), h('span', props.summary ?? `list ${props.shown} of ${props.total}`), h('button', { onClick: () => emit('filter', 'x') }, 'filter x')]),
 })
 
 const TidyStep = compileClientComponent(new URL('./TidyStep.vue', import.meta.url), {
@@ -93,7 +93,7 @@ describe('TidyStep', () => {
     await click(button(root, 'Preview'))
     expect(content(root)).toContain('keeps')
     expect(content(root)).toContain('removes 01JA_P1.faa.gz')
-    await click(button(root, 'Remove 842 copies'))
+    await click(button(root, 'Remove copies of 842 files'))
     expect(startDuplicates).toHaveBeenCalledWith('g1', 'i1', expect.anything())
     expect(events).toEqual(['started'])
   })
@@ -127,7 +127,7 @@ describe('TidyStep', () => {
     previewDuplicates.mockResolvedValue({ ...COPIES, total: 2 })
     await click(button(root, 'Preview'))
     await click(button(root, 'filter x'))
-    expect(button(root, 'Remove 842 copies')).toBeTruthy()
+    expect(button(root, 'Remove copies of 842 files')).toBeTruthy()
   })
 
   it('ignores a failed unfiltered reload and keeps the whole count', async () => {
@@ -140,7 +140,7 @@ describe('TidyStep', () => {
     previewDuplicates.mockRejectedValue(new Error('offline'))
     props.finished = 1
     await flush()
-    expect(button(mounted.root, 'Remove 842 copies')).toBeTruthy()
+    expect(button(mounted.root, 'Remove copies of 842 files')).toBeTruthy()
     mounted.app.unmount()
   })
 
@@ -152,11 +152,22 @@ describe('TidyStep', () => {
     previewDuplicates.mockResolvedValue({ ...COPIES, total: 7 })
     sessionEpoch.value++
     await flush()
-    expect(button(mounted.root, 'Remove 7 copies')).toBeTruthy()
+    expect(button(mounted.root, 'Remove copies of 7 files')).toBeTruthy()
     old({ ...COPIES, total: 99 })
     await flush()
-    expect(button(mounted.root, 'Remove 7 copies')).toBeTruthy()
+    expect(button(mounted.root, 'Remove copies of 7 files')).toBeTruthy()
     mounted.app.unmount()
+  })
+
+  it('counts files with copies, not rows, when one file has several contents', async () => {
+    const two = [COPIES.items[0], { ...COPIES.items[0], kept: { path: 'P1.v2', bytes: 1 } }]
+    previewDuplicates.mockResolvedValue({ ...COPIES, total: 1, items: two })
+    const { root } = await mount(null)
+    await click(button(root, 'Preview'))
+    const text = content(root)
+    expect(text).toContain('1 file is stored twice')
+    expect(text).toContain('Showing 2 · 1 file with copies')
+    expect(button(root, 'Remove copies of 1 file')).toBeTruthy()
   })
 
   it('looks again when a step ends, even one nobody saw run', async () => {
@@ -175,8 +186,8 @@ describe('TidyStep', () => {
     await click(button(root, 'Preview'))
     previewDuplicates.mockResolvedValue({ ...COPIES, total: 2 })
     await click(button(root, 'filter x'))
-    expect(content(root)).toContain('list 1 of 2')
-    expect(button(root, 'Remove 842 copies')).toBeTruthy()
+    expect(content(root)).toContain('Showing 1 · 2 files with copies')
+    expect(button(root, 'Remove copies of 842 files')).toBeTruthy()
   })
 
   it('hides the copies on an older node and says nothing is left', async () => {
@@ -189,9 +200,9 @@ describe('TidyStep', () => {
   it('starts nothing while a step runs or offline', async () => {
     const running = await mount(undefined, true)
     expect(button(running.root, 'Rename 12,034 files').props.disabled).toBe(true)
-    expect(button(running.root, 'Remove 842 copies').props.disabled).toBe(true)
+    expect(button(running.root, 'Remove copies of 842 files').props.disabled).toBe(true)
     offline.value = true
     const off = await mount()
-    expect(button(off.root, 'Remove 842 copies').props.disabled).toBe(true)
+    expect(button(off.root, 'Remove copies of 842 files').props.disabled).toBe(true)
   })
 })

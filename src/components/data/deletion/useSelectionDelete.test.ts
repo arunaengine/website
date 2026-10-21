@@ -253,4 +253,47 @@ describe('selection purge', () => {
     await selection.controlAll('abort', CLIENT)
     expect(controlStoragePurge.mock.calls.map((call) => call[0])).toEqual(['b'])
   })
+
+  it('retries a cancelled deletion with a new key and an uncertain one with the same key', async () => {
+    getStorageDeletionPreflight.mockResolvedValue(OPEN)
+    startStoragePurge.mockReset().mockImplementation(jobFor)
+    getStoragePurgeJob.mockReset().mockResolvedValue({ kind: 'storage_purge', state: 'cancelled' })
+    const selection = useSelectionDelete()
+    await selection.loadScopes('reef', { keys: ['a'], prefixes: [] }, CLIENT)
+    await selection.purgeKeys(['a'], CLIENT, ['a'])
+    await selection.purgeKeys(['a'], CLIENT, ['a'])
+    const [first, second] = startStoragePurge.mock.calls.map((call) => call[0].idempotencyKey)
+    expect(second).not.toBe(first)
+
+    startStoragePurge.mockReset().mockRejectedValue(new Error('network'))
+    await selection.purgeKeys(['a'], CLIENT, ['a'])
+    await selection.purgeKeys(['a'], CLIENT, ['a'])
+    const [third, fourth] = startStoragePurge.mock.calls.map((call) => call[0].idempotencyKey)
+    expect(fourth).toBe(third)
+  })
+
+  it('ignores a control answer and a poll answer of an earlier run', async () => {
+    getStorageDeletionPreflight.mockResolvedValue(OPEN)
+    startStoragePurge.mockReset().mockImplementation(jobFor)
+    let oldPoll: (reason: unknown) => void = () => {}
+    getStoragePurgeJob.mockReset().mockReturnValueOnce(new Promise((_, reject) => (oldPoll = reject)))
+    let oldControl: (value: unknown) => void = () => {}
+    controlStoragePurge.mockReset().mockReturnValueOnce(new Promise((resolve) => (oldControl = resolve)))
+    const selection = useSelectionDelete()
+    await selection.loadScopes('reef', { keys: ['a'], prefixes: [] }, CLIENT)
+    void selection.purgeKeys(['a'], CLIENT, ['a'])
+    await later()
+    const pausing = selection.controlAll('pause', CLIENT)
+
+    getStoragePurgeJob.mockReturnValue(new Promise(() => {}))
+    void selection.purgeKeys(['a'], CLIENT, ['a'])
+    await later()
+    oldControl(undefined)
+    oldPoll(new Error('old poll'))
+    await pausing
+    await later()
+    expect(selection.paused.value).toBe(false)
+    expect(selection.pollError.value).toBeNull()
+    expect(selection.controlError.value).toBeNull()
+  })
 })

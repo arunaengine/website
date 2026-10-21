@@ -18,6 +18,8 @@ const props = withDefaults(
     busy?: boolean
     /** False hides the name filter, for a node that cannot filter. */
     filterable?: boolean
+    /** Replaces the range text when the total counts other things than the rows. */
+    summary?: string
   }>(),
   { complete: true, busy: false, filterable: true },
 )
@@ -44,7 +46,7 @@ watch(() => props.filter, (value) => (draft.value = value))
         @change="emit('filter', draft.trim())"
       />
       <span v-else />
-      <span class="text-[11px] tabular-nums text-muted-foreground">{{ rangeLabel(offset, shown, total, complete) }}</span>
+      <span class="text-[11px] tabular-nums text-muted-foreground">{{ summary ?? rangeLabel(offset, shown, total, complete) }}</span>
       <span class="flex gap-2">
         <Button variant="outline" size="sm" :disabled="busy || !hasPrev" @click="emit('prev')">Previous</Button>
         <Button variant="outline" size="sm" :disabled="busy || !hasNext" @click="emit('next')">Next</Button>

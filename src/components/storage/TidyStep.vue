@@ -18,7 +18,7 @@ import {
 } from '@/lib/api'
 import { filesWord, organizeError } from '@/lib/organize'
 import { moveRefusal } from '@/lib/storageRules'
-import { formatBytes } from '@/lib/utils'
+import { formatBytes, formatNumber } from '@/lib/utils'
 
 const props = defineProps<{
   groupId: string
@@ -78,6 +78,13 @@ const copyComplete = computed(() => copyAll.value?.complete ?? true)
 // A partial count of zero is not "none": more copies may follow.
 const copyOffered = computed(() => copyTotal.value > 0 || !copyComplete.value)
 const copySettled = computed(() => copyAll.value !== null || copiesMissing.value)
+// The total counts files; the rows are one per kind of content, so the pager says what it counts.
+const copySummary = computed(() => {
+  const page = copies.page.value
+  if (!page) return undefined
+  const more = page.complete ? '' : 'at least '
+  return `Showing ${formatNumber(page.items.length)} · ${more}${filesWord(page.total)} with copies`
+})
 const renameCount = computed(() => props.renames?.count ?? 0)
 const renameOffered = computed(() => Boolean(props.renames && (props.renames.count > 0 || !props.renames.complete)))
 const idle = computed(() => !renameOffered.value && !copyOffered.value && copySettled.value && !copies.error.value)
@@ -190,13 +197,14 @@ const offlineHint = computed(() => (writesDisabled.value ? OFFLINE_WRITE_HINT : 
           {{ showCopies ? 'Hide preview' : 'Preview' }}
         </Button>
         <Button size="sm" :disabled="busy || blocked || writesDisabled" :title="offlineHint" @click="removeCopies">
-          {{ copyTotal ? `Remove ${copyTotal === 1 ? '1 copy' : `${copyTotal} copies`}` : 'Remove copies' }}
+          {{ copyTotal ? `Remove copies of ${copyComplete ? '' : 'at least '}${filesWord(copyTotal)}` : 'Remove copies' }}
         </Button>
       </div>
       <PagedList
         v-if="showCopies"
         :total="copies.page.value?.total ?? 0"
         :complete="copies.page.value?.complete ?? true"
+        :summary="copySummary"
         :offset="copies.offset.value"
         :shown="copies.items.value.length"
         :filter="copies.filter.value"
