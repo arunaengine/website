@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canRename, cleanRules, folderValue, OUTCOME_WORDS, previewCounts, ruleProblem } from '@/lib/fileRules'
+import { cleanRules, OUTCOME_WORDS, previewCounts, ruleProblem } from '@/lib/fileRules'
 
 describe('file rules', () => {
   it('cleans rules before saving', () => {
@@ -40,20 +40,5 @@ describe('file rules', () => {
 
   it('names a conflict without counting rules', () => {
     expect(OUTCOME_WORDS.conflict).toBe('Conflict')
-  })
-
-  it('writes folders the node accepts', () => {
-    expect(folderValue('')).toBe('')
-    expect(folderValue(' archive ')).toBe('archive/')
-    expect(folderValue('/archive/')).toBe('archive/')
-  })
-
-  it('renames only a plan without conflicts', () => {
-    const item = { from: 'x', to: 'archive/x', versions: ['v'], deleted: false, files: [] }
-    expect(canRename(null)).toBe(false)
-    expect(canRename({ bucket: 'b', items: [], truncated: false })).toBe(false)
-    expect(canRename({ bucket: 'b', items: [item], truncated: false })).toBe(true)
-    const taken = { ...item, conflict: 'the key `archive/x` already exists' }
-    expect(canRename({ bucket: 'b', items: [item, taken], truncated: false })).toBe(false)
   })
 })

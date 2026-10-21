@@ -47,8 +47,12 @@ const common = {
 const linkedRows = compileClientComponent(new URL('./LinkedFolderRows.vue', import.meta.url), {
   ...common,
   '@/components/groups/LinkedFolderDialog.vue': moduleDefault(Slotted('div')),
-  '@/components/storage/FileRulesDialog.vue': moduleDefault(Slotted('div')),
-  '@/components/storage/RenameFolderDialog.vue': moduleDefault(Slotted('div')),
+  '@/components/storage/LinkedFolderCard.vue': moduleDefault(
+    defineComponent({
+      props: { link: Object, runError: String },
+      setup: (props) => () => h('div', `${props.link?.backend_prefix}${props.runError ?? ''}`),
+    }),
+  ),
   '@/composables/useAruna': {
     isUnsupportedEndpoint: () => false,
     useAruna: () => ({ apiBaseUrl: ref('https://a'), authToken: ref('t'), sessionEpoch, listGroupBackends }),
@@ -94,30 +98,6 @@ describe('linked folder rows', () => {
     answer([link('new-share/')])
     await flush()
     expect(content(root)).toContain('new-share/')
-  })
-
-  it('lists the files a run did not add with the reason', async () => {
-    listGroupBackends.mockResolvedValue({ backends: [] })
-    const errors = [{ key: 'share/a.csv', error: 'the file differs from version X of a.csv' }]
-    const last_run = { job_id: 'j', state: 'succeeded', started_at: '', imported: 0, skipped: 0, failed: 1, errors }
-    listBackendImports.mockResolvedValue([{ ...link('share/'), last_run }])
-    const { root } = await mountApp(linkedRows, { props: { bucket: 'reef', groupId: 'g-1' } })
-    await flush()
-    expect(content(root)).toContain('1 file not added')
-    expect(content(root)).toContain('the file differs from version X of a.csv')
-  })
-
-  it('blocks a run while offline', async () => {
-    listGroupBackends.mockResolvedValue({ backends: [] })
-    listBackendImports.mockResolvedValue([link('share/')])
-    writesDisabled.value = true
-    try {
-      const { root } = await mountApp(linkedRows, { props: { bucket: 'reef', groupId: 'g-1' } })
-      await flush()
-      expect(element(root, (node) => node.props['aria-label'] === LinkedFolders.RUN_HINT).props.disabled).toBe(true)
-    } finally {
-      writesDisabled.value = false
-    }
   })
 })
 

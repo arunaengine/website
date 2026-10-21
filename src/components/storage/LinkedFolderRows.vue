@@ -3,16 +3,12 @@
 // group admins may read them; for everyone else the rows stay away.
 import { computed, ref, watch } from 'vue'
 import LinkedFolderDialog from '@/components/groups/LinkedFolderDialog.vue'
-import FileRulesDialog from '@/components/storage/FileRulesDialog.vue'
-import RenameFolderDialog from '@/components/storage/RenameFolderDialog.vue'
-import Badge from '@/components/ui/Badge.vue'
+import LinkedFolderCard from '@/components/storage/LinkedFolderCard.vue'
+import { useConnectivity } from '@/lib/connectivity'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
-import IconButton from '@/components/ui/IconButton.vue'
 import ListSkeleton from '@/components/ui/ListSkeleton.vue'
-import StatusDot from '@/components/ui/StatusDot.vue'
 import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
-import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import {
   ApiError,
   listBackendImports,
@@ -20,10 +16,7 @@ import {
   type BackendImport,
   type GroupBackendResponse,
 } from '@/lib/api'
-import { RUN_HINT, scheduleWords } from '@/lib/linkedFolders'
-import { stateTone } from '@/lib/stateBadge'
-import { errorMessage, relativeTime } from '@/lib/utils'
-import { ArrowLeftRight, FolderInput, ListFilter, Play, SlidersHorizontal } from '@lucide/vue'
+import { errorMessage } from '@/lib/utils'
 
 const props = defineProps<{ bucket: string; groupId: string | null; quiet?: boolean }>()
 // A count of null: the list was refused or failed, so it says nothing about the bucket.
@@ -44,9 +37,6 @@ const runningId = ref<string | null>(null)
 const rowError = ref<Record<string, string>>({})
 const dialogOpen = ref(false)
 const editing = ref<BackendImport | null>(null)
-const rulesOpen = ref(false)
-const renameOpen = ref(false)
-const picked = ref<BackendImport | null>(null)
 let requestId = 0
 
 function client() {
@@ -103,8 +93,6 @@ watch(
   () => [props.bucket, props.groupId, sessionEpoch.value],
   () => {
     dialogOpen.value = false
-    rulesOpen.value = false
-    renameOpen.value = false
     editing.value = null
     void load()
   },
@@ -132,16 +120,6 @@ async function run(link: BackendImport) {
   }
 }
 
-function openRules(link: BackendImport) {
-  picked.value = link
-  rulesOpen.value = true
-}
-
-function openRename(link: BackendImport) {
-  picked.value = link
-  renameOpen.value = true
-}
-
 function open(link: BackendImport | null) {
   editing.value = link
   dialogOpen.value = true
@@ -163,71 +141,19 @@ defineExpose({ open })
         description="A linked folder keeps a folder of your own storage and this bucket the same."
       />
     </template>
-    <div v-else class="surface overflow-hidden">
-      <ListSkeleton v-if="state === 'loading'" bare :rows="2" />
-      <ul v-else class="divide-y divide-border">
-        <li v-for="link in rows" :key="link.import_id" class="px-5 py-3.5">
-          <div class="flex items-center gap-2 text-xs">
-            <StatusDot
-              :tone="stateTone(link.last_run?.state ?? 'queued')"
-              :label="link.last_run?.state ?? 'not run yet'"
-            />
-            <Badge variant="secondary" size="sm" class="shrink-0">Linked folder</Badge>
-            <Badge variant="outline" size="sm" class="shrink-0">{{ scheduleWords(link.schedule) }}</Badge>
-            <ArrowLeftRight class="size-3.5 shrink-0 text-muted-foreground" aria-label="with" />
-            <Badge variant="outline" size="sm" class="shrink-0">{{ storageName(link) }}</Badge>
-            <span class="min-w-0 flex-1 truncate font-mono" :title="link.backend_prefix">{{ link.backend_prefix || '/' }}</span>
-            <span
-              v-if="link.last_run"
-              class="flex shrink-0 items-center gap-3 whitespace-nowrap text-[11px] tabular-nums text-muted-foreground"
-            >
-              <span>last run {{ relativeTime(link.last_run.started_at) }}</span>
-              <span>{{ link.last_run.imported }} new {{ link.last_run.imported === 1 ? 'file' : 'files' }}</span>
-            </span>
-          </div>
-          <div class="mt-2 flex items-center justify-end gap-2">
-            <span class="mr-auto text-[11px] text-muted-foreground">
-              Uploads to <span class="font-mono">{{ bucket }}/{{ link.key_prefix }}</span> go to your
-              storage. New files found there show at the top of <span class="font-mono">{{ bucket }}</span>,
-              or in a folder a file rule picks.
-            </span>
-            <IconButton
-              :label="RUN_HINT"
-              :disabled="runningId !== null"
-              :disabled-reason="writesDisabled ? OFFLINE_WRITE_HINT : null"
-              @click="run(link)"
-            >
-              <Play class="size-3.5" />
-            </IconButton>
-            <IconButton label="Sort new files" @click="openRules(link)">
-              <ListFilter class="size-3.5" />
-            </IconButton>
-            <IconButton
-              label="Rename a folder"
-              :disabled="writesDisabled"
-              :disabled-reason="writesDisabled ? OFFLINE_WRITE_HINT : null"
-              @click="openRename(link)"
-            >
-              <FolderInput class="size-3.5" />
-            </IconButton>
-            <IconButton label="Change the link" @click="open(link)">
-              <SlidersHorizontal class="size-3.5" />
-            </IconButton>
-          </div>
-          <p v-if="link.last_run?.error" class="mt-1 break-all text-[11px] text-destructive">{{ link.last_run.error }}</p>
-          <div v-if="link.last_run?.failed" class="mt-1 text-[11px] text-destructive">
-            <p>{{ link.last_run.failed }} {{ link.last_run.failed === 1 ? 'file' : 'files' }} not added</p>
-            <ul class="mt-0.5 space-y-0.5">
-              <li v-for="failure in link.last_run.errors.slice(0, 5)" :key="failure.key" class="break-all">
-                <span class="font-mono">{{ failure.key }}</span>: {{ failure.error }}
-              </li>
-            </ul>
-          </div>
-          <p v-if="rowError[link.import_id]" class="mt-1 break-all text-[11px] text-destructive">
-            {{ rowError[link.import_id] }}
-          </p>
-        </li>
-      </ul>
+    <ListSkeleton v-else-if="state === 'loading'" :rows="2" />
+    <div v-else class="space-y-3">
+      <LinkedFolderCard
+        v-for="link in rows"
+        :key="link.import_id"
+        :group-id="groupId!"
+        :link="link"
+        :storage="storageName(link)"
+        :running="runningId !== null"
+        :run-error="rowError[link.import_id]"
+        @run="run(link)"
+        @edit="open(link)"
+      />
     </div>
   </template>
   <LinkedFolderDialog
@@ -239,6 +165,4 @@ defineExpose({ open })
     :links="links"
     @saved="load"
   />
-  <FileRulesDialog v-if="groupId" v-model:open="rulesOpen" :group-id="groupId" :link="picked" />
-  <RenameFolderDialog v-model:open="renameOpen" :bucket="bucket" :from="picked?.key_prefix ?? ''" />
 </template>

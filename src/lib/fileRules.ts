@@ -1,5 +1,5 @@
-// Short words for file rules and folder renames, kept apart from the dialogs so tests reach them.
-import type { FileRule, FileRulePreview, RenamePlan } from '@/lib/api'
+// Short words for file rules, kept apart from the components so tests reach them.
+import type { FileRule, FileRulePreview } from '@/lib/api'
 
 export const OUTCOME_WORDS: Record<FileRulePreview['outcome'], string> = {
   known: 'Kept',
@@ -29,15 +29,4 @@ export function ruleProblem(rule: FileRule): string | null {
 export function previewCounts(files: FileRulePreview[]): { matched: number; unmatched: number; conflicts: number } {
   const count = (outcome: FileRulePreview['outcome']) => files.filter((file) => file.outcome === outcome).length
   return { matched: count('matched'), unmatched: count('root') + count('known'), conflicts: count('conflict') }
-}
-
-/** A folder field as the node wants it: empty or ending with `/`. */
-export function folderValue(value: string): string {
-  const folder = value.trim().replace(/^\/+/, '')
-  return !folder || folder.endsWith('/') ? folder : `${folder}/`
-}
-
-/** A plan can be applied when it moves something and nothing is in the way. */
-export function canRename(plan: RenamePlan | null): boolean {
-  return !!plan && plan.items.length > 0 && plan.items.every((item) => !item.conflict)
 }

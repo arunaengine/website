@@ -23,13 +23,10 @@ import {
   ApiError,
   createBackendImport,
   deleteBackendImport,
-  getImportRenames,
   runBackendImport,
-  startImportRenames,
   startBucketMove,
   updateBackendImport,
   type BackendImport,
-  type BackendImportRenames,
   type BackendImportRequest,
   type GroupBackendResponse,
 } from '@/lib/api'
@@ -93,15 +90,6 @@ const cron = ref('')
 const saving = ref(false)
 const confirmingDelete = ref(false)
 const submitError = ref<string | null>(null)
-// Files of a stored link that still have a name of an earlier pattern.
-const renames = ref<BackendImportRenames | null>(null)
-const renaming = computed(() => Boolean(renames.value?.progress && renames.value.progress.finished_at_ms == null))
-// An unknown count (not complete) still offers the rename.
-const offerRename = computed(() => {
-  const found = renames.value
-  return Boolean(found && (found.count > 0 || !found.complete)) && !patternChanged.value
-})
-
 const isEdit = computed(() => Boolean(props.link))
 const backendOptions = computed(() =>
   props.backends
@@ -238,42 +226,9 @@ watch(
     scheduleChoice.value = preset ? savedSchedule : 'custom'
     cron.value = preset ? '' : savedSchedule
     submitError.value = null
-    renames.value = null
     if (!stored) void bucketList.ensure()
-    else void loadRenames(stored, opening)
   },
 )
-
-// Older nodes have no rename route; the offer then stays hidden.
-// Only the latest load counts; a pattern save bumps it too.
-let renameLoad = 0
-async function loadRenames(stored: BackendImport, generation: number) {
-  const id = ++renameLoad
-  const latest = () => generation === opening && id === renameLoad
-  try {
-    const found = await getImportRenames(props.groupId, stored.import_id, { baseUrl: apiBaseUrl.value, token: authToken.value })
-    if (latest()) renames.value = found
-  } catch {
-    if (latest()) renames.value = null
-  }
-}
-
-async function rename() {
-  const stored = props.link
-  if (!stored || saving.value) return
-  submitError.value = null
-  saving.value = true
-  const generation = opening
-  try {
-    await startImportRenames(props.groupId, stored.import_id, { baseUrl: apiBaseUrl.value, token: authToken.value })
-    emit('saved')
-    if (generation === opening) emit('update:open', false)
-  } catch (err) {
-    if (generation === opening) submitError.value = moveRefusal(err) ?? errorMessage(err)
-  } finally {
-    if (generation === opening) saving.value = false
-  }
-}
 
 const bucketNote = useBucketCheck(() =>
   props.open && !isEdit.value && splits.value
@@ -339,7 +294,6 @@ async function submit() {
     let runError: string | undefined
     if (stored) {
       if (wanted !== (stored.schedule ?? '') || newPattern !== undefined) {
-        if (newPattern !== undefined) renameLoad++
         await updateBackendImport(props.groupId, stored.import_id, wanted || null, client, newPattern)
       }
       if (move) await startBucketMove(stored.bucket, stored.key_prefix, client)
@@ -354,15 +308,6 @@ async function submit() {
     }
     if (epoch !== sessionEpoch.value) return
     emit('saved', runError)
-    // After a new pattern, files with the old name are offered for renaming.
-    if (stored && newPattern !== undefined && current()) {
-      await loadRenames({ ...stored, write_pattern: newPattern }, generation)
-      if (current() && renames.value && (renames.value.count > 0 || !renames.value.complete)) {
-        pattern.value = newPattern
-        savedPattern.value = newPattern
-        return
-      }
-    }
     if (current()) emit('update:open', false)
   } catch (err) {
     if (epoch !== sessionEpoch.value || !current()) return
@@ -613,28 +558,8 @@ async function submit() {
               Move files already in this folder
             </label>
 
-            <div v-if="offerRename && renames" class="space-y-1.5 rounded-md border border-border px-3 py-2 text-xs" data-testid="rename-offer">
-              <p class="font-medium text-foreground">Rename existing files</p>
-              <p class="text-muted-foreground">
-                <template v-if="renames.count">
-                  {{ renames.count }}{{ renames.complete ? '' : '+' }} {{ renames.count === 1 ? 'file has' : 'files have' }} an older name.
-                </template>
-                <template v-else>Some files may have an older name.</template>
-                Each gets a copy with the new name, then the old file is removed.
-              </p>
-              <ul class="space-y-0.5 font-mono text-[11px] text-muted-foreground">
-                <li v-for="file in renames.files.slice(0, 3)" :key="file.from" class="break-all">{{ file.from }} → {{ file.to }}</li>
-              </ul>
-              <p v-if="renames.count > 3" class="text-[11px] text-muted-foreground">and {{ renames.count - 3 }} more</p>
-              <p v-if="renaming" class="text-[11px] text-muted-foreground">Renaming files…</p>
-              <Button v-else type="button" variant="outline" size="sm" :disabled="saving || writesDisabled" @click="rename">
-                Rename files
-              </Button>
-            </div>
-
             <Notice>
               Moving files does not rename or delete them in your storage.
-              <template v-if="offerRename">Old names are removed only when you choose Rename files.</template>
             </Notice>
           </fieldset>
           <p v-if="conflict" class="text-xs text-destructive">{{ conflict }}</p>
