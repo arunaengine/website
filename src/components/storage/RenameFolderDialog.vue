@@ -13,12 +13,14 @@ import { computed, ref, watch } from 'vue'
 import { useAruna } from '@/composables/useAruna'
 import { previewRename, renameKeys, type RenamePlan } from '@/lib/api'
 import { canRename, folderValue } from '@/lib/fileRules'
+import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { errorMessage } from '@/lib/utils'
 
 const props = defineProps<{ open: boolean; bucket: string; from?: string }>()
 const emit = defineEmits<{ (e: 'update:open', value: boolean): void; (e: 'renamed'): void }>()
 
 const { apiBaseUrl, authToken, sessionEpoch } = useAruna()
+const { writesDisabled } = useConnectivity()
 
 const from = ref('')
 const to = ref('')
@@ -78,7 +80,7 @@ async function preview() {
 
 async function apply() {
   const current = plan.value
-  if (busy.value || !canRename(current) || !current) return
+  if (busy.value || writesDisabled.value || !canRename(current) || !current) return
   const id = ++requestId
   busy.value = true
   error.value = null
@@ -147,7 +149,13 @@ async function apply() {
       <Notice v-if="done !== null" tone="success">Renamed {{ done }} {{ done === 1 ? 'file' : 'files' }}.</Notice>
       <DialogFooter>
         <Button variant="outline" :disabled="busy" @click="preview">Show changes</Button>
-        <Button :disabled="busy || !canRename(plan)" @click="apply">Rename</Button>
+        <Button
+          :disabled="busy || writesDisabled || !canRename(plan)"
+          :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
+          @click="apply"
+        >
+          Rename
+        </Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

@@ -22,12 +22,14 @@ import {
   type FileRulePreview,
 } from '@/lib/api'
 import { cleanRules, OUTCOME_WORDS, previewCounts, ruleProblem } from '@/lib/fileRules'
+import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { errorMessage } from '@/lib/utils'
 
 const props = defineProps<{ open: boolean; groupId: string; link: BackendImport | null }>()
 const emit = defineEmits<{ (e: 'update:open', value: boolean): void }>()
 
 const { apiBaseUrl, authToken, sessionEpoch } = useAruna()
+const { writesDisabled } = useConnectivity()
 
 const rules = ref<FileRule[]>([])
 const files = ref<FileRulePreview[]>([])
@@ -125,7 +127,7 @@ async function preview(more = false) {
 
 async function save() {
   const link = props.link
-  if (!link || busy.value || !loaded.value || !previewed.value || invalid.value) return
+  if (!link || busy.value || !loaded.value || !previewed.value || invalid.value || writesDisabled.value) return
   const id = ++requestId
   const sent = ruleKey()
   busy.value = true
@@ -197,7 +199,13 @@ async function save() {
       <DialogFooter v-if="!unsupported && !loading">
         <Button v-if="!loaded" variant="outline" @click="load">Try again</Button>
         <Button variant="outline" :disabled="busy || !loaded || invalid" @click="preview()">Show where files go</Button>
-        <Button :disabled="busy || !loaded || !previewed || invalid" @click="save">Save</Button>
+        <Button
+          :disabled="busy || !loaded || !previewed || invalid || writesDisabled"
+          :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
+          @click="save"
+        >
+          Save
+        </Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

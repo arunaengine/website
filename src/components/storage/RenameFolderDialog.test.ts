@@ -10,6 +10,8 @@ const previewRename = vi.fn()
 const renameKeys = vi.fn()
 const onRenamed = vi.fn()
 
+const offline = ref(false)
+
 const Slot = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
 const ButtonStub = defineComponent({
   inheritAttrs: false,
@@ -37,6 +39,7 @@ const RenameFolderDialog = compileClientComponent(new URL('./RenameFolderDialog.
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Notice.vue': moduleDefault(Slot),
+  '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled: offline }) },
   '@/composables/useAruna': {
     useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('bearer'), sessionEpoch: ref(0) }),
   },
@@ -60,6 +63,7 @@ function field(root: Parameters<typeof content>[0], id: string) {
 }
 
 beforeEach(() => {
+  offline.value = false
   previewRename.mockReset()
   renameKeys.mockReset()
   onRenamed.mockReset()
@@ -126,5 +130,18 @@ describe('RenameFolderDialog', () => {
 
     expect(content(root)).not.toContain('archive/x.csv')
     expect(button(root, 'Rename').props.disabled).toBe(true)
+  })
+
+  it('does not rename while offline', async () => {
+    previewRename.mockResolvedValue({ bucket: 'lab', items: [ITEM], truncated: false })
+    const { root } = await mount()
+    await typeValue(field(root, 'rename-to'), 'archive/')
+    await click(button(root, 'Show changes'))
+    offline.value = true
+    await flush()
+
+    expect(button(root, 'Rename').props.disabled).toBe(true)
+    await click(button(root, 'Rename'))
+    expect(renameKeys).not.toHaveBeenCalled()
   })
 })

@@ -10,6 +10,8 @@ const getFileRules = vi.fn()
 const previewFileRules = vi.fn()
 const saveFileRules = vi.fn()
 
+const offline = ref(false)
+
 const Slot = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
 const ButtonStub = defineComponent({
   inheritAttrs: false,
@@ -40,6 +42,7 @@ const FileRulesDialog = compileClientComponent(new URL('./FileRulesDialog.vue', 
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Notice.vue': moduleDefault(Slot),
   '@/components/ui/Spinner.vue': moduleDefault(Slot),
+  '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled: offline }) },
   '@/composables/useAruna': {
     isUnsupportedEndpoint: () => false,
     useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('bearer'), sessionEpoch: ref(0) }),
@@ -71,6 +74,7 @@ function deferred() {
 }
 
 beforeEach(() => {
+  offline.value = false
   getFileRules.mockReset()
   previewFileRules.mockReset()
   saveFileRules.mockReset()
@@ -154,5 +158,17 @@ describe('FileRulesDialog', () => {
     previewFileRules.mockResolvedValueOnce({ files: [], next: null })
     await click(button(root, 'Show more'))
     expect(content(root)).not.toContain('Shown so far')
+  })
+
+  it('does not save while offline', async () => {
+    previewFileRules.mockResolvedValue(PAGE)
+    const { root } = await mount()
+    await click(button(root, 'Show where files go'))
+    offline.value = true
+    await flush()
+
+    expect(button(root, 'Save').props.disabled).toBe(true)
+    await click(button(root, 'Save'))
+    expect(saveFileRules).not.toHaveBeenCalled()
   })
 })
