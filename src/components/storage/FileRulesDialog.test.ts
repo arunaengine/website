@@ -171,4 +171,10 @@ describe('FileRulesDialog', () => {
     await click(button(root, 'Save'))
     expect(saveFileRules).not.toHaveBeenCalled()
   })
+
+  it('explains the name patterns', async () => {
+    const { root } = await mount()
+
+    expect(content(root)).toContain('* any text, ? one character, [0-9] one of, {4} or {2,8} times, {fna,fa} either')
+  })
 })

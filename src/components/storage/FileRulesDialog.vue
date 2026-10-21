@@ -172,7 +172,8 @@ async function save() {
           <Plus class="size-3.5" /> Add a name
         </Button>
         <p class="text-[11px] text-muted-foreground">
-          <span class="font-mono">*</span> stands for any text. A file may match only one name.
+          <span class="font-mono">* any text, ? one character, [0-9] one of, {4} or {2,8} times, {fna,fa} either</span>.
+          A file may match only one name.
         </p>
 
         <template v-if="previewed">

@@ -764,6 +764,7 @@ export const docsTopics: DocsTopic[] = [
         icon: 'Route',
         steps: [
           'Sort new files on a linked bucket puts new files into folders by name, such as `*.faa.gz` into proteins/. `*` stands for any text.',
+          'A name may also use `?` for one character, `[0-9]` for one of a set or range, `{4}` or `{2,8}` for a repeat count and `{fna,fa}` for either.',
           'Show where files go lists each file and its place before you save. A file may match only one name; files Aruna already knows never move.',
           'Rename a folder gives files new names in Aruna, such as x into archive/x. Show changes first; only the files shown move.',
           'Your storage, its files and all versions stay as they are. Links by path stop working; DRS links by content keep working.',
