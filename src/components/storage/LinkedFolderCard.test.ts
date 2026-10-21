@@ -96,6 +96,19 @@ describe('linked folder card', () => {
     expect(text).toContain('in sync')
   })
 
+  it('marks the card a link from the bucket points at', async () => {
+    const quiet = await mount()
+    const marked = (root: Parameters<typeof content>[0]) =>
+      element(root, (node) => node.props['data-testid'] === 'link-card').props.class
+    expect(String(marked(quiet.root))).not.toContain('ring-2')
+    const mounted = await mountApp(Card, {
+      props: { groupId: 'g1', link: LINK, storage: 'lab', running: false, highlight: true },
+    })
+    await flush()
+    expect(String(marked(mounted.root))).toContain('ring-2')
+    expect(element(mounted.root, (node) => node.props['data-testid'] === 'link-card').props.id).toBe('link-i1')
+  })
+
   it('lists the files a run did not add after Show', async () => {
     const errors = [{ key: 'share/a.csv', error: 'the file differs from version X of a.csv' }]
     const { root } = await mount({ ...LINK, last_run: { ...RUN, failed: 1, errors } })

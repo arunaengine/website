@@ -1,10 +1,9 @@
 <script setup lang="ts">
-// Everything that copies data into or out of this bucket: syncs, linked folders
-// and staging jobs, each listed by its own source, with one Add menu.
+// Everything that copies data into or out of this bucket: syncs and staging jobs,
+// each listed by its own source, with one Add menu. Linked storage lives in the group.
 import { computed, ref, watch } from 'vue'
 import AddDataDialog from '@/components/data/AddDataDialog.vue'
 import SyncBucketDialog from '@/components/data/SyncBucketDialog.vue'
-import LinkedFolderRows from '@/components/storage/LinkedFolderRows.vue'
 import StagingJobRows from '@/components/storage/StagingJobRows.vue'
 import SyncsTab from '@/components/storage/SyncsTab.vue'
 import Button from '@/components/ui/Button.vue'
@@ -19,7 +18,7 @@ import RefreshButton from '@/components/ui/RefreshButton.vue'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { featureEnabled } from '@/lib/config'
-import { ArrowLeftRight, ChevronDown, CloudDownload, Link2, Plus } from '@lucide/vue'
+import { ArrowLeftRight, ChevronDown, CloudDownload, Plus } from '@lucide/vue'
 
 const props = defineProps<{ bucket: string; nodeId: string | null; groupId: string | null }>()
 
@@ -31,19 +30,17 @@ const kind = ref('all')
 const KINDS = [
   { value: 'all', label: 'All' },
   { value: 'syncs', label: 'Syncs' },
-  { value: 'linked', label: 'Linked folders' },
   { value: 'staging', label: 'Staging' },
 ]
-// Syncs of a bucket on another node are the only kind this node can show.
-const kinds = computed(() => (props.nodeId ? KINDS.slice(0, 2) : stagingEnabled ? KINDS : KINDS.slice(0, 3)))
+// Syncs of a bucket on another node are the only kind this node can show; with one kind there is nothing to filter.
+const filterable = computed(() => !props.nodeId && stagingEnabled)
 const shows = (value: string) => kind.value === 'all' || kind.value === value
 
 // Remounting the lists reloads them all at once.
 const reloadKey = ref(0)
 const counts = ref<Record<string, number | null>>({})
-const linkAvailable = ref(false)
 const allEmpty = computed(() => {
-  const known = ['syncs', ...(props.nodeId ? [] : ['linked', ...(stagingEnabled ? ['staging'] : [])])]
+  const known = ['syncs', ...(props.nodeId || !stagingEnabled ? [] : ['staging'])]
   return known.every((key) => counts.value[key] === 0)
 })
 
@@ -64,11 +61,6 @@ function reload() {
 
 const syncOpen = ref(false)
 const stagingOpen = ref(false)
-const linkedRows = ref<InstanceType<typeof LinkedFolderRows> | null>(null)
-
-function addLink() {
-  linkedRows.value?.open(null)
-}
 </script>
 
 <template>
@@ -78,7 +70,13 @@ function addLink() {
         Data copied into or out of this bucket. Only syncs you created are listed.
       </p>
       <div class="flex flex-wrap items-center gap-2">
-        <OptionToggle v-model="kind" :options="kinds" aria-label="Which transfers to show" />
+        <OptionToggle
+          v-if="filterable"
+          v-model="kind"
+          :options="KINDS"
+          class="p-0 [&>button]:h-7"
+          aria-label="Which transfers to show"
+        />
         <DropdownMenu>
           <DropdownMenuTrigger as-child>
             <Button variant="outline" size="sm">
@@ -91,15 +89,6 @@ function addLink() {
               <span>
                 <span class="block">Sync with another node</span>
                 <span class="block text-xs text-muted-foreground">Copy files to or from another node.</span>
-              </span>
-            </DropdownMenuItem>
-            <DropdownMenuItem v-if="!nodeId" class="items-start" :disabled="!linkAvailable" @click="addLink">
-              <Link2 class="mt-0.5 h-3.5 w-3.5" />
-              <span>
-                <span class="block">Link a storage folder</span>
-                <span class="block text-xs text-muted-foreground">
-                  {{ linkAvailable ? 'Keep a folder of your storage the same.' : 'Only group admins can link storage.' }}
-                </span>
               </span>
             </DropdownMenuItem>
             <DropdownMenuItem
@@ -127,7 +116,7 @@ function addLink() {
     <EmptyState
       v-if="kind === 'all' && allEmpty"
       title="Nothing is copied into or out of this bucket."
-      description="Use Add to sync it with another node, link a storage folder or stage data."
+      description="Use Add to sync it with another node or stage data."
     />
 
     <SyncsTab
@@ -140,18 +129,6 @@ function addLink() {
       @new-sync="syncOpen = true"
       @count="(count: number | null) => setCount('syncs', count)"
     />
-    <!-- Kept mounted while hidden: its dialog serves the Add menu. -->
-    <div v-if="!nodeId" v-show="shows('linked')">
-      <LinkedFolderRows
-        ref="linkedRows"
-        :key="`linked-${reloadKey}`"
-        :bucket="bucket"
-        :group-id="groupId"
-        :quiet="kind === 'all'"
-        @available="(value: boolean) => (linkAvailable = value)"
-        @count="(count: number | null) => setCount('linked', count)"
-      />
-    </div>
     <StagingJobRows
       v-if="!nodeId && stagingEnabled && shows('staging')"
       :key="`staging-${reloadKey}`"

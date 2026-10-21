@@ -1,7 +1,7 @@
 import { defineComponent, h, onMounted, ref } from 'vue'
 import * as VueRuntime from 'vue'
 import { describe, expect, it } from 'vitest'
-import { compileClientComponent, content, flush, mountApp, moduleDefault } from '@/test/clientRender'
+import { compileClientComponent, content, element, flush, mountApp, moduleDefault } from '@/test/clientRender'
 
 const IconStub = defineComponent((_, { attrs }) => () => h('i', attrs))
 const Slotted = (tag: string) =>
@@ -21,7 +21,6 @@ const tab = compileClientComponent(new URL('./TransfersTab.vue', import.meta.url
   '@lucide/vue': new Proxy({}, { get: () => IconStub }),
   '@/components/data/AddDataDialog.vue': moduleDefault(Slotted('div')),
   '@/components/data/SyncBucketDialog.vue': moduleDefault(Slotted('div')),
-  '@/components/storage/LinkedFolderRows.vue': moduleDefault(EmptyList),
   '@/components/storage/StagingJobRows.vue': moduleDefault(EmptyList),
   '@/components/storage/SyncsTab.vue': moduleDefault(EmptyList),
   '@/components/ui/Button.vue': moduleDefault(Slotted('button')),
@@ -49,5 +48,17 @@ describe('transfers tab', () => {
     await flush()
 
     expect(content(root)).not.toContain('Nothing is copied into or out of this bucket.')
+  })
+
+  it('keeps linked storage out of the transfers and filters only between syncs and staging', async () => {
+    const { root } = await mountApp(defineComponent({ setup: () => () => h(tab, { bucket: 'reef', nodeId: null, groupId: 'g-1' }) }))
+    expect(content(root)).not.toContain('Linked folders')
+    expect(content(root)).not.toContain('Link a storage folder')
+    expect(element(root, (node) => node.props['aria-label'] === 'Which transfers to show').props.class).toContain('h-7')
+  })
+
+  it('drops the filter when only syncs can be shown', async () => {
+    const { root } = await mountApp(defineComponent({ setup: () => () => h(tab, { bucket: 'reef', nodeId: 'n-2', groupId: 'g-1' }) }))
+    expect(() => element(root, (node) => node.props['aria-label'] === 'Which transfers to show')).toThrow()
   })
 })

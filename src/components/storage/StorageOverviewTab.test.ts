@@ -36,6 +36,7 @@ const tab = compileClientComponent(new URL('./StorageOverviewTab.vue', import.me
   '@lucide/vue': new Proxy({}, { get: () => IconStub }),
   '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
   '@/components/ui/DocsLink.vue': moduleDefault(Slotted('a')),
+  '@/components/storage/BucketLinkNote.vue': moduleDefault(Slotted('div')),
   '@/components/ui/DetailList.vue': moduleDefault(DetailListStub),
   '@/components/ui/Skeleton.vue': moduleDefault(Slotted('div')),
   '@/composables/useAruna': {
