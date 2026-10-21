@@ -129,4 +129,19 @@ describe('FileRulesDialog', () => {
     expect(button(root, 'Show where files go').props.disabled).toBe(false)
     expect(content(root)).not.toContain('Try again')
   })
+
+  it('blocks preview and save for a half filled rule', async () => {
+    previewFileRules.mockResolvedValue(PAGE)
+    const { root } = await mount()
+    await click(button(root, 'Show where files go'))
+    await click(button(root, 'Add a name'))
+    await typeValue(
+      element(root, (node) => node.tag === 'input' && node.props['aria-label'] === 'File name' && node.props.value === ''),
+      '*.txt',
+    )
+
+    expect(content(root)).toContain('Add a folder.')
+    expect(button(root, 'Show where files go').props.disabled).toBe(true)
+    expect(button(root, 'Save').props.disabled).toBe(true)
+  })
 })

@@ -21,7 +21,7 @@ import {
   type FileRule,
   type FileRulePreview,
 } from '@/lib/api'
-import { cleanRules, OUTCOME_WORDS, previewCounts } from '@/lib/fileRules'
+import { cleanRules, OUTCOME_WORDS, previewCounts, ruleProblem } from '@/lib/fileRules'
 import { errorMessage } from '@/lib/utils'
 
 const props = defineProps<{ open: boolean; groupId: string; link: BackendImport | null }>()
@@ -94,10 +94,12 @@ watch(rules, () => {
 }, { deep: true })
 
 const counts = computed(() => previewCounts(files.value))
+const problems = computed(() => rules.value.map(ruleProblem))
+const invalid = computed(() => problems.value.some(Boolean))
 
 async function preview(more = false) {
   const link = props.link
-  if (!link || busy.value || !loaded.value) return
+  if (!link || busy.value || !loaded.value || invalid.value) return
   const id = ++requestId
   const sent = ruleKey()
   busy.value = true
@@ -123,7 +125,7 @@ async function preview(more = false) {
 
 async function save() {
   const link = props.link
-  if (!link || busy.value || !loaded.value || !previewed.value) return
+  if (!link || busy.value || !loaded.value || !previewed.value || invalid.value) return
   const id = ++requestId
   const sent = ruleKey()
   busy.value = true
@@ -153,13 +155,16 @@ async function save() {
       <Notice v-if="unsupported">This node cannot sort files yet.</Notice>
       <div v-else-if="loading" class="flex justify-center py-6"><Spinner /></div>
       <div v-else-if="loaded" class="max-h-[60vh] space-y-3 overflow-y-auto px-1 scrollbar-thin">
-        <div v-for="(rule, index) in rules" :key="index" class="flex items-center gap-2">
-          <Input v-model="rule.pattern" placeholder="*.faa.gz" aria-label="File name" class="font-mono" />
-          <span class="shrink-0 text-xs text-muted-foreground">goes to</span>
-          <Input v-model="rule.folder" placeholder="proteins/" aria-label="Folder" class="font-mono" />
-          <Button variant="ghost" size="icon-sm" aria-label="Remove" @click="rules.splice(index, 1)">
-            <Trash2 class="size-3.5" />
-          </Button>
+        <div v-for="(rule, index) in rules" :key="index">
+          <div class="flex items-center gap-2">
+            <Input v-model="rule.pattern" placeholder="*.faa.gz" aria-label="File name" class="font-mono" />
+            <span class="shrink-0 text-xs text-muted-foreground">goes to</span>
+            <Input v-model="rule.folder" placeholder="proteins/" aria-label="Folder" class="font-mono" />
+            <Button variant="ghost" size="icon-sm" aria-label="Remove" @click="rules.splice(index, 1)">
+              <Trash2 class="size-3.5" />
+            </Button>
+          </div>
+          <p v-if="problems[index]" class="mt-1 text-[11px] text-destructive">{{ problems[index] }}</p>
         </div>
         <Button variant="outline" size="sm" @click="rules.push({ pattern: '', folder: '' })">
           <Plus class="size-3.5" /> Add a name
@@ -191,8 +196,8 @@ async function save() {
       <Notice v-if="saved" tone="success">Saved. The next run uses these names.</Notice>
       <DialogFooter v-if="!unsupported && !loading">
         <Button v-if="!loaded" variant="outline" @click="load">Try again</Button>
-        <Button variant="outline" :disabled="busy || !loaded" @click="preview()">Show where files go</Button>
-        <Button :disabled="busy || !loaded || !previewed" @click="save">Save</Button>
+        <Button variant="outline" :disabled="busy || !loaded || invalid" @click="preview()">Show where files go</Button>
+        <Button :disabled="busy || !loaded || !previewed || invalid" @click="save">Save</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

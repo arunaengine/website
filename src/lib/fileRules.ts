@@ -8,12 +8,21 @@ export const OUTCOME_WORDS: Record<FileRulePreview['outcome'], string> = {
   conflict: 'Two rules',
 }
 
-/** The rules worth sending: both fields filled, a folder ending with `/`. */
+/** The rules worth sending: blank rows dropped, a folder ending with `/`. */
 export function cleanRules(rules: FileRule[]): FileRule[] {
   return rules
     .map((rule) => ({ pattern: rule.pattern.trim(), folder: rule.folder.trim() }))
-    .filter((rule) => rule.pattern && rule.folder)
-    .map((rule) => ({ ...rule, folder: rule.folder.endsWith('/') ? rule.folder : `${rule.folder}/` }))
+    .filter((rule) => rule.pattern || rule.folder)
+    .map((rule) => ({ ...rule, folder: !rule.folder || rule.folder.endsWith('/') ? rule.folder : `${rule.folder}/` }))
+}
+
+/** A row with only one field filled is an error; a blank row is not. */
+export function ruleProblem(rule: FileRule): string | null {
+  const pattern = rule.pattern.trim()
+  const folder = rule.folder.trim()
+  if (!pattern && !folder) return null
+  if (!pattern) return 'Add a file name.'
+  return folder ? null : 'Add a folder.'
 }
 
 /** How many listed files a rule sorts and how many stay where they are. */
