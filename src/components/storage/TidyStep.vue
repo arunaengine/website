@@ -5,19 +5,20 @@ import PagedList from '@/components/storage/PagedList.vue'
 import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
 import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
+import { useCursorPage } from '@/composables/useCursorPage'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import {
-  PAGE_SIZE,
+  getImportRenames,
   previewDuplicates,
   startDuplicates,
   startImportRenames,
   type BackendImport,
   type BackendImportRenames,
-  type DuplicatePreview,
+  type DuplicateItem,
 } from '@/lib/api'
-import { filesWord } from '@/lib/organize'
+import { filesWord, organizeError } from '@/lib/organize'
 import { moveRefusal } from '@/lib/storageRules'
-import { errorMessage, formatBytes } from '@/lib/utils'
+import { formatBytes } from '@/lib/utils'
 
 const props = defineProps<{
   groupId: string
@@ -32,61 +33,47 @@ const emit = defineEmits<{ (e: 'started'): void }>()
 const { apiBaseUrl, authToken, sessionEpoch } = useAruna()
 const { writesDisabled } = useConnectivity()
 
-const copies = ref<DuplicatePreview | null>(null)
-const copyOffset = ref(0)
-const copyFilter = ref('')
 const showCopies = ref(false)
 const showRenames = ref(false)
-const renameOffset = ref(0)
-const renameFilter = ref('')
 const busy = ref(false)
 const error = ref<string | null>(null)
-let requestId = 0
 
 function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
 }
 
+const copies = useCursorPage<DuplicateItem>((query) =>
+  previewDuplicates(props.groupId, props.link.import_id, query, client()),
+)
+const oldNames = useCursorPage<{ from: string; to: string; writable?: boolean }>(async (query) => {
+  const found = await getImportRenames(props.groupId, props.link.import_id, client(), query)
+  return { items: found.files, total: found.count, complete: found.complete, next: found.next }
+})
+
+const copyTotal = computed(() => copies.page.value?.total ?? 0)
+const copyBytes = computed(() => (copies.page.value as { bytes?: number } | null)?.bytes ?? 0)
+const copyComplete = computed(() => copies.page.value?.complete ?? true)
 const renameCount = computed(() => props.renames?.count ?? 0)
 const renameOffered = computed(() => Boolean(props.renames && (props.renames.count > 0 || !props.renames.complete)))
-const renameRows = computed(() => {
-  const text = renameFilter.value.toLowerCase()
-  return (props.renames?.files ?? []).filter((file) => file.from.toLowerCase().includes(text))
-})
-const renamePage = computed(() => renameRows.value.slice(renameOffset.value, renameOffset.value + PAGE_SIZE))
-const idle = computed(() => !renameOffered.value && !copies.value?.total)
-
-async function loadCopies(offset = 0, filter = copyFilter.value) {
-  const id = ++requestId
-  try {
-    const page = await previewDuplicates(
-      props.groupId,
-      props.link.import_id,
-      { offset, limit: PAGE_SIZE, filter },
-      client(),
-    )
-    if (id !== requestId) return
-    copies.value = page
-    copyOffset.value = offset
-    copyFilter.value = filter
-  } catch (err) {
-    if (id !== requestId) return
-    copies.value = null
-    if (!isUnsupportedEndpoint(err)) error.value = errorMessage(err)
-  }
-}
+const idle = computed(() => !renameOffered.value && !copyTotal.value)
 
 watch(
   () => [props.link.import_id, sessionEpoch.value],
   () => {
-    copies.value = null
+    copies.reset()
+    oldNames.reset()
     showCopies.value = false
     showRenames.value = false
     error.value = null
-    void loadCopies(0, '')
+    void copies.load('')
   },
   { immediate: true },
 )
+
+function toggleRenames() {
+  showRenames.value = !showRenames.value
+  if (showRenames.value && !oldNames.page.value) void oldNames.load('')
+}
 
 async function act(run: () => Promise<unknown>) {
   if (busy.value || props.blocked || writesDisabled.value) return
@@ -97,7 +84,8 @@ async function act(run: () => Promise<unknown>) {
     await run()
     if (epoch === sessionEpoch.value) emit('started')
   } catch (err) {
-    if (epoch === sessionEpoch.value) error.value = moveRefusal(err) ?? errorMessage(err)
+    if (epoch !== sessionEpoch.value) return
+    error.value = isUnsupportedEndpoint(err) ? 'This node cannot do this yet.' : (moveRefusal(err) ?? organizeError(err))
   } finally {
     busy.value = false
   }
@@ -121,7 +109,7 @@ const offlineHint = computed(() => (writesDisabled.value ? OFFLINE_WRITE_HINT : 
           </p>
           <p class="text-xs text-muted-foreground">They get the new name. Each gets a copy first, then the old file is removed.</p>
         </div>
-        <Button v-if="renames.files.length" variant="outline" size="sm" @click="showRenames = !showRenames">
+        <Button variant="outline" size="sm" @click="toggleRenames">
           {{ showRenames ? 'Hide preview' : 'Preview' }}
         </Button>
         <Button size="sm" :disabled="busy || blocked || writesDisabled" :title="offlineHint" @click="rename">
@@ -130,52 +118,67 @@ const offlineHint = computed(() => (writesDisabled.value ? OFFLINE_WRITE_HINT : 
       </div>
       <PagedList
         v-if="showRenames"
-        :total="renameRows.length"
-        :offset="renameOffset"
-        :shown="renamePage.length"
-        :filter="renameFilter"
-        @page="(value: number) => (renameOffset = value)"
-        @filter="(value: string) => ((renameFilter = value), (renameOffset = 0))"
+        :total="oldNames.page.value?.total ?? 0"
+        :complete="oldNames.page.value?.complete ?? true"
+        :offset="oldNames.offset.value"
+        :shown="oldNames.items.value.length"
+        :filter="oldNames.filter.value"
+        :busy="oldNames.busy.value"
+        :has-next="oldNames.hasNext.value"
+        :has-prev="oldNames.hasPrev.value"
+        @next="oldNames.next()"
+        @prev="oldNames.prev()"
+        @filter="(value: string) => oldNames.load(value)"
       >
-        <li v-for="file in renamePage" :key="file.from" class="flex items-center gap-2 px-3 py-1.5 font-mono">
+        <li v-for="file in oldNames.items.value" :key="file.from" class="flex items-center gap-2 px-3 py-1.5 font-mono">
           <span class="min-w-0 flex-1 truncate" :title="file.from">{{ file.from }}</span>
           <span class="shrink-0 font-sans text-muted-foreground">→</span>
           <span class="min-w-0 flex-1 truncate" :title="file.to">{{ file.to }}</span>
+          <span v-if="file.writable === false" class="shrink-0 font-sans text-[11px] text-muted-foreground">cannot rename</span>
         </li>
       </PagedList>
     </div>
 
-    <div v-if="copies && copies.total" class="space-y-2" data-testid="copies-row">
+    <div v-if="copyTotal" class="space-y-2" data-testid="copies-row">
       <div class="flex items-center gap-2">
         <div class="min-w-0 flex-1">
-          <p class="text-sm">{{ filesWord(copies.total) }} {{ copies.total === 1 ? 'is' : 'are' }} stored twice · {{ formatBytes(copies.bytes) }}</p>
+          <p class="text-sm">
+            {{ copyComplete ? '' : 'At least ' }}{{ filesWord(copyTotal) }} {{ copyTotal === 1 ? 'is' : 'are' }} stored twice · {{ formatBytes(copyBytes) }}
+          </p>
           <p class="text-xs text-muted-foreground">Same name, same content. One copy stays; all versions keep working.</p>
         </div>
         <Button variant="outline" size="sm" @click="showCopies = !showCopies">
           {{ showCopies ? 'Hide preview' : 'Preview' }}
         </Button>
         <Button size="sm" :disabled="busy || blocked || writesDisabled" :title="offlineHint" @click="removeCopies">
-          Remove {{ copies.total === 1 ? '1 copy' : `${copies.total} copies` }}
+          Remove {{ copyTotal === 1 ? '1 copy' : `${copyTotal} copies` }}
         </Button>
       </div>
       <PagedList
         v-if="showCopies"
-        :total="copies.total"
-        :offset="copyOffset"
-        :shown="copies.items.length"
-        :filter="copyFilter"
-        @page="(value: number) => loadCopies(value)"
-        @filter="(value: string) => loadCopies(0, value)"
+        :total="copyTotal"
+        :complete="copyComplete"
+        :offset="copies.offset.value"
+        :shown="copies.items.value.length"
+        :filter="copies.filter.value"
+        :busy="copies.busy.value"
+        :has-next="copies.hasNext.value"
+        :has-prev="copies.hasPrev.value"
+        @next="copies.next()"
+        @prev="copies.prev()"
+        @filter="(value: string) => copies.load(value)"
       >
-        <li v-for="item in copies.items" :key="item.removed" class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 py-1.5">
-          <span class="truncate font-mono" :title="item.kept">{{ item.kept }}</span>
+        <li v-for="item in copies.items.value" :key="item.key" class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 py-1.5">
+          <span class="truncate font-mono" :title="item.kept.path">{{ item.kept.path }}</span>
           <span class="text-muted-foreground">keeps</span>
-          <span class="truncate font-mono text-muted-foreground" :title="item.removed">removes {{ item.removed }}</span>
+          <span class="truncate font-mono text-muted-foreground" :title="item.removed.map((file) => file.path).join(', ')">
+            removes {{ item.removed.map((file) => file.path).join(', ') }}
+          </span>
         </li>
       </PagedList>
     </div>
 
     <p class="text-[11px] text-muted-foreground">A file is only removed after its copy is checked and nothing else uses it.</p>
-    <Notice v-if="error" tone="error">{{ error }}</Notice>
+    <Notice v-if="error || copies.error.value || oldNames.error.value" tone="error">{{ error ?? copies.error.value ?? oldNames.error.value }}</Notice>
   </div>
 </template>

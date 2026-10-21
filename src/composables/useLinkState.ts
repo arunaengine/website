@@ -3,6 +3,7 @@
 import { computed, onScopeDispose, ref } from 'vue'
 import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
 import {
+  ApiError,
   controlJob,
   getImportRenames,
   getLinkStatus,
@@ -11,8 +12,7 @@ import {
   type LinkStatus,
   type OrganizeJob,
 } from '@/lib/api'
-import { isActive, renameJob } from '@/lib/organize'
-import { errorMessage } from '@/lib/utils'
+import { activeJob, organizeError } from '@/lib/organize'
 
 const POLL_MS = 3000
 
@@ -28,7 +28,7 @@ export function useLinkState(groupId: () => string, importId: () => string) {
   let generation = 0
   let timer: ReturnType<typeof setTimeout> | null = null
 
-  const job = computed(() => (isActive(stored.value) ? stored.value : renameJob(renames.value)))
+  const job = computed(() => activeJob(stored.value))
 
   function client() {
     return { baseUrl: apiBaseUrl.value, token: authToken.value }
@@ -39,7 +39,7 @@ export function useLinkState(groupId: () => string, importId: () => string) {
       return await run()
     } catch (err) {
       if (isUnsupportedEndpoint(err)) onMissing()
-      else error.value = errorMessage(err)
+      else error.value = organizeError(err)
       return null
     }
   }
@@ -72,7 +72,8 @@ export function useLinkState(groupId: () => string, importId: () => string) {
     try {
       stored.value = await controlJob(groupId(), importId(), action, client())
     } catch (err) {
-      error.value = errorMessage(err)
+      // The step ended on its own meanwhile; the refresh below shows how.
+      if (!(err instanceof ApiError && err.status === 409 && err.code === 'no_job')) error.value = organizeError(err)
     } finally {
       controlling.value = false
     }

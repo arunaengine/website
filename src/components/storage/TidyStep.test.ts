@@ -2,12 +2,15 @@ import * as VueRuntime from 'vue'
 import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { button, click, compileClientComponent, content, flush, mountApp, moduleDefault } from '@/test/clientRender'
+import * as Api from '@/lib/api'
+import * as CursorPage from '@/composables/useCursorPage'
 import * as Organize from '@/lib/organize'
 import * as Utils from '@/lib/utils'
 
 const previewDuplicates = vi.fn()
 const startDuplicates = vi.fn()
 const startImportRenames = vi.fn()
+const getImportRenames = vi.fn()
 const offline = ref(false)
 
 const Slot = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
@@ -16,7 +19,7 @@ const ButtonStub = defineComponent({
   setup: (_, { attrs, slots }) => () => h('button', attrs, slots.default?.()),
 })
 const ListStub = defineComponent({
-  props: { total: Number, shown: Number },
+  props: { total: Number, shown: Number, offset: Number, filter: String, hasNext: Boolean, hasPrev: Boolean, complete: Boolean, busy: Boolean },
   setup: (props, { slots }) => () => h('div', [h('ul', slots.default?.()), h('span', `list ${props.shown} of ${props.total}`)]),
 })
 
@@ -25,19 +28,25 @@ const TidyStep = compileClientComponent(new URL('./TidyStep.vue', import.meta.ur
   '@/components/storage/PagedList.vue': moduleDefault(ListStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Notice.vue': moduleDefault(Slot),
+  '@/composables/useCursorPage': CursorPage,
   '@/composables/useAruna': {
     isUnsupportedEndpoint: (err: { status?: number }) => err?.status === 404,
     useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('t'), sessionEpoch: ref(0) }),
   },
   '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled: offline }) },
-  '@/lib/api': { PAGE_SIZE: 100, previewDuplicates, startDuplicates, startImportRenames },
+  '@/lib/api': { PAGE_SIZE: 100, previewDuplicates, startDuplicates, startImportRenames, getImportRenames, ApiError: Api.ApiError },
   '@/lib/organize': Organize,
   '@/lib/storageRules': { moveRefusal: () => null },
   '@/lib/utils': Utils,
 })
 
 const FILES = [{ from: 'raw/01JA7Q3K_b.fastq', to: 'raw/b.fastq~01JA7Q3K' }]
-const COPIES = { total: 842, bytes: 1.2e12, items: [{ kept: 'P1.faa.gz', removed: '01JA_P1.faa.gz' }] }
+const COPIES = {
+  total: 842,
+  bytes: 1.2e12,
+  complete: true,
+  items: [{ key: 'P1.faa.gz', kept: { path: 'P1.faa.gz', bytes: 1 }, removed: [{ path: '01JA_P1.faa.gz', bytes: 1 }] }],
+}
 
 async function mount(renames: object | null = { count: 12034, complete: true, files: FILES }, blocked = false) {
   const events: string[] = []
@@ -54,6 +63,7 @@ beforeEach(() => {
   previewDuplicates.mockReset().mockResolvedValue(COPIES)
   startDuplicates.mockReset().mockResolvedValue({})
   startImportRenames.mockReset().mockResolvedValue({})
+  getImportRenames.mockReset().mockResolvedValue({ count: 12034, complete: true, files: FILES })
 })
 
 describe('TidyStep', () => {
@@ -69,6 +79,7 @@ describe('TidyStep', () => {
     const { root } = await mount()
     expect(content(root)).not.toContain('raw/b.fastq~01JA7Q3K')
     await click(button(root, 'Preview'))
+    expect(getImportRenames).toHaveBeenCalledWith('g1', 'i1', expect.anything(), { filter: '', limit: 100, after: null })
     expect(content(root)).toContain('raw/01JA7Q3K_b.fastq')
     expect(content(root)).toContain('raw/b.fastq~01JA7Q3K')
   })
@@ -82,6 +93,12 @@ describe('TidyStep', () => {
     await click(button(root, 'Remove 842 copies'))
     expect(startDuplicates).toHaveBeenCalledWith('g1', 'i1', expect.anything())
     expect(events).toEqual(['started'])
+  })
+
+  it('calls an uncounted number of copies a lower bound', async () => {
+    previewDuplicates.mockResolvedValue({ ...COPIES, complete: false })
+    const { root } = await mount(null)
+    expect(content(root)).toContain('At least 842 files are stored twice')
   })
 
   it('hides the copies on an older node and says nothing is left', async () => {

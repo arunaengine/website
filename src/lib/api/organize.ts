@@ -6,11 +6,11 @@ import { importsPath } from './backendImports'
 
 export const PAGE_SIZE = 100
 
+/** One page of a preview. `next` is an opaque cursor; a count is a lower bound until `complete`. */
 export interface PageQuery {
-  offset: number
-  limit: number
-  /** Only names that contain this text. */
-  filter: string
+  filter?: string
+  limit?: number
+  after?: string | null
 }
 
 export interface MoveRequest {
@@ -18,56 +18,70 @@ export interface MoveRequest {
   pattern: string
   /** Where they go; `{name}` is the file name, such as `proteins/{name}`. */
   target: string
+  /** Only files under this folder. */
+  from?: string
+  subfolders?: boolean
 }
 
 export interface MoveItem {
   from: string
   to: string
-  /** The target name is already used, so the file stays. */
-  taken: boolean
+  /** Why the file stays, such as a taken name. */
+  conflict?: string | null
 }
 
 export interface MovePreview {
   total: number
-  taken: number
+  complete: boolean
   items: MoveItem[]
+  next?: string | null
+  /** Another step holds the bucket, so a move cannot start now. */
+  blocked?: boolean | string | null
 }
 
-export interface MovePageQuery extends PageQuery {
-  /** Show only the files whose target name is taken. */
-  onlyTaken: boolean
+export interface StoredFile {
+  path: string
+  bytes: number
 }
 
 export interface DuplicateItem {
-  kept: string
-  removed: string
+  key: string
+  kept: StoredFile
+  removed: StoredFile[]
 }
 
 export interface DuplicatePreview {
   total: number
   bytes: number
+  complete: boolean
   items: DuplicateItem[]
+  next?: string | null
 }
 
 export type OrganizeKind = 'move' | 'rename' | 'duplicates'
-export type OrganizeState = 'running' | 'paused' | 'done' | 'aborted' | 'failed'
+export type OrganizeState = 'running' | 'paused' | 'done' | 'aborted'
 
 export interface OrganizeJob {
   kind: OrganizeKind
   state: OrganizeState
   done: number
-  total: number
   skipped: number
-  /** The step can be paused and aborted; the physical rename cannot. */
+  failed: number
+  /** Zero for a rename, which reports no total. */
+  total: number
+  /** The total is final; before that it is a lower bound. */
+  counted: boolean
+  waiting?: boolean | string | null
+  started_at_ms: number
+  finished_at_ms?: number | null
   controls: boolean
 }
 
 export interface LinkStatus {
   /** What the link holds, when the node counts it. */
   files?: number
-  bytes?: number
   /** Files that more than one link claims. */
-  conflicts: { path: string }[]
+  conflicts: { path: string; reason: string }[]
 }
 
 export interface DeleteScope {
@@ -77,13 +91,24 @@ export interface DeleteScope {
   key: string
 }
 
+export interface DeleteItem {
+  key: string
+  version_id: string
+  bytes: number
+  storage_file?: { path: string; bytes: number; kept?: boolean } | null
+}
+
 export interface DeleteImpact {
   files: number
   versions: number
+  bytes: number
   storage_files: number
   storage_bytes: number
-  /** Storage files that stay because another link or file still uses them. */
+  /** Storage files that stay because something else uses them; counts the current page only. */
   kept_files: number
+  complete: boolean
+  items: DeleteItem[]
+  next?: string | null
 }
 
 function organizePath(groupId: string, importId: string, step: string): string {
@@ -98,7 +123,7 @@ export function previewMove(
   groupId: string,
   importId: string,
   request: MoveRequest,
-  page: MovePageQuery,
+  page: PageQuery,
   client: ApiClientOptions,
 ): Promise<MovePreview> {
   return apiRequest(organizePath(groupId, importId, 'move/preview'), post({ ...request, ...page }), client)
@@ -132,6 +157,7 @@ export function getOrganizeJob(groupId: string, importId: string, client: ApiCli
   return apiRequest(organizePath(groupId, importId, 'job'), {}, client)
 }
 
+/** 409 `no_job` when nothing runs. */
 export function controlJob(
   groupId: string,
   importId: string,
@@ -146,7 +172,7 @@ export function getLinkStatus(groupId: string, importId: string, client: ApiClie
 }
 
 /** What a permanent delete removes in Aruna and in storage; nothing changes. */
-export function getDeleteImpact(scope: DeleteScope, client: ApiClientOptions): Promise<DeleteImpact> {
+export function getDeleteImpact(scope: DeleteScope, client: ApiClientOptions, page: PageQuery = {}): Promise<DeleteImpact> {
   const path = `/data/buckets/${encodeURIComponent(scope.bucket)}/storage/delete/preview`
-  return apiRequest(path, post({ kind: scope.kind, key: scope.key }), client)
+  return apiRequest(path, post({ kind: scope.kind, key: scope.key, ...page }), client)
 }

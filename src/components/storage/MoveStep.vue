@@ -6,17 +6,10 @@ import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
+import { useCursorPage } from '@/composables/useCursorPage'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
-import {
-  PAGE_SIZE,
-  previewMove,
-  startMove,
-  type BackendImport,
-  type MovePreview,
-  type OrganizeJob,
-} from '@/lib/api'
-import { filesWord, moveProblem } from '@/lib/organize'
-import { errorMessage, formatNumber } from '@/lib/utils'
+import { previewMove, startMove, type BackendImport, type MoveItem, type OrganizeJob } from '@/lib/api'
+import { filesWord, moveProblem, organizeError } from '@/lib/organize'
 
 const props = defineProps<{ groupId: string; link: BackendImport; blocked?: boolean }>()
 const emit = defineEmits<{ (e: 'started', job: OrganizeJob): void; (e: 'unsupported'): void }>()
@@ -26,10 +19,9 @@ const { writesDisabled } = useConnectivity()
 
 const pattern = ref('')
 const target = ref('')
-const plan = ref<MovePreview | null>(null)
-const offset = ref(0)
-const filter = ref('')
-const onlyTaken = ref(false)
+const from = ref('')
+const subfolders = ref(false)
+const previewed = ref(false)
 const busy = ref(false)
 const error = ref<string | null>(null)
 let requestId = 0
@@ -38,71 +30,58 @@ function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
 }
 
-const request = computed(() => ({ pattern: pattern.value.trim(), target: target.value.trim() }))
+const request = computed(() => {
+  const asked = { pattern: pattern.value.trim(), target: target.value.trim() }
+  const folder = from.value.trim()
+  return folder ? { ...asked, from: folder, subfolders: subfolders.value } : asked
+})
 const problem = computed(() => (pattern.value || target.value ? moveProblem(request.value) : null))
 const ready = computed(() => !moveProblem(request.value))
-const movable = computed(() => (plan.value ? plan.value.total - plan.value.taken : 0))
+
+const list = useCursorPage<MoveItem>(
+  (query) => previewMove(props.groupId, props.link.import_id, request.value, query, client()),
+  () => emit('unsupported'),
+)
+const total = computed(() => list.page.value?.total ?? 0)
+const complete = computed(() => list.page.value?.complete ?? true)
+const isBlocked = computed(() => props.blocked || Boolean((list.page.value as { blocked?: unknown } | null)?.blocked))
 
 // Other files or names make an old preview wrong.
-watch([pattern, target], () => {
+watch([pattern, target, from, subfolders], () => {
   requestId++
-  plan.value = null
+  list.reset()
+  previewed.value = false
   busy.value = false
-  offset.value = 0
-  filter.value = ''
-  onlyTaken.value = false
 })
 watch(() => [props.link.import_id, sessionEpoch.value], () => {
-  requestId++
   pattern.value = ''
   target.value = ''
-  plan.value = null
+  from.value = ''
+  subfolders.value = false
   error.value = null
-  busy.value = false
 })
 
-async function load(page: number, text = filter.value, taken = onlyTaken.value) {
-  if (busy.value || !ready.value) return
-  const id = ++requestId
-  const sent = request.value
-  busy.value = true
-  error.value = null
-  try {
-    const result = await previewMove(
-      props.groupId,
-      props.link.import_id,
-      sent,
-      { offset: page, limit: PAGE_SIZE, filter: text, onlyTaken: taken },
-      client(),
-    )
-    if (id !== requestId) return
-    plan.value = result
-    offset.value = page
-    filter.value = text
-    onlyTaken.value = taken
-  } catch (err) {
-    if (id !== requestId) return
-    if (isUnsupportedEndpoint(err)) emit('unsupported')
-    else error.value = errorMessage(err)
-  } finally {
-    if (id === requestId) busy.value = false
-  }
+async function preview() {
+  if (!ready.value) return
+  await list.load('')
+  previewed.value = true
 }
 
 async function start() {
-  if (busy.value || !ready.value || props.blocked || writesDisabled.value) return
+  if (busy.value || !ready.value || isBlocked.value || writesDisabled.value) return
   const id = ++requestId
   busy.value = true
   error.value = null
   try {
     const job = await startMove(props.groupId, props.link.import_id, request.value, client())
     if (id !== requestId) return
-    plan.value = null
+    list.reset()
+    previewed.value = false
     emit('started', job)
   } catch (err) {
     if (id !== requestId) return
     if (isUnsupportedEndpoint(err)) emit('unsupported')
-    else error.value = errorMessage(err)
+    else error.value = organizeError(err)
   } finally {
     if (id === requestId) busy.value = false
   }
@@ -116,35 +95,42 @@ async function start() {
       <Input v-model="pattern" placeholder="*.faa.gz" aria-label="Files to move" class="h-8 max-w-44 font-mono text-xs" />
       to
       <Input v-model="target" placeholder="proteins/{name}" aria-label="New name" class="h-8 max-w-56 font-mono text-xs" />
-      <Button variant="outline" size="sm" :disabled="busy || !ready" @click="load(0)">Preview</Button>
+      <Button variant="outline" size="sm" :disabled="list.busy.value || !ready" @click="preview">Preview</Button>
     </div>
     <p v-if="problem" class="text-[11px] text-destructive">{{ problem }}</p>
 
-    <div v-if="plan" class="space-y-2 rounded-md border border-border bg-muted/30 p-3">
+    <div class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+      Only in folder
+      <Input v-model="from" placeholder="whole bucket" aria-label="Only in folder" class="h-8 max-w-44 font-mono text-xs" />
+      <label class="flex items-center gap-1.5">
+        <input v-model="subfolders" type="checkbox" aria-label="Include subfolders" :disabled="!from.trim()" />
+        Include subfolders
+      </label>
+    </div>
+
+    <div v-if="previewed && list.page.value" class="space-y-2 rounded-md border border-border bg-muted/30 p-3">
       <p class="text-sm">
-        <b>{{ filesWord(movable) }}</b> will move.
-        <template v-if="plan.taken">{{ formatNumber(plan.taken) }} {{ plan.taken === 1 ? 'name is' : 'names are' }} taken and stay.</template>
-        <span class="text-xs text-muted-foreground">
-          Show only:
-          <button type="button" :class="onlyTaken ? '' : 'underline'" @click="load(0, filter, false)">all</button>
-          ·
-          <button type="button" :class="onlyTaken ? 'underline' : ''" @click="load(0, filter, true)">taken</button>
-        </span>
+        <b>{{ complete ? '' : 'At least ' }}{{ filesWord(total) }}</b> match. Files whose new name is taken stay.
       </p>
+      <Notice v-if="isBlocked">Another step is running.</Notice>
       <PagedList
-        :total="plan.total"
-        :offset="offset"
-        :shown="plan.items.length"
-        :filter="filter"
-        :busy="busy"
-        @page="(value: number) => load(value)"
-        @filter="(value: string) => load(0, value)"
+        :total="total"
+        :complete="complete"
+        :offset="list.offset.value"
+        :shown="list.items.value.length"
+        :filter="list.filter.value"
+        :busy="list.busy.value"
+        :has-next="list.hasNext.value"
+        :has-prev="list.hasPrev.value"
+        @next="list.next()"
+        @prev="list.prev()"
+        @filter="(value: string) => list.load(value)"
       >
-        <li v-for="item in plan.items" :key="item.from" class="flex items-center gap-2 px-3 py-1.5 font-mono">
+        <li v-for="item in list.items.value" :key="item.from" class="flex items-center gap-2 px-3 py-1.5 font-mono">
           <span class="min-w-0 flex-1 truncate" :title="item.from">{{ item.from }}</span>
           <span class="shrink-0 font-sans text-muted-foreground">→</span>
-          <span class="min-w-0 flex-1 truncate" :class="item.taken ? 'text-destructive' : ''" :title="item.to">
-            {{ item.to }}<template v-if="item.taken"> (taken)</template>
+          <span class="min-w-0 flex-1 truncate" :class="item.conflict ? 'text-destructive' : ''" :title="item.to">
+            {{ item.to }}<template v-if="item.conflict"> (taken)</template>
           </span>
         </li>
       </PagedList>
@@ -153,13 +139,13 @@ async function start() {
     <p class="text-[11px] text-muted-foreground">
       Only the names in Aruna change. Your storage stays as it is. Links by path change. DRS links keep working.
     </p>
-    <Notice v-if="error" tone="error">{{ error }}</Notice>
+    <Notice v-if="error || list.error.value" tone="error">{{ error ?? list.error.value }}</Notice>
     <Button
-      :disabled="busy || !ready || blocked || writesDisabled || (plan !== null && movable === 0)"
+      :disabled="busy || !ready || isBlocked || writesDisabled"
       :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
       @click="start"
     >
-      {{ plan ? `Move ${filesWord(movable)}` : 'Move files' }}
+      {{ previewed && total ? `Move ${complete ? '' : 'at least '}${filesWord(total)}` : 'Move files' }}
     </Button>
   </div>
 </template>

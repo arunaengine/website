@@ -2,8 +2,8 @@ import * as VueRuntime from 'vue'
 import { defineComponent, h } from 'vue'
 import { describe, expect, it } from 'vitest'
 import { button, click, compileClientComponent, content, element, mountApp, moduleDefault } from '@/test/clientRender'
-import type { OrganizeJob } from '@/lib/api'
 import * as Organize from '@/lib/organize'
+import type { ProgressJob } from '@/lib/organize'
 import * as Utils from '@/lib/utils'
 
 const ButtonStub = defineComponent({
@@ -18,9 +18,9 @@ const JobProgress = compileClientComponent(new URL('./JobProgress.vue', import.m
   '@/lib/utils': Utils,
 })
 
-const JOB: OrganizeJob = { kind: 'move', state: 'running', done: 92410, total: 214880, skipped: 2, controls: true }
+const JOB: ProgressJob = { kind: 'move', state: 'running', done: 92410, total: 214880, counted: true, skipped: 2, failed: 0, controls: true }
 
-async function mount(job: OrganizeJob) {
+async function mount(job: ProgressJob) {
   const actions: string[] = []
   const mounted = await mountApp(
     defineComponent(() => () => h(JobProgress, { job, onControl: (action: string) => actions.push(action) })),
@@ -55,6 +55,17 @@ describe('JobProgress', () => {
     await click(button(root, 'Abort'))
     await click(element(root, (node) => node.tag === 'button' && content(node) === 'Abort' && node.props.variant === 'destructive'))
     expect(actions).toEqual(['abort'])
+  })
+
+  it('shows a step without a total as a count only', async () => {
+    const { root } = await mount({ ...JOB, kind: 'rename', total: 0, counted: false, failed: 3 })
+    expect(content(root)).toContain('92,410 · 2 skipped · 3 failed')
+    expect(() => element(root, (node) => node.props.role === 'progressbar')).toThrow()
+  })
+
+  it('calls an uncounted total a lower bound', async () => {
+    const { root } = await mount({ ...JOB, counted: false })
+    expect(content(root)).toContain('of at least 214,880')
   })
 
   it('hides the controls for a step that cannot stop', async () => {

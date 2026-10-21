@@ -5,6 +5,14 @@ const getImportRenames = vi.fn()
 const getOrganizeJob = vi.fn()
 const getLinkStatus = vi.fn()
 const controlJob = vi.fn()
+const { MockApiError } = vi.hoisted(() => ({
+  MockApiError: class extends Error {
+    constructor(public status: number, message: string, public code?: string) {
+      super(message)
+    }
+  },
+}))
+const ApiError = MockApiError
 
 vi.mock('@/composables/useAruna', () => ({
   isUnsupportedEndpoint: (err: { status?: number }) => err?.status === 404,
@@ -15,11 +23,12 @@ vi.mock('@/lib/api', () => ({
   getOrganizeJob: (...args: unknown[]) => getOrganizeJob(...args),
   getLinkStatus: (...args: unknown[]) => getLinkStatus(...args),
   controlJob: (...args: unknown[]) => controlJob(...args),
+  ApiError: MockApiError,
 }))
 
 import { useLinkState } from './useLinkState'
 
-const RUNNING = { kind: 'move', state: 'running', done: 1, total: 4, skipped: 0, controls: true }
+const RUNNING = { kind: 'move', state: 'running', done: 1, total: 4, counted: true, skipped: 0, failed: 0, started_at_ms: 1, controls: true }
 
 function setup() {
   const scope = effectScope()
@@ -59,16 +68,27 @@ describe('useLinkState', () => {
     scope.stop()
   })
 
-  it('shows a running physical rename without controls', async () => {
-    getImportRenames.mockResolvedValue({
-      count: 6,
-      complete: true,
-      files: [],
-      progress: { migrated: 4, skipped: 0, failed: 0, started_at_ms: 1 },
-    })
+  it('shows a running rename that reports no total', async () => {
+    getOrganizeJob.mockResolvedValue({ ...RUNNING, kind: 'rename', total: 0, counted: false, done: 4 })
     const { scope, state } = setup()
     await state.refresh()
-    expect(state.job.value).toMatchObject({ kind: 'rename', done: 4, total: 10, controls: false })
+    expect(state.job.value).toMatchObject({ kind: 'rename', done: 4, total: 0 })
+    scope.stop()
+  })
+
+  it('shows nothing once a step is over', async () => {
+    getOrganizeJob.mockResolvedValue({ ...RUNNING, state: 'done' })
+    const { scope, state } = setup()
+    await state.refresh()
+    expect(state.job.value).toBeNull()
+    scope.stop()
+  })
+
+  it('does not call a step that ended meanwhile an error', async () => {
+    controlJob.mockRejectedValue(Object.assign(new ApiError(409, 'none', 'no_job')))
+    const { scope, state } = setup()
+    await state.control('pause')
+    expect(state.error.value).toBeNull()
     scope.stop()
   })
 

@@ -2,6 +2,8 @@ import * as VueRuntime from 'vue'
 import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { button, click, compileClientComponent, content, element, flush, mountApp, moduleDefault, typeValue } from '@/test/clientRender'
+import * as Api from '@/lib/api'
+import * as CursorPage from '@/composables/useCursorPage'
 import * as Organize from '@/lib/organize'
 import * as Utils from '@/lib/utils'
 
@@ -25,13 +27,13 @@ const InputStub = defineComponent({
     }),
 })
 const ListStub = defineComponent({
-  props: { total: Number, offset: Number, shown: Number, filter: String },
-  emits: ['page', 'filter'],
+  props: { total: Number, offset: Number, shown: Number, filter: String, hasNext: Boolean, hasPrev: Boolean, complete: Boolean },
+  emits: ['next', 'prev', 'filter'],
   setup: (props, { emit, slots }) => () =>
     h('div', [
       h('ul', slots.default?.()),
       h('span', `range ${props.offset}+${props.shown} of ${props.total}`),
-      h('button', { onClick: () => emit('page', 100) }, 'next page'),
+      h('button', { onClick: () => emit('next') }, 'next page'),
       h('button', { onClick: () => emit('filter', 'x') }, 'filter x'),
     ]),
 })
@@ -42,20 +44,22 @@ const MoveStep = compileClientComponent(new URL('./MoveStep.vue', import.meta.ur
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Notice.vue': moduleDefault(Slot),
+  '@/composables/useCursorPage': CursorPage,
   '@/composables/useAruna': {
     isUnsupportedEndpoint: (err: { status?: number }) => err?.status === 404,
     useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('t'), sessionEpoch: ref(0) }),
   },
   '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled: offline }) },
-  '@/lib/api': { PAGE_SIZE: 100, previewMove, startMove },
+  '@/lib/api': { ...Api, previewMove, startMove },
   '@/lib/organize': Organize,
   '@/lib/utils': Utils,
 })
 
 const PLAN = {
   total: 214880,
-  taken: 2,
-  items: [{ from: 'X1.faa.gz', to: 'proteins/X1.faa.gz', taken: true }],
+  complete: true,
+  items: [{ from: 'X1.faa.gz', to: 'proteins/X1.faa.gz', conflict: 'taken' }],
+  next: 'c1',
 }
 
 async function mount() {
@@ -97,7 +101,7 @@ describe('MoveStep', () => {
     expect(button(root, 'Preview').props.disabled).toBe(true)
   })
 
-  it('previews, counts what moves and pages', async () => {
+  it('previews, counts and pages by cursor', async () => {
     const { root } = await mount()
     await fill(root)
     await click(button(root, 'Preview'))
@@ -105,18 +109,50 @@ describe('MoveStep', () => {
       'g1',
       'i1',
       { pattern: '*.faa.gz', target: 'proteins/{name}' },
-      { offset: 0, limit: 100, filter: '', onlyTaken: false },
+      { filter: '', limit: 100, after: null },
       expect.anything(),
     )
-    expect(content(root)).toContain('214,878 files will move.')
-    expect(content(root)).toContain('2 names are taken and stay.')
+    expect(content(root)).toContain('214,880 files match.')
     expect(content(root)).toContain('proteins/X1.faa.gz (taken)')
-    expect(button(root, 'Move 214,878 files')).toBeTruthy()
+    expect(button(root, 'Move 214,880 files')).toBeTruthy()
 
     await click(button(root, 'next page'))
-    expect(previewMove).toHaveBeenLastCalledWith('g1', 'i1', expect.anything(), { offset: 100, limit: 100, filter: '', onlyTaken: false }, expect.anything())
-    await click(button(root, 'taken'))
-    expect(previewMove).toHaveBeenLastCalledWith('g1', 'i1', expect.anything(), { offset: 0, limit: 100, filter: '', onlyTaken: true }, expect.anything())
+    expect(previewMove).toHaveBeenLastCalledWith('g1', 'i1', expect.anything(), { filter: '', limit: 100, after: 'c1' }, expect.anything())
+    await click(button(root, 'filter x'))
+    expect(previewMove).toHaveBeenLastCalledWith('g1', 'i1', expect.anything(), { filter: 'x', limit: 100, after: null }, expect.anything())
+  })
+
+  it('names a lower bound and sends a folder', async () => {
+    previewMove.mockResolvedValue({ ...PLAN, complete: false })
+    const { root } = await mount()
+    await fill(root)
+    await typeValue(field(root, 'Only in folder'), 'raw/')
+    await click(button(root, 'Preview'))
+    expect(content(root)).toContain('At least 214,880 files match.')
+    expect(previewMove).toHaveBeenCalledWith(
+      'g1',
+      'i1',
+      { pattern: '*.faa.gz', target: 'proteins/{name}', from: 'raw/', subfolders: false },
+      expect.anything(),
+      expect.anything(),
+    )
+  })
+
+  it('does not start while the node reports another step', async () => {
+    previewMove.mockResolvedValue({ ...PLAN, blocked: true })
+    const { root } = await mount()
+    await fill(root)
+    await click(button(root, 'Preview'))
+    expect(content(root)).toContain('Another step is running.')
+    expect(button(root, 'Move 214,880 files').props.disabled).toBe(true)
+  })
+
+  it('shows a refusal in short words', async () => {
+    startMove.mockRejectedValue(new Api.ApiError(409, 'busy', 'job_running'))
+    const { root } = await mount()
+    await fill(root)
+    await click(button(root, 'Move files'))
+    expect(content(root)).toContain('Another step is running.')
   })
 
   it('starts without a preview', async () => {

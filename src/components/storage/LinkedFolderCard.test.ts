@@ -86,12 +86,13 @@ beforeEach(() => {
 
 describe('linked folder card', () => {
   it('shows the last run, the name style and an in sync state', async () => {
-    status.value = { files: 300214, bytes: 15.1e12, conflicts: [] }
+    status.value = { files: 300214, conflicts: [] }
     const { root } = await mount()
     const text = content(root)
     expect(text).toContain('12 new files')
     expect(text).toContain('New files are named name~ID')
     expect(text).toContain('300,214 files')
+    expect(text).not.toContain('TB')
     expect(text).toContain('in sync')
   })
 
@@ -106,7 +107,7 @@ describe('linked folder card', () => {
   })
 
   it('says what to do about a claimed file', async () => {
-    status.value = { conflicts: [{ path: 'raw/report.csv' }] }
+    status.value = { conflicts: [{ path: 'raw/report.csv', reason: 'two links' }] }
     const { root } = await mount()
     expect(content(root)).toContain('1 file needs a decision. Two links claim it. Add a file rule to choose one.')
     await click(button(root, 'Show'))

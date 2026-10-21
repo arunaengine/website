@@ -22,11 +22,10 @@ const PagedList = compileClientComponent(new URL('./PagedList.vue', import.meta.
   vue: VueRuntime,
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
-  '@/lib/api': { PAGE_SIZE: 100 },
   '@/lib/organize': Organize,
 })
 
-async function mount(offset: number, shown: number, total: number) {
+async function mount(offset: number, shown: number, total: number, hasNext = false, complete = true) {
   const events: unknown[][] = []
   const rows = Array.from({ length: shown }, (_, index) => h('li', `file${offset + index}`))
   const mounted = await mountApp(
@@ -38,8 +37,12 @@ async function mount(offset: number, shown: number, total: number) {
             total,
             offset,
             shown,
+            complete,
+            hasNext,
+            hasPrev: offset > 0,
             filter: '',
-            onPage: (value: number) => events.push(['page', value]),
+            onNext: () => events.push(['next']),
+            onPrev: () => events.push(['prev']),
             onFilter: (value: string) => events.push(['filter', value]),
           },
           { default: () => rows },
@@ -51,12 +54,17 @@ async function mount(offset: number, shown: number, total: number) {
 }
 
 describe('PagedList', () => {
-  it('shows the range and moves by one page', async () => {
-    const { root, events } = await mount(100, 100, 250)
+  it('shows the range and asks for the next and previous page', async () => {
+    const { root, events } = await mount(100, 100, 250, true)
     expect(content(root)).toContain('101-200 of 250')
     await click(button(root, 'Next'))
     await click(button(root, 'Previous'))
-    expect(events).toEqual([['page', 200], ['page', 0]])
+    expect(events).toEqual([['next'], ['prev']])
+  })
+
+  it('calls a lower bound at least', async () => {
+    const { root } = await mount(0, 100, 1000, true, false)
+    expect(content(root)).toContain('1-100 of at least 1,000')
   })
 
   it('stops at both ends', async () => {

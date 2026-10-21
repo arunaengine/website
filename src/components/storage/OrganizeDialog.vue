@@ -10,14 +10,15 @@ import JobProgress from '@/components/storage/JobProgress.vue'
 import MoveStep from '@/components/storage/MoveStep.vue'
 import TidyStep from '@/components/storage/TidyStep.vue'
 import Notice from '@/components/ui/Notice.vue'
-import type { BackendImport, BackendImportRenames, OrganizeJob } from '@/lib/api'
+import type { BackendImport, BackendImportRenames } from '@/lib/api'
+import type { ProgressJob } from '@/lib/organize'
 
 defineProps<{
   open: boolean
   groupId: string
   link: BackendImport | null
   renames: BackendImportRenames | null
-  job: OrganizeJob | null
+  job: ProgressJob | null
   /** False when the node has no routes for moving files and removing copies. */
   supported: boolean
   controlling?: boolean

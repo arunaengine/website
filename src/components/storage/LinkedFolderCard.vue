@@ -10,7 +10,7 @@ import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import type { BackendImport } from '@/lib/api'
 import { nameStyle, RUN_HINT, scheduleWords } from '@/lib/linkedFolders'
 import { filesWord, linkProblems } from '@/lib/organize'
-import { formatBytes, formatNumber, relativeTime } from '@/lib/utils'
+import { formatNumber, relativeTime } from '@/lib/utils'
 import { Play, SlidersHorizontal } from '@lucide/vue'
 
 const props = defineProps<{
@@ -37,9 +37,8 @@ watch(() => props.link, () => void refresh(), { immediate: true })
 const problems = computed(() => linkProblems(props.link, renames.value, status.value))
 const place = computed(() => props.link.key_prefix || props.link.bucket)
 const sizeLine = computed(() => {
-  const found = status.value
-  if (found?.files === undefined) return null
-  return found.bytes === undefined ? filesWord(found.files) : `${filesWord(found.files)} · ${formatBytes(found.bytes)}`
+  const files = status.value?.files
+  return files === undefined ? null : filesWord(files)
 })
 
 function show(id: string, action: 'show' | 'organize') {

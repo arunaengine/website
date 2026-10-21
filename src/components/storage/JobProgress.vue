@@ -2,11 +2,10 @@
 // A running step with its bar. Pause, Resume and Abort show only for steps that allow them.
 import { ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
-import type { OrganizeJob } from '@/lib/api'
-import { abortSentence, abortTitle, jobTitle, percent } from '@/lib/organize'
+import { abortSentence, abortTitle, jobTitle, percent, type ProgressJob } from '@/lib/organize'
 import { formatNumber } from '@/lib/utils'
 
-defineProps<{ job: OrganizeJob; busy?: boolean }>()
+defineProps<{ job: ProgressJob; busy?: boolean }>()
 const emit = defineEmits<{ (e: 'control', action: 'pause' | 'resume' | 'abort'): void }>()
 
 const asking = ref(false)
@@ -38,6 +37,7 @@ function abort() {
       </span>
     </div>
     <div
+      v-if="job.total"
       class="h-1.5 overflow-hidden rounded-full bg-muted"
       role="progressbar"
       :aria-valuenow="percent(job)"
@@ -47,7 +47,10 @@ function abort() {
       <div class="h-full bg-primary transition-all" :style="{ width: `${percent(job)}%` }" />
     </div>
     <p class="text-[11px] tabular-nums text-muted-foreground">
-      {{ formatNumber(job.done) }} of {{ formatNumber(job.total) }}<template v-if="job.skipped"> · {{ formatNumber(job.skipped) }} skipped</template>
+      {{ formatNumber(job.done) }}<template v-if="job.total"> of {{ job.counted ? '' : 'at least ' }}{{ formatNumber(job.total) }}</template>
+      <template v-if="job.skipped"> · {{ formatNumber(job.skipped) }} skipped</template>
+      <template v-if="job.failed"> · {{ formatNumber(job.failed) }} failed</template>
+      <template v-if="job.waiting"> · waiting</template>
     </p>
     <div v-if="asking" class="space-y-2 rounded-md border border-border bg-muted/40 px-3 py-2">
       <p class="text-sm font-medium text-foreground">{{ abortTitle(job) }}</p>

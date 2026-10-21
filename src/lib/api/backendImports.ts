@@ -98,7 +98,9 @@ export interface BackendImportRenames {
   count: number
   complete: boolean
   /** The first files, with the name they get. */
-  files: { from: string; to: string }[]
+  files: { from: string; to: string; writable?: boolean }[]
+  /** Cursor of the next page. */
+  next?: string | null
   /** The last move of the link's folder, which renames them. */
   progress?: MoveProgress | null
 }
@@ -108,8 +110,14 @@ export function getImportRenames(
   groupId: string,
   importId: string,
   client: ApiClientOptions,
+  page: { filter?: string; limit?: number; after?: string | null } = {},
 ): Promise<BackendImportRenames> {
-  return apiRequest(`${importsPath(groupId, importId)}/rename`, {}, client)
+  const query = new URLSearchParams()
+  if (page.filter) query.set('filter', page.filter)
+  if (page.limit) query.set('limit', String(page.limit))
+  if (page.after) query.set('after', page.after)
+  const text = query.toString()
+  return apiRequest(`${importsPath(groupId, importId)}/rename${text ? `?${text}` : ''}`, {}, client)
 }
 
 /** Gives them the current name: a copy first, then the old file is removed. */

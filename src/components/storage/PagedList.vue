@@ -1,21 +1,28 @@
 <script setup lang="ts">
 // A list of one page of many files, with a name filter and Previous/Next. The rows come from the slot.
-import { computed, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
-import { PAGE_SIZE } from '@/lib/api'
 import { rangeLabel } from '@/lib/organize'
 
 const props = withDefaults(
-  defineProps<{ total: number; offset: number; shown: number; filter: string; busy?: boolean; pageSize?: number }>(),
-  { busy: false, pageSize: PAGE_SIZE },
+  defineProps<{
+    total: number
+    offset: number
+    shown: number
+    filter: string
+    hasNext: boolean
+    hasPrev: boolean
+    /** False while the total is a lower bound. */
+    complete?: boolean
+    busy?: boolean
+  }>(),
+  { complete: true, busy: false },
 )
-const emit = defineEmits<{ (e: 'page', offset: number): void; (e: 'filter', value: string): void }>()
+const emit = defineEmits<{ (e: 'prev'): void; (e: 'next'): void; (e: 'filter', value: string): void }>()
 
 const draft = ref(props.filter)
 watch(() => props.filter, (value) => (draft.value = value))
-
-const hasNext = computed(() => props.offset + props.shown < props.total)
 </script>
 
 <template>
@@ -33,14 +40,10 @@ const hasNext = computed(() => props.offset + props.shown < props.total)
         aria-label="Filter by name"
         @change="emit('filter', draft.trim())"
       />
-      <span class="text-[11px] tabular-nums text-muted-foreground">{{ rangeLabel(offset, shown, total) }}</span>
+      <span class="text-[11px] tabular-nums text-muted-foreground">{{ rangeLabel(offset, shown, total, complete) }}</span>
       <span class="flex gap-2">
-        <Button variant="outline" size="sm" :disabled="busy || offset === 0" @click="emit('page', Math.max(offset - pageSize, 0))">
-          Previous
-        </Button>
-        <Button variant="outline" size="sm" :disabled="busy || !hasNext" @click="emit('page', offset + pageSize)">
-          Next
-        </Button>
+        <Button variant="outline" size="sm" :disabled="busy || !hasPrev" @click="emit('prev')">Previous</Button>
+        <Button variant="outline" size="sm" :disabled="busy || !hasNext" @click="emit('next')">Next</Button>
       </span>
     </div>
   </div>
