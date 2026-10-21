@@ -222,4 +222,35 @@ describe('selection purge', () => {
     expect(selection.controlError.value).toBeNull()
     expect(selection.starting.value).toBe(false)
   })
+
+  it('ignores a start answer of an earlier run', async () => {
+    getStorageDeletionPreflight.mockResolvedValue(OPEN)
+    controlStoragePurge.mockReset().mockResolvedValue(undefined)
+    getStoragePurgeJob.mockReset().mockReturnValue(new Promise(() => {}))
+    let oldStart: (value: unknown) => void = () => {}
+    startStoragePurge.mockReset().mockReturnValueOnce(new Promise((resolve) => (oldStart = resolve)))
+    const selection = useSelectionDelete()
+    await selection.loadScopes('reef', { keys: ['a', 'b'], prefixes: [] }, CLIENT)
+    void selection.purgeKeys(['a'], CLIENT, ['a', 'b'])
+    await later()
+
+    let newStart: (value: unknown) => void = () => {}
+    startStoragePurge.mockReturnValueOnce(new Promise((resolve) => (newStart = resolve)))
+    void selection.purgeKeys(['b'], CLIENT, ['a', 'b'])
+    await later()
+    expect(selection.starting.value).toBe(true)
+
+    oldStart({ job_id: 'a' })
+    await later()
+    // The old answer must not count against the new run, so Abort is still withheld.
+    expect(selection.starting.value).toBe(true)
+    await selection.controlAll('abort', CLIENT)
+    expect(controlStoragePurge).not.toHaveBeenCalled()
+
+    newStart({ job_id: 'b' })
+    await later()
+    expect(selection.starting.value).toBe(false)
+    await selection.controlAll('abort', CLIENT)
+    expect(controlStoragePurge.mock.calls.map((call) => call[0])).toEqual(['b'])
+  })
 })

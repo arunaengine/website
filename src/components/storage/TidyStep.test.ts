@@ -12,6 +12,7 @@ const startDuplicates = vi.fn()
 const startImportRenames = vi.fn()
 const getImportRenames = vi.fn()
 const offline = ref(false)
+const sessionEpoch = ref(0)
 
 const Slot = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
 const ButtonStub = defineComponent({
@@ -33,7 +34,7 @@ const TidyStep = compileClientComponent(new URL('./TidyStep.vue', import.meta.ur
   '@/composables/useCursorPage': CursorPage,
   '@/composables/useAruna': {
     isUnsupportedEndpoint: (err: { status?: number }) => err?.status === 404,
-    useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('t'), sessionEpoch: ref(0) }),
+    useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('t'), sessionEpoch }),
   },
   '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled: offline }) },
   '@/lib/api': { PAGE_SIZE: 100, previewDuplicates, startDuplicates, startImportRenames, getImportRenames, ApiError: Api.ApiError },
@@ -140,6 +141,21 @@ describe('TidyStep', () => {
     props.finished = 1
     await flush()
     expect(button(mounted.root, 'Remove 842 copies')).toBeTruthy()
+    mounted.app.unmount()
+  })
+
+  it('ignores an older whole-scope answer that arrives after a session reset', async () => {
+    let old: (value: unknown) => void = () => {}
+    previewDuplicates.mockReset().mockReturnValueOnce(new Promise((resolve) => (old = resolve)))
+    const props = reactive({ groupId: 'g1', link: { import_id: 'i1' }, renames: null, blocked: false, finished: 0 })
+    const mounted = await mountApp(defineComponent(() => () => h(TidyStep, props)))
+    previewDuplicates.mockResolvedValue({ ...COPIES, total: 7 })
+    sessionEpoch.value++
+    await flush()
+    expect(button(mounted.root, 'Remove 7 copies')).toBeTruthy()
+    old({ ...COPIES, total: 99 })
+    await flush()
+    expect(button(mounted.root, 'Remove 7 copies')).toBeTruthy()
     mounted.app.unmount()
   })
 

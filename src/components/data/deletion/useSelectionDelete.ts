@@ -97,6 +97,8 @@ export function useSelectionDelete() {
     startsPending.value = 0
     pollError.value = null
     controlError.value = null
+    // Answers still on their way for an earlier run must not touch this one.
+    ++runId
   }
 
   function reset() {
@@ -281,6 +283,7 @@ export function useSelectionDelete() {
 
   async function runScope(scope: PurgeScope, client: ApiClientOptions, id: number): Promise<KeyResult> {
     const result = await trackScope(scope, client, id)
+    if (id !== runId) return result
     const { [scope.key]: _ended, ...restActive } = activeJobs.value
     activeJobs.value = restActive
     const { [scope.key]: _paused, ...restPaused } = pausedJobs.value
@@ -293,9 +296,11 @@ export function useSelectionDelete() {
     try {
       jobId = (await startStoragePurge(scope.operation, client)).job_id
     } catch (error) {
+      if (id !== runId) return { key: scope.key, status: 'unknown', message: 'The result of this permanent deletion is no longer being tracked.' }
       startsPending.value--
       return { key: scope.key, status: failureStatus(error), message: storageDeletionErrorMessage(error) }
     }
+    if (id !== runId) return { key: scope.key, status: 'unknown', message: 'The result of this permanent deletion is no longer being tracked.' }
     activeJobs.value = { ...activeJobs.value, [scope.key]: jobId }
     startsPending.value--
     for (;;) {

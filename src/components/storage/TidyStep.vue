@@ -45,13 +45,17 @@ function client() {
 }
 
 const copiesMissing = ref(false)
+let wholeRun = 0
 const copyAll = ref<{ total: number; bytes: number; complete: boolean } | null>(null)
 // The action works on every copy, so its count comes only from a successful first page without a filter.
 const copies = useCursorPage<DuplicateItem>(
   async (query) => {
     const link = props.link.import_id
+    const whole = !query.filter && !query.after
+    // Only the newest whole-scope request may set the count; a reset makes older ones stale.
+    const mine = whole ? ++wholeRun : wholeRun
     const page = await previewDuplicates(props.groupId, link, query, client())
-    if (!query.filter && !query.after && link === props.link.import_id) {
+    if (whole && mine === wholeRun && link === props.link.import_id) {
       copyAll.value = { total: page.total, bytes: page.bytes, complete: page.complete }
     }
     return page
@@ -86,6 +90,7 @@ watch(
     showCopies.value = false
     showRenames.value = false
     error.value = null
+    wholeRun++
     copyAll.value = null
     copiesMissing.value = false
     void loadCopies()
