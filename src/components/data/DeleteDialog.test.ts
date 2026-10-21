@@ -50,7 +50,7 @@ const deleteBucket = vi.fn(async () => undefined)
 const purgeRun = vi.fn(async () => ({ state: 'succeeded' }))
 const removeBucket = vi.fn(async (_nodeId: string, _bucket: string, _job: unknown) => undefined)
 const preflightResponse = vi.fn()
-const getDeleteImpact = vi.fn(async () => {
+const getDeleteImpact = vi.fn(async (..._args: unknown[]): Promise<unknown> => {
   throw new Error('not found')
 })
 const backlinkPreflight = ref<BacklinkPreflightResponse | null>(null)

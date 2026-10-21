@@ -21,7 +21,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ (e: 'pick', action: RowAction): void }>()
 
-const ICONS = { open: Folder, details: Info, download: Download, rename: PencilLine, move: FolderInput, copy: Copy, access: Globe, delete: Trash2 }
+const ICONS = { open: Folder, details: Info, download: Download, rename: PencilLine, move: FolderInput, copy: Copy, access: Globe, delete: Trash2, purge: Trash2 }
 const LABELS: Record<RowAction, string> = {
   open: 'Open',
   details: 'Details',
@@ -31,16 +31,17 @@ const LABELS: Record<RowAction, string> = {
   copy: 'Copy to',
   access: 'Change access',
   delete: 'Delete',
+  purge: 'Delete permanently…',
 }
 
 const groups = computed<RowAction[][]>(() => {
   const change: RowAction[] = props.folder ? ['move', 'copy'] : ['rename', 'move', 'copy']
   if (props.access) change.push('access')
-  return [props.folder ? ['open', 'details'] : ['details', 'download'], change, ['delete']]
+  return [props.folder ? ['open', 'details'] : ['details', 'download'], change, ['delete', 'purge']]
 })
 
 function blocked(action: RowAction): boolean {
-  return Boolean(props.changeReason) && ['rename', 'move', 'delete'].includes(action)
+  return Boolean(props.changeReason) && ['rename', 'move', 'delete', 'purge'].includes(action)
 }
 </script>
 
@@ -60,7 +61,7 @@ function blocked(action: RowAction): boolean {
           :key="action"
           :disabled="blocked(action)"
           :title="blocked(action) ? changeReason ?? undefined : undefined"
-          :class="action === 'delete' ? 'text-destructive focus:text-destructive' : undefined"
+            :class="action === 'delete' || action === 'purge' ? 'text-destructive focus:text-destructive' : undefined"
           @click="emit('pick', action)"
         >
           <component :is="ICONS[action]" class="h-3.5 w-3.5" />

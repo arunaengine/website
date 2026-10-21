@@ -233,8 +233,9 @@ function folderReason(folderPrefix: string): string | null {
     : 'This session cannot delete this entire folder.'
 }
 
-function deleteObject(object: ObjectEntry) {
+function deleteObject(object: ObjectEntry, permanent = false) {
   requestDelete({
+    ...(permanent ? { option: 'delete-permanently' as const } : {}),
     kind: 'object',
     bucket: bucket.value,
     nodeId: remoteNodeId.value,
@@ -244,8 +245,9 @@ function deleteObject(object: ObjectEntry) {
   })
 }
 
-function deleteFolder(folder: FolderEntry) {
+function deleteFolder(folder: FolderEntry, permanent = false) {
   requestDelete({
+    ...(permanent ? { option: 'delete-permanently' as const } : {}),
     kind: 'folder',
     bucket: bucket.value,
     nodeId: remoteNodeId.value,
@@ -318,7 +320,7 @@ function onObjectAction(object: ObjectEntry, action: RowAction) {
   if (action === 'details') openDetails(object)
   else if (action === 'download') void locked.download(object)
   else if (action === 'access') emit('public-access', [{ kind: 'file', bucket: bucket.value, key }])
-  else if (action === 'delete') deleteObject(object)
+  else if (action === 'delete' || action === 'purge') deleteObject(object, action === 'purge')
   else if (action !== 'open') openTransfer(action, [{ key, folder: false }])
 }
 
@@ -327,7 +329,7 @@ function onFolderAction(folder: FolderEntry, action: RowAction) {
   if (action === 'open') openFolder(folder)
   else if (action === 'details') openDetails({ key, name: `${folder.name}/` })
   else if (action === 'access') emit('public-access', [{ kind: 'folder', bucket: bucket.value, key }])
-  else if (action === 'delete') deleteFolder(folder)
+  else if (action === 'delete' || action === 'purge') deleteFolder(folder, action === 'purge')
   else if (action !== 'download') openTransfer(action, [{ key, folder: true }])
 }
 

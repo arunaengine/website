@@ -40,9 +40,18 @@ async function onCompleted(result: DeletionResult) {
       <Trash2 class="size-4 text-primary" />
       <h2 class="font-display text-sm font-semibold text-aruna-navy">Delete bucket</h2>
       <Button
+        variant="outline"
+        size="sm"
+        class="ml-auto text-destructive hover:text-destructive"
+        :disabled="Boolean(refusal)"
+        :title="refusal ?? undefined"
+        @click="request = { kind: 'bucket', bucket, nodeId, option: 'delete-permanently' }"
+      >
+        Delete permanently…
+      </Button>
+      <Button
         variant="destructive"
         size="sm"
-        class="ml-auto"
         :disabled="Boolean(refusal)"
         :title="refusal ?? undefined"
         @click="request = { kind: 'bucket', bucket, nodeId }"

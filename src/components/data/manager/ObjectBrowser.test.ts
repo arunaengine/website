@@ -91,7 +91,7 @@ describe('object browser row actions', () => {
         .filter((node) => node.tag === 'button' && node.props['aria-label'])
         .map((node) => String(node.props['aria-label'])),
     ).toEqual(['Preview', 'Download', 'More actions'])
-    expect(menuLabels(row)).toEqual(['Details', 'Download', 'Rename', 'Move to', 'Copy to', 'Change access', 'Delete'])
+    expect(menuLabels(row)).toEqual(['Details', 'Download', 'Rename', 'Move to', 'Copy to', 'Change access', 'Delete', 'Delete permanently…'])
     // Icon only: the label is the accessible name, not visible text.
     expect(content(action(root, 'Preview')).trim()).toBe('')
   })
@@ -161,6 +161,17 @@ describe('object browser row actions', () => {
         key: listedObject.key,
         headState: 'live',
       }),
+    )
+  })
+
+  it('asks for a permanent delete from the menu', async () => {
+    requestDelete.mockClear()
+    const root = await render()
+
+    await click(menuItem(root, 'Delete permanently…'))
+
+    expect(requestDelete).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'object', key: listedObject.key, option: 'delete-permanently' }),
     )
   })
 
@@ -531,7 +542,7 @@ describe('object browser public access', () => {
     const root = await render({ folders: ref([listedFolder]) })
     const row = element(root, (node) => node.tag === 'tr' && content(node).includes(`${listedFolder.name}/`))
 
-    expect(menuLabels(row)).toEqual(['Open', 'Details', 'Move to', 'Copy to', 'Change access', 'Delete folder'])
+    expect(menuLabels(row)).toEqual(['Open', 'Details', 'Move to', 'Copy to', 'Change access', 'Delete folder', 'Delete permanently…'])
 
     await click(menuItem(root, 'Details', `${listedFolder.name}/`))
 
