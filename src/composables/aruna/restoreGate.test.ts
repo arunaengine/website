@@ -75,4 +75,21 @@ describe('restore gate', () => {
       vi.useRealTimers()
     }
   })
+
+  it('does not time out a restore that has taken the gate', async () => {
+    vi.useFakeTimers()
+    try {
+      bootstrapGate()
+      const gate = openGate()
+      let released = false
+      void gate.promise.then(() => (released = true))
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(released).toBe(false)
+      closeGate(gate)
+      await Promise.resolve()
+      expect(released).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

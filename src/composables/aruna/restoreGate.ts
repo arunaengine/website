@@ -1,11 +1,14 @@
 // Requests with an empty token wait here while a stored token is being restored. Each restore has
 // its own gate, so the late end of an abandoned restore never releases the requests of a newer one.
-// A gate that is replaced or left open too long releases its waiters, so nothing waits for ever.
+// A replaced gate releases its waiters, and so does a bootstrap gate no restore ever takes. A restore
+// is bounded by its own request timeout and its finalizer, so an owned gate has no watchdog.
 export interface RestoreGate {
   promise: Promise<void>
   resolve: () => void
   /** A restore has taken this gate; the bootstrap gate waits for the first one. */
   owned: boolean
+  /** Stops the watchdog of a bootstrap gate. */
+  stop: () => void
 }
 
 const LIMIT_MS = 15_000
@@ -18,11 +21,13 @@ function create(owned: boolean): RestoreGate {
   const gate: RestoreGate = {
     promise,
     owned,
+    stop: () => clearTimeout(timer),
     resolve: () => {
       clearTimeout(timer)
       finish()
     },
   }
+  if (owned) clearTimeout(timer)
   return gate
 }
 
@@ -36,6 +41,7 @@ export function bootstrapGate(): RestoreGate {
 export function openGate(): RestoreGate {
   if (current && !current.owned) {
     current.owned = true
+    current.stop()
     return current
   }
   // A restore that is replaced frees the requests that waited for it.
