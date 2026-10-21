@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // One linked folder: its last run, its problems in plain sentences, a running step and the Organize panel.
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import JobProgress from '@/components/storage/JobProgress.vue'
 import OrganizeDialog from '@/components/storage/OrganizeDialog.vue'
 import Button from '@/components/ui/Button.vue'
@@ -19,6 +19,8 @@ const props = defineProps<{
   storage: string
   running: boolean
   runError?: string
+  /** Opened from a link: scroll here and mark the card. */
+  highlight?: boolean
 }>()
 const emit = defineEmits<{ (e: 'run'): void; (e: 'edit'): void }>()
 
@@ -28,8 +30,13 @@ const { renames, status, job, supported, error, controlling, finished, refresh, 
   () => props.link.import_id,
 )
 
+const root = ref<HTMLElement | null>(null)
 const organizing = ref(false)
 const details = ref<string | null>(null)
+
+onMounted(() => {
+  if (props.highlight) root.value?.scrollIntoView?.({ block: 'center' })
+})
 
 // A new list, a saved link or a finished run all change what the node can say.
 watch(() => props.link, () => void refresh(), { immediate: true })
@@ -48,7 +55,12 @@ function show(id: string, action: 'show' | 'organize') {
 </script>
 
 <template>
-  <section class="surface overflow-hidden" data-testid="link-card">
+  <section
+    :id="`link-${link.import_id}`"
+    ref="root"
+    :class="['surface overflow-hidden', highlight ? 'ring-2 ring-primary' : '']"
+    data-testid="link-card"
+  >
     <header class="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-4">
       <div class="min-w-0">
         <h3 class="truncate font-display text-sm font-semibold text-aruna-navy">

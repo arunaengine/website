@@ -15,9 +15,10 @@ import Progress from '@/components/ui/Progress.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import StorageBackendDialog from '@/components/groups/StorageBackendDialog.vue'
 import LinkedFolderDialog from '@/components/groups/LinkedFolderDialog.vue'
+import LinkedFolderCard from '@/components/storage/LinkedFolderCard.vue'
 import DefaultRuleDialog from '@/components/groups/DefaultRuleDialog.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { FolderInput, Play, Plus } from '@lucide/vue'
+import { FolderInput, Plus } from '@lucide/vue'
 import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import {
@@ -33,8 +34,6 @@ import {
   type RoutingTarget,
 } from '@/lib/api'
 import {
-  arunaPlace,
-  bucketError,
   bucketTitle,
   defaultBucket,
   moveOffer,
@@ -45,15 +44,11 @@ import {
   type AskedMove,
   type MoveTotals,
   runActive,
-  runText,
-  splitPath,
   storageLine,
-  storagePlace,
 } from '@/lib/storageRules'
-import { RUN_HINT, writesElsewhere } from '@/lib/linkedFolders'
 import { errorMessage } from '@/lib/utils'
 
-const props = defineProps<{ groupId: string; groupName: string; canAdmin: boolean }>()
+const props = defineProps<{ groupId: string; groupName: string; canAdmin: boolean; focusLink?: string | null }>()
 const emit = defineEmits<{
   (e: 'count', count: number): void
   (e: 'backends', backends: GroupBackendResponse[]): void
@@ -80,7 +75,6 @@ const loadError = ref<string | null>(null)
 const hidden = ref(false)
 const actionError = ref<string | null>(null)
 const busyId = ref<string | null>(null)
-const expandedId = ref<string | null>(null)
 
 const storageDialog = ref(false)
 const editingStorage = ref<GroupBackendResponse | null>(null)
@@ -211,7 +205,6 @@ watch(
     target.value = null
     hidden.value = false
     actionError.value = null
-    expandedId.value = null
     clearPoll()
     void load()
   },
@@ -221,14 +214,6 @@ onBeforeUnmount(() => {
   disposed = true
   clearPoll()
 })
-
-// Where new uploads of a link go when that is not its own source folder.
-function writePlace(link: BackendImport): string {
-  const id = link.write_backend_id || link.backend_id
-  const target = backends.value?.find((backend) => backend.backend_id === id)
-  const place = storagePlace(target, link.write_prefix ?? link.backend_prefix)
-  return target ? `${target.name}: ${place}` : place
-}
 
 function linksOf(backend: GroupBackendResponse): BackendImport[] {
   return links.value.filter((link) => link.backend_id === backend.backend_id)
@@ -596,114 +581,19 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
             />
           </div>
 
-          <template v-for="link in linksOf(backend)" :key="link.import_id">
-            <div :class="[GRID, 'border-b border-dashed border-border py-1.5']" data-testid="linked-row">
-              <Badge size="sm" variant="secondary" class="justify-self-start uppercase">linked</Badge>
-              <span class="truncate font-mono" :title="arunaPlace(link)">{{ arunaPlace(link) }}</span>
-              <span
-                v-if="writesElsewhere(link)"
-                class="text-muted-foreground"
-                title="Files come from here; new uploads go elsewhere"
-              >←</span>
-              <span v-else class="text-muted-foreground">⇆</span>
-              <span class="truncate font-mono" :title="storagePlace(backend, link.backend_prefix)">
-                {{ storagePlace(backend, link.backend_prefix) }}
-              </span>
-              <span
-                v-if="bucketError(link.last_run)"
-                class="font-bold text-destructive"
-                :title="bucketError(link.last_run) ?? undefined"
-              >✗</span>
-              <span
-                v-else-if="bucketTitle(backend, splitPath(backend, link.backend_prefix).bucket)"
-                class="font-bold text-emerald-700 dark:text-emerald-400"
-                :title="bucketTitle(backend, splitPath(backend, link.backend_prefix).bucket) ?? undefined"
-              >✓</span>
-              <span v-else />
-              <span
-                class="truncate"
-                :class="{
-                  'text-muted-foreground': runText(link.last_run).tone === 'muted',
-                  'text-destructive': runText(link.last_run).tone === 'failed',
-                  'text-primary': runText(link.last_run).tone === 'active',
-                }"
-              >
-                <button
-                  v-if="runText(link.last_run).failures"
-                  type="button"
-                  class="underline"
-                  @click="expandedId = expandedId === link.import_id ? null : link.import_id"
-                >
-                  {{ runText(link.last_run).text }}
-                </button>
-                <template v-else>{{ runText(link.last_run).text }}</template>
-              </span>
-              <span v-if="canAdmin" class="flex justify-end gap-0.5">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  class="h-6 px-2 text-aruna-navy dark:text-foreground"
-                  :disabled="writesDisabled || busyId !== null || runActive(link.last_run)"
-                  :title="offline ?? RUN_HINT"
-                  aria-label="Run now"
-                  @click="run(link)"
-                >
-                  <Play class="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  v-if="moveOffer(linkMove(link))"
-                  variant="ghost"
-                  size="sm"
-                  class="h-6 px-2 text-aruna-navy dark:text-foreground"
-                  :disabled="writesDisabled || busyId !== null || linkMove(link).running"
-                  :title="offline ?? 'Move files'"
-                  aria-label="Move files"
-                  @click="askMove([[link.bucket, link.key_prefix]], arunaPlace(link))"
-                >
-                  <FolderInput class="h-3.5 w-3.5" />
-                </Button>
-                <span v-else class="inline-block h-6 w-[1.875rem]" aria-hidden="true" />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  class="h-6 px-2 text-aruna-navy dark:text-foreground"
-                  :disabled="writesDisabled"
-                  :title="offline"
-                  @click="openLink(backend, link)"
-                >
-                  Edit
-                </Button>
-              </span>
-              <span v-else />
-            </div>
-            <p
-              v-if="writesElsewhere(link)"
-              class="truncate py-0.5 pl-[5rem] text-[11px] text-muted-foreground"
-              data-testid="write-line"
-            >
-              New uploads go to <span class="font-mono">{{ writePlace(link) }}</span>
-            </p>
-            <div v-if="linkMove(link).running" class="py-0.5 pl-[5rem] text-[11px] text-muted-foreground" data-testid="move-line">
-              {{ moveText(linkMove(link)) }}
-              <Progress
-                :value="linkMove(link).done"
-                :max="linkMove(link).done + linkMove(link).misplaced"
-                :warn="101"
-                :critical="101"
-                label="Moving files"
-                bar-class="bg-primary"
-                class="mt-0.5 h-1"
-              />
-            </div>
-            <ul
-              v-if="expandedId === link.import_id && link.last_run"
-              class="space-y-0.5 py-1 pl-[5rem] text-[11px] text-muted-foreground"
-            >
-              <li v-for="failure in link.last_run.errors" :key="failure.key" class="truncate">
-                <span class="font-mono">{{ failure.key }}</span>: {{ failure.error }}
-              </li>
-            </ul>
-          </template>
+          <div v-if="canAdmin && linksOf(backend).length" class="space-y-3 pt-2">
+            <LinkedFolderCard
+              v-for="link in linksOf(backend)"
+              :key="link.import_id"
+              :group-id="groupId"
+              :link="link"
+              :storage="backend.name"
+              :running="busyId !== null || runActive(link.last_run)"
+              :highlight="focusLink === link.import_id"
+              @run="run(link)"
+              @edit="openLink(backend, link)"
+            />
+          </div>
 
           <Button
             v-if="canAdmin && !backend.disabled"

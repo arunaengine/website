@@ -644,6 +644,7 @@ async function leave() {
             :group-id="group.group_id"
             :group-name="group.display_name"
             :can-admin="canAdminStorage"
+            :focus-link="typeof route.query.link === 'string' ? route.query.link : null"
             @count="backendCount = $event"
             @backends="(groupBackends = $event), storageTick++"
           />

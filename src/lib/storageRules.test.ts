@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { BackendImport, BucketMoveResponse } from './api'
-import { moveText, moveView, rememberMoves, bucketError, bucketTitle, defaultBucket, runActive, linkConflict, runText, splitPath, suggestBucket } from './storageRules'
+import { moveText, moveView, rememberMoves, bucketError, bucketTitle, defaultBucket, runActive, linkConflict, splitPath, suggestBucket } from './storageRules'
 import { writesInside } from './linkedFolders'
 
 const split = { backend_id: 's1', group_id: 'g1', kind: 's3', name: 'lab', public_config: { endpoint: 'https://s3' } }
@@ -64,21 +64,6 @@ describe('storageRules', () => {
     expect(linkConflict(split, [], 'lab-raw/_parts/')).toBeNull()
     const former = { ...split, public_config: { ...split.public_config, 'layout:lab-old': 'true' } }
     expect(linkConflict(former, [], 'lab-old/')).toContain('default rule')
-  })
-
-  it('says Synced only after a run that succeeded', () => {
-    const run = { job_id: 'j', started_at: new Date().toISOString(), imported: 0, skipped: 0, failed: 0, errors: [] }
-    expect(runText({ ...run, state: 'succeeded' }).text).toMatch(/^Synced/)
-    expect(runText({ ...run, state: 'cancelled' }).text).toMatch(/^Stopped/)
-    expect(runText({ ...run, state: 'indeterminate' }).text).toMatch(/^Unknown/)
-    // Labels come before item failures, which stay open behind the text.
-    const failed = { ...run, failed: 3 }
-    expect(runText({ ...failed, state: 'cancelling' })).toMatchObject({ text: 'Stopping…', failures: true })
-    expect(runText({ ...failed, state: 'cancelled' }).text).toMatch(/^Stopped/)
-    expect(runText({ ...failed, state: 'indeterminate' }).text).toMatch(/^Unknown/)
-    expect(runText({ ...failed, state: 'succeeded' }).text).toMatch(/^3 failed/)
-    const busy = { ...run, imported: 2, skipped: 60, failed: 1, state: 'running' }
-    expect(runText(busy).text).toBe('Running… 2 added, 63 checked')
   })
 
   it('treats every unfinished state as running', () => {

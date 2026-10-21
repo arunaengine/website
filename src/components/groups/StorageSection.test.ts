@@ -30,6 +30,16 @@ const DialogStub = defineComponent({
   setup: (props, { slots }) => () => (props.open ? h('div', { role: 'dialog' }, slots.default?.()) : null),
 })
 
+const CardStub = defineComponent({
+  props: { link: Object, highlight: Boolean, running: Boolean },
+  emits: ['run', 'edit'],
+  setup: (props, { emit }) => () =>
+    h('div', { 'data-testid': 'link-card', 'data-link': (props.link as { import_id: string }).import_id, 'data-highlight': String(props.highlight) }, [
+      h('button', { onClick: () => emit('run') }, 'Run now'),
+      h('button', { onClick: () => emit('edit') }, 'Edit'),
+    ]),
+})
+
 const SaveStub = defineComponent({
   emits: ['saved'],
   setup: (_, { emit }) => () => h('i', { 'data-testid': 'save-default', onClick: () => emit('saved', true) }),
@@ -52,6 +62,7 @@ const StorageSection = compileClientComponent(new URL('./StorageSection.vue', im
   '@/components/ui/Progress.vue': moduleDefault(Empty),
   '@/components/groups/StorageBackendDialog.vue': moduleDefault(Empty),
   '@/components/groups/LinkedFolderDialog.vue': moduleDefault(Empty),
+  '@/components/storage/LinkedFolderCard.vue': moduleDefault(CardStub),
   '@/components/groups/DefaultRuleDialog.vue': moduleDefault(SaveStub),
   '@/composables/useAruna': {
     isUnsupportedEndpoint: () => false,
@@ -124,8 +135,8 @@ async function mount() {
   return mounted
 }
 
-function row(root: Parameters<typeof content>[0], id: string) {
-  return element(root, (node) => node.props['data-testid'] === 'linked-row' && content(node).includes(id))
+function card(root: Parameters<typeof content>[0], id: string) {
+  return element(root, (node) => node.props['data-testid'] === 'link-card' && node.props['data-link'] === id)
 }
 
 beforeEach(() => {
@@ -159,37 +170,13 @@ describe('StorageSection', () => {
     const text = content(mounted.root)
     expect(text).toContain('Aruna storage')
     expect(text).toContain('Your S3 storage · s3.lab.example.org')
-    for (const heading of ['In Aruna', 'In lab-object-store', 'Last run']) expect(text).toContain(heading)
-
+    
     const defaultRow = element(mounted.root, (node) => node.props['data-testid'] === 'default-row')
     expect(content(defaultRow)).toContain('All buckets')
     expect(content(defaultRow)).toContain('aruna-lab-default')
     expect(element(defaultRow, (node) => node.props.title === 'Bucket created')).toBeTruthy()
 
-    expect(content(row(mounted.root, 'sequencing'))).toContain('sequencing (whole bucket)')
-    expect(content(row(mounted.root, 'sequencing'))).toContain('lab-raw / 2024/')
-    expect(content(row(mounted.root, 'sequencing'))).toContain('Synced 2h ago')
-    expect(element(row(mounted.root, 'sequencing'), (node) => node.props.title === 'Bucket found')).toBeTruthy()
-    expect(content(row(mounted.root, 'results'))).toContain('3 failed · 2h ago')
-    // Item failures stay in Last run; the bucket itself was found.
-    expect(element(row(mounted.root, 'results'), (node) => node.props.title === 'Bucket found')).toBeTruthy()
-    expect(content(row(mounted.root, 'results'))).not.toContain('✗')
-    expect(content(row(mounted.root, 'denied'))).toContain('✗')
-    const unlisted = row(mounted.root, 'unlisted')
-    expect(element(unlisted, (node) => node.props.title === 'Bucket lab-unlisted not found')).toBeTruthy()
-    expect(element(row(mounted.root, 'denied'), (node) => node.props.title === 'No access to bucket lab-results')).toBeTruthy()
-    expect(content(row(mounted.root, 'imaging'))).toContain('imaging / raw/')
-    expect(content(row(mounted.root, 'imaging'))).toContain('Running… 312 added')
-    expect(labelled(row(mounted.root, 'imaging'), 'Run now').props.disabled).toBe(true)
-    expect(content(row(mounted.root, 'archive'))).toContain('Never run')
-    mounted.app.unmount()
-  })
-
-  it('shows the failures of the last run', async () => {
-    const mounted = await mount()
-    expect(content(mounted.root)).not.toContain('lab-results/a.csv')
-    await click(button(row(mounted.root, 'results'), '3 failed'))
-    expect(content(mounted.root)).toContain('lab-results/a.csv: No access to bucket lab-results')
+    expect(card(mounted.root, 'i4')).toBeTruthy()
     mounted.app.unmount()
   })
 
@@ -206,51 +193,22 @@ describe('StorageSection', () => {
     mounted.app.unmount()
   })
 
-  it('starts a run of a linked rule', async () => {
+  it('shows each linked bucket as a card under its storage and runs it from there', async () => {
     const mounted = await mount()
-    await click(labelled(row(mounted.root, 'sequencing'), 'Run now'))
+    const cards = nodes(mounted.root).filter((node) => node.props['data-testid'] === 'link-card')
+    expect(cards.map((card) => card.props['data-link'])).toEqual(LINKS.map((entry) => entry.import_id))
+    await click(button(card(mounted.root, 'i1'), 'Run now'))
     expect(runBackendImport).toHaveBeenCalledWith('g1', 'i1', expect.anything())
     mounted.app.unmount()
   })
 
-  it('hides Move files when nothing is misplaced and offers it otherwise', async () => {
-    getBucketMove.mockImplementation(async (bucket: string) => ({
-      bucket,
-      misplaced: bucket === 'sequencing' ? 7 : 0,
-      complete: true,
-    }))
-    const mounted = await mount()
-    expect(hasLabel(row(mounted.root, 'sequencing'), 'Move files')).toBe(true)
-    expect(hasLabel(row(mounted.root, 'results'), 'Move files')).toBe(false)
-    expect(getBucketMove).toHaveBeenCalledWith('sequencing', '', expect.anything())
-    expect(getBucketMove).toHaveBeenCalledWith('imaging', 'raw/', expect.anything())
-
-    await click(labelled(row(mounted.root, 'sequencing'), 'Move files'))
-    expect(startBucketMove).not.toHaveBeenCalled()
-    const dialog = element(mounted.root, (node) => node.props.role === 'dialog')
-    await click(button(dialog, 'Move files'))
-    expect(startBucketMove).toHaveBeenCalledWith('sequencing', '', expect.anything())
-    mounted.app.unmount()
-  })
-
-  it('keeps Move files for a count that stopped early', async () => {
-    getBucketMove.mockResolvedValue({ bucket: 'x', misplaced: 0, complete: false })
-    const mounted = await mount()
-    expect(hasLabel(row(mounted.root, 'sequencing'), 'Move files')).toBe(true)
-    mounted.app.unmount()
-  })
-
-  it('shows the progress of a running move and keeps the action off', async () => {
-    getBucketMove.mockResolvedValue({
-      bucket: 'x',
-      misplaced: 2260,
-      complete: true,
-      progress: { migrated: 1200, skipped: 30, failed: 10, started_at_ms: 1, finished_at_ms: null },
-    })
-    const mounted = await mount()
-    expect(content(row(mounted.root, 'sequencing'))).not.toContain('Moving files')
-    expect(content(mounted.root)).toContain('Moving files: 1,200 of 3,460')
-    expect(labelled(row(mounted.root, 'sequencing'), 'Move files').props.disabled).toBe(true)
+  it('marks the card a link opened from the bucket points at', async () => {
+    const mounted = await mountApp(
+      defineComponent(() => () => h(StorageSection, { groupId: 'g1', groupName: 'lab', canAdmin: true, focusLink: 'i2' })),
+    )
+    await flush()
+    expect(card(mounted.root, 'i1').props['data-highlight']).toBe('false')
+    expect(card(mounted.root, 'i2').props['data-highlight']).toBe('true')
     mounted.app.unmount()
   })
 
@@ -280,10 +238,8 @@ describe('StorageSection', () => {
       progress: { migrated: 5, skipped: 0, failed: 0, started_at_ms: 1, finished_at_ms: null },
     })
     const mounted = await mount()
-    const lines = nodes(mounted.root).filter((node) => node.props['data-testid'] === 'move-line')
     const defaultRow = element(mounted.root, (node) => node.props['data-testid'] === 'default-row')
     expect(labelled(defaultRow, 'Move files').props.disabled).toBe(false)
-    expect(lines).toHaveLength(LINKS.length)
     mounted.app.unmount()
   })
 
@@ -300,17 +256,25 @@ describe('StorageSection', () => {
   })
 
   it('keeps a running move in view when the status read fails', async () => {
-    getBucketMove.mockResolvedValueOnce({
-      bucket: 'x', misplaced: 5, complete: true,
-      progress: { migrated: 1, skipped: 0, failed: 0, started_at_ms: 1, finished_at_ms: null },
+    listGroupBuckets.mockResolvedValue(['alpha'])
+    let served = false
+    getBucketMove.mockImplementation(async (bucket: string) => {
+      if (bucket === 'alpha' && !served) {
+        served = true
+        return {
+          bucket, misplaced: 5, complete: true,
+          progress: { migrated: 1, skipped: 0, failed: 0, started_at_ms: 1, finished_at_ms: null },
+        }
+      }
+      throw new Error('down')
     })
-    getBucketMove.mockRejectedValue(new Error('down'))
     const mounted = await mount()
     expect(content(mounted.root)).toContain('Moving files')
     mounted.app.unmount()
   })
 
   it('counts up with a fixed total while the saved progress stays 0', async () => {
+    listGroupBuckets.mockResolvedValue(['alpha'])
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     try {
       let state = { misplaced: 100, migrated: 0 }
@@ -334,6 +298,7 @@ describe('StorageSection', () => {
   })
 
   it('keeps progress and polls again after a failed later poll', async () => {
+    listGroupBuckets.mockResolvedValue(['alpha'])
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     try {
       getBucketMove.mockResolvedValue({
@@ -376,33 +341,15 @@ describe('StorageSection', () => {
   })
 
   it('sends no move while offline', async () => {
+    listGroupBuckets.mockResolvedValue(['alpha'])
     getBucketMove.mockResolvedValue({ bucket: 'x', misplaced: 7, complete: true })
     const mounted = await mount()
-    await click(labelled(row(mounted.root, 'sequencing'), 'Move files'))
+    const defaultRow = element(mounted.root, (node) => node.props['data-testid'] === 'default-row')
+    await click(labelled(defaultRow, 'Move files'))
     writesDisabled.value = true
     await flush()
     await click(button(element(mounted.root, (node) => node.props.role === 'dialog'), 'Move files'))
     expect(startBucketMove).not.toHaveBeenCalled()
-    mounted.app.unmount()
-  })
-
-  it('says so when another move is still running in the bucket', async () => {
-    getBucketMove.mockResolvedValue({ bucket: 'x', misplaced: 7, complete: true })
-    startBucketMove.mockRejectedValue(new Api.ApiError(409, 'conflict', 'move_running'))
-    const mounted = await mount()
-    await click(labelled(row(mounted.root, 'sequencing'), 'Move files'))
-    await click(button(element(mounted.root, (node) => node.props.role === 'dialog'), 'Move files'))
-    expect(content(mounted.root)).toContain('Another move is still running in this bucket.')
-    mounted.app.unmount()
-  })
-
-  it('shows where new uploads go when that is elsewhere', async () => {
-    const moved = { ...link('i5', 'uploads', '', 'lab-raw/in/', null), write_prefix: 'lab-new/up/' }
-    listBackendImports.mockResolvedValue([moved])
-    const mounted = await mount()
-    const line = element(mounted.root, (node) => node.props['data-testid'] === 'write-line')
-    expect(content(line)).toContain('New uploads go to lab-object-store: lab-new / up/')
-    expect(content(row(mounted.root, 'uploads'))).toContain('←')
     mounted.app.unmount()
   })
 

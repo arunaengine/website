@@ -2,7 +2,7 @@
 import { ApiError, type BackendImport, type BackendImportRun, type BucketMoveResponse, type GroupBackendResponse } from './api'
 import { backendSchema } from './storage'
 import { storeName, writesInside } from './linkedFolders'
-import { formatNumber, relativeTime } from './utils'
+import { formatNumber } from './utils'
 
 /** Keys on group storages are at most this long; a folder must leave room for a file. */
 export const MAX_KEY_BYTES = 1024
@@ -21,13 +21,6 @@ export function splitPath(backend: GroupBackendResponse, path: string): { bucket
   if (!splitsBuckets(backend)) return { bucket: storeName(backend), folder: path }
   const slash = path.indexOf('/')
   return slash < 0 ? { bucket: path, folder: '' } : { bucket: path.slice(0, slash), folder: path.slice(slash + 1) }
-}
-
-/** A storage place as "bucket / folder/". */
-export function storagePlace(backend: GroupBackendResponse | undefined, path: string): string {
-  if (!backend) return path
-  const { bucket, folder } = splitPath(backend, path)
-  return `${bucket} / ${folder}`
 }
 
 /** An Aruna place as "bucket / folder/", or "bucket (whole bucket)". */
@@ -54,31 +47,6 @@ export function bucketTitle(backend: GroupBackendResponse, bucket: string): stri
   if (state === 'found') return 'Bucket found'
   // A fixed bucket was checked when the storage was added.
   return splitsBuckets(backend) ? null : 'Bucket found'
-}
-
-export interface RunText {
-  text: string
-  tone: 'muted' | 'failed' | 'active'
-  failures: boolean
-}
-
-/** The last run in a few words: "Synced 2h ago", "Running… 312 added, 400 checked", "3 failed · 1d ago". */
-export function runText(run: BackendImportRun | null | undefined): RunText {
-  if (!run) return { text: 'Never run', tone: 'muted', failures: false }
-  const ago = relativeTime(run.started_at)
-  const failures = run.failed > 0
-  if (run.state === 'cancelling') return { text: 'Stopping…', tone: 'active', failures }
-  if (run.state === 'awaiting_key') return { text: 'Waiting for an unlock', tone: 'active', failures }
-  if (ACTIVE_STATES.has(run.state)) {
-    const checked = run.imported + run.skipped + run.failed
-    const text = `Running… ${formatNumber(run.imported)} added, ${formatNumber(checked)} checked`
-    return { text, tone: 'active', failures }
-  }
-  if (run.state === 'cancelled') return { text: `Stopped · ${ago}`, tone: 'muted', failures }
-  if (run.state !== 'succeeded' && run.state !== 'failed') return { text: `Unknown · ${ago}`, tone: 'muted', failures }
-  if (failures) return { text: `${formatNumber(run.failed)} failed · ${ago}`, tone: 'failed', failures }
-  if (run.state === 'failed') return { text: `Failed · ${ago}`, tone: 'failed', failures }
-  return { text: `Synced ${ago}`, tone: 'muted', failures }
 }
 
 export function runActive(run: BackendImportRun | null | undefined): boolean {
