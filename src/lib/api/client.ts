@@ -64,6 +64,21 @@ export interface ApiRequestOptions extends RequestInit {
   onHeaders?: (headers: Headers) => void
 }
 
+/**
+ * Lets requests that carry an empty token wait while the session still restores its stored one.
+ * A request with no token key at all (the bootstrap) is never held.
+ */
+export interface SessionGate {
+  /** A promise while a stored token is still being restored, else null. */
+  pending(): Promise<void> | null
+  token(): string
+  baseUrl(): string
+}
+let sessionGate: SessionGate | null = null
+export function setSessionGate(gate: SessionGate | null) {
+  sessionGate = gate
+}
+
 export function defaultApiBaseUrl(): string {
   // The build-time env pin wins over runtime config so existing deployments
   // keep their behaviour; the localStorage override in useAruna wins over both.
@@ -117,7 +132,13 @@ export async function apiRequest<T>(
   const url = apiUrl(path, options.query, client)
 
   const headers = new Headers(options.headers)
-  const token = options.token ?? client.token
+  let token = options.token ?? client.token
+  const waiting = token === '' && options.token === undefined ? sessionGate?.pending() : null
+  if (waiting && sessionGate) {
+    await waiting
+    // The token that was restored belongs to the base this request was made for.
+    if ((client.baseUrl || defaultApiBaseUrl()) === sessionGate.baseUrl()) token = sessionGate.token()
+  }
   if (token) headers.set('Authorization', `Bearer ${token}`)
   if (options.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')

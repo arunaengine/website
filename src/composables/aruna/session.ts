@@ -1,4 +1,4 @@
-import { apiRequest, defaultApiBaseUrl, type RealmInfoResponse } from '@/lib/api'
+import { apiRequest, defaultApiBaseUrl, setSessionGate, type RealmInfoResponse } from '@/lib/api'
 import { ownerNodeAllowed } from '@/lib/federation/transfer'
 import { errorMessage } from '@/lib/utils'
 import { loadMetadata, resetRecentOrderProbe } from './catalog'
@@ -123,17 +123,44 @@ async function restoreToken(context: ReturnType<typeof refreshContext>): Promise
   }
 }
 
+// Requests that carry an empty token wait here while a stored token is being restored, so the
+// first loads of a page do not go out unsigned and come back 401.
+let restoreGate: { promise: Promise<void>; resolve: () => void } | null = null
+
+function openGate() {
+  if (restoreGate) return
+  let resolve = () => {}
+  const promise = new Promise<void>((done) => (resolve = done))
+  restoreGate = { promise, resolve }
+}
+
+function closeGate() {
+  restoreGate?.resolve()
+  restoreGate = null
+}
+
+if (restoring.value) openGate()
+setSessionGate({
+  pending: () => restoreGate?.promise ?? null,
+  token: () => authToken.value,
+  baseUrl: () => apiBaseUrl.value,
+})
+
 export function refresh(): Promise<void> {
   const context = refreshContext()
   if (refreshInFlight?.epoch === context.epoch) return refreshInFlight.promise
 
   restoring.value = !context.client.token
     && (carried?.baseUrl === context.client.baseUrl || hasStoredToken(context.client.baseUrl))
+  if (restoring.value) openGate()
+  else closeGate()
   const promise = restoring.value
     ? restoreToken(context)
+        .finally(closeGate)
         .then(() => refreshForContext(refreshContext()))
         .finally(() => {
           restoring.value = false
+          closeGate()
         })
     : refreshForContext(context)
   refreshInFlight = { epoch: context.epoch, promise }
@@ -145,6 +172,7 @@ export function refresh(): Promise<void> {
 
 export function setAuthToken(token: string) {
   carried = null
+  closeGate()
   const next = token.trim()
   if (next === authToken.value) return
   if (!next) forgetToken()
