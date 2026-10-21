@@ -1,6 +1,12 @@
 // Short words for the organize steps, kept apart from the components so tests reach them.
-import { ApiError, type BackendImport,
-  type BackendImportFailure, type BackendImportRenames, type LinkStatus, type OrganizeJob, type OrganizeKind } from '@/lib/api'
+import {
+  ApiError,
+  type BackendImport,
+  type BackendImportRenames,
+  type LinkStatus,
+  type OrganizeJob,
+  type OrganizeKind,
+} from '@/lib/api'
 import { errorMessage, formatNumber } from '@/lib/utils'
 
 export function filesWord(count: number): string {
@@ -88,19 +94,10 @@ export interface LinkProblem {
   action: 'show' | 'organize'
 }
 
-/** Failures of the last run that no decision explains; a conflict is told once, as a decision. */
-export function otherFailures(link: BackendImport, conflicts: { path: string }[]): number {
-  const run = link.last_run
-  if (!run?.failed) return 0
-  const paths = new Set(conflicts.map((conflict) => conflict.path))
-  const matched = run.errors.filter((failure) => paths.has(failure.key)).length
-  return run.failed - Math.max(matched, Math.min(conflicts.length, run.failed))
-}
-
-/** The failures of the last run that are not decisions. */
-export function failureList(link: BackendImport, conflicts: { path: string }[]): BackendImportFailure[] {
-  const paths = new Set(conflicts.map((conflict) => conflict.path))
-  return (link.last_run?.errors ?? []).filter((failure) => !paths.has(failure.key))
+/** Every file the last run did not add, with its own reason: the node's list, else the run's. */
+export function failureList(link: BackendImport, conflicts: { path: string; reason: string }[]): { path: string; reason: string }[] {
+  if (conflicts.length) return conflicts
+  return (link.last_run?.errors ?? []).map((failure) => ({ path: failure.key, reason: failure.error }))
 }
 
 /** The problems of one link as plain sentences, most urgent first. */
@@ -114,19 +111,12 @@ export function linkProblems(
   if (run?.error) {
     found.push({ id: 'stopped', text: `The last run stopped: ${run.error} Run it again, or check your storage.`, action: 'show' })
   }
-  const conflicts = status?.conflicts ?? []
-  const left = otherFailures(link, conflicts)
-  if (left > 0) {
+  // The status lists the same files as the run, each with its reason: one problem, told once.
+  const failed = run?.failed || (status?.conflicts.length ?? 0)
+  if (failed) {
     found.push({
       id: 'failed',
-      text: `${filesWord(left)} could not be added. Run again; if it stays, check the list.`,
-      action: 'show',
-    })
-  }
-  if (conflicts.length) {
-    found.push({
-      id: 'conflicts',
-      text: `${filesWord(conflicts.length)} ${conflicts.length === 1 ? 'needs' : 'need'} a decision. Choose Show to see why.`,
+      text: `${filesWord(failed)} could not be added. Choose Show to see why.`,
       action: 'show',
     })
   }

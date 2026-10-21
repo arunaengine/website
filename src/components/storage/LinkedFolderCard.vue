@@ -96,14 +96,9 @@ function show(id: string, action: 'show' | 'organize') {
           <p class="min-w-0 flex-1 break-words text-xs text-amber-800 dark:text-amber-300">{{ problem.text }}</p>
           <Button variant="outline" size="sm" @click="show(problem.id, problem.action)">Show</Button>
         </div>
-        <ul v-if="details === problem.id && problem.id === 'failed'" class="mt-2 space-y-0.5 text-[11px] text-destructive">
-          <li v-for="(failure, at) in failureList(link, status?.conflicts ?? []).slice(0, 20)" :key="`${at}\n${failure.key}`" class="break-all">
-            <span class="font-mono">{{ failure.key }}</span>: {{ failure.error }}
-          </li>
-        </ul>
-        <ul v-if="details === problem.id && problem.id === 'conflicts'" class="mt-2 space-y-0.5 font-mono text-[11px]">
-          <li v-for="(item, at) in status?.conflicts.slice(0, 20)" :key="`${at}\n${item.path}`" class="break-all">
-            {{ item.path }}<span v-if="item.reason" class="font-sans text-muted-foreground"> · {{ item.reason }}</span>
+        <ul v-if="details === problem.id && problem.id === 'failed'" class="mt-2 space-y-0.5 text-[11px]">
+          <li v-for="(item, at) in failureList(link, status?.conflicts ?? []).slice(0, 20)" :key="`${at}\n${item.path}`" class="break-all">
+            <span class="font-mono">{{ item.path }}</span>: <span class="text-destructive">{{ item.reason }}</span>
           </li>
         </ul>
       </li>
