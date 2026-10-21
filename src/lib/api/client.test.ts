@@ -42,7 +42,8 @@ describe('session gate', () => {
 
   it('does not hand the restored token to a request for another base', async () => {
     const fetchMock = respond()
-    setSessionGate({ pending: () => Promise.resolve(), token: () => 'restored', baseUrl: () => 'https://api.test' })
+    const done = Promise.resolve()
+    setSessionGate({ pending: () => done, token: () => 'restored', baseUrl: () => 'https://api.test' })
     await apiRequest('/x', {}, { baseUrl: 'https://other.test', token: '' })
     expect(sent(fetchMock)).toBeNull()
   })
@@ -52,5 +53,29 @@ describe('session gate', () => {
     setSessionGate({ pending: () => null, token: () => '', baseUrl: () => 'https://api.test' })
     await apiRequest('/x', {}, { baseUrl: 'https://api.test', token: '' })
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('waits for a newer restore that opened while it waited', async () => {
+    const fetchMock = respond()
+    let first: () => void = () => {}
+    let second: () => void = () => {}
+    const one = new Promise<void>((resolve) => (first = resolve))
+    const two = new Promise<void>((resolve) => (second = resolve))
+    let current: Promise<void> | null = one
+    let token = ''
+    setSessionGate({ pending: () => current, token: () => token, baseUrl: () => 'https://api.test' })
+
+    const answer = apiRequest('/x', {}, { baseUrl: 'https://api.test', token: '' })
+    await Promise.resolve()
+    // The restore it waited for is replaced by a newer one before it ends.
+    current = two
+    first()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(fetchMock).not.toHaveBeenCalled()
+    token = 'restored'
+    current = null
+    second()
+    await answer
+    expect(sent(fetchMock)).toBe('Bearer restored')
   })
 })

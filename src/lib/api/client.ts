@@ -133,11 +133,18 @@ export async function apiRequest<T>(
 
   const headers = new Headers(options.headers)
   let token = options.token ?? client.token
-  const waiting = token === '' && options.token === undefined ? sessionGate?.pending() : null
-  if (waiting && sessionGate) {
-    await waiting
+  if (token === '' && options.token === undefined && sessionGate) {
+    // A newer restore may open while this one waits (another node chosen); wait for it too.
+    let waiting = sessionGate.pending()
+    const waited = waiting !== null
+    // Bounded, so a gate that keeps handing out new promises cannot hold a request for ever.
+    for (let turns = 0; waiting && turns < 5; turns++) {
+      await waiting
+      const next = sessionGate.pending()
+      waiting = next === waiting ? null : next
+    }
     // The token that was restored belongs to the base this request was made for.
-    if ((client.baseUrl || defaultApiBaseUrl()) === sessionGate.baseUrl()) token = sessionGate.token()
+    if (waited && (client.baseUrl || defaultApiBaseUrl()) === sessionGate.baseUrl()) token = sessionGate.token()
   }
   if (token) headers.set('Authorization', `Bearer ${token}`)
   if (options.body && !headers.has('Content-Type')) {
