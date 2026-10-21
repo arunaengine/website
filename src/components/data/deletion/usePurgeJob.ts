@@ -46,7 +46,8 @@ export function usePurgeJob() {
       if (id === runId && word !== null) paused.value = word
     } catch (err) {
       const status = (err as { status?: number }).status
-      if (status === 404 || status === 405 || status === 501) stateRoute = false
+      // A late answer of an older run says nothing about the route of the newer one.
+      if (id === runId && (status === 404 || status === 405 || status === 501)) stateRoute = false
     }
   }
 
@@ -69,6 +70,7 @@ export function usePurgeJob() {
       status.value = next
       if (typeof next.paused === 'boolean') paused.value = next.paused
       else await readState(started.job_id, client, id)
+      if (id !== runId) return null
       progress.value = retainStoragePurgeProgress(progress.value, next.progress)
       if (isTerminalStoragePurgeJob(next.state)) return next
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))

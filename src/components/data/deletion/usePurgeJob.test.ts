@@ -84,4 +84,44 @@ describe('usePurgeJob pause', () => {
     await job.run({ scope: { kind: 'bucket', bucket: 'b' }, idempotencyKey: 'k2' }, CLIENT)
     expect(getStoragePurgeState).toHaveBeenCalledTimes(1)
   })
+
+  it('drops the late state answer of an older run', async () => {
+    startStoragePurge.mockReset().mockImplementation(async () => ({ job_id: 'old' }))
+    let oldState: (value: unknown) => void = () => {}
+    getStoragePurgeJob.mockReset().mockResolvedValueOnce({ ...running(), progress: { current: 90, unit: 'versions' } })
+    getStoragePurgeState.mockReset().mockReturnValueOnce(new Promise((resolve) => (oldState = resolve)))
+    const job = usePurgeJob()
+    const first = job.run({ scope: { kind: 'bucket', bucket: 'b' }, idempotencyKey: 'k' }, CLIENT)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    startStoragePurge.mockImplementation(async () => ({ job_id: 'new' }))
+    getStoragePurgeJob.mockResolvedValueOnce({ ...running(), progress: { current: 5, unit: 'versions' } })
+    getStoragePurgeState.mockReturnValue(new Promise(() => {}))
+    void job.run({ scope: { kind: 'bucket', bucket: 'b' }, idempotencyKey: 'k2' }, CLIENT)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    oldState({ job_id: 'old', state: 'running', paused: false, delete_storage_files: true })
+    expect(await first).toBeNull()
+    expect(job.progress.value).toBeNull()
+  })
+
+  it('does not let an older run switch the state route off for the newer one', async () => {
+    startStoragePurge.mockReset().mockImplementation(async () => ({ job_id: 'old' }))
+    let oldState: (reason: unknown) => void = () => {}
+    getStoragePurgeJob.mockReset().mockResolvedValueOnce(running())
+    getStoragePurgeState.mockReset().mockReturnValueOnce(new Promise((_, reject) => (oldState = reject)))
+    const job = usePurgeJob()
+    const first = job.run({ scope: { kind: 'bucket', bucket: 'b' }, idempotencyKey: 'k' }, CLIENT)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    startStoragePurge.mockImplementation(async () => ({ job_id: 'new' }))
+    getStoragePurgeJob.mockReset().mockResolvedValueOnce(running()).mockResolvedValueOnce({ ...running(), state: 'succeeded' })
+    getStoragePurgeState.mockReset().mockResolvedValue({ job_id: 'new', state: 'paused', paused: true, delete_storage_files: true })
+    const second = job.run({ scope: { kind: 'bucket', bucket: 'b' }, idempotencyKey: 'k2' }, CLIENT)
+    oldState({ status: 404 })
+    await first
+    await second
+    expect(getStoragePurgeState).toHaveBeenCalledWith('new', CLIENT)
+    expect(job.paused.value).toBe(true)
+  })
 })

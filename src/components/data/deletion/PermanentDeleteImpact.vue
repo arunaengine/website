@@ -37,7 +37,7 @@ const list = useCursorPage<DeleteItem>(async (query) => {
 
 // A filtered page has no count of its own: the totals above stay for the whole scope.
 const summary = computed(() =>
-  list.filter.value && list.page.value
+  filterable.value && list.filter.value && list.page.value
     ? `${list.items.value.length} on this page match "${list.filter.value}"`
     : undefined,
 )

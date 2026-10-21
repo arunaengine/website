@@ -630,6 +630,8 @@ describe('delete dialog', () => {
     expect(getDeleteImpact).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), { filter: '', limit: 100, after: null })
     expect(() => button(root, 'filter x')).toThrow()
     expect(content(root)).toContain('a/x.txt')
+    // The retry was not filtered, so the page must not claim to be.
+    expect(content(root)).not.toContain('on this page match')
   })
 
   it('keeps the filter and shows the error when the fallback fails too', async () => {
