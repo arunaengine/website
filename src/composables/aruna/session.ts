@@ -2,6 +2,7 @@ import { apiRequest, defaultApiBaseUrl, setSessionGate, type RealmInfoResponse }
 import { ownerNodeAllowed } from '@/lib/federation/transfer'
 import { errorMessage } from '@/lib/utils'
 import { loadMetadata, resetRecentOrderProbe } from './catalog'
+import { closeGate, openGate, pendingGate } from './restoreGate'
 import { loadAuthenticated } from './identity'
 import { loadInfo } from './realm'
 import {
@@ -123,25 +124,9 @@ async function restoreToken(context: ReturnType<typeof refreshContext>): Promise
   }
 }
 
-// Requests that carry an empty token wait here while a stored token is being restored, so the
-// first loads of a page do not go out unsigned and come back 401.
-let restoreGate: { promise: Promise<void>; resolve: () => void } | null = null
-
-function openGate() {
-  if (restoreGate) return
-  let resolve = () => {}
-  const promise = new Promise<void>((done) => (resolve = done))
-  restoreGate = { promise, resolve }
-}
-
-function closeGate() {
-  restoreGate?.resolve()
-  restoreGate = null
-}
-
 if (restoring.value) openGate()
 setSessionGate({
-  pending: () => restoreGate?.promise ?? null,
+  pending: pendingGate,
   token: () => authToken.value,
   baseUrl: () => apiBaseUrl.value,
 })
@@ -152,15 +137,16 @@ export function refresh(): Promise<void> {
 
   restoring.value = !context.client.token
     && (carried?.baseUrl === context.client.baseUrl || hasStoredToken(context.client.baseUrl))
-  if (restoring.value) openGate()
-  else closeGate()
-  const promise = restoring.value
+  const gate = restoring.value ? openGate() : null
+  if (!gate) closeGate()
+  const promise = gate
     ? restoreToken(context)
-        .finally(closeGate)
+        .finally(() => closeGate(gate))
         .then(() => refreshForContext(refreshContext()))
         .finally(() => {
-          restoring.value = false
-          closeGate()
+          // A restore that was left for another base must not end the pending state of the new one.
+          if (context.epoch === sessionEpoch.value) restoring.value = false
+          closeGate(gate)
         })
     : refreshForContext(context)
   refreshInFlight = { epoch: context.epoch, promise }
