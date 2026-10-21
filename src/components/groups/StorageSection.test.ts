@@ -31,10 +31,10 @@ const DialogStub = defineComponent({
 })
 
 const CardStub = defineComponent({
-  props: { link: Object, highlight: Boolean, running: Boolean },
+  props: { link: Object, highlight: Boolean, running: Boolean, writeTo: String },
   emits: ['run', 'edit'],
   setup: (props, { emit }) => () =>
-    h('div', { 'data-testid': 'link-card', 'data-link': (props.link as { import_id: string }).import_id, 'data-highlight': String(props.highlight) }, [
+    h('div', { 'data-testid': 'link-card', 'data-link': (props.link as { import_id: string }).import_id, 'data-highlight': String(props.highlight), 'data-write': props.writeTo ?? '' }, [
       h('button', { onClick: () => emit('run') }, 'Run now'),
       h('button', { onClick: () => emit('edit') }, 'Edit'),
     ]),
@@ -199,6 +199,15 @@ describe('StorageSection', () => {
     expect(cards.map((card) => card.props['data-link'])).toEqual(LINKS.map((entry) => entry.import_id))
     await click(button(card(mounted.root, 'i1'), 'Run now'))
     expect(runBackendImport).toHaveBeenCalledWith('g1', 'i1', expect.anything())
+    mounted.app.unmount()
+  })
+
+  it('passes the place new uploads go to when a link writes elsewhere', async () => {
+    const moved = { ...link('i5', 'uploads', '', 'lab-raw/in/', null), write_prefix: 'lab-new/up/' }
+    listBackendImports.mockResolvedValue([moved, link('i6', 'plain', '', 'lab-raw/p/', null)])
+    const mounted = await mount()
+    expect(card(mounted.root, 'i5').props['data-write']).toBe('lab-object-store: lab-new / up/')
+    expect(card(mounted.root, 'i6').props['data-write']).toBe('')
     mounted.app.unmount()
   })
 

@@ -134,3 +134,14 @@ export function linkProblems(
 export function copyKey(item: { key: string; kept: { path: string }; removed: { path: string }[] }): string {
   return [item.key, item.kept.path, ...item.removed.map((file) => file.path)].join('\n')
 }
+
+/** The last run in a word when it is not a plain success; empty after a success. */
+export function runLabel(run: { state: string } | null | undefined): string {
+  if (!run || run.state === 'succeeded') return ''
+  if (run.state === 'cancelling') return 'Stopping'
+  if (run.state === 'cancelled') return 'Stopped'
+  if (run.state === 'failed') return 'Failed'
+  if (run.state === 'awaiting_key') return 'Waiting for an unlock'
+  if (run.state === 'indeterminate') return 'Result unknown'
+  return 'Running now'
+}

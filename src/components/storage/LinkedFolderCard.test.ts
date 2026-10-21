@@ -1,8 +1,9 @@
-import { defineComponent, h, ref } from 'vue'
+import { defineComponent, h, reactive, ref } from 'vue'
 import * as VueRuntime from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as LinkedFolders from '@/lib/linkedFolders'
 import * as Organize from '@/lib/organize'
+import * as StorageRules from '@/lib/storageRules'
 import * as Utils from '@/lib/utils'
 import { button, click, compileClientComponent, content, element, flush, mountApp, moduleDefault } from '@/test/clientRender'
 
@@ -42,6 +43,7 @@ const Card = compileClientComponent(new URL('./LinkedFolderCard.vue', import.met
   '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled }) },
   '@/lib/linkedFolders': LinkedFolders,
   '@/lib/organize': Organize,
+  '@/lib/storageRules': StorageRules,
   '@/lib/utils': Utils,
 })
 
@@ -107,6 +109,46 @@ describe('linked folder card', () => {
     await flush()
     expect(String(marked(mounted.root))).toContain('ring-2')
     expect(element(mounted.root, (node) => node.props['data-testid'] === 'link-card').props.id).toBe('link-i1')
+  })
+
+  it('names the Aruna folder, keeping the bucket in view', async () => {
+    const { root } = await mount({ ...LINK, key_prefix: 'raw/' })
+    expect(content(root)).toContain('reef / raw/')
+    const whole = await mount({ ...LINK, key_prefix: '' })
+    expect(content(whole.root)).toContain('reef (whole bucket)')
+  })
+
+  it('keeps the state of a run that is not a success and says in sync only after one', async () => {
+    const running = await mount({ ...LINK, last_run: { ...RUN, state: 'running' } })
+    expect(content(running.root)).toContain('Running now')
+    expect(content(running.root)).not.toContain('in sync')
+    const stopped = await mount({ ...LINK, last_run: { ...RUN, state: 'cancelled' } })
+    expect(content(stopped.root)).toContain('Stopped')
+    expect(content(stopped.root)).not.toContain('in sync')
+    const done = await mount()
+    expect(content(done.root)).toContain('in sync')
+    expect(content(done.root)).toContain('Last run')
+  })
+
+  it('tells where new uploads go when that is elsewhere', async () => {
+    const elsewhere = await mountApp(Card, {
+      props: { groupId: 'g1', link: LINK, storage: 'lab', running: false, writeTo: 'lab: lab-new / up/' },
+    })
+    await flush()
+    expect(content(elsewhere.root)).toContain('New uploads go to lab: lab-new / up/')
+    const plain = await mount()
+    expect(content(plain.root)).not.toContain('New uploads go to')
+  })
+
+  it('scrolls to the card when the link in the address changes to it', async () => {
+    const props = reactive({ groupId: 'g1', link: LINK, storage: 'lab', running: false, highlight: false })
+    const mounted = await mountApp(defineComponent(() => () => h(Card, props)))
+    await flush()
+    const scrolled = vi.fn()
+    ;(element(mounted.root, (node) => node.props['data-testid'] === 'link-card') as unknown as { scrollIntoView: unknown }).scrollIntoView = scrolled
+    props.highlight = true
+    await flush()
+    expect(scrolled).toHaveBeenCalledWith({ block: 'center' })
   })
 
   it('lists the files a run did not add after Show', async () => {

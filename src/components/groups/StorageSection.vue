@@ -41,11 +41,13 @@ import {
   moveText,
   moveView,
   rememberMoves,
+  splitPath,
   type AskedMove,
   type MoveTotals,
   runActive,
   storageLine,
 } from '@/lib/storageRules'
+import { writesElsewhere } from '@/lib/linkedFolders'
 import { errorMessage } from '@/lib/utils'
 
 const props = defineProps<{ groupId: string; groupName: string; canAdmin: boolean; focusLink?: string | null }>()
@@ -214,6 +216,17 @@ onBeforeUnmount(() => {
   disposed = true
   clearPoll()
 })
+
+// Where new uploads of a link go when that is not its own source folder.
+function writePlace(link: BackendImport): string | null {
+  if (!writesElsewhere(link)) return null
+  const id = link.write_backend_id || link.backend_id
+  const target = backends.value?.find((backend) => backend.backend_id === id)
+  const path = link.write_prefix ?? link.backend_prefix
+  if (!target) return path
+  const { bucket, folder } = splitPath(target, path)
+  return `${target.name}: ${bucket} / ${folder}`
+}
 
 function linksOf(backend: GroupBackendResponse): BackendImport[] {
   return links.value.filter((link) => link.backend_id === backend.backend_id)
@@ -590,6 +603,7 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
               :storage="backend.name"
               :running="busyId !== null || runActive(link.last_run)"
               :highlight="focusLink === link.import_id"
+              :write-to="writePlace(link)"
               @run="run(link)"
               @edit="openLink(backend, link)"
             />

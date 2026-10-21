@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // One linked folder: its last run, its problems in plain sentences, a running step and the Organize panel.
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import JobProgress from '@/components/storage/JobProgress.vue'
 import OrganizeDialog from '@/components/storage/OrganizeDialog.vue'
 import Button from '@/components/ui/Button.vue'
@@ -9,7 +9,8 @@ import { useLinkState } from '@/composables/useLinkState'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import type { BackendImport } from '@/lib/api'
 import { nameStyle, RUN_HINT, scheduleWords } from '@/lib/linkedFolders'
-import { failureList, filesWord, linkProblems } from '@/lib/organize'
+import { failureList, filesWord, linkProblems, runLabel } from '@/lib/organize'
+import { arunaPlace } from '@/lib/storageRules'
 import { formatNumber, relativeTime } from '@/lib/utils'
 import { Play, SlidersHorizontal } from '@lucide/vue'
 
@@ -21,6 +22,8 @@ const props = defineProps<{
   runError?: string
   /** Opened from a link: scroll here and mark the card. */
   highlight?: boolean
+  /** Where new uploads go when that is not the linked folder itself. */
+  writeTo?: string | null
 }>()
 const emit = defineEmits<{ (e: 'run'): void; (e: 'edit'): void }>()
 
@@ -34,15 +37,30 @@ const root = ref<HTMLElement | null>(null)
 const organizing = ref(false)
 const details = ref<string | null>(null)
 
+function bringIntoView() {
+  root.value?.scrollIntoView?.({ block: 'center' })
+}
+
 onMounted(() => {
-  if (props.highlight) root.value?.scrollIntoView?.({ block: 'center' })
+  if (props.highlight) bringIntoView()
 })
+// The tab can stay open while the link in the address changes.
+watch(
+  () => props.highlight,
+  async (on) => {
+    if (!on) return
+    await nextTick()
+    bringIntoView()
+  },
+)
 
 // A new list, a saved link or a finished run all change what the node can say.
 watch(() => props.link, () => void refresh(), { immediate: true })
 
 const problems = computed(() => linkProblems(props.link, renames.value, status.value))
-const place = computed(() => props.link.key_prefix || props.link.bucket)
+const place = computed(() => arunaPlace(props.link))
+const label = computed(() => runLabel(props.link.last_run))
+const inSync = computed(() => props.link.last_run?.state === 'succeeded' && !problems.value.length && !job.value)
 const sizeLine = computed(() => {
   const files = status.value?.files
   return files === undefined ? null : filesWord(files)
@@ -66,9 +84,13 @@ function show(id: string, action: 'show' | 'organize') {
         <h3 class="truncate font-display text-sm font-semibold text-aruna-navy">
           <span class="font-mono">{{ place }}</span> ⇆ {{ storage }} / <span class="font-mono">{{ link.backend_prefix || '/' }}</span>
         </h3>
+        <p v-if="writeTo" class="mt-0.5 text-xs text-muted-foreground" data-testid="write-line">
+          New uploads go to <span class="font-mono">{{ writeTo }}</span>
+        </p>
         <p class="mt-0.5 text-xs text-muted-foreground">
           <template v-if="link.last_run">
-            Last run {{ relativeTime(link.last_run.started_at) }} · {{ formatNumber(link.last_run.imported) }} new {{ link.last_run.imported === 1 ? 'file' : 'files' }}
+            <template v-if="label">{{ label }} · started {{ relativeTime(link.last_run.started_at) }} ·</template>
+            <template v-else>Last run {{ relativeTime(link.last_run.started_at) }} ·</template> {{ formatNumber(link.last_run.imported) }} new {{ link.last_run.imported === 1 ? 'file' : 'files' }}
           </template>
           <template v-else>Not run yet</template>
           · {{ scheduleWords(link.schedule) }}
@@ -99,7 +121,7 @@ function show(id: string, action: 'show' | 'organize') {
         <p v-if="sizeLine" class="text-sm">{{ sizeLine }}</p>
         <p class="text-xs text-muted-foreground">New files are named <span class="font-mono">{{ nameStyle(link.write_pattern) }}</span></p>
       </div>
-      <span v-if="!problems.length && link.last_run" class="text-xs text-emerald-700 dark:text-emerald-300">✓ in sync</span>
+      <span v-if="inSync" class="text-xs text-emerald-700 dark:text-emerald-300">✓ in sync</span>
     </div>
 
     <ul v-if="problems.length || runError" class="divide-y divide-border border-t border-border">
