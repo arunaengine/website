@@ -738,7 +738,7 @@ export const docsTopics: DocsTopic[] = [
           'Open the group from [Groups](page:groups) and switch to its Storage tab.',
           'Choose Add your storage and enter the endpoint and [keys](concept:storage-access#external-storage-backend). No bucket is needed; Aruna checks the keys before it saves them.',
           'Use as default sends new uploads of all buckets to one bucket of your storage, such as aruna-lab-default. Aruna creates the bucket if it is missing and keeps its own layout there.',
-          'Link a bucket shows the same files in an Aruna bucket and a bucket of your storage, both ways. Aruna deletes nothing there, except the old name of a file you rename and the copies you remove in Organize.',
+          'Under each storage, Link a bucket shows the same files in an Aruna bucket and a bucket of your storage, both ways. Aruna deletes nothing there, except the old name of a file you rename and the copies you remove in Organize.',
           'A new linked folder puts the version ID after the file name by default, such as b.fastq~01JA7Q3K. You can change this later; files already saved keep their names until you rename them in Organize. A whole linked bucket keeps the original names and cannot change them.',
           'Rules may not overlap, and a linked bucket may not be the default bucket. Use as default on Aruna storage sends new uploads back to the node; files already in your storage stay there.',
           'Writers use the storage but can never see or change the keys.',
@@ -753,7 +753,7 @@ export const docsTopics: DocsTopic[] = [
         title: 'Sync a linked bucket',
         icon: 'RefreshCw',
         paragraphs: [
-          'A linked bucket checks your storage on its schedule, or when you choose Run now (on the card of the link). Uploads through Aruna reach your storage right away and need no run.',
+          'A linked bucket checks your storage on its schedule, or when you choose Run now (on the card of the link, under its storage in the group Storage tab). Uploads through Aruna reach your storage right away and need no run. The bucket page shows only a short line with a link to this card.',
           'A run lists the folder in your storage. New files become objects in the bucket. A changed file gets a new version, unless the object got a newer version in Aruna since then.',
           'Known files are compared by size and ETag, so a run does not read them again. Only new and changed files are read, so the first run of a large folder takes the longest.',
           'The card of the link shows when the last run started and how many new files it found. A problem is written as a plain sentence with a next step; choose Show to see the files.',
