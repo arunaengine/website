@@ -207,7 +207,7 @@ const filesLink = computed(() => ({
 
 <template>
   <div class="grid gap-5 lg:grid-cols-2">
-    <BucketLinkNote :bucket="bucket" :group-id="groupId" />
+    <BucketLinkNote v-if="!nodeId" :bucket="bucket" :group-id="groupId" />
     <section v-if="usageState !== 'missing'" class="surface lg:col-span-2">
       <header class="flex items-center gap-2 border-b border-border px-5 py-4">
         <Database class="size-4 text-primary" />

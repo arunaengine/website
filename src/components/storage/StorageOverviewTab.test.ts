@@ -36,7 +36,7 @@ const tab = compileClientComponent(new URL('./StorageOverviewTab.vue', import.me
   '@lucide/vue': new Proxy({}, { get: () => IconStub }),
   '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
   '@/components/ui/DocsLink.vue': moduleDefault(Slotted('a')),
-  '@/components/storage/BucketLinkNote.vue': moduleDefault(Slotted('div')),
+  '@/components/storage/BucketLinkNote.vue': moduleDefault(defineComponent(() => () => h('p', 'link note'))),
   '@/components/ui/DetailList.vue': moduleDefault(DetailListStub),
   '@/components/ui/Skeleton.vue': moduleDefault(Slotted('div')),
   '@/composables/useAruna': {
@@ -88,6 +88,16 @@ async function render(props: Record<string, unknown> = {}) {
 }
 
 describe('bucket storage overview', () => {
+  it('shows the link note for a local bucket only', async () => {
+    getBucketRouting.mockResolvedValue({ bucket: 'reef-survey', rules: [], warnings: [] })
+    getGroupRouting.mockResolvedValue({ group_id: 'g-1', warnings: [] })
+    listGroupBackends.mockResolvedValue({ backends: [] })
+    getBucketPlacement.mockResolvedValue({ bucket: 'reef-survey', policies: [], generation: 1 })
+    syncRows.value = []
+    expect(await render()).toContain('link note')
+    expect(await render({ nodeId: 'n-2' })).not.toContain('link note')
+  })
+
   it('states the none cases without inventing a copy count', async () => {
     getBucketRouting.mockResolvedValue({ bucket: 'reef-survey', rules: [], warnings: [] })
     getGroupRouting.mockResolvedValue({ group_id: 'g-1', warnings: [] })
