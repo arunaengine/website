@@ -49,15 +49,17 @@ const deleteObjectVersion = vi.fn(async () => undefined)
 const copyObjectVersion = vi.fn(async () => ({ versionId: 'new' }))
 const deleteBucket = vi.fn(async () => undefined)
 const purgeStatus = ref<unknown>(null)
+const purgePaused = ref(false)
 const purgeControl = vi.fn(async (..._args: unknown[]) => undefined)
 const purgeRun = vi.fn(async () => ({ state: 'succeeded' }))
 const removeBucket = vi.fn(async (_nodeId: string, _bucket: string, _job: unknown) => undefined)
 const preflightResponse = vi.fn()
 const getDeleteImpact = vi.fn(async (..._args: unknown[]): Promise<unknown> => {
-  throw new Error('not found')
+  throw Object.assign(new Error('not found'), { status: 404 })
 })
 const backlinkPreflight = ref<BacklinkPreflightResponse | null>(null)
 const sessionEpoch = ref(1)
+const offline = ref(false)
 
 function slotted(tag: string) {
   return defineComponent({
@@ -183,6 +185,7 @@ function dialogModules(overrides: Record<string, unknown> = {}) {
       submission: ref(null),
       status: purgeStatus,
       progress: ref({ current: 3, total: 10, unit: 'versions' }),
+      paused: purgePaused,
       reset: () => {},
       run: purgeRun,
       control: purgeControl,
@@ -213,7 +216,11 @@ function dialogModules(overrides: Record<string, unknown> = {}) {
   },
   '@/components/groups/bucketRemoval': { removeBucket },
   '@/composables/s3/endpoints': { nodeApiBase: (id: string) => `https://${id}.test/api/v1` },
-  '@/composables/useAruna': { useAruna: () => ({ authToken: ref('token'), sessionEpoch }) },
+  '@/composables/useAruna': {
+    isUnsupportedEndpoint: (err: { status?: number }) => err?.status === 404,
+    useAruna: () => ({ authToken: ref('token'), sessionEpoch }),
+  },
+  '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled: offline }) },
   '@/composables/useRealmNodes': {
     useRealmNodes: () => ({ displayName: (id: string) => `node ${id}` }),
   },
@@ -264,6 +271,17 @@ const impactDialog = compileClientComponent(
     '@/components/data/deletion/DeletionImpact.vue': moduleDefault(deletionImpact()),
   }),
 )
+
+const IMPACT = {
+  files: 1,
+  versions: 1,
+  bytes: 1,
+  storage_files: 1,
+  storage_bytes: 1,
+  kept_files: 0,
+  complete: true,
+  items: [],
+}
 
 const currentVersion = {
   key: 'a.txt',
@@ -483,6 +501,8 @@ describe('delete dialog', () => {
     const { root } = await open({ kind: 'object', bucket: 'reef', nodeId: null, key: 'a.txt' })
 
     await choose(root, 'delete-permanently')
+    expect(confirmButton(root).props.disabled).toBe(true)
+    await typeValue(element(root, (node) => node.tag === 'input' && node.props.type !== 'radio'), 'a.txt')
     await click(confirmButton(root))
 
     expect(purgeRun).toHaveBeenCalledTimes(1)
@@ -601,6 +621,7 @@ describe('delete dialog', () => {
 
   it('also deletes the storage files and names the bucket on a permanent delete', async () => {
     purgeRun.mockClear()
+    getDeleteImpact.mockResolvedValueOnce(IMPACT)
     const { root } = await open({ kind: 'bucket', bucket: 'reef', nodeId: null, option: 'delete-permanently' })
     await typeValue(element(root, (node) => node.tag === 'input' && node.props.type !== 'radio'), 'reef')
     await click(confirmButton(root))
@@ -610,16 +631,87 @@ describe('delete dialog', () => {
     )
   })
 
+  it('shows a delete the node says is paused, even while its state is running', async () => {
+    purgeStatus.value = { state: 'running', paused: true }
+    purgePaused.value = true
+    try {
+      const { root } = await open({ kind: 'folder', bucket: 'reef', nodeId: null, key: 'a/', option: 'delete-permanently' })
+      expect(content(root)).toContain('job paused')
+    } finally {
+      purgePaused.value = false
+      purgeStatus.value = null
+    }
+  })
+
   it('shows a running delete with pause and abort', async () => {
-    purgeStatus.value = { state: 'paused' }
+    purgeStatus.value = { state: 'running' }
+    purgePaused.value = true
     try {
       const { root } = await open({ kind: 'folder', bucket: 'reef', nodeId: null, key: 'a/', option: 'delete-permanently' })
       expect(content(root)).toContain('job paused 3 of 10')
       await click(button(root, 'job paused'))
       expect(purgeControl).toHaveBeenCalledWith('abort', expect.anything())
     } finally {
+      purgePaused.value = false
       purgeStatus.value = null
     }
+  })
+
+  it('waits for the storage check and blocks while it is pending', async () => {
+    let answer: (value: unknown) => void = () => {}
+    getDeleteImpact.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+    const { root } = await open({ kind: 'folder', bucket: 'reef', nodeId: null, key: 'raw/', option: 'delete-permanently' })
+    await typeValue(element(root, (node) => node.tag === 'input' && node.props.type !== 'radio'), 'raw')
+    expect(content(root)).toContain('Checking what is deleted in your storage…')
+    expect(confirmButton(root).props.disabled).toBe(true)
+    answer(IMPACT)
+    await flush()
+    expect(confirmButton(root).props.disabled).toBe(false)
+  })
+
+  it('says a failed storage check failed and blocks the delete', async () => {
+    getDeleteImpact.mockRejectedValueOnce(Object.assign(new Error('boom'), { status: 500 }))
+    const { root } = await open({ kind: 'folder', bucket: 'reef', nodeId: null, key: 'raw/', option: 'delete-permanently' })
+    await typeValue(element(root, (node) => node.tag === 'input' && node.props.type !== 'radio'), 'raw')
+    expect(content(root)).toContain('Could not check what is deleted in your storage. Nothing is deleted yet.')
+    expect(confirmButton(root).props.disabled).toBe(true)
+    getDeleteImpact.mockResolvedValueOnce(IMPACT)
+    await click(button(root, 'Try again'))
+    expect(content(root)).toContain('This cannot be undone.')
+    expect(confirmButton(root).props.disabled).toBe(false)
+  })
+
+  it('drops the storage warning when another outcome is chosen and ignores its late answer', async () => {
+    let answer: (value: unknown) => void = () => {}
+    getDeleteImpact.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+    const { root } = await open({ kind: 'folder', bucket: 'reef', nodeId: null, key: 'raw/' })
+    await choose(root, 'delete-permanently')
+    await choose(root, 'delete')
+    answer(IMPACT)
+    await flush()
+    expect(content(root)).not.toContain('This cannot be undone.')
+    expect(content(root)).not.toContain('Checking what is deleted')
+  })
+
+  it('does not delete or control a delete while offline', async () => {
+    getDeleteImpact.mockResolvedValueOnce(IMPACT)
+    offline.value = true
+    try {
+      const { root } = await open({ kind: 'folder', bucket: 'reef', nodeId: null, key: 'raw/', option: 'delete-permanently' })
+      await typeValue(element(root, (node) => node.tag === 'input' && node.props.type !== 'radio'), 'raw')
+      expect(confirmButton(root).props.disabled).toBe(true)
+    } finally {
+      offline.value = false
+    }
+  })
+
+  it('sends the storage flag to a remote bucket when the node can size it', async () => {
+    getDeleteImpact.mockResolvedValueOnce(IMPACT)
+    removeBucket.mockClear()
+    const { root } = await open({ kind: 'bucket', bucket: 'reef', nodeId: 'node-far', option: 'delete-permanently' })
+    await typeValue(element(root, (node) => node.tag === 'input' && node.props.type !== 'radio'), 'reef')
+    await click(confirmButton(root))
+    expect(removeBucket).toHaveBeenCalledWith('node-far', 'reef', expect.anything(), true)
   })
 
   it('leaves the box out when the node cannot size the delete', async () => {
@@ -683,7 +775,7 @@ describe('delete dialog for a bucket on another node', () => {
     await typeValue(field, 'reef')
     await click(button(root, 'Delete permanently'))
 
-    expect(removeBucket).toHaveBeenCalledWith('node-far', 'reef', expect.anything())
+    expect(removeBucket).toHaveBeenCalledWith('node-far', 'reef', expect.anything(), false)
     expect(purgeRun).not.toHaveBeenCalled()
     expect(completed).toEqual([expect.objectContaining({ committed: ['reef'] })])
   })

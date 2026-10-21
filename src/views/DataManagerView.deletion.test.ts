@@ -315,7 +315,7 @@ describe('Data Manager explicit multi-file deletion', () => {
     expect(functionSource(selectionSource, 'loadScopes')).toContain('getStorageDeletionPreflight(')
     expect(selectionSource).toContain("createStoragePurgeOperation({ kind: 'file', bucket, key }, undefined, { deleteStorageFiles: true })")
     expect(functionSource(selectionSource, 'purgeKeys')).toContain('runScope(')
-    expect(functionSource(selectionSource, 'runScope')).toContain('startStoragePurge(')
+    expect(functionSource(selectionSource, 'trackScope')).toContain('startStoragePurge(')
     expect(functionSource(objectBrowser.script, 'deleteFolder')).not.toContain('selectedObjectKeys')
     // One destructive entry per row: the Bomb icon and its twin are gone.
     expect(objectBrowserSource).not.toContain('Bomb')
@@ -528,7 +528,11 @@ const deleteDialogComponent = compileClientComponent(
     '@/components/groups/bucketRemoval': { removeBucket: vi.fn() },
     '@/composables/s3/endpoints': { nodeApiBase: () => null },
     '@/composables/usePortalFeatures': { usePortalFeatures: () => ({ shown: () => true }) },
-    '@/composables/useAruna': { useAruna: () => ({ authToken: ref('token'), sessionEpoch: ref(1) }) },
+    '@/composables/useAruna': {
+      isUnsupportedEndpoint: () => false,
+      useAruna: () => ({ authToken: ref('token'), sessionEpoch: ref(1) }),
+    },
+    '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled: ref(false) }) },
     '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: (id: string) => id }) },
     '@/composables/useStagingReferences': {
       useStagingReferences: () => ({ entries: ref([]), status: ref('loaded'), error: ref(null) }),

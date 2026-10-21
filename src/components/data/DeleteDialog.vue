@@ -28,7 +28,8 @@ import { removeBucket } from '@/components/groups/bucketRemoval'
 import { getDeleteImpact, type DeleteImpact, type DeleteScope } from '@/lib/api'
 import { organizeError, type ProgressJob } from '@/lib/organize'
 import { nodeApiBase } from '@/composables/s3/endpoints'
-import { useAruna } from '@/composables/useAruna'
+import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
+import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useStagingReferences } from '@/composables/useStagingReferences'
 import { s3ErrorMessage, useS3 } from '@/composables/useS3'
@@ -61,6 +62,7 @@ const emit = defineEmits<{
 }>()
 
 const s3 = useS3()
+const { writesDisabled } = useConnectivity()
 const { authToken, sessionEpoch } = useAruna()
 const realmNodes = useRealmNodes()
 const preflightState = useDeletionPreflight()
@@ -72,6 +74,8 @@ const preflightBusy = ref(false)
 // What a permanent delete removes in storage too; null when the node cannot say.
 const impact = ref<DeleteImpact | null>(null)
 const impactScope = ref<DeleteScope | null>(null)
+// pending: asked; failed: could not be read; missing: this node has no storage deletion.
+const impactState = ref<'idle' | 'pending' | 'failed' | 'missing' | 'ready'>('idle')
 const remaining = ref<StorageDeletionPreflight | null>(null)
 const remainingBusy = ref(false)
 const remainingMissing = ref(false)
@@ -186,7 +190,10 @@ const title = computed(() => {
   if (selected.value?.id === 'restore') return 'Restore this object'
   return `Delete ${requestNoun(current)}`
 })
-const typedTarget = computed(() => (request.value ? requestName(request.value) : ''))
+// A selection has no single name, so the bucket name is the one to type.
+const typedTarget = computed(() =>
+  request.value ? (isSelection.value ? request.value.bucket : requestName(request.value)) : '',
+)
 const typedOk = computed(
   () => selected.value?.tier !== 'typed-name' || typedName.value.trim() === typedTarget.value,
 )
@@ -255,6 +262,7 @@ function reset() {
   preflight.value = null
   impact.value = null
   impactScope.value = null
+  impactState.value = 'idle'
   preflightBusy.value = false
   remaining.value = null
   remainingBusy.value = false
@@ -303,7 +311,7 @@ const purgeJob = computed<ProgressJob | null>(() => {
   const total = purge.progress.value?.total
   return {
     kind: 'purge',
-    state: status.state === 'paused' ? 'paused' : 'running',
+    state: purge.paused.value || status.state === 'paused' ? 'paused' : 'running',
     done: purge.progress.value?.current ?? 0,
     total: total ?? 0,
     counted: total !== undefined,
@@ -320,43 +328,51 @@ const selectionJob = computed<ProgressJob | null>(() => {
   const finishedCount = result ? result.committed.length + result.failed.length + result.unknown.length : 0
   return {
     kind: 'purge',
-    state: 'running',
+    state: selection.paused.value ? 'paused' : 'running',
     done: finishedCount,
     total: ids.value.length,
     counted: true,
     skipped: 0,
     failed: result?.failed.length ?? 0,
-    controls: false,
+    controls: true,
   }
 })
 
 async function controlPurge(action: 'pause' | 'resume' | 'abort') {
   const client = apiClient()
-  if (!client) return
+  if (!client || writesDisabled.value) return
   try {
-    await purge.control(action, client)
+    if (isSelection.value) await selection.controlAll(action, client)
+    else await purge.control(action, client)
   } catch (caught) {
     error.value = organizeError(caught)
   }
 }
 
-// Older nodes answer 404 or fail; the box is then left out and the delete goes on as before.
+// The answer counts only for the outcome that asked: another outcome clears it.
 async function loadImpact() {
   const target = scope.value
   const client = apiClient()
-  if (!target || !client || impact.value) return
+  if (!target || !client) {
+    impactState.value = 'missing'
+    return
+  }
   const id = requestId
+  const key = outcomeKey.value
+  impact.value = null
+  impactState.value = 'pending'
   const kind = target.kind === 'prefix' ? 'folder' : target.kind
-  const key = target.kind === 'file' ? target.key : target.kind === 'prefix' ? target.prefix : ''
+  const path = target.kind === 'file' ? target.key : target.kind === 'prefix' ? target.prefix : ''
+  const asked = { kind, bucket: target.bucket, key: path } as const
   try {
-    const asked = { kind, bucket: target.bucket, key } as const
     const found = await getDeleteImpact(asked, client)
-    if (id === requestId) {
-      impactScope.value = asked
-      impact.value = found
-    }
-  } catch {
-    if (id === requestId) impact.value = null
+    if (id !== requestId || key !== outcomeKey.value) return
+    impactScope.value = asked
+    impact.value = found
+    impactState.value = 'ready'
+  } catch (caught) {
+    if (id !== requestId || key !== outcomeKey.value) return
+    impactState.value = isUnsupportedEndpoint(caught) ? 'missing' : 'failed'
   }
 }
 
@@ -418,7 +434,8 @@ watch(
         ? 'all_versions_purge'
         : 'latest_version_tombstone',
     )
-    if ((id === 'delete-permanently' || id === 'delete-bucket') && !isSelection.value) void loadImpact()
+    if (id !== 'delete-permanently') impactState.value = 'idle'
+    else if (!isSelection.value) void loadImpact()
     if (id === 'delete-permanently' && isSelection.value && !tooMany.value) {
       void selection.loadScopes(
         current.bucket,
@@ -462,14 +479,18 @@ async function runPurge(current: DeleteRequest): Promise<string[]> {
     return selection.outcome.value?.committed ?? []
   }
   if (remoteBucket.value && current.nodeId) {
-    await removeBucket(current.nodeId, current.bucket, purge)
+    await removeBucket(current.nodeId, current.bucket, purge, impactState.value !== 'missing')
     if (id !== requestId) return []
     await refreshRemaining(client)
     return [current.bucket]
   }
   const target = scope.value
   if (!target) throw new Error('This target has no permanent deletion scope.')
-  const storage = { deleteStorageFiles: true, confirm: target.kind === 'bucket' ? target.bucket : undefined }
+  // A node without the storage preview has no storage deletion either, so it gets the plain job.
+  const storage =
+    impactState.value === 'missing'
+      ? undefined
+      : { deleteStorageFiles: true, confirm: target.kind === 'bucket' ? target.bucket : undefined }
   const status = await purge.run(createStoragePurgeOperation(target, undefined, storage), client)
   if (id !== requestId) return []
   await refreshRemaining(client)
@@ -538,10 +559,18 @@ const showConfirm = computed(
   () => Boolean(selected.value) && (!finished.value || unresolved.value > 0 || Boolean(error.value)),
 )
 
+// The storage part of a permanent delete is never started unseen: wait for it, or say it failed.
+const physicalDelete = computed(() => selected.value?.id === 'delete-permanently' && !isSelection.value)
+const impactBlocked = computed(
+  () => physicalDelete.value && (impactState.value === 'pending' || impactState.value === 'failed'),
+)
+
 // Every outcome that removes one version needs to know which one.
 const confirmBlocked = computed(
   () =>
     Boolean(selected.value?.disabledReason)
+    || writesDisabled.value
+    || impactBlocked.value
     || !typedOk.value
     || (selected.value?.call.operation === 'delete-version' && !targetVersionId.value),
 )
@@ -649,13 +678,34 @@ onUnmounted(() => {
         />
         <p v-if="versionConsequence" class="text-muted-foreground">{{ versionConsequence }}</p>
 
-        <PermanentDeleteImpact
-          v-if="impact && impactScope && !finished"
-          :impact="impact"
-          :scope="impactScope"
-          :client="apiClient()!"
-          :label="`${requestNoun(request)} ${typedTarget}`"
-        />
+        <template v-if="selected?.id === 'delete-permanently' && !finished">
+          <PermanentDeleteImpact
+            v-if="impactState === 'ready' && impact && impactScope"
+            :impact="impact"
+            :scope="impactScope"
+            :client="apiClient()!"
+            :label="`${requestNoun(request)} ${typedTarget}`"
+          />
+          <p v-else-if="impactState === 'pending'" class="text-muted-foreground">
+            Checking what is deleted in your storage…
+          </p>
+          <div v-else-if="impactState === 'failed'" class="flex items-center gap-2 text-destructive">
+            <span>Could not check what is deleted in your storage. Nothing is deleted yet.</span>
+            <Button variant="outline" size="sm" @click="loadImpact">Try again</Button>
+          </div>
+          <div
+            v-else-if="isSelection"
+            class="space-y-1 rounded-md border border-destructive/30 bg-destructive/5 px-3.5 py-3 text-xs"
+            data-testid="selection-storage-note"
+          >
+            <p class="text-sm font-semibold text-destructive">Delete the selection permanently</p>
+            <p class="text-foreground">
+              This also deletes the files these entries hold in your storage. Files that other links or files
+              still use stay.
+            </p>
+            <p class="font-medium text-destructive">This cannot be undone.</p>
+          </div>
+        </template>
 
         <DeletionImpact
           :preflight="preflight"
@@ -706,7 +756,12 @@ onUnmounted(() => {
           </div>
         </section>
 
-        <JobProgress v-if="purgeJob ?? selectionJob" :job="(purgeJob ?? selectionJob)!" @control="controlPurge" />
+        <JobProgress
+          v-if="purgeJob ?? selectionJob"
+          :job="(purgeJob ?? selectionJob)!"
+          :busy="writesDisabled"
+          @control="controlPurge"
+        />
 
         <PurgeProgress
           :submission="purge.submission.value"
@@ -746,6 +801,7 @@ onUnmounted(() => {
           v-if="showConfirm && selected"
           variant="destructive"
           :disabled="busy || confirmBlocked"
+          :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
           @click="confirm"
         >
           {{ busy ? 'Working…' : retrying ? 'Try again' : selected.label }}
