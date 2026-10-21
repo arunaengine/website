@@ -1,6 +1,7 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h } from 'vue'
 import { describe, expect, it } from 'vitest'
+import * as StorageRules from '@/lib/storageRules'
 import { compileClientComponent, content, mountApp, moduleDefault } from '@/test/clientRender'
 
 const Slot = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
@@ -10,6 +11,7 @@ function stub(name: string) {
 
 const Organize = compileClientComponent(new URL('./OrganizeDialog.vue', import.meta.url), {
   vue: VueRuntime,
+  '@/lib/storageRules': StorageRules,
   '@/components/ui/Dialog.vue': moduleDefault(Slot),
   '@/components/ui/DialogContent.vue': moduleDefault(Slot),
   '@/components/ui/DialogHeader.vue': moduleDefault(Slot),
@@ -35,11 +37,18 @@ async function mount(props: Record<string, unknown>) {
 describe('OrganizeDialog', () => {
   it('shows the three steps', async () => {
     const text = content(await mount({}))
-    expect(text).toContain('Organize genomes/')
+    expect(text).toContain('Organize reef / genomes/')
     expect(text).toContain('Where new files go')
     expect(text).toContain('Move existing files')
     expect(text).toContain('Tidy your storage')
     expect(text).not.toContain('running job')
+  })
+
+  it('tells two folders of one name in different buckets apart', async () => {
+    const a = content(await mount({ link: { ...LINK, bucket: 'reef', key_prefix: 'raw/' } }))
+    const b = content(await mount({ link: { ...LINK, bucket: 'survey', key_prefix: 'raw/' } }))
+    expect(a).toContain('Organize reef / raw/')
+    expect(b).toContain('Organize survey / raw/')
   })
 
   it('leaves out moving files on a node without the routes', async () => {

@@ -12,6 +12,7 @@ import TidyStep from '@/components/storage/TidyStep.vue'
 import Notice from '@/components/ui/Notice.vue'
 import type { BackendImport, BackendImportRenames } from '@/lib/api'
 import type { ProgressJob } from '@/lib/organize'
+import { arunaPlace } from '@/lib/storageRules'
 
 defineProps<{
   open: boolean
@@ -38,7 +39,7 @@ const emit = defineEmits<{
   <Dialog :open="open" @update:open="(v: boolean) => emit('update:open', v)">
     <DialogContent class="max-w-3xl">
       <DialogHeader>
-        <DialogTitle>Organize {{ link?.key_prefix || link?.bucket }}</DialogTitle>
+        <DialogTitle>Organize {{ link ? arunaPlace(link) : '' }}</DialogTitle>
         <DialogDescription>Nothing changes until you start a step. Each step shows what it will do first.</DialogDescription>
       </DialogHeader>
 
