@@ -622,7 +622,10 @@ async function submit() {
               </Button>
             </div>
 
-            <Notice>Aruna never deletes files from your storage{{ offerRename ? ', except old names you rename' : '' }}.</Notice>
+            <Notice>
+              Moving files does not rename or delete them in your storage.
+              <template v-if="offerRename">Old names are removed only when you choose Rename files.</template>
+            </Notice>
           </fieldset>
           <p v-if="conflict" class="text-xs text-destructive">{{ conflict }}</p>
           <Notice v-if="submitError" tone="error">{{ submitError }}</Notice>

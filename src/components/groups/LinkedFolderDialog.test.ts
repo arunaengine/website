@@ -354,6 +354,14 @@ describe('LinkedFolderDialog', () => {
     mounted.app.unmount()
   })
 
+  it('says a move does not rename or delete', async () => {
+    const mounted = await mount(STORED, { movable: true })
+    const text = content(mounted.root)
+    expect(text).toContain('Moving files does not rename or delete them in your storage.')
+    expect(text).not.toContain('never deletes')
+    mounted.app.unmount()
+  })
+
   it('asks the node to move existing files of a new link', async () => {
     createBackendImport.mockResolvedValue({ ...STORED, import_id: 'new' })
     runBackendImport.mockResolvedValue({ job_id: 'j' })
