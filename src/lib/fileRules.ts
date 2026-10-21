@@ -5,7 +5,7 @@ export const OUTCOME_WORDS: Record<FileRulePreview['outcome'], string> = {
   known: 'Kept',
   matched: 'Sorted',
   root: 'Stays',
-  conflict: 'Two rules',
+  conflict: 'Conflict',
 }
 
 /** The rules worth sending: blank rows dropped, a folder ending with `/`. */

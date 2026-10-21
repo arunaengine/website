@@ -175,8 +175,8 @@ async function save() {
 
         <template v-if="previewed">
           <p class="text-xs text-foreground">
-            {{ counts.matched }} sorted, {{ counts.unmatched }} stay<template v-if="counts.conflicts">,
-              {{ counts.conflicts }} match two names and are skipped</template>.
+            <template v-if="next">Shown so far: </template>{{ counts.matched }} sorted, {{ counts.unmatched }} stay<template v-if="counts.conflicts">,
+              {{ counts.conflicts }} conflict and are skipped</template>.
           </p>
           <ul class="divide-y divide-border rounded-md border border-border text-xs">
             <li v-for="file in files" :key="file.path" class="flex items-center gap-2 px-3 py-1.5">

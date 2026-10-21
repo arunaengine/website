@@ -144,4 +144,15 @@ describe('FileRulesDialog', () => {
     expect(button(root, 'Show where files go').props.disabled).toBe(true)
     expect(button(root, 'Save').props.disabled).toBe(true)
   })
+
+  it('calls counts partial while more files wait', async () => {
+    previewFileRules.mockResolvedValueOnce({ ...PAGE, next: 'n1' })
+    const { root } = await mount()
+    await click(button(root, 'Show where files go'))
+    expect(content(root)).toContain('Shown so far: 1 sorted')
+
+    previewFileRules.mockResolvedValueOnce({ files: [], next: null })
+    await click(button(root, 'Show more'))
+    expect(content(root)).not.toContain('Shown so far')
+  })
 })

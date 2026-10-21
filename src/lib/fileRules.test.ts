@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canRename, cleanRules, folderValue, previewCounts, ruleProblem } from '@/lib/fileRules'
+import { canRename, cleanRules, folderValue, OUTCOME_WORDS, previewCounts, ruleProblem } from '@/lib/fileRules'
 
 describe('file rules', () => {
   it('cleans rules before saving', () => {
@@ -36,6 +36,10 @@ describe('file rules', () => {
       { path: 'x.gz', outcome: 'conflict', patterns: ['*.gz', 'x.*'] },
     ])
     expect(counts).toEqual({ matched: 1, unmatched: 2, conflicts: 1 })
+  })
+
+  it('names a conflict without counting rules', () => {
+    expect(OUTCOME_WORDS.conflict).toBe('Conflict')
   })
 
   it('writes folders the node accepts', () => {
