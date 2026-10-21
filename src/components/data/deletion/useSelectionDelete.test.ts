@@ -1,3 +1,4 @@
+import { effectScope } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 
 const startStoragePurge = vi.fn()
@@ -95,48 +96,72 @@ describe('selection purge', () => {
     await selection.loadScopes('reef', { keys: ['a'], prefixes: [] }, CLIENT)
     void selection.purgeKeys(['a'], CLIENT, ['a'])
     await new Promise((resolve) => setTimeout(resolve, 0))
-    await expect(selection.controlAll('pause', CLIENT)).rejects.toThrow('refused')
+    await selection.controlAll('pause', CLIENT)
+    expect(selection.controlError.value).toBe('refused')
     expect(selection.paused.value).toBe(false)
   })
 
-  it('aborts jobs the node accepts after Abort was pressed', async () => {
+  const later = () => new Promise((resolve) => setTimeout(resolve, 0))
+  const jobFor = async (operation: { scope: { key: string } }) => ({ job_id: operation.scope.key })
+
+  it('offers no controls until every start request has settled', async () => {
     getStorageDeletionPreflight.mockResolvedValue(OPEN)
     controlStoragePurge.mockReset().mockResolvedValue(undefined)
     let acceptB: (value: unknown) => void = () => {}
     startStoragePurge.mockImplementation((operation: { scope: { key: string } }) =>
-      operation.scope.key === 'b'
-        ? new Promise((resolve) => (acceptB = resolve))
-        : Promise.resolve({ job_id: operation.scope.key }),
+      operation.scope.key === 'b' ? new Promise((resolve) => (acceptB = resolve)) : jobFor(operation),
     )
-    getStoragePurgeJob.mockReturnValue(new Promise(() => {}))
-    const selection = useSelectionDelete()
-    await selection.loadScopes('reef', { keys: ['a', 'b', 'c'], prefixes: [] }, CLIENT)
-    void selection.purgeKeys(['a', 'b', 'c'], CLIENT, ['a', 'b', 'c'])
-    await new Promise((resolve) => setTimeout(resolve, 0))
-    await selection.controlAll('abort', CLIENT)
-    expect(controlStoragePurge.mock.calls.map((call) => [call[0], call[1]])).toEqual([['a', 'abort'], ['c', 'abort']])
-    acceptB({ job_id: 'b' })
-    await new Promise((resolve) => setTimeout(resolve, 0))
-    expect(controlStoragePurge).toHaveBeenLastCalledWith('b', 'abort', CLIENT)
-  })
-
-  it('keeps Resume for the jobs a partial pause reached', async () => {
-    getStorageDeletionPreflight.mockResolvedValue(OPEN)
-    startStoragePurge.mockImplementation(async (operation: { scope: { key: string } }) => ({ job_id: operation.scope.key }))
-    controlStoragePurge.mockReset().mockImplementation(async (jobId: string, action: string) => {
-      if (jobId === 'b' && action === 'pause') throw new Error('refused')
-    })
-    getStoragePurgeJob.mockReturnValue(new Promise(() => {}))
+    getStoragePurgeJob.mockReset().mockReturnValue(new Promise(() => {}))
     const selection = useSelectionDelete()
     await selection.loadScopes('reef', { keys: ['a', 'b'], prefixes: [] }, CLIENT)
     void selection.purgeKeys(['a', 'b'], CLIENT, ['a', 'b'])
-    await new Promise((resolve) => setTimeout(resolve, 0))
-    await expect(selection.controlAll('pause', CLIENT)).rejects.toThrow('refused')
+    await later()
+    expect(selection.starting.value).toBe(true)
+    await selection.controlAll('abort', CLIENT)
+    expect(controlStoragePurge).not.toHaveBeenCalled()
+    acceptB({ job_id: 'b' })
+    await later()
+    expect(selection.starting.value).toBe(false)
+    await selection.controlAll('abort', CLIENT)
+    expect(controlStoragePurge.mock.calls.map((call) => [call[0], call[1]])).toEqual([['a', 'abort'], ['b', 'abort']])
+  })
+
+  it('keeps Resume for the jobs a partial pause reached and the refusal as a control error', async () => {
+    getStorageDeletionPreflight.mockResolvedValue(OPEN)
+    startStoragePurge.mockImplementation(jobFor)
+    controlStoragePurge.mockReset().mockImplementation(async (jobId: string, action: string) => {
+      if (jobId === 'b' && action === 'pause') throw new Error('refused')
+    })
+    getStoragePurgeJob.mockReset().mockReturnValue(new Promise(() => {}))
+    const selection = useSelectionDelete()
+    await selection.loadScopes('reef', { keys: ['a', 'b'], prefixes: [] }, CLIENT)
+    void selection.purgeKeys(['a', 'b'], CLIENT, ['a', 'b'])
+    await later()
+    await selection.controlAll('pause', CLIENT)
+    expect(selection.controlError.value).toBe('refused')
     expect(selection.paused.value).toBe(true)
     controlStoragePurge.mockClear()
     await selection.controlAll('resume', CLIENT)
     expect(controlStoragePurge.mock.calls.map((call) => [call[0], call[1]])).toEqual([['a', 'resume']])
     expect(selection.paused.value).toBe(false)
+    expect(selection.controlError.value).toBeNull()
+  })
+
+  it('keeps a control refusal when a later poll works', async () => {
+    getStorageDeletionPreflight.mockResolvedValue(OPEN)
+    startStoragePurge.mockImplementation(jobFor)
+    controlStoragePurge.mockReset().mockRejectedValue(new Error('abort refused'))
+    getStoragePurgeJob.mockReset().mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ kind: 'storage_purge', state: 'running' })
+    const selection = useSelectionDelete()
+    await selection.loadScopes('reef', { keys: ['a'], prefixes: [] }, CLIENT)
+    void selection.purgeKeys(['a'], CLIENT, ['a'])
+    await later()
+    expect(selection.pollError.value).toBe('offline')
+    await selection.controlAll('abort', CLIENT)
+    expect(selection.controlError.value).toBe('abort refused')
+    await new Promise((resolve) => setTimeout(resolve, 1100))
+    expect(selection.pollError.value).toBeNull()
+    expect(selection.controlError.value).toBe('abort refused')
   })
 
   it('keeps the controls and shows the error when a poll fails', async () => {
@@ -147,10 +172,54 @@ describe('selection purge', () => {
     const selection = useSelectionDelete()
     await selection.loadScopes('reef', { keys: ['a'], prefixes: [] }, CLIENT)
     void selection.purgeKeys(['a'], CLIENT, ['a'])
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await later()
     expect(selection.pollError.value).toBe('offline')
     expect(selection.outcome.value).toBeNull()
     await selection.controlAll('abort', CLIENT)
     expect(controlStoragePurge).toHaveBeenCalledWith('a', 'abort', CLIENT)
+  })
+
+  it('stops polling when it is disposed', async () => {
+    vi.useFakeTimers()
+    try {
+      getStorageDeletionPreflight.mockResolvedValue(OPEN)
+      startStoragePurge.mockResolvedValue({ job_id: 'a' })
+      getStoragePurgeJob.mockReset().mockRejectedValue(new Error('offline'))
+      const scope = effectScope()
+      const selection = scope.run(() => useSelectionDelete())!
+      await selection.loadScopes('reef', { keys: ['a'], prefixes: [] }, CLIENT)
+      const running = selection.purgeKeys(['a'], CLIENT, ['a'])
+      await vi.advanceTimersByTimeAsync(2500)
+      const calls = getStoragePurgeJob.mock.calls.length
+      expect(calls).toBeGreaterThan(1)
+      scope.stop()
+      await vi.advanceTimersByTimeAsync(5000)
+      await running
+      expect(getStoragePurgeJob.mock.calls.length).toBeLessThanOrEqual(calls + 1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('starts clean for a retry after an abort', async () => {
+    getStorageDeletionPreflight.mockResolvedValue(OPEN)
+    startStoragePurge.mockReset().mockImplementation(jobFor)
+    controlStoragePurge.mockReset().mockResolvedValue(undefined)
+    getStoragePurgeJob.mockReset().mockResolvedValueOnce({ kind: 'storage_purge', state: 'running' })
+    getStoragePurgeJob.mockResolvedValue({ kind: 'storage_purge', state: 'cancelled' })
+    const selection = useSelectionDelete()
+    await selection.loadScopes('reef', { keys: ['a'], prefixes: [] }, CLIENT)
+    const first = selection.purgeKeys(['a'], CLIENT, ['a'])
+    await later()
+    await selection.controlAll('abort', CLIENT)
+    await first
+    expect(selection.outcome.value?.failed).toHaveLength(1)
+
+    getStoragePurgeJob.mockReset().mockResolvedValue({ kind: 'storage_purge', state: 'succeeded' })
+    await selection.purgeKeys(['a'], CLIENT, ['a'])
+    expect(startStoragePurge).toHaveBeenCalledTimes(2)
+    expect(selection.outcome.value?.committed).toEqual(['a'])
+    expect(selection.controlError.value).toBeNull()
+    expect(selection.starting.value).toBe(false)
   })
 })

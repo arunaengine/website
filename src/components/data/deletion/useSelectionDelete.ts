@@ -3,7 +3,7 @@
 // count as done and a transport that answered nothing stays "unknown" rather
 // than "failed". A folder is identified by its prefix and deleted through the
 // same prefix walk the single-folder control uses.
-import { computed, ref } from 'vue'
+import { computed, getCurrentScope, onScopeDispose, ref } from 'vue'
 import { isS3NetworkError, s3ErrorMessage, useS3 } from '@/composables/useS3'
 import type { DeletePrefixResult } from '@/composables/s3/objects'
 import type { ApiClientOptions } from '@/lib/api'
@@ -83,20 +83,28 @@ export function useSelectionDelete() {
   // Jobs whose pause the node accepted; Resume reaches exactly these.
   const pausedJobs = ref<Record<string, string>>({})
   const paused = computed(() => Object.keys(pausedJobs.value).length > 0)
-  // What the user asked last, applied to jobs the node accepts after the request.
-  let wanted: 'run' | 'pause' | 'abort' = 'run'
+  // Start requests not yet answered. Until all are, there is no job list to control.
+  const startsPending = ref(0)
+  const starting = computed(() => startsPending.value > 0)
   const pollError = ref<string | null>(null)
+  const controlError = ref<string | null>(null)
   let runId = 0
+
+  // Each purge invocation starts with no jobs, pauses or errors of an earlier one.
+  function resetTracking() {
+    activeJobs.value = {}
+    pausedJobs.value = {}
+    startsPending.value = 0
+    pollError.value = null
+    controlError.value = null
+  }
 
   function reset() {
     ++runId
     outcome.value = null
     scopes.value = []
     scopesBusy.value = false
-    activeJobs.value = {}
-    pausedJobs.value = {}
-    pollError.value = null
-    wanted = 'run'
+    resetTracking()
   }
 
   const inventory = computed(() => {
@@ -280,29 +288,16 @@ export function useSelectionDelete() {
     return result
   }
 
-  // A job the node accepts after Pause or Abort was pressed gets the same request.
-  async function applyWanted(scope: PurgeScope, jobId: string, client: ApiClientOptions) {
-    if (wanted === 'run') return
-    try {
-      await controlStoragePurge(jobId, wanted, client)
-      if (wanted === 'pause') pausedJobs.value = { ...pausedJobs.value, [scope.key]: jobId }
-    } catch (error) {
-      pollError.value = storageDeletionErrorMessage(error)
-    }
-  }
-
   async function trackScope(scope: PurgeScope, client: ApiClientOptions, id: number): Promise<KeyResult> {
-    if (wanted === 'abort') {
-      return { key: scope.key, status: 'failed', message: 'The permanent deletion was aborted before it started.' }
-    }
     let jobId: string
     try {
       jobId = (await startStoragePurge(scope.operation, client)).job_id
     } catch (error) {
+      startsPending.value--
       return { key: scope.key, status: failureStatus(error), message: storageDeletionErrorMessage(error) }
     }
     activeJobs.value = { ...activeJobs.value, [scope.key]: jobId }
-    await applyWanted(scope, jobId, client)
+    startsPending.value--
     for (;;) {
       if (id !== runId) {
         return { key: scope.key, status: 'unknown', message: 'The result of this permanent deletion is no longer being tracked.' }
@@ -330,11 +325,13 @@ export function useSelectionDelete() {
   }
 
   /**
-   * Pauses, resumes or aborts the jobs still running, and the ones the node accepts later.
-   * Every success is kept, so a partial pause still offers Resume; the first refusal is reported.
+   * Pauses, resumes or aborts the jobs the node has accepted. It does nothing while starts are
+   * pending. Every success is kept, so a partial pause still offers Resume; a refusal is kept
+   * in `controlError`, apart from polling errors.
    */
   async function controlAll(action: 'pause' | 'resume' | 'abort', client: ApiClientOptions) {
-    wanted = action === 'resume' ? 'run' : action
+    if (starting.value) return
+    controlError.value = null
     const targets = Object.entries(action === 'resume' ? pausedJobs.value : activeJobs.value)
     const settled = await Promise.allSettled(
       targets.map(([, jobId]) => controlStoragePurge(jobId, action, client)),
@@ -348,7 +345,7 @@ export function useSelectionDelete() {
     })
     pausedJobs.value = next
     const refused = settled.find((result) => result.status === 'rejected')
-    if (refused?.status === 'rejected') throw refused.reason
+    if (refused?.status === 'rejected') controlError.value = storageDeletionErrorMessage(refused.reason)
   }
 
   async function purgeKeys(ids: string[], client: ApiClientOptions | null, all: string[]) {
@@ -363,6 +360,8 @@ export function useSelectionDelete() {
       )
       return
     }
+    resetTracking()
+    startsPending.value = ids.length
     const id = runId
     const byKey = new Map(scopes.value.map((scope) => [scope.key, scope]))
     for (let offset = 0; offset < ids.length; offset += BATCH_SIZE) {
@@ -371,6 +370,7 @@ export function useSelectionDelete() {
       await Promise.all(
         batch.map(async (key) => {
           const scope = byKey.get(key)
+          if (!scope) startsPending.value--
           const result = scope
             ? await runScope(scope, client, id)
             : ({
@@ -384,6 +384,9 @@ export function useSelectionDelete() {
       if (id !== runId) return
     }
   }
+
+  // A closed dialog stops the polling of jobs it still tracks.
+  if (getCurrentScope()) onScopeDispose(() => ++runId)
 
   return {
     outcome,
@@ -401,6 +404,8 @@ export function useSelectionDelete() {
     purgeKeys,
     paused,
     pollError,
+    controlError,
+    starting,
     controlAll,
   }
 }

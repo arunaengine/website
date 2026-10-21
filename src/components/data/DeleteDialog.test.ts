@@ -220,6 +220,8 @@ function dialogModules(overrides: Record<string, unknown> = {}) {
       purgeKeys: async () => {},
       paused: ref(false),
       pollError: ref(null),
+      controlError: ref(null),
+      starting: ref(false),
       controlAll: async () => {},
     }),
   },
@@ -625,6 +627,19 @@ describe('delete dialog', () => {
     expect(getDeleteImpact).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), { filter: '', limit: 100, after: null })
     expect(() => button(root, 'filter x')).toThrow()
     expect(content(root)).toContain('a/x.txt')
+  })
+
+  it('keeps the filter and shows the error when the fallback fails too', async () => {
+    const page = { ...IMPACT, items: [{ key: 'a/x.txt', version_id: 'v1', bytes: 1 }] }
+    getDeleteImpact.mockResolvedValueOnce(IMPACT).mockResolvedValueOnce(page)
+    const { root } = await open({ kind: 'folder', bucket: 'reef', nodeId: null, key: 'a/', option: 'delete-permanently' })
+    await click(button(root, 'Show files'))
+    getDeleteImpact
+      .mockRejectedValueOnce(Object.assign(new Error('gone'), { status: 404 }))
+      .mockRejectedValueOnce(Object.assign(new Error('bucket gone'), { status: 404 }))
+    await click(button(root, 'filter x'))
+    expect(content(root)).toContain('bucket gone')
+    expect(button(root, 'filter x')).toBeTruthy()
   })
 
   it('words kept storage files carefully while the page is not complete', async () => {

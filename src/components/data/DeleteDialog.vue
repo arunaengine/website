@@ -334,7 +334,7 @@ const selectionJob = computed<ProgressJob | null>(() => {
     counted: true,
     skipped: 0,
     failed: result?.failed.length ?? 0,
-    controls: true,
+    controls: !selection.starting.value,
   }
 })
 
@@ -762,6 +762,8 @@ onUnmounted(() => {
           :busy="writesDisabled"
           @control="controlPurge"
         />
+        <p v-if="isSelection && selection.starting.value && busy" class="text-muted-foreground">Starting…</p>
+        <p v-if="isSelection && selection.controlError.value" class="text-destructive">{{ selection.controlError.value }}</p>
         <p v-if="isSelection && selection.pollError.value" class="text-destructive">
           {{ selection.pollError.value }} The deletions keep running. Trying again.
         </p>

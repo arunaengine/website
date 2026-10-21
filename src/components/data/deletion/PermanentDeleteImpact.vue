@@ -12,8 +12,11 @@ const props = defineProps<{ impact: DeleteImpact; label: string; scope: DeleteSc
 
 const listed = ref(false)
 // The first page came with the totals; later pages ask the node by cursor.
-// A node that rejects the filter field (400 or 404) is asked without it, and the filter goes away.
+// A node that rejects the filter field (400 or 404) is asked again without it. The filter goes
+// away only when that second request works; any other failure is shown as it is.
 const filterable = ref(true)
+// A 404 here means the bucket or scope is gone, not that the list is missing, so it is shown.
+const shown = (err: unknown) => (err instanceof Error ? new Error(err.message) : err)
 const list = useCursorPage<DeleteItem>(async (query) => {
   const ask = (filter: string) => getDeleteImpact(props.scope, props.client, { ...query, filter })
   let page
@@ -21,9 +24,13 @@ const list = useCursorPage<DeleteItem>(async (query) => {
     page = await ask(filterable.value ? query.filter : '')
   } catch (err) {
     const status = (err as { status?: number }).status
-    if (!query.filter || (status !== 400 && status !== 404)) throw err
+    if (!query.filter || (status !== 400 && status !== 404)) throw shown(err)
+    try {
+      page = await ask('')
+    } catch (second) {
+      throw shown(second)
+    }
     filterable.value = false
-    page = await ask('')
   }
   return { items: page.items, total: page.versions, complete: page.complete, next: page.next }
 })

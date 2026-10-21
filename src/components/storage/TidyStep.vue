@@ -45,18 +45,24 @@ function client() {
 }
 
 const copiesMissing = ref(false)
+const copyAll = ref<{ total: number; bytes: number; complete: boolean } | null>(null)
+// The action works on every copy, so its count comes only from a successful first page without a filter.
 const copies = useCursorPage<DuplicateItem>(
-  (query) => previewDuplicates(props.groupId, props.link.import_id, query, client()),
+  async (query) => {
+    const link = props.link.import_id
+    const page = await previewDuplicates(props.groupId, link, query, client())
+    if (!query.filter && !query.after && link === props.link.import_id) {
+      copyAll.value = { total: page.total, bytes: page.bytes, complete: page.complete }
+    }
+    return page
+  },
   () => (copiesMissing.value = true),
 )
-// The action works on every copy, so its count is the one taken without a name filter.
-const copyAll = ref<{ total: number; bytes: number; complete: boolean } | null>(null)
 
-async function loadCopies() {
-  await copies.load('')
-  const page = copies.page.value as { total: number; bytes?: number; complete: boolean } | null
-  if (page) copyAll.value = { total: page.total, bytes: page.bytes ?? 0, complete: page.complete }
+function loadCopies() {
+  return copies.load('')
 }
+
 const oldNames = useCursorPage<{ from: string; to: string; writable?: boolean }>(async (query) => {
   const found = await getImportRenames(props.groupId, props.link.import_id, client(), query)
   return { items: found.files, total: found.count, complete: found.complete, next: found.next }

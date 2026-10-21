@@ -129,6 +129,20 @@ describe('TidyStep', () => {
     expect(button(root, 'Remove 842 copies')).toBeTruthy()
   })
 
+  it('ignores a failed unfiltered reload and keeps the whole count', async () => {
+    const props = reactive({ groupId: 'g1', link: { import_id: 'i1' }, renames: null, blocked: false, finished: 0 })
+    const mounted = await mountApp(defineComponent(() => () => h(TidyStep, props)))
+    await flush()
+    previewDuplicates.mockResolvedValue({ ...COPIES, total: 2 })
+    await click(button(mounted.root, 'Preview'))
+    await click(button(mounted.root, 'filter x'))
+    previewDuplicates.mockRejectedValue(new Error('offline'))
+    props.finished = 1
+    await flush()
+    expect(button(mounted.root, 'Remove 842 copies')).toBeTruthy()
+    mounted.app.unmount()
+  })
+
   it('looks again when a step ends, even one nobody saw run', async () => {
     const props = reactive({ groupId: 'g1', link: { import_id: 'i1' }, renames: null, blocked: false, finished: 0 })
     const mounted = await mountApp(defineComponent(() => () => h(TidyStep, props)))
