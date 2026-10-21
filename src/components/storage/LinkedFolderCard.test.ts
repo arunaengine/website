@@ -106,6 +106,18 @@ describe('linked folder card', () => {
     expect(content(root)).not.toContain('in sync')
   })
 
+  it('does not list a decision twice as a failure', async () => {
+    const errors = [{ key: 'raw/report.csv', error: 'claimed' }, { key: 'x.csv', error: 'disk full' }]
+    status.value = { conflicts: [{ path: 'raw/report.csv', reason: 'two links' }] }
+    const { root } = await mount({ ...LINK, last_run: { ...RUN, failed: 2, errors } })
+    const text = content(root)
+    expect(text).toContain('1 file could not be added.')
+    expect(text).toContain('1 file needs a decision.')
+    await click(button(root, 'Show'))
+    expect(content(root)).toContain('disk full')
+    expect(content(root)).not.toContain('claimed')
+  })
+
   it('says what to do about a claimed file', async () => {
     status.value = { conflicts: [{ path: 'raw/report.csv', reason: 'two links' }] }
     const { root } = await mount()

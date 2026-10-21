@@ -9,7 +9,7 @@ import { useLinkState } from '@/composables/useLinkState'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import type { BackendImport } from '@/lib/api'
 import { nameStyle, RUN_HINT, scheduleWords } from '@/lib/linkedFolders'
-import { filesWord, linkProblems } from '@/lib/organize'
+import { failureList, filesWord, linkProblems } from '@/lib/organize'
 import { formatNumber, relativeTime } from '@/lib/utils'
 import { Play, SlidersHorizontal } from '@lucide/vue'
 
@@ -97,7 +97,7 @@ function show(id: string, action: 'show' | 'organize') {
           <Button variant="outline" size="sm" @click="show(problem.id, problem.action)">Show</Button>
         </div>
         <ul v-if="details === problem.id && problem.id === 'failed'" class="mt-2 space-y-0.5 text-[11px] text-destructive">
-          <li v-for="(failure, at) in link.last_run?.errors.slice(0, 20)" :key="`${at}\n${failure.key}`" class="break-all">
+          <li v-for="(failure, at) in failureList(link, status?.conflicts ?? []).slice(0, 20)" :key="`${at}\n${failure.key}`" class="break-all">
             <span class="font-mono">{{ failure.key }}</span>: {{ failure.error }}
           </li>
         </ul>

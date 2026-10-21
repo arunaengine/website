@@ -80,3 +80,33 @@ describe('copy rows', () => {
     expect(copyKey(a)).not.toBe(copyKey(b))
   })
 })
+
+describe('failures that are decisions', () => {
+  const LINK = { import_id: 'i', backend_id: 'b', backend_prefix: 'p/', bucket: 'reef', key_prefix: '', created_at: '' }
+  const run = (failed: number, keys: string[]) => ({
+    job_id: 'j', state: 'succeeded', started_at: '', imported: 0, skipped: 0, failed,
+    errors: keys.map((key) => ({ key, error: 'claimed' })),
+  })
+  const conflict = (path: string) => ({ path, reason: 'claimed' })
+
+  it('tells a failure once, as a decision, when every failure is one', () => {
+    const keys = Array.from({ length: 90 }, (_, index) => `f${index}`)
+    const found = linkProblems({ ...LINK, last_run: run(90, keys) }, null, { conflicts: keys.map(conflict) })
+    expect(found.map((problem) => problem.id)).toEqual(['conflicts'])
+    expect(found[0].text).toContain('90 files need a decision.')
+  })
+
+  it('keeps the generic line only for the failures no decision explains', () => {
+    const found = linkProblems({ ...LINK, last_run: run(5, ['a', 'b', 'c', 'd', 'e']) }, null, {
+      conflicts: [conflict('a'), conflict('b')],
+    })
+    expect(found.map((problem) => problem.id)).toEqual(['failed', 'conflicts'])
+    expect(found[0].text).toContain('3 files could not be added.')
+  })
+
+  it('still shows plain failures when there is no decision', () => {
+    const found = linkProblems({ ...LINK, last_run: run(2, ['a', 'b']) }, null, { conflicts: [] })
+    expect(found.map((problem) => problem.id)).toEqual(['failed'])
+    expect(found[0].text).toContain('2 files could not be added.')
+  })
+})
