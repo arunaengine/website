@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest'
-import { closeGate, openGate, pendingGate } from './restoreGate'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { bootstrapGate, closeGate, openGate, pendingGate } from './restoreGate'
+
+afterEach(() => closeGate())
 
 describe('restore gate', () => {
   it('holds requests until its own restore ends', async () => {
@@ -35,5 +37,42 @@ describe('restore gate', () => {
     closeGate()
     await gate.promise
     expect(pendingGate()).toBeNull()
+  })
+
+  it('keeps requests queued before the first refresh waiting for its restore', async () => {
+    const boot = bootstrapGate()
+    let released = false
+    void pendingGate()?.then(() => (released = true))
+    const first = openGate()
+    expect(first).toBe(boot)
+    await Promise.resolve()
+    expect(released).toBe(false)
+    closeGate(first)
+    await Promise.resolve()
+    expect(released).toBe(true)
+  })
+
+  it('frees the waiters of a gate that is replaced', async () => {
+    const first = openGate()
+    let released = false
+    void first.promise.then(() => (released = true))
+    const second = openGate()
+    await Promise.resolve()
+    expect(released).toBe(true)
+    expect(pendingGate()).toBe(second.promise)
+  })
+
+  it('frees the waiters of a gate nobody closes', async () => {
+    vi.useFakeTimers()
+    try {
+      const gate = bootstrapGate()
+      let released = false
+      void gate.promise.then(() => (released = true))
+      await vi.advanceTimersByTimeAsync(16_000)
+      expect(released).toBe(true)
+      expect(pendingGate()).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

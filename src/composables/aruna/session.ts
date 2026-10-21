@@ -2,7 +2,7 @@ import { apiRequest, defaultApiBaseUrl, setSessionGate, type RealmInfoResponse }
 import { ownerNodeAllowed } from '@/lib/federation/transfer'
 import { errorMessage } from '@/lib/utils'
 import { loadMetadata, resetRecentOrderProbe } from './catalog'
-import { closeGate, openGate, pendingGate } from './restoreGate'
+import { bootstrapGate, closeGate, openGate, pendingGate } from './restoreGate'
 import { loadAuthenticated } from './identity'
 import { loadInfo } from './realm'
 import {
@@ -124,7 +124,7 @@ async function restoreToken(context: ReturnType<typeof refreshContext>): Promise
   }
 }
 
-if (restoring.value) openGate()
+if (restoring.value) bootstrapGate()
 setSessionGate({
   pending: pendingGate,
   token: () => authToken.value,
