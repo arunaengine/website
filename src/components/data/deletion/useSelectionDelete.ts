@@ -21,6 +21,9 @@ import { BULK_PREFLIGHT_CONCURRENCY, type BulkDeleteIssue } from './useDeletionP
 
 const BATCH_SIZE = 1_000
 
+/** One purge job runs per selected entry, so a larger selection is refused. */
+export const MAX_SELECTION_PURGE = 500
+
 /** What one selection acts on: object keys and folder prefixes. */
 export interface SelectionTargets {
   keys: string[]
@@ -110,6 +113,7 @@ export function useSelectionDelete() {
   /** Every selected entry answered a preflight that allows the purge. */
   function purgeReady(ids: string[]): boolean {
     return (
+      ids.length <= MAX_SELECTION_PURGE &&
       scopes.value.length === ids.length &&
       scopes.value.every((scope) => scope.preflight?.permissions.purge)
     )
@@ -156,13 +160,13 @@ export function useSelectionDelete() {
     const next: PurgeScope[] = [
       ...targets.keys.map((key) => ({
         key,
-        operation: createStoragePurgeOperation({ kind: 'file', bucket, key }),
+        operation: createStoragePurgeOperation({ kind: 'file', bucket, key }, undefined, { deleteStorageFiles: true }),
         preflight: null,
         error: null,
       })),
       ...targets.prefixes.map((prefix) => ({
         key: prefix,
-        operation: createStoragePurgeOperation({ kind: 'prefix', bucket, prefix }),
+        operation: createStoragePurgeOperation({ kind: 'prefix', bucket, prefix }, undefined, { deleteStorageFiles: true }),
         preflight: null,
         error: null,
       })),
@@ -304,20 +308,21 @@ export function useSelectionDelete() {
     const byKey = new Map(scopes.value.map((scope) => [scope.key, scope]))
     for (let offset = 0; offset < ids.length; offset += BATCH_SIZE) {
       const batch = ids.slice(offset, offset + BATCH_SIZE)
-      const results = await Promise.all(
-        batch.map((key) => {
+      // Each entry is recorded as it ends, so the combined progress moves.
+      await Promise.all(
+        batch.map(async (key) => {
           const scope = byKey.get(key)
-          return scope
-            ? runScope(scope, client, id)
-            : Promise.resolve<KeyResult>({
+          const result = scope
+            ? await runScope(scope, client, id)
+            : ({
                 key,
                 status: 'failed',
                 message: 'The permanent deletion preflight is unavailable for this key.',
-              })
+              } as KeyResult)
+          if (id === runId) record(all, [result])
         }),
       )
       if (id !== runId) return
-      record(all, results)
     }
   }
 

@@ -313,7 +313,7 @@ describe('Data Manager explicit multi-file deletion', () => {
     })
     expect(selection.map((option) => option.id)).toEqual(['delete', 'delete-permanently'])
     expect(functionSource(selectionSource, 'loadScopes')).toContain('getStorageDeletionPreflight(')
-    expect(selectionSource).toContain("createStoragePurgeOperation({ kind: 'file', bucket, key })")
+    expect(selectionSource).toContain("createStoragePurgeOperation({ kind: 'file', bucket, key }, undefined, { deleteStorageFiles: true })")
     expect(functionSource(selectionSource, 'purgeKeys')).toContain('runScope(')
     expect(functionSource(selectionSource, 'runScope')).toContain('startStoragePurge(')
     expect(functionSource(objectBrowser.script, 'deleteFolder')).not.toContain('selectedObjectKeys')
