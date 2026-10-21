@@ -267,6 +267,14 @@ describe('LinkedFolderDialog', () => {
     running.app.unmount()
   })
 
+  it('offers the rename when the count is unknown', async () => {
+    getImportRenames.mockResolvedValue({ count: 0, complete: false, files: [] })
+    const mounted = await mount(STORED)
+    expect(content(mounted.root)).toContain('Some files may have an older name.')
+    expect(button(mounted.root, 'Rename files').props.disabled).toBe(false)
+    mounted.app.unmount()
+  })
+
   it('offers the rename right after a pattern change', async () => {
     updateBackendImport.mockResolvedValue(STORED)
     const files = [{ from: 'raw/2024/01JA7Q3K_b.fastq', to: 'raw/2024/b.fastq~01JA7Q3K' }]

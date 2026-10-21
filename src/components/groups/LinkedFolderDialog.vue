@@ -95,7 +95,11 @@ const submitError = ref<string | null>(null)
 // Files of a stored link that still have a name of an earlier pattern.
 const renames = ref<BackendImportRenames | null>(null)
 const renaming = computed(() => Boolean(renames.value?.progress && renames.value.progress.finished_at_ms == null))
-const offerRename = computed(() => Boolean(renames.value?.count) && !patternChanged.value)
+// An unknown count (not complete) still offers the rename.
+const offerRename = computed(() => {
+  const found = renames.value
+  return Boolean(found && (found.count > 0 || !found.complete)) && !patternChanged.value
+})
 
 const isEdit = computed(() => Boolean(props.link))
 const backendOptions = computed(() =>
@@ -340,7 +344,7 @@ async function submit() {
     // After a new pattern, files with the old name are offered for renaming.
     if (stored && newPattern !== undefined && current()) {
       await loadRenames({ ...stored, write_pattern: newPattern }, generation)
-      if (current() && renames.value?.count) {
+      if (current() && renames.value && (renames.value.count > 0 || !renames.value.complete)) {
         pattern.value = newPattern
         savedPattern.value = newPattern
         return
@@ -597,7 +601,10 @@ async function submit() {
             <div v-if="offerRename && renames" class="space-y-1.5 rounded-md border border-border px-3 py-2 text-xs" data-testid="rename-offer">
               <p class="font-medium text-foreground">Rename existing files</p>
               <p class="text-muted-foreground">
-                {{ renames.count }}{{ renames.complete ? '' : '+' }} {{ renames.count === 1 ? 'file has' : 'files have' }} an older name.
+                <template v-if="renames.count">
+                  {{ renames.count }}{{ renames.complete ? '' : '+' }} {{ renames.count === 1 ? 'file has' : 'files have' }} an older name.
+                </template>
+                <template v-else>Some files may have an older name.</template>
                 Each gets a copy with the new name, then the old file is removed.
               </p>
               <ul class="space-y-0.5 font-mono text-[11px] text-muted-foreground">
