@@ -98,4 +98,59 @@ describe('selection purge', () => {
     await expect(selection.controlAll('pause', CLIENT)).rejects.toThrow('refused')
     expect(selection.paused.value).toBe(false)
   })
+
+  it('aborts jobs the node accepts after Abort was pressed', async () => {
+    getStorageDeletionPreflight.mockResolvedValue(OPEN)
+    controlStoragePurge.mockReset().mockResolvedValue(undefined)
+    let acceptB: (value: unknown) => void = () => {}
+    startStoragePurge.mockImplementation((operation: { scope: { key: string } }) =>
+      operation.scope.key === 'b'
+        ? new Promise((resolve) => (acceptB = resolve))
+        : Promise.resolve({ job_id: operation.scope.key }),
+    )
+    getStoragePurgeJob.mockReturnValue(new Promise(() => {}))
+    const selection = useSelectionDelete()
+    await selection.loadScopes('reef', { keys: ['a', 'b', 'c'], prefixes: [] }, CLIENT)
+    void selection.purgeKeys(['a', 'b', 'c'], CLIENT, ['a', 'b', 'c'])
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await selection.controlAll('abort', CLIENT)
+    expect(controlStoragePurge.mock.calls.map((call) => [call[0], call[1]])).toEqual([['a', 'abort'], ['c', 'abort']])
+    acceptB({ job_id: 'b' })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(controlStoragePurge).toHaveBeenLastCalledWith('b', 'abort', CLIENT)
+  })
+
+  it('keeps Resume for the jobs a partial pause reached', async () => {
+    getStorageDeletionPreflight.mockResolvedValue(OPEN)
+    startStoragePurge.mockImplementation(async (operation: { scope: { key: string } }) => ({ job_id: operation.scope.key }))
+    controlStoragePurge.mockReset().mockImplementation(async (jobId: string, action: string) => {
+      if (jobId === 'b' && action === 'pause') throw new Error('refused')
+    })
+    getStoragePurgeJob.mockReturnValue(new Promise(() => {}))
+    const selection = useSelectionDelete()
+    await selection.loadScopes('reef', { keys: ['a', 'b'], prefixes: [] }, CLIENT)
+    void selection.purgeKeys(['a', 'b'], CLIENT, ['a', 'b'])
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await expect(selection.controlAll('pause', CLIENT)).rejects.toThrow('refused')
+    expect(selection.paused.value).toBe(true)
+    controlStoragePurge.mockClear()
+    await selection.controlAll('resume', CLIENT)
+    expect(controlStoragePurge.mock.calls.map((call) => [call[0], call[1]])).toEqual([['a', 'resume']])
+    expect(selection.paused.value).toBe(false)
+  })
+
+  it('keeps the controls and shows the error when a poll fails', async () => {
+    getStorageDeletionPreflight.mockResolvedValue(OPEN)
+    startStoragePurge.mockResolvedValue({ job_id: 'a' })
+    controlStoragePurge.mockReset().mockResolvedValue(undefined)
+    getStoragePurgeJob.mockReset().mockRejectedValueOnce(new Error('offline')).mockReturnValue(new Promise(() => {}))
+    const selection = useSelectionDelete()
+    await selection.loadScopes('reef', { keys: ['a'], prefixes: [] }, CLIENT)
+    void selection.purgeKeys(['a'], CLIENT, ['a'])
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(selection.pollError.value).toBe('offline')
+    expect(selection.outcome.value).toBeNull()
+    await selection.controlAll('abort', CLIENT)
+    expect(controlStoragePurge).toHaveBeenCalledWith('a', 'abort', CLIENT)
+  })
 })

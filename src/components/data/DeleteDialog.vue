@@ -762,6 +762,9 @@ onUnmounted(() => {
           :busy="writesDisabled"
           @control="controlPurge"
         />
+        <p v-if="isSelection && selection.pollError.value" class="text-destructive">
+          {{ selection.pollError.value }} The deletions keep running. Trying again.
+        </p>
 
         <PurgeProgress
           :submission="purge.submission.value"

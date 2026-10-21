@@ -80,7 +80,12 @@ export function useSelectionDelete() {
   const scopesBusy = ref(false)
   // Jobs that were started and have not ended, by key, so one control reaches all of them.
   const activeJobs = ref<Record<string, string>>({})
-  const paused = ref(false)
+  // Jobs whose pause the node accepted; Resume reaches exactly these.
+  const pausedJobs = ref<Record<string, string>>({})
+  const paused = computed(() => Object.keys(pausedJobs.value).length > 0)
+  // What the user asked last, applied to jobs the node accepts after the request.
+  let wanted: 'run' | 'pause' | 'abort' = 'run'
+  const pollError = ref<string | null>(null)
   let runId = 0
 
   function reset() {
@@ -89,7 +94,9 @@ export function useSelectionDelete() {
     scopes.value = []
     scopesBusy.value = false
     activeJobs.value = {}
-    paused.value = false
+    pausedJobs.value = {}
+    pollError.value = null
+    wanted = 'run'
   }
 
   const inventory = computed(() => {
@@ -266,26 +273,45 @@ export function useSelectionDelete() {
 
   async function runScope(scope: PurgeScope, client: ApiClientOptions, id: number): Promise<KeyResult> {
     const result = await trackScope(scope, client, id)
-    const { [scope.key]: _ended, ...rest } = activeJobs.value
-    activeJobs.value = rest
+    const { [scope.key]: _ended, ...restActive } = activeJobs.value
+    activeJobs.value = restActive
+    const { [scope.key]: _paused, ...restPaused } = pausedJobs.value
+    pausedJobs.value = restPaused
     return result
   }
 
-  async function trackScope(scope: PurgeScope, client: ApiClientOptions, id: number): Promise<KeyResult> {
+  // A job the node accepts after Pause or Abort was pressed gets the same request.
+  async function applyWanted(scope: PurgeScope, jobId: string, client: ApiClientOptions) {
+    if (wanted === 'run') return
     try {
-      const started = await startStoragePurge(scope.operation, client)
-      activeJobs.value = { ...activeJobs.value, [scope.key]: started.job_id }
-      for (;;) {
-        if (id !== runId) {
-          return { key: scope.key, status: 'unknown', message: 'The result of this permanent deletion is no longer being tracked.' }
-        }
-        const status = await getStoragePurgeJob(started.job_id, client)
+      await controlStoragePurge(jobId, wanted, client)
+      if (wanted === 'pause') pausedJobs.value = { ...pausedJobs.value, [scope.key]: jobId }
+    } catch (error) {
+      pollError.value = storageDeletionErrorMessage(error)
+    }
+  }
+
+  async function trackScope(scope: PurgeScope, client: ApiClientOptions, id: number): Promise<KeyResult> {
+    if (wanted === 'abort') {
+      return { key: scope.key, status: 'failed', message: 'The permanent deletion was aborted before it started.' }
+    }
+    let jobId: string
+    try {
+      jobId = (await startStoragePurge(scope.operation, client)).job_id
+    } catch (error) {
+      return { key: scope.key, status: failureStatus(error), message: storageDeletionErrorMessage(error) }
+    }
+    activeJobs.value = { ...activeJobs.value, [scope.key]: jobId }
+    await applyWanted(scope, jobId, client)
+    for (;;) {
+      if (id !== runId) {
+        return { key: scope.key, status: 'unknown', message: 'The result of this permanent deletion is no longer being tracked.' }
+      }
+      try {
+        const status = await getStoragePurgeJob(jobId, client)
+        pollError.value = null
         if (status.kind !== 'storage_purge') {
-          return {
-            key: scope.key,
-            status: 'failed',
-            message: `System job ${started.job_id} is not a permanent deletion.`,
-          }
+          return { key: scope.key, status: 'failed', message: `System job ${jobId} is not a permanent deletion.` }
         }
         if (isTerminalStoragePurgeJob(status.state)) {
           if (status.state === 'succeeded') return { key: scope.key, status: 'committed' }
@@ -295,26 +321,34 @@ export function useSelectionDelete() {
             message: status.error?.message ?? `The permanent deletion was ${status.state}.`,
           }
         }
-        await new Promise((resolve) => setTimeout(resolve, 1_000))
+      } catch (error) {
+        // The job runs on the node whether or not this read worked: keep its controls and try again.
+        pollError.value = storageDeletionErrorMessage(error)
       }
-    } catch (error) {
-      return {
-        key: scope.key,
-        status: failureStatus(error),
-        message: storageDeletionErrorMessage(error),
-      }
+      await new Promise((resolve) => setTimeout(resolve, 1_000))
     }
   }
 
-  /** Pauses, resumes or aborts every job still running; the first refusal is reported. */
+  /**
+   * Pauses, resumes or aborts the jobs still running, and the ones the node accepts later.
+   * Every success is kept, so a partial pause still offers Resume; the first refusal is reported.
+   */
   async function controlAll(action: 'pause' | 'resume' | 'abort', client: ApiClientOptions) {
+    wanted = action === 'resume' ? 'run' : action
+    const targets = Object.entries(action === 'resume' ? pausedJobs.value : activeJobs.value)
     const settled = await Promise.allSettled(
-      Object.values(activeJobs.value).map((jobId) => controlStoragePurge(jobId, action, client)),
+      targets.map(([, jobId]) => controlStoragePurge(jobId, action, client)),
     )
+    const next = { ...pausedJobs.value }
+    settled.forEach((result, index) => {
+      if (result.status !== 'fulfilled') return
+      const [key, jobId] = targets[index]
+      if (action === 'pause') next[key] = jobId
+      else delete next[key]
+    })
+    pausedJobs.value = next
     const refused = settled.find((result) => result.status === 'rejected')
     if (refused?.status === 'rejected') throw refused.reason
-    if (action === 'pause') paused.value = true
-    if (action === 'resume') paused.value = false
   }
 
   async function purgeKeys(ids: string[], client: ApiClientOptions | null, all: string[]) {
@@ -366,6 +400,7 @@ export function useSelectionDelete() {
     deletePrefixes,
     purgeKeys,
     paused,
+    pollError,
     controlAll,
   }
 }
