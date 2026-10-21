@@ -130,6 +130,8 @@ export interface FileRule {
 export interface FileRulePreview {
   path: string
   key?: string | null
+  /** The version a run registers the file as, when its name or an unfinished write names one. */
+  version_id?: string | null
   outcome: 'known' | 'matched' | 'root' | 'conflict'
   patterns?: string[]
 }
