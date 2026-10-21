@@ -320,7 +320,7 @@ describe('Data Manager explicit multi-file deletion', () => {
     // One destructive entry per row: the Bomb icon and its twin are gone.
     expect(objectBrowserSource).not.toContain('Bomb')
     expect(objectBrowser.template.match(/<RowMenu/g)).toHaveLength(2)
-    expect(objectBrowser.script).toContain('deleteFolder(folder, action === 'purge')')
+    expect(objectBrowser.script).toContain("deleteFolder(folder, action === 'purge')")
   })
 
   it('keeps new UI copy free of em dashes and the retired label namespace', () => {
