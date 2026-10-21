@@ -508,7 +508,8 @@ async function submit() {
                 <span class="block break-all font-mono">{{ placeLabel(sourceStore, `${storageRoot}run1/a.fastq`) }}</span>
                 <span class="block">
                   appears in Aruna as
-                  <span class="break-all font-mono">{{ placeLabel(bucketName, `${bucketRoot}run1/a.fastq`) }}</span>
+                  <span class="break-all font-mono">{{ placeLabel(bucketName, 'run1/a.fastq') }}</span>
+                  unless a file rule sorts it
                 </span>
               </p>
             </div>

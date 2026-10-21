@@ -151,7 +151,7 @@ describe('LinkedFolderDialog', () => {
 
     const text = content(mounted.root)
     expect(text).toContain('lab / raw/2024/run1/a.fastq')
-    expect(text).toContain('sequencing / seq/run1/a.fastq')
+    expect(text).toContain('sequencing / run1/a.fastq')
     expect(text).toContain('Uploads to sequencing / seq')
     expect(text).toContain('(lab / raw/2024)')
     expect(text).toContain('lab / raw/2024/run2/b.fastq~01JA7Q3K')

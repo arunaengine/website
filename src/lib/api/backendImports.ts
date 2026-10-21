@@ -123,7 +123,7 @@ export function startImportRenames(groupId: string, importId: string, client: Ap
 export interface FileRule {
   /** File name pattern: `*` is any text, `?` one character. */
   pattern: string
-  /** Folder below the link's bucket folder, ending with `/`. */
+  /** Folder of the bucket for matching files, ending with `/`. */
   folder: string
 }
 
