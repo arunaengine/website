@@ -463,7 +463,7 @@ async function submit() {
               </div>
               <div class="space-y-1">
                 <label :for="`${uid}-bucket-folder`" class="text-xs font-medium text-foreground">
-                  Folder in the Aruna bucket
+                  Upload folder in Aruna
                 </label>
                 <Input
                   :id="`${uid}-bucket-folder`"
@@ -473,7 +473,8 @@ async function submit() {
                   placeholder="runs/"
                 />
                 <p class="text-[11px] text-muted-foreground">
-                  Leave empty to place files at the top of {{ bucket.trim() || 'the Aruna bucket' }}.
+                  Uploads to this folder go to your storage. Leave empty for all of
+                  {{ bucket.trim() || 'the Aruna bucket' }}.
                 </p>
               </div>
             </div>

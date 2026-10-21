@@ -188,7 +188,8 @@ defineExpose({ open })
           <div class="mt-2 flex items-center justify-end gap-2">
             <span class="mr-auto text-[11px] text-muted-foreground">
               Uploads to <span class="font-mono">{{ bucket }}/{{ link.key_prefix }}</span> go to your
-              storage. New files found there show at the top of <span class="font-mono">{{ bucket }}</span>.
+              storage. New files found there show at the top of <span class="font-mono">{{ bucket }}</span>,
+              or in a folder a file rule picks.
             </span>
             <IconButton
               :label="RUN_HINT"

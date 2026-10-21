@@ -178,7 +178,7 @@ describe('LinkedFolderDialog', () => {
 
     const text = content(mounted.root)
     expect(text).toContain('Leave empty to use all files in S3 bucket lab.')
-    expect(text).toContain('Leave empty to place files at the top of sequencing.')
+    expect(text).toContain('Uploads to this folder go to your storage. Leave empty for all of sequencing.')
     expect(text).toContain('appears in Aruna as sequencing / run1/a.fastq')
     await submit(mounted.root)
 
