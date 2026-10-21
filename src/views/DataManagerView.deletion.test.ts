@@ -320,7 +320,7 @@ describe('Data Manager explicit multi-file deletion', () => {
     // One destructive entry per row: the Bomb icon and its twin are gone.
     expect(objectBrowserSource).not.toContain('Bomb')
     expect(objectBrowser.template.match(/<RowMenu/g)).toHaveLength(2)
-    expect(objectBrowser.script).toContain('deleteFolder(folder)')
+    expect(objectBrowser.script).toContain('deleteFolder(folder, action === 'purge')')
   })
 
   it('keeps new UI copy free of em dashes and the retired label namespace', () => {
@@ -477,6 +477,8 @@ const deleteDialogComponent = compileClientComponent(
     ),
     '@/components/data/deletion/DeletionImpact.vue': moduleDefault(Slotted('section')),
     '@/components/data/deletion/DeletionOutcome.vue': moduleDefault(Slotted('section')),
+    '@/components/data/deletion/PermanentDeleteImpact.vue': moduleDefault(Slotted('section')),
+    '@/lib/api': { getDeleteImpact: async () => { throw new Error('not found') } },
     '@/components/data/deletion/PurgeProgress.vue': moduleDefault(Slotted('section')),
     '@/components/data/deletion/VersionPicker.vue': moduleDefault(Slotted('section')),
     '@/components/data/deletion/useDeletionPreflight': {
