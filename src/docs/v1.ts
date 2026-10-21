@@ -775,7 +775,7 @@ export const docsTopics: DocsTopic[] = [
         title: 'Delete permanently',
         icon: 'Trash2',
         paragraphs: [
-          'Delete permanently in the menu of a file or folder, or on the bucket page, shows what goes in Aruna and in your storage, and which files stay because something else uses them. It cannot be undone. For a folder or a bucket you type its name to confirm.',
+          'Delete permanently in the menu of a file or folder, or on the bucket page, shows what goes in Aruna and in your storage, and which files stay because something else uses them. It cannot be undone. You type the name of the file, folder or bucket to confirm; for several selected items, type the bucket name.',
         ],
       },
     ],
