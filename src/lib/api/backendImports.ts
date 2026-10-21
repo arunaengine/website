@@ -50,7 +50,7 @@ export interface BackendImportRequest {
   move_existing?: boolean
 }
 
-function importsPath(groupId: string, importId?: string): string {
+export function importsPath(groupId: string, importId?: string): string {
   const base = `/data/groups/${encodeURIComponent(groupId)}/storage/imports`
   return importId ? `${base}/${encodeURIComponent(importId)}` : base
 }
