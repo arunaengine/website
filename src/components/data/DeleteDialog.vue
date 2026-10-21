@@ -20,11 +20,12 @@ import VersionPicker from '@/components/data/deletion/VersionPicker.vue'
 import { useDeletionPreflight } from '@/components/data/deletion/useDeletionPreflight'
 import { usePurgeJob } from '@/components/data/deletion/usePurgeJob'
 import {
+  MAX_SELECTION_PURGE,
   prefixDeleteFailure,
   useSelectionDelete,
 } from '@/components/data/deletion/useSelectionDelete'
 import { removeBucket } from '@/components/groups/bucketRemoval'
-import { getDeleteImpact, type DeleteImpact } from '@/lib/api'
+import { getDeleteImpact, type DeleteImpact, type DeleteScope } from '@/lib/api'
 import { organizeError, type ProgressJob } from '@/lib/organize'
 import { nodeApiBase } from '@/composables/s3/endpoints'
 import { useAruna } from '@/composables/useAruna'
@@ -70,6 +71,7 @@ const preflight = ref<StorageDeletionPreflight | null>(null)
 const preflightBusy = ref(false)
 // What a permanent delete removes in storage too; null when the node cannot say.
 const impact = ref<DeleteImpact | null>(null)
+const impactScope = ref<DeleteScope | null>(null)
 const remaining = ref<StorageDeletionPreflight | null>(null)
 const remainingBusy = ref(false)
 const remainingMissing = ref(false)
@@ -126,8 +128,12 @@ const canWrite = computed(() => {
   return s3.canWrite(current.bucket, current.key ?? '', current.nodeId)
 })
 
+// One job runs per selected entry, so a very large selection is better deleted as a folder.
+const tooMany = computed(() => isSelection.value && ids.value.length > MAX_SELECTION_PURGE)
+
 const canPurge = computed<boolean | null>(() => {
   if (isSelection.value) {
+    if (tooMany.value) return false
     if (selectedId.value !== 'delete-permanently') return null
     if (selection.scopesBusy.value || !selection.scopes.value.length) return null
     return selection.purgeReady(ids.value)
@@ -248,6 +254,7 @@ function reset() {
   ++requestId
   preflight.value = null
   impact.value = null
+  impactScope.value = null
   preflightBusy.value = false
   remaining.value = null
   remainingBusy.value = false
@@ -306,6 +313,23 @@ const purgeJob = computed<ProgressJob | null>(() => {
   }
 })
 
+// One bar for the whole selection: every finished entry counts, whatever its result.
+const selectionJob = computed<ProgressJob | null>(() => {
+  if (!busy.value || !isSelection.value || selected.value?.id !== 'delete-permanently') return null
+  const result = selection.outcome.value
+  const finishedCount = result ? result.committed.length + result.failed.length + result.unknown.length : 0
+  return {
+    kind: 'purge',
+    state: 'running',
+    done: finishedCount,
+    total: ids.value.length,
+    counted: true,
+    skipped: 0,
+    failed: result?.failed.length ?? 0,
+    controls: false,
+  }
+})
+
 async function controlPurge(action: 'pause' | 'resume' | 'abort') {
   const client = apiClient()
   if (!client) return
@@ -325,8 +349,12 @@ async function loadImpact() {
   const kind = target.kind === 'prefix' ? 'folder' : target.kind
   const key = target.kind === 'file' ? target.key : target.kind === 'prefix' ? target.prefix : ''
   try {
-    const found = await getDeleteImpact({ kind, bucket: target.bucket, key }, client)
-    if (id === requestId) impact.value = found
+    const asked = { kind, bucket: target.bucket, key } as const
+    const found = await getDeleteImpact(asked, client)
+    if (id === requestId) {
+      impactScope.value = asked
+      impact.value = found
+    }
   } catch {
     if (id === requestId) impact.value = null
   }
@@ -391,7 +419,7 @@ watch(
         : 'latest_version_tombstone',
     )
     if ((id === 'delete-permanently' || id === 'delete-bucket') && !isSelection.value) void loadImpact()
-    if (id === 'delete-permanently' && isSelection.value) {
+    if (id === 'delete-permanently' && isSelection.value && !tooMany.value) {
       void selection.loadScopes(
         current.bucket,
         { keys: keys.value, prefixes: prefixes.value },
@@ -621,7 +649,13 @@ onUnmounted(() => {
         />
         <p v-if="versionConsequence" class="text-muted-foreground">{{ versionConsequence }}</p>
 
-        <PermanentDeleteImpact v-if="impact && !finished" :impact="impact" :label="`${requestNoun(request)} ${typedTarget}`" />
+        <PermanentDeleteImpact
+          v-if="impact && impactScope && !finished"
+          :impact="impact"
+          :scope="impactScope"
+          :client="apiClient()!"
+          :label="`${requestNoun(request)} ${typedTarget}`"
+        />
 
         <DeletionImpact
           :preflight="preflight"
@@ -653,6 +687,9 @@ onUnmounted(() => {
           <p v-if="!selection.inventory.value.complete" class="text-amber-800 dark:text-amber-300">
             One or more inventories are incomplete or unavailable. Totals may be more than shown.
           </p>
+          <p v-if="tooMany" class="text-destructive">
+            That is more than {{ MAX_SELECTION_PURGE }} entries. Delete the folder instead, or select fewer.
+          </p>
           <div v-if="selection.deniedKeys.value.length" class="text-destructive">
             <p class="font-medium">Permanent deletion is not allowed for these entries</p>
             <ul class="space-y-1 pl-4 font-mono text-[10px]">
@@ -669,7 +706,7 @@ onUnmounted(() => {
           </div>
         </section>
 
-        <JobProgress v-if="purgeJob" :job="purgeJob" @control="controlPurge" />
+        <JobProgress v-if="purgeJob ?? selectionJob" :job="(purgeJob ?? selectionJob)!" @control="controlPurge" />
 
         <PurgeProgress
           :submission="purge.submission.value"

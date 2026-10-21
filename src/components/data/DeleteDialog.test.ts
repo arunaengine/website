@@ -1,6 +1,7 @@
 import { computed, defineComponent, h, ref, type Component } from 'vue'
 import * as VueRuntime from 'vue'
 import { describe, expect, it, vi } from 'vitest'
+import * as CursorPage from '@/composables/useCursorPage'
 import * as Organize from '@/lib/organize'
 import * as Utils from '@/lib/utils'
 import * as DeletionOptions from '@/lib/deletion/options'
@@ -64,6 +65,11 @@ function slotted(tag: string) {
     setup: (_, { attrs, slots }) => () => h(tag, attrs, slots.default?.()),
   })
 }
+
+const pagedStub = defineComponent({
+  props: { total: Number, shown: Number, hasNext: Boolean },
+  setup: (props, { slots }) => () => h('div', [h('ul', slots.default?.()), h('span', `shown ${props.shown} of ${props.total}`)]),
+})
 
 const jobProgress = defineComponent({
   props: { job: Object },
@@ -132,6 +138,10 @@ function dialogModules(overrides: Record<string, unknown> = {}) {
   '@/components/data/deletion/PermanentDeleteImpact.vue': moduleDefault(
     compileClientComponent(new URL('./deletion/PermanentDeleteImpact.vue', import.meta.url), {
       vue: VueRuntime,
+      '@/components/storage/PagedList.vue': moduleDefault(pagedStub),
+      '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+      '@/composables/useCursorPage': CursorPage,
+      '@/lib/api': { PAGE_SIZE: 100, getDeleteImpact },
       '@/lib/organize': Organize,
       '@/lib/utils': Utils,
     }),
@@ -325,8 +335,10 @@ async function choose(root: HostNode, id: string) {
   await flush()
 }
 
+// The confirm button is the last one in the footer, after any button in the body.
 function confirmButton(root: HostNode): HostNode {
-  return element(root, (node) => node.tag === 'button' && content(node).trim() !== 'Cancel')
+  const found = nodes(root).filter((node) => node.tag === 'button' && content(node).trim() !== 'Cancel')
+  return found[found.length - 1]
 }
 
 function labels(root: HostNode): string[] {
@@ -528,6 +540,46 @@ describe('delete dialog', () => {
     expect(confirmButton(root).props.disabled).toBe(true)
     await typeValue(element(root, (node) => node.tag === 'input' && node.props.type !== 'radio'), 'old-runs')
     expect(confirmButton(root).props.disabled).toBe(false)
+  })
+
+  it('lists what goes page by page', async () => {
+    getDeleteImpact.mockResolvedValueOnce({
+      files: 1,
+      versions: 2,
+      bytes: 30,
+      storage_files: 1,
+      storage_bytes: 30,
+      kept_files: 1,
+      complete: true,
+      items: [],
+    })
+    getDeleteImpact.mockResolvedValueOnce({
+      files: 1,
+      versions: 2,
+      bytes: 30,
+      storage_files: 1,
+      storage_bytes: 30,
+      kept_files: 1,
+      complete: true,
+      next: 'c1',
+      items: [
+        { key: 'a/x.txt', version_id: 'v1', bytes: 10, storage_file: { path: 'lab/x.txt', bytes: 10, kept: true } },
+        { key: 'a/y.txt', version_id: 'v2', bytes: 20, storage_file: { path: 'lab/y.txt', bytes: 20 } },
+      ],
+    })
+    const { root } = await open({ kind: 'folder', bucket: 'reef', nodeId: null, key: 'a/', option: 'delete-permanently' })
+    expect(content(root)).not.toContain('a/x.txt')
+    await click(button(root, 'Show files'))
+    expect(getDeleteImpact).toHaveBeenLastCalledWith(
+      { kind: 'folder', bucket: 'reef', key: 'a/' },
+      expect.anything(),
+      { filter: '', limit: 100, after: null },
+    )
+    const text = content(root)
+    expect(text).toContain('a/x.txt')
+    expect(text).toContain('stays in your storage: lab/x.txt')
+    expect(text).toContain('deleted in your storage: lab/y.txt')
+    expect(text).toContain('shown 2 of 2')
   })
 
   it('words kept storage files carefully while the page is not complete', async () => {

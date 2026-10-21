@@ -1,10 +1,26 @@
 <script setup lang="ts">
 // The red box of a permanent delete: what goes in Aruna, what goes in your storage, what stays.
-import type { DeleteImpact } from '@/lib/api'
+import { ref } from 'vue'
+import PagedList from '@/components/storage/PagedList.vue'
+import Button from '@/components/ui/Button.vue'
+import { useCursorPage } from '@/composables/useCursorPage'
+import { getDeleteImpact, type ApiClientOptions, type DeleteImpact, type DeleteItem, type DeleteScope } from '@/lib/api'
 import { filesWord } from '@/lib/organize'
 import { formatBytes, formatNumber } from '@/lib/utils'
 
-defineProps<{ impact: DeleteImpact; label: string }>()
+const props = defineProps<{ impact: DeleteImpact; label: string; scope: DeleteScope; client: ApiClientOptions }>()
+
+const listed = ref(false)
+// The first page came with the totals; later pages ask the node by cursor.
+const list = useCursorPage<DeleteItem>(async (query) => {
+  const page = await getDeleteImpact(props.scope, props.client, query)
+  return { items: page.items, total: page.versions, complete: page.complete, next: page.next }
+})
+
+function toggle() {
+  listed.value = !listed.value
+  if (listed.value && !list.page.value) void list.load('')
+}
 </script>
 
 <template>
@@ -24,5 +40,31 @@ defineProps<{ impact: DeleteImpact; label: string }>()
       <template v-else>Some storage files stay because other links or files still use them.</template>
     </p>
     <p class="text-xs font-medium text-destructive">This cannot be undone.</p>
+    <Button v-if="impact.versions" variant="outline" size="sm" @click="toggle">{{ listed ? 'Hide files' : 'Show files' }}</Button>
+    <PagedList
+      v-if="listed"
+      :total="list.page.value?.total ?? impact.versions"
+      :complete="list.page.value?.complete ?? impact.complete"
+      :offset="list.offset.value"
+      :shown="list.items.value.length"
+      :filter="list.filter.value"
+      :busy="list.busy.value"
+      :has-next="list.hasNext.value"
+      :has-prev="list.hasPrev.value"
+      @next="list.next()"
+      @prev="list.prev()"
+      @filter="(value: string) => list.load(value)"
+    >
+      <li v-for="item in list.items.value" :key="`${item.key}\n${item.version_id}`" class="space-y-0.5 px-3 py-1.5">
+        <div class="flex items-center gap-2">
+          <span class="min-w-0 flex-1 truncate font-mono" :title="item.key">{{ item.key }}</span>
+          <span class="shrink-0 tabular-nums text-muted-foreground">{{ formatBytes(item.bytes) }}</span>
+        </div>
+        <p v-if="item.storage_file" class="truncate font-mono text-[11px] text-muted-foreground" :title="item.storage_file.path">
+          {{ item.storage_file.kept ? 'stays' : 'deleted' }} in your storage: {{ item.storage_file.path }}
+        </p>
+      </li>
+    </PagedList>
+    <p v-if="list.error.value" class="text-xs text-destructive">{{ list.error.value }}</p>
   </div>
 </template>
