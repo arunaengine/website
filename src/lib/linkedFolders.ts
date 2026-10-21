@@ -106,3 +106,8 @@ export function cronProblem(value: string): string | null {
     ? null
     : 'Use five fields: minute, hour, day of month, month and day of week.'
 }
+
+/** The name style of new files in short words, such as `name~ID`. */
+export function nameStyle(pattern: string | null | undefined): string {
+  return fillPattern(pattern || NAME_PATTERNS[0].value, '', 'name', 'ID')
+}

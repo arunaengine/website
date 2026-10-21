@@ -29,15 +29,9 @@ const InputStub = defineComponent({
 })
 const icons = new Proxy({}, { get: () => defineComponent(() => () => h('i')) })
 
-const FileRulesDialog = compileClientComponent(new URL('./FileRulesDialog.vue', import.meta.url), {
+const FileRulesStep = compileClientComponent(new URL('./FileRulesStep.vue', import.meta.url), {
   vue: VueRuntime,
   '@lucide/vue': icons,
-  '@/components/ui/Dialog.vue': moduleDefault(Slot),
-  '@/components/ui/DialogContent.vue': moduleDefault(Slot),
-  '@/components/ui/DialogHeader.vue': moduleDefault(Slot),
-  '@/components/ui/DialogTitle.vue': moduleDefault(Slot),
-  '@/components/ui/DialogDescription.vue': moduleDefault(Slot),
-  '@/components/ui/DialogFooter.vue': moduleDefault(Slot),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Input.vue': moduleDefault(InputStub),
   '@/components/ui/Notice.vue': moduleDefault(Slot),
@@ -56,8 +50,8 @@ const RULE = { pattern: '*.faa.gz', folder: 'proteins/' }
 const PAGE = { files: [{ path: 'raw/a.faa.gz', key: 'proteins/a.faa.gz', outcome: 'matched' }] }
 
 async function mount() {
-  const state = reactive({ open: true, groupId: 'g1', link: { import_id: 'i1' } })
-  const mounted = await mountApp(defineComponent(() => () => h(FileRulesDialog, state)))
+  const state = reactive({ groupId: 'g1', link: { import_id: 'i1' } })
+  const mounted = await mountApp(defineComponent(() => () => h(FileRulesStep, state)))
   await flush()
   if (mounted.errors.length) throw mounted.errors[0]
   return { ...mounted, state }
@@ -81,7 +75,7 @@ beforeEach(() => {
   getFileRules.mockResolvedValue({ rules: [{ ...RULE }] })
 })
 
-describe('FileRulesDialog', () => {
+describe('FileRulesStep', () => {
   it('ignores a preview of rules edited while it ran', async () => {
     const answer = deferred()
     previewFileRules.mockReturnValueOnce(answer.promise)
@@ -109,14 +103,12 @@ describe('FileRulesDialog', () => {
     expect(content(root)).not.toContain('Saved.')
   })
 
-  it('can preview again after reopening during a request', async () => {
+  it('can preview again after another link opens during a request', async () => {
     previewFileRules.mockReturnValueOnce(new Promise(() => {}))
     const { root, state } = await mount()
     void click(button(root, 'Show where files go'))
     await flush()
-    state.open = false
-    await flush()
-    state.open = true
+    state.link = { import_id: 'i2' }
     await flush()
 
     expect(button(root, 'Show where files go').props.disabled).toBe(false)
@@ -175,6 +167,7 @@ describe('FileRulesDialog', () => {
   it('explains the name patterns', async () => {
     const { root } = await mount()
 
-    expect(content(root)).toContain('* any text, ? one character, [0-9] one of, {4} or {2,8} times, {fna,fa} either')
+    expect(content(root)).toContain('* any text, ? one character, [0-9] one of, {4} times, {fna,fa} either')
+    expect(content(root)).toContain('Other files go to the top of the bucket.')
   })
 })

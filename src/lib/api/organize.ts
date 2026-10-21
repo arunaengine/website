@@ -62,7 +62,10 @@ export interface OrganizeJob {
   controls: boolean
 }
 
-export interface LinkIssues {
+export interface LinkStatus {
+  /** What the link holds, when the node counts it. */
+  files?: number
+  bytes?: number
   /** Files that more than one link claims. */
   conflicts: { path: string }[]
 }
@@ -138,8 +141,8 @@ export function controlJob(
   return apiRequest(organizePath(groupId, importId, `job/${action}`), { method: 'POST' }, client)
 }
 
-export function getLinkIssues(groupId: string, importId: string, client: ApiClientOptions): Promise<LinkIssues> {
-  return apiRequest(organizePath(groupId, importId, 'issues'), {}, client)
+export function getLinkStatus(groupId: string, importId: string, client: ApiClientOptions): Promise<LinkStatus> {
+  return apiRequest(organizePath(groupId, importId, 'status'), {}, client)
 }
 
 /** What a permanent delete removes in Aruna and in storage; nothing changes. */
