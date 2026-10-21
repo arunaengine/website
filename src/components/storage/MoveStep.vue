@@ -59,6 +59,12 @@ watch([pattern, target, from, subfolders], () => {
   scopeTotal.value = null
 })
 watch(() => [props.link.import_id, sessionEpoch.value], () => {
+  // A start still on its way belongs to the old link.
+  requestId++
+  busy.value = false
+  list.reset()
+  previewed.value = false
+  scopeTotal.value = null
   pattern.value = ''
   target.value = ''
   from.value = ''

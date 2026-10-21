@@ -16,7 +16,7 @@ import {
   type BackendImportRenames,
   type DuplicateItem,
 } from '@/lib/api'
-import { filesWord, organizeError } from '@/lib/organize'
+import { copyKey, filesWord, organizeError } from '@/lib/organize'
 import { moveRefusal } from '@/lib/storageRules'
 import { formatBytes, formatNumber } from '@/lib/utils'
 
@@ -125,11 +125,13 @@ async function act(run: () => Promise<unknown>) {
   busy.value = true
   error.value = null
   const epoch = sessionEpoch.value
+  const link = props.link.import_id
+  const same = () => epoch === sessionEpoch.value && link === props.link.import_id
   try {
     await run()
-    if (epoch === sessionEpoch.value) emit('started')
+    if (same()) emit('started')
   } catch (err) {
-    if (epoch !== sessionEpoch.value) return
+    if (!same()) return
     error.value = isUnsupportedEndpoint(err) ? 'This node cannot do this yet.' : (moveRefusal(err) ?? organizeError(err))
   } finally {
     busy.value = false
@@ -215,7 +217,7 @@ const offlineHint = computed(() => (writesDisabled.value ? OFFLINE_WRITE_HINT : 
         @prev="copies.prev()"
         @filter="(value: string) => copies.load(value)"
       >
-        <li v-for="item in copies.items.value" :key="item.key" class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 py-1.5">
+        <li v-for="item in copies.items.value" :key="copyKey(item)" class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 py-1.5">
           <span class="truncate font-mono" :title="item.kept.path">{{ item.kept.path }}</span>
           <span class="text-muted-foreground">keeps</span>
           <span class="truncate font-mono text-muted-foreground" :title="item.removed.map((file) => file.path).join(', ')">

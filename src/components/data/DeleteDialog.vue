@@ -341,11 +341,12 @@ const selectionJob = computed<ProgressJob | null>(() => {
 async function controlPurge(action: 'pause' | 'resume' | 'abort') {
   const client = apiClient()
   if (!client || writesDisabled.value) return
+  const id = requestId
   try {
     if (isSelection.value) await selection.controlAll(action, client)
     else await purge.control(action, client)
   } catch (caught) {
-    error.value = organizeError(caught)
+    if (id === requestId) error.value = organizeError(caught)
   }
 }
 
@@ -506,6 +507,7 @@ async function runOption(current: DeleteRequest, option: DeletionOption): Promis
       return [current.key ?? '']
     case 'write-markers': {
       if (current.kind === 'selection') {
+        const asked = requestId
         const all = ids.value
         const pending = new Set(selection.pendingKeys(all))
         await selection.deleteMarkers(
@@ -514,6 +516,8 @@ async function runOption(current: DeleteRequest, option: DeletionOption): Promis
           keys.value.filter((key) => pending.has(key)),
           all,
         )
+        // The session may have changed while the files went; the folders must not follow it.
+        if (asked !== requestId) return []
         await selection.deletePrefixes(
           current.bucket,
           current.nodeId,

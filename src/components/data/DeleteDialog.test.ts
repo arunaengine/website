@@ -891,6 +891,21 @@ describe('delete dialog selection with folders', () => {
     expect(content(root)).toContain('cooked/')
   })
 
+  it('does not start the folders after the session changed during the files', async () => {
+    selectionS3.deleteObject.mockClear()
+    selectionS3.deletePrefix.mockClear()
+    let finish: (value: undefined) => void = () => {}
+    selectionS3.deleteObject.mockReturnValueOnce(new Promise<undefined>((resolve) => (finish = resolve)))
+    const { root } = await open(request, selectionDialog)
+    const pending = click(confirmButton(root))
+    await flush()
+    sessionEpoch.value++
+    await flush()
+    finish(undefined)
+    await pending
+    expect(selectionS3.deletePrefix).not.toHaveBeenCalled()
+  })
+
   it('deletes every selected folder through the prefix walk', async () => {
     selectionS3.deleteObject.mockClear()
     selectionS3.deletePrefix.mockClear()

@@ -6,10 +6,16 @@ const getStoragePurgeJob = vi.fn()
 const getStorageDeletionPreflight = vi.fn()
 const controlStoragePurge = vi.fn()
 
+const s3 = vi.hoisted(() => ({
+  canWrite: () => true,
+  canDeletePrefix: () => true,
+  deleteObject: vi.fn(),
+  deletePrefix: vi.fn(),
+}))
 vi.mock('@/composables/useS3', () => ({
   isS3NetworkError: () => false,
   s3ErrorMessage: String,
-  useS3: () => ({}),
+  useS3: () => s3,
 }))
 vi.mock('@/lib/storageDeletion', async () => {
   const real = await vi.importActual<typeof import('@/lib/storageDeletion')>('@/lib/storageDeletion')
@@ -295,5 +301,48 @@ describe('selection purge', () => {
     expect(selection.paused.value).toBe(false)
     expect(selection.pollError.value).toBeNull()
     expect(selection.controlError.value).toBeNull()
+  })
+
+  it('stops the folder walk and records nothing after a reset', async () => {
+    let first: (value: unknown) => void = () => {}
+    s3.deletePrefix.mockReset().mockReturnValueOnce(new Promise((resolve) => (first = resolve))).mockResolvedValue({ deleted: 1, errors: [] })
+    const selection = useSelectionDelete()
+    const walking = selection.deletePrefixes('reef', null, ['a/', 'b/'], ['a/', 'b/'])
+    await later()
+    selection.reset()
+    first({ deleted: 1, errors: [] })
+    await walking
+    expect(s3.deletePrefix).toHaveBeenCalledTimes(1)
+    expect(selection.outcome.value).toBeNull()
+  })
+
+  it('records no marker results after a reset', async () => {
+    let settle: (value: unknown) => void = () => {}
+    s3.deleteObject.mockReset().mockReturnValue(new Promise((resolve) => (settle = resolve)))
+    const selection = useSelectionDelete()
+    const deleting = selection.deleteMarkers('reef', null, ['a'], ['a'])
+    await later()
+    selection.reset()
+    settle(undefined)
+    await deleting
+    expect(selection.outcome.value).toBeNull()
+  })
+
+  it('does not leave a Resume for a job that ended before its pause was answered', async () => {
+    getStorageDeletionPreflight.mockResolvedValue(OPEN)
+    startStoragePurge.mockReset().mockImplementation(jobFor)
+    getStoragePurgeJob.mockReset().mockResolvedValueOnce({ kind: 'storage_purge', state: 'running' })
+    getStoragePurgeJob.mockResolvedValue({ kind: 'storage_purge', state: 'succeeded' })
+    let answer: (value: unknown) => void = () => {}
+    controlStoragePurge.mockReset().mockReturnValue(new Promise((resolve) => (answer = resolve)))
+    const selection = useSelectionDelete()
+    await selection.loadScopes('reef', { keys: ['a'], prefixes: [] }, CLIENT)
+    const running = selection.purgeKeys(['a'], CLIENT, ['a'])
+    await later()
+    const pausing = selection.controlAll('pause', CLIENT)
+    await running
+    answer(undefined)
+    await pausing
+    expect(selection.paused.value).toBe(false)
   })
 })

@@ -97,12 +97,12 @@ function show(id: string, action: 'show' | 'organize') {
           <Button variant="outline" size="sm" @click="show(problem.id, problem.action)">Show</Button>
         </div>
         <ul v-if="details === problem.id && problem.id === 'failed'" class="mt-2 space-y-0.5 text-[11px] text-destructive">
-          <li v-for="failure in link.last_run?.errors.slice(0, 20)" :key="failure.key" class="break-all">
+          <li v-for="(failure, at) in link.last_run?.errors.slice(0, 20)" :key="`${at}\n${failure.key}`" class="break-all">
             <span class="font-mono">{{ failure.key }}</span>: {{ failure.error }}
           </li>
         </ul>
         <ul v-if="details === problem.id && problem.id === 'conflicts'" class="mt-2 space-y-0.5 font-mono text-[11px]">
-          <li v-for="item in status?.conflicts.slice(0, 20)" :key="item.path" class="break-all">
+          <li v-for="(item, at) in status?.conflicts.slice(0, 20)" :key="`${at}\n${item.path}`" class="break-all">
             {{ item.path }}<span v-if="item.reason" class="font-sans text-muted-foreground"> · {{ item.reason }}</span>
           </li>
         </ul>

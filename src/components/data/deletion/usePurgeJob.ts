@@ -60,7 +60,10 @@ export function usePurgeJob() {
   /** Pauses, resumes or aborts the running delete; the poll shows the new state. */
   async function control(action: 'pause' | 'resume' | 'abort', client: ApiClientOptions) {
     if (!submission.value) return
+    const id = runId
     await controlStoragePurge(submission.value.job_id, action, client)
+    // A newer run owns the pause state now.
+    if (id !== runId) return
     if (action === 'pause') paused.value = true
     if (action === 'resume') paused.value = false
   }

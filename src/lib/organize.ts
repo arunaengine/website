@@ -122,3 +122,8 @@ export function linkProblems(
   }
   return found
 }
+
+/** A row identity for a duplicate group: one key can hold several contents. */
+export function copyKey(item: { key: string; kept: { path: string }; removed: { path: string }[] }): string {
+  return [item.key, item.kept.path, ...item.removed.map((file) => file.path)].join('\n')
+}

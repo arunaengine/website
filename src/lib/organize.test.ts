@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { abortSentence, activeJob, linkProblems, organizeError, percent, rangeLabel, type ProgressJob } from './organize'
+import { abortSentence, activeJob, copyKey, linkProblems, organizeError, percent, rangeLabel, type ProgressJob } from './organize'
 import { ApiError } from '@/lib/api'
 
 const MOVE: ProgressJob = { kind: 'move', state: 'running', done: 92410, total: 214880, counted: true, skipped: 2, failed: 0, controls: true }
@@ -70,5 +70,13 @@ describe('link problems', () => {
     expect(found[2].text).toContain('Choose Show to see why.')
     expect(found[3]).toMatchObject({ action: 'organize' })
     expect(found[3].text).toContain('At least 3 files still have the old name.')
+  })
+})
+
+describe('copy rows', () => {
+  it('tells apart two contents of one key', () => {
+    const a = { key: 'x', kept: { path: 'k1' }, removed: [{ path: 'r1' }] }
+    const b = { key: 'x', kept: { path: 'k2' }, removed: [{ path: 'r2' }] }
+    expect(copyKey(a)).not.toBe(copyKey(b))
   })
 })

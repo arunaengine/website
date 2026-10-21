@@ -1,5 +1,5 @@
 import * as VueRuntime from 'vue'
-import { defineComponent, h, ref } from 'vue'
+import { defineComponent, h, reactive, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { button, click, compileClientComponent, content, element, flush, mountApp, moduleDefault, typeValue } from '@/test/clientRender'
 import * as Api from '@/lib/api'
@@ -160,6 +160,24 @@ describe('MoveStep', () => {
     accept({})
     await pending
     expect(events).toEqual(['started'])
+  })
+
+  it('ignores a start accepted for the link that was left', async () => {
+    let accept: (value: unknown) => void = () => {}
+    startMove.mockReturnValueOnce(new Promise((resolve) => (accept = resolve)))
+    const events: string[] = []
+    const props = reactive({ groupId: 'g1', link: { import_id: 'i1' }, onStarted: () => events.push('started') })
+    const mounted = await mountApp(defineComponent(() => () => h(MoveStep, props)))
+    await flush()
+    await fill(mounted.root)
+    const pending = click(button(mounted.root, 'Move files'))
+    await flush()
+    props.link = { import_id: 'i2' }
+    await flush()
+    accept({})
+    await pending
+    expect(events).toEqual([])
+    expect(field(mounted.root, 'Files to move').props.disabled).toBe(false)
   })
 
   it('does not start while the node reports another step', async () => {

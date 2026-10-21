@@ -229,7 +229,10 @@ export function useSelectionDelete() {
     keys: string[],
     all: string[] = keys,
   ) {
+    const id = runId
     for (let offset = 0; offset < keys.length; offset += BATCH_SIZE) {
+      // A reset selection is a different one: nothing more starts and nothing is recorded.
+      if (id !== runId) return
       const batch = keys.slice(offset, offset + BATCH_SIZE)
       const permitted = batch.map((key) => s3.canWrite(bucket, key, nodeId))
       const settled = await Promise.allSettled(
@@ -237,6 +240,7 @@ export function useSelectionDelete() {
           permitted[index] ? s3.deleteObject(bucket, key, nodeId) : Promise.resolve(),
         ),
       )
+      if (id !== runId) return
       record(
         all,
         settled.map<KeyResult>((result, index) => {
@@ -263,7 +267,9 @@ export function useSelectionDelete() {
     prefixes: string[],
     all: string[] = prefixes,
   ) {
+    const id = runId
     for (const key of prefixes) {
+      if (id !== runId) return
       if (!s3.canDeletePrefix(bucket, key, nodeId)) {
         record(all, [
           { key, status: 'failed', message: 'This session no longer allows deleting this folder.' },
@@ -272,10 +278,12 @@ export function useSelectionDelete() {
       }
       try {
         const failure = prefixDeleteFailure(await s3.deletePrefix(bucket, key, nodeId))
+        if (id !== runId) return
         record(all, [
           failure ? { key, status: 'failed', message: failure } : { key, status: 'committed' },
         ])
       } catch (error) {
+        if (id !== runId) return
         record(all, [{ key, status: failureStatus(error), message: s3ErrorMessage(error) }])
       }
     }
@@ -362,8 +370,10 @@ export function useSelectionDelete() {
     settled.forEach((result, index) => {
       if (result.status !== 'fulfilled') return
       const [key, jobId] = targets[index]
-      if (action === 'pause') next[key] = jobId
-      else delete next[key]
+      // A pause answered after the job ended must not leave a Resume for a finished job.
+      if (action === 'pause') {
+        if (activeJobs.value[key] === jobId) next[key] = jobId
+      } else delete next[key]
     })
     pausedJobs.value = next
     const refused = settled.find((result) => result.status === 'rejected')
