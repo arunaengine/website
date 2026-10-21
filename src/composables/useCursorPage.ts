@@ -18,24 +18,28 @@ export function useCursorPage<T>(
   const filter = ref('')
   const busy = ref(false)
   const error = ref<string | null>(null)
-  // cursors[i] is the cursor that opens page i.
+  // cursors[i] opens page i and starts[i] is how many entries come before it.
   const cursors = ref<(string | null)[]>([null])
+  const starts = ref<number[]>([0])
   const index = ref(0)
   let generation = 0
 
   const items = computed(() => page.value?.items ?? [])
-  const offset = computed(() => index.value * PAGE_SIZE)
+  const offset = computed(() => starts.value[index.value] ?? 0)
   const hasNext = computed(() => Boolean(page.value?.next))
   const hasPrev = computed(() => index.value > 0)
 
-  async function open(at: number, text = filter.value) {
+  // The paging state changes only when the page arrived, so a failure keeps the page on screen.
+  async function open(nextCursors: (string | null)[], nextStarts: number[], at: number, text: string) {
     const id = ++generation
     busy.value = true
     error.value = null
     try {
-      const result = await fetchPage({ filter: text, limit: PAGE_SIZE, after: cursors.value[at] ?? null })
+      const result = await fetchPage({ filter: text, limit: PAGE_SIZE, after: nextCursors[at] ?? null })
       if (id !== generation) return
       page.value = result
+      cursors.value = nextCursors
+      starts.value = nextStarts
       index.value = at
       filter.value = text
     } catch (err) {
@@ -50,19 +54,21 @@ export function useCursorPage<T>(
 
   /** Starts over from the first page, optionally with a new filter. */
   function load(text = filter.value) {
-    cursors.value = [null]
-    return open(0, text)
+    return open([null], [0], 0, text)
   }
 
   function next() {
     const cursor = page.value?.next
     if (!cursor || busy.value) return Promise.resolve()
-    cursors.value = [...cursors.value.slice(0, index.value + 1), cursor]
-    return open(index.value + 1)
+    const at = index.value + 1
+    const start = offset.value + items.value.length
+    return open([...cursors.value.slice(0, at), cursor], [...starts.value.slice(0, at), start], at, filter.value)
   }
 
   function prev() {
-    return index.value > 0 && !busy.value ? open(index.value - 1) : Promise.resolve()
+    return index.value > 0 && !busy.value
+      ? open(cursors.value, starts.value, index.value - 1, filter.value)
+      : Promise.resolve()
   }
 
   /** Forgets everything, and ignores answers still on their way. */
@@ -73,6 +79,7 @@ export function useCursorPage<T>(
     busy.value = false
     error.value = null
     cursors.value = [null]
+    starts.value = [0]
     index.value = 0
   }
 

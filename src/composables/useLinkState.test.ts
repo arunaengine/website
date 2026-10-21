@@ -99,4 +99,38 @@ describe('useLinkState', () => {
     expect(state.error.value).toBe('refused')
     scope.stop()
   })
+
+  it('keeps the running step when a poll fails and shows the error', async () => {
+    getOrganizeJob.mockResolvedValue(RUNNING)
+    const { scope, state } = setup()
+    await state.refresh()
+    getOrganizeJob.mockRejectedValue(new Error('offline'))
+    await state.refresh()
+    expect(state.job.value).toMatchObject({ kind: 'move', state: 'running' })
+    expect(state.error.value).toBe('offline')
+    getOrganizeJob.mockResolvedValue(RUNNING)
+    await state.refresh()
+    expect(state.error.value).toBeNull()
+    scope.stop()
+  })
+
+  it('does not poll again after it is disposed, even with a control pending', async () => {
+    vi.useFakeTimers()
+    try {
+      getOrganizeJob.mockResolvedValue(RUNNING)
+      let answer: (value: unknown) => void = () => {}
+      controlJob.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+      const { scope, state } = setup()
+      await state.refresh()
+      const pending = state.control('pause')
+      scope.stop()
+      answer({ ...RUNNING, state: 'paused' })
+      await pending
+      const calls = getOrganizeJob.mock.calls.length
+      await vi.advanceTimersByTimeAsync(10_000)
+      expect(getOrganizeJob.mock.calls.length).toBe(calls)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

@@ -19,7 +19,7 @@ describe('useCursorPage', () => {
     await list.next()
     expect(list.items.value).toEqual(['p2'])
     expect(list.hasNext.value).toBe(false)
-    expect(list.offset.value).toBe(200)
+    expect(list.offset.value).toBe(2)
     await list.prev()
     expect(list.items.value).toEqual(['p1'])
     expect(fetchPage).toHaveBeenLastCalledWith({ filter: '', limit: 100, after: '1' })
@@ -48,5 +48,30 @@ describe('useCursorPage', () => {
     await gone.load('')
     expect(missing).toHaveBeenCalled()
     expect(gone.error.value).toBeNull()
+  })
+
+  it('keeps the page and the cursors when a filter load fails', async () => {
+    const { fetchPage, list } = pages()
+    await list.load('')
+    await list.next()
+    fetchPage.mockRejectedValueOnce(new Error('boom'))
+    await list.load('faa')
+    expect(list.error.value).toBe('boom')
+    expect(list.items.value).toEqual(['p1'])
+    expect(list.filter.value).toBe('')
+    expect(list.offset.value).toBe(1)
+    await list.prev()
+    expect(list.items.value).toEqual(['p0'])
+  })
+
+  it('counts the real size of each page for the offset', async () => {
+    const sizes = [3, 2]
+    const list = useCursorPage<string>(async (query) => {
+      const index = query.after === null ? 0 : Number(query.after)
+      return { items: Array(sizes[index]).fill('x'), total: 5, complete: true, next: index === 0 ? '1' : null }
+    })
+    await list.load('')
+    await list.next()
+    expect(list.offset.value).toBe(3)
   })
 })

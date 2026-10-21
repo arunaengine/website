@@ -23,24 +23,30 @@ export function useLinkState(groupId: () => string, importId: () => string) {
   const status = ref<LinkStatus | null>(null)
   // False once the node answers 404 for the step routes.
   const supported = ref(true)
-  const error = ref<string | null>(null)
+  // A failed read keeps what was known; the error stays visible until a read works.
+  const readError = ref<string | null>(null)
+  const controlError = ref<string | null>(null)
+  const error = computed(() => readError.value ?? controlError.value)
   const controlling = ref(false)
   let generation = 0
+  let disposed = false
   let timer: ReturnType<typeof setTimeout> | null = null
 
   const job = computed(() => activeJob(stored.value))
+  const context = () => `${groupId()}\n${importId()}`
 
   function client() {
     return { baseUrl: apiBaseUrl.value, token: authToken.value }
   }
 
-  async function optional<T>(run: () => Promise<T>, onMissing: () => void): Promise<T | null> {
+  type Read<T> = { state: 'ok'; value: T } | { state: 'missing' } | { state: 'failed'; message: string }
+
+  async function read<T>(run: () => Promise<T>): Promise<Read<T>> {
     try {
-      return await run()
+      return { state: 'ok', value: await run() }
     } catch (err) {
-      if (isUnsupportedEndpoint(err)) onMissing()
-      else error.value = organizeError(err)
-      return null
+      if (isUnsupportedEndpoint(err)) return { state: 'missing' }
+      return { state: 'failed', message: organizeError(err) }
     }
   }
 
@@ -49,38 +55,48 @@ export function useLinkState(groupId: () => string, importId: () => string) {
     const group = groupId()
     const link = importId()
     const [found, current, counted] = await Promise.all([
-      optional(() => getImportRenames(group, link, client()), () => {}),
-      optional(() => getOrganizeJob(group, link, client()), () => (supported.value = false)),
-      optional(() => getLinkStatus(group, link, client()), () => {}),
+      read(() => getImportRenames(group, link, client())),
+      read(() => getOrganizeJob(group, link, client())),
+      read(() => getLinkStatus(group, link, client())),
     ])
-    if (id !== generation) return
-    renames.value = found
-    stored.value = current
-    status.value = counted
+    if (disposed || id !== generation) return
+    if (found.state !== 'failed') renames.value = found.state === 'ok' ? found.value : null
+    if (counted.state !== 'failed') status.value = counted.state === 'ok' ? counted.value : null
+    if (current.state === 'ok') stored.value = current.value
+    else if (current.state === 'missing') {
+      supported.value = false
+      stored.value = null
+    }
+    const failed = [found, current, counted].find((result) => result.state === 'failed')
+    readError.value = failed?.state === 'failed' ? failed.message : null
     schedule()
   }
 
   function schedule() {
     if (timer) clearTimeout(timer)
-    timer = job.value ? setTimeout(() => void refresh(), POLL_MS) : null
+    timer = !disposed && job.value ? setTimeout(() => void refresh(), POLL_MS) : null
   }
 
   async function control(action: 'pause' | 'resume' | 'abort') {
-    if (controlling.value) return
+    if (controlling.value || disposed) return
     controlling.value = true
-    error.value = null
+    controlError.value = null
+    const asked = context()
     try {
-      stored.value = await controlJob(groupId(), importId(), action, client())
+      const answer = await controlJob(groupId(), importId(), action, client())
+      if (!disposed && asked === context()) stored.value = answer
     } catch (err) {
       // The step ended on its own meanwhile; the refresh below shows how.
-      if (!(err instanceof ApiError && err.status === 409 && err.code === 'no_job')) error.value = organizeError(err)
+      const over = err instanceof ApiError && err.status === 409 && err.code === 'no_job'
+      if (!over && !disposed && asked === context()) controlError.value = organizeError(err)
     } finally {
       controlling.value = false
     }
-    await refresh()
+    if (!disposed && asked === context()) await refresh()
   }
 
   onScopeDispose(() => {
+    disposed = true
     generation++
     if (timer) clearTimeout(timer)
   })
