@@ -69,8 +69,14 @@ function slotted(tag: string) {
 }
 
 const pagedStub = defineComponent({
-  props: { total: Number, shown: Number, hasNext: Boolean },
-  setup: (props, { slots }) => () => h('div', [h('ul', slots.default?.()), h('span', `shown ${props.shown} of ${props.total}`)]),
+  props: { total: Number, shown: Number, hasNext: Boolean, filterable: { type: Boolean, default: true } },
+  emits: ['filter'],
+  setup: (props, { slots, emit }) => () =>
+    h('div', [
+      h('ul', slots.default?.()),
+      h('span', `shown ${props.shown} of ${props.total}`),
+      props.filterable ? h('button', { onClick: () => emit('filter', 'x') }, 'filter x') : null,
+    ]),
 })
 
 const jobProgress = defineComponent({
@@ -552,7 +558,7 @@ describe('delete dialog', () => {
 
     const text = content(root)
     expect(text).toContain('4,210 files with all 4,388 versions')
-    expect(text).toContain('4,206 files (288.7 GB)')
+    expect(text).toContain('Your storage holds 4,206 files (288.7 GB)')
     expect(text).toContain('4 files in your storage stay because other links or files still use them.')
     expect(text).toContain('This cannot be undone.')
     expect(getDeleteImpact).toHaveBeenCalledWith(
@@ -605,6 +611,22 @@ describe('delete dialog', () => {
     expect(text).toContain('shown 2 of 2')
   })
 
+  it('filters the delete list and drops the filter on a node that rejects it', async () => {
+    const page = { ...IMPACT, items: [{ key: 'a/x.txt', version_id: 'v1', bytes: 1 }] }
+    getDeleteImpact.mockResolvedValueOnce(IMPACT).mockResolvedValueOnce(page)
+    const { root } = await open({ kind: 'folder', bucket: 'reef', nodeId: null, key: 'a/', option: 'delete-permanently' })
+    await click(button(root, 'Show files'))
+    getDeleteImpact.mockResolvedValueOnce(page)
+    await click(button(root, 'filter x'))
+    expect(getDeleteImpact).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), { filter: 'x', limit: 100, after: null })
+
+    getDeleteImpact.mockRejectedValueOnce(Object.assign(new Error('bad field'), { status: 400 })).mockResolvedValueOnce(page)
+    await click(button(root, 'filter x'))
+    expect(getDeleteImpact).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), { filter: '', limit: 100, after: null })
+    expect(() => button(root, 'filter x')).toThrow()
+    expect(content(root)).toContain('a/x.txt')
+  })
+
   it('words kept storage files carefully while the page is not complete', async () => {
     getDeleteImpact.mockResolvedValueOnce({
       files: 10,
@@ -619,6 +641,7 @@ describe('delete dialog', () => {
     const { root } = await open({ kind: 'folder', bucket: 'reef', nodeId: null, key: 'a/', option: 'delete-permanently' })
     const text = content(root)
     expect(text).toContain('at least 10 files')
+    expect(text).toContain('Your storage holds at least 10 files')
     expect(text).toContain('Some storage files stay because other links or files still use them.')
   })
 
@@ -715,6 +738,13 @@ describe('delete dialog', () => {
     await typeValue(element(root, (node) => node.tag === 'input' && node.props.type !== 'radio'), 'reef')
     await click(confirmButton(root))
     expect(removeBucket).toHaveBeenCalledWith('node-far', 'reef', expect.anything(), true)
+  })
+
+  it('does not say nothing is in storage while the check is incomplete', async () => {
+    getDeleteImpact.mockResolvedValueOnce({ ...IMPACT, storage_files: 0, storage_bytes: 0, complete: false })
+    const { root } = await open({ kind: 'folder', bucket: 'reef', nodeId: null, key: 'a/', option: 'delete-permanently' })
+    expect(content(root)).toContain('The check is not complete.')
+    expect(content(root)).not.toContain('No files in your storage belong to them.')
   })
 
   it('leaves the box out when the node cannot size the delete', async () => {

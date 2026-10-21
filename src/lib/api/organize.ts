@@ -174,5 +174,7 @@ export function getLinkStatus(groupId: string, importId: string, client: ApiClie
 /** What a permanent delete removes in Aruna and in storage; nothing changes. */
 export function getDeleteImpact(scope: DeleteScope, client: ApiClientOptions, page: PageQuery = {}): Promise<DeleteImpact> {
   const path = `/data/buckets/${encodeURIComponent(scope.bucket)}/storage/delete/preview`
-  return apiRequest(path, post({ kind: scope.kind, key: scope.key, ...page }), client)
+  // An empty filter is left out, so a node that lacks the field never sees it.
+  const { filter, ...rest } = page
+  return apiRequest(path, post({ kind: scope.kind, key: scope.key, ...rest, ...(filter ? { filter } : {}) }), client)
 }

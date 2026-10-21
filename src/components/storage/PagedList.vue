@@ -16,8 +16,10 @@ const props = withDefaults(
     /** False while the total is a lower bound. */
     complete?: boolean
     busy?: boolean
+    /** False hides the name filter, for a node that cannot filter. */
+    filterable?: boolean
   }>(),
-  { complete: true, busy: false },
+  { complete: true, busy: false, filterable: true },
 )
 const emit = defineEmits<{ (e: 'prev'): void; (e: 'next'): void; (e: 'filter', value: string): void }>()
 
@@ -34,12 +36,14 @@ watch(() => props.filter, (value) => (draft.value = value))
     </ul>
     <div class="flex flex-wrap items-center justify-between gap-2">
       <Input
+        v-if="filterable"
         v-model="draft"
         class="h-8 max-w-56 text-xs"
         placeholder="Filter by name…"
         aria-label="Filter by name"
         @change="emit('filter', draft.trim())"
       />
+      <span v-else />
       <span class="text-[11px] tabular-nums text-muted-foreground">{{ rangeLabel(offset, shown, total, complete) }}</span>
       <span class="flex gap-2">
         <Button variant="outline" size="sm" :disabled="busy || !hasPrev" @click="emit('prev')">Previous</Button>
