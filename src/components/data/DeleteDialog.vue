@@ -13,6 +13,7 @@ import Input from '@/components/ui/Input.vue'
 import RefusalNote from '@/components/ui/RefusalNote.vue'
 import DeletionImpact from '@/components/data/deletion/DeletionImpact.vue'
 import DeletionOutcome from '@/components/data/deletion/DeletionOutcome.vue'
+import PermanentDeleteImpact from '@/components/data/deletion/PermanentDeleteImpact.vue'
 import PurgeProgress from '@/components/data/deletion/PurgeProgress.vue'
 import VersionPicker from '@/components/data/deletion/VersionPicker.vue'
 import { useDeletionPreflight } from '@/components/data/deletion/useDeletionPreflight'
@@ -22,6 +23,7 @@ import {
   useSelectionDelete,
 } from '@/components/data/deletion/useSelectionDelete'
 import { removeBucket } from '@/components/groups/bucketRemoval'
+import { getDeleteImpact, type DeleteImpact } from '@/lib/api'
 import { nodeApiBase } from '@/composables/s3/endpoints'
 import { useAruna } from '@/composables/useAruna'
 import { useRealmNodes } from '@/composables/useRealmNodes'
@@ -63,6 +65,8 @@ const selection = useSelectionDelete()
 
 const preflight = ref<StorageDeletionPreflight | null>(null)
 const preflightBusy = ref(false)
+// What a permanent delete removes in storage too; null when the node cannot say.
+const impact = ref<DeleteImpact | null>(null)
 const remaining = ref<StorageDeletionPreflight | null>(null)
 const remainingBusy = ref(false)
 const remainingMissing = ref(false)
@@ -240,6 +244,7 @@ function apiClient() {
 function reset() {
   ++requestId
   preflight.value = null
+  impact.value = null
   preflightBusy.value = false
   remaining.value = null
   remainingBusy.value = false
@@ -278,6 +283,22 @@ async function loadPreflight() {
     error.value = storageDeletionErrorMessage(caught)
   } finally {
     if (id === requestId) preflightBusy.value = false
+  }
+}
+
+// Older nodes answer 404 or fail; the box is then left out and the delete goes on as before.
+async function loadImpact() {
+  const target = scope.value
+  const client = apiClient()
+  if (!target || !client || impact.value) return
+  const id = requestId
+  const kind = target.kind === 'prefix' ? 'folder' : target.kind
+  const key = target.kind === 'file' ? target.key : target.kind === 'prefix' ? target.prefix : ''
+  try {
+    const found = await getDeleteImpact({ kind, bucket: target.bucket, key }, client)
+    if (id === requestId) impact.value = found
+  } catch {
+    if (id === requestId) impact.value = null
   }
 }
 
@@ -339,6 +360,7 @@ watch(
         ? 'all_versions_purge'
         : 'latest_version_tombstone',
     )
+    if ((id === 'delete-permanently' || id === 'delete-bucket') && !isSelection.value) void loadImpact()
     if (id === 'delete-permanently' && isSelection.value) {
       void selection.loadScopes(
         current.bucket,
@@ -567,6 +589,8 @@ onUnmounted(() => {
           @select="(entry) => (pickedVersion = entry)"
         />
         <p v-if="versionConsequence" class="text-muted-foreground">{{ versionConsequence }}</p>
+
+        <PermanentDeleteImpact v-if="impact && !finished" :impact="impact" :label="`${requestNoun(request)} ${typedTarget}`" />
 
         <DeletionImpact
           :preflight="preflight"

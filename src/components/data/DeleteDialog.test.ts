@@ -1,6 +1,7 @@
 import { computed, defineComponent, h, ref, type Component } from 'vue'
 import * as VueRuntime from 'vue'
 import { describe, expect, it, vi } from 'vitest'
+import * as Organize from '@/lib/organize'
 import * as Utils from '@/lib/utils'
 import * as DeletionOptions from '@/lib/deletion/options'
 import * as DeletionRequest from '@/lib/deletion/request'
@@ -49,6 +50,9 @@ const deleteBucket = vi.fn(async () => undefined)
 const purgeRun = vi.fn(async () => ({ state: 'succeeded' }))
 const removeBucket = vi.fn(async (_nodeId: string, _bucket: string, _job: unknown) => undefined)
 const preflightResponse = vi.fn()
+const getDeleteImpact = vi.fn(async () => {
+  throw new Error('not found')
+})
 const backlinkPreflight = ref<BacklinkPreflightResponse | null>(null)
 const sessionEpoch = ref(1)
 
@@ -114,6 +118,15 @@ function dialogModules(overrides: Record<string, unknown> = {}) {
   '@/lib/deletion/options': DeletionOptions,
   '@/lib/deletion/request': DeletionRequest,
   '@/lib/objectVersions': ObjectVersions,
+  '@/lib/api': { getDeleteImpact },
+  '@/lib/organize': Organize,
+  '@/components/data/deletion/PermanentDeleteImpact.vue': moduleDefault(
+    compileClientComponent(new URL('./deletion/PermanentDeleteImpact.vue', import.meta.url), {
+      vue: VueRuntime,
+      '@/lib/organize': Organize,
+      '@/lib/utils': Utils,
+    }),
+  ),
   '@/lib/storageDeletion': {
     createStoragePurgeOperation: (scope: unknown) => ({ scope, idempotencyKey: 'key' }),
     getStorageDeletionPreflight: preflightResponse,
@@ -469,6 +482,50 @@ describe('delete dialog', () => {
 
     await typeValue(field, 'raw')
     expect(confirmButton(root).props.disabled).toBe(false)
+  })
+
+  it('shows what goes in Aruna and in storage before a permanent folder delete', async () => {
+    getDeleteImpact.mockResolvedValueOnce({
+      files: 4210,
+      versions: 4388,
+      storage_files: 4206,
+      storage_bytes: 310e9,
+      kept_files: 4,
+    })
+    const { root } = await open({
+      kind: 'folder',
+      bucket: 'reef',
+      nodeId: null,
+      key: 'old-runs/',
+      option: 'delete-permanently',
+    })
+
+    const text = content(root)
+    expect(text).toContain('4,210 files with all 4,388 versions')
+    expect(text).toContain('4,206 files (288.7 GB)')
+    expect(text).toContain('4 files in your storage stay because other links or files still use them.')
+    expect(text).toContain('This cannot be undone.')
+    expect(getDeleteImpact).toHaveBeenCalledWith(
+      { kind: 'folder', bucket: 'reef', key: 'old-runs/' },
+      expect.anything(),
+    )
+    // The typed name still guards the red button.
+    expect(confirmButton(root).props.disabled).toBe(true)
+    await typeValue(element(root, (node) => node.tag === 'input' && node.props.type !== 'radio'), 'old-runs')
+    expect(confirmButton(root).props.disabled).toBe(false)
+  })
+
+  it('leaves the box out when the node cannot size the delete', async () => {
+    const { root } = await open({
+      kind: 'folder',
+      bucket: 'reef',
+      nodeId: null,
+      key: 'raw/',
+      option: 'delete-permanently',
+    })
+
+    expect(content(root)).not.toContain('This cannot be undone.')
+    expect(confirmButton(root).props.disabled).toBe(true)
   })
 
   it('keeps a marker delete one click away', async () => {
