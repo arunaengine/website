@@ -1,6 +1,6 @@
 // What a linked folder shows beside its last run: old names, a running step and open problems.
 // Each answer is optional; a node that lacks a route (404) simply says nothing for it.
-import { computed, onScopeDispose, ref } from 'vue'
+import { computed, onScopeDispose, reactive, ref } from 'vue'
 import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
 import {
   ApiError,
@@ -15,6 +15,9 @@ import {
 import { activeJob, organizeError } from '@/lib/organize'
 
 const POLL_MS = 3000
+
+/** Links with a settings save on its way, by "group\nimport"; a new opening waits for it. */
+export const savesInFlight = reactive(new Set<string>())
 
 export function useLinkState(groupId: () => string, importId: () => string) {
   const { apiBaseUrl, authToken } = useAruna()

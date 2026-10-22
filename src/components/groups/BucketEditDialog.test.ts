@@ -1,5 +1,5 @@
 import * as VueRuntime from 'vue'
-import { defineComponent, h, ref, type Component } from 'vue'
+import { defineComponent, h, reactive, ref, type Component } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { click, compileClientComponent, content, element, flush, moduleDefault, mountApp, typeValue } from '@/test/clientRender'
 import * as Api from '@/lib/api'
@@ -13,6 +13,7 @@ const saveFileRules = vi.fn()
 const startImportRenames = vi.fn()
 const updateBackendImport = vi.fn()
 const refresh = vi.fn()
+const savesInFlight = reactive(new Set<string>())
 const status = ref<{ files?: number; conflicts: [] } | null>(null)
 const renames = ref<{ count: number; complete: boolean; files: [] } | null>(null)
 
@@ -57,6 +58,7 @@ const BucketEditDialog = compileClientComponent(new URL('./BucketEditDialog.vue'
   ...ui('TabsTrigger'),
   '@/composables/useAruna': { useAruna: () => ({ apiBaseUrl: ref('https://api'), authToken: ref('t'), sessionEpoch: ref(0) }) },
   '@/composables/useLinkState': {
+    savesInFlight,
     useLinkState: () => ({
       renames,
       status,
@@ -92,18 +94,29 @@ const saveButton = (root: Root) =>
 
 async function mount() {
   const open = ref(false)
+  const shown = ref(true)
   const mounted = await mountApp(
     defineComponent(() => () =>
-      h(BucketEditDialog, { open: open.value, groupId: 'g1', link: LINK, storage: 'spire', place: 'aruna-spire-genes' }),
+      shown.value
+        ? h(BucketEditDialog, { open: open.value, groupId: 'g1', link: LINK, storage: 'spire', place: 'aruna-spire-genes' })
+        : null,
     ),
   )
   open.value = true
   await flush()
   if (mounted.errors.length) throw mounted.errors[0]
-  return { ...mounted, open }
+  return { ...mounted, open, shown }
+}
+
+async function checkRename(root: Root) {
+  const box = element(root, (node) => node.tag === 'input' && node.props.type === 'checkbox')
+  ;(box as unknown as { checked: boolean }).checked = true
+  for (const listener of box.listeners.get('change') ?? []) listener({ target: box })
+  await flush()
 }
 
 beforeEach(() => {
+  savesInFlight.clear()
   status.value = null
   renames.value = null
   getFileRules.mockReset().mockResolvedValue({ rules: [] })
@@ -120,7 +133,8 @@ describe('BucketEditDialog', () => {
 
     await typeValue(field(root, 'New uploads are named'), 'suffix')
     expect(content(root)).toContain('After saving: b.fa.gz~01JA7Q3K')
-    expect(content(root)).toContain('Also rename the files that use the old style')
+    expect(content(root)).toContain('Also rename existing files to the new style (counted after saving)')
+    await checkRename(root)
     await click(saveButton(root))
 
     expect(updateBackendImport).toHaveBeenCalledWith('g1', 'i1', null, expect.anything(), '{dir}{name}~{id}')
@@ -142,27 +156,48 @@ describe('BucketEditDialog', () => {
     expect(saveButton(root).props.disabled).toBe(false)
   })
 
-  it('starts a new opening with Save usable while an old save still runs', async () => {
-    updateBackendImport.mockReturnValueOnce(new Promise(() => {}))
+  it('lets a new opening save only after the earlier save of the bucket ended', async () => {
+    let answer: (value: unknown) => void = () => {}
+    updateBackendImport.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
     const { root, open } = await mount()
     await typeValue(field(root, 'Look for new files'), '0 3 * * *')
     void (saveButton(root).props.onClick as () => Promise<void>)()
     await flush()
-    expect(content(saveButton(root))).toBe('Saving…')
     open.value = false
     await flush()
     open.value = true
     await flush()
     await typeValue(field(root, 'Look for new files'), '0 3 * * 1')
+    expect(content(saveButton(root)).trim()).toBe('Saving…')
+    expect(saveButton(root).props.disabled).toBe(true)
+    answer({})
+    await flush()
     expect(content(saveButton(root)).trim()).toBe('Save')
     expect(saveButton(root).props.disabled).toBe(false)
+  })
+
+  it('starts no rename after the dialog closed during a save', async () => {
+    let answer: (value: unknown) => void = () => {}
+    updateBackendImport.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+    const { root, shown } = await mount()
+    await typeValue(field(root, 'New uploads are named'), 'suffix')
+    await checkRename(root)
+    void (saveButton(root).props.onClick as () => Promise<void>)()
+    await flush()
+    shown.value = false
+    await flush()
+    answer({})
+    await flush()
+    expect(updateBackendImport).toHaveBeenCalled()
+    expect(startImportRenames).not.toHaveBeenCalled()
+    expect(savesInFlight.size).toBe(0)
   })
 
   it('counts the files of an older style before saving', async () => {
     renames.value = { count: 6, complete: true, files: [] }
     const { root } = await mount()
     await typeValue(field(root, 'New uploads are named'), 'plain')
-    expect(content(root)).toContain('Also rename at least 6 files that use an older style')
+    expect(content(root)).toContain('Also rename at least 6 files to the new style')
   })
 
   it('refuses a custom name without {name}', async () => {

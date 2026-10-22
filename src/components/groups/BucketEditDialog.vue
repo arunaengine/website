@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Edit one linked bucket: naming, mappings and schedule in Settings, clean-up steps in Organize.
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import BucketOrganize from '@/components/groups/BucketOrganize.vue'
 import MappingList from '@/components/groups/MappingList.vue'
 import JobProgress from '@/components/storage/JobProgress.vue'
@@ -19,7 +19,7 @@ import TabsContent from '@/components/ui/TabsContent.vue'
 import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import { useAruna } from '@/composables/useAruna'
-import { useLinkState } from '@/composables/useLinkState'
+import { savesInFlight, useLinkState } from '@/composables/useLinkState'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { getFileRules, saveFileRules, startImportRenames, updateBackendImport, type BackendImport } from '@/lib/api'
 import {
@@ -58,7 +58,7 @@ const { renames, status, job, error: stateError, controlling, finished, refresh,
 const tab = ref('settings')
 const choice = ref<NamingChoice>('plain')
 const custom = ref('')
-const renameOld = ref(true)
+const renameOld = ref(false)
 const schedule = ref('')
 const mappings = ref<Mapping[]>([])
 const savedMappings = ref<Mapping[]>([])
@@ -80,13 +80,15 @@ const mappingsChanged = computed(() => mappingsKnown.value && !sameMappings(mapp
 const dirty = computed(() => nameChanged.value || schedule.value !== savedSchedule.value || mappingsChanged.value)
 const invalid = computed(() => Boolean(nameError.value) || mappings.value.some((mapping) => mappingProblem(mapping)))
 const offersRename = computed(() => nameChanged.value && choice.value !== 'prefix')
-// The listing counts files of earlier styles now; the saved style adds its own files later.
+// The listing counts files of earlier styles now; files of the current style count only after saving.
 const renameLabel = computed(() => {
   const count = renames.value?.count ?? 0
   return count > 0
-    ? `Also rename ${countWords(count, false)} that use an older style`
-    : 'Also rename the files that use the old style'
+    ? `Also rename at least ${countWords(count, true)} to the new style`
+    : 'Also rename existing files to the new style (counted after saving)'
 })
+const saveKey = computed(() => `${props.groupId}\n${props.link.import_id}`)
+const saveBusy = computed(() => saving.value || savesInFlight.has(saveKey.value))
 const hourlyWarning = computed(() => {
   const files = status.value?.files
   return schedule.value === '0 * * * *' && files !== undefined && files >= BIG_BUCKET
@@ -95,6 +97,12 @@ const hourlyWarning = computed(() => {
 })
 
 let opening = 0
+let disposed = false
+// A closed dialog starts no further step of its save.
+onBeforeUnmount(() => {
+  disposed = true
+  opening++
+})
 async function loadMappings(id: number) {
   try {
     const { rules } = await getFileRules(props.groupId, props.link.import_id, client())
@@ -118,7 +126,7 @@ watch(
     custom.value = choice.value === 'custom' ? shownPattern(savedPattern.value) : ''
     savedSchedule.value = props.link.schedule ?? ''
     schedule.value = savedSchedule.value
-    renameOld.value = true
+    renameOld.value = false
     mappingsKnown.value = false
     mappings.value = []
     savedMappings.value = []
@@ -137,12 +145,17 @@ function pickChoice(value: string) {
 }
 
 async function save() {
-  if (!dirty.value || invalid.value || saving.value || writesDisabled.value) return
+  if (!dirty.value || invalid.value || saveBusy.value || writesDisabled.value) return
+  const key = saveKey.value
+  savesInFlight.add(key)
   saving.value = true
   saveError.value = null
   savedNote.value = false
   const id = opening
   const link = props.link.import_id
+  const asked = client()
+  const epoch = sessionEpoch.value
+  const live = () => !disposed && id === opening && epoch === sessionEpoch.value
   const rename = offersRename.value && renameOld.value
   // What is sent; edits made while it saves stay as a newer draft.
   const sentSchedule = schedule.value
@@ -150,25 +163,26 @@ async function save() {
   const sentMappings = mappingsChanged.value ? mappings.value.map((mapping) => ({ ...mapping })) : null
   try {
     if (sentPattern !== undefined || sentSchedule !== savedSchedule.value) {
-      await updateBackendImport(props.groupId, link, sentSchedule || null, client(), sentPattern)
-      if (id !== opening) return
+      await updateBackendImport(props.groupId, link, sentSchedule || null, asked, sentPattern)
+      if (!live()) return
       if (sentPattern !== undefined) savedPattern.value = sentPattern
       savedSchedule.value = sentSchedule
     }
     if (sentMappings) {
-      const { rules } = await saveFileRules(props.groupId, link, sentMappings.map(toRule), client())
-      if (id !== opening) return
+      const { rules } = await saveFileRules(props.groupId, link, sentMappings.map(toRule), asked)
+      if (!live()) return
       savedMappings.value = rules.map(toMapping)
       if (sameMappings(mappings.value, sentMappings)) mappings.value = rules.map(toMapping)
     }
-    if (rename) await startImportRenames(props.groupId, link, client())
-    if (id !== opening) return
+    if (rename) await startImportRenames(props.groupId, link, asked)
+    if (!live()) return
     savedNote.value = true
     emit('saved')
     void refresh()
   } catch (err) {
-    if (id === opening) saveError.value = errorMessage(err)
+    if (live()) saveError.value = errorMessage(err)
   } finally {
+    savesInFlight.delete(key)
     if (id === opening) saving.value = false
   }
 }
@@ -256,11 +270,11 @@ async function save() {
             <DialogClose as-child><Button variant="outline" size="sm">Cancel</Button></DialogClose>
             <Button
               size="sm"
-              :disabled="!dirty || invalid || saving || writesDisabled"
+              :disabled="!dirty || invalid || saveBusy || writesDisabled"
               :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined"
               @click="save"
             >
-              {{ saving ? 'Saving…' : 'Save' }}
+              {{ saveBusy ? 'Saving…' : 'Save' }}
             </Button>
           </div>
         </TabsContent>
