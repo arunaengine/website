@@ -112,13 +112,16 @@ export function syncStatus(
   return { text: `✕ ${when}`, tone: 'error', title: `Last sync ${when} did not finish.${reason} ${rule}` }
 }
 
-/** The files a sync did not add, with their reasons: the node's list first, else the run's. */
+/** The files a sync did not add, with their reasons: the node's list, then the run's others. */
 export function failedFiles(
   run: BackendImportRun | null | undefined,
   conflicts: { path: string; reason: string }[],
 ): { path: string; reason: string }[] {
-  if (conflicts.length) return conflicts
-  return (run?.errors ?? []).map((failure) => ({ path: failure.key, reason: failure.error }))
+  const listed = new Set(conflicts.map((conflict) => conflict.path))
+  const errors = (run?.errors ?? [])
+    .filter((failure) => !listed.has(failure.key))
+    .map((failure) => ({ path: failure.key, reason: failure.error }))
+  return [...conflicts, ...errors]
 }
 
 /** Why a template for one S3 bucket per Aruna bucket cannot work, or null. */
