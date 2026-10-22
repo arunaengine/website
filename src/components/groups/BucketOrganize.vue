@@ -87,7 +87,11 @@ const checking = computed(
   () => !failed.value && ((copyAll.value === null && !copiesMissing.value) || (renameAll.value === null && !renamesMissing.value)),
 )
 // Only checks that answered, and found nothing, mean nothing to clean up.
-const nothing = computed(() => !checking.value && !failed.value && !copyOffered.value && !renameOffered.value && !props.job)
+const nothing = computed(
+  () => Boolean(copyAll.value && renameAll.value) && !failed.value && !copyOffered.value && !renameOffered.value && !props.job,
+)
+// A node without a check's route cannot say the bucket is clean.
+const unavailable = computed(() => (copiesMissing.value || renamesMissing.value) && !copyOffered.value && !renameOffered.value)
 // The duplicate count is of files that have copies; one file may have several.
 const copyCount = computed(() => `${countWords(copyAll.value?.total ?? 0, copyAll.value?.complete ?? true)} with copies`)
 const copyButton = computed(() => `Remove copies of ${countWords(copyAll.value?.total ?? 0, copyAll.value?.complete ?? true)}`)
@@ -157,6 +161,7 @@ const blocked = computed(() => busy.value || Boolean(props.job) || writesDisable
     </p>
     <p v-if="checking" class="text-xs text-muted-foreground">Checking the bucket…</p>
     <p v-else-if="nothing" class="text-sm">Nothing to clean up.</p>
+    <p v-else-if="unavailable && !failed" class="text-xs text-muted-foreground">This node cannot check this bucket yet.</p>
     <div v-if="job && job.kind !== 'duplicates' && job.kind !== 'rename'" class="rounded-md border border-border px-3 py-2.5">
       <JobProgress :job="job" :busy="controlling" @control="(action) => emit('control', action)" />
     </div>

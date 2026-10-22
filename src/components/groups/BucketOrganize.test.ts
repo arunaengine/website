@@ -85,6 +85,14 @@ describe('BucketOrganize', () => {
     expect(content(root)).toContain('node down')
   })
 
+  it('does not call the bucket clean when a check route is missing', async () => {
+    previewDuplicates.mockResolvedValue({ total: 0, bytes: 0, complete: true, items: [] })
+    getImportRenames.mockRejectedValue({ status: 404 })
+    const { root } = await mount()
+    expect(content(root)).not.toContain('Nothing to clean up.')
+    expect(content(root)).toContain('This node cannot check this bucket yet.')
+  })
+
   it('shows only steps with work, with a partial count as at least', async () => {
     getImportRenames.mockResolvedValue({ count: 3, complete: false, files: [] })
     const { root } = await mount()
