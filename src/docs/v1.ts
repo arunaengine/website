@@ -720,7 +720,7 @@ export const docsTopics: DocsTopic[] = [
         route: '/app/groups',
         anchor: 'group-tabs',
         title: 'The Storage tab',
-        body: 'The Storage tab lists Aruna storage and the storage your group added, with their rules.',
+        body: 'The Storage tab lists each storage of the group with its buckets, and Aruna storage.',
       },
     ],
     sections: [
@@ -736,11 +736,11 @@ export const docsTopics: DocsTopic[] = [
         icon: 'HardDrive',
         steps: [
           'Open the group from [Groups](page:groups) and switch to its Storage tab.',
-          'Choose Add your storage and enter the endpoint and [keys](concept:storage-access#external-storage-backend). No bucket is needed; Aruna checks the keys before it saves them.',
-          'Use as default sends new uploads of all buckets to one bucket of your storage, such as aruna-lab-default. Aruna creates the bucket if it is missing and keeps its own layout there.',
-          'Under each storage, Link a bucket shows the same files in an Aruna bucket and a bucket of your storage, both ways. Aruna deletes nothing there, except the old name of a file you rename and the copies you remove in Organize.',
-          'A new linked folder puts the version ID after the file name by default, such as b.fastq~01JA7Q3K. You can change this later; files already saved keep their names until you rename them in Organize. A whole linked bucket keeps the original names and cannot change them.',
-          'Rules may not overlap, and a linked bucket may not be the default bucket. Use as default on Aruna storage sends new uploads back to the node; files already in your storage stay there.',
+          'Choose Add storage and enter the endpoint and [keys](concept:storage-access#external-storage-backend). Aruna checks the keys before it saves them. Edit on a storage changes its name, region and path-style setting, replaces the keys or removes the storage.',
+          'Each storage shows a table of the buckets that keep their files there: the S3 bucket, how new uploads are named and the last sync.',
+          'The row new buckets says where buckets created from now on go: Aruna storage, one shared S3 bucket where Aruna names the files, or an own S3 bucket per bucket from a template such as aruna-spire-{bucket}. Existing buckets never move.',
+          'Link an S3 bucket shows the files already in an S3 bucket in an Aruna bucket. Nothing is copied. A link ends only when its Aruna bucket is empty or deleted.',
+          'Edit on a bucket row sets how new uploads are named: {name}, or {name}~{id} if taken (the default), {name}~{id}, the old {id}_{name}, or a custom name with {name}. An existing file is never overwritten. Changing the style can also rename the files that use the old one.',
           'Writers use the storage but can never see or change the keys.',
         ],
         image: {
@@ -753,22 +753,26 @@ export const docsTopics: DocsTopic[] = [
         title: 'Sync a linked bucket',
         icon: 'RefreshCw',
         paragraphs: [
-          'A linked bucket checks your storage on its schedule, or when you choose Run now (on the card of the link, under its storage in the group Storage tab). Uploads through Aruna reach your storage right away and need no run. The bucket page shows only a short line with a link to this card.',
+          'A linked bucket checks your storage on its schedule (Look for new files in its Edit), or when you choose the play button on its row. Uploads through Aruna reach your storage right away and need no sync. The bucket page shows where the files are, with Change to open the Edit of the bucket.',
           'A run lists the folder in your storage. New files become objects in the bucket. A changed file gets a new version, unless the object got a newer version in Aruna since then.',
           'Known files are compared by size and ETag, so a run does not read them again. Only new and changed files are read, so the first run of a large folder takes the longest.',
-          'The card of the link shows when the last run started and how many new files it found. A problem is written as a plain sentence with a next step; choose Show to see the files.',
+          'The row shows when the last sync ran, such as ✓ 3d ago. Hover it to see how many new files it found and when it runs next.',
         ],
       },
       {
-        title: 'Organize a linked folder',
+        title: 'How mappings work',
         icon: 'Route',
-        steps: [
-          'Organize on the card of a link opens one panel with three steps. All are optional, and nothing changes until you start one.',
-          'Step 1, Where new files go: a file rule puts new files into folders by name, such as `*.faa.gz` into proteins/. `*` stands for any text, `?` for one character, `[0-9]` for one of a range, `{4}` for a repeat count and `{fna,fa}` for either. Other files go to the top of the bucket. Show where files go lists each file before you save.',
-          'Step 2, Move existing files: give files already in the bucket a new name, such as `*.faa.gz` to `proteins/{name}`. Preview lists them 100 at a time, and names that are taken stay. Only the names in Aruna change; your storage stays as it is. Links by path change; DRS links by content keep working.',
-          'Step 3, Tidy your storage: Rename files gives files with the old name the new one in your storage (a copy first, then the old file is removed). Remove copies deletes files that are stored twice and keeps one. A file is only removed after its copy is checked and nothing else uses it.',
-          'A running step shows its progress on the card and in the panel. Pause it, resume it, or abort it. Work already done stays done, and you can start again later.',
-          'Several linked folders may share one storage folder. A new file there needs a file rule in exactly one of them.',
+        paragraphs: [
+          'Mappings in the Edit of a bucket connect a path in Aruna with a path in your storage, both ways. The storage side is a file type such as `*.faa` or a folder such as `lars/{name}`. The Aruna side is a folder such as `proteins/{name}`. `{name}` carries subfolders.',
+          'Files found in storage appear at the Aruna path: `lars/sub/x` shows up as `foobar/sub/x`, and `a/x.faa` as `proteins/a/x.faa`. Uploads to the Aruna path are saved at the storage path, without the Aruna folder. All other paths are the same on both sides.',
+          'Example lists files of your storage with their Aruna path, page by page. Apply gives files already in Aruna their mapped path after you confirm the count. Only the paths in Aruna change; files in storage stay. Old Aruna paths stop working. Apply works only for saved mappings, and you can pause or abort it.',
+        ],
+      },
+      {
+        title: 'Organize a linked bucket',
+        icon: 'Route',
+        paragraphs: [
+          'The Organize tab in the Edit of a bucket shows only steps that have work. Duplicate files deletes the extra copy of a file stored twice. Old file names gives files with an older name style the current one. Review lists the files first; nothing changes until you confirm. A running step can be paused, resumed or aborted, and work already done stays done.',
         ],
       },
       {
