@@ -48,6 +48,8 @@ const actionError = ref<string | null>(null)
 const syncing = ref<string | null>(null)
 // The files the last sync of one bucket did not add, shown under its row.
 const problems = ref<{ id: string; files: { path: string; reason: string }[] | null } | null>(null)
+// Only the newest request may fill the list.
+let problemsRun = 0
 
 const storageDialog = ref(false)
 const editingStorage = ref<GroupBackendResponse | null>(null)
@@ -116,6 +118,7 @@ watch(
     editDialog.value = false
     editing.value = null
     focused = null
+    problemsRun++
     problems.value = null
     void load()
   },
@@ -198,16 +201,19 @@ async function sync(link: BackendImport) {
 
 async function showProblems(link: BackendImport) {
   if (problems.value?.id === link.import_id) {
+    problemsRun++
     problems.value = null
     return
   }
   const id = link.import_id
+  const asked = ++problemsRun
+  const epoch = sessionEpoch.value
   problems.value = { id, files: null }
   // A node without the status route still has the errors of the run.
   const conflicts = await getLinkStatus(props.groupId, id, client())
     .then((status) => status.conflicts)
     .catch(() => [])
-  if (problems.value?.id === id) problems.value = { id, files: failedFiles(link.last_run, conflicts) }
+  if (asked === problemsRun && epoch === sessionEpoch.value) problems.value = { id, files: failedFiles(link.last_run, conflicts) }
 }
 
 function onLinked(runError?: string) {

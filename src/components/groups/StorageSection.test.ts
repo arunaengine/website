@@ -173,6 +173,27 @@ describe('StorageSection', () => {
     expect(content(byTestId(root, 'sync-problems')[0])).toContain('a.faa: Access denied')
   })
 
+  it('fills a reopened failure list only from the newest answer', async () => {
+    const failed = { ...run('succeeded'), failed: 1, errors: [] }
+    listBackendImports.mockResolvedValue([{ ...LINKS[0], last_run: failed }])
+    const answers: ((value: unknown) => void)[] = []
+    getLinkStatus.mockImplementation(() => new Promise((resolve) => answers.push(resolve)))
+    const { root } = await mount()
+    const status = () => element(root, (node) => node.tag === 'button' && content(node).trim() === '! 1 failed')
+    const open = () => void (status().props.onClick as () => void)()
+    open()
+    open()
+    open()
+    await flush()
+    answers[1]({ conflicts: [{ path: 'new.faa', reason: 'newer' }] })
+    await flush()
+    answers[0]({ conflicts: [{ path: 'old.faa', reason: 'older' }] })
+    await flush()
+    const list = content(byTestId(root, 'sync-problems')[0])
+    expect(list).toContain('new.faa')
+    expect(list).not.toContain('old.faa')
+  })
+
   it('starts a sync only for a bucket that is not syncing', async () => {
     const { root } = await mount()
     const [first, second] = nodes(root).filter((node) => node.props['aria-label'] === 'Sync now')
