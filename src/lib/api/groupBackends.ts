@@ -41,3 +41,30 @@ export interface GroupBackendRequest {
 export function getGroupBackends(groupId: string, client: ApiClientOptions): Promise<ListGroupBackendsResponse> {
   return apiRequest<ListGroupBackendsResponse>(`/data/groups/${encodeURIComponent(groupId)}/storage/backends`, {}, client)
 }
+
+// GET /data/groups/{gid}/storage/buckets: one page of the group's buckets on this node, in name
+// order, each with the storage that keeps its files. Group ADMIN; older nodes answer 404.
+export interface StorageBucket {
+  bucket: string
+  /** Null for Aruna storage on this node. */
+  backend_id: string | null
+  provider_bucket: string | null
+  folder: string | null
+  /** New uploads go to the storage's shared bucket, named by Aruna. */
+  shared: boolean
+  /** The rule that links the whole bucket, if any. */
+  import_id: string | null
+  write_pattern: string | null
+}
+
+export function listStorageBuckets(
+  groupId: string,
+  page: { limit?: number; after?: string | null },
+  client: ApiClientOptions,
+): Promise<{ buckets: StorageBucket[]; next?: string | null }> {
+  const query = new URLSearchParams()
+  if (page.limit) query.set('limit', String(page.limit))
+  if (page.after) query.set('after', page.after)
+  const text = query.toString()
+  return apiRequest(`/data/groups/${encodeURIComponent(groupId)}/storage/buckets${text ? `?${text}` : ''}`, {}, client)
+}
