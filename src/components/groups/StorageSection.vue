@@ -1,53 +1,31 @@
 <script setup lang="ts">
-// The group's storage in one list: Aruna storage, then each storage the group added with
-// its rules. The default rule sends all buckets to one bucket; linked rules work both ways.
+// The group's storage: per storage a table of its buckets and where new buckets go, then Aruna storage.
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
-import Dialog from '@/components/ui/Dialog.vue'
-import DialogContent from '@/components/ui/DialogContent.vue'
-import DialogHeader from '@/components/ui/DialogHeader.vue'
-import DialogTitle from '@/components/ui/DialogTitle.vue'
-import DialogDescription from '@/components/ui/DialogDescription.vue'
-import DialogFooter from '@/components/ui/DialogFooter.vue'
-import DialogClose from '@/components/ui/DialogClose.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
-import Progress from '@/components/ui/Progress.vue'
+import IconButton from '@/components/ui/IconButton.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
+import BucketEditDialog from '@/components/groups/BucketEditDialog.vue'
+import LinkBucketDialog from '@/components/groups/LinkBucketDialog.vue'
+import NewBucketsDialog from '@/components/groups/NewBucketsDialog.vue'
 import StorageBackendDialog from '@/components/groups/StorageBackendDialog.vue'
-import LinkedFolderDialog from '@/components/groups/LinkedFolderDialog.vue'
-import LinkedFolderCard from '@/components/storage/LinkedFolderCard.vue'
-import DefaultRuleDialog from '@/components/groups/DefaultRuleDialog.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { FolderInput, Plus } from '@lucide/vue'
+import { RouterLink } from 'vue-router'
+import { Play } from '@lucide/vue'
 import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import {
   ApiError,
-  getBucketMove,
   listBackendImports,
-  listGroupBuckets,
   runBackendImport,
-  startBucketMove,
   type BackendImport,
-  type BucketMoveResponse,
   type GroupBackendResponse,
-  type RoutingTarget,
+  type GroupRoutingResponse,
 } from '@/lib/api'
-import {
-  bucketTitle,
-  defaultBucket,
-  moveOffer,
-  moveRefusal,
-  moveText,
-  moveView,
-  rememberMoves,
-  splitPath,
-  type AskedMove,
-  type MoveTotals,
-  runActive,
-  storageLine,
-} from '@/lib/storageRules'
-import { writesElsewhere } from '@/lib/linkedFolders'
+import { shownPattern, syncStatus } from '@/lib/bucketNaming'
+import { storeName } from '@/lib/linkedFolders'
+import { backendSchema } from '@/lib/storage'
+import { defaultBucket, runActive, splitPath, splitsBuckets } from '@/lib/storageRules'
 import { errorMessage } from '@/lib/utils'
 
 const props = defineProps<{ groupId: string; groupName: string; canAdmin: boolean; focusLink?: string | null }>()
@@ -56,54 +34,26 @@ const emit = defineEmits<{
   (e: 'backends', backends: GroupBackendResponse[]): void
 }>()
 
-const {
-  apiBaseUrl,
-  authToken,
-  sessionEpoch,
-  listGroupBackends,
-  getGroupRouting,
-  putGroupRouting,
-  disableGroupBackend,
-  enableGroupBackend,
-  saving,
-} = useAruna()
+const { apiBaseUrl, authToken, sessionEpoch, listGroupBackends, getGroupRouting } = useAruna()
 const { writesDisabled } = useConnectivity()
 
 const backends = ref<GroupBackendResponse[] | null>(null)
 const links = ref<BackendImport[]>([])
-const target = ref<RoutingTarget | null>(null)
+const routing = ref<GroupRoutingResponse | null>(null)
 const loading = ref(false)
 const loadError = ref<string | null>(null)
 const hidden = ref(false)
 const actionError = ref<string | null>(null)
-const busyId = ref<string | null>(null)
+const syncing = ref<string | null>(null)
 
 const storageDialog = ref(false)
 const editingStorage = ref<GroupBackendResponse | null>(null)
+const newBucketsDialog = ref(false)
 const linkDialog = ref(false)
-const editingLink = ref<BackendImport | null>(null)
-const linkStorage = ref<string | null>(null)
-const defaultDialog = ref(false)
-const defaultStorage = ref<GroupBackendResponse | null>(null)
-const arunaConfirm = ref(false)
-const removingId = ref<string | null>(null)
-// Move counts by "bucket\nprefix"; a node without the routes leaves them empty.
-const moves = ref<Record<string, AskedMove>>({})
-const groupBuckets = ref<string[]>([])
-// A confirmation keeps the group, client and session it was made for.
-interface MoveAsk {
-  pairs: [string, string][]
-  place: string
-  groupId: string
-  epoch: number
-  asked: ReturnType<typeof client>
-}
-const moveAsk = ref<MoveAsk | null>(null)
-
-const defaultId = computed(() => target.value?.backend_id ?? null)
-const defaultName = computed(
-  () => backends.value?.find((backend) => backend.backend_id === defaultId.value)?.name ?? '',
-)
+const linkBackend = ref<GroupBackendResponse | null>(null)
+const editDialog = ref(false)
+const editing = ref<BackendImport | null>(null)
+let focused: string | null = null
 
 function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
@@ -116,48 +66,6 @@ function clearPoll() {
   pollTimer = undefined
 }
 
-function schedulePoll() {
-  clearPoll()
-  const importing = links.value.some((link) => runActive(link.last_run))
-  if (!disposed && (importing || moveView(Object.values(moves.value)).running)) {
-    pollTimer = setTimeout(() => void load(), 3_000)
-  }
-}
-
-function moveKey(bucket: string, prefix: string): string {
-  return `${bucket}\n${prefix}`
-}
-
-const moveTotals: MoveTotals = new Map()
-
-async function loadMoves() {
-  const seq = loadSeq
-  const asked = client()
-  // A failed read keeps what was known, so a running move stays in view.
-  let buckets = groupBuckets.value
-  try {
-    buckets = await listGroupBuckets(props.groupId, asked)
-  } catch {
-    // Keep the last known buckets.
-  }
-  if (seq !== loadSeq) return
-  const pairs: [string, string][] = [
-    ...links.value.map((link): [string, string] => [link.bucket, link.key_prefix]),
-    ...buckets.map((bucket): [string, string] => [bucket, '']),
-  ]
-  const answers = await Promise.allSettled(pairs.map(([bucket, prefix]) => getBucketMove(bucket, prefix, asked)))
-  if (seq !== loadSeq) return
-  const next: Record<string, AskedMove> = {}
-  answers.forEach((answer, index) => {
-    const key = moveKey(...pairs[index])
-    const known = answer.status === 'fulfilled' ? { ...answer.value, asked: pairs[index][1] } : moves.value[key]
-    if (known) next[key] = known
-  })
-  groupBuckets.value = buckets
-  rememberMoves(moveTotals, Object.values(next))
-  moves.value = next
-}
-
 // Only the latest load for the current group and session writes state.
 let loadSeq = 0
 async function load() {
@@ -166,11 +74,12 @@ async function load() {
   const current = () => seq === loadSeq && epoch === sessionEpoch.value
   loading.value = true
   loadError.value = null
+  clearPoll()
   try {
-    const [list, routing, imports] = await Promise.all([
+    const [list, rules, imports] = await Promise.all([
       listGroupBackends(props.groupId),
       getGroupRouting(props.groupId),
-      // A node without linked rules still shows its storages.
+      // A node without linked buckets still shows its storages.
       listBackendImports(props.groupId, client()).catch((err) => {
         if (isUnsupportedEndpoint(err)) return []
         throw err
@@ -178,17 +87,15 @@ async function load() {
     ])
     if (!current()) return
     backends.value = list.backends
-    target.value = routing.default_target ?? null
+    routing.value = rules
     links.value = imports
+    if (editing.value) editing.value = imports.find((link) => link.import_id === editing.value?.import_id) ?? editing.value
     emit('count', list.backends.length)
     emit('backends', list.backends)
-    void loadMoves().then(() => {
-      if (current()) schedulePoll()
-    })
+    if (!disposed && imports.some((link) => runActive(link.last_run))) pollTimer = setTimeout(() => void load(), 3_000)
   } catch (err) {
     if (!current()) return
     if (err instanceof ApiError && (err.status === 403 || err.status === 401)) hidden.value = true
-    else if (backends.value && moveView(Object.values(moves.value)).running) schedulePoll()
     else loadError.value = errorMessage(err)
   } finally {
     if (current()) loading.value = false
@@ -200,14 +107,12 @@ watch(
   () => {
     backends.value = null
     links.value = []
-    moveAsk.value = null
-    moves.value = {}
-    moveTotals.clear()
-    groupBuckets.value = []
-    target.value = null
+    routing.value = null
     hidden.value = false
     actionError.value = null
-    clearPoll()
+    editDialog.value = false
+    editing.value = null
+    focused = null
     void load()
   },
   { immediate: true },
@@ -217,19 +122,44 @@ onBeforeUnmount(() => {
   clearPoll()
 })
 
-// Where new uploads of a link go when that is not its own source folder.
-function writePlace(link: BackendImport): string | null {
-  if (!writesElsewhere(link)) return null
-  const id = link.write_backend_id || link.backend_id
-  const target = backends.value?.find((backend) => backend.backend_id === id)
-  const path = link.write_prefix ?? link.backend_prefix
-  if (!target) return path
-  const { bucket, folder } = splitPath(target, path)
-  return `${target.name}: ${bucket} / ${folder}`
-}
+// A link in the address, such as from a bucket page, opens that bucket's Edit once.
+watch([() => props.focusLink, links], ([id]) => {
+  if (!id || id === focused) return
+  const link = links.value.find((entry) => entry.import_id === id)
+  if (!link) return
+  focused = id
+  openEdit(link)
+})
+
+const defaultId = computed(() => routing.value?.default_target?.backend_id ?? null)
 
 function linksOf(backend: GroupBackendResponse): BackendImport[] {
   return links.value.filter((link) => link.backend_id === backend.backend_id)
+}
+
+function backendOf(link: BackendImport): GroupBackendResponse | undefined {
+  return backends.value?.find((backend) => backend.backend_id === link.backend_id)
+}
+
+/** The S3 bucket and folder of a link, such as "lab-raw/runs". */
+function place(link: BackendImport): string {
+  const backend = backendOf(link)
+  if (!backend) return link.backend_prefix || '/'
+  const { bucket, folder } = splitPath(backend, link.backend_prefix)
+  const path = folder.replace(/\/+$/, '')
+  return path ? `${bucket}/${path}` : bucket
+}
+
+/** Where new buckets go on a storage, and how their files are named. */
+function newBucketsRow(backend: GroupBackendResponse): { where: string; names: string } {
+  const template = routing.value?.bucket_template
+  if (splitsBuckets(backend) && template) return { where: `${template} (one each)`, names: 'same as in Aruna' }
+  const shared = routing.value?.bucket ?? defaultBucket(backend) ?? backend.name
+  return { where: splitsBuckets(backend) ? `${shared} (shared)` : shared, names: 'chosen by Aruna' }
+}
+
+function kindLabel(backend: GroupBackendResponse): string {
+  return backendSchema(backend.kind)?.label ?? backend.kind
 }
 
 function openStorage(backend: GroupBackendResponse | null) {
@@ -237,139 +167,40 @@ function openStorage(backend: GroupBackendResponse | null) {
   storageDialog.value = true
 }
 
-function openLink(backend: GroupBackendResponse, link: BackendImport | null) {
-  linkStorage.value = backend.backend_id
-  editingLink.value = link
+function openLink(backend: GroupBackendResponse) {
+  linkBackend.value = backend
   linkDialog.value = true
 }
 
-function openDefault(backend: GroupBackendResponse) {
-  defaultStorage.value = backend
-  defaultDialog.value = true
+function openEdit(link: BackendImport) {
+  editing.value = link
+  editDialog.value = true
 }
 
-async function useArunaStorage() {
+async function sync(link: BackendImport) {
+  if (syncing.value) return
   actionError.value = null
-  try {
-    await putGroupRouting(props.groupId, null)
-    arunaConfirm.value = false
-    await load()
-  } catch (err) {
-    actionError.value = errorMessage(err)
-  }
-}
-
-async function run(link: BackendImport) {
-  if (busyId.value) return
-  actionError.value = null
-  busyId.value = link.import_id
+  syncing.value = link.import_id
   try {
     await runBackendImport(props.groupId, link.import_id, client())
   } catch (err) {
-    const running = err instanceof ApiError && err.status === 409
-    if (!running) actionError.value = errorMessage(err)
+    // 409: a sync is already running, which is what was asked for.
+    if (!(err instanceof ApiError && err.status === 409)) actionError.value = errorMessage(err)
   } finally {
-    busyId.value = null
+    syncing.value = null
     await load()
   }
 }
 
-function found(bucket: string, prefix: string): BucketMoveResponse[] {
-  const move = moves.value[moveKey(bucket, prefix)]
-  return move ? [move] : []
-}
-const defaultMove = computed(() =>
-  moveView(
-    groupBuckets.value.flatMap((bucket) => found(bucket, '')),
-    '',
-    moveTotals,
-  ),
-)
-function linkMove(link: BackendImport) {
-  return moveView(found(link.bucket, link.key_prefix), undefined, moveTotals)
-}
-// Only buckets that have something to move are asked.
-const defaultPairs = computed(() =>
-  groupBuckets.value
-    .filter((bucket) => moveOffer(moveView(found(bucket, ''))))
-    .map((bucket): [string, string] => [bucket, '']),
-)
-
-async function startMove() {
-  const ask = moveAsk.value
-  if (!ask || busyId.value || writesDisabled.value) return
-  actionError.value = null
-  busyId.value = 'move'
-  const stale = () => disposed || ask.epoch !== sessionEpoch.value || ask.groupId !== props.groupId
-  try {
-    for (const [bucket, prefix] of ask.pairs) {
-      if (stale() || writesDisabled.value) break
-      await startBucketMove(bucket, prefix, ask.asked)
-    }
-    moveAsk.value = null
-  } catch (err) {
-    if (!stale()) actionError.value = moveRefusal(err) ?? errorMessage(err)
-    moveAsk.value = null
-  } finally {
-    busyId.value = null
-    await load()
-  }
-}
-
-async function remove(backend: GroupBackendResponse) {
-  if (writesDisabled.value) return
-  actionError.value = null
-  try {
-    await disableGroupBackend(props.groupId, backend.backend_id)
-    removingId.value = null
-    await load()
-  } catch (err) {
-    actionError.value = errorMessage(err)
-  }
-}
-
-async function enable(backend: GroupBackendResponse) {
-  actionError.value = null
-  try {
-    await enableGroupBackend(props.groupId, backend.backend_id)
-    await load()
-  } catch (err) {
-    actionError.value = errorMessage(err)
-  }
-}
-
-function askMove(pairs: [string, string][], place: string) {
-  moveAsk.value = { pairs, place, groupId: props.groupId, epoch: sessionEpoch.value, asked: client() }
-}
-
-async function onDefaultSaved(move?: boolean) {
-  if (!move) return load()
-  const groupId = props.groupId
-  const epoch = sessionEpoch.value
-  const asked = client()
-  const same = () => !disposed && groupId === props.groupId && epoch === sessionEpoch.value
-  await load()
-  if (!same() || writesDisabled.value) return
-  // The new rules decide what is misplaced now, so ask again before moving.
-  const buckets = groupBuckets.value
-  const answers = await Promise.allSettled(buckets.map((bucket) => getBucketMove(bucket, '', asked)))
-  if (!same() || writesDisabled.value) return
-  const pairs = answers.flatMap((answer, index): [string, string][] =>
-    answer.status === 'fulfilled' && moveOffer(moveView([answer.value])) ? [[buckets[index], '']] : [],
-  )
-  if (!pairs.length) return
-  moveAsk.value = { pairs, place: 'all buckets', groupId, epoch, asked }
-  await startMove()
-}
-
-function onLinkSaved(runError?: string) {
+function onLinked(runError?: string) {
   actionError.value = runError ?? null
   void load()
 }
 
 const offline = computed(() => (writesDisabled.value ? OFFLINE_WRITE_HINT : undefined))
-// Fixed columns: kind, in Aruna, arrow, in storage, icon, last run, actions.
-const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.25rem_minmax(0,1fr)_8.5rem] items-center gap-2'
+const GRID =
+  'grid grid-cols-[minmax(0,1fr)_1rem_minmax(0,1.2fr)_minmax(0,1.4fr)_4.5rem_6rem] items-center gap-2'
+const EDIT = 'h-7 px-2 text-aruna-navy dark:text-foreground'
 </script>
 
 <template>
@@ -385,68 +216,15 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
         :title="offline"
         @click="openStorage(null)"
       >
-        <Plus class="h-3.5 w-3.5" /> Add your storage
+        + Add storage
       </Button>
     </div>
-    <p class="mt-1 text-xs text-muted-foreground">
-      Files are kept in Aruna's own storage or in storage you add, like your own S3. New uploads follow
-      the default rule unless a linked rule covers them.
-    </p>
+    <p class="mt-1 text-xs text-muted-foreground">Where the files of this group's buckets are kept.</p>
 
     <div v-if="hidden" class="mt-3 text-xs text-muted-foreground">Storage is only visible to group admins.</div>
     <Skeleton v-else-if="loading && !backends" class="mt-3 h-24" />
     <ErrorPanel v-else-if="loadError" class="mt-3" :message="loadError" @retry="load" />
     <template v-else-if="backends">
-      <section class="mt-3 rounded-lg border border-border" data-testid="aruna-storage">
-        <div class="flex items-center gap-2 px-3 py-2.5">
-          <div class="min-w-0">
-            <span class="text-sm font-semibold text-foreground">Aruna storage</span>
-            <Badge size="sm" variant="secondary" class="ml-1.5 uppercase">built in</Badge>
-            <p class="mt-0.5 text-xs text-muted-foreground">
-              Managed by Aruna on this node. No setup needed. Gets new uploads when your storage has no default rule.
-            </p>
-          </div>
-          <span class="flex-1" />
-          <Button
-            v-if="canAdmin && target"
-            variant="outline"
-            size="sm"
-            :disabled="writesDisabled"
-            :title="offline"
-            @click="arunaConfirm = true"
-          >
-            Use as default
-          </Button>
-          <template v-else-if="!target">
-            <Button
-              v-if="canAdmin && moveOffer(defaultMove)"
-              variant="ghost"
-              size="sm"
-              class="h-6 px-2 text-aruna-navy dark:text-foreground"
-              :disabled="writesDisabled || busyId !== null || defaultMove.running"
-              :title="offline ?? 'Move files'"
-              aria-label="Move files"
-              @click="askMove(defaultPairs, 'all buckets')"
-            >
-              <FolderInput class="h-3.5 w-3.5" />
-            </Button>
-            <Badge size="sm" variant="default" class="uppercase">default</Badge>
-          </template>
-        </div>
-        <div v-if="!target && defaultMove.running" class="px-3 pb-2.5 text-[11px] text-muted-foreground" data-testid="move-line">
-          {{ moveText(defaultMove) }}
-          <Progress
-            :value="defaultMove.done"
-            :max="defaultMove.done + defaultMove.misplaced"
-            :warn="101"
-            :critical="101"
-            label="Moving files"
-            bar-class="bg-primary"
-            class="mt-0.5 h-1"
-          />
-        </div>
-      </section>
-
       <section
         v-for="backend in backends"
         :key="backend.backend_id"
@@ -456,159 +234,85 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
         <div class="flex items-center gap-2 px-3 py-2.5">
           <div class="min-w-0">
             <span class="text-sm font-semibold text-foreground">{{ backend.name }}</span>
-            <Badge size="sm" variant="secondary" class="ml-1.5 uppercase">your storage</Badge>
+            <Badge size="sm" variant="secondary" class="ml-1.5 uppercase">{{ kindLabel(backend) }}</Badge>
             <Badge v-if="backend.disabled" size="sm" variant="warn" class="ml-1 uppercase">removed</Badge>
-            <p class="mt-0.5 truncate text-xs text-muted-foreground">{{ storageLine(backend) }}</p>
+            <p class="mt-0.5 truncate text-xs text-muted-foreground">{{ backend.public_config.endpoint ?? storeName(backend) }}</p>
           </div>
           <span class="flex-1" />
-          <template v-if="canAdmin">
-            <template v-if="removingId === backend.backend_id">
-              <span class="text-xs text-foreground">Remove? New uploads stop going here. Files stay readable.</span>
-              <Button
-                variant="destructive"
-                size="sm"
-                :disabled="saving || writesDisabled"
-                :title="offline"
-                @click="remove(backend)"
-              >
-                Remove
-              </Button>
-              <Button variant="ghost" size="sm" @click="removingId = null">Cancel</Button>
-            </template>
-            <template v-else>
-              <Button
-                v-if="!backend.disabled && defaultId !== backend.backend_id"
-                variant="ghost"
-                size="sm"
-                class="text-aruna-navy dark:text-foreground"
-                :disabled="writesDisabled"
-                :title="offline"
-                @click="openDefault(backend)"
-              >
-                Use as default
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                class="text-aruna-navy dark:text-foreground"
-                :disabled="writesDisabled"
-                :title="offline"
-                @click="openStorage(backend)"
-              >
-                Edit
-              </Button>
-              <Button
-                v-if="backend.disabled"
-                variant="ghost"
-                size="sm"
-                class="text-aruna-navy dark:text-foreground"
-                :disabled="writesDisabled"
-                :title="offline"
-                @click="enable(backend)"
-              >
-                Enable
-              </Button>
-              <Button
-                v-else
-                variant="ghost"
-                size="sm"
-                class="text-aruna-navy dark:text-foreground"
-                :disabled="writesDisabled"
-                :title="offline"
-                @click="removingId = backend.backend_id"
-              >
-                Remove
-              </Button>
-            </template>
-          </template>
+          <Button
+            v-if="canAdmin"
+            variant="ghost"
+            size="sm"
+            :class="EDIT"
+            :disabled="writesDisabled"
+            :title="offline ?? 'Connection settings'"
+            @click="openStorage(backend)"
+          >
+            Edit
+          </Button>
         </div>
 
         <div class="rounded-b-lg border-t border-border bg-muted/30 px-3 pb-2.5 pt-1.5 text-xs">
           <div
-            v-if="defaultId === backend.backend_id || linksOf(backend).length"
+            v-if="linksOf(backend).length || defaultId === backend.backend_id"
             :class="[GRID, 'border-b border-border py-1 text-[11px] uppercase tracking-wide text-muted-foreground']"
           >
-            <span />
-            <span class="truncate">In Aruna</span>
-            <span />
-            <span class="truncate">In {{ backend.name }}</span>
-            <span />
-            <span class="truncate">Last run</span>
-            <span />
+            <span>Aruna bucket</span><span /><span>S3 bucket</span><span>New uploads named</span><span>Synced</span><span />
           </div>
-
+          <div
+            v-for="link in linksOf(backend)"
+            :key="link.import_id"
+            :class="[GRID, 'border-b border-border py-1.5']"
+            data-testid="bucket-row"
+          >
+            <RouterLink
+              :to="{ name: 'bucket', params: { bucketId: link.bucket } }"
+              class="truncate font-mono text-primary hover:underline"
+            >
+              {{ link.key_prefix ? `${link.bucket}/${link.key_prefix}` : link.bucket }}
+            </RouterLink>
+            <span class="text-muted-foreground">⇆</span>
+            <span class="truncate font-mono" :title="place(link)">{{ place(link) }}</span>
+            <span class="truncate font-mono">{{ shownPattern(link.write_pattern) }}</span>
+            <span
+              class="truncate"
+              :class="{
+                'text-emerald-700 dark:text-emerald-300': syncStatus(link.last_run, link.schedule).tone === 'ok',
+                'text-destructive': syncStatus(link.last_run, link.schedule).tone === 'error',
+                'text-muted-foreground': syncStatus(link.last_run, link.schedule).tone === 'muted',
+              }"
+              :title="syncStatus(link.last_run, link.schedule).title"
+            >
+              {{ syncStatus(link.last_run, link.schedule).text }}
+            </span>
+            <span v-if="canAdmin" class="flex justify-end gap-0.5">
+              <IconButton
+                label="Sync now"
+                :disabled="writesDisabled || syncing !== null || runActive(link.last_run)"
+                @click="sync(link)"
+              >
+                <Play class="size-3.5" />
+              </IconButton>
+              <Button variant="ghost" size="sm" :class="EDIT" title="Settings and organize" @click="openEdit(link)">Edit</Button>
+            </span>
+            <span v-else />
+          </div>
           <div
             v-if="defaultId === backend.backend_id"
             :class="[GRID, 'border-b border-dashed border-border py-1.5']"
-            data-testid="default-row"
+            data-testid="new-buckets-row"
           >
-            <Badge size="sm" class="justify-self-start bg-aruna-navy uppercase text-white ring-0">default</Badge>
-            <span class="truncate">All buckets</span>
+            <span class="truncate text-muted-foreground">new buckets</span>
             <span class="text-muted-foreground">→</span>
-            <span class="truncate font-mono">{{ defaultBucket(backend) }}</span>
-            <span
-              v-if="bucketTitle(backend, defaultBucket(backend) ?? '')"
-              class="font-bold text-emerald-700 dark:text-emerald-400"
-              :title="bucketTitle(backend, defaultBucket(backend) ?? '') ?? undefined"
-            >✓</span>
-            <span v-else />
+            <span class="truncate font-mono">{{ newBucketsRow(backend).where }}</span>
+            <span class="truncate text-muted-foreground">{{ newBucketsRow(backend).names }}</span>
             <span />
-            <span class="flex justify-end gap-0.5">
-              <span v-if="canAdmin" class="inline-block h-6 w-[1.875rem]" aria-hidden="true" />
-              <Button
-                v-if="canAdmin && moveOffer(defaultMove)"
-                variant="ghost"
-                size="sm"
-                class="h-6 px-2 text-aruna-navy dark:text-foreground"
-                :disabled="writesDisabled || busyId !== null || defaultMove.running"
-                :title="offline ?? 'Move files'"
-                aria-label="Move files"
-                @click="askMove(defaultPairs, 'all buckets')"
-              >
-                <FolderInput class="h-3.5 w-3.5" />
-              </Button>
-              <span v-else-if="canAdmin" class="inline-block h-6 w-[1.875rem]" aria-hidden="true" />
-              <Button
-                v-if="canAdmin"
-                variant="ghost"
-                size="sm"
-                class="h-6 px-2 text-aruna-navy dark:text-foreground"
-                :disabled="writesDisabled"
-                :title="offline"
-                @click="openDefault(backend)"
-              >
+            <span class="flex justify-end">
+              <Button v-if="canAdmin" variant="ghost" size="sm" :class="EDIT" title="New buckets" @click="newBucketsDialog = true">
                 Edit
               </Button>
             </span>
           </div>
-          <div v-if="defaultMove.running" class="py-0.5 pl-[5rem] text-[11px] text-muted-foreground" data-testid="move-line">
-            {{ moveText(defaultMove) }}
-            <Progress
-              :value="defaultMove.done"
-              :max="defaultMove.done + defaultMove.misplaced"
-              :warn="101"
-              :critical="101"
-              label="Moving files"
-              bar-class="bg-primary"
-              class="mt-0.5 h-1"
-            />
-          </div>
-
-          <div v-if="canAdmin && linksOf(backend).length" class="space-y-3 pt-2">
-            <LinkedFolderCard
-              v-for="link in linksOf(backend)"
-              :key="link.import_id"
-              :group-id="groupId"
-              :link="link"
-              :storage="backend.name"
-              :running="busyId !== null || runActive(link.last_run)"
-              :highlight="focusLink === link.import_id"
-              :write-to="writePlace(link)"
-              @run="run(link)"
-              @edit="openLink(backend, link)"
-            />
-          </div>
-
           <Button
             v-if="canAdmin && !backend.disabled"
             variant="outline"
@@ -616,68 +320,60 @@ const GRID = 'grid grid-cols-[4.5rem_minmax(0,1.3fr)_1.25rem_minmax(0,1.2fr)_1.2
             class="mt-2"
             :disabled="writesDisabled"
             :title="offline"
-            @click="openLink(backend, null)"
+            @click="openLink(backend)"
           >
-            <Plus class="h-3.5 w-3.5" /> Link a bucket
+            + Link an S3 bucket
           </Button>
+        </div>
+      </section>
+
+      <section class="mt-3 rounded-lg border border-border" data-testid="aruna-storage">
+        <div class="flex items-center gap-2 px-3 py-2.5">
+          <div class="min-w-0">
+            <span class="text-sm font-semibold text-foreground">Aruna storage</span>
+            <Badge size="sm" variant="secondary" class="ml-1.5 uppercase">built in</Badge>
+            <p class="mt-0.5 text-xs text-muted-foreground">
+              {{ defaultId ? 'Managed by Aruna on this node.' : 'Gets new buckets.' }}
+            </p>
+          </div>
+        </div>
+        <div v-if="!defaultId" class="rounded-b-lg border-t border-border bg-muted/30 px-3 pb-2.5 pt-1.5 text-xs">
+          <div :class="[GRID, 'py-1.5']" data-testid="new-buckets-row">
+            <span class="truncate text-muted-foreground">new buckets</span>
+            <span class="text-muted-foreground">→</span>
+            <span class="truncate font-mono">on this node</span>
+            <span class="truncate text-muted-foreground">chosen by Aruna</span>
+            <span />
+            <span class="flex justify-end">
+              <Button v-if="canAdmin" variant="ghost" size="sm" :class="EDIT" title="New buckets" @click="newBucketsDialog = true">
+                Edit
+              </Button>
+            </span>
+          </div>
         </div>
       </section>
       <p v-if="actionError" class="mt-2 text-xs text-destructive">{{ actionError }}</p>
     </template>
 
-    <StorageBackendDialog
-      v-model:open="storageDialog"
-      :group-id="props.groupId"
-      :backend="editingStorage"
+    <StorageBackendDialog v-model:open="storageDialog" :group-id="groupId" :backend="editingStorage" @saved="load" />
+    <NewBucketsDialog
+      v-model:open="newBucketsDialog"
+      :group-id="groupId"
+      :group-name="groupName"
+      :backends="backends ?? []"
+      :routing="routing"
+      :links="links"
       @saved="load"
     />
-    <LinkedFolderDialog
-      v-model:open="linkDialog"
-      :group-id="props.groupId"
-      :backends="backends ?? []"
-      :link="editingLink"
-      :links="links"
-      :storage-id="linkStorage"
-      :movable="editingLink ? moveOffer(linkMove(editingLink)) : false"
-      @saved="onLinkSaved"
+    <LinkBucketDialog v-model:open="linkDialog" :group-id="groupId" :backend="linkBackend" :links="links" @saved="onLinked" />
+    <BucketEditDialog
+      v-if="editing"
+      v-model:open="editDialog"
+      :group-id="groupId"
+      :link="editing"
+      :storage="backendOf(editing)?.name ?? 'Storage'"
+      :place="place(editing)"
+      @saved="load"
     />
-    <DefaultRuleDialog
-      v-model:open="defaultDialog"
-      :group-id="props.groupId"
-      :group-name="props.groupName"
-      :backend="defaultStorage"
-      :links="links"
-      :has-buckets="groupBuckets.length > 0"
-      @saved="onDefaultSaved"
-    />
-    <Dialog :open="moveAsk !== null" @update:open="(v: boolean) => { if (!v) moveAsk = null }">
-      <DialogContent class="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Move files?</DialogTitle>
-          <DialogDescription>
-            Files in {{ moveAsk?.place }} move to the storage the rules choose now. This runs in the background.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <DialogClose as-child><Button type="button" variant="outline">Cancel</Button></DialogClose>
-          <Button :disabled="busyId !== null || writesDisabled" @click="startMove">Move files</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-    <Dialog :open="arunaConfirm" @update:open="(v: boolean) => (arunaConfirm = v)">
-      <DialogContent class="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Use Aruna storage as default?</DialogTitle>
-          <DialogDescription>
-            New uploads then go to Aruna storage again. The default rule of {{ defaultName }} is removed.
-            Files already in {{ defaultName }} stay there.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <DialogClose as-child><Button type="button" variant="outline">Cancel</Button></DialogClose>
-          <Button :disabled="saving || writesDisabled" @click="useArunaStorage">Use as default</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   </div>
 </template>
