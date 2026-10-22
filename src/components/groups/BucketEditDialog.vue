@@ -24,6 +24,7 @@ import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import { getFileRules, saveFileRules, startImportRenames, updateBackendImport, type BackendImport } from '@/lib/api'
 import {
   BIG_BUCKET,
+  countWords,
   customProblem,
   NAMING_OPTIONS,
   namingChoice,
@@ -79,6 +80,13 @@ const mappingsChanged = computed(() => mappingsKnown.value && !sameMappings(mapp
 const dirty = computed(() => nameChanged.value || schedule.value !== savedSchedule.value || mappingsChanged.value)
 const invalid = computed(() => Boolean(nameError.value) || mappings.value.some((mapping) => mappingProblem(mapping)))
 const offersRename = computed(() => nameChanged.value && choice.value !== 'prefix')
+// The listing counts files of earlier styles now; the saved style adds its own files later.
+const renameLabel = computed(() => {
+  const count = renames.value?.count ?? 0
+  return count > 0
+    ? `Also rename ${countWords(count, false)} that use an older style`
+    : 'Also rename the files that use the old style'
+})
 const hourlyWarning = computed(() => {
   const files = status.value?.files
   return schedule.value === '0 * * * *' && files !== undefined && files >= BIG_BUCKET
@@ -208,7 +216,7 @@ async function save() {
             </p>
             <label v-if="offersRename" class="mt-2 flex items-center gap-2 text-xs">
               <input v-model="renameOld" type="checkbox" />
-              Also rename the files that use the old style
+              {{ renameLabel }}
             </label>
           </div>
 

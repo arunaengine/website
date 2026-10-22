@@ -14,6 +14,7 @@ const startImportRenames = vi.fn()
 const updateBackendImport = vi.fn()
 const refresh = vi.fn()
 const status = ref<{ files?: number; conflicts: [] } | null>(null)
+const renames = ref<{ count: number; complete: boolean; files: [] } | null>(null)
 
 const Empty = defineComponent(() => () => null)
 const Slot = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
@@ -57,7 +58,7 @@ const BucketEditDialog = compileClientComponent(new URL('./BucketEditDialog.vue'
   '@/composables/useAruna': { useAruna: () => ({ apiBaseUrl: ref('https://api'), authToken: ref('t'), sessionEpoch: ref(0) }) },
   '@/composables/useLinkState': {
     useLinkState: () => ({
-      renames: ref(null),
+      renames,
       status,
       job: ref(null),
       error: ref(null),
@@ -104,6 +105,7 @@ async function mount() {
 
 beforeEach(() => {
   status.value = null
+  renames.value = null
   getFileRules.mockReset().mockResolvedValue({ rules: [] })
   updateBackendImport.mockReset().mockResolvedValue({})
   startImportRenames.mockReset().mockResolvedValue({})
@@ -154,6 +156,13 @@ describe('BucketEditDialog', () => {
     await typeValue(field(root, 'Look for new files'), '0 3 * * 1')
     expect(content(saveButton(root)).trim()).toBe('Save')
     expect(saveButton(root).props.disabled).toBe(false)
+  })
+
+  it('counts the files of an older style before saving', async () => {
+    renames.value = { count: 6, complete: true, files: [] }
+    const { root } = await mount()
+    await typeValue(field(root, 'New uploads are named'), 'plain')
+    expect(content(root)).toContain('Also rename at least 6 files that use an older style')
   })
 
   it('refuses a custom name without {name}', async () => {
