@@ -16,13 +16,14 @@ import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
 import {
   ApiError,
+  getLinkStatus,
   listBackendImports,
   runBackendImport,
   type BackendImport,
   type GroupBackendResponse,
   type GroupRoutingResponse,
 } from '@/lib/api'
-import { shownPattern, syncStatus } from '@/lib/bucketNaming'
+import { failedFiles, shownPattern, syncStatus } from '@/lib/bucketNaming'
 import { storeName } from '@/lib/linkedFolders'
 import { backendSchema } from '@/lib/storage'
 import { defaultBucket, runActive, splitPath, splitsBuckets } from '@/lib/storageRules'
@@ -45,6 +46,8 @@ const loadError = ref<string | null>(null)
 const hidden = ref(false)
 const actionError = ref<string | null>(null)
 const syncing = ref<string | null>(null)
+// The files the last sync of one bucket did not add, shown under its row.
+const problems = ref<{ id: string; files: { path: string; reason: string }[] | null } | null>(null)
 
 const storageDialog = ref(false)
 const editingStorage = ref<GroupBackendResponse | null>(null)
@@ -113,6 +116,7 @@ watch(
     editDialog.value = false
     editing.value = null
     focused = null
+    problems.value = null
     void load()
   },
   { immediate: true },
@@ -190,6 +194,20 @@ async function sync(link: BackendImport) {
     syncing.value = null
     await load()
   }
+}
+
+async function showProblems(link: BackendImport) {
+  if (problems.value?.id === link.import_id) {
+    problems.value = null
+    return
+  }
+  const id = link.import_id
+  problems.value = { id, files: null }
+  // A node without the status route still has the errors of the run.
+  const conflicts = await getLinkStatus(props.groupId, id, client())
+    .then((status) => status.conflicts)
+    .catch(() => [])
+  if (problems.value?.id === id) problems.value = { id, files: failedFiles(link.last_run, conflicts) }
 }
 
 function onLinked(runError?: string) {
@@ -274,17 +292,20 @@ const EDIT = 'h-7 px-2 text-aruna-navy dark:text-foreground'
             <span class="text-muted-foreground">⇆</span>
             <span class="truncate font-mono" :title="place(link)">{{ place(link) }}</span>
             <span class="truncate font-mono">{{ shownPattern(link.write_pattern) }}</span>
-            <span
-              class="truncate"
+            <component
+              :is="['warn', 'error'].includes(syncStatus(link.last_run, link.schedule).tone) ? 'button' : 'span'"
+              class="truncate text-left"
               :class="{
                 'text-emerald-700 dark:text-emerald-300': syncStatus(link.last_run, link.schedule).tone === 'ok',
-                'text-destructive': syncStatus(link.last_run, link.schedule).tone === 'error',
+                'text-amber-700 hover:underline dark:text-amber-300': syncStatus(link.last_run, link.schedule).tone === 'warn',
+                'text-destructive hover:underline': syncStatus(link.last_run, link.schedule).tone === 'error',
                 'text-muted-foreground': syncStatus(link.last_run, link.schedule).tone === 'muted',
               }"
               :title="syncStatus(link.last_run, link.schedule).title"
+              @click="['warn', 'error'].includes(syncStatus(link.last_run, link.schedule).tone) && showProblems(link)"
             >
               {{ syncStatus(link.last_run, link.schedule).text }}
-            </span>
+            </component>
             <span v-if="canAdmin" class="flex justify-end gap-0.5">
               <IconButton
                 label="Sync now"
@@ -296,6 +317,16 @@ const EDIT = 'h-7 px-2 text-aruna-navy dark:text-foreground'
               <Button variant="ghost" size="sm" :class="EDIT" title="Settings and organize" @click="openEdit(link)">Edit</Button>
             </span>
             <span v-else />
+            <div v-if="problems?.id === link.import_id" class="col-span-full py-1" data-testid="sync-problems">
+              <p v-if="!problems.files" class="text-muted-foreground">Loading…</p>
+              <p v-else-if="!problems.files.length" class="text-muted-foreground">The node lists no files for this sync.</p>
+              <ul v-else class="space-y-0.5 text-[11px]">
+                <li v-for="(file, at) in problems.files.slice(0, 20)" :key="`${at}\n${file.path}`" class="break-all">
+                  <span class="font-mono">{{ file.path }}</span>: <span class="text-destructive">{{ file.reason }}</span>
+                </li>
+                <li v-if="problems.files.length > 20" class="text-muted-foreground">and {{ problems.files.length - 20 }} more</li>
+              </ul>
+            </div>
           </div>
           <div
             v-if="defaultId === backend.backend_id"

@@ -13,6 +13,7 @@ const listGroupBackends = vi.fn()
 const getGroupRouting = vi.fn()
 const listBackendImports = vi.fn()
 const runBackendImport = vi.fn()
+const getLinkStatus = vi.fn()
 const writesDisabled = ref(false)
 
 const Empty = defineComponent(() => () => null)
@@ -69,7 +70,7 @@ const StorageSection = compileClientComponent(new URL('./StorageSection.vue', im
     }),
   },
   '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled }) },
-  '@/lib/api': { ...Api, listBackendImports, runBackendImport },
+  '@/lib/api': { ...Api, getLinkStatus, listBackendImports, runBackendImport },
   '@/lib/bucketNaming': BucketNaming,
   '@/lib/linkedFolders': LinkedFolders,
   '@/lib/storage': Storage,
@@ -158,6 +159,18 @@ describe('StorageSection', () => {
     const aruna = byTestId(root, 'aruna-storage')[0]
     expect(content(aruna)).toContain('Gets new buckets.')
     expect(content(aruna)).toContain('on this node')
+  })
+
+  it('warns about files a sync did not add and lists them on click', async () => {
+    const failed = { ...run('succeeded'), failed: 2, errors: [{ key: 'a.faa', error: 'Access denied' }] }
+    listBackendImports.mockResolvedValue([{ ...LINKS[0], last_run: failed }])
+    getLinkStatus.mockResolvedValue({ conflicts: [] })
+    const { root } = await mount()
+    const status = element(root, (node) => node.tag === 'button' && content(node).trim() === '! 2 failed')
+    await click(status)
+    await flush()
+    expect(getLinkStatus).toHaveBeenCalledWith('g1', 'i1', expect.anything())
+    expect(content(byTestId(root, 'sync-problems')[0])).toContain('a.faa: Access denied')
   })
 
   it('starts a sync only for a bucket that is not syncing', async () => {

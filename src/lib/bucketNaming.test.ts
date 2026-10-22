@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   countWords,
   customProblem,
+  failedFiles,
   namingChoice,
   namingExample,
   namingPattern,
@@ -65,6 +66,15 @@ describe('sync status', () => {
     })
     expect(syncStatus(run('failed', { error: 'denied' }), '0 * * * *').title).toContain('denied')
     expect(syncStatus(null, '').text).toBe('Not synced')
+    expect(syncStatus(run('succeeded', { failed: 3 }), '')).toMatchObject({ text: '! 3 failed', tone: 'warn' })
+  })
+})
+
+describe('failed files', () => {
+  it('lists the node conflicts first, else the errors of the run', () => {
+    const run = { job_id: 'j', state: 'succeeded', started_at: '', imported: 0, skipped: 0, failed: 1, errors: [{ key: 'a', error: 'denied' }] }
+    expect(failedFiles(run, [{ path: 'x', reason: 'two links' }])).toEqual([{ path: 'x', reason: 'two links' }])
+    expect(failedFiles(run, [])).toEqual([{ path: 'a', reason: 'denied' }])
   })
 })
 

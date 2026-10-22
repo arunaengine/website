@@ -92,7 +92,7 @@ export const BIG_BUCKET = 100_000
 export function syncStatus(
   run: BackendImportRun | null | undefined,
   schedule: string | null | undefined,
-): { text: string; tone: 'ok' | 'error' | 'muted'; title: string } {
+): { text: string; tone: 'ok' | 'warn' | 'error' | 'muted'; title: string } {
   const rule = scheduleSentence(schedule)
   if (!run) return { text: 'Not synced', tone: 'muted', title: `Not synced yet. ${rule}` }
   const when = relativeTime(run.started_at)
@@ -100,12 +100,25 @@ export function syncStatus(
   if (runActive(run)) {
     return { text: 'Syncing…', tone: 'muted', title: `Sync started ${when}. ${rule}` }
   }
+  if (run.state === 'succeeded' && run.failed > 0) {
+    const failed = `${formatNumber(run.failed)} failed`
+    return { text: `! ${failed}`, tone: 'warn', title: `Last sync ${when}, ${found}, ${failed}. Click to see them. ${rule}` }
+  }
   if (run.state === 'succeeded') {
     return { text: `✓ ${when}`, tone: 'ok', title: `Last sync ${when}, ${found}. ${rule}` }
   }
   const error = bucketError(run)
   const reason = error ? ` ${error}` : ''
   return { text: `✕ ${when}`, tone: 'error', title: `Last sync ${when} did not finish.${reason} ${rule}` }
+}
+
+/** The files a sync did not add, with their reasons: the node's list first, else the run's. */
+export function failedFiles(
+  run: BackendImportRun | null | undefined,
+  conflicts: { path: string; reason: string }[],
+): { path: string; reason: string }[] {
+  if (conflicts.length) return conflicts
+  return (run?.errors ?? []).map((failure) => ({ path: failure.key, reason: failure.error }))
 }
 
 /** Why a template for one S3 bucket per Aruna bucket cannot work, or null. */
