@@ -781,7 +781,9 @@ export function useDataManager() {
   // Everything except the bucket list, which has its own cache-aware entry points.
   function reloadContext(): Promise<unknown> {
     const work: Array<Promise<unknown>> = [loadSyncOverview()]
-    if (bucket.value) work.push(loadObjects(), references.reload())
+    if (bucket.value) work.push(loadObjects())
+    // The reference walk reads the whole bucket, so a refresh does not wait for it.
+    if (bucket.value) void references.reload()
     return Promise.all(work)
   }
 

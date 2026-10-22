@@ -6,6 +6,7 @@ import { flush, mountApp } from '@/test/clientRender'
 // A cached session: activating a group the browser already holds resolves at once.
 const nodeIdFor = (node?: string | null) => (node && node !== 'n-local' ? node : 'n-local')
 const searchBuckets = vi.fn(async () => ({ hits: [], nodes_queried: 1, nodes_failed: 0, failed_nodes: [] }))
+const referencesReload = vi.fn(async () => undefined)
 const activeContext = ref<Record<string, unknown> | null>(null)
 const s3 = {
   activeContext,
@@ -80,7 +81,7 @@ vi.mock('./useStagingReferences', () => ({
     entries: ref([]),
     referencedByKey: ref(new Map()),
     stats: ref({ count: 0, bytes: 0, groups: [] }),
-    reload: vi.fn(async () => undefined),
+    reload: referencesReload,
   }),
 }))
 vi.mock('./useUploadQueue', () => ({ useUploadQueue: () => ({ enqueue: vi.fn(), lastCompleted: ref(null) }) }))
@@ -147,6 +148,17 @@ describe('bucket list node choice', () => {
     await flush()
 
     expect(searchBuckets.mock.calls.length).toBe(before + 1)
+  })
+
+  it('finishes Refresh without waiting for references', async () => {
+    const { router, manager } = await start()
+    await router.push({ name: 'bucket', params: { bucketId: 'reef' }, query: { group: 'g-a' } })
+    await settle()
+    referencesReload.mockReset().mockReturnValue(new Promise<undefined>(() => {}))
+
+    await manager.onRefresh()
+
+    expect(referencesReload).toHaveBeenCalledTimes(1)
   })
 
   it('opens a new bucket only when the group stayed the same', async () => {
