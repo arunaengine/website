@@ -1,0 +1,234 @@
+<script setup lang="ts">
+// The Organize tab of a linked bucket: only clean-up steps that have work are shown.
+import { computed, ref, watch } from 'vue'
+import JobProgress from '@/components/storage/JobProgress.vue'
+import PagedList from '@/components/storage/PagedList.vue'
+import Button from '@/components/ui/Button.vue'
+import Notice from '@/components/ui/Notice.vue'
+import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
+import { useCursorPage } from '@/composables/useCursorPage'
+import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
+import {
+  getImportRenames,
+  previewDuplicates,
+  startDuplicates,
+  startImportRenames,
+  type BackendImport,
+  type BackendImportRenames,
+  type DuplicateItem,
+} from '@/lib/api'
+import { countWords } from '@/lib/bucketNaming'
+import { copyKey, organizeError, type ProgressJob } from '@/lib/organize'
+import { moveRefusal } from '@/lib/storageRules'
+import { formatNumber } from '@/lib/utils'
+
+const props = defineProps<{
+  groupId: string
+  link: BackendImport
+  /** The S3 bucket and folder, as the description shows it. */
+  place: string
+  renames: BackendImportRenames | null
+  job: ProgressJob | null
+  controlling?: boolean
+  /** Counts steps that ended, so the counts read again. */
+  finished?: number
+}>()
+const emit = defineEmits<{ (e: 'started'): void; (e: 'control', action: 'pause' | 'resume' | 'abort'): void }>()
+
+const { apiBaseUrl, authToken, sessionEpoch } = useAruna()
+const { writesDisabled } = useConnectivity()
+
+const open = ref<'dup' | 'ren' | null>(null)
+const busy = ref(false)
+const error = ref<string | null>(null)
+const copiesMissing = ref(false)
+const copyAll = ref<{ total: number; complete: boolean } | null>(null)
+let wholeRun = 0
+
+function client() {
+  return { baseUrl: apiBaseUrl.value, token: authToken.value }
+}
+
+// Only a first page without a filter sets the count the step acts on.
+const copies = useCursorPage<DuplicateItem>(
+  async (query) => {
+    const link = props.link.import_id
+    const whole = !query.filter && !query.after
+    const mine = whole ? ++wholeRun : wholeRun
+    const page = await previewDuplicates(props.groupId, link, query, client())
+    if (whole && mine === wholeRun && link === props.link.import_id) {
+      copyAll.value = { total: page.total, complete: page.complete }
+    }
+    return page
+  },
+  () => (copiesMissing.value = true),
+)
+const oldNames = useCursorPage<{ from: string; to: string; writable?: boolean }>(async (query) => {
+  const found = await getImportRenames(props.groupId, props.link.import_id, client(), query)
+  return { items: found.files, total: found.count, complete: found.complete, next: found.next }
+})
+
+const copyOffered = computed(() => Boolean(copyAll.value && (copyAll.value.total > 0 || !copyAll.value.complete)))
+const renameOffered = computed(() => Boolean(props.renames && (props.renames.count > 0 || !props.renames.complete)))
+const checking = computed(() => copyAll.value === null && !copiesMissing.value && !copies.error.value)
+const nothing = computed(() => !checking.value && !copyOffered.value && !renameOffered.value && !props.job)
+const copyCount = computed(() => countWords(copyAll.value?.total ?? 0, copyAll.value?.complete ?? true))
+const copyButton = computed(() => {
+  const { total, complete } = copyAll.value ?? { total: 0, complete: true }
+  return `Delete ${complete ? '' : 'at least '}${formatNumber(total)} ${total === 1 && complete ? 'copy' : 'copies'}`
+})
+const renameCount = computed(() => countWords(props.renames?.count ?? 0, props.renames?.complete ?? true))
+
+function reload() {
+  copies.reset()
+  oldNames.reset()
+  wholeRun++
+  copyAll.value = null
+  copiesMissing.value = false
+  void copies.load('')
+}
+
+watch(
+  () => [props.link.import_id, sessionEpoch.value],
+  () => {
+    open.value = null
+    error.value = null
+    reload()
+  },
+  { immediate: true },
+)
+watch(() => props.finished, reload)
+
+function review(step: 'dup' | 'ren') {
+  open.value = open.value === step ? null : step
+  if (open.value === 'ren' && !oldNames.page.value) void oldNames.load('')
+}
+
+async function act(run: () => Promise<unknown>) {
+  if (busy.value || props.job || writesDisabled.value) return
+  busy.value = true
+  error.value = null
+  const epoch = sessionEpoch.value
+  const link = props.link.import_id
+  const same = () => epoch === sessionEpoch.value && link === props.link.import_id
+  try {
+    await run()
+    if (same()) emit('started')
+  } catch (err) {
+    if (!same()) return
+    error.value = isUnsupportedEndpoint(err) ? 'This node cannot do this yet.' : (moveRefusal(err) ?? organizeError(err))
+  } finally {
+    busy.value = false
+  }
+}
+
+const removeCopies = () => act(() => startDuplicates(props.groupId, props.link.import_id, client()))
+const rename = () => act(() => startImportRenames(props.groupId, props.link.import_id, client()))
+const offline = computed(() => (writesDisabled.value ? OFFLINE_WRITE_HINT : undefined))
+const blocked = computed(() => busy.value || Boolean(props.job) || writesDisabled.value)
+</script>
+
+<template>
+  <div class="grid gap-3">
+    <p class="text-xs text-muted-foreground">
+      Clean up the files in <span class="font-mono">{{ place }}</span>. Paths in Aruna stay the same.
+    </p>
+    <p v-if="checking" class="text-xs text-muted-foreground">Checking the bucket…</p>
+    <p v-else-if="nothing" class="text-sm">Nothing to clean up.</p>
+    <div v-if="job && job.kind !== 'duplicates' && job.kind !== 'rename'" class="rounded-md border border-border px-3 py-2.5">
+      <JobProgress :job="job" :busy="controlling" @control="(action) => emit('control', action)" />
+    </div>
+
+    <div v-if="copyOffered || job?.kind === 'duplicates'" class="rounded-md border border-border px-3 py-2.5" data-testid="step-duplicates">
+      <div class="flex items-center gap-2">
+        <div class="min-w-0 flex-1">
+          <div class="text-sm font-medium">Duplicate files</div>
+          <p class="text-xs text-muted-foreground">Same content stored twice. The extra copy is deleted.</p>
+        </div>
+        <span v-if="copyOffered" class="text-xs text-muted-foreground">{{ copyCount }}</span>
+        <Button v-if="copyOffered" variant="outline" size="sm" @click="review('dup')">Review…</Button>
+      </div>
+      <div v-if="open === 'dup'" class="mt-3">
+        <PagedList
+          :total="copies.page.value?.total ?? 0"
+          :complete="copies.page.value?.complete ?? true"
+          :offset="copies.offset.value"
+          :shown="copies.items.value.length"
+          :filter="copies.filter.value"
+          :busy="copies.busy.value"
+          :has-next="copies.hasNext.value"
+          :has-prev="copies.hasPrev.value"
+          @next="copies.next()"
+          @prev="copies.prev()"
+          @filter="(value: string) => copies.load(value)"
+        >
+          <template #head>
+            <div class="grid grid-cols-2 gap-3 text-[11px] uppercase tracking-wide text-muted-foreground">
+              <span>Kept</span><span>Deleted</span>
+            </div>
+          </template>
+          <li v-for="item in copies.items.value" :key="copyKey(item)" class="grid grid-cols-2 gap-3 px-3 py-1.5 font-mono">
+            <span class="truncate" :title="item.kept.path">{{ item.kept.path }}</span>
+            <span class="truncate text-destructive" :title="item.removed.map((file) => file.path).join(', ')">
+              {{ item.removed.map((file) => file.path).join(', ') }}
+            </span>
+          </li>
+        </PagedList>
+        <div class="mt-2 flex justify-end gap-2">
+          <Button variant="ghost" size="sm" @click="open = null">Cancel</Button>
+          <Button variant="destructive" size="sm" :disabled="blocked" :title="offline" @click="removeCopies">
+            {{ copyButton }}
+          </Button>
+        </div>
+      </div>
+      <JobProgress v-if="job?.kind === 'duplicates'" class="mt-3" :job="job" :busy="controlling" @control="(action) => emit('control', action)" />
+    </div>
+
+    <div v-if="renameOffered || job?.kind === 'rename'" class="rounded-md border border-border px-3 py-2.5" data-testid="step-renames">
+      <div class="flex items-center gap-2">
+        <div class="min-w-0 flex-1">
+          <div class="text-sm font-medium">Old file names</div>
+          <p class="text-xs text-muted-foreground">Files with an older name style get the bucket's current style.</p>
+        </div>
+        <span v-if="renameOffered" class="text-xs text-muted-foreground">{{ renameCount }}</span>
+        <Button v-if="renameOffered" variant="outline" size="sm" @click="review('ren')">Review…</Button>
+      </div>
+      <div v-if="open === 'ren'" class="mt-3">
+        <PagedList
+          :total="oldNames.page.value?.total ?? 0"
+          :complete="oldNames.page.value?.complete ?? true"
+          :offset="oldNames.offset.value"
+          :shown="oldNames.items.value.length"
+          :filter="oldNames.filter.value"
+          :busy="oldNames.busy.value"
+          :has-next="oldNames.hasNext.value"
+          :has-prev="oldNames.hasPrev.value"
+          @next="oldNames.next()"
+          @prev="oldNames.prev()"
+          @filter="(value: string) => oldNames.load(value)"
+        >
+          <template #head>
+            <div class="grid grid-cols-2 gap-3 text-[11px] uppercase tracking-wide text-muted-foreground">
+              <span>Old name</span><span>New name</span>
+            </div>
+          </template>
+          <li v-for="file in oldNames.items.value" :key="file.from" class="grid grid-cols-2 gap-3 px-3 py-1.5 font-mono">
+            <span class="truncate" :title="file.from">{{ file.from }}</span>
+            <span class="truncate" :title="file.to">
+              {{ file.to }}<span v-if="file.writable === false" class="font-sans text-muted-foreground"> (cannot rename)</span>
+            </span>
+          </li>
+        </PagedList>
+        <div class="mt-2 flex justify-end gap-2">
+          <Button variant="ghost" size="sm" @click="open = null">Cancel</Button>
+          <Button size="sm" :disabled="blocked" :title="offline" @click="rename">Rename {{ renameCount }}</Button>
+        </div>
+      </div>
+      <JobProgress v-if="job?.kind === 'rename'" class="mt-3" :job="job" :busy="controlling" @control="(action) => emit('control', action)" />
+    </div>
+
+    <Notice v-if="error || copies.error.value || oldNames.error.value" tone="error">
+      {{ error ?? copies.error.value ?? oldNames.error.value }}
+    </Notice>
+  </div>
+</template>
