@@ -1,5 +1,5 @@
 import * as VueRuntime from 'vue'
-import { defineComponent, h, ref } from 'vue'
+import { defineComponent, h, ref, type Component } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { click, compileClientComponent, content, element, flush, moduleDefault, mountApp, typeValue } from '@/test/clientRender'
 import * as Api from '@/lib/api'
@@ -34,7 +34,7 @@ const SelectStub = defineComponent({
     h('select', { 'aria-label': props.ariaLabel, value: props.modelValue, onInput: (event: { target: { value: string } }) => emit('update:modelValue', event.target.value) }),
 })
 
-const ui = (name: string, component = Slot) => ({ [`@/components/ui/${name}.vue`]: moduleDefault(component) })
+const ui = (name: string, component: Component = Slot) => ({ [`@/components/ui/${name}.vue`]: moduleDefault(component) })
 const BucketEditDialog = compileClientComponent(new URL('./BucketEditDialog.vue', import.meta.url), {
   vue: VueRuntime,
   '@/components/groups/BucketOrganize.vue': moduleDefault(Empty),
