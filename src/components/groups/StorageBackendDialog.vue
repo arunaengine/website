@@ -133,11 +133,13 @@ function fullBody() {
   }
   const toggle = schema.value.toggle
   if (toggle && toggleOn.value) publicConfig[toggle.key] = 'true'
+  const cleanup = props.backend?.cleanup
   return {
     name: name.value.trim(),
     kind: kind.value,
     public_config: publicConfig,
     secret_config: credentials(),
+    ...(cleanup ? { cleanup } : {}),
   }
 }
 

@@ -136,6 +136,13 @@ describe('Storage dialog connection', () => {
     })
   })
 
+  it('sends the stored cleanup policy back unchanged', async () => {
+    const { root } = await mount({ ...stored, cleanup: { mode: 'reclaim', after_secs: 86400 } })
+    await typeValue(byId(root, '-name'), 'lab two')
+    await submit(root)
+    expect(replaceGroupBackend.mock.calls[0][2].cleanup).toEqual({ mode: 'reclaim', after_secs: 86400 })
+  })
+
   it('needs both keys once Replace keys is used', async () => {
     const { root } = await mount(stored)
     await click(buttonWith(root, 'Replace keys'))

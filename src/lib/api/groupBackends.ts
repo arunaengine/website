@@ -21,6 +21,13 @@ export interface GroupBackendResponse {
   public_config: Record<string, string>
   /** Disabled backends refuse new writes; stored objects stay readable. */
   disabled?: boolean
+  /** When unreferenced copies are deleted from the storage; absent on older nodes. */
+  cleanup?: CleanupPolicy
+}
+
+export interface CleanupPolicy {
+  mode: 'retain' | 'reclaim' | string
+  after_secs?: number
 }
 
 export interface ListGroupBackendsResponse {
@@ -35,6 +42,8 @@ export interface GroupBackendRequest {
   kind: GroupBackendKind
   public_config: Record<string, string>
   secret_config: Record<string, string>
+  /** An omitted policy resets it to `retain`, so an edit sends the stored one back. */
+  cleanup?: CleanupPolicy
 }
 
 /** The group's storages as one node answers them; useAruna's list asks the connected node. */
