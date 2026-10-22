@@ -1,5 +1,5 @@
 import * as VueRuntime from 'vue'
-import { defineComponent, h, ref } from 'vue'
+import { defineComponent, h, reactive, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { click, compileClientComponent, content, element, flush, moduleDefault, mountApp, nodes } from '@/test/clientRender'
 import * as Api from '@/lib/api'
@@ -238,6 +238,52 @@ describe('StorageSection', () => {
     expect(listStorageBuckets).toHaveBeenLastCalledWith('g1', { limit: 200, after: 'c1' }, expect.anything())
     expect(content(root)).toContain('beta')
     expect(nodes(root).some((node) => node.tag === 'button' && content(node).trim() === 'Show more buckets')).toBe(false)
+  })
+
+  it('starts the listing over on a refresh', async () => {
+    const first = { buckets: [listed('alpha', { shared: true, provider_bucket: 'shared' })], next: 'c1' }
+    listStorageBuckets
+      .mockResolvedValueOnce(first)
+      .mockResolvedValueOnce({ buckets: [listed('beta', { shared: true, provider_bucket: 'shared' })], next: null })
+      .mockResolvedValueOnce(first)
+    const { root } = await mount()
+    await click(buttonIn(root, 'Show more buckets'))
+    expect(content(root)).toContain('beta')
+    await click(nodes(root).find((node) => node.props['aria-label'] === 'Sync now')!)
+    await flush()
+    expect(content(root)).not.toContain('beta')
+    expect(buttonIn(root, 'Show more buckets').props.disabled).toBe(false)
+  })
+
+  it('drops a page request of the group that was left', async () => {
+    let fail: (reason: unknown) => void = () => {}
+    listStorageBuckets.mockImplementation((_group: string, page: { after?: string }) =>
+      page.after ? new Promise((_, reject) => (fail = reject)) : Promise.resolve({ buckets: [], next: 'c1' }),
+    )
+    const props = reactive({ groupId: 'g1', groupName: 'spire', canAdmin: true })
+    const { root } = await mountApp(defineComponent(() => () => h(StorageSection, props)))
+    await flush()
+    void (buttonIn(root, 'Show more buckets').props.onClick as () => void)()
+    await flush()
+    props.groupId = 'g2'
+    await flush()
+    await flush()
+    fail(new Error('old group failed'))
+    await flush()
+    expect(content(root)).not.toContain('old group failed')
+    expect(buttonIn(root, 'Show more buckets').props.disabled).toBe(false)
+  })
+
+  it('names the fixed bucket of a connection when the listing has none', async () => {
+    listGroupBackends.mockResolvedValue({ backends: [{ ...STORAGE, public_config: { endpoint: 'https://s3', bucket: 'fixed-data' } }] })
+    listStorageBuckets.mockResolvedValue({
+      buckets: [listed('samples', { shared: true }), listed('runs', { folder: 'raw/' })],
+      next: null,
+    })
+    const { root } = await mount()
+    const text = content(byTestId(root, 'storage-s1')[0])
+    expect(text).toContain('fixed-data (shared)')
+    expect(text).toContain('fixed-data/raw')
   })
 
   it('starts a sync only for a bucket that is not syncing', async () => {

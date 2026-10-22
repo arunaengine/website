@@ -67,6 +67,8 @@ const firstBuckets = ref<StorageBucket[] | null>(null)
 const moreBuckets = ref<StorageBucket[]>([])
 const bucketsNext = ref<string | null>(null)
 const loadingMore = ref(false)
+// A load or a context change ends every page request before it.
+let pageRun = 0
 
 function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
@@ -108,7 +110,11 @@ async function load() {
     routing.value = rules
     links.value = imports
     firstBuckets.value = page?.buckets ?? null
-    if (!moreBuckets.value.length) bucketsNext.value = page?.next ?? null
+    // A refresh starts the listing over, so later pages never mix with a newer first page.
+    pageRun++
+    loadingMore.value = false
+    moreBuckets.value = []
+    bucketsNext.value = page?.next ?? null
     if (editing.value) editing.value = imports.find((link) => link.import_id === editing.value?.import_id) ?? editing.value
     emit('count', list.backends.length)
     emit('backends', list.backends)
@@ -136,6 +142,8 @@ watch(
     firstBuckets.value = null
     moreBuckets.value = []
     bucketsNext.value = null
+    pageRun++
+    loadingMore.value = false
     problemsRun++
     problems.value = null
     void load()
@@ -159,18 +167,19 @@ watch([() => props.focusLink, links], ([id]) => {
 async function moreBucketsPage() {
   const after = bucketsNext.value
   if (!after || loadingMore.value) return
-  const seq = loadSeq
+  const run = ++pageRun
   const epoch = sessionEpoch.value
+  const current = () => run === pageRun && epoch === sessionEpoch.value
   loadingMore.value = true
   try {
     const page = await listStorageBuckets(props.groupId, { limit: BUCKET_PAGE, after }, client())
-    if (seq !== loadSeq || epoch !== sessionEpoch.value) return
+    if (!current()) return
     moreBuckets.value = [...moreBuckets.value, ...page.buckets]
     bucketsNext.value = page.next ?? null
   } catch (err) {
-    actionError.value = errorMessage(err)
+    if (current()) actionError.value = errorMessage(err)
   } finally {
-    loadingMore.value = false
+    if (current()) loadingMore.value = false
   }
 }
 
@@ -196,7 +205,10 @@ function rowsOf(backendId: string | null): Row[] {
 /** The S3 bucket of a listed bucket that is not linked. */
 function bucketPlace(entry: StorageBucket): string {
   if (entry.backend_id === null) return 'on this node'
-  const where = [entry.provider_bucket, entry.folder?.replace(/\/+$/, '')].filter(Boolean).join('/')
+  // A storage with a fixed bucket or container names it in its connection.
+  const backend = backends.value?.find((candidate) => candidate.backend_id === entry.backend_id)
+  const fallback = backend ? (entry.shared ? defaultBucket(backend) : null) ?? storeName(backend) : null
+  const where = [entry.provider_bucket ?? fallback, entry.folder?.replace(/\/+$/, '')].filter(Boolean).join('/')
   return entry.shared ? `${where} (shared)` : where
 }
 
