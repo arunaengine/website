@@ -7,6 +7,7 @@ import { flush, mountApp } from '@/test/clientRender'
 const nodeIdFor = (node?: string | null) => (node && node !== 'n-local' ? node : 'n-local')
 const searchBuckets = vi.fn(async () => ({ hits: [], nodes_queried: 1, nodes_failed: 0, failed_nodes: [] }))
 const referencesReload = vi.fn(async () => undefined)
+const bucketMissing = vi.fn((_err: unknown) => false)
 const activeContext = ref<Record<string, unknown> | null>(null)
 const s3 = {
   activeContext,
@@ -32,7 +33,7 @@ vi.mock('./useS3', () => ({
   useS3: () => s3,
   s3ErrorMessage: (err: Error) => err.message,
   isS3AuthError: () => false,
-  isS3BucketMissingError: () => false,
+  isS3BucketMissingError: (err: unknown) => bucketMissing(err),
   isS3NetworkError: () => false,
 }))
 vi.mock('./useAruna', () => ({
@@ -150,15 +151,37 @@ describe('bucket list node choice', () => {
     expect(searchBuckets.mock.calls.length).toBe(before + 1)
   })
 
-  it('finishes Refresh without waiting for references', async () => {
+  it('refreshes an open bucket with one check and one list', async () => {
     const { router, manager } = await start()
     await router.push({ name: 'bucket', params: { bucketId: 'reef' }, query: { group: 'g-a' } })
     await settle()
-    referencesReload.mockReset().mockReturnValue(new Promise<undefined>(() => {}))
+    const searches = searchBuckets.mock.calls.length
+    referencesReload.mockClear()
+    s3.headBucket.mockClear()
+    s3.listObjects.mockClear()
 
     await manager.onRefresh()
 
-    expect(referencesReload).toHaveBeenCalledTimes(1)
+    expect(s3.headBucket).toHaveBeenCalledExactlyOnceWith('reef', null)
+    expect(s3.listObjects).toHaveBeenCalledExactlyOnceWith('reef', '', undefined, null, expect.anything())
+    expect(referencesReload).not.toHaveBeenCalled()
+    expect(searchBuckets.mock.calls.length).toBe(searches)
+  })
+
+  it('skips the list when Refresh finds the bucket gone', async () => {
+    const { router, manager } = await start()
+    await router.push({ name: 'bucket', params: { bucketId: 'reef' }, query: { group: 'g-a' } })
+    await settle()
+    const gone = new Error('NoSuchBucket')
+    s3.headBucket.mockRejectedValueOnce(gone)
+    bucketMissing.mockImplementation((err) => err === gone)
+    s3.listObjects.mockClear()
+
+    await manager.onRefresh()
+
+    expect(s3.listObjects).not.toHaveBeenCalled()
+    expect(manager.listError.value).toBe('NoSuchBucket')
+    bucketMissing.mockReset().mockReturnValue(false)
   })
 
   it('opens a new bucket only when the group stayed the same', async () => {

@@ -781,16 +781,32 @@ export function useDataManager() {
   // Everything except the bucket list, which has its own cache-aware entry points.
   function reloadContext(): Promise<unknown> {
     const work: Array<Promise<unknown>> = [loadSyncOverview()]
-    if (bucket.value) work.push(loadObjects())
-    // The reference walk reads the whole bucket, so a refresh does not wait for it.
-    if (bucket.value) void references.reload()
+    if (bucket.value) work.push(loadObjects(), references.reload())
     return Promise.all(work)
   }
 
+  // Refresh checks the open bucket and reloads only the first page of its list.
+  async function refreshBucket() {
+    const target = bucket.value
+    const node = remoteNodeId.value
+    try {
+      await s3.headBucket(target, node)
+    } catch (err) {
+      if (isS3BucketMissingError(err) && target === bucket.value && node === remoteNodeId.value) {
+        clearObjectListing()
+        listError.value = s3ErrorMessage(err)
+        shortcuts.remove(target, node)
+        return
+      }
+    }
+    pages.reset()
+    await loadObjects()
+  }
+
+  // Without an open bucket, only the shown bucket list reloads.
   function refreshAll(): Promise<unknown> {
-    const work = [bucketList.refresh(), reloadContext()]
-    if (bucketNodeChoice.value === null) work.push(allBuckets.reload())
-    return Promise.all(work)
+    if (bucket.value) return refreshBucket()
+    return bucketNodeChoice.value === null ? allBuckets.reload() : bucketList.refresh()
   }
 
   const { busy: refreshBusy, refresh: onRefresh } = useRefresh(refreshAll)

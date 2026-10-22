@@ -22,8 +22,8 @@ export async function listBuckets(): Promise<BucketEntry[]> {
 }
 
 /** Resolves when the bucket exists; a missing one rejects with a not-found error. */
-export async function headBucket(bucket: string): Promise<void> {
-  await client().send(new HeadBucketCommand({ Bucket: bucket }))
+export async function headBucket(bucket: string, nodeId?: string | null): Promise<void> {
+  await client(nodeId).send(new HeadBucketCommand({ Bucket: bucket }))
 }
 
 export async function createBucket(name: string): Promise<void> {
