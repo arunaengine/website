@@ -27,10 +27,17 @@ const IconButtonStub = defineComponent({
     h('button', { ...attrs, 'aria-label': props.label, disabled: props.disabled }, slots.default?.()),
 })
 // The edit dialog shows which bucket it opened for.
+const mounts: string[] = []
 const EditStub = defineComponent({
   props: { open: Boolean, link: Object, place: String },
-  setup: (props) => () =>
-    props.open ? h('div', { 'data-testid': 'edit-dialog' }, `${(props.link as { bucket: string }).bucket} ${props.place}`) : null,
+  emits: ['update:open'],
+  setup: (props, { emit }) => {
+    mounts.push((props.link as { import_id: string }).import_id)
+    return () =>
+      props.open
+        ? h('div', { 'data-testid': 'edit-dialog', onClose: () => emit('update:open', false) }, `${(props.link as { bucket: string }).bucket} ${props.place}`)
+        : null
+  },
 })
 const OpenStub = (testid: string) =>
   defineComponent({
@@ -108,6 +115,7 @@ async function mount(focusLink: string | null = null) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mounts.length = 0
   writesDisabled.value = false
   listGroupBackends.mockResolvedValue({ backends: [STORAGE] })
   getGroupRouting.mockResolvedValue({ group_id: 'g1', default_target: { backend_id: 's1' }, warnings: [] })
@@ -167,6 +175,19 @@ describe('StorageSection', () => {
 
     const focused = await mount('i2')
     expect(content(byTestId(focused.root, 'edit-dialog')[0])).toBe('raw lab-raw/runs')
+  })
+
+  it('gives each bucket its own edit dialog and drops it when closed', async () => {
+    const { root } = await mount()
+    const edit = (row: number) =>
+      click(element(byTestId(root, 'bucket-row')[row], (node) => node.tag === 'button' && content(node).trim() === 'Edit'))
+    await edit(0)
+    await edit(1)
+    expect(mounts).toEqual(['i1', 'i2'])
+    expect(content(byTestId(root, 'edit-dialog')[0])).toBe('raw lab-raw/runs')
+    ;(byTestId(root, 'edit-dialog')[0].props.onClose as () => void)()
+    await flush()
+    expect(byTestId(root, 'edit-dialog')).toHaveLength(0)
   })
 
   it('opens the dialogs for new buckets, linking and the connection', async () => {

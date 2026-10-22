@@ -366,8 +366,10 @@ const EDIT = 'h-7 px-2 text-aruna-navy dark:text-foreground'
       @saved="load"
     />
     <LinkBucketDialog v-model:open="linkDialog" :group-id="groupId" :backend="linkBackend" :links="links" @saved="onLinked" />
+    <!-- One instance per bucket, gone when closed, so no job or poll outlives it. -->
     <BucketEditDialog
-      v-if="editing"
+      v-if="editing && editDialog"
+      :key="`${groupId}\n${editing.import_id}`"
       v-model:open="editDialog"
       :group-id="groupId"
       :link="editing"
