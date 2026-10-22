@@ -26,10 +26,10 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
   (e: 'update:open', v: boolean): void
-  (e: 'saved', backend: GroupBackendResponse): void
+  (e: 'saved', backend?: GroupBackendResponse): void
 }>()
 
-const { createGroupBackend, replaceGroupBackend, saving } = useAruna()
+const { createGroupBackend, replaceGroupBackend, disableGroupBackend, enableGroupBackend, saving } = useAruna()
 const { writesDisabled } = useConnectivity()
 const uid = useId()
 
@@ -40,21 +40,13 @@ const kind = ref<GroupBackendKind>('s3')
 const publicValues = ref<Record<string, string>>({})
 const secretValues = ref<Record<string, string>>({})
 const toggleOn = ref(false)
-// One provider bucket per Aruna bucket, stored as `bucket_prefix` and `bucket_delete`.
-const perBucket = ref(false)
-const bucketPrefix = ref('')
-const bucketDelete = ref('keep')
+const keysOpen = ref(false)
+const removing = ref(false)
 const submitError = ref<string | null>(null)
 
 const submitSummary = computed(() => (submitError.value ? shortError(submitError.value) : ''))
 
 const isEdit = computed(() => Boolean(props.backend))
-const DELETE_OPTIONS = [
-  { value: 'keep', label: 'Keep the provider bucket' },
-  { value: 'delete_empty', label: 'Delete it if empty' },
-]
-// Only an S3 storage without a fixed bucket names a bucket per Aruna bucket.
-const showsProviderBuckets = computed(() => kind.value === 's3' && !props.backend?.public_config.bucket)
 const schema = computed(() => BACKEND_KIND_SCHEMAS[kind.value])
 // A new S3 storage has no fixed bucket: each rule names its own.
 const fields = computed(() =>
@@ -85,12 +77,6 @@ const settingsChanged = computed(() => {
   if (name.value.trim() !== source.name) return true
   const toggle = schema.value.toggle
   if (toggle && (source.public_config[toggle.key] === 'true') !== toggleOn.value) return true
-  const config = source.public_config
-  if ('bucket_prefix' in config !== perBucket.value) return true
-  if (perBucket.value) {
-    if (config.bucket_prefix !== bucketPrefix.value.trim()) return true
-    if ((config.bucket_delete ?? 'keep') !== bucketDelete.value) return true
-  }
   return schema.value.public.some(
     (field) => (publicValues.value[field.key]?.trim() ?? '') !== (source.public_config[field.key] ?? ''),
   )
@@ -104,11 +90,14 @@ const missingRequired = computed(() =>
 // credentials, so they have to be entered again.
 const needsCredentials = computed(() => !isEdit.value || settingsChanged.value)
 
-// The node refuses an empty prefix.
-const prefixMissing = computed(() => showsProviderBuckets.value && perBucket.value && !bucketPrefix.value.trim())
+// The node replaces a storage whole, so a changed setting needs the keys again.
+watch(settingsChanged, (changed) => {
+  if (changed && isEdit.value) keysOpen.value = true
+})
+const pathStyleOff = computed(() => kind.value === 's3' && !toggleOn.value)
 
 const submitDisabled = computed(() => {
-  if (saving.value || writesDisabled.value || prefixMissing.value) return true
+  if (saving.value || writesDisabled.value) return true
   // Nothing typed and nothing changed: there is nothing to save.
   if (isEdit.value && !settingsChanged.value && !credentialsEntered.value) return true
   if (needsCredentials.value && (missingRequired.value || !name.value.trim())) return true
@@ -127,9 +116,8 @@ watch(
     secretValues.value = {}
     const toggleKey = BACKEND_KIND_SCHEMAS[kind.value].toggle?.key
     toggleOn.value = toggleKey !== undefined && source?.public_config[toggleKey] === 'true'
-    perBucket.value = source ? 'bucket_prefix' in source.public_config : false
-    bucketPrefix.value = source?.public_config.bucket_prefix ?? ''
-    bucketDelete.value = source?.public_config.bucket_delete ?? 'keep'
+    keysOpen.value = !source
+    removing.value = false
     submitError.value = null
   },
 )
@@ -151,10 +139,6 @@ function fullBody() {
   }
   const toggle = schema.value.toggle
   if (toggle && toggleOn.value) publicConfig[toggle.key] = 'true'
-  if (showsProviderBuckets.value && perBucket.value) {
-    publicConfig.bucket_prefix = bucketPrefix.value.trim()
-    publicConfig.bucket_delete = bucketDelete.value
-  }
   return {
     name: name.value.trim(),
     kind: kind.value,
@@ -180,6 +164,20 @@ async function submit() {
     submitError.value = errorMessage(err)
   }
 }
+
+async function setRemoved(remove: boolean) {
+  const existing = props.backend
+  if (!existing || writesDisabled.value) return
+  submitError.value = null
+  try {
+    if (remove) await disableGroupBackend(props.groupId, existing.backend_id)
+    else await enableGroupBackend(props.groupId, existing.backend_id)
+    emit('saved')
+    emit('update:open', false)
+  } catch (err) {
+    submitError.value = errorMessage(err)
+  }
+}
 </script>
 
 <template>
@@ -188,10 +186,10 @@ async function submit() {
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <Database class="h-4 w-4 text-primary" />
-          {{ isEdit ? 'Edit your storage' : 'Add your storage' }}
+          {{ backend ? backend.name : 'Add storage' }}
         </DialogTitle>
         <DialogDescription>
-          Storage your group runs, like your own S3. Rules decide which buckets Aruna uses there.
+          {{ isEdit ? 'Keys saved.' : 'Storage your group runs, like your own S3.' }}
         </DialogDescription>
       </DialogHeader>
 
@@ -235,7 +233,7 @@ async function submit() {
               aria-label="Locked"
               title="Files already stored here are recorded against this type and address; pointing the entry elsewhere would make them unreadable."
             />
-            <span>The type and the address cannot change. Add another storage instead.</span>
+            <span>To use another address, add a new storage.</span>
           </p>
 
           <div class="grid gap-3 sm:grid-cols-2">
@@ -268,48 +266,20 @@ async function submit() {
             />
           </label>
 
-          <section v-if="showsProviderBuckets" class="space-y-3 border-t border-border pt-3">
-            <h3 class="text-xs font-semibold text-foreground">Provider buckets</h3>
-            <label class="flex items-center gap-2 text-xs">
-              <Switch
-                :checked="perBucket"
-                :disabled="settingsLocked"
-                aria-label="Create a provider bucket for each new bucket"
-                @update:checked="(v: boolean) => (perBucket = v)"
-              />
-              <span class="text-foreground">Create a provider bucket for each new bucket</span>
-            </label>
-            <template v-if="perBucket">
-              <div>
-                <label :for="`${uid}-bucket-prefix`" class="text-xs font-medium text-foreground">Name prefix</label>
-                <Input
-                  :id="`${uid}-bucket-prefix`"
-                  v-model="bucketPrefix"
-                  class="mt-1 font-mono text-xs"
-                  placeholder="team-a-"
-                  :invalid="prefixMissing ? 'error' : undefined"
-                  :disabled="settingsLocked"
-                />
-                <p v-if="prefixMissing" class="mt-1 text-[11px] text-destructive">Enter a prefix.</p>
-                <p v-else class="mt-1 text-[11px] text-muted-foreground">
-                  New bucket results is stored in {{ bucketPrefix.trim() }}results.
-                </p>
-              </div>
-              <div>
-                <label class="text-xs font-medium text-foreground">When a bucket is deleted</label>
-                <Select
-                  v-model="bucketDelete"
-                  :options="DELETE_OPTIONS"
-                  :disabled="settingsLocked"
-                  aria-label="When a bucket is deleted"
-                  class="mt-1"
-                />
-              </div>
-            </template>
-          </section>
+          <Notice v-if="pathStyleOff" tone="warning">
+            Most self-hosted S3 fails without path-style. Aruna tests before saving.
+          </Notice>
 
-          <fieldset class="space-y-3 rounded-md border border-border p-3">
-            <legend class="px-1 text-xs font-semibold text-foreground">Credentials</legend>
+          <button
+            v-if="isEdit && !keysOpen"
+            type="button"
+            class="text-xs text-muted-foreground hover:text-foreground"
+            @click="keysOpen = true"
+          >
+            Replace keys
+          </button>
+          <fieldset v-else class="space-y-3 rounded-md border border-border p-3">
+            <legend class="px-1 text-xs font-semibold text-foreground">{{ isEdit ? 'Replace keys' : 'Credentials' }}</legend>
             <p class="text-[11px] text-muted-foreground">
               Stored write-only: the node never shows them again.
               <template v-if="schema.secretOneOf">One of the two is enough.</template>
@@ -342,9 +312,42 @@ async function submit() {
         </div>
 
         <DialogFooter>
+          <template v-if="backend">
+            <template v-if="removing">
+              <span class="mr-auto self-center text-xs text-foreground">
+                Remove? New uploads stop going here. Files stay readable.
+              </span>
+              <Button type="button" variant="destructive" size="sm" :disabled="saving || writesDisabled" @click="setRemoved(true)">
+                Remove
+              </Button>
+              <Button type="button" variant="ghost" size="sm" @click="removing = false">Keep</Button>
+            </template>
+            <Button
+              v-else-if="backend.disabled"
+              type="button"
+              variant="ghost"
+              size="sm"
+              class="mr-auto"
+              :disabled="saving || writesDisabled"
+              @click="setRemoved(false)"
+            >
+              Enable storage
+            </Button>
+            <Button
+              v-else
+              type="button"
+              variant="ghost"
+              size="sm"
+              class="mr-auto text-destructive"
+              :disabled="saving || writesDisabled"
+              @click="removing = true"
+            >
+              Remove storage…
+            </Button>
+          </template>
           <DialogClose as-child><Button type="button" variant="outline">Cancel</Button></DialogClose>
           <Button type="submit" :disabled="submitDisabled" :title="writesDisabled ? OFFLINE_WRITE_HINT : undefined">
-            {{ saving ? 'Saving…' : isEdit ? 'Save changes' : 'Add storage' }}
+            {{ saving ? 'Saving…' : isEdit ? 'Save' : 'Add storage' }}
           </Button>
         </DialogFooter>
       </form>

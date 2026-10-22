@@ -25,6 +25,8 @@ const saved: GroupBackendResponse = {
 }
 const createGroupBackend = vi.fn(async (_group: string, _body: GroupBackendRequest) => saved)
 const replaceGroupBackend = vi.fn(async (_group: string, _id: string, _body: GroupBackendRequest) => saved)
+const disableGroupBackend = vi.fn(async (_group: string, _id: string) => {})
+const enableGroupBackend = vi.fn(async (_group: string, _id: string) => saved)
 
 const Passthrough = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
 const Empty = defineComponent(() => () => null)
@@ -67,7 +69,7 @@ const StorageBackendDialog = compileClientComponent(new URL('./StorageBackendDia
   '@/lib/utils': Utils,
   '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled: ref(false) }) },
   '@/composables/useAruna': {
-    useAruna: () => ({ createGroupBackend, replaceGroupBackend, saving: ref(false) }),
+    useAruna: () => ({ createGroupBackend, replaceGroupBackend, disableGroupBackend, enableGroupBackend, saving: ref(false) }),
   },
   '@/components/ui/Dialog.vue': moduleDefault(Passthrough),
   '@/components/ui/DialogContent.vue': moduleDefault(Passthrough),
@@ -106,76 +108,50 @@ async function submit(root: Root) {
   await flush()
 }
 
-const toggle = (root: Root) => click(byLabel(root, 'Create a provider bucket for each new bucket'))
+const buttonWith = (root: Root, text: string) =>
+  element(root, (node) => node.tag === 'button' && content(node).trim() === text)
+const save = (root: Root) => element(root, (node) => node.tag === 'button' && node.props.type === 'submit')
+const stored: GroupBackendResponse = {
+  ...saved,
+  public_config: { endpoint: 'https://s3.test', force_path_style: 'true' },
+}
 
-describe('Storage dialog provider buckets', () => {
+describe('Storage dialog connection', () => {
   beforeEach(() => {
     createGroupBackend.mockClear()
     replaceGroupBackend.mockClear()
+    disableGroupBackend.mockClear()
   })
 
-  it('sends the prefix and the delete choice for a new S3 storage', async () => {
-    const { root } = await mount()
-    await typeValue(byId(root, '-name'), 'lab')
-    await typeValue(byId(root, '-pub-endpoint'), 'https://s3.test')
+  it('hides the keys until a setting changes, then asks for them', async () => {
+    const { root } = await mount(stored)
+    expect(content(root)).toContain('Replace keys')
+    expect(nodes(root).some((node) => String(node.props.id ?? '').endsWith('-sec-access_key_id'))).toBe(false)
+
+    await typeValue(byId(root, '-name'), 'lab two')
+    expect(save(root).props.disabled).toBe(true)
     await typeValue(byId(root, '-sec-access_key_id'), 'key')
     await typeValue(byId(root, '-sec-secret_access_key'), 'secret')
-
-    expect(content(root)).not.toContain('Name prefix')
-    await toggle(root)
-    await typeValue(byId(root, '-bucket-prefix'), 'team-a-')
-    expect(content(root)).toContain('New bucket results is stored in team-a-results.')
-    await typeValue(byLabel(root, 'When a bucket is deleted'), 'delete_empty')
     await submit(root)
 
-    expect(createGroupBackend.mock.calls[0][1].public_config).toEqual({
-      endpoint: 'https://s3.test',
-      bucket_prefix: 'team-a-',
-      bucket_delete: 'delete_empty',
+    expect(replaceGroupBackend.mock.calls[0][2]).toMatchObject({
+      name: 'lab two',
+      public_config: { endpoint: 'https://s3.test', force_path_style: 'true' },
     })
   })
 
-  it('needs a prefix while the toggle is on', async () => {
-    const { root } = await mount()
-    await typeValue(byId(root, '-name'), 'lab')
-    await typeValue(byId(root, '-pub-endpoint'), 'https://s3.test')
-    await typeValue(byId(root, '-sec-access_key_id'), 'key')
-    await typeValue(byId(root, '-sec-secret_access_key'), 'secret')
-    const save = () => element(root, (node) => node.tag === 'button' && node.props.type === 'submit')
-    expect(save().props.disabled).toBe(false)
-
-    await toggle(root)
-    await typeValue(byId(root, '-bucket-prefix'), '  ')
-    expect(content(root)).toContain('Enter a prefix.')
-    expect(byId(root, '-bucket-prefix').props.invalid).toBe('error')
-    expect(save().props.disabled).toBe(true)
-    await submit(root)
-    expect(createGroupBackend).not.toHaveBeenCalled()
-
-    await typeValue(byId(root, '-bucket-prefix'), 'team-a-')
-    expect(content(root)).not.toContain('Enter a prefix.')
-    expect(save().props.disabled).toBe(false)
+  it('warns only while path-style is off', async () => {
+    const { root } = await mount(stored)
+    expect(content(root)).not.toContain('Most self-hosted S3 fails without path-style.')
+    await click(byLabel(root, 'Path-style addressing'))
+    expect(content(root)).toContain('Most self-hosted S3 fails without path-style.')
   })
 
-  it('removes both keys when the toggle goes off', async () => {
-    const { root } = await mount({
-      ...saved,
-      public_config: { endpoint: 'https://s3.test', bucket_prefix: 'team-a-', bucket_delete: 'keep' },
-    })
-    expect(byId(root, '-bucket-prefix').props.value).toBe('team-a-')
-
-    await toggle(root)
-    await typeValue(byId(root, '-sec-access_key_id'), 'key')
-    await typeValue(byId(root, '-sec-secret_access_key'), 'secret')
-    await submit(root)
-
-    expect(replaceGroupBackend.mock.calls[0][2].public_config).toEqual({ endpoint: 'https://s3.test' })
-  })
-
-  it('offers no provider buckets on a storage with a fixed bucket', async () => {
-    const { root } = await mount({ ...saved, public_config: { endpoint: 'https://s3.test', bucket: 'fixed' } })
-
-    expect(content(root)).not.toContain('Provider buckets')
-    expect(nodes(root).some((node) => node.props['aria-label'] === 'Create a provider bucket for each new bucket')).toBe(false)
+  it('removes the storage after a confirm', async () => {
+    const { root } = await mount(stored)
+    await click(buttonWith(root, 'Remove storage…'))
+    expect(disableGroupBackend).not.toHaveBeenCalled()
+    await click(buttonWith(root, 'Remove'))
+    expect(disableGroupBackend).toHaveBeenCalledWith('g1', 'b1')
   })
 })
