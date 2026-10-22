@@ -3,7 +3,7 @@
 // members see it read only. Non-members get no location and see nothing.
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { MapPin, Pencil } from '@lucide/vue'
+import { MapPin } from '@lucide/vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Dialog from '@/components/ui/Dialog.vue'
@@ -122,7 +122,7 @@ function saveChoice() {
         <p v-if="stored" class="text-[11px] text-muted-foreground">{{ stored }}</p>
         <p v-if="canAdmin" class="text-[11px] text-muted-foreground">Changing it does not move existing datasets or their files.</p>
       </div>
-      <Button v-if="canAdmin" variant="outline" size="sm" @click="edit"><Pencil class="h-3.5 w-3.5" /> Edit</Button>
+      <Button v-if="canAdmin" variant="ghost" size="sm" class="h-7 px-2 text-aruna-navy dark:text-foreground" @click="edit">Edit</Button>
     </div>
 
     <Dialog :open="open" @update:open="(value: boolean) => (open = value)">
