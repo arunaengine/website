@@ -18,15 +18,18 @@ export async function getGroupRouting(groupId: string): Promise<GroupRoutingResp
 }
 
 // An omitted target clears the group default, falling back to node routing. `bucket` names
-// the default bucket on a storage without a fixed bucket; the node finds or creates it.
+// the shared bucket on a storage without a fixed bucket; the node finds or creates it.
+// `bucketTemplate` gives each new bucket its own S3 bucket; "" clears it.
 export async function putGroupRouting(
   groupId: string,
   target: RoutingTarget | null,
   bucket?: string,
+  bucketTemplate?: string,
 ): Promise<GroupRoutingResponse> {
   saving.value = true
   try {
-    const body = target ? { default_target: target, ...(bucket ? { bucket } : {}) } : {}
+    const extra = { ...(bucket ? { bucket } : {}), ...(bucketTemplate !== undefined ? { bucket_template: bucketTemplate } : {}) }
+    const body = target ? { default_target: target, ...extra } : {}
     return await request<GroupRoutingResponse>(`/data/groups/${groupId}/storage/routing`, {
       method: 'PUT',
       body: JSON.stringify(body),

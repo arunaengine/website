@@ -26,5 +26,9 @@ export interface BucketRoutingResponse {
 export interface GroupRoutingResponse {
   group_id: string
   default_target?: RoutingTarget | null
+  /** One S3 bucket per new bucket, with {bucket} and {group}; absent in shared mode. */
+  bucket_template?: string | null
+  /** The shared bucket of the target storage, if any. */
+  bucket?: string | null
   warnings: string[]
 }

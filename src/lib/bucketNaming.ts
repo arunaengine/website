@@ -1,7 +1,7 @@
 // Names of new uploads, sync schedules and the S3 bucket template of new buckets, as the
 // group Storage tab shows them. Stored patterns keep `{dir}`; the portal shows them without it.
 import type { BackendImportRun } from './api'
-import { bucketError, runActive } from './storageRules'
+import { bucketError, bucketProblem, runActive } from './storageRules'
 import { formatNumber, relativeTime } from './utils'
 
 export const SAMPLE_ID = '01JA7Q3K'
@@ -112,14 +112,9 @@ export function syncStatus(
 export function templateProblem(template: string, group: string): string | null {
   const value = template.trim()
   if (!value.includes('{bucket}')) return 'Needs {bucket}, so each bucket gets its own S3 bucket.'
-  return S3_BUCKET.test(fillTemplate(value, 'samples', group)) ? null : 'S3 bucket names use a-z, 0-9, dots and dashes.'
+  // The node tests the template with the bucket name `data`.
+  return bucketProblem(fillTemplate(value, 'data', group)) ? 'S3 bucket names use a-z, 0-9, dots and dashes.' : null
 }
-
-export function sharedProblem(name: string): string | null {
-  return S3_BUCKET.test(name.trim()) ? null : 'S3 bucket names use a-z, 0-9, dots and dashes.'
-}
-
-const S3_BUCKET = /^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/
 
 export function fillTemplate(template: string, bucket: string, group: string): string {
   return template.trim().replaceAll('{bucket}', bucket).replaceAll('{group}', group)
