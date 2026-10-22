@@ -34,7 +34,7 @@ watch(() => props.filter, (value) => (draft.value = value))
     <slot name="head" />
     <ul class="divide-y divide-border rounded-md border border-border bg-background text-xs">
       <slot />
-      <li v-if="!shown" class="px-3 py-2 text-muted-foreground">{{ busy ? 'Loading…' : 'No files.' }}</li>
+      <li v-if="!shown" class="px-3 py-2 text-muted-foreground">{{ busy ? 'Loading…' : hasNext ? 'None on this page.' : 'No files.' }}</li>
     </ul>
     <div class="flex flex-wrap items-center justify-between gap-2">
       <Input
@@ -46,7 +46,7 @@ watch(() => props.filter, (value) => (draft.value = value))
         @change="emit('filter', draft.trim())"
       />
       <span v-else />
-      <span class="text-[11px] tabular-nums text-muted-foreground">{{ summary ?? rangeLabel(offset, shown, total, complete) }}</span>
+      <span class="text-[11px] tabular-nums text-muted-foreground">{{ summary ?? (shown || !hasNext ? rangeLabel(offset, shown, total, complete) : '') }}</span>
       <span class="flex gap-2">
         <Button variant="outline" size="sm" :disabled="busy || !hasPrev" @click="emit('prev')">Previous</Button>
         <Button variant="outline" size="sm" :disabled="busy || !hasNext" @click="emit('next')">Next</Button>

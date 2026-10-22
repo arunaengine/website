@@ -75,6 +75,14 @@ describe('PagedList', () => {
     expect(content(empty.root)).toContain('No files')
   })
 
+  it('keeps Next on an empty page that has more after it', async () => {
+    const { root, events } = await mount(100, 0, 300, true, false)
+    expect(content(root)).toContain('None on this page.')
+    expect(content(root)).not.toContain('No files')
+    await click(button(root, 'Next'))
+    expect(events).toEqual([['next']])
+  })
+
   it('sends the filter text when it changes', async () => {
     const { root, events } = await mount(0, 3, 3)
     const field = element(root, (node) => node.tag === 'input')
