@@ -79,6 +79,12 @@ watch(
   },
 )
 
+// Another storage starts from its own shared bucket.
+watch(store, (id) => {
+  if (!props.open || id === props.routing?.default_target?.backend_id) return
+  shared.value = (backend.value ? defaultBucket(backend.value) : null) ?? suggestBucket(props.groupName)
+})
+
 // Another account or realm must never inherit an open form.
 watch(sessionEpoch, () => {
   if (props.open) emit('update:open', false)
