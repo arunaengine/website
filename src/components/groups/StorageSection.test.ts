@@ -14,6 +14,7 @@ const getGroupRouting = vi.fn()
 const listBackendImports = vi.fn()
 const runBackendImport = vi.fn()
 const getLinkStatus = vi.fn()
+const listStorageBuckets = vi.fn()
 const writesDisabled = ref(false)
 
 const Empty = defineComponent(() => () => null)
@@ -70,7 +71,7 @@ const StorageSection = compileClientComponent(new URL('./StorageSection.vue', im
     }),
   },
   '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled }) },
-  '@/lib/api': { ...Api, getLinkStatus, listBackendImports, runBackendImport },
+  '@/lib/api': { ...Api, getLinkStatus, listBackendImports, listStorageBuckets, runBackendImport },
   '@/lib/bucketNaming': BucketNaming,
   '@/lib/linkedFolders': LinkedFolders,
   '@/lib/storage': Storage,
@@ -122,6 +123,18 @@ beforeEach(() => {
   getGroupRouting.mockResolvedValue({ group_id: 'g1', default_target: { backend_id: 's1' }, warnings: [] })
   listBackendImports.mockResolvedValue(LINKS)
   runBackendImport.mockResolvedValue({ job_id: 'j2' })
+  listStorageBuckets.mockResolvedValue({ buckets: [], next: null })
+})
+
+const listed = (bucket: string, extra: Record<string, unknown> = {}) => ({
+  bucket,
+  backend_id: 's1',
+  provider_bucket: null,
+  folder: null,
+  shared: false,
+  import_id: null,
+  write_pattern: null,
+  ...extra,
 })
 
 describe('StorageSection', () => {
@@ -192,6 +205,39 @@ describe('StorageSection', () => {
     const list = content(byTestId(root, 'sync-problems')[0])
     expect(list).toContain('new.faa')
     expect(list).not.toContain('old.faa')
+  })
+
+  it('lists every bucket under the storage that keeps its files', async () => {
+    listStorageBuckets.mockResolvedValue({
+      buckets: [
+        listed('genes', { provider_bucket: 'aruna-spire-genes', folder: '', import_id: 'i1' }),
+        listed('samples', { provider_bucket: 'aruna-spire-default', shared: true }),
+        listed('scratch', { backend_id: null }),
+      ],
+      next: null,
+    })
+    const { root } = await mount()
+    const storage = byTestId(root, 'storage-s1')[0]
+    const rows = byTestId(storage, 'bucket-row')
+    expect(rows.map((row) => content(row).split('⇆')[0].split('→')[0].trim())).toEqual(['genes', 'samples', 'raw'])
+    expect(content(rows[0])).toContain('✓ 3d ago')
+    expect(content(rows[1])).toContain('aruna-spire-default (shared)')
+    expect(content(rows[1])).toContain('chosen by Aruna')
+    const aruna = byTestId(root, 'aruna-storage')[0]
+    expect(content(byTestId(aruna, 'bucket-row')[0])).toContain('scratch')
+    expect(content(byTestId(aruna, 'bucket-row')[0])).toContain('on this node')
+  })
+
+  it('pages through the bucket listing', async () => {
+    listStorageBuckets
+      .mockResolvedValueOnce({ buckets: [listed('alpha', { shared: true, provider_bucket: 'shared' })], next: 'c1' })
+      .mockResolvedValueOnce({ buckets: [listed('beta', { shared: true, provider_bucket: 'shared' })], next: null })
+    const { root } = await mount()
+    expect(content(root)).not.toContain('beta')
+    await click(buttonIn(root, 'Show more buckets'))
+    expect(listStorageBuckets).toHaveBeenLastCalledWith('g1', { limit: 200, after: 'c1' }, expect.anything())
+    expect(content(root)).toContain('beta')
+    expect(nodes(root).some((node) => node.tag === 'button' && content(node).trim() === 'Show more buckets')).toBe(false)
   })
 
   it('starts a sync only for a bucket that is not syncing', async () => {

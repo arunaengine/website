@@ -18,10 +18,12 @@ import {
   ApiError,
   getLinkStatus,
   listBackendImports,
+  listStorageBuckets,
   runBackendImport,
   type BackendImport,
   type GroupBackendResponse,
   type GroupRoutingResponse,
+  type StorageBucket,
 } from '@/lib/api'
 import { failedFiles, shownPattern, syncStatus } from '@/lib/bucketNaming'
 import { storeName } from '@/lib/linkedFolders'
@@ -59,6 +61,12 @@ const linkBackend = ref<GroupBackendResponse | null>(null)
 const editDialog = ref(false)
 const editing = ref<BackendImport | null>(null)
 let focused: string | null = null
+// The group's buckets with their storage, page by page; null on a node without the listing.
+const BUCKET_PAGE = 200
+const firstBuckets = ref<StorageBucket[] | null>(null)
+const moreBuckets = ref<StorageBucket[]>([])
+const bucketsNext = ref<string | null>(null)
+const loadingMore = ref(false)
 
 function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
@@ -81,7 +89,7 @@ async function load() {
   loadError.value = null
   clearPoll()
   try {
-    const [list, rules, imports] = await Promise.all([
+    const [list, rules, imports, page] = await Promise.all([
       listGroupBackends(props.groupId),
       getGroupRouting(props.groupId),
       // A node without linked buckets still shows its storages.
@@ -89,11 +97,18 @@ async function load() {
         if (isUnsupportedEndpoint(err)) return []
         throw err
       }),
+      // A node without the listing shows its linked buckets only.
+      listStorageBuckets(props.groupId, { limit: BUCKET_PAGE }, client()).catch((err) => {
+        if (isUnsupportedEndpoint(err)) return null
+        throw err
+      }),
     ])
     if (!current()) return
     backends.value = list.backends
     routing.value = rules
     links.value = imports
+    firstBuckets.value = page?.buckets ?? null
+    if (!moreBuckets.value.length) bucketsNext.value = page?.next ?? null
     if (editing.value) editing.value = imports.find((link) => link.import_id === editing.value?.import_id) ?? editing.value
     emit('count', list.backends.length)
     emit('backends', list.backends)
@@ -118,6 +133,9 @@ watch(
     editDialog.value = false
     editing.value = null
     focused = null
+    firstBuckets.value = null
+    moreBuckets.value = []
+    bucketsNext.value = null
     problemsRun++
     problems.value = null
     void load()
@@ -138,11 +156,51 @@ watch([() => props.focusLink, links], ([id]) => {
   openEdit(link)
 })
 
-const defaultId = computed(() => routing.value?.default_target?.backend_id ?? null)
-
-function linksOf(backend: GroupBackendResponse): BackendImport[] {
-  return links.value.filter((link) => link.backend_id === backend.backend_id)
+async function moreBucketsPage() {
+  const after = bucketsNext.value
+  if (!after || loadingMore.value) return
+  const seq = loadSeq
+  const epoch = sessionEpoch.value
+  loadingMore.value = true
+  try {
+    const page = await listStorageBuckets(props.groupId, { limit: BUCKET_PAGE, after }, client())
+    if (seq !== loadSeq || epoch !== sessionEpoch.value) return
+    moreBuckets.value = [...moreBuckets.value, ...page.buckets]
+    bucketsNext.value = page.next ?? null
+  } catch (err) {
+    actionError.value = errorMessage(err)
+  } finally {
+    loadingMore.value = false
+  }
 }
+
+type Row = { kind: 'link'; link: BackendImport } | { kind: 'bucket'; entry: StorageBucket }
+
+/** The rows of a storage, or of Aruna storage for null: listed buckets, then links not listed. */
+function rowsOf(backendId: string | null): Row[] {
+  const listed = firstBuckets.value ? [...firstBuckets.value, ...moreBuckets.value] : []
+  const shown = new Set(listed.map((entry) => entry.import_id).filter(Boolean))
+  const rows: Row[] = []
+  for (const entry of listed) {
+    if (entry.backend_id !== backendId) continue
+    const link = entry.import_id ? links.value.find((candidate) => candidate.import_id === entry.import_id) : undefined
+    rows.push(link ? { kind: 'link', link } : { kind: 'bucket', entry })
+  }
+  if (backendId === null) return rows
+  for (const link of links.value) {
+    if (link.backend_id === backendId && !shown.has(link.import_id)) rows.push({ kind: 'link', link })
+  }
+  return rows
+}
+
+/** The S3 bucket of a listed bucket that is not linked. */
+function bucketPlace(entry: StorageBucket): string {
+  if (entry.backend_id === null) return 'on this node'
+  const where = [entry.provider_bucket, entry.folder?.replace(/\/+$/, '')].filter(Boolean).join('/')
+  return entry.shared ? `${where} (shared)` : where
+}
+
+const defaultId = computed(() => routing.value?.default_target?.backend_id ?? null)
 
 function backendOf(link: BackendImport): GroupBackendResponse | undefined {
   return backends.value?.find((backend) => backend.backend_id === link.backend_id)
@@ -278,62 +336,72 @@ const EDIT = 'h-7 px-2 text-aruna-navy dark:text-foreground'
 
         <div class="rounded-b-lg border-t border-border bg-muted/30 px-3 pb-2.5 pt-1.5 text-xs">
           <div
-            v-if="linksOf(backend).length || defaultId === backend.backend_id"
+            v-if="rowsOf(backend.backend_id).length || defaultId === backend.backend_id"
             :class="[GRID, 'border-b border-border py-1 text-[11px] uppercase tracking-wide text-muted-foreground']"
           >
             <span>Aruna bucket</span><span /><span>S3 bucket</span><span>New uploads named</span><span>Synced</span><span />
           </div>
-          <div
-            v-for="link in linksOf(backend)"
-            :key="link.import_id"
-            :class="[GRID, 'border-b border-border py-1.5']"
-            data-testid="bucket-row"
-          >
-            <RouterLink
-              :to="{ name: 'bucket', params: { bucketId: link.bucket } }"
-              class="truncate font-mono text-primary hover:underline"
-            >
-              {{ link.key_prefix ? `${link.bucket}/${link.key_prefix}` : link.bucket }}
-            </RouterLink>
-            <span class="text-muted-foreground">⇆</span>
-            <span class="truncate font-mono" :title="place(link)">{{ place(link) }}</span>
-            <span class="truncate font-mono">{{ shownPattern(link.write_pattern) }}</span>
-            <component
-              :is="['warn', 'error'].includes(syncStatus(link.last_run, link.schedule).tone) ? 'button' : 'span'"
-              class="truncate text-left"
-              :class="{
-                'text-emerald-700 dark:text-emerald-300': syncStatus(link.last_run, link.schedule).tone === 'ok',
-                'text-amber-700 hover:underline dark:text-amber-300': syncStatus(link.last_run, link.schedule).tone === 'warn',
-                'text-destructive hover:underline': syncStatus(link.last_run, link.schedule).tone === 'error',
-                'text-muted-foreground': syncStatus(link.last_run, link.schedule).tone === 'muted',
-              }"
-              :title="syncStatus(link.last_run, link.schedule).title"
-              @click="['warn', 'error'].includes(syncStatus(link.last_run, link.schedule).tone) && showProblems(link)"
-            >
-              {{ syncStatus(link.last_run, link.schedule).text }}
-            </component>
-            <span v-if="canAdmin" class="flex justify-end gap-0.5">
-              <IconButton
-                label="Sync now"
-                :disabled="writesDisabled || syncing !== null || runActive(link.last_run)"
-                @click="sync(link)"
-              >
-                <Play class="size-3.5" />
-              </IconButton>
-              <Button variant="ghost" size="sm" :class="EDIT" title="Settings and organize" @click="openEdit(link)">Edit</Button>
-            </span>
-            <span v-else />
-            <div v-if="problems?.id === link.import_id" class="col-span-full py-1" data-testid="sync-problems">
-              <p v-if="!problems.files" class="text-muted-foreground">Loading…</p>
-              <p v-else-if="!problems.files.length" class="text-muted-foreground">The node lists no files for this sync.</p>
-              <ul v-else class="space-y-0.5 text-[11px]">
-                <li v-for="(file, at) in problems.files.slice(0, 20)" :key="`${at}\n${file.path}`" class="break-all">
-                  <span class="font-mono">{{ file.path }}</span>: <span class="text-destructive">{{ file.reason }}</span>
-                </li>
-                <li v-if="problems.files.length > 20" class="text-muted-foreground">and {{ problems.files.length - 20 }} more</li>
-              </ul>
+          <template v-for="row in rowsOf(backend.backend_id)" :key="row.kind === 'link' ? row.link.import_id : row.entry.bucket">
+            <div v-if="row.kind === 'bucket'" :class="[GRID, 'border-b border-border py-1.5']" data-testid="bucket-row">
+              <RouterLink :to="{ name: 'bucket', params: { bucketId: row.entry.bucket } }" class="truncate font-mono text-primary hover:underline">
+                {{ row.entry.bucket }}
+              </RouterLink>
+              <span class="text-muted-foreground">→</span>
+              <span class="truncate font-mono" :title="bucketPlace(row.entry)">{{ bucketPlace(row.entry) }}</span>
+              <span class="truncate text-muted-foreground">chosen by Aruna</span>
+              <span /><span />
             </div>
-          </div>
+            <div
+              v-else
+              :class="[GRID, 'border-b border-border py-1.5']"
+              data-testid="bucket-row"
+            >
+              <RouterLink
+                :to="{ name: 'bucket', params: { bucketId: row.link.bucket } }"
+                class="truncate font-mono text-primary hover:underline"
+              >
+                {{ row.link.key_prefix ? `${row.link.bucket}/${row.link.key_prefix}` : row.link.bucket }}
+              </RouterLink>
+              <span class="text-muted-foreground">⇆</span>
+              <span class="truncate font-mono" :title="place(row.link)">{{ place(row.link) }}</span>
+              <span class="truncate font-mono">{{ shownPattern(row.link.write_pattern) }}</span>
+              <component
+                :is="['warn', 'error'].includes(syncStatus(row.link.last_run, row.link.schedule).tone) ? 'button' : 'span'"
+                class="truncate text-left"
+                :class="{
+                  'text-emerald-700 dark:text-emerald-300': syncStatus(row.link.last_run, row.link.schedule).tone === 'ok',
+                  'text-amber-700 hover:underline dark:text-amber-300': syncStatus(row.link.last_run, row.link.schedule).tone === 'warn',
+                  'text-destructive hover:underline': syncStatus(row.link.last_run, row.link.schedule).tone === 'error',
+                  'text-muted-foreground': syncStatus(row.link.last_run, row.link.schedule).tone === 'muted',
+                }"
+                :title="syncStatus(row.link.last_run, row.link.schedule).title"
+                @click="['warn', 'error'].includes(syncStatus(row.link.last_run, row.link.schedule).tone) && showProblems(row.link)"
+              >
+                {{ syncStatus(row.link.last_run, row.link.schedule).text }}
+              </component>
+              <span v-if="canAdmin" class="flex justify-end gap-0.5">
+                <IconButton
+                  label="Sync now"
+                  :disabled="writesDisabled || syncing !== null || runActive(row.link.last_run)"
+                  @click="sync(row.link)"
+                >
+                  <Play class="size-3.5" />
+                </IconButton>
+                <Button variant="ghost" size="sm" :class="EDIT" title="Settings and organize" @click="openEdit(row.link)">Edit</Button>
+              </span>
+              <span v-else />
+              <div v-if="problems?.id === row.link.import_id" class="col-span-full py-1" data-testid="sync-problems">
+                <p v-if="!problems.files" class="text-muted-foreground">Loading…</p>
+                <p v-else-if="!problems.files.length" class="text-muted-foreground">The node lists no files for this sync.</p>
+                <ul v-else class="space-y-0.5 text-[11px]">
+                  <li v-for="(file, at) in problems.files.slice(0, 20)" :key="`${at}\n${file.path}`" class="break-all">
+                    <span class="font-mono">{{ file.path }}</span>: <span class="text-destructive">{{ file.reason }}</span>
+                  </li>
+                  <li v-if="problems.files.length > 20" class="text-muted-foreground">and {{ problems.files.length - 20 }} more</li>
+                </ul>
+              </div>
+            </div>
+          </template>
           <div
             v-if="defaultId === backend.backend_id"
             :class="[GRID, 'border-b border-dashed border-border py-1.5']"
@@ -374,8 +442,24 @@ const EDIT = 'h-7 px-2 text-aruna-navy dark:text-foreground'
             </p>
           </div>
         </div>
-        <div v-if="!defaultId" class="rounded-b-lg border-t border-border bg-muted/30 px-3 pb-2.5 pt-1.5 text-xs">
-          <div :class="[GRID, 'py-1.5']" data-testid="new-buckets-row">
+        <div v-if="!defaultId || rowsOf(null).length" class="rounded-b-lg border-t border-border bg-muted/30 px-3 pb-2.5 pt-1.5 text-xs">
+          <div
+            v-for="row in rowsOf(null)"
+            :key="row.kind === 'bucket' ? row.entry.bucket : row.link.import_id"
+            :class="[GRID, 'border-b border-border py-1.5']"
+            data-testid="bucket-row"
+          >
+            <template v-if="row.kind === 'bucket'">
+              <RouterLink :to="{ name: 'bucket', params: { bucketId: row.entry.bucket } }" class="truncate font-mono text-primary hover:underline">
+                {{ row.entry.bucket }}
+              </RouterLink>
+              <span class="text-muted-foreground">→</span>
+              <span class="truncate font-mono">on this node</span>
+              <span class="truncate text-muted-foreground">chosen by Aruna</span>
+              <span /><span />
+            </template>
+          </div>
+          <div v-if="!defaultId" :class="[GRID, 'py-1.5']" data-testid="new-buckets-row">
             <span class="truncate text-muted-foreground">new buckets</span>
             <span class="text-muted-foreground">→</span>
             <span class="truncate font-mono">on this node</span>
@@ -389,6 +473,9 @@ const EDIT = 'h-7 px-2 text-aruna-navy dark:text-foreground'
           </div>
         </div>
       </section>
+      <Button v-if="bucketsNext" variant="outline" size="sm" class="mt-2" :disabled="loadingMore" @click="moreBucketsPage">
+        {{ loadingMore ? 'Loading…' : 'Show more buckets' }}
+      </Button>
       <p v-if="actionError" class="mt-2 text-xs text-destructive">{{ actionError }}</p>
     </template>
 
