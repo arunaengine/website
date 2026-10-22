@@ -41,22 +41,3 @@ export interface GroupBackendRequest {
 export function getGroupBackends(groupId: string, client: ApiClientOptions): Promise<ListGroupBackendsResponse> {
   return apiRequest<ListGroupBackendsResponse>(`/data/groups/${encodeURIComponent(groupId)}/storage/backends`, {}, client)
 }
-
-// GET .../backends/{bid}/buckets/{bucket}: whether the provider bucket exists
-// and the keys can write there. Older nodes answer 404.
-export interface ProviderBucketCheck {
-  bucket: string
-  exists: boolean
-  /** Proven by a test write when the bucket exists; null when it does not; absent on older nodes. */
-  writable?: boolean | null
-}
-
-export function checkProviderBucket(
-  groupId: string,
-  backendId: string,
-  bucket: string,
-  client: ApiClientOptions,
-): Promise<ProviderBucketCheck> {
-  const path = `/data/groups/${encodeURIComponent(groupId)}/storage/backends/${encodeURIComponent(backendId)}/buckets/${encodeURIComponent(bucket)}`
-  return apiRequest<ProviderBucketCheck>(path, {}, client)
-}

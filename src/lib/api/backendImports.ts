@@ -80,10 +80,6 @@ export function updateBackendImport(
   return apiRequest(importsPath(groupId, importId), { method: 'PUT', body: JSON.stringify(body) }, client)
 }
 
-export function deleteBackendImport(groupId: string, importId: string, client: ApiClientOptions): Promise<void> {
-  return apiRequest(importsPath(groupId, importId), { method: 'DELETE' }, client)
-}
-
 /** Starts a run; 409 while one is still going. */
 export function runBackendImport(
   groupId: string,

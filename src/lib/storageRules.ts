@@ -1,8 +1,6 @@
 // Wording and checks for the rules of a group's storage: the default rule and linked buckets.
-import { ApiError, type BackendImport, type BackendImportRun, type BucketMoveResponse, type GroupBackendResponse } from './api'
-import { backendSchema } from './storage'
+import { ApiError, type BackendImport, type BackendImportRun, type GroupBackendResponse } from './api'
 import { storeName, writesInside } from './linkedFolders'
-import { formatNumber } from './utils'
 
 /** Keys on group storages are at most this long; a folder must leave room for a file. */
 export const MAX_KEY_BYTES = 1024
@@ -31,22 +29,6 @@ export function arunaPlace(link: Pick<BackendImport, 'bucket' | 'key_prefix'>): 
 /** Where the default rule of a storage writes: its default bucket, or its fixed bucket. */
 export function defaultBucket(backend: GroupBackendResponse): string | null {
   return backend.public_config.default_bucket ?? (splitsBuckets(backend) ? null : storeName(backend))
-}
-
-/** "Your S3 storage · endpoint", or the kind and its container for other kinds. */
-export function storageLine(backend: GroupBackendResponse): string {
-  const kind = backendSchema(backend.kind)?.label ?? backend.kind
-  const where = backend.public_config.endpoint ?? storeName(backend)
-  return `Your ${kind} storage · ${where}`
-}
-
-/** Hover text of the bucket check from the state saved with the rule; null when unknown. */
-export function bucketTitle(backend: GroupBackendResponse, bucket: string): string | null {
-  const state = backend.public_config[`bucket:${bucket}`]
-  if (state === 'created') return 'Bucket created'
-  if (state === 'found') return 'Bucket found'
-  // A fixed bucket was checked when the storage was added.
-  return splitsBuckets(backend) ? null : 'Bucket found'
 }
 
 export function runActive(run: BackendImportRun | null | undefined): boolean {
@@ -163,20 +145,6 @@ export function defaultConflict(
   return linked ? `Bucket ${bucket} is linked to ${arunaPlace(linked)}. Pick another bucket.` : null
 }
 
-/** The files of a bucket found not where the rules put them, and any move now running. */
-export interface MoveView {
-  misplaced: number
-  /** A count stopped early, so more files may need a move. */
-  partial: boolean
-  running: boolean
-  done: number
-}
-
-/** Whether Move files makes sense: files to move, maybe more, or a move that runs. */
-export function moveOffer(view: MoveView): boolean {
-  return view.misplaced > 0 || view.partial || view.running
-}
-
 export const MOVE_BUSY = 'Another move is still running in this bucket.'
 
 /** A short message for a refused move, or null for any other error. */
@@ -186,53 +154,3 @@ export function moveRefusal(err: unknown): string | null {
   return err.code === 'bucket_encrypted' ? 'This bucket is encrypted, so its files cannot be moved.' : null
 }
 
-/** A move answer that remembers the folder it was asked for, as counts differ per folder. */
-export type AskedMove = BucketMoveResponse & { asked?: string }
-
-/** One key per move run and asked folder, so a new run starts a new total. */
-function runKey(move: AskedMove): string {
-  return `${move.bucket}\n${move.asked ?? ''}\n${move.move_prefix ?? ''}\n${move.progress?.started_at_ms}`
-}
-
-/** Files of a move run seen so far: the largest of left to move plus moved. */
-export type MoveTotals = Map<string, number>
-
-/** Keeps the largest total of each running move, so the total never shrinks. */
-export function rememberMoves(totals: MoveTotals, moves: AskedMove[]) {
-  for (const move of moves) {
-    const progress = move.progress
-    if (!progress) continue
-    const scope = `${move.bucket}\n${move.asked ?? ''}\n`
-    const key = runKey(move)
-    // A finished or superseded run of the same scope is forgotten.
-    for (const old of [...totals.keys()]) {
-      if (old.startsWith(scope) && (old !== key || progress.finished_at_ms != null)) totals.delete(old)
-    }
-    if (progress.finished_at_ms != null) continue
-    totals.set(key, Math.max(totals.get(key) ?? 0, move.misplaced + progress.migrated))
-  }
-}
-
-/**
- * `prefix` limits progress to moves started for that prefix; counts stay whole.
- * Done counts down the live left-to-move count, as the node saves progress only per page.
- */
-export function moveView(moves: AskedMove[], prefix?: string, totals?: MoveTotals): MoveView {
-  const view: MoveView = { misplaced: 0, partial: false, running: false, done: 0 }
-  for (const move of moves) {
-    const progress = move.progress
-    view.misplaced += move.misplaced
-    if (!move.complete) view.partial = true
-    if (!progress || progress.finished_at_ms != null) continue
-    if (prefix !== undefined && (move.move_prefix ?? '') !== prefix) continue
-    view.running = true
-    const total = Math.max(totals?.get(runKey(move)) ?? 0, move.misplaced + progress.migrated)
-    view.done += Math.max(0, total - move.misplaced)
-  }
-  return view
-}
-
-/** "Moving files: 1,240 of 3,500". */
-export function moveText(view: MoveView): string {
-  return `Moving files: ${formatNumber(view.done)} of ${formatNumber(view.done + view.misplaced)}${view.partial ? '+' : ''}`
-}

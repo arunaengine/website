@@ -1,12 +1,5 @@
 // Short words for the organize steps, kept apart from the components so tests reach them.
-import {
-  ApiError,
-  type BackendImport,
-  type BackendImportRenames,
-  type LinkStatus,
-  type OrganizeJob,
-  type OrganizeKind,
-} from '@/lib/api'
+import { ApiError, type OrganizeJob, type OrganizeKind } from '@/lib/api'
 import { errorMessage, formatNumber } from '@/lib/utils'
 
 export function filesWord(count: number): string {
@@ -78,70 +71,7 @@ export function organizeError(err: unknown): string {
   return errorMessage(err)
 }
 
-/** What is wrong with a move request, or null. */
-export function moveProblem(request: { pattern: string; target: string }): string | null {
-  if (!request.pattern.trim()) return 'Add a file name, such as *.faa.gz.'
-  if (!request.target.includes('{name}')) return 'The new name needs {name}, such as proteins/{name}.'
-  if (request.target.startsWith('/')) return 'The new name cannot start with /.'
-  return null
-}
-
-export interface LinkProblem {
-  id: string
-  /** A plain sentence with the next step. */
-  text: string
-  /** Show opens the details on the card; Organize opens the panel. */
-  action: 'show' | 'organize'
-}
-
-/** Every file the last run did not add, with its own reason: the node's list, else the run's. */
-export function failureList(link: BackendImport, conflicts: { path: string; reason: string }[]): { path: string; reason: string }[] {
-  if (conflicts.length) return conflicts
-  return (link.last_run?.errors ?? []).map((failure) => ({ path: failure.key, reason: failure.error }))
-}
-
-/** The problems of one link as plain sentences, most urgent first. */
-export function linkProblems(
-  link: BackendImport,
-  renames: BackendImportRenames | null,
-  status: LinkStatus | null,
-): LinkProblem[] {
-  const found: LinkProblem[] = []
-  const run = link.last_run
-  if (run?.error) {
-    found.push({ id: 'stopped', text: `The last run stopped: ${run.error} Run it again, or check your storage.`, action: 'show' })
-  }
-  // The status lists the same files as the run, each with its reason: one problem, told once.
-  const failed = run?.failed || (status?.conflicts.length ?? 0)
-  if (failed) {
-    found.push({
-      id: 'failed',
-      text: `${filesWord(failed)} could not be added. Choose Show to see why.`,
-      action: 'show',
-    })
-  }
-  if (renames && renames.count > 0) {
-    found.push({
-      id: 'renames',
-      text: `${renames.complete ? '' : 'At least '}${filesWord(renames.count)} still ${renames.count === 1 ? 'has' : 'have'} the old name. Rename them in Organize.`,
-      action: 'organize',
-    })
-  }
-  return found
-}
-
 /** A row identity for a duplicate group: one key can hold several contents. */
 export function copyKey(item: { key: string; kept: { path: string }; removed: { path: string }[] }): string {
   return [item.key, item.kept.path, ...item.removed.map((file) => file.path)].join('\n')
-}
-
-/** The last run in a word when it is not a plain success; empty after a success. */
-export function runLabel(run: { state: string } | null | undefined): string {
-  if (!run || run.state === 'succeeded') return ''
-  if (run.state === 'cancelling') return 'Stopping'
-  if (run.state === 'cancelled') return 'Stopped'
-  if (run.state === 'failed') return 'Failed'
-  if (run.state === 'awaiting_key') return 'Waiting for an unlock'
-  if (run.state === 'indeterminate') return 'Result unknown'
-  return 'Running now'
 }

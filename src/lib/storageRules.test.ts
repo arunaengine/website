@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { BackendImport, BucketMoveResponse } from './api'
-import { moveText, moveView, rememberMoves, bucketError, bucketTitle, defaultBucket, runActive, linkConflict, splitPath, suggestBucket } from './storageRules'
+import type { BackendImport } from './api'
+import { bucketError, defaultBucket, runActive, linkConflict, splitPath, suggestBucket } from './storageRules'
 import { writesInside } from './linkedFolders'
 
 const split = { backend_id: 's1', group_id: 'g1', kind: 's3', name: 'lab', public_config: { endpoint: 'https://s3' } }
@@ -36,13 +36,6 @@ describe('storageRules', () => {
     expect(linkConflict(split, [], 'lab-raw/2024/')).toBeNull()
   })
 
-  it('takes the bucket check from the saved state, not from runs', () => {
-    const checked = { ...split, public_config: { ...split.public_config, 'bucket:lab-raw': 'created' } }
-    expect(bucketTitle(checked, 'lab-raw')).toBe('Bucket created')
-    expect(bucketTitle(split, 'lab-raw')).toBeNull()
-    expect(bucketTitle(fixed, 'data')).toBe('Bucket found')
-  })
-
   it('shows a cross only when a failed run used nothing', () => {
     const run = { job_id: 'j', started_at: '', imported: 0, skipped: 0, failed: 1, state: 'failed' }
     const denied = [{ key: 'lab-raw/a.csv', error: 'Access denied' }]
@@ -74,63 +67,5 @@ describe('storageRules', () => {
     for (const state of ['succeeded', 'failed', 'cancelled', 'indeterminate']) {
       expect(runActive({ ...run, state })).toBe(false)
     }
-  })
-
-  it('counts a move up from a total that never shrinks', () => {
-    const at = (misplaced: number, migrated: number, started = 1): BucketMoveResponse => ({
-      bucket: 'b', misplaced, complete: true,
-      progress: { migrated, skipped: 9, failed: 0, started_at_ms: started, finished_at_ms: null },
-    })
-    const totals = new Map<string, number>()
-    const text = (move: BucketMoveResponse) => {
-      rememberMoves(totals, [move])
-      return moveText(moveView([move], undefined, totals))
-    }
-    expect(text(at(100, 0))).toBe('Moving files: 0 of 100')
-    expect(text(at(99, 0))).toBe('Moving files: 1 of 100')
-    expect(text(at(36, 64))).toBe('Moving files: 64 of 100')
-    // A saved page never moves the number back or past the total.
-    expect(text(at(36, 70))).toBe('Moving files: 70 of 106')
-    expect(text(at(10, 90))).toBe('Moving files: 96 of 106')
-    // A new run has its own total.
-    expect(text(at(20, 0, 2))).toBe('Moving files: 0 of 20')
-  })
-
-  it('keeps separate totals for the bucket and a folder of it', () => {
-    const run = { migrated: 0, skipped: 0, failed: 0, started_at_ms: 1, finished_at_ms: null }
-    const whole = { bucket: 'b', misplaced: 100, complete: true, progress: run, move_prefix: 'raw/', asked: '' }
-    const folder = { ...whole, misplaced: 10, asked: 'raw/' }
-    const totals = new Map<string, number>()
-    rememberMoves(totals, [whole, folder])
-    expect(moveText(moveView([whole], '', totals))).toBe('Moving files: 0 of 100')
-    expect(moveText(moveView([folder], 'raw/', totals))).toBe('Moving files: 0 of 10')
-    const later = { ...folder, misplaced: 9 }
-    rememberMoves(totals, [later])
-    expect(moveText(moveView([later], 'raw/', totals))).toBe('Moving files: 1 of 10')
-  })
-
-  it('keeps a running total through snapshots that do not show it', () => {
-    const run = { migrated: 0, skipped: 0, failed: 0, started_at_ms: 1, finished_at_ms: null }
-    const move = { bucket: 'b', misplaced: 100, complete: true, progress: run, asked: '' }
-    const totals = new Map<string, number>()
-    rememberMoves(totals, [move])
-    const again = { ...move, misplaced: 90, progress: { ...run, migrated: 0 } }
-    for (const snapshot of [[], [{ ...move, progress: null }], [{ ...move, asked: 'raw/', misplaced: 3 }]]) {
-      rememberMoves(totals, snapshot)
-      expect(moveText(moveView([again], '', totals))).toBe('Moving files: 10 of 100')
-    }
-  })
-
-  it('forgets the totals of runs that ended or were replaced', () => {
-    const run = { migrated: 0, skipped: 0, failed: 0, started_at_ms: 1, finished_at_ms: null }
-    const move = { bucket: 'b', misplaced: 5, complete: true, progress: run, asked: '' }
-    const totals = new Map<string, number>()
-    rememberMoves(totals, [move])
-    expect(totals.size).toBe(1)
-    rememberMoves(totals, [{ ...move, progress: { ...run, started_at_ms: 2 } }])
-    expect([...totals.values()]).toEqual([5])
-    expect([...totals.keys()][0]).toContain('\n2')
-    rememberMoves(totals, [{ ...move, progress: { ...run, started_at_ms: 2, finished_at_ms: 9 } }])
-    expect(totals.size).toBe(0)
   })
 })

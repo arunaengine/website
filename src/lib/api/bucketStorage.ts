@@ -1,5 +1,5 @@
-// Moving a bucket's files to where the storage rules put them, and the check for
-// broken files. Group ADMIN starts them. Nodes without the routes answer 404.
+// The check of a bucket for broken files, and the progress of a rename.
+// Group ADMIN starts them. Nodes without the routes answer 404.
 import { apiRequest, type ApiClientOptions } from './client'
 
 export interface MoveProgress {
@@ -8,15 +8,6 @@ export interface MoveProgress {
   failed: number
   started_at_ms: number
   finished_at_ms?: number | null
-}
-
-export interface BucketMoveResponse {
-  bucket: string
-  /** Files not where the rules put them; a lower bound unless `complete`. */
-  misplaced: number
-  complete: boolean
-  move_prefix?: string | null
-  progress?: MoveProgress | null
 }
 
 export interface CheckProgress {
@@ -56,18 +47,6 @@ export interface BucketCleanupResponse {
 
 function storagePath(bucket: string, tail: string): string {
   return `/data/buckets/${encodeURIComponent(bucket)}/storage/${tail}`
-}
-
-export function getBucketMove(
-  bucket: string,
-  prefix: string,
-  client: ApiClientOptions,
-): Promise<BucketMoveResponse> {
-  return apiRequest(storagePath(bucket, 'move'), { query: { prefix } }, client)
-}
-
-export function startBucketMove(bucket: string, prefix: string, client: ApiClientOptions): Promise<unknown> {
-  return apiRequest(storagePath(bucket, 'move'), { method: 'POST', body: JSON.stringify({ prefix }) }, client)
 }
 
 export function getBucketCheck(
