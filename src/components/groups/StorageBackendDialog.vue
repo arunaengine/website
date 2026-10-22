@@ -86,22 +86,16 @@ const missingRequired = computed(() =>
   schema.value.public.some((field) => field.required && !publicValues.value[field.key]?.trim()),
 )
 
-// Editing settings goes through a full replace, which always rewrites the
-// credentials, so they have to be entered again.
-const needsCredentials = computed(() => !isEdit.value || settingsChanged.value)
-
-// The node replaces a storage whole, so a changed setting needs the keys again.
-watch(settingsChanged, (changed) => {
-  if (changed && isEdit.value) keysOpen.value = true
-})
+// An edit without keys keeps the stored ones; keys are needed only to add a storage or replace them.
+const needsCredentials = computed(() => !isEdit.value || credentialsEntered.value)
 const pathStyleOff = computed(() => kind.value === 's3' && !toggleOn.value)
 
 const submitDisabled = computed(() => {
   if (saving.value || writesDisabled.value) return true
   // Nothing typed and nothing changed: there is nothing to save.
   if (isEdit.value && !settingsChanged.value && !credentialsEntered.value) return true
-  if (needsCredentials.value && (missingRequired.value || !name.value.trim())) return true
-  return credentialsIncomplete.value
+  if (missingRequired.value || !name.value.trim()) return true
+  return needsCredentials.value && credentialsIncomplete.value
 })
 
 watch(
@@ -283,8 +277,7 @@ async function setRemoved(remove: boolean) {
             <p class="text-[11px] text-muted-foreground">
               Stored write-only: the node never shows them again.
               <template v-if="schema.secretOneOf">One of the two is enough.</template>
-              <template v-if="isEdit && !settingsChanged"> Leave blank to keep the current ones.</template>
-              <template v-else-if="isEdit"> Changing the settings above rewrites them, so enter them again.</template>
+              <template v-if="isEdit"> Leave blank to keep the current ones.</template>
             </p>
             <div v-for="field in schema.secret" :key="field.key">
               <label :for="`${uid}-sec-${field.key}`" class="text-xs font-medium text-foreground">{{ field.label }}</label>

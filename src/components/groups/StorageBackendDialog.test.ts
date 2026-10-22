@@ -123,21 +123,27 @@ describe('Storage dialog connection', () => {
     disableGroupBackend.mockClear()
   })
 
-  it('hides the keys until a setting changes, then asks for them', async () => {
+  it('saves a setting without keys, so the stored keys stay', async () => {
     const { root } = await mount(stored)
-    expect(content(root)).toContain('Replace keys')
     expect(nodes(root).some((node) => String(node.props.id ?? '').endsWith('-sec-access_key_id'))).toBe(false)
-
     await typeValue(byId(root, '-name'), 'lab two')
-    expect(save(root).props.disabled).toBe(true)
-    await typeValue(byId(root, '-sec-access_key_id'), 'key')
-    await typeValue(byId(root, '-sec-secret_access_key'), 'secret')
+    expect(save(root).props.disabled).toBe(false)
     await submit(root)
-
     expect(replaceGroupBackend.mock.calls[0][2]).toMatchObject({
       name: 'lab two',
       public_config: { endpoint: 'https://s3.test', force_path_style: 'true' },
+      secret_config: {},
     })
+  })
+
+  it('needs both keys once Replace keys is used', async () => {
+    const { root } = await mount(stored)
+    await click(buttonWith(root, 'Replace keys'))
+    await typeValue(byId(root, '-sec-access_key_id'), 'key')
+    expect(save(root).props.disabled).toBe(true)
+    await typeValue(byId(root, '-sec-secret_access_key'), 'secret')
+    await submit(root)
+    expect(replaceGroupBackend.mock.calls[0][2].secret_config).toEqual({ access_key_id: 'key', secret_access_key: 'secret' })
   })
 
   it('warns only while path-style is off', async () => {
