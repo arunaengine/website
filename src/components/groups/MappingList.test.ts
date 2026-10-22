@@ -32,7 +32,7 @@ const MappingList = compileClientComponent(new URL('./MappingList.vue', import.m
   '@/components/storage/PagedList.vue': moduleDefault(Slot),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/IconButton.vue': moduleDefault(IconButtonStub),
-  '@/components/ui/Input.vue': moduleDefault(defineComponent(() => () => h('input'))),
+  '@/components/ui/Input.vue': moduleDefault(defineComponent({ inheritAttrs: false, setup: (_, { attrs }) => () => h('input', attrs) })),
   '@/components/ui/Notice.vue': moduleDefault(Slot),
   '@/composables/useAruna': {
     isUnsupportedEndpoint: () => false,
@@ -56,13 +56,22 @@ const buttonIn = (root: Root, text: string) => element(root, (node) => node.tag 
 
 async function mount() {
   const events: string[] = []
+  const model = ref([SAVED, DRAFT])
   const mounted = await mountApp(
     defineComponent(() => () =>
-      h(MappingList, { groupId: 'g1', link: LINK, modelValue: [SAVED, DRAFT], saved: [SAVED], job: null, onStarted: () => events.push('started') }),
+      h(MappingList, {
+        groupId: 'g1',
+        link: LINK,
+        modelValue: model.value,
+        saved: [SAVED],
+        job: null,
+        onStarted: () => events.push('started'),
+        'onUpdate:modelValue': (value: (typeof SAVED)[]) => (model.value = value),
+      }),
     ),
   )
   if (mounted.errors.length) throw mounted.errors[0]
-  return { ...mounted, events }
+  return { ...mounted, events, model }
 }
 
 beforeEach(() => {
@@ -93,6 +102,22 @@ describe('MappingList', () => {
       expect.anything(),
     )
     expect(events).toEqual(['started'])
+  })
+
+  it('drops a pending confirm when the rule is edited before the count arrives', async () => {
+    let answer: (value: unknown) => void = () => {}
+    previewMove.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+    const { root, model } = await mount()
+    const pending = (buttonIn(rows(root)[0], 'Apply…').props.onClick as () => Promise<void>)()
+    const field = nodes(rows(root)[0]).find((node) => node.tag === 'input' && node.props['aria-label'] === 'Storage path')!
+    ;(field.props['onUpdate:modelValue'] as (value: string) => void)('*.fna')
+    await flush()
+    answer({ total: 9, complete: true, items: [] })
+    await pending
+    await flush()
+    expect(model.value[0].storage).toBe('*.fna')
+    expect(content(root)).not.toContain('Move 9 files')
+    expect(startMove).not.toHaveBeenCalled()
   })
 
   it('shows an example of the rule as it is typed', async () => {

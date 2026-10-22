@@ -37,7 +37,9 @@ const { apiBaseUrl, authToken, sessionEpoch } = useAruna()
 const { writesDisabled } = useConnectivity()
 
 const example = ref<number | null>(null)
-const asking = ref<{ index: number; count: number; complete: boolean } | null>(null)
+// A confirm holds a copy of the saved rule it counted; any edit drops it.
+const asking = ref<{ index: number; mapping: Mapping; count: number; complete: boolean } | null>(null)
+let revision = 0
 const applied = ref<number | null>(null)
 const busy = ref(false)
 const error = ref<string | null>(null)
@@ -67,6 +69,14 @@ watch(
     examples.reset()
   },
 )
+// A rule that is no longer saved cannot be applied.
+watch(
+  () => props.saved,
+  () => {
+    revision++
+    if (asking.value && !isSaved(asking.value.mapping)) asking.value = null
+  },
+)
 
 function isSaved(mapping: Mapping): boolean {
   const rule = toRule(mapping)
@@ -76,7 +86,8 @@ function isSaved(mapping: Mapping): boolean {
 function update(index: number, side: keyof Mapping, value: string) {
   const next = props.modelValue.map((mapping, at) => (at === index ? { ...mapping, [side]: value } : mapping))
   if (example.value === index) closeExample()
-  if (asking.value?.index === index) asking.value = null
+  revision++
+  asking.value = null
   emit('update:modelValue', next)
 }
 
@@ -85,6 +96,7 @@ function add() {
 }
 
 function remove(index: number) {
+  revision++
   example.value = null
   asking.value = null
   examples.reset()
@@ -104,14 +116,18 @@ function toggleExample(index: number) {
 }
 
 async function askApply(index: number) {
-  const mapping = props.modelValue[index]
-  if (!mapping || busy.value) return
+  const current = props.modelValue[index]
+  if (!current || !isSaved(current) || busy.value) return
+  const mapping = { ...current }
   busy.value = true
   error.value = null
   const link = props.link.import_id
+  const asked = revision
   try {
     const page = await previewMove(props.groupId, link, movePlan(mapping), { limit: 1 }, client())
-    if (link === props.link.import_id) asking.value = { index, count: page.total, complete: page.complete }
+    if (link === props.link.import_id && asked === revision) {
+      asking.value = { index, mapping, count: page.total, complete: page.complete }
+    }
   } catch (err) {
     if (link === props.link.import_id) error.value = isUnsupportedEndpoint(err) ? 'This node cannot do this yet.' : organizeError(err)
   } finally {
@@ -121,8 +137,8 @@ async function askApply(index: number) {
 
 async function apply() {
   const ask = asking.value
-  const mapping = ask ? props.modelValue[ask.index] : null
-  if (!ask || !mapping || busy.value || props.job || writesDisabled.value) return
+  const mapping = ask?.mapping
+  if (!ask || !mapping || !isSaved(mapping) || busy.value || props.job || writesDisabled.value) return
   busy.value = true
   error.value = null
   const link = props.link.import_id
@@ -233,8 +249,8 @@ const COLUMNS = 'grid grid-cols-[minmax(0,1fr)_1.5rem_minmax(0,1fr)_11rem] items
         <div v-if="asking?.index === index" class="mt-2 rounded-md border border-border bg-muted/50 px-3 py-2">
           <div class="flex items-center gap-2">
             <span class="flex-1">
-              {{ countWords(asking.count, asking.complete) }} in Aruna match <span class="font-mono">{{ mapping.storage }}</span> in
-              storage and get the Aruna path <span class="font-mono">{{ mapping.aruna }}</span>.
+              {{ countWords(asking.count, asking.complete) }} in Aruna match <span class="font-mono">{{ asking.mapping.storage }}</span> in
+              storage and get the Aruna path <span class="font-mono">{{ asking.mapping.aruna }}</span>.
             </span>
             <Button variant="ghost" size="sm" @click="asking = null">Cancel</Button>
             <Button
