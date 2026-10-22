@@ -86,7 +86,8 @@ const LINK = {
 }
 type Root = Parameters<typeof content>[0]
 const field = (root: Root, label: string) => element(root, (node) => node.props['aria-label'] === label)
-const saveButton = (root: Root) => element(root, (node) => node.tag === 'button' && content(node).trim() === 'Save')
+const saveButton = (root: Root) =>
+  element(root, (node) => node.tag === 'button' && ['Save', 'Saving…'].includes(content(node).trim()))
 
 async function mount() {
   const open = ref(false)
@@ -98,7 +99,7 @@ async function mount() {
   open.value = true
   await flush()
   if (mounted.errors.length) throw mounted.errors[0]
-  return mounted
+  return { ...mounted, open }
 }
 
 beforeEach(() => {
@@ -122,6 +123,37 @@ describe('BucketEditDialog', () => {
 
     expect(updateBackendImport).toHaveBeenCalledWith('g1', 'i1', null, expect.anything(), '{dir}{name}~{id}')
     expect(startImportRenames).toHaveBeenCalledWith('g1', 'i1', expect.anything())
+  })
+
+  it('keeps a schedule changed while a save runs as unsaved', async () => {
+    let answer: (value: unknown) => void = () => {}
+    updateBackendImport.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+    const { root } = await mount()
+    await typeValue(field(root, 'Look for new files'), '0 3 * * *')
+    const pending = (saveButton(root).props.onClick as () => Promise<void>)()
+    await flush()
+    await typeValue(field(root, 'Look for new files'), '0 3 * * 1')
+    answer({})
+    await pending
+    await flush()
+    expect(updateBackendImport).toHaveBeenCalledWith('g1', 'i1', '0 3 * * *', expect.anything(), undefined)
+    expect(saveButton(root).props.disabled).toBe(false)
+  })
+
+  it('starts a new opening with Save usable while an old save still runs', async () => {
+    updateBackendImport.mockReturnValueOnce(new Promise(() => {}))
+    const { root, open } = await mount()
+    await typeValue(field(root, 'Look for new files'), '0 3 * * *')
+    void (saveButton(root).props.onClick as () => Promise<void>)()
+    await flush()
+    expect(content(saveButton(root))).toBe('Saving…')
+    open.value = false
+    await flush()
+    open.value = true
+    await flush()
+    await typeValue(field(root, 'Look for new files'), '0 3 * * 1')
+    expect(content(saveButton(root)).trim()).toBe('Save')
+    expect(saveButton(root).props.disabled).toBe(false)
   })
 
   it('refuses a custom name without {name}', async () => {

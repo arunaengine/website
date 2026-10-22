@@ -116,6 +116,7 @@ watch(
     savedMappings.value = []
     saveError.value = null
     savedNote.value = false
+    saving.value = false
     void loadMappings(id)
     void refresh()
   },
@@ -135,19 +136,22 @@ async function save() {
   const id = opening
   const link = props.link.import_id
   const rename = offersRename.value && renameOld.value
+  // What is sent; edits made while it saves stay as a newer draft.
+  const sentSchedule = schedule.value
+  const sentPattern = nameChanged.value ? pattern.value : undefined
+  const sentMappings = mappingsChanged.value ? mappings.value.map((mapping) => ({ ...mapping })) : null
   try {
-    if (nameChanged.value || schedule.value !== savedSchedule.value) {
-      const writePattern = nameChanged.value ? pattern.value : undefined
-      await updateBackendImport(props.groupId, link, schedule.value || null, client(), writePattern)
+    if (sentPattern !== undefined || sentSchedule !== savedSchedule.value) {
+      await updateBackendImport(props.groupId, link, sentSchedule || null, client(), sentPattern)
       if (id !== opening) return
-      if (writePattern) savedPattern.value = writePattern
-      savedSchedule.value = schedule.value
+      if (sentPattern !== undefined) savedPattern.value = sentPattern
+      savedSchedule.value = sentSchedule
     }
-    if (mappingsChanged.value) {
-      const { rules } = await saveFileRules(props.groupId, link, mappings.value.map(toRule), client())
+    if (sentMappings) {
+      const { rules } = await saveFileRules(props.groupId, link, sentMappings.map(toRule), client())
       if (id !== opening) return
       savedMappings.value = rules.map(toMapping)
-      mappings.value = rules.map(toMapping)
+      if (sameMappings(mappings.value, sentMappings)) mappings.value = rules.map(toMapping)
     }
     if (rename) await startImportRenames(props.groupId, link, client())
     if (id !== opening) return
