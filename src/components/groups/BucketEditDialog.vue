@@ -262,7 +262,6 @@ async function save() {
             :group-id="groupId"
             :link="link"
             :place="place"
-            :renames="renames"
             :job="job"
             :controlling="controlling"
             :finished="finished"

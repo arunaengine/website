@@ -23,7 +23,12 @@ const ButtonStub = defineComponent({
 const BucketOrganize = compileClientComponent(new URL('./BucketOrganize.vue', import.meta.url), {
   vue: VueRuntime,
   '@/components/storage/JobProgress.vue': moduleDefault(defineComponent(() => () => h('p', 'job running'))),
-  '@/components/storage/PagedList.vue': moduleDefault(Slot),
+  '@/components/storage/PagedList.vue': moduleDefault(
+    defineComponent({
+      props: { summary: String },
+      setup: (props, { slots }) => () => h('div', [slots.head?.(), slots.default?.(), h('span', props.summary ?? '')]),
+    }),
+  ),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Notice.vue': moduleDefault(Slot),
   '@/composables/useAruna': {
@@ -45,13 +50,16 @@ type Root = Parameters<typeof content>[0]
 const buttonIn = (root: Root, text: string) => element(root, (node) => node.tag === 'button' && content(node).trim() === text)
 const step = (root: Root, id: string) => nodes(root).filter((node) => node.props['data-testid'] === id)
 
-async function mount(renames: unknown) {
+async function mount() {
+  const finished = ref(0)
   const mounted = await mountApp(
-    defineComponent(() => () => h(BucketOrganize, { groupId: 'g1', link: LINK, place: 'aruna-spire-genes', renames, job: null })),
+    defineComponent(() => () =>
+      h(BucketOrganize, { groupId: 'g1', link: LINK, place: 'aruna-spire-genes', job: null, finished: finished.value }),
+    ),
   )
   await flush()
   if (mounted.errors.length) throw mounted.errors[0]
-  return mounted
+  return { ...mounted, finished }
 }
 
 beforeEach(() => {
@@ -64,25 +72,45 @@ beforeEach(() => {
 describe('BucketOrganize', () => {
   it('says so when there is nothing to clean up', async () => {
     previewDuplicates.mockResolvedValue({ total: 0, bytes: 0, complete: true, items: [] })
-    const { root } = await mount({ count: 0, complete: true, files: [] })
+    const { root } = await mount()
     expect(content(root)).toContain('Nothing to clean up.')
     expect(step(root, 'step-duplicates')).toHaveLength(0)
     expect(step(root, 'step-renames')).toHaveLength(0)
   })
 
+  it('does not call a failed check nothing to clean up', async () => {
+    previewDuplicates.mockRejectedValue(new Error('node down'))
+    const { root } = await mount()
+    expect(content(root)).not.toContain('Nothing to clean up.')
+    expect(content(root)).toContain('node down')
+  })
+
   it('shows only steps with work, with a partial count as at least', async () => {
-    const { root } = await mount({ count: 3, complete: false, files: [] })
-    expect(content(step(root, 'step-duplicates')[0])).toContain('6 files')
+    getImportRenames.mockResolvedValue({ count: 3, complete: false, files: [] })
+    const { root } = await mount()
+    expect(content(step(root, 'step-duplicates')[0])).toContain('6 files with copies')
     expect(content(step(root, 'step-renames')[0])).toContain('at least 3 files')
     expect(content(root)).not.toContain('Nothing to clean up.')
   })
 
   it('deletes copies only after the review is confirmed', async () => {
-    const { root } = await mount({ count: 0, complete: true, files: [] })
+    const { root } = await mount()
     await click(buttonIn(step(root, 'step-duplicates')[0], 'Review…'))
     expect(content(root)).toContain('01M5_a.faa')
     expect(startDuplicates).not.toHaveBeenCalled()
-    await click(buttonIn(root, 'Delete 6 copies'))
+    expect(content(root)).toContain('Showing 1 · 6 files with copies')
+    await click(buttonIn(root, 'Remove copies of 6 files'))
     expect(startDuplicates).toHaveBeenCalledWith('g1', 'i1', expect.anything())
+  })
+
+  it('reads an open rename review again after a step ended', async () => {
+    getImportRenames.mockResolvedValue({ count: 1, complete: true, files: [{ from: '01M5_a.faa', to: 'a.faa' }] })
+    const { root, finished } = await mount()
+    await click(buttonIn(step(root, 'step-renames')[0], 'Review…'))
+    getImportRenames.mockResolvedValue({ count: 1, complete: true, files: [{ from: '01M6_b.faa', to: 'b.faa' }] })
+    finished.value++
+    await flush()
+    await flush()
+    expect(content(root)).toContain('01M6_b.faa')
   })
 })

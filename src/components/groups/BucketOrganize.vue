@@ -14,7 +14,6 @@ import {
   startDuplicates,
   startImportRenames,
   type BackendImport,
-  type BackendImportRenames,
   type DuplicateItem,
 } from '@/lib/api'
 import { countWords } from '@/lib/bucketNaming'
@@ -27,7 +26,6 @@ const props = defineProps<{
   link: BackendImport
   /** The S3 bucket and folder, as the description shows it. */
   place: string
-  renames: BackendImportRenames | null
   job: ProgressJob | null
   controlling?: boolean
   /** Counts steps that ended, so the counts read again. */
@@ -42,8 +40,12 @@ const open = ref<'dup' | 'ren' | null>(null)
 const busy = ref(false)
 const error = ref<string | null>(null)
 const copiesMissing = ref(false)
+const renamesMissing = ref(false)
+// Counts of the whole bucket, from first pages without a filter; null until known.
 const copyAll = ref<{ total: number; complete: boolean } | null>(null)
+const renameAll = ref<{ total: number; complete: boolean } | null>(null)
 let wholeRun = 0
+let renameRun = 0
 
 function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
@@ -63,29 +65,50 @@ const copies = useCursorPage<DuplicateItem>(
   },
   () => (copiesMissing.value = true),
 )
-const oldNames = useCursorPage<{ from: string; to: string; writable?: boolean }>(async (query) => {
-  const found = await getImportRenames(props.groupId, props.link.import_id, client(), query)
-  return { items: found.files, total: found.count, complete: found.complete, next: found.next }
-})
+const oldNames = useCursorPage<{ from: string; to: string; writable?: boolean }>(
+  async (query) => {
+    const link = props.link.import_id
+    const whole = !query.filter && !query.after
+    const mine = renameRun
+    const found = await getImportRenames(props.groupId, link, client(), query)
+    if (whole && mine === renameRun && link === props.link.import_id) {
+      renameAll.value = { total: found.count, complete: found.complete }
+    }
+    return { items: found.files, total: found.count, complete: found.complete, next: found.next }
+  },
+  () => (renamesMissing.value = true),
+)
 
-const copyOffered = computed(() => Boolean(copyAll.value && (copyAll.value.total > 0 || !copyAll.value.complete)))
-const renameOffered = computed(() => Boolean(props.renames && (props.renames.count > 0 || !props.renames.complete)))
-const checking = computed(() => copyAll.value === null && !copiesMissing.value && !copies.error.value)
-const nothing = computed(() => !checking.value && !copyOffered.value && !renameOffered.value && !props.job)
-const copyCount = computed(() => countWords(copyAll.value?.total ?? 0, copyAll.value?.complete ?? true))
-const copyButton = computed(() => {
-  const { total, complete } = copyAll.value ?? { total: 0, complete: true }
-  return `Delete ${complete ? '' : 'at least '}${formatNumber(total)} ${total === 1 && complete ? 'copy' : 'copies'}`
+const offered = (count: { total: number; complete: boolean } | null) => Boolean(count && (count.total > 0 || !count.complete))
+const copyOffered = computed(() => offered(copyAll.value))
+const renameOffered = computed(() => offered(renameAll.value))
+const failed = computed(() => copies.error.value ?? oldNames.error.value)
+const checking = computed(
+  () => !failed.value && ((copyAll.value === null && !copiesMissing.value) || (renameAll.value === null && !renamesMissing.value)),
+)
+// Only checks that answered, and found nothing, mean nothing to clean up.
+const nothing = computed(() => !checking.value && !failed.value && !copyOffered.value && !renameOffered.value && !props.job)
+// The duplicate count is of files that have copies; one file may have several.
+const copyCount = computed(() => `${countWords(copyAll.value?.total ?? 0, copyAll.value?.complete ?? true)} with copies`)
+const copyButton = computed(() => `Remove copies of ${countWords(copyAll.value?.total ?? 0, copyAll.value?.complete ?? true)}`)
+const copySummary = computed(() => {
+  const page = copies.page.value
+  return page ? `Showing ${formatNumber(page.items.length)} · ${copyCount.value}` : undefined
 })
-const renameCount = computed(() => countWords(props.renames?.count ?? 0, props.renames?.complete ?? true))
+const renameCount = computed(() => countWords(renameAll.value?.total ?? 0, renameAll.value?.complete ?? true))
 
+// Reads both counts again; an open review shows its fresh first page.
 function reload() {
   copies.reset()
   oldNames.reset()
   wholeRun++
+  renameRun++
   copyAll.value = null
+  renameAll.value = null
   copiesMissing.value = false
+  renamesMissing.value = false
   void copies.load('')
+  void oldNames.load('')
 }
 
 watch(
@@ -101,7 +124,6 @@ watch(() => props.finished, reload)
 
 function review(step: 'dup' | 'ren') {
   open.value = open.value === step ? null : step
-  if (open.value === 'ren' && !oldNames.page.value) void oldNames.load('')
 }
 
 async function act(run: () => Promise<unknown>) {
@@ -150,6 +172,7 @@ const blocked = computed(() => busy.value || Boolean(props.job) || writesDisable
       </div>
       <div v-if="open === 'dup'" class="mt-3">
         <PagedList
+          :summary="copySummary"
           :total="copies.page.value?.total ?? 0"
           :complete="copies.page.value?.complete ?? true"
           :offset="copies.offset.value"
