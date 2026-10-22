@@ -2,7 +2,8 @@ import * as VueRuntime from 'vue'
 import { defineComponent, h, reactive, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { compileClientComponent, content, element, flush, mountApp, moduleDefault } from '@/test/clientRender'
-import * as LinkedFolders from '@/lib/linkedFolders'
+import * as BucketNaming from '@/lib/bucketNaming'
+import * as StorageRules from '@/lib/storageRules'
 
 const listBackendImports = vi.fn()
 const listGroupBackends = vi.fn()
@@ -20,11 +21,13 @@ const Note = compileClientComponent(new URL('./BucketLinkNote.vue', import.meta.
     useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('t'), sessionEpoch, listGroupBackends }),
   },
   '@/lib/api': { listBackendImports },
-  '@/lib/linkedFolders': LinkedFolders,
+  '@/components/ui/Button.vue': moduleDefault(defineComponent((_, { slots }) => () => h('span', slots.default?.()))),
+  '@/lib/bucketNaming': BucketNaming,
+  '@/lib/storageRules': StorageRules,
 })
 
-const BACKEND = { backend_id: 's1', name: 'lab-s3', kind: 's3', public_config: { bucket: 'lab-s3' } }
-const LINK = { import_id: 'i1', backend_id: 's1', backend_prefix: 'linked-test/', bucket: 'reef', key_prefix: '', created_at: '' }
+const BACKEND = { backend_id: 's1', name: 'spire', kind: 's3', public_config: {} }
+const LINK = { import_id: 'i1', backend_id: 's1', backend_prefix: 'aruna-spire-reef/', bucket: 'reef', key_prefix: '', created_at: '' }
 
 beforeEach(() => {
   listGroupBackends.mockReset().mockResolvedValue({ backends: [BACKEND] })
@@ -32,10 +35,13 @@ beforeEach(() => {
 })
 
 describe('bucket link note', () => {
-  it('points at the card of the link in the group storage tab', async () => {
+  it('says where the files are and opens the bucket edit in the group', async () => {
     const { root } = await mountApp(Note, { props: { bucket: 'reef', groupId: 'g1' } })
     await flush()
-    expect(content(root).replace(/\s+/g, ' ')).toContain('Linked to lab-s3 / linked-test/ · Manage in group storage')
+    const text = content(root).replace(/\s+/g, ' ')
+    expect(text).toContain('Where the files are')
+    expect(text).toContain('spire / aruna-spire-reef. New uploads are named {name}.')
+    expect(text).toContain('Change')
     const to = JSON.parse(String(element(root, (node) => node.tag === 'a').props['data-to']))
     expect(to).toEqual({ name: 'group', params: { id: 'g1' }, query: { tab: 'storage', link: 'i1' } })
   })
