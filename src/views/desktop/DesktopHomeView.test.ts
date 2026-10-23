@@ -14,6 +14,7 @@ const foldersState = ref('ready')
 const syncTransfers = ref<DeviceTransfer[]>([])
 const transfersState = ref('ready')
 const compute = ref<DeviceCompute | null>(null)
+const computeShown = ref(true)
 const syncStatus = ref<DeviceSyncStatus>({
   realmReachable: true,
   lastSyncMs: null,
@@ -66,7 +67,7 @@ let DesktopHomeView: Component
 beforeAll(async () => {
   vi.doMock('vue-router', () => ({ RouterLink: RouterLinkStub }))
   vi.doMock('@/composables/useAruna', () => ({ useAruna: () => ({ currentUser: ref({ id: 'u1' }) }) }))
-  vi.doMock('@/composables/usePortalFeatures', () => ({ usePortalFeatures: () => ({ shown: () => true }) }))
+  vi.doMock('@/composables/usePortalFeatures', () => ({ usePortalFeatures: () => ({ shown: (feature: string) => feature !== 'compute' || computeShown.value }) }))
   vi.doMock('@/composables/useRealm', () => ({
     useRealm: () => ({ realm: ref({ name: 'Test realm', shortName: 'Testrealm' }) }),
   }))
@@ -156,6 +157,7 @@ beforeEach(() => {
   syncTransfers.value = []
   transfersState.value = 'ready'
   compute.value = null
+  computeShown.value = true
   realmJobs.value = []
   uploadItems.value = []
   syncStatus.value = {
@@ -252,6 +254,15 @@ describe('desktop home', () => {
     expect(html).toContain('on this computer')
     expect(html).toContain('in Testrealm')
     expect(html).toContain('runs nothing itself yet')
+  })
+
+  it('leaves out the runs card while compute is switched off', async () => {
+    computeShown.value = false
+
+    const html = await render()
+
+    expect(html).not.toContain('in Testrealm')
+    expect(html).not.toContain('>Runs<')
   })
 
   it('names the state of a node with no identity yet', async () => {

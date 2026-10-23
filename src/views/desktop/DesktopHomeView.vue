@@ -243,17 +243,13 @@ onMounted(() => void reload())
         </section>
 
         <!-- Runs -->
-        <section class="surface flex flex-col overflow-hidden">
+        <section v-if="shown('compute')" class="surface flex flex-col overflow-hidden">
           <header class="flex items-center justify-between border-b border-border px-5 py-3">
             <div class="flex items-center gap-2">
               <Play class="h-4 w-4 text-primary" />
               <h2 class="font-display text-sm font-semibold text-aruna-navy">Runs</h2>
             </div>
-            <RouterLink
-              v-if="shown('compute')"
-              :to="{ name: 'runs' }"
-              class="text-xs font-medium text-primary hover:underline"
-            >Open</RouterLink>
+            <RouterLink :to="{ name: 'runs' }" class="text-xs font-medium text-primary hover:underline">Open</RouterLink>
           </header>
           <div class="flex-1 space-y-3 px-5 py-4">
             <div class="flex flex-wrap gap-x-8 gap-y-2">
