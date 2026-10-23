@@ -22,6 +22,11 @@ const status = { state: 'running', enrolled: false, apiBaseUrl: LOCAL }
 const nodeStatus = vi.fn(async () => status)
 // What the realm node says it is; null until a realm token asked.
 const nodeInfo = ref<{ node: { capabilities: string } } | null>(null)
+const deviceStatus = ref<{ updateRequired: { local: string; realm: string } | null } | null>(null)
+const UpdateStub = defineComponent({
+  props: { local: String, realm: String },
+  setup: (props) => () => h('div', `update-required ${props.local} ${props.realm}`),
+})
 
 vi.mock('@/lib/desktopBridge', () => ({ nodeStatus }))
 vi.mock('@/composables/useAruna', () => ({
@@ -103,6 +108,8 @@ const WelcomeDeviceView = compileClientComponent(new URL('./WelcomeDeviceView.vu
     }),
   },
   '@/composables/useDeviceSetup': { useDeviceSetup: () => setup },
+  '@/composables/useDeviceStatus': { useDeviceStatus: () => ({ status: deviceStatus, start: vi.fn(), stop: vi.fn() }) },
+  '@/views/desktop/UpdateRequiredView.vue': moduleDefault(UpdateStub),
   '@/lib/onboarding-config': { managementPortals: () => [] },
 })
 
@@ -146,10 +153,40 @@ beforeEach(() => {
   nodeInfo.value = null
   setup.watching.value = false
   setup.joined.value = false
+  deviceStatus.value = null
 })
 
 afterEach(() => {
   vi.unstubAllGlobals()
+})
+
+describe('an app the realm has outgrown', () => {
+  it('puts the update screen ahead of the joining progress', async () => {
+    const router = await guarded()
+    const mounted = await mountApp(WelcomeDeviceView, { router })
+    await click(button(mounted.root, 'Set up this device'))
+    expect(content(mounted.root)).toContain('Joining the realm')
+
+    // The shell then reports it refused to start the node.
+    deviceStatus.value = { updateRequired: { local: '3.0.0-alpha.131', realm: '3.0.0-alpha.133' } }
+    await vi.waitFor(() => expect(content(mounted.root)).toContain('update-required 3.0.0-alpha.131 3.0.0-alpha.133'))
+
+    expect(content(mounted.root)).not.toContain('Joining the realm')
+    expect(content(mounted.root)).not.toContain('Set up this device')
+    mounted.app.unmount()
+  })
+
+  it('comes back to the setup step when the versions match again', async () => {
+    deviceStatus.value = { updateRequired: { local: '3.0.0-alpha.131', realm: '3.0.0-alpha.133' } }
+    const router = await guarded()
+    const mounted = await mountApp(WelcomeDeviceView, { router })
+    expect(content(mounted.root)).toContain('update-required')
+
+    deviceStatus.value = { updateRequired: null }
+
+    await vi.waitFor(() => expect(content(mounted.root)).toContain('Set up this device'))
+    mounted.app.unmount()
+  })
 })
 
 describe('setting up this device', () => {

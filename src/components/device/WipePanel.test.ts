@@ -73,6 +73,8 @@ describe('WipePanel', () => {
     const mounted = await mountApp(WipePanel)
 
     expect(content(mounted.root)).toContain('Takes this computer out of Test realm')
+    expect(content(mounted.root)).toContain('Data that exists only on this computer is lost')
+    expect(content(mounted.root)).toContain('folder links disappear')
     expect(() => element(mounted.root, (node) => node.tag === 'input')).toThrow()
     await click(button(mounted.root, 'Remove this computer…'))
     await click(button(mounted.root, 'Remove this computer'))

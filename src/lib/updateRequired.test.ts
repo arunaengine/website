@@ -9,7 +9,17 @@ describe('version gap', () => {
     expect(versionGap('3.1.0-alpha.1', '3.0.0-alpha.133')).toBe('realm-older')
   })
 
+  it('puts a pre-release below the release it leads up to', () => {
+    expect(versionGap('3.0.0-alpha.133', '3.0.0')).toBe('realm-newer')
+    expect(versionGap('3.0.0', '3.0.0-alpha.133')).toBe('realm-older')
+    expect(versionGap('3.0.0-alpha.2', '3.0.0-alpha.10')).toBe('realm-newer')
+    expect(versionGap('3.0.0-alpha.1', '3.0.0-beta.1')).toBe('realm-newer')
+    expect(versionGap('3.0.0-alpha', '3.0.0-alpha.1')).toBe('realm-newer')
+  })
+
   it('does not guess when the versions are equal or not versions', () => {
+    expect(versionGap('3.0.0', '3.0.0+build.5')).toBe('unknown')
+    expect(versionGap('3.0', '3.0.1')).toBe('unknown')
     expect(versionGap('3.0.0-alpha.131', '3.0.0-alpha.131')).toBe('unknown')
     expect(versionGap('dev', '3.0.0-alpha.131')).toBe('unknown')
   })

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // Full-window screen for an app and a realm that run different Aruna versions.
 // The node does not start until they match, so nothing else is reachable. There
-// is no updater yet: Update now opens the page the new build is published on.
+// is no updater yet: the owner is told where to get a build, and may check
+// again once the versions might match.
 import { computed, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Dialog from '@/components/ui/Dialog.vue'
@@ -14,19 +15,22 @@ import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import AppLogo from '@/components/layout/AppLogo.vue'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
+import { useNodeControl } from '@/composables/useNodeControl'
 import { useRealm } from '@/composables/useRealm'
 import { appQuit, openExternal, WIPE_PHRASE, wipeDevice } from '@/lib/desktopBridge'
-import { DESKTOP_RELEASES_URL, releaseName, versionGap } from '@/lib/updateRequired'
+import { DESKTOP_DOWNLOAD_HELP, DESKTOP_DOWNLOAD_URL, releaseName, versionGap } from '@/lib/updateRequired'
 import { errorMessage } from '@/lib/utils'
-import { Download, ExternalLink, Trash2 } from '@lucide/vue'
+import { Download, ExternalLink, RefreshCw, Trash2 } from '@lucide/vue'
 
 const props = defineProps<{ local: string; realm: string }>()
 
-const { refresh } = useDeviceStatus()
+const { status, refresh } = useDeviceStatus()
+const control = useNodeControl()
 const { realm: realmInfo } = useRealm()
 const confirming = ref(false)
 const busy = ref(false)
 const failure = ref<string | null>(null)
+const checked = ref(false)
 
 const gap = computed(() => versionGap(props.local, props.realm))
 const name = computed(() => realmInfo.value.name)
@@ -38,11 +42,20 @@ const lead = computed(() => {
 
 async function open(): Promise<void> {
   failure.value = null
+  if (!DESKTOP_DOWNLOAD_URL) return
   try {
-    await openExternal(DESKTOP_RELEASES_URL)
+    await openExternal(DESKTOP_DOWNLOAD_URL)
   } catch (err) {
     failure.value = errorMessage(err)
   }
+}
+
+// The shell looks at the realm again whenever it is asked to start the node.
+async function checkAgain(): Promise<void> {
+  failure.value = null
+  checked.value = false
+  await control.start()
+  checked.value = true
 }
 
 async function wipe(): Promise<void> {
@@ -91,22 +104,36 @@ async function quit(): Promise<void> {
         </div>
       </dl>
 
-      <div v-if="gap !== 'realm-older'" class="flex flex-wrap items-center gap-3">
-        <Button @click="open"><Download class="h-4 w-4" /> Update now</Button>
-        <button type="button" class="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline" @click="open">
-          What is new in {{ releaseName(realm) }} <ExternalLink class="h-3 w-3" />
-        </button>
-      </div>
+      <template v-if="gap !== 'realm-older'">
+        <p class="text-sm text-muted-foreground">{{ DESKTOP_DOWNLOAD_HELP }}</p>
+        <div v-if="DESKTOP_DOWNLOAD_URL" class="flex flex-wrap items-center gap-3">
+          <Button @click="open"><Download class="h-4 w-4" /> Update now</Button>
+          <button type="button" class="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline" @click="open">
+            What is new in {{ releaseName(realm) }} <ExternalLink class="h-3 w-3" />
+          </button>
+        </div>
+      </template>
       <p v-else class="text-sm text-muted-foreground">
         Ask the person who runs {{ name }} to update it, or install the same version of this app.
       </p>
+
+      <div class="flex flex-wrap items-center gap-3">
+        <Button variant="outline" size="sm" :disabled="control.busy.value" @click="checkAgain">
+          <RefreshCw class="h-3.5 w-3.5" /> Check again
+        </Button>
+        <span v-if="checked && status?.updateRequired" class="text-[11px] text-muted-foreground">
+          The versions still differ.
+        </span>
+      </div>
+      <Notice v-if="control.error.value" tone="error">{{ control.error.value }}</Notice>
 
       <Notice v-if="failure" tone="error">{{ failure }}</Notice>
 
       <div class="space-y-2 border-t border-border pt-4">
         <p class="text-xs leading-relaxed text-muted-foreground">
-          Update does not work? You can start from scratch. This deletes what Aruna keeps on this computer. The files in
-          your synced folders stay where they are.
+          Update does not work? You can start from scratch. This deletes what Aruna keeps on this computer. Data that
+          exists only on this computer is lost, and your folder links disappear. The files in your synced folders stay
+          where they are.
         </p>
         <Button variant="outline" size="sm" @click="confirming = true">
           <Trash2 class="h-3.5 w-3.5" /> Remove local data and set up again
@@ -125,8 +152,9 @@ async function quit(): Promise<void> {
         <DialogHeader>
           <DialogTitle>Remove local data and set up again?</DialogTitle>
           <DialogDescription>
-            This deletes what Aruna keeps on this computer. The files in your synced folders stay where they are. You
-            sign in and set up this computer again afterwards.
+            This deletes what Aruna keeps on this computer. Data that exists only on this computer is lost, and your
+            folder links disappear. The files in your synced folders stay where they are. You set up this computer
+            again afterwards.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

@@ -3,7 +3,7 @@
 // and may be skipped. Setting up mints an enrollment against the realm and
 // redeems it here; the shell restarts the node and switches this window's
 // context underneath the step, which keeps watching across it.
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AppLogo from '@/components/layout/AppLogo.vue'
 import ClaimWatchStep from '@/components/onboarding/ClaimWatchStep.vue'
@@ -13,7 +13,9 @@ import Input from '@/components/ui/Input.vue'
 import RefusalNote from '@/components/ui/RefusalNote.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useDeviceSetup } from '@/composables/useDeviceSetup'
+import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { managementPortals } from '@/lib/onboarding-config'
+import UpdateRequiredView from '@/views/desktop/UpdateRequiredView.vue'
 import iconMark from '@/assets/brand/icon-mark.avif'
 import { ArrowRight, Check, Laptop } from '@lucide/vue'
 
@@ -22,6 +24,13 @@ const { bootstrapped, refresh, realm, nodeInfo, isManagementNode, realmInfo } = 
 if (typeof window !== 'undefined' && !bootstrapped.value) void refresh()
 const { applying, error, watching, joined, stages, state, apply, done } = useDeviceSetup()
 const deviceName = ref('')
+
+// The shell starts no node while the app and the realm differ, so joining
+// would only wait; the update screen comes ahead of any progress.
+const { status, start, stop } = useDeviceStatus()
+const update = computed(() => status.value?.updateRequired ?? null)
+onMounted(start)
+onBeforeUnmount(stop)
 
 // Only a management node mints an enrollment. A node that has not said what
 // it is does not gate: the realm info answers anyone, the node info a token.
@@ -43,7 +52,8 @@ function leave(): void {
 </script>
 
 <template>
-  <div class="relative flex min-h-full items-center justify-center overflow-hidden px-4 py-10">
+  <UpdateRequiredView v-if="update" :local="update.local" :realm="update.realm" />
+  <div v-else class="relative flex min-h-full items-center justify-center overflow-hidden px-4 py-10">
     <div
       aria-hidden="true"
       class="grid-faint pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_at_50%_0%,black_30%,transparent_75%)]"
