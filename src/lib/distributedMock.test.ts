@@ -89,6 +89,7 @@ describe('distributed mock helpers', () => {
     expect(exampleMark('bakrep', annotation.key)).toBe('Not pinned')
     expect(mockFile('bakrep', genome.key)?.size).toBe(genome.size)
     expect(exampleMark('lab-raw-data', 'raw/2026/reef-07/notes.txt')).toBeNull()
+    expect(mockFile('bakrep', genome.key)?.external?.digests[0].scope).toBe('not established')
   })
 
   it('finds example files when every word of the query is in the key', () => {

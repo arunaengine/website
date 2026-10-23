@@ -283,7 +283,7 @@ export const MOCK_OBJECTS: readonly MockObject[] = [
       etag: '"9b2cf535f27731c974343645a3985328"',
       digests: [
         { algorithm: 'sha256', digest: '5e0f1f4a8d3c6b27a91e4c05d7f2b8a36c19e0d4f7a25b83c6d1e9f04a7b2c58', scope: 'full object', origin: 'Checksum manifest of the source' },
-        { algorithm: 'md5', digest: '9b2cf535f27731c974343645a3985328', scope: 'full object', origin: 'Listing ETag, evidence only' },
+        { algorithm: 'md5', digest: '9b2cf535f27731c974343645a3985328', scope: 'not established', origin: 'Listing ETag, evidence only' },
       ],
       refreshed: '2026-10-23T05:40:00Z',
     },
@@ -344,7 +344,7 @@ export const MOCK_OBJECTS: readonly MockObject[] = [
       source: `${BAKREP_ENDPOINT}/bakrep-v2-data-031/GCF_003697165.2/genome.fna.gz`,
       etag: '"4d7e0a19b3c85f62e1a70d94c8b3f517"',
       digests: [
-        { algorithm: 'md5', digest: '4d7e0a19b3c85f62e1a70d94c8b3f517', scope: 'full object', origin: 'Listing ETag, evidence only' },
+        { algorithm: 'md5', digest: '4d7e0a19b3c85f62e1a70d94c8b3f517', scope: 'not established', origin: 'Listing ETag, evidence only' },
       ],
       refreshed: '2026-10-23T05:52:00Z',
     },
@@ -367,7 +367,7 @@ export const MOCK_OBJECTS: readonly MockObject[] = [
       source: `${BAKREP_ENDPOINT}/bakrep-v2-data-044/GCF_000008865.2/genome.fna.gz`,
       etag: '"c21b7f40a5d9e386b0f14c72ad85e903"',
       digests: [
-        { algorithm: 'md5', digest: 'c21b7f40a5d9e386b0f14c72ad85e903', scope: 'full object', origin: 'Listing ETag, evidence only' },
+        { algorithm: 'md5', digest: 'c21b7f40a5d9e386b0f14c72ad85e903', scope: 'not established', origin: 'Listing ETag, evidence only' },
       ],
       refreshed: '2026-10-23T06:03:00Z',
     },
@@ -572,7 +572,7 @@ function bakrepObject(key: string): MockObject | undefined {
     external: {
       source: `${BAKREP_ENDPOINT}/${key}`,
       etag: genome ? `"${etag}"` : undefined,
-      digests: genome ? [{ algorithm: 'md5', digest: etag, scope: 'full object', origin: 'Listing ETag, evidence only' }] : [],
+      digests: genome ? [{ algorithm: 'md5', digest: etag, scope: 'not established', origin: 'Listing ETag, evidence only' }] : [],
       refreshed: LISTED_AT,
       notPinned: genome ? undefined : 'The source sends no ETag and no checksum for the whole file, so one exact content cannot be named.',
     },

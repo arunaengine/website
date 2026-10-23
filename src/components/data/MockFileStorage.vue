@@ -4,12 +4,15 @@ import Badge from '@/components/ui/Badge.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
 import SourceInfo from '@/components/distributed/SourceInfo.vue'
 import type { MockObject } from '@/lib/distributedMockData'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import Notice from '@/components/ui/Notice.vue'
 
-defineProps<{ object: MockObject }>()
+const props = defineProps<{ object: MockObject }>()
 
 const copied = ref(false)
+// Only a node with a full copy holds bytes. The others know the file but keep none.
+const withBytes = computed(() => props.object.holders.filter((holder) => holder.bytes === 'Full copy'))
+const listedOnly = computed(() => props.object.holders.filter((holder) => holder.bytes !== 'Full copy'))
 </script>
 
 <template>
@@ -23,13 +26,17 @@ const copied = ref(false)
     </div>
     <div class="surface space-y-3 p-4">
       <h3 class="text-sm font-medium text-foreground">Storage locations</h3>
-      <ul class="divide-y divide-border rounded-md border border-border text-xs">
-        <li v-for="holder in object.holders" :key="holder.nodeId" class="flex flex-wrap items-center gap-x-4 px-3 py-2">
+      <ul v-if="withBytes.length" class="divide-y divide-border rounded-md border border-border text-xs">
+        <li v-for="holder in withBytes" :key="holder.nodeId" class="flex flex-wrap items-center gap-x-4 px-3 py-2">
           <NodeLabel :node-id="holder.nodeId" class="w-20 font-medium" />
           <span class="w-32">{{ holder.role }}</span>
           <span class="text-muted-foreground">{{ holder.bytes }}</span>
         </li>
       </ul>
+      <p v-else class="text-xs text-muted-foreground">No node holds the bytes yet. They are read from the source.</p>
+      <p v-if="listedOnly.length" class="text-xs text-muted-foreground">
+        Also listed on: {{ listedOnly.map((holder) => `${holder.nodeId} (${holder.role.toLowerCase()}, ${holder.bytes.toLowerCase()})`).join(', ') }}.
+      </p>
     </div>
     <div v-if="object.external" class="surface space-y-3 p-4 lg:col-span-2">
       <h3 class="text-sm font-medium text-foreground">Registered from an external source</h3>
