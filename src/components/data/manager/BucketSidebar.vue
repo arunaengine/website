@@ -7,6 +7,7 @@ import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import BucketRow from '@/components/data/BucketRow.vue'
 import { useBucketJobs } from '@/composables/useBucketJobs'
+import MockBucketRows from '@/components/data/manager/MockBucketRows.vue'
 import { useBucketSearch } from '@/composables/useBucketSearch'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useS3 } from '@/composables/useS3'
@@ -209,6 +210,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
               </template>
             </BucketRow>
           </li>
+          <MockBucketRows :filter="bucketNameFilter" :active="bucket" @open="openBucket" />
         </ul>
         <p v-else-if="!all.loading.value" class="px-3 py-4 text-xs text-muted-foreground">No buckets found.</p>
         <p v-if="all.failedNodes.value" class="border-t border-border/70 px-3 py-2 text-xs text-muted-foreground">
@@ -273,6 +275,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
                 </template>
               </BucketRow>
             </li>
+            <MockBucketRows :filter="bucketNameFilter" :active="bucket" @open="openBucket" />
           </ul>
           <p v-else class="px-3 py-4 text-xs text-muted-foreground">No buckets in this group yet.</p>
           <div v-if="recentBuckets.length" class="border-t border-border/70 py-1">

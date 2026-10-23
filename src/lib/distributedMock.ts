@@ -276,3 +276,10 @@ export const MIN_MEMBERS = 2
 export function isPending(results: readonly MemberResult[]): boolean {
   return results.some((result) => !result.created)
 }
+
+// A quiet line for lists: where the bucket is stored.
+export function storedLabel(preset: PresetId, nodes: number): string {
+  if (preset === 'sharding' || preset === 'sharding-replicas') return `Split across ${nodes} nodes`
+  if (preset === 'two-node' || preset === 'mirror') return `Copies on ${nodes} nodes`
+  return `On ${nodes} nodes`
+}

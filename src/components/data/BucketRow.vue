@@ -3,7 +3,7 @@ import BucketJobLabel from '@/components/storage/BucketJobLabel.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import type { BucketJob } from '@/lib/api'
-import { ArrowLeftRight, Boxes, FolderSync, Pin, Server } from '@lucide/vue'
+import { ArrowLeftRight, Boxes, FolderSync, Pin, Server, TriangleAlert } from '@lucide/vue'
 import { RouterLink } from 'vue-router'
 
 // One shared row for every bucket list surface (sidebar pins/locals, recently
@@ -19,6 +19,8 @@ const props = withDefaults(
     synced?: boolean
     /** The step running on the bucket, if any. */
     job?: BucketJob | null
+    /** Writes to part of the bucket are refused right now. */
+    degraded?: boolean
     /** The currently opened bucket. */
     active?: boolean
     /** Keyboard highlight (combobox rows). */
@@ -43,6 +45,7 @@ const props = withDefaults(
     pinned: false,
     synced: false,
     job: null,
+    degraded: false,
     active: false,
     highlighted: false,
     subtitle: null,
@@ -95,6 +98,11 @@ function onClick() {
             class="h-3 w-3 shrink-0 text-primary/60"
             aria-label="Sync relationships configured"
           />
+          <TriangleAlert
+            v-if="degraded"
+            class="h-3 w-3 shrink-0 text-amber-500"
+            aria-label="Degraded: writes to part of this bucket are refused"
+          />
           <span v-if="place" class="w-20 truncate text-[11px] text-muted-foreground" :title="placeTitle ?? undefined">{{ place }}</span>
         </span>
       </button>
@@ -121,6 +129,11 @@ function onClick() {
           v-if="synced"
           class="h-3 w-3 shrink-0 text-primary/60"
           aria-label="Sync relationships configured"
+        />
+        <TriangleAlert
+          v-if="degraded"
+          class="h-3 w-3 shrink-0 text-amber-500"
+          aria-label="Degraded: writes to part of this bucket are refused"
         />
         <span v-if="place" class="w-20 truncate text-[11px] text-muted-foreground" :title="placeTitle ?? undefined">{{ place }}</span>
       </span>
