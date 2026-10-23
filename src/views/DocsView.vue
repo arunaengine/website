@@ -73,6 +73,7 @@ import { computed, defineComponent, h, type Component } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { startTour } from '@/composables/useTour'
 import { parseInline } from '@/docs/inline'
+import { mockEnabled } from '@/lib/distributedMock'
 import {
   docsScreenshots,
   docsTopicBySlug,
@@ -183,7 +184,12 @@ const topicSlug = computed(() => {
   const value = route.params.topic
   return Array.isArray(value) ? value[0] ?? '' : typeof value === 'string' ? value : ''
 })
-const topic = computed(() => docsTopicBySlug(topicSlug.value))
+// A design preview topic is listed and opened only while the node mock is on.
+const listed = computed(() => docsTopics.filter((entry) => !entry.preview || mockEnabled()))
+const topic = computed(() => {
+  const found = docsTopicBySlug(topicSlug.value)
+  return found && listed.value.includes(found) ? found : undefined
+})
 const tour = computed(() => topic.value?.tour ?? [])
 // A guide either narrates its controls or hands over to an interactive tutorial.
 const tutorial = computed(() => topic.value?.tutorial ?? null)
@@ -194,13 +200,13 @@ const topicGroups = computed(() => {
       kind: 'Guide',
       label: 'How-to guides',
       blurb: 'Step-by-step walkthroughs: create a group, upload data, build a dataset, and run compute next to it.',
-      topics: docsTopics.filter((entry) => entry.kind === 'Guide'),
+      topics: listed.value.filter((entry) => entry.kind === 'Guide'),
     },
     {
       kind: 'Concept',
       label: 'Concepts & glossary',
       blurb: 'How datasets, storage, replication, and compute placement work, with a glossary that defines every term.',
-      topics: docsTopics.filter((entry) => entry.kind === 'Concept'),
+      topics: listed.value.filter((entry) => entry.kind === 'Concept'),
     },
   ]
   return groups

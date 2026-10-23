@@ -49,6 +49,8 @@ export interface DocsTopic {
   tour?: DocsTourStep[]
   /** Hands "Show me in the portal" to the interactive tutorial of that name. */
   tutorial?: 'compute' | 'profile'
+  /** A design preview: listed and opened only while the node mock is on. */
+  preview?: boolean
 }
 
 /** Stable anchor id for a section heading; concept: links may target it. */
@@ -372,7 +374,7 @@ export const docsTopics: DocsTopic[] = [
       },
       {
         title: 'Syncs',
-        icon: 'ArrowLeftRight',
+        icon: 'Share2',
         paragraphs: [
           'A bucket sync is a standing, one way mapping from a source bucket on this node into a bucket on a target node. The target checks its own write permission, writes its own copy, and owns and serves it from then on under its own name.',
           'Only the syncs you created are listed to you, and only you can run, pause or delete them. A bucket can be synced by somebody else without ever appearing in your list.',
@@ -1730,6 +1732,89 @@ export const docsTopics: DocsTopic[] = [
         ],
       },
     ],
+  },
+  {
+    slug: 'storage-features',
+    kind: 'Guide',
+    title: 'Which storage feature do I need?',
+    summary: 'Design preview. References, copies, syncs, storing a bucket on more nodes, storage rules and placement rules: what each one is for.',
+    sections: [
+      {
+        title: 'The short answer',
+        icon: 'Route',
+        paragraphs: [
+          'Storing a bucket on more nodes gives you one bucket with copies. A sync gives you two buckets. A reference is a pointer without a copy.',
+          'This page is a design preview. The table lists every way to put data in a bucket or keep it somewhere. The questions below pick the right one, in the order people usually ask them.',
+        ],
+      },
+      {
+        title: 'The features',
+        icon: 'ListChecks',
+        table: {
+          columns: ['Feature', 'What it does', 'Why it exists', 'When to use it'],
+          rows: [
+            ['Reference (external source or another bucket)', 'A file points to data elsewhere. Nothing is copied. The bytes are fetched when someone reads.', 'Build a bucket from data that already lives elsewhere without paying twice.', 'Large public data, files of another bucket that are only used.'],
+            ['Copy in (import a snapshot, copy an object)', 'The bytes are copied into the bucket as a version of its own.', 'Independence from the source.', 'Inputs that must stay reproducible, archiving.'],
+            ['Import storage in place (linked storage backend)', 'Registers files that are already in a storage backend of the group, without copying.', 'Bring existing storage into Aruna without moving it.', 'Existing S3 storage or folders with lab data.'],
+            ['Offered folder (desktop)', 'A local folder on a device becomes a read-only bucket of references.', 'Share data from your own computer without uploading.', 'Device data that should stay on the device.'],
+            ['Sync between buckets', 'Bucket B follows bucket A: once, continuously or as references, and optionally deletions.', 'Two separate buckets with their own owner, name, rights or settings.', 'A curated public bucket fed from a private one, another group, other storage or encryption.'],
+            ['Bucket stored on more nodes', 'One bucket with the same name on several nodes. One node writes each part of the key space. Copies, splitting, and copy or cache on use are choices.', 'Data larger than one node, or one bucket in several locations with the load spread.', 'bakrep, RefSeq, SPIRE under load, a two-node replica.'],
+            ['Storage rules on a node (routing, storage move)', 'Chooses which storage backend on one node receives a bucket or folder, and moves existing copies.', 'Storage tiers on one node.', 'Raw data to archive storage, working data to fast storage.'],
+            ['Placement rules (placement policies)', 'A list of where copies may be stored. They never create copies.', 'Compliance.', 'Data that must not leave a site.'],
+            ['Copies of single versions on other nodes', 'Extra copies of single versions of the same bucket on other nodes.', 'Closeness to compute, single important files.', 'Automatic for job inputs. Use Edit rules for this file.'],
+            ['Dataset (metadata, hasPart)', 'Describes a collection of files, folders, buckets and datasets. It has no storage effect.', 'Compose by meaning, publish and cite.', 'Describing and publishing what belongs together.'],
+            ['Offline files (desktop)', 'Device-local copies for offline work.', 'Work without a connection.', 'A laptop on the road.'],
+          ],
+        },
+      },
+      {
+        title: 'I want to describe or publish data that belongs together',
+        icon: 'Tags',
+        paragraphs: [
+          'Use a [dataset](concept:datasets). This is not a storage question: a dataset describes what belongs together and has no effect on where bytes are stored.',
+        ],
+      },
+      {
+        title: 'The data is already somewhere else',
+        icon: 'Link2',
+        bullets: [
+          'You only want to use it: add a reference. Nothing is copied, and the bytes are fetched when someone reads.',
+          'It must stay readable when the source changes or disappears: copy it in.',
+          'It is in our own storage: import it in place.',
+          'It is on your computer: offer the folder from the desktop app.',
+        ],
+      },
+      {
+        title: 'The same bucket should be on several nodes, or it is too large for one node',
+        icon: 'Server',
+        paragraphs: [
+          'Store the bucket on more nodes. You choose this when you create the bucket. It stays one bucket with one name, and the nodes keep copies, split the files, or fetch them when they are read.',
+          'Do not copy a whole bucket to another node by hand. Whole-bucket copies on other nodes are a bucket stored on more nodes.',
+        ],
+      },
+      {
+        title: 'I need a separate second bucket that follows the first',
+        icon: 'ArrowLeftRight',
+        paragraphs: [
+          'Use a [sync](concept:where-data-lives#syncs): a second bucket follows this one. Choose it when the second bucket needs other rights, another owner, other storage or encryption, or when it is a curated public copy.',
+        ],
+      },
+      {
+        title: 'Same node, fast or archive storage',
+        icon: 'HardDrive',
+        paragraphs: [
+          'Use [storage rules](concept:where-data-lives#storage-backend) on the node. They choose which storage backend receives a bucket or a folder, and they can move existing copies.',
+        ],
+      },
+      {
+        title: 'Data must not leave a site',
+        icon: 'ShieldCheck',
+        paragraphs: [
+          'Use [placement rules](concept:where-data-lives#placement-policies). They list where copies may be stored. They allow or refuse a copy and never create one.',
+        ],
+      },
+    ],
+    preview: true,
   },
   glossaryTopic,
 ]
