@@ -86,7 +86,7 @@ describe('distributed mock helpers', () => {
     const sample = exampleListing('bakrep', 'bakrep-v2-data-012/').folders[0]
     const [genome, annotation] = exampleListing('bakrep', sample.prefix).files
     expect(exampleMark('bakrep', genome.key)).toBe('From a source')
-    expect(exampleMark('bakrep', annotation.key)).toBe('Not pinned')
+    expect(exampleMark('bakrep', annotation.key)).toBe('Can change at the source')
     expect(mockFile('bakrep', genome.key)?.size).toBe(genome.size)
     expect(exampleMark('lab-raw-data', 'raw/2026/reef-07/notes.txt')).toBeNull()
     expect(mockFile('bakrep', genome.key)?.external?.digests[0].scope).toBe('not established')

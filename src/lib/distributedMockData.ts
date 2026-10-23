@@ -237,7 +237,8 @@ export interface ExternalInfo {
   etag?: string
   digests: SourceDigest[]
   refreshed: string
-  notPinned?: string
+  /** The content cannot be checked, so it may change at the source. */
+  mayChange?: boolean
 }
 
 export interface Holder {
@@ -306,7 +307,7 @@ export const MOCK_OBJECTS: readonly MockObject[] = [
       source: `${BAKREP_ENDPOINT}/bakrep-v2-data-007/GCF_000005845.2/annotation.gff3.gz`,
       digests: [],
       refreshed: '2026-10-23T05:40:00Z',
-      notPinned: 'The source sends no ETag and no checksum for the whole file, so one exact content cannot be named.',
+      mayChange: true,
     },
     datasets: ['bakrep collection'],
   },
@@ -574,7 +575,7 @@ function bakrepObject(key: string): MockObject | undefined {
       etag: genome ? `"${etag}"` : undefined,
       digests: genome ? [{ algorithm: 'md5', digest: etag, scope: 'not established', origin: 'Listing ETag, evidence only' }] : [],
       refreshed: LISTED_AT,
-      notPinned: genome ? undefined : 'The source sends no ETag and no checksum for the whole file, so one exact content cannot be named.',
+      mayChange: !genome,
     },
     datasets: ['bakrep collection'],
   }
@@ -616,11 +617,11 @@ export function mockFile(bucket: string, key: string): MockObject | undefined {
   return bucket === 'bakrep' ? bakrepObject(key) : plainObject(bucket, key)
 }
 
-// The marker a file row carries: where the bytes come from, and whether the version is pinned.
+// The marker a file row carries: where the bytes come from, and whether Aruna can check the content.
 export function exampleMark(bucket: string, key: string): string | null {
   const external = mockFile(bucket, key)?.external
   if (!external) return null
-  return external.notPinned ? 'Not pinned' : 'From a source'
+  return external.mayChange ? 'Can change at the source' : 'From a source'
 }
 
 export interface SourceLine {

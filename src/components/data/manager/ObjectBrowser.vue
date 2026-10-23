@@ -682,7 +682,7 @@ async function onDrop(event: DragEvent) {
                     class="h-3 w-3 shrink-0 text-primary/40"
                     aria-label="Covered by a sync relationship"
                   />
-                  <Badge v-if="mockEnabled() && exampleMark(bucket, object.key)" :variant="exampleMark(bucket, object.key) === 'Not pinned' ? 'warn' : 'outline'" size="sm" class="shrink-0">
+                  <Badge v-if="mockEnabled() && exampleMark(bucket, object.key)" :variant="exampleMark(bucket, object.key) === 'Can change at the source' ? 'warn' : 'outline'" size="sm" class="shrink-0">
                     {{ exampleMark(bucket, object.key) }}
                   </Badge>
                   <Tooltip v-if="references.keyIsReferenced(object.key)">
