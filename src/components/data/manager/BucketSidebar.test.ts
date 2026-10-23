@@ -138,6 +138,7 @@ const sidebarModules = {
   '@/components/ui/IconButton.vue': moduleDefault(IconButtonStub),
   '@/components/data/BucketRow.vue': moduleDefault(RowStub),
   '@/composables/useBucketJobs': { useBucketJobs: () => stepJobs },
+  '@/components/data/manager/MockBucketRows.vue': moduleDefault(Empty),
   '@/composables/useBucketSearch': {
     useBucketSearch: () => ({ hits: otherSearch, error: otherError, searched: ref(true), nodesFailed: otherFailed }),
   },
