@@ -458,3 +458,25 @@ export const CONTENT_SOURCES: Record<string, ContentSources> = {
 export function contentSources(bucket: string): ContentSources {
   return CONTENT_SOURCES[bucket] ?? CONTENT_SOURCES[ORDINARY_BUCKET]
 }
+
+export interface FileHit {
+  key: string
+  title: string
+  subtitle: string
+  bucket: string
+}
+
+// File name matches of the example buckets: every word of the query must occur in the key.
+export function searchFiles(query: string): FileHit[] {
+  const words = query.toLowerCase().split(/\s+/).filter((word) => word.length >= 2)
+  if (!words.length) return []
+  return MOCK_OBJECTS.filter((file) => words.every((word) => file.key.toLowerCase().includes(word))).map((file) => {
+    const nodes = mockBucket(file.bucket)?.members.length ?? 0
+    return {
+      key: file.versionId,
+      title: file.key,
+      subtitle: `Stored on ${nodes} nodes · Bucket: ${file.bucket}`,
+      bucket: file.bucket,
+    }
+  })
+}

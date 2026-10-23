@@ -112,6 +112,8 @@ const compiled = compileClientComponent(new URL('./SearchOverlay.vue', import.me
     }),
   },
   '@/lib/dataEntities': { isLeafFile },
+  '@/lib/distributedMock': { mockEnabled: () => false },
+  '@/lib/distributedMockData': { searchFiles: () => [] },
   '@/lib/utils': {
     relativeTime: (value: string) => `relative ${value}`,
     truncateMiddle: (value: string) => value,

@@ -20,6 +20,8 @@ import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useSearchSettings } from '@/composables/useSearchSettings'
 import { OBJECT_SEARCH_MODE_LABELS, useUnifiedSearch } from '@/composables/useUnifiedSearch'
 import { isLeafFile } from '@/lib/dataEntities'
+import { mockEnabled } from '@/lib/distributedMock'
+import { searchFiles } from '@/lib/distributedMockData'
 import { truncateMiddle } from '@/lib/utils'
 import { Search, Settings2, X } from '@lucide/vue'
 import { useMediaQuery } from '@vueuse/core'
@@ -122,6 +124,16 @@ const items = computed<QuickItem[]>(() => [
       ...(!isLocalNode(hit.issuer_node_id) ? { node: hit.issuer_node_id } : {}),
       ...(objectParentPrefix(hit.key) ? { prefix: objectParentPrefix(hit.key) as string } : {}),
     },
+  })),
+  // Files of the example buckets stored on several nodes (node mock).
+  ...(mockEnabled() ? searchFiles(q.value) : []).map((file): QuickItem => ({
+    key: `m:${file.key}`,
+    section: 'files',
+    title: file.title,
+    subtitle: file.subtitle,
+    routeName: 'bucket',
+    routeParams: { bucketId: file.bucket },
+    routeQuery: { object: file.title },
   })),
   ...quickGroups.value.map((group): QuickItem => ({
     key: `g:${group.group_id}`,

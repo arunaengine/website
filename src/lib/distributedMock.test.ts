@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { docsTopicBySlug } from '@/docs/v1'
 import { applyPortalConfig } from '@/lib/config'
 import { defaultSettings, mockEnabled, firstResults, grantGap, isPending, nodeGlob, planRanges, plannedStart, presetMembers, rangeTotal, retryResult, STORAGE_QUESTIONS } from './distributedMock'
-import { BAKREP_COUNT, mockBucket, sourceObjects } from './distributedMockData'
+import { BAKREP_COUNT, mockBucket, searchFiles, sourceObjects } from './distributedMockData'
 
 describe('distributed mock helpers', () => {
   it('reports the members a node-specific grant does not reach', () => {
@@ -61,6 +61,14 @@ describe('distributed mock helpers', () => {
     applyPortalConfig({ features: { distributedMock: true } })
     expect(mockEnabled()).toBe(true)
     applyPortalConfig({})
+  })
+
+  it('finds example files when every word of the query is in the key', () => {
+    expect(searchFiles('genome gcf_000005845').map((hit) => hit.title)).toEqual([
+      'bakrep-v2-data-007/GCF_000005845.2/genome.fna.gz',
+    ])
+    expect(searchFiles('genome').length).toBeGreaterThan(2)
+    expect(searchFiles('a')).toEqual([])
   })
 
   it('answers every storage question in the guide', () => {
