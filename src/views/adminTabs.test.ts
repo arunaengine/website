@@ -21,6 +21,12 @@ describe('realm administration tabs', () => {
     expect(tabs.at(-1)).toEqual({ id: 'portal-features', label: 'Portal features' })
   })
 
+  it('offers the database list only for the node mock', () => {
+    const tabs = adminTabs({ placement: false, policies: false, databases: true })
+
+    expect(tabs.map((tab) => tab.id)).toEqual(['realm', 'compute', 'databases', 'federation', 'portal-features'])
+  })
+
   it('drops both placement tabs when the feature is off', () => {
     const tabs = adminTabs({ placement: false, policies: false })
 

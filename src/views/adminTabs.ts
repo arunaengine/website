@@ -6,7 +6,7 @@ export interface AdminTab {
   label: string
 }
 
-export function adminTabs(features: { placement: boolean; policies: boolean }): AdminTab[] {
+export function adminTabs(features: { placement: boolean; policies: boolean; databases?: boolean }): AdminTab[] {
   return [
     { id: 'realm', label: 'Quota & usage' },
     { id: 'compute', label: 'Compute' },
@@ -17,6 +17,7 @@ export function adminTabs(features: { placement: boolean; policies: boolean }): 
         ]
       : []),
     ...(features.policies ? [{ id: 'policies', label: 'Policies' }] : []),
+    ...(features.databases ? [{ id: 'databases', label: 'Databases' }] : []),
     { id: 'federation', label: 'Federation' },
     { id: 'portal-features', label: 'Portal features' },
   ]

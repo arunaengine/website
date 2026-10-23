@@ -12,6 +12,7 @@ import PlacementAdminPanel from '@/components/placement/PlacementAdminPanel.vue'
 import DataPlacementPanel from '@/components/storage/DataPlacementPanel.vue'
 import PoliciesSection from '@/components/policies/PoliciesSection.vue'
 import FederationSettings from '@/components/federation/FederationSettings.vue'
+import DatabasesAdmin from '@/components/settings/DatabasesAdmin.vue'
 import FeatureDefaults from '@/components/settings/FeatureDefaults.vue'
 import EffectivePolicies from '@/components/policies/EffectivePolicies.vue'
 import Tabs from '@/components/ui/Tabs.vue'
@@ -26,6 +27,7 @@ import { useAuth } from '@/composables/useAuth'
 import { useRefresh } from '@/composables/useRefresh'
 import { useUserDirectory } from '@/composables/useUserDirectory'
 import { featureEnabled } from '@/lib/config'
+import { mockEnabled } from '@/lib/distributedMock'
 import { errorMessage, formatBytes, formatNumber, shortUserId } from '@/lib/utils'
 import { apiErrorMessage, type RealmQuotaConfig, type UserSearchHit } from '@/lib/api'
 import { useDebounceFn } from '@vueuse/core'
@@ -45,7 +47,7 @@ const { busy: refreshBusy, refresh: onRefresh } = useRefresh(refresh)
 const placementAdminEnabled = featureEnabled('placementAdmin')
 const policiesEnabled = featureEnabled('policies')
 
-const tabs = adminTabs({ placement: placementAdminEnabled, policies: policiesEnabled })
+const tabs = adminTabs({ placement: placementAdminEnabled, policies: policiesEnabled, databases: mockEnabled() })
 const tab = useRouteTab(
   tabs.map((entry) => entry.id),
   'realm',
@@ -352,7 +354,7 @@ async function save() {
       </section>
     </div>
 
-    <div v-else-if="!isRealmAdmin" class="container py-8">
+    <div v-else-if="!isRealmAdmin && !(mockEnabled() && tab === 'databases')" class="container py-8">
       <section class="surface mx-auto max-w-xl p-8 text-center">
         <ShieldCheck class="mx-auto h-8 w-8 text-muted-foreground/70" />
         <h2 class="mt-3 font-display text-base font-semibold text-aruna-navy">Realm admin access required</h2>
@@ -369,7 +371,7 @@ async function save() {
     <Tabs v-else v-model="tab">
       <div class="container pt-6">
         <TabsList aria-label="Realm administration sections" class="h-auto flex-wrap justify-start">
-          <TabsTrigger v-for="entry in tabs" :key="entry.id" :value="entry.id">
+          <TabsTrigger v-for="entry in tabs.filter((item) => isRealmAdmin || item.id === 'databases')" :key="entry.id" :value="entry.id">
             {{ entry.label }}
           </TabsTrigger>
         </TabsList>
@@ -385,6 +387,8 @@ async function save() {
         <PoliciesSection scope="realm" :can-admin="isRealmAdmin" />
         <EffectivePolicies />
       </TabsContent>
+
+      <TabsContent v-if="mockEnabled()" value="databases" class="container mt-0 py-8"><DatabasesAdmin /></TabsContent>
 
       <TabsContent value="federation" class="container mt-0 py-8"><FederationSettings /></TabsContent>
 
