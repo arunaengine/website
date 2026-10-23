@@ -161,6 +161,42 @@ describe('watching the node', () => {
     device.stop()
   })
 
+  it('ignores an answer that arrives after its client went away', async () => {
+    let late!: (value: unknown) => void
+    apiRequest.mockReturnValueOnce(new Promise((resolve) => (late = resolve)) as never)
+    const device = await load()
+    device.start()
+    await vi.waitFor(() => expect(apiRequest).toHaveBeenCalledTimes(1))
+
+    push({ ...RUNNING, ready: false })
+    await vi.waitFor(() => expect(device.identity.value).toBeNull())
+    late({ node: { peer_id: 'old', realm_id: 'realm-1' }, services: { interfaces: { s3: { url: 'http://old' } } } })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(device.s3Url.value).toBeNull()
+    expect(device.identity.value).toBeNull()
+    device.stop()
+  })
+
+  it('keeps the newer answer when an older call fails late', async () => {
+    let failed!: (reason: Error) => void
+    apiRequest.mockReturnValueOnce(new Promise((_, reject) => (failed = reject)) as never)
+    const device = await load()
+    device.start()
+    await vi.waitFor(() => expect(apiRequest).toHaveBeenCalledTimes(1))
+
+    push({ ...RUNNING, ready: false })
+    await vi.waitFor(() => expect(device.identity.value).toBeNull())
+    push({ ...RUNNING, ready: true })
+    await vi.waitFor(() => expect(device.s3Url.value).toBe('http://127.0.0.1:34118'))
+    failed(new Error('old failure'))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(device.s3Url.value).toBe('http://127.0.0.1:34118')
+    expect(device.identityError.value).toBeNull()
+    device.stop()
+  })
+
   it('reads again when the window comes back', async () => {
     const device = await load()
     device.start()

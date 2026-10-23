@@ -131,10 +131,12 @@ const deviceClient = computed<DeviceClient | null>(() =>
 async function readIdentity(client: DeviceClient): Promise<void> {
   try {
     const info = await apiRequest<InfoResponse>('/system/info', {}, client)
+    if (deviceClient.value !== client) return
     identity.value = { nodeId: info.node.peer_id, realm: info.node.realm_id }
     s3Url.value = info.services?.interfaces?.s3?.url ?? null
     identityError.value = null
   } catch (err) {
+    if (deviceClient.value !== client) return
     identity.value = null
     s3Url.value = null
     identityError.value = errorMessage(err)
