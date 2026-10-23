@@ -4,7 +4,7 @@ import { computed } from 'vue'
 import DetailList from '@/components/ui/DetailList.vue'
 import { useMockDatabases } from '@/composables/useMockDatabases'
 
-const props = defineProps<{ bucket: string }>()
+const props = withDefaults(defineProps<{ bucket: string; heading?: boolean }>(), { heading: true })
 
 const { entries } = useMockDatabases()
 const entry = computed(() => entries.value.find((item) => item.bucket === props.bucket))
@@ -12,7 +12,7 @@ const entry = computed(() => entries.value.find((item) => item.bucket === props.
 
 <template>
   <section v-if="entry" class="space-y-2">
-    <h3 class="text-sm font-medium text-foreground">Database bucket</h3>
+    <h3 v-if="heading" class="text-sm font-medium text-foreground">Database bucket</h3>
     <p class="text-sm text-muted-foreground">{{ entry.description }}</p>
     <DetailList
       :items="[

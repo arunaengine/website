@@ -32,7 +32,7 @@ function ask() {
     </header>
     <div class="space-y-3 px-5 py-4 text-sm">
       <template v-if="entry?.status === 'agreed'">
-        <DatabaseInfo :bucket="bucket" />
+        <DatabaseInfo :bucket="bucket" :heading="false" />
         <p class="text-xs text-muted-foreground">Group admins of {{ group }} can take the mark off. The bucket and its files stay as they are.</p>
         <Button size="sm" variant="outline" @click="remove(entry.id)">Remove the database bucket mark</Button>
       </template>
