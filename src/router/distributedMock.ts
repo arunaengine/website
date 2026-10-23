@@ -18,6 +18,7 @@ export function distributedMockRoutes(): RouteRecordRaw {
     children: [
       { path: '', name: 'mock-distributed', component: () => import('@/views/DistributedMockView.vue') },
       { path: 'new', name: 'mock-distributed-new', component: () => import('@/views/DistributedCreateView.vue') },
+      { path: ':bucketId/object', name: 'mock-distributed-object', component: () => import('@/views/DistributedObjectView.vue') },
       { path: ':bucketId', name: 'mock-distributed-bucket', component: () => import('@/views/DistributedBucketView.vue') },
     ],
   }

@@ -6,6 +6,7 @@ import PageHeader from '@/components/dashboard/PageHeader.vue'
 import AccessTab from '@/components/distributed/AccessTab.vue'
 import BucketActions from '@/components/distributed/BucketActions.vue'
 import DegradedNotice from '@/components/distributed/DegradedNotice.vue'
+import FilesTab from '@/components/distributed/FilesTab.vue'
 import MemberTable from '@/components/distributed/MemberTable.vue'
 import MockNotice from '@/components/distributed/MockNotice.vue'
 import RangeTable from '@/components/distributed/RangeTable.vue'
@@ -43,7 +44,7 @@ const VIEWERS = [
   { value: 'member', label: 'Group member' },
 ]
 
-const tab = useRouteTab(['overview', 'access', 'settings'], 'overview')
+const tab = useRouteTab(['overview', 'files', 'access', 'settings'], 'overview')
 
 const settings = computed(() => {
   const found = bucket.value
@@ -81,6 +82,7 @@ const settings = computed(() => {
       <Tabs v-else v-model="tab" class="space-y-5">
         <TabsList aria-label="Distributed bucket sections">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="files">Files</TabsTrigger>
           <TabsTrigger value="access">Access</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
@@ -106,6 +108,10 @@ const settings = computed(() => {
             <h2 class="font-display text-base font-semibold text-aruna-navy">Key ranges</h2>
             <RangeTable :ranges="bucket.ranges" />
           </section>
+        </TabsContent>
+
+        <TabsContent value="files" class="mt-0">
+          <FilesTab :bucket="bucket.name" />
         </TabsContent>
 
         <TabsContent value="access" class="mt-0">

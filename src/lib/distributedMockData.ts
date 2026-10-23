@@ -202,3 +202,111 @@ export const MOCK_GRANTS: Record<string, MockGrant[]> = {
   'spire-db': [{ holder: 'Genome Lab', kind: 'Group', role: 'Read', nodes: ['*'] }],
   'reads-edge': [{ holder: 'Sequencing Core', kind: 'Group', role: 'Write', nodes: ['node-1'] }],
 }
+
+export interface SourceDigest {
+  algorithm: string
+  digest: string
+  scope: 'full object' | 'composite'
+  origin: string
+}
+
+export interface ExternalInfo {
+  source: string
+  etag?: string
+  digests: SourceDigest[]
+  refreshed: string
+  notPinned?: string
+}
+
+export interface Holder {
+  nodeId: string
+  role: string
+  bytes: string
+}
+
+export interface MockObject {
+  id: string
+  bucket: string
+  key: string
+  versionId: string
+  size: number
+  modified: string
+  servedBy: string
+  how: string
+  holders: Holder[]
+  contentHash?: string
+  external?: ExternalInfo
+  datasets: string[]
+}
+
+const GENOME = 'bakrep-v2-data-007/GCF_000005845.2/'
+
+export const MOCK_OBJECTS: readonly MockObject[] = [
+  {
+    id: 'genome',
+    bucket: 'bakrep',
+    key: `${GENOME}genome.fna.gz`,
+    versionId: '01K8Y3M5R7T9W2B4D6F8H0JKNP',
+    size: 1_320_448,
+    modified: '2026-10-23T05:40:00Z',
+    servedBy: 'node-2',
+    how: 'node-2 has no copy yet. It read the file from the source and checked the recorded ETag first.',
+    holders: [
+      { nodeId: 'node-1', role: 'Coordinator', bytes: 'Record only' },
+      { nodeId: 'node-3', role: 'Replica', bytes: 'Record only' },
+      { nodeId: 'node-5', role: 'Cache on use', bytes: 'Not fetched yet' },
+    ],
+    external: {
+      source: `${BAKREP_ENDPOINT}/bakrep-v2-data-007/GCF_000005845.2/genome.fna.gz`,
+      etag: '"9b2cf535f27731c974343645a3985328"',
+      digests: [
+        { algorithm: 'sha256', digest: '5e0f1f4a8d3c6b27a91e4c05d7f2b8a36c19e0d4f7a25b83c6d1e9f04a7b2c58', scope: 'full object', origin: 'Checksum manifest of the source' },
+        { algorithm: 'md5', digest: '9b2cf535f27731c974343645a3985328', scope: 'full object', origin: 'Listing ETag, evidence only' },
+      ],
+      refreshed: '2026-10-23T05:40:00Z',
+    },
+    datasets: ['E. coli genomes, 2025 release', 'bakrep collection'],
+  },
+  {
+    id: 'annotation',
+    bucket: 'bakrep',
+    key: `${GENOME}annotation.gff3.gz`,
+    versionId: '01K8Y3M5R7T9W2B4D6F8H0JKNQ',
+    size: 412_903,
+    modified: '2026-10-23T05:40:00Z',
+    servedBy: 'node-2',
+    how: 'node-2 read the whole file from the source, checked it, and then sent it.',
+    holders: [
+      { nodeId: 'node-1', role: 'Coordinator', bytes: 'Record only' },
+      { nodeId: 'node-3', role: 'Replica', bytes: 'Record only' },
+    ],
+    external: {
+      source: `${BAKREP_ENDPOINT}/bakrep-v2-data-007/GCF_000005845.2/annotation.gff3.gz`,
+      digests: [],
+      refreshed: '2026-10-23T05:40:00Z',
+      notPinned: 'The source sends no ETag and no checksum for the whole file, so one exact content cannot be named.',
+    },
+    datasets: ['bakrep collection'],
+  },
+  {
+    id: 'release',
+    bucket: 'spire-db',
+    key: 'release-2026-10/spire_mags.tsv.zst',
+    versionId: '01K8W9C2D4F6H8KMQ0S2V4X6ZA',
+    size: 48_318_382_080,
+    modified: '2026-10-02T11:05:00Z',
+    servedBy: 'node-2',
+    how: 'node-2 holds a full copy and served the file itself.',
+    holders: [
+      { nodeId: 'node-1', role: 'Coordinator', bytes: 'Full copy' },
+      { nodeId: 'node-2', role: 'Replica', bytes: 'Full copy' },
+      { nodeId: 'node-3', role: 'Replica, leaving', bytes: 'Full copy' },
+    ],
+    contentHash: '3f7a9c1e5b2d8046fa1c7e93b5d0a2486c91e7f3a5b0d24c68e1f9a37b5c0d82',
+    datasets: ['SPIRE release 2026-10'],
+  },
+]
+
+export function mockObject(id: string): MockObject | undefined {
+  return MOCK_OBJECTS.find((object) => object.id === id)
+}
