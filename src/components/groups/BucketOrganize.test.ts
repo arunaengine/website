@@ -203,6 +203,25 @@ describe('BucketOrganize rename run', () => {
     expect(content(root)).toContain('Rename 3 files')
   })
 
+  it('says which files kept their old name from the finished run alone', async () => {
+    getImportRenames.mockResolvedValue({ count: 0, complete: true, files: [], plan: PLAN })
+    const { root } = await mount({ lastJob: RENAMED })
+    expect(content(stepOf(root))).toContain('3 files kept their old name.')
+    // No file is left to list, so there is nothing to open.
+    expect(() => buttonIn(stepOf(root), 'Show them')).toThrow()
+  })
+
+  it('says it before the count is read, and offers the list once it is', async () => {
+    let answer: (value: unknown) => void = () => {}
+    getImportRenames.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+    const { root } = await mount({ lastJob: RENAMED })
+    expect(content(stepOf(root))).toContain('3 files kept their old name.')
+    expect(() => buttonIn(stepOf(root), 'Show them')).toThrow()
+    answer({ ...PLANNED, count: 3 })
+    await flush()
+    expect(buttonIn(stepOf(root), 'Show them')).toBeDefined()
+  })
+
   it('stays quiet about failures when none failed', async () => {
     getImportRenames.mockResolvedValue({ count: 0, complete: true, files: [], plan: PLAN })
     const { root } = await mount({ lastJob: { ...RENAMED, failed: 0 } })
@@ -221,14 +240,14 @@ describe('BucketOrganize rename run', () => {
 describe('BucketOrganize rename start', () => {
   beforeEach(() => getImportRenames.mockResolvedValue(PLANNED))
 
-  it('tells the parent a rename was accepted, with the file count', async () => {
+  it('tells the parent a rename was accepted', async () => {
     const renaming = vi.fn()
     const started = vi.fn()
     const { root } = await mount({}, { onRenaming: renaming, onStarted: started })
     await click(buttonIn(stepOf(root), 'Review…'))
     await click(buttonIn(root, 'Rename 3,877 files'))
     expect(startImportRenames).toHaveBeenCalledWith('g1', 'i1', expect.anything())
-    expect(renaming).toHaveBeenCalledWith(3877)
+    expect(renaming).toHaveBeenCalledTimes(1)
     expect(started).not.toHaveBeenCalled()
   })
 

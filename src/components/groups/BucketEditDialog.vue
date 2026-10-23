@@ -139,6 +139,16 @@ watch(
   { immediate: true },
 )
 
+// The bucket list shows a rename once it is accepted, and again once its step is seen running.
+function renamed() {
+  emit('saved')
+  void begin()
+}
+watch(
+  () => Boolean(job.value && !job.value.starting),
+  (seen, was) => seen && !was && emit('saved'),
+)
+
 function pickChoice(value: string) {
   choice.value = value as NamingChoice
   if (value === 'custom' && !custom.value) custom.value = '{name}'
@@ -178,7 +188,7 @@ async function save() {
     if (!live()) return
     savedNote.value = true
     emit('saved')
-    void (rename ? begin(null) : refresh())
+    void (rename ? begin() : refresh())
   } catch (err) {
     if (live()) saveError.value = errorMessage(err)
   } finally {
@@ -289,7 +299,7 @@ async function save() {
             :controlling="controlling"
             :finished="finished"
             @started="refresh"
-            @renaming="begin"
+            @renaming="renamed"
             @control="control"
           />
         </TabsContent>

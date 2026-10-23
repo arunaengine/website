@@ -17,8 +17,14 @@ const begin = vi.fn()
 const savesInFlight = reactive(new Set<string>())
 const status = ref<{ files?: number; conflicts: [] } | null>(null)
 const renames = ref<{ count: number; complete: boolean; files: [] } | null>(null)
+const job = ref<{ kind: string; starting?: boolean } | null>(null)
 
 const Empty = defineComponent(() => () => null)
+// The organize tab starts a rename with this button.
+const OrganizeStub = defineComponent({
+  emits: ['renaming'],
+  setup: (_, { emit }) => () => h('button', { 'data-testid': 'start-rename', onClick: () => emit('renaming') }),
+})
 const Slot = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
 const ButtonStub = defineComponent({
   inheritAttrs: false,
@@ -40,7 +46,7 @@ const SelectStub = defineComponent({
 const ui = (name: string, component: Component = Slot) => ({ [`@/components/ui/${name}.vue`]: moduleDefault(component) })
 const BucketEditDialog = compileClientComponent(new URL('./BucketEditDialog.vue', import.meta.url), {
   vue: VueRuntime,
-  '@/components/groups/BucketOrganize.vue': moduleDefault(Empty),
+  '@/components/groups/BucketOrganize.vue': moduleDefault(OrganizeStub),
   '@/components/groups/MappingList.vue': moduleDefault(Empty),
   '@/components/storage/JobProgress.vue': moduleDefault(Empty),
   ...ui('Button', ButtonStub),
@@ -63,7 +69,7 @@ const BucketEditDialog = compileClientComponent(new URL('./BucketEditDialog.vue'
     useLinkState: () => ({
       renames,
       status,
-      job: ref(null),
+      job,
       error: ref(null),
       controlling: ref(false),
       finished: ref(0),
@@ -95,13 +101,13 @@ const field = (root: Root, label: string) => element(root, (node) => node.props[
 const saveButton = (root: Root) =>
   element(root, (node) => node.tag === 'button' && ['Save', 'Saving…'].includes(content(node).trim()))
 
-async function mount() {
+async function mount(listeners: Record<string, unknown> = {}) {
   const open = ref(false)
   const shown = ref(true)
   const mounted = await mountApp(
     defineComponent(() => () =>
       shown.value
-        ? h(BucketEditDialog, { open: open.value, groupId: 'g1', link: LINK, storage: 'spire', place: 'aruna-spire-genes' })
+        ? h(BucketEditDialog, { open: open.value, groupId: 'g1', link: LINK, storage: 'spire', place: 'aruna-spire-genes', ...listeners })
         : null,
     ),
   )
@@ -127,6 +133,7 @@ beforeEach(() => {
   startImportRenames.mockReset().mockResolvedValue({})
   refresh.mockReset()
   begin.mockReset()
+  job.value = null
 })
 
 describe('BucketEditDialog', () => {
@@ -144,9 +151,24 @@ describe('BucketEditDialog', () => {
     expect(updateBackendImport).toHaveBeenCalledWith('g1', 'i1', null, expect.anything(), '{dir}{name}~{id}')
     expect(startImportRenames).toHaveBeenCalledWith('g1', 'i1', expect.anything())
     // The rename shows as running at once, not after the next plan read.
-    expect(begin).toHaveBeenCalledWith(null)
+    expect(begin).toHaveBeenCalledWith()
     // Only the read at opening; the save asks for no further one.
     expect(refresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows the bucket list a rename as soon as the organize tab starts it, and again once it runs', async () => {
+    const saved = vi.fn()
+    const { root } = await mount({ onSaved: saved })
+    await click(element(root, (node) => node.props['data-testid'] === 'start-rename'))
+    expect(begin).toHaveBeenCalledTimes(1)
+    expect(saved).toHaveBeenCalledTimes(1)
+    // The lock holds while it only starts; the list is asked again when the step is seen.
+    job.value = { kind: 'rename', starting: true }
+    await flush()
+    expect(saved).toHaveBeenCalledTimes(1)
+    job.value = { kind: 'rename' }
+    await flush()
+    expect(saved).toHaveBeenCalledTimes(2)
   })
 
   it('keeps a schedule changed while a save runs as unsaved', async () => {

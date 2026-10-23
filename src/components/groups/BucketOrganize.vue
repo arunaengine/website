@@ -38,8 +38,8 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
   (e: 'started'): void
-  /** A rename was accepted, with the number of files it was started for. */
-  (e: 'renaming', total: number | null): void
+  /** A rename was accepted. */
+  (e: 'renaming'): void
   (e: 'control', action: 'pause' | 'resume' | 'abort'): void
 }>()
 
@@ -113,7 +113,7 @@ const copySummary = computed(() => {
 })
 const renaming = computed(() => props.job?.kind === 'rename')
 const renamed = computed(() => (props.lastJob?.kind === 'rename' && props.lastJob.state === 'done' ? props.lastJob : null))
-// Files that kept their old name are shown with the way to open them, instead of the count.
+// With files that kept their old name, the way to open them replaces the count and Review.
 const kept = computed(() => Boolean(renamed.value?.failed) && renameOffered.value && !renaming.value)
 const renameCount = computed(() => countWords(renameAll.value?.total ?? 0, renameAll.value?.complete ?? true))
 const copyLine = computed(() => {
@@ -175,7 +175,7 @@ const removeCopies = () => act(() => startDuplicates(props.groupId, props.link.i
 const rename = () =>
   act(
     () => startImportRenames(props.groupId, props.link.import_id, client()),
-    () => emit('renaming', renameAll.value?.complete ? renameAll.value.total : null),
+    () => emit('renaming'),
   )
 const offline = computed(() => (writesDisabled.value ? OFFLINE_WRITE_HINT : undefined))
 const blocked = computed(() => busy.value || Boolean(props.job) || writesDisabled.value)
@@ -260,9 +260,9 @@ const blocked = computed(() => busy.value || Boolean(props.job) || writesDisable
       </div>
       <template v-if="renamed && !renaming">
         <p class="mt-2 text-sm">{{ filesWord(renamed.done) }} renamed.</p>
-        <p v-if="kept" class="mt-1 flex items-center gap-1 text-xs text-destructive">
+        <p v-if="renamed.failed" class="mt-1 flex items-center gap-1 text-xs text-destructive">
           {{ renamed.failed === 1 ? '1 file kept its old name.' : `${filesWord(renamed.failed)} kept their old name.` }}
-          <Button variant="link" size="sm" class="h-auto p-0 text-xs" @click="review('ren')">Show them</Button>
+          <Button v-if="renameOffered" variant="link" size="sm" class="h-auto p-0 text-xs" @click="review('ren')">Show them</Button>
         </p>
       </template>
       <div v-if="open === 'ren' && !renaming" class="mt-3">
