@@ -26,7 +26,7 @@ const onNodeStatus = vi.fn(async (handler: Push) => {
 
 const apiRequest = vi.fn(async () => ({
   node: { peer_id: 'peer-1', realm_id: 'realm-1' },
-  services: { interfaces: { s3: { url: 'http://127.0.0.1:34118' } } },
+  services: { interfaces: { s3: { url: 'http://127.0.0.1:34118' }, mcp: { url: 'http://127.0.0.1:34116/mcp' } } },
 }))
 
 vi.mock('@/lib/api', () => ({ apiRequest }))
@@ -161,23 +161,6 @@ describe('watching the node', () => {
     device.stop()
   })
 
-  it('ignores an answer that arrives after its client went away', async () => {
-    let late!: (value: unknown) => void
-    apiRequest.mockReturnValueOnce(new Promise((resolve) => (late = resolve)) as never)
-    const device = await load()
-    device.start()
-    await vi.waitFor(() => expect(apiRequest).toHaveBeenCalledTimes(1))
-
-    push({ ...RUNNING, ready: false })
-    await vi.waitFor(() => expect(device.identity.value).toBeNull())
-    late({ node: { peer_id: 'old', realm_id: 'realm-1' }, services: { interfaces: { s3: { url: 'http://old' } } } })
-    await new Promise((resolve) => setTimeout(resolve, 0))
-
-    expect(device.s3Url.value).toBeNull()
-    expect(device.identity.value).toBeNull()
-    device.stop()
-  })
-
   it('keeps the newer answer when an older call fails late', async () => {
     let failed!: (reason: Error) => void
     apiRequest.mockReturnValueOnce(new Promise((_, reject) => (failed = reject)) as never)
@@ -194,6 +177,36 @@ describe('watching the node', () => {
 
     expect(device.s3Url.value).toBe('http://127.0.0.1:34118')
     expect(device.identityError.value).toBeNull()
+    device.stop()
+  })
+
+  it('drops the addresses of a node it has since left', async () => {
+    let answer!: (value: unknown) => void
+    apiRequest.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)) as never)
+    const device = await load()
+    device.start()
+    await vi.waitFor(() => expect(apiRequest).toHaveBeenCalled())
+
+    // The node stops answering before its first answer arrives.
+    push({ ...RUNNING, ready: false })
+    await vi.waitFor(() => expect(device.deviceClient.value).toBeNull())
+    answer({
+      node: { peer_id: 'old', realm_id: 'old' },
+      services: { interfaces: { s3: { url: 'http://old:1' }, mcp: { url: 'http://old:2/mcp' } } },
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(device.identity.value).toBeNull()
+    expect(device.s3Url.value).toBeNull()
+    expect(device.mcpUrl.value).toBeNull()
+    device.stop()
+  })
+
+  it('reads the MCP address with the S3 address', async () => {
+    const device = await load()
+    device.start()
+
+    await vi.waitFor(() => expect(device.mcpUrl.value).toBe('http://127.0.0.1:34116/mcp'))
     device.stop()
   })
 
