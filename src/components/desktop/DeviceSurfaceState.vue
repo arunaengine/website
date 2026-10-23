@@ -39,7 +39,7 @@ const headline = computed(() => {
 const detail = computed(() => {
   switch (props.state) {
     case 'offline':
-      return `The node on this computer keeps ${props.subject}. Start it under This device.`
+      return `The node on this computer keeps ${props.subject}. Start it under This computer.`
     case 'unsupported':
       return 'Update the node and this fills itself in.'
     case 'forbidden':

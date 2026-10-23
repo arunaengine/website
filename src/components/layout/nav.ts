@@ -2,6 +2,7 @@
 // mobile bar all render this list, in this order.
 import {
   Activity,
+  ArrowLeftRight,
   BookOpen,
   Boxes,
   FileJson2,
@@ -14,6 +15,7 @@ import {
   RefreshCw,
   Settings,
   ShieldCheck,
+  SquareTerminal,
   Users,
   Workflow,
 } from '@lucide/vue'
@@ -46,6 +48,8 @@ export interface NavOptions {
   canInspectUsers: boolean
   /** At least one AI provider is ready, the same gate as the top-bar launcher. */
   assistant?: boolean
+  /** This computer runs jobs itself; the desktop Runs entry needs it. */
+  localRuns?: boolean
   /** The user's feature switches; without it every feature is shown. */
   shown?: (feature: PortalFeature) => boolean
 }
@@ -88,10 +92,12 @@ export function navEntries(options: NavOptions): NavEntry[] {
             to: '/app/sync',
             icon: RefreshCw,
             label: 'Sync',
-            match: ['/app/sync', '/app/folders', '/app/transfers'],
+            match: ['/app/sync', '/app/folders'],
           },
-          ...(shown('compute') ? [{ to: '/app/runs', icon: Play, label: 'Runs' }] : []),
-          { to: '/app/device', icon: Laptop, label: 'This device' },
+          { to: '/app/activity', icon: ArrowLeftRight, label: 'Activity' },
+          { to: '/app/tools', icon: SquareTerminal, label: 'Tools' },
+          ...(shown('compute') && options.localRuns ? [{ to: '/app/runs', icon: Play, label: 'Runs' }] : []),
+          { to: '/app/device', icon: Laptop, label: 'This computer' },
           navSeparator,
         ]
       : []),

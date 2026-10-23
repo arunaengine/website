@@ -1,5 +1,5 @@
 import * as VueRuntime from 'vue'
-import { createSSRApp, defineComponent, h, ref, type Component } from 'vue'
+import { computed, createSSRApp, defineComponent, h, ref, type Component } from 'vue'
 import { renderToString } from '@vue/server-renderer'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as Nav from '@/components/layout/nav'
@@ -23,6 +23,8 @@ const nodeStatus = ref<{
 } | null>(null)
 const nodeState = ref<'stopped' | 'starting' | 'running' | 'error' | 'unknown'>('unknown')
 const nodeLoaded = ref(false)
+const localRuns = ref(true)
+const loadCompute = vi.fn(async () => undefined)
 
 const RouterLinkStub = defineComponent({
   props: { to: { type: [String, Object], required: true } },
@@ -86,9 +88,13 @@ const DesktopLayoutClient = compileClientComponent(new URL('./DesktopLayout.vue'
       status: nodeStatus,
       state: nodeState,
       loaded: nodeLoaded,
+      deviceClient: ref(null),
       start: watchNode,
       stop: unwatchNode,
     }),
+  },
+  '@/composables/useDeviceCompute': {
+    useDeviceCompute: () => ({ compute: computed(() => ({ enabled: localRuns.value })), load: loadCompute }),
   },
   '@/lib/config': { featureEnabled: () => true, portalConfig },
   '@/lib/desktopBridge': { appQuit },
@@ -123,9 +129,13 @@ beforeAll(async () => {
       status: nodeStatus,
       state: nodeState,
       loaded: nodeLoaded,
+      deviceClient: ref(null),
       start: watchNode,
       stop: unwatchNode,
     }),
+  }))
+  vi.doMock('@/composables/useDeviceCompute', () => ({
+    useDeviceCompute: () => ({ compute: computed(() => ({ enabled: localRuns.value })), load: loadCompute }),
   }))
   vi.doMock('@/lib/config', () => ({ featureEnabled: () => true, portalConfig }))
   vi.doMock('@/lib/desktopBridge', () => ({ appQuit }))
@@ -154,6 +164,7 @@ beforeEach(() => {
   nodeStatus.value = null
   nodeState.value = 'unknown'
   nodeLoaded.value = false
+  localRuns.value = true
   appQuit.mockReset().mockResolvedValue(undefined)
 })
 
@@ -173,6 +184,8 @@ describe('desktop shell', () => {
       '/app/compute',
       '/app/notebooks',
       '/app/sync',
+      '/app/activity',
+      '/app/tools',
       '/app/runs',
       '/app/device',
       '/app/groups',
@@ -182,9 +195,18 @@ describe('desktop shell', () => {
     ])
     expect(html.match(/role="separator"/g)).toHaveLength(2)
     expect(html).toContain('Sync')
-    expect(html).toContain('This device')
+    expect(html).toContain('This computer')
     expect(html).toContain('Groups')
     expect(html).toContain('Status')
+  })
+
+  it('leaves Runs out while this computer runs no jobs', async () => {
+    localRuns.value = false
+
+    const html = await renderToString(createSSRApp(DesktopLayout))
+
+    expect(destinations(html)).not.toContain('/app/runs')
+    expect(destinations(html)).toContain('/app/tools')
   })
 
   it('carries one flat list with no group headings', async () => {

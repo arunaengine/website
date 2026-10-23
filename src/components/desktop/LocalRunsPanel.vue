@@ -79,7 +79,7 @@ watch(reachable, (now) => now && reload())
 
     <template v-else>
       <Notice v-if="compute && !compute.enabled" tone="warning">
-        Running work on this computer is switched off. Turn it on under This device to use it.
+        Running work on this computer is switched off. Turn it on under This computer to use it.
       </Notice>
 
       <Notice v-if="listState === 'unsupported'" tone="warning">
