@@ -72,6 +72,8 @@ const loadingMore = ref(false)
 let pageRun = 0
 // Pages shown, so a poll reads as many again and keeps them.
 let shownPages = 1
+// A read that found a page on its way holds back its data; one more follows the page.
+let rereadLater = false
 
 function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
@@ -135,8 +137,9 @@ async function readAll(poll: boolean) {
     backends.value = list.backends
     routing.value = rules
     links.value = imports
-    // A page being added now is kept; the next poll reads the pages again.
-    if (!(poll && loadingMore.value)) {
+    if (poll && loadingMore.value) rereadLater = true
+    else {
+      rereadLater = false
       firstBuckets.value = page?.buckets ?? null
       // A refresh starts the listing over, so later pages never mix with a newer first page.
       pageRun++
@@ -173,6 +176,7 @@ watch(
     moreBuckets.value = []
     bucketsNext.value = null
     shownPages = 1
+    rereadLater = false
     pageRun++
     loadingMore.value = false
     problemsRun++
@@ -212,7 +216,13 @@ async function moreBucketsPage() {
   } catch (err) {
     if (current()) actionError.value = errorMessage(err)
   } finally {
-    if (current()) loadingMore.value = false
+    if (current()) {
+      loadingMore.value = false
+      if (rereadLater && !disposed) {
+        rereadLater = false
+        void readAll(true)
+      }
+    }
   }
 }
 

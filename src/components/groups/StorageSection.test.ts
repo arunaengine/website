@@ -362,6 +362,51 @@ describe('StorageSection', () => {
     }
   })
 
+  it.each([true, false])('reads once more after a page that was on its way (answered: %s), so a rename started meanwhile is followed', async (answered) => {
+    vi.useFakeTimers()
+    try {
+      const job = { kind: 'rename', state: 'running', done: 4, failed: 0 }
+      let started = false
+      let settle: (ok: boolean) => void = () => {}
+      let pending = true
+      const second = { buckets: [listed('beta', { shared: true, provider_bucket: 'shared' })], next: null }
+      listStorageBuckets.mockImplementation((_group: string, page: { after?: string }) => {
+        if (page.after === 'c1') {
+          if (!pending) return Promise.resolve(second)
+          pending = false
+          return new Promise((resolve, reject) => (settle = (ok) => (ok ? resolve(second) : reject(new Error('page failed')))))
+        }
+        const alpha = listed('alpha', { shared: true, provider_bucket: 'shared', ...(started ? { job } : {}) })
+        return Promise.resolve({ buckets: [alpha], next: 'c1' })
+      })
+      const { root } = await mount()
+      void (buttonIn(root, 'Show more buckets').props.onClick as () => void)()
+      await flush()
+      await click(nodes(root).find((node) => node.props.title === 'Settings and organize')!)
+      // A rename is accepted and then seen while the page is still on its way.
+      started = true
+      const saved = byTestId(root, 'edit-dialog')[0].props.onSaved as () => void
+      saved()
+      saved()
+      await flush()
+      await flush()
+      expect(byTestId(root, 'bucket-job')).toHaveLength(0)
+      settle(answered)
+      await flush()
+      await flush()
+      expect(content(root).includes('beta')).toBe(answered)
+      expect(byTestId(root, 'bucket-job')).toHaveLength(1)
+      // The step is followed: the pages shown are read again on the next tick.
+      const calls = listStorageBuckets.mock.calls.length
+      await vi.advanceTimersByTimeAsync(3000)
+      await flush()
+      expect(listStorageBuckets.mock.calls.length).toBe(calls + (answered ? 2 : 1))
+      expect(byTestId(root, 'bucket-job')).toHaveLength(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('keeps a page that is being added when a poll answers', async () => {
     vi.useFakeTimers()
     try {
