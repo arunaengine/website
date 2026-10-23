@@ -18,6 +18,8 @@ const identity = ref<{ nodeId: string; realm: string } | null>(null)
 const identityError = ref<string | null>(null)
 // The S3 endpoint the local node reports about itself.
 const s3Url = ref<string | null>(null)
+// The node's own MCP address, when it serves one.
+const mcpUrl = ref<string | null>(null)
 // Refcounted: the shell's own views hold it open, and nothing polls the node
 // from the welcome routes, which have their own way of watching it.
 let watchers = 0
@@ -134,11 +136,13 @@ async function readIdentity(client: DeviceClient): Promise<void> {
     if (deviceClient.value !== client) return
     identity.value = { nodeId: info.node.peer_id, realm: info.node.realm_id }
     s3Url.value = info.services?.interfaces?.s3?.url ?? null
+    mcpUrl.value = info.services?.interfaces?.mcp?.url ?? null
     identityError.value = null
   } catch (err) {
     if (deviceClient.value !== client) return
     identity.value = null
     s3Url.value = null
+    mcpUrl.value = null
     identityError.value = errorMessage(err)
   }
 }
@@ -148,6 +152,7 @@ watch(
   (client) => {
     identity.value = null
     s3Url.value = null
+    mcpUrl.value = null
     identityError.value = null
     if (client) void readIdentity(client)
   },
@@ -166,6 +171,7 @@ export function useDeviceStatus() {
     identity,
     identityError,
     s3Url,
+    mcpUrl,
     refresh,
     start,
     stop,

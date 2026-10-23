@@ -55,7 +55,7 @@ describe('web routes', () => {
 
   it('has no device views to reach', async () => {
     const routes = await build()
-    const desktopOnly = ['device', 'folders', 'folders/:folderId', 'transfers', 'sync', 'runs', 'runs/:jobId']
+    const desktopOnly = ['device', 'folders', 'folders/:folderId', 'transfers', 'sync', 'tools', 'runs', 'runs/:jobId']
 
     for (const path of desktopOnly) expect(child(routes, path)).toBeUndefined()
   })
@@ -163,6 +163,7 @@ describe('desktop routes', () => {
     const routes = await build({ apiBaseUrl: '/api/v1' })
     const expected = [
       ['sync', 'sync'],
+      ['tools', 'tools'],
       ['folders/:folderId', 'folder'],
       ['runs', 'runs'],
       ['runs/:jobId', 'run'],
