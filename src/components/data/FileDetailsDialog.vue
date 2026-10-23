@@ -14,6 +14,8 @@ import Tabs from '@/components/ui/Tabs.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
+import MockFileGeneral from '@/components/data/MockFileGeneral.vue'
+import MockFileStorage from '@/components/data/MockFileStorage.vue'
 import ObjectLocationsPanel from '@/components/data/ObjectLocationsPanel.vue'
 import ReferencedBy from '@/components/data/ReferencedBy.vue'
 import ObjectVersionsPanel from '@/components/data/ObjectVersionsPanel.vue'
@@ -38,6 +40,8 @@ import { publicUrl, type PublicTarget } from '@/lib/publicAccess'
 import { arnLocationLabel, parseArunaArn } from '@/lib/sync'
 import type { DeleteRequest } from '@/lib/deletion/request'
 import { featureEnabled } from '@/lib/config'
+import { mockEnabled } from '@/lib/distributedMock'
+import { mockFile } from '@/lib/distributedMockData'
 import { isNotebookKey } from '@/lib/notebook/document'
 import { stateVariant } from '@/lib/stateBadge'
 import { formatBytes, relativeTime } from '@/lib/utils'
@@ -97,10 +101,13 @@ const pinnedVersion = ref<string | null>(null)
 let headSeq = 0
 
 const remote = computed(() => Boolean(props.nodeId))
+// A file of an example bucket stored on several nodes (node mock).
+const mock = computed(() => (mockEnabled() ? mockFile(props.bucket, props.objectKey) : undefined))
+const shownSize = computed(() => props.size ?? mock.value?.size)
 const currentVersion = computed(() => pinnedVersion.value ?? head.value?.versionId ?? null)
 // Preview is a mode of this dialog, not a tab: it fills the frame under the
 // same header, and the tabs are one click away.
-const previewMode = computed(() => props.tab === 'preview' && !props.folder)
+const previewMode = computed(() => props.tab === 'preview' && !props.folder && !mock.value)
 const detailsTab = computed(() => (previewMode.value ? 'general' : props.tab))
 const notebookLink = computed(() => !remote.value && !pinnedVersion.value && props.groupId &&
   isNotebookKey(props.objectKey) && featureEnabled('tes') && shown('notebooks')
@@ -108,7 +115,7 @@ const notebookLink = computed(() => !remote.value && !pinnedVersion.value && pro
   : null)
 
 async function loadHead() {
-  if (!props.objectKey || remote.value || props.folder) return
+  if (!props.objectKey || remote.value || props.folder || mock.value) return
   const seq = ++headSeq
   headBusy.value = true
   headError.value = null
@@ -202,7 +209,7 @@ const fileReferences = computed(() =>
 
 function loadReferences() {
   const apiBase = props.nodeId ? nodeApiBase(props.nodeId) : apiBaseUrl.value
-  if (!currentUser.value || !apiBase || props.folder) {
+  if (!currentUser.value || !apiBase || props.folder || mock.value) {
     resetReferences()
     return
   }
@@ -254,7 +261,7 @@ const details = computed(() => props.folder ? [
   { label: 'Node', value: nodeName(props.nodeId) },
 ] : [
   { label: 'Key', value: props.objectKey },
-  { label: 'Size', value: props.size === undefined ? 'unknown' : formatBytes(props.size) },
+  { label: 'Size', value: shownSize.value === undefined ? 'unknown' : formatBytes(shownSize.value) },
   {
     label: 'Last modified',
     value: props.lastModified ? relativeTime(props.lastModified.toISOString()) : 'unknown',
@@ -277,7 +284,7 @@ const details = computed(() => props.folder ? [
           </DialogTitle>
           <p class="mt-0.5 font-mono text-[11px] text-muted-foreground">
             <span class="break-all">{{ props.bucket }}/{{ props.objectKey }}</span>
-            <span v-if="props.size !== undefined"> · {{ formatBytes(props.size) }}</span>
+            <span v-if="shownSize !== undefined"> · {{ formatBytes(shownSize) }}</span>
           </p>
         </div>
         <div class="flex flex-wrap items-center justify-end gap-2">
@@ -291,7 +298,7 @@ const details = computed(() => props.folder ? [
             <RouterLink :to="notebookLink" @click="leave"><NotebookPen class="h-4 w-4" /> Open notebook</RouterLink>
           </Button>
           <Button
-            v-if="!props.folder"
+            v-if="!props.folder && !mock"
             variant="outline"
             size="sm"
             @click="emit('update:tab', previewMode ? 'general' : 'preview')"
@@ -376,7 +383,7 @@ const details = computed(() => props.folder ? [
               </div>
             </dd>
           </div>
-          <div v-if="props.groupId" class="flex items-center justify-between gap-4">
+          <div v-if="props.groupId && !mock" class="flex items-center justify-between gap-4">
             <dt class="shrink-0 text-muted-foreground">Public access</dt>
             <dd class="flex min-w-0 items-center justify-end gap-2">
               <Badge :variant="filePublic ? 'success' : 'secondary'" size="sm" class="uppercase">
@@ -416,8 +423,9 @@ const details = computed(() => props.folder ? [
         <p v-if="props.folder" class="mt-3 text-xs text-muted-foreground">
           A public folder rule covers every file below it, including files added later.
         </p>
+        <MockFileGeneral v-if="mock" :object="mock" class="mt-4 border-t border-border pt-3" />
         <ReferencedBy
-          v-if="currentUser && !props.folder"
+          v-if="currentUser && !props.folder && !mock"
           class="mt-4 border-t border-border pt-3"
           :preflight="fileReferences"
           :busy="referencesBusy"
@@ -427,7 +435,9 @@ const details = computed(() => props.folder ? [
       </TabsContent>
 
       <TabsContent value="versions" class="surface p-4">
+        <p v-if="mock" class="text-xs text-muted-foreground">The mock has no version history.</p>
         <ObjectVersionsPanel
+          v-else
           :active="props.open && props.tab === 'versions'"
           :bucket="props.bucket"
           :object-key="props.objectKey"
@@ -440,7 +450,8 @@ const details = computed(() => props.folder ? [
       </TabsContent>
 
       <TabsContent value="storage">
-        <div class="grid gap-4 lg:grid-cols-2">
+        <MockFileStorage v-if="mock" :object="mock" />
+        <div v-else class="grid gap-4 lg:grid-cols-2">
           <div class="surface space-y-3 p-4">
             <PolicyColumn
               :key="props.revision"
