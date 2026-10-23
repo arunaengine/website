@@ -7,6 +7,7 @@ import {
   isDeviceUnsupported,
   isMoving,
   isStaleExpectation,
+  listFolderActions,
   readAction,
   readCompute,
   readDraft,
@@ -187,6 +188,48 @@ describe('action audit', () => {
     expect(readAction({ action: 'replace_local', scope: 'all_pending', confirm: 'x' }).scope).toBe('all_pending')
     expect(readAction({ action: 'keep_local' }).scope).toBe('entry')
     expect(readAction({ action: 'keep_local', scope: 'folder' }).scope).toBe('entry')
+  })
+})
+
+describe('audit log paging', () => {
+  const client = { baseUrl: 'http://127.0.0.1:9000/api/v1', token: 'owner-token' }
+
+  it('follows every cursor so the newest decisions are not left behind', async () => {
+    const request = vi
+      .spyOn(await import('./api'), 'apiRequest')
+      .mockResolvedValueOnce({ actions: [{ action: 'keep_local', path: 'a' }], next_cursor: 'c1' })
+      .mockResolvedValueOnce({ actions: [{ action: 'resolve', path: 'b' }], next_cursor: 'c2' })
+      .mockResolvedValueOnce({ actions: [{ action: 'replace_local', path: 'c' }] })
+    try {
+      const found = await listFolderActions('f1', client)
+
+      expect(found.map((entry) => entry.path)).toEqual(['a', 'b', 'c'])
+      expect(request.mock.calls.map((call) => call[1]?.query)).toEqual([
+        { cursor: undefined },
+        { cursor: 'c1' },
+        { cursor: 'c2' },
+      ])
+    } finally {
+      request.mockRestore()
+    }
+  })
+
+  it('stops on a cursor that repeats and fails with the page that failed', async () => {
+    const request = vi
+      .spyOn(await import('./api'), 'apiRequest')
+      .mockResolvedValue({ actions: [{ action: 'keep_local', path: 'a' }], next_cursor: 'same' })
+    try {
+      expect(await listFolderActions('f1', client)).toHaveLength(2)
+      request.mockReset().mockResolvedValueOnce({ actions: [], next_cursor: 'c1' }).mockRejectedValueOnce(new Error('later page'))
+      await expect(listFolderActions('f1', client)).rejects.toThrow('later page')
+    } finally {
+      request.mockRestore()
+    }
+  })
+
+  it('keeps the outcome the node recorded', () => {
+    expect(readAction({ action: 'replace_local', outcome: 'stale' }).outcome).toBe('stale')
+    expect(readAction({ action: 'replace_local' }).outcome).toBeNull()
   })
 })
 

@@ -320,6 +320,9 @@ export function entryExpectation(entry: FolderEntry): ActionExpectation | null {
 /** One entry, or every pending entry in the folder. */
 export type ActionScope = 'entry' | 'all_pending'
 
+/** What came of a decision: taken, refused because the file moved on, or failed. */
+export type ActionOutcome = 'applied' | 'stale' | 'failed'
+
 export interface ActionRecord {
   action: string
   scope: ActionScope
@@ -328,7 +331,8 @@ export interface ActionRecord {
   at_ms: number | null
   before_blake3: string | null
   after_blake3: string | null
-  outcome: string | null
+  /** Null from a node that records none; any other word is kept as it came. */
+  outcome: ActionOutcome | string | null
   message: string | null
 }
 
@@ -430,9 +434,38 @@ export async function applyFolderAction(
   return readFolder(await post<unknown>(`/device/folders/${encodeURIComponent(folderId)}/actions`, client, body))
 }
 
+export interface ActionPage {
+  actions: ActionRecord[]
+  next_cursor: string | null
+}
+
+/** One page of a folder's audit log, oldest first. */
+export async function listFolderActionPage(
+  folderId: string,
+  cursor: string | undefined,
+  client: DeviceClient,
+): Promise<ActionPage> {
+  const answer = record(
+    await request<unknown>(`/device/folders/${encodeURIComponent(folderId)}/actions`, client, {
+      query: { cursor },
+    }),
+  )
+  return { actions: list(answer.actions).map(readAction), next_cursor: text(answer.next_cursor) }
+}
+
+/** The whole audit log of a folder: every page, oldest first. */
 export async function listFolderActions(folderId: string, client: DeviceClient): Promise<ActionRecord[]> {
-  const answer = await request<unknown>(`/device/folders/${encodeURIComponent(folderId)}/actions`, client)
-  return list(record(answer).actions).map(readAction)
+  const found: ActionRecord[] = []
+  const seen = new Set<string>()
+  let cursor: string | undefined
+  for (;;) {
+    const page = await listFolderActionPage(folderId, cursor, client)
+    found.push(...page.actions)
+    // A cursor that repeats would never end, so it ends the walk.
+    if (!page.next_cursor || seen.has(page.next_cursor)) return found
+    seen.add(page.next_cursor)
+    cursor = page.next_cursor
+  }
 }
 
 // ── Transfers ────────────────────────────────────────────────────────────────

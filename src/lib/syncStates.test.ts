@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readAction, readEntry, type DeviceTransfer, type FolderEntry, type SyncedFolder, type SyncDocument } from './deviceApi'
 import {
   ENTRY_META,
+  decisionLine,
   decisionText,
   entryBadge,
   entryMeta,
@@ -228,6 +229,30 @@ describe('decision text', () => {
     expect(decisionText(record('replace_local', 'a.csv'))).toBe('Used the Aruna version of a.csv')
     expect(decisionText(record('remove_local', 'a.csv'))).toBe('Moved your copy of a.csv to the Trash')
     expect(decisionText(record('resolve', 'a.csv'))).toBe('Marked a.csv as handled')
+  })
+
+  it('never tells a refused or failed choice as a success', () => {
+    const stale = readAction({ action: 'replace_local', path: 'a.csv', outcome: 'stale' })
+    const failed = readAction({ action: 'replace_local', path: 'a.csv', outcome: 'failed', message: 'disk full' })
+    const bulk = readAction({ action: 'replace_local', scope: 'all_pending', outcome: 'failed', message: 'locked' })
+
+    expect(decisionLine(stale)).toEqual({
+      text: 'Did not use the Aruna version of a.csv: the file changed again first',
+      outcome: 'stale',
+    })
+    expect(decisionLine(failed)).toEqual({
+      text: 'Could not use the Aruna version of a.csv: disk full',
+      outcome: 'failed',
+    })
+    expect(decisionText(bulk)).toBe('Could not use the Aruna version of all waiting files: locked')
+    expect(decisionText(readAction({ action: 'remove_local', path: 'a', outcome: 'failed' }))).toBe(
+      'Could not move your copy of a to the Trash',
+    )
+  })
+
+  it('takes a node that records no outcome at its word and skips an outcome it does not know', () => {
+    expect(decisionLine(readAction({ action: 'keep_local', path: 'a.csv' }))?.outcome).toBe('applied')
+    expect(decisionText(readAction({ action: 'keep_local', path: 'a.csv', outcome: 'maybe' }))).toBeNull()
   })
 
   it('covers a whole folder and skips an action it cannot word', () => {

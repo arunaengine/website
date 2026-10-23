@@ -180,21 +180,54 @@ export function folderConfirmed(root: string, typed: string): boolean {
   return name.length > 0 && typed.trim() === name
 }
 
-/** One plain line for a decision the owner took, or null for an action it cannot word. */
-export function decisionText(record: ActionRecord): string | null {
+export type DecisionOutcome = 'applied' | 'stale' | 'failed'
+
+export interface DecisionLine {
+  text: string
+  outcome: DecisionOutcome
+}
+
+// What a choice is called before it happens: "use the Aruna version of".
+const VERB: Record<string, [done: string, tried: string, after?: string]> = {
+  keep_local: ['Kept your version of', 'keep your version of'],
+  replace_local: ['Used the Aruna version of', 'use the Aruna version of'],
+  remove_local: ['Moved your copy of', 'move your copy of', 'to the Trash'],
+  resolve: ['Marked', 'mark', 'as handled'],
+}
+
+function phrase(parts: [string, string, string?] | undefined, file: string, tried: boolean): string | null {
+  if (!parts) return null
+  const tail = parts[2] ? ` ${parts[2]}` : ''
+  return `${tried ? parts[1] : parts[0]} ${file}${tail}`
+}
+
+/**
+ * One plain line for a decision the owner took, or null for one it cannot word.
+ * A refused or failed choice is told as such, never as a success.
+ */
+export function decisionLine(record: ActionRecord): DecisionLine | null {
   const file = record.scope === 'all_pending' ? 'all waiting files' : (record.path ?? 'a file')
-  switch (record.action) {
-    case 'keep_local':
-      return `Kept your version of ${file}`
-    case 'replace_local':
-      return `Used the Aruna version of ${file}`
-    case 'remove_local':
-      return `Moved your copy of ${file} to the Trash`
-    case 'resolve':
-      return `Marked ${file} as handled`
-    default:
-      return null
+  const verb = VERB[record.action]
+  // A node that records no outcome says only that the choice was taken.
+  const outcome = record.outcome ?? 'applied'
+  if (outcome === 'applied') {
+    const text = phrase(verb, file, false)
+    return text ? { text, outcome } : null
   }
+  const tried = phrase(verb, file, true)
+  if (!tried) return null
+  if (outcome === 'stale') {
+    return { text: `Did not ${tried}: the file changed again first`, outcome }
+  }
+  if (outcome === 'failed') {
+    return { text: `Could not ${tried}${record.message ? `: ${record.message}` : ''}`, outcome }
+  }
+  return null
+}
+
+/** The line alone, for callers that only show text. */
+export function decisionText(record: ActionRecord): string | null {
+  return decisionLine(record)?.text ?? null
 }
 
 /** What a transfer is doing, in the words the owner reads. */
