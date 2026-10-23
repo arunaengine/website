@@ -93,7 +93,7 @@ const COPY_PART = { strategy: 'copy', coverage: 'assigned' } as const
 export const PRESETS: readonly Preset[] = [
   {
     id: 'two-node',
-    label: 'Two-node replica',
+    label: 'Copy on two nodes',
     description: 'One node writes, the other keeps a full copy. Reads work on both.',
     nodes: ['node-1', 'node-3'],
     members: [COPY_ALL, COPY_ALL],
@@ -102,7 +102,7 @@ export const PRESETS: readonly Preset[] = [
   },
   {
     id: 'mirror',
-    label: 'Mirror',
+    label: 'Copy on every chosen node',
     description: 'Full copies on several nodes. Downloads spread over the copies.',
     nodes: ['node-1', 'node-2', 'node-3'],
     members: [COPY_ALL, COPY_ALL, COPY_ALL],
@@ -111,8 +111,8 @@ export const PRESETS: readonly Preset[] = [
   },
   {
     id: 'sharding',
-    label: 'Sharding',
-    description: 'The key space is cut into ranges. Each range has one node that writes.',
+    label: 'Split across nodes',
+    description: 'The files are divided into ranges. Each range has one node that writes.',
     nodes: ['node-1', 'node-2', 'node-3', 'node-5'],
     members: [COPY_PART, COPY_PART, COPY_PART, COPY_PART],
     ranges: 8,
@@ -120,8 +120,8 @@ export const PRESETS: readonly Preset[] = [
   },
   {
     id: 'sharding-replicas',
-    label: 'Sharding with replicas',
-    description: 'Like sharding, and every range also has a copy on a node in another location.',
+    label: 'Split with copies',
+    description: 'Like splitting, and every range also has a copy on a node in another location.',
     nodes: ['node-1', 'node-2', 'node-3', 'node-5'],
     members: [COPY_PART, COPY_PART, COPY_PART, COPY_PART],
     ranges: 8,
@@ -129,7 +129,7 @@ export const PRESETS: readonly Preset[] = [
   },
   {
     id: 'copy-edge',
-    label: 'Copy-on-use edge',
+    label: 'Edge node, copy on use',
     description: 'An edge node fetches a file when it is first read and then keeps it.',
     nodes: ['node-1', 'node-5'],
     members: [COPY_ALL, { strategy: 'copy on use', coverage: 'all' }],
@@ -138,7 +138,7 @@ export const PRESETS: readonly Preset[] = [
   },
   {
     id: 'cache-edge',
-    label: 'Cache-on-use edge',
+    label: 'Edge node, cache on use',
     description: 'An edge node caches files that are read. The cache has a size limit.',
     nodes: ['node-1', 'node-5'],
     members: [COPY_ALL, { strategy: 'cache on use', coverage: 'all' }],
@@ -147,7 +147,7 @@ export const PRESETS: readonly Preset[] = [
   },
   {
     id: 'stream-edge',
-    label: 'Stream edge',
+    label: 'Edge node, stream',
     description: 'An edge node knows the files but keeps no bytes. Every read goes to a holder.',
     nodes: ['node-1', 'node-5'],
     members: [COPY_ALL, { strategy: 'stream', coverage: 'all' }],
@@ -282,4 +282,20 @@ export function storedLabel(preset: PresetId, nodes: number): string {
   if (preset === 'sharding' || preset === 'sharding-replicas') return `Split across ${nodes} nodes`
   if (preset === 'two-node' || preset === 'mirror') return `Copies on ${nodes} nodes`
   return `On ${nodes} nodes`
+}
+
+export interface Placement {
+  several: boolean
+  preset: PresetId
+  members: MemberDraft[]
+  settings: CreateSettings
+}
+
+// Unchanged behaviour: the bucket is stored on this node only.
+export function defaultPlacement(): Placement {
+  return { several: false, preset: 'two-node', members: presetMembers('two-node'), settings: defaultSettings('two-node') }
+}
+
+export function placementLabel(placement: Placement): string {
+  return placement.several ? storedLabel(placement.preset, placement.members.length) : 'This node'
 }

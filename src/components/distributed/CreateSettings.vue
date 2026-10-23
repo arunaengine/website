@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Key ranges, refresh, range requests and search for a new distributed bucket.
+// Key ranges, refresh, range requests and search for a bucket stored on several nodes.
 import { computed } from 'vue'
 import Input from '@/components/ui/Input.vue'
 import OptionToggle from '@/components/ui/OptionToggle.vue'
@@ -43,8 +43,8 @@ function set<K extends keyof CreateSettings>(key: K, value: CreateSettings[K]) {
 
 <template>
   <div class="space-y-5">
-    <section class="surface space-y-3 p-5">
-      <h2 class="font-display text-base font-semibold text-aruna-navy">Key ranges</h2>
+    <section class="space-y-3">
+      <h3 class="text-sm font-medium text-foreground">Ranges</h3>
       <p v-if="single" class="text-xs text-muted-foreground">
         This preset uses one range for the whole bucket. {{ nodeIds[0] }} is its only coordinator.
       </p>
@@ -92,8 +92,8 @@ function set<K extends keyof CreateSettings>(key: K, value: CreateSettings[K]) {
       </template>
     </section>
 
-    <section class="surface space-y-4 p-5">
-      <h2 class="font-display text-base font-semibold text-aruna-navy">Reads and updates</h2>
+    <section class="space-y-4">
+      <h3 class="text-sm font-medium text-foreground">Reads and updates</h3>
       <div class="grid gap-4 md:grid-cols-2">
         <div class="space-y-1">
           <label class="text-xs font-medium text-foreground" for="dm-refresh">Check external sources</label>

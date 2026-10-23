@@ -7,6 +7,7 @@ import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import BucketRow from '@/components/data/BucketRow.vue'
 import { useBucketJobs } from '@/composables/useBucketJobs'
+import BucketStorageDialog from '@/components/data/BucketStorageDialog.vue'
 import MockBucketRows from '@/components/data/manager/MockBucketRows.vue'
 import { useBucketSearch } from '@/composables/useBucketSearch'
 import { useRealmNodes } from '@/composables/useRealmNodes'
@@ -15,6 +16,7 @@ import type { DataManager } from '@/composables/useDataManager'
 import type { BucketSearchHit } from '@/lib/api'
 import { isDesktop } from '@/lib/desktop'
 import type { BindSource } from '@/lib/bindSource'
+import { defaultPlacement, mockEnabled, placementLabel } from '@/lib/distributedMock'
 import { folderName } from '@/lib/deviceApi'
 import { placeName, placeTitle } from '@/lib/bucketPlace'
 import { isHiddenBucket } from '@/lib/workspaces'
@@ -73,6 +75,11 @@ const {
 const listings = ref(0)
 watch(() => all.loading.value, (busy) => busy || listings.value++)
 const jobs = useBucketJobs(selectedGroupId, computed(() => [buckets.value, listings.value]))
+
+// Where the next bucket is stored (node mock); this node unless changed.
+const storageOpen = ref(false)
+const placement = ref(defaultPlacement())
+
 const allNodes = computed(() => bucketNodeChoice.value === null)
 // An older node cannot list without a name; the open node's list stands in.
 const searchList = computed(() => allNodes.value && !all.needsName.value)
@@ -380,10 +387,14 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
             <FolderPlus class="h-4 w-4" />
           </Button>
         </div>
+        <button v-if="mockEnabled()" type="button" class="block text-left text-xs text-muted-foreground hover:text-foreground" @click="storageOpen = true">
+          Stored on: {{ placementLabel(placement) }} <span class="underline">Change</span>
+        </button>
         <p v-if="createBucketError" class="text-xs text-destructive">{{ createBucketError }}</p>
         <p v-else-if="newBucketProblem" class="text-xs text-destructive">{{ newBucketProblem }}</p>
         <p v-else-if="newBucketRefusal" class="text-xs text-muted-foreground">{{ newBucketRefusal }}</p>
       </footer>
     </div>
+    <BucketStorageDialog v-if="mockEnabled()" v-model:open="storageOpen" v-model="placement" />
   </aside>
 </template>
