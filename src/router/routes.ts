@@ -1,5 +1,6 @@
 import type { RouteRecordRaw } from 'vue-router'
 import { isDesktop } from '@/lib/desktop'
+import { distributedMockRoutes } from './distributedMock'
 
 // The shell has no marketing surface, so '/' boots into the app shell, which
 // renders the signed-in views or its own sign-in prompt. LandingView stays a
@@ -106,6 +107,8 @@ export function portalRoutes(): RouteRecordRaw[] {
           name: 'bucket-storage',
           component: () => import('@/views/BucketStorageView.vue'),
         },
+        // Design mock with example data; only opens when its feature flag is on.
+        distributedMockRoutes(),
         // Retired bucket-builder route: the consolidated Add data dialog replaced
         // the full-page builder; old links land in the bucket view with it open.
         {
