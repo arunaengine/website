@@ -8,6 +8,8 @@ import * as RouterRuntime from 'vue-router'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  button,
+  click,
   compileClientComponent,
   content,
   element,
@@ -377,6 +379,21 @@ describe('SettingsView access tab', () => {
     expect(text).not.toContain('API base URL')
     expect(text).not.toContain('VITE_ARUNA_API_BASE_URL')
     expect(text).toContain('API reference')
+  })
+
+  it('leaves the shell base alone when applying in the desktop app', async () => {
+    desktop.value = true
+    const { root } = await mount('?tab=access')
+    // The shell switched from the realm to the local node after the draft was set.
+    apiBaseUrl.value = 'http://127.0.0.1:34116/api/v1'
+    aruna.setApiBaseUrl.mockClear()
+    aruna.setAuthToken.mockClear()
+
+    await click(button(root, 'Apply connection'))
+    desktop.value = false
+    apiBaseUrl.value = '/api/v1'
+    expect(aruna.setApiBaseUrl).not.toHaveBeenCalled()
+    expect(aruna.setAuthToken).toHaveBeenCalledWith('token')
   })
 
   it('keeps the signed-out entry point', async () => {

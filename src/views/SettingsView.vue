@@ -188,7 +188,8 @@ const swaggerUrl = computed(() => {
 
 function saveConnection() {
   const previousBaseUrl = apiBaseUrl.value
-  setApiBaseUrl(apiBaseDraft.value)
+  // The shell owns the base in the desktop app; the draft would be stale.
+  if (!isDesktop()) setApiBaseUrl(apiBaseDraft.value)
   // Changing endpoint resets the session; authenticate explicitly after the
   // new endpoint's public realm information has loaded.
   if (apiBaseUrl.value === previousBaseUrl) setAuthToken(tokenDraft.value)
