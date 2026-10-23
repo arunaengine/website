@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { docsTopicBySlug } from '@/docs/v1'
 import { applyPortalConfig } from '@/lib/config'
 import { defaultSettings, mockEnabled, firstResults, grantGap, isPending, nodeGlob, planRanges, plannedStart, presetMembers, rangeTotal, retryResult, STORAGE_QUESTIONS } from './distributedMock'
-import { BAKREP_COUNT, exampleListing, exampleMark, grantWarnings, mockFile, sourceLines, mockBucket, searchFiles, sourceObjects } from './distributedMockData'
+import { BAKREP_COUNT, exampleListing, exampleMark, grantWarnings, mockFile, sourceLines, bucketCopies, mockBucket, searchFiles, sourceObjects } from './distributedMockData'
 
 describe('distributed mock helpers', () => {
   it('reports the members a node-specific grant does not reach', () => {
@@ -92,9 +92,11 @@ describe('distributed mock helpers', () => {
     expect(mockFile('bakrep', genome.key)?.external?.digests[0].scope).toBe('not established')
   })
 
-  it('lists only what applies to where the files come from', () => {
-    expect(sourceLines('lab-raw-data').map((line) => line.question)).toEqual(['elsewhere', 'sync'])
-    expect(sourceLines('bakrep')[0].text).toContain('not copied')
+  it('lists incoming file sources and outgoing copies apart', () => {
+    expect(sourceLines('lab-raw-data')).toHaveLength(2)
+    expect(sourceLines('bakrep')[0].text).toContain('without copying')
+    expect(bucketCopies('spire-db')[0]).toContain('spire-public')
+    expect(bucketCopies('bakrep')).toEqual([])
     expect(sourceLines('nothing-here')).toEqual([])
   })
 

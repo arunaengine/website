@@ -22,7 +22,8 @@ import BucketNodesTab from '@/components/storage/BucketNodesTab.vue'
 import BucketEncryptionTab from '@/components/storage/BucketEncryptionTab.vue'
 import BucketPolicySection from '@/components/storage/BucketPolicySection.vue'
 import MockOverview from '@/components/storage/MockOverview.vue'
-import ContentSources from '@/components/storage/ContentSources.vue'
+import CopiesOfBucket from '@/components/storage/CopiesOfBucket.vue'
+import FileSources from '@/components/storage/FileSources.vue'
 import StorageOverviewTab from '@/components/storage/StorageOverviewTab.vue'
 import TransfersTab from '@/components/storage/TransfersTab.vue'
 import { useAruna } from '@/composables/useAruna'
@@ -79,7 +80,7 @@ const routeTab = useRouteTab(TAB_IDS, 'overview')
 const tab = computed({
   get() {
     const value = routeTab.value
-    if (example.value && !['overview', 'nodes', 'access'].includes(value)) return 'overview'
+    if (example.value && !['overview', 'nodes', 'transfers', 'access'].includes(value)) return 'overview'
     if (value === 'nodes' && !nodesTab.value) return 'overview'
     if (value === 'backend' && !backendVisible.value) return 'overview'
     if (value === 'placement' && !placementVisible.value) return 'overview'
@@ -133,14 +134,14 @@ const browserLink = computed(() => ({
           <TabsTrigger v-if="placementTrigger && !example" value="placement">Placement</TabsTrigger>
           <TabsTrigger v-if="groupId || example" value="access">Access</TabsTrigger>
           <TabsTrigger v-if="!example" value="encryption">Encryption</TabsTrigger>
-          <TabsTrigger v-if="!example" value="transfers">Transfers</TabsTrigger>
+          <TabsTrigger value="transfers">Transfers</TabsTrigger>
         </TabsList>
       </div>
 
       <TabsContent value="overview" class="mt-0 space-y-5">
         <MockOverview v-if="example" :bucket="example" />
         <StorageOverviewTab v-else :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
-        <ContentSources v-if="example" :bucket="bucket" />
+        <FileSources v-if="example" :bucket="bucket" />
         <BucketDeleteSection :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
       </TabsContent>
 
@@ -177,7 +178,8 @@ const browserLink = computed(() => ({
       </TabsContent>
 
       <TabsContent value="transfers" class="mt-0">
-        <TransfersTab :bucket="bucket" :node-id="nodeId" :group-id="groupId" />
+        <CopiesOfBucket v-if="example" :bucket="bucket" />
+        <TransfersTab v-else :bucket="bucket" :node-id="nodeId" :group-id="groupId" />
       </TabsContent>
     </Tabs>
   </div>
