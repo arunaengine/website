@@ -5,8 +5,9 @@ import { RouterLink } from 'vue-router'
 import { stamp } from '@/lib/distributedMock'
 import type { Origin } from '@/lib/distributedMockData'
 
-const props = defineProps<{ origin: Origin }>()
+const props = defineProps<{ origin: Origin; short?: boolean }>()
 
+const host = computed(() => (props.origin.kind === 'source' ? props.origin.source.replace(/^https?:\/\//, '') : ''))
 const w3id = (id: string) => `https://w3id.org/aruna/data${id}`
 const link = computed(() => {
   const origin = props.origin
@@ -17,7 +18,21 @@ const link = computed(() => {
 </script>
 
 <template>
-  <div class="space-y-0.5">
+  <p v-if="short">
+    <template v-if="origin.kind === 'source'">
+      <a v-if="link" :href="link.href" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">
+        From {{ origin.database ?? host }}<template v-if="origin.database"> · {{ host }}</template>
+      </a>
+    </template>
+    <template v-else-if="origin.kind === 'upload'">
+      Uploaded by {{ origin.user }} · {{ stamp(origin.time).slice(0, 10) }}<template v-if="origin.device"> · {{ origin.device }}</template>
+    </template>
+    <a v-else-if="origin.kind === 'copy' && link" :href="link.href" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">Copy of another version</a>
+    <a v-else-if="origin.kind === 'sync' && link" :href="link.href" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">Synced from {{ origin.sync.split(' ')[0] }}</a>
+    <template v-else-if="origin.kind === 'storage'">Registered from storage folder {{ origin.folder }}</template>
+    <RouterLink v-else-if="origin.kind === 'job'" :to="{ name: 'compute', query: { tab: 'jobs' } }" class="text-primary hover:underline">Result of a run</RouterLink>
+  </p>
+  <div v-else class="space-y-0.5">
     <p v-if="origin.kind === 'upload'">
       Uploaded by {{ origin.user }} on {{ origin.node }}, {{ stamp(origin.time) }}<template v-if="origin.device">, from the device {{ origin.device }}</template>.
     </p>

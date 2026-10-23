@@ -43,6 +43,5 @@ const entries = computed(() => all.value.filter((entry) => !removed.value.includ
       </li>
       <li v-if="!entries.length" class="text-muted-foreground">Removed. The dataset will not point to the origin of this file.</li>
     </ul>
-    <p class="text-muted-foreground">Added automatically when you add the file to a dataset. You can remove it there.</p>
   </div>
 </template>

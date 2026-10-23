@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import Notice from '@/components/ui/Notice.vue'
+// Marks a surface that shows example data.
+import Badge from '@/components/ui/Badge.vue'
 </script>
 
 <template>
-  <Notice title="Design mock">
-    This page shows example data. It does not talk to a node and nothing you do here is saved.
-  </Notice>
+  <Badge variant="outline" size="sm" title="Example data. Nothing here talks to a node and nothing is saved.">Mock</Badge>
 </template>

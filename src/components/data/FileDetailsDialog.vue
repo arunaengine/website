@@ -349,7 +349,8 @@ const details = computed(() => props.folder ? [
       </TabsList>
 
       <TabsContent value="general" class="surface p-4">
-        <dl class="space-y-2 text-xs">
+        <MockFileGeneral v-if="mock" :object="mock" />
+        <dl v-else class="space-y-2 text-xs">
           <div v-for="detail in details" :key="detail.label" class="flex items-baseline justify-between gap-4">
             <dt class="shrink-0 text-muted-foreground">{{ detail.label }}</dt>
             <dd class="min-w-0 break-all text-right font-mono text-foreground">{{ detail.value }}</dd>
@@ -424,7 +425,6 @@ const details = computed(() => props.folder ? [
         <p v-if="props.folder" class="mt-3 text-xs text-muted-foreground">
           A public folder rule covers every file below it, including files added later.
         </p>
-        <MockFileGeneral v-if="mock" :object="mock" class="mt-4 border-t border-border pt-3" />
         <ReferencedBy
           v-if="currentUser && !props.folder && !mock"
           class="mt-4 border-t border-border pt-3"
