@@ -127,6 +127,7 @@ const when = (ms: number | null): string => (ms ? relativeTime(new Date(ms).toIS
       eyebrow="This computer"
       title="Activity"
       description="What is moving between this computer and Aruna, and what you decided."
+      :docs="{ topic: 'where-data-lives', section: 'Syncs' }"
     >
       <template #actions>
         <Button variant="outline" size="sm" :disabled="acting || !canAct" @click="pauseAll">

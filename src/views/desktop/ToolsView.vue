@@ -79,13 +79,8 @@ function made(iso: string): string {
       eyebrow="This computer"
       title="Connect your tools"
       description="Use the programs you already know with the data on this computer. Everything on this page stays on this computer."
-    >
-      <template #actions>
-        <Button variant="outline" size="sm" as-child>
-          <RouterLink :to="{ name: 'docs', params: { topic: 'cli-access-key' } }">Open the guide</RouterLink>
-        </Button>
-      </template>
-    </PageHeader>
+      :docs="{ topic: 'cli-access-key', label: 'Open the guide' }"
+    />
 
     <div class="container space-y-5 py-5">
       <section class="surface overflow-hidden">
