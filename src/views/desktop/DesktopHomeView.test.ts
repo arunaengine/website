@@ -25,6 +25,9 @@ const syncStatus = ref<DeviceSyncStatus>({
 const syncState = ref('ready')
 const realmJobs = ref<Array<{ job_id: string; state: string }>>([])
 const uploadItems = ref<Array<{ id: number; state: string }>>([])
+const credentials = ref<Array<{ access_key_id: string; status: string }>>([])
+const latestDecision = ref<{ text: string; atMs: number | null } | null>(null)
+const startNode = vi.fn()
 
 function folder(overrides: Partial<SyncedFolder> = {}): SyncedFolder {
   return {
@@ -60,13 +63,13 @@ const RouterLinkStub = defineComponent({
 })
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
 const BadgeStub = defineComponent((_, { slots }) => () => h('span', slots.default?.()))
-const NewRunMenuStub = defineComponent(() => () => h('button', 'New run'))
+const TooltipStub = defineComponent((_, { slots }) => () => h('span', [slots.default?.(), slots.content?.()]))
 
 let DesktopHomeView: Component
 
 beforeAll(async () => {
   vi.doMock('vue-router', () => ({ RouterLink: RouterLinkStub }))
-  vi.doMock('@/composables/useAruna', () => ({ useAruna: () => ({ currentUser: ref({ id: 'u1' }) }) }))
+  vi.doMock('@/composables/useAruna', () => ({ useAruna: () => ({ currentUser: ref({ id: 'u1' }), credentials }) }))
   vi.doMock('@/composables/usePortalFeatures', () => ({ usePortalFeatures: () => ({ shown: (feature: string) => feature !== 'compute' || computeShown.value }) }))
   vi.doMock('@/composables/useRealm', () => ({
     useRealm: () => ({ realm: ref({ name: 'Test realm', shortName: 'Testrealm' }) }),
@@ -103,6 +106,12 @@ beforeAll(async () => {
       load: vi.fn(async () => undefined),
     }),
   }))
+  vi.doMock('@/composables/useFolderDecisions', () => ({
+    useFolderDecisions: () => ({ latest: latestDecision, load: vi.fn(async () => undefined) }),
+  }))
+  vi.doMock('@/composables/useNodeControl', () => ({
+    useNodeControl: () => ({ busy: ref(false), error: ref(null), start: startNode }),
+  }))
   vi.doMock('@/composables/useRealmNodes', () => ({
     useRealmNodes: () => ({ nodeById: () => null, displayName: () => 'lab node' }),
   }))
@@ -127,9 +136,9 @@ beforeAll(async () => {
   vi.doMock('@/composables/useUploadQueue', () => ({ useUploadQueue: () => ({ items: uploadItems }) }))
   vi.doMock('@/lib/config', () => ({ featureEnabled: () => true }))
   vi.doMock('@/components/desktop/BindFolderDialog.vue', () => ({ default: EmptyStub }))
-  vi.doMock('@/components/compute/NewRunMenu.vue', () => ({ default: NewRunMenuStub }))
   vi.doMock('@/components/ui/Button.vue', () => ({ default: ButtonStub }))
   vi.doMock('@/components/ui/Badge.vue', () => ({ default: BadgeStub }))
+  vi.doMock('@/components/ui/Tooltip.vue', () => ({ default: TooltipStub }))
   vi.doMock('@/components/ui/Skeleton.vue', () => ({ default: EmptyStub }))
   DesktopHomeView = (await import('./DesktopHomeView.vue')).default
 })
@@ -160,6 +169,9 @@ beforeEach(() => {
   computeShown.value = true
   realmJobs.value = []
   uploadItems.value = []
+  credentials.value = []
+  latestDecision.value = null
+  startNode.mockReset()
   syncStatus.value = {
     realmReachable: true,
     lastSyncMs: null,
@@ -174,227 +186,188 @@ function render(): Promise<string> {
   return renderToString(createSSRApp(DesktopHomeView))
 }
 
+function transfer(overrides: Partial<DeviceTransfer> = {}): DeviceTransfer {
+  return {
+    id: 't1',
+    direction: 'upload',
+    folder_id: 'f1',
+    path: 'raw/scan.tiff',
+    bucket: 'lab',
+    key: 'raw/scan.tiff',
+    state: 'transferring',
+    bytes_total: 100,
+    bytes_done: 40,
+    attempts: 1,
+    next_attempt_ms: null,
+    message: null,
+    ...overrides,
+  }
+}
+
 describe('desktop home', () => {
-  it('leads with what the node on this machine is', async () => {
+  it('names the node in one pill and keeps the long plate out', async () => {
     const html = await render()
 
-    expect(html).toContain('This computer')
-    expect(html).toContain('online')
-    expect(html).toContain('Testrealm')
-    expect(html).toContain('0.4.0')
-    expect(html).toContain('1h 00m')
+    expect(html).toContain('Running')
+    expect(html).toContain('Version')
+    expect(html).toContain('Running for 1 hour')
+    expect(html).toContain('Signed in to Test realm')
+    expect(html).not.toContain('joining the realm')
+    expect(html).not.toContain('Open buckets')
+    expect(html).not.toContain('Drafts on this computer')
   })
 
-  it('puts the decisions the folders are waiting for in front', async () => {
+  it('offers the two things to do from the header', async () => {
+    const html = await render()
+
+    expect(html).toContain('Connect your tools')
+    expect(html).toContain('Sync a folder')
+    expect(html).toContain('#tools')
+  })
+
+  it('puts the decisions the folders are waiting for on the folder row', async () => {
     const html = await render()
 
     expect(html).toContain('data-2026')
-    expect(html).toContain('Needs you 2')
-    expect(html).toContain('2 waiting for your decision')
+    expect(html).toContain('2 files need you')
+    expect(html).toContain('lab/raw/ on')
   })
 
-  it('keeps every sync surface in one card', async () => {
+  it('lists folders in one card that opens the sync page', async () => {
     const html = await render()
 
     expect(html).toContain('#sync')
     expect(html).not.toContain('#folders')
     expect(html).not.toContain('#transfers')
-    expect(html).toContain('Sync')
   })
 
   it('reflects a folder transfer in that folder chip', async () => {
-    folders.value = [
-      folder({
-        counters: {
-          in_sync: 412,
-          uploading: 0,
-          conflicts: 0,
-          pending_replacements: 0,
-          remote_deleted: 0,
-          errors: 0,
-        },
-      }),
-    ]
-    syncTransfers.value = [
-      {
-        id: 't1',
-        direction: 'upload',
-        folder_id: 'f1',
-        path: 'raw/scan.tiff',
-        bucket: 'lab',
-        key: 'raw/scan.tiff',
-        state: 'running',
-        bytes_total: 100,
-        bytes_done: 40,
-        attempts: 1,
-        next_attempt_ms: null,
-        message: null,
-      },
-    ]
-    const html = await render()
+    folders.value = [folder({ counters: { ...folder().counters, uploading: 0, conflicts: 0 } })]
+    syncTransfers.value = [transfer()]
 
-    expect(html).toContain('Syncing 1')
+    expect(await render()).toContain('Sending 1 file')
   })
 
-  it('separates the runs by where they execute', async () => {
-    realmJobs.value = [{ job_id: 'j1', state: 'running' }]
-    compute.value = {
-      enabled: false,
-      backend: null,
-      healthy: false,
-      limits: { max_cpu_cores: null, max_ram_bytes: null, max_disk_bytes: null, max_concurrent: null },
-      running: 0,
-      queued: 0,
-      paused: false,
-      message: null,
-    }
+  it('shows real progress only for bytes the node counted', async () => {
+    syncTransfers.value = [transfer(), transfer({ id: 't2', path: 'raw/old.tiff', state: 'running', bytes_done: 0 })]
+    const html = await render()
 
+    expect(html).toContain('40%')
+    expect(html).toContain('raw/old.tiff')
+    expect(html).not.toMatch(/\b0%/)
+  })
+
+  it('counts failed files and the last decision under Activity', async () => {
+    syncTransfers.value = [transfer({ state: 'failed' }), transfer({ id: 't2', state: 'failed' })]
+    latestDecision.value = { text: 'Kept your version of report.xlsx', atMs: Date.now() }
+    const html = await render()
+
+    expect(html).toContain('2 files failed')
+    expect(html).toContain('Retry')
+    expect(html).toContain('Kept your version of report.xlsx')
+  })
+
+  it('says nothing moves instead of inventing activity', async () => {
+    expect(await render()).toContain('Nothing is moving right now.')
+  })
+
+  it('walks through the first steps until each one is done', async () => {
+    folders.value = []
+    compute.value = null
+    const html = await render()
+
+    expect(html).toContain('Get started')
+    expect(html).toContain('0 of 3 done')
+    expect(html).toContain('Connect your tools')
+    expect(html).toContain('Turn on local runs')
+  })
+
+  it('counts a step as done only on what the node and realm reported', async () => {
+    credentials.value = [{ access_key_id: 'AK1', status: 'active' }]
+    compute.value = { ...enabledCompute(), enabled: false }
+    const html = await render()
+
+    expect(html).toContain('2 of 3 done')
+  })
+
+  it('drops the list once every step is done', async () => {
+    credentials.value = [{ access_key_id: 'AK1', status: 'active' }]
+    compute.value = enabledCompute()
+
+    expect(await render()).not.toContain('Get started')
+  })
+
+  it('shows no steps before the folders have loaded', async () => {
+    foldersState.value = 'loading'
+    folders.value = []
+
+    expect(await render()).not.toContain('Get started')
+  })
+
+  it('leaves out the runs step and card while compute is switched off', async () => {
+    computeShown.value = false
+    compute.value = enabledCompute()
+    const html = await render()
+
+    expect(html).not.toContain('in Testrealm')
+    expect(html).not.toContain('Turn on local runs')
+    expect(html).not.toContain('>Runs<')
+  })
+
+  it('shows the runs card only once the node runs jobs', async () => {
+    realmJobs.value = [{ job_id: 'j1', state: 'running' }]
+    expect(await render()).not.toContain('in Testrealm')
+
+    compute.value = enabledCompute()
     const html = await render()
 
     expect(html).toContain('on this computer')
     expect(html).toContain('in Testrealm')
-    expect(html).toContain('runs nothing itself yet')
   })
 
-  it('leaves out the runs card while compute is switched off', async () => {
-    computeShown.value = false
-
-    const html = await render()
-
-    expect(html).not.toContain('in Testrealm')
-    expect(html).not.toContain('>Runs<')
-  })
-
-  it('names the state of a node with no identity yet', async () => {
-    status.value = { ...status.value!, nodeId: null, enrolled: false, enrolling: true }
-    expect(await render()).toContain('joining the realm')
-
-    status.value = { ...status.value!, enrolling: false }
-    expect(await render()).toContain('not set up')
-  })
-
-  it('takes the node id from the node itself', async () => {
-    // The shell reports none, so an enrolled device must not read as unset.
-    status.value = { ...status.value!, nodeId: null }
-    expect(await render()).toContain('joined')
-
-    identity.value = { nodeId: '01HZY7QK4N8ZP3V2C6M9AB', realm: 'realm-id' }
-    const html = await render()
-
-    expect(html).toContain('01HZY7QK')
-    expect(html).not.toContain('joined')
-  })
-
-  it('says the node is down instead of showing an empty folder list', async () => {
+  it('offers Start when the node is stopped', async () => {
     nodeState.value = 'stopped'
-    nodeLabel.value = 'stopped'
     deviceClient.value = null
     folders.value = []
     foldersState.value = 'offline'
-    status.value = { ...status.value!, state: 'stopped', message: 'The node was stopped by its owner.' }
+    status.value = { ...status.value!, state: 'stopped', ready: false, message: 'The node was stopped by its owner.' }
 
     const html = await render()
 
-    expect(html).toContain('not running')
+    expect(html).toContain('Stopped')
+    expect(html).toContain('This computer is not running.')
     expect(html).toContain('The node was stopped by its owner.')
-    expect(html).not.toContain('folder bound')
+    expect(html).toContain('Start')
+    expect(html).not.toContain('Nothing syncs with this computer yet.')
   })
 
-  it('does not read as online while the node is not serving yet', async () => {
-    nodeLabel.value = 'starting'
+  it('does not read as running while the node is not serving yet', async () => {
     status.value = { ...status.value!, ready: false, message: 'The node is still starting.' }
 
     const html = await render()
 
+    expect(html).toContain('Starting')
     expect(html).toContain('The node is still starting.')
-    expect(html).not.toContain('online')
+    expect(html).not.toContain('This computer is running')
   })
 
-  it('separates what the sync owes from what it cannot fix alone', async () => {
-    syncStatus.value = {
-      realmReachable: false,
-      lastSyncMs: null,
-      pendingTotal: 3,
-      documents: [
-        {
-          documentId: 'd1',
-          path: 'lab/run.json',
-          groupId: 'g1',
-          state: 'invalid',
-          pendingEdits: 1,
-          localOnly: false,
-          validationFindings: 2,
-          lastError: null,
-          lastSyncedMs: null,
-        },
-      ],
-      datasets: [
-        { folderId: 'f1', label: 'data-2026', state: 'pending', pendingUploads: 2, unsyncedFiles: 2, conflicts: 1 },
-      ],
-    }
-
-    const html = await render()
-
-    expect(html).toContain('3 changes pending')
-    expect(html).toContain('Realm unreachable')
-    expect(html).toContain('Invalid')
-    expect(html).toContain('2 validation findings')
-  })
-
-  it('shows at most three merged folder and document rows', async () => {
-    syncStatus.value = {
-      ...syncStatus.value,
-      documents: [
-        {
-          documentId: 'd1',
-          path: 'lab/one.json',
-          groupId: 'g1',
-          state: 'synced',
-          pendingEdits: 0,
-          localOnly: false,
-          validationFindings: 0,
-          lastError: null,
-          lastSyncedMs: null,
-        },
-        {
-          documentId: 'd2',
-          path: 'lab/two.json',
-          groupId: 'g1',
-          state: 'synced',
-          pendingEdits: 0,
-          localOnly: false,
-          validationFindings: 0,
-          lastError: null,
-          lastSyncedMs: null,
-        },
-        {
-          documentId: 'd3',
-          path: 'lab/three.json',
-          groupId: 'g1',
-          state: 'synced',
-          pendingEdits: 0,
-          localOnly: false,
-          validationFindings: 0,
-          lastError: null,
-          lastSyncedMs: null,
-        },
-      ],
-    }
-
-    const html = await render()
-
-    expect(html).toContain('data-2026')
-    expect(html).toContain('lab/one.json')
-    expect(html).toContain('lab/two.json')
-    expect(html).not.toContain('lab/three.json')
-  })
-
-  it('invents no drafts while the first read is still in flight', async () => {
+  it('shows a draft card only while a draft waits', async () => {
     // Drafts load on mount, which a server render never reaches.
     const html = await render()
 
-    expect(html).toContain('Drafts on this computer')
     expect(html).not.toContain('waiting to be published')
-    expect(html).not.toContain('does not serve')
   })
 })
+
+function enabledCompute(): DeviceCompute {
+  return {
+    enabled: true,
+    backend: 'docker',
+    healthy: true,
+    limits: { max_cpu_cores: null, max_ram_bytes: null, max_disk_bytes: null, max_concurrent: null },
+    running: 0,
+    queued: 0,
+    paused: false,
+    message: null,
+  }
+}

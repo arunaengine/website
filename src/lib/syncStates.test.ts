@@ -8,6 +8,8 @@ import {
   folderConfirmed,
   itemChip,
   orderEntries,
+  transferLabel,
+  transferPercent,
 } from './syncStates'
 
 function folder(overrides: Partial<SyncedFolder> = {}): SyncedFolder {
@@ -231,5 +233,25 @@ describe('decision text', () => {
       'Used the Aruna version of all waiting files',
     )
     expect(decisionText(record('something_new', 'a.csv'))).toBeNull()
+  })
+})
+
+describe('transfer wording and progress', () => {
+  const base = failedTransfer(null)
+  const moving = { ...base, state: 'transferring' as const, bytes_total: 200, bytes_done: 50 }
+
+  it('names a transfer by its direction', () => {
+    expect(transferLabel({ ...moving, direction: 'upload' })).toBe('Sending')
+    expect(transferLabel({ ...moving, direction: 'download' })).toBe('Receiving')
+    expect(transferLabel({ ...base, state: 'queued' })).toBe('Waiting')
+    expect(transferLabel({ ...base, state: 'done' })).toBe('Done')
+  })
+
+  it('counts bytes only for a node that reports them for real', () => {
+    expect(transferPercent(moving)).toBe(25)
+    expect(transferPercent({ ...moving, state: 'running' })).toBeNull()
+    expect(transferPercent({ ...moving, bytes_done: null })).toBeNull()
+    expect(transferPercent({ ...moving, bytes_total: null })).toBeNull()
+    expect(transferPercent({ ...moving, bytes_done: 900 })).toBe(100)
   })
 })

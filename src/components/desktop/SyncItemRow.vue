@@ -6,9 +6,9 @@ import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
 import Progress from '@/components/ui/Progress.vue'
-import { folderName, type DeviceTransfer, type TransferState } from '@/lib/deviceApi'
+import { folderName, isMoving, type DeviceTransfer } from '@/lib/deviceApi'
 import { stateVariant } from '@/lib/stateBadge'
-import { itemChip, type SyncItem } from '@/lib/syncStates'
+import { itemChip, transferLabel, transferPercent, type SyncItem } from '@/lib/syncStates'
 import { formatBytes } from '@/lib/utils'
 import { ArrowDownToLine, ArrowUpFromLine, FileText, FolderSync, Pause, Play } from '@lucide/vue'
 
@@ -46,14 +46,6 @@ const noticeTone = computed<'error' | 'warning' | null>(() =>
   chip.value.variant === 'destructive' ? 'error' : chip.value.variant === 'warn' ? 'warning' : null,
 )
 
-const TRANSFER_LABEL: Record<TransferState, string> = {
-  queued: 'Queued',
-  running: 'Running',
-  retrying: 'Retrying',
-  failed: 'Failed',
-  done: 'Done',
-}
-
 const transfers = computed(() => {
   if (props.item.kind !== 'folder') return []
   return [...(props.item.transfers ?? [])].sort((left, right) => {
@@ -69,14 +61,9 @@ function remotePath(bucket: string, prefix: string): string {
   return prefix ? `${bucket}/${prefix}` : bucket
 }
 
-function percent(transfer: DeviceTransfer): number {
-  if (!transfer.bytes_total || transfer.bytes_done === null) return 0
-  return Math.min(100, Math.round((transfer.bytes_done / transfer.bytes_total) * 100))
-}
-
 function moved(transfer: DeviceTransfer): string {
-  if (transfer.bytes_total === null) return ''
-  return `${formatBytes(transfer.bytes_done ?? 0)} of ${formatBytes(transfer.bytes_total)}`
+  if (transfer.bytes_total === null || transfer.bytes_done === null || transferPercent(transfer) === null) return ''
+  return `${formatBytes(transfer.bytes_done)} of ${formatBytes(transfer.bytes_total)}`
 }
 </script>
 
@@ -98,9 +85,8 @@ function moved(transfer: DeviceTransfer): string {
 
         <p v-if="folder" class="mt-1 truncate text-[11px] text-muted-foreground" :title="folder.root">
           <span class="hash">{{ folder.root }}</span>
-          →
+          → {{ remotePath(folder.remote.bucket, folder.remote.prefix) }} on
           <NodeLabel :node-id="folder.remote.node_id" size="sm" />
-          · {{ remotePath(folder.remote.bucket, folder.remote.prefix) }}
         </p>
         <p v-else-if="document" class="hash mt-1 truncate">{{ subtitle }}</p>
 
@@ -129,15 +115,15 @@ function moved(transfer: DeviceTransfer): string {
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-2">
             <span class="hash min-w-0 flex-1 truncate text-foreground">{{ transfer.path }}</span>
-            <Badge :variant="stateVariant(transfer.state)" size="sm">{{ TRANSFER_LABEL[transfer.state] }}</Badge>
+            <Badge :variant="stateVariant(transfer.state)" size="sm">{{ transferLabel(transfer) }}</Badge>
             <span class="text-muted-foreground">{{ moved(transfer) }}</span>
           </div>
           <p v-if="transfer.message" class="truncate text-destructive">{{ transfer.message }}</p>
         </div>
         <Progress
-          :value="percent(transfer)"
-          :indeterminate="transfer.bytes_total === null && transfer.state === 'running'"
-          :label="`${transfer.path}: ${percent(transfer)}%`"
+          :value="transferPercent(transfer) ?? 0"
+          :indeterminate="transferPercent(transfer) === null && isMoving(transfer)"
+          :label="transfer.path"
           class="h-1.5 w-28 shrink-0"
         />
       </div>

@@ -51,6 +51,7 @@ const STATE_TONE: Record<string, StateTone> = {
   queued: 'idle',
   initializing: 'progress',
   running: 'progress',
+  transferring: 'progress',
   paused: 'idle',
   complete: 'done',
   executor_error: 'failed',

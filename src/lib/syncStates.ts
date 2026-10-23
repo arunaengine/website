@@ -195,3 +195,33 @@ export function decisionText(record: ActionRecord): string | null {
       return null
   }
 }
+
+/** What a transfer is doing, in the words the owner reads. */
+export function transferLabel(transfer: DeviceTransfer): string {
+  switch (transfer.state) {
+    case 'queued':
+      return 'Waiting'
+    case 'running':
+    case 'transferring':
+      return transfer.direction === 'upload' ? 'Sending' : 'Receiving'
+    case 'retrying':
+      return 'Retrying'
+    case 'failed':
+      return 'Failed'
+    default:
+      return 'Done'
+  }
+}
+
+/**
+ * How far a transfer got, or null while that is not known. Only a node that
+ * reports the transferring state counts bytes for real, so a transfer it
+ * calls running shows no percentage instead of an invented one.
+ */
+export function transferPercent(transfer: DeviceTransfer): number | null {
+  if (transfer.state === 'done') return 100
+  if (transfer.state === 'queued') return 0
+  if (transfer.state !== 'transferring') return null
+  if (!transfer.bytes_total || transfer.bytes_done === null) return null
+  return Math.min(100, Math.floor((transfer.bytes_done / transfer.bytes_total) * 100))
+}
