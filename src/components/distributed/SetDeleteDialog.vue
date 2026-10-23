@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Deleting a distributed bucket. The preview lists datasets that refer to it and says if the list is complete.
+// Deleting a bucket stored on several nodes. The preview lists datasets that refer to it and says if the list is complete.
 import { computed, ref } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'

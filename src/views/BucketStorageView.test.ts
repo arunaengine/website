@@ -73,6 +73,7 @@ const view = compileClientComponent(new URL('./BucketStorageView.vue', import.me
   '@/components/ui/TabsList.vue': moduleDefault(Slotted('div')),
   '@/components/ui/TabsTrigger.vue': moduleDefault(TabsTriggerStub),
   '@/components/storage/BucketAccessTab.vue': moduleDefault(Marker('public rules')),
+  '@/components/distributed/AccessTab.vue': moduleDefault(Marker('grants on nodes')),
   '@/components/storage/BucketNodesTab.vue': moduleDefault(Marker('nodes of the bucket')),
   '@/components/storage/ContentSources.vue': moduleDefault(Marker('where the contents come from')),
   '@/lib/distributedMock': { mockEnabled: () => false },

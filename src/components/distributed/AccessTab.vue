@@ -19,7 +19,7 @@ const rows = computed(() => {
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="surface space-y-4 p-5">
     <p class="text-sm text-muted-foreground">
       Permissions are checked on the node that serves a request. A node that fetches bytes from another member
       is checked there too.

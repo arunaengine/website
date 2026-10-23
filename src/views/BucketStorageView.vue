@@ -17,6 +17,7 @@ import BucketAccessTab from '@/components/storage/BucketAccessTab.vue'
 import BucketBackendTab from '@/components/storage/BucketBackendTab.vue'
 import BucketComplianceSection from '@/components/storage/BucketComplianceSection.vue'
 import BucketDeleteSection from '@/components/storage/BucketDeleteSection.vue'
+import AccessTab from '@/components/distributed/AccessTab.vue'
 import BucketNodesTab from '@/components/storage/BucketNodesTab.vue'
 import BucketEncryptionTab from '@/components/storage/BucketEncryptionTab.vue'
 import BucketPolicySection from '@/components/storage/BucketPolicySection.vue'
@@ -162,7 +163,8 @@ const browserLink = computed(() => ({
         />
       </TabsContent>
 
-      <TabsContent v-if="groupId" value="access" class="mt-0">
+      <TabsContent v-if="groupId" value="access" class="mt-0 space-y-5">
+        <AccessTab v-if="example" :bucket="example" />
         <BucketAccessTab :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
       </TabsContent>
 
