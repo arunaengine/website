@@ -110,6 +110,20 @@ describe('desktop mode', () => {
     expect(desktop.desktopBridge()).toBeNull()
   })
 
+  it('flags a shell whose bridge is older than the portal expects', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const invoke = vi.fn(async () => null)
+    const old = await boot(shell({ bridge: { invoke, version: 1 } }))
+    expect(old.bridgeOutdated.value).toBe(true)
+    expect(warn).toHaveBeenCalledWith('aruna-desktop: outdated app', { have: 1, need: old.BRIDGE_VERSION })
+
+    warn.mockClear()
+    const current = await boot(shell({ bridge: { invoke, version: old.BRIDGE_VERSION } }))
+    expect(current.bridgeOutdated.value).toBe(false)
+    expect(warn).not.toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
   it('sends the sign-in url to the system browser', async () => {
     const invoke = vi.fn(async () => null)
     await boot(shell({ bridge: { invoke, version: 1 } }))

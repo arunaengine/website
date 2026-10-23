@@ -3,7 +3,7 @@
 // runs, and its absence is plain web behaviour. The shell never replaces this
 // window: it reports every later context, so the context lives in a ref and
 // the portal follows it (aruna notes, decision 20).
-import { shallowRef } from 'vue'
+import { computed, shallowRef } from 'vue'
 import { applyPortalConfig, DEFAULT_PORTAL_CONFIG, loadPortalConfig } from './config'
 import { reportGlobalError } from '@/composables/useGlobalErrors'
 import type { Unlisten } from './desktopEvents'
@@ -17,6 +17,9 @@ export interface DesktopBridge {
   invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown>
   version: number
 }
+
+/** The bridge version this portal build is written against. */
+export const BRIDGE_VERSION = 6
 
 /** Runtime switches; unknown flags are passed through to the feature map. */
 export interface DesktopFeatures {
@@ -100,6 +103,12 @@ export const shellContext = shallowRef<DesktopContext | null>(
 export function desktopContext(): DesktopContext | null {
   return shellContext.value
 }
+
+/** True when the shell's bridge is older than this portal expects. */
+export const bridgeOutdated = computed(() => {
+  const bridge = shellContext.value?.bridge
+  return bridge !== undefined && bridge.version < BRIDGE_VERSION
+})
 
 /** True inside the Aruna Desktop shell; the guard for every desktop-only path. */
 export function isDesktop(): boolean {
@@ -235,6 +244,9 @@ export async function bootRuntimeConfig(): Promise<void> {
     return
   }
   installConfig(context)
+  if (bridgeOutdated.value) {
+    console.warn('aruna-desktop: outdated app', { have: context.bridge?.version, need: BRIDGE_VERSION })
+  }
   try {
     const bridge = await import('./desktopBridge')
     bridge.installAuthOpener()
