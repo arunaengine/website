@@ -228,7 +228,7 @@ export const MOCK_GRANTS: Record<string, MockGrant[]> = {
 export interface SourceDigest {
   algorithm: string
   digest: string
-  scope: 'full object' | 'composite'
+  scope: 'full object' | 'composite' | 'not established'
   origin: string
 }
 
@@ -434,12 +434,193 @@ export function sourceCoordinator(index: number): string {
   return BAKREP_NODES[index % BAKREP_NODES.length]
 }
 
-export function bucketFiles(bucket: string): MockObject[] {
-  return MOCK_OBJECTS.filter((object) => object.bucket === bucket)
+export interface ExampleEntry {
+  key: string
+  name: string
+  size: number
+  modified: string
+}
+
+export interface ExampleListing {
+  folders: { prefix: string; name: string }[]
+  files: ExampleEntry[]
+}
+
+const FIRST_SAMPLE: Record<number, string> = { 7: 'GCF_000005845.2', 31: 'GCF_003697165.2', 44: 'GCF_000008865.2' }
+const SOURCE_FILES = ['genome.fna.gz', 'annotation.gff3.gz']
+const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
+const LISTED_AT = '2026-10-23T05:40:00Z'
+
+function hashOf(text: string): number {
+  let hash = 2166136261
+  for (let index = 0; index < text.length; index += 1) hash = Math.imul(hash ^ text.charCodeAt(index), 16777619) >>> 0
+  return hash
+}
+
+function digits(text: string, length: number, alphabet: string): string {
+  let hash = hashOf(text)
+  let out = ''
+  for (let index = 0; index < length; index += 1) {
+    hash = Math.imul(hash ^ (index + 1), 16777619) >>> 0
+    out += alphabet[hash % alphabet.length]
+  }
+  return out
+}
+
+function sampleIds(index: number): string[] {
+  const other = (step: number) => `GCF_${String(1000 + index * 37 + step * 11).padStart(9, '0')}.1`
+  return [FIRST_SAMPLE[index] ?? other(0), other(1), other(2)]
+}
+
+function sourceIndex(folder: string): number {
+  return BAKREP_NAMES.indexOf(folder)
+}
+
+const BAKREP_NAMES = Array.from({ length: BAKREP_COUNT }, (_, index) => sourceName(index))
+
+function bakrepEntry(index: number, sample: string, file: string): ExampleEntry {
+  const key = `${sourceName(index)}/${sample}/${file}`
+  const defined = MOCK_OBJECTS.find((object) => object.key === key)
+  return { key, name: file, size: defined?.size ?? 300_000 + (hashOf(key) % 1_500_000), modified: defined?.modified ?? LISTED_AT }
+}
+
+const PLAIN_FILES: Record<string, { key: string; size: number }[]> = {
+  'spire-db': [
+    { key: 'release-2026-10/metadata/samples.tsv.zst', size: 412_000_000 },
+    { key: 'release-2026-09/spire_mags.tsv.zst', size: 46_900_000_000 },
+    { key: 'docs/README.md', size: 6_400 },
+  ],
+  'reads-edge': [
+    { key: 'runs/2026-10-01/sample-01.fastq.gz', size: 5_100_000_000 },
+    { key: 'runs/2026-10-01/sample-02.fastq.gz', size: 4_700_000_000 },
+    { key: 'runs/2026-10-08/sample-03.fastq.gz', size: 5_400_000_000 },
+    { key: 'qc/summary.tsv', size: 18_300 },
+  ],
+  [ORDINARY_BUCKET]: [
+    { key: 'raw/2026/reef-07/reads_R2.fastq.gz', size: 3_790_000_000 },
+    { key: 'raw/2026/reef-08/reads_R1.fastq.gz', size: 3_410_000_000 },
+    { key: 'analysis/coverage.tsv', size: 92_000 },
+  ],
+}
+
+function plainEntries(bucket: string): ExampleEntry[] {
+  const defined = MOCK_OBJECTS.filter((object) => object.bucket === bucket).map((object) => ({
+    key: object.key,
+    name: object.key.split('/').pop() ?? object.key,
+    size: object.size,
+    modified: object.modified,
+  }))
+  const plain = (PLAIN_FILES[bucket] ?? []).map((file) => ({
+    ...file,
+    name: file.key.split('/').pop() ?? file.key,
+    modified: '2026-10-02T11:05:00Z',
+  }))
+  return [...defined, ...plain]
+}
+
+// The folders and files directly under a prefix, as an S3 listing would return them.
+export function exampleListing(bucket: string, prefix: string, nameStart = ''): ExampleListing {
+  const start = nameStart.toLowerCase()
+  const keep = (name: string) => name.toLowerCase().startsWith(start)
+  if (bucket === 'bakrep') {
+    const parts = prefix.split('/').filter(Boolean)
+    if (!parts.length) {
+      return { folders: BAKREP_NAMES.filter(keep).map((name) => ({ prefix: `${name}/`, name })), files: [] }
+    }
+    const index = sourceIndex(parts[0])
+    if (index < 0 || parts.length > 2) return { folders: [], files: [] }
+    if (parts.length === 1) {
+      return { folders: sampleIds(index).filter(keep).map((name) => ({ prefix: `${prefix}${name}/`, name })), files: [] }
+    }
+    if (!sampleIds(index).includes(parts[1])) return { folders: [], files: [] }
+    return { folders: [], files: SOURCE_FILES.filter(keep).map((file) => bakrepEntry(index, parts[1], file)) }
+  }
+  const folders = new Map<string, { prefix: string; name: string }>()
+  const files: ExampleEntry[] = []
+  for (const entry of plainEntries(bucket)) {
+    if (!entry.key.startsWith(prefix)) continue
+    const rest = entry.key.slice(prefix.length)
+    if (!keep(rest)) continue
+    const slash = rest.indexOf('/')
+    if (slash < 0) files.push({ ...entry, name: rest })
+    else folders.set(rest.slice(0, slash), { prefix: `${prefix}${rest.slice(0, slash)}/`, name: rest.slice(0, slash) })
+  }
+  return { folders: [...folders.values()], files }
+}
+
+function bakrepObject(key: string): MockObject | undefined {
+  const [folder, sample, file, ...extra] = key.split('/')
+  const index = sourceIndex(folder ?? '')
+  if (index < 0 || extra.length || !sampleIds(index).includes(sample ?? '') || !SOURCE_FILES.includes(file ?? '')) return undefined
+  const entry = bakrepEntry(index, sample, file)
+  const coordinator = BAKREP_NODES[index % BAKREP_NODES.length]
+  const genome = file === 'genome.fna.gz'
+  const etag = digits(`${key}:etag`, 32, '0123456789abcdef')
+  return {
+    id: key,
+    bucket: 'bakrep',
+    key,
+    versionId: `01K8Y3M5R7${digits(key, 16, CROCKFORD)}`,
+    size: entry.size,
+    modified: LISTED_AT,
+    servedBy: 'node-2',
+    how: 'node-2 has no copy yet. It read the file from the source and checked it first.',
+    holders: [
+      { nodeId: coordinator, role: 'Coordinator', bytes: 'Record only' },
+      { nodeId: BAKREP_REPLICA[coordinator], role: 'Replica', bytes: 'Record only' },
+    ],
+    external: {
+      source: `${BAKREP_ENDPOINT}/${key}`,
+      etag: genome ? `"${etag}"` : undefined,
+      digests: genome ? [{ algorithm: 'md5', digest: etag, scope: 'full object', origin: 'Listing ETag, evidence only' }] : [],
+      refreshed: LISTED_AT,
+      notPinned: genome ? undefined : 'The source sends no ETag and no checksum for the whole file, so one exact content cannot be named.',
+    },
+    datasets: ['bakrep collection'],
+  }
+}
+
+const HELD: Record<DataStrategy, string> = {
+  copy: 'Full copy',
+  'copy on use': 'Not fetched yet',
+  'cache on use': 'Not fetched yet',
+  stream: 'No bytes kept',
+}
+
+function plainObject(bucket: string, key: string): MockObject | undefined {
+  const file = (PLAIN_FILES[bucket] ?? []).find((entry) => entry.key === key)
+  const found = mockBucket(bucket)
+  if (!file || !found) return undefined
+  return {
+    id: key,
+    bucket,
+    key,
+    versionId: `01K8V2A4C6${digits(key, 16, CROCKFORD)}`,
+    size: file.size,
+    modified: '2026-10-02T11:05:00Z',
+    servedBy: found.members[0].nodeId,
+    how: `${found.members[0].nodeId} holds the file and served it itself.`,
+    holders: found.members.map((member, index) => ({
+      nodeId: member.nodeId,
+      role: index === 0 ? 'Coordinator' : member.strategy === 'copy' ? 'Replica' : 'Edge',
+      bytes: HELD[member.strategy],
+    })),
+    contentHash: digits(`${key}:blake3`, 64, '0123456789abcdef'),
+    datasets: [],
+  }
 }
 
 export function mockFile(bucket: string, key: string): MockObject | undefined {
-  return MOCK_OBJECTS.find((object) => object.bucket === bucket && object.key === key)
+  const defined = MOCK_OBJECTS.find((object) => object.bucket === bucket && object.key === key)
+  if (defined) return defined
+  return bucket === 'bakrep' ? bakrepObject(key) : plainObject(bucket, key)
+}
+
+// The marker a file row carries: where the bytes come from, and whether the version is pinned.
+export function exampleMark(bucket: string, key: string): string | null {
+  const external = mockFile(bucket, key)?.external
+  if (!external) return null
+  return external.notPinned ? 'Not pinned' : 'From a source'
 }
 
 export interface ContentSources {

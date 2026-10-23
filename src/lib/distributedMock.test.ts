@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { docsTopicBySlug } from '@/docs/v1'
 import { applyPortalConfig } from '@/lib/config'
 import { defaultSettings, mockEnabled, firstResults, grantGap, isPending, nodeGlob, planRanges, plannedStart, presetMembers, rangeTotal, retryResult, STORAGE_QUESTIONS } from './distributedMock'
-import { BAKREP_COUNT, grantWarnings, mockBucket, searchFiles, sourceObjects } from './distributedMockData'
+import { BAKREP_COUNT, exampleListing, exampleMark, grantWarnings, mockFile, mockBucket, searchFiles, sourceObjects } from './distributedMockData'
 
 describe('distributed mock helpers', () => {
   it('reports the members a node-specific grant does not reach', () => {
@@ -68,6 +68,27 @@ describe('distributed mock helpers', () => {
       { bucket: 'bakrep', missing: ['node-3', 'node-5'] },
     ])
     expect(grantWarnings(['data/*/bakrep/**', 'data/node-1/lab-raw-data/**', 'meta/**'])).toEqual([])
+  })
+
+  it('lists folders and files of an example bucket like S3 does', () => {
+    const root = exampleListing('bakrep', '')
+    expect(root.folders).toHaveLength(BAKREP_COUNT)
+    expect(root.folders[0]).toEqual({ prefix: 'bakrep-v2-data-000/', name: 'bakrep-v2-data-000' })
+    const samples = exampleListing('bakrep', 'bakrep-v2-data-007/').folders
+    expect(samples[0].name).toBe('GCF_000005845.2')
+    const files = exampleListing('bakrep', samples[0].prefix).files
+    expect(files.map((file) => file.name)).toEqual(['genome.fna.gz', 'annotation.gff3.gz'])
+    expect(exampleListing('spire-db', 'release-2026-10/').folders.map((folder) => folder.name)).toEqual(['metadata'])
+    expect(exampleListing('spire-db', '', 'doc').folders.map((folder) => folder.name)).toEqual(['docs'])
+  })
+
+  it('marks files from a source and gives every listed file its details', () => {
+    const sample = exampleListing('bakrep', 'bakrep-v2-data-012/').folders[0]
+    const [genome, annotation] = exampleListing('bakrep', sample.prefix).files
+    expect(exampleMark('bakrep', genome.key)).toBe('From a source')
+    expect(exampleMark('bakrep', annotation.key)).toBe('Not pinned')
+    expect(mockFile('bakrep', genome.key)?.size).toBe(genome.size)
+    expect(exampleMark('lab-raw-data', 'raw/2026/reef-07/notes.txt')).toBeNull()
   })
 
   it('finds example files when every word of the query is in the key', () => {

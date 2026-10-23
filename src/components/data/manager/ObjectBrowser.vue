@@ -20,6 +20,7 @@ import { useAruna } from '@/composables/useAruna'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { isDesktop } from '@/lib/desktop'
 import { mockEnabled } from '@/lib/distributedMock'
+import { exampleMark } from '@/lib/distributedMockData'
 import type { BindSource } from '@/lib/bindSource'
 import { folderName } from '@/lib/deviceApi'
 import { useBrokenFiles } from '@/composables/useBrokenFiles'
@@ -681,6 +682,9 @@ async function onDrop(event: DragEvent) {
                     class="h-3 w-3 shrink-0 text-primary/40"
                     aria-label="Covered by a sync relationship"
                   />
+                  <Badge v-if="mockEnabled() && exampleMark(bucket, object.key)" :variant="exampleMark(bucket, object.key) === 'Not pinned' ? 'warn' : 'outline'" size="sm" class="shrink-0">
+                    {{ exampleMark(bucket, object.key) }}
+                  </Badge>
                   <Tooltip v-if="references.keyIsReferenced(object.key)">
                     <span class="shrink-0" tabindex="0">
                       <Link2 class="h-3 w-3 text-primary/40" :aria-label="referencedFrom(object.key)" />

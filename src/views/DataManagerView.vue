@@ -23,7 +23,7 @@ import DeleteDialog from '@/components/data/DeleteDialog.vue'
 import FileDetailsDialog from '@/components/data/FileDetailsDialog.vue'
 import PublicAccessDialog from '@/components/data/PublicAccessDialog.vue'
 import MockSidebar from '@/components/data/manager/MockSidebar.vue'
-import MockBucketBrowser from '@/components/data/manager/MockBucketBrowser.vue'
+import MockBucketBanner from '@/components/data/manager/MockBucketBanner.vue'
 import ObjectBrowser from '@/components/data/manager/ObjectBrowser.vue'
 import UploadPanel from '@/components/data/manager/UploadPanel.vue'
 import NewNotebookDialog from '@/components/notebook/NewNotebookDialog.vue'
@@ -254,6 +254,10 @@ function openNewFolder() {
 
 async function createFolder() {
   if (newFolderInvalid.value || newFolderBusy.value) return
+  if (exampleBucket.value) {
+    newFolderOpen.value = false
+    return
+  }
   newFolderBusy.value = true
   newFolderError.value = null
   const targetBucket = bucket.value
@@ -332,12 +336,19 @@ async function createFolder() {
 
       <section v-else-if="mockOnly" class="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
         <MockSidebar :active="bucket" @open="(name: string) => manager.openBucket(name)" />
-        <MockBucketBrowser
-          v-if="exampleBucket"
-          :bucket="exampleBucket"
-          @add-data="addDataOpen = true"
-          @open="(key: string) => manager.openDetails({ key, name: key.split('/').pop() ?? key })"
-        />
+        <div v-if="exampleBucket" class="min-w-0 space-y-4">
+          <MockBucketBanner :bucket="exampleBucket" />
+          <ObjectBrowser
+            :manager="manager"
+            :notebooks="notebooksView"
+            @add-data="addDataOpen = true"
+            @new-folder="openNewFolder"
+            @new-notebook="newNotebookOpen = true"
+            @sync-to-node="openSyncDialog"
+            @sync-to-computer="openBindDialog"
+            @public-access="openPublicAccess"
+          />
+        </div>
         <EmptyState v-else title="Pick an example bucket" description="The buckets on the left show example data. Nothing here talks to a node." />
       </section>
 
@@ -412,26 +423,22 @@ async function createFolder() {
           @new-bucket="newBucketOpen = true"
         />
 
-        <MockBucketBrowser
-          v-if="exampleBucket"
-          :bucket="exampleBucket"
-          @add-data="addDataOpen = true"
-          @open="(key: string) => manager.openDetails({ key, name: key.split('/').pop() ?? key })"
-        />
-        <ObjectBrowser
-          v-else
-          :manager="manager"
-          :notebooks="notebooksView"
-          @add-data="addDataOpen = true"
-          @new-folder="openNewFolder"
-          @new-notebook="newNotebookOpen = true"
-          @sync-to-node="openSyncDialog"
-          @sync-to-computer="openBindDialog"
-          @public-access="openPublicAccess"
-          @new-bucket="newBucketOpen = true"
-        >
-          <UploadPanel :manager="manager" />
-        </ObjectBrowser>
+        <div class="min-w-0 space-y-4">
+          <MockBucketBanner v-if="exampleBucket" :bucket="exampleBucket" />
+          <ObjectBrowser
+            :manager="manager"
+            :notebooks="notebooksView"
+            @add-data="addDataOpen = true"
+            @new-folder="openNewFolder"
+            @new-notebook="newNotebookOpen = true"
+            @sync-to-node="openSyncDialog"
+            @sync-to-computer="openBindDialog"
+            @public-access="openPublicAccess"
+            @new-bucket="newBucketOpen = true"
+          >
+            <UploadPanel :manager="manager" />
+          </ObjectBrowser>
+        </div>
       </section>
     </div>
 

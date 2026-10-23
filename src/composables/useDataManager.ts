@@ -41,6 +41,8 @@ import { referenceSourceLabel, referenceSourceName, type ReferenceSourceGroup } 
 import { bindSource, type BindSource } from '@/lib/bindSource'
 import { isDesktop } from '@/lib/desktop'
 import type { SyncedFolder } from '@/lib/deviceApi'
+import { mockEnabled } from '@/lib/distributedMock'
+import { exampleListing, mockBucket } from '@/lib/distributedMockData'
 import { parseArunaArn, prefixesOverlap, syncBucketKey } from '@/lib/sync'
 import { dataWatchPathPrefix, s3EndpointNodeId } from '@/lib/watches'
 
@@ -753,7 +755,22 @@ export function useDataManager() {
 
 
   // One page at a time: the page replaces the list, and Prev or Next pick it.
+  // An example bucket of the node mock lists from static data, with or without a session.
+  const exampleOpen = computed(() => mockEnabled() && Boolean(mockBucket(bucket.value)))
+  function listExample() {
+    const page = exampleListing(bucket.value, s3Prefix.value, nameFilter.value)
+    folders.value = page.folders
+    objects.value = page.files.map((file) => ({ key: file.key, name: file.name, size: file.size, lastModified: new Date(file.modified) }))
+    nextToken.value = undefined
+    listError.value = null
+    listAuthError.value = false
+    remoteBrowseBlocked.value = false
+    listLoading.value = false
+    listedOnce.value = true
+  }
+
   async function loadObjects() {
+    if (exampleOpen.value) return listExample()
     if (!contextReady.value || !effectiveEndpoint.value || !bucket.value) return
     if (!s3.canRead(bucket.value, s3Prefix.value, remoteNodeId.value)) {
       listError.value = 'This session does not allow reading the selected bucket and prefix.'
@@ -877,6 +894,7 @@ export function useDataManager() {
     else pages.reset()
     if (bucket.value && contextReady.value) void loadObjects()
   })
+  watch([bucket, prefix, nameFilter, exampleOpen], () => exampleOpen.value && listExample(), { immediate: true })
 
   watch(
     () => route.query.group,
@@ -1054,6 +1072,7 @@ export function useDataManager() {
   const publicAccess = usePublicAccess(activeGroupId)
   const currentBindSource = computed(() => bindSourceFor(bucket.value, remoteNodeId.value, activeGroupId.value))
   const canWriteCurrentPrefix = computed(() =>
+    exampleOpen.value ||
     Boolean(
       contextReady.value &&
         bucket.value &&
