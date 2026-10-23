@@ -3,6 +3,7 @@ import { defineComponent, h, reactive, ref } from 'vue'
 import * as RouterRuntime from 'vue-router'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useRefresh } from '@/composables/useRefresh'
 import * as DeviceApi from '@/lib/deviceApi'
 import * as StateBadge from '@/lib/stateBadge'
 import * as SyncStates from '@/lib/syncStates'
@@ -16,6 +17,7 @@ import {
   moduleDefault,
   mountApp,
   nodes,
+  refreshButton,
   type HostNode,
 } from '@/test/clientRender'
 import type { FolderEntry, SyncedFolder } from '@/lib/deviceApi'
@@ -144,6 +146,7 @@ const FolderDetailView = compileClientComponent(new URL('./FolderDetailView.vue'
   '@lucide/vue': icons,
   '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+  '@/components/ui/RefreshButton.vue': moduleDefault(refreshButton()),
   '@/components/ui/RefusalNote.vue': moduleDefault(RefusalStub),
   '@/components/ui/EmptyState.vue': moduleDefault(Passthrough),
   '@/components/ui/ErrorPanel.vue': moduleDefault(Passthrough),
@@ -157,10 +160,11 @@ const FolderDetailView = compileClientComponent(new URL('./FolderDetailView.vue'
   '@/components/desktop/StopSyncDialog.vue': moduleDefault(StopDialogStub),
   '@/components/desktop/FolderHistory.vue': moduleDefault(HistoryStub),
   '@/composables/useDeviceTransfers': { useDeviceTransfers: () => ({ all: transfers }) },
+  '@/composables/useRefresh': { useRefresh },
   '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: () => 'lab node', isLocalNode: (id: string) => id === 'home' }) },
   '@/composables/useSyncedFolders': {
     useSyncedFolders: () => ({
-      folders: ref([folder]),
+      folders: ref([folder, { ...folder, folder_id: 'f2', root: '/home/me/other' }]),
       ensureLoaded: vi.fn(async () => undefined),
       refreshFolder,
       entries,
@@ -381,6 +385,101 @@ describe('the bucket and stopping', () => {
     stopDialog.confirm()
     await VueRuntime.nextTick()
     expect(unbind).toHaveBeenCalledWith('f1')
+    mounted.app.unmount()
+  })
+})
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((done) => (resolve = done))
+  return { promise, resolve }
+}
+
+describe('reading the list after a retry', () => {
+  it('reads the entries again once the folder was swept, so a fixed file stops showing as failed', async () => {
+    const mounted = await mount()
+    entries.mockClear()
+    entries.mockResolvedValue({ entries: [entry({ path: 'notes/bad.md', state: 'in_sync' })], next_cursor: null })
+
+    await click(rowButton(mounted.root, 'notes/bad.md', 'Retry'))
+    await VueRuntime.nextTick()
+
+    expect(sync).toHaveBeenCalledWith('f1')
+    expect(entries).toHaveBeenCalled()
+    expect(refreshFolder).toHaveBeenCalled()
+    expect(content(row(mounted.root, 'notes/bad.md'))).toContain('Synced')
+    mounted.app.unmount()
+  })
+
+  it('keeps a way to read the folder again by hand', async () => {
+    const mounted = await mount()
+    entries.mockClear()
+
+    await click(button(mounted.root, 'Refresh'))
+
+    expect(entries).toHaveBeenCalled()
+    mounted.app.unmount()
+  })
+})
+
+describe('answers for another filter or folder', () => {
+  it('drops the answer of a filter the owner has left', async () => {
+    const mounted = await mount()
+    const slow = deferred<DeviceApi.EntryPage>()
+    entries.mockReset()
+    entries.mockReturnValueOnce(slow.promise)
+    await click(button(mounted.root, 'Failed'))
+    entries.mockResolvedValue({ entries: [entry({ path: 'notes/synced.md', state: 'in_sync' })], next_cursor: null })
+    await click(button(mounted.root, 'Synced'))
+    await VueRuntime.nextTick()
+
+    slow.resolve({ entries: [entry({ path: 'notes/failed.md', state: 'error' })], next_cursor: null })
+    await slow.promise
+    await VueRuntime.nextTick()
+
+    expect(content(mounted.root)).toContain('notes/synced.md')
+    expect(content(mounted.root)).not.toContain('notes/failed.md')
+    mounted.app.unmount()
+  })
+
+  it('shows no row of the old folder under the new one and drops its late answer', async () => {
+    const slow = deferred<DeviceApi.EntryPage>()
+    const router = await (async () => {
+      const Stub = defineComponent(() => () => h('div'))
+      const made = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: '/app/sync', name: 'sync', component: Stub },
+          { path: '/app/folders/:folderId', name: 'folder', component: Stub },
+          { path: '/app/device', name: 'device', component: Stub },
+          { path: '/app/activity', name: 'activity', component: Stub },
+          { path: '/app/buckets/:bucketId', name: 'bucket', component: Stub },
+        ],
+      })
+      await made.push('/app/folders/f1')
+      await made.isReady()
+      return made
+    })()
+    entries.mockResolvedValue({ entries: rows, next_cursor: null })
+    const mounted = await mountApp(FolderDetailView, { router })
+    expect(content(mounted.root)).toContain('notes/day.md')
+
+    entries.mockReset()
+    entries.mockReturnValue(slow.promise)
+    await router.push('/app/folders/f2')
+    await vi.waitFor(() => expect(entries).toHaveBeenCalledWith('f2', expect.anything()))
+    expect(content(mounted.root)).not.toContain('notes/day.md')
+
+    // The slow answer is for f2; the owner has already gone back to f1.
+    entries.mockResolvedValue({ entries: [entry({ path: 'f1-only.md', state: 'in_sync' })], next_cursor: null })
+    await router.push('/app/folders/f1')
+    await vi.waitFor(() => expect(entries).toHaveBeenCalledWith('f1', expect.anything()))
+    slow.resolve({ entries: [entry({ path: 'f2-only.md', state: 'in_sync' })], next_cursor: null })
+    await slow.promise
+    await VueRuntime.nextTick()
+
+    expect(content(mounted.root)).toContain('f1-only.md')
+    expect(content(mounted.root)).not.toContain('f2-only.md')
     mounted.app.unmount()
   })
 })

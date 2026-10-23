@@ -5,6 +5,7 @@ import { computed, onMounted, ref, useTemplateRef, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import RefusalNote from '@/components/ui/RefusalNote.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
@@ -19,6 +20,7 @@ import ReplaceLocalDialog from '@/components/desktop/ReplaceLocalDialog.vue'
 import StopSyncDialog from '@/components/desktop/StopSyncDialog.vue'
 import { useDeviceTransfers } from '@/composables/useDeviceTransfers'
 import { useRealmNodes } from '@/composables/useRealmNodes'
+import { useRefresh } from '@/composables/useRefresh'
 import { useSyncedFolders } from '@/composables/useSyncedFolders'
 import {
   entryExpectation,
@@ -118,9 +120,14 @@ const movingByPath = computed(
     ),
 )
 
+// Bumped on every fresh read, so an answer for another folder or filter is dropped.
+let generation = 0
+
 async function loadPage(reset = true): Promise<void> {
-  if (!folderId.value || (!reset && loadingMore.value)) return
+  const folder = folderId.value
+  if (!folder || (!reset && loadingMore.value)) return
   const asked = reset ? filterStates.value : filterStates.value.filter((state) => cursors.value[state])
+  const mine = reset ? ++generation : generation
   if (reset) {
     listState.value = 'loading'
     cursors.value = {}
@@ -131,14 +138,16 @@ async function loadPage(reset = true): Promise<void> {
   try {
     const pages = await Promise.all(
       asked.map((state) =>
-        loadEntries(folderId.value, { state, cursor: reset ? undefined : (cursors.value[state] ?? undefined) }),
+        loadEntries(folder, { state, cursor: reset ? undefined : (cursors.value[state] ?? undefined) }),
       ),
     )
+    if (mine !== generation || folder !== folderId.value) return
     const found = pages.flatMap((page) => page.entries)
     rows.value = reset ? found : [...rows.value, ...found]
     asked.forEach((state, index) => (cursors.value = { ...cursors.value, [state]: pages[index]?.next_cursor ?? null }))
     listState.value = 'ready'
   } catch (err) {
+    if (mine !== generation || folder !== folderId.value) return
     listState.value = 'error'
     listError.value = errorMessage(err)
   } finally {
@@ -146,7 +155,7 @@ async function loadPage(reset = true): Promise<void> {
   }
 }
 
-/** A failed file is retried by sweeping the folder again, not by an action. */
+/** A failed file is retried by sweeping the folder again; the list is read afterwards. */
 async function retry(): Promise<void> {
   actionError.value = null
   try {
@@ -154,6 +163,7 @@ async function retry(): Promise<void> {
   } catch (err) {
     actionError.value = errorMessage(err)
   }
+  await refresh()
 }
 
 async function refresh(): Promise<void> {
@@ -167,24 +177,35 @@ async function refresh(): Promise<void> {
   await history.value?.reload()
 }
 
+const { busy: refreshBusy, refresh: onRefresh } = useRefresh(refresh)
+
 onMounted(async () => {
   await ensureLoaded()
   await loadPage()
 })
 watch(filter, () => void loadPage())
-watch(folderId, () => void refresh())
+// Another folder starts from nothing: no row of the last one stays under its actions.
+watch(folderId, () => {
+  rows.value = []
+  cursors.value = {}
+  filter.value = 'all'
+  void refresh()
+})
 
 async function act(entry: FolderEntry, action: EntryAction): Promise<void> {
   actionError.value = null
+  const folder = folderId.value
   const expected = entryExpectation(entry)
   if (!expected) {
     actionError.value = 'This computer has not hashed that file yet, so nothing can be applied to it. Sync the folder and try again.'
     return
   }
   try {
-    const updated = await entryAction(folderId.value, entry.path, action, expected)
+    const updated = await entryAction(folder, entry.path, action, expected)
+    // The owner may have moved to another folder while the node answered.
+    if (folder !== folderId.value) return
     rows.value = rows.value.map((row) => (row.path === entry.path ? updated : row))
-    await refreshFolder(folderId.value).catch(() => undefined)
+    await refreshFolder(folder).catch(() => undefined)
     await history.value?.reload()
   } catch (err) {
     actionError.value = isStaleExpectation(err)
@@ -291,6 +312,7 @@ const filesText = computed(() => {
         <Button v-if="folder" variant="outline" size="sm" @click="reveal(folder.root)">
           <FolderOpen class="h-3.5 w-3.5" /> Show on disk
         </Button>
+        <RefreshButton :busy="refreshBusy" :disabled="busy" @click="onRefresh" />
         <Button
           v-if="folder && folder.state !== 'deleting'"
           variant="outline"
