@@ -11,6 +11,10 @@ import {
   apiRequest,
   type ApiClientOptions,
   type ApiRequestOptions,
+  type CreateS3CredentialsRequest,
+  type CreateS3CredentialsResponse,
+  type ListS3CredentialsResponse,
+  type S3CredentialSummary,
   type ProfileValidationPreviewResponse,
 } from './api'
 
@@ -711,4 +715,23 @@ export async function setDocumentSelection(
   const path = `/device/documents/${encodeURIComponent(documentId)}/selection`
   const answer = await request<unknown>(path, client, { method: 'PUT', body: JSON.stringify({ selected }) })
   return readDeviceDocument(answer)
+}
+
+// ── Access keys of this computer's node ──────────────────────────────────────
+// Keys are node-local: one made on the realm's node does not open this one, so
+// they are always asked of the device client and never of the portal API.
+
+export async function listDeviceCredentials(client: DeviceClient): Promise<S3CredentialSummary[]> {
+  return (await request<ListS3CredentialsResponse>('/access/credentials', client)).credentials ?? []
+}
+
+export function createDeviceCredential(
+  body: CreateS3CredentialsRequest,
+  client: DeviceClient,
+): Promise<CreateS3CredentialsResponse> {
+  return post<CreateS3CredentialsResponse>('/access/credentials', client, body)
+}
+
+export function revokeDeviceCredential(accessKeyId: string, client: DeviceClient): Promise<void> {
+  return request<void>(`/access/credentials/${encodeURIComponent(accessKeyId)}`, client, { method: 'DELETE' })
 }

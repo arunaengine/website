@@ -20,6 +20,7 @@ import JobStateBadge from '@/components/jobs/JobStateBadge.vue'
 import { useAruna } from '@/composables/useAruna'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { useDeviceCompute } from '@/composables/useDeviceCompute'
+import { useDeviceKeys } from '@/composables/useDeviceKeys'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { useDeviceTransfers } from '@/composables/useDeviceTransfers'
 import { useFolderDecisions } from '@/composables/useFolderDecisions'
@@ -36,7 +37,8 @@ import { relativeTime } from '@/lib/utils'
 import { Check, Play, Plus, SquareTerminal } from '@lucide/vue'
 
 const { realm } = useRealm()
-const { currentUser, credentials } = useAruna()
+const { currentUser } = useAruna()
+const deviceKeys = useDeviceKeys()
 const { shown } = usePortalFeatures()
 const { status, state: nodeState, deviceClient, refresh } = useDeviceStatus()
 const {
@@ -79,7 +81,7 @@ const steps = computed(() => {
     {
       key: 'tools',
       title: 'Connect your tools',
-      done: credentials.value.some((key) => key.status === 'active'),
+      done: deviceKeys.active.value.length > 0,
       text: 'Use aws, rclone, Python or an AI assistant with your data.',
       action: { label: 'Connect', to: { name: 'tools' } },
     },
@@ -98,9 +100,14 @@ const steps = computed(() => {
   return list
 })
 const stepsDone = computed(() => steps.value.filter((step) => step.done).length)
-// Only a loaded list can say a step is open, so nothing shows before that.
+// Only loaded lists can say a step is open, so nothing shows before that.
 const showSteps = computed(
-  () => !startHidden.value && foldersState.value === 'ready' && stepsDone.value < steps.value.length,
+  () =>
+    !startHidden.value &&
+    foldersState.value === 'ready' &&
+    deviceKeys.state.value !== 'idle' &&
+    deviceKeys.state.value !== 'loading' &&
+    stepsDone.value < steps.value.length,
 )
 
 const folderItems = computed<SyncItem[]>(() =>

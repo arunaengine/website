@@ -9,6 +9,8 @@ const mcpUrl = ref<string | null>(null)
 const compute = ref<{ enabled: boolean } | null>(null)
 const computeShown = ref(true)
 const credentials = ref<Array<{ access_key_id: string; status: string; expires_at: string }>>([])
+const keysState = ref('ready')
+const keysAvailable = ref(true)
 
 const passthrough = defineComponent((_, { attrs, slots }) => () => h('div', attrs, slots.default?.()))
 const ButtonStub = defineComponent((_, { attrs, slots }) => () => h('button', attrs, slots.default?.()))
@@ -31,13 +33,18 @@ beforeAll(async () => {
   vi.doMock('@/components/ui/TabsContent.vue', () => ({ default: passthrough }))
   vi.doMock('@/components/dashboard/PageHeader.vue', () => ({ default: passthrough }))
   vi.doMock('@/components/desktop/CreateKeyDialog.vue', () => ({ default: defineComponent(() => () => null) }))
-  vi.doMock('@/composables/useAruna', () => ({
-    useAruna: () => ({ credentials, revokeS3Credential: vi.fn(), saving: ref(false) }),
+  vi.doMock('@/composables/useDeviceKeys', () => ({
+    useDeviceKeys: () => ({
+      active: computed(() => credentials.value.filter((key) => key.status === 'active')),
+      state: keysState,
+      available: keysAvailable,
+      remove: vi.fn(),
+    }),
   }))
   vi.doMock('@/composables/usePortalFeatures', () => ({
     usePortalFeatures: () => ({ shown: () => computeShown.value }),
   }))
-  vi.doMock('@/composables/useDeviceStatus', () => ({ useDeviceStatus: () => ({ status, s3Url, mcpUrl }) }))
+  vi.doMock('@/composables/useDeviceStatus', () => ({ useDeviceStatus: () => ({ status, s3Url, mcpUrl, deviceClient: ref(null) }) }))
   vi.doMock('@/composables/useDeviceCompute', () => ({
     useDeviceCompute: () => ({ compute, ensureLoaded: vi.fn(async () => undefined) }),
   }))
@@ -59,6 +66,8 @@ beforeEach(() => {
   compute.value = { enabled: true }
   computeShown.value = true
   credentials.value = []
+  keysState.value = 'ready'
+  keysAvailable.value = true
 })
 
 const render = () => renderToString(createSSRApp(ToolsView))
@@ -106,6 +115,16 @@ describe('connect your tools', () => {
     expect(html).not.toContain('ARKGONE')
     expect(html).toContain('Remove')
     expect(html).not.toContain('You have no key yet.')
+  })
+
+  it('says nothing about keys it could not read and blocks making one', async () => {
+    keysState.value = 'offline'
+    keysAvailable.value = false
+    const html = await render()
+
+    expect(html).toContain('Aruna cannot list your keys right now.')
+    expect(html).not.toContain('You have no key yet.')
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>[^<]*(<[^>]+>)*[^<]*Create key/)
   })
 
   it('says there is no key instead of inventing one', async () => {

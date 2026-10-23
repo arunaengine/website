@@ -26,6 +26,7 @@ const syncState = ref('ready')
 const realmJobs = ref<Array<{ job_id: string; state: string }>>([])
 const uploadItems = ref<Array<{ id: number; state: string }>>([])
 const credentials = ref<Array<{ access_key_id: string; status: string }>>([])
+const keysState = ref('ready')
 const latestDecision = ref<{ text: string; atMs: number | null } | null>(null)
 const startNode = vi.fn()
 
@@ -69,7 +70,7 @@ let DesktopHomeView: Component
 
 beforeAll(async () => {
   vi.doMock('vue-router', () => ({ RouterLink: RouterLinkStub }))
-  vi.doMock('@/composables/useAruna', () => ({ useAruna: () => ({ currentUser: ref({ id: 'u1' }), credentials }) }))
+  vi.doMock('@/composables/useAruna', () => ({ useAruna: () => ({ currentUser: ref({ id: 'u1' }) }) }))
   vi.doMock('@/composables/usePortalFeatures', () => ({ usePortalFeatures: () => ({ shown: (feature: string) => feature !== 'compute' || computeShown.value }) }))
   vi.doMock('@/composables/useRealm', () => ({
     useRealm: () => ({ realm: ref({ name: 'Test realm', shortName: 'Testrealm' }) }),
@@ -105,6 +106,9 @@ beforeAll(async () => {
       state: transfersState,
       load: vi.fn(async () => undefined),
     }),
+  }))
+  vi.doMock('@/composables/useDeviceKeys', () => ({
+    useDeviceKeys: () => ({ active: computed(() => credentials.value.filter((key) => key.status === 'active')), state: keysState }),
   }))
   vi.doMock('@/composables/useFolderDecisions', () => ({
     useFolderDecisions: () => ({ latest: latestDecision, load: vi.fn(async () => undefined) }),
@@ -171,6 +175,7 @@ beforeEach(() => {
   realmJobs.value = []
   uploadItems.value = []
   credentials.value = []
+  keysState.value = 'ready'
   latestDecision.value = null
   startNode.mockReset()
   syncStatus.value = {
@@ -301,6 +306,12 @@ describe('desktop home', () => {
   it('shows no steps before the folders have loaded', async () => {
     foldersState.value = 'loading'
     folders.value = []
+
+    expect(await render()).not.toContain('Get started')
+  })
+
+  it('shows no steps before the keys of this computer are read', async () => {
+    keysState.value = 'loading'
 
     expect(await render()).not.toContain('Get started')
   })

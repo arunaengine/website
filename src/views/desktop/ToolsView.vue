@@ -2,7 +2,7 @@
 // Connect your tools: the address of this computer, one key per tool, and the
 // lines to paste into each program. The key's secret is shown once and is kept
 // only in this page's memory.
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
@@ -14,8 +14,8 @@ import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
 import CreateKeyDialog from '@/components/desktop/CreateKeyDialog.vue'
-import { useAruna } from '@/composables/useAruna'
 import { useDeviceCompute } from '@/composables/useDeviceCompute'
+import { useDeviceKeys } from '@/composables/useDeviceKeys'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { useNodeControl } from '@/composables/useNodeControl'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
@@ -24,9 +24,10 @@ import { nextflowSnippet, tesAddress, TOOLS, toolSnippet, type ToolId, type Tool
 import { errorMessage } from '@/lib/utils'
 import { Check, Play, Plus, Trash2 } from '@lucide/vue'
 
-const { credentials, revokeS3Credential, saving } = useAruna()
 const { shown } = usePortalFeatures()
-const { status, s3Url, mcpUrl } = useDeviceStatus()
+const { status, s3Url, mcpUrl, deviceClient } = useDeviceStatus()
+const keyStore = useDeviceKeys()
+const { active: keys, available: keysAvailable, state: keysState, remove: removeKey } = keyStore
 const { compute, ensureLoaded: ensureCompute } = useDeviceCompute()
 const control = useNodeControl()
 
@@ -42,7 +43,8 @@ const running = computed(() => status.value?.state === 'running' && status.value
 const address = computed(() => (running.value ? s3Url.value : null))
 const tes = computed(() => (running.value ? tesAddress(status.value?.apiBaseUrl) : null))
 const names = ref<Record<string, string>>({})
-const keys = computed(() => credentials.value.filter((credential) => credential.status === 'active'))
+// A secret belongs to the node that made it, so a change of node forgets it.
+watch(deviceClient, () => (fresh.value = null))
 
 onMounted(() => {
   names.value = keyNames()
@@ -59,7 +61,7 @@ function onCreated(key: ToolKey & { name: string }): void {
 async function remove(accessKeyId: string): Promise<void> {
   removeError.value = null
   try {
-    await revokeS3Credential(accessKeyId)
+    await removeKey(accessKeyId)
     if (fresh.value?.accessKeyId === accessKeyId) fresh.value = null
     removing.value = null
   } catch (err) {
@@ -117,7 +119,9 @@ function made(iso: string): string {
       <section class="surface overflow-hidden">
         <header class="flex items-center justify-between border-b border-border px-5 py-3">
           <h2 class="font-display text-sm font-semibold text-aruna-navy">Access keys</h2>
-          <Button variant="outline" size="sm" @click="createOpen = true"><Plus class="h-3.5 w-3.5" /> Create key</Button>
+          <Button variant="outline" size="sm" :disabled="!keysAvailable" @click="createOpen = true">
+            <Plus class="h-3.5 w-3.5" /> Create key
+          </Button>
         </header>
         <p class="px-5 pt-4 text-sm text-muted-foreground">
           A key is a user name and a password for your tools. Make one for each tool, so you can remove it alone later.
@@ -156,17 +160,23 @@ function made(iso: string): string {
               </p>
             </div>
             <template v-if="removing === key.access_key_id">
-              <Button variant="destructive" size="sm" :disabled="saving" @click="remove(key.access_key_id)">
+              <Button variant="destructive" size="sm" @click="remove(key.access_key_id)">
                 <Check class="h-3.5 w-3.5" /> Yes, remove it
               </Button>
               <Button variant="ghost" size="sm" @click="removing = null">Keep it</Button>
             </template>
-            <Button v-else variant="ghost" size="sm" @click="removing = key.access_key_id">
+            <Button v-else variant="ghost" size="sm" :disabled="!keysAvailable" @click="removing = key.access_key_id">
               <Trash2 class="h-3.5 w-3.5" /> Remove
             </Button>
           </li>
         </ul>
-        <p v-else class="px-5 pb-4 pt-3 text-xs text-muted-foreground">You have no key yet.</p>
+        <p v-else-if="keysState === 'ready'" class="px-5 pb-4 pt-3 text-xs text-muted-foreground">You have no key yet.</p>
+        <p v-else-if="keysState === 'idle' || keysState === 'loading'" class="px-5 pb-4 pt-3 text-xs text-muted-foreground">
+          Reading your keys…
+        </p>
+        <p v-else class="px-5 pb-4 pt-3 text-xs text-muted-foreground">
+          Aruna cannot list your keys right now. Start it first, then they show up here.
+        </p>
         <Notice v-if="removeError" tone="error" class="mx-5 mb-4">{{ removeError }}</Notice>
       </section>
 

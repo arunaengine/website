@@ -15,6 +15,7 @@ import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import { useAruna } from '@/composables/useAruna'
+import { useDeviceKeys } from '@/composables/useDeviceKeys'
 import { rememberKeyName } from '@/lib/keyNames'
 import { errorMessage } from '@/lib/utils'
 
@@ -27,7 +28,9 @@ const emit = defineEmits<{
   (e: 'created', key: { accessKeyId: string; secret: string; name: string }): void
 }>()
 
-const { myGroups, createS3Credentials } = useAruna()
+const { myGroups } = useAruna()
+// Keys belong to the node on this computer, never to the realm's node.
+const { available, create: createKey } = useDeviceKeys()
 
 const name = ref('')
 const groupId = ref('')
@@ -37,7 +40,7 @@ const busy = ref(false)
 const groupOptions = computed(() => myGroups.value.map((group) => ({ value: group.id, label: group.name })))
 // One group needs no question; with more, the key belongs to the one chosen.
 const askGroup = computed(() => groupOptions.value.length > 1)
-const canCreate = computed(() => Boolean(name.value.trim() && groupId.value) && !busy.value)
+const canCreate = computed(() => Boolean(name.value.trim() && groupId.value) && available.value && !busy.value)
 
 watch(
   () => props.open,
@@ -56,7 +59,7 @@ async function create(): Promise<void> {
   error.value = null
   const label = name.value.trim()
   try {
-    const made = await createS3Credentials({ group_id: groupId.value, expires_in_seconds: YEAR_SECONDS })
+    const made = await createKey(groupId.value, YEAR_SECONDS)
     rememberKeyName(made.access_key_id, label)
     emit('created', { accessKeyId: made.access_key_id, secret: made.access_secret, name: label })
     emit('update:open', false)
@@ -87,7 +90,10 @@ async function create(): Promise<void> {
           <span class="text-xs font-medium text-foreground">Group</span>
           <Select v-model="groupId" class="mt-1" :options="groupOptions" aria-label="Group the key belongs to" />
         </label>
-        <p class="text-[11px] text-muted-foreground">You will see the secret once, right after this step.</p>
+        <p v-if="!available" class="text-[11px] text-destructive">
+          Aruna is not running on this computer, so a key cannot be made now.
+        </p>
+        <p v-else class="text-[11px] text-muted-foreground">You will see the secret once, right after this step.</p>
         <RefusalNote v-if="error" :message="error" />
       </div>
 
