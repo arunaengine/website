@@ -8,6 +8,7 @@ import GlobalErrorBanner from '@/components/layout/GlobalErrorBanner.vue'
 import KeyIssueNotice from '@/components/storage/KeyIssueNotice.vue'
 import RealmUnreachable from '@/components/layout/RealmUnreachable.vue'
 import NodeDown from '@/components/layout/NodeDown.vue'
+import UpdateRequiredView from '@/views/desktop/UpdateRequiredView.vue'
 import FeatureHidden from '@/components/layout/FeatureHidden.vue'
 import Notice from '@/components/ui/Notice.vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
@@ -65,6 +66,8 @@ const { status, loaded, state, deviceClient, start: watchNode, stop: unwatchNode
 const { compute, load: loadCompute } = useDeviceCompute()
 // Runs is on the sidebar only once the node itself says it runs jobs.
 watch(deviceClient, (client) => client && void loadCompute(), { immediate: true })
+// The shell starts no node while the app and the realm differ; only this screen is left.
+const update = computed(() => status.value?.updateRequired ?? null)
 const nodeDown = computed(
   () =>
     loaded.value &&
@@ -113,7 +116,8 @@ watch(
 </script>
 
 <template>
-  <div class="app-shell flex min-h-full bg-background">
+  <UpdateRequiredView v-if="update" :local="update.local" :realm="update.realm" />
+  <div v-else class="app-shell flex min-h-full bg-background">
     <a
       href="#main-content"
       class="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:ring-2 focus:ring-ring"

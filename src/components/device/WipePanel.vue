@@ -9,12 +9,9 @@ import { useAruna } from '@/composables/useAruna'
 import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { useRealm } from '@/composables/useRealm'
 import { ApiError, apiRequest } from '@/lib/api'
-import { wipeDevice } from '@/lib/desktopBridge'
+import { WIPE_PHRASE, wipeDevice } from '@/lib/desktopBridge'
 import { errorMessage } from '@/lib/utils'
 import { Trash2 } from '@lucide/vue'
-
-// Echoed back to the shell, which demands the phrase before it wipes anything.
-const WIPE_PHRASE = 'wipe'
 
 // An app that cannot start has no node to name itself, so it skips the realm step.
 const props = withDefaults(defineProps<{ realm?: boolean }>(), { realm: true })

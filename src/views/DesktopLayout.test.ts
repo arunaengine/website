@@ -20,6 +20,7 @@ const realmReach = ref('reachable')
 const nodeStatus = ref<{
   enrolled: boolean
   realmMismatch?: { expected: string; actual: string; realmUrl: string } | null
+  updateRequired?: { local: string; realm: string } | null
 } | null>(null)
 const nodeState = ref<'stopped' | 'starting' | 'running' | 'error' | 'unknown'>('unknown')
 const nodeLoaded = ref(false)
@@ -35,6 +36,10 @@ const RouterLinkStub = defineComponent({
 const EmptyStub = defineComponent(() => () => null)
 const RouterViewStub = defineComponent(() => () => h('div', 'routed-view'))
 const NodeDownStub = defineComponent(() => () => h('div', 'node-down'))
+const UpdateStub = defineComponent({
+  props: { local: String, realm: String },
+  setup: (props) => () => h('div', `update-required ${props.local} ${props.realm}`),
+})
 const RealmUnreachableStub = defineComponent(() => () => h('div', 'realm-unreachable'))
 const SideNavStub = defineComponent((_, { slots }) => () => h('aside', slots.footer?.({ collapsed: false })))
 // Records the variant it was handed, which is how the desktop chrome is chosen.
@@ -64,6 +69,7 @@ const DesktopLayoutClient = compileClientComponent(new URL('./DesktopLayout.vue'
   '@/components/layout/GlobalErrorBanner.vue': moduleDefault(EmptyStub),
   '@/components/layout/RealmUnreachable.vue': moduleDefault(RealmUnreachableStub),
   '@/components/layout/NodeDown.vue': moduleDefault(NodeDownStub),
+  '@/views/desktop/UpdateRequiredView.vue': moduleDefault(UpdateStub),
   '@/components/data/TransfersPanel.vue': moduleDefault(EmptyStub),
   '@/components/storage/KeyIssueNotice.vue': moduleDefault(EmptyStub),
   '@/components/assistant/AssistantLauncher.vue': moduleDefault(EmptyStub),
@@ -147,6 +153,7 @@ beforeAll(async () => {
   vi.doMock('@/components/layout/RealmUnreachable.vue', () => ({ default: RealmUnreachableStub }))
   vi.doMock('@/components/federation/LinkOffer.vue', () => ({ default: defineComponent(() => () => null) }))
   vi.doMock('@/components/layout/NodeDown.vue', () => ({ default: NodeDownStub }))
+  vi.doMock('@/views/desktop/UpdateRequiredView.vue', () => ({ default: UpdateStub }))
   vi.doMock('@/components/data/TransfersPanel.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/components/storage/KeyIssueNotice.vue', () => ({ default: EmptyStub }))
   vi.doMock('@/components/assistant/AssistantPanel.vue', () => ({ default: EmptyStub }))
@@ -198,6 +205,26 @@ describe('desktop shell', () => {
     expect(html).toContain('This computer')
     expect(html).toContain('Groups')
     expect(html).toContain('Status')
+  })
+
+  it('shows only the update screen when the realm runs another version', async () => {
+    nodeStatus.value = { enrolled: true, updateRequired: { local: '3.0.0-alpha.131', realm: '3.0.0-alpha.133' } }
+
+    const html = await renderToString(createSSRApp(DesktopLayout))
+
+    expect(html).toContain('update-required 3.0.0-alpha.131 3.0.0-alpha.133')
+    expect(html).not.toContain('routed-view')
+    expect(html).not.toContain('topbar:desktop')
+    expect(destinations(html)).toEqual([])
+  })
+
+  it('keeps the shell while the versions match', async () => {
+    nodeStatus.value = { enrolled: true, updateRequired: null }
+
+    const html = await renderToString(createSSRApp(DesktopLayout))
+
+    expect(html).not.toContain('update-required')
+    expect(html).toContain('routed-view')
   })
 
   it('leaves Runs out while this computer runs no jobs', async () => {

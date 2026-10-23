@@ -98,7 +98,21 @@ describe('bridge commands', () => {
         actual: 'new-realm',
         realmUrl: 'https://realm.test',
       },
+      updateRequired: null,
     })
+  })
+
+  it('reads the versions of an update the shell asks for', async () => {
+    const bridge = await withShell(() => ({
+      state: 'stopped',
+      updateRequired: { local: ' 3.0.0-alpha.131 ', realm: '3.0.0-alpha.133' },
+    }))
+    await expect(bridge.nodeStatus()).resolves.toMatchObject({
+      updateRequired: { local: '3.0.0-alpha.131', realm: '3.0.0-alpha.133' },
+    })
+
+    const partial = await withShell(() => ({ state: 'stopped', updateRequired: { local: '3.0.0-alpha.131' } }))
+    await expect(partial.nodeStatus()).resolves.toMatchObject({ updateRequired: null })
   })
 
   it('reads a node that is not listening yet', async () => {

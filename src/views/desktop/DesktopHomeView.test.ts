@@ -156,6 +156,7 @@ beforeEach(() => {
     uptimeSeconds: 3600,
     message: null,
     realmMismatch: null,
+    updateRequired: null,
   }
   nodeState.value = 'running'
   nodeLabel.value = 'online'

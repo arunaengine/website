@@ -35,7 +35,7 @@ const WipePanel = compileClientComponent(new URL('./WipePanel.vue', import.meta.
   '@/composables/useDeviceStatus': { useDeviceStatus: () => ({ identity, loaded, status }) },
   '@/composables/useRealm': { useRealm: () => ({ realm: ref({ name: 'Test realm' }) }) },
   '@/lib/api': { ...Api, apiRequest },
-  '@/lib/desktopBridge': { wipeDevice },
+  '@/lib/desktopBridge': { wipeDevice, WIPE_PHRASE: 'wipe' },
   '@/lib/utils': Utils,
 })
 

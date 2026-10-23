@@ -49,6 +49,8 @@ export interface NodeStatus {
   message: string | null
   detail?: string | null
   realmMismatch: { expected: string; actual: string; realmUrl: string } | null
+  // The realm runs another Aruna version than this app bundles, so the node did not start.
+  updateRequired: { local: string; realm: string } | null
 }
 
 /** Which executor local runs use, and how much of the machine they may take. */
@@ -205,6 +207,12 @@ export function readStatus(payload: unknown): NodeStatus {
   const expected = asText(mismatch?.expected)
   const actual = asText(mismatch?.actual)
   const realmUrl = asText(mismatch?.realmUrl)
+  const gap =
+    raw.updateRequired && typeof raw.updateRequired === 'object' && !Array.isArray(raw.updateRequired)
+      ? (raw.updateRequired as Record<string, unknown>)
+      : null
+  const local = asText(gap?.local)
+  const realmVersion = asText(gap?.realm)
   return {
     state: STATES.find((known) => known === raw.state) ?? 'error',
     nodeId: asText(raw.nodeId),
@@ -218,6 +226,7 @@ export function readStatus(payload: unknown): NodeStatus {
     message: asText(raw.message),
     detail: asText(raw.detail),
     realmMismatch: expected && actual && realmUrl ? { expected, actual, realmUrl } : null,
+    updateRequired: local && realmVersion ? { local, realm: realmVersion } : null,
   }
 }
 
@@ -288,6 +297,9 @@ export async function validateRealm(input: string): Promise<RealmTarget> {
     redirectedFrom: asText(raw.redirectedFrom),
   }
 }
+
+/** The phrase the shell demands back before it wipes a device. */
+export const WIPE_PHRASE = 'wipe'
 
 /**
  * Destroys the local identity and every local replica. `confirm` is the phrase

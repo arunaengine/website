@@ -19,7 +19,7 @@ export interface DesktopBridge {
 }
 
 /** The bridge version this portal build is written against. */
-export const BRIDGE_VERSION = 6
+export const BRIDGE_VERSION = 7
 
 /** Runtime switches; unknown flags are passed through to the feature map. */
 export interface DesktopFeatures {

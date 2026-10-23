@@ -64,6 +64,7 @@ function start(): void {
             ready: next.ready,
             detail: next.detail,
             realmMismatch: next.realmMismatch,
+            updateRequired: next.updateRequired,
           }
         : next
       error.value = null
