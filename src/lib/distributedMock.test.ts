@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
-import { defaultSettings, firstResults, grantGap, isPending, nodeGlob, planRanges, plannedStart, presetMembers, rangeTotal, retryResult } from './distributedMock'
+import { afterEach, describe, expect, it } from 'vitest'
+import { applyPortalConfig } from '@/lib/config'
+import { defaultSettings, mockEnabled, firstResults, grantGap, isPending, nodeGlob, planRanges, plannedStart, presetMembers, rangeTotal, retryResult } from './distributedMock'
 import { BAKREP_COUNT, mockBucket, sourceObjects } from './distributedMockData'
 
 describe('distributed mock helpers', () => {
@@ -52,5 +53,12 @@ describe('distributed mock helpers', () => {
     const again = retryResult(first[2])
     expect(again.created).toBe(false)
     expect(retryResult(again).created).toBe(true)
+  })
+
+  it('stays off until the deployment turns the feature on', () => {
+    expect(mockEnabled()).toBe(false)
+    applyPortalConfig({ features: { distributedMock: true } })
+    expect(mockEnabled()).toBe(true)
+    applyPortalConfig({})
   })
 })

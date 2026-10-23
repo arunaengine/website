@@ -1,16 +1,14 @@
 <script setup lang="ts">
 // One create result per member node. A set stays pending until every member is admitted.
-import { RouterLink } from 'vue-router'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
 import Notice from '@/components/ui/Notice.vue'
 import { isPending, MIN_MEMBERS, type MemberResult } from '@/lib/distributedMock'
-import { MOCK_BASE } from '@/router/distributedMock'
 import { RefreshCw, UserMinus } from '@lucide/vue'
 
 defineProps<{ name: string; results: MemberResult[] }>()
-const emit = defineEmits<{ (e: 'retry', nodeId: string): void; (e: 'drop', nodeId: string): void }>()
+const emit = defineEmits<{ (e: 'retry', nodeId: string): void; (e: 'drop', nodeId: string): void; (e: 'done'): void }>()
 </script>
 
 <template>
@@ -65,8 +63,8 @@ const emit = defineEmits<{ (e: 'retry', nodeId: string): void; (e: 'drop', nodeI
     <p v-if="isPending(results)" class="text-xs text-muted-foreground">
       Mock: the retry fails once more with the same reason, then works as if the other bucket was removed.
     </p>
-    <Button v-else variant="outline" size="sm" as-child>
-      <RouterLink :to="`${MOCK_BASE}/spire-db`">Open an example bucket page</RouterLink>
-    </Button>
+    <div v-else class="flex justify-end">
+      <Button size="sm" @click="emit('done')">Done</Button>
+    </div>
   </section>
 </template>

@@ -1,5 +1,6 @@
 // Static types and helpers for the distributed bucket mock. Nothing here talks to a
 // node: the mock only shows how the agreed design could look in the portal.
+import { featureEnabled } from '@/lib/config'
 import type { StateTone } from '@/lib/stateBadge'
 
 export type MemberState = 'created' | 'catching up' | 'ready' | 'leaving' | 'failed'
@@ -14,6 +15,13 @@ export type PresetId =
   | 'copy-edge'
   | 'cache-edge'
   | 'stream-edge'
+
+// The mock shows example data in the Data section. It is on when the deployment feature
+// `distributedMock` is on in portal-config.json, or for a build started with
+// VITE_ARUNA_DISTRIBUTED_MOCK=1.
+export function mockEnabled(): boolean {
+  return featureEnabled('distributedMock') || import.meta.env.VITE_ARUNA_DISTRIBUTED_MOCK === '1'
+}
 
 export const SHARD_HOST_LABEL = 'aruna-engine.org/shard-host'
 export const REALM_ID = 'k3V9xQ2mT7aLd0RpYc8WnHfJ5uBsE1gZtO4iXvNq6Ay'
