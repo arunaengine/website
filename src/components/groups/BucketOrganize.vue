@@ -36,7 +36,12 @@ const props = defineProps<{
   /** Counts steps that ended, so the counts read again. */
   finished?: number
 }>()
-const emit = defineEmits<{ (e: 'started'): void; (e: 'control', action: 'pause' | 'resume' | 'abort'): void }>()
+const emit = defineEmits<{
+  (e: 'started'): void
+  /** A rename was accepted, with the number of files it was started for. */
+  (e: 'renaming', total: number | null): void
+  (e: 'control', action: 'pause' | 'resume' | 'abort'): void
+}>()
 
 const { apiBaseUrl, authToken, sessionEpoch } = useAruna()
 const { writesDisabled } = useConnectivity()
@@ -148,7 +153,7 @@ function review(step: 'dup' | 'ren') {
   open.value = open.value === step ? null : step
 }
 
-async function act(run: () => Promise<unknown>) {
+async function act(run: () => Promise<unknown>, started: () => void = () => emit('started')) {
   if (busy.value || props.job || writesDisabled.value) return
   busy.value = true
   error.value = null
@@ -157,7 +162,7 @@ async function act(run: () => Promise<unknown>) {
   const same = () => epoch === sessionEpoch.value && link === props.link.import_id
   try {
     await run()
-    if (same()) emit('started')
+    if (same()) started()
   } catch (err) {
     if (!same()) return
     error.value = isUnsupportedEndpoint(err) ? 'This node cannot do this yet.' : (moveRefusal(err) ?? organizeError(err))
@@ -167,7 +172,11 @@ async function act(run: () => Promise<unknown>) {
 }
 
 const removeCopies = () => act(() => startDuplicates(props.groupId, props.link.import_id, client()))
-const rename = () => act(() => startImportRenames(props.groupId, props.link.import_id, client()))
+const rename = () =>
+  act(
+    () => startImportRenames(props.groupId, props.link.import_id, client()),
+    () => emit('renaming', renameAll.value?.complete ? renameAll.value.total : null),
+  )
 const offline = computed(() => (writesDisabled.value ? OFFLINE_WRITE_HINT : undefined))
 const blocked = computed(() => busy.value || Boolean(props.job) || writesDisabled.value)
 </script>

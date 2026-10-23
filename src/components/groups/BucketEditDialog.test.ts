@@ -13,6 +13,7 @@ const saveFileRules = vi.fn()
 const startImportRenames = vi.fn()
 const updateBackendImport = vi.fn()
 const refresh = vi.fn()
+const begin = vi.fn()
 const savesInFlight = reactive(new Set<string>())
 const status = ref<{ files?: number; conflicts: [] } | null>(null)
 const renames = ref<{ count: number; complete: boolean; files: [] } | null>(null)
@@ -66,7 +67,9 @@ const BucketEditDialog = compileClientComponent(new URL('./BucketEditDialog.vue'
       error: ref(null),
       controlling: ref(false),
       finished: ref(0),
+      lastJob: ref(null),
       refresh,
+      begin,
       control: vi.fn(),
     }),
   },
@@ -123,6 +126,7 @@ beforeEach(() => {
   updateBackendImport.mockReset().mockResolvedValue({})
   startImportRenames.mockReset().mockResolvedValue({})
   refresh.mockReset()
+  begin.mockReset()
 })
 
 describe('BucketEditDialog', () => {
@@ -139,6 +143,10 @@ describe('BucketEditDialog', () => {
 
     expect(updateBackendImport).toHaveBeenCalledWith('g1', 'i1', null, expect.anything(), '{dir}{name}~{id}')
     expect(startImportRenames).toHaveBeenCalledWith('g1', 'i1', expect.anything())
+    // The rename shows as running at once, not after the next plan read.
+    expect(begin).toHaveBeenCalledWith(null)
+    // Only the read at opening; the save asks for no further one.
+    expect(refresh).toHaveBeenCalledTimes(1)
   })
 
   it('keeps a schedule changed while a save runs as unsaved', async () => {

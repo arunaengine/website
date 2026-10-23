@@ -12,9 +12,11 @@ import {
   type LinkStatus,
   type OrganizeJob,
 } from '@/lib/api'
-import { activeJob, organizeError, timeLeft } from '@/lib/organize'
+import { activeJob, organizeError, timeLeft, type ProgressJob } from '@/lib/organize'
 
 const POLL_MS = 3000
+// A rename the node accepted but no read shows yet; it has no step to pause or abort.
+const STARTING: ProgressJob = { kind: 'rename', state: 'running', done: 0, total: 0, counted: false, skipped: 0, failed: 0, controls: false }
 
 /** Links with a settings save on its way, by "group\nimport"; a new opening waits for it. */
 export const savesInFlight = reactive(new Set<string>())
@@ -40,8 +42,11 @@ export function useLinkState(groupId: () => string, importId: () => string) {
 
   // A rename reports no total; it is fixed from the plan, once per run (by its start time).
   const sized = ref<{ started: number; total: number } | null>(null)
+  // A rename the node just accepted counts as running until a read shows its step or two reads do not.
+  const starting = ref<{ before: number | null; total: number | null; misses: number } | null>(null)
   const job = computed(() => {
     const active = activeJob(stored.value)
+    if (!active && starting.value) return STARTING
     if (active?.kind !== 'rename' || !sized.value || sized.value.started !== active.started_at_ms) return active
     const total = Math.max(sized.value.total, active.done + active.failed)
     const counted = { ...active, total, counted: true }
@@ -80,16 +85,18 @@ export function useLinkState(groupId: () => string, importId: () => string) {
     if (disposed || id !== generation) return
     if (found && found.state !== 'failed') renames.value = found.state === 'ok' ? found.value : null
     if (counted && counted.state !== 'failed') status.value = counted.state === 'ok' ? counted.value : null
-    const wasActive = job.value !== null
+    const wasActive = activeJob(stored.value) !== null
     if (current.state === 'ok') {
       stored.value = current.value
       size(found?.state === 'ok')
+      confirm()
       const ended = current.value && !activeJob(current.value) ? `${current.value.started_at_ms}:${current.value.finished_at_ms}` : ''
       if ((ended && ended !== lastEnd) || (wasActive && !current.value)) finished.value++
       if (ended) lastEnd = ended
     } else if (current.state === 'missing') {
       supported.value = false
       stored.value = null
+      starting.value = null
     }
     const failed = [found, current, counted].find((result) => result?.state === 'failed')
     readError.value = failed?.state === 'failed' ? failed.message : null
@@ -97,12 +104,32 @@ export function useLinkState(groupId: () => string, importId: () => string) {
     schedule()
   }
 
-  // A plan read with the answer left out the files done by then; an older plan did not.
+  // The plan the click was made on, or the one read now (it left out the files done by then) or before.
   function size(fresh: boolean) {
     const active = activeJob(stored.value)
     const started = active?.started_at_ms
-    if (!active || active.kind !== 'rename' || started === undefined || started === sized.value?.started || !renames.value) return
-    sized.value = { started, total: renames.value.count + (fresh ? active.done + active.failed : 0) }
+    if (!active || active.kind !== 'rename' || started === undefined || started === sized.value?.started) return
+    const total = starting.value?.total ?? (renames.value ? renames.value.count + (fresh ? active.done + active.failed : 0) : null)
+    if (total !== null) sized.value = { started, total }
+  }
+
+  function confirm() {
+    const begun = starting.value
+    if (!begun) return
+    const step = stored.value
+    if (step && (activeJob(step) || step.started_at_ms !== begun.before)) starting.value = null
+    else if (++begun.misses >= 2) {
+      // The step ended before any read saw it.
+      starting.value = null
+      finished.value++
+    }
+  }
+
+  /** A rename was accepted: shows it running at once, with the plan count it was started from. */
+  function begin(total: number | null) {
+    if (disposed) return Promise.resolve()
+    starting.value = { before: stored.value?.started_at_ms ?? null, total, misses: 0 }
+    return refresh()
   }
 
   function schedule() {
@@ -134,5 +161,5 @@ export function useLinkState(groupId: () => string, importId: () => string) {
     if (timer) clearTimeout(timer)
   })
 
-  return { renames, status, job, lastJob, supported, error, controlling, finished, refresh, control }
+  return { renames, status, job, lastJob, supported, error, controlling, finished, refresh, begin, control }
 }

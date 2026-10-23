@@ -50,7 +50,7 @@ const emit = defineEmits<{ (e: 'update:open', value: boolean): void; (e: 'saved'
 
 const { apiBaseUrl, authToken, sessionEpoch } = useAruna()
 const { writesDisabled } = useConnectivity()
-const { renames, status, job, lastJob, error: stateError, controlling, finished, refresh, control } = useLinkState(
+const { renames, status, job, lastJob, error: stateError, controlling, finished, refresh, begin, control } = useLinkState(
   () => props.groupId,
   () => props.link.import_id,
 )
@@ -178,7 +178,7 @@ async function save() {
     if (!live()) return
     savedNote.value = true
     emit('saved')
-    void refresh()
+    void (rename ? begin(null) : refresh())
   } catch (err) {
     if (live()) saveError.value = errorMessage(err)
   } finally {
@@ -289,6 +289,7 @@ async function save() {
             :controlling="controlling"
             :finished="finished"
             @started="refresh"
+            @renaming="begin"
             @control="control"
           />
         </TabsContent>

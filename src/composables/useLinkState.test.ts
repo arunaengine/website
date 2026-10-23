@@ -237,6 +237,82 @@ describe('useLinkState', () => {
     scope.stop()
   })
 
+  describe('a rename just accepted', () => {
+    const STEP = { ...RUNNING, kind: 'rename', total: 0, counted: false, done: 20, started_at_ms: 100 }
+
+    it('runs at once, before any read answers, and reads no plan', async () => {
+      getOrganizeJob.mockReturnValue(new Promise(() => {}))
+      const { scope, state } = setup()
+      void state.begin(3877)
+      expect(state.job.value).toMatchObject({ kind: 'rename', state: 'running', controls: false })
+      expect(getImportRenames).not.toHaveBeenCalled()
+      scope.stop()
+    })
+
+    it('takes the real step and the count it was started from once a read shows it', async () => {
+      getOrganizeJob.mockResolvedValue(STEP)
+      const { scope, state } = setup()
+      await state.begin(3877)
+      expect(state.job.value).toMatchObject({ done: 20, total: 3877, counted: true, controls: true })
+      scope.stop()
+    })
+
+    it('stays running through a read that does not show the step yet', async () => {
+      vi.useFakeTimers()
+      try {
+        getOrganizeJob.mockResolvedValue(null)
+        const { scope, state } = setup()
+        await state.begin(3877)
+        expect(state.job.value).toMatchObject({ kind: 'rename', controls: false })
+        getOrganizeJob.mockResolvedValue(STEP)
+        await vi.advanceTimersByTimeAsync(3000)
+        expect(state.job.value).toMatchObject({ done: 20, total: 3877, controls: true })
+        scope.stop()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('stays running when only an older finished step is shown', async () => {
+      const older = { ...RUNNING, kind: 'rename', state: 'done', started_at_ms: 5, finished_at_ms: 6 }
+      getOrganizeJob.mockResolvedValue(older)
+      const { scope, state } = setup()
+      await state.refresh()
+      await state.begin(10)
+      expect(state.job.value).toMatchObject({ kind: 'rename', controls: false })
+      getOrganizeJob.mockResolvedValue({ ...older, started_at_ms: 9, finished_at_ms: 12 })
+      await state.refresh()
+      expect(state.job.value).toBeNull()
+      expect(state.lastJob.value).toMatchObject({ started_at_ms: 9 })
+      scope.stop()
+    })
+
+    it('ends when no read ever shows the step, and reads the counts again', async () => {
+      vi.useFakeTimers()
+      try {
+        getOrganizeJob.mockResolvedValue(null)
+        const { scope, state } = setup()
+        await state.begin(3)
+        await vi.advanceTimersByTimeAsync(3000)
+        expect(state.job.value).toBeNull()
+        expect(state.finished.value).toBe(1)
+        expect(getImportRenames).toHaveBeenCalled()
+        scope.stop()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('stays running when a read fails', async () => {
+      getOrganizeJob.mockRejectedValue(new Error('offline'))
+      const { scope, state } = setup()
+      await state.begin(3)
+      expect(state.job.value).toMatchObject({ kind: 'rename' })
+      expect(state.error.value).toBe('offline')
+      scope.stop()
+    })
+  })
+
   it('counts a running step that vanished', async () => {
     getOrganizeJob.mockResolvedValue(RUNNING)
     const { scope, state } = setup()

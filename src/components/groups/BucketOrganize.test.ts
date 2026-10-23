@@ -9,10 +9,20 @@ import * as Organize from '@/lib/organize'
 import * as StorageRules from '@/lib/storageRules'
 import * as Utils from '@/lib/utils'
 
+const getOrganizeJob = vi.fn()
+const getLinkStatus = vi.fn()
 const previewDuplicates = vi.fn()
 const startDuplicates = vi.fn()
 const getImportRenames = vi.fn()
 const startImportRenames = vi.fn()
+
+// The real link state reads its steps through these; the panel's own calls use the map below.
+vi.mock('@/lib/api', async (original) => ({
+  ...(await original<typeof Api>()),
+  getImportRenames: (...args: unknown[]) => getImportRenames(...args),
+  getOrganizeJob: (...args: unknown[]) => getOrganizeJob(...args),
+  getLinkStatus: (...args: unknown[]) => getLinkStatus(...args),
+}))
 
 const Slot = defineComponent((_, { slots }) => () => h('div', [slots.head?.(), slots.default?.()]))
 const ButtonStub = defineComponent({
@@ -51,7 +61,7 @@ type Root = Parameters<typeof content>[0]
 const buttonIn = (root: Root, text: string) => element(root, (node) => node.tag === 'button' && content(node).trim() === text)
 const step = (root: Root, id: string) => nodes(root).filter((node) => node.props['data-testid'] === id)
 
-async function mount(initial: { job?: unknown; lastJob?: unknown } = {}) {
+async function mount(initial: { job?: unknown; lastJob?: unknown } = {}, listeners: Record<string, unknown> = {}) {
   const finished = ref(0)
   const steps = reactive({ job: initial.job ?? null, lastJob: initial.lastJob ?? null })
   const mounted = await mountApp(
@@ -63,6 +73,7 @@ async function mount(initial: { job?: unknown; lastJob?: unknown } = {}) {
         job: steps.job,
         lastJob: steps.lastJob,
         finished: finished.value,
+        ...listeners,
       }),
     ),
   )
@@ -88,6 +99,8 @@ beforeEach(() => {
   startDuplicates.mockReset().mockResolvedValue({})
   getImportRenames.mockReset().mockResolvedValue({ count: 0, complete: true, files: [] })
   startImportRenames.mockReset().mockResolvedValue({})
+  getOrganizeJob.mockReset().mockResolvedValue(null)
+  getLinkStatus.mockReset().mockResolvedValue({ conflicts: [] })
 })
 
 describe('BucketOrganize rename plan', () => {
@@ -202,6 +215,59 @@ describe('BucketOrganize rename run', () => {
     getImportRenames.mockResolvedValue({ count: 0, complete: true, files: [], plan: PLAN })
     const { root } = await mount({ lastJob: { ...RENAMED, state: 'aborted' } })
     expect(step(root, 'step-renames')).toHaveLength(0)
+  })
+})
+
+describe('BucketOrganize rename start', () => {
+  beforeEach(() => getImportRenames.mockResolvedValue(PLANNED))
+
+  it('tells the parent a rename was accepted, with the file count', async () => {
+    const renaming = vi.fn()
+    const started = vi.fn()
+    const { root } = await mount({}, { onRenaming: renaming, onStarted: started })
+    await click(buttonIn(stepOf(root), 'Review…'))
+    await click(buttonIn(root, 'Rename 3,877 files'))
+    expect(startImportRenames).toHaveBeenCalledWith('g1', 'i1', expect.anything())
+    expect(renaming).toHaveBeenCalledWith(3877)
+    expect(started).not.toHaveBeenCalled()
+  })
+
+  it('leaves the button usable and shows the error when the start is refused', async () => {
+    startImportRenames.mockRejectedValue(new Error('refused'))
+    const renaming = vi.fn()
+    const { root } = await mount({}, { onRenaming: renaming })
+    await click(buttonIn(stepOf(root), 'Review…'))
+    await click(buttonIn(root, 'Rename 3,877 files'))
+    expect(renaming).not.toHaveBeenCalled()
+    expect(content(root)).toContain('refused')
+    expect(buttonIn(root, 'Rename 3,877 files').props.disabled).toBeFalsy()
+  })
+
+  it('locks the review and hides the list at once, before any read shows the step', async () => {
+    const { useLinkState } = await import('@/composables/useLinkState')
+    getOrganizeJob.mockReturnValue(new Promise(() => {}))
+    const mounted = await mountApp(
+      defineComponent(() => {
+        const state = useLinkState(() => 'g1', () => 'i1')
+        return () =>
+          h(BucketOrganize, {
+            groupId: 'g1',
+            link: LINK,
+            place: 'aruna-spire-genes',
+            job: state.job.value,
+            lastJob: state.lastJob.value,
+            onRenaming: state.begin,
+          })
+      }),
+    )
+    await flush()
+    await click(buttonIn(stepOf(mounted.root), 'Review…'))
+    await click(buttonIn(mounted.root, 'Rename 3,877 files'))
+    const card = stepOf(mounted.root)
+    expect(buttonIn(card, 'Review…').props.disabled).toBe(true)
+    expect(() => buttonIn(mounted.root, 'Rename 3,877 files')).toThrow()
+    expect(step(mounted.root, 'rename-plan')).toHaveLength(0)
+    expect(content(card)).toContain('job running')
   })
 })
 
