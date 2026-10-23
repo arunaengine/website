@@ -17,6 +17,7 @@ export function distributedMockRoutes(): RouteRecordRaw {
     beforeEnter: () => mockEnabled() || { name: 'buckets' },
     children: [
       { path: '', name: 'mock-distributed', component: () => import('@/views/DistributedMockView.vue') },
+      { path: 'new', name: 'mock-distributed-new', component: () => import('@/views/DistributedCreateView.vue') },
     ],
   }
 }

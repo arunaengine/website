@@ -176,6 +176,12 @@ export function planRanges(count: number, nodeIds: readonly string[], replicas: 
   })
 }
 
+export function roleLabel(preset: PresetId, index: number, member: MemberDraft): string {
+  if (preset === 'sharding' || preset === 'sharding-replicas') return 'Coordinates ranges'
+  if (index === 0) return 'Coordinator'
+  return member.strategy === 'copy' ? 'Replica' : 'Edge'
+}
+
 export const MEMBER_TONE: Record<MemberState, StateTone> = {
   created: 'idle',
   'catching up': 'progress',
