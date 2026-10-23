@@ -44,6 +44,8 @@ const allBuckets = {
   reload,
   loadMore,
 }
+// The steps the node reports as running, by bucket name.
+const stepJobs = ref(new Map<string, { kind: string; state: string; done: number; failed: number }>())
 const nodeChoice = ref<string | null>(null)
 const choose = vi.fn((nodeId: string | null) => {
   nodeChoice.value = nodeId
@@ -53,7 +55,7 @@ const choose = vi.fn((nodeId: string | null) => {
 const Empty = defineComponent(() => () => null)
 // The row renders its name and action slot so the sidebar's own controls are visible.
 const RowStub = defineComponent({
-  props: { bucket: { type: String, default: '' }, highlighted: Boolean },
+  props: { bucket: { type: String, default: '' }, highlighted: Boolean, job: { type: Object, default: null } },
   emits: ['open'],
   setup: (props, { slots, emit }) => () =>
     h('div', [
@@ -63,6 +65,7 @@ const RowStub = defineComponent({
         props.bucket,
       ),
       h('span', { role: 'tooltip' }, slots.tooltip?.()),
+      props.job ? h('em', { 'data-testid': 'row-job' }, `${props.bucket}: ${(props.job as { kind: string }).kind}`) : null,
       slots.actions?.(),
     ]),
 })
@@ -109,6 +112,7 @@ const sidebarModules = {
   '@/components/ui/Spinner.vue': moduleDefault(Empty),
   '@/components/ui/IconButton.vue': moduleDefault(IconButtonStub),
   '@/components/data/BucketRow.vue': moduleDefault(RowStub),
+  '@/composables/useBucketJobs': { useBucketJobs: () => stepJobs },
   '@/composables/useBucketSearch': {
     useBucketSearch: () => ({ hits: otherSearch, error: otherError, searched: ref(true), nodesFailed: otherFailed }),
   },
@@ -145,6 +149,7 @@ function manager() {
     selectedGroupId: ref('g1'),
     bucketNameFilter: ref(''),
     allBuckets,
+    buckets: ref([]),
     recentNodes: ref([]),
     pickNode: choose,
     syncByBucket: ref(new Map()),
@@ -323,6 +328,49 @@ describe('Bucket sidebar sync to this computer', () => {
 
     expect(onSyncComputer).toHaveBeenCalledWith({ bucket: 'results', nodeId: 'node-2', groupId: 'g7' })
     expect(() => element(root, (node) => node.props['aria-label'] === 'Sync private to this computer…')).toThrow()
+  })
+})
+
+describe('Bucket sidebar running steps', () => {
+  const shown = (root: Parameters<typeof content>[0]) =>
+    nodes(root).filter((node) => node.props['data-testid'] === 'row-job').map((node) => content(node))
+
+  beforeEach(() => {
+    nodeChoice.value = null
+    allBuckets.hits.value = []
+    stepJobs.value = new Map([['reef-survey', { kind: 'rename', state: 'running', done: 2, failed: 0 }]])
+  })
+
+  it('marks a bucket of this node that has a step running', async () => {
+    const { root } = await mountApp(BucketSidebar, { props: { manager: withBucket() } })
+    await pickNode()
+    expect(shown(root)).toEqual(['reef-survey: rename'])
+  })
+
+  it('marks nothing when the node reports no step', async () => {
+    stepJobs.value = new Map()
+    const { root } = await mountApp(BucketSidebar, { props: { manager: withBucket() } })
+    await pickNode()
+    expect(shown(root)).toEqual([])
+  })
+
+  it('does not put the steps of this node on a bucket of another node', async () => {
+    const { root } = await mountApp(BucketSidebar, { props: { manager: withBucket('node-far') } })
+    await pickNode()
+    expect(shown(root)).toEqual([])
+  })
+
+  it('marks the results of this node under All nodes, not those of other nodes', async () => {
+    stepJobs.value = new Map([
+      ['reef-survey', { kind: 'move', state: 'running', done: 2, failed: 0 }],
+      ['far-reads', { kind: 'move', state: 'running', done: 2, failed: 0 }],
+    ])
+    allBuckets.hits.value = [
+      { bucket: 'reef-survey', node_id: 'home', group_id: 'g1' },
+      { bucket: 'far-reads', node_id: 'node-2', group_id: 'g1' },
+    ]
+    const { root } = await mountApp(BucketSidebar, { props: { manager: manager() } })
+    expect(shown(root)).toEqual(['reef-survey: move'])
   })
 })
 

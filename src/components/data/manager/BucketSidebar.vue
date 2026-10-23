@@ -6,6 +6,7 @@ import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import BucketRow from '@/components/data/BucketRow.vue'
+import { useBucketJobs } from '@/composables/useBucketJobs'
 import { useBucketSearch } from '@/composables/useBucketSearch'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useS3 } from '@/composables/useS3'
@@ -35,6 +36,7 @@ const {
   selectedGroupId,
   bucketNameFilter,
   allBuckets: all,
+  buckets,
   syncByBucket,
   syncKeyFor,
   openSearchHit,
@@ -61,6 +63,8 @@ const {
   bindSourceFor,
 } = props.manager
 
+// Steps running on this node's buckets of the group; rows of other nodes show none.
+const jobs = useBucketJobs(selectedGroupId, buckets)
 const allNodes = computed(() => bucketNodeChoice.value === null)
 // An older node cannot list without a name; the open node's list stands in.
 const searchList = computed(() => allNodes.value && !all.needsName.value)
@@ -162,6 +166,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
               :pinnable="false"
               option
               :highlighted="index === activeIndex"
+              :job="realmNodes.isLocalNode(hit.node_id) ? jobs.get(hit.bucket) : null"
               :active="hit.bucket === bucket && (realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id) === remoteNodeId"
               @open="openHit(hit)"
             >
@@ -206,6 +211,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
                 :node-id="entry.nodeId"
                 :pinned="entry.pinned"
                 :synced="syncByBucket.has(syncKeyFor(entry.nodeId, entry.bucket))"
+                :job="entry.nodeId ? null : jobs.get(entry.bucket)"
                 :active="entry.bucket === bucket && (entry.nodeId ?? null) === remoteNodeId"
                 @open="openBucketOn(entry.bucket, entry.nodeId)"
                 @toggle-pin="shortcuts.togglePin(entry.bucket, entry.nodeId)"

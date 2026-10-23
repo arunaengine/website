@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import BucketJobLabel from '@/components/storage/BucketJobLabel.vue'
 import Tooltip from '@/components/ui/Tooltip.vue'
 import { useRealmNodes } from '@/composables/useRealmNodes'
+import type { BucketJob } from '@/lib/api'
 import { ArrowLeftRight, Boxes, Pin, Server } from '@lucide/vue'
 import { RouterLink } from 'vue-router'
 
@@ -15,6 +17,8 @@ const props = withDefaults(
     pinned?: boolean
     /** Shows the ArrowLeftRight glyph for buckets with sync relationships. */
     synced?: boolean
+    /** The step running on the bucket, if any. */
+    job?: BucketJob | null
     /** The currently opened bucket. */
     active?: boolean
     /** Keyboard highlight (combobox rows). */
@@ -32,6 +36,7 @@ const props = withDefaults(
     nodeId: null,
     pinned: false,
     synced: false,
+    job: null,
     active: false,
     highlighted: false,
     subtitle: null,
@@ -76,6 +81,7 @@ function onClick() {
           <span v-if="subtitle" class="block truncate text-[10px] font-normal text-muted-foreground">{{ subtitle }}</span>
         </span>
         <span class="flex shrink-0 items-center gap-1">
+          <BucketJobLabel v-if="job" :job="job" />
           <ArrowLeftRight
             v-if="synced"
             class="h-3 w-3 shrink-0 text-primary/60"
@@ -101,6 +107,7 @@ function onClick() {
         <span v-if="subtitle" class="block truncate text-[10px] font-normal text-muted-foreground">{{ subtitle }}</span>
       </span>
       <span class="flex shrink-0 items-center gap-1">
+        <BucketJobLabel v-if="job" :job="job" />
         <ArrowLeftRight
           v-if="synced"
           class="h-3 w-3 shrink-0 text-primary/60"
