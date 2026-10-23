@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { abortSentence, activeJob, copyKey, organizeError, percent, rangeLabel, timeLeft, type ProgressJob } from './organize'
+import { abortSentence, activeJob, bucketJobLabel, copyKey, organizeError, percent, rangeLabel, timeLeft, type ProgressJob } from './organize'
 import { ApiError } from '@/lib/api'
 
 const MOVE: ProgressJob = { kind: 'move', state: 'running', done: 92410, total: 214880, counted: true, skipped: 2, failed: 0, controls: true }
@@ -25,6 +25,22 @@ describe('organize words', () => {
     expect(abortSentence({ ...MOVE, kind: 'purge', done: 2, total: 5 })).toBe(
       '2 files are already deleted and stay deleted. The other 3 stay as they are. You can start again later.',
     )
+  })
+
+  it('names the step running on a bucket', () => {
+    const kinds = ['rename', 'move', 'compression', 'encryption', 'duplicates', 'key_move', 'check', 'purge', 'import'] as const
+    expect(kinds.map((kind) => bucketJobLabel({ kind, state: 'running', done: 0, failed: 0 }))).toEqual([
+      'Renaming',
+      'Moving',
+      'Compressing',
+      'Encrypting',
+      'Removing copies',
+      'Moving keys',
+      'Checking',
+      'Deleting',
+      'Importing',
+    ])
+    expect(bucketJobLabel({ kind: 'move', state: 'paused', done: 0, failed: 0 })).toBe('Moving (paused)')
   })
 
   it('tells the time left from the speed so far', () => {

@@ -53,6 +53,14 @@ export function getGroupBackends(groupId: string, client: ApiClientOptions): Pro
 
 // GET /data/groups/{gid}/storage/buckets: one page of the group's buckets on this node, in name
 // order, each with the storage that keeps its files. Group ADMIN; older nodes answer 404.
+/** A step running or paused on a bucket. */
+export interface BucketJob {
+  kind: 'rename' | 'move' | 'compression' | 'encryption' | 'duplicates' | 'key_move' | 'check' | 'purge' | 'import'
+  state: 'running' | 'paused'
+  done: number
+  failed: number
+}
+
 export interface StorageBucket {
   bucket: string
   /** Null for Aruna storage on this node. */
@@ -64,6 +72,8 @@ export interface StorageBucket {
   /** The rule that links the whole bucket, if any. */
   import_id: string | null
   write_pattern: string | null
+  /** The step running on the bucket; absent when none runs and on older nodes. */
+  job?: BucketJob
 }
 
 export function listStorageBuckets(

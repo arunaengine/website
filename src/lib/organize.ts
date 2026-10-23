@@ -1,5 +1,5 @@
 // Short words for the organize steps, kept apart from the components so tests reach them.
-import { ApiError, type OrganizeJob, type OrganizeKind } from '@/lib/api'
+import { ApiError, type BucketJob, type OrganizeJob, type OrganizeKind } from '@/lib/api'
 import { errorMessage, formatNumber } from '@/lib/utils'
 
 export function filesWord(count: number): string {
@@ -76,6 +76,24 @@ export function timeLeft(job: ProgressJob, now: number): string | null {
 /** The job as the progress box shows it; null once it is over. */
 export function activeJob(job: OrganizeJob | null): ProgressJob | null {
   return job && (job.state === 'running' || job.state === 'paused') ? { ...job, state: job.state } : null
+}
+
+const BUCKET_STEPS: Record<BucketJob['kind'], string> = {
+  rename: 'Renaming',
+  move: 'Moving',
+  compression: 'Compressing',
+  encryption: 'Encrypting',
+  duplicates: 'Removing copies',
+  key_move: 'Moving keys',
+  check: 'Checking',
+  purge: 'Deleting',
+  import: 'Importing',
+}
+
+/** "Renaming", or "Renaming (paused)", for a step in a bucket list. */
+export function bucketJobLabel(job: BucketJob): string {
+  const label = BUCKET_STEPS[job.kind] ?? 'Working'
+  return job.state === 'paused' ? `${label} (paused)` : label
 }
 
 /** A short message for a refused organize call. */
