@@ -223,7 +223,7 @@ const stages = computed(() => watchStages(watchState.value))
           </Button>
         </div>
         <p v-if="atCap && !minted" class="text-[11px] text-muted-foreground">
-          You hold every device this realm allows. Remove one under Settings → Devices to enroll another.
+          You hold every device this realm allows. Remove one under Settings, Access & connection, to enroll another.
         </p>
       </div>
 
