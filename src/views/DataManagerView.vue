@@ -21,6 +21,7 @@ import NodePicker from '@/components/data/NodePicker.vue'
 import DeleteDialog from '@/components/data/DeleteDialog.vue'
 import FileDetailsDialog from '@/components/data/FileDetailsDialog.vue'
 import PublicAccessDialog from '@/components/data/PublicAccessDialog.vue'
+import MockBucketBrowser from '@/components/data/manager/MockBucketBrowser.vue'
 import ObjectBrowser from '@/components/data/manager/ObjectBrowser.vue'
 import UploadPanel from '@/components/data/manager/UploadPanel.vue'
 import NewNotebookDialog from '@/components/notebook/NewNotebookDialog.vue'
@@ -30,6 +31,8 @@ import { providePageContext } from '@/composables/usePageContext'
 import { useS3, s3ErrorMessage } from '@/composables/useS3'
 import { folderNameProblem } from '@/lib/bucketName'
 import { isDesktop } from '@/lib/desktop'
+import { mockEnabled } from '@/lib/distributedMock'
+import { mockBucket } from '@/lib/distributedMockData'
 import type { BindSource } from '@/lib/bindSource'
 import { placeName, placeTitle } from '@/lib/bucketPlace'
 import type { BucketSearchHit } from '@/lib/api'
@@ -192,6 +195,8 @@ function onSyncChanged() {
 }
 
 const addDataOpen = ref(false)
+// An example bucket of the node mock replaces the object browser.
+const exampleBucket = computed(() => (mockEnabled() ? mockBucket(bucket.value) : undefined))
 const newNotebookOpen = ref(false)
 // The notebooks entry is this same view with notebooks highlighted.
 const notebooksView = computed(() => route.name === 'notebooks' || route.query.notebooks === '1')
@@ -384,7 +389,14 @@ async function createFolder() {
           @new-bucket="newBucketOpen = true"
         />
 
+        <MockBucketBrowser
+          v-if="exampleBucket"
+          :bucket="exampleBucket"
+          @add-data="addDataOpen = true"
+          @open="(key: string) => manager.openDetails({ key, name: key.split('/').pop() ?? key })"
+        />
         <ObjectBrowser
+          v-else
           :manager="manager"
           :notebooks="notebooksView"
           @add-data="addDataOpen = true"

@@ -304,6 +304,69 @@ export const MOCK_OBJECTS: readonly MockObject[] = [
     contentHash: '3f7a9c1e5b2d8046fa1c7e93b5d0a2486c91e7f3a5b0d24c68e1f9a37b5c0d82',
     datasets: ['SPIRE release 2026-10'],
   },
+  {
+    id: 'genome31',
+    bucket: 'bakrep',
+    key: 'bakrep-v2-data-031/GCF_003697165.2/genome.fna.gz',
+    versionId: '01K8Y3M5R7T9W2B4D6F8H0JKNR',
+    size: 1_287_330,
+    modified: '2026-10-23T05:52:00Z',
+    servedBy: 'node-2',
+    how: 'node-2 has no copy yet. It read the file from the source and checked the recorded ETag first.',
+    holders: [
+      { nodeId: 'node-2', role: 'Coordinator', bytes: 'Record only' },
+      { nodeId: 'node-3', role: 'Replica', bytes: 'Record only' },
+    ],
+    external: {
+      source: `${BAKREP_ENDPOINT}/bakrep-v2-data-031/GCF_003697165.2/genome.fna.gz`,
+      etag: '"4d7e0a19b3c85f62e1a70d94c8b3f517"',
+      digests: [
+        { algorithm: 'md5', digest: '4d7e0a19b3c85f62e1a70d94c8b3f517', scope: 'full object', origin: 'Listing ETag, evidence only' },
+      ],
+      refreshed: '2026-10-23T05:52:00Z',
+    },
+    datasets: ['bakrep collection'],
+  },
+  {
+    id: 'genome44',
+    bucket: 'bakrep',
+    key: 'bakrep-v2-data-044/GCF_000008865.2/genome.fna.gz',
+    versionId: '01K8Y3M5R7T9W2B4D6F8H0JKNS',
+    size: 1_301_776,
+    modified: '2026-10-23T06:03:00Z',
+    servedBy: 'node-2',
+    how: 'node-2 has no copy yet. It read the file from the source and checked the recorded ETag first.',
+    holders: [
+      { nodeId: 'node-1', role: 'Coordinator', bytes: 'Record only' },
+      { nodeId: 'node-3', role: 'Replica', bytes: 'Record only' },
+    ],
+    external: {
+      source: `${BAKREP_ENDPOINT}/bakrep-v2-data-044/GCF_000008865.2/genome.fna.gz`,
+      etag: '"c21b7f40a5d9e386b0f14c72ad85e903"',
+      digests: [
+        { algorithm: 'md5', digest: 'c21b7f40a5d9e386b0f14c72ad85e903', scope: 'full object', origin: 'Listing ETag, evidence only' },
+      ],
+      refreshed: '2026-10-23T06:03:00Z',
+    },
+    datasets: ['bakrep collection'],
+  },
+  {
+    id: 'escherichia',
+    bucket: 'spire-db',
+    key: 'release-2026-10/escherichia_coli_mags.tsv.zst',
+    versionId: '01K8W9C2D4F6H8KMQ0S2V4X6ZB',
+    size: 2_113_536_000,
+    modified: '2026-10-02T11:07:00Z',
+    servedBy: 'node-2',
+    how: 'node-2 holds a full copy and served the file itself.',
+    holders: [
+      { nodeId: 'node-1', role: 'Coordinator', bytes: 'Full copy' },
+      { nodeId: 'node-2', role: 'Replica', bytes: 'Full copy' },
+      { nodeId: 'node-3', role: 'Replica, leaving', bytes: 'Full copy' },
+    ],
+    contentHash: '8c04e7b21f6a93d5e0b7c418a2f6d93b07e5c1a8d4f20b6e93a7c5d18f0e2b46',
+    datasets: ['SPIRE release 2026-10'],
+  },
 ]
 
 export function mockObject(id: string): MockObject | undefined {
@@ -346,3 +409,11 @@ export const SEARCH_HITS: readonly SearchHit[] = [
   { kind: 'dataset', title: 'Escherichia coli K-12 reference annotation', where: 'Genome Lab', relation: 'No files in a distributed bucket' },
   { kind: 'file', title: 'release-2026-10/escherichia_coli_mags.tsv.zst', where: 'spire-db', relation: 'Used by SPIRE release 2026-10' },
 ]
+
+export function bucketFiles(bucket: string): MockObject[] {
+  return MOCK_OBJECTS.filter((object) => object.bucket === bucket)
+}
+
+export function mockFile(bucket: string, key: string): MockObject | undefined {
+  return MOCK_OBJECTS.find((object) => object.bucket === bucket && object.key === key)
+}
