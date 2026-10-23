@@ -19,6 +19,7 @@ import KeyedReadNotice from '@/components/storage/KeyedReadNotice.vue'
 import { useAruna } from '@/composables/useAruna'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { isDesktop } from '@/lib/desktop'
+import { mockEnabled } from '@/lib/distributedMock'
 import type { BindSource } from '@/lib/bindSource'
 import { folderName } from '@/lib/deviceApi'
 import { useBrokenFiles } from '@/composables/useBrokenFiles'
@@ -539,7 +540,7 @@ async function onDrop(event: DragEvent) {
         <div class="mt-4 flex justify-center gap-2">
           <RefreshButton v-if="!remoteEndpointMissing" :busy="retrySpinning" label="Try again" @click="onRetryObjects" />
           <Button
-            v-if="showSyncButton && (!desktop || (currentBindSource && !currentLinkedFolder))"
+            v-if="showSyncButton && (desktop ? currentBindSource && !currentLinkedFolder : !mockEnabled())"
             size="sm"
             @click="currentBindSource && desktop ? emit('sync-to-computer', currentBindSource) : emit('sync-to-node')"
           >

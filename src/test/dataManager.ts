@@ -186,6 +186,7 @@ export function objectBrowser(): Component {
       '@/components/storage/KeyedReadNotice.vue': moduleDefault(Slotted('aside')),
       '@/composables/usePortalFeatures': { usePortalFeatures: () => ({ shown: () => true }) },
       '@/lib/desktop': { isDesktop: () => desktopMode.on },
+      '@/lib/distributedMock': { mockEnabled: () => false },
       '@/composables/useAruna': { useAruna: () => ({ isRealmAdmin: ref(false) }) },
       '@/composables/useBrokenFiles': {
         useBrokenFiles: () => ({ reasonOf: (key: string) => brokenFiles.reasons[key] ?? null }),
