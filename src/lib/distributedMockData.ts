@@ -745,13 +745,13 @@ export function grantWarnings(suffixes: readonly string[]): GrantWarning[] {
 
 export type DatabaseReaders = 'Everyone in the realm' | 'Public'
 
-// A dataset can link a bucket, a folder in a bucket or a database as one folder-like part.
-// Live parts show the current files. A dataset version can fix a part as of a date.
+// A dataset can link a bucket or a folder in a bucket as one folder-like part, always with the
+// current files. Linking a database is ordinary dataset-to-dataset metadata: it does not make the
+// files of the database part of the dataset.
 export interface LinkedPart {
   kind: 'bucket' | 'folder' | 'database'
   bucket: string
   prefix?: string
-  asOf?: string
 }
 
 export interface ExampleDataset {
@@ -799,7 +799,7 @@ export const DATASETS_START: readonly ExampleDataset[] = [
     creator: 'Mira Okafor',
     source: 'Own sequencing',
     group: 'Genome Lab',
-    parts: [{ kind: 'folder', bucket: ORDINARY_BUCKET, prefix: 'raw/2026', asOf: '2026-10-01' }],
+    parts: [{ kind: 'folder', bucket: ORDINARY_BUCKET, prefix: 'raw/2026' }],
   },
   {
     id: '01K8Z0DS0ECOLI000000000006',
@@ -822,7 +822,7 @@ export const DATASETS_START: readonly ExampleDataset[] = [
     creator: 'Sequencing Core',
     source: 'Own sequencing',
     group: 'Sequencing Core',
-    parts: [{ kind: 'folder', bucket: 'reads-edge', prefix: 'runs', asOf: '2026-10-08' }],
+    parts: [{ kind: 'folder', bucket: 'reads-edge', prefix: 'runs' }],
   },
 ]
 
@@ -869,13 +869,16 @@ export function crateOf(dataset: ExampleDataset): Record<string, unknown> {
 }
 
 export function partId(part: LinkedPart): string {
+  if (part.kind === 'database') {
+    return `https://w3id.org/aruna/${DATABASES_START.find((entry) => entry.bucket === part.bucket)?.datasetId ?? part.bucket}`
+  }
   return `s3://${part.bucket}/${part.prefix ? `${part.prefix}/` : ''}`
 }
 
 export function partLabel(part: LinkedPart): string {
   const name = part.prefix ? `${part.bucket}/${part.prefix}` : part.bucket
   const what = part.kind === 'folder' ? 'linked folder' : part.kind === 'database' ? 'linked database' : 'linked bucket'
-  return `${name}, ${what}, ${part.asOf ? `as of ${part.asOf}` : 'live'}`
+  return `${name}, ${what}`
 }
 
 export type Origin =

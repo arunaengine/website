@@ -29,8 +29,9 @@ const marks = ref<DatabaseEntry[]>(DATABASES_START.map((entry) => ({ ...entry })
 // Realm roles that hold WRITE on the path that allows marking databases.
 const curators = ref<RealmRole[]>(REALM_ROLES.filter((role) => role.name === 'Database curators').map((role) => ({ ...role })))
 
+// Only a direct bucket or folder link covers files. A linked database is dataset metadata.
 function covers(part: LinkedPart, bucket: string, key: string): boolean {
-  return part.bucket === bucket && (!part.prefix || key.startsWith(`${part.prefix}/`))
+  return part.kind !== 'database' && part.bucket === bucket && (!part.prefix || key.startsWith(`${part.prefix}/`))
 }
 
 export function useMockDatabases() {
@@ -80,7 +81,7 @@ export function useMockDatabases() {
 
   // Datasets that link the bucket, or a folder of it, as a part.
   function linkedBy(bucket: string): { dataset: ExampleDataset; part: LinkedPart }[] {
-    return datasets.value.flatMap((dataset) => dataset.parts.filter((part) => part.bucket === bucket).map((part) => ({ dataset, part })))
+    return datasets.value.flatMap((dataset) => dataset.parts.filter((part) => part.kind !== 'database' && part.bucket === bucket).map((part) => ({ dataset, part })))
   }
 
   // Every file inside a linked part is part of the dataset. Nothing is stored per file.

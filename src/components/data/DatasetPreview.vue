@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // A small preview of a dataset: its linked parts as folder-like rows and its RO-Crate.
-// A linked part shows the current files by default. Browse into it like any folder.
+// A linked part always shows the current files. Browse into it like any folder.
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
@@ -22,7 +22,7 @@ const KINDS = [
 ]
 
 const adding = ref(false)
-const draft = ref({ kind: 'bucket' as LinkedPart['kind'], bucket: '', prefix: '', asOf: '' })
+const draft = ref({ kind: 'bucket' as LinkedPart['kind'], bucket: '', prefix: '' })
 const choices = computed(() =>
   draft.value.kind === 'database'
     ? entries.value.map((entry) => ({ value: entry.bucket, label: entry.dataset.name }))
@@ -31,10 +31,10 @@ const choices = computed(() =>
 
 function link() {
   if (!draft.value.bucket) return
-  const { kind, bucket, prefix, asOf } = draft.value
-  linkPart(props.datasetId, { kind, bucket, ...(kind === 'folder' && prefix ? { prefix: prefix.replace(/\/$/, '') } : {}), ...(asOf ? { asOf } : {}) })
+  const { kind, bucket, prefix } = draft.value
+  linkPart(props.datasetId, { kind, bucket, ...(kind === 'folder' && prefix ? { prefix: prefix.replace(/\/$/, '') } : {}) })
   adding.value = false
-  draft.value = { kind: 'bucket', bucket: '', prefix: '', asOf: '' }
+  draft.value = { kind: 'bucket', bucket: '', prefix: '' }
 }
 </script>
 
@@ -51,14 +51,13 @@ function link() {
           >{{ partLabel(part) }}</RouterLink>
         </li>
       </ul>
-      <p class="mt-1 text-muted-foreground">The files stay unnamed under the part. A dataset version can fix a part as of a date.</p>
+      <p class="mt-1 text-muted-foreground">The files stay unnamed under the part. A linked bucket or folder always shows the current files. A linked database is only a link between datasets.</p>
     </div>
     <Button v-if="!adding" size="sm" variant="outline" @click="adding = true"><Plus class="size-3.5" /> Add a linked bucket or folder</Button>
     <div v-else class="grid gap-2 sm:grid-cols-2">
       <OptionToggle v-model="draft.kind" :options="KINDS" aria-label="Kind of linked part" class="sm:col-span-2" />
       <Select v-model="draft.bucket" :options="choices" placeholder="Choose" aria-label="Linked bucket or database" />
       <Input v-if="draft.kind === 'folder'" v-model="draft.prefix" placeholder="Folder, for example raw/2026" aria-label="Folder" />
-      <Input v-model="draft.asOf" placeholder="As of a date (empty: live)" aria-label="As of" />
       <div class="flex gap-2 sm:col-span-2">
         <Button size="sm" :disabled="!draft.bucket" @click="link">Link</Button>
         <Button size="sm" variant="ghost" @click="adding = false">Cancel</Button>

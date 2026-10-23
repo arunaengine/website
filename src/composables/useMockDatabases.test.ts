@@ -10,8 +10,11 @@ describe('databases of the node mock', () => {
       ['bakrep', true],
       ['E. coli genomes, 2025 release', false],
     ])
+    // That dataset also links the RefSeq database, which does not make its files part of it.
+    const refseq = marks.partOf('refseq', 'bacteria/GCF_000005845.2_genomic.fna.gz')
+    expect(refseq.map((item) => item.dataset.name)).toEqual(['RefSeq'])
     const reef = marks.partOf('lab-raw-data', 'raw/2026/reef-07/notes.txt')
-    expect(reef.map((item) => item.part.asOf)).toEqual(['2026-10-01'])
+    expect(reef.map((item) => [item.dataset.name, item.part.kind])).toEqual([['Reef survey 2026', 'folder']])
     expect(marks.partOf('lab-raw-data', 'analysis/coverage.tsv')).toEqual([])
   })
 
