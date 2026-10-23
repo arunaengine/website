@@ -16,6 +16,7 @@ import Spinner from '@/components/ui/Spinner.vue'
 import CoverageIcon from '@/components/search/CoverageIcon.vue'
 import { useAruna } from '@/composables/useAruna'
 import { useRealm } from '@/composables/useRealm'
+import { useMockDatabases } from '@/composables/useMockDatabases'
 import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useSearchSettings } from '@/composables/useSearchSettings'
 import { OBJECT_SEARCH_MODE_LABELS, useUnifiedSearch } from '@/composables/useUnifiedSearch'
@@ -28,7 +29,7 @@ import { useMediaQuery } from '@vueuse/core'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
-type QuickSection = 'datasets' | 'files' | 'buckets' | 'objects' | 'groups' | 'people'
+type QuickSection = 'datasets' | 'files' | 'buckets' | 'objects' | 'databases' | 'groups' | 'people'
 
 interface QuickItem {
   key: string
@@ -46,6 +47,7 @@ const QUICK_KIND_LABELS: Record<QuickSection, string> = {
   files: 'File',
   buckets: 'Bucket',
   objects: 'Object',
+  databases: 'Database',
   groups: 'Group',
   people: 'User',
 }
@@ -68,6 +70,7 @@ const { authToken } = useAruna()
 const { displayName: nodeDisplayName, isLocalNode } = useRealmNodes()
 const router = useRouter()
 const { objectSearchMode } = useSearchSettings()
+const { search: searchDatabases } = useMockDatabases()
 const objectModeOptions = Object.entries(OBJECT_SEARCH_MODE_LABELS).map(([value, label]) => ({ value, label }))
 
 // Quick search is server-backed only: the catalog is paged, so a client-side
@@ -125,7 +128,15 @@ const items = computed<QuickItem[]>(() => [
       ...(objectParentPrefix(hit.key) ? { prefix: objectParentPrefix(hit.key) as string } : {}),
     },
   })),
-  // Files of the example buckets stored on several nodes (node mock).
+  // Listed databases and files of the example buckets (node mock).
+  ...(mockEnabled() ? searchDatabases(q.value) : []).map((entry): QuickItem => ({
+    key: `db:${entry.id}`,
+    section: 'databases',
+    title: entry.name,
+    subtitle: `${entry.description} ${entry.source}`,
+    routeName: 'bucket',
+    routeParams: { bucketId: entry.bucket },
+  })),
   ...(mockEnabled() ? searchFiles(q.value) : []).map((file): QuickItem => ({
     key: `m:${file.key}`,
     section: 'files',
