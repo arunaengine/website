@@ -219,11 +219,15 @@ describe('object browser sync to this computer', () => {
   it('offers the desktop button next to Add data and asks to bind the bucket', async () => {
     desktopMode.on = true
     const onSyncToComputer = vi.fn()
-    const root = await render({ showSyncButton: computed(() => true) }, { onSyncToComputer })
+    const source = { bucket: 'reef', nodeId: 'realm-1', groupId: 'g1' }
+    const root = await render(
+      { showSyncButton: computed(() => true), currentBindSource: computed(() => source) },
+      { onSyncToComputer },
+    )
 
     await bubbleClick(action(root, 'Sync to this computer'))
 
-    expect(onSyncToComputer).toHaveBeenCalledTimes(1)
+    expect(onSyncToComputer).toHaveBeenCalledWith(source)
   })
 
   it('keeps the button out of the web portal', async () => {
@@ -232,9 +236,9 @@ describe('object browser sync to this computer', () => {
     expect(() => action(root, 'Sync to this computer')).toThrow()
   })
 
-  it('keeps the button out for a bucket that cannot be synced', async () => {
+  it('keeps the button out for a bucket that is not a confirmed realm source', async () => {
     desktopMode.on = true
-    const root = await render({ showSyncButton: computed(() => false) })
+    const root = await render({ showSyncButton: computed(() => true), currentBindSource: computed(() => null) })
 
     expect(() => action(root, 'Sync to this computer')).toThrow()
   })

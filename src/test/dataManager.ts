@@ -270,6 +270,8 @@ export function fakeManager(overrides: Record<string, unknown> = {}) {
     keyIsSynced: () => false,
     bucketSyncCount: computed(() => 2),
     showSyncButton: computed(() => false),
+    bindSourceFor: () => null,
+    currentBindSource: computed(() => null),
     selectedObjectKeys,
     selectedPrefixes,
     selectedCount: computed(() => selectedObjectKeys.value.size + selectedPrefixes.value.size),

@@ -12,6 +12,7 @@ import { useS3 } from '@/composables/useS3'
 import type { DataManager } from '@/composables/useDataManager'
 import type { BucketSearchHit } from '@/lib/api'
 import { isDesktop } from '@/lib/desktop'
+import type { BindSource } from '@/lib/bindSource'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import { ArrowLeftRight, Boxes, ChevronRight, FolderPlus, History, KeyRound, Trash2 } from '@lucide/vue'
 import { computed, ref, useId, watch } from 'vue'
@@ -21,7 +22,7 @@ const props = defineProps<{ manager: DataManager }>()
 const desktop = isDesktop()
 const emit = defineEmits<{
   (e: 'sync', hit: BucketSearchHit): void
-  (e: 'sync-computer', target: { bucket: string; nodeId: string | null; groupId: string | null }): void
+  (e: 'sync-computer', source: BindSource): void
 }>()
 
 const s3 = useS3()
@@ -57,6 +58,7 @@ const {
   createBucket,
   createBucketError,
   requestDelete,
+  bindSourceFor,
 } = props.manager
 
 const allNodes = computed(() => bucketNodeChoice.value === null)
@@ -108,6 +110,13 @@ function openHit(hit: BucketSearchHit) {
   openBucketOn(hit.bucket, realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id)
 }
 
+function emitSync(source: BindSource | null) {
+  if (source) emit('sync-computer', source)
+}
+
+// A hit names its own node and group; nothing falls back to the connected node.
+const hitSource = (hit: BucketSearchHit) => (desktop ? bindSourceFor(hit.bucket, hit.node_id, hit.group_id) : null)
+
 // Bucket deletion lives on the row it destroys; the shared dialog does the rest.
 function deleteRefusal(name: string, nodeId: string | null): string | null {
   // The serving node decides in the dialog's preflight.
@@ -157,6 +166,11 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
               @open="openHit(hit)"
             >
               <template #tooltip>{{ rowNode(hit.node_id) }}</template>
+              <template v-if="hitSource(hit)" #actions>
+                <IconButton :label="`Sync ${hit.bucket} to this computer…`" side="right" @click="emitSync(hitSource(hit))">
+                  <ArrowLeftRight class="h-3 w-3" />
+                </IconButton>
+              </template>
             </BucketRow>
           </li>
         </ul>
@@ -199,10 +213,10 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
                 <template #tooltip>{{ rowNode(entry.nodeId) }}</template>
                 <template #actions>
                   <IconButton
-                    v-if="desktop && !isWorkspaceBucket(entry.bucket)"
+                    v-if="desktop && bindSourceFor(entry.bucket, entry.nodeId ?? null, selectedGroupId)"
                     :label="`Sync ${entry.bucket} to this computer…`"
                     side="right"
-                    @click="emit('sync-computer', { bucket: entry.bucket, nodeId: entry.nodeId ?? null, groupId: selectedGroupId ?? null })"
+                    @click="emitSync(bindSourceFor(entry.bucket, entry.nodeId ?? null, selectedGroupId))"
                   >
                     <ArrowLeftRight class="h-3 w-3" />
                   </IconButton>
@@ -284,15 +298,11 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
               @open="openSearchHit(hit)"
             >
               <template #tooltip>{{ rowNode(hit.node_id) }}</template>
-              <template v-if="desktop || !realmNodes.isLocalNode(hit.node_id)" #actions>
+              <template v-if="desktop ? hitSource(hit) : !realmNodes.isLocalNode(hit.node_id)" #actions>
                 <IconButton
                   :label="desktop ? `Sync ${hit.bucket} to this computer…` : `Sync ${hit.bucket} to this node…`"
                   side="right"
-                  @click="
-                    desktop
-                      ? emit('sync-computer', { bucket: hit.bucket, nodeId: realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id, groupId: hit.group_id })
-                      : emit('sync', hit)
-                  "
+                  @click="desktop ? emitSync(hitSource(hit)) : emit('sync', hit)"
                 >
                   <ArrowLeftRight class="h-3 w-3" />
                 </IconButton>

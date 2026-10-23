@@ -15,6 +15,7 @@ import {
 } from '@/test/clientRender'
 import { BUCKET_NAME_REQUIREMENT, bucketNameProblem } from '@/lib/bucketName'
 import * as Workspaces from '@/lib/workspaces'
+import { bindSource } from '@/lib/bindSource'
 
 const aruna = vi.hoisted(() => ({ authToken: { value: 'token' }, searchBuckets: vi.fn() }))
 vi.mock('@/composables/useAruna', () => ({ useAruna: () => aruna }))
@@ -169,6 +170,18 @@ function manager() {
     createBucket,
     createBucketError: ref(null),
     requestDelete,
+    // The realm nodes are node-2 and home; the laptop is the computer's own user node.
+    bindSourceFor: (name: string, nodeId: string | null, groupId: string | null | undefined) =>
+      bindSource(
+        [
+          { nodeId: 'node-2', kind: 'server' },
+          { nodeId: 'home', kind: 'server' },
+          { nodeId: 'laptop', kind: 'user' },
+        ],
+        name,
+        nodeId ?? 'home',
+        groupId,
+      ),
   }
 }
 
@@ -286,7 +299,30 @@ describe('Bucket sidebar sync to this computer', () => {
     await pickNode()
     await click(element(root, (node) => node.props['aria-label'] === 'Sync reef-survey to this computer…'))
 
-    expect(onSyncComputer).toHaveBeenCalledWith({ bucket: 'reef-survey', nodeId: null, groupId: 'g1' })
+    expect(onSyncComputer).toHaveBeenCalledWith({ bucket: 'reef-survey', nodeId: 'home', groupId: 'g1' })
+  })
+
+  it('offers nothing for a bucket on the computer’s own user node', async () => {
+    desktopMode.on = true
+    const { root } = await mountApp(BucketSidebar, { props: { manager: withBucket('laptop') } })
+    await pickNode()
+
+    expect(() => element(root, (node) => node.props['aria-label'] === 'Sync reef-survey to this computer…')).toThrow()
+  })
+
+  it('offers the action on every All nodes result with its own node and group', async () => {
+    desktopMode.on = true
+    allBuckets.hits.value = [
+      { bucket: 'results', node_id: 'node-2', group_id: 'g7' },
+      { bucket: 'private', node_id: 'laptop', group_id: 'g1' },
+    ]
+    const onSyncComputer = vi.fn()
+    const { root } = await mountApp(BucketSidebar, { props: { manager: withBucket(), onSyncComputer } })
+
+    await click(element(root, (node) => node.props['aria-label'] === 'Sync results to this computer…'))
+
+    expect(onSyncComputer).toHaveBeenCalledWith({ bucket: 'results', nodeId: 'node-2', groupId: 'g7' })
+    expect(() => element(root, (node) => node.props['aria-label'] === 'Sync private to this computer…')).toThrow()
   })
 })
 

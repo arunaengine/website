@@ -36,6 +36,7 @@ import { isWorkspaceBucket } from '@/lib/workspaces'
 import { useAllBuckets } from './useAllBuckets'
 import type { BucketSearchHit, SourceConnectorSummary, SyncRelationship, UsageResponse } from '@/lib/api'
 import { referenceSourceLabel, referenceSourceName, type ReferenceSourceGroup } from '@/lib/references'
+import { bindSource, type BindSource } from '@/lib/bindSource'
 import { parseArunaArn, prefixesOverlap, syncBucketKey } from '@/lib/sync'
 import { dataWatchPathPrefix, s3EndpointNodeId } from '@/lib/watches'
 
@@ -420,6 +421,11 @@ export function useDataManager() {
       ...(covers(relationship.source) ? [{ relationship, direction: 'outgoing' as const }] : []),
       ...(covers(relationship.target) ? [{ relationship, direction: 'incoming' as const }] : []),
     ])
+  }
+
+  // The desktop binds a bucket to a folder only from a realm node, by explicit ids.
+  function bindSourceFor(name: string, nodeId: string | null, groupId: string | null | undefined): BindSource | null {
+    return bindSource(realmNodes.nodes.value, name, nodeId ?? realmNodes.localNodeId.value, groupId)
   }
 
   const showSyncButton = computed(
@@ -1016,6 +1022,7 @@ export function useDataManager() {
     contextReady.value ? s3.activeContext.value?.groupId ?? null : null,
   )
   const publicAccess = usePublicAccess(activeGroupId)
+  const currentBindSource = computed(() => bindSourceFor(bucket.value, remoteNodeId.value, activeGroupId.value))
   const canWriteCurrentPrefix = computed(() =>
     Boolean(
       contextReady.value &&
@@ -1412,6 +1419,8 @@ export function useDataManager() {
     syncsForKey,
     bucketSyncCount,
     showSyncButton,
+    bindSourceFor,
+    currentBindSource,
     loadSyncOverview,
     references,
     referenceStats,

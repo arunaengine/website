@@ -29,6 +29,7 @@ import { providePageContext } from '@/composables/usePageContext'
 import { useS3, s3ErrorMessage } from '@/composables/useS3'
 import { folderNameProblem } from '@/lib/bucketName'
 import { isDesktop } from '@/lib/desktop'
+import type { BindSource } from '@/lib/bindSource'
 import type { BucketSearchHit } from '@/lib/api'
 import type { PublicTarget } from '@/lib/publicAccess'
 import { computed, ref, watch } from 'vue'
@@ -140,16 +141,13 @@ function openSyncFromHit(hit: BucketSearchHit) {
   syncDialogOpen.value = true
 }
 
-// "Sync to this computer": the desktop binds a bucket to a folder.
+// "Sync to this computer": the desktop binds a bucket to a folder. The source
+// always comes with explicit node and group ids.
 const bindOpen = ref(false)
-const bindTarget = ref<{ bucket: string; nodeId: string | null; groupId: string | null }>({
-  bucket: '',
-  nodeId: null,
-  groupId: null,
-})
+const bindTarget = ref<BindSource>({ bucket: '', nodeId: '', groupId: '' })
 
-function openBindDialog(target?: { bucket: string; nodeId: string | null; groupId: string | null }) {
-  bindTarget.value = target ?? { bucket: bucket.value, nodeId: remoteNodeId.value, groupId: activeGroupId.value ?? null }
+function openBindDialog(source: BindSource) {
+  bindTarget.value = source
   bindOpen.value = true
 }
 
@@ -352,7 +350,7 @@ async function createFolder() {
           @new-folder="openNewFolder"
           @new-notebook="newNotebookOpen = true"
           @sync-to-node="openSyncDialog"
-          @sync-to-computer="openBindDialog()"
+          @sync-to-computer="openBindDialog"
           @public-access="openPublicAccess"
         >
           <UploadPanel :manager="manager" />
@@ -390,7 +388,7 @@ async function createFolder() {
       v-if="desktop"
       v-model:open="bindOpen"
       :bucket="bindTarget.bucket"
-      :node-id="bindTarget.nodeId ?? realmNodes.localNodeId.value"
+      :node-id="bindTarget.nodeId"
       :group-id="bindTarget.groupId"
       @bound="onSyncChanged"
     />
