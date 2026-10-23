@@ -147,6 +147,23 @@ describe('useLinkState', () => {
     scope.stop()
   })
 
+  it('reads only the progress while a step runs', async () => {
+    getOrganizeJob.mockResolvedValue(RUNNING)
+    const { scope, state } = setup()
+    await state.refresh()
+    expect(getImportRenames).toHaveBeenCalledTimes(1)
+    await state.refresh()
+    expect(getImportRenames).toHaveBeenCalledTimes(1)
+    expect(getLinkStatus).toHaveBeenCalledTimes(1)
+    getImportRenames.mockResolvedValue({ count: 3, complete: true, files: [] })
+    getOrganizeJob.mockResolvedValue({ ...RUNNING, state: 'done', finished_at_ms: 5 })
+    await state.refresh()
+    expect(getImportRenames).toHaveBeenCalledTimes(2)
+    expect(getLinkStatus).toHaveBeenCalledTimes(2)
+    expect(state.renames.value?.count).toBe(3)
+    scope.stop()
+  })
+
   it('counts a running step that vanished', async () => {
     getOrganizeJob.mockResolvedValue(RUNNING)
     const { scope, state } = setup()

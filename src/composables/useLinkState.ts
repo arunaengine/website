@@ -60,14 +60,16 @@ export function useLinkState(groupId: () => string, importId: () => string) {
     const id = ++generation
     const group = groupId()
     const link = importId()
+    // A running step needs only its progress; the full reads follow once it ends.
+    const running = job.value !== null
     const [found, current, counted] = await Promise.all([
-      read(() => getImportRenames(group, link, client())),
+      running ? null : read(() => getImportRenames(group, link, client())),
       read(() => getOrganizeJob(group, link, client())),
-      read(() => getLinkStatus(group, link, client())),
+      running ? null : read(() => getLinkStatus(group, link, client())),
     ])
     if (disposed || id !== generation) return
-    if (found.state !== 'failed') renames.value = found.state === 'ok' ? found.value : null
-    if (counted.state !== 'failed') status.value = counted.state === 'ok' ? counted.value : null
+    if (found && found.state !== 'failed') renames.value = found.state === 'ok' ? found.value : null
+    if (counted && counted.state !== 'failed') status.value = counted.state === 'ok' ? counted.value : null
     const wasActive = job.value !== null
     if (current.state === 'ok') {
       stored.value = current.value
@@ -78,8 +80,9 @@ export function useLinkState(groupId: () => string, importId: () => string) {
       supported.value = false
       stored.value = null
     }
-    const failed = [found, current, counted].find((result) => result.state === 'failed')
+    const failed = [found, current, counted].find((result) => result?.state === 'failed')
     readError.value = failed?.state === 'failed' ? failed.message : null
+    if (running && !job.value) return refresh()
     schedule()
   }
 
