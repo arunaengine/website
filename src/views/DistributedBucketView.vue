@@ -3,6 +3,7 @@
 import { computed, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
+import AccessTab from '@/components/distributed/AccessTab.vue'
 import BucketActions from '@/components/distributed/BucketActions.vue'
 import DegradedNotice from '@/components/distributed/DegradedNotice.vue'
 import MemberTable from '@/components/distributed/MemberTable.vue'
@@ -11,6 +12,7 @@ import RangeTable from '@/components/distributed/RangeTable.vue'
 import Badge from '@/components/ui/Badge.vue'
 import DetailList from '@/components/ui/DetailList.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import Notice from '@/components/ui/Notice.vue'
 import OptionToggle from '@/components/ui/OptionToggle.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import Tabs from '@/components/ui/Tabs.vue'
@@ -18,8 +20,8 @@ import TabsContent from '@/components/ui/TabsContent.vue'
 import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import { useRouteTab } from '@/composables/useRouteTab'
-import { presetById, stamp } from '@/lib/distributedMock'
-import { degradedRanges, mockBucket } from '@/lib/distributedMockData'
+import { grantGap, presetById, stamp } from '@/lib/distributedMock'
+import { degradedRanges, mockBucket, MOCK_GRANTS } from '@/lib/distributedMockData'
 import { formatCount } from '@/lib/formatCount'
 import { formatBytes } from '@/lib/utils'
 import { MOCK_BASE } from '@/router/distributedMock'
@@ -30,13 +32,18 @@ const degraded = computed(() => (bucket.value ? degradedRanges(bucket.value) : [
 const objects = computed(() => bucket.value?.ranges.reduce((sum, range) => sum + range.objects, 0) ?? 0)
 const bytes = computed(() => bucket.value?.ranges.reduce((sum, range) => sum + range.bytes, 0) ?? 0)
 
+const grantWarnings = computed(() => {
+  const ids = bucket.value?.members.map((member) => member.nodeId) ?? []
+  return (MOCK_GRANTS[bucket.value?.name ?? ''] ?? []).filter((grant) => grantGap(grant.nodes, ids).length).length
+})
+
 const viewer = ref('admin')
 const VIEWERS = [
   { value: 'admin', label: 'Group admin' },
   { value: 'member', label: 'Group member' },
 ]
 
-const tab = useRouteTab(['overview', 'settings'], 'overview')
+const tab = useRouteTab(['overview', 'access', 'settings'], 'overview')
 
 const settings = computed(() => {
   const found = bucket.value
@@ -74,6 +81,7 @@ const settings = computed(() => {
       <Tabs v-else v-model="tab" class="space-y-5">
         <TabsList aria-label="Distributed bucket sections">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="access">Access</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
@@ -85,6 +93,10 @@ const settings = computed(() => {
             <StatCard label="Size" :value="formatBytes(bytes)" />
           </div>
           <DegradedNotice v-for="range in degraded" :key="range.id" :range="range" />
+          <Notice v-if="grantWarnings" tone="warning">
+            {{ grantWarnings }} {{ grantWarnings === 1 ? 'grant does' : 'grants do' }} not cover every node.
+            <RouterLink :to="{ query: { tab: 'access' } }" class="underline">See the access list</RouterLink>.
+          </Notice>
           <BucketActions :bucket="bucket" :admin="viewer === 'admin'" />
           <section class="space-y-2">
             <h2 class="font-display text-base font-semibold text-aruna-navy">Members</h2>
@@ -94,6 +106,10 @@ const settings = computed(() => {
             <h2 class="font-display text-base font-semibold text-aruna-navy">Key ranges</h2>
             <RangeTable :ranges="bucket.ranges" />
           </section>
+        </TabsContent>
+
+        <TabsContent value="access" class="mt-0">
+          <AccessTab :bucket="bucket" />
         </TabsContent>
 
         <TabsContent value="settings" class="mt-0">

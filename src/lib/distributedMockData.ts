@@ -185,3 +185,20 @@ export const DELETE_PREVIEWS: Record<string, DeletePreview> = {
   },
   'reads-edge': { datasets: [], reasons: [] },
 }
+
+export interface MockGrant {
+  holder: string
+  kind: 'Group' | 'User'
+  role: 'Read' | 'Write'
+  nodes: string[]
+}
+
+export const MOCK_GRANTS: Record<string, MockGrant[]> = {
+  bakrep: [
+    { holder: 'Genome Lab', kind: 'Group', role: 'Write', nodes: ['node-1', 'node-2'] },
+    { holder: 'Soil Ecology', kind: 'Group', role: 'Read', nodes: ['*'] },
+    { holder: 'Mira Okafor', kind: 'User', role: 'Read', nodes: ['node-3'] },
+  ],
+  'spire-db': [{ holder: 'Genome Lab', kind: 'Group', role: 'Read', nodes: ['*'] }],
+  'reads-edge': [{ holder: 'Sequencing Core', kind: 'Group', role: 'Write', nodes: ['node-1'] }],
+}
