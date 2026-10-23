@@ -53,11 +53,7 @@ const LocalPanel = compileClientComponent(new URL('./LocalPanel.vue', import.met
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Notice.vue': moduleDefault(Notice),
   '@/components/ui/Switch.vue': moduleDefault(SwitchStub),
-  '@/composables/useAruna': {
-    useAruna: () => ({
-      nodeInfo: VueRuntime.computed(() => ({ services: { interfaces: { s3: { url: s3Url.value } } } })),
-    }),
-  },
+  '@/composables/useDeviceStatus': { useDeviceStatus: () => ({ s3Url }) },
   '@/lib/desktopBridge': {
     nodeSettings: async () => stored.value,
     setNodeSettings,
@@ -115,6 +111,15 @@ describe('the local S3 endpoint', () => {
 
     expect(content(mounted.root)).not.toContain('127.0.0.1')
     expect(toggle(mounted.root).props.checked).toBe(true)
+    mounted.app.unmount()
+  })
+
+  it('shows no URL while the local node is down', async () => {
+    // The realm's own endpoint must never stand in for the local one.
+    s3Url.value = null
+    const mounted = await mountApp(LocalPanel)
+
+    expect(content(mounted.root)).not.toContain('http')
     mounted.app.unmount()
   })
 

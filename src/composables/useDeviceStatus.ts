@@ -16,6 +16,8 @@ const error = ref<string | null>(null)
 const loaded = ref(false)
 const identity = ref<{ nodeId: string; realm: string } | null>(null)
 const identityError = ref<string | null>(null)
+// The S3 endpoint the local node reports about itself.
+const s3Url = ref<string | null>(null)
 // Refcounted: the shell's own views hold it open, and nothing polls the node
 // from the welcome routes, which have their own way of watching it.
 let watchers = 0
@@ -130,9 +132,11 @@ async function readIdentity(client: DeviceClient): Promise<void> {
   try {
     const info = await apiRequest<InfoResponse>('/system/info', {}, client)
     identity.value = { nodeId: info.node.peer_id, realm: info.node.realm_id }
+    s3Url.value = info.services?.interfaces?.s3?.url ?? null
     identityError.value = null
   } catch (err) {
     identity.value = null
+    s3Url.value = null
     identityError.value = errorMessage(err)
   }
 }
@@ -141,6 +145,7 @@ watch(
   deviceClient,
   (client) => {
     identity.value = null
+    s3Url.value = null
     identityError.value = null
     if (client) void readIdentity(client)
   },
@@ -158,6 +163,7 @@ export function useDeviceStatus() {
     deviceClient,
     identity,
     identityError,
+    s3Url,
     refresh,
     start,
     stop,

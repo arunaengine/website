@@ -1,19 +1,17 @@
 <script setup lang="ts">
 // Where the node stores its data on this computer, and whether it runs at all.
 // Folder bindings live in the node itself, not here.
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
 import Switch from '@/components/ui/Switch.vue'
-import { useAruna } from '@/composables/useAruna'
+import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { nodeSettings, pickDirectory, setNodeSettings, type NodeSettings } from '@/lib/desktopBridge'
 import { errorMessage } from '@/lib/utils'
 import { FolderOpen } from '@lucide/vue'
 
-const { nodeInfo } = useAruna()
-
-// What the node itself reports; unknown while it restarts.
-const s3Url = computed(() => nodeInfo.value?.services?.interfaces?.s3?.url ?? null)
+// What this computer's node reports; unknown while it is down or restarts.
+const { s3Url } = useDeviceStatus()
 
 const settings = ref<NodeSettings | null>(null)
 const loadError = ref<string | null>(null)

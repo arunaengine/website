@@ -24,7 +24,10 @@ const onNodeStatus = vi.fn(async (handler: Push) => {
   return unlisten
 })
 
-const apiRequest = vi.fn(async () => ({ node: { peer_id: 'peer-1', realm_id: 'realm-1' } }))
+const apiRequest = vi.fn(async () => ({
+  node: { peer_id: 'peer-1', realm_id: 'realm-1' },
+  services: { interfaces: { s3: { url: 'http://127.0.0.1:34118' } } },
+}))
 
 vi.mock('@/lib/api', () => ({ apiRequest }))
 vi.mock('@/lib/desktop', () => ({ isDesktop: () => true }))
@@ -150,9 +153,11 @@ describe('watching the node', () => {
     const device = await load()
     device.start()
     await vi.waitFor(() => expect(device.identity.value).not.toBeNull())
+    expect(device.s3Url.value).toBe('http://127.0.0.1:34118')
 
     push({ ...RUNNING, ready: false })
     await vi.waitFor(() => expect(device.identity.value).toBeNull())
+    expect(device.s3Url.value).toBeNull()
     device.stop()
   })
 
