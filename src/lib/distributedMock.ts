@@ -247,3 +247,24 @@ export function plannedStart(settings: CreateSettings, index: number): string {
   if (settings.hint === 'keys') return settings.keys.split('\n').filter((key) => key.trim())[index - 1].trim()
   return 'cut from the key layout'
 }
+
+export interface MemberResult {
+  nodeId: string
+  created: boolean
+  tries: number
+}
+
+// The mock fails the last member once with a taken name; the second retry succeeds.
+export function firstResults(members: readonly MemberDraft[]): MemberResult[] {
+  return members.map((member, index) => ({ nodeId: member.nodeId, created: index < members.length - 1, tries: 1 }))
+}
+
+export function retryResult(result: MemberResult): MemberResult {
+  return { ...result, tries: result.tries + 1, created: result.tries >= 2 }
+}
+
+export const MIN_MEMBERS = 2
+
+export function isPending(results: readonly MemberResult[]): boolean {
+  return results.some((result) => !result.created)
+}

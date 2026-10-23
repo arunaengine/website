@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defaultSettings, grantGap, nodeGlob, planRanges, plannedStart, presetMembers, rangeTotal } from './distributedMock'
+import { defaultSettings, firstResults, grantGap, isPending, nodeGlob, planRanges, plannedStart, presetMembers, rangeTotal, retryResult } from './distributedMock'
 import { BAKREP_COUNT, mockBucket, sourceObjects } from './distributedMockData'
 
 describe('distributed mock helpers', () => {
@@ -43,5 +43,14 @@ describe('distributed mock helpers', () => {
     expect(rangeTotal(keys)).toBe(3)
     expect(plannedStart(keys, 2)).toBe('genomes/t')
     expect(rangeTotal({ ...settings, hint: 'import' })).toBe(49)
+  })
+
+  it('keeps the bucket pending until the failed member is created', () => {
+    const first = firstResults(presetMembers('mirror'))
+    expect(first.map((result) => result.created)).toEqual([true, true, false])
+    expect(isPending(first)).toBe(true)
+    const again = retryResult(first[2])
+    expect(again.created).toBe(false)
+    expect(retryResult(again).created).toBe(true)
   })
 })
