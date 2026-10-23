@@ -33,12 +33,16 @@ const IconButtonStub = defineComponent({
 const mounts: string[] = []
 const EditStub = defineComponent({
   props: { open: Boolean, link: Object, place: String },
-  emits: ['update:open'],
+  emits: ['update:open', 'saved'],
   setup: (props, { emit }) => {
     mounts.push((props.link as { import_id: string }).import_id)
     return () =>
       props.open
-        ? h('div', { 'data-testid': 'edit-dialog', onClose: () => emit('update:open', false) }, `${(props.link as { bucket: string }).bucket} ${props.place}`)
+        ? h(
+            'div',
+            { 'data-testid': 'edit-dialog', onClose: () => emit('update:open', false), onSaved: () => emit('saved') },
+            `${(props.link as { bucket: string }).bucket} ${props.place}`,
+          )
         : null
   },
 })
@@ -322,6 +326,37 @@ describe('StorageSection', () => {
       const done = listStorageBuckets.mock.calls.length
       await vi.advanceTimersByTimeAsync(30_000)
       expect(listStorageBuckets.mock.calls.length).toBe(done)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps the pages shown and follows a step when a bucket dialog reports a change', async () => {
+    vi.useFakeTimers()
+    try {
+      const job = { kind: 'rename', state: 'running', done: 4, failed: 0 }
+      const first = { buckets: [listed('alpha', { shared: true, provider_bucket: 'shared' })], next: 'c1' }
+      let second = { buckets: [listed('beta', { shared: true, provider_bucket: 'shared' })], next: null }
+      listStorageBuckets.mockImplementation((_group: string, page: { after?: string }) =>
+        Promise.resolve(page.after === 'c1' ? second : first),
+      )
+      const { root } = await mount()
+      await click(buttonIn(root, 'Show more buckets'))
+      await click(nodes(root).find((node) => node.props.title === 'Settings and organize')!)
+      // A rename on the second page is accepted: the dialog asks for a new read.
+      second = { buckets: [listed('beta', { shared: true, provider_bucket: 'shared', job })], next: null }
+      ;(byTestId(root, 'edit-dialog')[0].props.onSaved as () => void)()
+      await flush()
+      await flush()
+      expect(content(root)).toContain('alpha')
+      expect(content(root)).toContain('beta')
+      expect(byTestId(root, 'bucket-job')).toHaveLength(1)
+      // The step is followed from the second page, and it is still there after the next read.
+      const calls = listStorageBuckets.mock.calls.length
+      await vi.advanceTimersByTimeAsync(3000)
+      await flush()
+      expect(listStorageBuckets.mock.calls.length).toBe(calls + 2)
+      expect(content(root)).toContain('beta')
     } finally {
       vi.useRealTimers()
     }

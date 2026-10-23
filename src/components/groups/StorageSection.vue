@@ -96,6 +96,8 @@ function follow(imports: BackendImport[]) {
 // Only the latest load for the current group and session writes state.
 let loadSeq = 0
 const load = () => readAll(false)
+// Reads again and keeps the pages shown, for a change that adds or removes no bucket.
+const reread = () => readAll(true)
 async function readAll(poll: boolean) {
   const seq = ++loadSeq
   const epoch = sessionEpoch.value
@@ -551,7 +553,7 @@ const EDIT = 'h-7 px-2 text-aruna-navy dark:text-foreground'
       :link="editing"
       :storage="backendOf(editing)?.name ?? 'Storage'"
       :place="place(editing)"
-      @saved="load"
+      @saved="reread"
     />
   </div>
 </template>
