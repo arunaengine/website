@@ -8,14 +8,17 @@ import StorageFeatureLink from '@/components/distributed/StorageFeatureLink.vue'
 import AddDataShell from '@/components/data/add/AddDataShell.vue'
 import UploadTab from '@/components/data/add/UploadTab.vue'
 import ConnectorTab from '@/components/data/add/ConnectorTab.vue'
+import CollectionTab from '@/components/data/add/CollectionTab.vue'
 import OtherBucketsTab from '@/components/data/add/OtherBucketsTab.vue'
 import { useConnectorSource, type ConnectorStagingRow } from '@/components/data/add/useConnectorSource'
 import { useOtherBuckets } from '@/components/data/add/useOtherBuckets'
 import { useBuilderBasket } from '@/composables/useBuilderBasket'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import type { StagingReferenceEntry } from '@/lib/api'
+import { mockEnabled } from '@/lib/distributedMock'
+import { mockBucket } from '@/lib/distributedMockData'
 import { computed, ref, toRef } from 'vue'
-import { Boxes, CloudDownload, Upload } from '@lucide/vue'
+import { Boxes, CloudDownload, Database, Upload } from '@lucide/vue'
 
 // The ONE "Add data" entry point: a basket dialog for local files/folders
 // (persistent upload queue) and connector entries (batch staging), plus an
@@ -64,6 +67,8 @@ const otherBuckets = useOtherBuckets({
 const { groupSel, registerOpen, onConnectorSaved } = connectorSource
 
 const { shown } = usePortalFeatures()
+// Whole collections register into a bucket stored on several nodes (node mock).
+const collection = computed(() => mockEnabled() && Boolean(mockBucket(props.bucket)))
 const tab = ref(props.tab === 'connector' && !shown('connectors') ? 'local' : props.tab ?? 'local')
 
 function addConnectorRows(rows: ConnectorStagingRow[]) {
@@ -92,6 +97,7 @@ function onImportsCreated() {
         <TabsTrigger value="local"><Upload class="mr-1 h-3.5 w-3.5" /> Local files</TabsTrigger>
         <TabsTrigger v-if="shown('connectors')" value="connector"><CloudDownload class="mr-1 h-3.5 w-3.5" /> From connector</TabsTrigger>
         <TabsTrigger value="other"><Boxes class="mr-1 h-3.5 w-3.5" /> Other buckets</TabsTrigger>
+        <TabsTrigger v-if="collection" value="collection"><Database class="mr-1 h-3.5 w-3.5" /> Whole collection</TabsTrigger>
       </TabsList>
 
       <TabsContent value="local" class="space-y-3">
@@ -113,6 +119,9 @@ function onImportsCreated() {
           :prefix="prefix"
           @created="onImportsCreated"
         />
+      </TabsContent>
+      <TabsContent v-if="collection" value="collection" class="space-y-3">
+        <CollectionTab :bucket="bucket" />
       </TabsContent>
     </Tabs>
     <StorageFeatureLink question="elsewhere" />
