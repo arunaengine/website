@@ -64,7 +64,10 @@ const {
 } = props.manager
 
 // Steps running on this node's buckets of the group; rows of other nodes show none.
-const jobs = useBucketJobs(selectedGroupId, buckets)
+// They are read again whenever a list was read, in either mode (not on each typed letter).
+const listings = ref(0)
+watch(() => all.loading.value, (busy) => busy || listings.value++)
+const jobs = useBucketJobs(selectedGroupId, computed(() => [buckets.value, listings.value]))
 const allNodes = computed(() => bucketNodeChoice.value === null)
 // An older node cannot list without a name; the open node's list stands in.
 const searchList = computed(() => allNodes.value && !all.needsName.value)

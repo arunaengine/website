@@ -18,8 +18,18 @@ import * as Workspaces from '@/lib/workspaces'
 import { bindSource } from '@/lib/bindSource'
 
 const aruna = vi.hoisted(() => ({ authToken: { value: 'token' }, searchBuckets: vi.fn() }))
-vi.mock('@/composables/useAruna', () => ({ useAruna: () => aruna }))
+const listJobs = vi.hoisted(() => vi.fn())
+vi.mock('@/composables/useAruna', () => ({
+  isUnsupportedEndpoint: () => false,
+  useAruna: () => ({ ...aruna, apiBaseUrl: ref('https://api.test'), sessionEpoch: ref(0) }),
+}))
+// Only the listing the step labels are read from; everything else of the API stays real.
+vi.mock('@/lib/api', async (original) => ({
+  ...(await original<typeof import('@/lib/api')>()),
+  listStorageBuckets: (...args: unknown[]) => listJobs(...args),
+}))
 const RealSearch = await import('@/composables/useBucketSearch')
+const RealJobs = await import('@/composables/useBucketJobs')
 
 const createBucket = vi.fn()
 const requestDelete = vi.fn()
@@ -371,6 +381,52 @@ describe('Bucket sidebar running steps', () => {
     ]
     const { root } = await mountApp(BucketSidebar, { props: { manager: manager() } })
     expect(shown(root)).toEqual(['reef-survey: move'])
+  })
+})
+
+// The same sidebar on the real step reader, which asks the node's bucket listing.
+const RealJobsSidebar = compileClientComponent(new URL('./BucketSidebar.vue', import.meta.url), {
+  ...sidebarModules,
+  '@/composables/useBucketJobs': RealJobs,
+})
+
+describe('Bucket sidebar step reads', () => {
+  const shown = (root: Parameters<typeof content>[0]) =>
+    nodes(root).filter((node) => node.props['data-testid'] === 'row-job').map((node) => content(node))
+  const RENAMING = { kind: 'rename', state: 'running', done: 2, failed: 0 }
+
+  beforeEach(() => {
+    nodeChoice.value = null
+    allBuckets.loading.value = false
+    allBuckets.hits.value = [{ bucket: 'reef-survey', node_id: 'home', group_id: 'g1' }]
+    listJobs.mockReset().mockResolvedValue({ buckets: [{ bucket: 'reef-survey' }], next: null })
+  })
+
+  it('labels a step that started elsewhere once the All nodes list is read again', async () => {
+    const { root } = await mountApp(RealJobsSidebar, { props: { manager: manager() } })
+    await flush()
+    expect(listJobs).toHaveBeenCalledTimes(1)
+    expect(shown(root)).toEqual([])
+    // Refresh with All nodes selected reloads only the search results.
+    listJobs.mockResolvedValue({ buckets: [{ bucket: 'reef-survey', job: RENAMING }], next: null })
+    allBuckets.loading.value = true
+    await flush()
+    allBuckets.hits.value = [{ bucket: 'reef-survey', node_id: 'home', group_id: 'g1' }]
+    allBuckets.loading.value = false
+    await flush()
+    await flush()
+    expect(listJobs).toHaveBeenCalledTimes(2)
+    expect(shown(root)).toEqual(['reef-survey: rename'])
+  })
+
+  it('does not read the steps again for each typed letter', async () => {
+    await mountApp(RealJobsSidebar, { props: { manager: manager() } })
+    await flush()
+    allBuckets.hits.value = []
+    await flush()
+    allBuckets.hits.value = []
+    await flush()
+    expect(listJobs).toHaveBeenCalledTimes(1)
   })
 })
 
