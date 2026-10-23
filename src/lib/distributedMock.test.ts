@@ -110,7 +110,11 @@ describe('distributed mock helpers', () => {
     expect(origin('spire-db', 'release-2026-10/escherichia_coli_mags.tsv.zst').kind).toBe('sync')
     expect(basedOn(origin('spire-db', 'release-2026-10/escherichia_coli_mags.tsv.zst'))[0].value).toMatch(/^https:\/\/w3id\.org\/aruna\/data\//)
     expect(origin('lab-raw-data', 'analysis/coverage.tsv').kind).toBe('job')
+    expect(basedOn(origin('lab-raw-data', 'analysis/coverage.tsv'))).toEqual([
+      { label: 'Run', value: '01K8V5N7Q9S1U3W5Y7Z9B2D4F6', property: 'run' },
+    ])
     expect(origin('reads-edge', 'qc/summary.tsv').kind).toBe('storage')
+    expect(basedOn(origin('reads-edge', 'qc/summary.tsv'))).toEqual([])
     expect(DATABASES_START.map((entry) => entry.bucket).every((name) => mockBucket(name))).toBe(true)
   })
 

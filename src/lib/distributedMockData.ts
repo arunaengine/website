@@ -866,15 +866,18 @@ export function originOf(object: MockObject): Origin {
 export interface BasedOn {
   label: string
   value: string
+  /** isBasedOn for derived data, run for the run crate link of a job result. */
+  property: 'isBasedOn' | 'run'
 }
 
 // What the dataset editor adds as isBasedOn when this file joins a dataset.
 export function basedOn(origin: Origin): BasedOn[] {
   const w3id = (id: string) => `https://w3id.org/aruna/data${id}`
-  if (origin.kind === 'source') return [{ label: 'Source', value: `${origin.source}/${origin.path}` }]
-  if (origin.kind === 'copy') return [{ label: 'Original version', value: w3id(origin.from) }]
-  if (origin.kind === 'sync') return [{ label: 'Original version', value: w3id(origin.from) }]
-  if (origin.kind === 'storage') return [{ label: 'Storage folder', value: `${origin.folder}/${origin.key}` }]
-  if (origin.kind === 'job') return [{ label: 'Run', value: `run:${origin.run}` }]
+  if (origin.kind === 'source') return [{ label: 'Source', value: `${origin.source}/${origin.path}`, property: 'isBasedOn' }]
+  if (origin.kind === 'copy' || origin.kind === 'sync') {
+    return [{ label: 'Original version', value: w3id(origin.from), property: 'isBasedOn' }]
+  }
+  if (origin.kind === 'job') return [{ label: 'Run', value: origin.run, property: 'run' }]
+  // Uploads have no origin to add, and storage paths stay private.
   return []
 }
