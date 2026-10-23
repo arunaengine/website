@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Members of one distributed bucket: state, data strategy, metadata coverage and lag.
+// Nodes of one bucket: state, data strategy, metadata coverage and lag.
 import Badge from '@/components/ui/Badge.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
 import { MEMBER_TONE, mockNode, stamp } from '@/lib/distributedMock'

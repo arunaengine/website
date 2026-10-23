@@ -1,4 +1,4 @@
-// Static types and helpers for the distributed bucket mock. Nothing here talks to a
+// Static types and helpers for the node mock. Nothing here talks to a
 // node: the mock only shows how the agreed design could look in the portal.
 import { featureEnabled } from '@/lib/config'
 import type { StateTone } from '@/lib/stateBadge'

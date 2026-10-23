@@ -1,4 +1,4 @@
-// Example data for the distributed bucket mock. All values are made up.
+// Example data for the node mock. All values are made up.
 import type { Coverage, DataStrategy, MemberState, PresetId, RangeMode } from '@/lib/distributedMock'
 
 export interface MockMember {
@@ -26,7 +26,6 @@ export interface MockRange {
 export interface MockBucket {
   name: string
   preset: PresetId
-  description: string
   members: MockMember[]
   ranges: MockRange[]
   refresh: string
@@ -106,7 +105,6 @@ export const MOCK_BUCKETS: readonly MockBucket[] = [
   {
     name: 'bakrep',
     preset: 'sharding-replicas',
-    description: 'Registered files of 49 public S3 buckets at de.NBI, about 50 million files.',
     members: bakrepMembers(),
     ranges: bakrepRanges(),
     refresh: 'Every 24 hours',
@@ -117,7 +115,6 @@ export const MOCK_BUCKETS: readonly MockBucket[] = [
   {
     name: 'spire-db',
     preset: 'mirror',
-    description: 'SPIRE database releases. Downloads spread over the copies.',
     members: [
       { nodeId: 'node-1', state: 'ready', strategy: 'copy', coverage: 'all', lag: '0 s' },
       { nodeId: 'node-2', state: 'ready', strategy: 'copy', coverage: 'all', lag: '1 s' },
@@ -132,7 +129,6 @@ export const MOCK_BUCKETS: readonly MockBucket[] = [
   {
     name: 'reads-edge',
     preset: 'stream-edge',
-    description: 'Sequencing reads at node-1, read through from node-5 without a local copy.',
     members: [
       { nodeId: 'node-1', state: 'ready', strategy: 'copy', coverage: 'all', lag: '0 s' },
       { nodeId: 'node-5', state: 'ready', strategy: 'stream', coverage: 'all', lag: '3 s' },
@@ -369,10 +365,6 @@ export const MOCK_OBJECTS: readonly MockObject[] = [
   },
 ]
 
-export function mockObject(id: string): MockObject | undefined {
-  return MOCK_OBJECTS.find((object) => object.id === id)
-}
-
 export interface ImportState {
   percent: number
   state: 'done' | 'running' | 'queued'
@@ -388,27 +380,6 @@ export function importProgress(index: number): ImportState {
 export function sourceCoordinator(index: number): string {
   return BAKREP_NODES[index % BAKREP_NODES.length]
 }
-
-export interface SearchHit {
-  kind: 'dataset' | 'file'
-  title: string
-  where: string
-  relation: string
-  file?: string
-}
-
-export const SEARCH_QUERY = 'Escherichia coli genome'
-
-export const SEARCH_HITS: readonly SearchHit[] = [
-  { kind: 'dataset', title: 'E. coli genomes, 2025 release', where: 'Genome Lab', relation: '1,284 files in bakrep' },
-  { kind: 'file', title: 'bakrep-v2-data-007/GCF_000005845.2/genome.fna.gz', where: 'bakrep', relation: 'Used by E. coli genomes, 2025 release', file: 'genome' },
-  { kind: 'file', title: 'bakrep-v2-data-007/GCF_000005845.2/annotation.gff3.gz', where: 'bakrep', relation: 'Used by bakrep collection', file: 'annotation' },
-  { kind: 'dataset', title: 'bakrep collection', where: 'Genome Lab', relation: 'Describes all of bakrep' },
-  { kind: 'file', title: 'bakrep-v2-data-031/GCF_003697165.2/genome.fna.gz', where: 'bakrep', relation: 'Used by bakrep collection' },
-  { kind: 'file', title: 'bakrep-v2-data-044/GCF_000008865.2/genome.fna.gz', where: 'bakrep', relation: 'Used by bakrep collection' },
-  { kind: 'dataset', title: 'Escherichia coli K-12 reference annotation', where: 'Genome Lab', relation: 'No files in a distributed bucket' },
-  { kind: 'file', title: 'release-2026-10/escherichia_coli_mags.tsv.zst', where: 'spire-db', relation: 'Used by SPIRE release 2026-10' },
-]
 
 export function bucketFiles(bucket: string): MockObject[] {
   return MOCK_OBJECTS.filter((object) => object.bucket === bucket)

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Key ranges of one distributed bucket. A long list shows the first rows and a button for the rest.
+// Key ranges of one bucket stored on several nodes. A long list shows the first rows and a button for the rest.
 import { computed, ref } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// The id of a file version in a distributed bucket. It names no node.
+// The id of a file version in a bucket stored on several nodes. It names no node.
 import CopyButton from '@/components/ui/CopyButton.vue'
 import { REALM_ID } from '@/lib/distributedMock'
 
