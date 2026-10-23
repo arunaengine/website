@@ -1,5 +1,5 @@
 // Example data for the node mock. All values are made up.
-import { grantGap, type StorageQuestion, type Coverage, type DataStrategy, type MemberState, type PresetId, type RangeMode } from '@/lib/distributedMock'
+import { grantGap, REALM_ID, type StorageQuestion, type Coverage, type DataStrategy, type MemberState, type PresetId, type RangeMode } from '@/lib/distributedMock'
 
 export interface MockMember {
   nodeId: string
@@ -485,10 +485,13 @@ function hashOf(text: string): number {
 }
 
 function digits(text: string, length: number, alphabet: string): string {
-  let hash = hashOf(text)
+  let hash = hashOf(text) || 1
   let out = ''
   for (let index = 0; index < length; index += 1) {
-    hash = Math.imul(hash ^ (index + 1), 16777619) >>> 0
+    hash ^= hash << 13
+    hash ^= hash >>> 17
+    hash ^= hash << 5
+    hash >>>= 0
     out += alphabet[hash % alphabet.length]
   }
   return out
@@ -804,4 +807,74 @@ export const DATABASES_START: readonly DatabaseEntry[] = [
 export function databaseStats(bucket: string): { files: number; bytes: number } {
   const ranges = mockBucket(bucket)?.ranges ?? []
   return { files: ranges.reduce((sum, range) => sum + range.objects, 0), bytes: ranges.reduce((sum, range) => sum + range.bytes, 0) }
+}
+
+export type Origin =
+  | { kind: 'upload'; user: string; node: string; time: string; device?: string }
+  | { kind: 'source'; source: string; path: string; etag?: string; digest?: string; database?: string }
+  | { kind: 'copy'; from: string }
+  | { kind: 'sync'; sync: string; from: string }
+  | { kind: 'storage'; folder: string; key: string }
+  | { kind: 'job'; run: string }
+
+const idOf = (version: string) => `/${REALM_ID}/${version}`
+
+const ORIGINS: Record<string, Origin> = {
+  'spire-db:release-2026-10/escherichia_coli_mags.tsv.zst': {
+    kind: 'sync',
+    sync: 'spire-staging to spire-db',
+    from: idOf('01K8W1B3D5F7H9KMQ1S3V5X7Z2'),
+  },
+  'lab-raw-data:raw/2026/reef-07/reads_R1.fastq.gz': {
+    kind: 'upload',
+    user: 'Mira Okafor',
+    node: 'node-1',
+    time: '2026-08-20T10:12:00Z',
+    device: 'sequencer-laptop-3',
+  },
+  'lab-raw-data:raw/2026/reef-08/reads_R1.fastq.gz': { kind: 'copy', from: idOf('01K8T6A2C4E6G8JKMPRSTVXZ13') },
+  'lab-raw-data:analysis/coverage.tsv': { kind: 'job', run: '01K8V5N7Q9S1U3W5Y7Z9B2D4F6' },
+}
+
+// Where a file version came from, set when it was created and never changed.
+export function originOf(object: MockObject): Origin {
+  const known = ORIGINS[`${object.bucket}:${object.key}`]
+  if (known) return known
+  const database = DATABASES_START.find((entry) => entry.bucket === object.bucket)?.name
+  if (object.external) {
+    const url = new URL(object.external.source)
+    const digest = object.external.digests[0]
+    return {
+      kind: 'source',
+      source: url.origin,
+      path: url.pathname.slice(1),
+      etag: object.external.etag,
+      digest: digest ? `${digest.algorithm}:${digest.digest}` : undefined,
+      database,
+    }
+  }
+  if (object.bucket === 'refseq') {
+    return { kind: 'source', source: 'https://ftp.ncbi.nlm.nih.gov', path: `refseq/${object.key}`, database }
+  }
+  if (object.bucket === 'bakta-db') {
+    return { kind: 'source', source: 'https://zenodo.org', path: `records/10522951/files/${object.key.split('/').pop()}`, database }
+  }
+  if (object.bucket === 'reads-edge') return { kind: 'storage', folder: 'sequencer-share', key: object.key }
+  return { kind: 'upload', user: 'Mira Okafor', node: object.holders[0]?.nodeId ?? 'node-1', time: object.modified }
+}
+
+export interface BasedOn {
+  label: string
+  value: string
+}
+
+// What the dataset editor adds as isBasedOn when this file joins a dataset.
+export function basedOn(origin: Origin): BasedOn[] {
+  const w3id = (id: string) => `https://w3id.org/aruna/data${id}`
+  if (origin.kind === 'source') return [{ label: 'Source', value: `${origin.source}/${origin.path}` }]
+  if (origin.kind === 'copy') return [{ label: 'Original version', value: w3id(origin.from) }]
+  if (origin.kind === 'sync') return [{ label: 'Original version', value: w3id(origin.from) }]
+  if (origin.kind === 'storage') return [{ label: 'Storage folder', value: `${origin.folder}/${origin.key}` }]
+  if (origin.kind === 'job') return [{ label: 'Run', value: `run:${origin.run}` }]
+  return []
 }

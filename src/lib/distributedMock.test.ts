@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { docsTopicBySlug } from '@/docs/v1'
 import { applyPortalConfig } from '@/lib/config'
 import { defaultSettings, mockEnabled, firstResults, grantGap, isPending, nodeGlob, planRanges, plannedStart, presetMembers, rangeTotal, retryResult, STORAGE_QUESTIONS } from './distributedMock'
-import { BAKREP_COUNT, exampleListing, exampleMark, grantWarnings, mockFile, sourceLines, bucketCopies, mockBucket, searchFiles, sourceObjects } from './distributedMockData'
+import { BAKREP_COUNT, exampleListing, exampleMark, grantWarnings, mockFile, sourceLines, bucketCopies, basedOn, originOf, DATABASES_START, mockBucket, searchFiles, sourceObjects } from './distributedMockData'
 
 describe('distributed mock helpers', () => {
   it('reports the members a node-specific grant does not reach', () => {
@@ -98,6 +98,20 @@ describe('distributed mock helpers', () => {
     expect(bucketCopies('spire-db')[0]).toContain('spire-public')
     expect(bucketCopies('bakrep')).toEqual([])
     expect(sourceLines('nothing-here')).toEqual([])
+  })
+
+  it('keeps a mix of origins and turns them into isBasedOn entries', () => {
+    const origin = (bucket: string, key: string) => originOf(mockFile(bucket, key)!)
+    const registered = origin('bakrep', 'bakrep-v2-data-007/GCF_000005845.2/genome.fna.gz')
+    expect(registered).toMatchObject({ kind: 'source', source: 'https://s3.gi.denbi.de', database: 'bakrep' })
+    expect(basedOn(registered)[0].value).toBe('https://s3.gi.denbi.de/bakrep-v2-data-007/GCF_000005845.2/genome.fna.gz')
+    expect(origin('lab-raw-data', 'raw/2026/reef-07/reads_R1.fastq.gz')).toMatchObject({ kind: 'upload', device: 'sequencer-laptop-3' })
+    expect(basedOn(origin('lab-raw-data', 'raw/2026/reef-07/reads_R1.fastq.gz'))).toEqual([])
+    expect(origin('spire-db', 'release-2026-10/escherichia_coli_mags.tsv.zst').kind).toBe('sync')
+    expect(basedOn(origin('spire-db', 'release-2026-10/escherichia_coli_mags.tsv.zst'))[0].value).toMatch(/^https:\/\/w3id\.org\/aruna\/data\//)
+    expect(origin('lab-raw-data', 'analysis/coverage.tsv').kind).toBe('job')
+    expect(origin('reads-edge', 'qc/summary.tsv').kind).toBe('storage')
+    expect(DATABASES_START.map((entry) => entry.bucket).every((name) => mockBucket(name))).toBe(true)
   })
 
   it('finds example files when every word of the query is in the key', () => {

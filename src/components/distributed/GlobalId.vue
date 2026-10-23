@@ -1,13 +1,14 @@
 <script setup lang="ts">
 // The id of a file version in a bucket stored on several nodes. It names no node.
+import { computed } from 'vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
 import { REALM_ID } from '@/lib/distributedMock'
 
 const props = defineProps<{ versionId: string; contentHash?: string }>()
 
-const short = `/${REALM_ID}/${props.versionId}`
-const url = `https://w3id.org/aruna/data/${REALM_ID}/${props.versionId}`
-const content = props.contentHash ? `https://w3id.org/aruna/data/${props.contentHash}` : ''
+const short = computed(() => `/${REALM_ID}/${props.versionId}`)
+const url = computed(() => `https://w3id.org/aruna/data/${REALM_ID}/${props.versionId}`)
+const content = computed(() => (props.contentHash ? `https://w3id.org/aruna/data/${props.contentHash}` : ''))
 </script>
 
 <template>
