@@ -12,6 +12,7 @@ import {
   type EntryState,
   type FolderCounters,
   type FolderEntry,
+  type FolderMode,
   type SyncedFolder,
   type SyncDocument,
 } from './deviceApi'
@@ -98,32 +99,32 @@ export interface EntryMeta {
 }
 
 export const ENTRY_META: Record<EntryState, EntryMeta> = {
-  in_sync: { label: 'In sync', tone: 'settled', hint: 'The same bytes here and in the realm.' },
-  local_new: { label: 'New here', tone: 'moving', hint: 'Queued for upload to the realm.' },
-  local_changed: { label: 'Changed here', tone: 'moving', hint: 'Your edit becomes the next realm version.' },
-  remote_new: { label: 'New in the realm', tone: 'moving', hint: 'Being written into this folder.' },
+  in_sync: { label: 'Synced', tone: 'settled', hint: 'Same on this computer and in Aruna.' },
+  local_new: { label: 'Sending', tone: 'moving', hint: 'Waiting to be sent to Aruna.' },
+  local_changed: { label: 'Sending', tone: 'moving', hint: 'Your edit is on its way to Aruna.' },
+  remote_new: { label: 'Receiving', tone: 'moving', hint: 'Coming from Aruna into this folder.' },
   remote_changed: {
-    label: 'Updated in the realm',
+    label: 'Receiving',
     tone: 'moving',
-    hint: 'Your copy is unchanged since the last sync, so it can be updated safely.',
+    hint: 'Your copy is unchanged since the last sync, so the new Aruna version can be saved here.',
   },
   conflict: {
     label: 'Both changed',
     tone: 'decide',
-    hint: 'Your file was kept and the realm version sits beside it as a conflicted copy.',
+    hint: 'Your file was kept and the Aruna version sits beside it as a copy. Nothing was replaced.',
   },
   pending_replace: {
     label: 'Waiting for you',
     tone: 'decide',
-    hint: 'The realm version can only take its place if you say so.',
+    hint: 'The Aruna version only takes its place if you say so.',
   },
   remote_deleted: {
-    label: 'Deleted in the realm',
+    label: 'Deleted in Aruna',
     tone: 'decide',
     hint: 'Your file is still here. Removing it is your call.',
   },
-  local_deleted: { label: 'Deleted here', tone: 'moving', hint: 'The realm gets a delete marker.' },
-  error: { label: 'Error', tone: 'error', hint: 'The last attempt on this file failed.' },
+  local_deleted: { label: 'Deleted here', tone: 'moving', hint: 'Aruna keeps a delete marker.' },
+  error: { label: 'Failed', tone: 'error', hint: 'The last try on this file failed.' },
 }
 
 export function entryMeta(state: EntryState): EntryMeta {
@@ -224,4 +225,15 @@ export function transferPercent(transfer: DeviceTransfer): number | null {
   if (transfer.state !== 'transferring') return null
   if (!transfer.bytes_total || transfer.bytes_done === null) return null
   return Math.min(100, Math.floor((transfer.bytes_done / transfer.bytes_total) * 100))
+}
+
+/** How a folder works, as a short label. */
+export function modeLabel(mode: FolderMode): string {
+  return mode === 'upload_only' ? 'Send to Aruna' : mode === 'download_only' ? 'Keep a copy' : 'Both ways'
+}
+
+/** How a folder works, as the end of a sentence. */
+export function modePhrase(mode: FolderMode): string {
+  if (mode === 'upload_only') return 'sending to Aruna'
+  return mode === 'download_only' ? 'keeping a copy on this computer' : 'both ways'
 }

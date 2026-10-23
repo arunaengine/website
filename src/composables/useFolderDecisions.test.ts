@@ -42,6 +42,17 @@ describe('folder decisions', () => {
     expect(found.latest.value?.folder).toBe('Reports')
   })
 
+  it('can read the log of one folder only', async () => {
+    actionLog.mockResolvedValue([record('keep_local', 'a.csv', 10)])
+    const found = await decisions()
+
+    await found.load('f2')
+
+    expect(actionLog).toHaveBeenCalledTimes(1)
+    expect(actionLog).toHaveBeenCalledWith('f2')
+    expect(found.items.value[0]?.folder).toBe('Reports')
+  })
+
   it('says so when only some folders answered', async () => {
     actionLog.mockImplementation(async (id: string) => {
       if (id === 'f2') throw new Error('gone')

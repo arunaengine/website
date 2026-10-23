@@ -3,8 +3,8 @@ import { defineComponent, h, reactive, ref } from 'vue'
 import * as RouterRuntime from 'vue-router'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { useRefresh } from '@/composables/useRefresh'
 import * as DeviceApi from '@/lib/deviceApi'
+import * as StateBadge from '@/lib/stateBadge'
 import * as SyncStates from '@/lib/syncStates'
 import * as Utils from '@/lib/utils'
 import {
@@ -16,7 +16,6 @@ import {
   moduleDefault,
   mountApp,
   nodes,
-  refreshButton,
   type HostNode,
 } from '@/test/clientRender'
 import type { FolderEntry, SyncedFolder } from '@/lib/deviceApi'
@@ -73,6 +72,8 @@ const sync = vi.fn(async () => folder)
 const entries = vi.fn(async (): Promise<DeviceApi.EntryPage> => ({ entries: rows, next_cursor: null }))
 const refreshFolder = vi.fn(async () => folder)
 const actionErrors = reactive(new Map<string, string>())
+const transfers = ref<DeviceApi.DeviceTransfer[]>([])
+const unbind = vi.fn(async () => undefined)
 
 // Records what the dialog was opened with, which is the point of the gating.
 const dialogOpens: Array<{ path: string | null; action: string }> = []
@@ -100,13 +101,38 @@ const RefusalStub = defineComponent({
   props: { message: { type: String, required: true } },
   setup: (props) => () => h('div', props.message),
 })
-const SelectStub = defineComponent({ setup: () => () => h('select') })
+const ChipsStub = defineComponent({
+  props: { options: { type: Array, default: () => [] }, modelValue: String },
+  emits: ['update:modelValue'],
+  setup: (props, { emit }) => () =>
+    h(
+      'div',
+      (props.options as Array<{ value: string; label: string; count?: number }>).map((option) =>
+        h('button', { onClick: () => emit('update:modelValue', option.value) }, `${option.label}${option.count === undefined ? '' : ` ${option.count}`}`),
+      ),
+    ),
+})
+const ProgressStub = defineComponent({
+  props: { value: Number, indeterminate: Boolean },
+  setup: (props) => () => h('i', { 'data-progress': props.indeterminate ? 'unknown' : String(props.value) }),
+})
+// Records what the stop dialog was opened with and lets a test confirm it.
+const stopDialog = { open: false, confirm: () => {} }
+const StopDialogStub = defineComponent({
+  props: { open: Boolean, name: String, bucket: String, sending: Number },
+  emits: ['confirm'],
+  setup(props, { emit }) {
+    return () => {
+      stopDialog.open = props.open
+      stopDialog.confirm = () => emit('confirm')
+      return h('div', props.open ? `stop ${props.name} ${props.bucket} ${props.sending}` : '')
+    }
+  },
+})
+const HistoryStub = defineComponent({ setup: (_, { expose }) => { expose({ reload: async () => {} }); return () => h('div', 'history') } })
 const SpinnerStub = defineComponent({ props: { label: String }, setup: (props) => () => h('span', props.label) })
 const icons = new Proxy({}, { get: () => defineComponent(() => () => h('i')) })
 
-const DetailList = compileClientComponent(new URL('../../components/ui/DetailList.vue', import.meta.url), {
-  vue: VueRuntime,
-})
 const Notice = compileClientComponent(new URL('../../components/ui/Notice.vue', import.meta.url), {
   vue: VueRuntime,
   '@/lib/utils': Utils,
@@ -118,19 +144,20 @@ const FolderDetailView = compileClientComponent(new URL('./FolderDetailView.vue'
   '@lucide/vue': icons,
   '@/components/ui/Badge.vue': moduleDefault(BadgeStub),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
-  '@/components/ui/RefreshButton.vue': moduleDefault(refreshButton()),
   '@/components/ui/RefusalNote.vue': moduleDefault(RefusalStub),
   '@/components/ui/EmptyState.vue': moduleDefault(Passthrough),
   '@/components/ui/ErrorPanel.vue': moduleDefault(Passthrough),
-  '@/components/ui/DetailList.vue': moduleDefault(DetailList),
   '@/components/ui/Notice.vue': moduleDefault(Notice),
-  '@/components/ui/Select.vue': moduleDefault(SelectStub),
+  '@/components/ui/FilterChips.vue': moduleDefault(ChipsStub),
+  '@/components/ui/Progress.vue': moduleDefault(ProgressStub),
   '@/components/ui/Skeleton.vue': moduleDefault(Passthrough),
   '@/components/ui/Spinner.vue': moduleDefault(SpinnerStub),
   '@/components/dashboard/PageHeader.vue': moduleDefault(PageHeaderStub),
   '@/components/desktop/ReplaceLocalDialog.vue': moduleDefault(ReplaceLocalDialogStub),
-  '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: () => 'lab node' }) },
-  '@/composables/useRefresh': { useRefresh },
+  '@/components/desktop/StopSyncDialog.vue': moduleDefault(StopDialogStub),
+  '@/components/desktop/FolderHistory.vue': moduleDefault(HistoryStub),
+  '@/composables/useDeviceTransfers': { useDeviceTransfers: () => ({ all: transfers }) },
+  '@/composables/useRealmNodes': { useRealmNodes: () => ({ displayName: () => 'lab node', isLocalNode: (id: string) => id === 'home' }) },
   '@/composables/useSyncedFolders': {
     useSyncedFolders: () => ({
       folders: ref([folder]),
@@ -140,12 +167,13 @@ const FolderDetailView = compileClientComponent(new URL('./FolderDetailView.vue'
       entryAction,
       setPaused: vi.fn(),
       sync,
-      unbind: vi.fn(),
+      unbind,
       busy: ref(false),
       actionErrors,
     }),
   },
   '@/lib/deviceApi': DeviceApi,
+  '@/lib/stateBadge': StateBadge,
   '@/lib/syncStates': SyncStates,
   '@/lib/utils': Utils,
 })
@@ -158,6 +186,8 @@ async function mount() {
       { path: '/app/sync', name: 'sync', component: Stub },
       { path: '/app/folders/:folderId', name: 'folder', component: Stub },
       { path: '/app/device', name: 'device', component: Stub },
+      { path: '/app/activity', name: 'activity', component: Stub },
+      { path: '/app/buckets/:bucketId', name: 'bucket', component: Stub },
     ],
   })
   await router.push('/app/folders/f1')
@@ -183,7 +213,11 @@ beforeEach(() => {
   actionErrors.clear()
   folder.last_error = null
   folder.state = 'active'
+  folder.mode = 'two_way'
+  transfers.value = []
+  unbind.mockClear()
   dialogOpens.length = 0
+  stopDialog.open = false
 })
 
 describe('folder entries', () => {
@@ -244,7 +278,7 @@ describe('folder entries', () => {
   it('opens the same dialog to replace one copy', async () => {
     const mounted = await mount()
 
-    await click(rowButton(mounted.root, 'notes/day.md', 'Replace mine'))
+    await click(rowButton(mounted.root, 'notes/day.md', 'Use the Aruna one'))
 
     expect(entryAction).not.toHaveBeenCalled()
     expect(dialogOpens).toContainEqual({ path: 'notes/day.md', action: 'replace_local' })
@@ -257,8 +291,40 @@ describe('folder entries', () => {
     await click(rowButton(mounted.root, 'notes/bad.md', 'Mark handled'))
     expect(entryAction).toHaveBeenCalledWith('f1', 'notes/bad.md', 'resolve', expect.any(Object))
 
-    await click(rowButton(mounted.root, 'notes/bad.md', 'Retry sync'))
+    await click(rowButton(mounted.root, 'notes/bad.md', 'Retry'))
     expect(sync).toHaveBeenCalledWith('f1')
+    mounted.app.unmount()
+  })
+
+  it('keeps both copies of a conflict through the existing resolve action', async () => {
+    const mounted = await mount()
+
+    await click(rowButton(mounted.root, 'notes/day.md', 'Keep both'))
+
+    expect(entryAction).toHaveBeenCalledWith('f1', 'notes/day.md', 'resolve', expect.any(Object))
+    mounted.app.unmount()
+  })
+
+  it('offers no keep both where there is no copy beside the file', async () => {
+    entries.mockResolvedValue({ entries: [entry({ path: 'notes/wait.md', state: 'pending_replace' })], next_cursor: null })
+    const mounted = await mount()
+
+    expect(() => rowButton(mounted.root, 'notes/wait.md', 'Keep both')).toThrow()
+    expect(rowButton(mounted.root, 'notes/wait.md', 'Keep mine')).toBeTruthy()
+    mounted.app.unmount()
+  })
+
+  it('shows progress on a file the node is moving and no invented percent otherwise', async () => {
+    transfers.value = [
+      DeviceApi.readTransfer({ id: 't1', folder_id: 'f1', path: 'notes/kept.md', state: 'transferring', bytes_total: 200, bytes_done: 50 }, 'upload'),
+      DeviceApi.readTransfer({ id: 't2', folder_id: 'f1', path: 'notes/bad.md', state: 'running', bytes_total: 200, bytes_done: 0 }, 'upload'),
+    ]
+    const mounted = await mount()
+
+    expect(content(row(mounted.root, 'notes/kept.md'))).toContain('Sending 25%')
+    expect(content(row(mounted.root, 'notes/kept.md'))).toContain('50 B of 200 B sent.')
+    const unknown = nodes(row(mounted.root, 'notes/bad.md')).find((node) => node.props['data-progress'])
+    expect(unknown?.props['data-progress']).toBe('unknown')
     mounted.app.unmount()
   })
 
@@ -266,6 +332,55 @@ describe('folder entries', () => {
     const mounted = await mount()
 
     expect(() => rowButton(mounted.root, 'notes/kept.md', 'Keep mine')).toThrow()
+    mounted.app.unmount()
+  })
+})
+
+describe('folder filters', () => {
+  it('counts the chips from the node tally and asks for the states a chip stands for', async () => {
+    const mounted = await mount()
+
+    expect(content(mounted.root)).toContain('Synced 9')
+    expect(content(mounted.root)).toContain('Needs you 2')
+    expect(content(mounted.root)).toContain('Failed 1')
+
+    entries.mockClear()
+    await click(button(mounted.root, 'Needs you'))
+
+    const states = entries.mock.calls.map((call) => (call as unknown as [string, { state: string }])[1].state)
+    expect(states).toEqual(['conflict', 'pending_replace', 'remote_deleted'])
+    mounted.app.unmount()
+  })
+
+  it('leaves out Receiving for a folder that only sends', async () => {
+    folder.mode = 'upload_only'
+    const mounted = await mount()
+
+    expect(content(mounted.root)).not.toContain('Receiving')
+    mounted.app.unmount()
+  })
+})
+
+describe('the bucket and stopping', () => {
+  it('links to the bucket on its node', async () => {
+    const mounted = await mount()
+
+    expect(content(mounted.root)).toContain('lab')
+    expect(content(mounted.root)).toContain('on lab node')
+    mounted.app.unmount()
+  })
+
+  it('asks before it stops syncing and keeps the files', async () => {
+    const mounted = await mount()
+
+    await click(button(mounted.root, 'Stop syncing'))
+    expect(stopDialog.open).toBe(true)
+    expect(unbind).not.toHaveBeenCalled()
+    expect(content(mounted.root)).toContain('stop data-2026 lab 0')
+
+    stopDialog.confirm()
+    await VueRuntime.nextTick()
+    expect(unbind).toHaveBeenCalledWith('f1')
     mounted.app.unmount()
   })
 })
@@ -299,7 +414,7 @@ describe('folder failures', () => {
     expect(content(mounted.root)).toContain('deleting')
     expect(() => button(mounted.root, 'Pause')).toThrow()
     expect(() => button(mounted.root, 'Sync now')).toThrow()
-    expect(() => button(mounted.root, 'Unbind folder')).toThrow()
+    expect(() => button(mounted.root, 'Stop syncing')).toThrow()
     mounted.app.unmount()
   })
 })

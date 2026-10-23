@@ -21,9 +21,12 @@ export function useFolderDecisions() {
   const partial = ref(false)
   let generation = 0
 
-  async function load(): Promise<void> {
+  /** Reads every folder's log, or only the one named. */
+  async function load(only?: string): Promise<void> {
     const mine = ++generation
-    const asked = folders.value.map((folder) => ({ id: folder.folder_id, name: folderName(folder.root) }))
+    const asked = folders.value
+      .filter((folder) => !only || folder.folder_id === only)
+      .map((folder) => ({ id: folder.folder_id, name: folderName(folder.root) }))
     if (state.value !== 'ready') state.value = 'loading'
     const answers = await Promise.allSettled(asked.map(async (folder) => actionLog(folder.id)))
     if (mine !== generation) return

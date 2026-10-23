@@ -7,6 +7,8 @@ import {
   entryMeta,
   folderConfirmed,
   itemChip,
+  modeLabel,
+  modePhrase,
   orderEntries,
   transferLabel,
   transferPercent,
@@ -167,7 +169,7 @@ describe('entry wording', () => {
   })
 
   it('never describes an automatic overwrite of local bytes', () => {
-    expect(entryMeta('conflict').hint).toContain('kept')
+    expect(entryMeta('conflict').hint).toContain('Nothing was replaced')
     expect(entryMeta('pending_replace').tone).toBe('decide')
     expect(entryMeta('remote_deleted').hint).toContain('still here')
     expect(entryMeta('remote_changed').hint).toContain('unchanged since the last sync')
@@ -253,5 +255,15 @@ describe('transfer wording and progress', () => {
     expect(transferPercent({ ...moving, bytes_done: null })).toBeNull()
     expect(transferPercent({ ...moving, bytes_total: null })).toBeNull()
     expect(transferPercent({ ...moving, bytes_done: 900 })).toBe(100)
+  })
+})
+
+describe('folder mode wording', () => {
+  it('words the three ways a folder can work', () => {
+    expect(modeLabel('two_way')).toBe('Both ways')
+    expect(modeLabel('upload_only')).toBe('Send to Aruna')
+    expect(modeLabel('download_only')).toBe('Keep a copy')
+    expect(modePhrase('two_way')).toBe('both ways')
+    expect(modePhrase('download_only')).toBe('keeping a copy on this computer')
   })
 })
