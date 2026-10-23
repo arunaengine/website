@@ -41,7 +41,7 @@ function link() {
 <template>
   <div v-if="dataset" class="space-y-3 text-xs">
     <div>
-      <p class="mb-1 text-muted-foreground">Linked parts</p>
+      <p class="mb-1 font-medium text-foreground">Linked parts</p>
       <ul class="divide-y divide-border rounded-md border border-border">
         <li v-for="part in dataset.parts" :key="partLabel(part)" class="flex items-center gap-2 px-3 py-2">
           <Folder class="size-3.5 shrink-0 text-primary" />
@@ -51,7 +51,6 @@ function link() {
           >{{ partLabel(part) }}</RouterLink>
         </li>
       </ul>
-      <p class="mt-1 text-muted-foreground">The files stay unnamed under the part. A linked bucket or folder always shows the current files. A linked database is only a link between datasets.</p>
     </div>
     <Button v-if="!adding" size="sm" variant="outline" @click="adding = true"><Plus class="size-3.5" /> Add a linked bucket or folder</Button>
     <div v-else class="grid gap-2 sm:grid-cols-2">

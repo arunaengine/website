@@ -2,6 +2,7 @@
 // Realm admins mark a bucket as a database and link the dataset that describes it.
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
+import DatasetPreview from '@/components/data/DatasetPreview.vue'
 import MockNotice from '@/components/distributed/MockNotice.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
@@ -84,20 +85,26 @@ function mark() {
         </p>
       </div>
       <ul class="divide-y divide-border rounded-md border border-border">
-        <li v-for="entry in entries" :key="entry.id" class="flex flex-wrap items-center gap-3 px-4 py-3">
-          <div class="min-w-0 flex-1">
-            <p class="text-sm font-medium text-foreground">
-              {{ entry.dataset.name }} <span class="font-mono text-xs font-normal text-muted-foreground">{{ entry.bucket }}</span>
-              <Badge v-if="entry.status === 'pending'" variant="warn" size="sm" class="ml-1">Waiting for the group admins of {{ OWNING_GROUP[entry.bucket] }}</Badge>
-            </p>
-            <p class="text-xs text-muted-foreground">{{ entry.dataset.description || 'No description yet.' }}</p>
-            <p class="text-xs text-muted-foreground">Dataset <span class="font-mono">{{ entry.datasetId }}</span> · {{ entry.readers }}</p>
+        <li v-for="entry in entries" :key="entry.id" class="px-4 py-3">
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-medium text-foreground">
+                {{ entry.dataset.name }} <span class="font-mono text-xs font-normal text-muted-foreground">{{ entry.bucket }}</span>
+                <Badge v-if="entry.status === 'pending'" variant="warn" size="sm" class="ml-1">Waiting for the group admins of {{ OWNING_GROUP[entry.bucket] }}</Badge>
+              </p>
+              <p class="text-xs text-muted-foreground">{{ entry.dataset.description || 'No description yet.' }}</p>
+              <p class="text-xs text-muted-foreground">Dataset <span class="font-mono">{{ entry.datasetId }}</span> · {{ entry.readers }}</p>
           </div>
           <Button v-if="entry.status === 'pending'" size="sm" variant="outline" title="Mock: shows what happens when the group admins agree" @click="agree(entry.id)">Group admins agree</Button>
           <Button size="sm" variant="outline" as-child>
             <RouterLink :to="{ name: 'dataset-edit', params: { id: entry.datasetId } }"><Pencil class="size-3.5" /> Edit the dataset</RouterLink>
           </Button>
           <Button size="sm" variant="ghost" class="text-destructive hover:text-destructive" :aria-label="`Remove ${entry.dataset.name}`" @click="remove(entry.id)"><Trash2 class="size-3.5" /> Remove</Button>
+          </div>
+          <details class="mt-2 text-xs">
+            <summary class="cursor-pointer text-muted-foreground">Dataset</summary>
+            <div class="mt-2"><DatasetPreview :dataset-id="entry.datasetId" /></div>
+          </details>
         </li>
         <li v-if="!entries.length" class="px-4 py-6 text-center text-sm text-muted-foreground">No bucket is marked as a database yet.</li>
       </ul>

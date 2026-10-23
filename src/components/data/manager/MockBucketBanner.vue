@@ -16,12 +16,12 @@ const degraded = computed(() => degradedRanges(props.bucket))
 <template>
   <div class="space-y-3">
     <div class="flex flex-wrap items-center gap-2">
+      <MockNotice />
       <Badge variant="outline" size="sm">
         {{ isMulti(bucket) ? storedLabel(bucket.preset, bucket.members.length) : 'This node' }}
       </Badge>
       <Badge v-if="degraded.length" variant="warn" size="sm">Degraded</Badge>
     </div>
-    <MockNotice />
     <DatabaseInfo :bucket="bucket.name" />
     <DegradedNotice v-for="range in degraded" :key="range.id" :range="range" />
   </div>

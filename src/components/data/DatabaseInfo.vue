@@ -1,35 +1,35 @@
 <script setup lang="ts">
-// A database is a bucket plus a linked dataset. This shows what the dataset says about it.
+// A database is a bucket plus a linked dataset. A compact header with what the dataset says.
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import DatasetPreview from '@/components/data/DatasetPreview.vue'
-import DetailList from '@/components/ui/DetailList.vue'
+import Button from '@/components/ui/Button.vue'
 import { useMockDatabases } from '@/composables/useMockDatabases'
+import { cn } from '@/lib/utils'
 import { mockBucket } from '@/lib/distributedMockData'
 
-const props = withDefaults(defineProps<{ bucket: string; heading?: boolean }>(), { heading: true })
+const props = defineProps<{ bucket: string; bare?: boolean }>()
 
 const { entries } = useMockDatabases()
 const entry = computed(() => entries.value.find((item) => item.bucket === props.bucket))
+const refresh = computed(() => {
+  const value = mockBucket(props.bucket)?.refresh ?? 'Off'
+  return value === 'Off' ? '' : value.toLowerCase()
+})
 </script>
 
 <template>
-  <section v-if="entry" class="space-y-2">
-    <div class="flex flex-wrap items-baseline gap-x-3">
-      <h3 v-if="heading" class="text-sm font-medium text-foreground">Database: {{ entry.dataset.name }}</h3>
-      <RouterLink :to="{ name: 'dataset', params: { id: entry.datasetId } }" class="text-xs font-medium text-primary hover:underline">Open the dataset</RouterLink>
+  <section
+    v-if="entry"
+    :class="cn('flex flex-wrap items-center gap-x-4 gap-y-2', bare ? '' : 'surface p-4')"
+    :title="`Who may read: ${entry.readers}. Dataset ${entry.datasetId}.`"
+  >
+    <div class="min-w-0 flex-1">
+      <p class="text-sm font-medium text-foreground">{{ entry.dataset.name }}</p>
+      <p class="text-sm text-muted-foreground">{{ entry.dataset.description }}</p>
+      <p class="text-xs text-muted-foreground">{{ [entry.dataset.license, entry.dataset.source, refresh].filter(Boolean).join(' · ') }}</p>
     </div>
-    <p class="text-sm text-muted-foreground">{{ entry.dataset.description }}</p>
-    <DetailList
-      :items="[
-        { label: 'Source', value: entry.dataset.source },
-        { label: 'License', value: entry.dataset.license },
-        { label: 'Creator', value: entry.dataset.creator },
-        { label: 'Refresh', value: mockBucket(bucket)?.refresh ?? 'Off' },
-        { label: 'Who may read', value: entry.readers },
-        { label: 'Dataset id', value: entry.datasetId, mono: true },
-      ]"
-    />
-    <DatasetPreview :dataset-id="entry.datasetId" />
+    <Button size="sm" variant="outline" as-child>
+      <RouterLink :to="{ name: 'dataset', params: { id: entry.datasetId } }">Open the dataset</RouterLink>
+    </Button>
   </section>
 </template>

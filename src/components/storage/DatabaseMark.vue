@@ -37,8 +37,7 @@ function ask() {
     </header>
     <div class="space-y-3 px-5 py-4 text-sm">
       <template v-if="entry?.status === 'agreed'">
-        <DatabaseInfo :bucket="bucket" :heading="false" />
-        <p class="text-xs text-muted-foreground">Group admins of {{ group }} can take the mark off. The bucket, its files and the dataset stay as they are.</p>
+        <DatabaseInfo bare :bucket="bucket" />
         <Button size="sm" variant="outline" @click="remove(entry.id)">Remove the database mark</Button>
       </template>
       <template v-else-if="entry">
@@ -51,10 +50,7 @@ function ask() {
         </div>
       </template>
       <template v-else>
-        <p class="text-muted-foreground">
-          This is an ordinary bucket. You hold the permission to mark buckets as databases through the role Database curators.
-          The group that owns the bucket must agree.
-        </p>
+        <p class="text-muted-foreground">Not a database. Marking needs the agreement of the group admins of {{ group }}.</p>
         <Button v-if="!asking" size="sm" variant="outline" @click="asking = true">Mark as database</Button>
         <div v-else class="grid gap-3 sm:grid-cols-2">
           <Select v-model="dataset" :options="choices" placeholder="Dataset that describes it" aria-label="Dataset" />
