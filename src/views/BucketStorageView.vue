@@ -22,6 +22,7 @@ import BucketNodesTab from '@/components/storage/BucketNodesTab.vue'
 import BucketEncryptionTab from '@/components/storage/BucketEncryptionTab.vue'
 import BucketPolicySection from '@/components/storage/BucketPolicySection.vue'
 import MockOverview from '@/components/storage/MockOverview.vue'
+import DatabaseMark from '@/components/storage/DatabaseMark.vue'
 import CopiesOfBucket from '@/components/storage/CopiesOfBucket.vue'
 import FileSources from '@/components/storage/FileSources.vue'
 import StorageOverviewTab from '@/components/storage/StorageOverviewTab.vue'
@@ -142,6 +143,7 @@ const browserLink = computed(() => ({
         <MockOverview v-if="example" :bucket="example" />
         <StorageOverviewTab v-else :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
         <FileSources v-if="example" :bucket="bucket" />
+        <DatabaseMark v-if="example" :bucket="bucket" />
         <BucketDeleteSection :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
       </TabsContent>
 

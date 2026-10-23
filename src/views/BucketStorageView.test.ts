@@ -77,6 +77,7 @@ const view = compileClientComponent(new URL('./BucketStorageView.vue', import.me
   '@/components/storage/MockOverview.vue': moduleDefault(Marker('mock overview')),
   '@/components/storage/BucketNodesTab.vue': moduleDefault(Marker('nodes of the bucket')),
   '@/components/storage/FileSources.vue': moduleDefault(Marker('file sources')),
+  '@/components/storage/DatabaseMark.vue': moduleDefault(Marker('database bucket mark')),
   '@/components/storage/CopiesOfBucket.vue': moduleDefault(Marker('copies of this bucket')),
   '@/lib/distributedMock': { mockEnabled: () => false },
   '@/lib/distributedMockData': { mockBucket: () => undefined, isMulti: () => false },
