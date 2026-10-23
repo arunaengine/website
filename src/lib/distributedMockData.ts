@@ -417,3 +417,44 @@ export function bucketFiles(bucket: string): MockObject[] {
 export function mockFile(bucket: string, key: string): MockObject | undefined {
   return MOCK_OBJECTS.find((object) => object.bucket === bucket && object.key === key)
 }
+
+export interface ContentSources {
+  references: string[]
+  followedBy: string[]
+  follows: string[]
+  imports: string[]
+}
+
+export const ORDINARY_BUCKET = 'lab-raw-data'
+
+// Where the files of a bucket come from. A bucket not listed here reads as an ordinary one.
+export const CONTENT_SOURCES: Record<string, ContentSources> = {
+  bakrep: {
+    references: ['49 public buckets at s3.gi.denbi.de: about 50 million files, nothing copied'],
+    followedBy: [],
+    follows: [],
+    imports: [],
+  },
+  'spire-db': {
+    references: [],
+    followedBy: ['spire-public in the group Open Data follows this bucket, as references'],
+    follows: ['This bucket follows spire-staging in the group Genome Lab, continuously'],
+    imports: [],
+  },
+  'reads-edge': {
+    references: [],
+    followedBy: [],
+    follows: [],
+    imports: ['Storage backend sequencer-share: 5,210 files registered in place, not copied'],
+  },
+  [ORDINARY_BUCKET]: {
+    references: ['12 files of spire-db, read from there when needed'],
+    followedBy: ['lab-archive on node-2 follows this bucket, once a day'],
+    follows: [],
+    imports: [],
+  },
+}
+
+export function contentSources(bucket: string): ContentSources {
+  return CONTENT_SOURCES[bucket] ?? CONTENT_SOURCES[ORDINARY_BUCKET]
+}

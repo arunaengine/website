@@ -52,7 +52,7 @@ function move() {
   <Dialog :open="open" @update:open="emit('update:open', $event)">
     <DialogContent>
       <DialogHeader>
-        <DialogTitle>Transfer a range</DialogTitle>
+        <DialogTitle>Move a range to another node</DialogTitle>
         <DialogDescription>Only the coordinator of a range writes to it. A transfer is the only way to change that.</DialogDescription>
       </DialogHeader>
       <div class="grid gap-3 sm:grid-cols-2">
@@ -69,7 +69,7 @@ function move() {
       </ol>
       <DialogFooter>
         <Button variant="outline" @click="emit('update:open', false)">Cancel</Button>
-        <Button :disabled="!target || Boolean(range.degradedSince)" @click="move">Start transfer</Button>
+        <Button :disabled="!target || Boolean(range.degradedSince)" @click="move">Start the move</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

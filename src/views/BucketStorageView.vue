@@ -17,8 +17,10 @@ import BucketAccessTab from '@/components/storage/BucketAccessTab.vue'
 import BucketBackendTab from '@/components/storage/BucketBackendTab.vue'
 import BucketComplianceSection from '@/components/storage/BucketComplianceSection.vue'
 import BucketDeleteSection from '@/components/storage/BucketDeleteSection.vue'
+import BucketNodesTab from '@/components/storage/BucketNodesTab.vue'
 import BucketEncryptionTab from '@/components/storage/BucketEncryptionTab.vue'
 import BucketPolicySection from '@/components/storage/BucketPolicySection.vue'
+import ContentSources from '@/components/storage/ContentSources.vue'
 import StorageOverviewTab from '@/components/storage/StorageOverviewTab.vue'
 import TransfersTab from '@/components/storage/TransfersTab.vue'
 import { useAruna } from '@/composables/useAruna'
@@ -26,6 +28,8 @@ import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useRouteTab } from '@/composables/useRouteTab'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { useS3 } from '@/composables/useS3'
+import { mockEnabled } from '@/lib/distributedMock'
+import { mockBucket } from '@/lib/distributedMockData'
 import { isGroupAdmin } from '@/lib/groupAdmin'
 import type { GroupDetailResponse } from '@/lib/api'
 import { ChevronLeft } from '@lucide/vue'
@@ -58,6 +62,8 @@ watch(
   { immediate: true },
 )
 
+// An example bucket of the node mock, stored on several nodes.
+const example = computed(() => (mockEnabled() ? mockBucket(bucket.value) : undefined))
 const canAdminGroup = computed(() => isGroupAdmin(group.value, currentUser.value?.id ?? ''))
 const local = computed(() => !nodeId.value)
 const backendVisible = computed(() => local.value && canAdminGroup.value)
@@ -65,11 +71,12 @@ const placementVisible = computed(() => local.value && (canAdminGroup.value || i
 // A hidden feature loses its tab trigger only; a deep link still opens the tab.
 const placementTrigger = computed(() => placementVisible.value && shown('placement'))
 
-const TAB_IDS = ['overview', 'backend', 'placement', 'access', 'encryption', 'transfers']
+const TAB_IDS = ['overview', 'nodes', 'backend', 'placement', 'access', 'encryption', 'transfers']
 const routeTab = useRouteTab(TAB_IDS, 'overview')
 const tab = computed({
   get() {
     const value = routeTab.value
+    if (value === 'nodes' && !example.value) return 'overview'
     if (value === 'backend' && !backendVisible.value) return 'overview'
     if (value === 'placement' && !placementVisible.value) return 'overview'
     if (value === 'access' && !groupId.value) return 'overview'
@@ -117,6 +124,7 @@ const browserLink = computed(() => ({
       <div class="overflow-x-auto">
         <TabsList aria-label="Bucket settings sections">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger v-if="example" value="nodes">Nodes</TabsTrigger>
           <TabsTrigger v-if="backendVisible" value="backend">Storage backend</TabsTrigger>
           <TabsTrigger v-if="placementTrigger" value="placement">Placement</TabsTrigger>
           <TabsTrigger v-if="groupId" value="access">Access</TabsTrigger>
@@ -127,7 +135,12 @@ const browserLink = computed(() => ({
 
       <TabsContent value="overview" class="mt-0 space-y-5">
         <StorageOverviewTab :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
+        <ContentSources v-if="mockEnabled()" :bucket="bucket" />
         <BucketDeleteSection :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
+      </TabsContent>
+
+      <TabsContent v-if="example" value="nodes" class="mt-0">
+        <BucketNodesTab :bucket="example" :admin="canAdminGroup" />
       </TabsContent>
 
       <TabsContent v-if="backendVisible" value="backend" class="mt-0">
