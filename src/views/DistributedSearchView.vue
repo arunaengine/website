@@ -24,7 +24,9 @@ const hits = computed(() => SEARCH_HITS.filter((hit) => kind.value === 'all' || 
 
 <template>
   <div>
-    <PageHeader title="Search" description="Datasets and the files of distributed buckets in one list.">
+    <PageHeader
+      :docs="{ topic: 'where-data-lives', section: 'Buckets' }"
+      title="Search" description="Datasets and the files of distributed buckets in one list.">
       <template #breadcrumbs>
         <span>·</span>
         <RouterLink :to="MOCK_BASE" class="hover:underline">Distributed buckets</RouterLink>

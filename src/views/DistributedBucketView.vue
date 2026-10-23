@@ -62,7 +62,9 @@ const settings = computed(() => {
 
 <template>
   <div>
-    <PageHeader :title="bucket?.name ?? 'Unknown bucket'" :description="bucket?.description">
+    <PageHeader
+      :docs="{ topic: 'where-data-lives', section: 'Buckets' }"
+      :title="bucket?.name ?? 'Unknown bucket'" :description="bucket?.description">
       <template #breadcrumbs>
         <span>·</span>
         <RouterLink :to="MOCK_BASE" class="hover:underline">Distributed buckets</RouterLink>

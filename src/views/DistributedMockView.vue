@@ -16,6 +16,7 @@ import { Plus, Search, Upload } from '@lucide/vue'
 <template>
   <div>
     <PageHeader
+      :docs="{ topic: 'where-data-lives', section: 'Buckets' }"
       title="Distributed buckets"
       description="One bucket name on several nodes. Each file has one node that writes it and any number of copies that serve reads."
     >

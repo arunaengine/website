@@ -59,6 +59,7 @@ function drop(nodeId: string) {
 <template>
   <div>
     <PageHeader
+      :docs="{ topic: 'where-data-lives', section: 'Buckets' }"
       title="New distributed bucket"
       description="Create the same bucket on several nodes. Each node creates its own bucket, so each creation can fail."
     >

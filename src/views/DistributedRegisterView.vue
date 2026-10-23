@@ -21,6 +21,7 @@ const started = ref(false)
 <template>
   <div>
     <PageHeader
+      :docs="{ topic: 'where-data-lives', section: 'Buckets' }"
       title="Register an external collection"
       description="List the files of public S3 buckets once. Browsing and file name search then need no request to the source."
     >

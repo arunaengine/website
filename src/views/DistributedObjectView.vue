@@ -22,7 +22,9 @@ const copied = ref(false)
 
 <template>
   <div>
-    <PageHeader :title="object?.key.split('/').pop() ?? 'Unknown file'" :description="object ? `${formatBytes(object.size)}, changed ${stamp(object.modified)}` : undefined">
+    <PageHeader
+      :docs="{ topic: 'where-data-lives', section: 'Buckets' }"
+      :title="object?.key.split('/').pop() ?? 'Unknown file'" :description="object ? `${formatBytes(object.size)}, changed ${stamp(object.modified)}` : undefined">
       <template #breadcrumbs>
         <span>·</span>
         <RouterLink :to="MOCK_BASE" class="hover:underline">Distributed buckets</RouterLink>
