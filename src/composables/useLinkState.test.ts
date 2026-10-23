@@ -68,12 +68,21 @@ describe('useLinkState', () => {
     scope.stop()
   })
 
-  it('shows a running rename that reports no total', async () => {
+  it('shows a rename from an older node as a count only, never a guessed total', async () => {
     getImportRenames.mockResolvedValue({ count: 6, complete: true, files: [] })
-    getOrganizeJob.mockResolvedValue({ ...RUNNING, kind: 'rename', total: 0, counted: false, done: 4 })
+    getOrganizeJob.mockResolvedValue({ ...RUNNING, kind: 'rename', total: 0, counted: false, done: 400 })
     const { scope, state } = setup()
     await state.refresh()
-    expect(state.job.value).toMatchObject({ kind: 'rename', done: 4, total: 10 })
+    expect(state.job.value).toMatchObject({ kind: 'rename', done: 400, total: 0, counted: false })
+    expect(state.job.value?.left).toBeUndefined()
+    scope.stop()
+  })
+
+  it('does not take a lower bound for the total of a rename', async () => {
+    getOrganizeJob.mockResolvedValue({ ...RUNNING, kind: 'rename', total: 50, counted: false, done: 400 })
+    const { scope, state } = setup()
+    await state.refresh()
+    expect(state.job.value).toMatchObject({ total: 0 })
     scope.stop()
   })
 
@@ -165,58 +174,24 @@ describe('useLinkState', () => {
     scope.stop()
   })
 
-  it('sizes a running rename from the plan read with it, and fixes it for that run', async () => {
-    const rename = { ...RUNNING, kind: 'rename', total: 0, counted: false, done: 152, failed: 3, started_at_ms: 100 }
-    getImportRenames.mockResolvedValue({ count: 3722, complete: true, files: [] })
-    getOrganizeJob.mockResolvedValue(rename)
+  it('shows the total the node reports for a rename', async () => {
+    getOrganizeJob.mockResolvedValue({ ...RUNNING, kind: 'rename', total: 3877, counted: true, done: 152, started_at_ms: 100 })
     const { scope, state } = setup()
     await state.refresh()
     expect(state.job.value).toMatchObject({ kind: 'rename', done: 152, total: 3877, counted: true })
-    // The plan is not read again while the run goes on, and the total stays.
-    getOrganizeJob.mockResolvedValue({ ...rename, done: 400 })
-    await state.refresh()
-    expect(getImportRenames).toHaveBeenCalledTimes(1)
-    expect(state.job.value).toMatchObject({ done: 400, total: 3877 })
-    // A new run is sized by its own start.
-    getOrganizeJob.mockResolvedValue({ ...rename, state: 'done', finished_at_ms: 500 })
-    getImportRenames.mockResolvedValue({ count: 3, complete: true, files: [] })
-    await state.refresh()
-    getOrganizeJob.mockResolvedValue({ ...rename, started_at_ms: 600, done: 0, failed: 0 })
-    await state.refresh()
-    expect(state.job.value).toMatchObject({ done: 0, total: 3 })
     scope.stop()
   })
 
-  it('takes an older plan as it is when the new read gave none', async () => {
-    getImportRenames.mockResolvedValueOnce({ count: 3877, complete: true, files: [] })
-    const { scope, state } = setup()
-    await state.refresh()
-    getImportRenames.mockRejectedValue(new Error('slow'))
-    getOrganizeJob.mockResolvedValue({ ...RUNNING, kind: 'rename', total: 0, counted: false, done: 9, started_at_ms: 100 })
-    await state.refresh()
-    expect(state.job.value).toMatchObject({ done: 9, total: 3877 })
-    scope.stop()
-  })
-
-  it('leaves a rename without a total when no plan is known', async () => {
-    getImportRenames.mockRejectedValue({ status: 404 })
-    getOrganizeJob.mockResolvedValue({ ...RUNNING, kind: 'rename', total: 0, counted: false, done: 9 })
-    const { scope, state } = setup()
-    await state.refresh()
-    expect(state.job.value).toMatchObject({ done: 9, total: 0, counted: false })
-    scope.stop()
-  })
-
-  it('tells the time left of a rename from its speed since it started', async () => {
+  it('tells the time left of a rename from the node total and the speed since it started', async () => {
     vi.useFakeTimers()
     try {
       vi.setSystemTime(10 * 60_000)
-      getImportRenames.mockResolvedValue({ count: 3725, complete: true, files: [] })
-      getOrganizeJob.mockResolvedValue({ ...RUNNING, kind: 'rename', total: 0, counted: false, done: 152, started_at_ms: 0 })
+      const rename = { ...RUNNING, kind: 'rename', total: 3877, counted: true, done: 152, started_at_ms: 0 }
+      getOrganizeJob.mockResolvedValue(rename)
       const { scope, state } = setup()
       await state.refresh()
       expect(state.job.value?.left).toBe('about 4 h left')
-      getOrganizeJob.mockResolvedValue({ ...RUNNING, kind: 'rename', state: 'paused', total: 0, done: 152, started_at_ms: 0 })
+      getOrganizeJob.mockResolvedValue({ ...rename, state: 'paused' })
       await state.refresh()
       expect(state.job.value?.left).toBeNull()
       scope.stop()
@@ -240,20 +215,21 @@ describe('useLinkState', () => {
   describe('a rename just accepted', () => {
     const STEP = { ...RUNNING, kind: 'rename', total: 0, counted: false, done: 20, started_at_ms: 100 }
 
-    it('runs at once, before any read answers, and reads no plan', async () => {
+    it('runs at once as starting, before any read answers, and reads no plan', async () => {
       getOrganizeJob.mockReturnValue(new Promise(() => {}))
       const { scope, state } = setup()
-      void state.begin(3877)
-      expect(state.job.value).toMatchObject({ kind: 'rename', state: 'running', controls: false })
+      void state.begin()
+      expect(state.job.value).toMatchObject({ kind: 'rename', state: 'running', controls: false, starting: true, done: 0 })
       expect(getImportRenames).not.toHaveBeenCalled()
       scope.stop()
     })
 
-    it('takes the real step and the count it was started from once a read shows it', async () => {
-      getOrganizeJob.mockResolvedValue(STEP)
+    it('takes the real step once a read shows it', async () => {
+      getOrganizeJob.mockResolvedValue({ ...STEP, total: 3877, counted: true })
       const { scope, state } = setup()
-      await state.begin(3877)
-      expect(state.job.value).toMatchObject({ done: 20, total: 3877, counted: true, controls: true })
+      await state.begin()
+      expect(state.job.value).toMatchObject({ done: 20, total: 3877, controls: true })
+      expect(state.job.value?.starting).toBeUndefined()
       scope.stop()
     })
 
@@ -262,11 +238,11 @@ describe('useLinkState', () => {
       try {
         getOrganizeJob.mockResolvedValue(null)
         const { scope, state } = setup()
-        await state.begin(3877)
+        await state.begin()
         expect(state.job.value).toMatchObject({ kind: 'rename', controls: false })
         getOrganizeJob.mockResolvedValue(STEP)
         await vi.advanceTimersByTimeAsync(3000)
-        expect(state.job.value).toMatchObject({ done: 20, total: 3877, controls: true })
+        expect(state.job.value).toMatchObject({ done: 20, controls: true })
         scope.stop()
       } finally {
         vi.useRealTimers()
@@ -278,7 +254,7 @@ describe('useLinkState', () => {
       getOrganizeJob.mockResolvedValue(older)
       const { scope, state } = setup()
       await state.refresh()
-      await state.begin(10)
+      await state.begin()
       expect(state.job.value).toMatchObject({ kind: 'rename', controls: false })
       getOrganizeJob.mockResolvedValue({ ...older, started_at_ms: 9, finished_at_ms: 12 })
       await state.refresh()
@@ -292,7 +268,7 @@ describe('useLinkState', () => {
       try {
         getOrganizeJob.mockResolvedValue(null)
         const { scope, state } = setup()
-        await state.begin(3)
+        await state.begin()
         await vi.advanceTimersByTimeAsync(3000)
         expect(state.job.value).toBeNull()
         expect(state.finished.value).toBe(1)
@@ -306,7 +282,7 @@ describe('useLinkState', () => {
     it('stays running when a read fails', async () => {
       getOrganizeJob.mockRejectedValue(new Error('offline'))
       const { scope, state } = setup()
-      await state.begin(3)
+      await state.begin()
       expect(state.job.value).toMatchObject({ kind: 'rename' })
       expect(state.error.value).toBe('offline')
       scope.stop()

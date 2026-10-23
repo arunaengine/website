@@ -59,6 +59,8 @@ export interface BucketJob {
   state: 'running' | 'paused'
   done: number
   failed: number
+  /** The files the step handles, when the node counts them. */
+  total?: number
 }
 
 export interface StorageBucket {

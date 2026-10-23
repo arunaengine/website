@@ -16,7 +16,17 @@ import { activeJob, organizeError, timeLeft, type ProgressJob } from '@/lib/orga
 
 const POLL_MS = 3000
 // A rename the node accepted but no read shows yet; it has no step to pause or abort.
-const STARTING: ProgressJob = { kind: 'rename', state: 'running', done: 0, total: 0, counted: false, skipped: 0, failed: 0, controls: false }
+const STARTING: ProgressJob = {
+  kind: 'rename',
+  state: 'running',
+  done: 0,
+  total: 0,
+  counted: false,
+  skipped: 0,
+  failed: 0,
+  controls: false,
+  starting: true,
+}
 
 /** Links with a settings save on its way, by "group\nimport"; a new opening waits for it. */
 export const savesInFlight = reactive(new Set<string>())
@@ -40,17 +50,13 @@ export function useLinkState(groupId: () => string, importId: () => string) {
   let disposed = false
   let timer: ReturnType<typeof setTimeout> | null = null
 
-  // A rename reports no total; it is fixed from the plan, once per run (by its start time).
-  const sized = ref<{ started: number; total: number } | null>(null)
   // A rename the node just accepted counts as running until a read shows its step or two reads do not.
-  const starting = ref<{ before: number | null; total: number | null; misses: number } | null>(null)
+  const starting = ref<{ before: number | null; misses: number } | null>(null)
   const job = computed(() => {
     const active = activeJob(stored.value)
     if (!active && starting.value) return STARTING
-    if (active?.kind !== 'rename' || !sized.value || sized.value.started !== active.started_at_ms) return active
-    const total = Math.max(sized.value.total, active.done + active.failed)
-    const counted = { ...active, total, counted: true }
-    return { ...counted, left: timeLeft(counted, Date.now()) }
+    // The time left needs the node's final total; without one a rename shows its count only.
+    return active?.kind === 'rename' && active.total ? { ...active, left: timeLeft(active, Date.now()) } : active
   })
   // The last step, once it is over.
   const lastJob = computed(() => (stored.value && !activeJob(stored.value) ? stored.value : null))
@@ -88,7 +94,6 @@ export function useLinkState(groupId: () => string, importId: () => string) {
     const wasActive = activeJob(stored.value) !== null
     if (current.state === 'ok') {
       stored.value = current.value
-      size(found?.state === 'ok')
       confirm()
       const ended = current.value && !activeJob(current.value) ? `${current.value.started_at_ms}:${current.value.finished_at_ms}` : ''
       if ((ended && ended !== lastEnd) || (wasActive && !current.value)) finished.value++
@@ -104,15 +109,6 @@ export function useLinkState(groupId: () => string, importId: () => string) {
     schedule()
   }
 
-  // The plan the click was made on, or the one read now (it left out the files done by then) or before.
-  function size(fresh: boolean) {
-    const active = activeJob(stored.value)
-    const started = active?.started_at_ms
-    if (!active || active.kind !== 'rename' || started === undefined || started === sized.value?.started) return
-    const total = starting.value?.total ?? (renames.value ? renames.value.count + (fresh ? active.done + active.failed : 0) : null)
-    if (total !== null) sized.value = { started, total }
-  }
-
   function confirm() {
     const begun = starting.value
     if (!begun) return
@@ -125,10 +121,10 @@ export function useLinkState(groupId: () => string, importId: () => string) {
     }
   }
 
-  /** A rename was accepted: shows it running at once, with the plan count it was started from. */
-  function begin(total: number | null) {
+  /** A rename was accepted: shows it starting at once and keeps the panel locked until it is seen. */
+  function begin() {
     if (disposed) return Promise.resolve()
-    starting.value = { before: stored.value?.started_at_ms ?? null, total, misses: 0 }
+    starting.value = { before: stored.value?.started_at_ms ?? null, misses: 0 }
     return refresh()
   }
 

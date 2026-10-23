@@ -44,13 +44,15 @@ function abort() {
       v-if="job.total"
       class="h-1.5 overflow-hidden rounded-full bg-muted"
       role="progressbar"
+      :aria-label="jobTitle(job)"
+      :aria-valuetext="`${formatNumber(job.done)} of ${job.counted ? '' : 'at least '}${formatNumber(job.total)}`"
       :aria-valuenow="percent(job)"
       aria-valuemin="0"
       aria-valuemax="100"
     >
       <div class="h-full bg-primary transition-all" :style="{ width: `${percent(job)}%` }" />
     </div>
-    <p class="text-[11px] tabular-nums text-muted-foreground">
+    <p v-if="!job.starting" class="text-[11px] tabular-nums text-muted-foreground">
       {{ formatNumber(job.done) }}<template v-if="job.total"> of {{ job.counted ? '' : 'at least ' }}{{ formatNumber(job.total) }}</template>
       <template v-if="job.kind === 'rename'"> renamed</template>
       <template v-if="job.skipped && job.kind !== 'rename'"> · {{ formatNumber(job.skipped) }} skipped</template>

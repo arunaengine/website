@@ -29,6 +29,8 @@ export interface ProgressJob {
   started_at_ms?: number
   /** Time left as a short phrase, when it can be told. */
   left?: string | null
+  /** The node accepted the rename, but no read shows its step yet. */
+  starting?: boolean
 }
 
 const TITLES: Record<ProgressJob['kind'], { running: string; abort: string; verb: string }> = {
@@ -39,6 +41,7 @@ const TITLES: Record<ProgressJob['kind'], { running: string; abort: string; verb
 }
 
 export function jobTitle(job: ProgressJob): string {
+  if (job.starting) return 'Starting rename…'
   const title = TITLES[job.kind].running
   return job.state === 'paused' ? `${title} (paused)` : title
 }
@@ -67,15 +70,17 @@ export function timeLeft(job: ProgressJob, now: number): string | null {
   const handled = job.done + job.failed
   const spent = now - (job.started_at_ms ?? now)
   if (job.state !== 'running' || handled < LEFT_AFTER || spent <= 0 || job.total <= handled) return null
+  // A pause stays in the elapsed time, so after a resume this is the average speed of the whole run.
   const minutes = ((job.total - handled) * spent) / handled / 60_000
   const rounded = Math.round(minutes)
   if (rounded < 1) return 'less than 1 min left'
   return rounded < 60 ? `about ${rounded} min left` : `about ${formatNumber(Math.round(minutes / 60))} h left`
 }
 
-/** The job as the progress box shows it; null once it is over. */
+/** The job as the progress box shows it; null once it is over. A rename shows only a final total. */
 export function activeJob(job: OrganizeJob | null): ProgressJob | null {
-  return job && (job.state === 'running' || job.state === 'paused') ? { ...job, state: job.state } : null
+  if (!job || (job.state !== 'running' && job.state !== 'paused')) return null
+  return { ...job, state: job.state, total: job.kind === 'rename' && !job.counted ? 0 : job.total }
 }
 
 const BUCKET_STEPS: Record<BucketJob['kind'], string> = {

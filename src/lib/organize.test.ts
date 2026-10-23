@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { abortSentence, activeJob, bucketJobLabel, copyKey, organizeError, percent, rangeLabel, timeLeft, type ProgressJob } from './organize'
+import {
+  abortSentence,
+  activeJob,
+  bucketJobLabel,
+  copyKey,
+  jobTitle,
+  organizeError,
+  percent,
+  rangeLabel,
+  timeLeft,
+  type ProgressJob,
+} from './organize'
 import { ApiError } from '@/lib/api'
 
 const MOVE: ProgressJob = { kind: 'move', state: 'running', done: 92410, total: 214880, counted: true, skipped: 2, failed: 0, controls: true }
@@ -72,6 +83,19 @@ describe('organize words', () => {
     expect(activeJob({ ...job, state: 'done' })).toBeNull()
     expect(activeJob({ ...job, state: 'aborted' })).toBeNull()
     expect(activeJob(null)).toBeNull()
+  })
+
+  it('keeps only a final total for a rename', () => {
+    const rename = { kind: 'rename', state: 'running', done: 1, skipped: 0, failed: 0, total: 50, counted: false, started_at_ms: 1, controls: true } as const
+    expect(activeJob(rename)).toMatchObject({ total: 0 })
+    expect(activeJob({ ...rename, counted: true })).toMatchObject({ total: 50, counted: true })
+    expect(activeJob({ ...rename, kind: 'move' })).toMatchObject({ total: 50, counted: false })
+  })
+
+  it('titles a rename that is only starting', () => {
+    const rename: ProgressJob = { ...MOVE, kind: 'rename', done: 0, total: 0, counted: false, starting: true }
+    expect(jobTitle(rename)).toBe('Starting rename…')
+    expect(jobTitle({ ...rename, starting: false })).toBe('Renaming files in your storage')
   })
 
   it('words a refused call shortly', () => {

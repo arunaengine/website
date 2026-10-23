@@ -67,7 +67,7 @@ export interface OrganizeJob {
   done: number
   skipped: number
   failed: number
-  /** Zero for a rename, which reports no total. */
+  /** Zero for a rename started on an older node, which reports no total. */
   total: number
   /** The total is final; before that it is a lower bound. */
   counted: boolean

@@ -82,6 +82,24 @@ describe('JobProgress', () => {
     expect(content(failed.root)).toContain('152 of 3,877 renamed · 3 failed')
   })
 
+  it('names the bar and reads its value', async () => {
+    const { root } = await mount(JOB)
+    const bar = element(root, (node) => node.props.role === 'progressbar')
+    expect(bar.props['aria-label']).toBe('Moving files')
+    expect(bar.props['aria-valuetext']).toBe('92,410 of 214,880')
+    const lower = await mount({ ...JOB, counted: false })
+    expect(element(lower.root, (node) => node.props.role === 'progressbar').props['aria-valuetext']).toBe('92,410 of at least 214,880')
+  })
+
+  it('says a rename is starting, with no count and no controls to use', async () => {
+    const starting = { ...JOB, kind: 'rename', done: 0, total: 0, counted: false, skipped: 0, controls: false, starting: true } as const
+    const { root } = await mount(starting)
+    expect(content(root)).toContain('Starting rename…')
+    expect(content(root)).not.toContain('renamed')
+    expect(content(root)).toContain('Runs on the server. You can close this window.')
+    expect(() => button(root, 'Pause')).toThrow()
+  })
+
   it('shows a rename without a total as a count only', async () => {
     const { root } = await mount({ ...JOB, kind: 'rename', total: 0, counted: false, skipped: 0 })
     expect(content(root)).toContain('92,410 renamed')
