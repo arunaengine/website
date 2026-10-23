@@ -36,7 +36,6 @@ import type { BucketSearchHit } from '@/lib/api'
 import type { PublicTarget } from '@/lib/publicAccess'
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { MOCK_BASE, mockEnabled } from '@/router/distributedMock'
 import { KeyRound, LogIn, ShieldAlert } from '@lucide/vue'
 
 const { bootstrapped, currentUser, myGroups } = useAruna()
@@ -307,9 +306,6 @@ async function createFolder() {
         </span>
       </template>
       <template #actions>
-        <Button v-if="mockEnabled() && route.name === 'buckets'" variant="outline" size="sm" as-child>
-          <RouterLink :to="MOCK_BASE">Distributed buckets (mock)</RouterLink>
-        </Button>
         <RefreshButton v-if="contextReady" :busy="refreshSpinning" @click="onRefresh" />
       </template>
     </PageHeader>
