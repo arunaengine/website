@@ -294,6 +294,62 @@ describe('StorageSection', () => {
     }
   })
 
+  it('follows a step on a later page without dropping the pages shown', async () => {
+    vi.useFakeTimers()
+    try {
+      listBackendImports.mockResolvedValue([LINKS[0]])
+      const job = { kind: 'rename', state: 'running', done: 4, failed: 0 }
+      const first = { buckets: [listed('alpha', { shared: true, provider_bucket: 'shared' })], next: 'c1' }
+      let second = { buckets: [listed('beta', { shared: true, provider_bucket: 'shared', job })], next: null }
+      listStorageBuckets.mockImplementation((_group: string, page: { after?: string }) =>
+        Promise.resolve(page.after === 'c1' ? second : first),
+      )
+      const { root } = await mount()
+      await click(buttonIn(root, 'Show more buckets'))
+      expect(byTestId(root, 'bucket-job')).toHaveLength(1)
+      const calls = listStorageBuckets.mock.calls.length
+      await vi.advanceTimersByTimeAsync(3000)
+      await flush()
+      // Both pages are read again and stay shown, with no button to load the second.
+      expect(listStorageBuckets.mock.calls.length).toBe(calls + 2)
+      expect(content(root)).toContain('beta')
+      expect(byTestId(root, 'bucket-job')).toHaveLength(1)
+      second = { buckets: [listed('beta', { shared: true, provider_bucket: 'shared' })], next: null }
+      await vi.advanceTimersByTimeAsync(3000)
+      await flush()
+      expect(byTestId(root, 'bucket-job')).toHaveLength(0)
+      expect(content(root)).toContain('beta')
+      const done = listStorageBuckets.mock.calls.length
+      await vi.advanceTimersByTimeAsync(30_000)
+      expect(listStorageBuckets.mock.calls.length).toBe(done)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps a page that is being added when a poll answers', async () => {
+    vi.useFakeTimers()
+    try {
+      listBackendImports.mockResolvedValue([LINKS[0]])
+      const job = { kind: 'rename', state: 'running', done: 4, failed: 0 }
+      const first = { buckets: [listed('alpha', { shared: true, provider_bucket: 'shared', job })], next: 'c1' }
+      let answer: (value: unknown) => void = () => {}
+      listStorageBuckets.mockImplementation((_group: string, page: { after?: string }) =>
+        page.after === 'c1' ? new Promise((resolve) => (answer = resolve)) : Promise.resolve(first),
+      )
+      const { root } = await mount()
+      void (buttonIn(root, 'Show more buckets').props.onClick as () => void)()
+      await vi.advanceTimersByTimeAsync(3000)
+      await flush()
+      answer({ buckets: [listed('beta', { shared: true, provider_bucket: 'shared' })], next: null })
+      await flush()
+      expect(content(root)).toContain('beta')
+      expect(content(root)).toContain('alpha')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('pages through the bucket listing', async () => {
     listStorageBuckets
       .mockResolvedValueOnce({ buckets: [listed('alpha', { shared: true, provider_bucket: 'shared' })], next: 'c1' })

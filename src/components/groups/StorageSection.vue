@@ -70,6 +70,8 @@ const bucketsNext = ref<string | null>(null)
 const loadingMore = ref(false)
 // A load or a context change ends every page request before it.
 let pageRun = 0
+// Pages shown, so a poll reads as many again and keeps them.
+let shownPages = 1
 
 function client() {
   return { baseUrl: apiBaseUrl.value, token: authToken.value }
@@ -82,9 +84,19 @@ function clearPoll() {
   pollTimer = undefined
 }
 
+// Reads again every few seconds while a sync runs or a step runs on any bucket shown.
+function follow(imports: BackendImport[]) {
+  const listed = [...(firstBuckets.value ?? []), ...moreBuckets.value]
+  if (disposed || pollTimer !== undefined) return
+  if (listed.some((entry) => entry.job) || imports.some((link) => runActive(link.last_run))) {
+    pollTimer = setTimeout(() => void readAll(true), 3_000)
+  }
+}
+
 // Only the latest load for the current group and session writes state.
 let loadSeq = 0
-async function load() {
+const load = () => readAll(false)
+async function readAll(poll: boolean) {
   const seq = ++loadSeq
   const epoch = sessionEpoch.value
   const current = () => seq === loadSeq && epoch === sessionEpoch.value
@@ -107,20 +119,34 @@ async function load() {
       }),
     ])
     if (!current()) return
+    // A poll reads the pages shown again, one after the other from the first, and keeps them.
+    let rest: StorageBucket[] = []
+    let next = page?.next ?? null
+    let read = 1
+    while (poll && page && next && read < shownPages) {
+      const more = await listStorageBuckets(props.groupId, { limit: BUCKET_PAGE, after: next }, client())
+      if (!current()) return
+      rest = [...rest, ...more.buckets]
+      next = more.next ?? null
+      read++
+    }
     backends.value = list.backends
     routing.value = rules
     links.value = imports
-    firstBuckets.value = page?.buckets ?? null
-    // A refresh starts the listing over, so later pages never mix with a newer first page.
-    pageRun++
-    loadingMore.value = false
-    moreBuckets.value = []
-    bucketsNext.value = page?.next ?? null
+    // A page being added now is kept; the next poll reads the pages again.
+    if (!(poll && loadingMore.value)) {
+      firstBuckets.value = page?.buckets ?? null
+      // A refresh starts the listing over, so later pages never mix with a newer first page.
+      pageRun++
+      loadingMore.value = false
+      moreBuckets.value = rest
+      bucketsNext.value = next
+      shownPages = read
+    }
     if (editing.value) editing.value = imports.find((link) => link.import_id === editing.value?.import_id) ?? editing.value
     emit('count', list.backends.length)
     emit('backends', list.backends)
-    const stepRuns = Boolean(page?.buckets.some((entry) => entry.job))
-    if (!disposed && (stepRuns || imports.some((link) => runActive(link.last_run)))) pollTimer = setTimeout(() => void load(), 3_000)
+    follow(imports)
   } catch (err) {
     if (!current()) return
     if (err instanceof ApiError && (err.status === 403 || err.status === 401)) hidden.value = true
@@ -144,6 +170,7 @@ watch(
     firstBuckets.value = null
     moreBuckets.value = []
     bucketsNext.value = null
+    shownPages = 1
     pageRun++
     loadingMore.value = false
     problemsRun++
@@ -178,8 +205,8 @@ async function moreBucketsPage() {
     if (!current()) return
     moreBuckets.value = [...moreBuckets.value, ...page.buckets]
     bucketsNext.value = page.next ?? null
-    // A step on a later page is followed by the same reads.
-    if (!disposed && pollTimer === undefined && page.buckets.some((entry) => entry.job)) pollTimer = setTimeout(() => void load(), 3_000)
+    shownPages++
+    follow(links.value)
   } catch (err) {
     if (current()) actionError.value = errorMessage(err)
   } finally {
