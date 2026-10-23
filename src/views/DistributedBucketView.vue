@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // Mock page of one distributed bucket: members, key ranges and distribution settings.
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
+import BucketActions from '@/components/distributed/BucketActions.vue'
 import DegradedNotice from '@/components/distributed/DegradedNotice.vue'
 import MemberTable from '@/components/distributed/MemberTable.vue'
 import MockNotice from '@/components/distributed/MockNotice.vue'
@@ -10,6 +11,7 @@ import RangeTable from '@/components/distributed/RangeTable.vue'
 import Badge from '@/components/ui/Badge.vue'
 import DetailList from '@/components/ui/DetailList.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import OptionToggle from '@/components/ui/OptionToggle.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import Tabs from '@/components/ui/Tabs.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
@@ -27,6 +29,12 @@ const bucket = computed(() => mockBucket(String(route.params.bucketId ?? '')))
 const degraded = computed(() => (bucket.value ? degradedRanges(bucket.value) : []))
 const objects = computed(() => bucket.value?.ranges.reduce((sum, range) => sum + range.objects, 0) ?? 0)
 const bytes = computed(() => bucket.value?.ranges.reduce((sum, range) => sum + range.bytes, 0) ?? 0)
+
+const viewer = ref('admin')
+const VIEWERS = [
+  { value: 'admin', label: 'Group admin' },
+  { value: 'member', label: 'Group member' },
+]
 
 const tab = useRouteTab(['overview', 'settings'], 'overview')
 
@@ -55,6 +63,9 @@ const settings = computed(() => {
           <Badge v-else variant="success" size="sm">Active</Badge>
         </template>
       </template>
+      <template #actions>
+        <OptionToggle v-model="viewer" :options="VIEWERS" aria-label="View as" />
+      </template>
     </PageHeader>
 
     <div class="container space-y-5 py-6">
@@ -74,6 +85,7 @@ const settings = computed(() => {
             <StatCard label="Size" :value="formatBytes(bytes)" />
           </div>
           <DegradedNotice v-for="range in degraded" :key="range.id" :range="range" />
+          <BucketActions :bucket="bucket" :admin="viewer === 'admin'" />
           <section class="space-y-2">
             <h2 class="font-display text-base font-semibold text-aruna-navy">Members</h2>
             <MemberTable :bucket="bucket" />
