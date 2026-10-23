@@ -2,6 +2,7 @@
 // A database is a bucket plus a linked dataset. This shows what the dataset says about it.
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
+import DatasetPreview from '@/components/data/DatasetPreview.vue'
 import DetailList from '@/components/ui/DetailList.vue'
 import { useMockDatabases } from '@/composables/useMockDatabases'
 import { mockBucket } from '@/lib/distributedMockData'
@@ -29,5 +30,6 @@ const entry = computed(() => entries.value.find((item) => item.bucket === props.
         { label: 'Dataset id', value: entry.datasetId, mono: true },
       ]"
     />
+    <DatasetPreview :dataset-id="entry.datasetId" />
   </section>
 </template>

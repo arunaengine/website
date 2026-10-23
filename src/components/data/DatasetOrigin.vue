@@ -1,19 +1,29 @@
 <script setup lang="ts">
-// The isBasedOn entries the dataset editor adds on its own when this file joins a dataset.
+// What the dataset editor adds on its own when this file joins a dataset: where it came from
+// (isBasedOn, or a run link) and the linked datasets it is part of (isPartOf).
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import Button from '@/components/ui/Button.vue'
-import { basedOn, type Origin } from '@/lib/distributedMockData'
+import type { PartOf } from '@/composables/useMockDatabases'
+import { basedOn, type BasedOn, type Origin } from '@/lib/distributedMockData'
 
-const props = defineProps<{ origin: Origin }>()
+const props = defineProps<{ origin: Origin; partOf: PartOf[] }>()
 
 const removed = ref<string[]>([])
-const entries = computed(() => basedOn(props.origin).filter((entry) => !removed.value.includes(entry.value)))
+const all = computed<BasedOn[]>(() => [
+  ...basedOn(props.origin),
+  ...props.partOf.map((item) => ({
+    label: item.dataset.name,
+    value: `https://w3id.org/aruna/${item.dataset.id}`,
+    property: 'isPartOf' as const,
+  })),
+])
+const entries = computed(() => all.value.filter((entry) => !removed.value.includes(entry.value)))
 </script>
 
 <template>
   <div class="space-y-1.5">
-    <p v-if="!basedOn(origin).length" class="text-muted-foreground">
+    <p v-if="!all.length" class="text-muted-foreground">
       {{ origin.kind === 'storage' ? 'Nothing is added (the storage folder stays private).' : 'Nothing is added: this file was uploaded directly.' }}
     </p>
     <ul v-else class="space-y-1">
@@ -26,7 +36,7 @@ const entries = computed(() => basedOn(props.origin).filter((entry) => !removed.
           </span>
         </template>
         <template v-else>
-          <span class="shrink-0 text-muted-foreground">isBasedOn</span>
+          <span class="shrink-0 text-muted-foreground">{{ entry.property }}</span>
           <span class="min-w-0 flex-1 break-all font-mono">{{ entry.value }}</span>
         </template>
         <Button size="sm" variant="ghost" :aria-label="`Remove ${entry.label}`" @click="removed.push(entry.value)">Remove</Button>

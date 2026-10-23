@@ -1,11 +1,17 @@
 <script setup lang="ts">
-// The id of a file in a bucket stored on several nodes, and the datasets that use it.
+// What file details add for an example file: origin, datasets it is part of, ids and preview.
+import { computed } from 'vue'
 import DatasetOrigin from '@/components/data/DatasetOrigin.vue'
 import OriginLine from '@/components/data/OriginLine.vue'
 import GlobalId from '@/components/distributed/GlobalId.vue'
+import { RouterLink } from 'vue-router'
+import { useMockDatabases } from '@/composables/useMockDatabases'
 import { originOf, type MockObject } from '@/lib/distributedMockData'
 
-defineProps<{ object: MockObject }>()
+const props = defineProps<{ object: MockObject }>()
+
+const { partOf } = useMockDatabases()
+const parts = computed(() => partOf(props.object.bucket, props.object.key))
 </script>
 
 <template>
@@ -13,6 +19,17 @@ defineProps<{ object: MockObject }>()
     <div>
       <p class="mb-1 text-muted-foreground">Origin</p>
       <OriginLine :origin="originOf(object)" />
+    </div>
+    <div v-if="parts.length">
+      <p class="mb-1 text-muted-foreground">Part of</p>
+      <ul class="space-y-0.5">
+        <li v-for="item in parts" :key="item.dataset.id">
+          <RouterLink :to="{ name: 'dataset', params: { id: item.dataset.id } }" class="font-medium text-primary hover:underline">{{ item.dataset.name }}</RouterLink>
+          <span class="text-muted-foreground">
+            ({{ [item.database ? 'database' : '', item.part.asOf ? `version as of ${item.part.asOf}` : ''].filter(Boolean).join(', ') || 'linked, live' }})
+          </span>
+        </li>
+      </ul>
     </div>
     <div>
       <p class="mb-1 text-muted-foreground">Id of this version</p>
@@ -27,7 +44,7 @@ defineProps<{ object: MockObject }>()
     </div>
     <div>
       <p class="mb-1 text-muted-foreground">Added to datasets as</p>
-      <DatasetOrigin :key="object.versionId" :origin="originOf(object)" />
+      <DatasetOrigin :key="object.versionId" :origin="originOf(object)" :part-of="parts" />
     </div>
   </div>
 </template>
