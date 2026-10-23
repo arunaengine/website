@@ -754,7 +754,30 @@ export interface DatabaseEntry {
   refresh: string
   readers: DatabaseReaders
   bucket: string
+  /** Pending until the group admins of the owning group agree. */
+  status: 'agreed' | 'pending'
 }
+
+export const OWNING_GROUP: Record<string, string> = {
+  bakrep: 'Genome Lab',
+  'spire-db': 'Genome Lab',
+  refseq: 'Genome Lab',
+  'bakta-db': 'Genome Lab',
+  'reads-edge': 'Sequencing Core',
+  [ORDINARY_BUCKET]: 'Genome Lab',
+}
+
+export interface RealmRole {
+  name: string
+  users: string[]
+}
+
+// Realm roles of the example realm. Database curators hold WRITE on the database bucket path.
+export const REALM_ROLES: readonly RealmRole[] = [
+  { name: 'Database curators', users: ['Mira Okafor', 'Hendrik Voss'] },
+  { name: 'Data stewards', users: ['Ana Lopez', 'Kofi Mensah', 'Yuki Tanaka'] },
+  { name: 'Group leads', users: ['Sofia Richter'] },
+]
 
 // Buckets a realm admin marked as database buckets, with a description. Any bucket can be one.
 export const DATABASES_START: readonly DatabaseEntry[] = [
@@ -767,6 +790,7 @@ export const DATABASES_START: readonly DatabaseEntry[] = [
     refresh: 'Every 24 hours',
     readers: 'Public',
     bucket: 'bakrep',
+    status: 'agreed',
   },
   {
     id: 'refseq',
@@ -777,6 +801,7 @@ export const DATABASES_START: readonly DatabaseEntry[] = [
     refresh: 'Every 7 days',
     readers: 'Everyone in the realm',
     bucket: 'refseq',
+    status: 'agreed',
   },
   {
     id: 'spire',
@@ -787,6 +812,7 @@ export const DATABASES_START: readonly DatabaseEntry[] = [
     refresh: 'Off',
     readers: 'Public',
     bucket: 'spire-db',
+    status: 'agreed',
   },
   {
     id: 'bakta',
@@ -797,6 +823,7 @@ export const DATABASES_START: readonly DatabaseEntry[] = [
     refresh: 'Off',
     readers: 'Everyone in the realm',
     bucket: 'bakta-db',
+    status: 'agreed',
   },
 ]
 

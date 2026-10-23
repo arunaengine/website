@@ -1,20 +1,34 @@
-// The database buckets of the node mock: buckets with a description, kept in memory so a realm admin can edit them.
-import { ref } from 'vue'
-import { DATABASES_START, type DatabaseEntry } from '@/lib/distributedMockData'
+// The database buckets of the node mock: buckets with a description, kept in memory so a
+// realm admin can edit them. A new mark waits for the group admins of the owning group.
+import { computed, ref } from 'vue'
+import { DATABASES_START, REALM_ROLES, type DatabaseEntry, type RealmRole } from '@/lib/distributedMockData'
 
-const entries = ref<DatabaseEntry[]>(DATABASES_START.map((entry) => ({ ...entry })))
+const all = ref<DatabaseEntry[]>(DATABASES_START.map((entry) => ({ ...entry })))
+// Realm roles that hold WRITE on the path that allows marking database buckets.
+const curators = ref<RealmRole[]>(REALM_ROLES.filter((role) => role.name === 'Database curators').map((role) => ({ ...role })))
 
 export function useMockDatabases() {
-  function add(entry: Omit<DatabaseEntry, 'id'>) {
-    entries.value = [...entries.value, { ...entry, id: `${entry.bucket}-${entries.value.length + 1}` }]
+  // Only agreed marks count for lists, Add data and search.
+  const entries = computed(() => all.value.filter((entry) => entry.status === 'agreed'))
+
+  function add(entry: Omit<DatabaseEntry, 'id' | 'status'>) {
+    all.value = [...all.value, { ...entry, id: `${entry.bucket}-${all.value.length + 1}`, status: 'pending' }]
   }
 
-  function update(id: string, patch: Partial<Omit<DatabaseEntry, 'id' | 'bucket'>>) {
-    entries.value = entries.value.map((entry) => (entry.id === id ? { ...entry, ...patch } : entry))
+  function agree(id: string) {
+    all.value = all.value.map((entry) => (entry.id === id ? { ...entry, status: 'agreed' } : entry))
+  }
+
+  function update(id: string, patch: Partial<Omit<DatabaseEntry, 'id' | 'bucket' | 'status'>>) {
+    all.value = all.value.map((entry) => (entry.id === id ? { ...entry, ...patch } : entry))
   }
 
   function remove(id: string) {
-    entries.value = entries.value.filter((entry) => entry.id !== id)
+    all.value = all.value.filter((entry) => entry.id !== id)
+  }
+
+  function grant(role: RealmRole) {
+    if (!curators.value.some((item) => item.name === role.name)) curators.value = [...curators.value, role]
   }
 
   // Entries whose name, description or source contain every word of the query.
@@ -27,5 +41,5 @@ export function useMockDatabases() {
     })
   }
 
-  return { entries, add, update, remove, search }
+  return { entries, all, curators, add, agree, update, remove, grant, search }
 }
