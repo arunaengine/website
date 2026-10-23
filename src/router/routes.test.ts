@@ -55,7 +55,7 @@ describe('web routes', () => {
 
   it('has no device views to reach', async () => {
     const routes = await build()
-    const desktopOnly = ['device', 'folders', 'folders/:folderId', 'transfers', 'sync', 'tools', 'runs', 'runs/:jobId']
+    const desktopOnly = ['device', 'folders', 'folders/:folderId', 'transfers', 'sync', 'activity', 'tools', 'runs', 'runs/:jobId']
 
     for (const path of desktopOnly) expect(child(routes, path)).toBeUndefined()
   })
@@ -163,6 +163,7 @@ describe('desktop routes', () => {
     const routes = await build({ apiBaseUrl: '/api/v1' })
     const expected = [
       ['sync', 'sync'],
+      ['activity', 'activity'],
       ['tools', 'tools'],
       ['folders/:folderId', 'folder'],
       ['runs', 'runs'],
@@ -180,7 +181,7 @@ describe('desktop routes', () => {
 
     expect(child(routes, 'folders')?.redirect).toEqual({ name: 'sync' })
     expect(child(routes, 'folders')?.component).toBeUndefined()
-    expect(child(routes, 'transfers')?.redirect).toEqual({ name: 'sync' })
+    expect(child(routes, 'transfers')?.redirect).toEqual({ name: 'activity' })
     expect(child(routes, 'transfers')?.component).toBeUndefined()
   })
 

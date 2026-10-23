@@ -49,9 +49,10 @@ function desktopRoutes(): RouteRecordRaw[] {
       name: 'folder',
       component: () => import('@/views/desktop/FolderDetailView.vue'),
     },
-    // The old folder and transfer paths stay reachable through Sync.
+    // The old folder and transfer paths stay reachable.
     { path: 'folders', redirect: { name: 'sync' } },
-    { path: 'transfers', redirect: { name: 'sync' } },
+    { path: 'transfers', redirect: { name: 'activity' } },
+    { path: 'activity', name: 'activity', component: () => import('@/views/desktop/ActivityView.vue') },
     { path: 'tools', name: 'tools', component: () => import('@/views/desktop/ToolsView.vue') },
     { path: 'runs', name: 'runs', component: () => import('@/views/desktop/RunsView.vue'), meta: { feature: 'compute' } },
     { path: 'runs/:jobId', name: 'run', component: () => import('@/views/desktop/RunsView.vue'), meta: { feature: 'compute' } },
