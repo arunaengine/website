@@ -1,5 +1,5 @@
 // Example data for the node mock. All values are made up.
-import type { Coverage, DataStrategy, MemberState, PresetId, RangeMode } from '@/lib/distributedMock'
+import { grantGap, type Coverage, type DataStrategy, type MemberState, type PresetId, type RangeMode } from '@/lib/distributedMock'
 
 export interface MockMember {
   nodeId: string
@@ -500,5 +500,25 @@ export function searchFiles(query: string): FileHit[] {
       subtitle: `${nodes > 1 ? `Stored on ${nodes} nodes` : 'Stored on this node'} · Bucket: ${file.bucket}`,
       bucket: file.bucket,
     }
+  })
+}
+
+export interface GrantWarning {
+  bucket: string
+  missing: string[]
+}
+
+// Role paths like data/node-1/bakrep/** that name some nodes of an example bucket, not all.
+export function grantWarnings(suffixes: readonly string[]): GrantWarning[] {
+  const named = new Map<string, string[]>()
+  for (const suffix of suffixes) {
+    const [area, node, bucket] = suffix.split('/')
+    if (area !== 'data' || !node || !bucket) continue
+    named.set(bucket, [...(named.get(bucket) ?? []), node])
+  }
+  return [...named].flatMap(([bucket, nodes]) => {
+    const found = mockBucket(bucket)
+    const missing = found && isMulti(found) ? grantGap(nodes, found.members.map((member) => member.nodeId)) : []
+    return missing.length ? [{ bucket, missing }] : []
   })
 }

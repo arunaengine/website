@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { docsTopicBySlug } from '@/docs/v1'
 import { applyPortalConfig } from '@/lib/config'
 import { defaultSettings, mockEnabled, firstResults, grantGap, isPending, nodeGlob, planRanges, plannedStart, presetMembers, rangeTotal, retryResult, STORAGE_QUESTIONS } from './distributedMock'
-import { BAKREP_COUNT, mockBucket, searchFiles, sourceObjects } from './distributedMockData'
+import { BAKREP_COUNT, grantWarnings, mockBucket, searchFiles, sourceObjects } from './distributedMockData'
 
 describe('distributed mock helpers', () => {
   it('reports the members a node-specific grant does not reach', () => {
@@ -61,6 +61,13 @@ describe('distributed mock helpers', () => {
     applyPortalConfig({ features: { distributedMock: true } })
     expect(mockEnabled()).toBe(true)
     applyPortalConfig({})
+  })
+
+  it('warns for a role that names some nodes of an example bucket', () => {
+    expect(grantWarnings(['data/node-1/bakrep/**', 'data/node-2/bakrep/**'])).toEqual([
+      { bucket: 'bakrep', missing: ['node-3', 'node-5'] },
+    ])
+    expect(grantWarnings(['data/*/bakrep/**', 'data/node-1/lab-raw-data/**', 'meta/**'])).toEqual([])
   })
 
   it('finds example files when every word of the query is in the key', () => {

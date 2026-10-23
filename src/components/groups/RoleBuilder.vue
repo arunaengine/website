@@ -5,6 +5,7 @@ import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import OptionToggle from '@/components/ui/OptionToggle.vue'
 import Select from '@/components/ui/Select.vue'
+import GrantNodeWarning from './GrantNodeWarning.vue'
 import PermissionPathPicker from './PermissionPathPicker.vue'
 import { describeTarget, pathProblem } from './permission-paths'
 import { useAruna } from '@/composables/useAruna'
@@ -267,6 +268,7 @@ async function submit() {
             </li>
           </ul>
           <p v-if="notice" class="mt-1.5 text-[11px] text-muted-foreground">{{ notice }}</p>
+          <GrantNodeWarning :paths="grants.map((grant) => grant.suffix)" :role="name.trim()" />
 
           <div class="mt-4">
             <button
