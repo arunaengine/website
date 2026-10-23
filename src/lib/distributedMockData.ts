@@ -43,13 +43,12 @@ export function sourceName(index: number): string {
   return `bakrep-v2-data-${String(index).padStart(3, '0')}`
 }
 
-// Four coordinators take the ranges in turn, a replica sits in the other location.
-const BAKREP_NODES = ['node-1', 'node-3', 'node-2', 'node-5']
+// Three coordinators take the ranges in turn, a replica sits in the other location.
+const BAKREP_NODES = ['node-1', 'node-2', 'node-3']
 const BAKREP_REPLICA: Record<string, string> = {
   'node-1': 'node-3',
-  'node-2': 'node-5',
+  'node-2': 'node-3',
   'node-3': 'node-1',
-  'node-5': 'node-2',
 }
 
 export function sourceObjects(index: number): number {

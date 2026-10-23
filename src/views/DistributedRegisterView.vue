@@ -55,8 +55,8 @@ const started = ref(false)
             is the key <span class="font-mono">{{ sourceName(7) }}/GCF_000005845.2/genome.fna.gz</span>.
           </p>
           <p class="text-xs text-muted-foreground">
-            There is one range per source bucket, so {{ BAKREP_COUNT }} ranges. Nodes node-1, node-2, node-3 and node-5 take turns
-            as coordinators, and each range has a copy in the other location. Create the members and settings
+            There is one range per source bucket, so {{ BAKREP_COUNT }} ranges. Nodes node-1, node-2 and node-3 take turns
+            as coordinators, each range has a copy in the other location, and node-5 caches files that are read. Create the members and settings
             on <RouterLink :to="`${MOCK_BASE}/new`" class="underline">New distributed bucket</RouterLink>.
           </p>
           <label class="flex items-start gap-3 text-sm">
