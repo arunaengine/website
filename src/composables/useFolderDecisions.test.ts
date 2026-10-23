@@ -1,5 +1,5 @@
-import { nextTick, ref } from 'vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { effectScope, nextTick, ref, type EffectScope } from 'vue'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/lib/api'
 import { readAction, readFolder } from '@/lib/deviceApi'
 
@@ -17,10 +17,19 @@ vi.mock('@/composables/useDeviceStatus', () => ({ useDeviceStatus: () => ({ devi
 
 const record = (action: string, path: string, at_ms: number) => readAction({ action, path, at_ms })
 
+// Each store keeps a watch on the device; a scope per case lets it go afterwards.
+const scopes: EffectScope[] = []
+
 async function decisions() {
   const { useFolderDecisions } = await import('./useFolderDecisions')
-  return useFolderDecisions()
+  const scope = effectScope()
+  scopes.push(scope)
+  return scope.run(() => useFolderDecisions())!
 }
+
+afterEach(() => {
+  for (const scope of scopes.splice(0)) scope.stop()
+})
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -135,19 +144,34 @@ describe('folder decisions', () => {
     expect(found.items.value.map((item) => item.text)).toEqual(['Kept your version of again.csv'])
   })
 
-  it('drops an answer that arrives after the device or session changed', async () => {
+  it('drops an answer that arrives after the device changed and reads again for the new one', async () => {
     const slow = deferred<ReturnType<typeof record>[]>()
-    actionLog.mockReturnValue(slow.promise)
+    actionLog.mockReturnValueOnce(slow.promise).mockResolvedValue([record('keep_local', 'new-device.csv', 20)])
     const found = await decisions()
     const pending = found.load('f1')
 
     deviceClient.value = clientB
-    await nextTick()
+    await vi.waitFor(() => expect(found.items.value.map((item) => item.text)).toEqual(['Kept your version of new-device.csv']))
     slow.resolve([record('keep_local', 'old-device.csv', 10)])
     await pending
 
+    expect(found.items.value.map((item) => item.text)).toEqual(['Kept your version of new-device.csv'])
+    expect(found.state.value).toBe('ready')
+    expect(actionLog).toHaveBeenCalledTimes(2)
+  })
+
+  it('waits as offline while there is no device and reads again when one returns', async () => {
+    actionLog.mockResolvedValue([record('keep_local', 'a.csv', 10)])
+    const found = await decisions()
+    await found.load('f1')
+
+    deviceClient.value = null
+    await vi.waitFor(() => expect(found.state.value).toBe('offline'))
     expect(found.items.value).toEqual([])
-    expect(found.state.value).toBe('idle')
+
+    deviceClient.value = clientB
+    await vi.waitFor(() => expect(found.state.value).toBe('ready'))
+    expect(found.items.value).toHaveLength(1)
   })
 
   it('says the device is absent instead of an empty history', async () => {

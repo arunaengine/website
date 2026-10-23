@@ -28,6 +28,8 @@ export function useFolderDecisions() {
   let generation = 0
   // Which folders the list in hand was read for.
   let scope = ''
+  // What a view last asked for, so a new device can be read for it again.
+  let wanted: { only?: string } | null = null
 
   function clear(): void {
     items.value = []
@@ -38,13 +40,17 @@ export function useFolderDecisions() {
   }
 
   // A new device or session starts from nothing, and an answer in flight dies.
-  watch(deviceClient, () => {
+  // The view still waits for its list, so it is read again once a device is there.
+  watch(deviceClient, (client) => {
     generation += 1
     clear()
+    if (wanted && client) void load(wanted.only)
+    else if (wanted) state.value = 'offline'
   })
 
   /** Reads every folder's log, or only the one named. */
   async function load(only?: string): Promise<void> {
+    wanted = { only }
     const mine = ++generation
     const client = deviceClient.value
     const key = only ?? '*'
