@@ -107,7 +107,8 @@ async function save(): Promise<void> {
 const resolved = computed(() => {
   if (!probe.value) return null
   if (probe.value.docker.available) return 'Docker'
-  if (probe.value.apptainer.available) return 'Apptainer'
+  // The shell only picks Apptainer when it has a delegated cgroup.
+  if (probe.value.apptainer.available && probe.value.apptainer.cgroupOk) return 'Apptainer'
   return null
 })
 
@@ -116,7 +117,8 @@ const chosenMissing = computed(() => {
   if (!probe.value || !backend || backend === 'off') return null
   if (backend === 'docker' && !probe.value.docker.available) return 'Docker is unreachable on this computer.'
   if (backend === 'apptainer' && !probe.value.apptainer.available) return 'Apptainer is not installed on this computer.'
-  if (backend === 'auto' && !resolved.value) return 'Neither Docker nor Apptainer was found on this computer.'
+  if (backend === 'apptainer' && !probe.value.apptainer.cgroupOk) return 'Apptainer has no delegated cgroup on this computer.'
+  if (backend === 'auto' && !resolved.value) return 'No usable Docker or Apptainer was found on this computer.'
   return null
 })
 </script>
