@@ -176,9 +176,17 @@ const canSubmit = computed(
     !submitting.value,
 )
 
-// An older node answers 400 for a mode it does not know.
+// Only an older node's refusal of the mode itself says so; every other refusal
+// (an unusable folder, a bad name) is shown as the node worded it.
+const UNKNOWN_MODE = /unknown variant\s+[`'"]?download_only/i
+
 function refusal(err: unknown): string {
-  if (mode.value === 'download_only' && err instanceof ApiError && (err.status === 400 || err.status === 422)) {
+  if (
+    mode.value === 'download_only' &&
+    err instanceof ApiError &&
+    (err.status === 400 || err.status === 422) &&
+    UNKNOWN_MODE.test(err.message)
+  ) {
     return 'This version of Aruna cannot keep a copy on this computer yet. Choose another way, or update Aruna.'
   }
   return errorMessage(err)

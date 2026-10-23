@@ -241,12 +241,25 @@ describe('choosing what the sync does', () => {
   })
 
   it('says an older node cannot keep a copy yet', async () => {
-    bind.mockRejectedValue(new ApiError(400, 'unknown variant `download_only`'))
+    bind.mockRejectedValue(
+      new ApiError(422, 'unknown variant `download_only`, expected `two_way` or `upload_only`'),
+    )
     const mounted = await mountReady(preset)
 
     await click(button(mounted.root, 'Start syncing'))
 
     expect(content(mounted.root)).toContain('cannot keep a copy on this computer yet')
+    mounted.app.unmount()
+  })
+
+  it('shows a 400 about the folder itself instead of blaming the version', async () => {
+    bind.mockRejectedValue(new ApiError(400, 'The folder /home/me/data is not empty.'))
+    const mounted = await mountReady(preset)
+
+    await click(button(mounted.root, 'Start syncing'))
+
+    expect(content(mounted.root)).toContain('The folder /home/me/data is not empty.')
+    expect(content(mounted.root)).not.toContain('cannot keep a copy')
     mounted.app.unmount()
   })
 
