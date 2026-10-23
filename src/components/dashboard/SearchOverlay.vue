@@ -47,7 +47,7 @@ const QUICK_KIND_LABELS: Record<QuickSection, string> = {
   files: 'File',
   buckets: 'Bucket',
   objects: 'Object',
-  databases: 'Database bucket',
+  databases: 'Database',
   groups: 'Group',
   people: 'User',
 }
@@ -128,12 +128,12 @@ const items = computed<QuickItem[]>(() => [
       ...(objectParentPrefix(hit.key) ? { prefix: objectParentPrefix(hit.key) as string } : {}),
     },
   })),
-  // Database buckets and files of the example buckets (node mock).
+  // Databases and files of the example buckets (node mock).
   ...(mockEnabled() ? searchDatabases(q.value) : []).map((entry): QuickItem => ({
     key: `db:${entry.id}`,
     section: 'databases',
-    title: entry.name,
-    subtitle: `${entry.description} ${entry.source}`,
+    title: entry.dataset.name,
+    subtitle: `${entry.dataset.description} ${entry.dataset.source}`,
     routeName: 'bucket',
     routeParams: { bucketId: entry.bucket },
   })),

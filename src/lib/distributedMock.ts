@@ -25,7 +25,7 @@ export function mockEnabled(): boolean {
 
 export const SHARD_HOST_LABEL = 'aruna-engine.org/shard-host'
 export const REALM_ID = 'k3V9xQ2mT7aLd0RpYc8WnHfJ5uBsE1gZtO4iXvNq6Ay'
-export const DATABASE_BUCKETS_PATH = `/${REALM_ID}/admin/database-buckets`
+export const DATABASES_PATH = `/${REALM_ID}/admin/databases`
 export const GROUP_ID = '01K8XW4C2T6B9Q1ZHDNE5A7RMF'
 
 export interface MockNode {

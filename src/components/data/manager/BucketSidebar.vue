@@ -82,11 +82,11 @@ const jobs = useBucketJobs(selectedGroupId, computed(() => [buckets.value, listi
 // Where the next bucket is stored (node mock); this node unless changed.
 const storageOpen = ref(false)
 const resultsOpen = ref(false)
-// Database buckets are ordinary buckets with a description, so this is only a filter.
+// A database is a bucket with a linked dataset, so this is only a filter.
 const bucketKind = ref('buckets')
 const KINDS = [
   { value: 'buckets', label: 'Buckets' },
-  { value: 'database', label: 'Database buckets' },
+  { value: 'database', label: 'Databases' },
 ]
 const databaseMode = computed(() => mockEnabled() && bucketKind.value === 'database')
 // The example rows show even when the group has no bucket of its own.

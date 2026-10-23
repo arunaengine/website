@@ -17,7 +17,7 @@ const rows = computed(() =>
 )
 const second = (bucket: MockBucket) =>
   props.databaseOnly
-    ? (described(bucket.name)?.description ?? null)
+    ? (described(bucket.name)?.dataset.description ?? null)
     : isMulti(bucket)
       ? storedLabel(bucket.preset, bucket.members.length)
       : null

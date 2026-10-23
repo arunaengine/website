@@ -1,18 +1,42 @@
 import { describe, expect, it } from 'vitest'
-import { useMockDatabases } from './useMockDatabases'
+import { NEW_DATASET, useMockDatabases } from './useMockDatabases'
 
-describe('database bucket marks of the node mock', () => {
+describe('databases of the node mock', () => {
+  // The first test sees the untouched example data; the others change it.
+  it('says which datasets a file is part of, live or as of a date', () => {
+    const marks = useMockDatabases()
+    const bakrep = marks.partOf('bakrep', 'bakrep-v2-data-007/GCF_000005845.2/genome.fna.gz')
+    expect(bakrep.map((item) => [item.dataset.name, item.database])).toEqual([
+      ['bakrep', true],
+      ['E. coli genomes, 2025 release', false],
+    ])
+    const reef = marks.partOf('lab-raw-data', 'raw/2026/reef-07/notes.txt')
+    expect(reef.map((item) => item.part.asOf)).toEqual(['2026-10-01'])
+    expect(marks.partOf('lab-raw-data', 'analysis/coverage.tsv')).toEqual([])
+  })
+
   it('keeps a new mark out of the lists until the group admins agree', () => {
     const marks = useMockDatabases()
-    marks.add({ name: 'lab-raw-data', description: 'Raw reads', source: 'Lab', license: 'CC BY 4.0', refresh: 'Off', readers: 'Everyone in the realm', bucket: 'lab-raw-data' })
+    marks.add('lab-raw-data', NEW_DATASET)
     const added = marks.all.value.find((entry) => entry.bucket === 'lab-raw-data')!
 
     expect(added.status).toBe('pending')
+    expect(added.dataset.name).toBe('lab-raw-data')
+    expect(added.dataset.parts).toEqual([{ kind: 'bucket', bucket: 'lab-raw-data' }])
     expect(marks.entries.value.some((entry) => entry.bucket === 'lab-raw-data')).toBe(false)
     marks.agree(added.id)
     expect(marks.entries.value.some((entry) => entry.bucket === 'lab-raw-data')).toBe(true)
     marks.remove(added.id)
     expect(marks.entries.value.some((entry) => entry.bucket === 'lab-raw-data')).toBe(false)
+  })
+
+  it('links an existing dataset to the bucket when it is marked', () => {
+    const marks = useMockDatabases()
+    const reef = marks.datasets.value.find((dataset) => dataset.name === 'Reef survey 2026')!
+    marks.add('lab-raw-data', reef.id)
+
+    expect(marks.datasets.value.find((dataset) => dataset.id === reef.id)!.parts.map((part) => part.kind)).toEqual(['folder', 'bucket'])
+    marks.remove(marks.all.value.find((entry) => entry.datasetId === reef.id)!.id)
   })
 
   it('lists the curators once however often a role is granted', () => {

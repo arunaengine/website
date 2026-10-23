@@ -1,8 +1,10 @@
 <script setup lang="ts">
-// What the realm admins wrote about a database bucket. The bucket itself is an ordinary bucket.
+// A database is a bucket plus a linked dataset. This shows what the dataset says about it.
 import { computed } from 'vue'
+import { RouterLink } from 'vue-router'
 import DetailList from '@/components/ui/DetailList.vue'
 import { useMockDatabases } from '@/composables/useMockDatabases'
+import { mockBucket } from '@/lib/distributedMockData'
 
 const props = withDefaults(defineProps<{ bucket: string; heading?: boolean }>(), { heading: true })
 
@@ -12,14 +14,19 @@ const entry = computed(() => entries.value.find((item) => item.bucket === props.
 
 <template>
   <section v-if="entry" class="space-y-2">
-    <h3 v-if="heading" class="text-sm font-medium text-foreground">Database bucket</h3>
-    <p class="text-sm text-muted-foreground">{{ entry.description }}</p>
+    <div class="flex flex-wrap items-baseline gap-x-3">
+      <h3 v-if="heading" class="text-sm font-medium text-foreground">Database: {{ entry.dataset.name }}</h3>
+      <RouterLink :to="{ name: 'dataset', params: { id: entry.datasetId } }" class="text-xs font-medium text-primary hover:underline">Open the dataset</RouterLink>
+    </div>
+    <p class="text-sm text-muted-foreground">{{ entry.dataset.description }}</p>
     <DetailList
       :items="[
-        { label: 'Source', value: entry.source },
-        { label: 'License', value: entry.license },
-        { label: 'Refresh', value: entry.refresh },
+        { label: 'Source', value: entry.dataset.source },
+        { label: 'License', value: entry.dataset.license },
+        { label: 'Creator', value: entry.dataset.creator },
+        { label: 'Refresh', value: mockBucket(bucket)?.refresh ?? 'Off' },
         { label: 'Who may read', value: entry.readers },
+        { label: 'Dataset id', value: entry.datasetId, mono: true },
       ]"
     />
   </section>

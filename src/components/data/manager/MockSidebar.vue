@@ -20,7 +20,7 @@ const filter = ref('')
 const kind = ref('buckets')
 const KINDS = [
   { value: 'buckets', label: 'Buckets' },
-  { value: 'database', label: 'Database buckets' },
+  { value: 'database', label: 'Databases' },
 ]
 const name = ref('')
 const placement = ref(defaultPlacement())

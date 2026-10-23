@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Add the files of a database bucket to this bucket as references. Nothing is copied.
+// Add the files of a database to this bucket as references. Nothing is copied.
 import { ref } from 'vue'
 import MockNotice from '@/components/distributed/MockNotice.vue'
 import Button from '@/components/ui/Button.vue'
@@ -15,14 +15,14 @@ const chosen = ref('')
 <template>
   <div class="space-y-3">
     <MockNotice />
-    <p class="text-sm text-muted-foreground">Database buckets are ordinary buckets that realm admins described for everyone to use. You can use their files without copying them.</p>
+    <p class="text-sm text-muted-foreground">Databases are buckets that realm admins described with a dataset for everyone to use. You can use their files without copying them.</p>
     <ul class="divide-y divide-border rounded-md border border-border">
       <li v-for="entry in entries" :key="entry.id" class="flex flex-wrap items-center gap-3 px-3 py-2.5">
         <div class="min-w-0 flex-1">
-          <p class="text-sm font-medium text-foreground">{{ entry.name }}</p>
-          <p class="text-xs text-muted-foreground">{{ entry.description }} {{ entry.source }}, {{ entry.license }}.</p>
+          <p class="text-sm font-medium text-foreground">{{ entry.dataset.name }}</p>
+          <p class="text-xs text-muted-foreground">{{ entry.dataset.description }} {{ entry.dataset.source }}, {{ entry.dataset.license }}.</p>
         </div>
-        <Button size="sm" variant="outline" @click="chosen = entry.name">Add as references</Button>
+        <Button size="sm" variant="outline" @click="chosen = entry.dataset.name">Add as references</Button>
       </li>
     </ul>
     <Notice v-if="chosen" tone="success">
