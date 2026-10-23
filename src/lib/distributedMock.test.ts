@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { grantGap, nodeGlob, planRanges, presetMembers } from './distributedMock'
+import { defaultSettings, grantGap, nodeGlob, planRanges, plannedStart, presetMembers, rangeTotal } from './distributedMock'
 import { BAKREP_COUNT, mockBucket, sourceObjects } from './distributedMockData'
 
 describe('distributed mock helpers', () => {
@@ -33,5 +33,15 @@ describe('distributed mock helpers', () => {
     expect(total).toBeGreaterThan(49_000_000)
     expect(total).toBeLessThan(51_000_000)
     expect(bakrep?.ranges.filter((range) => range.degradedSince)).toHaveLength(1)
+  })
+
+  it('counts ranges from the chosen hint and keeps them within the limit', () => {
+    const settings = defaultSettings('sharding')
+    expect(rangeTotal(settings)).toBe(8)
+    expect(rangeTotal({ ...settings, count: 99_999 })).toBe(4096)
+    const keys = { ...settings, hint: 'keys' as const, keys: 'genomes/m\n\ngenomes/t\n' }
+    expect(rangeTotal(keys)).toBe(3)
+    expect(plannedStart(keys, 2)).toBe('genomes/t')
+    expect(rangeTotal({ ...settings, hint: 'import' })).toBe(49)
   })
 })

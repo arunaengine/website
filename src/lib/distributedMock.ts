@@ -165,6 +165,7 @@ export interface PlannedRange {
 
 // Coordinators go round the members. A replica sits in another location when one exists.
 export function planRanges(count: number, nodeIds: readonly string[], replicas: boolean): PlannedRange[] {
+  if (!nodeIds.length) return []
   return Array.from({ length: count }, (_, index) => {
     const coordinator = nodeIds[index % nodeIds.length]
     const place = mockNode(coordinator)?.location
@@ -203,4 +204,46 @@ export function grantGap(segments: readonly string[], memberIds: readonly string
 
 export function nodeGlob(bucket: string): string {
   return `/${REALM_ID}/g/${GROUP_ID}/data/*/${bucket}/**`
+}
+
+export type HintKind = 'count' | 'keys' | 'import'
+
+export interface CreateSettings {
+  hint: HintKind
+  count: number
+  layout: string
+  keys: string
+  refresh: string
+  mode: RangeMode
+  index: boolean
+}
+
+export const REFRESH_OPTIONS = [
+  { value: 'off', label: 'Off' },
+  { value: '15m', label: 'Every 15 minutes' },
+  { value: '1h', label: 'Every hour' },
+  { value: '6h', label: 'Every 6 hours' },
+  { value: '24h', label: 'Every 24 hours' },
+  { value: '7d', label: 'Every 7 days' },
+]
+
+export const IMPORT_RANGES = 49
+export const MAX_RANGES = 4096
+
+export function defaultSettings(preset: PresetId): CreateSettings {
+  const base = presetById(preset)
+  return { hint: 'count', count: base.ranges, layout: '', keys: '', refresh: 'off', mode: base.mode, index: true }
+}
+
+export function rangeTotal(settings: CreateSettings): number {
+  if (settings.hint === 'import') return IMPORT_RANGES
+  if (settings.hint === 'keys') return settings.keys.split('\n').filter((key) => key.trim()).length + 1
+  return Math.min(Math.max(Math.trunc(settings.count) || 1, 1), MAX_RANGES)
+}
+
+export function plannedStart(settings: CreateSettings, index: number): string {
+  if (index === 0) return '(start)'
+  if (settings.hint === 'import') return `bakrep-v2-data-${String(index).padStart(3, '0')}/`
+  if (settings.hint === 'keys') return settings.keys.split('\n').filter((key) => key.trim())[index - 1].trim()
+  return 'cut from the key layout'
 }

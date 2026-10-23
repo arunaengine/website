@@ -1,23 +1,28 @@
 <script setup lang="ts">
-// Mock of creating a distributed bucket: a name, a preset, member nodes and
-// one data strategy per member. The next sections add the key ranges and reads.
+// Mock of creating a distributed bucket: a name, a preset, member nodes with a
+// data strategy each, key ranges, refresh, range requests and search.
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import PageHeader from '@/components/dashboard/PageHeader.vue'
+import CreateSettings from '@/components/distributed/CreateSettings.vue'
 import MemberPicker from '@/components/distributed/MemberPicker.vue'
 import MockNotice from '@/components/distributed/MockNotice.vue'
 import PresetPicker from '@/components/distributed/PresetPicker.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
 import { bucketNameProblem } from '@/lib/bucketName'
-import { presetMembers, STRATEGIES, type MemberDraft, type PresetId } from '@/lib/distributedMock'
+import { defaultSettings, presetMembers, STRATEGIES, type MemberDraft, type PresetId } from '@/lib/distributedMock'
 import { MOCK_BASE } from '@/router/distributedMock'
 
 const name = ref('')
 const preset = ref<PresetId>('sharding-replicas')
 const members = ref<MemberDraft[]>(presetMembers(preset.value))
+const settings = ref(defaultSettings(preset.value))
 
-watch(preset, (id) => (members.value = presetMembers(id)))
+watch(preset, (id) => {
+  members.value = presetMembers(id)
+  settings.value = defaultSettings(id)
+})
 
 const nameProblem = computed(() => (name.value.trim() ? bucketNameProblem(name.value.trim()) : null))
 const fewMembers = computed(() => members.value.length < 2)
@@ -64,6 +69,8 @@ const fewMembers = computed(() => members.value.length < 2)
           </div>
         </dl>
       </section>
+
+      <CreateSettings v-model="settings" :preset="preset" :node-ids="members.map((member) => member.nodeId)" />
     </div>
   </div>
 </template>
