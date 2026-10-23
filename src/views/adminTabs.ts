@@ -17,7 +17,7 @@ export function adminTabs(features: { placement: boolean; policies: boolean; dat
         ]
       : []),
     ...(features.policies ? [{ id: 'policies', label: 'Policies' }] : []),
-    ...(features.databases ? [{ id: 'databases', label: 'Databases' }] : []),
+    ...(features.databases ? [{ id: 'databases', label: 'Database buckets' }] : []),
     { id: 'federation', label: 'Federation' },
     { id: 'portal-features', label: 'Portal features' },
   ]

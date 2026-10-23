@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Add the files of a listed database to this bucket as references. Nothing is copied.
+// Add the files of a database bucket to this bucket as references. Nothing is copied.
 import { ref } from 'vue'
 import MockNotice from '@/components/distributed/MockNotice.vue'
 import Button from '@/components/ui/Button.vue'
@@ -15,7 +15,7 @@ const chosen = ref('')
 <template>
   <div class="space-y-3">
     <MockNotice />
-    <p class="text-sm text-muted-foreground">Databases your realm admins listed. You can use their files without copying them.</p>
+    <p class="text-sm text-muted-foreground">Database buckets are ordinary buckets that realm admins described for everyone to use. You can use their files without copying them.</p>
     <ul class="divide-y divide-border rounded-md border border-border">
       <li v-for="entry in entries" :key="entry.id" class="flex flex-wrap items-center gap-3 px-3 py-2.5">
         <div class="min-w-0 flex-1">

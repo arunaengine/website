@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Above the file list of an example bucket: where it is stored and what is wrong with it.
 import { computed } from 'vue'
+import DatabaseInfo from '@/components/data/DatabaseInfo.vue'
 import DegradedNotice from '@/components/distributed/DegradedNotice.vue'
 import MockNotice from '@/components/distributed/MockNotice.vue'
 import Badge from '@/components/ui/Badge.vue'
@@ -21,6 +22,7 @@ const degraded = computed(() => degradedRanges(props.bucket))
       <Badge v-if="degraded.length" variant="warn" size="sm">Degraded</Badge>
     </div>
     <MockNotice />
+    <DatabaseInfo :bucket="bucket.name" />
     <DegradedNotice v-for="range in degraded" :key="range.id" :range="range" />
   </div>
 </template>

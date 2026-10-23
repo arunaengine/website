@@ -98,7 +98,7 @@ function onImportsCreated() {
         <TabsTrigger value="local"><Upload class="mr-1 h-3.5 w-3.5" /> Local files</TabsTrigger>
         <TabsTrigger v-if="shown('connectors')" value="connector"><CloudDownload class="mr-1 h-3.5 w-3.5" /> From connector</TabsTrigger>
         <TabsTrigger value="other"><Boxes class="mr-1 h-3.5 w-3.5" /> Other buckets</TabsTrigger>
-        <TabsTrigger v-if="mockEnabled()" value="databases"><Library class="mr-1 h-3.5 w-3.5" /> Databases</TabsTrigger>
+        <TabsTrigger v-if="mockEnabled()" value="databases"><Library class="mr-1 h-3.5 w-3.5" /> Database buckets</TabsTrigger>
         <TabsTrigger v-if="collection" value="collection"><Database class="mr-1 h-3.5 w-3.5" /> Whole collection</TabsTrigger>
       </TabsList>
 

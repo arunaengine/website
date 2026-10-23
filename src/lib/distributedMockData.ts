@@ -167,11 +167,8 @@ export const MOCK_BUCKETS: readonly MockBucket[] = [
   {
     name: 'bakta-db',
     preset: 'two-node',
-    members: [
-      { nodeId: 'node-2', state: 'ready', strategy: 'copy', coverage: 'all', lag: '0 s' },
-      { nodeId: 'node-3', state: 'ready', strategy: 'copy', coverage: 'all', lag: '2 s' },
-    ],
-    ranges: [{ ...SPIRE_RANGE, coordinator: 'node-2', replicas: ['node-3'], objects: 14, bytes: 66_000_000_000, epoch: 1 }],
+    members: [{ nodeId: 'node-2', state: 'ready', strategy: 'copy', coverage: 'all', lag: '0 s' }],
+    ranges: [{ ...SPIRE_RANGE, coordinator: 'node-2', replicas: [], objects: 14, bytes: 66_000_000_000, epoch: 1 }],
     refresh: 'Off',
     mode: 'passthrough',
     searchIndex: false,
@@ -759,7 +756,7 @@ export interface DatabaseEntry {
   bucket: string
 }
 
-// The databases a realm admin listed. Each one points to an ordinary bucket.
+// Buckets a realm admin marked as database buckets, with a description. Any bucket can be one.
 export const DATABASES_START: readonly DatabaseEntry[] = [
   {
     id: 'bakrep',
@@ -802,12 +799,6 @@ export const DATABASES_START: readonly DatabaseEntry[] = [
     bucket: 'bakta-db',
   },
 ]
-
-// Files and bytes of the bucket a database entry points to, counted on its coordinators.
-export function databaseStats(bucket: string): { files: number; bytes: number } {
-  const ranges = mockBucket(bucket)?.ranges ?? []
-  return { files: ranges.reduce((sum, range) => sum + range.objects, 0), bytes: ranges.reduce((sum, range) => sum + range.bytes, 0) }
-}
 
 export type Origin =
   | { kind: 'upload'; user: string; node: string; time: string; device?: string }

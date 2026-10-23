@@ -1,4 +1,4 @@
-// The database list of the node mock, kept in memory so a realm admin can edit it.
+// The database buckets of the node mock: buckets with a description, kept in memory so a realm admin can edit them.
 import { ref } from 'vue'
 import { DATABASES_START, type DatabaseEntry } from '@/lib/distributedMockData'
 

@@ -118,6 +118,15 @@ describe('distributed mock helpers', () => {
     expect(DATABASES_START.map((entry) => entry.bucket).every((name) => mockBucket(name))).toBe(true)
   })
 
+  it('keeps being a database bucket apart from where a bucket is stored', () => {
+    const marked = (name: string) => DATABASES_START.some((entry) => entry.bucket === name)
+    expect([marked('bakta-db'), mockBucket('bakta-db')?.members.length]).toEqual([true, 1])
+    expect([marked('refseq'), mockBucket('refseq')?.members.length]).toEqual([true, 2])
+    expect([marked('reads-edge'), mockBucket('reads-edge')?.members.length]).toEqual([false, 2])
+    expect(marked('lab-raw-data')).toBe(false)
+    expect(marked('bakrep') && marked('spire-db')).toBe(true)
+  })
+
   it('finds example files when every word of the query is in the key', () => {
     expect(searchFiles('genome gcf_000005845').map((hit) => hit.title)).toEqual([
       'bakrep-v2-data-007/GCF_000005845.2/genome.fna.gz',

@@ -4,10 +4,10 @@ import Button from '@/components/ui/Button.vue'
 import IconButton from '@/components/ui/IconButton.vue'
 import Input from '@/components/ui/Input.vue'
 import Notice from '@/components/ui/Notice.vue'
+import OptionToggle from '@/components/ui/OptionToggle.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import BucketRow from '@/components/data/BucketRow.vue'
 import { useBucketJobs } from '@/composables/useBucketJobs'
-import DatabaseList from '@/components/data/manager/DatabaseList.vue'
 import BucketCreateResults from '@/components/data/BucketCreateResults.vue'
 import BucketStorageDialog from '@/components/data/BucketStorageDialog.vue'
 import MockBucketRows from '@/components/data/manager/MockBucketRows.vue'
@@ -82,6 +82,13 @@ const jobs = useBucketJobs(selectedGroupId, computed(() => [buckets.value, listi
 // Where the next bucket is stored (node mock); this node unless changed.
 const storageOpen = ref(false)
 const resultsOpen = ref(false)
+// Database buckets are ordinary buckets with a description, so this is only a filter.
+const bucketKind = ref('buckets')
+const KINDS = [
+  { value: 'buckets', label: 'Buckets' },
+  { value: 'database', label: 'Database buckets' },
+]
+const databaseMode = computed(() => mockEnabled() && bucketKind.value === 'database')
 // The example rows show even when the group has no bucket of its own.
 const examples = computed(() => (mockEnabled() ? exampleBuckets(bucketNameFilter.value) : []))
 const placement = ref(defaultPlacement())
@@ -193,6 +200,9 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
           <Badge variant="outline" size="count">{{ searchList ? all.hits.value.length : nodeBuckets.length }}</Badge>
         </div>
       </header>
+      <div v-if="mockEnabled()" class="border-b border-border px-3 py-2">
+        <OptionToggle v-model="bucketKind" :options="KINDS" aria-label="Kind of bucket" />
+      </div>
       <div class="border-b border-border px-3 py-2">
         <Input
           v-model="bucketNameFilter"
@@ -206,7 +216,10 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
           @keydown="onKeydown"
         />
       </div>
-      <template v-if="searchList">
+      <ul v-if="databaseMode" class="max-h-[420px] overflow-y-auto py-1">
+        <MockBucketRows database-only :filter="bucketNameFilter" :active="bucket" @open="openBucket" />
+      </ul>
+      <template v-else-if="searchList">
         <Spinner v-if="all.loading.value && !all.hits.value.length" show-label label="Loading buckets…" class="px-3 py-4" />
         <p v-else-if="all.error.value" class="px-3 py-3 text-xs text-destructive">{{ all.error.value }}</p>
         <ul v-else-if="all.hits.value.length || examples.length" :id="`${listId}-group`" role="listbox" class="max-h-[420px] overflow-y-auto py-1">
@@ -348,7 +361,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
           </div>
         </template>
       </template>
-      <div v-if="otherHits.length || search.error.value || otherPartial" class="border-t border-border/70 py-1">
+      <div v-if="!databaseMode && (otherHits.length || search.error.value || otherPartial)" class="border-t border-border/70 py-1">
         <p class="px-3 pb-1 pt-2 text-xs font-medium text-muted-foreground">Other groups</p>
         <p v-if="search.error.value" class="px-3 pb-1 text-xs text-destructive">Other groups could not be searched.</p>
         <p v-else-if="otherPartial" class="px-3 pb-1 text-xs text-muted-foreground">Some nodes did not answer.</p>
@@ -408,7 +421,6 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
         <p v-else-if="newBucketRefusal" class="text-xs text-muted-foreground">{{ newBucketRefusal }}</p>
       </footer>
     </div>
-    <DatabaseList v-if="mockEnabled()" @open="openBucket" />
     <template v-if="mockEnabled()">
       <BucketStorageDialog v-model:open="storageOpen" v-model="placement" />
       <BucketCreateResults v-model:open="resultsOpen" :name="newBucketName.trim()" :placement="placement" />

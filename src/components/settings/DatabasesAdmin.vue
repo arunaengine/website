@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Realm admins curate the database list: add an entry from an existing bucket, edit its texts, remove it.
+// Realm admins mark a bucket as a database bucket and describe it: add, edit and remove.
 import { computed, ref } from 'vue'
 import MockNotice from '@/components/distributed/MockNotice.vue'
 import Button from '@/components/ui/Button.vue'
@@ -35,9 +35,9 @@ function create() {
     <MockNotice />
     <section class="space-y-3">
       <div>
-        <h2 class="font-display text-base font-semibold text-aruna-navy">Databases</h2>
+        <h2 class="font-display text-base font-semibold text-aruna-navy">Database buckets</h2>
         <p class="text-xs text-muted-foreground">
-          The list people see under Databases in the Data section. An entry grants nothing: who may read a database is decided by the permissions of its bucket.
+          Mark a bucket as a database bucket and describe it. A database bucket is an ordinary bucket: the mark grants nothing, and who may read it is decided by the permissions of the bucket.
         </p>
       </div>
       <ul class="divide-y divide-border rounded-md border border-border">
@@ -59,13 +59,13 @@ function create() {
             <Select :model-value="entry.readers" :options="READERS" aria-label="Who may read" @update:model-value="update(entry.id, { readers: $event as DatabaseReaders })" />
           </div>
         </li>
-        <li v-if="!entries.length" class="px-4 py-6 text-center text-sm text-muted-foreground">No databases are listed yet.</li>
+        <li v-if="!entries.length" class="px-4 py-6 text-center text-sm text-muted-foreground">No bucket is marked as a database bucket yet.</li>
       </ul>
     </section>
 
     <section class="space-y-3 rounded-md border border-border p-4">
-      <h3 class="text-sm font-medium text-foreground">Add an entry from an existing bucket</h3>
-      <p v-if="!free.length" class="text-xs text-muted-foreground">Every example bucket is already listed.</p>
+      <h3 class="text-sm font-medium text-foreground">Mark an existing bucket as a database bucket</h3>
+      <p v-if="!free.length" class="text-xs text-muted-foreground">Every example bucket is already marked.</p>
       <div v-else class="grid gap-3 sm:grid-cols-2">
         <Select v-model="draft.bucket" :options="free.map((name) => ({ value: name, label: name }))" placeholder="Bucket" aria-label="Bucket" />
         <Input v-model="draft.name" placeholder="Name shown to users" aria-label="Name" />
@@ -74,7 +74,7 @@ function create() {
         <Input v-model="draft.license" placeholder="License" aria-label="New license" />
         <Select v-model="draft.refresh" :options="refreshOptions" aria-label="New refresh interval" />
         <Select v-model="draft.readers" :options="READERS" aria-label="New readers" />
-        <div class="sm:col-span-2"><Button size="sm" :disabled="!draft.bucket" @click="create"><Plus class="size-3.5" /> Add to the list</Button></div>
+        <div class="sm:col-span-2"><Button size="sm" :disabled="!draft.bucket" @click="create"><Plus class="size-3.5" /> Mark as database bucket</Button></div>
       </div>
     </section>
   </div>

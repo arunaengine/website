@@ -44,7 +44,7 @@ const link = computed(() => {
       <template v-if="origin.digest"><span class="break-all font-mono">{{ origin.digest }}</span> (evidence)</template>.
     </p>
     <p v-if="origin.kind === 'source' && origin.database" class="text-muted-foreground">
-      Listed database: <RouterLink :to="{ name: 'buckets' }" class="text-primary hover:underline">{{ origin.database }}</RouterLink>.
+      Database bucket: <RouterLink :to="{ name: 'buckets' }" class="text-primary hover:underline">{{ origin.database }}</RouterLink>.
     </p>
   </div>
 </template>

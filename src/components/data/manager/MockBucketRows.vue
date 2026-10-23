@@ -1,14 +1,26 @@
 <script setup lang="ts">
 // Example buckets that are stored on several nodes, listed like any other bucket.
 import { computed } from 'vue'
+import { useMockDatabases } from '@/composables/useMockDatabases'
 import BucketRow from '@/components/data/BucketRow.vue'
 import { mockEnabled, storedLabel } from '@/lib/distributedMock'
-import { degradedRanges, exampleBuckets, isMulti } from '@/lib/distributedMockData'
+import { degradedRanges, exampleBuckets, isMulti, type MockBucket } from '@/lib/distributedMockData'
 
-const props = defineProps<{ filter: string; active: string }>()
+const props = defineProps<{ filter: string; active: string; databaseOnly?: boolean }>()
+
+const { entries } = useMockDatabases()
+const described = (name: string) => entries.value.find((entry) => entry.bucket === name)
 const emit = defineEmits<{ (e: 'open', bucket: string): void }>()
 
-const rows = computed(() => (mockEnabled() ? exampleBuckets(props.filter) : []))
+const rows = computed(() =>
+  mockEnabled() ? exampleBuckets(props.filter).filter((bucket) => !props.databaseOnly || described(bucket.name)) : [],
+)
+const second = (bucket: MockBucket) =>
+  props.databaseOnly
+    ? (described(bucket.name)?.description ?? null)
+    : isMulti(bucket)
+      ? storedLabel(bucket.preset, bucket.members.length)
+      : null
 </script>
 
 <template>
@@ -19,7 +31,7 @@ const rows = computed(() => (mockEnabled() ? exampleBuckets(props.filter) : []))
       :pinnable="false"
       :active="bucket.name === active"
       :degraded="degradedRanges(bucket).length > 0"
-      :subtitle="isMulti(bucket) ? storedLabel(bucket.preset, bucket.members.length) : null"
+      :subtitle="second(bucket)"
       @open="emit('open', bucket.name)"
     >
       <template #tooltip>Stored on {{ bucket.members.map((member) => member.nodeId).join(', ') }}</template>
