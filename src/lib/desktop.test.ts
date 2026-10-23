@@ -114,12 +114,29 @@ describe('desktop mode', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const invoke = vi.fn(async () => null)
     const old = await boot(shell({ bridge: { invoke, version: 1 } }))
+    const { errors } = (await import('@/composables/useGlobalErrors')).useGlobalErrors()
     expect(old.bridgeOutdated.value).toBe(true)
     expect(warn).toHaveBeenCalledWith('aruna-desktop: outdated app', { have: 1, need: old.BRIDGE_VERSION })
+    expect(errors.value.map((entry) => entry.message)).toEqual([
+      'This Aruna Desktop is out of date. Please install the latest version.',
+    ])
 
     warn.mockClear()
     const current = await boot(shell({ bridge: { invoke, version: old.BRIDGE_VERSION } }))
+    const next = (await import('@/composables/useGlobalErrors')).useGlobalErrors()
     expect(current.bridgeOutdated.value).toBe(false)
+    expect(warn).not.toHaveBeenCalled()
+    expect(next.errors.value).toEqual([])
+    warn.mockRestore()
+  })
+
+  it('does not flag a shell newer than the portal', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const newer = await boot(shell({ bridge: { invoke: vi.fn(async () => null), version: 7 } }))
+    const { errors } = (await import('@/composables/useGlobalErrors')).useGlobalErrors()
+
+    expect(newer.bridgeOutdated.value).toBe(false)
+    expect(errors.value).toEqual([])
     expect(warn).not.toHaveBeenCalled()
     warn.mockRestore()
   })

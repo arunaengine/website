@@ -246,6 +246,7 @@ export async function bootRuntimeConfig(): Promise<void> {
   installConfig(context)
   if (bridgeOutdated.value) {
     console.warn('aruna-desktop: outdated app', { have: context.bridge?.version, need: BRIDGE_VERSION })
+    reportGlobalError('This Aruna Desktop is out of date. Please install the latest version.')
   }
   try {
     const bridge = await import('./desktopBridge')
