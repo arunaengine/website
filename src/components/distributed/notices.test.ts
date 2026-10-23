@@ -19,7 +19,7 @@ describe('distributed notices', () => {
   it('names the range, the coordinator and the copies of a degraded range', async () => {
     const range = degradedRanges(mockBucket('bakrep')!)[0]
     const markup = await render(DegradedNotice, { range })
-    expect(markup).toContain('Range r-017')
+    expect(markup).toContain('range r-017')
     expect(markup).toContain('node-3')
     expect(markup).toContain('since 2026-10-23 08:12 UTC')
     expect(markup).toContain('copies on node-1')

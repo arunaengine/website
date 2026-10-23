@@ -20,10 +20,6 @@ const rows = computed(() => {
 
 <template>
   <div class="surface space-y-4 p-5">
-    <p class="text-sm text-muted-foreground">
-      Permissions are checked on the node that serves a request. A node that fetches bytes from another member
-      is checked there too.
-    </p>
     <PermissionNotice v-for="row in rows.filter((item) => item.missing.length)" :key="row.holder" :holder="row.holder" :bucket="bucket.name" :missing="row.missing" />
     <div class="overflow-x-auto rounded-md border border-border">
       <table class="w-full min-w-[44rem] text-left text-xs">

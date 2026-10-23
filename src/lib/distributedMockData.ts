@@ -662,28 +662,27 @@ export function exampleMark(bucket: string, key: string): string | null {
 }
 
 export interface SourceLine {
-  text: string
+  label: string
+  value: string
   question: StorageQuestion
 }
 
 // How files got into a bucket, incoming paths only. No line means uploads only.
 export const FILE_SOURCES: Record<string, SourceLine[]> = {
-  bakrep: [
-    { text: 'From an external source without copying: about 50 million files in 49 buckets at s3.gi.denbi.de.', question: 'elsewhere' },
-  ],
+  bakrep: [{ label: 'From an external source', value: 's3.gi.denbi.de, about 50 million files, not copied', question: 'elsewhere' }],
   'spire-db': [
-    { text: 'Uploaded directly: 11 files.', question: 'elsewhere' },
-    { text: 'Copied from bucket spire-staging of the group Genome Lab by a sync (continuous).', question: 'sync' },
+    { label: 'Uploaded directly', value: '11 files', question: 'elsewhere' },
+    { label: 'Copied by a sync', value: 'spire-staging (Genome Lab), continuous', question: 'sync' },
   ],
   'reads-edge': [
-    { text: 'Registered from storage folder sequencer-share without copying: 5,210 files.', question: 'elsewhere' },
+    { label: 'Registered from a storage folder', value: 'sequencer-share, 5,210 files, not copied', question: 'elsewhere' },
   ],
   [ORDINARY_BUCKET]: [
-    { text: 'Uploaded directly: 1,828 files.', question: 'elsewhere' },
-    { text: 'From a database without copying: 12 files of the SPIRE database.', question: 'elsewhere' },
+    { label: 'Uploaded directly', value: '1,828 files', question: 'elsewhere' },
+    { label: 'From a database', value: 'SPIRE database, 12 files, not copied', question: 'elsewhere' },
   ],
   refseq: [
-    { text: 'From an external source without copying: about 320,000 files at ftp.ncbi.nlm.nih.gov/refseq.', question: 'elsewhere' },
+    { label: 'From an external source', value: 'ftp.ncbi.nlm.nih.gov/refseq, about 320,000 files, not copied', question: 'elsewhere' },
   ],
 }
 
@@ -691,13 +690,18 @@ export function sourceLines(bucket: string): SourceLine[] {
   return FILE_SOURCES[bucket] ?? []
 }
 
-// Other buckets that get a copy of this one by a sync.
-export const BUCKET_COPIES: Record<string, string[]> = {
-  'spire-db': ['spire-public in the group Open Data: a copy as references (sync, as references)'],
-  [ORDINARY_BUCKET]: ['lab-archive on node-2: a copy of all files (sync, continuous)'],
+export interface BucketCopy {
+  to: string
+  how: string
 }
 
-export function bucketCopies(bucket: string): string[] {
+// Other buckets that get a copy of this one by a sync.
+export const BUCKET_COPIES: Record<string, BucketCopy[]> = {
+  'spire-db': [{ to: 'spire-public', how: 'Group Open Data, sync as references' }],
+  [ORDINARY_BUCKET]: [{ to: 'lab-archive', how: 'On node-2, sync continuously' }],
+}
+
+export function bucketCopies(bucket: string): BucketCopy[] {
   return BUCKET_COPIES[bucket] ?? []
 }
 

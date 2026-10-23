@@ -6,9 +6,10 @@ import DegradedNotice from '@/components/distributed/DegradedNotice.vue'
 import MemberTable from '@/components/distributed/MemberTable.vue'
 import MockNotice from '@/components/distributed/MockNotice.vue'
 import RangeTable from '@/components/distributed/RangeTable.vue'
+import RowList from '@/components/distributed/RowList.vue'
 import StorageFeatureLink from '@/components/distributed/StorageFeatureLink.vue'
-import DetailList from '@/components/ui/DetailList.vue'
 import OptionToggle from '@/components/ui/OptionToggle.vue'
+import StatCard from '@/components/ui/StatCard.vue'
 import { presetById, stamp } from '@/lib/distributedMock'
 import { degradedRanges, type MockBucket } from '@/lib/distributedMockData'
 
@@ -28,31 +29,42 @@ const settings = computed(() => [
   { label: 'Range requests', value: props.bucket.mode },
   { label: 'Search index', value: props.bucket.searchIndex ? 'On' : 'Off' },
   { label: 'Created', value: stamp(props.bucket.created) },
-  { label: 'Name on every node', value: props.bucket.name, mono: true },
 ])
 </script>
 
 <template>
   <div class="space-y-5">
-    <MockNotice />
-    <OptionToggle v-model="viewer" :options="VIEWERS" aria-label="View as" />
+    <div class="flex flex-wrap items-center gap-3">
+      <MockNotice />
+      <OptionToggle v-model="viewer" :options="VIEWERS" aria-label="View as" class="ml-auto" />
+    </div>
+    <div class="grid gap-3 sm:grid-cols-3">
+      <StatCard label="State" :value="degraded.length ? 'Degraded' : 'Active'" />
+      <StatCard label="Nodes" :value="bucket.members.length" />
+      <StatCard label="Ranges" :value="bucket.ranges.length" />
+    </div>
     <DegradedNotice v-for="range in degraded" :key="range.id" :range="range" />
-    <section class="space-y-2">
-      <div class="flex items-center gap-2">
-        <h2 class="font-display text-base font-semibold text-aruna-navy">Nodes</h2>
+    <section class="surface">
+      <header class="flex items-center gap-2 border-b border-border px-5 py-4">
+        <h2 class="font-display text-sm font-semibold text-aruna-navy">Nodes</h2>
         <StorageFeatureLink icon question="nodes" />
+      </header>
+      <div class="space-y-3 p-5">
+        <MemberTable :bucket="bucket" />
+        <BucketActions :bucket="bucket" :admin="viewer === 'admin'" />
       </div>
-      <MemberTable :bucket="bucket" />
-      <BucketActions :bucket="bucket" :admin="viewer === 'admin'" />
     </section>
-    <section class="space-y-2">
-      <h2 class="font-display text-base font-semibold text-aruna-navy">Ranges</h2>
-      <p class="text-xs text-muted-foreground">A range is a part of the bucket. One node writes each range, and other nodes keep copies.</p>
-      <RangeTable :ranges="bucket.ranges" />
+    <section class="surface">
+      <header class="border-b border-border px-5 py-4">
+        <h2 class="font-display text-sm font-semibold text-aruna-navy">Ranges</h2>
+      </header>
+      <div class="p-5"><RangeTable :ranges="bucket.ranges" /></div>
     </section>
-    <section class="space-y-2">
-      <h2 class="font-display text-base font-semibold text-aruna-navy">Reads and updates</h2>
-      <DetailList :items="settings" />
+    <section class="surface">
+      <header class="border-b border-border px-5 py-4">
+        <h2 class="font-display text-sm font-semibold text-aruna-navy">Reads and updates</h2>
+      </header>
+      <div class="px-5 py-4"><RowList :rows="settings" /></div>
     </section>
   </div>
 </template>

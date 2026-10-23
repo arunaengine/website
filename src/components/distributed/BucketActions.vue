@@ -26,7 +26,6 @@ function done(message: string) {
       <Button variant="outline" size="sm" @click="dialog = 'leave'"><UserMinus class="size-3.5" /> Remove node</Button>
       <Button variant="outline" size="sm" @click="dialog = 'transfer'"><ArrowRightLeft class="size-3.5" /> Move a range</Button>
     </div>
-    <p v-else class="text-xs text-muted-foreground">Only admins of the group can add or remove nodes or move ranges.</p>
     <Notice v-if="result" tone="success">{{ result }}</Notice>
     <JoinDialog :open="dialog === 'join'" :bucket="bucket" @update:open="dialog = $event ? 'join' : null" @done="done" />
     <LeaveDialog :open="dialog === 'leave'" :bucket="bucket" @update:open="dialog = $event ? 'leave' : null" @done="done" />

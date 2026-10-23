@@ -94,8 +94,8 @@ describe('distributed mock helpers', () => {
 
   it('lists incoming file sources and outgoing copies apart', () => {
     expect(sourceLines('lab-raw-data')).toHaveLength(2)
-    expect(sourceLines('bakrep')[0].text).toContain('without copying')
-    expect(bucketCopies('spire-db')[0]).toContain('spire-public')
+    expect(sourceLines('bakrep')[0].value).toContain('not copied')
+    expect(bucketCopies('spire-db')[0].to).toBe('spire-public')
     expect(bucketCopies('bakrep')).toEqual([])
     expect(sourceLines('nothing-here')).toEqual([])
   })

@@ -1,10 +1,17 @@
 <script setup lang="ts">
-// How files got into the bucket. Only incoming paths are listed, in plain sentences.
+// How files got into the bucket. Only incoming paths are listed, one row each.
+import { computed } from 'vue'
+import RowList from '@/components/distributed/RowList.vue'
 import StorageFeatureLink from '@/components/distributed/StorageFeatureLink.vue'
 import { sourceLines } from '@/lib/distributedMockData'
 import { Waypoints } from '@lucide/vue'
 
-defineProps<{ bucket: string }>()
+const props = defineProps<{ bucket: string }>()
+
+const lines = computed(() => sourceLines(props.bucket))
+const rows = computed(() =>
+  lines.value.length ? lines.value.map((line) => ({ ...line, key: line.label })) : [{ key: 'direct', label: 'Uploaded directly', value: 'All files', question: 'elsewhere' as const }],
+)
 </script>
 
 <template>
@@ -16,14 +23,13 @@ defineProps<{ bucket: string }>()
         <p class="text-xs text-muted-foreground">How files got into this bucket</p>
       </div>
     </header>
-    <div class="px-5 py-4 text-sm">
-      <p v-if="!sourceLines(bucket).length" class="text-muted-foreground">All files were uploaded to this bucket directly.</p>
-      <ul v-else class="space-y-1.5">
-        <li v-for="line in sourceLines(bucket)" :key="line.text" class="flex items-start gap-2">
-          <span>{{ line.text }}</span>
-          <StorageFeatureLink icon :question="line.question" class="mt-0.5" />
-        </li>
-      </ul>
+    <div class="px-5 py-4">
+      <RowList :rows="rows">
+        <template v-for="row in rows" :key="row.key" #[row.key]>
+          {{ row.value }}
+          <StorageFeatureLink icon :question="row.question" class="ml-1" />
+        </template>
+      </RowList>
     </div>
   </section>
 </template>
