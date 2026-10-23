@@ -2,7 +2,9 @@ import { createSSRApp, defineComponent, h, ref, type Component } from 'vue'
 import { renderToString } from '@vue/server-renderer'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const items = ref<Array<{ text: string; atMs: number | null }>>([])
+const items = ref<Array<{ text: string; atMs: number | null; outcome?: string }>>([])
+const error = ref<string | null>(null)
+const partial = ref(false)
 const state = ref('ready')
 const load = vi.fn(async () => undefined)
 
@@ -10,13 +12,15 @@ let FolderHistory: Component
 
 beforeAll(async () => {
   vi.doMock('vue-router', () => ({ RouterLink: defineComponent((_, { slots }) => () => h('a', slots.default?.())) }))
-  vi.doMock('@/composables/useFolderDecisions', () => ({ useFolderDecisions: () => ({ items, state, load }) }))
+  vi.doMock('@/composables/useFolderDecisions', () => ({ useFolderDecisions: () => ({ items, state, error, partial, load }) }))
   FolderHistory = (await import('./FolderHistory.vue')).default
 })
 
 beforeEach(() => {
   items.value = []
   state.value = 'ready'
+  error.value = null
+  partial.value = false
   load.mockClear()
 })
 
@@ -51,5 +55,27 @@ describe('folder history', () => {
 
     expect(html).toContain('does not keep a history of decisions yet')
     expect(html).not.toContain('You have not decided anything')
+  })
+
+  it('tells a read that failed apart from an empty history', async () => {
+    state.value = 'error'
+    error.value = 'the node is busy'
+    const html = await render()
+
+    expect(html).toContain('The history could not be read: the node is busy')
+    expect(html).not.toContain('You have not decided anything')
+    expect(html).not.toContain('does not keep a history')
+  })
+
+  it('marks a failed or refused choice and a history that is only partly read', async () => {
+    partial.value = true
+    items.value = [
+      { text: 'Could not use the Aruna version of a.csv: disk full', atMs: null, outcome: 'failed' },
+      { text: 'Did not use the Aruna version of b.csv: the file changed again first', atMs: null, outcome: 'stale' },
+    ]
+    const html = await render()
+
+    expect(html).toContain('text-destructive')
+    expect(html).toContain('Part of the history could not be read.')
   })
 })

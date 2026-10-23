@@ -44,13 +44,36 @@ const moving = computed(() => transfers.value.filter(isMoving).length)
 const progress = computed(() => totalProgress(transfers.value))
 const groups = computed(() => groupActivity(folders.value, transfers.value, decisions.items.value, filter.value))
 
+// A count that depends on decisions waits until they were read.
+const decisionsKnown = computed(() => decisions.state.value === 'ready')
+
 const chips = computed(() => [
-  { value: 'all', label: 'All', count: counts.value.all },
+  { value: 'all', label: 'All', ...(decisionsKnown.value ? { count: counts.value.all } : {}) },
   { value: 'progress', label: 'In progress', count: counts.value.progress },
   { value: 'failed', label: 'Failed', count: counts.value.failed },
   { value: 'done', label: 'Done', count: counts.value.done },
-  { value: 'decisions', label: 'Decisions', count: counts.value.decisions },
+  { value: 'decisions', label: 'Decisions', ...(decisionsKnown.value ? { count: counts.value.decisions } : {}) },
 ])
+
+// Loading, unavailable and failed are not the same as nothing decided yet.
+const decisionsNote = computed(() => {
+  switch (decisions.state.value) {
+    case 'idle':
+    case 'loading':
+      return { tone: 'muted', text: 'Reading your decisions…' }
+    case 'unsupported':
+      return { tone: 'muted', text: 'This version of Aruna does not keep a history of decisions yet.' }
+    case 'ready':
+      return decisions.partial.value
+        ? { tone: 'muted', text: 'Some folders did not report their decisions, so the list may be shorter than it should be.' }
+        : null
+    default:
+      return {
+        tone: 'error',
+        text: `Your decisions could not be read${decisions.error.value ? `: ${decisions.error.value}` : '.'}`,
+      }
+  }
+})
 
 // The first read that is not ready is the one worth explaining.
 const surface = computed(() =>
@@ -180,12 +203,23 @@ const when = (ms: number | null): string => (ms ? relativeTime(new Date(ms).toIS
           <span class="text-[11px] text-muted-foreground">Grouped by folder</span>
         </div>
 
-        <p v-if="decisions.partial.value" class="text-[11px] text-muted-foreground">
-          Some folders did not report their decisions, so the list may be shorter than it should be.
-        </p>
+        <div v-if="decisionsNote" class="flex flex-wrap items-center gap-2 text-[11px]" :class="decisionsNote.tone === 'error' ? 'text-destructive' : 'text-muted-foreground'">
+          <span>{{ decisionsNote.text }}</span>
+          <button v-if="decisionsNote.tone === 'error'" type="button" class="text-primary hover:underline" @click="decisions.load()">
+            Try again
+          </button>
+        </div>
 
         <p v-if="!groups.length" class="surface px-5 py-8 text-center text-sm text-muted-foreground">
-          {{ filter === 'all' ? 'Nothing syncs with this computer yet.' : 'Nothing matches this filter.' }}
+          {{
+            filter === 'all'
+              ? 'Nothing syncs with this computer yet.'
+              : filter === 'decisions' && !decisionsKnown
+                ? 'Your decisions are not available right now.'
+                : filter === 'decisions'
+                  ? 'You have not decided anything yet.'
+                  : 'Nothing matches this filter.'
+          }}
         </p>
 
         <section v-for="group in groups" :key="group.key" class="surface overflow-hidden">
@@ -231,7 +265,11 @@ const when = (ms: number | null): string => (ms ? relativeTime(new Date(ms).toIS
               <History class="h-3.5 w-3.5 text-muted-foreground" /> Decisions
             </p>
             <ul class="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
-              <li v-for="(entry, index) in group.decisions" :key="index">
+              <li
+                v-for="(entry, index) in group.decisions"
+                :key="index"
+                :class="entry.outcome === 'failed' ? 'text-destructive' : entry.outcome === 'stale' ? 'text-amber-700 dark:text-amber-300' : ''"
+              >
                 {{ entry.text }}<template v-if="entry.atMs"> · {{ when(entry.atMs) }}</template>
               </li>
             </ul>

@@ -7,7 +7,9 @@ const folders = ref<SyncedFolder[]>([])
 const foldersState = ref('ready')
 const transfers = ref<DeviceTransfer[]>([])
 const transfersState = ref('ready')
-const decisionItems = ref<Array<{ folderId: string; folder: string; text: string; atMs: number | null }>>([])
+const decisionItems = ref<Array<{ folderId: string; folder: string; text: string; atMs: number | null; outcome: string }>>([])
+const decisionsState = ref('ready')
+const decisionsError = ref<string | null>(null)
 const decisionsPartial = ref(false)
 const syncStatus = ref({ realmReachable: true, lastSyncMs: null as number | null })
 
@@ -48,7 +50,7 @@ beforeAll(async () => {
     useDeviceSync: () => ({ status: syncStatus, runSync: vi.fn(), load: vi.fn(async () => undefined) }),
   }))
   vi.doMock('@/composables/useFolderDecisions', () => ({
-    useFolderDecisions: () => ({ items: decisionItems, partial: decisionsPartial, load: vi.fn(async () => undefined) }),
+    useFolderDecisions: () => ({ items: decisionItems, partial: decisionsPartial, state: decisionsState, error: decisionsError, load: vi.fn(async () => undefined) }),
   }))
   ActivityView = (await import('./ActivityView.vue')).default
 })
@@ -63,6 +65,8 @@ beforeEach(() => {
   transfersState.value = 'ready'
   decisionItems.value = []
   decisionsPartial.value = false
+  decisionsState.value = 'ready'
+  decisionsError.value = null
   syncStatus.value = { realmReachable: true, lastSyncMs: null }
 })
 
@@ -96,7 +100,7 @@ describe('activity', () => {
   })
 
   it('lists the decisions under their folder', async () => {
-    decisionItems.value = [{ folderId: 'f1', folder: 'Sequencing runs', text: 'Kept your version of samplesheet.csv', atMs: null }]
+    decisionItems.value = [{ folderId: 'f1', folder: 'Sequencing runs', text: 'Kept your version of samplesheet.csv', atMs: null, outcome: 'applied' }]
     const html = await render()
 
     expect(html).toContain('Decisions')
@@ -128,5 +132,25 @@ describe('activity', () => {
     const html = await render()
 
     expect(html).toContain('Nothing is moving in this folder.')
+  })
+
+  it('tells loading, unavailable and failed decisions apart from none decided', async () => {
+    decisionsState.value = 'loading'
+    expect(await render()).toContain('Reading your decisions…')
+
+    decisionsState.value = 'unsupported'
+    expect(await render()).toContain('does not keep a history of decisions yet')
+
+    decisionsState.value = 'error'
+    decisionsError.value = 'the node is busy'
+    const failed = await render()
+    expect(failed).toContain('Your decisions could not be read: the node is busy')
+    expect(failed).toContain('Try again')
+    // No count is claimed while the decisions are unknown.
+    expect(failed).not.toContain('Decisions 0')
+    expect(failed).not.toContain('All 0')
+
+    decisionsState.value = 'ready'
+    expect(await render()).toContain('Decisions 0')
   })
 })
