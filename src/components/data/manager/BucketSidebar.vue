@@ -7,6 +7,7 @@ import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import BucketRow from '@/components/data/BucketRow.vue'
 import { useBucketJobs } from '@/composables/useBucketJobs'
+import DatabaseList from '@/components/data/manager/DatabaseList.vue'
 import BucketCreateResults from '@/components/data/BucketCreateResults.vue'
 import BucketStorageDialog from '@/components/data/BucketStorageDialog.vue'
 import MockBucketRows from '@/components/data/manager/MockBucketRows.vue'
@@ -407,6 +408,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
         <p v-else-if="newBucketRefusal" class="text-xs text-muted-foreground">{{ newBucketRefusal }}</p>
       </footer>
     </div>
+    <DatabaseList v-if="mockEnabled()" @open="openBucket" />
     <template v-if="mockEnabled()">
       <BucketStorageDialog v-model:open="storageOpen" v-model="placement" />
       <BucketCreateResults v-model:open="resultsOpen" :name="newBucketName.trim()" :placement="placement" />

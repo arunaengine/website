@@ -10,7 +10,6 @@ import DialogTitle from '@/components/ui/DialogTitle.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
-import EmptyState from '@/components/ui/EmptyState.vue'
 import Notice from '@/components/ui/Notice.vue'
 import AddDataDialog from '@/components/data/AddDataDialog.vue'
 import DataViewSkeleton from '@/components/data/DataViewSkeleton.vue'
@@ -22,6 +21,7 @@ import NodePicker from '@/components/data/NodePicker.vue'
 import DeleteDialog from '@/components/data/DeleteDialog.vue'
 import FileDetailsDialog from '@/components/data/FileDetailsDialog.vue'
 import PublicAccessDialog from '@/components/data/PublicAccessDialog.vue'
+import DatabasesTable from '@/components/data/DatabasesTable.vue'
 import MockSidebar from '@/components/data/manager/MockSidebar.vue'
 import MockBucketBanner from '@/components/data/manager/MockBucketBanner.vue'
 import ObjectBrowser from '@/components/data/manager/ObjectBrowser.vue'
@@ -349,7 +349,7 @@ async function createFolder() {
             @public-access="openPublicAccess"
           />
         </div>
-        <EmptyState v-else title="Pick an example bucket" description="The buckets on the left show example data. Nothing here talks to a node." />
+        <DatabasesTable v-else />
       </section>
 
       <Notice v-else-if="!s3.connectedEndpoint.value" tone="warning" class="flex items-start gap-3 p-5 text-sm">
@@ -425,6 +425,7 @@ async function createFolder() {
 
         <div class="min-w-0 space-y-4">
           <MockBucketBanner v-if="exampleBucket" :bucket="exampleBucket" />
+          <DatabasesTable v-if="mockEnabled() && !bucket" />
           <ObjectBrowser
             :manager="manager"
             :notebooks="notebooksView"

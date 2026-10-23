@@ -2,6 +2,7 @@
 // The bucket list when no session can open: only the example buckets, from static data.
 import { computed, ref } from 'vue'
 import BucketCreateResults from '@/components/data/BucketCreateResults.vue'
+import DatabaseList from '@/components/data/manager/DatabaseList.vue'
 import BucketStorageDialog from '@/components/data/BucketStorageDialog.vue'
 import MockBucketRows from '@/components/data/manager/MockBucketRows.vue'
 import Badge from '@/components/ui/Badge.vue'
@@ -32,13 +33,14 @@ function create() {
 </script>
 
 <template>
-  <aside class="surface overflow-hidden">
-    <header class="flex items-center justify-between border-b border-border px-3 py-3">
-      <h2 class="text-sm font-semibold text-foreground">Buckets</h2>
-      <Badge variant="outline" size="count">{{ exampleBuckets(filter).length }}</Badge>
-    </header>
-    <div class="border-b border-border px-3 py-2">
-      <Input v-model="filter" placeholder="Find a bucket" aria-label="Find a bucket" class="h-8 text-xs" />
+  <aside class="space-y-3">
+    <div class="surface overflow-hidden">
+      <header class="flex items-center justify-between border-b border-border px-3 py-3">
+        <h2 class="text-sm font-semibold text-foreground">Buckets</h2>
+        <Badge variant="outline" size="count">{{ exampleBuckets(filter).length }}</Badge>
+      </header>
+      <div class="border-b border-border px-3 py-2">
+        <Input v-model="filter" placeholder="Find a bucket" aria-label="Find a bucket" class="h-8 text-xs" />
     </div>
     <ul class="max-h-[420px] overflow-y-auto py-1">
       <MockBucketRows :filter="filter" :active="active" @open="emit('open', $event)" />
@@ -63,6 +65,8 @@ function create() {
       <p v-if="problem" class="text-xs text-destructive">{{ problem }}</p>
       <p v-else-if="done" class="text-xs text-muted-foreground">{{ done }}</p>
     </footer>
+    </div>
+    <DatabaseList @open="emit('open', $event)" />
     <BucketStorageDialog v-model:open="storageOpen" v-model="placement" />
     <BucketCreateResults v-model:open="resultsOpen" :name="name.trim()" :placement="placement" />
   </aside>

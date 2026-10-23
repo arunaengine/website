@@ -151,6 +151,32 @@ export const MOCK_BUCKETS: readonly MockBucket[] = [
     searchIndex: true,
     created: '2026-08-14T08:45:00Z',
   },
+  {
+    name: 'refseq',
+    preset: 'mirror',
+    members: [
+      { nodeId: 'node-1', state: 'ready', strategy: 'copy', coverage: 'all', lag: '1 s' },
+      { nodeId: 'node-3', state: 'ready', strategy: 'copy', coverage: 'all', lag: '4 s' },
+    ],
+    ranges: [{ ...SPIRE_RANGE, replicas: ['node-3'], objects: 318_904, bytes: 2_900_000_000_000, epoch: 1 }],
+    refresh: 'Every 7 days',
+    mode: 'passthrough',
+    searchIndex: true,
+    created: '2026-09-15T10:00:00Z',
+  },
+  {
+    name: 'bakta-db',
+    preset: 'two-node',
+    members: [
+      { nodeId: 'node-2', state: 'ready', strategy: 'copy', coverage: 'all', lag: '0 s' },
+      { nodeId: 'node-3', state: 'ready', strategy: 'copy', coverage: 'all', lag: '2 s' },
+    ],
+    ranges: [{ ...SPIRE_RANGE, coordinator: 'node-2', replicas: ['node-3'], objects: 14, bytes: 66_000_000_000, epoch: 1 }],
+    refresh: 'Off',
+    mode: 'passthrough',
+    searchIndex: false,
+    created: '2026-10-05T13:30:00Z',
+  },
 ]
 
 // An ordinary bucket lives on one node. Only a bucket on more nodes has the Nodes tab.
@@ -497,6 +523,17 @@ const PLAIN_FILES: Record<string, { key: string; size: number }[]> = {
     { key: 'runs/2026-10-08/sample-03.fastq.gz', size: 5_400_000_000 },
     { key: 'qc/summary.tsv', size: 18_300 },
   ],
+  refseq: [
+    { key: 'bacteria/GCF_000005845.2_genomic.fna.gz', size: 1_320_000 },
+    { key: 'bacteria/GCF_000006765.1_genomic.fna.gz', size: 2_010_000 },
+    { key: 'viruses/viral.1.1.genomic.fna.gz', size: 98_000_000 },
+    { key: 'README.txt', size: 5_100 },
+  ],
+  'bakta-db': [
+    { key: 'db/bakta.db', size: 52_000_000_000 },
+    { key: 'db/version.json', size: 210 },
+    { key: 'db-light/bakta.db', size: 1_900_000_000 },
+  ],
   [ORDINARY_BUCKET]: [
     { key: 'raw/2026/reef-07/reads_R2.fastq.gz', size: 3_790_000_000 },
     { key: 'raw/2026/reef-08/reads_R1.fastq.gz', size: 3_410_000_000 },
@@ -629,26 +666,39 @@ export interface SourceLine {
   question: StorageQuestion
 }
 
-// What does not come from a direct upload. A bucket without lines was filled by uploads.
-export const CONTENT_SOURCES: Record<string, SourceLine[]> = {
+// How files got into a bucket, incoming paths only. No line means uploads only.
+export const FILE_SOURCES: Record<string, SourceLine[]> = {
   bakrep: [
-    { text: 'About 50 million files point to data in the source s3.gi.denbi.de, 49 buckets (not copied).', question: 'elsewhere' },
+    { text: 'From an external source without copying: about 50 million files in 49 buckets at s3.gi.denbi.de.', question: 'elsewhere' },
   ],
   'spire-db': [
-    { text: 'Copies files from bucket spire-staging of the group Genome Lab (sync, continuous).', question: 'sync' },
-    { text: 'Bucket spire-public of the group Open Data gets a copy of these files (sync, as references).', question: 'sync' },
+    { text: 'Uploaded directly: 11 files.', question: 'elsewhere' },
+    { text: 'Copied from bucket spire-staging of the group Genome Lab by a sync (continuous).', question: 'sync' },
   ],
   'reads-edge': [
     { text: 'Registered from storage folder sequencer-share without copying: 5,210 files.', question: 'elsewhere' },
   ],
   [ORDINARY_BUCKET]: [
-    { text: '12 files point to data in bucket spire-db (not copied).', question: 'elsewhere' },
-    { text: 'Bucket lab-archive on node-2 gets a copy of these files (sync, continuous).', question: 'sync' },
+    { text: 'Uploaded directly: 1,828 files.', question: 'elsewhere' },
+    { text: 'From a database without copying: 12 files of the SPIRE database.', question: 'elsewhere' },
+  ],
+  refseq: [
+    { text: 'From an external source without copying: about 320,000 files at ftp.ncbi.nlm.nih.gov/refseq.', question: 'elsewhere' },
   ],
 }
 
 export function sourceLines(bucket: string): SourceLine[] {
-  return CONTENT_SOURCES[bucket] ?? []
+  return FILE_SOURCES[bucket] ?? []
+}
+
+// Other buckets that get a copy of this one by a sync.
+export const BUCKET_COPIES: Record<string, string[]> = {
+  'spire-db': ['spire-public in the group Open Data: a copy as references (sync, as references)'],
+  [ORDINARY_BUCKET]: ['lab-archive on node-2: a copy of all files (sync, continuous)'],
+}
+
+export function bucketCopies(bucket: string): string[] {
+  return BUCKET_COPIES[bucket] ?? []
 }
 
 export interface FileHit {
@@ -691,4 +741,67 @@ export function grantWarnings(suffixes: readonly string[]): GrantWarning[] {
     const missing = found && isMulti(found) ? grantGap(nodes, found.members.map((member) => member.nodeId)) : []
     return missing.length ? [{ bucket, missing }] : []
   })
+}
+
+export type DatabaseReaders = 'Everyone in the realm' | 'Public'
+
+export interface DatabaseEntry {
+  id: string
+  name: string
+  description: string
+  source: string
+  license: string
+  refresh: string
+  readers: DatabaseReaders
+  bucket: string
+}
+
+// The databases a realm admin listed. Each one points to an ordinary bucket.
+export const DATABASES_START: readonly DatabaseEntry[] = [
+  {
+    id: 'bakrep',
+    name: 'bakrep',
+    description: 'About 50 million annotated bacterial genomes.',
+    source: 'de.NBI cloud, s3.gi.denbi.de',
+    license: 'CC BY 4.0',
+    refresh: 'Every 24 hours',
+    readers: 'Public',
+    bucket: 'bakrep',
+  },
+  {
+    id: 'refseq',
+    name: 'RefSeq',
+    description: 'NCBI reference sequences of genomes, transcripts and proteins.',
+    source: 'NCBI, ftp.ncbi.nlm.nih.gov/refseq',
+    license: 'Public domain',
+    refresh: 'Every 7 days',
+    readers: 'Everyone in the realm',
+    bucket: 'refseq',
+  },
+  {
+    id: 'spire',
+    name: 'SPIRE database',
+    description: 'Metagenome-assembled genomes of microbial communities.',
+    source: 'SPIRE, EMBL',
+    license: 'CC BY 4.0',
+    refresh: 'Off',
+    readers: 'Public',
+    bucket: 'spire-db',
+  },
+  {
+    id: 'bakta',
+    name: 'Bakta database',
+    description: 'Reference data for the Bakta annotation tool.',
+    source: 'Zenodo, record 10522951',
+    license: 'CC BY 4.0',
+    refresh: 'Off',
+    readers: 'Everyone in the realm',
+    bucket: 'bakta-db',
+  },
+]
+
+// Files and bytes of the bucket a database entry points to, counted on its coordinators.
+export function databaseStats(bucket: string): { files: number; bytes: number } {
+  const ranges = mockBucket(bucket)?.ranges ?? []
+  return { files: ranges.reduce((sum, range) => sum + range.objects, 0), bytes: ranges.reduce((sum, range) => sum + range.bytes, 0) }
 }

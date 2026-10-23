@@ -141,6 +141,7 @@ const sidebarModules = {
   '@/components/data/manager/MockBucketRows.vue': moduleDefault(Empty),
   '@/components/data/BucketStorageDialog.vue': moduleDefault(Empty),
   '@/components/data/BucketCreateResults.vue': moduleDefault(Empty),
+  '@/components/data/manager/DatabaseList.vue': moduleDefault(Empty),
   '@/lib/distributedMockData': { exampleBuckets: () => [] },
   '@/lib/distributedMock': { mockEnabled: () => false, defaultPlacement: () => ({}), placementLabel: () => '' },
   '@/composables/useBucketSearch': {
