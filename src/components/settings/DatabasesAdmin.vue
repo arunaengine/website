@@ -52,9 +52,7 @@ function mark() {
     <section class="space-y-3">
       <div>
         <h2 class="font-display text-base font-semibold text-aruna-navy">Who can create databases</h2>
-        <p class="text-xs text-muted-foreground">
-          Realm admins always can. Members of the roles below can mark buckets as databases. The group that owns a bucket must agree.
-        </p>
+        <p class="text-xs text-muted-foreground">Realm admins always can, and members of these roles. The group that owns a bucket must agree.</p>
       </div>
       <ul class="divide-y divide-border rounded-md border border-border">
         <li v-for="role in curators" :key="role.name" class="px-4 py-3 text-sm">
@@ -68,7 +66,7 @@ function mark() {
         <Select v-model="roleChoice" :options="grantable.map((role) => ({ value: role.name, label: role.name }))" placeholder="An existing realm role" aria-label="Existing realm role" />
         <Input v-model="newRole" placeholder="Or the name of a new role" aria-label="New role name" />
         <p class="text-xs text-muted-foreground sm:col-span-2">
-          Adds the access rule <span class="font-mono">admin/databases</span> with WRITE to the role, like an access rule in the role builder.
+          Adds the access rule <span class="font-mono">admin/databases</span> with WRITE to the role.
         </p>
         <div class="flex gap-2 sm:col-span-2">
           <Button size="sm" :disabled="!roleChoice && !newRole.trim()" @click="grantRole">Grant WRITE</Button>
@@ -80,9 +78,7 @@ function mark() {
     <section class="space-y-3">
       <div>
         <h2 class="font-display text-base font-semibold text-aruna-navy">Databases</h2>
-        <p class="text-xs text-muted-foreground">
-          Mark a bucket as a database and link the dataset that describes it. A database is an ordinary bucket: the mark grants nothing, and who may read it is decided by the permissions of the bucket.
-        </p>
+        <p class="text-xs text-muted-foreground">Mark a bucket as a database and link the dataset that describes it. The mark grants nothing.</p>
       </div>
       <ul class="divide-y divide-border rounded-md border border-border">
         <li v-for="entry in entries" :key="entry.id" class="px-4 py-3">
@@ -112,13 +108,12 @@ function mark() {
 
     <section class="space-y-3 rounded-md border border-border p-4">
       <h3 class="text-sm font-medium text-foreground">Mark a bucket as a database</h3>
-      <p class="text-xs text-muted-foreground">The group that owns the bucket must agree. Until then the entry waits for its group admins.</p>
       <p v-if="!free.length" class="text-xs text-muted-foreground">Every example bucket is already marked.</p>
       <div v-else class="grid gap-3 sm:grid-cols-2">
         <Select v-model="bucket" :options="free.map((name) => ({ value: name, label: name }))" placeholder="Bucket" aria-label="Bucket" @update:model-value="dataset = ''" />
         <Select v-model="dataset" :options="datasetChoices" placeholder="Dataset" aria-label="Dataset" :disabled="!bucket" />
         <p v-if="dataset === NEW_DATASET" class="text-xs text-muted-foreground sm:col-span-2">
-          The new dataset is named {{ bucket }} and links the bucket as one part. Describe it in the dataset editor.
+          Named {{ bucket }}, linking the bucket. Describe it in the dataset editor.
         </p>
         <div class="sm:col-span-2"><Button size="sm" :disabled="!bucket || !dataset" @click="mark"><Plus class="size-3.5" /> Mark as database</Button></div>
       </div>

@@ -20,10 +20,7 @@ const started = ref(false)
   <div class="space-y-4">
     <MockNotice />
     <template v-if="!started">
-      <p class="text-sm text-muted-foreground">
-        List the files of an external collection once. Browsing and file name search in
-        <span class="font-mono">{{ bucket }}</span> then need no request to the source.
-      </p>
+      <p class="text-sm text-muted-foreground">List the files of an external collection once. <span class="font-mono">{{ bucket }}</span> then needs no request to the source.</p>
       <DetailList
         :items="[
           { label: 'Endpoint', value: BAKREP_ENDPOINT, mono: true },

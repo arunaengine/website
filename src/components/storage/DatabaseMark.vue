@@ -41,9 +41,7 @@ function ask() {
         <Button size="sm" variant="outline" @click="remove(entry.id)">Remove the database mark</Button>
       </template>
       <template v-else-if="entry">
-        <Notice tone="warning" :title="`Waiting for the group admins of ${group}`">
-          The mark takes effect when they agree. Until then this is an ordinary bucket.
-        </Notice>
+        <Notice tone="warning" :title="`Waiting for the group admins of ${group}`">The mark takes effect when they agree.</Notice>
         <div class="flex gap-2">
           <Button size="sm" variant="outline" title="Mock: shows what happens when the group admins agree" @click="agree(entry.id)">Group admins agree</Button>
           <Button size="sm" variant="ghost" @click="remove(entry.id)">Cancel the request</Button>

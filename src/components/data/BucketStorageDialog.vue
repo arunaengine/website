@@ -59,7 +59,7 @@ function apply() {
       <DialogHeader>
         <DialogTitle>Where should this bucket be stored?</DialogTitle>
         <DialogDescription>
-          Each node creates its own bucket with the same name, so each creation can fail.
+          Each node creates its own bucket, so each can fail.
           <StorageFeatureLink question="nodes" class="ml-1" />
         </DialogDescription>
       </DialogHeader>
@@ -77,9 +77,7 @@ function apply() {
         </div>
         <div class="space-y-2">
           <h3 class="text-sm font-medium text-foreground">Nodes</h3>
-          <p class="text-xs text-muted-foreground">
-            Only nodes an operator marked as shard hosts can be chosen. The list is fixed when the bucket is created.
-          </p>
+          <p class="text-xs text-muted-foreground">Only shard hosts can be chosen.</p>
           <MemberPicker v-model="draft.members" :preset="draft.preset" />
           <Notice v-if="few" tone="warning">Choose at least two nodes.</Notice>
         </div>

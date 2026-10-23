@@ -15,7 +15,6 @@ const chosen = ref('')
 <template>
   <div class="space-y-3">
     <MockNotice />
-    <p class="text-sm text-muted-foreground">Databases are buckets that realm admins described with a dataset for everyone to use. You can use their files without copying them.</p>
     <ul class="divide-y divide-border rounded-md border border-border">
       <li v-for="entry in entries" :key="entry.id" class="flex flex-wrap items-center gap-3 px-3 py-2.5">
         <div class="min-w-0 flex-1">
