@@ -691,8 +691,9 @@ describe('object browser public access', () => {
   it('opens the same details view for a folder', async () => {
     openDetails.mockClear()
     const root = await render({ folders: ref([listedFolder]) })
-    const row = element(root, (node) => node.tag === 'tr' && content(node).includes(`${listedFolder.name}/`))
+    const row = element(root, (node) => node.tag === 'tr' && content(node).includes(listedFolder.name))
 
+    expect(content(element(row, (node) => node.tag === 'td' && content(node).trim() === listedFolder.name))).toBe(` ${listedFolder.name} `)
     expect(menuLabels(row)).toEqual(['Open', 'Details', 'Move to', 'Copy to', 'Change access', 'Delete folder', 'Delete permanently…'])
 
     await click(menuItem(root, 'Details', `${listedFolder.name}/`))
@@ -709,7 +710,7 @@ describe('object browser public access', () => {
     })
 
     const fileRow = element(root, (node) => node.tag === 'tr' && content(node).includes(listedObject.name))
-    const folderRow = element(root, (node) => node.tag === 'tr' && content(node).includes(`${listedFolder.name}/`))
+    const folderRow = element(root, (node) => node.tag === 'tr' && content(node).includes(listedFolder.name))
     expect(content(fileRow)).toContain('public')
     expect(content(folderRow)).not.toContain('public')
   })

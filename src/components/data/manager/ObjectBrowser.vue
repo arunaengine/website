@@ -607,7 +607,7 @@ async function onDrop(event: DragEvent) {
               </td>
               <td class="px-4 py-2.5">
                 <span class="flex items-center gap-2">
-                  <ObjectIcon :name="folder.name" folder class="h-4 w-4" /> {{ folder.name }}/
+                  <ObjectIcon :name="folder.name" folder class="h-4 w-4" /> {{ folder.name }}
                   <Badge v-if="folderPublic(folder.prefix)" variant="success" size="sm" class="shrink-0 uppercase" title="Everyone can read this folder">
                     <Globe class="mr-0.5 h-3 w-3" aria-hidden="true" /> public
                   </Badge>
