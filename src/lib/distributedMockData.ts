@@ -153,3 +153,35 @@ export function mockBucket(name: string): MockBucket | undefined {
 export function degradedRanges(bucket: MockBucket): MockRange[] {
   return bucket.ranges.filter((range) => range.degradedSince)
 }
+
+export interface PreviewDataset {
+  title: string
+  group: string
+  refers: string
+}
+
+export interface DeletePreview {
+  datasets: PreviewDataset[]
+  reasons: string[]
+}
+
+// No reasons means the preview is complete.
+export const DELETE_PREVIEWS: Record<string, DeletePreview> = {
+  bakrep: {
+    datasets: [
+      { title: 'bakrep collection', group: 'Genome Lab', refers: 'The whole bucket' },
+      { title: 'E. coli genomes, 2025 release', group: 'Genome Lab', refers: 'Folder bakrep-v2-data-007/' },
+      { title: 'Soil MAGs benchmark', group: 'Soil Ecology', refers: '1,284 single files' },
+    ],
+    reasons: [
+      '2 documents on node-2 are still being indexed. Their references are not listed yet.',
+      '3 references could not be matched to this bucket yet. They are retried in the background.',
+      'References that name a file only by its content hash are not covered.',
+    ],
+  },
+  'spire-db': {
+    datasets: [{ title: 'SPIRE release 2026-10', group: 'Genome Lab', refers: 'Folder release-2026-10/' }],
+    reasons: [],
+  },
+  'reads-edge': { datasets: [], reasons: [] },
+}
