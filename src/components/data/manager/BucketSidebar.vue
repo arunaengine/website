@@ -11,12 +11,18 @@ import { useRealmNodes } from '@/composables/useRealmNodes'
 import { useS3 } from '@/composables/useS3'
 import type { DataManager } from '@/composables/useDataManager'
 import type { BucketSearchHit } from '@/lib/api'
+import { isDesktop } from '@/lib/desktop'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import { ArrowLeftRight, Boxes, ChevronRight, FolderPlus, History, KeyRound, Trash2 } from '@lucide/vue'
 import { computed, ref, useId, watch } from 'vue'
 
 const props = defineProps<{ manager: DataManager }>()
-const emit = defineEmits<{ (e: 'sync', hit: BucketSearchHit): void }>()
+// Aruna Desktop offers one action: sync a bucket to a folder on this computer.
+const desktop = isDesktop()
+const emit = defineEmits<{
+  (e: 'sync', hit: BucketSearchHit): void
+  (e: 'sync-computer', target: { bucket: string; nodeId: string | null; groupId: string | null }): void
+}>()
 
 const s3 = useS3()
 const realmNodes = useRealmNodes()
@@ -193,6 +199,14 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
                 <template #tooltip>{{ rowNode(entry.nodeId) }}</template>
                 <template #actions>
                   <IconButton
+                    v-if="desktop && !isWorkspaceBucket(entry.bucket)"
+                    :label="`Sync ${entry.bucket} to this computer…`"
+                    side="right"
+                    @click="emit('sync-computer', { bucket: entry.bucket, nodeId: entry.nodeId ?? null, groupId: selectedGroupId ?? null })"
+                  >
+                    <ArrowLeftRight class="h-3 w-3" />
+                  </IconButton>
+                  <IconButton
                     label="Delete bucket…"
                     class="text-muted-foreground hover:text-destructive"
                     :disabled-reason="deleteRefusal(entry.bucket, entry.nodeId)"
@@ -270,8 +284,16 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
               @open="openSearchHit(hit)"
             >
               <template #tooltip>{{ rowNode(hit.node_id) }}</template>
-              <template v-if="!realmNodes.isLocalNode(hit.node_id)" #actions>
-                <IconButton :label="`Sync ${hit.bucket} to this node…`" side="right" @click="emit('sync', hit)">
+              <template v-if="desktop || !realmNodes.isLocalNode(hit.node_id)" #actions>
+                <IconButton
+                  :label="desktop ? `Sync ${hit.bucket} to this computer…` : `Sync ${hit.bucket} to this node…`"
+                  side="right"
+                  @click="
+                    desktop
+                      ? emit('sync-computer', { bucket: hit.bucket, nodeId: realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id, groupId: hit.group_id })
+                      : emit('sync', hit)
+                  "
+                >
                   <ArrowLeftRight class="h-3 w-3" />
                 </IconButton>
               </template>

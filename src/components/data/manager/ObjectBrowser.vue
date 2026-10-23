@@ -18,6 +18,7 @@ import WatchButton from '@/components/watches/WatchButton.vue'
 import KeyedReadNotice from '@/components/storage/KeyedReadNotice.vue'
 import { useAruna } from '@/composables/useAruna'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
+import { isDesktop } from '@/lib/desktop'
 import { useBrokenFiles } from '@/composables/useBrokenFiles'
 import { useLockedBucket } from '@/composables/useLockedBucket'
 import { useProviderBucket } from '@/composables/useProviderBucket'
@@ -65,10 +66,13 @@ const emit = defineEmits<{
   (e: 'new-folder'): void
   (e: 'new-notebook'): void
   (e: 'sync-to-node'): void
+  (e: 'sync-to-computer'): void
   (e: 'public-access', targets: PublicTarget[]): void
 }>()
 
 const s3 = useS3()
+// Aruna Desktop binds a bucket to a folder; the web only syncs between nodes.
+const desktop = isDesktop()
 const { isRealmAdmin } = useAruna()
 const { getBucketPlacement } = usePlacementPolicies()
 const { shown } = usePortalFeatures()
@@ -454,6 +458,7 @@ async function onDrop(event: DragEvent) {
             </template>
           </Popover>
           <!-- The Add data pipeline always targets the connected node. -->
+          <Button v-if="desktop && showSyncButton && !remoteBlocked" variant="outline" size="sm" aria-label="Sync to this computer" title="Keep this bucket and a folder on this computer in step" @click="emit('sync-to-computer')"><ArrowLeftRight class="h-4 w-4" /><span class="hidden xl:inline">Sync to this computer</span></Button>
           <Button v-if="!remoteBlocked" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix"  aria-label="New folder" :title="writeRestrictionMessage ?? 'Create a folder'" @click="emit('new-folder')"><FolderPlus class="h-4 w-4" /><span class="hidden xl:inline">New folder</span></Button>
           <Button v-if="notebooks && !remoteNodeId" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix"  aria-label="New notebook" :title="writeRestrictionMessage ?? 'Create a notebook here'" @click="emit('new-notebook')"><NotebookPen class="h-4 w-4" /><span class="hidden xl:inline">New notebook</span></Button>
           <Button v-if="!remoteNodeId" data-tour="bucket-add-data" size="sm" :disabled="!canWriteCurrentPrefix"  aria-label="Add data" :title="writeRestrictionMessage ?? 'Add data'" @click="emit('add-data')"><Plus class="h-4 w-4" /><span class="hidden xl:inline">Add data</span></Button>
@@ -486,8 +491,8 @@ async function onDrop(event: DragEvent) {
         </p>
         <div class="mt-4 flex justify-center gap-2">
           <RefreshButton v-if="!remoteEndpointMissing" :busy="retrySpinning" label="Try again" @click="onRetryObjects" />
-          <Button v-if="showSyncButton" size="sm" @click="emit('sync-to-node')">
-            <ArrowLeftRight class="h-3.5 w-3.5" /> Sync to this node…
+          <Button v-if="showSyncButton" size="sm" @click="desktop ? emit('sync-to-computer') : emit('sync-to-node')">
+            <ArrowLeftRight class="h-3.5 w-3.5" /> {{ desktop ? 'Sync to this computer' : 'Sync to this node…' }}
           </Button>
         </div>
       </div>

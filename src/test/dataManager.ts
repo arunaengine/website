@@ -60,6 +60,9 @@ export const MenuItemStub = defineComponent({
     h('button', { ...attrs, role: attrs.role ?? 'menuitem', disabled: props.disabled }, slots.default?.()),
 })
 
+/** Whether the browser under test runs inside Aruna Desktop. */
+export const desktopMode = { on: false }
+
 /** The write answers the compiled browser sees; a test may narrow them. */
 export const s3Access = {
   canWrite: (_bucket: string, _key: string) => true,
@@ -67,6 +70,7 @@ export const s3Access = {
 }
 
 export function resetS3Access() {
+  desktopMode.on = false
   s3Access.canWrite = () => true
   s3Access.canDeletePrefix = () => true
 }
@@ -177,6 +181,7 @@ export function objectBrowser(): Component {
       '@/components/watches/WatchButton.vue': moduleDefault(Slotted('button')),
       '@/components/storage/KeyedReadNotice.vue': moduleDefault(Slotted('aside')),
       '@/composables/usePortalFeatures': { usePortalFeatures: () => ({ shown: () => true }) },
+      '@/lib/desktop': { isDesktop: () => desktopMode.on },
       '@/composables/useAruna': { useAruna: () => ({ isRealmAdmin: ref(false) }) },
       '@/composables/useBrokenFiles': {
         useBrokenFiles: () => ({ reasonOf: (key: string) => brokenFiles.reasons[key] ?? null }),

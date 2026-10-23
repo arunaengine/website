@@ -14,6 +14,7 @@ import {
 import {
   brokenFiles,
   debounceHold,
+  desktopMode,
   fakeManager,
   listedFolder,
   listedObject,
@@ -32,9 +33,9 @@ const push = vi.fn()
 
 const browser = objectBrowser()
 
-async function render(overrides: Record<string, unknown> = {}) {
+async function render(overrides: Record<string, unknown> = {}, listeners: Record<string, unknown> = {}) {
   const manager = fakeManager({ openDetails, download, requestDelete, router: { push }, ...overrides })
-  const host = defineComponent({ setup: () => () => h(browser, { manager }) })
+  const host = defineComponent({ setup: () => () => h(browser, { manager, ...listeners }) })
   const { root } = await mountApp(host)
   return root
 }
@@ -209,6 +210,33 @@ describe('object browser toolbar', () => {
     expect(push).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'bucket-storage', params: { bucketId: 'reef' } }),
     )
+  })
+})
+
+describe('object browser sync to this computer', () => {
+  afterEach(() => resetS3Access())
+
+  it('offers the desktop button next to Add data and asks to bind the bucket', async () => {
+    desktopMode.on = true
+    const onSyncToComputer = vi.fn()
+    const root = await render({ showSyncButton: computed(() => true) }, { onSyncToComputer })
+
+    await bubbleClick(action(root, 'Sync to this computer'))
+
+    expect(onSyncToComputer).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the button out of the web portal', async () => {
+    const root = await render({ showSyncButton: computed(() => true) })
+
+    expect(() => action(root, 'Sync to this computer')).toThrow()
+  })
+
+  it('keeps the button out for a bucket that cannot be synced', async () => {
+    desktopMode.on = true
+    const root = await render({ showSyncButton: computed(() => false) })
+
+    expect(() => action(root, 'Sync to this computer')).toThrow()
   })
 })
 

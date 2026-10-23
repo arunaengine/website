@@ -14,6 +14,7 @@ import Notice from '@/components/ui/Notice.vue'
 import AddDataDialog from '@/components/data/AddDataDialog.vue'
 import DataViewSkeleton from '@/components/data/DataViewSkeleton.vue'
 import SyncBucketDialog from '@/components/data/SyncBucketDialog.vue'
+import BindFolderDialog from '@/components/desktop/BindFolderDialog.vue'
 import BucketSidebar from '@/components/data/manager/BucketSidebar.vue'
 import NodePicker from '@/components/data/NodePicker.vue'
 import DeleteDialog from '@/components/data/DeleteDialog.vue'
@@ -137,6 +138,19 @@ function openSyncFromHit(hit: BucketSearchHit) {
     nodeId: realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id,
   }
   syncDialogOpen.value = true
+}
+
+// "Sync to this computer": the desktop binds a bucket to a folder.
+const bindOpen = ref(false)
+const bindTarget = ref<{ bucket: string; nodeId: string | null; groupId: string | null }>({
+  bucket: '',
+  nodeId: null,
+  groupId: null,
+})
+
+function openBindDialog(target?: { bucket: string; nodeId: string | null; groupId: string | null }) {
+  bindTarget.value = target ?? { bucket: bucket.value, nodeId: remoteNodeId.value, groupId: activeGroupId.value ?? null }
+  bindOpen.value = true
 }
 
 function onSyncChanged() {
@@ -329,7 +343,7 @@ async function createFolder() {
           {{ sessionWarning }}
         </Notice>
 
-        <BucketSidebar :manager="manager" @sync="openSyncFromHit" />
+        <BucketSidebar :manager="manager" @sync="openSyncFromHit" @sync-computer="openBindDialog" />
 
         <ObjectBrowser
           :manager="manager"
@@ -338,6 +352,7 @@ async function createFolder() {
           @new-folder="openNewFolder"
           @new-notebook="newNotebookOpen = true"
           @sync-to-node="openSyncDialog"
+          @sync-to-computer="openBindDialog()"
           @public-access="openPublicAccess"
         >
           <UploadPanel :manager="manager" />
@@ -369,6 +384,15 @@ async function createFolder() {
       :source-prefix="syncSource.prefix"
       :source-node-id="syncSource.nodeId"
       @created="onSyncChanged"
+    />
+
+    <BindFolderDialog
+      v-if="desktop"
+      v-model:open="bindOpen"
+      :bucket="bindTarget.bucket"
+      :node-id="bindTarget.nodeId ?? realmNodes.localNodeId.value"
+      :group-id="bindTarget.groupId"
+      @bound="onSyncChanged"
     />
 
     <PublicAccessDialog

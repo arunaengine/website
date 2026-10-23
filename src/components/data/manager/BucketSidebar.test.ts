@@ -26,6 +26,7 @@ const showNode = vi.fn()
 const reload = vi.fn()
 const loadMore = vi.fn()
 let canDelete = true
+const desktopMode = { on: false }
 
 // What the cross-group search answered for the typed name.
 const otherError = ref<string | null>(null)
@@ -111,6 +112,7 @@ const sidebarModules = {
     useBucketSearch: () => ({ hits: otherSearch, error: otherError, searched: ref(true), nodesFailed: otherFailed }),
   },
   '@/lib/workspaces': Workspaces,
+  '@/lib/desktop': { isDesktop: () => desktopMode.on },
   '@/composables/useRealmNodes': {
     useRealmNodes: () => ({
       displayName: (id: string | null) => (id ? `name-${id}` : 'this node'),
@@ -264,6 +266,27 @@ describe('Bucket sidebar deletion', () => {
 
     expect(trash(root).props.disabled).toBe(true)
     expect(trash(root).props.title).toContain('write on the whole bucket')
+  })
+})
+
+describe('Bucket sidebar sync to this computer', () => {
+  beforeEach(() => {
+    nodeChoice.value = null
+    desktopMode.on = false
+  })
+
+  it('offers the action on a bucket row in the desktop only', async () => {
+    const web = await mountApp(BucketSidebar, { props: { manager: withBucket() } })
+    await pickNode()
+    expect(() => element(web.root, (node) => node.props['aria-label'] === 'Sync reef-survey to this computer…')).toThrow()
+
+    desktopMode.on = true
+    const onSyncComputer = vi.fn()
+    const { root } = await mountApp(BucketSidebar, { props: { manager: withBucket(), onSyncComputer } })
+    await pickNode()
+    await click(element(root, (node) => node.props['aria-label'] === 'Sync reef-survey to this computer…'))
+
+    expect(onSyncComputer).toHaveBeenCalledWith({ bucket: 'reef-survey', nodeId: null, groupId: 'g1' })
   })
 })
 

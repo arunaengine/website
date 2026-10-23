@@ -528,6 +528,7 @@ const deleteDialogComponent = compileClientComponent(
     '@/components/groups/bucketRemoval': { removeBucket: vi.fn() },
     '@/composables/s3/endpoints': { nodeApiBase: () => null },
     '@/composables/usePortalFeatures': { usePortalFeatures: () => ({ shown: () => true }) },
+    '@/lib/desktop': { isDesktop: () => false },
     '@/composables/useAruna': {
       isUnsupportedEndpoint: () => false,
       useAruna: () => ({ authToken: ref('token'), sessionEpoch: ref(1) }),
