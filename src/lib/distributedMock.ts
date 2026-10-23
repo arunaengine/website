@@ -279,6 +279,7 @@ export function isPending(results: readonly MemberResult[]): boolean {
 
 // A quiet line for lists: where the bucket is stored.
 export function storedLabel(preset: PresetId, nodes: number): string {
+  if (nodes < 2) return 'This node'
   if (preset === 'sharding' || preset === 'sharding-replicas') return `Split across ${nodes} nodes`
   if (preset === 'two-node' || preset === 'mirror') return `Copies on ${nodes} nodes`
   return `On ${nodes} nodes`

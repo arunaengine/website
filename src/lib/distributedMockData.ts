@@ -34,6 +34,8 @@ export interface MockBucket {
   created: string
 }
 
+export const ORDINARY_BUCKET = 'lab-raw-data'
+
 export const BAKREP_ENDPOINT = 'https://s3.gi.denbi.de'
 export const BAKREP_COUNT = 49
 export const DEGRADED_RANGE = 17
@@ -139,7 +141,27 @@ export const MOCK_BUCKETS: readonly MockBucket[] = [
     searchIndex: false,
     created: '2026-10-10T15:20:00Z',
   },
+  {
+    name: ORDINARY_BUCKET,
+    preset: 'two-node',
+    members: [{ nodeId: 'node-1', state: 'ready', strategy: 'copy', coverage: 'all', lag: '0 s' }],
+    ranges: [{ ...SPIRE_RANGE, replicas: [], objects: 1_840, bytes: 96_000_000_000, epoch: 1 }],
+    refresh: 'Off',
+    mode: 'passthrough',
+    searchIndex: true,
+    created: '2026-08-14T08:45:00Z',
+  },
 ]
+
+// An ordinary bucket lives on one node. Only a bucket on more nodes has the Nodes tab.
+export function isMulti(bucket: MockBucket): boolean {
+  return bucket.members.length > 1
+}
+
+export function exampleBuckets(filter = ''): MockBucket[] {
+  const term = filter.trim().toLowerCase()
+  return MOCK_BUCKETS.filter((bucket) => bucket.name.includes(term))
+}
 
 export function mockBucket(name: string): MockBucket | undefined {
   return MOCK_BUCKETS.find((bucket) => bucket.name === name)
@@ -179,6 +201,10 @@ export const DELETE_PREVIEWS: Record<string, DeletePreview> = {
     reasons: [],
   },
   'reads-edge': { datasets: [], reasons: [] },
+  [ORDINARY_BUCKET]: {
+    datasets: [{ title: 'Reef survey 2026', group: 'Genome Lab', refers: 'Folder raw/2026/' }],
+    reasons: [],
+  },
 }
 
 export interface MockGrant {
@@ -196,6 +222,7 @@ export const MOCK_GRANTS: Record<string, MockGrant[]> = {
   ],
   'spire-db': [{ holder: 'Genome Lab', kind: 'Group', role: 'Read', nodes: ['*'] }],
   'reads-edge': [{ holder: 'Sequencing Core', kind: 'Group', role: 'Write', nodes: ['node-1'] }],
+  [ORDINARY_BUCKET]: [{ holder: 'Genome Lab', kind: 'Group', role: 'Write', nodes: ['node-1'] }],
 }
 
 export interface SourceDigest {
@@ -363,6 +390,32 @@ export const MOCK_OBJECTS: readonly MockObject[] = [
     contentHash: '8c04e7b21f6a93d5e0b7c418a2f6d93b07e5c1a8d4f20b6e93a7c5d18f0e2b46',
     datasets: ['SPIRE release 2026-10'],
   },
+  {
+    id: 'reef-reads',
+    bucket: ORDINARY_BUCKET,
+    key: 'raw/2026/reef-07/reads_R1.fastq.gz',
+    versionId: '01K8V2A4C6E8GJMPRTVXZ13579',
+    size: 3_822_104_576,
+    modified: '2026-08-20T10:12:00Z',
+    servedBy: 'node-1',
+    how: 'node-1 holds the file and served it itself.',
+    holders: [{ nodeId: 'node-1', role: 'Only copy', bytes: 'Full copy' }],
+    contentHash: '1d9e5a07c3b84f26a0e7d19c5b3f8a64e2c07d91b5a3f84e60c2d7a19b8e5f30',
+    datasets: ['Reef survey 2026'],
+  },
+  {
+    id: 'reef-notes',
+    bucket: ORDINARY_BUCKET,
+    key: 'raw/2026/reef-07/notes.txt',
+    versionId: '01K8V2A4C6E8GJMPRTVXZ24680',
+    size: 2_048,
+    modified: '2026-08-20T10:14:00Z',
+    servedBy: 'node-1',
+    how: 'node-1 holds the file and served it itself.',
+    holders: [{ nodeId: 'node-1', role: 'Only copy', bytes: 'Full copy' }],
+    contentHash: '6b30f2e8a1c95d47e0b36f8a2d19c5e7403a8b1f6d2e95c07a34b8e1d60f2a95',
+    datasets: ['Reef survey 2026'],
+  },
 ]
 
 export interface ImportState {
@@ -395,8 +448,6 @@ export interface ContentSources {
   follows: string[]
   imports: string[]
 }
-
-export const ORDINARY_BUCKET = 'lab-raw-data'
 
 // Where the files of a bucket come from. A bucket not listed here reads as an ordinary one.
 export const CONTENT_SOURCES: Record<string, ContentSources> = {
@@ -446,7 +497,7 @@ export function searchFiles(query: string): FileHit[] {
     return {
       key: file.versionId,
       title: file.key,
-      subtitle: `Stored on ${nodes} nodes · Bucket: ${file.bucket}`,
+      subtitle: `${nodes > 1 ? `Stored on ${nodes} nodes` : 'Stored on this node'} · Bucket: ${file.bucket}`,
       bucket: file.bucket,
     }
   })
