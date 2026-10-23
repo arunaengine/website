@@ -7,8 +7,10 @@ import { useDeviceQuery } from '@/composables/useDeviceQuery'
 
 const query = useDeviceQuery<DeviceCompute | null>(getCompute, null)
 
+// A read already in flight is joined, never skipped: the caller reads the
+// answer right after, and a pending read has none yet.
 async function ensureLoaded(): Promise<void> {
-  if (query.state.value === 'ready' || query.state.value === 'loading') return
+  if (query.state.value === 'ready') return
   await query.run()
 }
 
