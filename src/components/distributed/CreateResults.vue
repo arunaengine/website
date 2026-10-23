@@ -12,9 +12,9 @@ const emit = defineEmits<{ (e: 'retry', nodeId: string): void; (e: 'drop', nodeI
 </script>
 
 <template>
-  <section class="surface space-y-4 p-5">
+  <section class="space-y-4">
     <div class="flex flex-wrap items-center gap-2">
-      <h2 class="font-display text-base font-semibold text-aruna-navy">Create results for <span class="font-mono">{{ name }}</span></h2>
+      <h2 class="font-display text-base font-semibold text-aruna-navy">Created on the nodes: <span class="font-mono">{{ name }}</span></h2>
       <Badge v-if="isPending(results)" variant="warn" size="sm">Pending</Badge>
       <Badge v-else variant="success" size="sm">Active</Badge>
     </div>

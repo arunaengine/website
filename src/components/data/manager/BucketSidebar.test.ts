@@ -140,6 +140,7 @@ const sidebarModules = {
   '@/composables/useBucketJobs': { useBucketJobs: () => stepJobs },
   '@/components/data/manager/MockBucketRows.vue': moduleDefault(Empty),
   '@/components/data/BucketStorageDialog.vue': moduleDefault(Empty),
+  '@/components/data/BucketCreateResults.vue': moduleDefault(Empty),
   '@/lib/distributedMock': { mockEnabled: () => false, defaultPlacement: () => ({}), placementLabel: () => '' },
   '@/composables/useBucketSearch': {
     useBucketSearch: () => ({ hits: otherSearch, error: otherError, searched: ref(true), nodesFailed: otherFailed }),

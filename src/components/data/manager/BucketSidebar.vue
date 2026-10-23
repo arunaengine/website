@@ -7,6 +7,7 @@ import Notice from '@/components/ui/Notice.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import BucketRow from '@/components/data/BucketRow.vue'
 import { useBucketJobs } from '@/composables/useBucketJobs'
+import BucketCreateResults from '@/components/data/BucketCreateResults.vue'
 import BucketStorageDialog from '@/components/data/BucketStorageDialog.vue'
 import MockBucketRows from '@/components/data/manager/MockBucketRows.vue'
 import { useBucketSearch } from '@/composables/useBucketSearch'
@@ -78,7 +79,15 @@ const jobs = useBucketJobs(selectedGroupId, computed(() => [buckets.value, listi
 
 // Where the next bucket is stored (node mock); this node unless changed.
 const storageOpen = ref(false)
+const resultsOpen = ref(false)
 const placement = ref(defaultPlacement())
+
+// Several nodes show the result of each node; one node creates as before.
+function create() {
+  const several = mockEnabled() && placement.value.several
+  if (!several) return void createBucket()
+  if (newBucketName.value.trim() && !createBucketBlocker.value) resultsOpen.value = true
+}
 
 const allNodes = computed(() => bucketNodeChoice.value === null)
 // An older node cannot list without a name; the open node's list stands in.
@@ -381,9 +390,9 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
             class="h-8 font-mono text-xs"
             :invalid="newBucketProblem ? 'error' : undefined"
             aria-label="New bucket name"
-            @keyup.enter="createBucket"
+            @keyup.enter="create"
           />
-          <Button variant="outline" size="sm" aria-label="Create bucket" :title="`Creates the bucket on ${createNode}`" :disabled="creatingBucket || !newBucketName.trim() || Boolean(createBucketBlocker)" @click="createBucket">
+          <Button variant="outline" size="sm" aria-label="Create bucket" :title="`Creates the bucket on ${mockEnabled() && placement.several ? `${placement.members.length} nodes` : createNode}`" :disabled="creatingBucket || !newBucketName.trim() || Boolean(createBucketBlocker)" @click="create">
             <FolderPlus class="h-4 w-4" />
           </Button>
         </div>
@@ -395,6 +404,9 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
         <p v-else-if="newBucketRefusal" class="text-xs text-muted-foreground">{{ newBucketRefusal }}</p>
       </footer>
     </div>
-    <BucketStorageDialog v-if="mockEnabled()" v-model:open="storageOpen" v-model="placement" />
+    <template v-if="mockEnabled()">
+      <BucketStorageDialog v-model:open="storageOpen" v-model="placement" />
+      <BucketCreateResults v-model:open="resultsOpen" :name="newBucketName.trim()" :placement="placement" />
+    </template>
   </aside>
 </template>

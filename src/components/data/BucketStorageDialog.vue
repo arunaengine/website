@@ -56,7 +56,7 @@ function apply() {
   <Dialog :open="open" @update:open="emit('update:open', $event)">
     <DialogContent class="max-w-3xl">
       <DialogHeader>
-        <DialogTitle>Where is the bucket stored?</DialogTitle>
+        <DialogTitle>Where should this bucket be stored?</DialogTitle>
         <DialogDescription>
           Each node creates its own bucket with the same name, so each creation can fail.
         </DialogDescription>
