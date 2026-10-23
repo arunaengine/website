@@ -1,6 +1,7 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ApiError } from '@/lib/api'
 import * as Utils from '@/lib/utils'
 import * as Workspaces from '@/lib/workspaces'
 import {
@@ -9,6 +10,7 @@ import {
   compileClientComponent,
   content,
   input,
+  element,
   moduleDefault,
   mountApp,
   typeValue,
@@ -107,13 +109,14 @@ const BindFolderDialog = compileClientComponent(new URL('./BindFolderDialog.vue'
     useS3,
   },
   '@/composables/useSyncedFolders': { useSyncedFolders: () => ({ bind, busy }) },
+  '@/lib/api': { ApiError },
   '@/lib/utils': Utils,
   '@/lib/workspaces': Workspaces,
   '@/lib/desktopBridge': { pickDirectory: vi.fn(async () => '/home/me/data') },
 })
 
-async function mountReady() {
-  const mounted = await mountApp(BindFolderDialog, { props: { open: true } })
+async function mountReady(props: Record<string, unknown> = {}) {
+  const mounted = await mountApp(BindFolderDialog, { props: { open: true, ...props } })
   await click(button(mounted.root, 'Choose'))
   return mounted
 }
@@ -140,7 +143,7 @@ describe('syncing a folder to a bucket', () => {
         create_bucket: true,
       }),
     )
-    expect(content(mounted.root)).toContain('A new name creates the bucket on the selected node.')
+    expect(content(mounted.root)).toContain('A bucket that does not exist yet is made for you.')
     expect(mounted.errors).toEqual([])
     mounted.app.unmount()
   })
@@ -170,6 +173,90 @@ describe('syncing a folder to a bucket', () => {
     await click(button(mounted.root, 'Start syncing'))
 
     expect(content(mounted.root)).toContain(conflict)
+    mounted.app.unmount()
+  })
+})
+
+describe('choosing what the sync does', () => {
+  const preset = { bucket: 'lab', nodeId: 'node-1', groupId: 'g1' }
+
+  it('keeps a copy by default on a bucket page and never creates the bucket', async () => {
+    const mounted = await mountReady(preset)
+    const html = content(mounted.root)
+
+    expect(html).toContain('Sync to this computer')
+    expect(html).toContain('What do you want to do?')
+    expect(html).toContain('Keep a copy on this computer')
+    expect(html).toContain('Realm node')
+    expect(element(mounted.root, (node) => node.props['data-testid'] === 'chosen-bucket')).toBeTruthy()
+
+    await click(button(mounted.root, 'Start syncing'))
+
+    expect(bind).toHaveBeenCalledWith({
+      root: '/home/me/data',
+      group_id: 'g1',
+      remote: { node_id: 'node-1', bucket: 'lab', prefix: '' },
+      create_bucket: false,
+      mode: 'download_only',
+      propagate_deletes: true,
+    })
+    mounted.app.unmount()
+  })
+
+  it('sends the three directions to the node as their modes', async () => {
+    for (const [title, mode] of [
+      ['Send a folder to Aruna', 'upload_only'],
+      ['Both ways', 'two_way'],
+      ['Keep a copy on this computer', 'download_only'],
+    ] as const) {
+      bind.mockClear()
+      const mounted = await mountReady(preset)
+      await click(button(mounted.root, title))
+      await click(button(mounted.root, 'Start syncing'))
+
+      expect(bind).toHaveBeenCalledWith(expect.objectContaining({ mode }))
+      mounted.app.unmount()
+    }
+  })
+
+  it('offers a different bucket after Pick another', async () => {
+    const mounted = await mountReady(preset)
+
+    await click(button(mounted.root, 'Pick another'))
+
+    expect(() => element(mounted.root, (node) => node.props['data-testid'] === 'chosen-bucket')).toThrow()
+    expect(input(mounted.root, 'aria-label', 'Bucket name')).toBeTruthy()
+    mounted.app.unmount()
+  })
+
+  it('needs an existing bucket to keep a copy of', async () => {
+    const mounted = await mountReady()
+    await click(button(mounted.root, 'Keep a copy on this computer'))
+    await typeValue(input(mounted.root, 'aria-label', 'Bucket name'), 'brand-new')
+
+    expect(content(mounted.root)).toContain('Pick a bucket that exists')
+    await click(button(mounted.root, 'Start syncing'))
+    expect(bind).not.toHaveBeenCalled()
+    mounted.app.unmount()
+  })
+
+  it('says an older node cannot keep a copy yet', async () => {
+    bind.mockRejectedValue(new ApiError(400, 'unknown variant `download_only`'))
+    const mounted = await mountReady(preset)
+
+    await click(button(mounted.root, 'Start syncing'))
+
+    expect(content(mounted.root)).toContain('cannot keep a copy on this computer yet')
+    mounted.app.unmount()
+  })
+
+  it('keeps the node refusal verbatim for any other failure', async () => {
+    bind.mockRejectedValue(new ApiError(409, 'The folder is not empty.'))
+    const mounted = await mountReady(preset)
+
+    await click(button(mounted.root, 'Start syncing'))
+
+    expect(content(mounted.root)).toContain('The folder is not empty.')
     mounted.app.unmount()
   })
 })
