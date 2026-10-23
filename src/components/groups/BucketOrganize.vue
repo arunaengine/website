@@ -5,6 +5,7 @@ import JobProgress from '@/components/storage/JobProgress.vue'
 import PagedList from '@/components/storage/PagedList.vue'
 import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import { isUnsupportedEndpoint, useAruna } from '@/composables/useAruna'
 import { useCursorPage } from '@/composables/useCursorPage'
 import { OFFLINE_WRITE_HINT, useConnectivity } from '@/lib/connectivity'
@@ -15,11 +16,12 @@ import {
   startImportRenames,
   type BackendImport,
   type DuplicateItem,
+  type RenamePlan,
 } from '@/lib/api'
 import { countWords } from '@/lib/bucketNaming'
-import { copyKey, organizeError, type ProgressJob } from '@/lib/organize'
+import { copyKey, filesWord, organizeError, type ProgressJob } from '@/lib/organize'
 import { moveRefusal } from '@/lib/storageRules'
-import { formatNumber } from '@/lib/utils'
+import { formatBytes, formatNumber } from '@/lib/utils'
 
 const props = defineProps<{
   groupId: string
@@ -43,7 +45,7 @@ const copiesMissing = ref(false)
 const renamesMissing = ref(false)
 // Counts of the whole bucket, from first pages without a filter; null until known.
 const copyAll = ref<{ total: number; complete: boolean } | null>(null)
-const renameAll = ref<{ total: number; complete: boolean } | null>(null)
+const renameAll = ref<{ total: number; complete: boolean; plan?: RenamePlan } | null>(null)
 let wholeRun = 0
 let renameRun = 0
 
@@ -72,7 +74,7 @@ const oldNames = useCursorPage<{ from: string; to: string; writable?: boolean }>
     const mine = renameRun
     const found = await getImportRenames(props.groupId, link, client(), query)
     if (whole && mine === renameRun && link === props.link.import_id) {
-      renameAll.value = { total: found.count, complete: found.complete }
+      renameAll.value = { total: found.count, complete: found.complete, plan: found.plan }
     }
     return { items: found.files, total: found.count, complete: found.complete, next: found.next }
   },
@@ -82,6 +84,8 @@ const oldNames = useCursorPage<{ from: string; to: string; writable?: boolean }>
 const offered = (count: { total: number; complete: boolean } | null) => Boolean(count && (count.total > 0 || !count.complete))
 const copyOffered = computed(() => offered(copyAll.value))
 const renameOffered = computed(() => offered(renameAll.value))
+// The first read of a big bucket takes a while; its count is unknown until then.
+const counting = computed(() => renameAll.value === null && !renamesMissing.value && !oldNames.error.value)
 const failed = computed(() => copies.error.value ?? oldNames.error.value)
 const checking = computed(
   () => !failed.value && ((copyAll.value === null && !copiesMissing.value) || (renameAll.value === null && !renamesMissing.value)),
@@ -100,6 +104,12 @@ const copySummary = computed(() => {
   return page ? `Showing ${formatNumber(page.items.length)} · ${copyCount.value}` : undefined
 })
 const renameCount = computed(() => countWords(renameAll.value?.total ?? 0, renameAll.value?.complete ?? true))
+const copyLine = computed(() => {
+  const plan = renameAll.value?.plan
+  if (!plan?.streamed_files) return 'copy them inside your storage, not through Aruna'
+  if (plan.streamed_files >= (renameAll.value?.total ?? 0)) return 'copy them through Aruna'
+  return `copy ${filesWord(plan.streamed_files)} (${formatBytes(plan.streamed_bytes)}) through Aruna and the rest inside your storage`
+})
 
 // Reads both counts again; an open review shows its fresh first page.
 function reload() {
@@ -212,16 +222,31 @@ const blocked = computed(() => busy.value || Boolean(props.job) || writesDisable
       <JobProgress v-if="job?.kind === 'duplicates'" class="mt-3" :job="job" :busy="controlling" @control="(action) => emit('control', action)" />
     </div>
 
-    <div v-if="renameOffered || job?.kind === 'rename'" class="rounded-md border border-border px-3 py-2.5" data-testid="step-renames">
+    <div v-if="renameOffered || counting || job?.kind === 'rename'" class="rounded-md border border-border px-3 py-2.5" data-testid="step-renames">
       <div class="flex items-center gap-2">
         <div class="min-w-0 flex-1">
           <div class="text-sm font-medium">Old file names</div>
           <p class="text-xs text-muted-foreground">Files with an older name style get the bucket's current style.</p>
         </div>
-        <span v-if="renameOffered" class="text-xs text-muted-foreground">{{ renameCount }}</span>
-        <Button v-if="renameOffered" variant="outline" size="sm" @click="review('ren')">Review…</Button>
+        <Spinner v-if="counting" show-label label="Counting files…" />
+        <span v-else-if="renameOffered" class="text-xs text-muted-foreground">{{ renameCount }}</span>
+        <Button v-if="counting || renameOffered" variant="outline" size="sm" :disabled="counting" @click="review('ren')">Review…</Button>
       </div>
       <div v-if="open === 'ren'" class="mt-3">
+        <div v-if="renameAll?.plan" class="mb-2 rounded-md bg-muted px-3 py-2.5" data-testid="rename-plan">
+          <p class="text-sm font-medium">This rename will</p>
+          <ul class="mt-1 list-disc space-y-0.5 pl-4 text-xs text-muted-foreground">
+            <li>
+              rename <b class="font-medium text-foreground">{{ filesWord(renameAll.total) }}</b>
+              ({{ formatBytes(renameAll.plan.bytes) }}) in your storage
+            </li>
+            <li>{{ copyLine }}</li>
+            <li v-if="renameAll.plan.unchanged_files">leave {{ filesWord(renameAll.plan.unchanged_files) }} as they are</li>
+          </ul>
+          <p class="mt-2 text-xs text-muted-foreground">
+            Large renames can take hours. They run on the server, so you can close this window.
+          </p>
+        </div>
         <PagedList
           :total="oldNames.page.value?.total ?? 0"
           :complete="oldNames.page.value?.complete ?? true"

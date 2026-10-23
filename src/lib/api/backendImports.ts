@@ -89,10 +89,25 @@ export function runBackendImport(
   return apiRequest(`${importsPath(groupId, importId)}/run`, { method: 'POST' }, client)
 }
 
+/** What a rename would do, counted over the whole link. */
+export interface RenamePlan {
+  bytes: number
+  /** Files that go through Aruna because the storage cannot copy them itself. */
+  streamed_files: number
+  streamed_bytes: number
+  taken_files: number
+  withheld_files: number
+  /** Files that already have the right name. */
+  unchanged_files: number
+  unchanged_bytes: number
+}
+
 export interface BackendImportRenames {
-  /** Files an earlier name pattern named; a lower bound unless `complete`. */
+  /** Files still to rename; a lower bound on older nodes unless `complete`. */
   count: number
   complete: boolean
+  /** Absent on older nodes. */
+  plan?: RenamePlan
   /** The first files, with the name they get. */
   files: { from: string; to: string; writable?: boolean }[]
   /** Cursor of the next page. */

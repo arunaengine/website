@@ -1,5 +1,5 @@
 import * as VueRuntime from 'vue'
-import { defineComponent, h, ref } from 'vue'
+import { defineComponent, h, reactive, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { click, compileClientComponent, content, element, flush, moduleDefault, mountApp, nodes } from '@/test/clientRender'
 import * as Api from '@/lib/api'
@@ -31,6 +31,7 @@ const BucketOrganize = compileClientComponent(new URL('./BucketOrganize.vue', im
   ),
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
   '@/components/ui/Notice.vue': moduleDefault(Slot),
+  '@/components/ui/Spinner.vue': moduleDefault(defineComponent({ props: { label: String }, setup: (p) => () => h('span', p.label) })),
   '@/composables/useAruna': {
     isUnsupportedEndpoint: () => false,
     useAruna: () => ({ apiBaseUrl: ref('https://api'), authToken: ref('t'), sessionEpoch: ref(0) }),
@@ -62,11 +63,75 @@ async function mount() {
   return { ...mounted, finished }
 }
 
+const GB = 1024 ** 3
+const PLAN = {
+  bytes: 826 * GB,
+  streamed_files: 0,
+  streamed_bytes: 0,
+  taken_files: 0,
+  withheld_files: 0,
+  unchanged_files: 297137,
+  unchanged_bytes: 9 * GB,
+}
+const PLANNED = { count: 3877, complete: true, files: [{ from: '01M5_a.faa', to: 'a.faa' }], plan: PLAN }
+
 beforeEach(() => {
   previewDuplicates.mockReset().mockResolvedValue({ total: 6, bytes: 6, complete: true, items: [COPY], next: null })
   startDuplicates.mockReset().mockResolvedValue({})
   getImportRenames.mockReset().mockResolvedValue({ count: 0, complete: true, files: [] })
   startImportRenames.mockReset().mockResolvedValue({})
+})
+
+describe('BucketOrganize rename plan', () => {
+  it('counts the files first and keeps Review off until the plan is read', async () => {
+    let answer: (value: unknown) => void = () => {}
+    getImportRenames.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+    const { root } = await mount()
+    const card = step(root, 'step-renames')[0]
+    expect(content(card)).toContain('Counting files…')
+    expect(buttonIn(card, 'Review…').props.disabled).toBe(true)
+    answer(PLANNED)
+    await flush()
+    expect(content(step(root, 'step-renames')[0])).not.toContain('Counting files…')
+    expect(buttonIn(step(root, 'step-renames')[0], 'Review…').props.disabled).toBeFalsy()
+  })
+
+  it('does not offer the step while the count is unknown and the read failed', async () => {
+    getImportRenames.mockRejectedValue(new Error('node down'))
+    const { root } = await mount()
+    expect(step(root, 'step-renames')).toHaveLength(0)
+  })
+
+  it('tells what the rename will do above the list', async () => {
+    getImportRenames.mockResolvedValue(PLANNED)
+    const { root } = await mount()
+    expect(content(root)).not.toContain('This rename will')
+    await click(buttonIn(step(root, 'step-renames')[0], 'Review…'))
+    const plan = content(step(root, 'rename-plan')[0]).replace(/\s+/g, ' ')
+    expect(plan).toContain('This rename will')
+    expect(plan).toContain('rename 3,877 files (826 GB) in your storage')
+    expect(plan).toContain('copy them inside your storage, not through Aruna')
+    expect(plan).toContain('leave 297,137 files as they are')
+    expect(plan).toContain('Large renames can take hours. They run on the server, so you can close this window.')
+    expect(content(root)).toContain('Rename 3,877 files')
+  })
+
+  it('says how many files go through Aruna', async () => {
+    getImportRenames.mockResolvedValue({ ...PLANNED, plan: { ...PLAN, streamed_files: 12, streamed_bytes: 3 * GB } })
+    const { root } = await mount()
+    await click(buttonIn(step(root, 'step-renames')[0], 'Review…'))
+    const plan = content(step(root, 'rename-plan')[0])
+    expect(plan).toContain('copy 12 files (3 GB) through Aruna and the rest inside your storage')
+    expect(plan).not.toContain('not through Aruna')
+  })
+
+  it('leaves out the plan box on a node that sends no plan', async () => {
+    getImportRenames.mockResolvedValue({ count: 3, complete: true, files: [{ from: '01M5_a.faa', to: 'a.faa' }] })
+    const { root } = await mount()
+    await click(buttonIn(step(root, 'step-renames')[0], 'Review…'))
+    expect(step(root, 'rename-plan')).toHaveLength(0)
+    expect(content(root)).toContain('Rename 3 files')
+  })
 })
 
 describe('BucketOrganize', () => {
