@@ -79,7 +79,7 @@ describe('connect your tools', () => {
     const html = await render()
 
     expect(html).toContain('http://127.0.0.1:41000')
-    expect(html).toContain('tes.endpoint = &#39;http://127.0.0.1:41001/ga4gh/tes/v1&#39;')
+    expect(html).toContain('tes.endpoint = &#39;http://127.0.0.1:41001/api/v1/ga4gh/tes/v1&#39;')
     expect(html).not.toContain('34118')
     expect(html).not.toContain('34116')
   })
@@ -117,7 +117,7 @@ describe('connect your tools', () => {
     const html = await render()
 
     expect(html).toContain('process.executor = &#39;tes&#39;')
-    expect(html).toContain('tes.endpoint = &#39;http://127.0.0.1:9000/ga4gh/tes/v1&#39;')
+    expect(html).toContain('tes.endpoint = &#39;http://127.0.0.1:9000/api/v1/ga4gh/tes/v1&#39;')
     expect(html).toContain('Local runs off')
     expect(html).toContain('Needs local runs.')
   })

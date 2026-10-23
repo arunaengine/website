@@ -40,10 +40,15 @@ export function nodeOrigin(apiBase: string | null | undefined): string | null {
   }
 }
 
-/** Where workflow tools send jobs: the TES facade of this computer's node. */
+/** Where workflow tools send jobs: the TES facade, which lives under the node's API base. */
 export function tesAddress(apiBase: string | null | undefined): string | null {
-  const origin = nodeOrigin(apiBase)
-  return origin ? `${origin}/ga4gh/tes/v1` : null
+  if (!apiBase) return null
+  try {
+    const url = new URL(apiBase)
+    return `${url.origin}${url.pathname.replace(/\/+$/, '')}/ga4gh/tes/v1`
+  } catch {
+    return null
+  }
 }
 
 export function toolSnippet(tool: ToolId, address: string | null, key: ToolKey | null, assistant?: string | null): string {

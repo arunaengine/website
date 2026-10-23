@@ -33,14 +33,15 @@ describe('tool snippets', () => {
   })
 
   it('writes the Nextflow lines against the local job address', () => {
-    expect(nextflowSnippet('http://127.0.0.1:9000/ga4gh/tes/v1')).toBe(
-      "# nextflow.config\nprocess.executor = 'tes'\ntes.endpoint = 'http://127.0.0.1:9000/ga4gh/tes/v1'",
+    expect(nextflowSnippet('http://127.0.0.1:9000/api/v1/ga4gh/tes/v1')).toBe(
+      "# nextflow.config\nprocess.executor = 'tes'\ntes.endpoint = 'http://127.0.0.1:9000/api/v1/ga4gh/tes/v1'",
     )
   })
 
   it('derives the job address from the node API base', () => {
     expect(nodeOrigin('http://127.0.0.1:9000/api/v1')).toBe('http://127.0.0.1:9000')
-    expect(tesAddress('http://127.0.0.1:9000/api/v1')).toBe('http://127.0.0.1:9000/ga4gh/tes/v1')
+    expect(tesAddress('http://127.0.0.1:9000/api/v1')).toBe('http://127.0.0.1:9000/api/v1/ga4gh/tes/v1')
+    expect(tesAddress('http://127.0.0.1:9000/api/v1/')).toBe('http://127.0.0.1:9000/api/v1/ga4gh/tes/v1')
     expect(tesAddress(null)).toBeNull()
     expect(tesAddress('not a url')).toBeNull()
   })
