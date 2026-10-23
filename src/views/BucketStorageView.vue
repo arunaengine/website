@@ -140,7 +140,7 @@ const browserLink = computed(() => ({
       <TabsContent value="overview" class="mt-0 space-y-5">
         <MockOverview v-if="example" :bucket="example" />
         <StorageOverviewTab v-else :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
-        <ContentSources v-if="mockEnabled()" :bucket="bucket" />
+        <ContentSources v-if="example" :bucket="bucket" />
         <BucketDeleteSection :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
       </TabsContent>
 

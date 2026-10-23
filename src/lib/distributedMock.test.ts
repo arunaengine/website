@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { docsTopicBySlug } from '@/docs/v1'
 import { applyPortalConfig } from '@/lib/config'
 import { defaultSettings, mockEnabled, firstResults, grantGap, isPending, nodeGlob, planRanges, plannedStart, presetMembers, rangeTotal, retryResult, STORAGE_QUESTIONS } from './distributedMock'
-import { BAKREP_COUNT, exampleListing, exampleMark, grantWarnings, mockFile, mockBucket, searchFiles, sourceObjects } from './distributedMockData'
+import { BAKREP_COUNT, exampleListing, exampleMark, grantWarnings, mockFile, sourceLines, mockBucket, searchFiles, sourceObjects } from './distributedMockData'
 
 describe('distributed mock helpers', () => {
   it('reports the members a node-specific grant does not reach', () => {
@@ -90,6 +90,12 @@ describe('distributed mock helpers', () => {
     expect(mockFile('bakrep', genome.key)?.size).toBe(genome.size)
     expect(exampleMark('lab-raw-data', 'raw/2026/reef-07/notes.txt')).toBeNull()
     expect(mockFile('bakrep', genome.key)?.external?.digests[0].scope).toBe('not established')
+  })
+
+  it('lists only what applies to where the files come from', () => {
+    expect(sourceLines('lab-raw-data').map((line) => line.question)).toEqual(['elsewhere', 'sync'])
+    expect(sourceLines('bakrep')[0].text).toContain('not copied')
+    expect(sourceLines('nothing-here')).toEqual([])
   })
 
   it('finds example files when every word of the query is in the key', () => {

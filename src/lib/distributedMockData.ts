@@ -1,5 +1,5 @@
 // Example data for the node mock. All values are made up.
-import { grantGap, type Coverage, type DataStrategy, type MemberState, type PresetId, type RangeMode } from '@/lib/distributedMock'
+import { grantGap, type StorageQuestion, type Coverage, type DataStrategy, type MemberState, type PresetId, type RangeMode } from '@/lib/distributedMock'
 
 export interface MockMember {
   nodeId: string
@@ -623,43 +623,31 @@ export function exampleMark(bucket: string, key: string): string | null {
   return external.notPinned ? 'Not pinned' : 'From a source'
 }
 
-export interface ContentSources {
-  references: string[]
-  followedBy: string[]
-  follows: string[]
-  imports: string[]
+export interface SourceLine {
+  text: string
+  question: StorageQuestion
 }
 
-// Where the files of a bucket come from. A bucket not listed here reads as an ordinary one.
-export const CONTENT_SOURCES: Record<string, ContentSources> = {
-  bakrep: {
-    references: ['49 public buckets at s3.gi.denbi.de: about 50 million files, nothing copied'],
-    followedBy: [],
-    follows: [],
-    imports: [],
-  },
-  'spire-db': {
-    references: [],
-    followedBy: ['spire-public in the group Open Data follows this bucket, as references'],
-    follows: ['This bucket follows spire-staging in the group Genome Lab, continuously'],
-    imports: [],
-  },
-  'reads-edge': {
-    references: [],
-    followedBy: [],
-    follows: [],
-    imports: ['Storage backend sequencer-share: 5,210 files registered in place, not copied'],
-  },
-  [ORDINARY_BUCKET]: {
-    references: ['12 files of spire-db, read from there when needed'],
-    followedBy: ['lab-archive on node-2 follows this bucket, once a day'],
-    follows: [],
-    imports: [],
-  },
+// What does not come from a direct upload. A bucket without lines was filled by uploads.
+export const CONTENT_SOURCES: Record<string, SourceLine[]> = {
+  bakrep: [
+    { text: 'About 50 million files point to data in the source s3.gi.denbi.de, 49 buckets (not copied).', question: 'elsewhere' },
+  ],
+  'spire-db': [
+    { text: 'Copies files from bucket spire-staging of the group Genome Lab (sync, continuous).', question: 'sync' },
+    { text: 'Bucket spire-public of the group Open Data gets a copy of these files (sync, as references).', question: 'sync' },
+  ],
+  'reads-edge': [
+    { text: 'Registered from storage folder sequencer-share without copying: 5,210 files.', question: 'elsewhere' },
+  ],
+  [ORDINARY_BUCKET]: [
+    { text: '12 files point to data in bucket spire-db (not copied).', question: 'elsewhere' },
+    { text: 'Bucket lab-archive on node-2 gets a copy of these files (sync, continuous).', question: 'sync' },
+  ],
 }
 
-export function contentSources(bucket: string): ContentSources {
-  return CONTENT_SOURCES[bucket] ?? CONTENT_SOURCES[ORDINARY_BUCKET]
+export function sourceLines(bucket: string): SourceLine[] {
+  return CONTENT_SOURCES[bucket] ?? []
 }
 
 export interface FileHit {
