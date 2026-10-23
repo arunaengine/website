@@ -33,6 +33,7 @@ const WipePanel = compileClientComponent(new URL('./WipePanel.vue', import.meta.
   '@/components/ui/Notice.vue': moduleDefault(PassThrough),
   '@/composables/useAruna': { useAruna: () => ({ apiBaseUrl: ref('/api/v1'), authToken: ref('token') }) },
   '@/composables/useDeviceStatus': { useDeviceStatus: () => ({ identity, loaded, status }) },
+  '@/composables/useRealm': { useRealm: () => ({ realm: ref({ name: 'Test realm' }) }) },
   '@/lib/api': { ...Api, apiRequest },
   '@/lib/desktopBridge': { wipeDevice },
   '@/lib/utils': Utils,
@@ -47,10 +48,11 @@ beforeEach(() => {
   wipeDevice.mockClear()
 })
 
-async function confirmWipe() {
-  const mounted = await mountApp(WipePanel)
+async function confirmWipe(props: Record<string, unknown> = {}) {
+  const mounted = await mountApp(WipePanel, { props })
+  await click(button(mounted.root, 'Remove this computer…'))
   await typeValue(element(mounted.root, (node) => node.tag === 'input'), 'wipe')
-  await click(button(mounted.root, 'Wipe device'))
+  await click(button(mounted.root, 'Remove this computer'))
   return mounted
 }
 
@@ -64,6 +66,27 @@ describe('WipePanel', () => {
     })
     expect(calls).toEqual(['realm', 'local'])
     expect(mounted.errors).toEqual([])
+    mounted.app.unmount()
+  })
+
+  it('asks for the typed word before it shows the final button', async () => {
+    const mounted = await mountApp(WipePanel)
+
+    expect(content(mounted.root)).toContain('Takes this computer out of Test realm')
+    expect(() => element(mounted.root, (node) => node.tag === 'input')).toThrow()
+    await click(button(mounted.root, 'Remove this computer…'))
+    await click(button(mounted.root, 'Remove this computer'))
+
+    expect(wipeDevice).not.toHaveBeenCalled()
+    mounted.app.unmount()
+  })
+
+  it('wipes locally without the realm step when the node cannot name itself', async () => {
+    identity.value = null
+    const mounted = await confirmWipe({ realm: false })
+
+    expect(apiRequest).not.toHaveBeenCalled()
+    expect(calls).toEqual(['local'])
     mounted.app.unmount()
   })
 

@@ -101,7 +101,7 @@ async function startNode(): Promise<void> {
             </RouterLink>
           </Button>
           <Button v-else variant="outline" as-child>
-            <RouterLink :to="{ name: 'device' }">Open the device page</RouterLink>
+            <RouterLink :to="{ name: 'device' }">Open This computer</RouterLink>
           </Button>
         </div>
       </div>

@@ -57,7 +57,7 @@ const detail = computed(() => {
 
   <EmptyState v-else-if="state === 'offline'" :title="headline" :description="detail">
     <Button variant="outline" size="sm" as-child>
-      <RouterLink :to="{ name: 'device' }">Open the device page</RouterLink>
+      <RouterLink :to="{ name: 'device' }">Open This computer</RouterLink>
     </Button>
   </EmptyState>
 

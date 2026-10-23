@@ -29,14 +29,11 @@ const ComputePanel = compileClientComponent(new URL('./ComputePanel.vue', import
   '@/components/ui/Badge.vue': moduleDefault(plain),
   '@/components/ui/Button.vue': moduleDefault(plain),
   '@/components/ui/Notice.vue': moduleDefault(Notice),
-  '@/components/ui/RefreshButton.vue': moduleDefault(plain),
   '@/components/ui/Input.vue': moduleDefault(plain),
-  '@/components/ui/Select.vue': moduleDefault(plain),
   '@/components/ui/Switch.vue': moduleDefault(plain),
   '@/composables/useDeviceCompute': {
     useDeviceCompute: () => ({ compute: ref(null), state: ref('offline'), load: async () => {} }),
   },
-  '@/composables/useRefresh': { useRefresh: (run: () => unknown) => ({ busy: ref(false), refresh: run }) },
   '@/lib/desktopBridge': {
     computeProbe: async () => probe.value,
     nodeSettings: async () => ({ compute: { backend: backend.value } }),
@@ -64,20 +61,18 @@ beforeEach(() => {
 })
 
 describe('the container runtime the shell would pick', () => {
-  it('skips Apptainer without a delegated cgroup', async () => {
+  it('warns when no usable runtime was found', async () => {
     probe.value = seen(false, true, false)
-    const html = await render()
 
-    expect(html).not.toContain('Automatic picks')
-    expect(html).toContain('No usable Docker or Apptainer')
+    expect(await render()).toContain('No usable Docker or Apptainer')
   })
 
-  it('picks Apptainer with a delegated cgroup', async () => {
+  it('stays quiet when Apptainer has a delegated cgroup', async () => {
     probe.value = seen(false, true, true)
     const html = await render()
 
-    expect(html).toContain('Automatic picks Apptainer')
     expect(html).not.toContain('No usable')
+    expect(html).not.toContain('Automatic picks')
   })
 
   it('warns when a chosen Apptainer has no cgroup', async () => {
@@ -85,5 +80,24 @@ describe('the container runtime the shell would pick', () => {
     probe.value = seen(true, true, false)
 
     expect(await render()).toContain('Apptainer has no delegated cgroup')
+  })
+
+  it('says nothing about a runtime while local runs are off', async () => {
+    backend.value = 'off'
+    probe.value = seen(false, false, false)
+
+    expect(await render()).not.toContain('No usable')
+  })
+})
+
+describe('the local runs card', () => {
+  it('words the switch and the limits in plain terms', async () => {
+    probe.value = seen(true, false, false)
+    const html = await render()
+
+    for (const text of ['Local runs', 'Run jobs on this computer', 'Jobs at a time', 'Keep failed jobs', 'Save']) {
+      expect(html).toContain(text)
+    }
+    expect(html).toContain('Saving restarts Aruna on this computer for a few seconds.')
   })
 })

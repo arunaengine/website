@@ -270,7 +270,7 @@ async function createFolder() {
         <ShieldAlert class="mt-0.5 h-4 w-4 shrink-0" />
         <p>
           This node does not advertise an S3 endpoint, so the portal cannot connect.
-          <template v-if="desktop">Turn the local S3 endpoint on under This computer, Storage &amp; settings.</template>
+          <template v-if="desktop">Turn the local S3 endpoint on under This computer.</template>
         </p>
       </Notice>
 

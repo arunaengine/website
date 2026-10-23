@@ -1,17 +1,14 @@
 <script setup lang="ts">
-// Whether this computer runs work itself, with which runtime, and how much of
-// it that work may take. The probe is what the shell found; the settings
-// are what the owner decided, and saving them restarts the node.
+// Whether this computer runs jobs itself and how much of it they may take. The
+// probe is what the shell found; the settings are what the owner decided, and
+// saving them restarts the node.
 import { computed, onMounted, ref } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Notice from '@/components/ui/Notice.vue'
-import RefreshButton from '@/components/ui/RefreshButton.vue'
 import Input from '@/components/ui/Input.vue'
-import Select from '@/components/ui/Select.vue'
 import Switch from '@/components/ui/Switch.vue'
 import { useDeviceCompute } from '@/composables/useDeviceCompute'
-import { useRefresh } from '@/composables/useRefresh'
 import {
   computeProbe,
   nodeSettings,
@@ -19,27 +16,19 @@ import {
   type ComputeProbe,
   type ComputeSettings,
 } from '@/lib/desktopBridge'
-import { errorMessage, formatBytes } from '@/lib/utils'
+import { errorMessage } from '@/lib/utils'
+import { Cpu } from '@lucide/vue'
 
 const GIB = 1024 ** 3
 
-const { compute, state: liveState, load: loadLive } = useDeviceCompute()
+const { compute, load: loadLive } = useDeviceCompute()
 
 const settings = ref<ComputeSettings | null>(null)
 const probe = ref<ComputeProbe | null>(null)
 const loadError = ref<string | null>(null)
-const probeError = ref<string | null>(null)
 const saveError = ref<string | null>(null)
 const saved = ref(false)
 const saving = ref(false)
-const probing = ref(false)
-
-const BACKEND_OPTIONS = [
-  { value: 'auto', label: 'Automatic' },
-  { value: 'docker', label: 'Docker' },
-  { value: 'apptainer', label: 'Apptainer' },
-  { value: 'off', label: 'Off' },
-]
 
 async function load(): Promise<void> {
   try {
@@ -50,26 +39,27 @@ async function load(): Promise<void> {
   }
 }
 
+// A probe that fails only costs the hint below; the settings still work.
 async function runProbe(): Promise<void> {
-  probing.value = true
   try {
     probe.value = await computeProbe()
-    probeError.value = null
-  } catch (err) {
-    probeError.value = errorMessage(err)
-  } finally {
-    probing.value = false
+  } catch {
+    probe.value = null
   }
 }
-
-const { busy: probeBusy, refresh: onProbe } = useRefresh(runProbe)
-const spinning = computed(() => probeBusy.value || probing.value)
 
 onMounted(() => {
   void load()
   void runProbe()
   void loadLive()
 })
+
+// Turning runs on lets the shell pick the runtime; the last choice is kept otherwise.
+const on = computed(() => settings.value !== null && settings.value.backend !== 'off')
+
+function setOn(enabled: boolean): void {
+  patch({ backend: enabled ? 'auto' : 'off' })
+}
 
 function patch(change: Partial<ComputeSettings>): void {
   if (!settings.value) return
@@ -124,55 +114,43 @@ const chosenMissing = computed(() => {
 </script>
 
 <template>
-  <div class="space-y-4">
-    <div class="surface space-y-5 p-5">
-      <div class="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 class="font-display text-sm font-semibold text-aruna-navy">Runs on this computer</h3>
-          <p class="mt-1 text-xs text-muted-foreground">
-            Runs you send to This computer execute in a container here, against data this node already holds. The
-            realm never sends work to this computer.
-          </p>
-        </div>
-        <div class="flex shrink-0 items-center gap-2">
-          <Badge v-if="compute?.enabled" variant="success">on</Badge>
-          <Badge v-else variant="secondary">off</Badge>
-          <RefreshButton :busy="spinning" sr-label="Look for a runtime again" @click="onProbe" />
-        </div>
+  <section class="surface overflow-hidden">
+    <header class="flex items-center justify-between gap-2 border-b border-border px-5 py-3">
+      <div class="flex items-center gap-2">
+        <Cpu class="h-4 w-4 text-primary" />
+        <h2 class="font-display text-sm font-semibold text-aruna-navy">Local runs</h2>
       </div>
+      <Badge v-if="compute?.enabled" variant="success">On</Badge>
+      <Badge v-else variant="secondary">Off</Badge>
+    </header>
 
+    <div class="space-y-5 px-5 py-4">
       <Notice v-if="loadError" tone="error">{{ loadError }}</Notice>
 
       <template v-else-if="settings">
-        <div class="grid gap-3 sm:grid-cols-2">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <span class="text-xs font-medium text-foreground">Run jobs on this computer</span>
+            <p class="text-[11px] text-muted-foreground">
+              Jobs run next to your data. Aruna never sends work here on its own.
+            </p>
+          </div>
+          <Switch :checked="on" aria-label="Run jobs on this computer" @update:checked="setOn" />
+        </div>
+
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <label class="block">
-            <span class="text-xs font-medium text-foreground">Container runtime</span>
-            <Select
-              :model-value="settings.backend"
-              class="mt-1"
-              :options="BACKEND_OPTIONS"
-              aria-label="Container runtime"
-              @update:model-value="patch({ backend: $event as ComputeSettings['backend'] })"
-            />
-            <span v-if="settings.backend === 'auto' && resolved" class="mt-1 block text-[11px] text-muted-foreground"
-              >Automatic picks {{ resolved }} on this computer.</span
-            >
-          </label>
-          <label class="block">
-            <span class="text-xs font-medium text-foreground">Runs at a time</span>
+            <span class="text-xs font-medium text-foreground">Jobs at a time</span>
             <Input
               :model-value="numberInput(settings.maxConcurrent)"
               class="mt-1"
               type="number"
               min="1"
               placeholder="1"
-              aria-label="Runs at a time"
+              aria-label="Jobs at a time"
               @update:model-value="patchNumber('maxConcurrent', String($event))"
             />
           </label>
-        </div>
-
-        <div class="grid gap-3 sm:grid-cols-3">
           <label class="block">
             <span class="text-xs font-medium text-foreground">CPU cores</span>
             <Input
@@ -213,72 +191,32 @@ const chosenMissing = computed(() => {
 
         <div class="flex items-center justify-between gap-3">
           <div>
-            <span class="text-xs font-medium text-foreground">Keep failed runs</span>
+            <span class="text-xs font-medium text-foreground">Keep failed jobs</span>
             <p class="text-[11px] text-muted-foreground">
-              Leaves the workspace of a failed run on disk so you can look at what it produced.
+              Leave the files of a failed job on disk so you can look at them.
             </p>
           </div>
           <Switch
             :checked="settings.keepFailed"
-            aria-label="Keep the workspace of failed runs"
+            aria-label="Keep the files of failed jobs"
             @update:checked="patch({ keepFailed: $event })"
           />
         </div>
 
-        <Notice v-if="chosenMissing" tone="warning">
-          {{ chosenMissing }} Runs sent here will be refused until it is available.
+        <Notice v-if="on && chosenMissing" tone="warning">
+          {{ chosenMissing }} Jobs sent here are refused until it is available.
         </Notice>
 
         <Notice v-if="saveError" tone="error">{{ saveError }}</Notice>
 
         <div class="flex flex-wrap items-center justify-end gap-3">
-          <span class="mr-auto text-[11px] text-muted-foreground">Saving restarts the node on this computer.</span>
+          <span class="mr-auto text-[11px] text-muted-foreground">
+            Saving restarts Aruna on this computer for a few seconds.
+          </span>
           <span v-if="saved" class="text-[11px] text-muted-foreground">Saved.</span>
-          <Button :disabled="saving" @click="save">{{ saving ? 'Saving…' : 'Save compute settings' }}</Button>
+          <Button :disabled="saving" @click="save">{{ saving ? 'Saving…' : 'Save' }}</Button>
         </div>
       </template>
     </div>
-
-    <div class="surface space-y-3 p-5">
-      <h3 class="font-display text-sm font-semibold text-aruna-navy">What this computer offers</h3>
-      <p v-if="probeError" class="text-xs text-muted-foreground">The shell could not look for a runtime: {{ probeError }}</p>
-      <dl v-else-if="probe" class="grid gap-3 sm:grid-cols-2">
-        <div class="surface-inline px-3 py-2">
-          <dt class="text-xs font-medium text-foreground">Docker</dt>
-          <dd class="mt-0.5 font-mono text-[11px] text-muted-foreground">
-            {{ probe.docker.available ? (probe.docker.version ?? 'available') : 'unreachable' }}
-          </dd>
-          <dd v-if="probe.docker.socket" class="truncate font-mono text-[10px] text-muted-foreground">
-            {{ probe.docker.socket }}
-          </dd>
-        </div>
-        <div class="surface-inline px-3 py-2">
-          <dt class="text-xs font-medium text-foreground">Apptainer</dt>
-          <dd class="mt-0.5 font-mono text-[11px] text-muted-foreground">
-            {{ probe.apptainer.available ? (probe.apptainer.version ?? 'available') : 'not installed' }}
-          </dd>
-          <dd v-if="probe.apptainer.available && !probe.apptainer.cgroupOk" class="text-[10px] text-amber-700 dark:text-amber-300">
-            No delegated cgroup, so resource limits will not hold.
-          </dd>
-        </div>
-      </dl>
-
-      <div v-if="liveState === 'ready' && compute" class="flex flex-wrap gap-x-6 gap-y-1 text-[11px] text-muted-foreground">
-        <span>backend <span class="font-mono text-foreground">{{ compute.backend ?? 'none' }}</span></span>
-        <span>health <span class="font-mono text-foreground">{{ compute.healthy ? 'ok' : 'not ready' }}</span></span>
-        <span>running <span class="font-mono text-foreground">{{ compute.running }}</span></span>
-        <span>queued <span class="font-mono text-foreground">{{ compute.queued }}</span></span>
-        <span v-if="compute.limits.max_ram_bytes"
-          >memory cap
-          <span class="font-mono text-foreground">{{ formatBytes(compute.limits.max_ram_bytes) }}</span></span
-        >
-      </div>
-      <p v-else-if="liveState === 'unsupported'" class="text-[11px] text-muted-foreground">
-        This node version does not report its compute state yet.
-      </p>
-      <p v-else-if="liveState === 'offline'" class="text-[11px] text-muted-foreground">
-        The node is not running, so it reports no compute state.
-      </p>
-    </div>
-  </div>
+  </section>
 </template>

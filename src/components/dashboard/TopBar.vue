@@ -88,7 +88,7 @@ async function handleSignOut() {
         v-if="desktop"
         :to="{ name: 'device' }"
         class="flex h-9 min-w-0 shrink items-center gap-2 rounded-md border border-border/70 bg-card px-2.5 transition-colors hover:border-border hover:bg-muted"
-        :title="`This device: ${nodeLabel}`"
+        :title="`This computer: ${nodeLabel}`"
       >
         <StatusDot :tone="nodeTone" :label="nodeLabel" class="size-1.5" />
         <span class="text-[12px] font-medium leading-none text-foreground">{{ nodeLabel }}</span>
