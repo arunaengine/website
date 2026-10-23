@@ -104,7 +104,8 @@ const remote = computed(() => Boolean(props.nodeId))
 // A file of an example bucket stored on several nodes (node mock).
 const mock = computed(() => (mockEnabled() ? mockFile(props.bucket, props.objectKey) : undefined))
 const shownSize = computed(() => props.size ?? mock.value?.size)
-const currentVersion = computed(() => pinnedVersion.value ?? head.value?.versionId ?? null)
+const shownModified = computed(() => props.lastModified ?? (mock.value ? new Date(mock.value.modified) : undefined))
+const currentVersion = computed(() => pinnedVersion.value ?? head.value?.versionId ?? mock.value?.versionId ?? null)
 // Preview is a mode of this dialog, not a tab: it fills the frame under the
 // same header, and the tabs are one click away.
 const previewMode = computed(() => props.tab === 'preview' && !props.folder && !mock.value)
@@ -142,7 +143,7 @@ async function loadChecksums() {
   const realmId = nodeInfo.value?.node.realm_id
   const nodeId = props.nodeId ?? localNodeId()
   const baseUrl = nodeId ? nodeApiBase(nodeId) : null
-  if (!props.open || props.folder || !version || !realmId || !nodeId || !baseUrl) return
+  if (!props.open || props.folder || mock.value || !version || !realmId || !nodeId || !baseUrl) return
   const id = versionObjectId(realmId, nodeId, props.bucket, props.objectKey, version)
   try {
     const object = await apiRequest<DrsObjectResponse>(
@@ -264,7 +265,7 @@ const details = computed(() => props.folder ? [
   { label: 'Size', value: shownSize.value === undefined ? 'unknown' : formatBytes(shownSize.value) },
   {
     label: 'Last modified',
-    value: props.lastModified ? relativeTime(props.lastModified.toISOString()) : 'unknown',
+    value: shownModified.value ? relativeTime(shownModified.value.toISOString()) : 'unknown',
   },
   { label: 'Content type', value: head.value?.contentType || 'unknown' },
 ])

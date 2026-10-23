@@ -10,6 +10,7 @@ import DialogTitle from '@/components/ui/DialogTitle.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import Notice from '@/components/ui/Notice.vue'
 import AddDataDialog from '@/components/data/AddDataDialog.vue'
 import DataViewSkeleton from '@/components/data/DataViewSkeleton.vue'
@@ -21,6 +22,7 @@ import NodePicker from '@/components/data/NodePicker.vue'
 import DeleteDialog from '@/components/data/DeleteDialog.vue'
 import FileDetailsDialog from '@/components/data/FileDetailsDialog.vue'
 import PublicAccessDialog from '@/components/data/PublicAccessDialog.vue'
+import MockSidebar from '@/components/data/manager/MockSidebar.vue'
 import MockBucketBrowser from '@/components/data/manager/MockBucketBrowser.vue'
 import ObjectBrowser from '@/components/data/manager/ObjectBrowser.vue'
 import UploadPanel from '@/components/data/manager/UploadPanel.vue'
@@ -197,6 +199,16 @@ function onSyncChanged() {
 const addDataOpen = ref(false)
 // An example bucket of the node mock replaces the object browser.
 const exampleBucket = computed(() => (mockEnabled() ? mockBucket(bucket.value) : undefined))
+// Without a session the example buckets still show, from static data.
+const mockOnly = computed(
+  () =>
+    mockEnabled() &&
+    bootstrapped.value &&
+    (!currentUser.value ||
+      !s3.connectedEndpoint.value ||
+      Boolean(contextError.value && !contextReady.value) ||
+      (!groupsLoading.value && !hasGroups.value)),
+)
 const newNotebookOpen = ref(false)
 // The notebooks entry is this same view with notebooks highlighted.
 const notebooksView = computed(() => route.name === 'notebooks' || route.query.notebooks === '1')
@@ -317,6 +329,17 @@ async function createFolder() {
 
     <div class="container space-y-6 py-8">
       <DataViewSkeleton v-if="!bootstrapped" />
+
+      <section v-else-if="mockOnly" class="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <MockSidebar :active="bucket" @open="(name: string) => manager.openBucket(name)" />
+        <MockBucketBrowser
+          v-if="exampleBucket"
+          :bucket="exampleBucket"
+          @add-data="addDataOpen = true"
+          @open="(key: string) => manager.openDetails({ key, name: key.split('/').pop() ?? key })"
+        />
+        <EmptyState v-else title="Pick an example bucket" description="The buckets on the left show example data. Nothing here talks to a node." />
+      </section>
 
       <Notice v-else-if="!s3.connectedEndpoint.value" tone="warning" class="flex items-start gap-3 p-5 text-sm">
         <ShieldAlert class="mt-0.5 h-4 w-4 shrink-0" />

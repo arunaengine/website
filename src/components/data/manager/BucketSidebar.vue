@@ -18,6 +18,7 @@ import type { BucketSearchHit } from '@/lib/api'
 import { isDesktop } from '@/lib/desktop'
 import type { BindSource } from '@/lib/bindSource'
 import { defaultPlacement, mockEnabled, placementLabel } from '@/lib/distributedMock'
+import { exampleBuckets } from '@/lib/distributedMockData'
 import { folderName } from '@/lib/deviceApi'
 import { placeName, placeTitle } from '@/lib/bucketPlace'
 import { isHiddenBucket } from '@/lib/workspaces'
@@ -80,6 +81,8 @@ const jobs = useBucketJobs(selectedGroupId, computed(() => [buckets.value, listi
 // Where the next bucket is stored (node mock); this node unless changed.
 const storageOpen = ref(false)
 const resultsOpen = ref(false)
+// The example rows show even when the group has no bucket of its own.
+const examples = computed(() => (mockEnabled() ? exampleBuckets(bucketNameFilter.value) : []))
 const placement = ref(defaultPlacement())
 
 // Several nodes show the result of each node; one node creates as before.
@@ -205,7 +208,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
       <template v-if="searchList">
         <Spinner v-if="all.loading.value && !all.hits.value.length" show-label label="Loading buckets…" class="px-3 py-4" />
         <p v-else-if="all.error.value" class="px-3 py-3 text-xs text-destructive">{{ all.error.value }}</p>
-        <ul v-else-if="all.hits.value.length" :id="`${listId}-group`" role="listbox" class="max-h-[420px] overflow-y-auto py-1">
+        <ul v-else-if="all.hits.value.length || examples.length" :id="`${listId}-group`" role="listbox" class="max-h-[420px] overflow-y-auto py-1">
           <li v-for="(hit, index) in all.hits.value" :key="`${hit.node_id}/${hit.bucket}`">
             <BucketRow
               :bucket="hit.bucket"
@@ -248,7 +251,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
         <template v-else>
           <!-- A failed revalidation keeps the last good list and reports itself above it. -->
           <p v-if="bucketsError" class="border-b border-border/70 px-3 py-2 text-xs text-destructive">{{ bucketsError }}</p>
-          <ul v-if="nodeBuckets.length" :id="`${listId}-group`" role="listbox" class="max-h-[420px] overflow-y-auto py-1">
+          <ul v-if="nodeBuckets.length || examples.length" :id="`${listId}-group`" role="listbox" class="max-h-[420px] overflow-y-auto py-1">
             <li
               v-for="(entry, index) in nodeBuckets"
               :key="`${entry.nodeId ?? 'local'}/${entry.bucket}`"
