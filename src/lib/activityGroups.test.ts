@@ -8,7 +8,13 @@ const folders = [
 ]
 const transfer = (id: string, state: string, extra: Record<string, unknown> = {}): DeviceTransfer =>
   readTransfer({ id, state, path: `${id}.txt`, folder_id: 'f1', ...extra }, 'upload')
-const decision = (folderId: string) => ({ folderId, folder: 'x', text: 'Kept your version of a.csv', atMs: 1 })
+const decision = (folderId: string) => ({
+  folderId,
+  folder: 'x',
+  text: 'Kept your version of a.csv',
+  atMs: 1,
+  outcome: 'applied' as const,
+})
 
 const rows = [
   transfer('a', 'done'),
