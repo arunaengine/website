@@ -4,6 +4,7 @@ import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import TabsContent from '@/components/ui/TabsContent.vue'
 import ConnectorDialog from '@/components/groups/ConnectorDialog.vue'
+import StorageFeatureLink from '@/components/distributed/StorageFeatureLink.vue'
 import AddDataShell from '@/components/data/add/AddDataShell.vue'
 import UploadTab from '@/components/data/add/UploadTab.vue'
 import ConnectorTab from '@/components/data/add/ConnectorTab.vue'
@@ -114,6 +115,7 @@ function onImportsCreated() {
         />
       </TabsContent>
     </Tabs>
+    <StorageFeatureLink question="elsewhere" />
 
     <template #dialogs>
       <ConnectorDialog v-model:open="registerOpen" :group-id="groupSel" @saved="onConnectorSaved" />

@@ -6,6 +6,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import DocsLink from '@/components/ui/DocsLink.vue'
+import StorageFeatureLink from '@/components/distributed/StorageFeatureLink.vue'
 import ListShell from '@/components/ui/ListShell.vue'
 import Notice from '@/components/ui/Notice.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
@@ -206,6 +207,7 @@ function remove(row: SyncRow) {
       <p class="text-xs text-muted-foreground">
         Only syncs you created are listed.
         <DocsLink icon topic="where-data-lives" section="Syncs" class="ml-0.5" />
+        <StorageFeatureLink icon question="sync" class="ml-0.5" />
       </p>
       <div class="flex items-center gap-2">
         <Button variant="outline" size="sm" @click="emit('new-sync')">

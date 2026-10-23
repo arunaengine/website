@@ -299,3 +299,15 @@ export function defaultPlacement(): Placement {
 export function placementLabel(placement: Placement): string {
   return placement.several ? storedLabel(placement.preset, placement.members.length) : 'This node'
 }
+
+// The questions of the storage feature guide, by the section title that answers each.
+export const STORAGE_QUESTIONS = {
+  describe: 'I want to describe or publish data that belongs together',
+  elsewhere: 'The data is already somewhere else',
+  nodes: 'The same bucket should be on several nodes, or it is too large for one node',
+  sync: 'I need a separate second bucket that follows the first',
+  rules: 'Same node, fast or archive storage',
+  sites: 'Data must not leave a site',
+} as const
+
+export type StorageQuestion = keyof typeof STORAGE_QUESTIONS

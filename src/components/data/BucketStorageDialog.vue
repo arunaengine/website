@@ -3,6 +3,7 @@
 // to keep copies, and the advanced options hold the per-node settings.
 import { computed, ref, watch } from 'vue'
 import CreateSettings from '@/components/distributed/CreateSettings.vue'
+import StorageFeatureLink from '@/components/distributed/StorageFeatureLink.vue'
 import MemberPicker from '@/components/distributed/MemberPicker.vue'
 import MemberSettings from '@/components/distributed/MemberSettings.vue'
 import MockNotice from '@/components/distributed/MockNotice.vue'
@@ -59,6 +60,7 @@ function apply() {
         <DialogTitle>Where should this bucket be stored?</DialogTitle>
         <DialogDescription>
           Each node creates its own bucket with the same name, so each creation can fail.
+          <StorageFeatureLink question="nodes" class="ml-1" />
         </DialogDescription>
       </DialogHeader>
       <MockNotice />

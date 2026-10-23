@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
+import { docsTopicBySlug } from '@/docs/v1'
 import { applyPortalConfig } from '@/lib/config'
-import { defaultSettings, mockEnabled, firstResults, grantGap, isPending, nodeGlob, planRanges, plannedStart, presetMembers, rangeTotal, retryResult } from './distributedMock'
+import { defaultSettings, mockEnabled, firstResults, grantGap, isPending, nodeGlob, planRanges, plannedStart, presetMembers, rangeTotal, retryResult, STORAGE_QUESTIONS } from './distributedMock'
 import { BAKREP_COUNT, mockBucket, sourceObjects } from './distributedMockData'
 
 describe('distributed mock helpers', () => {
@@ -60,5 +61,10 @@ describe('distributed mock helpers', () => {
     applyPortalConfig({ features: { distributedMock: true } })
     expect(mockEnabled()).toBe(true)
     applyPortalConfig({})
+  })
+
+  it('answers every storage question in the guide', () => {
+    const titles = docsTopicBySlug('storage-features')?.sections.map((section) => section.title) ?? []
+    for (const title of Object.values(STORAGE_QUESTIONS)) expect(titles).toContain(title)
   })
 })

@@ -79,6 +79,7 @@ const dialog = compileClientComponent(new URL('./SyncBucketDialog.vue', import.m
   '@/components/ui/DialogTitle.vue': moduleDefault(Slotted('h2')),
   '@/components/ui/DialogDescription.vue': moduleDefault(Slotted('p')),
   '@/components/ui/DocsLink.vue': moduleDefault(DocsLinkStub),
+  '@/components/distributed/StorageFeatureLink.vue': moduleDefault({ render: () => null }),
   '@/components/ui/DialogFooter.vue': moduleDefault(Slotted('footer')),
   '@/components/ui/DialogClose.vue': moduleDefault(Slotted('div')),
   '@/components/data/BucketSearchBox.vue': moduleDefault(SearchBoxStub),

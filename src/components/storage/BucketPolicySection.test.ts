@@ -54,6 +54,7 @@ const section = compileClientComponent(new URL('./BucketPolicySection.vue', impo
   '@/components/ui/DialogHeader.vue': moduleDefault(Slotted('header')),
   '@/components/ui/DialogTitle.vue': moduleDefault(Slotted('h2')),
   '@/components/ui/DocsLink.vue': moduleDefault(Slotted('a')),
+  '@/components/distributed/StorageFeatureLink.vue': moduleDefault({ render: () => null }),
   '@/components/ui/ErrorPanel.vue': moduleDefault(MessageStub),
   '@/components/ui/Input.vue': moduleDefault(Slotted('input')),
   '@/components/ui/RefreshButton.vue': moduleDefault(Slotted('button')),

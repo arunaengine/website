@@ -59,6 +59,7 @@ const tab = compileClientComponent(new URL('./SyncsTab.vue', import.meta.url), {
   '@/components/ui/Badge.vue': moduleDefault(Slotted('span')),
   '@/components/ui/Button.vue': moduleDefault(Slotted('button')),
   '@/components/ui/DocsLink.vue': moduleDefault(Slotted('a')),
+  '@/components/distributed/StorageFeatureLink.vue': moduleDefault({ render: () => null }),
   '@/components/ui/ListShell.vue': moduleDefault(ListShellStub),
   '@/components/ui/Notice.vue': moduleDefault(Slotted('aside')),
   '@/components/ui/RefreshButton.vue': moduleDefault(Slotted('button')),

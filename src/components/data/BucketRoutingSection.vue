@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Button from '@/components/ui/Button.vue'
 import DocsLink from '@/components/ui/DocsLink.vue'
+import StorageFeatureLink from '@/components/distributed/StorageFeatureLink.vue'
 import Input from '@/components/ui/Input.vue'
 import Switch from '@/components/ui/Switch.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
@@ -222,6 +223,7 @@ async function save() {
       <p class="text-[11px] text-muted-foreground">
         The most specific rule wins.
         <DocsLink icon topic="where-data-lives" section="Storage backend" class="ml-0.5" />
+        <StorageFeatureLink icon question="rules" class="ml-0.5" />
       </p>
     </template>
   </section>

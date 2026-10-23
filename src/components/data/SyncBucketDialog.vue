@@ -12,6 +12,7 @@ import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import DialogDescription from '@/components/ui/DialogDescription.vue'
 import DocsLink from '@/components/ui/DocsLink.vue'
+import StorageFeatureLink from '@/components/distributed/StorageFeatureLink.vue'
 import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import BucketSearchBox from '@/components/data/BucketSearchBox.vue'
@@ -351,6 +352,7 @@ function describeError(err: unknown): string {
           <p class="text-xs font-medium text-foreground">
             When a source object points at data elsewhere
             <DocsLink icon topic="where-data-lives" section="Syncs" class="ml-0.5" />
+            <StorageFeatureLink icon question="sync" class="ml-0.5" />
           </p>
           <div
             class="mt-1 grid gap-2 sm:grid-cols-3"
