@@ -310,3 +310,19 @@ export const MOCK_OBJECTS: readonly MockObject[] = [
 export function mockObject(id: string): MockObject | undefined {
   return MOCK_OBJECTS.find((object) => object.id === id)
 }
+
+export interface ImportState {
+  percent: number
+  state: 'done' | 'running' | 'queued'
+}
+
+// A snapshot of a running registration: the first ranges are done, the next ones run.
+export function importProgress(index: number): ImportState {
+  if (index < 20) return { percent: 100, state: 'done' }
+  if (index < 28) return { percent: 20 + ((index * 13) % 70), state: 'running' }
+  return { percent: 0, state: 'queued' }
+}
+
+export function sourceCoordinator(index: number): string {
+  return BAKREP_NODES[index % BAKREP_NODES.length]
+}
