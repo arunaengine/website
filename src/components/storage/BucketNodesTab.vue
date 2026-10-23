@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // The nodes a bucket is stored on, who writes which part, and how reads and updates work.
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import BucketActions from '@/components/distributed/BucketActions.vue'
 import DegradedNotice from '@/components/distributed/DegradedNotice.vue'
 import MemberTable from '@/components/distributed/MemberTable.vue'
@@ -8,10 +8,18 @@ import MockNotice from '@/components/distributed/MockNotice.vue'
 import RangeTable from '@/components/distributed/RangeTable.vue'
 import StorageFeatureLink from '@/components/distributed/StorageFeatureLink.vue'
 import DetailList from '@/components/ui/DetailList.vue'
+import OptionToggle from '@/components/ui/OptionToggle.vue'
 import { presetById, stamp } from '@/lib/distributedMock'
 import { degradedRanges, type MockBucket } from '@/lib/distributedMockData'
 
-const props = defineProps<{ bucket: MockBucket; admin: boolean }>()
+const props = defineProps<{ bucket: MockBucket }>()
+
+// The example data can be viewed as a group admin or as a member.
+const viewer = ref('admin')
+const VIEWERS = [
+  { value: 'admin', label: 'Group admin' },
+  { value: 'member', label: 'Group member' },
+]
 
 const degraded = computed(() => degradedRanges(props.bucket))
 const settings = computed(() => [
@@ -27,6 +35,7 @@ const settings = computed(() => [
 <template>
   <div class="space-y-5">
     <MockNotice />
+    <OptionToggle v-model="viewer" :options="VIEWERS" aria-label="View as" />
     <DegradedNotice v-for="range in degraded" :key="range.id" :range="range" />
     <section class="space-y-2">
       <div class="flex items-center gap-2">
@@ -34,7 +43,7 @@ const settings = computed(() => [
         <StorageFeatureLink icon question="nodes" />
       </div>
       <MemberTable :bucket="bucket" />
-      <BucketActions :bucket="bucket" :admin="admin" />
+      <BucketActions :bucket="bucket" :admin="viewer === 'admin'" />
     </section>
     <section class="space-y-2">
       <h2 class="font-display text-base font-semibold text-aruna-navy">Ranges</h2>

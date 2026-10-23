@@ -21,6 +21,7 @@ import AccessTab from '@/components/distributed/AccessTab.vue'
 import BucketNodesTab from '@/components/storage/BucketNodesTab.vue'
 import BucketEncryptionTab from '@/components/storage/BucketEncryptionTab.vue'
 import BucketPolicySection from '@/components/storage/BucketPolicySection.vue'
+import MockOverview from '@/components/storage/MockOverview.vue'
 import ContentSources from '@/components/storage/ContentSources.vue'
 import StorageOverviewTab from '@/components/storage/StorageOverviewTab.vue'
 import TransfersTab from '@/components/storage/TransfersTab.vue'
@@ -30,7 +31,7 @@ import { useRouteTab } from '@/composables/useRouteTab'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { useS3 } from '@/composables/useS3'
 import { mockEnabled } from '@/lib/distributedMock'
-import { mockBucket } from '@/lib/distributedMockData'
+import { isMulti, mockBucket } from '@/lib/distributedMockData'
 import { isGroupAdmin } from '@/lib/groupAdmin'
 import type { GroupDetailResponse } from '@/lib/api'
 import { ChevronLeft } from '@lucide/vue'
@@ -63,8 +64,9 @@ watch(
   { immediate: true },
 )
 
-// An example bucket of the node mock, stored on several nodes.
+// An example bucket of the node mock. It has no session behind it, so only its own tabs show.
 const example = computed(() => (mockEnabled() ? mockBucket(bucket.value) : undefined))
+const nodesTab = computed(() => Boolean(example.value && isMulti(example.value)))
 const canAdminGroup = computed(() => isGroupAdmin(group.value, currentUser.value?.id ?? ''))
 const local = computed(() => !nodeId.value)
 const backendVisible = computed(() => local.value && canAdminGroup.value)
@@ -77,10 +79,11 @@ const routeTab = useRouteTab(TAB_IDS, 'overview')
 const tab = computed({
   get() {
     const value = routeTab.value
-    if (value === 'nodes' && !example.value) return 'overview'
+    if (example.value && !['overview', 'nodes', 'access'].includes(value)) return 'overview'
+    if (value === 'nodes' && !nodesTab.value) return 'overview'
     if (value === 'backend' && !backendVisible.value) return 'overview'
     if (value === 'placement' && !placementVisible.value) return 'overview'
-    if (value === 'access' && !groupId.value) return 'overview'
+    if (value === 'access' && !groupId.value && !example.value) return 'overview'
     return value
   },
   set(next: string) {
@@ -125,23 +128,24 @@ const browserLink = computed(() => ({
       <div class="overflow-x-auto">
         <TabsList aria-label="Bucket settings sections">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger v-if="example" value="nodes">Nodes</TabsTrigger>
-          <TabsTrigger v-if="backendVisible" value="backend">Storage backend</TabsTrigger>
-          <TabsTrigger v-if="placementTrigger" value="placement">Placement</TabsTrigger>
-          <TabsTrigger v-if="groupId" value="access">Access</TabsTrigger>
-          <TabsTrigger value="encryption">Encryption</TabsTrigger>
-          <TabsTrigger value="transfers">Transfers</TabsTrigger>
+          <TabsTrigger v-if="nodesTab" value="nodes">Nodes</TabsTrigger>
+          <TabsTrigger v-if="backendVisible && !example" value="backend">Storage backend</TabsTrigger>
+          <TabsTrigger v-if="placementTrigger && !example" value="placement">Placement</TabsTrigger>
+          <TabsTrigger v-if="groupId || example" value="access">Access</TabsTrigger>
+          <TabsTrigger v-if="!example" value="encryption">Encryption</TabsTrigger>
+          <TabsTrigger v-if="!example" value="transfers">Transfers</TabsTrigger>
         </TabsList>
       </div>
 
       <TabsContent value="overview" class="mt-0 space-y-5">
-        <StorageOverviewTab :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
+        <MockOverview v-if="example" :bucket="example" />
+        <StorageOverviewTab v-else :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
         <ContentSources v-if="mockEnabled()" :bucket="bucket" />
         <BucketDeleteSection :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
       </TabsContent>
 
-      <TabsContent v-if="example" value="nodes" class="mt-0">
-        <BucketNodesTab :bucket="example" :admin="canAdminGroup" />
+      <TabsContent v-if="example && nodesTab" value="nodes" class="mt-0">
+        <BucketNodesTab :bucket="example" />
       </TabsContent>
 
       <TabsContent v-if="backendVisible" value="backend" class="mt-0">
@@ -163,9 +167,9 @@ const browserLink = computed(() => ({
         />
       </TabsContent>
 
-      <TabsContent v-if="groupId" value="access" class="mt-0 space-y-5">
+      <TabsContent v-if="groupId || example" value="access" class="mt-0 space-y-5">
         <AccessTab v-if="example" :bucket="example" />
-        <BucketAccessTab :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
+        <BucketAccessTab v-if="groupId && !example" :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
       </TabsContent>
 
       <TabsContent value="encryption" class="mt-0">

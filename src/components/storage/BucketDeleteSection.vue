@@ -9,7 +9,7 @@ import { useBuckets } from '@/composables/useBuckets'
 import { useBucketShortcuts } from '@/composables/useBucketShortcuts'
 import { useS3 } from '@/composables/useS3'
 import { mockEnabled } from '@/lib/distributedMock'
-import { mockBucket } from '@/lib/distributedMockData'
+import { isMulti, mockBucket } from '@/lib/distributedMockData'
 import type { DeleteRequest, DeletionResult } from '@/lib/deletion/request'
 import { Trash2 } from '@lucide/vue'
 
@@ -68,7 +68,7 @@ async function onCompleted(result: DeletionResult) {
       </Button>
     </header>
     <p class="px-5 py-4 text-sm text-muted-foreground">
-      {{ previewResult || (refusal ?? (example ? 'Removes the bucket and all its files on every node.' : 'Removes the bucket and all its files.')) }}
+      {{ previewResult || (refusal ?? (example && isMulti(example) ? 'Removes the bucket and all its files on every node.' : 'Removes the bucket and all its files.')) }}
     </p>
     <DeleteDialog :request="request" @close="request = null" @completed="onCompleted" />
     <SetDeleteDialog v-if="example" v-model:open="previewOpen" :bucket="example" @done="previewResult = `Mock, nothing changed: ${$event}`" />

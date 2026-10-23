@@ -4,7 +4,7 @@ import { computed } from 'vue'
 import MockNotice from '@/components/distributed/MockNotice.vue'
 import StorageFeatureLink from '@/components/distributed/StorageFeatureLink.vue'
 import { storedLabel } from '@/lib/distributedMock'
-import { contentSources, mockBucket } from '@/lib/distributedMockData'
+import { contentSources, isMulti, mockBucket } from '@/lib/distributedMockData'
 import { Waypoints } from '@lucide/vue'
 
 const props = defineProps<{ bucket: string }>()
@@ -13,6 +13,7 @@ const sources = computed(() => contentSources(props.bucket))
 const stored = computed(() => {
   const found = mockBucket(props.bucket)
   if (!found) return ['This node only']
+  if (!isMulti(found)) return [`This node: ${found.members[0].nodeId}`]
   return [`${storedLabel(found.preset, found.members.length)}: ${found.members.map((member) => member.nodeId).join(', ')}`]
 })
 const groups = computed(() => [
@@ -32,7 +33,7 @@ const groups = computed(() => [
       <StorageFeatureLink icon question="elsewhere" />
     </header>
     <div class="space-y-3 px-5 py-4">
-      <MockNotice />
+      <MockNotice v-if="!mockBucket(bucket)" />
       <dl class="space-y-2 text-sm">
         <div v-for="group in groups" :key="group.title" class="grid gap-1 sm:grid-cols-[10rem_1fr]">
           <dt class="text-xs font-medium text-muted-foreground">{{ group.title }}</dt>
