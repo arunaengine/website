@@ -26,6 +26,9 @@ export interface ProgressJob {
   failed: number
   waiting?: boolean | string | null
   controls: boolean
+  started_at_ms?: number
+  /** Time left as a short phrase, when it can be told. */
+  left?: string | null
 }
 
 const TITLES: Record<ProgressJob['kind'], { running: string; abort: string; verb: string }> = {
@@ -55,6 +58,19 @@ export function abortSentence(job: ProgressJob): string {
 
 export function percent(job: ProgressJob): number {
   return job.total > 0 ? Math.min(100, Math.round((job.done / job.total) * 100)) : 0
+}
+
+const LEFT_AFTER = 5
+
+/** "about 40 min left" from the speed so far; null while paused, early on or without a total. */
+export function timeLeft(job: ProgressJob, now: number): string | null {
+  const handled = job.done + job.failed
+  const spent = now - (job.started_at_ms ?? now)
+  if (job.state !== 'running' || handled < LEFT_AFTER || spent <= 0 || job.total <= handled) return null
+  const minutes = ((job.total - handled) * spent) / handled / 60_000
+  const rounded = Math.round(minutes)
+  if (rounded < 1) return 'less than 1 min left'
+  return rounded < 60 ? `about ${rounded} min left` : `about ${formatNumber(Math.round(minutes / 60))} h left`
 }
 
 /** The job as the progress box shows it; null once it is over. */

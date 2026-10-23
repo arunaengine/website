@@ -13,6 +13,7 @@ const ButtonStub = defineComponent({
 const JobProgress = compileClientComponent(new URL('./JobProgress.vue', import.meta.url), {
   vue: VueRuntime,
   '@/components/ui/Button.vue': moduleDefault(ButtonStub),
+  '@/components/ui/Spinner.vue': moduleDefault(defineComponent({ props: { label: String }, setup: (p) => () => h('i', p.label) })),
   '@/lib/api': {},
   '@/lib/organize': Organize,
   '@/lib/utils': Utils,
@@ -58,8 +59,32 @@ describe('JobProgress', () => {
   })
 
   it('shows a step without a total as a count only', async () => {
-    const { root } = await mount({ ...JOB, kind: 'rename', total: 0, counted: false, failed: 3 })
+    const { root } = await mount({ ...JOB, kind: 'move', total: 0, counted: false, failed: 3 })
     expect(content(root)).toContain('92,410 · 2 skipped · 3 failed')
+    expect(() => element(root, (node) => node.props.role === 'progressbar')).toThrow()
+  })
+
+  it('shows a rename with its bar, time left and where it runs', async () => {
+    const rename = { ...JOB, kind: 'rename', done: 152, total: 3877, skipped: 0, left: 'about 7 h left' } as const
+    const { root } = await mount(rename)
+    expect(content(root)).toContain('Renaming files in your storage')
+    expect(content(root)).toContain('152 of 3,877 renamed · about 7 h left')
+    expect(content(root)).toContain('Runs on the server. You can close this window.')
+    expect(element(root, (node) => node.props.role === 'progressbar').props['aria-valuenow']).toBe(4)
+  })
+
+  it('never calls a renamed file skipped and shows failed ones only when there are some', async () => {
+    const rename = { ...JOB, kind: 'rename', done: 152, total: 3877, skipped: 2, failed: 0 } as const
+    const quiet = await mount(rename)
+    expect(content(quiet.root)).not.toContain('skipped')
+    expect(content(quiet.root)).not.toContain('failed')
+    const failed = await mount({ ...rename, failed: 3 })
+    expect(content(failed.root)).toContain('152 of 3,877 renamed · 3 failed')
+  })
+
+  it('shows a rename without a total as a count only', async () => {
+    const { root } = await mount({ ...JOB, kind: 'rename', total: 0, counted: false, skipped: 0 })
+    expect(content(root)).toContain('92,410 renamed')
     expect(() => element(root, (node) => node.props.role === 'progressbar')).toThrow()
   })
 

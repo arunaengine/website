@@ -12,7 +12,7 @@ import {
   type LinkStatus,
   type OrganizeJob,
 } from '@/lib/api'
-import { activeJob, organizeError } from '@/lib/organize'
+import { activeJob, organizeError, timeLeft } from '@/lib/organize'
 
 const POLL_MS = 3000
 
@@ -38,7 +38,17 @@ export function useLinkState(groupId: () => string, importId: () => string) {
   let disposed = false
   let timer: ReturnType<typeof setTimeout> | null = null
 
-  const job = computed(() => activeJob(stored.value))
+  // A rename reports no total; it is fixed from the plan, once per run (by its start time).
+  const sized = ref<{ started: number; total: number } | null>(null)
+  const job = computed(() => {
+    const active = activeJob(stored.value)
+    if (active?.kind !== 'rename' || !sized.value || sized.value.started !== active.started_at_ms) return active
+    const total = Math.max(sized.value.total, active.done + active.failed)
+    const counted = { ...active, total, counted: true }
+    return { ...counted, left: timeLeft(counted, Date.now()) }
+  })
+  // The last step, once it is over.
+  const lastJob = computed(() => (stored.value && !activeJob(stored.value) ? stored.value : null))
   const context = () => `${groupId()}\n${importId()}`
 
   function client() {
@@ -73,6 +83,7 @@ export function useLinkState(groupId: () => string, importId: () => string) {
     const wasActive = job.value !== null
     if (current.state === 'ok') {
       stored.value = current.value
+      size(found?.state === 'ok')
       const ended = current.value && !activeJob(current.value) ? `${current.value.started_at_ms}:${current.value.finished_at_ms}` : ''
       if ((ended && ended !== lastEnd) || (wasActive && !current.value)) finished.value++
       if (ended) lastEnd = ended
@@ -84,6 +95,14 @@ export function useLinkState(groupId: () => string, importId: () => string) {
     readError.value = failed?.state === 'failed' ? failed.message : null
     if (running && !job.value) return refresh()
     schedule()
+  }
+
+  // A plan read with the answer left out the files done by then; an older plan did not.
+  function size(fresh: boolean) {
+    const active = activeJob(stored.value)
+    const started = active?.started_at_ms
+    if (!active || active.kind !== 'rename' || started === undefined || started === sized.value?.started || !renames.value) return
+    sized.value = { started, total: renames.value.count + (fresh ? active.done + active.failed : 0) }
   }
 
   function schedule() {
@@ -115,5 +134,5 @@ export function useLinkState(groupId: () => string, importId: () => string) {
     if (timer) clearTimeout(timer)
   })
 
-  return { renames, status, job, supported, error, controlling, finished, refresh, control }
+  return { renames, status, job, lastJob, supported, error, controlling, finished, refresh, control }
 }

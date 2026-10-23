@@ -50,7 +50,7 @@ const emit = defineEmits<{ (e: 'update:open', value: boolean): void; (e: 'saved'
 
 const { apiBaseUrl, authToken, sessionEpoch } = useAruna()
 const { writesDisabled } = useConnectivity()
-const { renames, status, job, error: stateError, controlling, finished, refresh, control } = useLinkState(
+const { renames, status, job, lastJob, error: stateError, controlling, finished, refresh, control } = useLinkState(
   () => props.groupId,
   () => props.link.import_id,
 )
@@ -285,6 +285,7 @@ async function save() {
             :link="link"
             :place="place"
             :job="job"
+            :last-job="lastJob"
             :controlling="controlling"
             :finished="finished"
             @started="refresh"

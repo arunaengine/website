@@ -16,6 +16,7 @@ import {
   startImportRenames,
   type BackendImport,
   type DuplicateItem,
+  type OrganizeJob,
   type RenamePlan,
 } from '@/lib/api'
 import { countWords } from '@/lib/bucketNaming'
@@ -29,6 +30,8 @@ const props = defineProps<{
   /** The S3 bucket and folder, as the description shows it. */
   place: string
   job: ProgressJob | null
+  /** The last step that ended; null while one runs or when none ran. */
+  lastJob?: OrganizeJob | null
   controlling?: boolean
   /** Counts steps that ended, so the counts read again. */
   finished?: number
@@ -103,6 +106,10 @@ const copySummary = computed(() => {
   const page = copies.page.value
   return page ? `Showing ${formatNumber(page.items.length)} · ${copyCount.value}` : undefined
 })
+const renaming = computed(() => props.job?.kind === 'rename')
+const renamed = computed(() => (props.lastJob?.kind === 'rename' && props.lastJob.state === 'done' ? props.lastJob : null))
+// Files that kept their old name are shown with the way to open them, instead of the count.
+const kept = computed(() => Boolean(renamed.value?.failed) && renameOffered.value && !renaming.value)
 const renameCount = computed(() => countWords(renameAll.value?.total ?? 0, renameAll.value?.complete ?? true))
 const copyLine = computed(() => {
   const plan = renameAll.value?.plan
@@ -135,6 +142,7 @@ watch(
   { immediate: true },
 )
 watch(() => props.finished, reload)
+watch(renaming, (on) => on && (open.value = null))
 
 function review(step: 'dup' | 'ren') {
   open.value = open.value === step ? null : step
@@ -222,17 +230,33 @@ const blocked = computed(() => busy.value || Boolean(props.job) || writesDisable
       <JobProgress v-if="job?.kind === 'duplicates'" class="mt-3" :job="job" :busy="controlling" @control="(action) => emit('control', action)" />
     </div>
 
-    <div v-if="renameOffered || counting || job?.kind === 'rename'" class="rounded-md border border-border px-3 py-2.5" data-testid="step-renames">
+    <div v-if="renameOffered || counting || renaming || renamed" class="rounded-md border border-border px-3 py-2.5" data-testid="step-renames">
       <div class="flex items-center gap-2">
         <div class="min-w-0 flex-1">
           <div class="text-sm font-medium">Old file names</div>
           <p class="text-xs text-muted-foreground">Files with an older name style get the bucket's current style.</p>
         </div>
         <Spinner v-if="counting" show-label label="Counting files…" />
-        <span v-else-if="renameOffered" class="text-xs text-muted-foreground">{{ renameCount }}</span>
-        <Button v-if="counting || renameOffered" variant="outline" size="sm" :disabled="counting" @click="review('ren')">Review…</Button>
+        <span v-else-if="renameOffered && !renaming && !kept" class="text-xs text-muted-foreground">{{ renameCount }}</span>
+        <Button
+          v-if="counting || renaming || (renameOffered && !kept)"
+          variant="outline"
+          size="sm"
+          :disabled="counting || renaming"
+          :title="renaming ? 'A rename is running' : undefined"
+          @click="review('ren')"
+        >
+          Review…
+        </Button>
       </div>
-      <div v-if="open === 'ren'" class="mt-3">
+      <template v-if="renamed && !renaming">
+        <p class="mt-2 text-sm">{{ filesWord(renamed.done) }} renamed.</p>
+        <p v-if="kept" class="mt-1 flex items-center gap-1 text-xs text-destructive">
+          {{ renamed.failed === 1 ? '1 file kept its old name.' : `${filesWord(renamed.failed)} kept their old name.` }}
+          <Button variant="link" size="sm" class="h-auto p-0 text-xs" @click="review('ren')">Show them</Button>
+        </p>
+      </template>
+      <div v-if="open === 'ren' && !renaming" class="mt-3">
         <div v-if="renameAll?.plan" class="mb-2 rounded-md bg-muted px-3 py-2.5" data-testid="rename-plan">
           <p class="text-sm font-medium">This rename will</p>
           <ul class="mt-1 list-disc space-y-0.5 pl-4 text-xs text-muted-foreground">

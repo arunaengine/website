@@ -69,10 +69,11 @@ describe('useLinkState', () => {
   })
 
   it('shows a running rename that reports no total', async () => {
+    getImportRenames.mockResolvedValue({ count: 6, complete: true, files: [] })
     getOrganizeJob.mockResolvedValue({ ...RUNNING, kind: 'rename', total: 0, counted: false, done: 4 })
     const { scope, state } = setup()
     await state.refresh()
-    expect(state.job.value).toMatchObject({ kind: 'rename', done: 4, total: 0 })
+    expect(state.job.value).toMatchObject({ kind: 'rename', done: 4, total: 10 })
     scope.stop()
   })
 
@@ -161,6 +162,78 @@ describe('useLinkState', () => {
     expect(getImportRenames).toHaveBeenCalledTimes(2)
     expect(getLinkStatus).toHaveBeenCalledTimes(2)
     expect(state.renames.value?.count).toBe(3)
+    scope.stop()
+  })
+
+  it('sizes a running rename from the plan read with it, and fixes it for that run', async () => {
+    const rename = { ...RUNNING, kind: 'rename', total: 0, counted: false, done: 152, failed: 3, started_at_ms: 100 }
+    getImportRenames.mockResolvedValue({ count: 3722, complete: true, files: [] })
+    getOrganizeJob.mockResolvedValue(rename)
+    const { scope, state } = setup()
+    await state.refresh()
+    expect(state.job.value).toMatchObject({ kind: 'rename', done: 152, total: 3877, counted: true })
+    // The plan is not read again while the run goes on, and the total stays.
+    getOrganizeJob.mockResolvedValue({ ...rename, done: 400 })
+    await state.refresh()
+    expect(getImportRenames).toHaveBeenCalledTimes(1)
+    expect(state.job.value).toMatchObject({ done: 400, total: 3877 })
+    // A new run is sized by its own start.
+    getOrganizeJob.mockResolvedValue({ ...rename, state: 'done', finished_at_ms: 500 })
+    getImportRenames.mockResolvedValue({ count: 3, complete: true, files: [] })
+    await state.refresh()
+    getOrganizeJob.mockResolvedValue({ ...rename, started_at_ms: 600, done: 0, failed: 0 })
+    await state.refresh()
+    expect(state.job.value).toMatchObject({ done: 0, total: 3 })
+    scope.stop()
+  })
+
+  it('takes an older plan as it is when the new read gave none', async () => {
+    getImportRenames.mockResolvedValueOnce({ count: 3877, complete: true, files: [] })
+    const { scope, state } = setup()
+    await state.refresh()
+    getImportRenames.mockRejectedValue(new Error('slow'))
+    getOrganizeJob.mockResolvedValue({ ...RUNNING, kind: 'rename', total: 0, counted: false, done: 9, started_at_ms: 100 })
+    await state.refresh()
+    expect(state.job.value).toMatchObject({ done: 9, total: 3877 })
+    scope.stop()
+  })
+
+  it('leaves a rename without a total when no plan is known', async () => {
+    getImportRenames.mockRejectedValue({ status: 404 })
+    getOrganizeJob.mockResolvedValue({ ...RUNNING, kind: 'rename', total: 0, counted: false, done: 9 })
+    const { scope, state } = setup()
+    await state.refresh()
+    expect(state.job.value).toMatchObject({ done: 9, total: 0, counted: false })
+    scope.stop()
+  })
+
+  it('tells the time left of a rename from its speed since it started', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(10 * 60_000)
+      getImportRenames.mockResolvedValue({ count: 3725, complete: true, files: [] })
+      getOrganizeJob.mockResolvedValue({ ...RUNNING, kind: 'rename', total: 0, counted: false, done: 152, started_at_ms: 0 })
+      const { scope, state } = setup()
+      await state.refresh()
+      expect(state.job.value?.left).toBe('about 4 h left')
+      getOrganizeJob.mockResolvedValue({ ...RUNNING, kind: 'rename', state: 'paused', total: 0, done: 152, started_at_ms: 0 })
+      await state.refresh()
+      expect(state.job.value?.left).toBeNull()
+      scope.stop()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps the last step once it is over', async () => {
+    getOrganizeJob.mockResolvedValue(RUNNING)
+    const { scope, state } = setup()
+    await state.refresh()
+    expect(state.lastJob.value).toBeNull()
+    getOrganizeJob.mockResolvedValue({ ...RUNNING, state: 'done', finished_at_ms: 5 })
+    await state.refresh()
+    expect(state.job.value).toBeNull()
+    expect(state.lastJob.value).toMatchObject({ kind: 'move', state: 'done' })
     scope.stop()
   })
 

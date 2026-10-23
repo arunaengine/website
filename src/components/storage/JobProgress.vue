@@ -2,6 +2,7 @@
 // A running step with its bar. Pause, Resume and Abort show only for steps that allow them.
 import { ref } from 'vue'
 import Button from '@/components/ui/Button.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import { abortSentence, abortTitle, jobTitle, percent, type ProgressJob } from '@/lib/organize'
 import { formatNumber } from '@/lib/utils'
 
@@ -19,7 +20,10 @@ function abort() {
 <template>
   <div class="space-y-2" data-testid="job-progress">
     <div class="flex items-center justify-between gap-2">
-      <span class="text-sm font-medium text-foreground">{{ jobTitle(job) }}</span>
+      <span class="flex items-center gap-2 text-sm font-medium text-foreground">
+        <Spinner v-if="job.kind === 'rename' && job.state === 'running'" label="Renaming" />
+        {{ jobTitle(job) }}
+      </span>
       <span v-if="job.controls" class="flex gap-2">
         <Button v-if="job.state === 'paused'" variant="outline" size="sm" :disabled="busy" @click="emit('control', 'resume')">
           Resume
@@ -48,10 +52,13 @@ function abort() {
     </div>
     <p class="text-[11px] tabular-nums text-muted-foreground">
       {{ formatNumber(job.done) }}<template v-if="job.total"> of {{ job.counted ? '' : 'at least ' }}{{ formatNumber(job.total) }}</template>
-      <template v-if="job.skipped"> · {{ formatNumber(job.skipped) }} skipped</template>
+      <template v-if="job.kind === 'rename'"> renamed</template>
+      <template v-if="job.skipped && job.kind !== 'rename'"> · {{ formatNumber(job.skipped) }} skipped</template>
       <template v-if="job.failed"> · {{ formatNumber(job.failed) }} failed</template>
       <template v-if="job.waiting"> · waiting</template>
+      <template v-if="job.left"> · {{ job.left }}</template>
     </p>
+    <p v-if="job.kind === 'rename'" class="text-[11px] text-muted-foreground">Runs on the server. You can close this window.</p>
     <div v-if="asking" class="space-y-2 rounded-md border border-border bg-muted/40 px-3 py-2">
       <p class="text-sm font-medium text-foreground">{{ abortTitle(job) }}</p>
       <p class="text-xs text-muted-foreground">{{ abortSentence(job) }}</p>

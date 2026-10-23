@@ -51,16 +51,24 @@ type Root = Parameters<typeof content>[0]
 const buttonIn = (root: Root, text: string) => element(root, (node) => node.tag === 'button' && content(node).trim() === text)
 const step = (root: Root, id: string) => nodes(root).filter((node) => node.props['data-testid'] === id)
 
-async function mount() {
+async function mount(initial: { job?: unknown; lastJob?: unknown } = {}) {
   const finished = ref(0)
+  const steps = reactive({ job: initial.job ?? null, lastJob: initial.lastJob ?? null })
   const mounted = await mountApp(
     defineComponent(() => () =>
-      h(BucketOrganize, { groupId: 'g1', link: LINK, place: 'aruna-spire-genes', job: null, finished: finished.value }),
+      h(BucketOrganize, {
+        groupId: 'g1',
+        link: LINK,
+        place: 'aruna-spire-genes',
+        job: steps.job,
+        lastJob: steps.lastJob,
+        finished: finished.value,
+      }),
     ),
   )
   await flush()
   if (mounted.errors.length) throw mounted.errors[0]
-  return { ...mounted, finished }
+  return { ...mounted, finished, steps }
 }
 
 const GB = 1024 ** 3
@@ -131,6 +139,69 @@ describe('BucketOrganize rename plan', () => {
     await click(buttonIn(step(root, 'step-renames')[0], 'Review…'))
     expect(step(root, 'rename-plan')).toHaveLength(0)
     expect(content(root)).toContain('Rename 3 files')
+  })
+})
+
+const RENAMING = { kind: 'rename', state: 'running', done: 152, total: 3877, counted: true, skipped: 0, failed: 0, controls: true }
+const RENAMED = { ...RENAMING, state: 'done', done: 3874, failed: 3, started_at_ms: 1, finished_at_ms: 2 }
+const stepOf = (root: Root) => step(root, 'step-renames')[0]
+
+describe('BucketOrganize rename run', () => {
+  beforeEach(() => getImportRenames.mockResolvedValue(PLANNED))
+
+  it('locks the review while a rename runs and shows its progress', async () => {
+    const { root } = await mount({ job: RENAMING })
+    const card = stepOf(root)
+    expect(buttonIn(card, 'Review…').props.disabled).toBe(true)
+    expect(buttonIn(card, 'Review…').props.title).toBe('A rename is running')
+    expect(content(card)).toContain('job running')
+    expect(content(card)).not.toContain('3,877 files')
+  })
+
+  it('locks the review of a paused rename too', async () => {
+    const { root } = await mount({ job: { ...RENAMING, state: 'paused' } })
+    expect(buttonIn(stepOf(root), 'Review…').props.disabled).toBe(true)
+  })
+
+  it('hides an open list and its Rename button once a rename starts', async () => {
+    const { root, steps } = await mount()
+    await click(buttonIn(stepOf(root), 'Review…'))
+    expect(content(root)).toContain('Rename 3,877 files')
+    steps.job = RENAMING
+    await flush()
+    expect(content(root)).not.toContain('Rename 3,877 files')
+    expect(step(root, 'rename-plan')).toHaveLength(0)
+    expect(buttonIn(stepOf(root), 'Review…').props.disabled).toBe(true)
+  })
+
+  it('keeps the review open while another kind of step runs', async () => {
+    const { root } = await mount({ job: { ...RENAMING, kind: 'duplicates' } })
+    expect(buttonIn(stepOf(root), 'Review…').props.disabled).toBeFalsy()
+  })
+
+  it('says how many files were renamed and how many kept their old name', async () => {
+    getImportRenames.mockResolvedValue({ ...PLANNED, count: 3 })
+    const { root } = await mount({ lastJob: RENAMED })
+    const text = content(stepOf(root))
+    expect(text).toContain('3,874 files renamed.')
+    expect(text).toContain('3 files kept their old name.')
+    expect(() => buttonIn(stepOf(root), 'Review…')).toThrow()
+    await click(buttonIn(stepOf(root), 'Show them'))
+    expect(content(root)).toContain('Rename 3 files')
+  })
+
+  it('stays quiet about failures when none failed', async () => {
+    getImportRenames.mockResolvedValue({ count: 0, complete: true, files: [], plan: PLAN })
+    const { root } = await mount({ lastJob: { ...RENAMED, failed: 0 } })
+    expect(content(stepOf(root))).toContain('3,874 files renamed.')
+    expect(content(stepOf(root))).not.toContain('kept')
+    expect(content(stepOf(root))).not.toContain('skipped')
+  })
+
+  it('shows no result for a rename that was stopped', async () => {
+    getImportRenames.mockResolvedValue({ count: 0, complete: true, files: [], plan: PLAN })
+    const { root } = await mount({ lastJob: { ...RENAMED, state: 'aborted' } })
+    expect(step(root, 'step-renames')).toHaveLength(0)
   })
 })
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { abortSentence, activeJob, copyKey, organizeError, percent, rangeLabel, type ProgressJob } from './organize'
+import { abortSentence, activeJob, copyKey, organizeError, percent, rangeLabel, timeLeft, type ProgressJob } from './organize'
 import { ApiError } from '@/lib/api'
 
 const MOVE: ProgressJob = { kind: 'move', state: 'running', done: 92410, total: 214880, counted: true, skipped: 2, failed: 0, controls: true }
@@ -25,6 +25,27 @@ describe('organize words', () => {
     expect(abortSentence({ ...MOVE, kind: 'purge', done: 2, total: 5 })).toBe(
       '2 files are already deleted and stay deleted. The other 3 stay as they are. You can start again later.',
     )
+  })
+
+  it('tells the time left from the speed so far', () => {
+    const MIN = 60_000
+    const rename: ProgressJob = { ...MOVE, kind: 'rename', done: 152, total: 3877, started_at_ms: 0 }
+    // 152 files in 10 minutes leave 3,725 files: about 245 minutes.
+    expect(timeLeft(rename, 10 * MIN)).toBe('about 4 h left')
+    expect(timeLeft({ ...rename, done: 1000 }, 10 * MIN)).toBe('about 29 min left')
+    expect(timeLeft({ ...rename, done: 3870 }, 10 * MIN)).toBe('less than 1 min left')
+    expect(timeLeft({ ...rename, done: 100, failed: 52 }, 10 * MIN)).toBe('about 4 h left')
+  })
+
+  it('tells no time before it can know', () => {
+    const rename: ProgressJob = { ...MOVE, kind: 'rename', done: 4, total: 100, started_at_ms: 0 }
+    expect(timeLeft(rename, 60_000)).toBeNull()
+    expect(timeLeft({ ...rename, done: 50 }, 60_000)).not.toBeNull()
+    expect(timeLeft({ ...rename, done: 50, state: 'paused' }, 60_000)).toBeNull()
+    expect(timeLeft({ ...rename, done: 50, total: 0 }, 60_000)).toBeNull()
+    expect(timeLeft({ ...rename, done: 100 }, 60_000)).toBeNull()
+    expect(timeLeft({ ...rename, done: 50, started_at_ms: undefined }, 60_000)).toBeNull()
+    expect(timeLeft({ ...rename, done: 50 }, 0)).toBeNull()
   })
 
   it('gives percent and shows a job only while it runs', () => {
