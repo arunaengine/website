@@ -5,6 +5,7 @@ import Badge from '@/components/ui/Badge.vue'
 import ErrorPanel from '@/components/ui/ErrorPanel.vue'
 import IconButton from '@/components/ui/IconButton.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
+import BucketJobLabel from '@/components/storage/BucketJobLabel.vue'
 import BucketEditDialog from '@/components/groups/BucketEditDialog.vue'
 import LinkBucketDialog from '@/components/groups/LinkBucketDialog.vue'
 import NewBucketsDialog from '@/components/groups/NewBucketsDialog.vue'
@@ -118,7 +119,8 @@ async function load() {
     if (editing.value) editing.value = imports.find((link) => link.import_id === editing.value?.import_id) ?? editing.value
     emit('count', list.backends.length)
     emit('backends', list.backends)
-    if (!disposed && imports.some((link) => runActive(link.last_run))) pollTimer = setTimeout(() => void load(), 3_000)
+    const stepRuns = Boolean(page?.buckets.some((entry) => entry.job))
+    if (!disposed && (stepRuns || imports.some((link) => runActive(link.last_run)))) pollTimer = setTimeout(() => void load(), 3_000)
   } catch (err) {
     if (!current()) return
     if (err instanceof ApiError && (err.status === 403 || err.status === 401)) hidden.value = true
@@ -176,6 +178,8 @@ async function moreBucketsPage() {
     if (!current()) return
     moreBuckets.value = [...moreBuckets.value, ...page.buckets]
     bucketsNext.value = page.next ?? null
+    // A step on a later page is followed by the same reads.
+    if (!disposed && pollTimer === undefined && page.buckets.some((entry) => entry.job)) pollTimer = setTimeout(() => void load(), 3_000)
   } catch (err) {
     if (current()) actionError.value = errorMessage(err)
   } finally {
@@ -183,7 +187,7 @@ async function moreBucketsPage() {
   }
 }
 
-type Row = { kind: 'link'; link: BackendImport } | { kind: 'bucket'; entry: StorageBucket }
+type Row = { kind: 'link'; link: BackendImport; entry?: StorageBucket } | { kind: 'bucket'; entry: StorageBucket }
 
 /** The rows of a storage, or of Aruna storage for null: listed buckets, then links not listed. */
 function rowsOf(backendId: string | null): Row[] {
@@ -193,7 +197,7 @@ function rowsOf(backendId: string | null): Row[] {
   for (const entry of listed) {
     if (entry.backend_id !== backendId) continue
     const link = entry.import_id ? links.value.find((candidate) => candidate.import_id === entry.import_id) : undefined
-    rows.push(link ? { kind: 'link', link } : { kind: 'bucket', entry })
+    rows.push(link ? { kind: 'link', link, entry } : { kind: 'bucket', entry })
   }
   if (backendId === null) return rows
   for (const link of links.value) {
@@ -355,9 +359,12 @@ const EDIT = 'h-7 px-2 text-aruna-navy dark:text-foreground'
           </div>
           <template v-for="row in rowsOf(backend.backend_id)" :key="row.kind === 'link' ? row.link.import_id : row.entry.bucket">
             <div v-if="row.kind === 'bucket'" :class="[GRID, 'border-b border-border py-1.5']" data-testid="bucket-row">
-              <RouterLink :to="{ name: 'bucket', params: { bucketId: row.entry.bucket } }" class="truncate font-mono text-primary hover:underline">
-                {{ row.entry.bucket }}
-              </RouterLink>
+              <span class="flex min-w-0 items-center gap-2">
+                <RouterLink :to="{ name: 'bucket', params: { bucketId: row.entry.bucket } }" class="truncate font-mono text-primary hover:underline">
+                  {{ row.entry.bucket }}
+                </RouterLink>
+                <BucketJobLabel v-if="row.entry.job" :job="row.entry.job" />
+              </span>
               <span class="text-muted-foreground">→</span>
               <span class="truncate font-mono" :title="bucketPlace(row.entry)">{{ bucketPlace(row.entry) }}</span>
               <span class="truncate text-muted-foreground">chosen by Aruna</span>
@@ -368,12 +375,15 @@ const EDIT = 'h-7 px-2 text-aruna-navy dark:text-foreground'
               :class="[GRID, 'border-b border-border py-1.5']"
               data-testid="bucket-row"
             >
-              <RouterLink
-                :to="{ name: 'bucket', params: { bucketId: row.link.bucket } }"
-                class="truncate font-mono text-primary hover:underline"
-              >
-                {{ row.link.key_prefix ? `${row.link.bucket}/${row.link.key_prefix}` : row.link.bucket }}
-              </RouterLink>
+              <span class="flex min-w-0 items-center gap-2">
+                <RouterLink
+                  :to="{ name: 'bucket', params: { bucketId: row.link.bucket } }"
+                  class="truncate font-mono text-primary hover:underline"
+                >
+                  {{ row.link.key_prefix ? `${row.link.bucket}/${row.link.key_prefix}` : row.link.bucket }}
+                </RouterLink>
+                <BucketJobLabel v-if="row.entry?.job" :job="row.entry.job" />
+              </span>
               <span class="text-muted-foreground">⇆</span>
               <span class="truncate font-mono" :title="place(row.link)">{{ place(row.link) }}</span>
               <span class="truncate font-mono">{{ shownPattern(row.link.write_pattern) }}</span>
@@ -462,9 +472,12 @@ const EDIT = 'h-7 px-2 text-aruna-navy dark:text-foreground'
             data-testid="bucket-row"
           >
             <template v-if="row.kind === 'bucket'">
-              <RouterLink :to="{ name: 'bucket', params: { bucketId: row.entry.bucket } }" class="truncate font-mono text-primary hover:underline">
-                {{ row.entry.bucket }}
-              </RouterLink>
+              <span class="flex min-w-0 items-center gap-2">
+                <RouterLink :to="{ name: 'bucket', params: { bucketId: row.entry.bucket } }" class="truncate font-mono text-primary hover:underline">
+                  {{ row.entry.bucket }}
+                </RouterLink>
+                <BucketJobLabel v-if="row.entry.job" :job="row.entry.job" />
+              </span>
               <span class="text-muted-foreground">→</span>
               <span class="truncate font-mono">on this node</span>
               <span class="truncate text-muted-foreground">chosen by Aruna</span>

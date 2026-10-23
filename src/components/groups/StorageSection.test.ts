@@ -5,6 +5,7 @@ import { click, compileClientComponent, content, element, flush, moduleDefault, 
 import * as Api from '@/lib/api'
 import * as BucketNaming from '@/lib/bucketNaming'
 import * as LinkedFolders from '@/lib/linkedFolders'
+import * as Organize from '@/lib/organize'
 import * as Storage from '@/lib/storage'
 import * as StorageRules from '@/lib/storageRules'
 import * as Utils from '@/lib/utils'
@@ -41,6 +42,11 @@ const EditStub = defineComponent({
         : null
   },
 })
+// The step label of a bucket row, as the row shows it.
+const JobStub = defineComponent({
+  props: { job: Object },
+  setup: (props) => () => h('em', { 'data-testid': 'bucket-job' }, Organize.bucketJobLabel(props.job as never)),
+})
 const OpenStub = (testid: string) =>
   defineComponent({
     props: { open: Boolean },
@@ -60,8 +66,9 @@ const StorageSection = compileClientComponent(new URL('./StorageSection.vue', im
   '@/components/groups/NewBucketsDialog.vue': moduleDefault(OpenStub('new-buckets-dialog')),
   '@/components/groups/LinkBucketDialog.vue': moduleDefault(OpenStub('link-dialog')),
   '@/components/groups/BucketEditDialog.vue': moduleDefault(EditStub),
+  '@/components/storage/BucketJobLabel.vue': moduleDefault(JobStub),
   '@/composables/useAruna': {
-    isUnsupportedEndpoint: () => false,
+    isUnsupportedEndpoint: (err: { status?: number }) => err?.status === 404,
     useAruna: () => ({
       apiBaseUrl: ref('https://api.test'),
       authToken: ref('bearer'),
@@ -226,6 +233,65 @@ describe('StorageSection', () => {
     const aruna = byTestId(root, 'aruna-storage')[0]
     expect(content(byTestId(aruna, 'bucket-row')[0])).toContain('scratch')
     expect(content(byTestId(aruna, 'bucket-row')[0])).toContain('on this node')
+  })
+
+  it('marks each bucket that has a step running', async () => {
+    listStorageBuckets.mockResolvedValue({
+      buckets: [
+        listed('genes', { provider_bucket: 'aruna-spire-genes', folder: '', import_id: 'i1', job: { kind: 'rename', state: 'running', done: 4, failed: 0 } }),
+        listed('samples', { provider_bucket: 'aruna-spire-default', shared: true, job: { kind: 'move', state: 'paused', done: 1, failed: 0 } }),
+        listed('scratch', { backend_id: null, job: { kind: 'compression', state: 'running', done: 0, failed: 0 } }),
+        listed('plain', { provider_bucket: 'aruna-spire-default', shared: true }),
+      ],
+      next: null,
+    })
+    const { root } = await mount()
+    const labelOf = (name: string) =>
+      byTestId(nodes(root).find((node) => node.props['data-testid'] === 'bucket-row' && content(node).includes(name))!, 'bucket-job').map(content)
+    expect(labelOf('genes')).toEqual(['Renaming'])
+    expect(labelOf('samples')).toEqual(['Moving (paused)'])
+    expect(labelOf('scratch')).toEqual(['Compressing'])
+    expect(labelOf('plain')).toEqual([])
+  })
+
+  it('shows no step label when the node sends none', async () => {
+    listStorageBuckets.mockResolvedValue({ buckets: [listed('genes', { import_id: 'i1' })], next: null })
+    const { root } = await mount()
+    expect(byTestId(root, 'bucket-job')).toHaveLength(0)
+  })
+
+  it('shows the linked buckets without labels or an error on a node without the listing', async () => {
+    listStorageBuckets.mockRejectedValue({ status: 404 })
+    const { root } = await mount()
+    expect(byTestId(root, 'bucket-row')).toHaveLength(2)
+    expect(byTestId(root, 'bucket-job')).toHaveLength(0)
+  })
+
+  it('shows no storage and no label to a caller the listing refuses', async () => {
+    listStorageBuckets.mockRejectedValue(new Api.ApiError(403, 'forbidden'))
+    const { root } = await mount()
+    expect(content(root)).toContain('Storage is only visible to group admins.')
+    expect(byTestId(root, 'bucket-row')).toHaveLength(0)
+  })
+
+  it('reads the listing again while a step runs and stops when none does', async () => {
+    vi.useFakeTimers()
+    try {
+      listBackendImports.mockResolvedValue([LINKS[0]])
+      const running = { buckets: [listed('genes', { import_id: 'i1', job: { kind: 'rename', state: 'running', done: 4, failed: 0 } })], next: null }
+      listStorageBuckets.mockResolvedValue(running)
+      const { root } = await mount()
+      expect(listStorageBuckets).toHaveBeenCalledTimes(1)
+      listStorageBuckets.mockResolvedValue({ buckets: [listed('genes', { import_id: 'i1' })], next: null })
+      await vi.advanceTimersByTimeAsync(3000)
+      await flush()
+      expect(listStorageBuckets).toHaveBeenCalledTimes(2)
+      expect(byTestId(root, 'bucket-job')).toHaveLength(0)
+      await vi.advanceTimersByTimeAsync(30_000)
+      expect(listStorageBuckets).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('pages through the bucket listing', async () => {
