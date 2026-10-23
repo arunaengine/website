@@ -2,7 +2,7 @@
 // and the downloads it is materializing. Per-instance, because each surface
 // polls only while it is on screen.
 import { computed, onUnmounted } from 'vue'
-import { getTransfers, type DeviceTransfers } from '@/lib/deviceApi'
+import { getTransfers, isMoving, type DeviceTransfers } from '@/lib/deviceApi'
 import { useDeviceQuery } from '@/composables/useDeviceQuery'
 import { follow, onWake, POLL_ACTIVE_MS, POLL_IDLE_MS } from '@/lib/poll'
 
@@ -14,7 +14,7 @@ export function useDeviceTransfers(options: { poll?: boolean } = {}) {
 
   const all = computed(() => [...transfers.value.uploads, ...transfers.value.downloads])
   const active = computed(() =>
-    all.value.filter((transfer) => transfer.state === 'queued' || transfer.state === 'running'),
+    all.value.filter((transfer) => transfer.state === 'queued' || isMoving(transfer)),
   )
   const failed = computed(() => all.value.filter((transfer) => transfer.state === 'failed'))
 

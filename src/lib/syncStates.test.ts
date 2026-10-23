@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { readEntry, type DeviceTransfer, type FolderEntry, type SyncedFolder, type SyncDocument } from './deviceApi'
+import { readAction, readEntry, type DeviceTransfer, type FolderEntry, type SyncedFolder, type SyncDocument } from './deviceApi'
 import {
   ENTRY_META,
+  decisionText,
   entryBadge,
   entryMeta,
   folderConfirmed,
@@ -104,7 +105,20 @@ describe('folder item chips', () => {
       counters: { ...folder().counters, uploading: 4, conflicts: 1, pending_replacements: 2, remote_deleted: 3 },
     })
 
-    expect(itemChip({ kind: 'folder', folder: value })).toEqual({ label: 'Needs you 6', variant: 'warn' })
+    expect(itemChip({ kind: 'folder', folder: value })).toEqual({ label: '6 files need you', variant: 'warn' })
+  })
+
+  it('words what is moving by its direction', () => {
+    const base = failedTransfer(null)
+    const down = { ...base, state: 'transferring' as const, direction: 'download' as const, folder_id: 'f1' }
+    const up = { ...down, direction: 'upload' as const }
+
+    expect(itemChip({ kind: 'folder', folder: folder(), transfers: [down, down] }).label).toBe('Receiving 2 files')
+    expect(itemChip({ kind: 'folder', folder: folder(), transfers: [up] }).label).toBe('Sending 1 file')
+    expect(itemChip({ kind: 'folder', folder: folder(), transfers: [up, down] }).label).toBe('Sending 2 files')
+    expect(
+      itemChip({ kind: 'folder', folder: folder({ counters: { ...folder().counters, uploading: 3 } }) }).label,
+    ).toBe('Sending 3 files')
   })
 
   it('says when an otherwise quiet folder has never been checked', () => {
@@ -199,5 +213,23 @@ describe('folder-wide confirmation', () => {
   it('stays closed when the folder has no name to type', () => {
     expect(folderConfirmed('', '')).toBe(false)
     expect(folderConfirmed('/', '')).toBe(false)
+  })
+})
+
+describe('decision text', () => {
+  const record = (action: string, path: string | null, scope = 'entry') => readAction({ action, path, scope })
+
+  it('words each decision in plain terms', () => {
+    expect(decisionText(record('keep_local', 'a.csv'))).toBe('Kept your version of a.csv')
+    expect(decisionText(record('replace_local', 'a.csv'))).toBe('Used the Aruna version of a.csv')
+    expect(decisionText(record('remove_local', 'a.csv'))).toBe('Moved your copy of a.csv to the Trash')
+    expect(decisionText(record('resolve', 'a.csv'))).toBe('Marked a.csv as handled')
+  })
+
+  it('covers a whole folder and skips an action it cannot word', () => {
+    expect(decisionText(record('replace_local', null, 'all_pending'))).toBe(
+      'Used the Aruna version of all waiting files',
+    )
+    expect(decisionText(record('something_new', 'a.csv'))).toBeNull()
   })
 })

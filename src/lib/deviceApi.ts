@@ -107,10 +107,11 @@ function member<T extends string>(known: readonly T[], value: unknown, fallback:
 
 // ── Synced folders ───────────────────────────────────────────────────────────
 
-export type FolderMode = 'two_way' | 'upload_only'
+// download_only is served by newer nodes; an older one answers 400 when it is asked for.
+export type FolderMode = 'two_way' | 'upload_only' | 'download_only'
 export type FolderState = 'active' | 'paused' | 'deleting' | 'error'
 
-export const FOLDER_MODES: readonly FolderMode[] = ['two_way', 'upload_only']
+export const FOLDER_MODES: readonly FolderMode[] = ['two_way', 'upload_only', 'download_only']
 const FOLDER_STATES: readonly FolderState[] = ['active', 'paused', 'deleting', 'error']
 
 /** Where a folder's contents live in the realm. */
@@ -433,9 +434,22 @@ export async function listFolderActions(folderId: string, client: DeviceClient):
 // ── Transfers ────────────────────────────────────────────────────────────────
 
 export type TransferDirection = 'upload' | 'download'
-export type TransferState = 'queued' | 'running' | 'retrying' | 'failed' | 'done'
+// 'transferring' is what newer nodes call bytes in motion; they report real progress with it.
+export type TransferState = 'queued' | 'running' | 'transferring' | 'retrying' | 'failed' | 'done'
 
-const TRANSFER_STATES: readonly TransferState[] = ['queued', 'running', 'retrying', 'failed', 'done']
+const TRANSFER_STATES: readonly TransferState[] = [
+  'queued',
+  'running',
+  'transferring',
+  'retrying',
+  'failed',
+  'done',
+]
+
+/** True while the node is working on the transfer right now. */
+export function isMoving(transfer: Pick<DeviceTransfer, 'state'>): boolean {
+  return transfer.state === 'running' || transfer.state === 'transferring'
+}
 
 export interface DeviceTransfer {
   id: string

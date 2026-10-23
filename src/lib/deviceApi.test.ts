@@ -5,6 +5,7 @@ import {
   deviceSyncStatus,
   entryExpectation,
   isDeviceUnsupported,
+  isMoving,
   isStaleExpectation,
   readAction,
   readCompute,
@@ -116,6 +117,18 @@ describe('entry mapping', () => {
 })
 
 describe('transfer and compute mapping', () => {
+  it('reads the newer transferring state as bytes in motion', () => {
+    const transfer = readTransfer({ id: 't1', state: 'transferring', bytes_done: 5, bytes_total: 10 }, 'upload')
+
+    expect(transfer.state).toBe('transferring')
+    expect(isMoving(transfer)).toBe(true)
+    expect(isMoving(readTransfer({ state: 'queued' }, 'upload'))).toBe(false)
+  })
+
+  it('keeps a folder that only downloads', () => {
+    expect(readFolder({ folder_id: 'f1', mode: 'download_only' }).mode).toBe('download_only')
+  })
+
   it('falls back to the list a transfer came from', () => {
     expect(readTransfer({ id: 't1', path: 'a' }, 'download').direction).toBe('download')
     expect(readTransfer({ id: 't2', path: 'a', direction: 'upload' }, 'download').direction).toBe('upload')

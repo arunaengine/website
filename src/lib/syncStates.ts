@@ -5,6 +5,8 @@ import type { BadgeVariant } from '@/components/nodes/node-display'
 import { stateVariant, toneVariant, type StateTone } from './stateBadge'
 import {
   folderName,
+  isMoving,
+  type ActionRecord,
   type DeviceTransfer,
   type DocumentSyncState,
   type EntryState,
@@ -68,13 +70,17 @@ export function itemChip(item: SyncItem): ItemChip {
   }
 
   const needsYou = needsYouCount(folder.counters)
-  if (needsYou) return { label: `Needs you ${needsYou}`, variant: toneVariant('attention') }
+  if (needsYou) {
+    return { label: `${needsYou} ${needsYou === 1 ? 'file needs' : 'files need'} you`, variant: toneVariant('attention') }
+  }
 
-  const activeTransfers = folderTransfers.filter(
-    (transfer) => transfer.state === 'queued' || transfer.state === 'running',
-  ).length
-  const syncing = folder.counters.uploading || activeTransfers
-  if (syncing) return { label: `Syncing ${syncing}`, variant: toneVariant('progress') }
+  const activeTransfers = folderTransfers.filter((transfer) => transfer.state === 'queued' || isMoving(transfer))
+  const syncing = folder.counters.uploading || activeTransfers.length
+  if (syncing) {
+    const receiving = !folder.counters.uploading && activeTransfers.every((transfer) => transfer.direction === 'download')
+    const noun = syncing === 1 ? 'file' : 'files'
+    return { label: `${receiving ? 'Receiving' : 'Sending'} ${syncing} ${noun}`, variant: toneVariant('progress') }
+  }
 
   return {
     label: 'In sync',
@@ -171,4 +177,21 @@ export function entryBadge(state: EntryState): BadgeVariant {
 export function folderConfirmed(root: string, typed: string): boolean {
   const name = folderName(root)
   return name.length > 0 && typed.trim() === name
+}
+
+/** One plain line for a decision the owner took, or null for an action it cannot word. */
+export function decisionText(record: ActionRecord): string | null {
+  const file = record.scope === 'all_pending' ? 'all waiting files' : (record.path ?? 'a file')
+  switch (record.action) {
+    case 'keep_local':
+      return `Kept your version of ${file}`
+    case 'replace_local':
+      return `Used the Aruna version of ${file}`
+    case 'remove_local':
+      return `Moved your copy of ${file} to the Trash`
+    case 'resolve':
+      return `Marked ${file} as handled`
+    default:
+      return null
+  }
 }
