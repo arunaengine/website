@@ -69,6 +69,10 @@ async function create(groupId: string, expiresInSeconds: number): Promise<Create
     throw new Error('This computer changed while the key was made, so its secret is not shown. Look for the key again.')
   }
   await load()
+  // The reload may have outlasted the session too.
+  if (deviceClient.value !== target) {
+    throw new Error('This computer changed while the key was made, so its secret is not shown. Look for the key again.')
+  }
   return made
 }
 

@@ -70,6 +70,23 @@ describe('device access keys', () => {
     expect(revoke).toHaveBeenCalledWith('ARK1', clientA)
   })
 
+  it('does not hand over a secret when the session changed during the reload', async () => {
+    create.mockResolvedValue({ access_key_id: 'ARK2', access_secret: 'secret-of-a' })
+    deviceClient.value = clientA
+    const keys = await store()
+    await keys.load()
+
+    // The reload that follows the creation stays open while the client changes.
+    const slow = deferred<S3CredentialSummary[]>()
+    list.mockReturnValueOnce(slow.promise).mockResolvedValue([])
+    const pending = keys.create('g1', 100)
+    await vi.waitFor(() => expect(list).toHaveBeenCalledTimes(3))
+    deviceClient.value = clientB
+    slow.resolve([key('ARK2')])
+
+    await expect(pending).rejects.toThrow(/changed while the key was made/)
+  })
+
   it('refuses to make or remove a key without the device', async () => {
     const keys = await store()
 
