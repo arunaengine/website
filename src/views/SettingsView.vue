@@ -35,6 +35,7 @@ import { useWatches } from '@/composables/useWatches'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { RouterLink, useRouter } from 'vue-router'
 import { apiOrigin } from '@/lib/api'
+import { isDesktop } from '@/lib/desktop'
 import { errorMessage, relativeTime } from '@/lib/utils'
 import { computed, ref, watch } from 'vue'
 import { ChevronRight, ExternalLink, Eye, KeyRound, Palette, Moon, Sun, Monitor, ListChecks, ArrowRight, LogIn, Plus, Save } from '@lucide/vue'
@@ -347,9 +348,11 @@ async function revoke(accessKeyId: string) {
           </div>
           <div class="grid gap-5 p-5 md:grid-cols-2">
             <div>
-              <label class="text-xs font-medium text-foreground">API base URL</label>
-              <Input v-model="apiBaseDraft" class="mt-1" placeholder="/api/v1" />
-              <p class="mt-1 text-[11px] text-muted-foreground">Release builds can pin this with VITE_ARUNA_API_BASE_URL; the /api proxy is development-only.</p>
+              <template v-if="!isDesktop()">
+                <label class="text-xs font-medium text-foreground">API base URL</label>
+                <Input v-model="apiBaseDraft" class="mt-1" placeholder="/api/v1" />
+                <p class="mt-1 text-[11px] text-muted-foreground">Release builds can pin this with VITE_ARUNA_API_BASE_URL; the /api proxy is development-only.</p>
+              </template>
               <a :href="swaggerUrl" target="_blank" rel="noopener" class="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:underline">
                 <ExternalLink class="h-3 w-3" /> API reference (Swagger UI)
               </a>

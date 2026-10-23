@@ -173,6 +173,7 @@ const currentUser = ref<Record<string, unknown> | null>({ id: 'user-1', name: 'A
 const userInfo = ref<Record<string, unknown> | null>({ user: { user_id: 'user-1' } })
 const authToken = ref('token')
 const apiBaseUrl = ref('/api/v1')
+const desktop = ref(false)
 const myGroups = ref<Array<Record<string, unknown>>>([])
 const discoverableGroups = ref<Array<Record<string, unknown>>>([])
 
@@ -242,6 +243,7 @@ const SettingsView = compileClientComponent(new URL('./SettingsView.vue', import
   'vue-router': RouterRuntime,
   '@lucide/vue': icons,
   '@/lib/api': { apiOrigin: () => 'https://node.example' },
+  '@/lib/desktop': { isDesktop: () => desktop.value },
   '@/components/layout/nav': { SETTINGS_TAB_ANCHORS: { access: 'settings-access', assistant: 'settings-assistant', keys: 'settings-keys' } },
   '@/lib/utils': Utils,
   '@/composables/useRouteTab': RouteTab,
@@ -364,6 +366,17 @@ describe('SettingsView access tab', () => {
     expect(text).not.toContain('Signed in as')
     expect(text).not.toContain('Sign out')
     expect(text).toContain('Identity details')
+  })
+
+  it('offers the API base URL on the web only', async () => {
+    expect(panelText((await mount('?tab=access')).root, 'access')).toContain('API base URL')
+
+    desktop.value = true
+    const text = panelText((await mount('?tab=access')).root, 'access')
+    desktop.value = false
+    expect(text).not.toContain('API base URL')
+    expect(text).not.toContain('VITE_ARUNA_API_BASE_URL')
+    expect(text).toContain('API reference')
   })
 
   it('keeps the signed-out entry point', async () => {
