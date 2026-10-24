@@ -5,6 +5,7 @@ import Select from '@/components/ui/Select.vue'
 import AccessBadge from '@/components/ui/AccessBadge.vue'
 import Popover from '@/components/ui/Popover.vue'
 import CopyButton from '@/components/ui/CopyButton.vue'
+import Spinner from '@/components/ui/Spinner.vue'
 import { computed, ref, watch } from 'vue'
 import { ShieldCheck, UserMinus, UserPlus, X } from '@lucide/vue'
 import { useDebounceFn } from '@vueuse/core'
@@ -53,6 +54,9 @@ function attribute(member: GroupMember, key: string): string | undefined {
 }
 
 const memberError = ref<string | null>(null)
+// The member, or member and role, whose removal is on its way.
+const removing = ref<string | null>(null)
+const removalKey = (userId: string, roleId?: string) => `${userId}/${roleId ?? ''}`
 const query = ref('')
 const results = ref<UserSearchHit[]>([])
 const searching = ref(false)
@@ -142,12 +146,16 @@ async function addMember() {
 }
 
 async function removeMember(member: GroupMember, roleId?: string) {
+  if (removing.value) return
   memberError.value = null
+  removing.value = removalKey(member.user_id, roleId)
   try {
     await removeGroupMember(props.groupId, member.user_id, roleId)
     emit('changed')
   } catch (err) {
     memberError.value = errorMessage(err)
+  } finally {
+    removing.value = null
   }
 }
 </script>
@@ -222,17 +230,26 @@ async function removeMember(member: GroupMember, roleId?: string) {
                   class="rounded-sm p-0.5 text-muted-foreground opacity-60 transition-opacity hover:opacity-100"
                   :title="`Revoke ${role.name}`"
                   :aria-label="`Revoke ${role.name}`"
-                  :disabled="saving"
+                  :disabled="saving || removing !== null"
+                  :aria-busy="removing === removalKey(member.user_id, role.role_id)"
                   @click="removeMember(member, role.role_id)"
                 >
-                  <X class="h-3 w-3" />
+                  <Spinner v-if="removing === removalKey(member.user_id, role.role_id)" label="Revoking the role" />
+                  <X v-else class="h-3 w-3" />
                 </button>
               </span>
             </div>
           </td>
           <td v-if="canManage" class="px-5 py-2.5 text-right">
-            <Button variant="ghost" size="sm" :disabled="saving" @click="removeMember(member)">
-              <UserMinus class="h-3.5 w-3.5" /> Remove
+            <Button
+              variant="ghost"
+              size="sm"
+              :disabled="saving || removing !== null"
+              :aria-busy="removing === removalKey(member.user_id)"
+              @click="removeMember(member)"
+            >
+              <Spinner v-if="removing === removalKey(member.user_id)" label="Removing the member" class="text-current" />
+              <UserMinus v-else class="h-3.5 w-3.5" /> Remove
             </Button>
           </td>
         </tr>
