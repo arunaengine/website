@@ -2,7 +2,7 @@
 // Every bucket the owner can use, each with its place. A bucket on a device
 // cannot be linked and stays greyed with the reason. Nothing is created here;
 // the last row asks for New bucket instead.
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { useBucketSearch } from '@/composables/useBucketSearch'
 import { useRealmNodes } from '@/composables/useRealmNodes'
@@ -18,7 +18,7 @@ const emit = defineEmits<{
 }>()
 
 const realmNodes = useRealmNodes()
-const { hits, searching, searched, error } = useBucketSearch(query, { listAll: true })
+const { hits, searching, searched, error, more, loadMore } = useBucketSearch(query, { listAll: true })
 const open = ref(false)
 
 const rows = computed(() =>
@@ -38,6 +38,15 @@ const rows = computed(() =>
     }),
 )
 const typed = computed(() => query.value.trim())
+
+// A page with nothing to show (only workspace buckets) asks for the next one.
+watch(
+  [rows, more, searching, error],
+  () => {
+    if (!rows.value.length && more.value && !searching.value && !error.value) void loadMore()
+  },
+  { immediate: true },
+)
 
 function pick(row: (typeof rows.value)[number]) {
   if (row.device) return
@@ -97,9 +106,19 @@ function onFocusOut(event: FocusEvent) {
           </button>
         </li>
       </ul>
-      <p v-else-if="searched && !searching && !error" class="px-3 py-2 text-[11px] text-muted-foreground">
+      <p v-else-if="searched && !searching && !error && !more" class="px-3 py-2 text-[11px] text-muted-foreground">
         No bucket matched.
       </p>
+      <button
+        v-if="more"
+        type="button"
+        class="w-full border-t border-border px-3 py-2 text-left text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+        :disabled="searching"
+        @mousedown.prevent
+        @click="loadMore"
+      >
+        {{ searching ? 'Loading more…' : 'Load more' }}
+      </button>
       <button
         type="button"
         class="flex w-full items-center gap-2 border-t border-border px-3 py-2 text-left text-xs text-primary hover:bg-muted"
