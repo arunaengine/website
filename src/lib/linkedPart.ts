@@ -17,6 +17,23 @@ export function looksLikePart(id: string): boolean {
   return parts.length >= 3 && !CONTENT_ID.test(parts[0]) && Boolean(parts[0] && parts[1])
 }
 
+/** Bytes to URL-safe Base64 without padding, as the node writes the prefix of a set id. */
+function encodePrefix(prefix: string): string {
+  let binary = ''
+  for (const byte of new TextEncoder().encode(prefix)) binary += String.fromCharCode(byte)
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+/**
+ * The id a dataset uses for a bucket or a folder: the global id URL of a set, or the bucket-prefix
+ * ARN of an ordinary bucket on a node. The root of a bucket has an empty prefix.
+ */
+export function partId(where: { realmId: string; nodeId: string; bucket: string; prefix: string; setId: string | null }): string {
+  const prefix = where.prefix.replace(/^\/+/, '')
+  if (where.setId) return `${W3ID_DATA}${where.realmId}/${where.setId}/${prefix ? encodePrefix(prefix) : ''}`
+  return `arn:aruna:${where.realmId}:${where.nodeId}:s3/${where.bucket}/${prefix}`
+}
+
 /** The reason the files of a part cannot be listed from this node, or null. */
 export function browseProblem(target: PartTargetResponse): string | null {
   if (!target.bucket) return 'This node has no record of the bucket yet.'

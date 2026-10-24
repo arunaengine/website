@@ -110,6 +110,10 @@ export interface FilePart {
   contentUrl?: string
   encodingFormat?: string
   contentSize?: string
+  /** Where the content came from, as the node lets a dataset say it (isBasedOn). */
+  basedOn?: string[]
+  /** The linked parts of other datasets that contain the file (isPartOf). */
+  partOf?: string[]
 }
 
 function reference(id: string): DraftValue[] {
@@ -118,6 +122,19 @@ function reference(id: string): DraftValue[] {
 
 function textValue(value: string): DraftValue[] {
   return [{ kind: textKind(value), value }]
+}
+
+/**
+ * Identical bytes have one content id. A second file with the same id but another origin stays a
+ * separate entity under its location, so the origin of the first is not lost.
+ */
+function entityIdFor(draft: CrateDraft, part: FilePart): string {
+  const existing = findEntity(draft, part.id)
+  if (!existing || !part.contentUrl) return part.id
+  const known = (existing.properties.isBasedOn ?? []).map((value) => value.value).sort().join('\n')
+  const incoming = [...(part.basedOn ?? [])].sort().join('\n')
+  const sameFile = (existing.properties.contentUrl ?? []).some((value) => value.value === part.contentUrl)
+  return known === incoming || sameFile ? part.id : part.contentUrl
 }
 
 /** A stored object as a data entity, linked from the target that picked it. */
@@ -131,9 +148,12 @@ export function addFilePart(
     ...(part.contentUrl ? { contentUrl: textValue(part.contentUrl) } : {}),
     ...(part.encodingFormat ? { encodingFormat: textValue(part.encodingFormat) } : {}),
     ...(part.contentSize ? { contentSize: textValue(part.contentSize) } : {}),
+    ...(part.basedOn?.length ? { isBasedOn: part.basedOn.map((id) => ({ kind: 'reference' as const, value: id })) } : {}),
+    ...(part.partOf?.length ? { isPartOf: part.partOf.map((id) => ({ kind: 'reference' as const, value: id })) } : {}),
   }
-  const added = addEntity(draft, { type: part.type ?? 'File', id: part.id, properties })
-  return linkReference(added.draft, target.entityId, target.property, part.id)
+  const id = entityIdFor(draft, part)
+  const added = addEntity(draft, { type: part.type ?? 'File', id, properties })
+  return linkReference(added.draft, target.entityId, target.property, id)
 }
 
 /** A referenced dataset, per the RO-Crate rules for linking another crate. */

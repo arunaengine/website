@@ -132,3 +132,50 @@ describe('orphanedDataEntities', () => {
     ])
   })
 })
+
+describe('addFilePart origin', () => {
+  const file = {
+    id: 'https://w3id.org/aruna/data/' + 'a'.repeat(64),
+    name: 'one.csv',
+    contentUrl: 's3://reads/one.csv',
+  }
+
+  it('writes the origin and the datasets as references the editor can remove', () => {
+    const draft = addFilePart(newDraft(), {
+      ...file,
+      basedOn: ['https://example.org/src/one.csv'],
+      partOf: ['https://w3id.org/aruna/01K8Z0DS0REEF0000000000005'],
+    })
+
+    expect(findEntity(draft, file.id)?.properties.isBasedOn).toEqual([{ kind: 'reference', value: 'https://example.org/src/one.csv' }])
+    expect(findEntity(draft, file.id)?.properties.isPartOf).toEqual([
+      { kind: 'reference', value: 'https://w3id.org/aruna/01K8Z0DS0REEF0000000000005' },
+    ])
+  })
+
+  it('adds nothing for a file without origin, as before', () => {
+    const properties = findEntity(addFilePart(newDraft(), file), file.id)?.properties ?? {}
+
+    expect('isBasedOn' in properties || 'isPartOf' in properties).toBe(false)
+  })
+
+  it('keeps identical bytes with another origin as a separate entity under their location', () => {
+    const first = addFilePart(newDraft(), { ...file, basedOn: ['https://a.example/x'] })
+    const second = addFilePart(first, { ...file, contentUrl: 's3://reads/copy/one.csv', basedOn: ['https://b.example/x'] })
+
+    expect(findEntity(second, file.id)?.properties.isBasedOn).toEqual([{ kind: 'reference', value: 'https://a.example/x' }])
+    expect(findEntity(second, 's3://reads/copy/one.csv')?.properties.isBasedOn).toEqual([{ kind: 'reference', value: 'https://b.example/x' }])
+    expect(findEntity(second, './')?.properties.hasPart).toEqual([
+      { kind: 'reference', value: file.id },
+      { kind: 'reference', value: 's3://reads/copy/one.csv' },
+    ])
+  })
+
+  it('reuses the entity for the same file or the same origin', () => {
+    const first = addFilePart(newDraft(), { ...file, basedOn: ['https://a.example/x'] })
+
+    expect(addFilePart(first, { ...file, basedOn: ['https://a.example/x'] }).entities).toHaveLength(2)
+    expect(addFilePart(first, { ...file, basedOn: ['https://other.example/x'] }).entities).toHaveLength(2)
+    expect(addFilePart(first, { ...file, contentUrl: 's3://reads/copy/one.csv', basedOn: ['https://a.example/x'] }).entities).toHaveLength(2)
+  })
+})
