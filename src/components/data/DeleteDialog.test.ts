@@ -80,10 +80,10 @@ const pagedStub = defineComponent({
 })
 
 const jobProgress = defineComponent({
-  props: { job: Object, busy: Boolean },
+  props: { job: Object, busy: Boolean, disabled: Boolean },
   emits: ['control'],
   setup: (props, { emit }) => () =>
-    h('button', { 'data-busy': props.busy, onClick: () => emit('control', 'abort') }, `job ${(props.job as { state: string }).state} ${(props.job as { done: number }).done} of ${(props.job as { total: number }).total}`),
+    h('button', { 'data-busy': props.busy, 'data-disabled': props.disabled, onClick: () => emit('control', 'abort') }, `job ${(props.job as { state: string }).state} ${(props.job as { done: number }).done} of ${(props.job as { total: number }).total}`),
 })
 
 const ButtonStub = defineComponent({
@@ -747,6 +747,27 @@ describe('delete dialog', () => {
       expect(button(root, 'job running').props['data-busy']).toBe(true)
       expect(content(root)).not.toContain('the old session was refused')
     } finally {
+      purgeStatus.value = null
+    }
+  })
+
+  it('ends the wait of a refused control while offline and keeps the controls blocked', async () => {
+    let refuse: (err: unknown) => void = () => {}
+    purgeControl.mockReturnValueOnce(new Promise<undefined>((_, reject) => (refuse = reject)))
+    purgeStatus.value = { state: 'running' }
+    try {
+      const { root } = await open({ kind: 'folder', bucket: 'reef', nodeId: null, key: 'a/', option: 'delete-permanently' })
+      void (button(root, 'job running').props.onClick as () => void)()
+      await flush()
+      offline.value = true
+      await flush()
+      expect(button(root, 'job running').props['data-busy']).toBe(true)
+      refuse(new Error('the connection dropped'))
+      await flush()
+      expect(button(root, 'job running').props['data-busy']).toBe(false)
+      expect(button(root, 'job running').props['data-disabled']).toBe(true)
+    } finally {
+      offline.value = false
       purgeStatus.value = null
     }
   })

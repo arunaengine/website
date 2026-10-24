@@ -6,7 +6,8 @@ import Spinner from '@/components/ui/Spinner.vue'
 import { abortSentence, abortTitle, jobTitle, percent, type ProgressJob } from '@/lib/organize'
 import { formatNumber } from '@/lib/utils'
 
-const props = defineProps<{ job: ProgressJob; busy?: boolean }>()
+// `busy`: a control is on its way; `disabled`: the controls are blocked for another reason.
+const props = defineProps<{ job: ProgressJob; busy?: boolean; disabled?: boolean }>()
 const emit = defineEmits<{ (e: 'control', action: 'pause' | 'resume' | 'abort'): void }>()
 
 const asking = ref(false)
@@ -41,20 +42,20 @@ function abort() {
           v-if="resumeShown"
           variant="outline"
           size="sm"
-          :disabled="busy"
+          :disabled="busy || disabled"
           :aria-busy="busy && sent === 'resume'"
           @click="send('resume')"
         >
           <Spinner v-if="busy && sent === 'resume'" label="Resuming" class="text-current" /> Resume
         </Button>
-        <Button v-else variant="outline" size="sm" :disabled="busy" :aria-busy="busy && sent === 'pause'" @click="send('pause')">
+        <Button v-else variant="outline" size="sm" :disabled="busy || disabled" :aria-busy="busy && sent === 'pause'" @click="send('pause')">
           <Spinner v-if="busy && sent === 'pause'" label="Pausing" class="text-current" /> Pause
         </Button>
         <Button
           variant="outline"
           size="sm"
           class="border-destructive/30 text-destructive hover:text-destructive"
-          :disabled="busy"
+          :disabled="busy || disabled"
           :aria-busy="busy && sent === 'abort'"
           @click="asking = true"
         >
@@ -88,7 +89,7 @@ function abort() {
       <p class="text-xs text-muted-foreground">{{ abortSentence(job) }}</p>
       <div class="flex gap-2">
         <Button variant="outline" size="sm" @click="asking = false">Keep running</Button>
-        <Button variant="destructive" size="sm" :disabled="busy" @click="abort">Abort</Button>
+        <Button variant="destructive" size="sm" :disabled="busy || disabled" @click="abort">Abort</Button>
       </div>
     </div>
   </div>

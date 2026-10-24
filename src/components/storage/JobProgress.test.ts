@@ -79,6 +79,13 @@ describe('JobProgress', () => {
     expect(button(mounted.root, 'Pause').props['aria-busy']).toBe(false)
   })
 
+  it('blocks the controls while disabled without marking a wait', async () => {
+    const mounted = await mountApp(defineComponent(() => () => h(JobProgress, { job: JOB, disabled: true })))
+    expect(button(mounted.root, 'Pause').props.disabled).toBe(true)
+    expect(button(mounted.root, 'Abort').props.disabled).toBe(true)
+    expect(button(mounted.root, 'Pause').props['aria-busy']).toBeFalsy()
+  })
+
   it('marks no control for a busy state no control caused', async () => {
     const busy = ref(false)
     const mounted = await mountApp(defineComponent(() => () => h(JobProgress, { job: JOB, busy: busy.value })))

@@ -770,7 +770,8 @@ onUnmounted(() => {
         <JobProgress
           v-if="purgeJob ?? selectionJob"
           :job="(purgeJob ?? selectionJob)!"
-          :busy="writesDisabled || controlling"
+          :busy="controlling"
+          :disabled="writesDisabled"
           @control="controlPurge"
         />
         <p v-if="isSelection && selection.starting.value && busy" class="text-muted-foreground">Starting…</p>
