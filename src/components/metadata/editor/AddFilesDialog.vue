@@ -179,10 +179,13 @@ function identityOptions(): ContentIdentityOptions {
 
 // What the node lets a dataset say about a file: where it came from and the datasets it is part of.
 // A node that cannot say adds nothing, and the file is added as before.
-async function origins(bucketName: string, key: string): Promise<Pick<FilePart, 'basedOn' | 'partOf'>> {
+async function origins(bucketName: string, key: string): Promise<Pick<FilePart, 'basedOn' | 'partOf' | 'createdBy'>> {
   const [origin, parts] = await Promise.allSettled([getFileOrigin(bucketName, { key }), getFilePartOf(bucketName, key)])
   const basedOn = origin.status === 'fulfilled'
     ? origin.value.projection.flatMap((item) => (item.property === 'isBasedOn' ? [item.id] : []))
+    : []
+  const createdBy = origin.status === 'fulfilled'
+    ? origin.value.projection.flatMap((item) => (item.property === 'CreateAction' ? [item.run_id] : []))
     : []
   const partOf = parts.status === 'fulfilled'
     ? parts.value.datasets.filter((dataset) => dataset.document_id !== props.draft.documentId).map((dataset) => dataset.graph_iri)
@@ -190,7 +193,7 @@ async function origins(bucketName: string, key: string): Promise<Pick<FilePart, 
   if (parts.status === 'fulfilled' && parts.value.more) {
     originNote.value = 'Some files are part of more datasets than the ten added. Open the file in Data to see them all.'
   }
-  return { ...(basedOn.length ? { basedOn } : {}), ...(partOf.length ? { partOf } : {}) }
+  return { ...(basedOn.length ? { basedOn } : {}), ...(partOf.length ? { partOf } : {}), ...(createdBy.length ? { createdBy } : {}) }
 }
 
 async function filePart(bucketName: string, key: string, name: string, size?: number, lookup = true): Promise<FilePart> {

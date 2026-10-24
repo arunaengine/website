@@ -153,6 +153,19 @@ describe('addFilePart origin', () => {
     ])
   })
 
+  it('records a job result as the result of a CreateAction that the dataset mentions', () => {
+    const first = addFilePart(newDraft(), { ...file, createdBy: ['01RUN'] })
+    const second = addFilePart(first, { id: 's3://reads/two.csv', name: 'two.csv', createdBy: ['01RUN'] })
+
+    expect(findEntity(second, '#run-01RUN')).toMatchObject({ types: ['CreateAction'], properties: { identifier: [{ value: '01RUN' }] } })
+    expect(findEntity(second, '#run-01RUN')?.properties.result).toEqual([
+      { kind: 'reference', value: file.id },
+      { kind: 'reference', value: 's3://reads/two.csv' },
+    ])
+    expect(findEntity(second, './')?.properties.mentions).toEqual([{ kind: 'reference', value: '#run-01RUN' }])
+    expect(orphanedDataEntities(second)).toEqual([])
+  })
+
   it('adds nothing for a file without origin, as before', () => {
     const properties = findEntity(addFilePart(newDraft(), file), file.id)?.properties ?? {}
 

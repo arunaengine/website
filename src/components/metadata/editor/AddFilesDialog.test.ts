@@ -221,6 +221,7 @@ describe('AddFilesDialog', () => {
     expect(getFileOrigin).toHaveBeenCalledWith('reads', { key: 'raw/one.csv' })
     const file = Editor.findEntity(updates[0], `https://w3id.org/aruna/data/${BLAKE3}`)
     expect(file?.properties.isBasedOn).toEqual([{ kind: 'reference', value: 'https://example.org/src/one.csv' }])
+    expect(Editor.findEntity(updates[0], '#run-run1')?.properties.result).toEqual([{ kind: 'reference', value: `https://w3id.org/aruna/data/${BLAKE3}` }])
     // The dataset being edited is not named as one the file is part of.
     expect(file?.properties.isPartOf).toEqual([{ kind: 'reference', value: 'https://w3id.org/aruna/d9' }])
     mounted.app.unmount()

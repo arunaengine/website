@@ -114,6 +114,8 @@ export interface FilePart {
   basedOn?: string[]
   /** The linked parts of other datasets that contain the file (isPartOf). */
   partOf?: string[]
+  /** The runs that wrote the file: each becomes a CreateAction with the file as its result. */
+  createdBy?: string[]
 }
 
 function reference(id: string): DraftValue[] {
@@ -137,6 +139,21 @@ function entityIdFor(draft: CrateDraft, part: FilePart): string {
   return known === incoming || sameFile ? part.id : part.contentUrl
 }
 
+/**
+ * The run crate convention for a job result: a CreateAction of the run with the file as its result,
+ * which the dataset mentions. Several results of one run share one action.
+ */
+function addRunResult(draft: CrateDraft, runId: string, fileId: string): CrateDraft {
+  const actionId = `#run-${runId}`
+  const action = addEntity(draft, {
+    type: 'CreateAction',
+    id: actionId,
+    name: `Run ${runId}`,
+    properties: { identifier: textValue(runId) },
+  })
+  return linkReference(linkReference(action.draft, actionId, 'result', fileId), rootId(draft), 'mentions', actionId)
+}
+
 /** A stored object as a data entity, linked from the target that picked it. */
 export function addFilePart(
   draft: CrateDraft,
@@ -153,7 +170,8 @@ export function addFilePart(
   }
   const id = entityIdFor(draft, part)
   const added = addEntity(draft, { type: part.type ?? 'File', id, properties })
-  return linkReference(added.draft, target.entityId, target.property, id)
+  const linked = linkReference(added.draft, target.entityId, target.property, id)
+  return (part.createdBy ?? []).reduce((next, runId) => addRunResult(next, runId, id), linked)
 }
 
 /** A referenced dataset, per the RO-Crate rules for linking another crate. */
