@@ -5,6 +5,7 @@ import { ApiError, type DataLinksResponse } from '@/lib/api'
 const aruna = vi.hoisted(() => ({
   sessionEpoch: { value: 1 },
   getBucketLinks: vi.fn(),
+  getDataLinks: vi.fn(),
 }))
 vi.mock('@/composables/useAruna', () => ({ useAruna: () => aruna }))
 
@@ -35,6 +36,7 @@ function start(target: Target | null = file) {
 describe('dataset links', () => {
   beforeEach(() => {
     aruna.getBucketLinks.mockReset()
+    aruna.getDataLinks.mockReset()
   })
 
   it('asks for the linked parts that contain a file', async () => {
@@ -53,6 +55,17 @@ describe('dataset links', () => {
     await vi.waitFor(() => expect(links.state.value).toBe('ready'))
 
     expect(aruna.getBucketLinks).toHaveBeenCalledWith('lab', { prefix: '', parts_only: true })
+    scope.stop()
+  })
+
+  it('asks for the datasets that name an identifier, with the bucket route left alone', async () => {
+    aruna.getDataLinks.mockResolvedValue(page(['d1']))
+    const part = 'https://w3id.org/aruna/data/r/s/'
+    const { links, scope } = start({ bucket: '', key: '', folder: false, remote: false, id: part })
+    await vi.waitFor(() => expect(links.state.value).toBe('ready'))
+
+    expect(aruna.getDataLinks).toHaveBeenCalledWith(part, { parts_only: true })
+    expect(aruna.getBucketLinks).not.toHaveBeenCalled()
     scope.stop()
   })
 

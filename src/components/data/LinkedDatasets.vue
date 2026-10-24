@@ -7,13 +7,14 @@ import Button from '@/components/ui/Button.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { useDatasetLinks, type LinkTarget } from '@/composables/useDatasetLinks'
 
-const props = defineProps<{ heading: string; target: LinkTarget; card?: boolean; quietEmpty?: boolean }>()
+const props = defineProps<{ heading: string; target: LinkTarget; card?: boolean; quietEmpty?: boolean; exclude?: string }>()
 
 const target = computed(() => props.target)
 const links = useDatasetLinks(target)
+const documents = computed(() => links.documents.value.filter((document) => document.document_id !== props.exclude))
 
 // A node without the route shows nothing at all.
-const visible = computed(() => links.state.value !== 'missing' && !(props.quietEmpty && links.state.value === 'ready' && !links.documents.value.length && !links.hidden.value))
+const visible = computed(() => links.state.value !== 'missing' && !(props.quietEmpty && links.state.value === 'ready' && !documents.value.length && !links.hidden.value))
 </script>
 
 <template>
@@ -29,9 +30,9 @@ const visible = computed(() => links.state.value !== 'missing' && !(props.quietE
         <button type="button" class="text-primary hover:underline" @click="links.reload()">Try again</button>
       </p>
       <template v-else>
-        <p v-if="!links.documents.value.length" class="text-xs text-muted-foreground">None you can read.</p>
+        <p v-if="!documents.length" class="text-xs text-muted-foreground">None you can read.</p>
         <ul v-else class="space-y-1 text-xs">
-          <li v-for="document in links.documents.value" :key="document.document_id">
+          <li v-for="document in documents" :key="document.document_id">
             <RouterLink :to="{ name: 'dataset', params: { id: document.document_id } }" class="font-medium text-primary hover:underline">
               {{ document.title || document.document_path }}
             </RouterLink>

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { compileClientComponent, content, element, mountApp, moduleDefault, nodes } from '@/test/clientRender'
 import * as DataIdentity from '@/lib/crate/dataIdentity'
 import * as DataEntities from '@/lib/dataEntities'
+import * as LinkedPart from '@/lib/linkedPart'
 import * as Uri from '@/lib/profiles/uri'
 import * as Utils from '@/lib/utils'
 
@@ -18,6 +19,8 @@ const DatasetFiles = compileClientComponent(new URL('./DatasetFiles.vue', import
   vue: VueRuntime,
   'vue-router': { RouterLink: LinkStub },
   '@/components/data/ReferencedBy.vue': moduleDefault(Slot),
+  '@/components/metadata/view/LinkedPartActions.vue': moduleDefault(defineComponent({ props: { id: String }, setup: (props) => () => h('em', `linked part ${props.id}`) })),
+  '@/lib/linkedPart': LinkedPart,
   '@/components/ui/Badge.vue': moduleDefault(Slot),
   '@/components/ui/Button.vue': moduleDefault(Slot),
   '@/components/ui/IconButton.vue': moduleDefault(Slot),
@@ -129,5 +132,22 @@ describe('DatasetFiles', () => {
 
     expect(content(mounted.root)).not.toContain('Location')
     mounted.app.unmount()
+  })
+
+  it('offers the live files and the other datasets for a Dataset-typed part that names a bucket', async () => {
+    const part = 'https://w3id.org/aruna/data/k3V9xQ2m/01K8Y2B6D8/cmF3LzIwMjYv'
+    const mounted = await render({ '@id': part, '@type': 'Dataset', name: 'Raw 2026' })
+
+    expect(content(mounted.root)).toContain(`linked part ${part}`)
+    mounted.app.unmount()
+  })
+
+  it('offers nothing of the kind for a file, or a Dataset that is not a bucket', async () => {
+    const file = await render({ '@id': 's3://reads/raw/one.csv' })
+    expect(content(file.root)).not.toContain('linked part')
+    file.app.unmount()
+    const dataset = await render({ '@id': '#sub', '@type': 'Dataset', name: 'Sub' })
+    expect(content(dataset.root)).not.toContain('linked part')
+    dataset.app.unmount()
   })
 })

@@ -4,6 +4,7 @@
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import ReferencedBy from '@/components/data/ReferencedBy.vue'
+import LinkedPartActions from '@/components/metadata/view/LinkedPartActions.vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import IconButton from '@/components/ui/IconButton.vue'
@@ -18,6 +19,7 @@ import type { DatasetViewState } from '@/composables/useDatasetView'
 import type { CrateObjectReference } from '@/lib/crateReferences'
 import { objectLocation, objectRoute, parseDataIdentity } from '@/lib/crate/dataIdentity'
 import { dataEntityTreeOf, formatContentSize, type DataEntity, type DataEntityNode } from '@/lib/dataEntities'
+import { looksLikePart } from '@/lib/linkedPart'
 import { termNameFromUri } from '@/lib/profiles/uri'
 import { isHttpUrl } from '@/lib/utils'
 import { Eye, ExternalLink as ExternalLinkIcon, FileJson2, Folder, Info, Link2 } from '@lucide/vue'
@@ -48,6 +50,11 @@ const { hasActiveKey: hasS3Access, endpoint: s3Endpoint } = s3
 const dataEntities = computed<DataEntityNode[]>(() =>
   dataEntityTreeOf(currentCrate.value).filter((row) => !subcrateIris.value.has(row.id)),
 )
+
+// A Dataset-typed part that names a bucket or a folder: its files are always the current ones.
+function linkedPart(row: DataEntity): boolean {
+  return row.types.some((type) => termNameFromUri(type) === 'Dataset') && looksLikePart(row.id)
+}
 
 function rowTypes(row: DataEntity): string {
   return row.types.map(termNameFromUri).join(', ') || '-'
@@ -208,6 +215,7 @@ function openPreview(row: DataEntity) {
                   <a v-else-if="entityLink(row)" :href="entityLink(row)" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline" @click.stop>{{ row.contentUrl }}</a>
                   <span v-else class="font-mono">{{ locationText(row) }}</span>
                 </span>
+                <LinkedPartActions v-if="linkedPart(row)" :id="row.id" :dataset-id="detailId" />
                 <span v-if="referencedBy.get(row.id)?.length" class="mt-1 flex flex-wrap items-center gap-x-1.5 text-[11px] font-normal text-muted-foreground">
                   <Link2 class="h-3 w-3 shrink-0" /> Loaded datasets only:
                   <template v-for="(ref, i) in referencedBy.get(row.id) ?? []" :key="ref.documentId">

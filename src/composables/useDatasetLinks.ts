@@ -14,6 +14,8 @@ export interface LinkTarget {
   folder: boolean
   /** A bucket on another node is asked of that node, which this portal does not do. */
   remote: boolean
+  /** An identifier to ask for instead of a file or folder of the bucket. */
+  id?: string
 }
 
 function queryOf(target: LinkTarget): BucketLinksQuery {
@@ -21,7 +23,7 @@ function queryOf(target: LinkTarget): BucketLinksQuery {
 }
 
 export function useDatasetLinks(target: Ref<LinkTarget | null>) {
-  const { getBucketLinks, sessionEpoch } = useAruna()
+  const { getBucketLinks, getDataLinks, sessionEpoch } = useAruna()
   const documents = ref<DataLinkDocument[]>([])
   const state = ref<LinksState>('loading')
   const error = ref<string | null>(null)
@@ -50,7 +52,10 @@ export function useDatasetLinks(target: Ref<LinkTarget | null>) {
     if (append) loadingMore.value = true
     else state.value = 'loading'
     try {
-      const page = await getBucketLinks(asked.bucket, { ...queryOf(asked), ...(append && next.value ? { after: next.value } : {}) })
+      const after = append && next.value ? { after: next.value } : {}
+      const page = asked.id
+        ? await getDataLinks(asked.id, { parts_only: true, ...after })
+        : await getBucketLinks(asked.bucket, { ...queryOf(asked), ...after })
       if (!current()) return
       take(page, append)
       state.value = 'ready'
@@ -67,7 +72,7 @@ export function useDatasetLinks(target: Ref<LinkTarget | null>) {
   }
 
   watch(
-    () => [target.value?.bucket, target.value?.key, target.value?.folder, target.value?.remote],
+    () => [target.value?.bucket, target.value?.key, target.value?.folder, target.value?.remote, target.value?.id],
     () => {
       documents.value = []
       next.value = null
