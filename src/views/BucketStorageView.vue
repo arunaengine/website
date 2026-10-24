@@ -27,6 +27,7 @@ import BucketSources from '@/components/storage/BucketSources.vue'
 import LinkedDatasets from '@/components/data/LinkedDatasets.vue'
 import LinkedBy from '@/components/storage/LinkedBy.vue'
 import DatabaseMark from '@/components/storage/DatabaseMark.vue'
+import DatabaseSettings from '@/components/storage/DatabaseSettings.vue'
 import CopiesOfBucket from '@/components/storage/CopiesOfBucket.vue'
 import FileSources from '@/components/storage/FileSources.vue'
 import StorageOverviewTab from '@/components/storage/StorageOverviewTab.vue'
@@ -79,6 +80,10 @@ const example = computed(() => (mockEnabled() ? mockBucket(bucket.value) : undef
 const distribution = useBucketDistribution(bucket, nodeId)
 const live = computed(() => (example.value ? null : distribution.view.value))
 const nodes = computed(() => example.value ?? live.value ?? undefined)
+// The set of the bucket for a mark: null for an ordinary bucket, undefined while it is not known.
+const setId = computed(() =>
+  live.value?.live?.setId ?? (distribution.state.value === 'ordinary' ? null : undefined),
+)
 const nodesTab = computed(() => Boolean(nodes.value && isMulti(nodes.value)))
 const canAdminGroup = computed(() => isGroupAdmin(group.value, currentUser.value?.id ?? ''))
 const local = computed(() => !nodeId.value)
@@ -159,6 +164,14 @@ const browserLink = computed(() => ({
         <LinkedBy v-if="example" :bucket="bucket" />
         <LinkedDatasets v-else heading="Linked by datasets" card :target="{ bucket, key: '', folder: true, remote: Boolean(nodeId) }" />
         <DatabaseMark v-if="example" :bucket="bucket" />
+        <DatabaseSettings
+          v-else
+          :bucket="bucket"
+          :node-id="nodeId"
+          :set-id="setId"
+          :group-name="group?.display_name ?? null"
+          :can-admin="canAdminGroup"
+        />
         <Notice v-if="live" tone="info">
           This bucket is stored on {{ live.members.length }} nodes. Deleting it is not available yet.
         </Notice>
