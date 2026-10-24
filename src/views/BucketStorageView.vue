@@ -160,7 +160,7 @@ const browserLink = computed(() => ({
         <StorageOverviewTab v-else :bucket="bucket" :group-id="groupId" :node-id="nodeId" />
         <DistributionOverview v-if="live" :bucket="live" />
         <FileSources v-if="example" :bucket="bucket" />
-        <BucketSources v-else :bucket="bucket" :node-id="nodeId" />
+        <BucketSources v-else :bucket="bucket" :node-id="nodeId" :group-id="groupId" />
         <LinkedBy v-if="example" :bucket="bucket" />
         <LinkedDatasets v-else heading="Linked by datasets" card :target="{ bucket, key: '', folder: true, remote: Boolean(nodeId) }" />
         <DatabaseMark v-if="example" :bucket="bucket" />

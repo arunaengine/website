@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { SyncRelationship } from '@/lib/api'
+import type { FileSource } from '@/lib/api'
 import type { ReferenceSourceGroup } from '@/lib/references'
 import { formatNumber } from '@/lib/utils'
 import { sourceRows } from './bucketSources'
@@ -13,24 +13,12 @@ const group: ReferenceSourceGroup = {
   sourcePaths: [],
 }
 
-function relationship(id: string, mode: SyncRelationship['mode']): SyncRelationship {
-  return {
-    id,
-    source: 'arn:aruna:realm:node-2:s3/results/raw',
-    target: 'arn:aruna:realm:node-1:s3/shared',
-    mode,
-    reference_handling: 'materialize',
-    replicate_deletes: false,
-    created_by: 'u1',
-    created_at: '2026-10-01T00:00:00Z',
-    state: 'enabled',
-    status: { counters: { versions_synced: 0, bytes_synced: 0, failures: 0, consecutive_failures: 0 } },
-  }
-}
+const sync: FileSource = { kind: 'sync', relationship_id: 's1', source: 'arn:aruna:realm:node-2:s3/results/raw', mode: 'continuous' }
+const storage: FileSource = { kind: 'storage', import_id: 'i1', backend_id: 'b1', backend_prefix: '/lab/2026/', key_prefix: 'raw/' }
 
 describe('bucket sources', () => {
   it('lists referenced sources and buckets that a sync copies from', () => {
-    const rows = sourceRows([group], [relationship('s1', 'continuous')], (id) => `Node ${id}`)
+    const rows = sourceRows([group], [sync], (id) => `Node ${id}`, (id) => id)
 
     expect(rows.map((row) => [row.question, row.value])).toEqual([
       ['elsewhere', `${formatNumber(1_200)} files, read from the source`],
@@ -39,7 +27,13 @@ describe('bucket sources', () => {
     expect(rows[1].label).toBe('results/raw on Node node-2')
   })
 
+  it('lists a storage folder registered in place with the name of its backend', () => {
+    const rows = sourceRows([], [storage], (id) => id, (id) => `Lab share ${id}`)
+
+    expect(rows[0]).toMatchObject({ question: 'elsewhere', label: 'Storage folder Lab share b1/lab/2026', value: 'Registered in place under raw/, not copied' })
+  })
+
   it('lists nothing for a bucket that has no known source', () => {
-    expect(sourceRows([], [], (id) => id)).toEqual([])
+    expect(sourceRows([], [], (id) => id, (id) => id)).toEqual([])
   })
 })
