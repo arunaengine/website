@@ -17,6 +17,8 @@ export interface RealmNodeDisplay {
   info: RealmNodeInfo['info']
   /** Human label: a published name label when set, else "<kind> <short-id>". */
   label: string
+  /** The label without the location the desktop adds to it. */
+  name?: string
   /** Hover text for the label: the node id, or kind and short id in the desktop. */
   title?: string
   s3Url: string | null
@@ -46,12 +48,18 @@ function hostOf(url: string | null): string | null {
 }
 
 // The desktop names places in words: this computer, a device by its enrolled
-// name, a node by its name or host with its location.
-function placeName(node: RealmNodeInfo, thisComputer: boolean): string {
+// name, a node by its name or host.
+function plainName(node: RealmNodeInfo, thisComputer: boolean): string {
   if (thisComputer) return 'This computer'
   const labels = node.info?.labels ?? {}
   const named = labels['name'] || labels['display_name'] || labels['device']
-  const name = named || (node.kind === 'user' ? 'Device' : (hostOf(nodeApiBase(node)) ?? 'Node'))
+  return named || (node.kind === 'user' ? 'Device' : (hostOf(nodeApiBase(node)) ?? 'Node'))
+}
+
+// The plain name, with the node's location when it has one.
+function placeName(node: RealmNodeInfo, thisComputer: boolean): string {
+  const name = plainName(node, thisComputer)
+  if (thisComputer) return name
   // "default" is the backend's placeholder for a node without a location.
   const location = node.placement?.location
   return location && location !== 'default' ? `${name} · ${location}` : name
@@ -73,6 +81,7 @@ export function useRealmNodes() {
         kind: node.kind,
         info: node.info,
         label: desktop ? placeName(node, thisComputer) : nodeLabel(node),
+        name: desktop ? plainName(node, thisComputer) : nodeLabel(node),
         title: desktop ? `${kindLabel[node.kind]} ${truncateMiddle(node.node_id, 8, 4)}` : node.node_id,
         // The connected node's own S3 endpoint comes from /info even when the
         // node has not published a realm record yet.

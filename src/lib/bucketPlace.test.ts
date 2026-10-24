@@ -14,10 +14,10 @@ const node = (nodeId: string, kind: 'management' | 'server' | 'user', extra: Rec
 })
 
 describe('place names', () => {
-  it('names this computer, another device and a realm node with its location', () => {
+  it('names this computer, another device and a realm node with its location once', () => {
     expect(placeName(node('dev', 'user', { isLocal: true }))).toBe('This computer')
     expect(placeName(node('laptop', 'user', { label: "Lena's laptop" }))).toBe("Lena's laptop")
-    expect(placeName(node('n1', 'server', { label: 'node-1', location: 'Giessen' }))).toBe('node-1 · Giessen')
+    expect(placeName(node('n1', 'server', { label: 'node-1 · Giessen', location: 'Giessen' }))).toBe('node-1 · Giessen')
     expect(placeName(node('n2', 'server', { label: 'node-2' }))).toBe('node-2')
   })
 

@@ -91,7 +91,7 @@ const dialogStubs = Object.fromEntries(
     (name) => [`@/components/ui/${name}.vue`, moduleDefault(Passthrough)],
   ),
 )
-const realmNode = { nodeId: 'node-1', kind: 'server', label: 'node-1', isLocal: false, location: 'Giessen' }
+const realmNode = { nodeId: 'node-1', kind: 'server', label: 'node-1 · Giessen', isLocal: false, location: 'Giessen' }
 
 const BindFolderDialog = compileClientComponent(new URL('./BindFolderDialog.vue', import.meta.url), {
   vue: VueRuntime,

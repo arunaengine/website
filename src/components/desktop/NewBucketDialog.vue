@@ -3,7 +3,7 @@
 // A realm node is the default. A bucket on this computer stays here and cannot
 // be linked to a folder. A bucket that is linked next is made by that link;
 // any other bucket on a realm node is made through this computer's node.
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
@@ -39,7 +39,7 @@ const emit = defineEmits<{
   (e: 'link', bucket: BindSource): void
 }>()
 
-const { apiBaseUrl, myGroups } = useAruna()
+const { apiBaseUrl, myGroups, sessionEpoch } = useAruna()
 const realmNodes = useRealmNodes()
 const s3 = useS3()
 const { deviceClient } = useDeviceStatus()
@@ -119,10 +119,16 @@ function suggest() {
   void loadFree()
 }
 
+// Bumped on every open, close and unmount, so an older create ends unseen.
+let generation = 0
+onBeforeUnmount(() => generation++)
+
 watch(
   () => props.open,
   (open) => {
+    generation++
     if (!open) return
+    creating.value = false
     name.value = props.name ?? ''
     groupId.value = props.groupId || groupOptions.value[0]?.value || ''
     link.value = true
@@ -157,6 +163,9 @@ async function submit() {
   creating.value = true
   error.value = null
   const local = entry.kind === 'user'
+  const run = generation
+  const epoch = sessionEpoch.value
+  const current = () => run === generation && epoch === sessionEpoch.value
   try {
     if (local) {
       const session = await s3.activateContext(target.nodeId, target.groupId)
@@ -166,12 +175,13 @@ async function submit() {
       const client = requireDevice(deviceClient.value, 'the realm nodes')
       await createRealmBucket({ name: target.bucket, group_id: target.groupId, node_id: target.nodeId }, client)
     }
+    if (!current()) return
     emit('created', target)
     emit('update:open', false)
   } catch (err) {
-    error.value = local ? s3ErrorMessage(err, target.bucket) : refusal(err, entry, target.bucket)
+    if (current()) error.value = local ? s3ErrorMessage(err, target.bucket) : refusal(err, entry, target.bucket)
   } finally {
-    creating.value = false
+    if (run === generation) creating.value = false
   }
 }
 </script>
@@ -249,7 +259,7 @@ async function submit() {
                   <td class="px-3 py-2" :title="placeTitle(entry)">
                     <span class="flex items-center gap-2 text-foreground">
                       <component :is="entry.kind === 'user' ? Laptop : Server" class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      {{ entry.kind === 'user' ? 'This computer' : entry.label }}
+                      {{ entry.kind === 'user' ? 'This computer' : (entry.name ?? entry.label) }}
                       <Badge v-if="entry.nodeId === suggested" variant="outline" size="sm">default</Badge>
                     </span>
                   </td>

@@ -14,8 +14,8 @@ function hit(bucket: string): BucketSearchHit {
   return { bucket, node_id: 'n1', group_id: 'g2', arn: bucket } as BucketSearchHit
 }
 
-function answer(hits: BucketSearchHit[]) {
-  return { hits, nodes_queried: 1, nodes_failed: 0 }
+function answer(hits: BucketSearchHit[], next_cursor?: string) {
+  return { hits, nodes_queried: 1, nodes_failed: 0, next_cursor }
 }
 
 describe('bucket search', () => {
@@ -47,6 +47,46 @@ describe('bucket search', () => {
 
     expect(aruna.searchBuckets).toHaveBeenCalledWith('', { limit: 50 })
     expect(search.hits.value.map((entry) => entry.bucket)).toEqual(['reads', 'runs'])
+    scope.stop()
+  })
+
+  it('keeps the cursor of a listing and loads the next page', async () => {
+    aruna.searchBuckets
+      .mockResolvedValueOnce(answer([hit('reads')], 'c1'))
+      .mockResolvedValueOnce(answer([hit('runs')]))
+    const scope = effectScope()
+    const search = scope.run(() => useBucketSearch(ref(''), { listAll: true }))!
+    await vi.advanceTimersByTimeAsync(300)
+    expect(search.more.value).toBe(true)
+
+    await search.loadMore()
+
+    expect(aruna.searchBuckets).toHaveBeenLastCalledWith('', { limit: 50, cursor: 'c1' })
+    expect(search.hits.value.map((entry) => entry.bucket)).toEqual(['reads', 'runs'])
+    expect(search.more.value).toBe(false)
+    scope.stop()
+  })
+
+  it('drops a next page that arrives after a newer query', async () => {
+    let late: (value: unknown) => void = () => {}
+    aruna.searchBuckets
+      .mockResolvedValueOnce(answer([hit('reads')], 'c1'))
+      .mockImplementationOnce(() => new Promise((resolve) => (late = resolve)))
+      .mockResolvedValue(answer([hit('runs')]))
+    const query = ref('')
+    const scope = effectScope()
+    const search = scope.run(() => useBucketSearch(query, { listAll: true }))!
+    await vi.advanceTimersByTimeAsync(300)
+
+    const pending = search.loadMore()
+    query.value = 'ru'
+    await nextTick()
+    late(answer([hit('stale')]))
+    await pending
+    await vi.advanceTimersByTimeAsync(300)
+
+    expect(search.hits.value.map((entry) => entry.bucket)).toEqual(['runs'])
+    expect(search.more.value).toBe(false)
     scope.stop()
   })
 

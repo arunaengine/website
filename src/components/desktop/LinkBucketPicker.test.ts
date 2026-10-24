@@ -1,6 +1,6 @@
 import * as VueRuntime from 'vue'
 import { defineComponent, h, ref } from 'vue'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as BucketPlace from '@/lib/bucketPlace'
 import * as Workspaces from '@/lib/workspaces'
 import { button, click, compileClientComponent, content, element, moduleDefault, mountApp } from '@/test/clientRender'
@@ -13,13 +13,23 @@ const hit = (bucket: string, node_id: string) => ({
   group_name: 'Lab group',
   created_at: '',
 })
-const hits = ref([hit('test', 'node-1'), hit('test', 'device'), hit('notes', 'laptop'), hit('ws-run', 'node-2')])
+const listed = [hit('test', 'node-1'), hit('test', 'device'), hit('notes', 'laptop'), hit('ws-run', 'node-2')]
+const hits = ref(listed)
+const more = ref(false)
+const loadMore = vi.fn()
 const nodes = new Map<string, Record<string, unknown>>([
-  ['node-1', { nodeId: 'node-1', kind: 'server', label: 'node-1', isLocal: false, location: 'Giessen' }],
+  ['node-1', { nodeId: 'node-1', kind: 'server', label: 'node-1 · Giessen', isLocal: false, location: 'Giessen' }],
   ['device', { nodeId: 'device', kind: 'user', label: 'device 12D3…', isLocal: true, location: null }],
   ['laptop', { nodeId: 'laptop', kind: 'user', label: "Lena's laptop", isLocal: false, location: null }],
 ])
-const useBucketSearch = vi.fn(() => ({ hits, searching: ref(false), searched: ref(true), error: ref(null) }))
+const useBucketSearch = vi.fn(() => ({
+  hits,
+  searching: ref(false),
+  searched: ref(true),
+  error: ref(null),
+  more,
+  loadMore,
+}))
 
 const icons = new Proxy({}, { get: () => defineComponent(() => () => h('i')) })
 const LinkBucketPicker = compileClientComponent(new URL('./LinkBucketPicker.vue', import.meta.url), {
@@ -50,6 +60,32 @@ const option = (root: Parameters<typeof element>[0], text: string) =>
   element(root, (node) => node.tag === 'button' && node.props.role === 'option' && content(node).includes(text))
 
 describe('the bucket picker of Link a local folder', () => {
+  afterEach(() => {
+    hits.value = listed
+    more.value = false
+    loadMore.mockClear()
+  })
+
+  it('offers the next page instead of claiming no match', async () => {
+    more.value = true
+    const mounted = await mountOpen()
+
+    expect(loadMore).not.toHaveBeenCalled()
+    await click(button(mounted.root, 'Load more'))
+    expect(loadMore).toHaveBeenCalledTimes(1)
+    mounted.app.unmount()
+  })
+
+  it('asks for the next page when a page holds only workspace buckets', async () => {
+    hits.value = [hit('ws-run', 'node-2')]
+    more.value = true
+    const mounted = await mountOpen()
+
+    expect(loadMore).toHaveBeenCalled()
+    expect(content(mounted.root)).not.toContain('No bucket matched.')
+    mounted.app.unmount()
+  })
+
   it('lists every bucket with its place, without a node filter', async () => {
     const mounted = await mountOpen()
 

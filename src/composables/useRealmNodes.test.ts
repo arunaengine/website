@@ -52,6 +52,8 @@ describe('place names in the desktop', () => {
     expect(displayName('device0001aaaa')).toBe('This computer')
     expect(displayName('device0002bbbb')).toBe('lab-laptop')
     expect(nodeById('device0002bbbb')?.title).toMatch(/^device device0/)
+    expect(nodeById('node1aaaa0001')?.name).toBe('node-1')
+    expect(nodeById('device0001aaaa')?.name).toBe('This computer')
   })
 
   it('keeps the web labels as they are', () => {
