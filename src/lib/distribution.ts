@@ -1,7 +1,17 @@
 // What the portal shows of a bucket stored on more nodes. The node answers with
 // ids and states only, so a figure the node does not report stays absent here.
-import type { DistributedResponse, MemberStateName, StrategyName } from '@/lib/api'
-import type { Coverage, DataStrategy, MemberState, PresetId, RangeMode } from '@/lib/distributedMock'
+import type { BehaviourName, CreateDistributedRequest, DistributedResponse, MemberStateName, StrategyName } from '@/lib/api'
+import {
+  MAX_RANGES,
+  MIN_MEMBERS,
+  splitKeys,
+  type Coverage,
+  type DataStrategy,
+  type MemberState,
+  type Placement,
+  type PresetId,
+  type RangeMode,
+} from '@/lib/distributedMock'
 
 export interface DistributedMember {
   nodeId: string
@@ -157,6 +167,62 @@ export function fromStatus(status: DistributedResponse): DistributedBucket {
       conflicted: status.conflicted,
       changesUnavailable: status.configuration_changes_unavailable,
       recommendedGrant: status.recommended_grant,
+    },
+  }
+}
+
+const STRATEGY_NAMES: Record<DataStrategy, StrategyName> = {
+  copy: 'copy',
+  'copy on use': 'copy_on_use',
+  'cache on use': 'cache_on_use',
+  stream: 'stream',
+}
+
+const BEHAVIOURS: Record<RangeMode, BehaviourName> = {
+  passthrough: 'passthrough',
+  'fill first': 'fill_first',
+  'serve and fill': 'serve_and_fill',
+}
+
+const REFRESH_SECONDS: Record<string, number> = {
+  '15m': 900,
+  '1h': 3_600,
+  '6h': 21_600,
+  '24h': 86_400,
+  '7d': 604_800,
+}
+
+const isSharded = (placement: Placement) => placement.preset.startsWith('sharding')
+
+/** The reason a placement cannot be created yet, or null. */
+export function placementProblem(placement: Placement): string | null {
+  const copies = placement.members.filter((member) => member.strategy === 'copy')
+  if (placement.members.length < MIN_MEMBERS) return 'Choose at least two nodes.'
+  if (!copies.length) return 'Choose at least one node that keeps copies.'
+  if (!isSharded(placement)) return null
+  if (placement.preset === 'sharding-replicas' && copies.length < 2) return 'A copy of each range needs two nodes that keep copies.'
+  const keys = splitKeys(placement.settings)
+  if (keys.length + 1 > MAX_RANGES) return `At most ${MAX_RANGES} ranges.`
+  if (keys.some((key, index) => index > 0 && key <= keys[index - 1])) return 'Split keys must be in order, one per line.'
+  return null
+}
+
+/** The create request for a bucket on several nodes. Nodes that keep no copy are edges. */
+export function createRequest(name: string, placement: Placement): CreateDistributedRequest {
+  const { settings } = placement
+  const sharded = isSharded(placement)
+  return {
+    bucket: name,
+    layout: sharded ? 'sharding' : 'replica',
+    nodes: placement.members.filter((member) => member.strategy === 'copy').map((member) => member.nodeId),
+    ...(sharded ? { boundaries: splitKeys(settings), replicas: placement.preset === 'sharding-replicas' ? 1 : 0 } : {}),
+    edges: placement.members
+      .filter((member) => member.strategy !== 'copy')
+      .map((member) => ({ node_id: member.nodeId, strategy: STRATEGY_NAMES[member.strategy] as Exclude<StrategyName, 'copy'> })),
+    settings: {
+      refresh_secs: REFRESH_SECONDS[settings.refresh],
+      range_behaviour: BEHAVIOURS[settings.mode],
+      search_index: settings.index,
     },
   }
 }

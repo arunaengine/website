@@ -6,7 +6,6 @@ import CreateSettings from '@/components/distributed/CreateSettings.vue'
 import StorageFeatureLink from '@/components/distributed/StorageFeatureLink.vue'
 import MemberPicker from '@/components/distributed/MemberPicker.vue'
 import MemberSettings from '@/components/distributed/MemberSettings.vue'
-import MockNotice from '@/components/distributed/MockNotice.vue'
 import PresetPicker from '@/components/distributed/PresetPicker.vue'
 import Button from '@/components/ui/Button.vue'
 import Dialog from '@/components/ui/Dialog.vue'
@@ -17,14 +16,9 @@ import DialogHeader from '@/components/ui/DialogHeader.vue'
 import DialogTitle from '@/components/ui/DialogTitle.vue'
 import Notice from '@/components/ui/Notice.vue'
 import OptionToggle from '@/components/ui/OptionToggle.vue'
-import {
-  defaultSettings,
-  MIN_MEMBERS,
-  presetMembers,
-  STRATEGIES,
-  type Placement,
-  type PresetId,
-} from '@/lib/distributedMock'
+import { useRealmNodes } from '@/composables/useRealmNodes'
+import { defaultSettings, membersFor, presetById, STRATEGIES, type Placement, type PresetId } from '@/lib/distributedMock'
+import { placementProblem } from '@/lib/distribution'
 
 const props = defineProps<{ open: boolean; modelValue: Placement }>()
 const emit = defineEmits<{ (e: 'update:open', value: boolean): void; (e: 'update:modelValue', value: Placement): void }>()
@@ -41,10 +35,29 @@ const WHERE = [
   { value: 'one', label: 'This node' },
   { value: 'several', label: 'Several nodes' },
 ]
-const few = computed(() => draft.value.several && draft.value.members.length < MIN_MEMBERS)
+const { nodes, localNodeId } = useRealmNodes()
+const problem = computed(() => (draft.value.several ? placementProblem(draft.value) : null))
+
+// Reachable infrastructure nodes, this node first.
+const reachable = computed(() =>
+  nodes.value
+    .filter((node) => node.kind !== 'user' && node.reachable)
+    .sort((a, b) => Number(b.nodeId === localNodeId.value) - Number(a.nodeId === localNodeId.value))
+    .map((node) => node.nodeId),
+)
+
+function start(preset: PresetId) {
+  return membersFor(preset, reachable.value.slice(0, presetById(preset).members.length))
+}
 
 function pickPreset(preset: PresetId) {
-  draft.value = { ...draft.value, preset, members: presetMembers(preset), settings: defaultSettings(preset) }
+  draft.value = { ...draft.value, preset, members: start(preset), settings: defaultSettings(preset) }
+}
+
+function pickWhere(value: string) {
+  const several = value === 'several'
+  const empty = !draft.value.members.length
+  draft.value = { ...draft.value, several, members: several && empty ? start(draft.value.preset) : draft.value.members }
 }
 
 function apply() {
@@ -63,12 +76,11 @@ function apply() {
           <StorageFeatureLink question="nodes" class="ml-1" />
         </DialogDescription>
       </DialogHeader>
-      <MockNotice />
       <OptionToggle
         :model-value="draft.several ? 'several' : 'one'"
         :options="WHERE"
         aria-label="Where the bucket is stored"
-        @update:model-value="draft = { ...draft, several: $event === 'several' }"
+        @update:model-value="pickWhere"
       />
       <template v-if="draft.several">
         <div class="space-y-2">
@@ -77,9 +89,9 @@ function apply() {
         </div>
         <div class="space-y-2">
           <h3 class="text-sm font-medium text-foreground">Nodes</h3>
-          <p class="text-xs text-muted-foreground">Only shard hosts can be chosen.</p>
+          <p class="text-xs text-muted-foreground">Only reachable realm nodes can hold a bucket. The first node writes.</p>
           <MemberPicker v-model="draft.members" :preset="draft.preset" />
-          <Notice v-if="few" tone="warning">Choose at least two nodes.</Notice>
+          <Notice v-if="problem" tone="warning">{{ problem }}</Notice>
         </div>
         <details class="rounded-md border border-border px-4 py-3">
           <summary class="cursor-pointer text-sm font-medium text-foreground">Advanced options</summary>
@@ -100,7 +112,7 @@ function apply() {
       </template>
       <DialogFooter>
         <Button variant="outline" @click="emit('update:open', false)">Cancel</Button>
-        <Button :disabled="few" @click="apply">Use these settings</Button>
+        <Button :disabled="Boolean(problem)" @click="apply">Use these settings</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

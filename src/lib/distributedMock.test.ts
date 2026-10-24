@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { docsTopicBySlug } from '@/docs/v1'
 import { applyPortalConfig } from '@/lib/config'
-import { defaultSettings, mockEnabled, firstResults, grantGap, isPending, nodeGlob, planRanges, plannedStart, presetMembers, rangeTotal, retryResult, STORAGE_QUESTIONS } from './distributedMock'
+import { defaultSettings, mockEnabled, grantGap, membersFor, nodeGlob, planRanges, rangeTotal, splitKeys, STORAGE_QUESTIONS } from './distributedMock'
 import { BAKREP_COUNT, exampleListing, exampleMark, grantWarnings, mockFile, sourceLines, bucketCopies, basedOn, originOf, DATABASES_START, mockBucket, searchFiles, sourceObjects } from './distributedMockData'
 
 describe('distributed mock helpers', () => {
@@ -15,15 +15,15 @@ describe('distributed mock helpers', () => {
     expect(nodeGlob('bakrep')).toMatch(/^\/[^/]+\/g\/[^/]+\/data\/\*\/bakrep\/\*\*$/)
   })
 
-  it('puts a replica in another location than its coordinator', () => {
-    const ranges = planRanges(4, ['node-1', 'node-2', 'node-3', 'node-5'], true)
-    expect(ranges.map((range) => range.coordinator)).toEqual(['node-1', 'node-2', 'node-3', 'node-5'])
-    expect(ranges[0].replica).toBe('node-3')
-    expect(ranges[2].replica).toBe('node-1')
+  it('plans coordinators in turn and a copy on the next node', () => {
+    const ranges = planRanges(4, ['node-1', 'node-2', 'node-3'], true)
+    expect(ranges.map((range) => range.coordinator)).toEqual(['node-1', 'node-2', 'node-3', 'node-1'])
+    expect(ranges.map((range) => range.replica)).toEqual(['node-2', 'node-3', 'node-1', 'node-2'])
+    expect(planRanges(2, ['node-1', 'node-2'], false).map((range) => range.replica)).toEqual([null, null])
   })
 
   it('gives the edge presets a single copy origin and an edge member', () => {
-    const [origin, edge] = presetMembers('stream-edge')
+    const [origin, edge] = membersFor('stream-edge', ['a', 'b'])
     expect(origin.strategy).toBe('copy')
     expect(edge.strategy).toBe('stream')
   })
@@ -37,23 +37,17 @@ describe('distributed mock helpers', () => {
     expect(bakrep?.ranges.filter((range) => range.degradedSince)).toHaveLength(1)
   })
 
-  it('counts ranges from the chosen hint and keeps them within the limit', () => {
+  it('counts ranges from the typed split keys and ignores empty lines', () => {
     const settings = defaultSettings('sharding')
-    expect(rangeTotal(settings)).toBe(8)
-    expect(rangeTotal({ ...settings, count: 99_999 })).toBe(4096)
-    const keys = { ...settings, hint: 'keys' as const, keys: 'genomes/m\n\ngenomes/t\n' }
+    expect(rangeTotal(settings)).toBe(1)
+    const keys = { ...settings, keys: 'genomes/m\n\n genomes/t \n' }
+    expect(splitKeys(keys)).toEqual(['genomes/m', 'genomes/t'])
     expect(rangeTotal(keys)).toBe(3)
-    expect(plannedStart(keys, 2)).toBe('genomes/t')
-    expect(rangeTotal({ ...settings, hint: 'import' })).toBe(49)
   })
 
-  it('keeps the bucket pending until the failed member is created', () => {
-    const first = firstResults(presetMembers('mirror'))
-    expect(first.map((result) => result.created)).toEqual([true, true, false])
-    expect(isPending(first)).toBe(true)
-    const again = retryResult(first[2])
-    expect(again.created).toBe(false)
-    expect(retryResult(again).created).toBe(true)
+  it('gives the preset roles to as many nodes as there are', () => {
+    expect(membersFor('mirror', ['a', 'b']).map((member) => member.nodeId)).toEqual(['a', 'b'])
+    expect(membersFor('two-node', ['a', 'b', 'c'])).toHaveLength(2)
   })
 
   it('stays off until the deployment turns the feature on', () => {

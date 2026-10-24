@@ -1,21 +1,27 @@
 <script setup lang="ts">
-// Choose the nodes with their location and operator label. A node without the
-// shard-host label cannot be chosen.
+// Choose the nodes with their location and use. Only reachable infrastructure nodes can hold a bucket.
 import Badge from '@/components/ui/Badge.vue'
 import NodeLabel from '@/components/ui/NodeLabel.vue'
-import { MOCK_NODES, SHARD_HOST_LABEL, type MemberDraft, type MockNode, type PresetId } from '@/lib/distributedMock'
+import { useRealmNodes, type RealmNodeDisplay } from '@/composables/useRealmNodes'
+import { membersFor, type MemberDraft, type PresetId } from '@/lib/distributedMock'
+import { formatBytes } from '@/lib/utils'
 
 const props = defineProps<{ modelValue: MemberDraft[]; preset: PresetId }>()
 const emit = defineEmits<{ (e: 'update:modelValue', value: MemberDraft[]): void }>()
 
-const memberOf = (node: MockNode) => props.modelValue.find((member) => member.nodeId === node.id)
-const eligible = (node: MockNode) => node.shardHost && node.reachable
+const { nodes } = useRealmNodes()
 
-function toggle(node: MockNode, on: boolean) {
-  if (!on) return emit('update:modelValue', props.modelValue.filter((member) => member.nodeId !== node.id))
-  const sharded = props.preset.startsWith('sharding')
-  const added: MemberDraft = { nodeId: node.id, strategy: 'copy', coverage: sharded ? 'assigned' : 'all' }
-  emit('update:modelValue', [...props.modelValue, added])
+// Devices cannot hold a bucket.
+const infrastructure = () => nodes.value.filter((node) => node.kind !== 'user')
+const memberOf = (node: RealmNodeDisplay) => props.modelValue.find((member) => member.nodeId === node.nodeId)
+
+function toggle(node: RealmNodeDisplay, on: boolean) {
+  const chosen = props.modelValue.map((member) => member.nodeId).filter((id) => id !== node.nodeId)
+  const ids = on ? [...chosen, node.nodeId] : chosen
+  // The roles of the preset follow the order of the chosen nodes; later nodes keep copies.
+  const roles = membersFor(props.preset, ids)
+  const extra = ids.slice(roles.length).map((nodeId) => ({ nodeId, strategy: 'copy' as const, coverage: props.preset.startsWith('sharding') ? ('assigned' as const) : ('all' as const) }))
+  emit('update:modelValue', [...roles, ...extra])
 }
 </script>
 
@@ -27,30 +33,27 @@ function toggle(node: MockNode, on: boolean) {
           <th class="w-10 px-3 py-2"><span class="sr-only">Member</span></th>
           <th class="px-3 py-2 font-medium">Node</th>
           <th class="px-3 py-2 font-medium">Location</th>
-          <th class="px-3 py-2 font-medium">Operator label</th>
-          <th class="px-3 py-2 font-medium">Free space</th>
+          <th class="px-3 py-2 font-medium">State</th>
+          <th class="px-3 py-2 font-medium">Used space</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-border">
-        <tr v-for="node in MOCK_NODES" :key="node.id" :class="eligible(node) ? '' : 'text-muted-foreground'">
+        <tr v-for="node in infrastructure()" :key="node.nodeId" :class="node.reachable ? '' : 'text-muted-foreground'">
           <td class="px-3 py-2">
             <input
               type="checkbox"
               :checked="Boolean(memberOf(node))"
-              :disabled="!eligible(node)"
-              :aria-label="`Store on ${node.id}`"
+              :disabled="!node.reachable"
+              :aria-label="`Store on ${node.label}`"
               @change="toggle(node, ($event.target as HTMLInputElement).checked)"
             />
           </td>
-          <td class="px-3 py-2 font-medium"><NodeLabel :node-id="node.id" /></td>
-          <td class="px-3 py-2">{{ node.location }}</td>
+          <td class="px-3 py-2 font-medium"><NodeLabel :node-id="node.nodeId" /></td>
+          <td class="px-3 py-2">{{ node.location ?? 'Not set' }}</td>
           <td class="px-3 py-2">
-            <Badge v-if="node.shardHost" variant="success" size="sm" class="font-mono">{{ SHARD_HOST_LABEL }}</Badge>
-            <span v-else :title="`An operator sets ${SHARD_HOST_LABEL} to allow this node.`">
-              <span class="font-mono">{{ SHARD_HOST_LABEL }}</span> is not set
-            </span>
+            <Badge :variant="node.reachable ? 'success' : 'warn'" size="sm">{{ node.reachable ? 'reachable' : 'not reachable' }}</Badge>
           </td>
-          <td class="px-3 py-2">{{ node.freePercent }} %</td>
+          <td class="px-3 py-2">{{ node.info ? formatBytes(node.info.utilization.storage_bytes_used) : 'Unknown' }}</td>
         </tr>
       </tbody>
     </table>

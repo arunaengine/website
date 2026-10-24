@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { DistributedResponse } from '@/lib/api'
-import { degradedRanges, fromStatus } from './distribution'
+import { defaultSettings, type Placement, type PresetId } from '@/lib/distributedMock'
+import { createRequest, degradedRanges, fromStatus, placementProblem } from './distribution'
 
 const NODE_A = 'a'.repeat(64)
 const NODE_B = 'b'.repeat(64)
@@ -75,5 +76,49 @@ describe('status to view', () => {
 
   it('shows a pending set as pending', () => {
     expect(fromStatus(status({ phase: 'pending', serving: false })).live).toMatchObject({ pending: true, serving: false })
+  })
+})
+
+describe('create request', () => {
+  const member = (nodeId: string, strategy: Placement['members'][number]['strategy'] = 'copy') => ({ nodeId, strategy, coverage: 'all' as const })
+  const placement = (preset: PresetId, members: Placement['members'], settings: Partial<Placement['settings']> = {}): Placement => ({
+    several: true,
+    preset,
+    members,
+    settings: { ...defaultSettings(preset), ...settings },
+  })
+
+  it('keeps copies on the first node and every other copy node of a replica layout', () => {
+    const request = createRequest('spire', placement('mirror', [member('a'), member('b'), member('c')]))
+
+    expect(request).toMatchObject({ bucket: 'spire', layout: 'replica', nodes: ['a', 'b', 'c'], edges: [] })
+    expect(request.boundaries).toBeUndefined()
+  })
+
+  it('sends the nodes that keep no copy as edges with their strategy', () => {
+    const request = createRequest('reads', placement('cache-edge', [member('a'), member('b', 'cache on use')], { mode: 'serve and fill' }))
+
+    expect(request.nodes).toEqual(['a'])
+    expect(request.edges).toEqual([{ node_id: 'b', strategy: 'cache_on_use' }])
+    expect(request.settings?.range_behaviour).toBe('serve_and_fill')
+  })
+
+  it('splits at the typed keys and asks for one more copy of each range', () => {
+    const request = createRequest('bakrep', placement('sharding-replicas', [member('a'), member('b'), member('c')], { keys: 'genomes/m\n\n genomes/t \n', refresh: '24h', index: false }))
+
+    expect(request).toMatchObject({ layout: 'sharding', boundaries: ['genomes/m', 'genomes/t'], replicas: 1 })
+    expect(request.settings).toMatchObject({ refresh_secs: 86_400, search_index: false })
+  })
+
+  it('leaves the refresh out while it is off', () => {
+    expect(createRequest('a', placement('mirror', [member('a'), member('b')])).settings?.refresh_secs).toBeUndefined()
+  })
+
+  it('names what is missing before anything is sent', () => {
+    expect(placementProblem(placement('mirror', [member('a')]))).toBe('Choose at least two nodes.')
+    expect(placementProblem(placement('stream-edge', [member('a', 'stream'), member('b', 'stream')]))).toBe('Choose at least one node that keeps copies.')
+    expect(placementProblem(placement('sharding-replicas', [member('a'), member('b', 'stream')]))).toBe('A copy of each range needs two nodes that keep copies.')
+    expect(placementProblem(placement('sharding', [member('a'), member('b')], { keys: 'm\nb' }))).toBe('Split keys must be in order, one per line.')
+    expect(placementProblem(placement('sharding', [member('a'), member('b')], { keys: 'b\nm' }))).toBeNull()
   })
 })

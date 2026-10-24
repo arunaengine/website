@@ -82,9 +82,7 @@ export interface Preset {
   id: PresetId
   label: string
   description: string
-  nodes: string[]
   members: Pick<MemberDraft, 'strategy' | 'coverage'>[]
-  ranges: number
   mode: RangeMode
 }
 
@@ -96,63 +94,49 @@ export const PRESETS: readonly Preset[] = [
     id: 'two-node',
     label: 'Copy on two nodes',
     description: 'One node writes, the other keeps a full copy. Reads work on both.',
-    nodes: ['node-1', 'node-3'],
     members: [COPY_ALL, COPY_ALL],
-    ranges: 1,
     mode: 'passthrough',
   },
   {
     id: 'mirror',
     label: 'Copy on every chosen node',
     description: 'Full copies on several nodes. Downloads spread over the copies.',
-    nodes: ['node-1', 'node-2', 'node-3'],
     members: [COPY_ALL, COPY_ALL, COPY_ALL],
-    ranges: 1,
     mode: 'passthrough',
   },
   {
     id: 'sharding',
     label: 'Split across nodes',
     description: 'The files are divided into ranges. Each range has one node that writes.',
-    nodes: ['node-1', 'node-2', 'node-3', 'node-5'],
     members: [COPY_PART, COPY_PART, COPY_PART, COPY_PART],
-    ranges: 8,
     mode: 'passthrough',
   },
   {
     id: 'sharding-replicas',
     label: 'Split with copies',
-    description: 'Like splitting, and every range also has a copy on a node in another location.',
-    nodes: ['node-1', 'node-2', 'node-3', 'node-5'],
+    description: 'Like splitting, and every range also has a copy on the next node.',
     members: [COPY_PART, COPY_PART, COPY_PART, COPY_PART],
-    ranges: 8,
     mode: 'passthrough',
   },
   {
     id: 'copy-edge',
     label: 'Edge node, copy on use',
     description: 'An edge node fetches a file when it is first read and then keeps it.',
-    nodes: ['node-1', 'node-5'],
     members: [COPY_ALL, { strategy: 'copy on use', coverage: 'all' }],
-    ranges: 1,
     mode: 'serve and fill',
   },
   {
     id: 'cache-edge',
     label: 'Edge node, cache on use',
     description: 'An edge node caches files that are read. The cache has a size limit.',
-    nodes: ['node-1', 'node-5'],
     members: [COPY_ALL, { strategy: 'cache on use', coverage: 'all' }],
-    ranges: 1,
     mode: 'serve and fill',
   },
   {
     id: 'stream-edge',
     label: 'Edge node, stream',
     description: 'An edge node knows the files but keeps no bytes. Every read goes to a holder.',
-    nodes: ['node-1', 'node-5'],
     members: [COPY_ALL, { strategy: 'stream', coverage: 'all' }],
-    ranges: 1,
     mode: 'passthrough',
   },
 ]
@@ -161,9 +145,11 @@ export function presetById(id: PresetId): Preset {
   return PRESETS.find((preset) => preset.id === id) ?? PRESETS[0]
 }
 
-export function presetMembers(id: PresetId): MemberDraft[] {
-  const preset = presetById(id)
-  return preset.nodes.map((nodeId, index) => ({ nodeId, ...preset.members[index] }))
+// The preset's roles on the given nodes, in order. Fewer nodes than roles leave the last roles out.
+export function membersFor(id: PresetId, nodeIds: readonly string[]): MemberDraft[] {
+  return presetById(id)
+    .members.slice(0, nodeIds.length)
+    .map((member, index) => ({ nodeId: nodeIds[index], ...member }))
 }
 
 export interface PlannedRange {
@@ -172,18 +158,14 @@ export interface PlannedRange {
   replica: string | null
 }
 
-// Coordinators go round the members. A replica sits in another location when one exists.
+// Coordinators go round the members. A replica sits on the next member, as the node plans it.
 export function planRanges(count: number, nodeIds: readonly string[], replicas: boolean): PlannedRange[] {
-  if (!nodeIds.length) return []
-  return Array.from({ length: count }, (_, index) => {
-    const coordinator = nodeIds[index % nodeIds.length]
-    const place = mockNode(coordinator)?.location
-    const other = nodeIds.filter((id) => id !== coordinator)
-    const apart = other.filter((id) => mockNode(id)?.location !== place)
-    const pool = apart.length ? apart : other
-    const replica = replicas && pool.length ? pool[index % pool.length] : null
-    return { id: `r-${String(index).padStart(3, '0')}`, coordinator, replica }
-  })
+  if (nodeIds.length < 2 && replicas) return []
+  return Array.from({ length: nodeIds.length ? count : 0 }, (_, index) => ({
+    id: `r-${String(index).padStart(3, '0')}`,
+    coordinator: nodeIds[index % nodeIds.length],
+    replica: replicas ? nodeIds[(index + 1) % nodeIds.length] : null,
+  }))
 }
 
 export function roleLabel(preset: PresetId, index: number, member: MemberDraft): string {
@@ -215,12 +197,7 @@ export function nodeGlob(bucket: string): string {
   return `/${REALM_ID}/g/${GROUP_ID}/data/*/${bucket}/**`
 }
 
-export type HintKind = 'count' | 'keys' | 'import'
-
 export interface CreateSettings {
-  hint: HintKind
-  count: number
-  layout: string
   keys: string
   refresh: string
   mode: RangeMode
@@ -236,26 +213,22 @@ export const REFRESH_OPTIONS = [
   { value: '7d', label: 'Every 7 days' },
 ]
 
-export const IMPORT_RANGES = 49
 export const MAX_RANGES = 4096
 
 export function defaultSettings(preset: PresetId): CreateSettings {
-  const base = presetById(preset)
-  return { hint: 'count', count: base.ranges, layout: '', keys: '', refresh: 'off', mode: base.mode, index: true }
+  return { keys: '', refresh: 'off', mode: presetById(preset).mode, index: true }
+}
+
+// The lower bounds of the second and later ranges, one per line.
+export function splitKeys(settings: CreateSettings): string[] {
+  return settings.keys.split('\n').map((key) => key.trim()).filter(Boolean)
 }
 
 export function rangeTotal(settings: CreateSettings): number {
-  if (settings.hint === 'import') return IMPORT_RANGES
-  if (settings.hint === 'keys') return settings.keys.split('\n').filter((key) => key.trim()).length + 1
-  return Math.min(Math.max(Math.trunc(settings.count) || 1, 1), MAX_RANGES)
+  return splitKeys(settings).length + 1
 }
 
-export function plannedStart(settings: CreateSettings, index: number): string {
-  if (index === 0) return '(start)'
-  if (settings.hint === 'import') return `bakrep-v2-data-${String(index).padStart(3, '0')}/`
-  if (settings.hint === 'keys') return settings.keys.split('\n').filter((key) => key.trim())[index - 1].trim()
-  return 'cut from the key layout'
-}
+export const MIN_MEMBERS = 2
 
 export interface MemberResult {
   nodeId: string
@@ -271,8 +244,6 @@ export function firstResults(members: readonly MemberDraft[]): MemberResult[] {
 export function retryResult(result: MemberResult): MemberResult {
   return { ...result, tries: result.tries + 1, created: result.tries >= 2 }
 }
-
-export const MIN_MEMBERS = 2
 
 export function isPending(results: readonly MemberResult[]): boolean {
   return results.some((result) => !result.created)
@@ -295,7 +266,7 @@ export interface Placement {
 
 // Unchanged behaviour: the bucket is stored on this node only.
 export function defaultPlacement(): Placement {
-  return { several: false, preset: 'two-node', members: presetMembers('two-node'), settings: defaultSettings('two-node') }
+  return { several: false, preset: 'two-node', members: [], settings: defaultSettings('two-node') }
 }
 
 export function placementLabel(placement: Placement): string {
