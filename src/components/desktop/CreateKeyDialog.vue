@@ -31,6 +31,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:open', v: boolean): void
   (e: 'created', key: { accessKeyId: string; secret: string; name: string }): void
+  // The saved name only, also after its opening ended; never the secret.
+  (e: 'named', key: { accessKeyId: string; name: string }): void
 }>()
 
 const { myGroups } = useAruna()
@@ -76,6 +78,7 @@ async function create(): Promise<void> {
     const made = await (props.create ?? deviceKeys.create)(groupId.value, YEAR_SECONDS)
     // The key exists either way, so the list can name it; only its own opening sees the secret.
     rememberKeyName(made.access_key_id, label)
+    emit('named', { accessKeyId: made.access_key_id, name: label })
     if (mine !== generation) return
     emit('created', { accessKeyId: made.access_key_id, secret: made.access_secret, name: label })
     emit('update:open', false)

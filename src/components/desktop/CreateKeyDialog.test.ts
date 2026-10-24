@@ -121,6 +121,31 @@ describe('creating a key', () => {
     mounted.app.unmount()
   })
 
+  it('hands up the saved name of a key that answers after a cancel, never its secret', async () => {
+    let answer!: (made: unknown) => void
+    createKey.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+    const open = ref(true)
+    const onCreated = vi.fn()
+    const onNamed = vi.fn()
+    const host = defineComponent(() => () =>
+      h(CreateKeyDialog, { open: open.value, 'onUpdate:open': (v: boolean) => (open.value = v), onCreated, onNamed }),
+    )
+    const mounted = await mountApp(host)
+
+    await typeValue(input(mounted.root, 'aria-label', 'Key name'), 'Cancelled')
+    const first = click(button(mounted.root, 'Create key'))
+    await flush()
+    open.value = false
+    await flush()
+    answer({ access_key_id: 'ARKCANCEL', access_secret: 'cancel-secret' })
+    await first
+
+    expect(onNamed).toHaveBeenCalledWith({ accessKeyId: 'ARKCANCEL', name: 'Cancelled' })
+    expect(JSON.stringify(onNamed.mock.calls)).not.toContain('cancel-secret')
+    expect(onCreated).not.toHaveBeenCalled()
+    mounted.app.unmount()
+  })
+
   it('shows the refusal and remembers no name when the node says no', async () => {
     createKey.mockRejectedValue(new Error('The group has no write access.'))
     const mounted = await mountApp(CreateKeyDialog, { props: { open: true } })

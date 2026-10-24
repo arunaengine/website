@@ -21,7 +21,7 @@ const createDeviceKey = vi.fn()
 const infoRequest = vi.fn()
 const dialogs = {
   create: undefined as undefined | ((group: string, seconds: number) => Promise<unknown>),
-  emit: undefined as undefined | ((event: 'created' | 'update:open', value: unknown) => void),
+  emit: undefined as undefined | ((event: 'created' | 'named' | 'update:open', value: unknown) => void),
 }
 
 const Plain = defineComponent({
@@ -59,7 +59,7 @@ const ContentStub = defineComponent({
 const CopyStub = defineComponent({ props: { value: String }, setup: (props) => () => h('i', { 'data-copy': props.value }) })
 const KeyDialogStub = defineComponent({
   props: { open: Boolean, create: Function },
-  emits: ['created', 'update:open'],
+  emits: ['created', 'named', 'update:open'],
   setup(props, { emit }) {
     dialogs.emit = emit as typeof dialogs.emit
     return () => {
@@ -220,6 +220,19 @@ describe('connect your tools in the desktop settings', () => {
 
     expect(content(mounted.root)).not.toContain('late-secret')
     expect(content(mounted.root)).not.toContain('Your new key is ready')
+    mounted.app.unmount()
+  })
+
+  it('names a key at once whose answer came after the dialog was cancelled', async () => {
+    deviceKeyList.value = [{ access_key_id: 'ARKLATE', status: 'active', expires_at: '2027-10-12T00:00:00Z' }]
+    const mounted = await mountApp(ConnectTools)
+    await flush()
+    expect(content(mounted.root)).toContain('Access key')
+
+    dialogs.emit!('named', { accessKeyId: 'ARKLATE', name: 'Late tools' })
+    await flush()
+
+    expect(content(keyRow(mounted.root, 'Late tools'))).toContain('This computer')
     mounted.app.unmount()
   })
 
