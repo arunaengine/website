@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // New bucket in Aruna Desktop: a name, a group and the place that stores it.
 // A realm node is the default. A bucket on this computer stays here and cannot
-// be linked to a folder. A bucket that is linked next is made by that link.
+// be linked to a folder. A bucket that is linked next is made by that link;
+// any other bucket on a realm node is made through this computer's node.
 import { computed, ref, watch } from 'vue'
 import Badge from '@/components/ui/Badge.vue'
 import Button from '@/components/ui/Button.vue'
@@ -17,14 +18,16 @@ import DialogFooter from '@/components/ui/DialogFooter.vue'
 import DialogClose from '@/components/ui/DialogClose.vue'
 import GroupSelect from '@/components/groups/GroupSelect.vue'
 import { useAruna } from '@/composables/useAruna'
+import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { useRealmNodes, type RealmNodeDisplay } from '@/composables/useRealmNodes'
-import { isS3NetworkError, s3ErrorMessage, useS3 } from '@/composables/useS3'
-import { apiRequest, type InfoResponse } from '@/lib/api'
+import { s3ErrorMessage, useS3 } from '@/composables/useS3'
+import { ApiError, apiRequest, type InfoResponse } from '@/lib/api'
 import type { BindSource } from '@/lib/bindSource'
 import { bucketNameProblem } from '@/lib/bucketName'
 import { defaultPlace, freeSpace, placeName, placeTitle } from '@/lib/bucketPlace'
+import { createRealmBucket, requireDevice } from '@/lib/deviceApi'
 import { desktopContext } from '@/lib/desktop'
-import { formatBytes } from '@/lib/utils'
+import { errorMessage, formatBytes } from '@/lib/utils'
 import { isWorkspaceBucket } from '@/lib/workspaces'
 import { Boxes, Laptop, Plus, Server } from '@lucide/vue'
 
@@ -39,9 +42,7 @@ const emit = defineEmits<{
 const { apiBaseUrl, myGroups } = useAruna()
 const realmNodes = useRealmNodes()
 const s3 = useS3()
-
-const NODE_REFUSED =
-  'This node does not let the app create buckets directly. Turn on "Then link a folder" to create it with the link.'
+const { deviceClient } = useDeviceStatus()
 
 const name = ref('')
 const groupId = ref('')
@@ -135,9 +136,19 @@ watch(places, () => {
   if (props.open && !nodeId.value) suggest()
 })
 
+// The two refusals a person can act on get their own words.
+function refusal(err: unknown, entry: RealmNodeDisplay, bucket: string): string {
+  if (err instanceof ApiError && err.status === 409 && err.code === 'bucket_exists') {
+    return `A bucket named ${bucket} already exists on ${placeName(entry)}.`
+  }
+  if (err instanceof ApiError && err.status === 502) return `${placeName(entry)} cannot be reached right now. Try again later.`
+  return errorMessage(err)
+}
+
 async function submit() {
-  if (!canCreate.value || !place.value) return
-  const target: BindSource = { bucket: trimmed.value, nodeId: place.value.nodeId, groupId: groupId.value }
+  const entry = place.value
+  if (!canCreate.value || !entry) return
+  const target: BindSource = { bucket: trimmed.value, nodeId: entry.nodeId, groupId: groupId.value }
   if (deferred.value) {
     emit('link', target)
     emit('update:open', false)
@@ -145,14 +156,20 @@ async function submit() {
   }
   creating.value = true
   error.value = null
+  const local = entry.kind === 'user'
   try {
-    const session = await s3.activateContext(target.nodeId, target.groupId)
-    const reference = { nodeId: session.issuerNodeId, groupId: target.groupId, accessKeyId: session.accessKeyId }
-    await s3.createBucket(target.bucket, session.issuerNodeId, reference)
+    if (local) {
+      const session = await s3.activateContext(target.nodeId, target.groupId)
+      const reference = { nodeId: session.issuerNodeId, groupId: target.groupId, accessKeyId: session.accessKeyId }
+      await s3.createBucket(target.bucket, session.issuerNodeId, reference)
+    } else {
+      const client = requireDevice(deviceClient.value, 'the realm nodes')
+      await createRealmBucket({ name: target.bucket, group_id: target.groupId, node_id: target.nodeId }, client)
+    }
     emit('created', target)
     emit('update:open', false)
   } catch (err) {
-    error.value = !here.value && isS3NetworkError(err) ? NODE_REFUSED : s3ErrorMessage(err, target.bucket)
+    error.value = local ? s3ErrorMessage(err, target.bucket) : refusal(err, entry, target.bucket)
   } finally {
     creating.value = false
   }
