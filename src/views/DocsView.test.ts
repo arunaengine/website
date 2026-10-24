@@ -5,7 +5,6 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import { docsScreenshots, docsTopics } from '@/docs/v1'
-import { applyPortalConfig } from '@/lib/config'
 import { SETTINGS_TAB_ANCHORS, navAnchor, navEntries } from '@/components/layout/nav'
 
 // Every source file that can carry a data-tour anchor.
@@ -47,8 +46,6 @@ beforeAll(async () => {
   vi.doMock('@/components/ui/Button.vue', () => ({ default: ButtonStub }))
   vi.doMock('@/components/ui/EmptyState.vue', () => ({ default: EmptyStateStub }))
   DocsView = (await import('./DocsView.vue')).default
-  // Design preview topics are listed only while the node mock is on.
-  applyPortalConfig({ features: { distributedMock: true } })
 })
 
 async function renderTopic(slug: string): Promise<string> {
@@ -57,10 +54,7 @@ async function renderTopic(slug: string): Promise<string> {
 }
 
 describe('versioned in-portal Docs', () => {
-  it('opens a design preview topic only while the node mock is on', async () => {
-    applyPortalConfig({})
-    expect(await renderTopic('storage-features')).not.toContain('Which storage feature do I need?')
-    applyPortalConfig({ features: { distributedMock: true } })
+  it('opens the storage feature guide', async () => {
     expect(await renderTopic('storage-features')).toContain('Which storage feature do I need?')
   })
 

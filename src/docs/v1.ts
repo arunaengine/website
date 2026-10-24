@@ -49,8 +49,6 @@ export interface DocsTopic {
   tour?: DocsTourStep[]
   /** Hands "Show me in the portal" to the interactive tutorial of that name. */
   tutorial?: 'compute' | 'profile'
-  /** A design preview: listed and opened only while the node mock is on. */
-  preview?: boolean
 }
 
 /** Stable anchor id for a section heading; concept: links may target it. */
@@ -1737,14 +1735,14 @@ export const docsTopics: DocsTopic[] = [
     slug: 'storage-features',
     kind: 'Guide',
     title: 'Which storage feature do I need?',
-    summary: 'Design preview. References, copies, syncs, storing a bucket on more nodes, storage rules and placement rules: what each one is for.',
+    summary: 'References, copies, syncs, storing a bucket on more nodes, storage rules and placement rules: what each one is for.',
     sections: [
       {
         title: 'The short answer',
         icon: 'Route',
         paragraphs: [
           'Storing a bucket on more nodes gives you one bucket with copies. A sync gives you two buckets. A reference is a pointer without a copy.',
-          'This page is a design preview. The table lists every way to put data in a bucket or keep it somewhere. The questions below pick the right one, in the order people usually ask them.',
+          'The table lists every way to put data in a bucket or keep it somewhere. The questions below pick the right one, in the order people usually ask them.',
         ],
       },
       {
@@ -1814,7 +1812,6 @@ export const docsTopics: DocsTopic[] = [
         ],
       },
     ],
-    preview: true,
   },
   glossaryTopic,
 ]
