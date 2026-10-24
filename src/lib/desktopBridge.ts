@@ -81,9 +81,10 @@ export interface ComputeProbe {
 
 export interface EnrollPayload {
   secret: string
-  // Both are carried by an aruna://enroll link; a pasted bare secret has neither.
+  // Carried by an aruna://enroll link; a pasted bare secret has none of them.
   seedUrl?: string
   realm?: string
+  site?: string
   label?: string
 }
 

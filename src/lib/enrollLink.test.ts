@@ -12,6 +12,15 @@ describe('parseEnrollInput', () => {
     })
   })
 
+  it('keeps the website a link names as its site', () => {
+    expect(parseEnrollInput(`${LINK}&site=https%3A%2F%2Fv3.test`)).toEqual({
+      secret: 'ab+cd/ef=',
+      seedUrl: 'https://node.test',
+      realm: 'R1',
+      site: 'https://v3.test',
+    })
+  })
+
   it('keeps a link without seed or realm', () => {
     expect(parseEnrollInput('aruna://enroll?secret=S3CRET-VALUE')).toEqual({ secret: 'S3CRET-VALUE' })
   })
@@ -42,7 +51,7 @@ describe('withSite', () => {
 
   it('adds the website after the node fields, which stay as minted', () => {
     expect(withSite(LINK, SITE)).toBe(`${LINK}&site=https%3A%2F%2Fv3.aruna-engine.org`)
-    expect(parseEnrollInput(withSite(LINK, SITE))).toEqual(parseEnrollInput(LINK))
+    expect(parseEnrollInput(withSite(LINK, SITE))).toEqual({ ...parseEnrollInput(LINK), site: SITE })
   })
 
   it('leaves a link that already names its site', () => {

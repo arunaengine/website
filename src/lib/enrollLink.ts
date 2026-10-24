@@ -6,6 +6,8 @@ export interface EnrollInput {
   secret: string
   seedUrl?: string
   realm?: string
+  // The realm website that showed the link; the device signs in through it.
+  site?: string
 }
 
 // A pasted code carries no separators or whitespace; anything shorter than
@@ -29,6 +31,8 @@ function fromLink(raw: string): EnrollInput | null {
   if (seedUrl) input.seedUrl = seedUrl
   const realm = url.searchParams.get('realm')?.trim()
   if (realm) input.realm = realm
+  const site = url.searchParams.get('site')?.trim()
+  if (site) input.site = site
   return input
 }
 

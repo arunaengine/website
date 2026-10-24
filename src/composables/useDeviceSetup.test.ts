@@ -88,6 +88,22 @@ describe('applying a setup', () => {
     api.done()
   })
 
+  it('hands the site the link names to the shell', async () => {
+    const enroll_url = `${ENROLL_URL}&site=https%3A%2F%2Fv3.test`
+    mint.mockResolvedValue({ response: { enroll_url, expires_at: 99 }, enrollmentId: 'enr-3' })
+    const api = await mounted()
+
+    await api.apply('')
+
+    expect(enrollApply).toHaveBeenCalledWith({
+      secret: 'ab+cd/ef=',
+      seedUrl: 'https://node.test',
+      realm: 'R1',
+      site: 'https://v3.test',
+    })
+    api.done()
+  })
+
   it('keeps a failed apply on the form', async () => {
     mint.mockResolvedValue({ response: { enroll_url: null, expires_at: 99 }, enrollmentId: null })
     const api = await mounted()
