@@ -19,7 +19,7 @@ const component = compileClientComponent(new URL('./DatabasesTab.vue', import.me
 })
 
 function row(bucket: string, target: Databases.DatabaseRow['target']): Databases.DatabaseRow {
-  return { entryId: `e-${bucket}`, datasetId: 'd', bucket, ownerGroup: 'g', title: `${bucket} title`, documentPath: null, state: 'active', target }
+  return { entryId: `e-${bucket}`, datasetId: 'd', bucket, ownerGroup: 'g', title: `${bucket} title`, documentPath: null, state: 'active', public: false, target }
 }
 
 describe('databases in Add data', () => {

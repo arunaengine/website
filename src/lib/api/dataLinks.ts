@@ -67,3 +67,51 @@ export function getDataLinks(
 ): Promise<DataLinksResponse> {
   return apiRequest('/metadata/links', { query: { id, ...query }, signal }, client)
 }
+
+export interface PartOfDataset {
+  document_id: string
+  title?: string | null
+  /** The dataset's w3id, which file metadata names as `isPartOf`. */
+  graph_iri: string
+  /** The linked parts of the dataset that contain the file. */
+  part_ids: string[]
+}
+
+export interface PartOfResponse {
+  /** At most ten datasets. */
+  datasets: PartOfDataset[]
+  /** More datasets contain the file; the paged listing has them all. */
+  more: boolean
+  complete: boolean
+  hidden_references_exist: boolean
+  more_datasets: string
+}
+
+/** The datasets whose live linked parts contain a file: its derived `isPartOf`. */
+export function getFilePartOf(
+  bucket: string,
+  key: string,
+  client: ApiClientOptions = {},
+  signal?: AbortSignal,
+): Promise<PartOfResponse> {
+  return apiRequest(`/data/buckets/${encodeURIComponent(bucket)}/objects/part-of`, { query: { key }, signal }, client)
+}
+
+export interface PartTargetResponse {
+  /** The canonical identifier of the part. */
+  id: string
+  /** The bucket name; absent for a set this node has no record of yet. */
+  bucket?: string | null
+  prefix: string
+  /** The set of a bucket stored on more nodes. */
+  set_id?: string | null
+  /** The node of an ordinary bucket. */
+  node_id?: string | null
+  /** This node holds the bucket and can list the part's files itself. */
+  held_here: boolean
+}
+
+/** Resolves a linked part, a bucket root or a folder, to the bucket that holds its files. */
+export function getPartTarget(id: string, client: ApiClientOptions = {}, signal?: AbortSignal): Promise<PartTargetResponse> {
+  return apiRequest('/metadata/links/target', { query: { id }, signal }, client)
+}

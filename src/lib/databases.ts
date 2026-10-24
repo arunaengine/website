@@ -14,6 +14,8 @@ export interface DatabaseRow {
   /** The dataset's title when the caller may read the dataset. */
   title: string | null
   documentPath: string | null
+  /** Anyone may read the bucket, also without a login. */
+  public: boolean
 }
 
 export function rowOf(view: DatabaseView): DatabaseRow {
@@ -26,6 +28,7 @@ export function rowOf(view: DatabaseView): DatabaseRow {
     state: view.state,
     title: view.title ?? null,
     documentPath: view.document_path ?? null,
+    public: view.public,
   }
 }
 

@@ -27,6 +27,8 @@ export interface DatabaseView extends DatabaseEntryView {
   title?: string | null
   graph_iri?: string | null
   document_path?: string | null
+  /** Anyone, also without a login, may read the bucket; otherwise realm users with access. */
+  public: boolean
 }
 
 export interface DatabaseListResponse {

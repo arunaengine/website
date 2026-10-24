@@ -3,7 +3,7 @@ import type { DatabaseRequestView, DatabaseView } from '@/lib/api'
 import { briefOf, databaseOf, openNode, requestOf, rowOf, sameTarget, searchRows, targetOf } from './databases'
 
 function view(bucket: string, target: DatabaseView['target'], extra: Partial<DatabaseView> = {}): DatabaseView {
-  return { entry_id: `e-${bucket}`, dataset_id: `d-${bucket}`, owner_group: 'g1', target, bucket, state: 'active', title: `${bucket} database`, ...extra }
+  return { entry_id: `e-${bucket}`, dataset_id: `d-${bucket}`, owner_group: 'g1', target, bucket, state: 'active', public: false, title: `${bucket} database`, ...extra }
 }
 
 const set = { kind: 'distributed' as const, set_id: 's1' }

@@ -16,7 +16,7 @@ onMounted(() => databases.ensure())
 const entry = computed(() => databases.find(props.bucket, props.nodeId))
 const brief = useDatasetBrief(computed(() => entry.value?.datasetId ?? null))
 const title = computed(() => brief.value?.name || entry.value?.title || '')
-const facts = computed(() => [brief.value?.license, STATE_NOTES[entry.value?.state ?? 'active']].filter(Boolean).join(' · '))
+const facts = computed(() => [brief.value?.license, entry.value?.public ? 'Public' : '', STATE_NOTES[entry.value?.state ?? 'active']].filter(Boolean).join(' · '))
 </script>
 
 <template>

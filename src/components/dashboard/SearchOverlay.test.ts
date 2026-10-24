@@ -642,7 +642,7 @@ describe('narrow TopBar search panel', () => {
 
   it('lists the databases a person may use under their own tag', async () => {
     databaseRows = [{
-      entryId: 'e1', datasetId: 'd1', bucket: 'spire-db', ownerGroup: 'group-a', title: 'SPIRE microbiome', documentPath: null, state: 'active',
+      entryId: 'e1', datasetId: 'd1', bucket: 'spire-db', ownerGroup: 'group-a', title: 'SPIRE microbiome', documentPath: null, state: 'active', public: false,
       target: { kind: 'ordinary', node_id: 'node-b', bucket: 'spire-db' },
     }]
     const mounted = await mount()

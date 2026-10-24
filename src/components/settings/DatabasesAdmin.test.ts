@@ -43,7 +43,7 @@ const component = compileClientComponent(new URL('./DatabasesAdmin.vue', import.
 })
 
 function view(bucket: string, extra: Partial<DatabaseView> = {}): DatabaseView {
-  return { entry_id: `e-${bucket}`, dataset_id: `d-${bucket}`, owner_group: 'g1', target: { kind: 'ordinary', node_id: 'n1', bucket }, bucket, state: 'active', title: `${bucket} title`, ...extra }
+  return { entry_id: `e-${bucket}`, dataset_id: `d-${bucket}`, owner_group: 'g1', target: { kind: 'ordinary', node_id: 'n1', bucket }, bucket, state: 'active', public: false, title: `${bucket} title`, ...extra }
 }
 
 async function render() {

@@ -65,3 +65,20 @@ export function getFileOrigin(
 ): Promise<OriginResponse> {
   return apiRequest(`/data/buckets/${encodeURIComponent(bucket)}/objects/origin`, { query, signal }, client)
 }
+
+export type FileSource =
+  /** Another bucket's files are copied in by a sync. */
+  | { kind: 'sync'; relationship_id: string; source: string; mode: 'once' | 'reference' | 'continuous' }
+  /** A storage backend folder of the group is registered without copying. */
+  | { kind: 'storage'; import_id: string; backend_id: string; backend_prefix: string; key_prefix: string }
+
+export interface FileSourcesResponse {
+  sources: FileSource[]
+  /** False when more rows exist than one answer reads. */
+  complete: boolean
+}
+
+/** The incoming paths of a bucket on this node. Direct uploads are always possible and not listed. */
+export function getBucketSources(bucket: string, client: ApiClientOptions = {}, signal?: AbortSignal): Promise<FileSourcesResponse> {
+  return apiRequest(`/data/buckets/${encodeURIComponent(bucket)}/sources`, { signal }, client)
+}

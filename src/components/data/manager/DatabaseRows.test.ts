@@ -29,7 +29,7 @@ const component = compileClientComponent(new URL('./DatabaseRows.vue', import.me
 
 function row(bucket: string, extra: Partial<Databases.DatabaseRow> = {}): Databases.DatabaseRow {
   return {
-    entryId: `e-${bucket}`, datasetId: `d-${bucket}`, bucket, ownerGroup: 'g1', title: `${bucket} title`, documentPath: null, state: 'active',
+    entryId: `e-${bucket}`, datasetId: `d-${bucket}`, bucket, ownerGroup: 'g1', title: `${bucket} title`, documentPath: null, state: 'active', public: false,
     target: { kind: 'ordinary', node_id: 'n1', bucket },
     ...extra,
   }

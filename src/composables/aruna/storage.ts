@@ -1,7 +1,11 @@
 import {
   createDistributedBucket as requestCreate,
   getBucketLinks as requestLinks,
+  getBucketSources as requestSources,
+  getFilePartOf as requestPartOf,
   getFileOrigin as requestOrigin,
+  getPartTarget as requestTarget,
+  getDataLinks as requestDataLinks,
   getBucketDistribution as requestDistribution,
   getBucketUsage as requestBucketUsage,
   retryAdmission as requestRetry,
@@ -13,7 +17,10 @@ import {
   type CreateDistributedRequest,
   type DataLinksResponse,
   type DistributedResponse,
+  type FileSourcesResponse,
   type OriginResponse,
+  type PartOfResponse,
+  type PartTargetResponse,
   type GroupRoutingResponse,
   type ReplicateBlobRequest,
   type ReplicateBlobResponse,
@@ -67,6 +74,26 @@ export function getBucketLinks(bucket: string, query: BucketLinksQuery, signal?:
 /** Where one file version of a bucket on this node came from. */
 export function getFileOrigin(bucket: string, query: { key: string; version_id?: string }, signal?: AbortSignal): Promise<OriginResponse> {
   return requestOrigin(bucket, query, refreshContext().client, signal)
+}
+
+/** The datasets whose linked parts contain a file of a bucket on this node. */
+export function getFilePartOf(bucket: string, key: string, signal?: AbortSignal): Promise<PartOfResponse> {
+  return requestPartOf(bucket, key, refreshContext().client, signal)
+}
+
+/** The incoming syncs and storage folders of a bucket on this node. */
+export function getBucketSources(bucket: string, signal?: AbortSignal): Promise<FileSourcesResponse> {
+  return requestSources(bucket, refreshContext().client, signal)
+}
+
+/** The bucket and folder a linked part covers. */
+export function getPartTarget(id: string, signal?: AbortSignal): Promise<PartTargetResponse> {
+  return requestTarget(id, refreshContext().client, signal)
+}
+
+/** The datasets that name one Aruna data identifier. */
+export function getDataLinks(id: string, query: { parts_only?: boolean; after?: string; limit?: number } = {}, signal?: AbortSignal): Promise<DataLinksResponse> {
+  return requestDataLinks(id, query, refreshContext().client, signal)
 }
 
 /** The set a bucket on this node belongs to; 404 means an ordinary bucket. */

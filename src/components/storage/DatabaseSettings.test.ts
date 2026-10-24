@@ -39,7 +39,7 @@ const component = compileClientComponent(new URL('./DatabaseSettings.vue', impor
 })
 
 const entry: Databases.DatabaseRow = {
-  entryId: 'e1', datasetId: 'd1', bucket: 'lab', ownerGroup: 'g1', title: 'Lab', documentPath: null, state: 'active',
+  entryId: 'e1', datasetId: 'd1', bucket: 'lab', ownerGroup: 'g1', title: 'Lab', documentPath: null, state: 'active', public: false,
   target: { kind: 'ordinary', node_id: 'n1', bucket: 'lab' },
 }
 

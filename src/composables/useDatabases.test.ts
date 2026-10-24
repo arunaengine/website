@@ -20,6 +20,7 @@ function view(bucket: string, extra: Partial<DatabaseView> = {}): DatabaseView {
     target: { kind: 'ordinary', node_id: 'n1', bucket },
     bucket,
     state: 'active',
+    public: false,
     title: `${bucket} database`,
     ...extra,
   }
