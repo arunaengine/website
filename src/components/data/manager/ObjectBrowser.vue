@@ -72,7 +72,6 @@ const emit = defineEmits<{
   (e: 'add-data'): void
   (e: 'new-folder'): void
   (e: 'new-notebook'): void
-  (e: 'sync-to-node'): void
   (e: 'sync-to-computer', source: BindSource): void
   (e: 'public-access', targets: PublicTarget[]): void
   (e: 'new-bucket'): void
@@ -540,13 +539,8 @@ async function onDrop(event: DragEvent) {
         </p>
         <div class="mt-4 flex justify-center gap-2">
           <RefreshButton v-if="!remoteEndpointMissing" :busy="retrySpinning" label="Try again" @click="onRetryObjects" />
-          <Button
-            v-if="showSyncButton && (desktop ? currentBindSource && !currentLinkedFolder : !mockEnabled())"
-            size="sm"
-            @click="currentBindSource && desktop ? emit('sync-to-computer', currentBindSource) : emit('sync-to-node')"
-          >
-            <FolderSync v-if="desktop" class="h-3.5 w-3.5" /><ArrowLeftRight v-else class="h-3.5 w-3.5" />
-            {{ desktop ? 'Link a local folder' : 'Sync to this node…' }}
+          <Button v-if="showSyncButton && desktop && currentBindSource && !currentLinkedFolder" size="sm" @click="emit('sync-to-computer', currentBindSource)">
+            <FolderSync class="h-3.5 w-3.5" /> Link a local folder
           </Button>
         </div>
       </div>

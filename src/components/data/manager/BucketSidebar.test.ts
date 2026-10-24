@@ -680,6 +680,16 @@ describe('Bucket sidebar node choice', () => {
     otherSearch.value = []
   })
 
+  it('offers no whole-bucket copy for a match on another node in the web portal', async () => {
+    desktopMode.on = false
+    otherSearch.value = [{ arn: 'a', bucket: 'results', node_id: 'node-2', group_id: 'g2' }]
+    const { root } = await mountApp(BucketSidebar, { props: { manager: manager() } })
+
+    expect(content(root)).toContain('results')
+    expect(() => element(root, (node) => String(node.props['aria-label'] ?? '').startsWith('Sync results'))).toThrow()
+    otherSearch.value = []
+  })
+
   it('says when other groups could not be searched or answered in part', async () => {
     otherError.value = 'search failed'
     const { root } = await mountApp(BucketSidebar, { props: { manager: manager() } })

@@ -13,7 +13,6 @@ import DialogClose from '@/components/ui/DialogClose.vue'
 import Notice from '@/components/ui/Notice.vue'
 import AddDataDialog from '@/components/data/AddDataDialog.vue'
 import DataViewSkeleton from '@/components/data/DataViewSkeleton.vue'
-import SyncBucketDialog from '@/components/data/SyncBucketDialog.vue'
 import BindFolderDialog from '@/components/desktop/BindFolderDialog.vue'
 import NewBucketDialog from '@/components/desktop/NewBucketDialog.vue'
 import BucketSidebar from '@/components/data/manager/BucketSidebar.vue'
@@ -37,7 +36,6 @@ import { mockEnabled } from '@/lib/distributedMock'
 import { mockBucket } from '@/lib/distributedMockData'
 import type { BindSource } from '@/lib/bindSource'
 import { placeName, placeTitle } from '@/lib/bucketPlace'
-import type { BucketSearchHit } from '@/lib/api'
 import type { PublicTarget } from '@/lib/publicAccess'
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
@@ -54,7 +52,6 @@ const {
   bucket,
   s3Prefix,
   remoteNodeId,
-  realmNodes,
   selectedGroupId,
   selectedGroupName,
   groupsLoading,
@@ -126,28 +123,6 @@ function openPublicAccess(targets: PublicTarget[]) {
 }
 
 // ── Bucket sync ─────────────────────────────────────────────────────────────
-const syncDialogOpen = ref(false)
-const syncSource = ref<{ bucket: string; prefix: string; nodeId: string | null }>({
-  bucket: '',
-  prefix: '',
-  nodeId: null,
-})
-
-function openSyncDialog() {
-  syncSource.value = { bucket: bucket.value, prefix: s3Prefix.value, nodeId: remoteNodeId.value }
-  syncDialogOpen.value = true
-}
-
-// "Sync to this node…" on a remote search hit: remote source → local target.
-function openSyncFromHit(hit: BucketSearchHit) {
-  syncSource.value = {
-    bucket: hit.bucket,
-    prefix: '',
-    nodeId: realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id,
-  }
-  syncDialogOpen.value = true
-}
-
 // "Link a local folder": the desktop binds a bucket to a folder. The source
 // always comes with explicit node and group ids; newBucket is made by the link.
 const bindOpen = ref(false)
@@ -344,7 +319,6 @@ async function createFolder() {
             @add-data="addDataOpen = true"
             @new-folder="openNewFolder"
             @new-notebook="newNotebookOpen = true"
-            @sync-to-node="openSyncDialog"
             @sync-to-computer="openBindDialog"
             @public-access="openPublicAccess"
           />
@@ -418,7 +392,6 @@ async function createFolder() {
 
         <BucketSidebar
           :manager="manager"
-          @sync="openSyncFromHit"
           @sync-computer="openBindDialog"
           @new-bucket="newBucketOpen = true"
         />
@@ -431,7 +404,6 @@ async function createFolder() {
             @add-data="addDataOpen = true"
             @new-folder="openNewFolder"
             @new-notebook="newNotebookOpen = true"
-            @sync-to-node="openSyncDialog"
             @sync-to-computer="openBindDialog"
             @public-access="openPublicAccess"
             @new-bucket="newBucketOpen = true"
@@ -458,14 +430,6 @@ async function createFolder() {
       :bucket="bucket"
       :prefix="s3Prefix"
       :group-id="activeGroupId ?? ''"
-    />
-
-    <SyncBucketDialog
-      v-model:open="syncDialogOpen"
-      :source-bucket="syncSource.bucket"
-      :source-prefix="syncSource.prefix"
-      :source-node-id="syncSource.nodeId"
-      @created="onSyncChanged"
     />
 
     <BindFolderDialog

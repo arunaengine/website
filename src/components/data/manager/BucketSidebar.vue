@@ -23,14 +23,13 @@ import { exampleBuckets } from '@/lib/distributedMockData'
 import { folderName } from '@/lib/deviceApi'
 import { placeName, placeTitle } from '@/lib/bucketPlace'
 import { isHiddenBucket } from '@/lib/workspaces'
-import { ArrowLeftRight, Boxes, ChevronRight, FolderPlus, FolderSync, History, KeyRound, Plus, Trash2 } from '@lucide/vue'
+import { Boxes, ChevronRight, FolderPlus, FolderSync, History, KeyRound, Plus, Trash2 } from '@lucide/vue'
 import { computed, ref, useId, watch } from 'vue'
 
 const props = defineProps<{ manager: DataManager }>()
 // Aruna Desktop offers one action: link a bucket to a folder on this computer.
 const desktop = isDesktop()
 const emit = defineEmits<{
-  (e: 'sync', hit: BucketSearchHit): void
   (e: 'sync-computer', source: BindSource): void
   (e: 'new-bucket'): void
 }>()
@@ -382,11 +381,6 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
               <template #link>
                 <IconButton v-if="hitSource(hit)" :label="`Link a local folder to ${hit.bucket}…`" side="right" @click="emitSync(hitSource(hit))">
                   <FolderSync class="h-3 w-3" />
-                </IconButton>
-              </template>
-              <template v-if="!desktop && !realmNodes.isLocalNode(hit.node_id) && !mockEnabled()" #actions>
-                <IconButton :label="`Sync ${hit.bucket} to this node…`" side="right" @click="emit('sync', hit)">
-                  <ArrowLeftRight class="h-3 w-3" />
                 </IconButton>
               </template>
             </BucketRow>
