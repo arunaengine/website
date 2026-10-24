@@ -35,7 +35,7 @@ import type { SyncRow } from '@/composables/useBucketSyncs'
 import { usePublicAccess, type PublicAccess } from '@/composables/usePublicAccess'
 import { useS3, s3ErrorMessage } from '@/composables/useS3'
 import { useAssistantObject } from '@/composables/useAssistantObject'
-import { apiRequest } from '@/lib/api'
+import { ApiError, apiRequest } from '@/lib/api'
 import { exactFileBacklinkPreflight } from '@/lib/backlinks'
 import { fileChecksums, type FileChecksum } from '@/lib/checksums'
 import { versionObjectId, type DrsObjectResponse } from '@/lib/contentIdentity'
@@ -92,7 +92,7 @@ const emit = defineEmits<{
 }>()
 
 const s3 = useS3()
-const { currentUser, apiBaseUrl, authToken, nodeInfo } = useAruna()
+const { currentUser, apiBaseUrl, authToken, nodeInfo, getFileOrigin } = useAruna()
 const { shown } = usePortalFeatures()
 const { displayName: nodeName } = useRealmNodes()
 const { leave } = useAssistantObject()
@@ -147,13 +147,20 @@ async function loadChecksums() {
   const nodeId = props.nodeId ?? localNodeId()
   const baseUrl = nodeId ? nodeApiBase(nodeId) : null
   if (!props.open || props.folder || mock.value || !version || !realmId || !nodeId || !baseUrl) return
-  const id = versionObjectId(realmId, nodeId, props.bucket, props.objectKey, version)
+  const lookup = (id: string) =>
+    apiRequest<DrsObjectResponse>(`/ga4gh/drs/v1/objects/${encodeURIComponent(id)}`, {}, { baseUrl, token: authToken.value ?? undefined })
   try {
-    const object = await apiRequest<DrsObjectResponse>(
-      `/ga4gh/drs/v1/objects/${encodeURIComponent(id)}`,
-      {},
-      { baseUrl, token: authToken.value ?? undefined },
-    )
+    let object: DrsObjectResponse
+    try {
+      object = await lookup(versionObjectId(realmId, nodeId, props.bucket, props.objectKey, version))
+    } catch (error) {
+      // A node ARN of a bucket stored on more nodes answers 409 where this member holds no bytes:
+      // the version is then asked for by its global id, which any node resolves.
+      if (!(error instanceof ApiError) || error.status !== 409 || props.nodeId) throw error
+      const globalId = (await getFileOrigin(props.bucket, { key: props.objectKey, version_id: version })).global_id
+      if (!globalId) throw error
+      object = await lookup(globalId)
+    }
     if (seq === checksumSeq) checksums.value = fileChecksums(object)
   } catch {
     // Checksums are extra details; the dialog stays useful without them.

@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { mockBucket } from '@/lib/distributedMockData'
 import { degradedRanges } from '@/lib/distribution'
 import DegradedNotice from './DegradedNotice.vue'
+import GlobalId from './GlobalId.vue'
 import PermissionNotice from './PermissionNotice.vue'
 
 const render = (component: object, props: Record<string, unknown>) =>
@@ -24,5 +25,15 @@ describe('distributed notices', () => {
     expect(markup).toContain('node-3')
     expect(markup).toContain('since 2026-10-23 08:12 UTC')
     expect(markup).toContain('copies on node-1')
+  })
+})
+
+describe('global id', () => {
+  it('shows the short form and the URL of the id the node sent', async () => {
+    const markup = await render(GlobalId, { globalUrl: 'https://w3id.org/aruna/data/k3V9xQ2m/01K8Y2B6D8' })
+
+    expect(markup).toContain('/k3V9xQ2m/01K8Y2B6D8')
+    expect(markup).toContain('https://w3id.org/aruna/data/k3V9xQ2m/01K8Y2B6D8')
+    expect(markup).not.toContain('By content')
   })
 })

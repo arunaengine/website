@@ -4,7 +4,7 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import OriginLine from '@/components/data/OriginLine.vue'
-import CopyButton from '@/components/ui/CopyButton.vue'
+import GlobalId from '@/components/distributed/GlobalId.vue'
 import Spinner from '@/components/ui/Spinner.vue'
 import { useDatabases } from '@/composables/useDatabases'
 import { useFileOrigin, type OriginTarget } from '@/composables/useFileOrigin'
@@ -48,20 +48,20 @@ const recorded = computed(() => Boolean(origin.value || hop.value))
         <OriginLine v-if="hop" short :origin="hop" />
         <p v-if="!recorded" class="text-muted-foreground">Not recorded for this version.</p>
       </div>
-      <details v-if="recorded || found.origin.value?.global_id" class="border-t border-border pt-3 text-xs">
+      <div v-if="found.origin.value?.global_id" class="space-y-1.5 text-xs">
+        <p class="text-muted-foreground">
+          Id of this version. It names no node: the URL downloads the file from a holder that the node chooses.
+          Send your token with the request unless the file is public.
+        </p>
+        <GlobalId :global-url="found.origin.value.global_id" />
+      </div>
+      <details v-if="recorded" class="border-t border-border pt-3 text-xs">
         <summary class="cursor-pointer text-sm font-medium text-foreground">Details</summary>
         <div class="mt-3 space-y-4">
           <div v-if="origin" class="space-y-0.5">
             <p class="mb-1 text-muted-foreground">Origin</p>
             <OriginLine :origin="origin" />
             <OriginLine v-if="hop" :origin="hop" />
-          </div>
-          <div v-if="found.origin.value?.global_id">
-            <p class="mb-1 text-muted-foreground">Id</p>
-            <p class="surface-inline flex items-center gap-2 px-3 py-2">
-              <span class="min-w-0 flex-1 break-all font-mono">{{ found.origin.value.global_id }}</span>
-              <CopyButton :value="found.origin.value.global_id" label="Copy the id" />
-            </p>
           </div>
           <div>
             <p class="mb-1 text-muted-foreground">Added to datasets as</p>
