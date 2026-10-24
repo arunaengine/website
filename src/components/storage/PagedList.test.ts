@@ -55,6 +55,23 @@ async function mount(offset: number, shown: number, total: number, hasNext = fal
 }
 
 describe('PagedList', () => {
+  it('drops the wait of Next when a name filter replaces its page', async () => {
+    const busy = ref(false)
+    const props = { total: 250, offset: 100, shown: 0, hasNext: true, hasPrev: true, filter: '' }
+    const { root } = await mountApp(
+      defineComponent(() => () =>
+        h(PagedList, { ...props, busy: busy.value, onNext: () => (busy.value = true), onFilter: () => (busy.value = true) }),
+      ),
+    )
+    await click(button(root, 'Next'))
+    expect(content(root)).toContain('Loading the page')
+    const filter = element(root, (node) => node.tag === 'input')
+    ;(filter.props.onChange as () => void)()
+    await flush()
+    expect(content(root)).not.toContain('Loading the page')
+    expect(button(root, 'Next').props['aria-busy']).toBe(false)
+  })
+
   it('shows the wait on the page button that was used until its page is read', async () => {
     const busy = ref(false)
     const props = { total: 250, offset: 100, shown: 0, hasNext: true, hasPrev: true, filter: '' }

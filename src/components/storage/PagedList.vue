@@ -47,7 +47,7 @@ watch(() => props.busy, (busy) => busy || (going.value = null))
         class="h-8 max-w-56 text-xs"
         placeholder="Filter by name…"
         aria-label="Filter by name"
-        @change="emit('filter', draft.trim())"
+        @change="(going = null), emit('filter', draft.trim())"
       />
       <span v-else />
       <span class="text-[11px] tabular-nums text-muted-foreground">{{ summary ?? (shown || !hasNext ? rangeLabel(offset, shown, total, complete) : '') }}</span>
