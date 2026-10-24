@@ -21,6 +21,8 @@ export interface RealmNodeDisplay {
   /** Presence-confirmed infrastructure node, or a device seen recently. */
   reachable: boolean
   isLocal: boolean
+  /** Placement location; absent when unset or "default". */
+  location?: string | null
   /** Executor kinds this node advertises; empty without a compute backend. */
   executorKinds: string[]
 }
@@ -54,6 +56,7 @@ export function useRealmNodes() {
           (node.present && node.connection_status === 'connected') ||
           node.connection_status === 'seen',
         isLocal,
+        location: node.placement?.location && node.placement.location !== 'default' ? node.placement.location : null,
         executorKinds: (node.info?.executors ?? []).map((executor) => executor.kind),
       }
     }),
