@@ -25,7 +25,7 @@ import { ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, History, Pause, Play,
 const { realm } = useRealm()
 const { folders, listState: foldersState, listError: foldersError, ensureLoaded, setPaused, sync } = useSyncedFolders()
 const { all: transfers, state: transfersState, error: transfersError, load: loadTransfers } = useDeviceTransfers()
-const { status: syncStatus, runSync, load: loadSync } = useDeviceSync()
+const { status: syncStatus, state: syncState, running: syncRunning, runSync, load: loadSync } = useDeviceSync()
 const decisions = useFolderDecisions()
 
 const filter = ref<ActivityFilter>('all')
@@ -96,6 +96,8 @@ const surface = computed(() =>
 
 const allPaused = computed(() => folders.value.length > 0 && folders.value.every((folder) => folder.state === 'paused'))
 const canAct = computed(() => folders.value.some((folder) => folder.state !== 'deleting'))
+// Sync now also carries offline datasets, so it needs the node and the realm, not a folder.
+const canSync = computed(() => syncState.value === 'ready' && syncStatus.value.realmReachable && !syncRunning.value)
 
 const lastCheck = computed(() => {
   const at = syncStatus.value.lastSyncMs
@@ -159,7 +161,7 @@ const when = (ms: number | null): string => (ms ? relativeTime(new Date(ms).toIS
           <Pause v-else class="h-3.5 w-3.5" />
           {{ allPaused ? 'Resume all' : 'Pause all' }}
         </Button>
-        <Button variant="outline" size="sm" :disabled="acting || !canAct || allPaused" @click="syncNow">
+        <Button variant="outline" size="sm" :disabled="acting || !canSync" @click="syncNow">
           <RefreshCw class="h-3.5 w-3.5" /> Sync now
         </Button>
       </div>

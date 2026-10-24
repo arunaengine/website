@@ -6,7 +6,7 @@ import * as DeviceApi from '@/lib/deviceApi'
 import * as NodePill from '@/lib/nodePill'
 import * as SyncStates from '@/lib/syncStates'
 import * as Utils from '@/lib/utils'
-import { button, click, compileClientComponent, content, element, moduleDefault, mountApp, type HostNode } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, element, flush, moduleDefault, mountApp, type HostNode } from '@/test/clientRender'
 import type { DeviceCompute, DeviceTransfer, SyncedFolder } from '@/lib/deviceApi'
 import type { NodeStatus } from '@/lib/desktopBridge'
 
@@ -22,6 +22,7 @@ const computeShown = ref(true)
 const credentials = ref<Array<{ access_key_id: string; status: string }>>([])
 const keysState = ref('ready')
 const startHidden = ref(false)
+const loadCompute = vi.fn(async () => undefined)
 
 function folder(overrides: Partial<SyncedFolder> = {}): SyncedFolder {
   return {
@@ -83,7 +84,7 @@ const HomeCards = compileClientComponent(new URL('./HomeCards.vue', import.meta.
     usePortalFeatures: () => ({ shown: (feature: string) => feature !== 'compute' || computeShown.value }),
   },
   '@/composables/useDeviceCompute': {
-    useDeviceCompute: () => ({ compute, state: computeState, ensureLoaded: vi.fn(async () => undefined) }),
+    useDeviceCompute: () => ({ compute, state: computeState, load: loadCompute, ensureLoaded: vi.fn(async () => undefined) }),
   },
   '@/composables/useDeviceKeys': {
     useDeviceKeys: () => ({
@@ -138,6 +139,7 @@ beforeEach(() => {
   credentials.value = []
   keysState.value = 'ready'
   startHidden.value = false
+  loadCompute.mockClear()
 })
 
 describe('desktop home cards', () => {
@@ -215,6 +217,16 @@ describe('desktop home cards', () => {
     await click(button(mounted.root, 'Link a local folder'))
     expect(content(mounted.root)).toContain('bind-dialog-open')
     mounted.app.unmount()
+  })
+
+  it('reads the running count again on every visit', async () => {
+    compute.value = enabledCompute()
+    for (const visit of [1, 2]) {
+      const mounted = await mountApp(HomeCards)
+      await flush()
+      expect(loadCompute).toHaveBeenCalledTimes(visit)
+      mounted.app.unmount()
+    }
   })
 
   it('says reading or unavailable instead of a zero', async () => {

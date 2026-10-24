@@ -17,7 +17,12 @@ const listKeys = vi.fn()
 const revokeKey = vi.fn()
 const createKey = vi.fn()
 const removeDeviceKey = vi.fn()
-const dialogs = { create: undefined as undefined | ((group: string, seconds: number) => Promise<unknown>) }
+const createDeviceKey = vi.fn()
+const infoRequest = vi.fn()
+const dialogs = {
+  create: undefined as undefined | ((group: string, seconds: number) => Promise<unknown>),
+  emit: undefined as undefined | ((event: 'created' | 'update:open', value: unknown) => void),
+}
 
 const Plain = defineComponent({
   inheritAttrs: false,
@@ -54,7 +59,9 @@ const ContentStub = defineComponent({
 const CopyStub = defineComponent({ props: { value: String }, setup: (props) => () => h('i', { 'data-copy': props.value }) })
 const KeyDialogStub = defineComponent({
   props: { open: Boolean, create: Function },
-  setup(props) {
+  emits: ['created', 'update:open'],
+  setup(props, { emit }) {
+    dialogs.emit = emit as typeof dialogs.emit
     return () => {
       dialogs.create = props.create as typeof dialogs.create
       return h('div', props.open ? 'key-dialog-open' : '')
@@ -76,6 +83,7 @@ const ConnectTools = compileClientComponent(new URL('./ConnectTools.vue', import
   '@/components/ui/TabsTrigger.vue': moduleDefault(TriggerStub),
   '@/components/data/CreateCredentialDialog.vue': moduleDefault(Plain),
   '@/components/desktop/CreateKeyDialog.vue': moduleDefault(KeyDialogStub),
+  '@/lib/api': { apiRequest: infoRequest },
   '@/composables/useAruna': {
     useAruna: () => ({ authToken: ref('token'), realmInfo: ref({ interfaces: { mcp: { url: 'https://realm.example/mcp' } } }) }),
   },
@@ -85,6 +93,7 @@ const ConnectTools = compileClientComponent(new URL('./ConnectTools.vue', import
       state: keysState,
       available: computed(() => keysState.value === 'ready'),
       remove: removeDeviceKey,
+      create: createDeviceKey,
     }),
   },
   '@/composables/useDeviceStatus': { useDeviceStatus: () => ({ status, s3Url, mcpUrl, deviceClient: ref(null) }) },
@@ -134,6 +143,8 @@ beforeEach(() => {
   revokeKey.mockReset().mockResolvedValue(undefined)
   createKey.mockReset().mockResolvedValue({ access_key_id: 'ARKNEW', access_secret: 's' })
   removeDeviceKey.mockReset().mockResolvedValue(undefined)
+  createDeviceKey.mockReset().mockResolvedValue({ access_key_id: 'ARKHERE', access_secret: 'here-secret' })
+  infoRequest.mockReset().mockResolvedValue({ services: { interfaces: {} } })
 })
 
 describe('connect your tools in the desktop settings', () => {
@@ -177,13 +188,74 @@ describe('connect your tools in the desktop settings', () => {
     const mounted = await mountApp(ConnectTools)
     await flush()
 
-    expect(dialogs.create).toBeUndefined()
+    await dialogs.create?.('g1', 60)
+    expect(createDeviceKey).toHaveBeenCalledWith('g1', 60)
+    expect(createKey).not.toHaveBeenCalled()
     await click(tab(mounted.root, 'node-1-id'))
     await dialogs.create?.('g1', 60)
     expect(createKey).toHaveBeenCalledWith({ group_id: 'g1', expires_in_seconds: 60 }, {
       baseUrl: 'https://node-1.example/api/v1',
       token: 'token',
     })
+    mounted.app.unmount()
+  })
+
+  it('keeps a key that answers after a cancel off the place chosen since', async () => {
+    realmNodes.value = [node1, { ...node1, nodeId: 'node-2-id', label: 'node-2', s3Url: 'https://s3.node-2.example', apiBase: 'https://node-2.example/api/v1' }]
+    let answer!: (made: unknown) => void
+    createKey.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+    const mounted = await mountApp(ConnectTools)
+    await flush()
+
+    await click(tab(mounted.root, 'node-1-id'))
+    await click(button(mounted.root, 'Create key'))
+    const pending = dialogs.create!('g1', 60)
+    dialogs.emit!('update:open', false)
+    await flush()
+    await click(tab(mounted.root, 'node-2-id'))
+    answer({ access_key_id: 'ARKLATE', access_secret: 'late-secret' })
+    await pending
+    dialogs.emit!('created', { accessKeyId: 'ARKLATE', secret: 'late-secret', name: 'Late' })
+    await flush()
+
+    expect(content(mounted.root)).not.toContain('late-secret')
+    expect(content(mounted.root)).not.toContain('Your new key is ready')
+    mounted.app.unmount()
+  })
+
+  it('shows a new key only at the place it was made for', async () => {
+    realmNodes.value = [node1, { ...node1, nodeId: 'node-2-id', label: 'node-2', s3Url: 'https://s3.node-2.example', apiBase: 'https://node-2.example/api/v1' }]
+    const mounted = await mountApp(ConnectTools)
+    await flush()
+
+    await click(tab(mounted.root, 'node-1-id'))
+    await click(button(mounted.root, 'Create key'))
+    await dialogs.create!('g1', 60)
+    dialogs.emit!('created', { accessKeyId: 'ARKNEW', secret: 's3cr3t', name: 'Lab' })
+    await flush()
+    expect(content(mounted.root)).toContain('aws_secret_access_key s3cr3t')
+
+    await click(tab(mounted.root, 'node-2-id'))
+    expect(content(mounted.root)).not.toContain('aws_secret_access_key s3cr3t')
+    mounted.app.unmount()
+  })
+
+  it('shows the AI address a realm node reports itself, unavailable until then', async () => {
+    let answer!: (info: unknown) => void
+    infoRequest.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+    const mounted = await mountApp(ConnectTools)
+    await flush()
+
+    await click(tab(mounted.root, 'node-1-id'))
+    await click(tab(mounted.root, 'assistant'))
+    expect(infoRequest).toHaveBeenCalledWith('/system/info', {}, { baseUrl: 'https://node-1.example/api/v1', token: 'token' })
+    expect(content(mounted.root)).not.toContain('https://realm.example/mcp')
+    expect(content(mounted.root)).toContain('The AI address is unavailable until this place reports it')
+
+    answer({ services: { interfaces: { mcp: { url: 'https://node-1.example/mcp' } } } })
+    await flush()
+    expect(content(mounted.root)).toContain('https://node-1.example/mcp')
+    expect(content(mounted.root)).not.toContain('The AI address is unavailable')
     mounted.app.unmount()
   })
 

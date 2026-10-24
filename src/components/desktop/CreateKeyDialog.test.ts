@@ -2,7 +2,7 @@ import * as VueRuntime from 'vue'
 import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as Utils from '@/lib/utils'
-import { button, click, compileClientComponent, content, input, moduleDefault, mountApp, typeValue } from '@/test/clientRender'
+import { button, click, compileClientComponent, content, flush, input, moduleDefault, mountApp, typeValue } from '@/test/clientRender'
 
 const createKey = vi.fn()
 const available = ref(true)
@@ -89,6 +89,35 @@ describe('creating a key', () => {
     expect(onNode).toHaveBeenCalledWith('g1', 365 * 24 * 3600)
     expect(createKey).not.toHaveBeenCalled()
     expect(onCreated).toHaveBeenCalledWith({ accessKeyId: 'AKN1', secret: 'node-secret', name: 'Lab server backup' })
+    mounted.app.unmount()
+  })
+
+  it('keeps a reopened dialog as it is when an earlier, closed one gets its answer', async () => {
+    let answer!: (made: unknown) => void
+    createKey.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+    const open = ref(true)
+    const onCreated = vi.fn()
+    const host = defineComponent(() => () =>
+      h(CreateKeyDialog, { open: open.value, 'onUpdate:open': (v: boolean) => (open.value = v), onCreated }),
+    )
+    const mounted = await mountApp(host)
+
+    await typeValue(input(mounted.root, 'aria-label', 'Key name'), 'First')
+    const first = click(button(mounted.root, 'Create key'))
+    await flush()
+    open.value = false
+    await flush()
+    open.value = true
+    await flush()
+    await typeValue(input(mounted.root, 'aria-label', 'Key name'), 'Second')
+    answer({ access_key_id: 'ARKLATE', access_secret: 'late-secret' })
+    await first
+
+    expect(open.value).toBe(true)
+    expect(onCreated).not.toHaveBeenCalled()
+    expect(input(mounted.root, 'aria-label', 'Key name').props.value).toBe('Second')
+    expect(button(mounted.root, 'Create key').props.disabled).toBe(false)
+    expect(stored).toEqual({ ARKLATE: 'First' })
     mounted.app.unmount()
   })
 

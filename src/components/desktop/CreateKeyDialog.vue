@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Makes one access key for one tool. The node keeps no name for a key, so the
 // name stays in this app; the secret is handed up once and kept nowhere.
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import RefusalNote from '@/components/ui/RefusalNote.vue'
@@ -41,6 +41,10 @@ const name = ref('')
 const groupId = ref('')
 const error = ref<string | null>(null)
 const busy = ref(false)
+// Each opening of the dialog is one generation; closing or unmounting ends it, so a
+// late answer of an earlier opening never closes or changes the one shown now.
+let generation = 0
+onUnmounted(() => (generation += 1))
 
 const groupOptions = computed(() => myGroups.value.map((group) => ({ value: group.id, label: group.name })))
 // One group needs no question; with more, the key belongs to the one chosen.
@@ -50,7 +54,11 @@ const canCreate = computed(() => Boolean(name.value.trim() && groupId.value) && 
 watch(
   () => props.open,
   (open) => {
-    if (!open) return
+    if (!open) {
+      generation += 1
+      busy.value = false
+      return
+    }
     name.value = ''
     groupId.value = groupOptions.value[0]?.value ?? ''
     error.value = null
@@ -60,18 +68,21 @@ watch(
 
 async function create(): Promise<void> {
   if (!canCreate.value) return
+  const mine = generation
   busy.value = true
   error.value = null
   const label = name.value.trim()
   try {
     const made = await (props.create ?? deviceKeys.create)(groupId.value, YEAR_SECONDS)
+    // The key exists either way, so the list can name it; only its own opening sees the secret.
     rememberKeyName(made.access_key_id, label)
+    if (mine !== generation) return
     emit('created', { accessKeyId: made.access_key_id, secret: made.access_secret, name: label })
     emit('update:open', false)
   } catch (err) {
-    error.value = errorMessage(err)
+    if (mine === generation) error.value = errorMessage(err)
   } finally {
-    busy.value = false
+    if (mine === generation) busy.value = false
   }
 }
 </script>

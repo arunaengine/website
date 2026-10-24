@@ -21,7 +21,7 @@ import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import { useNodeControl } from '@/composables/useNodeControl'
 import { usePortalFeatures } from '@/composables/usePortalFeatures'
 import { useRealmNodes, type RealmNodeDisplay } from '@/composables/useRealmNodes'
-import type { S3CredentialSummary } from '@/lib/api'
+import { apiRequest, type InfoResponse, type S3CredentialSummary } from '@/lib/api'
 import { createDeviceCredential, listDeviceCredentials, revokeDeviceCredential } from '@/lib/deviceApi'
 import { keyNames } from '@/lib/keyNames'
 import { nextflowSnippet, tesAddress, TOOLS, toolSnippet, type ToolId, type ToolKey } from '@/lib/toolSnippets'
@@ -32,7 +32,7 @@ const DEVICE = 'device'
 
 const route = useRoute()
 const { shown } = usePortalFeatures()
-const { authToken, realmInfo } = useAruna()
+const { authToken } = useAruna()
 const { nodes } = useRealmNodes()
 const { status, s3Url, mcpUrl, deviceClient } = useDeviceStatus()
 const deviceKeys = useDeviceKeys()
@@ -49,9 +49,31 @@ const address = computed(() => (node.value ? node.value.s3Url : running.value ? 
 const tes = computed(() =>
   node.value ? tesAddress(node.value.apiBase) : running.value ? tesAddress(status.value?.apiBaseUrl) : null,
 )
-const assistant = computed(() =>
-  node.value ? (realmInfo.value?.interfaces.mcp?.url ?? null) : running.value ? mcpUrl.value : null,
+// A realm node's AI address is the one that node reports itself; unknown until it answers.
+const nodeMcp = ref<{ nodeId: string; url: string | null } | null>(null)
+let mcpRead = 0
+watch(
+  () => node.value?.nodeId,
+  async () => {
+    const target = node.value
+    const mine = ++mcpRead
+    nodeMcp.value = null
+    if (!target) return
+    let url: string | null = null
+    try {
+      const info = await apiRequest<InfoResponse>('/system/info', {}, nodeClient(target))
+      url = info.services?.interfaces?.mcp?.url ?? null
+    } catch {
+      url = null
+    }
+    if (mine === mcpRead) nodeMcp.value = { nodeId: target.nodeId, url }
+  },
+  { immediate: true },
 )
+const assistant = computed(() => {
+  if (!node.value) return running.value ? mcpUrl.value : null
+  return nodeMcp.value?.nodeId === node.value.nodeId ? nodeMcp.value.url : null
+})
 
 const programs = computed(() => [
   ...TOOLS.filter((tool) => tool.id !== 'assistant'),
@@ -121,12 +143,27 @@ watch(deviceClient, () => {
 })
 
 const canCreate = computed(() => (node.value ? Boolean(authToken.value) : deviceKeys.available.value))
-const createOnNode = computed(() => {
+
+// The key request in flight and the place it started at. Closing the dialog
+// drops it, so a late answer never lands on another place.
+let pendingKey: { nodeId: string | null; accessKeyId?: string } | null = null
+watch(createOpen, (open) => {
+  if (!open) pendingKey = null
+})
+
+// Without this computer's node the dialog keeps its own "not running" answer.
+const createKey = computed(() => {
   const target = node.value
-  if (!target) return undefined
+  if (!target && !deviceKeys.available.value) return undefined
+  const client = target ? nodeClient(target) : null
   return async (groupId: string, expiresInSeconds: number) => {
-    const made = await createDeviceCredential({ group_id: groupId, expires_in_seconds: expiresInSeconds }, nodeClient(target))
-    await loadNodeKeys()
+    const request: { nodeId: string | null; accessKeyId?: string } = { nodeId: target?.nodeId ?? null }
+    pendingKey = request
+    const made = client
+      ? await createDeviceCredential({ group_id: groupId, expires_in_seconds: expiresInSeconds }, client)
+      : await deviceKeys.create(groupId, expiresInSeconds)
+    request.accessKeyId = made.access_key_id
+    if (client) await loadNodeKeys()
     return made
   }
 })
@@ -139,11 +176,15 @@ onMounted(() => {
 const freshHere = computed(() => (fresh.value && fresh.value.nodeId === (node.value?.nodeId ?? null) ? fresh.value : null))
 const snippet = (id: string): string =>
   id === 'nextflow' ? nextflowSnippet(tes.value) : toolSnippet(id as ToolId, address.value, freshHere.value, assistant.value)
-const ready = (id: string) => Boolean(id === 'nextflow' ? tes.value : address.value)
+const ready = (id: string) =>
+  Boolean(id === 'nextflow' ? tes.value : id === 'assistant' ? address.value && assistant.value : address.value)
 
 function onCreated(key: ToolKey & { name: string }): void {
-  fresh.value = { ...key, nodeId: node.value?.nodeId ?? null }
+  const request = pendingKey
   names.value = keyNames()
+  if (!request || request.accessKeyId !== key.accessKeyId) return
+  pendingKey = null
+  fresh.value = { ...key, nodeId: request.nodeId }
 }
 
 async function remove(accessKeyId: string, owner: RealmNodeDisplay | null): Promise<void> {
@@ -327,14 +368,14 @@ function made(iso: string): string {
               </div>
             </Notice>
             <Notice v-if="entry.id === 'assistant' && address && !assistant" tone="warning">
-              Aruna reports no address for AI assistants, so the line above shows a placeholder.
+              The AI address is unavailable until this place reports it, so the line above shows a placeholder.
             </Notice>
           </TabsContent>
         </Tabs>
       </div>
     </section>
 
-    <CreateKeyDialog v-model:open="createOpen" :create="createOnNode" @created="onCreated" />
+    <CreateKeyDialog v-model:open="createOpen" :create="createKey" @created="onCreated" />
     <CreateCredentialDialog v-model:open="tokenOpen" />
   </div>
 </template>
