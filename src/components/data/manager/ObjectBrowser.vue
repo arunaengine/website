@@ -74,6 +74,8 @@ const emit = defineEmits<{
 const s3 = useS3()
 // Aruna Desktop binds a bucket to a folder; the web only syncs between nodes.
 const desktop = isDesktop()
+// The desktop keeps every button label and wraps the row instead.
+const labelClass = desktop ? undefined : 'hidden xl:inline'
 const { isRealmAdmin } = useAruna()
 const { getBucketPlacement } = usePlacementPolicies()
 const { shown } = usePortalFeatures()
@@ -366,7 +368,7 @@ async function onDrop(event: DragEvent) {
     <EmptyState v-if="!bucket" title="Select a bucket to browse its objects." />
 
     <template v-else>
-      <div class="flex flex-nowrap items-center justify-between gap-2">
+      <div :class="['flex items-center justify-between gap-2', desktop ? 'flex-wrap' : 'flex-nowrap']">
         <div class="flex min-w-0 flex-1 items-center gap-2">
           <Breadcrumbs :bucket="bucket" :path="prefix" single-line @navigate="navigateTo" />
           <Badge v-if="lockedOnNode" :variant="stateVariant('locked')" size="sm" class="shrink-0">
@@ -378,7 +380,7 @@ async function onDrop(event: DragEvent) {
           </span>
           <Spinner v-if="listLoading" label="Loading objects" class="shrink-0" />
         </div>
-        <div class="flex shrink-0 items-center gap-2">
+        <div :class="['flex items-center gap-2', desktop ? 'flex-wrap' : 'shrink-0']">
           <WatchButton
             surface="bucket"
             :path-prefix="watchPathPrefix"
@@ -460,10 +462,10 @@ async function onDrop(event: DragEvent) {
             </template>
           </Popover>
           <!-- The Add data pipeline always targets the connected node. -->
-          <Button v-if="desktop && currentBindSource && !remoteBlocked" variant="outline" size="sm" aria-label="Sync to this computer" title="Keep this bucket and a folder on this computer in step" @click="emit('sync-to-computer', currentBindSource)"><ArrowLeftRight class="h-4 w-4" /><span class="hidden xl:inline">Sync to this computer</span></Button>
-          <Button v-if="!remoteBlocked" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix"  aria-label="New folder" :title="writeRestrictionMessage ?? 'Create a folder'" @click="emit('new-folder')"><FolderPlus class="h-4 w-4" /><span class="hidden xl:inline">New folder</span></Button>
-          <Button v-if="notebooks && !remoteNodeId" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix"  aria-label="New notebook" :title="writeRestrictionMessage ?? 'Create a notebook here'" @click="emit('new-notebook')"><NotebookPen class="h-4 w-4" /><span class="hidden xl:inline">New notebook</span></Button>
-          <Button v-if="!remoteNodeId" data-tour="bucket-add-data" size="sm" :disabled="!canWriteCurrentPrefix"  aria-label="Add data" :title="writeRestrictionMessage ?? 'Add data'" @click="emit('add-data')"><Plus class="h-4 w-4" /><span class="hidden xl:inline">Add data</span></Button>
+          <Button v-if="desktop && currentBindSource && !remoteBlocked" variant="outline" size="sm" aria-label="Sync to this computer" title="Keep this bucket and a folder on this computer in step" @click="emit('sync-to-computer', currentBindSource)"><ArrowLeftRight class="h-4 w-4" /><span :class="labelClass">Sync to this computer</span></Button>
+          <Button v-if="!remoteBlocked" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix"  aria-label="New folder" :title="writeRestrictionMessage ?? 'Create a folder'" @click="emit('new-folder')"><FolderPlus class="h-4 w-4" /><span :class="labelClass">New folder</span></Button>
+          <Button v-if="notebooks && !remoteNodeId" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix"  aria-label="New notebook" :title="writeRestrictionMessage ?? 'Create a notebook here'" @click="emit('new-notebook')"><NotebookPen class="h-4 w-4" /><span :class="labelClass">New notebook</span></Button>
+          <Button v-if="!remoteNodeId" data-tour="bucket-add-data" size="sm" :disabled="!canWriteCurrentPrefix"  aria-label="Add data" :title="writeRestrictionMessage ?? 'Add data'" @click="emit('add-data')"><Plus class="h-4 w-4" /><span :class="labelClass">Add data</span></Button>
         </div>
       </div>
       <div v-if="deletedLoading || (showDeleted && deletedTruncated)" class="flex flex-wrap items-center gap-x-3 gap-y-1">
