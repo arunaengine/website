@@ -65,6 +65,7 @@ watch(
     unsupported.value = false
     confirmingId.value = null
     deleteError.value = null
+    deleting.value = null
     void load()
   },
   { immediate: true },
@@ -82,16 +83,20 @@ function openEdit(connector: RepositoryConnector) {
 
 async function confirmDelete(connector: RepositoryConnector) {
   if (deleting.value) return
+  const id = connector.connector_id
+  const epoch = sessionEpoch.value
+  const current = () => deleting.value === id && epoch === sessionEpoch.value
   deleteError.value = null
-  deleting.value = connector.connector_id
+  deleting.value = id
   try {
-    await deleteRepositoryConnector(props.groupId, connector.connector_id, client())
+    await deleteRepositoryConnector(props.groupId, id, client())
+    if (!current()) return
     confirmingId.value = null
     await load()
   } catch (err) {
-    deleteError.value = errorMessage(err)
+    if (current()) deleteError.value = errorMessage(err)
   } finally {
-    deleting.value = null
+    if (deleting.value === id) deleting.value = null
   }
 }
 </script>

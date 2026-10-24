@@ -7,6 +7,7 @@ import { button, click, compileClientComponent, content, element, flush, moduleD
 
 const listRepositoryConnectors = vi.fn()
 const deleteRepositoryConnector = vi.fn()
+const sessionEpoch = ref(0)
 
 const Empty = defineComponent(() => () => null)
 const Slot = defineComponent((_, { slots }) => () => h('div', slots.default?.()))
@@ -27,7 +28,7 @@ const Section = compileClientComponent(new URL('./RepositoriesSection.vue', impo
   '@/components/groups/RepositoryDialog.vue': moduleDefault(Empty),
   '@/composables/useAruna': {
     isUnsupportedEndpoint: () => false,
-    useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('t'), sessionEpoch: ref(0) }),
+    useAruna: () => ({ apiBaseUrl: ref('https://api.test'), authToken: ref('t'), sessionEpoch }),
   },
   '@/lib/connectivity': { OFFLINE_WRITE_HINT: 'offline', useConnectivity: () => ({ writesDisabled: ref(false) }) },
   '@/lib/utils': Utils,
@@ -51,6 +52,24 @@ beforeEach(() => {
 })
 
 describe('RepositoriesSection', () => {
+  it('starts a new session without the wait or the error of a delete from the one before', async () => {
+    let refuse: (err: unknown) => void = () => {}
+    deleteRepositoryConnector.mockReturnValueOnce(new Promise((_, reject) => (refuse = reject)))
+    const { root } = await mountApp(defineComponent(() => () => h(Section, { groupId: 'g1', canWrite: true })))
+    await flush()
+    await click(element(root, (node) => node.props['aria-label'] === 'Delete repository zenodo'))
+    void (button(root, 'Delete').props.onClick as () => Promise<void>)()
+    await flush()
+    sessionEpoch.value++
+    await flush()
+    await click(element(root, (node) => node.props['aria-label'] === 'Delete repository zenodo'))
+    expect(button(root, 'Delete').props['aria-busy']).toBe(false)
+    expect(button(root, 'Delete').props.disabled).toBe(false)
+    refuse(new Error('the old session was refused'))
+    await flush()
+    expect(content(root)).not.toContain('the old session was refused')
+  })
+
   it('shows the wait on the confirmed Delete, sends it once and frees it when it fails', async () => {
     let refuse: (err: unknown) => void = () => {}
     deleteRepositoryConnector.mockReturnValueOnce(new Promise((_, reject) => (refuse = reject)))
