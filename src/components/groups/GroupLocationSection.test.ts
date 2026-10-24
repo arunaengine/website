@@ -173,6 +173,33 @@ describe('GroupLocationSection', () => {
     plain.app.unmount()
   })
 
+  it('keeps the line shown while a reload reads, and starts empty for another location', async () => {
+    getGroupRouting.mockResolvedValue({ group_id: 'G1', default_target: { backend_id: 's1' }, warnings: [] })
+    const reload = ref(0)
+    const location = ref({ bucket: 'lab', prefix: '' })
+    const host = defineComponent({
+      setup: () => () => h(GroupLocationSection, { group: group(location.value), canAdmin: true, reload: reload.value }),
+    })
+    const mounted = await mountApp(host)
+    await flush()
+    expect(content(mounted.root)).toContain('Files are stored in de.NBI-spire.')
+
+    let answer: (value: unknown) => void = () => {}
+    listGroupBackends.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+    reload.value = 1
+    await flush()
+    expect(content(mounted.root)).toContain('Files are stored in de.NBI-spire.')
+    answer({ backends: [{ backend_id: 's1', name: 'Alpha', kind: 's3', public_config: {} }] })
+    await flush()
+    expect(content(mounted.root)).toContain('Files are stored in Alpha.')
+
+    listGroupBackends.mockReturnValueOnce(new Promise(() => {}))
+    location.value = { bucket: 'raw', prefix: '' }
+    await flush()
+    expect(content(mounted.root)).not.toContain('Files are stored')
+    mounted.app.unmount()
+  })
+
   it('does not claim a disabled storage and reloads on change', async () => {
     getGroupRouting.mockResolvedValue({ group_id: 'G1', default_target: { backend_id: 's1' }, warnings: [] })
     listGroupBackends.mockResolvedValue({

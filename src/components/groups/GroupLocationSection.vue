@@ -39,9 +39,10 @@ const stored = ref('')
 let loadSeq = 0
 watch(
   () => [props.group.group_id, location.value?.bucket, location.value?.prefix, props.reload] as const,
-  async ([groupId, bucket, prefix]) => {
+  async ([groupId, bucket, prefix], before) => {
     const seq = ++loadSeq
-    stored.value = ''
+    // A reload keeps the line until its answer; another group or location starts empty.
+    if (!before || before[0] !== groupId || before[1] !== bucket || before[2] !== prefix) stored.value = ''
     if (!bucket) return
     try {
       const [bucketRules, group, list] = await Promise.all([
@@ -54,13 +55,16 @@ watch(
         .filter((rule) => !rule.exact && (prefix ?? '').startsWith(rule.key_prefix))
         .sort((x, y) => y.key_prefix.length - x.key_prefix.length)
       const target = covering.length ? covering[0].target : group.default_target
-      if (!target) stored.value = 'Files are stored on this node.'
+      let line = ''
+      if (!target) line = 'Files are stored on this node.'
       else if (target.backend_id) {
         const backend = list.backends.find((entry) => entry.backend_id === target.backend_id)
-        if (backend) stored.value = backend.disabled ? `${backend.name} is disabled.` : `Files are stored in ${backend.name}.`
+        if (backend) line = backend.disabled ? `${backend.name} is disabled.` : `Files are stored in ${backend.name}.`
       }
+      stored.value = line
     } catch {
       // Without the rules the line stays hidden.
+      if (seq === loadSeq) stored.value = ''
     }
   },
   { immediate: true },
