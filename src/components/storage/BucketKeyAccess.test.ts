@@ -1,4 +1,4 @@
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, ref } from 'vue'
 import * as VueRuntime from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as Api from '@/lib/api'
@@ -147,6 +147,21 @@ describe('bucket key access', () => {
     await flush()
     expect(button(row(root, 2), 'Extend').props['aria-busy']).toBe(false)
     expect(content(root)).toContain('did not confirm this change')
+  })
+
+  it('keeps the Extend that was sent while a refresh shows the key locked', async () => {
+    extend.mockReturnValueOnce(new Promise(() => {}))
+    const shown = ref(status({ generations: [key(2, 'active', OPEN)] }))
+    const { root } = await mountApp(
+      defineComponent(() => () =>
+        h(access, { bucket: 'reef', status: shown.value, busy: false, outcomeUnknown: false, unlock, extend, lock }),
+      ),
+    )
+    void (button(row(root, 2), 'Extend').props.onClick as () => Promise<void>)()
+    await flush()
+    shown.value = status({ generations: [key(2, 'active', LOCKED)] })
+    await flush()
+    expect(button(row(root, 2), 'Extending the unlock').props['aria-busy']).toBe(true)
   })
 
   it('shows the wait on Lock all keys while the lock is on its way', async () => {

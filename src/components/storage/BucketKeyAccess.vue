@@ -96,7 +96,7 @@ function extendKey(key: BucketKeyGeneration) {
             <Button v-if="canUnlock(key)" size="sm" :disabled="busy || outcomeUnknown" @click="unlockTarget = key">
               Unlock
             </Button>
-            <template v-if="canExtend(key)">
+            <template v-if="canExtend(key) || sent === key.generation">
               <Select
                 class="w-56"
                 :model-value="extendBy[key.generation] ?? ''"
