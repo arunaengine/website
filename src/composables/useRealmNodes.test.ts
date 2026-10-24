@@ -38,7 +38,7 @@ beforeEach(() => {
       node('node1aaaa0001', 'server', { name: 'node-1' }, 'Giessen'),
       node('node2bbbb0002', 'server', {}, 'Heidelberg'),
       node('device0001aaaa', 'user'),
-      node('device0002bbbb', 'user', { device: 'lab-laptop' }),
+      node('device0002bbbb', 'user', { device: 'lab-laptop' }, 'default'),
     ],
   }
 })
