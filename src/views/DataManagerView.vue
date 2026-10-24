@@ -15,6 +15,7 @@ import AddDataDialog from '@/components/data/AddDataDialog.vue'
 import DataViewSkeleton from '@/components/data/DataViewSkeleton.vue'
 import SyncBucketDialog from '@/components/data/SyncBucketDialog.vue'
 import BindFolderDialog from '@/components/desktop/BindFolderDialog.vue'
+import NewBucketDialog from '@/components/desktop/NewBucketDialog.vue'
 import BucketSidebar from '@/components/data/manager/BucketSidebar.vue'
 import NodePicker from '@/components/data/NodePicker.vue'
 import DeleteDialog from '@/components/data/DeleteDialog.vue'
@@ -30,13 +31,14 @@ import { useS3, s3ErrorMessage } from '@/composables/useS3'
 import { folderNameProblem } from '@/lib/bucketName'
 import { isDesktop } from '@/lib/desktop'
 import type { BindSource } from '@/lib/bindSource'
+import { placeName, placeTitle } from '@/lib/bucketPlace'
 import type { BucketSearchHit } from '@/lib/api'
 import type { PublicTarget } from '@/lib/publicAccess'
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { KeyRound, LogIn, ShieldAlert } from '@lucide/vue'
 
-const { bootstrapped, currentUser } = useAruna()
+const { bootstrapped, currentUser, myGroups } = useAruna()
 const s3 = useS3()
 const desktop = isDesktop()
 
@@ -141,15 +143,42 @@ function openSyncFromHit(hit: BucketSearchHit) {
   syncDialogOpen.value = true
 }
 
-// "Sync to this computer": the desktop binds a bucket to a folder. The source
-// always comes with explicit node and group ids.
+// "Link a local folder": the desktop binds a bucket to a folder. The source
+// always comes with explicit node and group ids; newBucket is made by the link.
 const bindOpen = ref(false)
-const bindTarget = ref<BindSource>({ bucket: '', nodeId: '', groupId: '' })
+const bindTarget = ref<BindSource & { newBucket?: boolean }>({ bucket: '', nodeId: '', groupId: '' })
 
-function openBindDialog(source: BindSource) {
+function openBindDialog(source: BindSource & { newBucket?: boolean }) {
   bindTarget.value = source
   bindOpen.value = true
 }
+
+// New bucket in the desktop: it opens once made, or goes on to the link dialog.
+const newBucketOpen = ref(false)
+watch(newBucketOpen, (open) => {
+  contextHold.value = open
+})
+
+function onBucketCreated(created: BindSource) {
+  manager.openSearchHit({
+    arn: '',
+    bucket: created.bucket,
+    node_id: created.nodeId,
+    group_id: created.groupId,
+    group_name: myGroups.value.find((group) => group.id === created.groupId)?.name ?? null,
+    created_at: '',
+  })
+  // The list shown: every node through the search, or the one node.
+  void (bucketNodeChoice.value === null ? manager.allBuckets.reload() : bucketList.refresh())
+}
+
+// The desktop names the place; kind and id go to the tooltip.
+const headerPlace = computed(() => {
+  const node = desktop ? realmNodes.nodeById(requiredNodeId.value) : null
+  return node
+    ? { name: placeName(node), title: placeTitle(node) }
+    : { name: requiredNodeName.value, title: `${requiredNodeName.value} (${requiredNodeId.value})` }
+})
 
 function onSyncChanged() {
   void bucketList.refresh()
@@ -236,9 +265,9 @@ async function createFolder() {
           <span
             v-if="route.name === 'bucket' && !notebooksView && requiredNodeId"
             class="min-w-0 truncate text-sm font-normal text-muted-foreground"
-            :title="`${requiredNodeName} (${requiredNodeId})`"
+            :title="headerPlace.title"
           >
-            on {{ requiredNodeName }}
+            on {{ headerPlace.name }}
           </span>
         </span>
       </template>
@@ -341,7 +370,12 @@ async function createFolder() {
           {{ sessionWarning }}
         </Notice>
 
-        <BucketSidebar :manager="manager" @sync="openSyncFromHit" @sync-computer="openBindDialog" />
+        <BucketSidebar
+          :manager="manager"
+          @sync="openSyncFromHit"
+          @sync-computer="openBindDialog"
+          @new-bucket="newBucketOpen = true"
+        />
 
         <ObjectBrowser
           :manager="manager"
@@ -352,6 +386,7 @@ async function createFolder() {
           @sync-to-node="openSyncDialog"
           @sync-to-computer="openBindDialog"
           @public-access="openPublicAccess"
+          @new-bucket="newBucketOpen = true"
         >
           <UploadPanel :manager="manager" />
         </ObjectBrowser>
@@ -390,7 +425,16 @@ async function createFolder() {
       :bucket="bindTarget.bucket"
       :node-id="bindTarget.nodeId"
       :group-id="bindTarget.groupId"
+      :new-bucket="bindTarget.newBucket"
       @bound="onSyncChanged"
+    />
+
+    <NewBucketDialog
+      v-if="desktop"
+      v-model:open="newBucketOpen"
+      :group-id="selectedGroupId"
+      @created="onBucketCreated"
+      @link="(target: BindSource) => openBindDialog({ ...target, newBucket: true })"
     />
 
     <PublicAccessDialog

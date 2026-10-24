@@ -213,7 +213,7 @@ describe('object browser toolbar', () => {
   })
 })
 
-describe('object browser sync to this computer', () => {
+describe('object browser link a local folder', () => {
   afterEach(() => resetS3Access())
 
   it('offers the desktop button next to Add data and asks to bind the bucket', async () => {
@@ -225,7 +225,7 @@ describe('object browser sync to this computer', () => {
       { onSyncToComputer },
     )
 
-    await bubbleClick(action(root, 'Sync to this computer'))
+    await bubbleClick(action(root, 'Link a local folder'))
 
     expect(onSyncToComputer).toHaveBeenCalledWith(source)
   })
@@ -242,14 +242,65 @@ describe('object browser sync to this computer', () => {
   it('keeps the button out of the web portal', async () => {
     const root = await render({ showSyncButton: computed(() => true) })
 
-    expect(() => action(root, 'Sync to this computer')).toThrow()
+    expect(() => action(root, 'Link a local folder')).toThrow()
   })
 
   it('keeps the button out for a bucket that is not a confirmed realm source', async () => {
     desktopMode.on = true
     const root = await render({ showSyncButton: computed(() => true), currentBindSource: computed(() => null) })
 
-    expect(() => action(root, 'Sync to this computer')).toThrow()
+    expect(() => action(root, 'Link a local folder')).toThrow()
+  })
+
+  it('never hides the toolbar labels in the desktop', async () => {
+    const label = (root: HostNode, text: string) =>
+      element(root, (node) => node.tag === 'span' && content(node).trim() === text)
+    desktopMode.on = true
+    const source = { bucket: 'reef', nodeId: 'realm-1', groupId: 'g1' }
+    const desktop = await render({ currentBindSource: computed(() => source) })
+
+    for (const text of ['Link a local folder', 'New folder', 'Add data']) {
+      expect(String(label(desktop, text).props.class ?? '')).not.toContain('hidden')
+    }
+
+    desktopMode.on = false
+    const web = await render()
+    expect(String(label(web, 'Add data').props.class)).toContain('hidden xl:inline')
+  })
+})
+
+describe('object browser bucket on this computer', () => {
+  const device = { nodeId: 'dev', kind: 'user', label: 'device dev', isLocal: true }
+  const realmNodes = {
+    displayName: (id: string) => `node ${id}`,
+    nodeById: (id: string | null) => (id === 'dev' ? device : null),
+    localNodeId: ref('dev'),
+  }
+  const note = (root: HostNode) => element(root, (node) => node.props['data-testid'] === 'device-bucket-note')
+
+  afterEach(() => {
+    desktopMode.on = false
+  })
+
+  it('says its files are already here and offers a bucket on a realm node', async () => {
+    desktopMode.on = true
+    const onNewBucket = vi.fn()
+    const root = await render({ realmNodes }, { onNewBucket })
+
+    expect(content(note(root))).toContain('Its files are already here, so there is nothing to link.')
+    await bubbleClick(button(note(root), 'New bucket on a realm node'))
+
+    expect(onNewBucket).toHaveBeenCalled()
+  })
+
+  it('shows no note for a bucket on a realm node or on the web', async () => {
+    desktopMode.on = true
+    const remote = await render({ realmNodes, remoteNodeId: ref('realm-1') })
+    expect(() => note(remote)).toThrow()
+
+    desktopMode.on = false
+    const web = await render({ realmNodes })
+    expect(() => note(web)).toThrow()
   })
 })
 

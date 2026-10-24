@@ -8,6 +8,7 @@ import {
   type CORSRule,
 } from '@aws-sdk/client-s3'
 import { client } from './client'
+import type { S3SessionReference } from './session'
 
 export interface BucketEntry {
   name: string
@@ -26,8 +27,12 @@ export async function headBucket(bucket: string, nodeId?: string | null): Promis
   await client(nodeId).send(new HeadBucketCommand({ Bucket: bucket }))
 }
 
-export async function createBucket(name: string): Promise<void> {
-  await client().send(new CreateBucketCommand({ Bucket: name }))
+export async function createBucket(
+  name: string,
+  nodeId?: string | null,
+  reference?: S3SessionReference,
+): Promise<void> {
+  await client(nodeId, reference).send(new CreateBucketCommand({ Bucket: name }))
 }
 
 // Removes the bucket itself. S3 only drops an EMPTY bucket, so callers empty it

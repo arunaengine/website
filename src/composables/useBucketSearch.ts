@@ -8,8 +8,10 @@ import { errorMessage } from '@/lib/utils'
 
 export const MIN_CHARS = 2
 
-export function useBucketSearch(query: Ref<string>) {
+// listAll: an empty query lists every bucket, up to the node's page limit.
+export function useBucketSearch(query: Ref<string>, options: { listAll?: boolean } = {}) {
   const { authToken, searchBuckets } = useAruna()
+  const minChars = options.listAll ? 0 : MIN_CHARS
   const hits = ref<BucketSearchHit[]>([])
   const nodesQueried = ref(0)
   const nodesFailed = ref(0)
@@ -20,7 +22,7 @@ export function useBucketSearch(query: Ref<string>) {
 
   const runSearch = useDebounceFn(async (term: string) => {
     const mySeq = ++seq
-    if (term.length < MIN_CHARS || !authToken.value) {
+    if (term.length < minChars || !authToken.value) {
       hits.value = []
       searching.value = false
       searched.value = false
@@ -29,7 +31,7 @@ export function useBucketSearch(query: Ref<string>) {
     searching.value = true
     error.value = null
     try {
-      const response = await searchBuckets(term)
+      const response = await searchBuckets(term, options.listAll ? { limit: 50 } : {})
       if (mySeq !== seq) return
       hits.value = response.hits
       nodesQueried.value = response.nodes_queried
@@ -50,7 +52,7 @@ export function useBucketSearch(query: Ref<string>) {
     (value) => {
       const term = value.trim()
       ++seq
-      if (term.length < MIN_CHARS) {
+      if (term.length < minChars) {
         hits.value = []
         searching.value = false
         searched.value = false

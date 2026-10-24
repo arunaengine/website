@@ -15,6 +15,7 @@ import {
 } from '@/test/clientRender'
 import { BUCKET_NAME_REQUIREMENT, bucketNameProblem } from '@/lib/bucketName'
 import * as Workspaces from '@/lib/workspaces'
+import * as BucketPlace from '@/lib/bucketPlace'
 import { bindSource } from '@/lib/bindSource'
 
 const aruna = vi.hoisted(() => ({ authToken: { value: 'token' }, searchBuckets: vi.fn() }))
@@ -65,7 +66,13 @@ const choose = vi.fn((nodeId: string | null) => {
 const Empty = defineComponent(() => () => null)
 // The row renders its name and action slot so the sidebar's own controls are visible.
 const RowStub = defineComponent({
-  props: { bucket: { type: String, default: '' }, highlighted: Boolean, job: { type: Object, default: null } },
+  props: {
+    bucket: { type: String, default: '' },
+    highlighted: Boolean,
+    job: { type: Object, default: null },
+    place: { type: String, default: null },
+    placeTitle: { type: String, default: null },
+  },
   emits: ['open'],
   setup: (props, { slots, emit }) => () =>
     h('div', [
@@ -76,6 +83,7 @@ const RowStub = defineComponent({
       ),
       h('span', { role: 'tooltip' }, slots.tooltip?.()),
       props.job ? h('em', { 'data-testid': 'row-job' }, `${props.bucket}: ${(props.job as { kind: string }).kind}`) : null,
+      props.place ? h('small', { 'data-testid': 'row-place', title: props.placeTitle }, `${props.bucket}: ${props.place}`) : null,
       slots.actions?.(),
     ]),
 })
@@ -127,9 +135,14 @@ const sidebarModules = {
     useBucketSearch: () => ({ hits: otherSearch, error: otherError, searched: ref(true), nodesFailed: otherFailed }),
   },
   '@/lib/workspaces': Workspaces,
+  '@/lib/bucketPlace': BucketPlace,
   '@/lib/desktop': { isDesktop: () => desktopMode.on },
   '@/composables/useRealmNodes': {
     useRealmNodes: () => ({
+      nodeById: (id: string | null) =>
+        id === 'node-2'
+          ? { nodeId: 'node-2', kind: 'server', label: 'node-2', isLocal: false, location: 'Giessen' }
+          : null,
       displayName: (id: string | null) => (id ? `name-${id}` : 'this node'),
       isLocalNode: (id: string | null) => !id || id === 'home',
       localNodeId: ref('home'),
@@ -297,7 +310,7 @@ describe('Bucket sidebar deletion', () => {
   })
 })
 
-describe('Bucket sidebar sync to this computer', () => {
+describe('Bucket sidebar link a local folder', () => {
   beforeEach(() => {
     nodeChoice.value = null
     desktopMode.on = false
@@ -306,13 +319,13 @@ describe('Bucket sidebar sync to this computer', () => {
   it('offers the action on a bucket row in the desktop only', async () => {
     const web = await mountApp(BucketSidebar, { props: { manager: withBucket() } })
     await pickNode()
-    expect(() => element(web.root, (node) => node.props['aria-label'] === 'Sync reef-survey to this computer…')).toThrow()
+    expect(() => element(web.root, (node) => node.props['aria-label'] === 'Link a local folder to reef-survey…')).toThrow()
 
     desktopMode.on = true
     const onSyncComputer = vi.fn()
     const { root } = await mountApp(BucketSidebar, { props: { manager: withBucket(), onSyncComputer } })
     await pickNode()
-    await click(element(root, (node) => node.props['aria-label'] === 'Sync reef-survey to this computer…'))
+    await click(element(root, (node) => node.props['aria-label'] === 'Link a local folder to reef-survey…'))
 
     expect(onSyncComputer).toHaveBeenCalledWith({ bucket: 'reef-survey', nodeId: 'home', groupId: 'g1' })
   })
@@ -322,7 +335,7 @@ describe('Bucket sidebar sync to this computer', () => {
     const { root } = await mountApp(BucketSidebar, { props: { manager: withBucket('laptop') } })
     await pickNode()
 
-    expect(() => element(root, (node) => node.props['aria-label'] === 'Sync reef-survey to this computer…')).toThrow()
+    expect(() => element(root, (node) => node.props['aria-label'] === 'Link a local folder to reef-survey…')).toThrow()
   })
 
   it('offers the action on every All nodes result with its own node and group', async () => {
@@ -334,10 +347,44 @@ describe('Bucket sidebar sync to this computer', () => {
     const onSyncComputer = vi.fn()
     const { root } = await mountApp(BucketSidebar, { props: { manager: withBucket(), onSyncComputer } })
 
-    await click(element(root, (node) => node.props['aria-label'] === 'Sync results to this computer…'))
+    await click(element(root, (node) => node.props['aria-label'] === 'Link a local folder to results…'))
 
     expect(onSyncComputer).toHaveBeenCalledWith({ bucket: 'results', nodeId: 'node-2', groupId: 'g7' })
-    expect(() => element(root, (node) => node.props['aria-label'] === 'Sync private to this computer…')).toThrow()
+    expect(() => element(root, (node) => node.props['aria-label'] === 'Link a local folder to private…')).toThrow()
+  })
+})
+
+describe('Bucket sidebar in the desktop', () => {
+  beforeEach(() => {
+    nodeChoice.value = null
+    allBuckets.hits.value = []
+    desktopMode.on = true
+  })
+  afterEach(() => {
+    desktopMode.on = false
+  })
+
+  it('asks for the New bucket dialog instead of a name field', async () => {
+    const onNewBucket = vi.fn()
+    const { root } = await mountApp(BucketSidebar, { props: { manager: manager(), onNewBucket } })
+
+    expect(() => field(root)).toThrow()
+    await click(button(root, 'New bucket'))
+
+    expect(onNewBucket).toHaveBeenCalled()
+    expect(createBucket).not.toHaveBeenCalled()
+  })
+
+  it('names the place of every row, with kind and id in the tooltip', async () => {
+    allBuckets.hits.value = [
+      { bucket: 'results', node_id: 'node-2', group_id: 'g1' },
+      { bucket: 'notes', node_id: 'home', group_id: 'g1' },
+    ]
+    const { root } = await mountApp(BucketSidebar, { props: { manager: manager() } })
+    const places = nodes(root).filter((node) => node.props['data-testid'] === 'row-place')
+
+    expect(places.map((node) => content(node))).toEqual(['results: node-2', 'notes: This computer'])
+    expect(places[0].props.title).toBe('node-2 · Giessen (server node-2)')
   })
 })
 

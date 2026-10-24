@@ -14,16 +14,18 @@ import type { DataManager } from '@/composables/useDataManager'
 import type { BucketSearchHit } from '@/lib/api'
 import { isDesktop } from '@/lib/desktop'
 import type { BindSource } from '@/lib/bindSource'
+import { placeName, placeTitle } from '@/lib/bucketPlace'
 import { isWorkspaceBucket } from '@/lib/workspaces'
-import { ArrowLeftRight, Boxes, ChevronRight, FolderPlus, History, KeyRound, Trash2 } from '@lucide/vue'
+import { ArrowLeftRight, Boxes, ChevronRight, FolderPlus, FolderSync, History, KeyRound, Plus, Trash2 } from '@lucide/vue'
 import { computed, ref, useId, watch } from 'vue'
 
 const props = defineProps<{ manager: DataManager }>()
-// Aruna Desktop offers one action: sync a bucket to a folder on this computer.
+// Aruna Desktop offers one action: link a bucket to a folder on this computer.
 const desktop = isDesktop()
 const emit = defineEmits<{
   (e: 'sync', hit: BucketSearchHit): void
   (e: 'sync-computer', source: BindSource): void
+  (e: 'new-bucket'): void
 }>()
 
 const s3 = useS3()
@@ -83,6 +85,16 @@ const otherHits = computed(() =>
 // Hover text of a row; a row without a node is on this node.
 function rowNode(nodeId: string | null): string {
   return `On ${realmNodes.displayName(nodeId ?? realmNodes.localNodeId.value)}`
+}
+// The desktop names every row's place, short; the tooltip adds location, kind and id.
+function rowPlace(nodeId: string | null): { place: string | null; placeTitle: string | null } {
+  if (!desktop) return { place: null, placeTitle: null }
+  const node = realmNodes.nodeById(nodeId ?? realmNodes.localNodeId.value)
+  if (node) {
+    const short = node.kind === 'user' && node.isLocal ? 'This computer' : node.label
+    return { place: short, placeTitle: `${placeName(node)} (${placeTitle(node)})` }
+  }
+  return { place: realmNodes.isLocalNode(nodeId) ? 'This computer' : realmNodes.displayName(nodeId), placeTitle: null }
 }
 // Arrow keys move through the shown rows of this group, then of other groups.
 const listId = `bucket-results-${useId()}`
@@ -171,12 +183,13 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
               :highlighted="index === activeIndex"
               :job="realmNodes.isLocalNode(hit.node_id) ? jobs.get(hit.bucket) : null"
               :active="hit.bucket === bucket && (realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id) === remoteNodeId"
+              v-bind="rowPlace(hit.node_id)"
               @open="openHit(hit)"
             >
               <template #tooltip>{{ rowNode(hit.node_id) }}</template>
               <template v-if="hitSource(hit)" #actions>
-                <IconButton :label="`Sync ${hit.bucket} to this computer…`" side="right" @click="emitSync(hitSource(hit))">
-                  <ArrowLeftRight class="h-3 w-3" />
+                <IconButton :label="`Link a local folder to ${hit.bucket}…`" side="right" @click="emitSync(hitSource(hit))">
+                  <FolderSync class="h-3 w-3" />
                 </IconButton>
               </template>
             </BucketRow>
@@ -216,6 +229,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
                 :synced="syncByBucket.has(syncKeyFor(entry.nodeId, entry.bucket))"
                 :job="entry.nodeId ? null : jobs.get(entry.bucket)"
                 :active="entry.bucket === bucket && (entry.nodeId ?? null) === remoteNodeId"
+                v-bind="rowPlace(entry.nodeId ?? null)"
                 @open="openBucketOn(entry.bucket, entry.nodeId)"
                 @toggle-pin="shortcuts.togglePin(entry.bucket, entry.nodeId)"
               >
@@ -223,11 +237,11 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
                 <template #actions>
                   <IconButton
                     v-if="desktop && bindSourceFor(entry.bucket, entry.nodeId ?? null, selectedGroupId)"
-                    :label="`Sync ${entry.bucket} to this computer…`"
+                    :label="`Link a local folder to ${entry.bucket}…`"
                     side="right"
                     @click="emitSync(bindSourceFor(entry.bucket, entry.nodeId ?? null, selectedGroupId))"
                   >
-                    <ArrowLeftRight class="h-3 w-3" />
+                    <FolderSync class="h-3 w-3" />
                   </IconButton>
                   <IconButton
                     label="Delete bucket…"
@@ -256,6 +270,7 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
                   :pinned="false"
                   :synced="syncByBucket.has(syncKeyFor(entry.nodeId, entry.bucket))"
                   :active="entry.bucket === bucket && (entry.nodeId ?? null) === remoteNodeId"
+                  v-bind="rowPlace(entry.nodeId ?? null)"
                   @open="openBucketOn(entry.bucket, entry.nodeId)"
                   @toggle-pin="shortcuts.togglePin(entry.bucket, entry.nodeId)"
                 >
@@ -304,23 +319,30 @@ function deleteRefusal(name: string, nodeId: string | null): string | null {
               :node-id="realmNodes.isLocalNode(hit.node_id) ? null : hit.node_id"
               :subtitle="hit.group_name || null"
               :pinnable="false"
+              v-bind="rowPlace(hit.node_id)"
               @open="openSearchHit(hit)"
             >
               <template #tooltip>{{ rowNode(hit.node_id) }}</template>
               <template v-if="desktop ? hitSource(hit) : !realmNodes.isLocalNode(hit.node_id)" #actions>
                 <IconButton
-                  :label="desktop ? `Sync ${hit.bucket} to this computer…` : `Sync ${hit.bucket} to this node…`"
+                  :label="desktop ? `Link a local folder to ${hit.bucket}…` : `Sync ${hit.bucket} to this node…`"
                   side="right"
                   @click="desktop ? emitSync(hitSource(hit)) : emit('sync', hit)"
                 >
-                  <ArrowLeftRight class="h-3 w-3" />
+                  <FolderSync v-if="desktop" class="h-3 w-3" />
+                  <ArrowLeftRight v-else class="h-3 w-3" />
                 </IconButton>
               </template>
             </BucketRow>
           </li>
         </ul>
       </div>
-      <footer class="space-y-2 border-t border-border p-3">
+      <footer v-if="desktop" class="border-t border-border p-3">
+        <Button variant="outline" size="sm" class="w-full" data-tour="bucket-create" @click="emit('new-bucket')">
+          <Plus class="h-4 w-4" /> New bucket
+        </Button>
+      </footer>
+      <footer v-else class="space-y-2 border-t border-border p-3">
         <div class="flex gap-2">
           <Input
             v-model="newBucketName"

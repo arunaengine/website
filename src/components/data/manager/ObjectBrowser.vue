@@ -40,6 +40,7 @@ import { stateVariant } from '@/lib/stateBadge'
 import { fileRows, type RowAction, type SelectionAction } from '@/lib/objectListing'
 import type { TransferMode, TransferSource } from '@/lib/objectMove'
 import { formatBytes, relativeTime } from '@/lib/utils'
+import { isWorkspaceBucket } from '@/lib/workspaces'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
@@ -50,8 +51,10 @@ import {
   Download,
   Eye,
   FolderPlus,
+  FolderSync,
   Globe,
   KeyRound,
+  Laptop,
   Link2,
   Lock,
   NotebookPen,
@@ -69,13 +72,14 @@ const emit = defineEmits<{
   (e: 'sync-to-node'): void
   (e: 'sync-to-computer', source: BindSource): void
   (e: 'public-access', targets: PublicTarget[]): void
+  (e: 'new-bucket'): void
 }>()
 
 const s3 = useS3()
 // Aruna Desktop binds a bucket to a folder; the web only syncs between nodes.
 const desktop = isDesktop()
-// The desktop keeps every button label and wraps the row instead.
-const labelClass = desktop ? undefined : 'hidden xl:inline'
+// The desktop never hides toolbar labels; its toolbar wraps instead.
+const toolbarLabel = desktop ? '' : 'hidden xl:inline'
 const { isRealmAdmin } = useAruna()
 const { getBucketPlacement } = usePlacementPolicies()
 const { shown } = usePortalFeatures()
@@ -148,6 +152,16 @@ const {
   requestDelete,
   publicAccess,
 } = props.manager
+
+// A bucket on this computer: its files are already here, so no folder can be linked.
+const onThisComputer = computed(
+  () =>
+    desktop &&
+    Boolean(bucket.value) &&
+    !remoteNodeId.value &&
+    !isWorkspaceBucket(bucket.value) &&
+    realmNodes.nodeById(realmNodes.localNodeId.value)?.kind === 'user',
+)
 
 const locked = useLockedBucket(bucket, remoteNodeId, activeGroupId, download)
 const { reasonOf: brokenReason } = useBrokenFiles(bucket, remoteNodeId, objects)
@@ -368,7 +382,7 @@ async function onDrop(event: DragEvent) {
     <EmptyState v-if="!bucket" title="Select a bucket to browse its objects." />
 
     <template v-else>
-      <div :class="['flex items-center justify-between gap-2', desktop ? 'flex-wrap' : 'flex-nowrap']">
+      <div class="flex items-center justify-between gap-2" :class="desktop ? 'flex-wrap' : 'flex-nowrap'">
         <div class="flex min-w-0 flex-1 items-center gap-2">
           <Breadcrumbs :bucket="bucket" :path="prefix" single-line @navigate="navigateTo" />
           <Badge v-if="lockedOnNode" :variant="stateVariant('locked')" size="sm" class="shrink-0">
@@ -380,7 +394,7 @@ async function onDrop(event: DragEvent) {
           </span>
           <Spinner v-if="listLoading" label="Loading objects" class="shrink-0" />
         </div>
-        <div :class="['flex items-center gap-2', desktop ? 'flex-wrap' : 'shrink-0']">
+        <div class="flex items-center gap-2" :class="desktop ? 'min-w-0 flex-wrap justify-end' : 'shrink-0'">
           <WatchButton
             surface="bucket"
             :path-prefix="watchPathPrefix"
@@ -462,10 +476,10 @@ async function onDrop(event: DragEvent) {
             </template>
           </Popover>
           <!-- The Add data pipeline always targets the connected node. -->
-          <Button v-if="desktop && currentBindSource && !remoteBlocked" variant="outline" size="sm" aria-label="Sync to this computer" title="Keep this bucket and a folder on this computer in step" @click="emit('sync-to-computer', currentBindSource)"><ArrowLeftRight class="h-4 w-4" /><span :class="labelClass">Sync to this computer</span></Button>
-          <Button v-if="!remoteBlocked" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix"  aria-label="New folder" :title="writeRestrictionMessage ?? 'Create a folder'" @click="emit('new-folder')"><FolderPlus class="h-4 w-4" /><span :class="labelClass">New folder</span></Button>
-          <Button v-if="notebooks && !remoteNodeId" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix"  aria-label="New notebook" :title="writeRestrictionMessage ?? 'Create a notebook here'" @click="emit('new-notebook')"><NotebookPen class="h-4 w-4" /><span :class="labelClass">New notebook</span></Button>
-          <Button v-if="!remoteNodeId" data-tour="bucket-add-data" size="sm" :disabled="!canWriteCurrentPrefix"  aria-label="Add data" :title="writeRestrictionMessage ?? 'Add data'" @click="emit('add-data')"><Plus class="h-4 w-4" /><span :class="labelClass">Add data</span></Button>
+          <Button v-if="desktop && currentBindSource && !remoteBlocked" variant="outline" size="sm" aria-label="Link a local folder" title="Keep a folder on this computer and this bucket in step" @click="emit('sync-to-computer', currentBindSource)"><FolderSync class="h-4 w-4" /><span :class="toolbarLabel">Link a local folder</span></Button>
+          <Button v-if="!remoteBlocked" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix"  aria-label="New folder" :title="writeRestrictionMessage ?? 'Create a folder'" @click="emit('new-folder')"><FolderPlus class="h-4 w-4" /><span :class="toolbarLabel">New folder</span></Button>
+          <Button v-if="notebooks && !remoteNodeId" variant="outline" size="sm" :disabled="!canWriteCurrentPrefix"  aria-label="New notebook" :title="writeRestrictionMessage ?? 'Create a notebook here'" @click="emit('new-notebook')"><NotebookPen class="h-4 w-4" /><span :class="toolbarLabel">New notebook</span></Button>
+          <Button v-if="!remoteNodeId" data-tour="bucket-add-data" size="sm" :disabled="!canWriteCurrentPrefix"  aria-label="Add data" :title="writeRestrictionMessage ?? 'Add data'" @click="emit('add-data')"><Plus class="h-4 w-4" /><span :class="toolbarLabel">Add data</span></Button>
         </div>
       </div>
       <div v-if="deletedLoading || (showDeleted && deletedTruncated)" class="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -475,6 +489,14 @@ async function onDrop(event: DragEvent) {
         </p>
       </div>
       <Notice v-if="deletedError" tone="warning">{{ deletedError }}</Notice>
+      <Notice v-if="onThisComputer" class="flex flex-wrap items-center gap-3" data-testid="device-bucket-note">
+        <Laptop class="h-4 w-4 shrink-0" />
+        <p class="min-w-0 flex-1">
+          <span class="font-medium text-foreground">Stored only on this computer.</span>
+          Its files are already here, so there is nothing to link.
+        </p>
+        <Button variant="outline" size="sm" @click="emit('new-bucket')"><Plus class="h-4 w-4" /> New bucket on a realm node</Button>
+      </Notice>
       <p v-if="writeRestrictionMessage" class="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
         {{ writeRestrictionMessage }}
       </p>
@@ -500,7 +522,8 @@ async function onDrop(event: DragEvent) {
             size="sm"
             @click="currentBindSource && desktop ? emit('sync-to-computer', currentBindSource) : emit('sync-to-node')"
           >
-            <ArrowLeftRight class="h-3.5 w-3.5" /> {{ desktop ? 'Sync to this computer' : 'Sync to this node…' }}
+            <FolderSync v-if="desktop" class="h-3.5 w-3.5" /><ArrowLeftRight v-else class="h-3.5 w-3.5" />
+            {{ desktop ? 'Link a local folder' : 'Sync to this node…' }}
           </Button>
         </div>
       </div>

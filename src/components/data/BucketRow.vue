@@ -31,6 +31,9 @@ const props = withDefaults(
     openOnMousedown?: boolean
     /** Hide the pin toggle (picker dialogs). */
     pinnable?: boolean
+    /** Readable place shown on the row; its title names kind and id. */
+    place?: string | null
+    placeTitle?: string | null
   }>(),
   {
     nodeId: null,
@@ -43,6 +46,8 @@ const props = withDefaults(
     option: false,
     openOnMousedown: false,
     pinnable: true,
+    place: null,
+    placeTitle: null,
   },
 )
 
@@ -81,6 +86,7 @@ function onClick() {
           <span v-if="subtitle" class="block truncate text-[10px] font-normal text-muted-foreground">{{ subtitle }}</span>
         </span>
         <span class="flex shrink-0 items-center gap-1">
+          <span v-if="place" class="max-w-32 truncate text-[11px] text-muted-foreground" :title="placeTitle ?? undefined">{{ place }}</span>
           <BucketJobLabel v-if="job" :job="job" />
           <ArrowLeftRight
             v-if="synced"
@@ -107,6 +113,7 @@ function onClick() {
         <span v-if="subtitle" class="block truncate text-[10px] font-normal text-muted-foreground">{{ subtitle }}</span>
       </span>
       <span class="flex shrink-0 items-center gap-1">
+        <span v-if="place" class="max-w-32 truncate text-[11px] text-muted-foreground" :title="placeTitle ?? undefined">{{ place }}</span>
         <BucketJobLabel v-if="job" :job="job" />
         <ArrowLeftRight
           v-if="synced"

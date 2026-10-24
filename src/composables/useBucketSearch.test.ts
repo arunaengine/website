@@ -39,6 +39,17 @@ describe('bucket search', () => {
     scope.stop()
   })
 
+  it('lists every bucket for an empty query when asked to', async () => {
+    aruna.searchBuckets.mockResolvedValue(answer([hit('reads'), hit('runs')]))
+    const scope = effectScope()
+    const search = scope.run(() => useBucketSearch(ref(''), { listAll: true }))!
+    await vi.advanceTimersByTimeAsync(300)
+
+    expect(aruna.searchBuckets).toHaveBeenCalledWith('', { limit: 50 })
+    expect(search.hits.value.map((entry) => entry.bucket)).toEqual(['reads', 'runs'])
+    scope.stop()
+  })
+
   it('drops a late answer for an older query', async () => {
     let late: (value: unknown) => void = () => {}
     aruna.searchBuckets.mockImplementationOnce(() => new Promise((resolve) => (late = resolve)))
