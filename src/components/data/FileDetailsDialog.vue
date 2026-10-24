@@ -16,6 +16,7 @@ import TabsList from '@/components/ui/TabsList.vue'
 import TabsTrigger from '@/components/ui/TabsTrigger.vue'
 import MockFileGeneral from '@/components/data/MockFileGeneral.vue'
 import MockFileStorage from '@/components/data/MockFileStorage.vue'
+import FileOrigin from '@/components/data/FileOrigin.vue'
 import LinkedDatasets from '@/components/data/LinkedDatasets.vue'
 import ObjectLocationsPanel from '@/components/data/ObjectLocationsPanel.vue'
 import ReferencedBy from '@/components/data/ReferencedBy.vue'
@@ -419,6 +420,11 @@ const details = computed(() => props.folder ? [
             </li>
           </ul>
         </div>
+        <FileOrigin
+          v-if="props.open && !mock && !remote && !props.folder"
+          class="mt-4"
+          :target="{ bucket: props.bucket, key: props.objectKey, versionId: pinnedVersion }"
+        />
         <LinkedDatasets
           v-if="props.open && !mock && !remote"
           class="mt-4"
