@@ -51,6 +51,8 @@ const accepted = ref(false)
 const query = ref('')
 const results = ref<UserSearchHit[]>([])
 const chosen = ref<UserSearchHit | null>(null)
+// Grant is on its way for the chosen user; the search stays put until it answers.
+const granting = computed(() => busy.value !== null && busy.value === chosen.value?.user_id)
 const searchState = ref<'idle' | 'searching' | 'done' | 'failed'>('idle')
 const searchError = ref<string | null>(null)
 let searches = 0
@@ -177,14 +179,14 @@ function confirmRemoval() {
       <div v-if="canManage" class="space-y-1.5">
         <label class="text-xs font-medium text-foreground" for="holder-search">Grant a key holder</label>
         <div class="relative flex gap-2">
-          <Input id="holder-search" v-model="query" placeholder="Search users (min 2 characters)" />
+          <Input id="holder-search" v-model="query" placeholder="Search users (min 2 characters)" :disabled="granting" />
           <Button
             size="sm"
             :disabled="!chosen || busy !== null || frozen"
-            :aria-busy="busy !== null && busy === chosen?.user_id"
+            :aria-busy="granting"
             @click="addHolder"
           >
-            <Spinner v-if="busy !== null && busy === chosen?.user_id" label="Granting" class="text-current" /> Grant
+            <Spinner v-if="granting" label="Granting" class="text-current" /> Grant
           </Button>
           <div
             v-if="searchState !== 'idle' && !chosen"
