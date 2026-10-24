@@ -272,6 +272,7 @@ function reset() {
   typedName.value = ''
   pickedVersion.value = null
   busy.value = false
+  controlling.value = false
   finished.value = false
   error.value = null
   purge.reset()
@@ -352,7 +353,7 @@ async function controlPurge(action: 'pause' | 'resume' | 'abort') {
   } catch (caught) {
     if (id === requestId) error.value = organizeError(caught)
   } finally {
-    controlling.value = false
+    if (id === requestId) controlling.value = false
   }
 }
 

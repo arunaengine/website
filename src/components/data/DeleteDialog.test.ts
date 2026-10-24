@@ -725,6 +725,32 @@ describe('delete dialog', () => {
     }
   })
 
+  it('frees the job controls when a new session resets the dialog, and an old answer leaves a new control alone', async () => {
+    let refuse: (err: unknown) => void = () => {}
+    purgeControl.mockReturnValueOnce(new Promise<undefined>((_, reject) => (refuse = reject)))
+    purgeControl.mockReturnValueOnce(new Promise<undefined>(() => {}))
+    const sent = purgeControl.mock.calls.length
+    purgeStatus.value = { state: 'running' }
+    try {
+      const { root } = await open({ kind: 'folder', bucket: 'reef', nodeId: null, key: 'a/', option: 'delete-permanently' })
+      void (button(root, 'job running').props.onClick as () => void)()
+      await flush()
+      expect(button(root, 'job running').props['data-busy']).toBe(true)
+      sessionEpoch.value++
+      await flush()
+      expect(button(root, 'job running').props['data-busy']).toBe(false)
+      void (button(root, 'job running').props.onClick as () => void)()
+      await flush()
+      expect(purgeControl.mock.calls.length).toBe(sent + 2)
+      refuse(new Error('the old session was refused'))
+      await flush()
+      expect(button(root, 'job running').props['data-busy']).toBe(true)
+      expect(content(root)).not.toContain('the old session was refused')
+    } finally {
+      purgeStatus.value = null
+    }
+  })
+
   it('waits for the storage check and blocks while it is pending', async () => {
     let answer: (value: unknown) => void = () => {}
     getDeleteImpact.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
